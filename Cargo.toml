@@ -4,15 +4,19 @@ description = "Easily export your Rust types to other languages"
 version = "0.0.6"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2021"
-license = "MIT"
+license-file = "LICENCE"
 include = ["/src", "/examples", "/LICENCE", "/README.md"]
-repository = "https://github.com/oscartbeaumont/rspc/tree/main/crates/specta"
+repository = "https://github.com/oscartbeaumont/specta"
 documentation = "https://docs.rs/specta/latest/specta"
-keywords = ["async", "specta", "rspc", "typescript", "typesafe"]
+keywords = ["specta", "rspc", "typescript", "typesafe", "reflection"]
 categories = ["web-programming", "asynchronous"]
 
+[[example]]
+name = "function"
+required-features = ["function"]
+
 [features]
-default = ["serde", "typescript"]
+default = ["serde", "typescript", "function"] # TODO: I kinda wish "function" was disabled by default but I can't get doctests working without it
 
 ##! Internal Features
 ## Support for exporting the types of Rust functions.
@@ -56,9 +60,6 @@ bson = ["dep:bson"]
 uhlc = ["dep:uhlc"]
 ## [bytesize](https://docs.rs/bytesize) crate
 bytesize = ["dep:bytesize"]
-
-[package.metadata.docs.rs]
-all-features = true
 
 [dependencies]
 specta-macros = { version = "0.0.6", path = "./macros" }
