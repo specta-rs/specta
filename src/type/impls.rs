@@ -274,6 +274,22 @@ impl_as!(
 #[cfg(feature = "bytesize")]
 impl_as!(bytesize::ByteSize as u64);
 
+#[cfg(feature = "url")]
+impl_as!(url::Url as String);
+
+#[cfg(feature = "url")]
+impl<S> Type for url::Host<S> {
+    const NAME: &'static str = stringify!($ty);
+
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
+        <String as Type>::inline(opts, generics)
+    }
+
+    fn reference(opts: DefOpts, generics: &[DataType]) -> DataType {
+        <String as Type>::reference(opts, generics)
+    }
+}
+
 #[cfg(feature = "uhlc")]
 pub use uhlc_impls::*;
 
