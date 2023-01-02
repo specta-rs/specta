@@ -12,12 +12,11 @@ fn rename_all() {
     assert_eq!(inline::<Rename>(), "{ A: number, B: number }");
 }
 
-#[cfg(feature = "serde")]
 #[test]
-fn serde_rename_special_char() {
-    #[derive(serde::Serialize, Type)]
+fn rename_special_char() {
+    #[derive(Type)]
     struct RenameSerdeSpecialChar {
-        #[serde(rename = "a/b")]
+        #[specta(rename = "a/b")]
         b: i32,
     }
 

@@ -1,17 +1,16 @@
-use serde::Serialize;
 use specta::{ts::export, Type};
 
-#[derive(Type, Serialize)]
+#[derive(Type)]
 struct Bar {
     field: i32,
 }
 
-#[derive(Type, Serialize)]
+#[derive(Type)]
 struct Foo {
     bar: Bar,
 }
 
-#[derive(Type, Serialize)]
+#[derive(Type)]
 enum SimpleEnum {
     A(String),
     B(i32),

@@ -8,12 +8,10 @@ pub trait SpectaFunctionResult<TMarker> {
     fn to_datatype(opts: DefOpts) -> DataType;
 }
 
-#[cfg(feature = "serde")]
 #[doc(hidden)]
-pub enum SpectaFunctionResultSerialize {}
+pub enum SpectaFunctionResultType {}
 
-#[cfg(feature = "serde")]
-impl<T: serde::Serialize + Type> SpectaFunctionResult<SpectaFunctionResultSerialize> for T {
+impl<T: Type> SpectaFunctionResult<SpectaFunctionResultType> for T {
     fn to_datatype(opts: DefOpts) -> DataType {
         T::reference(opts, &[])
     }

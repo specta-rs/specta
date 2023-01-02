@@ -6,7 +6,6 @@ use std::{
     path::PathBuf,
 };
 
-use serde::Serialize;
 use specta::{ts, Type};
 
 macro_rules! assert_ts_type {
@@ -155,14 +154,14 @@ struct GenericStruct<T> {
     arg: T,
 }
 
-#[derive(Serialize, Type)]
+#[derive(Type)]
 struct FlattenEnumStruct {
     outer: String,
-    #[serde(flatten)]
+    #[specta(flatten)]
     inner: FlattenEnum,
 }
 
-#[derive(Serialize, Type)]
+#[derive(Type)]
 #[serde(tag = "tag", content = "test")]
 enum FlattenEnum {
     One,
@@ -170,7 +169,7 @@ enum FlattenEnum {
     Three,
 }
 
-#[derive(Serialize, Type)]
+#[derive(Type)]
 struct OverridenStruct {
     #[specta(type = String)]
     overriden_field: i32,
