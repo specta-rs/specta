@@ -7,8 +7,6 @@ pub struct MyCustomType<A> {
 }
 
 fn main() {
-    dbg!(MyCustomType::<()>::definition_generics());
-
     assert_eq!(
         ts::export::<MyCustomType<()>>(),
         Ok("export interface MyCustomType<A> { my_field: string, generic: A }".to_string())
