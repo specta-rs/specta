@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Setup
-        run: sudo apt-get install librust-atk-dev
+        run: sudo apt-get install librust-atk-dev libwebkit2gtk-4.0-dev build-essential libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
       - uses: actions-rs/toolchain@v1
         with:
             toolchain: stable
