@@ -25,45 +25,64 @@ pub enum BigIntExportBehavior {
     FailWithReason(&'static str),
 }
 
-/// Allows you to configure how Specta's Typescript exporter will deal with Rust doc comments.
-#[derive(Default)]
-pub enum CommentStyle {
-    /// Export them in a JSDoc style
-    #[default]
-    JsDoc,
-    /// Do not export them
-    Disabled,
-}
+/// The signature for a function responsible for exporting Typescript comments.
+pub type CommentFormatterFn = fn(&'static [&'static str]) -> String;
 
-/// TODO
-impl CommentStyle {
-    /// TODO
-    pub fn render(&self, comments: &'static [&'static str]) -> String {
-        match self {
-            Self::JsDoc => {
-                if comments.is_empty() {
-                    return "".to_owned();
-                }
+/// Built in formatters for exporting Rust doc comments into Typescript.
+pub mod comments {
+    use super::CommentFormatterFn;
 
-                let mut result = "/**\n".to_owned();
-                for comment in comments {
-                    result.push_str(&format!(" * {comment}\n"));
-                }
-                result.push_str(" */\n");
-                result
-            }
-            Self::Disabled => "".to_owned(),
+    /// Export the Typescript comments as JS Doc comments. This means all JS Doc attributes will work.
+    pub fn js_doc(comments: &'static [&'static str]) -> String {
+        if comments.is_empty() {
+            return "".to_owned();
         }
+
+        let mut result = "/**\n".to_owned();
+        for comment in comments {
+            result.push_str(&format!(" * {comment}\n"));
+        }
+        result.push_str(" */\n");
+        result
     }
+
+    const _: CommentFormatterFn = js_doc;
 }
 
 /// allows you to control the behavior of the Typescript exporter
-#[derive(Default)]
 pub struct ExportConfiguration {
     /// control the bigint exporting behavior
-    pub bigint: BigIntExportBehavior,
+    bigint: BigIntExportBehavior,
     /// control the style of exported comments
-    pub comment_style: CommentStyle,
+    comment_exporter: Option<CommentFormatterFn>,
+}
+
+impl ExportConfiguration {
+    /// Construct a new `ExportConfiguration`
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Configure the BigInt handling behaviour
+    pub fn bigint(mut self, bigint: BigIntExportBehavior) -> Self {
+        self.bigint = bigint;
+        self
+    }
+
+    /// Configure a function which is responsible for styling the comments to be exported
+    pub fn comment_style(mut self, exporter: Option<CommentFormatterFn>) -> Self {
+        self.comment_exporter = exporter;
+        self
+    }
+}
+
+impl Default for ExportConfiguration {
+    fn default() -> Self {
+        Self {
+            bigint: Default::default(),
+            comment_exporter: Some(comments::js_doc),
+        }
+    }
 }
 
 #[derive(Error, Debug)]
@@ -194,7 +213,10 @@ pub fn export_datatype(
         _ => return Err(TsExportError::CannotExport(def.clone())), // TODO: Can this be enforced at a type system level
     };
 
-    let comments = conf.comment_style.render(def.comments);
+    let comments = conf
+        .comment_exporter
+        .map(|v| v(def.comments))
+        .unwrap_or_default();
     Ok(format!("{comments}export {declaration}"))
 }
 

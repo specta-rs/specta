@@ -20,6 +20,10 @@ name = "integration_tests"
 path = "tests/lib.rs"
 harness = true
 
+[[example]]
+name = "export"
+required-features = ["export"]
+
 [features]
 default = ["serde", "typescript"]
 

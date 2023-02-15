@@ -16,10 +16,11 @@ macro_rules! for_bigint_types {
 fn test_bigint_types() {
     // TODO: Assert error type is exactly what is expected for these ones
     for_bigint_types!(T -> assert!(specta::ts::inline::<T>(&ExportConfiguration::default()).is_err()));
-    for_bigint_types!(T -> assert!(specta::ts::inline::<T>(&ExportConfiguration { bigint: BigIntExportBehavior::Fail, ..Default::default() }).is_err()));
-    for_bigint_types!(T -> assert!(specta::ts::inline::<T>(&ExportConfiguration { bigint: BigIntExportBehavior::FailWithReason("some reason"), ..Default::default() }).is_err()));
+    for_bigint_types!(T -> assert!(specta::ts::inline::<T>(&ExportConfiguration::new()).is_err()));
+    for_bigint_types!(T -> assert!(specta::ts::inline::<T>(&ExportConfiguration::new().bigint(BigIntExportBehavior::Fail)).is_err()));
+    for_bigint_types!(T -> assert!(specta::ts::inline::<T>(&ExportConfiguration::new().bigint(BigIntExportBehavior::FailWithReason("some reason"))).is_err()));
 
-    for_bigint_types!(T -> assert_eq!(specta::ts::inline::<T>(&ExportConfiguration { bigint: BigIntExportBehavior::String, ..Default::default() }).unwrap(), "string"));
-    for_bigint_types!(T -> assert_eq!(specta::ts::inline::<T>(&ExportConfiguration { bigint: BigIntExportBehavior::Number, ..Default::default() }).unwrap(), "number"));
-    for_bigint_types!(T -> assert_eq!(specta::ts::inline::<T>(&ExportConfiguration { bigint: BigIntExportBehavior::BigInt, ..Default::default() }).unwrap(), "BigInt"));
+    for_bigint_types!(T -> assert_eq!(specta::ts::inline::<T>(&ExportConfiguration::new().bigint(BigIntExportBehavior::String)).unwrap(), "string"));
+    for_bigint_types!(T -> assert_eq!(specta::ts::inline::<T>(&ExportConfiguration::new().bigint(BigIntExportBehavior::Number)).unwrap(), "number"));
+    for_bigint_types!(T -> assert_eq!(specta::ts::inline::<T>(&ExportConfiguration::new().bigint(BigIntExportBehavior::BigInt)).unwrap(), "BigInt"));
 }
