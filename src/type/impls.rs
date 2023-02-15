@@ -1,8 +1,5 @@
 use crate::*;
 
-impl<K: Type, V: Type> Flatten for std::collections::HashMap<K, V> {}
-impl<K: Type, V: Type> Flatten for std::collections::BTreeMap<K, V> {}
-
 impl_primitives!(
     i8 i16 i32 i64 i128 isize
     u8 u16 u32 u64 u128 usize
@@ -13,11 +10,21 @@ impl_primitives!(
 
 impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 
-use std::{cell::*, rc::Rc, sync::*};
-impl_containers!(Box Rc Arc Cell RefCell Mutex RwLock);
+const _: () = {
+    use std::{cell::*, rc::Rc, sync::*};
+    impl_containers!(Box Rc Arc Cell RefCell Mutex RwLock);
+};
+
+#[cfg(feature = "tokio")]
+const _: () = {
+    use tokio::sync::{Mutex, RwLock};
+    impl_containers!(Mutex RwLock);
+};
 
 impl<'a> Type for &'a str {
     const NAME: &'static str = String::NAME;
+    const SID: TypeSid = sid!();
+    const IMPL_LOCATION: ImplLocation = impl_location!();
 
     fn inline(defs: DefOpts, generics: &[DataType]) -> DataType {
         String::inline(defs, generics)
@@ -26,14 +33,28 @@ impl<'a> Type for &'a str {
 
 impl<'a, T: Type + 'static> Type for &'a T {
     const NAME: &'static str = T::NAME;
+    const SID: TypeSid = sid!();
+    const IMPL_LOCATION: ImplLocation = impl_location!();
 
     fn inline(defs: DefOpts, generics: &[DataType]) -> DataType {
         T::inline(defs, generics)
     }
 }
 
-impl<'a, T: ToOwned + Type + 'static> Type for std::borrow::Cow<'a, T> {
+impl<T: Type> Type for [T] {
     const NAME: &'static str = T::NAME;
+    const SID: TypeSid = sid!();
+    const IMPL_LOCATION: ImplLocation = impl_location!();
+
+    fn inline(defs: DefOpts, generics: &[DataType]) -> DataType {
+        T::inline(defs, generics)
+    }
+}
+
+impl<'a, T: ?Sized + ToOwned + Type + 'static> Type for std::borrow::Cow<'a, T> {
+    const NAME: &'static str = T::NAME;
+    const SID: TypeSid = sid!();
+    const IMPL_LOCATION: ImplLocation = impl_location!();
 
     fn inline(defs: DefOpts, generics: &[DataType]) -> DataType {
         T::inline(defs, generics)
@@ -116,6 +137,8 @@ impl_for_list!(
 
 impl<'a, T: Type> Type for &'a [T] {
     const NAME: &'static str = "&[T]";
+    const SID: TypeSid = sid!();
+    const IMPL_LOCATION: ImplLocation = impl_location!();
 
     fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         <Vec<T>>::inline(opts, generics)
@@ -128,6 +151,8 @@ impl<'a, T: Type> Type for &'a [T] {
 
 impl<const N: usize, T: Type> Type for [T; N] {
     const NAME: &'static str = "&[T; N]";
+    const SID: TypeSid = sid!();
+    const IMPL_LOCATION: ImplLocation = impl_location!();
 
     fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         <Vec<T>>::inline(opts, generics)
@@ -140,6 +165,8 @@ impl<const N: usize, T: Type> Type for [T; N] {
 
 impl<T: Type> Type for Option<T> {
     const NAME: &'static str = "Option";
+    const SID: TypeSid = sid!();
+    const IMPL_LOCATION: ImplLocation = impl_location!();
 
     fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         DataType::Nullable(Box::new(generics.get(0).cloned().unwrap_or_else(|| {
@@ -170,24 +197,31 @@ impl<T: Type> Type for Option<T> {
 
 impl_for_map!(HashMap<K, V> as "HashMap");
 impl_for_map!(BTreeMap<K, V> as "BTreeMap");
+impl<K: Type, V: Type> Flatten for std::collections::HashMap<K, V> {}
+impl<K: Type, V: Type> Flatten for std::collections::BTreeMap<K, V> {}
 
 #[cfg(feature = "indexmap")]
-impl_for_list!(indexmap::IndexSet<T> as "IndexSet");
-
-#[cfg(feature = "indexmap")]
-impl_for_map!(indexmap::IndexMap<K, V> as "IndexMap");
-
-#[cfg(feature = "serde")]
-impl_for_map!(serde_json::Map<K, V> as "Map");
+const _: () = {
+    impl_for_list!(indexmap::IndexSet<T> as "IndexSet");
+    impl_for_map!(indexmap::IndexMap<K, V> as "IndexMap");
+    impl<K: Type, V: Type> Flatten for indexmap::IndexMap<K, V> {}
+};
 
 #[cfg(feature = "serde")]
-impl Type for serde_json::Value {
-    const NAME: &'static str = "Value";
+const _: () = {
+    impl_for_map!(serde_json::Map<K, V> as "Map");
+    impl<K: Type, V: Type> Flatten for serde_json::Map<K, V> {}
 
-    fn inline(_: DefOpts, _: &[DataType]) -> DataType {
-        DataType::Any
+    impl Type for serde_json::Value {
+        const NAME: &'static str = "Value";
+        const SID: TypeSid = sid!();
+        const IMPL_LOCATION: ImplLocation = impl_location!();
+
+        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+            DataType::Any
+        }
     }
-}
+};
 
 #[cfg(feature = "uuid")]
 impl_as!(
@@ -196,11 +230,7 @@ impl_as!(
 );
 
 #[cfg(feature = "chrono")]
-pub use chrono_impls::*;
-
-#[cfg(feature = "chrono")]
-mod chrono_impls {
-    use super::*;
+const _: () = {
     use chrono::*;
 
     impl_as!(
@@ -212,6 +242,8 @@ mod chrono_impls {
 
     impl<T: TimeZone> Type for DateTime<T> {
         const NAME: &'static str = "DateTime";
+        const SID: TypeSid = sid!();
+        const IMPL_LOCATION: ImplLocation = impl_location!();
 
         fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
             String::inline(opts, generics)
@@ -221,12 +253,14 @@ mod chrono_impls {
     #[allow(deprecated)]
     impl<T: TimeZone> Type for Date<T> {
         const NAME: &'static str = "DateTime";
+        const SID: TypeSid = sid!();
+        const IMPL_LOCATION: ImplLocation = impl_location!();
 
         fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
             String::inline(opts, generics)
         }
     }
-}
+};
 
 #[cfg(feature = "time")]
 impl_as!(
@@ -274,28 +308,8 @@ impl_as!(
 #[cfg(feature = "bytesize")]
 impl_as!(bytesize::ByteSize as u64);
 
-#[cfg(feature = "url")]
-impl_as!(url::Url as String);
-
-#[cfg(feature = "url")]
-impl<S> Type for url::Host<S> {
-    const NAME: &'static str = stringify!($ty);
-
-    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
-        <String as Type>::inline(opts, generics)
-    }
-
-    fn reference(opts: DefOpts, generics: &[DataType]) -> DataType {
-        <String as Type>::reference(opts, generics)
-    }
-}
-
 #[cfg(feature = "uhlc")]
-pub use uhlc_impls::*;
-
-#[cfg(feature = "uhlc")]
-mod uhlc_impls {
-    use super::*;
+const _: () = {
     use uhlc::*;
 
     impl_as!(
@@ -310,4 +324,41 @@ mod uhlc_impls {
         time: NTP64,
         id: ID,
     }
-}
+};
+
+#[cfg(feature = "glam")]
+const _: () = {
+    use glam::*;
+
+    #[derive(Type)]
+    #[specta(remote = "DVec2", crate = "crate")]
+    #[allow(dead_code)]
+    struct DVec2Def {
+        x: f64,
+        y: f64,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = "IVec2", crate = "crate")]
+    #[allow(dead_code)]
+    struct IVec2Def {
+        x: i32,
+        y: i32,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = "DMat2", crate = "crate")]
+    #[allow(dead_code)]
+    struct DMat2Def {
+        pub x_axis: DVec2,
+        pub y_axis: DVec2,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = "DAffine2", crate = "crate")]
+    #[allow(dead_code)]
+    struct DAffine2Def {
+        matrix2: DMat2,
+        translation: DVec2,
+    }
+};

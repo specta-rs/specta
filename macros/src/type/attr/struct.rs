@@ -1,35 +1,25 @@
-use syn::{Attribute, Ident, Result};
+use syn::Result;
 
-use crate::attr::parse_assign_str;
+use crate::utils::MetaAttr;
 
-#[derive(Default, Clone)]
-pub struct StructAttr {}
-
-#[cfg(feature = "serde")]
 #[derive(Default)]
-pub struct SerdeStructAttr(StructAttr);
-
-impl StructAttr {
-    pub fn from_attrs(attrs: &[Attribute]) -> Result<Self> {
-        let mut result = Self::default();
-        #[cfg(feature = "serde")]
-        crate::utils::parse_serde_attrs::<SerdeStructAttr>(attrs).for_each(|a| result.merge(a.0));
-        Ok(result)
-    }
-
-    fn merge(&mut self, StructAttr {}: StructAttr) {}
+pub struct StructAttr {
+    pub transparent: bool,
 }
 
-#[cfg(feature = "serde")]
 impl_parse! {
-    SerdeStructAttr(input, out) {
-        // parse #[serde(default)] to not emit a warning
-        "default" => {
-            use syn::Token;
-            if input.peek(Token![=]) {
-                input.parse::<Token![=]>()?;
-                parse_assign_str(input)?;
-            }
-        },
+    StructAttr(attr, out) {
+        "transparent" => out.transparent = true,
+    }
+}
+
+impl StructAttr {
+    pub fn from_attrs(attrs: &mut Vec<MetaAttr>) -> Result<Self> {
+        let mut result = Self::default();
+        Self::try_from_attrs("specta", attrs, &mut result)?;
+        #[cfg(feature = "serde")]
+        Self::try_from_attrs("serde", attrs, &mut result)?;
+        Self::try_from_attrs("repr", attrs, &mut result)?; // To handle `#[repr(transparent)]`
+        Ok(result)
     }
 }

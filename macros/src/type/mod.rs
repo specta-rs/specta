@@ -1,13 +1,13 @@
 use attr::*;
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::{format_ident, quote, ToTokens};
 use r#enum::parse_enum;
 use r#struct::parse_struct;
 use syn::{parse_macro_input, Data, DeriveInput};
 
 use generics::impl_heading;
 
-use crate::utils::unraw_raw_ident;
+use crate::utils::{pass_attrs, unraw_raw_ident};
 
 use self::generics::{
     add_type_to_where_clause, generics_with_ident_and_bounds_only, generics_with_ident_only,
@@ -21,18 +21,19 @@ mod r#struct;
 pub fn derive(
     input: proc_macro::TokenStream,
     default_crate_name: String,
-) -> proc_macro::TokenStream {
-    let derive_input = parse_macro_input!(input);
-
+) -> syn::Result<proc_macro::TokenStream> {
     let DeriveInput {
         ident,
         generics,
         data,
         attrs,
         ..
-    } = &derive_input;
+    } = &parse_macro_input::parse::<DeriveInput>(input)?;
 
-    let container_attrs = ContainerAttr::from_attrs(attrs).unwrap();
+    // We pass all the attributes at the start and when decoding them pop them off the list.
+    // This means at the end we can check for any that weren't consumed and throw an error.
+    let mut attrs = pass_attrs(attrs)?;
+    let container_attrs = ContainerAttr::from_attrs(&mut attrs)?;
 
     let ident = container_attrs
         .remote
@@ -47,36 +48,52 @@ pub fn derive(
         .parse()
         .unwrap();
     let crate_ref = quote!(#crate_name);
-
-    let name_str = unraw_raw_ident(&format_ident!(
-        "{}",
-        container_attrs
-            .rename
-            .clone()
-            .unwrap_or_else(|| ident.to_string())
-    ));
+    let comments = {
+        let comments = &container_attrs.doc;
+        quote!(&[#(#comments),*])
+    };
 
     let (inlines, category, can_flatten) = match data {
-        Data::Struct(data) => parse_struct(&name_str, &container_attrs, generics, &crate_ref, data),
-        Data::Enum(data) => {
-            let enum_attrs = EnumAttr::from_attrs(attrs).unwrap();
+        Data::Struct(data) => parse_struct(
+            (&container_attrs, StructAttr::from_attrs(&mut attrs)?),
+            generics,
+            &crate_ref,
+            data,
+        ),
+        Data::Enum(data) => parse_enum(
+            &EnumAttr::from_attrs(&container_attrs, &mut attrs)?,
+            &container_attrs,
+            generics,
+            &crate_ref,
+            data,
+        ),
+        Data::Union(data) => Err(syn::Error::new_spanned(
+            data.union_token,
+            "specta: Union types are not supported by Specta yet!",
+        )),
+    }?;
 
-            parse_enum(
-                &name_str,
-                &enum_attrs,
-                &container_attrs,
-                generics,
-                &crate_ref,
-                data,
-            )
-        }
-        _ => panic!("Type 'Union' is not supported by specta!"),
-    };
+    for attr in attrs
+        .into_iter()
+        .filter(|attr| attr.root_ident() == "specta")
+    {
+        return Err(syn::Error::new(
+            attr.key_span(),
+            format!(
+                "specta: Found unsupported container attribute '{}'",
+                attr.tag()
+            ),
+        ));
+    }
+
+    let name = container_attrs.rename.clone().unwrap_or_else(|| {
+        unraw_raw_ident(&format_ident!("{}", ident.to_string())).to_token_stream()
+    });
 
     let definition_generics = generics.type_params().map(|param| {
         let ident = &param.ident;
 
-        quote!(#crate_ref::GenericType(stringify!(#ident).to_string()))
+        quote!(#crate_ref::GenericType(stringify!(#ident)))
     });
 
     let flatten_impl = can_flatten.then(|| {
@@ -117,9 +134,13 @@ pub fn derive(
         }
     });
 
-    quote! {
+    Ok(quote! {
+        #[automatically_derived]
         #type_impl_heading {
-            const NAME: &'static str = #name_str;
+            const NAME: &'static str = #name;
+            const COMMENTS: &'static [&'static str] = #comments;
+            const SID:#crate_ref::TypeSid = #crate_ref::sid!(@with_specta_path; #crate_name);
+            const IMPL_LOCATION: #crate_ref::ImplLocation = #crate_ref::impl_location!(@with_specta_path; #crate_name);
 
             fn inline(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::DataType {
                 #inlines
@@ -137,5 +158,5 @@ pub fn derive(
         #export
 
         #flatten_impl
-    }.into()
+    }.into())
 }

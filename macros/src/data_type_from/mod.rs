@@ -5,14 +5,15 @@ use syn::{parse_macro_input, Data, DeriveInput, Fields};
 
 use attr::*;
 
-pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let derive_input = parse_macro_input!(input);
+use crate::utils::pass_attrs;
 
+pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
     let DeriveInput {
         ident, data, attrs, ..
-    } = &derive_input;
+    } = &parse_macro_input::parse::<DeriveInput>(input)?;
 
-    let container_attrs = ContainerAttr::from_attrs(attrs).unwrap();
+    let mut attrs = pass_attrs(&attrs)?;
+    let container_attrs = ContainerAttr::from_attrs(&mut attrs)?;
     let crate_name = format_ident!(
         "{}",
         container_attrs
@@ -23,9 +24,17 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let body = match data {
         Data::Struct(data) => match &data.fields {
             Fields::Named(_) => {
-                let fields = data.fields.iter().filter_map(|field| {
-                    let attrs = FieldAttr::from_attrs(&field.attrs).unwrap();
+                let fields = data
+                    .fields
+                    .iter()
+                    .map(|field| {
+                        let mut attrs = pass_attrs(&field.attrs)?;
+                        let field_attrs = FieldAttr::from_attrs(&mut attrs)?;
 
+                        Ok((field, field_attrs))
+                    })
+                    .collect::<syn::Result<Vec<_>>>()?;
+                let fields = fields.iter().filter_map(|(field, attrs)| {
                     if attrs.skip {
                         return None;
                     }
@@ -34,7 +43,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
                     Some(quote! {
                         #crate_name::ObjectField {
-                            name: stringify!(#ident).to_string(),
+                            name: stringify!(#ident),
                             ty: t.#ident.into(),
                             optional: false,
                             flatten: false
@@ -44,7 +53,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
                 quote! {
                     #crate_name::ObjectType {
-                        name: stringify!(#ident).to_string(),
+                        name: stringify!(#ident),
                         generics: vec![],
                         fields: vec![#(#fields),*],
                         tag: None,
@@ -60,7 +69,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
                 quote! {
                     #crate_name::TupleType {
-                        name: stringify!(#ident).to_string(),
+                        name: stringify!(#ident),
                         generics: vec![],
                         fields: vec![#(#fields),*]
                     }.into()
@@ -71,12 +80,13 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         _ => todo!("ToDataType only supports named structs"),
     };
 
-    quote! {
+    Ok(quote! {
+        #[automatically_derived]
         impl From<#ident> for #crate_name::DataType {
             fn from(t: #ident) -> Self {
                 #body
             }
         }
     }
-    .into()
+    .into())
 }

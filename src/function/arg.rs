@@ -7,9 +7,12 @@ pub trait SpectaFunctionArg<TMarker> {
 }
 
 #[doc(hidden)]
-pub enum SpectaFunctionArgMarker {}
+pub enum SpectaFunctionArgDeserializeMarker {}
 
-impl<'de, T: Type> SpectaFunctionArg<SpectaFunctionArgMarker> for T {
+#[cfg(feature = "serde")]
+impl<'de, T: serde::Deserialize<'de> + Type> SpectaFunctionArg<SpectaFunctionArgDeserializeMarker>
+    for T
+{
     fn to_datatype(opts: DefOpts) -> Option<DataType> {
         Some(T::reference(opts, &[]))
     }

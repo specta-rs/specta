@@ -1,4 +1,6 @@
-use specta::{ts::inline, Type};
+use crate::ts::assert_ts;
+
+use specta::Type;
 
 #[test]
 fn rename_all() {
@@ -9,16 +11,17 @@ fn rename_all() {
         b: i32,
     }
 
-    assert_eq!(inline::<Rename>(), "{ A: number, B: number }");
+    assert_ts!(Rename, "{ A: number; B: number }");
 }
 
+#[cfg(feature = "serde")]
 #[test]
-fn rename_special_char() {
-    #[derive(Type)]
+fn serde_rename_special_char() {
+    #[derive(serde::Serialize, Type)]
     struct RenameSerdeSpecialChar {
-        #[specta(rename = "a/b")]
+        #[serde(rename = "a/b")]
         b: i32,
     }
 
-    assert_eq!(inline::<RenameSerdeSpecialChar>(), r#"{ "a/b": number }"#);
+    assert_ts!(RenameSerdeSpecialChar, r#"{ "a/b": number }"#);
 }

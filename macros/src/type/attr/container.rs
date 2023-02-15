@@ -1,66 +1,60 @@
-use syn::{Attribute, Result};
+use proc_macro2::TokenStream;
+use quote::ToTokens;
+use syn::Result;
 
-use crate::utils::*;
+use crate::utils::{Inflection, MetaAttr};
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone)]
 pub struct ContainerAttr {
     pub rename_all: Option<Inflection>,
-    pub rename: Option<String>,
+    pub rename: Option<TokenStream>,
     pub tag: Option<String>,
     pub crate_name: Option<String>,
     pub inline: bool,
     pub remote: Option<String>,
+    pub doc: Vec<String>,
 }
 
-#[cfg(feature = "serde")]
-#[derive(Default)]
-pub struct SerdeContainerAttr(ContainerAttr);
+impl_parse! {
+    ContainerAttr(attr, out) {
+        "rename_all" => out.rename_all = out.rename_all.take().or(Some(attr.pass_inflection()?)),
+        "rename" => {
+            let attr = attr.pass_string()?;
+            out.rename = out.rename.take().or_else(|| Some({
+                let name = crate::r#type::unraw_raw_ident(&quote::format_ident!("{}", attr));
+                quote::quote!( #name )
+            }))
+        },
+        "rename_to_value" => {
+            let attr = attr.pass_path()?;
+            out.rename = out.rename.take().or_else(|| Some({
+                let expr = attr.to_token_stream();
+                quote::quote!( #expr )
+            }))
+        },
+        "tag" => out.tag = out.tag.take().or(Some(attr.pass_string()?)),
+        "crate" => {
+            if attr.root_ident() == "specta" {
+                out.crate_name = out.crate_name.take().or(Some(attr.pass_string()?));
+            }
+        },
+        "inline" => out.inline = true,
+        "remote" => out.remote = out.remote.take().or(Some(attr.pass_string()?)),
+        "doc" => {
+            if attr.tag().as_str() == "doc" {
+                out.doc.push(attr.pass_string()?);
+            }
+        }
+    }
+}
 
 impl ContainerAttr {
-    pub fn from_attrs(attrs: &[Attribute]) -> Result<Self> {
+    pub fn from_attrs(attrs: &mut Vec<MetaAttr>) -> Result<Self> {
         let mut result = Self::default();
-        parse_attrs(attrs)?.for_each(|a| result.merge(a));
+        Self::try_from_attrs("specta", attrs, &mut result)?;
         #[cfg(feature = "serde")]
-        crate::utils::parse_serde_attrs::<SerdeContainerAttr>(attrs)
-            .for_each(|a| result.merge(a.0));
+        Self::try_from_attrs("serde", attrs, &mut result)?;
+        Self::try_from_attrs("doc", attrs, &mut result)?;
         Ok(result)
-    }
-
-    fn merge(
-        &mut self,
-        ContainerAttr {
-            rename,
-            rename_all,
-            tag,
-            crate_name,
-            inline,
-            remote,
-        }: ContainerAttr,
-    ) {
-        self.rename = self.rename.take().or(rename);
-        self.rename_all = self.rename_all.take().or(rename_all);
-        self.tag = self.tag.take().or(tag);
-        self.crate_name = self.crate_name.take().or(crate_name);
-        self.inline = self.inline || inline;
-        self.remote = self.remote.take().or(remote);
-    }
-}
-
-impl_parse! {
-    ContainerAttr(input, out) {
-        "rename" => out.rename = Some(parse_assign_str(input)?),
-        "rename_all" => out.rename_all = Some(parse_assign_inflection(input)?),
-        "crate" => out.crate_name = Some(parse_assign_str(input)?),
-        "inline" => out.inline = true,
-        "remote" => out.remote = Some(parse_assign_str(input)?)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl_parse! {
-    SerdeContainerAttr(input, out) {
-        "rename" => out.0.rename = Some(parse_assign_str(input)?),
-        "rename_all" => out.0.rename_all = Some(parse_assign_inflection(input)?),
-        "tag" => out.0.tag = Some(parse_assign_str(input)?),
     }
 }
