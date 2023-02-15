@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use std::{
     cell::RefCell,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
@@ -5,7 +7,7 @@ use std::{
 };
 
 use serde::Serialize;
-use specta::Type;
+use specta::{ts::ExportConfiguration, Type};
 
 macro_rules! assert_ts {
     ($t:ty, $e:expr) => {
@@ -27,6 +29,9 @@ pub(crate) use assert_ts_export_err;
 macro_rules! assert_ts_export {
     ($t:ty, $e:expr) => {
         assert_eq!(specta::ts::export::<$t>(&Default::default()).unwrap(), $e)
+    };
+    ($t:ty, $e:expr; $cfg:expr) => {
+        assert_eq!(specta::ts::export::<$t>($cfg).unwrap(), $e)
     };
 }
 pub(crate) use assert_ts_export;
@@ -112,6 +117,16 @@ fn typescript_types() {
     assert_ts!(SkipVariant, "{ A: string }");
     assert_ts!(SkipVariant2, r#"{ tag: "A"; data: string }"#);
     assert_ts!(SkipVariant3, "{ A: { a: string } }");
+
+    assert_ts_export!(
+        DocComments,
+        "/**\n *  Type level doc comment\n */\nexport type DocComments = { a: string }"
+    );
+    assert_ts_export!(DocComments, "export type DocComments = { a: string }"; &ExportConfiguration::new().comment_style(None));
+
+    // assert_ts_export!(DeprecatedType, "");
+    // assert_ts_export!(DeprecatedTypeWithMsg, "");
+    // assert_ts_export!(DeprecatedFields, "");
 }
 
 #[derive(Type)]
@@ -249,3 +264,44 @@ enum SkipVariant3 {
         b: i32,
     },
 }
+
+/// Type level doc comment
+#[derive(Type)]
+#[specta(export = false)]
+pub struct DocComments {
+    /// Field level doc comment
+    a: String,
+}
+
+// #[derive(Type)]
+// #[specta(export = false)]
+// #[deprecated]
+// struct DeprecatedType {
+//     a: i32,
+// }
+
+// #[derive(Type)]
+// #[specta(export = false)]
+// #[deprecated = "Look at you big man using a deprecation message"]
+// struct DeprecatedTypeWithMsg {
+//     a: i32,
+// }
+
+// #[derive(Type)]
+// #[specta(export = false)]
+// #[deprecated(note = "Look at you big man using a deprecation message")]
+// struct DeprecatedTypeWithMsg2 {
+//     a: i32,
+// }
+
+// #[derive(Type)]
+// #[specta(export = false)]
+// struct DeprecatedFields {
+//     a: i32,
+//     // #[deprecated]
+//     b: String,
+//     #[deprecated = "This field is cringe!"]
+//     c: String,
+//     #[deprecated(note = "This field is cringe!")]
+//     d: String,
+// }

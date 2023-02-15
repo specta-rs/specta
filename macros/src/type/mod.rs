@@ -138,6 +138,10 @@ pub fn derive(
         Some(export) => quote!(Some(#export)),
         None => quote!(None),
     };
+    let deprecated = match container_attrs.deprecated {
+        Some(msg) => quote!(Some(#msg)),
+        None => quote!(None),
+    };
 
     Ok(quote! {
         #[automatically_derived]
@@ -147,6 +151,7 @@ pub fn derive(
             const SID:#crate_ref::TypeSid = #crate_ref::sid!(@with_specta_path; #crate_name);
             const IMPL_LOCATION: #crate_ref::ImplLocation = #crate_ref::impl_location!(@with_specta_path; #crate_name);
             const EXPORT: Option<bool> = #should_export;
+            const DEPRECATED: Option<&'static str> = #deprecated;
 
             fn inline(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::DataType {
                 #inlines

@@ -12,8 +12,9 @@ pub struct ContainerAttr {
     pub crate_name: Option<String>,
     pub inline: bool,
     pub remote: Option<String>,
-    pub doc: Vec<String>,
     pub export: Option<bool>, // Option is used because if not explicitly set, we enable it
+    pub doc: Vec<String>,
+    pub deprecated: Option<String>,
 }
 
 impl_parse! {
@@ -41,12 +42,18 @@ impl_parse! {
         },
         "inline" => out.inline = attr.parse_bool().unwrap_or(true),
         "remote" => out.remote = out.remote.take().or(Some(attr.parse_string()?)),
+        "export" => out.export = out.export.take().or(Some(attr.parse_bool().unwrap_or(true))),
         "doc" => {
             if attr.key == "doc" {
                 out.doc.push(attr.parse_string()?);
             }
         },
-        "export" => out.export = out.export.take().or(Some(attr.parse_bool().unwrap_or(true))),
+        // TODO: Finish implementing by supporting the official `#[deprecated]` attribute: https://github.com/oscartbeaumont/specta/issues/32
+        "deprecated" => {
+            if attr.key == "specta" {
+                out.deprecated = out.deprecated.take().or(Some(attr.parse_string()?));
+            }
+        },
     }
 }
 
