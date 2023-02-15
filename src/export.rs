@@ -20,7 +20,7 @@ pub fn ts_with_cfg(cfg: &ExportConfiguration, path: &str) -> Result<(), TsExport
 
     for typ in (*TYPES.lock().expect("Failed to acquire lock on 'TYPES'")).values() {
         if typ.export.unwrap_or(cfg.export_by_default.unwrap_or(true)) {
-            out += &ts::export_datatype(&cfg, typ)?;
+            out += &ts::export_datatype(cfg, typ)?;
             out += "\n\n";
         }
     }
