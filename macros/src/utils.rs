@@ -65,6 +65,16 @@ impl MetaAttr {
         }
     }
 
+    pub fn pass_bool(&self) -> Result<bool> {
+        match &self.value {
+            MetaFieldInner::Lit(Lit::Bool(b)) => Ok(b.value()),
+            _ => Err(syn::Error::new(
+                self.value_span(),
+                "specta: expected boolean literal. Eg. `true` or `false`",
+            )),
+        }
+    }
+
     pub fn pass_path(&self) -> Result<Path> {
         match &self.value {
             MetaFieldInner::Path(path) => Ok(path.clone()),

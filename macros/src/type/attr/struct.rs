@@ -9,7 +9,7 @@ pub struct StructAttr {
 
 impl_parse! {
     StructAttr(attr, out) {
-        "transparent" => out.transparent = true,
+        "transparent" => out.transparent = attr.pass_bool().unwrap_or(true)
     }
 }
 

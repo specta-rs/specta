@@ -4,12 +4,14 @@ use crate::ts::assert_ts_export_err;
 
 // Typescript reserved field name
 #[derive(Type)]
+#[specta(export = false)]
 pub struct ReservedFieldName {
     r#enum: String,
 }
 
 // Typescript reserved type name
 #[derive(Type)]
+#[specta(export = false)]
 #[allow(non_camel_case_types)]
 pub struct r#enum {
     a: String,

@@ -55,6 +55,10 @@ pub struct ExportConfiguration {
     bigint: BigIntExportBehavior,
     /// control the style of exported comments
     comment_exporter: Option<CommentFormatterFn>,
+    /// Configure whether or not to export types by default.
+    /// This can be overridden on a type basis by using `#[specta(export)]`
+    #[cfg(feature = "export")]
+    pub(crate) export_by_default: Option<bool>,
 }
 
 impl ExportConfiguration {
@@ -74,6 +78,14 @@ impl ExportConfiguration {
         self.comment_exporter = exporter;
         self
     }
+
+    /// Configure whether or not to export types by default.
+    /// Note: This parameter only work if this configuration if passed into [specta::export::ts]
+    #[cfg(feature = "export")]
+    pub fn export_by_default(mut self, x: Option<bool>) -> Self {
+        self.export_by_default = x;
+        self
+    }
 }
 
 impl Default for ExportConfiguration {
@@ -81,6 +93,8 @@ impl Default for ExportConfiguration {
         Self {
             bigint: Default::default(),
             comment_exporter: Some(comments::js_doc),
+            #[cfg(feature = "export")]
+            export_by_default: None,
         }
     }
 }

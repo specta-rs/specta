@@ -5,6 +5,7 @@ use specta::Type;
 use crate::ts::assert_ts;
 
 #[derive(Type)]
+#[specta(export = false)]
 struct Simple {
     a: i32,
     b: String,

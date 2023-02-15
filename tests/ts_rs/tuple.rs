@@ -11,6 +11,7 @@ fn test_tuple() {
 #[test]
 fn test_newtype() {
     #[derive(Type)]
+    #[specta(export = false)]
     struct NewType(String);
 
     assert_ts!(NewType, "string");
@@ -19,6 +20,7 @@ fn test_newtype() {
 #[test]
 fn test_tuple_newtype() {
     #[derive(Type)]
+    #[specta(export = false)]
     struct TupleNewType(String, i32, (i32, i32));
     assert_ts!(TupleNewType, "[string, number, [number, number]]")
 }

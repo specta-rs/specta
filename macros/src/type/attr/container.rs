@@ -13,6 +13,7 @@ pub struct ContainerAttr {
     pub inline: bool,
     pub remote: Option<String>,
     pub doc: Vec<String>,
+    pub export: Option<bool>, // Option is used because if not explicitly set, we enable it
 }
 
 impl_parse! {
@@ -38,13 +39,14 @@ impl_parse! {
                 out.crate_name = out.crate_name.take().or(Some(attr.pass_string()?));
             }
         },
-        "inline" => out.inline = true,
+        "inline" => out.inline = attr.pass_bool().unwrap_or(true),
         "remote" => out.remote = out.remote.take().or(Some(attr.pass_string()?)),
         "doc" => {
             if attr.tag().as_str() == "doc" {
                 out.doc.push(attr.pass_string()?);
             }
-        }
+        },
+        "export" => out.export = out.export.take().or(Some(attr.pass_bool().unwrap_or(true))),
     }
 }
 

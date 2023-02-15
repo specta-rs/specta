@@ -9,14 +9,17 @@ macro_rules! field_ty_macro {
 }
 
 #[derive(Type)]
+#[specta(export = false)]
 pub struct MacroStruct(field_ty_macro!());
 
 #[derive(Type)]
+#[specta(export = false)]
 pub struct MacroStruct2 {
     demo: field_ty_macro!(),
 }
 
 #[derive(Type)]
+#[specta(export = false)]
 pub enum MacroEnum {
     Demo(field_ty_macro!()),
     Demo2 { demo2: field_ty_macro!() },

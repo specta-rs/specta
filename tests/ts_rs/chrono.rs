@@ -10,6 +10,7 @@ use crate::ts::assert_ts;
 #[test]
 fn chrono() {
     #[derive(Type)]
+    #[specta(export = false)]
     #[allow(dead_code)]
     struct Chrono {
         date: (NaiveDate, Date<Utc>, Date<Local>, Date<FixedOffset>),

@@ -115,15 +115,19 @@ fn typescript_types() {
 }
 
 #[derive(Type)]
+#[specta(export = false)]
 struct Unit1;
 
 #[derive(Type)]
+#[specta(export = false)]
 struct Unit2 {}
 
 #[derive(Type)]
+#[specta(export = false)]
 struct Unit3();
 
 #[derive(Type)]
+#[specta(export = false)]
 struct SimpleStruct {
     a: i32,
     b: String,
@@ -133,16 +137,20 @@ struct SimpleStruct {
 }
 
 #[derive(Type)]
+#[specta(export = false)]
 struct TupleStruct1(i32);
 
 #[derive(Type)]
+#[specta(export = false)]
 struct TupleStruct3(i32, bool, String);
 
 #[derive(Type)]
+#[specta(export = false)]
 #[specta(rename = "HasBeenRenamed")]
 struct RenamedStruct;
 
 #[derive(Type)]
+#[specta(export = false)]
 enum TestEnum {
     Unit,
     Single(i32),
@@ -151,15 +159,18 @@ enum TestEnum {
 }
 
 #[derive(Type)]
+#[specta(export = false)]
 struct RefStruct(TestEnum);
 
 #[derive(Type)]
+#[specta(export = false)]
 struct InlineStruct {
     ref_struct: SimpleStruct,
     val: i32,
 }
 
 #[derive(Type)]
+#[specta(export = false)]
 struct InlinerStruct {
     #[specta(inline)]
     inline_this: InlineStruct,
@@ -167,11 +178,13 @@ struct InlinerStruct {
 }
 
 #[derive(Type)]
+#[specta(export = false)]
 struct GenericStruct<T> {
     arg: T,
 }
 
 #[derive(Serialize, Type)]
+#[specta(export = false)]
 struct FlattenEnumStruct {
     outer: String,
     #[serde(flatten)]
@@ -179,6 +192,7 @@ struct FlattenEnumStruct {
 }
 
 #[derive(Serialize, Type)]
+#[specta(export = false)]
 #[serde(tag = "tag", content = "test")]
 enum FlattenEnum {
     One,
@@ -187,17 +201,20 @@ enum FlattenEnum {
 }
 
 #[derive(Serialize, Type)]
+#[specta(export = false)]
 struct OverridenStruct {
     #[specta(type = String)]
     overriden_field: i32,
 }
 
 #[derive(Type)]
+#[specta(export = false)]
 struct HasGenericAlias(GenericAlias<i32>);
 
 type GenericAlias<T> = std::collections::HashMap<T, String>;
 
 #[derive(Serialize, Type)]
+#[specta(export = false)]
 enum SkipVariant {
     A(String),
     #[serde(skip)]
@@ -207,6 +224,7 @@ enum SkipVariant {
 }
 
 #[derive(Serialize, Type)]
+#[specta(export = false)]
 #[serde(tag = "tag", content = "data")]
 enum SkipVariant2 {
     A(String),
@@ -217,6 +235,7 @@ enum SkipVariant2 {
 }
 
 #[derive(Serialize, Type)]
+#[specta(export = false)]
 enum SkipVariant3 {
     A {
         a: String,

@@ -41,6 +41,10 @@ pub trait Type {
     /// The code location where this type is implemented. Used for error reporting.
     const IMPL_LOCATION: ImplLocation;
 
+    /// Whether the type should export when the `export` feature is enabled.
+    /// `None` will use the default which is why `false` is not just used.
+    const EXPORT: Option<bool> = Some(false);
+
     /// Returns the inline definition of a type with generics substituted for those provided.
     /// This function defines the base structure of every type, and is used in both
     /// [`definition`](crate::Type::definition) and [`reference`](crate::Type::definition)
@@ -67,6 +71,7 @@ pub trait Type {
             comments: Self::COMMENTS,
             sid: Self::SID,
             impl_location: Self::IMPL_LOCATION,
+            export: Self::EXPORT,
             inner: Self::inline(
                 opts,
                 &Self::definition_generics()
@@ -111,6 +116,7 @@ pub trait Type {
                     comments: Self::COMMENTS,
                     sid: Self::SID,
                     impl_location: Self::IMPL_LOCATION,
+                    export: Self::EXPORT,
                     inner: placeholder,
                 });
 

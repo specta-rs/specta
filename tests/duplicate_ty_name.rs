@@ -16,4 +16,6 @@ pub struct Three {
 
 #[ignore] // TODO: Remove once working
 #[test]
-fn test_duplicate_ty_name() {}
+fn test_duplicate_ty_name() {
+    todo!();
+}
