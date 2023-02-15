@@ -166,7 +166,7 @@ pub fn construct_datatype(
                 ty.span(),
                 format!(
                     "specta: Cannot get path from type `{}`",
-                    ty.to_token_stream().to_string()
+                    ty.to_token_stream()
                 ),
             ));
         }

@@ -1,11 +1,11 @@
 use proc_macro2::Span;
-use quote::{format_ident, ToTokens};
+use quote::format_ident;
 use syn::{
     ext::IdentExt,
     parse::{Parse, ParseStream},
+    punctuated::Punctuated,
     spanned::Spanned,
-    token::Paren,
-    Attribute, Ident, Lit, Path, Result, Token,
+    Ident, Lit, Path, Result, Token,
 };
 
 #[derive(Clone)]
@@ -102,86 +102,69 @@ impl MetaAttr {
 }
 
 /// This parser is an alternative to `attr.parse_meta()?` from `syn`.
-/// We do this to allow `#[specta(type = String)]`. This is technically against the Rust spec, but it's nicer for DX (and the API that we had before these changes).
-pub struct MetaFieldParser(pub Vec<MetaAttr>);
-
-impl Parse for MetaFieldParser {
+/// We do this to allow `#[specta(type = String)]`.
+/// This is technically against the Rust spec,
+/// but it's nicer for DX (and the API that we had before these changes).
+impl Parse for MetaAttr {
     fn parse(input: ParseStream) -> Result<Self> {
-        input.parse::<Token![#]>()?;
-        let bcontent;
-        if input.peek(Paren) {
-            syn::parenthesized!(bcontent in input);
-        } else {
-            syn::bracketed!(bcontent in input);
-        }
-        let ident = bcontent.parse::<Ident>()?;
-
-        // Because of Rust's order of operations when passing macros we will get other macros which we can just ignore.
-        if !(ident == "specta" || ident == "serde" || ident == "doc") {
-            // Eat rest of the stream so syn doesn't complain
-            let _ = bcontent.step(|cursor| {
-                let mut rest = *cursor;
-                while let Some((_tt, next)) = rest.token_tree() {
-                    rest = next;
-                }
-                Ok(((), rest))
-            });
-
-            return Ok(Self(vec![]));
-        }
-
-        // Doc comments
-        if bcontent.peek(Token![=]) {
-            let _ = bcontent.parse::<Token![=]>()?;
-            return Ok(Self(vec![MetaAttr {
-                root_ident: ident.clone(),
-                key: ident.clone(),
-                value: MetaFieldInner::Lit(bcontent.parse::<Lit>()?),
-            }]));
-        }
-
-        let content;
-        syn::parenthesized!(content in bcontent);
-
-        let mut result = Vec::new();
-        loop {
-            result.push(MetaAttr {
-                root_ident: ident.clone(),
-                key: content.call(Ident::parse_any)?,
-                value: match content.peek(Token![=]) {
-                    true => {
-                        let _ = content.parse::<Token![=]>()?;
-                        match content.peek(Lit) {
-                            true => MetaFieldInner::Lit(content.parse::<Lit>()?),
-                            false => MetaFieldInner::Path(content.parse::<Path>()?),
-                        }
+        Ok(Self {
+            root_ident: Ident::new("TEMP", input.span()),
+            key: input.call(Ident::parse_any)?,
+            value: match input.peek(Token![=]) {
+                true => {
+                    let _ = input.parse::<Token![=]>()?;
+                    match input.peek(Lit) {
+                        true => MetaFieldInner::Lit(input.parse()?),
+                        false => MetaFieldInner::Path(input.parse()?),
                     }
-                    false => MetaFieldInner::None,
-                },
-            });
-
-            match content.is_empty() {
-                true => break,
-                false => {
-                    content.parse::<Token![,]>()?;
                 }
-            }
-        }
-
-        Ok(Self(result))
+                false => MetaFieldInner::None,
+            },
+        })
     }
 }
 
 /// pass all of the attributes into a single structure.
 /// We can then remove them from the struct while passing an any left over must be invalid and an error can be thrown.
-pub fn pass_attrs(attrs: &[Attribute]) -> syn::Result<Vec<MetaAttr>> {
-    let mut map = Vec::new();
-    for attr in attrs {
-        map.append(
-            &mut syn::parse::<crate::utils::MetaFieldParser>(attr.to_token_stream().into())?.0,
-        );
-    }
-    Ok(map)
+pub fn parse_attrs(attrs: &[syn::Attribute]) -> syn::Result<Vec<MetaAttr>> {
+    Ok(attrs
+        .iter()
+        .map(|attr| {
+            let ident = attr
+                .path
+                .get_ident()
+                .expect("Attribute path must be an ident")
+                .clone();
+
+            if !(ident == "specta" || ident == "serde" || ident == "doc") {
+                return Ok(vec![]);
+            }
+
+            if ident == "doc" {
+                let meta = attr.parse_meta()?;
+                return match meta {
+                    syn::Meta::NameValue(value) => Ok(vec![MetaAttr {
+                        root_ident: ident.clone(),
+                        key: ident,
+                        value: MetaFieldInner::Lit(value.lit),
+                    }]),
+                    _ => Err(syn::Error::new(meta.span(), "specta: invalid doc comment")),
+                };
+            }
+
+            Ok(attr
+                .parse_args_with(Punctuated::<MetaAttr, Token![,]>::parse_terminated)?
+                .into_iter()
+                .map(|a| MetaAttr {
+                    root_ident: ident.clone(),
+                    ..a
+                })
+                .collect::<Vec<_>>())
+        })
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .flatten()
+        .collect())
 }
 
 macro_rules! impl_parse {
@@ -194,9 +177,9 @@ macro_rules! impl_parse {
             ) -> syn::Result<()> {
                 use itertools::{Either, Itertools};
 
-                let (filtered_attrs, mut rest): (Vec<_>, Vec<_>) = std::mem::replace(attrs, vec![])
+                let (filtered_attrs, mut rest): (Vec<_>, Vec<_>) = std::mem::take(attrs)
                     .into_iter()
-                    .partition_map(|attr| match attr.root_ident().to_string() == ident {
+                    .partition_map(|attr| match *attr.root_ident() == ident {
                         true => Either::Left(attr),
                         false => Either::Right(attr),
                     });

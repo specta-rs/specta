@@ -43,6 +43,6 @@ pub fn specta(
 #[proc_macro]
 pub fn fn_datatype(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     fn_datatype::proc_macro(parse_macro_input!(input as fn_datatype::FnDatatypeInput))
-        .unwrap_or_else(|err| err.into_compile_error().into())
+        .unwrap_or_else(|err| err.into_compile_error())
         .into()
 }
