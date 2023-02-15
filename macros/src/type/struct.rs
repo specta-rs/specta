@@ -1,4 +1,4 @@
-use crate::utils::{pass_attrs, unraw_raw_ident};
+use crate::utils::{parse_attrs, unraw_raw_ident};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{DataStruct, Field, Fields, GenericParam, Generics};
@@ -8,18 +8,18 @@ use super::{attr::*, generics::construct_datatype};
 pub fn decode_field_attrs(field: &Field) -> syn::Result<(&Field, FieldAttr)> {
     // We pass all the attributes at the start and when decoding them pop them off the list.
     // This means at the end we can check for any that weren't consumed and throw an error.
-    let mut attrs = pass_attrs(&field.attrs)?;
+    let mut attrs = parse_attrs(&field.attrs)?;
     let field_attrs = FieldAttr::from_attrs(&mut attrs)?;
 
-    for attr in attrs
-        .into_iter()
-        .filter(|attr| attr.root_ident() == "specta")
-    {
-        return Err(syn::Error::new(
-            attr.key_span(),
-            format!("specta: Found unsupported field attribute '{}'", attr.tag()),
-        ));
-    }
+    attrs
+        .iter()
+        .find(|attr| attr.root_ident == "specta")
+        .map_or(Ok(()), |attr| {
+            Err(syn::Error::new(
+                attr.key.span(),
+                format!("specta: Found unsupported field attribute '{}'", attr.key),
+            ))
+        })?;
 
     Ok((field, field_attrs))
 }

@@ -7,7 +7,7 @@ use syn::{parse_macro_input, Data, DeriveInput};
 
 use generics::impl_heading;
 
-use crate::utils::{pass_attrs, unraw_raw_ident};
+use crate::utils::{parse_attrs, unraw_raw_ident};
 
 use self::generics::{
     add_type_to_where_clause, generics_with_ident_and_bounds_only, generics_with_ident_only,
@@ -32,7 +32,7 @@ pub fn derive(
 
     // We pass all the attributes at the start and when decoding them pop them off the list.
     // This means at the end we can check for any that weren't consumed and throw an error.
-    let mut attrs = pass_attrs(attrs)?;
+    let mut attrs = parse_attrs(attrs)?;
     let container_attrs = ContainerAttr::from_attrs(&mut attrs)?;
 
     let ident = container_attrs
@@ -73,18 +73,18 @@ pub fn derive(
         )),
     }?;
 
-    for attr in attrs
-        .into_iter()
-        .filter(|attr| attr.root_ident() == "specta")
-    {
-        return Err(syn::Error::new(
-            attr.key_span(),
-            format!(
-                "specta: Found unsupported container attribute '{}'",
-                attr.tag()
-            ),
-        ));
-    }
+    attrs
+        .iter()
+        .find(|attr| attr.root_ident == "specta")
+        .map_or(Ok(()), |attr| {
+            Err(syn::Error::new(
+                attr.key.span(),
+                format!(
+                    "specta: Found unsupported container attribute '{}'",
+                    attr.key
+                ),
+            ))
+        })?;
 
     let name = container_attrs.rename.clone().unwrap_or_else(|| {
         unraw_raw_ident(&format_ident!("{}", ident.to_string())).to_token_stream()

@@ -1,7 +1,7 @@
 use proc_macro2::Span;
 use syn::{Error, Result};
 
-use crate::utils::MetaAttr;
+use crate::utils::Attribute;
 
 use super::ContainerAttr;
 
@@ -23,15 +23,18 @@ pub struct EnumAttr {
 impl_parse! {
     EnumAttr(attr, out) {
         // "tag" was already passed in the container so we don't need to do anything here
-        "content" => out.content = out.content.take().or(Some(attr.pass_string()?)),
-        "untagged" => out.untagged = attr.pass_bool().unwrap_or(true),
+        "content" => out.content = out.content.take().or(Some(attr.parse_string()?)),
+        "untagged" => out.untagged = attr.parse_bool().unwrap_or(true),
     }
 }
 
 impl EnumAttr {
-    pub fn from_attrs(container_attrs: &ContainerAttr, attrs: &mut Vec<MetaAttr>) -> Result<Self> {
-        let mut result = Self::default();
-        result.tag = container_attrs.tag.clone();
+    pub fn from_attrs(container_attrs: &ContainerAttr, attrs: &mut Vec<Attribute>) -> Result<Self> {
+        let mut result = Self {
+            tag: container_attrs.tag.clone(),
+            ..Default::default()
+        };
+
         Self::try_from_attrs("specta", attrs, &mut result)?;
         #[cfg(feature = "serde")]
         Self::try_from_attrs("serde", attrs, &mut result)?;

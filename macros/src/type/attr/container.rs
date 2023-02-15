@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::Result;
 
-use crate::utils::{Inflection, MetaAttr};
+use crate::utils::{Attribute, Inflection};
 
 #[derive(Default, Clone)]
 pub struct ContainerAttr {
@@ -19,46 +19,46 @@ pub struct ContainerAttr {
 
 impl_parse! {
     ContainerAttr(attr, out) {
-        "rename_all" => out.rename_all = out.rename_all.take().or(Some(attr.pass_inflection()?)),
+        "rename_all" => out.rename_all = out.rename_all.take().or(Some(attr.parse_inflection()?)),
         "rename" => {
-            let attr = attr.pass_string()?;
+            let attr = attr.parse_string()?;
             out.rename = out.rename.take().or_else(|| Some({
                 let name = crate::r#type::unraw_raw_ident(&quote::format_ident!("{}", attr));
                 quote::quote!( #name )
             }))
         },
         "rename_to_value" => {
-            let attr = attr.pass_path()?;
+            let attr = attr.parse_path()?;
             out.rename = out.rename.take().or_else(|| Some({
                 let expr = attr.to_token_stream();
                 quote::quote!( #expr )
             }))
         },
-        "tag" => out.tag = out.tag.take().or(Some(attr.pass_string()?)),
+        "tag" => out.tag = out.tag.take().or(Some(attr.parse_string()?)),
         "crate" => {
-            if attr.root_ident() == "specta" {
-                out.crate_name = out.crate_name.take().or(Some(attr.pass_string()?));
+            if attr.root_ident == "specta" {
+                out.crate_name = out.crate_name.take().or(Some(attr.parse_string()?));
             }
         },
-        "inline" => out.inline = attr.pass_bool().unwrap_or(true),
-        "remote" => out.remote = out.remote.take().or(Some(attr.pass_string()?)),
-        "export" => out.export = out.export.take().or(Some(attr.pass_bool().unwrap_or(true))),
+        "inline" => out.inline = attr.parse_bool().unwrap_or(true),
+        "remote" => out.remote = out.remote.take().or(Some(attr.parse_string()?)),
+        "export" => out.export = out.export.take().or(Some(attr.parse_bool().unwrap_or(true))),
         "doc" => {
-            if attr.tag().as_str() == "doc" {
-                out.doc.push(attr.pass_string()?);
+            if attr.key == "doc" {
+                out.doc.push(attr.parse_string()?);
             }
         },
         // TODO: Finish implementing by supporting the official `#[deprecated]` attribute: https://github.com/oscartbeaumont/specta/issues/32
         "deprecated" => {
-            if attr.tag().as_str() == "specta" {
-                out.deprecated = out.deprecated.take().or(Some(attr.pass_string()?));
+            if attr.key == "specta" {
+                out.deprecated = out.deprecated.take().or(Some(attr.parse_string()?));
             }
         },
     }
 }
 
 impl ContainerAttr {
-    pub fn from_attrs(attrs: &mut Vec<MetaAttr>) -> Result<Self> {
+    pub fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
         let mut result = Self::default();
         Self::try_from_attrs("specta", attrs, &mut result)?;
         #[cfg(feature = "serde")]

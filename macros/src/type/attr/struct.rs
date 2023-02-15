@@ -1,6 +1,6 @@
 use syn::Result;
 
-use crate::utils::MetaAttr;
+use crate::utils::Attribute;
 
 #[derive(Default)]
 pub struct StructAttr {
@@ -9,12 +9,12 @@ pub struct StructAttr {
 
 impl_parse! {
     StructAttr(attr, out) {
-        "transparent" => out.transparent = attr.pass_bool().unwrap_or(true)
+        "transparent" => out.transparent = attr.parse_bool().unwrap_or(true)
     }
 }
 
 impl StructAttr {
-    pub fn from_attrs(attrs: &mut Vec<MetaAttr>) -> Result<Self> {
+    pub fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
         let mut result = Self::default();
         Self::try_from_attrs("specta", attrs, &mut result)?;
         #[cfg(feature = "serde")]

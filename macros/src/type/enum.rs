@@ -76,21 +76,18 @@ pub fn parse_enum(
         .map(|v| {
             // We pass all the attributes at the start and when decoding them pop them off the list.
             // This means at the end we can check for any that weren't consumed and throw an error.
-            let mut attrs = pass_attrs(&v.attrs)?;
+            let mut attrs = parse_attrs(&v.attrs)?;
             let variant_attrs = VariantAttr::from_attrs(&mut attrs)?;
 
-            for attr in attrs
-                .into_iter()
-                .filter(|attr| attr.root_ident() == "specta")
-            {
-                return Err(syn::Error::new(
-                    attr.key_span(),
-                    format!(
-                        "specta: Found unsupported variant attribute '{}'",
-                        attr.tag()
-                    ),
-                ));
-            }
+            attrs
+                .iter()
+                .find(|attr| attr.root_ident == "specta")
+                .map_or(Ok(()), |attr| {
+                    Err(syn::Error::new(
+                        attr.key.span(),
+                        format!("specta: Found unsupported enum attribute '{}'", attr.key),
+                    ))
+                })?;
 
             Ok((v, variant_attrs))
         })
