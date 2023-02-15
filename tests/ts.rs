@@ -108,6 +108,10 @@ fn typescript_types() {
 
     assert_ts!(OverridenStruct, "{ overriden_field: string }");
     assert_ts!(HasGenericAlias, r#"{ [key: number]: string }"#);
+
+    assert_ts!(SkipVariant, "{ A: string }");
+    assert_ts!(SkipVariant2, r#"{ tag: "A"; data: string }"#);
+    assert_ts!(SkipVariant3, "{ A: { a: string } }");
 }
 
 #[derive(Type)]
@@ -192,3 +196,37 @@ struct OverridenStruct {
 struct HasGenericAlias(GenericAlias<i32>);
 
 type GenericAlias<T> = std::collections::HashMap<T, String>;
+
+#[derive(Serialize, Type)]
+enum SkipVariant {
+    A(String),
+    #[serde(skip)]
+    B(i32),
+    #[specta(skip)]
+    C(i32),
+}
+
+#[derive(Serialize, Type)]
+#[serde(tag = "tag", content = "data")]
+enum SkipVariant2 {
+    A(String),
+    #[serde(skip)]
+    B(i32),
+    #[specta(skip)]
+    C(i32),
+}
+
+#[derive(Serialize, Type)]
+enum SkipVariant3 {
+    A {
+        a: String,
+    },
+    #[serde(skip)]
+    B {
+        b: i32,
+    },
+    #[specta(skip)]
+    C {
+        b: i32,
+    },
+}
