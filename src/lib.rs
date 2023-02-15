@@ -1,6 +1,7 @@
 //! Easily export your Rust types to other languages
 //!
-//! Specta provides a system for type introspection and a set of language exporter which allows you to export your Rust types to other languages! Currently we support exporting to [Typescript](https://www.typescriptlang.org) and have alpha support for [OpenAPI](https://www.openapis.org).
+//! Specta provides a system for type introspection and a set of language exporter which allows you to export your Rust types to other languages!
+//! Currently we only support exporting to [TypeScript](https://www.typescriptlang.org).
 //!
 //! ## Example
 //! ```rust
@@ -9,11 +10,6 @@
 //! #[derive(Type)]
 //! pub struct MyCustomType {
 //!    pub my_field: String,
-//! }
-//!
-//! #[specta]
-//! fn some_function(name: String, age: i32) -> bool {
-//!     true
 //! }
 //!
 //! fn main() {
@@ -26,9 +22,15 @@
 //!
 //! ## Why not ts-rs?
 //!
-//! ts-rs is a great library,
+//! [ts-rs](https://github.com/Aleph-Alpha/ts-rs) is a great library,
 //! but it has a few limitations which became a problem when I was building [rspc](https://github.com/oscartbeaumont/rspc).
 //! Namely it deals with types individually which means it is not possible to export a type and all of the other types it depends on.
+//!
+//! ## Why not [Typeshare](https://github.com/1Password/typeshare)?
+//! [Typeshare](https://github.com/1Password/typeshare) is also great, but its approach is fundamentally different.
+//! While Specta uses traits and runtime information, Typeshare statically analyzes your Rust
+//! files.
+//! This results in a loss of information and lack of compatability with types from other crates.
 //!
 //! ## Supported Libraries
 //!
@@ -46,8 +48,8 @@ pub mod datatype;
 #[cfg(feature = "export")]
 pub mod export;
 /// Support for exporting Rust functions.
-#[cfg(feature = "function")]
-pub mod function;
+#[cfg(feature = "functions")]
+pub mod functions;
 mod lang;
 /// Contains [`Type`] and everything related to it, including implementations and helper macros
 pub mod r#type;
@@ -113,16 +115,16 @@ pub use specta_macros::RSPCType;
 ///     "B".to_string(),
 /// ]);
 ///
-/// // TODO: Fix this API
+/// // TODO: come up with something for DataTypeFrom
 /// // assert_eq!(
-/// //    ts::export_datatype(&ExportConfiguration::default(),&e.into()).unwrap(),
-/// //    "export type MyEnum = \"A\" | \"B\""
-/// //);
+/// //  ts::export_datatype(&ts::ExportConfiguration::default(), &e.into()).unwrap(),
+/// //     "export type MyEnum = \"A\" | \"B\""
+/// // );
 /// ```
 ///
 pub use specta_macros::DataTypeFrom;
 
-/// Attribute macro which can be put on a Rust function to introspect its types.
+/// Prepares a function to have its types extracted using [`fn_datatype`]
 ///
 /// ```rust
 /// #[specta::specta]

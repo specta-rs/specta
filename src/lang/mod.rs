@@ -4,7 +4,7 @@
 // #[allow(warnings)] // TODO: Remove once this is out of dev
 // pub mod openapi;
 
-/// [Typescript](https://www.typescriptlang.org) support.
+/// [TypeScript](https://www.typescriptlang.org) support.
 #[cfg(feature = "typescript")]
 pub mod ts;
 

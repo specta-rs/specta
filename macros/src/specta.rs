@@ -7,7 +7,7 @@ use syn::{parse_macro_input, FnArg, ItemFn, Visibility};
 use crate::utils::format_fn_wrapper;
 
 pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
-    if !cfg!(feature = "function") {
+    if !cfg!(feature = "functions") {
         return Err(syn::Error::new(
             Span::call_site(),
             "Please enable the 'function' feature on the Specta crate to work with Functions.",

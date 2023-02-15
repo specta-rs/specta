@@ -19,7 +19,7 @@ pub struct DefOpts<'a> {
     pub type_map: &'a mut TypeDefs,
 }
 
-/// a wrapper around data type that can store the type erased data type and the doc comments on the type
+/// A wrapper around data type that can store the type erased data type and the doc comments on the type
 #[derive(Debug, Clone)]
 #[allow(missing_docs)]
 pub struct DataTypeExt {

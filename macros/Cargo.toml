@@ -12,7 +12,7 @@ categories = ["web-programming", "asynchronous"]
 
 [features]
 serde = ["termcolor"]
-function = []
+functions = []
 export = []
 
 [lib]

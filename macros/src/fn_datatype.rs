@@ -38,7 +38,7 @@ pub fn proc_macro(
     let fn_arg_names = quote!(#specta_fn_macro!(@arg_names));
 
     Ok(quote! {
-        specta::function::get_datatype_internal(
+        specta::functions::get_datatype_internal(
             #function as #fn_signature,
             #fn_name,
             #type_map,

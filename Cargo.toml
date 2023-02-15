@@ -29,7 +29,7 @@ default = ["serde", "typescript"]
 
 ##! Internal Features
 ## Support for exporting the types of Rust functions.
-function = ["serde", "specta-macros/function"]
+functions = ["serde", "specta-macros/functions"]
 export = ["dep:ctor", "specta-macros/export"]
 
 #! Compatability
@@ -38,7 +38,7 @@ serde = ["specta-macros/serde", "dep:serde_json"]
 ## Support for [Tauri](https://tauri.app). This is required when using [`specta::function`](macro@crate::specta) with Tauri Commands.
 tauri = ["dep:tauri"]
 
-#! Language Exporter
+#! Languages
 ## Support for [TypeScript](https://www.typescriptlang.org) language exporting
 typescript = []
 # ## Support for [Rust](https://www.rust-lang.org) language exporting

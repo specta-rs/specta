@@ -80,7 +80,7 @@ impl ExportConfiguration {
     }
 
     /// Configure whether or not to export types by default.
-    /// Note: This parameter only work if this configuration if passed into [specta::export::ts]
+    /// Note: This parameter only work if this configuration if passed into [crate::export::ts]
     #[cfg(feature = "export")]
     pub fn export_by_default(mut self, x: Option<bool>) -> Self {
         self.export_by_default = x;

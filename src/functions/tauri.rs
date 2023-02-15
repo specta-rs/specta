@@ -1,6 +1,6 @@
 use tauri::{AppHandle, Runtime, State, Window};
 
-use crate::{function::SpectaFunctionArg, DataType, DefOpts};
+use crate::{functions::SpectaFunctionArg, DataType, DefOpts};
 
 #[doc(hidden)]
 pub enum TauriMarker {}

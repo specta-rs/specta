@@ -13,6 +13,8 @@ use crate::*;
 /// Returns a [`FunctionDataType`] for a given function that has been annotated with
 /// [`specta`](macro@crate::specta).
 ///
+/// # Examples
+///
 /// ```rust
 /// use specta::*;
 ///
@@ -142,3 +144,50 @@ macro_rules! impl_typed_command {
 }
 
 impl_typed_command!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
+
+/// Collects function types into a [`Vec`],
+/// and all downstream types into a [`TypeDefs`] instance.
+///
+/// Specifying a `type_map` argument allows a custom [`TypeDefs`] to be used.
+///
+/// # Examples
+///
+/// ```rust
+/// use specta::*;
+///
+/// #[specta]
+/// fn some_function(name: String, age: i32) -> bool {
+///     true
+/// }
+///
+/// fn main() {
+///     // `type_defs` is created internally
+///     let (functions, type_defs) = functions::collect_types![some_function];
+///
+///     let mut custom_type_defs = Typedefs::default();
+///
+///     // `type_defs` is provided.
+///     // This can be used when integrating tauri-specta with other specta-enabled libraries.
+///     let (functions, custom_type_defs) = funtions::collect_types![
+///         type_defs: custom_type_defs,
+///         some_function
+///     ];
+/// }
+/// ````
+#[macro_export]
+macro_rules! collect_types {
+    (type_map: $type_map:ident, $($command:path),*) => {{
+        let type_map: $crate::TypeDefs = $type_map;
+
+        (
+            vec![
+                $($crate::fn_datatype!(type_map, $command)),*
+            ],
+            type_map,
+        )
+    }};
+    ($($command:path),*) => {{
+        let mut type_map = $crate::TypeDefs::default();
+        $crate::functions::collect_types!(type_map: type_map, $($command),*)
+    }};
+}
