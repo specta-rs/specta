@@ -19,7 +19,7 @@ pub struct ContainerAttr {
 
 impl_parse! {
     ContainerAttr(attr, out) {
-        "rename_all" => out.rename_all = out.rename_all.take().or(Some(attr.pass_inflection()?)),
+        "rename_all" => out.rename_all = out.rename_all.take().or(Some(attr.parse_inflection()?)),
         "rename" => {
             let attr = attr.parse_string()?;
             out.rename = out.rename.take().or_else(|| Some({

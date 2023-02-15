@@ -11,7 +11,7 @@ pub struct VariantAttr {
 
 impl_parse! {
     VariantAttr(attr, out) {
-        "rename_all" => out.rename_all = out.rename_all.take().or(Some(attr.pass_inflection()?)),
+        "rename_all" => out.rename_all = out.rename_all.take().or(Some(attr.parse_inflection()?)),
         "rename" => out.rename = out.rename.take().or(Some(attr.parse_string()?)),
         "skip" => out.skip = attr.parse_bool().unwrap_or(true),
         "skip_serializing" => out.skip = true,

@@ -85,7 +85,7 @@ impl Attribute {
         }
     }
 
-    pub fn pass_inflection(&self) -> Result<Inflection> {
+    pub fn parse_inflection(&self) -> Result<Inflection> {
         match &self.value {
             Some(AttributeValue::Lit(Lit::Str(lit))) => {
                 Ok(match lit.value().to_lowercase().replace('_', "").as_str() {
