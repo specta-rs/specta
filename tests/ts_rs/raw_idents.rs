@@ -4,6 +4,7 @@ use crate::ts::assert_ts;
 
 #[allow(non_camel_case_types)]
 #[derive(Type)]
+#[specta(export = false)]
 struct r#struct {
     // r#type: i32, // TS reserved keyword
     r#use: i32,

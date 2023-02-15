@@ -3,12 +3,15 @@ use specta::Type;
 use crate::ts::assert_ts;
 
 #[derive(Type)]
+#[specta(export = false)]
 struct UnitA;
 
 #[derive(Type)]
+#[specta(export = false)]
 struct UnitB {}
 
 #[derive(Type)]
+#[specta(export = false)]
 struct UnitC();
 
 #[test]

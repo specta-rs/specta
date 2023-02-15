@@ -13,7 +13,7 @@ impl_parse! {
     VariantAttr(attr, out) {
         "rename_all" => out.rename_all = out.rename_all.take().or(Some(attr.pass_inflection()?)),
         "rename" => out.rename = out.rename.take().or(Some(attr.pass_string()?)),
-        "skip" => out.skip = true,
+        "skip" => out.skip = attr.pass_bool().unwrap_or(true),
         "skip_serializing" => out.skip = true,
         "skip_deserializing" => out.skip = true,
     }

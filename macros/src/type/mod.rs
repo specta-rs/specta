@@ -134,6 +134,11 @@ pub fn derive(
         }
     });
 
+    let should_export = match container_attrs.export {
+        Some(export) => quote!(Some(#export)),
+        None => quote!(None),
+    };
+
     Ok(quote! {
         #[automatically_derived]
         #type_impl_heading {
@@ -141,6 +146,7 @@ pub fn derive(
             const COMMENTS: &'static [&'static str] = #comments;
             const SID:#crate_ref::TypeSid = #crate_ref::sid!(@with_specta_path; #crate_name);
             const IMPL_LOCATION: #crate_ref::ImplLocation = #crate_ref::impl_location!(@with_specta_path; #crate_name);
+            const EXPORT: Option<bool> = #should_export;
 
             fn inline(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::DataType {
                 #inlines

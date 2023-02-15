@@ -3,6 +3,7 @@ use specta::Type;
 use crate::ts::assert_ts;
 
 #[derive(Type)]
+#[specta(export = false)]
 struct Optional {
     a: Option<i32>,
     #[specta(optional)]

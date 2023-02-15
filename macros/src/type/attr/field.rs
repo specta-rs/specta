@@ -19,13 +19,13 @@ impl_parse! {
             qself: None,
             path: attr.pass_path()?,
         }))),
-        "inline" => out.inline = true,
-        "skip" => out.skip = true,
+        "inline" => out.inline = attr.pass_bool().unwrap_or(true),
+        "skip" => out.skip = attr.pass_bool().unwrap_or(true),
         "skip_serializing" => out.skip = true,
         "skip_deserializing" => out.skip = true,
         "skip_serializing_if" => out.optional = attr.pass_string()? == *"Option::is_none",
-        "optional" => out.optional = true,
-        "flatten" => out.flatten = true,
+        "optional" => out.optional = attr.pass_bool().unwrap_or(true),
+        "flatten" => out.flatten = attr.pass_bool().unwrap_or(true)
     }
 }
 

@@ -3,6 +3,7 @@ use specta::Type;
 use crate::ts::assert_ts;
 
 #[derive(Type)]
+#[specta(export = false)]
 #[serde(tag = "kind", content = "d")]
 enum SimpleEnumA {
     A,
@@ -10,6 +11,7 @@ enum SimpleEnumA {
 }
 
 #[derive(Type)]
+#[specta(export = false)]
 #[serde(tag = "kind", content = "data")]
 enum ComplexEnum {
     A,
@@ -20,6 +22,7 @@ enum ComplexEnum {
 }
 
 #[derive(Type)]
+#[specta(export = false)]
 #[serde(untagged)]
 enum Untagged {
     Foo(String),

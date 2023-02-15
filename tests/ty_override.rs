@@ -4,6 +4,7 @@ use crate::ts::assert_ts;
 
 // This test is to do with how the Macro passes the tokens
 #[derive(Type)]
+#[specta(export = false)]
 pub struct SpectaTypeOverride {
     #[specta(type = String)] // Ident
     string_ident: (),
@@ -15,6 +16,7 @@ pub struct SpectaTypeOverride {
 
 // Checking that you can override the type of a field that is invalid. This is to ensure user code can override Specta in the case we have a bug/unsupported type.
 #[derive(Type)]
+#[specta(export = false)]
 pub struct InvalidToValidType {
     #[specta(type = Option<serde_json::Value>)]
     pub(crate) cause: Option<Box<dyn std::error::Error + Send + Sync>>,

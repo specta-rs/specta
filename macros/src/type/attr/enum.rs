@@ -24,7 +24,7 @@ impl_parse! {
     EnumAttr(attr, out) {
         // "tag" was already passed in the container so we don't need to do anything here
         "content" => out.content = out.content.take().or(Some(attr.pass_string()?)),
-        "untagged" => out.untagged = true,
+        "untagged" => out.untagged = attr.pass_bool().unwrap_or(true),
     }
 }
 

@@ -3,6 +3,7 @@ use specta::Type;
 use crate::ts::assert_ts;
 
 #[derive(Type)]
+#[specta(export = false)]
 #[serde(tag = "type")]
 struct TaggedType {
     a: i32,

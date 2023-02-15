@@ -27,6 +27,7 @@ pub struct DataTypeExt {
     pub comments: &'static [&'static str],
     pub sid: TypeSid,
     pub impl_location: ImplLocation,
+    pub export: Option<bool>,
     pub inner: DataType,
 }
 
