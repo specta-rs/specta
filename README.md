@@ -12,8 +12,6 @@
 
 <br>
 
-> Specta is still under active development. Right now the Typescript exporter is the only stable one and many others are in the works.
-
 ## Features
 
  - Export structs and enums to [Typescript](https://www.typescriptlang.org)
@@ -30,10 +28,11 @@ Specta can be used in your application either directly or through a library whic
 
 ## Usage
 
-Create a new project and run.
+Add `specta` as a dependency to your project,
+enabling the languages you want to export to:
 
 ```bash
-cargo add specta
+cargo add specta --features typescript # only 'typescript' is currently supported
 ```
 
 Then you can use Specta like so:
@@ -49,8 +48,8 @@ pub struct MyCustomType<A> {
 
 fn main() {
     assert_eq!(
-        ts::export::<MyCustomType<()>>(),
-        Ok("export interface MyCustomType<A> { my_field: string, generic: A }".to_string())
+        ts::export::<MyCustomType<()>>(&Default::default()),
+        Ok("export type MyCustomType<A> = { my_field: string, generic: A }".to_string())
     );
 }
 ```
@@ -60,6 +59,7 @@ Check out the [docs](https://docs.rs/specta) for more information.
 
 ## Motivation
 
-This library was originally created to power the type exporting functionality of [rspc](https://rspc.dev), but after building it we realized that it could be useful for other projects as well so we decided to move it into a dedicated library.
+This library was originally created to power the type exporting functionality of [rspc](https://rspc.dev),
+but after building it we realized that it could be useful for other projects as well so we decided to move it into a dedicated library.
 
 A huge thanks to [Brendonovich](https://github.com/brendonovich) for doing a heap of development on this library.
