@@ -28,6 +28,7 @@ pub struct DataTypeExt {
     pub sid: TypeSid,
     pub impl_location: ImplLocation,
     pub export: Option<bool>,
+    pub deprecated: Option<&'static str>,
     pub inner: DataType,
 }
 

@@ -45,6 +45,9 @@ pub trait Type {
     /// `None` will use the default which is why `false` is not just used.
     const EXPORT: Option<bool> = Some(false);
 
+    /// The Rust deprecated comment if the type is deprecated.
+    const DEPRECATED: Option<&'static str> = None;
+
     /// Returns the inline definition of a type with generics substituted for those provided.
     /// This function defines the base structure of every type, and is used in both
     /// [`definition`](crate::Type::definition) and [`reference`](crate::Type::definition)
@@ -72,6 +75,7 @@ pub trait Type {
             sid: Self::SID,
             impl_location: Self::IMPL_LOCATION,
             export: Self::EXPORT,
+            deprecated: Self::DEPRECATED,
             inner: Self::inline(
                 opts,
                 &Self::definition_generics()
@@ -117,6 +121,7 @@ pub trait Type {
                     sid: Self::SID,
                     impl_location: Self::IMPL_LOCATION,
                     export: Self::EXPORT,
+                    deprecated: Self::DEPRECATED,
                     inner: placeholder,
                 });
 
