@@ -140,3 +140,6 @@ pub mod internal {
     pub use ctor;
     pub use specta_macros::fn_datatype;
 }
+
+#[cfg(doctest)]
+doc_comment::doctest!("../README.md");

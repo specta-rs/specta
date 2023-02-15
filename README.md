@@ -41,15 +41,30 @@ Then you can use Specta like so:
 use specta::{ts, Type};
 
 #[derive(Type)]
-pub struct MyCustomType<A> {
+pub struct TypeOne {
+    pub a: String,
+    pub b: GenericType<i32>,
+    #[serde(rename = "cccccc")]
+     pub c: MyEnum,
+}
+
+#[derive(Type)]
+pub struct GenericType<A> {
     pub my_field: String,
     pub generic: A,
 }
 
+#[derive(Type)]
+pub enum MyEnum {
+    A,
+    B,
+    C,
+}
+
 fn main() {
     assert_eq!(
-        ts::export::<MyCustomType<()>>(&Default::default()),
-        Ok("export type MyCustomType<A> = { my_field: string, generic: A }".to_string())
+        ts::export::<TypeOne>(&Default::default()).unwrap(),
+        "export type TypeOne = { a: string; b: GenericType<number>; cccccc: MyEnum }".to_string()
     );
 }
 ```
