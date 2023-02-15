@@ -164,12 +164,12 @@ impl_typed_command!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
 ///     // `type_defs` is created internally
 ///     let (functions, type_defs) = functions::collect_types![some_function];
 ///
-///     let mut custom_type_defs = Typedefs::default();
+///     let custom_type_defs = TypeDefs::default();
 ///
 ///     // `type_defs` is provided.
 ///     // This can be used when integrating tauri-specta with other specta-enabled libraries.
-///     let (functions, custom_type_defs) = funtions::collect_types![
-///         type_defs: custom_type_defs,
+///     let (functions, custom_type_defs) = functions::collect_types![
+///         type_map: custom_type_defs,
 ///         some_function
 ///     ];
 /// }
@@ -177,7 +177,7 @@ impl_typed_command!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
 #[macro_export]
 macro_rules! collect_types {
     (type_map: $type_map:ident, $($command:path),*) => {{
-        let type_map: $crate::TypeDefs = $type_map;
+        let mut type_map: $crate::TypeDefs = $type_map;
 
         (
             vec![
@@ -191,3 +191,5 @@ macro_rules! collect_types {
         $crate::functions::collect_types!(type_map: type_map, $($command),*)
     }};
 }
+
+pub use collect_types;
