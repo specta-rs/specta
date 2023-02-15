@@ -19,6 +19,13 @@
  - Supports wide range of common crates in Rust ecosystem
  - Supports type inference - can determine type of `fn demo() -> impl Type`.
 
+## Using Specta
+
+Specta can be used in your application either directly or through a library which simplifies the process of using it.
+
+ - [rspc](https://github.com/oscartbeaumont/rspc) for easily building end-to-end typesafe APIs
+ - [tauri-specta](https://github.com/oscartbeaumont/tauri-specta) for typesafe Tauri commands
+
 ## Usage
 
 Create a new project and run.
