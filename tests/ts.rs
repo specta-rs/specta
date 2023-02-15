@@ -14,6 +14,16 @@ macro_rules! assert_ts {
 }
 pub(crate) use assert_ts;
 
+macro_rules! assert_ts_export_err {
+    ($t:ty, $e:pat) => {
+        match specta::ts::export::<$t>(&Default::default()) {
+            Err($e) => {}
+            v => assert!(false, "got {:?} but expected {}'", v, stringify!($e)),
+        }
+    };
+}
+pub(crate) use assert_ts_export_err;
+
 macro_rules! assert_ts_export {
     ($t:ty, $e:expr) => {
         assert_eq!(specta::ts::export::<$t>(&Default::default()).unwrap(), $e)

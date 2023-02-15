@@ -82,6 +82,10 @@ pub enum TsExportError {
     AnonymousObject,
     #[error("Cannot export anonymous enum. Try wrapping the type in a tuple struct which has the `ToDataType` derive macro on it.")]
     AnonymousEnum,
+    #[error("You have defined a type with the name '{0}' which is a reserved name by the Typescript exporter. Try renaming it or using `#[specta(rename = \"new name\")]`")]
+    ForbiddenTypeName(&'static str),
+    #[error("You have defined a field '{1}' on type '{0}' which has a name that is reserved name by the Typescript exporter. Try renaming it or using `#[specta(rename = \"new name\")]`")]
+    ForbiddenFieldName(String, &'static str),
     #[error("Type cannot be exported: {0:?}")]
     CannotExport(DataTypeExt),
     #[error("Cannot export type due to an internal error. This likely is a bug in Specta itself and not your code: {0}")]
@@ -143,6 +147,8 @@ pub fn export_datatype(
         }) => {
             if name.is_empty() {
                 return Err(TsExportError::AnonymousObject);
+            } else if let Some(name) = RESERVED_WORDS.iter().find(|v| *v == name) {
+                return Err(TsExportError::ForbiddenTypeName(name));
             }
 
             match fields.len() {
@@ -161,6 +167,8 @@ pub fn export_datatype(
         DataType::Enum(EnumType { name, generics, .. }) => {
             if name.is_empty() {
                 return Err(TsExportError::AnonymousEnum);
+            } else if let Some(name) = RESERVED_WORDS.iter().find(|v| *v == name) {
+                return Err(TsExportError::ForbiddenTypeName(name));
             }
 
             let generics = match generics.len() {
@@ -172,6 +180,10 @@ pub fn export_datatype(
         }
         // Unnamed struct
         DataType::Tuple(TupleType { name, generics, .. }) => {
+            if let Some(name) = RESERVED_WORDS.iter().find(|v| *v == name) {
+                return Err(TsExportError::ForbiddenTypeName(name));
+            }
+
             let generics = match generics.len() {
                 0 => "".into(),
                 _ => format!("<{}>", generics.to_vec().join(", ")),
@@ -249,7 +261,7 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
                     .iter()
                     .filter(|f| !f.flatten)
                     .map(|field| {
-                        let field_name_safe = sanitise_name(field.name);
+                        let field_name_safe = sanitise_name(name, field.name)?;
                         let field_ts_str = datatype(conf, &field.ty);
 
                         // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
@@ -285,12 +297,17 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
                 field_sections.join(" & ")
             }
         },
-        DataType::Enum(EnumType { variants, repr, .. }) => match &variants[..] {
+        DataType::Enum(EnumType {
+            name,
+            variants,
+            repr,
+            ..
+        }) => match &variants[..] {
             [] => "never".to_string(),
             variants => variants
                 .iter()
                 .map(|variant| {
-                    let sanitised_name = sanitise_name(variant.name());
+                    let sanitised_name = sanitise_name(name, variant.name())?;
 
                     Ok(match (repr, variant) {
                         (EnumRepr::Internal { tag }, EnumVariant::Unit(_)) => {
@@ -314,7 +331,7 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
                             fields.extend(
                                 obj.fields
                                     .iter()
-                                    .map(|v| object_field_to_ts(conf, v))
+                                    .map(|v| object_field_to_ts(conf, name, v))
                                     .collect::<Result<Vec<_>, _>>()?,
                             );
 
@@ -405,9 +422,10 @@ impl LiteralType {
 /// convert an object field into a Typescript string
 pub fn object_field_to_ts(
     conf: &ExportConfiguration,
+    type_name: &str,
     field: &ObjectField,
 ) -> Result<String, TsExportError> {
-    let field_name_safe = sanitise_name(field.name);
+    let field_name_safe = sanitise_name(type_name, field.name)?;
 
     let (key, ty) = match field.optional {
         true => (
@@ -424,18 +442,93 @@ pub fn object_field_to_ts(
 }
 
 /// sanitise a string to be a valid Typescript key
-pub fn sanitise_name(value: &str) -> String {
-    let valid = value
+pub fn sanitise_name(type_name: &str, field_name: &str) -> Result<String, TsExportError> {
+    if let Some(name) = RESERVED_WORDS.iter().find(|v| **v == field_name) {
+        return Err(TsExportError::ForbiddenFieldName(
+            type_name.to_owned(),
+            name,
+        ));
+    }
+
+    let valid = field_name
         .chars()
         .all(|c| c.is_alphanumeric() || c == '_' || c == '$')
-        && value
+        && field_name
             .chars()
             .next()
             .map(|first| !first.is_numeric())
             .unwrap_or(true);
-    if !valid {
-        format!(r#""{value}""#)
+
+    Ok(if !valid {
+        format!(r#""{field_name}""#)
     } else {
-        value.to_string()
-    }
+        field_name.to_string()
+    })
 }
+
+// Taken from: https://github.com/microsoft/TypeScript/issues/2536#issuecomment-87194347
+const RESERVED_WORDS: &[&str] = &[
+    "break",
+    "case",
+    "catch",
+    "class",
+    "const",
+    "continue",
+    "debugger",
+    "default",
+    "delete",
+    "do",
+    "else",
+    "enum",
+    "export",
+    "extends",
+    "false",
+    "finally",
+    "for",
+    "function",
+    "if",
+    "import",
+    "in",
+    "instanceof",
+    "new",
+    "null",
+    "return",
+    "super",
+    "switch",
+    "this",
+    "throw",
+    "true",
+    "try",
+    "typeof",
+    "var",
+    "void",
+    "while",
+    "with",
+    "as",
+    "implements",
+    "interface",
+    "let",
+    "package",
+    "private",
+    "protected",
+    "public",
+    "static",
+    "yield",
+    "any",
+    "boolean",
+    "constructor",
+    "declare",
+    "get",
+    "module",
+    "require",
+    "number",
+    "set",
+    "string",
+    "symbol",
+    "type",
+    "from",
+    "of",
+    "namespace",
+    "async",
+    "await",
+];

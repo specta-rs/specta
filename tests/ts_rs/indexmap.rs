@@ -11,8 +11,11 @@ fn indexmap() {
     #[allow(dead_code)]
     struct Indexes {
         map: IndexMap<String, String>,
-        set: IndexSet<String>,
+        indexset: IndexSet<String>,
     }
 
-    assert_ts!(Indexes, "{ map: { [key: string]: string }; set: string[] }");
+    assert_ts!(
+        Indexes,
+        "{ map: { [key: string]: string }; indexset: string[] }"
+    );
 }
