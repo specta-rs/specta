@@ -41,13 +41,13 @@ impl CommentStyle {
     pub fn render(&self, comments: &'static [&'static str]) -> String {
         match self {
             Self::JsDoc => {
-                if comments.len() == 0 {
+                if comments.is_empty() {
                     return "".to_owned();
                 }
 
                 let mut result = "/**\n".to_owned();
                 for comment in comments {
-                    result.push_str(&format!(" * {}\n", comment));
+                    result.push_str(&format!(" * {comment}\n"));
                 }
                 result.push_str(" */\n");
                 result
@@ -69,7 +69,7 @@ pub struct ExportConfiguration {
 #[derive(Error, Debug)]
 #[allow(missing_docs)]
 pub enum TsExportError {
-    #[error("Failed to export type '{}' on field `{}`: {err}", .ty_name.unwrap_or_default(), .field_name.clone().unwrap_or_default())]
+    #[error("Failed to export type '{}' on field `{}`: {err}", .ty_name.unwrap_or_default(), .field_name.unwrap_or_default())]
     WithCtx {
         // TODO: Handle this better. Make `ty_name` non optional
         ty_name: Option<&'static str>,
@@ -239,7 +239,7 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
                             .map(|type_str| format!("({type_str})"))
                             .map_err(|err| TsExportError::WithCtx {
                                 ty_name: None,
-                                field_name: Some(field.name.clone()),
+                                field_name: Some(field.name),
                                 err: Box::new(err),
                             })
                     })
@@ -249,11 +249,11 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
                     .iter()
                     .filter(|f| !f.flatten)
                     .map(|field| {
-                        let field_name_safe = sanitise_name(&field.name);
+                        let field_name_safe = sanitise_name(field.name);
 
                         let (key, ty) = match field.optional {
                             true => (
-                                format!("{}?", field_name_safe),
+                                format!("{field_name_safe}?"),
                                 match &field.ty {
                                     DataType::Nullable(ty) => ty.as_ref(),
                                     ty => ty,
@@ -405,11 +405,11 @@ pub fn object_field_to_ts(
     conf: &ExportConfiguration,
     field: &ObjectField,
 ) -> Result<String, TsExportError> {
-    let field_name_safe = sanitise_name(&field.name);
+    let field_name_safe = sanitise_name(field.name);
 
     let (key, ty) = match field.optional {
         true => (
-            format!("{}?", field_name_safe),
+            format!("{field_name_safe}?"),
             match &field.ty {
                 DataType::Nullable(ty) => ty.as_ref(),
                 ty => ty,
