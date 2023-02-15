@@ -250,25 +250,27 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
                     .filter(|f| !f.flatten)
                     .map(|field| {
                         let field_name_safe = sanitise_name(field.name);
+                        let field_ts_str = datatype(conf, &field.ty);
 
-                        let (key, ty) = match field.optional {
+                        // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
+                        let (key, result) = match field.optional {
                             true => (
                                 format!("{field_name_safe}?"),
                                 match &field.ty {
-                                    DataType::Nullable(ty) => ty.as_ref(),
-                                    ty => ty,
+                                    DataType::Nullable(_) => field_ts_str,
+                                    _ => field_ts_str.map(|v| format!("{v} | null")),
                                 },
                             ),
-                            false => (field_name_safe, &field.ty),
+                            false => (field_name_safe, field_ts_str),
                         };
 
-                        datatype(conf, ty)
-                            .map(|v| format!("{key}: {v}"))
-                            .map_err(|err| TsExportError::WithCtx {
+                        result.map(|v| format!("{key}: {v}")).map_err(|err| {
+                            TsExportError::WithCtx {
                                 ty_name: None,
                                 field_name: Some(field.name),
                                 err: Box::new(err),
-                            })
+                            }
+                        })
                     })
                     .collect::<Result<Vec<_>, _>>()?;
 

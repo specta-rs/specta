@@ -70,4 +70,25 @@ struct FlattenInternal {
     unnamed: UnnamedInternal,
 }
 
+// Invalid attributes
+#[derive(Type)]
+#[specta(noshot = true)]
+struct InvalidAttrs1;
+
+#[derive(Type)]
+#[specta(noshot)]
+struct InvalidAttrs2;
+
+#[derive(Type)]
+struct InvalidAttrs3 {
+    #[specta(noshot = true)]
+    a: String,
+}
+
+#[derive(Type)]
+struct InvalidAttrs4 {
+    #[specta(noshot)]
+    a: String,
+}
+
 // TODO: https://docs.rs/trybuild/latest/trybuild/#what-to-test
