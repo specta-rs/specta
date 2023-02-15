@@ -75,13 +75,13 @@ pub fn derive(
 
     attrs
         .iter()
-        .find(|attr| attr.root_ident() == "specta")
+        .find(|attr| attr.root_ident == "specta")
         .map_or(Ok(()), |attr| {
             Err(syn::Error::new(
-                attr.key_span(),
+                attr.key.span(),
                 format!(
                     "specta: Found unsupported container attribute '{}'",
-                    attr.tag()
+                    attr.key
                 ),
             ))
         })?;

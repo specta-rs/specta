@@ -13,11 +13,11 @@ pub fn decode_field_attrs(field: &Field) -> syn::Result<(&Field, FieldAttr)> {
 
     attrs
         .iter()
-        .find(|attr| attr.root_ident() == "specta")
+        .find(|attr| attr.root_ident == "specta")
         .map_or(Ok(()), |attr| {
             Err(syn::Error::new(
-                attr.key_span(),
-                format!("specta: Found unsupported field attribute '{}'", attr.tag()),
+                attr.key.span(),
+                format!("specta: Found unsupported field attribute '{}'", attr.key),
             ))
         })?;
 

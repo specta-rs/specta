@@ -81,11 +81,11 @@ pub fn parse_enum(
 
             attrs
                 .iter()
-                .find(|attr| attr.root_ident() == "specta")
+                .find(|attr| attr.root_ident == "specta")
                 .map_or(Ok(()), |attr| {
                     Err(syn::Error::new(
-                        attr.key_span(),
-                        format!("specta: Found unsupported enum attribute '{}'", attr.tag()),
+                        attr.key.span(),
+                        format!("specta: Found unsupported enum attribute '{}'", attr.key),
                     ))
                 })?;
 
