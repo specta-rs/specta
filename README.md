@@ -12,6 +12,8 @@
 
 <br>
 
+> Specta is still under active development. Right now the Typescript exporter is the only stable one and many others are in the works.
+
 ## Features
 
  - Export structs and enums to [Typescript](https://www.typescriptlang.org)
