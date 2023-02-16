@@ -11,16 +11,16 @@ pub enum TypeCategory {
     /// The type should be properly referenced and stored in the type map to be defined outside of
     /// where it is referenced.
     Reference {
-        /// Datatype to be put in the type map while field types are being resolved. Used in order to
-        /// support recursive types without causing an infinite loop.
-        ///
-        /// This works since a child type that references a parent type does not care about the
-        /// parent's fields, only really its name. Once all of the parent's fields have been
-        /// resolved will the parent's definition be placed in the type map.
-        ///
-        /// This doesn't account for flattening and inlining recursive types, however, which will
-        /// require a more complex solution since it will require multiple processing stages.
-        placeholder: DataType,
+        // /// Datatype to be put in the type map while field types are being resolved. Used in order to
+        // /// support recursive types without causing an infinite loop.
+        // ///
+        // /// This works since a child type that references a parent type does not care about the
+        // /// parent's fields, only really its name. Once all of the parent's fields have been
+        // /// resolved will the parent's definition be placed in the type map.
+        // ///
+        // /// This doesn't account for flattening and inlining recursive types, however, which will
+        // /// require a more complex solution since it will require multiple processing stages.
+        // placeholder: DataTypeItem,
         /// Datatype to use whenever a reference to the type is requested.
         reference: DataType,
     },
@@ -68,22 +68,14 @@ pub trait Type {
     /// as the value for the `generics` arg.
     ///
     /// Implemented internally
-    fn definition(opts: DefOpts) -> DataTypeExt {
-        DataTypeExt {
-            name: Self::NAME,
-            comments: Self::COMMENTS,
-            sid: Self::SID,
-            impl_location: Self::IMPL_LOCATION,
-            export: Self::EXPORT,
-            deprecated: Self::DEPRECATED,
-            inner: Self::inline(
-                opts,
-                &Self::definition_generics()
-                    .into_iter()
-                    .map(Into::into)
-                    .collect::<Vec<_>>(),
-            ),
-        }
+    fn definition(opts: DefOpts) -> DataType {
+        Self::inline(
+            opts,
+            &Self::definition_generics()
+                .into_iter()
+                .map(Into::into)
+                .collect::<Vec<_>>(),
+        )
     }
 
     /// Defines which category this type falls into, determining how references to it are created.
@@ -111,18 +103,12 @@ pub trait Type {
 
         match category {
             TypeCategory::Inline(inline) => inline,
-            TypeCategory::Reference {
-                placeholder,
-                reference,
-            } => {
-                opts.type_map.entry(Self::NAME).or_insert(DataTypeExt {
+            TypeCategory::Reference { reference } => {
+                opts.type_map.entry(Self::NAME).or_insert(DataType {
                     name: Self::NAME,
-                    comments: Self::COMMENTS,
                     sid: Self::SID,
                     impl_location: Self::IMPL_LOCATION,
-                    export: Self::EXPORT,
-                    deprecated: Self::DEPRECATED,
-                    inner: placeholder,
+                    item: DataTypeItem::Placeholder,
                 });
 
                 let definition = Self::definition(DefOpts {
@@ -133,7 +119,7 @@ pub trait Type {
                 if let Some(ty) = opts.type_map.get(&Self::NAME) {
                     // TODO: Properly detect duplicate name where SID don't match
                     // println!("{:#?} {:?}", ty, definition);
-                    if matches!(ty.inner, DataType::Placeholder) {
+                    if matches!(ty.item, DataTypeItem::Placeholder) {
                         opts.type_map.insert(Self::NAME, definition);
                     } else if ty.sid != definition.sid {
                         // TODO: Return runtime error instead of panicking
@@ -156,7 +142,7 @@ pub trait Type {
 pub trait Flatten: Type {}
 
 /// The Specta ID for the type. Holds for the given properties `T::SID == T::SID`, `T::SID != S::SID` and `Type<T>::SID == Type<S>::SID` (unlike std::any::TypeId)
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[doc(hidden)]
 pub struct TypeSid(u64);
 
@@ -206,10 +192,13 @@ pub const fn internal_sid_hash(
 #[doc(hidden)]
 macro_rules! sid {
     () => {
+        $crate::sid!(<Self as $crate::Type>::NAME, <Self as $crate::Type>::IMPL_LOCATION.as_str())
+    };
+    ($name:expr, $location:expr) => {
         $crate::internal_sid_hash(
             module_path!(),
-            <Self as $crate::Type>::IMPL_LOCATION.as_str(),
-            <Self as $crate::Type>::NAME,
+            $name,
+            $location
         )
     };
      // Using `$crate_path:path` here does not work because: https://github.com/rust-lang/rust/issues/48067
@@ -226,7 +215,7 @@ macro_rules! sid {
 
 /// The location of the impl block for a given type. This is used for error reporting.
 /// The content of it is transparent and should be generated by the `impl_location!` macro.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[doc(hidden)]
 pub struct ImplLocation(&'static str);
 

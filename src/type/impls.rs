@@ -169,20 +169,28 @@ impl<T: Type> Type for Option<T> {
     const IMPL_LOCATION: ImplLocation = impl_location!();
 
     fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
-        DataType::Nullable(Box::new(generics.get(0).cloned().unwrap_or_else(|| {
-            T::inline(
-                DefOpts {
-                    parent_inline: false,
-                    type_map: opts.type_map,
-                },
-                generics,
-            )
-        })))
+        DataType {
+            name: Self::NAME,
+            sid: Self::SID,
+            impl_location: Self::IMPL_LOCATION,
+            item: DataTypeItem::Nullable(Box::new(generics.get(0).cloned().unwrap_or_else(|| {
+                T::inline(
+                    DefOpts {
+                        parent_inline: false,
+                        type_map: opts.type_map,
+                    },
+                    generics,
+                )
+            }))),
+        }
     }
 
     fn category_impl(opts: DefOpts, generics: &[DataType]) -> TypeCategory {
-        TypeCategory::Inline(DataType::Nullable(Box::new(
-            generics.get(0).cloned().unwrap_or_else(|| {
+        TypeCategory::Inline(DataType {
+            name: Self::NAME,
+            sid: Self::SID,
+            impl_location: Self::IMPL_LOCATION,
+            item: DataTypeItem::Nullable(Box::new(generics.get(0).cloned().unwrap_or_else(|| {
                 T::reference(
                     DefOpts {
                         parent_inline: false,
@@ -190,8 +198,8 @@ impl<T: Type> Type for Option<T> {
                     },
                     generics,
                 )
-            }),
-        )))
+            }))),
+        })
     }
 }
 
@@ -218,7 +226,12 @@ const _: () = {
         const IMPL_LOCATION: ImplLocation = impl_location!();
 
         fn inline(_: DefOpts, _: &[DataType]) -> DataType {
-            DataType::Any
+            DataType {
+                name: Self::NAME,
+                sid: Self::SID,
+                impl_location: Self::IMPL_LOCATION,
+                item: DataTypeItem::Any,
+            }
         }
     }
 };

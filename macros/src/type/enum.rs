@@ -97,6 +97,7 @@ pub fn parse_enum(
         .map(|(variant, attrs)| {
             let variant_ident_str = unraw_raw_ident(&variant.ident);
 
+            // TODO: This was in `EnumVariant::Unit`. Should I worried it's unused.
             let variant_name_str = match (attrs.rename, container_attrs.rename_all) {
                 (Some(name), _) => name,
                 (_, Some(inflection)) => inflection.apply(&variant_ident_str),
@@ -107,7 +108,7 @@ pub fn parse_enum(
 
             Ok(match &variant.fields {
                 Fields::Unit => {
-                    quote!(#crate_ref::EnumVariant::Unit(#variant_name_str))
+                    quote!(#crate_ref::EnumVariant::Unit)
                 }
                 Fields::Unnamed(fields) => {
                     let fields = fields
@@ -133,7 +134,7 @@ pub fn parse_enum(
                         .collect::<syn::Result<Vec<TokenStream>>>()?;
 
                     quote!(#crate_ref::EnumVariant::Unnamed(#crate_ref::TupleType {
-                        name: #variant_name_str,
+                        // name: #variant_name_str,
                         fields: vec![#(#fields),*],
                         generics: vec![]
                     }))
@@ -164,7 +165,7 @@ pub fn parse_enum(
                             };
 
                             Ok(quote!(#crate_ref::ObjectField {
-                                name: #field_name,
+                                key: #field_name,
                                 optional: false,
                                 flatten: false,
                                 ty: {
@@ -177,11 +178,10 @@ pub fn parse_enum(
                         .collect::<syn::Result<Vec<TokenStream>>>()?;
 
                     quote!(#crate_ref::EnumVariant::Named(#crate_ref::ObjectType {
-                        name: #variant_name_str,
+                        // name: #variant_name_str,
                         fields: vec![#(#fields),*],
                         generics: vec![],
                         tag: None,
-                        type_id: None
                     }))
                 }
             })
@@ -190,20 +190,23 @@ pub fn parse_enum(
 
     Ok((
         quote!(#crate_ref::EnumType {
-            name: <Self as #crate_ref::Type>::NAME,
+            // name: <Self as #crate_ref::Type>::NAME,
             generics: vec![#(#definition_generics),*],
             variants: vec![#(#variants),*],
             repr: #crate_ref::EnumRepr::#repr_tokens,
-            type_id: std::any::TypeId::of::<Self>()
         }.into()),
         quote! {
             #crate_ref::TypeCategory::Reference {
-                reference: #crate_ref::DataType::Reference {
+                reference: #crate_ref::DataType {
                     name: <Self as #crate_ref::Type>::NAME,
-                    generics: vec![#(#reference_generics),*],
-                    type_id: std::any::TypeId::of::<Self>()
-                },
-                placeholder: #crate_ref::DataType::Placeholder,
+                    sid: <Self as #crate_ref::Type>::SID,
+                    impl_location: <Self as #crate_ref::Type>::IMPL_LOCATION,
+                    item: #crate_ref::DataTypeItem::Reference {
+                        name: <Self as #crate_ref::Type>::NAME,
+                        generics: vec![#(#reference_generics),*],
+                        sid: <Self as #crate_ref::Type>::SID,
+                    },
+                }
             }
         },
         can_flatten,

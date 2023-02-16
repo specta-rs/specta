@@ -111,16 +111,14 @@ pub enum TsExportError {
     },
     #[error("Your Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`")]
     BigIntForbidden,
-    #[error("Cannot export anonymous object. Try wrapping the type in a tuple struct which has the `ToDataType` derive macro on it.")]
-    AnonymousObject,
-    #[error("Cannot export anonymous enum. Try wrapping the type in a tuple struct which has the `ToDataType` derive macro on it.")]
-    AnonymousEnum,
+    #[error("Cannot export anonymous type. Try wrapping the type in a tuple struct which has the `ToDataType` derive macro on it.")]
+    AnonymousType, // TODO: Include metadata about the type, `IMPL_LOCATION`, `NAME`, etc
     #[error("You have defined a type with the name '{0}' which is a reserved name by the Typescript exporter. Try renaming it or using `#[specta(rename = \"new name\")]`")]
     ForbiddenTypeName(&'static str),
     #[error("You have defined a field '{1}' on type '{0}' which has a name that is reserved name by the Typescript exporter. Try renaming it or using `#[specta(rename = \"new name\")]`")]
     ForbiddenFieldName(String, &'static str),
     #[error("Type cannot be exported: {0:?}")]
-    CannotExport(DataTypeExt),
+    CannotExport(DataType), // TODO: probs just have `SID` and `IMPL_LOCATION` in this error?
     #[error("Cannot export type due to an internal error. This likely is a bug in Specta itself and not your code: {0}")]
     InternalError(&'static str),
     #[error("IO error: {0}")]
@@ -162,74 +160,74 @@ pub fn inline<T: Type>(conf: &ExportConfiguration) -> Result<String, TsExportErr
 // TODO: Accept `DataTypeExt` or `DataType`. This is hard because we take it by reference
 pub fn export_datatype(
     conf: &ExportConfiguration,
-    def: &DataTypeExt,
+    typ: &DataType,
 ) -> Result<String, TsExportError> {
-    let inline_ts = datatype(conf, &def.inner).map_err(|err| TsExportError::WithCtx {
-        ty_name: Some(def.name),
+    let ty_name = typ.name;
+    if ty_name.is_empty() {
+        return Err(TsExportError::AnonymousType);
+    } else if let Some(name) = RESERVED_WORDS.iter().find(|v| **v == ty_name) {
+        return Err(TsExportError::ForbiddenTypeName(name));
+    }
+
+    let inline_ts = datatype(conf, &typ).map_err(|err| TsExportError::WithCtx {
+        ty_name: Some(typ.name),
         field_name: None,
         err: Box::new(err),
     })?;
 
-    let declaration = match &def.inner {
+    let (declaration, comments) = match &typ.item {
         // Named struct
-        DataType::Object(ObjectType {
-            name,
-            generics,
-            fields,
+        DataTypeItem::Object(CustomDataType {
+            comments,
+            item: ObjectType {
+                generics, fields, ..
+            },
             ..
-        }) => {
-            if name.is_empty() {
-                return Err(TsExportError::AnonymousObject);
-            } else if let Some(name) = RESERVED_WORDS.iter().find(|v| *v == name) {
-                return Err(TsExportError::ForbiddenTypeName(name));
-            }
-
+        }) => (
             match fields.len() {
-                0 => format!("type {name} = {inline_ts}"),
+                0 => format!("type {ty_name} = {inline_ts}"),
                 _ => {
                     let generics = match generics.len() {
                         0 => "".into(),
                         _ => format!("<{}>", generics.to_vec().join(", ")),
                     };
 
-                    format!("type {name}{generics} = {inline_ts}")
+                    format!("type {ty_name}{generics} = {inline_ts}")
                 }
-            }
-        }
+            },
+            *comments,
+        ),
         // Enum
-        DataType::Enum(EnumType { name, generics, .. }) => {
-            if name.is_empty() {
-                return Err(TsExportError::AnonymousEnum);
-            } else if let Some(name) = RESERVED_WORDS.iter().find(|v| *v == name) {
-                return Err(TsExportError::ForbiddenTypeName(name));
-            }
-
+        DataTypeItem::Enum(CustomDataType {
+            comments,
+            item: EnumType { generics, .. },
+            ..
+        }) => {
             let generics = match generics.len() {
                 0 => "".into(),
                 _ => format!("<{}>", generics.to_vec().join(", ")),
             };
 
-            format!("type {name}{generics} = {inline_ts}")
+            (format!("type {ty_name}{generics} = {inline_ts}"), *comments)
         }
         // Unnamed struct
-        DataType::Tuple(TupleType { name, generics, .. }) => {
-            if let Some(name) = RESERVED_WORDS.iter().find(|v| *v == name) {
-                return Err(TsExportError::ForbiddenTypeName(name));
-            }
-
+        DataTypeItem::Tuple(TupleType { generics, .. }) => {
             let generics = match generics.len() {
                 0 => "".into(),
                 _ => format!("<{}>", generics.to_vec().join(", ")),
             };
 
-            format!("type {name}{generics} = {inline_ts}")
+            (
+                format!("type {ty_name}{generics} = {inline_ts}"),
+                &[] as &[&str],
+            )
         }
-        _ => return Err(TsExportError::CannotExport(def.clone())), // TODO: Can this be enforced at a type system level
+        _ => return Err(TsExportError::CannotExport(typ.clone())), // TODO: Can this be enforced at a type system level
     };
 
     let comments = conf
         .comment_exporter
-        .map(|v| v(def.comments))
+        .map(|v| v(comments))
         .unwrap_or_default();
     Ok(format!("{comments}export {declaration}"))
 }
@@ -237,8 +235,9 @@ pub fn export_datatype(
 /// Convert a DataType to a TypeScript string
 /// Eg. `{ demo: string; }`
 pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, TsExportError> {
-    Ok(match &typ {
-        DataType::Any => "any".into(),
+    let ty_name = typ.name;
+    Ok(match &typ.item {
+        DataTypeItem::Any => "any".into(),
         primitive_def!(i8 i16 i32 u8 u16 u32 f32 f64) => "number".into(),
         primitive_def!(usize isize i64 u64 i128 u128) => match conf.bigint {
             BigIntExportBehavior::String => "string".into(),
@@ -251,9 +250,9 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
         },
         primitive_def!(String char) => "string".into(),
         primitive_def!(bool) => "boolean".into(),
-        DataType::Literal(literal) => literal.to_ts(),
-        DataType::Nullable(def) => format!("{} | null", datatype(conf, def)?),
-        DataType::Record(def) => {
+        DataTypeItem::Literal(literal) => literal.to_ts(),
+        DataTypeItem::Nullable(def) => format!("{} | null", datatype(conf, def)?),
+        DataTypeItem::Record(def) => {
             format!(
                 // We use this isn't of `Record<K, V>` to avoid issues with circular references.
                 "{{ [key: {}]: {} }}",
@@ -262,8 +261,8 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
             )
         }
         // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
-        DataType::List(def) => format!("{}[]", datatype(conf, def)?),
-        DataType::Tuple(TupleType { fields, .. }) => match &fields[..] {
+        DataTypeItem::List(def) => format!("{}[]", datatype(conf, def)?),
+        DataTypeItem::Tuple(TupleType { fields, .. }) => match &fields[..] {
             [] => "null".to_string(),
             [ty] => datatype(conf, ty)?,
             tys => format!(
@@ -274,8 +273,9 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
                     .join(", ")
             ),
         },
-        DataType::Object(ObjectType {
-            fields, tag, name, ..
+        DataTypeItem::Object(CustomDataType {
+            item: ObjectType { fields, tag, .. },
+            ..
         }) => match &fields[..] {
             [] => "null".to_string(),
             fields => {
@@ -287,7 +287,7 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
                             .map(|type_str| format!("({type_str})"))
                             .map_err(|err| TsExportError::WithCtx {
                                 ty_name: None,
-                                field_name: Some(field.name),
+                                field_name: Some(field.key),
                                 err: Box::new(err),
                             })
                     })
@@ -297,15 +297,15 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
                     .iter()
                     .filter(|f| !f.flatten)
                     .map(|field| {
-                        let field_name_safe = sanitise_name(name, field.name)?;
+                        let field_name_safe = sanitise_name(ty_name, field.key)?;
                         let field_ts_str = datatype(conf, &field.ty);
 
                         // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
                         let (key, result) = match field.optional {
                             true => (
                                 format!("{field_name_safe}?"),
-                                match &field.ty {
-                                    DataType::Nullable(_) => field_ts_str,
+                                match &field.ty.item {
+                                    DataTypeItem::Nullable(_) => field_ts_str,
                                     _ => field_ts_str.map(|v| format!("{v} | null")),
                                 },
                             ),
@@ -315,7 +315,7 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
                         result.map(|v| format!("{key}: {v}")).map_err(|err| {
                             TsExportError::WithCtx {
                                 ty_name: None,
-                                field_name: Some(field.name),
+                                field_name: Some(field.key),
                                 err: Box::new(err),
                             }
                         })
@@ -323,7 +323,7 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
                     .collect::<Result<Vec<_>, _>>()?;
 
                 if let Some(tag) = tag {
-                    unflattened_fields.push(format!("{tag}: \"{name}\""));
+                    unflattened_fields.push(format!("{tag}: \"{ty_name}\""));
                 }
 
                 if !unflattened_fields.is_empty() {
@@ -333,31 +333,36 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
                 field_sections.join(" & ")
             }
         },
-        DataType::Enum(EnumType {
-            name,
-            variants,
-            repr,
+        DataTypeItem::Enum(CustomDataType {
+            item: EnumType { variants, repr, .. },
             ..
         }) => match &variants[..] {
             [] => "never".to_string(),
             variants => variants
                 .iter()
                 .map(|variant| {
-                    let sanitised_name = sanitise_name(name, variant.name())?;
+                    let sanitised_name = sanitise_name(typ.name, typ.name)?; // TODO: variant.name() // TODO: I would be suprised if this correct?
 
                     Ok(match (repr, variant) {
-                        (EnumRepr::Internal { tag }, EnumVariant::Unit(_)) => {
+                        (EnumRepr::Internal { tag }, EnumVariant::Unit) => {
                             format!("{{ {tag}: \"{sanitised_name}\" }}")
                         }
                         (EnumRepr::Internal { tag }, EnumVariant::Unnamed(tuple)) => {
-                            let typ =
-                                datatype(conf, &DataType::Tuple(tuple.clone())).map_err(|err| {
-                                    TsExportError::WithCtx {
-                                        ty_name: None,
-                                        field_name: Some(variant.name()),
-                                        err: Box::new(err),
-                                    }
-                                })?;
+                            let typ = datatype(
+                                conf,
+                                // TODO: is this just `typ` and can it just be used directly?
+                                &DataType {
+                                    name: typ.name,
+                                    sid: typ.sid,
+                                    impl_location: typ.impl_location,
+                                    item: DataTypeItem::Tuple(tuple.clone()),
+                                },
+                            )
+                            .map_err(|err| TsExportError::WithCtx {
+                                ty_name: None,
+                                field_name: Some(typ.name), // variant.name()), // TODO: This is probs wrong
+                                err: Box::new(err),
+                            })?;
 
                             format!("({{ {tag}: \"{sanitised_name}\" }} & {typ})")
                         }
@@ -367,44 +372,44 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
                             fields.extend(
                                 obj.fields
                                     .iter()
-                                    .map(|v| object_field_to_ts(conf, name, v))
+                                    .map(|v| object_field_to_ts(conf, ty_name, v))
                                     .collect::<Result<Vec<_>, _>>()?,
                             );
 
                             format!("{{ {} }}", fields.join("; "))
                         }
-                        (EnumRepr::External, EnumVariant::Unit(_)) => {
+                        (EnumRepr::External, EnumVariant::Unit) => {
                             format!("\"{sanitised_name}\"")
                         }
                         (EnumRepr::External, v) => {
                             let ts_values = datatype(conf, &v.data_type()).map_err(|err| {
                                 TsExportError::WithCtx {
                                     ty_name: None,
-                                    field_name: Some(variant.name()),
+                                    field_name: Some(typ.name), // variant.name()), // TODO: This is probs wrong
                                     err: Box::new(err),
                                 }
                             })?;
 
                             format!("{{ {sanitised_name}: {ts_values} }}")
                         }
-                        (EnumRepr::Untagged, EnumVariant::Unit(_)) => "null".to_string(),
+                        (EnumRepr::Untagged, EnumVariant::Unit) => "null".to_string(),
                         (EnumRepr::Untagged, v) => {
                             datatype(conf, &v.data_type()).map_err(|err| {
                                 TsExportError::WithCtx {
                                     ty_name: None,
-                                    field_name: Some(variant.name()),
+                                    field_name: Some(typ.name), // variant.name()), // TODO: This is probs wrong
                                     err: Box::new(err),
                                 }
                             })?
                         }
-                        (EnumRepr::Adjacent { tag, .. }, EnumVariant::Unit(_)) => {
+                        (EnumRepr::Adjacent { tag, .. }, EnumVariant::Unit) => {
                             format!("{{ {tag}: \"{sanitised_name}\" }}")
                         }
                         (EnumRepr::Adjacent { tag, content }, v) => {
                             let ts_values = datatype(conf, &v.data_type()).map_err(|err| {
                                 TsExportError::WithCtx {
                                     ty_name: None,
-                                    field_name: Some(variant.name()),
+                                    field_name: Some(typ.name), // variant.name()), // TODO: This is probs wrong
                                     err: Box::new(err),
                                 }
                             })?;
@@ -416,7 +421,7 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
                 .collect::<Result<Vec<_>, TsExportError>>()?
                 .join(" | "),
         },
-        DataType::Reference { name, generics, .. } => match &generics[..] {
+        DataTypeItem::Reference { name, generics, .. } => match &generics[..] {
             [] => name.to_string(),
             generics => {
                 let generics = generics
@@ -428,8 +433,8 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
                 format!("{name}<{generics}>")
             }
         },
-        DataType::Generic(GenericType(ident)) => ident.to_string(),
-        DataType::Placeholder => {
+        DataTypeItem::Generic(GenericType(ident)) => ident.to_string(),
+        DataTypeItem::Placeholder => {
             return Err(TsExportError::InternalError(
                 "Attempted to export a placeholder!",
             ))
@@ -458,17 +463,17 @@ impl LiteralType {
 /// convert an object field into a Typescript string
 pub fn object_field_to_ts(
     conf: &ExportConfiguration,
-    type_name: &str,
+    typ_name: &str,
     field: &ObjectField,
 ) -> Result<String, TsExportError> {
-    let field_name_safe = sanitise_name(type_name, field.name)?;
+    let field_name_safe = sanitise_name(typ_name, field.key)?;
 
     let (key, ty) = match field.optional {
         true => (
             format!("{field_name_safe}?"),
-            match &field.ty {
-                DataType::Nullable(ty) => ty.as_ref(),
-                ty => ty,
+            match &field.ty.item {
+                DataTypeItem::Nullable(ty) => &ty,
+                ty => &field.ty,
             },
         ),
         false => (field_name_safe, &field.ty),

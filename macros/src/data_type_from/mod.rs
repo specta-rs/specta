@@ -44,10 +44,10 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
                     Some(quote! {
                         #crate_name::ObjectField {
-                            name: stringify!(#ident),
-                            ty: t.#ident.into(),
+                            key: stringify!(#ident),
                             optional: false,
                             flatten: false
+                            ty: t.#ident.into(), // DataTypeItem -> DataType // TODO: Fix this
                         }
                     })
                 });
@@ -58,22 +58,20 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         generics: vec![],
                         fields: vec![#(#fields),*],
                         tag: None,
-                        type_id: None
                     }.into()
                 }
             }
             Fields::Unnamed(_) => {
                 let fields = data.fields.iter().enumerate().map(|(i, _)| {
                     let i = proc_macro2::Literal::usize_unsuffixed(i);
-                    quote!(t.#i.into())
+                    quote!(t.#i.into()) // TODO: Maybe need to fix this `into`?
                 });
 
                 quote! {
                     #crate_name::TupleType {
-                        name: stringify!(#ident),
                         generics: vec![],
                         fields: vec![#(#fields),*]
-                    }.into()
+                    }.into() // TODO: Maybe need to fix this `into`?
                 }
             }
             _ => todo!("ToDataType only supports named structs"),
@@ -85,7 +83,13 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         #[automatically_derived]
         impl From<#ident> for #crate_name::DataType {
             fn from(t: #ident) -> Self {
-                #body
+                // This impl is created as a unique type.
+                #crate_name::DataType {
+                    name: stringify!(#ident),
+                    sid: #crate_name::sid!(stringify!(#ident), #crate_name::impl_location!().as_str()),
+                    impl_location: #crate_name::impl_location!(),
+                    item: #body,
+                }
             }
         }
     }

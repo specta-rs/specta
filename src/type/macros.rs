@@ -6,7 +6,12 @@ macro_rules! impl_primitives {
             const IMPL_LOCATION: $crate::ImplLocation = $crate::impl_location!();
 
             fn inline(_: DefOpts, _: &[DataType]) -> DataType {
-                DataType::Primitive(datatype::PrimitiveType::$i)
+                DataType {
+                    name: <Self as Type>::NAME,
+                    sid: <Self as Type>::SID,
+                    impl_location: <Self as Type>::IMPL_LOCATION,
+                    item: DataTypeItem::Primitive(datatype::PrimitiveType::$i)
+                }
             }
         }
     )+};
@@ -33,11 +38,15 @@ macro_rules! impl_tuple {
                     }, &[]
                 ));)*
 
-                DataType::Tuple(datatype::TupleType {
+                DataType {
                     name: <Self as Type>::NAME,
-                    fields: vec![$($i),*],
-                    generics: vec![]
-                })
+                    sid: <Self as Type>::SID,
+                    impl_location: <Self as Type>::IMPL_LOCATION,
+                    item: DataTypeItem::Tuple(datatype::TupleType {
+                        fields: vec![$($i),*],
+                        generics: vec![]
+                    })
+                }
             }
         }
     };
@@ -104,23 +113,33 @@ macro_rules! impl_for_list {
             const IMPL_LOCATION: $crate::ImplLocation = $crate::impl_location!();
 
             fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
-                DataType::List(Box::new(generics.get(0).cloned().unwrap_or(T::inline(
-                    DefOpts {
-                        parent_inline: false,
-                        type_map: opts.type_map,
-                    },
-                    generics,
-                ))))
+                DataType {
+                    name: Self::NAME,
+                    sid: Self::SID,
+                    impl_location: Self::IMPL_LOCATION,
+                    item:DataTypeItem::List(Box::new(generics.get(0).cloned().unwrap_or(T::inline(
+                        DefOpts {
+                            parent_inline: false,
+                            type_map: opts.type_map,
+                        },
+                        generics,
+                    ))))
+                }
             }
 
             fn reference(opts: DefOpts, generics: &[DataType]) -> DataType {
-                DataType::List(Box::new(generics.get(0).cloned().unwrap_or(T::reference(
-                    DefOpts {
-                        parent_inline: false,
-                        type_map: opts.type_map,
-                    },
-                    generics,
-                ))))
+                DataType {
+                    name: Self::NAME,
+                    sid: Self::SID,
+                    impl_location: Self::IMPL_LOCATION,
+                    item: DataTypeItem::List(Box::new(generics.get(0).cloned().unwrap_or(T::reference(
+                        DefOpts {
+                            parent_inline: false,
+                            type_map: opts.type_map,
+                        },
+                        generics,
+                    ))))
+                }
             }
         }
     )+};
@@ -134,41 +153,51 @@ macro_rules! impl_for_map {
             const IMPL_LOCATION: $crate::ImplLocation = $crate::impl_location!();
 
             fn inline(defs: DefOpts, generics: &[DataType]) -> DataType {
-                DataType::Record(Box::new((
-                    generics.get(0).cloned().unwrap_or(<K as Type>::inline(
-                        DefOpts {
-                            parent_inline: false,
-                            type_map: defs.type_map,
-                        },
-                        &[],
-                    )),
-                    generics.get(1).cloned().unwrap_or(<V as Type>::inline(
-                        DefOpts {
-                            parent_inline: false,
-                            type_map: defs.type_map,
-                        },
-                        &[],
-                    )),
-                )))
+                DataType {
+                    name: Self::NAME,
+                    sid: Self::SID,
+                    impl_location: Self::IMPL_LOCATION,
+                    item: DataTypeItem::Record(Box::new((
+                        generics.get(0).cloned().unwrap_or(<K as Type>::inline(
+                            DefOpts {
+                                parent_inline: false,
+                                type_map: defs.type_map,
+                            },
+                            &[],
+                        )),
+                        generics.get(1).cloned().unwrap_or(<V as Type>::inline(
+                            DefOpts {
+                                parent_inline: false,
+                                type_map: defs.type_map,
+                            },
+                            &[],
+                        )),
+                    ))),
+                }
             }
 
             fn reference(opts: DefOpts, generics: &[DataType]) -> DataType {
-                DataType::Record(Box::new((
-                    generics.get(0).cloned().unwrap_or(K::reference(
-                        DefOpts {
-                            parent_inline: false,
-                            type_map: opts.type_map,
-                        },
-                        generics,
-                    )),
-                    generics.get(1).cloned().unwrap_or(V::reference(
-                        DefOpts {
-                            parent_inline: false,
-                            type_map: opts.type_map,
-                        },
-                        generics,
-                    )),
-                )))
+                DataType {
+                    name: Self::NAME,
+                    sid: Self::SID,
+                    impl_location: Self::IMPL_LOCATION,
+                    item: DataTypeItem::Record(Box::new((
+                        generics.get(0).cloned().unwrap_or(K::reference(
+                            DefOpts {
+                                parent_inline: false,
+                                type_map: opts.type_map,
+                            },
+                            generics,
+                        )),
+                        generics.get(1).cloned().unwrap_or(V::reference(
+                            DefOpts {
+                                parent_inline: false,
+                                type_map: opts.type_map,
+                            },
+                            generics,
+                        )),
+                    ))),
+                }
             }
         }
     };

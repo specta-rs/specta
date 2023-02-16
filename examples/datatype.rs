@@ -1,29 +1,24 @@
 //! This file show how to use an advanced API of Specta.
 //! You probably shouldn't be using this in application code but if your building a library on Specta it will be useful.
 
-use specta::{
-    datatype::{DataType, LiteralType},
-    DataTypeFrom,
-};
+use specta::{datatype::LiteralType, ts, DataTypeFrom, DataTypeItem};
+
+// TODO: Do up some docs on the difference between working with `DataType` and `DataTypeItem` if gonna support both
 
 #[derive(DataTypeFrom)]
-pub struct MyEnum(pub Vec<DataType>);
+pub struct MyEnum(pub Vec<DataTypeItem>);
+
+// TODO: Also support this???
+// #[derive(DataTypeFrom)]
+// pub struct MyEnum(pub Vec<DataType>);
 
 fn main() {
-    let _e = MyEnum(vec![
-        DataType::Literal(LiteralType::String("A".to_string())),
-        DataType::Literal(LiteralType::String("B".to_string())),
+    let e = MyEnum(vec![
+        DataTypeItem::Literal(LiteralType::String("A".to_string())),
+        DataTypeItem::Literal(LiteralType::String("B".to_string())),
     ]);
+    let ts = ts::export_datatype(&Default::default(), &e.into()).unwrap();
 
-    // TODO: Fix this
-    // let ts = ts::export_datatype(&ExportConfiguration::default(), &DataTypeExt {
-    //     name: "",
-    //     comments: "",
-    //     sid: todo!(),
-    //     impl_location: todo!(),
-    //     inner: e.into(),
-    // })).unwrap();
-
-    // println!("{ts}");
-    // assert_eq!(ts, "export type MyEnum = \"A\" | \"B\"");
+    println!("{ts}");
+    assert_eq!(ts, "export type MyEnum = \"A\" | \"B\"");
 }

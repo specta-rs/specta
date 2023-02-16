@@ -107,9 +107,9 @@ pub fn parse_struct(
                             type_map: opts.type_map
                         }, &generics);
 
-                        match &mut ty {
-                            #crate_ref::DataType::Enum(e) => {
-                                e.make_flattenable();
+                        match &mut ty.item {
+                            #crate_ref::DataTypeItem::Enum(e) => {
+                                e.item.make_flattenable();
                             }
                             _ => {}
                         }
@@ -125,7 +125,7 @@ pub fn parse_struct(
                 };
 
                 Ok(quote!(#crate_ref::ObjectField {
-                    name: #field_name,
+                    key: #field_name,
                     optional: #optional,
                     flatten: #flatten,
                     ty: {
@@ -141,11 +141,10 @@ pub fn parse_struct(
                 .unwrap_or(quote!(None));
 
             quote!(#crate_ref::ObjectType {
-                name: <Self as #crate_ref::Type>::NAME,
+                // name: <Self as #crate_ref::Type>::NAME,
                 generics: vec![#(#definition_generics),*],
                 fields: vec![#(#fields),*],
                 tag: #tag,
-                type_id: Some(std::any::TypeId::of::<Self>())
             }.into())
         }
         Fields::Unnamed(_) => {
@@ -186,7 +185,7 @@ pub fn parse_struct(
                     .collect::<syn::Result<Vec<TokenStream>>>()?;
 
                 quote!(#crate_ref::TupleType {
-                    name: <Self as #crate_ref::Type>::NAME,
+                    // name: <Self as #crate_ref::Type>::NAME,
                     generics: vec![#(#definition_generics),*],
                     fields: vec![#(#fields),*]
                 }.into())
@@ -194,7 +193,7 @@ pub fn parse_struct(
         }
         Fields::Unit => {
             quote!(#crate_ref::TupleType {
-                name: <Self as #crate_ref::Type>::NAME,
+                // name: <Self as #crate_ref::Type>::NAME,
                 generics: vec![#(#definition_generics),*],
                 fields: vec![],
             }.into())
@@ -207,14 +206,19 @@ pub fn parse_struct(
             <Self as #crate_ref::Type>::inline(opts, generics)
         }))
     } else {
+        // TODO: This whole block looks way overcomplicated
         quote! {
             #crate_ref::TypeCategory::Reference {
-                reference: #crate_ref::DataType::Reference {
+                reference: #crate_ref::DataType {
                     name: <Self as #crate_ref::Type>::NAME,
-                    generics: vec![#(#reference_generics),*],
-                    type_id: std::any::TypeId::of::<Self>()
-                },
-                placeholder: #crate_ref::DataType::Placeholder,
+                    sid: <Self as #crate_ref::Type>::SID,
+                    impl_location: <Self as #crate_ref::Type>::IMPL_LOCATION,
+                    item: #crate_ref::DataTypeItem::Reference {
+                        name: <Self as #crate_ref::Type>::NAME,
+                        sid: <Self as #crate_ref::Type>::SID,
+                        generics: vec![#(#reference_generics),*],
+                    },
+                }
             }
         }
     };
