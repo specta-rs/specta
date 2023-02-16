@@ -68,7 +68,7 @@ impl EnumVariant {
         match self {
             Self::Unit => unreachable!("Unit enum variants have no type!"),
             Self::Unnamed(tuple_type) => tuple_type.clone().into(),
-            Self::Named(object_type) => object_type.clone().into(),
+            Self::Named(object_type) => todo!(), // object_type.clone().into(),
         }
     }
 }

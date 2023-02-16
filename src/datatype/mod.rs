@@ -77,11 +77,18 @@ impl DataType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CustomDataType<T> {
+    /// The name of the type
     pub name: &'static str,
+    /// The Specta ID for the type. The value for this should come from the `sid!();` macro.
     pub sid: TypeSid,
+    /// The code location where this type is implemented. Used for error reporting.
     pub impl_location: ImplLocation,
+    /// Rust documentation comments on the type
     pub comments: &'static [&'static str],
+    // Whether the type should export when the `export` feature is enabled.
+    /// `None` will use the default which is why `false` is not just used.
     pub export: Option<bool>,
+    /// The Rust deprecated comment if the type is deprecated.
     pub deprecated: Option<&'static str>,
     pub item: T,
 }
@@ -178,13 +185,26 @@ impl From<LiteralType> for DataType {
     }
 }
 
-impl From<ObjectType> for DataType {
-    fn from(t: ObjectType) -> Self {
-        // Self::Object(t)
-        todo!();
+impl From<CustomDataType<ObjectType>> for DataType {
+    fn from(t: CustomDataType<ObjectType>) -> Self {
+        Self::Object(t)
     }
 }
 
+impl From<CustomDataType<EnumType>> for DataType {
+    fn from(t: CustomDataType<EnumType>) -> Self {
+        Self::Enum(t)
+    }
+}
+
+// impl From<ObjectType> for DataType {
+//     fn from(t: ObjectType) -> Self {
+//         // Self::Object(t)
+//         todo!();
+//     }
+// }
+
+// TODO: Remove this
 impl From<EnumType> for DataType {
     fn from(t: EnumType) -> Self {
         // Self::Enum(t)
@@ -204,24 +224,25 @@ impl From<TupleType> for DataType {
     }
 }
 
-// TODO
-// impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
-//     fn from(t: Vec<T>) -> Self {
-//         DataType::Enum(EnumType {
-//             variants: t
-//                 .into_iter()
-//                 .map(|t| -> EnumVariant {
-//                     EnumVariant::Unnamed(TupleType {
-//                         fields: vec![t.into()],
-//                         generics: vec![],
-//                     })
-//                 })
-//                 .collect(),
-//             generics: vec![],
-//             repr: EnumRepr::Untagged,
-//         })
-//     }
-// }
+// TODO: Remove this and do within `ToDataType` derive macro -> needs be named cause enum. // TODO: Is requirement good?
+impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
+    fn from(t: Vec<T>) -> Self {
+        todo!();
+        // DataType::Enum(EnumType {
+        //     variants: t
+        //         .into_iter()
+        //         .map(|t| -> EnumVariant {
+        //             EnumVariant::Unnamed(TupleType {
+        //                 fields: vec![t.into()],
+        //                 generics: vec![],
+        //             })
+        //         })
+        //         .collect(),
+        //     generics: vec![],
+        //     repr: EnumRepr::Untagged,
+        // })
+    }
+}
 
 impl<T: Into<DataType> + 'static> From<Option<T>> for DataType {
     fn from(t: Option<T>) -> Self {

@@ -24,7 +24,6 @@ const _: () = {
 impl<'a> Type for &'a str {
     const NAME: &'static str = String::NAME;
     const SID: TypeSid = sid!();
-    const IMPL_LOCATION: ImplLocation = impl_location!();
 
     fn inline(defs: DefOpts, generics: &[DataType]) -> DataType {
         String::inline(defs, generics)
@@ -34,7 +33,6 @@ impl<'a> Type for &'a str {
 impl<'a, T: Type + 'static> Type for &'a T {
     const NAME: &'static str = T::NAME;
     const SID: TypeSid = sid!();
-    const IMPL_LOCATION: ImplLocation = impl_location!();
 
     fn inline(defs: DefOpts, generics: &[DataType]) -> DataType {
         T::inline(defs, generics)
@@ -44,7 +42,6 @@ impl<'a, T: Type + 'static> Type for &'a T {
 impl<T: Type> Type for [T] {
     const NAME: &'static str = T::NAME;
     const SID: TypeSid = sid!();
-    const IMPL_LOCATION: ImplLocation = impl_location!();
 
     fn inline(defs: DefOpts, generics: &[DataType]) -> DataType {
         T::inline(defs, generics)
@@ -54,7 +51,6 @@ impl<T: Type> Type for [T] {
 impl<'a, T: ?Sized + ToOwned + Type + 'static> Type for std::borrow::Cow<'a, T> {
     const NAME: &'static str = T::NAME;
     const SID: TypeSid = sid!();
-    const IMPL_LOCATION: ImplLocation = impl_location!();
 
     fn inline(defs: DefOpts, generics: &[DataType]) -> DataType {
         T::inline(defs, generics)
@@ -138,7 +134,6 @@ impl_for_list!(
 impl<'a, T: Type> Type for &'a [T] {
     const NAME: &'static str = "&[T]";
     const SID: TypeSid = sid!();
-    const IMPL_LOCATION: ImplLocation = impl_location!();
 
     fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         <Vec<T>>::inline(opts, generics)
@@ -152,7 +147,6 @@ impl<'a, T: Type> Type for &'a [T] {
 impl<const N: usize, T: Type> Type for [T; N] {
     const NAME: &'static str = "&[T; N]";
     const SID: TypeSid = sid!();
-    const IMPL_LOCATION: ImplLocation = impl_location!();
 
     fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         <Vec<T>>::inline(opts, generics)
@@ -166,7 +160,6 @@ impl<const N: usize, T: Type> Type for [T; N] {
 impl<T: Type> Type for Option<T> {
     const NAME: &'static str = "Option";
     const SID: TypeSid = sid!();
-    const IMPL_LOCATION: ImplLocation = impl_location!();
 
     fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         DataType::Nullable(Box::new(generics.get(0).cloned().unwrap_or_else(|| {
@@ -215,7 +208,6 @@ const _: () = {
     impl Type for serde_json::Value {
         const NAME: &'static str = "Value";
         const SID: TypeSid = sid!();
-        const IMPL_LOCATION: ImplLocation = impl_location!();
 
         fn inline(_: DefOpts, _: &[DataType]) -> DataType {
             DataType::Any
@@ -243,7 +235,6 @@ const _: () = {
     impl<T: TimeZone> Type for DateTime<T> {
         const NAME: &'static str = "DateTime";
         const SID: TypeSid = sid!();
-        const IMPL_LOCATION: ImplLocation = impl_location!();
 
         fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
             String::inline(opts, generics)
@@ -254,7 +245,6 @@ const _: () = {
     impl<T: TimeZone> Type for Date<T> {
         const NAME: &'static str = "DateTime";
         const SID: TypeSid = sid!();
-        const IMPL_LOCATION: ImplLocation = impl_location!();
 
         fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
             String::inline(opts, generics)

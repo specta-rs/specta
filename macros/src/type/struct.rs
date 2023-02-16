@@ -109,7 +109,7 @@ pub fn parse_struct(
 
                         match &mut ty {
                             #crate_ref::DataType::Enum(e) => {
-                                e.make_flattenable();
+                                e.item.make_flattenable();
                             }
                             _ => {}
                         }
@@ -140,12 +140,35 @@ pub fn parse_struct(
                 .map(|t| quote!(Some(#t)))
                 .unwrap_or(quote!(None));
 
-            quote!(#crate_ref::ObjectType {
-                // name: <Self as #crate_ref::Type>::NAME,
-                generics: vec![#(#definition_generics),*],
-                fields: vec![#(#fields),*],
-                tag: #tag,
-            }.into())
+            let comments = {
+                let comments = &container_attrs.doc;
+                quote!(&[#(#comments),*])
+            };
+            let should_export = match container_attrs.export {
+                Some(export) => quote!(Some(#export)),
+                None => quote!(None),
+            };
+            let deprecated = match &container_attrs.deprecated {
+                Some(msg) => quote!(Some(#msg)),
+                None => quote!(None),
+            };
+
+            quote!(
+                // TODO: Do `CustomDataType` in a centeral place for both struct and enum
+                #crate_ref::CustomDataType {
+                    name: <Self as #crate_ref::Type>::NAME,
+                    sid: <Self as #crate_ref::Type>::SID, // #crate_ref::sid!(@with_specta_path; #crate_name)
+                    impl_location: #crate_ref::impl_location!(@with_specta_path; #crate_ref),
+                    comments: #comments,
+                    export: #should_export,
+                    deprecated: #deprecated,
+                    item: #crate_ref::ObjectType {
+                        generics: vec![#(#definition_generics),*],
+                        fields: vec![#(#fields),*],
+                        tag: #tag,
+                    }
+                }.into()
+            )
         }
         Fields::Unnamed(_) => {
             if struct_attrs.transparent {
