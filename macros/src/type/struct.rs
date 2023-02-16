@@ -107,9 +107,9 @@ pub fn parse_struct(
                             type_map: opts.type_map
                         }, &generics);
 
-                        match &mut ty.item {
-                            #crate_ref::DataTypeItem::Enum(e) => {
-                                e.item.make_flattenable();
+                        match &mut ty {
+                            #crate_ref::DataType::Enum(e) => {
+                                e.make_flattenable();
                             }
                             _ => {}
                         }
@@ -209,15 +209,10 @@ pub fn parse_struct(
         // TODO: This whole block looks way overcomplicated
         quote! {
             #crate_ref::TypeCategory::Reference {
-                reference: #crate_ref::DataType {
+                reference: #crate_ref::DataType::Reference {
                     name: <Self as #crate_ref::Type>::NAME,
                     sid: <Self as #crate_ref::Type>::SID,
-                    impl_location: <Self as #crate_ref::Type>::IMPL_LOCATION,
-                    item: #crate_ref::DataTypeItem::Reference {
-                        name: <Self as #crate_ref::Type>::NAME,
-                        sid: <Self as #crate_ref::Type>::SID,
-                        generics: vec![#(#reference_generics),*],
-                    },
+                    generics: vec![#(#reference_generics),*],
                 }
             }
         }

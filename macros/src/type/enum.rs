@@ -197,15 +197,10 @@ pub fn parse_enum(
         }.into()),
         quote! {
             #crate_ref::TypeCategory::Reference {
-                reference: #crate_ref::DataType {
+                reference: #crate_ref::DataType::Reference {
                     name: <Self as #crate_ref::Type>::NAME,
+                    generics: vec![#(#reference_generics),*],
                     sid: <Self as #crate_ref::Type>::SID,
-                    impl_location: <Self as #crate_ref::Type>::IMPL_LOCATION,
-                    item: #crate_ref::DataTypeItem::Reference {
-                        name: <Self as #crate_ref::Type>::NAME,
-                        generics: vec![#(#reference_generics),*],
-                        sid: <Self as #crate_ref::Type>::SID,
-                    },
                 }
             }
         },

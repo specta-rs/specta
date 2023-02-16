@@ -29,6 +29,8 @@ pub enum TypeCategory {
 /// Provides runtime type information that can be fed into a language exporter to generate a type definition in another language.
 /// Avoid implementing this trait yourself where possible and use the [`Type`](derive@crate::Type) macro instead.
 pub trait Type {
+    // TODO: Most all these const params onto `CustomType` and refactor around that!
+
     /// The name of the type
     const NAME: &'static str;
 
@@ -104,12 +106,9 @@ pub trait Type {
         match category {
             TypeCategory::Inline(inline) => inline,
             TypeCategory::Reference { reference } => {
-                opts.type_map.entry(Self::NAME).or_insert(DataType {
-                    name: Self::NAME,
-                    sid: Self::SID,
-                    impl_location: Self::IMPL_LOCATION,
-                    item: DataTypeItem::Placeholder,
-                });
+                opts.type_map
+                    .entry(Self::NAME)
+                    .or_insert(DataType::Placeholder);
 
                 let definition = Self::definition(DefOpts {
                     parent_inline: false,
@@ -118,16 +117,17 @@ pub trait Type {
 
                 if let Some(ty) = opts.type_map.get(&Self::NAME) {
                     // TODO: Properly detect duplicate name where SID don't match
+                    todo!();
                     // println!("{:#?} {:?}", ty, definition);
-                    if matches!(ty.item, DataTypeItem::Placeholder) {
-                        opts.type_map.insert(Self::NAME, definition);
-                    } else if ty.sid != definition.sid {
-                        // TODO: Return runtime error instead of panicking
-                        #[allow(clippy::panic)]
-                        {
-                            panic!("Specta: you have tried to export two types both called '{}' declared at '{}' and '{}'! You could give both types a unique name or put `#[specta(inline)]` on one/both of them to cause it to be exported without a name.", ty.name, ty.impl_location.as_str(), definition.impl_location.as_str());
-                        }
-                    }
+                    // if matches!(ty.item, DataType::Placeholder) {
+                    //     opts.type_map.insert(Self::NAME, definition);
+                    // } else if ty.sid != definition.sid {
+                    //     // TODO: Return runtime error instead of panicking
+                    //     #[allow(clippy::panic)]
+                    //     {
+                    //         panic!("Specta: you have tried to export two types both called '{}' declared at '{}' and '{}'! You could give both types a unique name or put `#[specta(inline)]` on one/both of them to cause it to be exported without a name.", ty.name, ty.impl_location.as_str(), definition.impl_location.as_str());
+                    //     }
+                    // }
                 } else {
                     opts.type_map.insert(Self::NAME, definition);
                 }
@@ -137,6 +137,22 @@ pub trait Type {
         }
     }
 }
+
+/// TODO
+pub trait CustomType {}
+
+// TODO: Do this
+// impl<T: CustomType> Type for T {
+//     const NAME: &'static str;
+
+//     const SID: TypeSid;
+
+//     const IMPL_LOCATION: ImplLocation;
+
+//     fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
+//         todo!()
+//     }
+// }
 
 /// A marker trait for compile-time validation of which types can be flattened.
 pub trait Flatten: Type {}

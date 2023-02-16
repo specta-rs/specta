@@ -47,7 +47,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                             key: stringify!(#ident),
                             optional: false,
                             flatten: false
-                            ty: t.#ident.into(), // DataTypeItem -> DataType // TODO: Fix this
+                            ty: t.#ident, // .into(), // DataTypeItem -> DataType // TODO: Fix this
                         }
                     })
                 });

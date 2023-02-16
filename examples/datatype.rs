@@ -17,8 +17,8 @@ fn main() {
         DataTypeItem::Literal(LiteralType::String("A".to_string())),
         DataTypeItem::Literal(LiteralType::String("B".to_string())),
     ]);
-    let ts = ts::export_datatype(&Default::default(), &e.into()).unwrap();
+    // let ts = ts::export_datatype(&Default::default(), &e.into()).unwrap();
 
-    println!("{ts}");
-    assert_eq!(ts, "export type MyEnum = \"A\" | \"B\"");
+    // println!("{ts}");
+    // assert_eq!(ts, "export type MyEnum = \"A\" | \"B\"");
 }

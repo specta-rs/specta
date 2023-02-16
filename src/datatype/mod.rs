@@ -22,32 +22,7 @@ pub struct DefOpts<'a> {
 /// A wrapper around [DataTypeItem] to store general information about the type.
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
-pub struct DataType {
-    pub name: &'static str,
-    pub sid: TypeSid,
-    pub impl_location: ImplLocation,
-    pub item: DataTypeItem,
-}
-
-impl DataType {
-    pub fn should_export(&self, default: bool) -> bool {
-        match &self.item {
-            // TODO: Why did I comment these out?
-            // DataTypeItem::Reference { .. } => true,
-            // DataTypeItem::Generic(_) => true,
-            DataTypeItem::Object(obj) => obj.export.unwrap_or(default),
-            DataTypeItem::Enum(en) => en.export.unwrap_or(default),
-            _ => false,
-        }
-    }
-}
-
-// TODO: Should a bunch of this stuff be moved into the `specta::datatype` module?
-
-/// this is used internally to represent the types.
-#[derive(Debug, Clone, PartialEq)]
-#[allow(missing_docs)]
-pub enum DataTypeItem {
+pub enum DataType {
     // Always inlined
     Any,
     Primitive(PrimitiveType),
@@ -67,12 +42,44 @@ pub enum DataTypeItem {
     },
     Generic(GenericType),
     /// Used when the type is not yet known. This allows us to avoid stack overflows.
-    /// It should never be returned from the Specta functions. Doing so is a Specta bug!
+    /// It should never be returned from the Specta functions. Doing so is classed as a bug!
     Placeholder,
 }
 
+impl DataType {
+    pub fn should_export(&self, default: bool) -> bool {
+        match self {
+            // TODO: Why did I comment these out? -> I think they can be removed?
+            // DataTypeItem::Reference { .. } => true,
+            // DataTypeItem::Generic(_) => true,
+            DataType::Object(obj) => obj.export.unwrap_or(default),
+            DataType::Enum(en) => en.export.unwrap_or(default),
+            _ => false,
+        }
+    }
+
+    pub fn type_name(&self) -> &'static str {
+        // TODO: Can this emit the name even if wrapped in primitves? Eg. `Option<MyAwesomeCustomStruct>`?
+        todo!();
+    }
+
+    pub fn sid(&self) -> Option<TypeSid> {
+        match self {
+            DataType::Object(obj) => Some(obj.sid),
+            DataType::Enum(en) => Some(en.sid),
+            DataType::Reference { sid, .. } => Some(*sid), // TODO: Should I have this case?
+            _ => None,
+        }
+    }
+}
+
+// TODO: Should a bunch of this stuff be moved into the `specta::datatype` module?
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct CustomDataType<T> {
+    pub name: &'static str,
+    pub sid: TypeSid,
+    pub impl_location: ImplLocation,
     pub comments: &'static [&'static str],
     pub export: Option<bool>,
     pub deprecated: Option<&'static str>,
@@ -161,15 +168,13 @@ pub enum LiteralType {
 
 impl From<PrimitiveType> for DataType {
     fn from(t: PrimitiveType) -> Self {
-        // Self::Primitive(t)
-        todo!();
+        Self::Primitive(t)
     }
 }
 
 impl From<LiteralType> for DataType {
     fn from(t: LiteralType) -> Self {
-        // Self::Literal(t)
-        todo!();
+        Self::Literal(t)
     }
 }
 
@@ -189,62 +194,34 @@ impl From<EnumType> for DataType {
 
 impl From<GenericType> for DataType {
     fn from(t: GenericType) -> Self {
-        // Self::Generic(t)
-        todo!();
+        Self::Generic(t)
     }
 }
 
-// TODO: Remove?
 impl From<TupleType> for DataType {
     fn from(t: TupleType) -> Self {
-        // DataType {
-        //     name: todo!(),
-        //     sid: todo!(),
-        //     impl_location: todo!(),
-        //     item: DataTypeItem::Tuple(t),
-        // }
-        todo!();
+        DataType::Tuple(t)
     }
 }
 
-impl From<TupleType> for DataTypeItem {
-    fn from(t: TupleType) -> Self {
-        // DataType {
-        //     name: todo!(),
-        //     sid: todo!(),
-        //     impl_location: todo!(),
-        //     item: DataTypeItem::Tuple(t),
-        // }
-        todo!();
-    }
-}
-
-impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
-    fn from(t: Vec<T>) -> Self {
-        todo!();
-        //         // DataType {
-        //         //     name: "",
-        //         //     // TODO: Generating sid and impl_location is probs bad. Maybe try and avoid it?
-        //         //     sid: sid!(),
-        //         //     impl_location: impl_location!(),
-        //         //     item: DataTypeItem::Enum(EnumType {
-        //         //         // name: "",
-        //         //         variants: t
-        //         //             .into_iter()
-        //         //             .map(|t| -> EnumVariant {
-        //         //                 EnumVariant::Unnamed(TupleType {
-        //         //                     // name: "",
-        //         //                     fields: vec![t.into()],
-        //         //                     generics: vec![],
-        //         //                 })
-        //         //             })
-        //         //             .collect(),
-        //         //         generics: vec![],
-        //         //         repr: EnumRepr::Untagged,
-        //         //     }),
-        //         // }
-    }
-}
+// TODO
+// impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
+//     fn from(t: Vec<T>) -> Self {
+//         DataType::Enum(EnumType {
+//             variants: t
+//                 .into_iter()
+//                 .map(|t| -> EnumVariant {
+//                     EnumVariant::Unnamed(TupleType {
+//                         fields: vec![t.into()],
+//                         generics: vec![],
+//                     })
+//                 })
+//                 .collect(),
+//             generics: vec![],
+//             repr: EnumRepr::Untagged,
+//         })
+//     }
+// }
 
 impl<T: Into<DataType> + 'static> From<Option<T>> for DataType {
     fn from(t: Option<T>) -> Self {
@@ -253,20 +230,14 @@ impl<T: Into<DataType> + 'static> From<Option<T>> for DataType {
     }
 }
 
-// impl<'a> From<&'a str> for DataType {
-//     fn from(t: &'a str) -> Self {
-//         LiteralType::String(t.to_string()).into()
-//     }
-// }
+impl<'a> From<&'a str> for DataType {
+    fn from(t: &'a str) -> Self {
+        LiteralType::String(t.to_string()).into()
+    }
+}
 
-// impl From<String> for DataType {
-//     fn from(t: String) -> Self {
-//         LiteralType::String(t).into()
-//     }
-// }
-
-// impl From<DataType> for DataTypeItem {
-//     fn from(value: DataType) -> Self {
-//         value.item
-//     }
-// }
+impl From<String> for DataType {
+    fn from(t: String) -> Self {
+        LiteralType::String(t).into()
+    }
+}
