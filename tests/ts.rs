@@ -118,6 +118,11 @@ fn typescript_types() {
     assert_ts!(SkipVariant2, r#"{ tag: "A"; data: string }"#);
     assert_ts!(SkipVariant3, "{ A: { a: string } }");
 
+    assert_ts!(
+        EnumMacroAttributes,
+        "{ A: string } | { bbb: number } | { cccc: number } | { D: { a: string; bbbbbb: number } } "
+    );
+
     assert_ts_export!(
         DocComments,
         "/**\n *  Type level doc comment\n */\nexport type DocComments = { a: string }"
@@ -261,6 +266,22 @@ enum SkipVariant3 {
     },
     #[specta(skip)]
     C {
+        b: i32,
+    },
+}
+
+#[derive(Type)]
+#[specta(export = false)]
+pub enum EnumMacroAttributes {
+    A(#[specta(type = String)] i32),
+    #[specta(rename = "bbb")]
+    B(i32),
+    #[specta(rename = "cccc")]
+    C(#[specta(type = i32)] String),
+    D {
+        #[specta(type = String)]
+        a: i32,
+        #[specta(rename = "bbbbbb")]
         b: i32,
     },
 }
