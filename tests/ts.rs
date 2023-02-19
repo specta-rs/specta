@@ -120,7 +120,7 @@ fn typescript_types() {
 
     assert_ts!(
         EnumMacroAttributes,
-        "{ A: string } | { bbb: number } | { cccc: number } | { D: { a: string; bbbbbb: number } } "
+        "{ A: string } | { bbb: number } | { cccc: number } | { D: { a: string; bbbbbb: number } }"
     );
 
     assert_ts_export!(
@@ -128,6 +128,11 @@ fn typescript_types() {
         "/**\n *  Type level doc comment\n */\nexport type DocComments = { a: string }"
     );
     assert_ts_export!(DocComments, "export type DocComments = { a: string }"; &ExportConfiguration::new().comment_style(None));
+
+    assert_ts_export!(
+        Recursive,
+        "export type Recursive = { a: number; children: Recursive[] }"
+    );
 
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");
@@ -292,6 +297,14 @@ pub enum EnumMacroAttributes {
 pub struct DocComments {
     /// Field level doc comment
     a: String,
+}
+
+#[derive(Type)]
+#[specta(export = false)]
+pub struct Recursive {
+    /// Field level doc comment
+    a: i32,
+    children: Vec<Recursive>,
 }
 
 // #[derive(Type)]
