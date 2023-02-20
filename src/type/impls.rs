@@ -141,28 +141,20 @@ impl<const N: usize, T: Type> Type for [T; N] {
 
 impl<T: Type> Type for Option<T> {
     fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
-        DataType::Nullable(Box::new(generics.get(0).cloned().unwrap_or_else(|| {
-            T::inline(
-                DefOpts {
-                    parent_inline: false,
-                    type_map: opts.type_map,
-                },
-                generics,
-            )
-        })))
+        DataType::Nullable(Box::new(
+            generics
+                .get(0)
+                .cloned()
+                .unwrap_or_else(|| T::inline(opts, generics)),
+        ))
     }
 
     fn category_impl(opts: DefOpts, generics: &[DataType]) -> TypeCategory {
         TypeCategory::Inline(DataType::Nullable(Box::new(
-            generics.get(0).cloned().unwrap_or_else(|| {
-                T::reference(
-                    DefOpts {
-                        parent_inline: false,
-                        type_map: opts.type_map,
-                    },
-                    generics,
-                )
-            }),
+            generics
+                .get(0)
+                .cloned()
+                .unwrap_or_else(|| T::reference(opts, generics)),
         )))
     }
 }

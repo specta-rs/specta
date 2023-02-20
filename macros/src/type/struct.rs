@@ -41,12 +41,17 @@ pub fn parse_struct(
         })
         .collect::<Vec<_>>();
 
+    let parent_inline = container_attrs
+        .inline
+        .then(|| quote!(true))
+        .unwrap_or(quote!(opts.parent_inline));
+
     let reference_generics = generic_idents.iter().map(|(i, ident)| {
         quote! {
             generics.get(#i).cloned().unwrap_or_else(||
                 <#ident as #crate_ref::Type>::reference(
                     #crate_ref::DefOpts {
-                        parent_inline: false,
+                        parent_inline: #parent_inline,
                         type_map: opts.type_map
                     },
                     &[]
@@ -93,6 +98,11 @@ pub fn parse_struct(
                 let optional = field_attrs.optional;
                 let flatten = field_attrs.flatten;
 
+                let parent_inline = field_attrs
+                    .inline
+                    .then(|| quote!(true))
+                    .unwrap_or(quote!(opts.parent_inline));
+
                 let ty = if field_attrs.flatten {
                     quote! {
                         #[allow(warnings)]
@@ -104,7 +114,7 @@ pub fn parse_struct(
                         validate_flatten::<#field_ty>();
 
                         let mut ty = <#field_ty as #crate_ref::Type>::inline(#crate_ref::DefOpts {
-                            parent_inline: false,
+                            parent_inline: #parent_inline,
                             type_map: opts.type_map
                         }, &generics);
 

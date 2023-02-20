@@ -36,7 +36,7 @@ pub fn parse_enum(
             generics.get(#i).cloned().unwrap_or_else(
                 || <#ident as #crate_ref::Type>::reference(
                     #crate_ref::DefOpts {
-                        parent_inline: false,
+                        parent_inline: opts.parent_inline,
                         type_map: opts.type_map
                     },
                     &[]
@@ -125,7 +125,7 @@ pub fn parse_enum(
                                 field_ty,
                                 &generic_idents,
                                 crate_ref,
-                                false,
+                                attrs.inline,
                             )?;
 
                             Ok(quote!({
@@ -155,7 +155,7 @@ pub fn parse_enum(
                                 field_ty,
                                 &generic_idents,
                                 crate_ref,
-                                false,
+                                attrs.inline,
                             )?;
 
                             let field_ident_str = unraw_raw_ident(field.ident.as_ref().unwrap());

@@ -92,6 +92,10 @@ pub fn construct_datatype(
         false => quote!(reference),
     };
 
+    let parent_inline = inline
+        .then(|| quote!(true))
+        .unwrap_or(quote!(opts.parent_inline));
+
     let path = match ty {
         Type::Tuple(t) => {
             let elems = t
@@ -119,7 +123,7 @@ pub fn construct_datatype(
                 #(#elems)*
 
                 let #var_ident = <#ty as #crate_ref::Type>::#method(#crate_ref::DefOpts {
-                    parent_inline: false,
+                    parent_inline: #parent_inline,
                     type_map: opts.type_map
                 }, &[#(#generic_var_idents),*]);
             });
@@ -138,7 +142,7 @@ pub fn construct_datatype(
                 #elem
 
                 let #var_ident = <#ty as #crate_ref::Type>::#method(#crate_ref::DefOpts {
-                    parent_inline: false,
+                    parent_inline: #parent_inline,
                     type_map: opts.type_map
                 }, &[#elem_var_ident]);
             });
@@ -156,7 +160,7 @@ pub fn construct_datatype(
         Type::Macro(m) => {
             return Ok(quote! {
                 let #var_ident = <#m as #crate_ref::Type>::#method(#crate_ref::DefOpts {
-                    parent_inline: false,
+                    parent_inline: #parent_inline,
                     type_map: opts.type_map
                 }, &[]);
             });
@@ -181,7 +185,7 @@ pub fn construct_datatype(
                 let #var_ident = generics.get(#i).map(Clone::clone).unwrap_or_else(||
                     <#generic_ident as #crate_ref::Type>::#method(
                         #crate_ref::DefOpts {
-                            parent_inline: #inline,
+                            parent_inline: #parent_inline,
                             type_map: opts.type_map
                         },
                         &[#crate_ref::DataType::Generic(#crate_ref::GenericType(
@@ -234,7 +238,7 @@ pub fn construct_datatype(
 
         let #var_ident = <#ty as #crate_ref::Type>::#method(
             #crate_ref::DefOpts {
-                parent_inline: #inline,
+                parent_inline: #parent_inline,
                 type_map: opts.type_map
             },
             &[#(#generic_var_idents),*]

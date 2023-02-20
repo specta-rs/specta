@@ -16,13 +16,6 @@ macro_rules! assert_ts {
 }
 pub(crate) use assert_ts;
 
-macro_rules! assert_ts_export_err {
-    ($t:ty, $e:expr) => {
-        assert_eq!(specta::ts::export::<$t>(&Default::default()), Err($e));
-    };
-}
-pub(crate) use assert_ts_export_err;
-
 macro_rules! assert_ts_export {
     ($t:ty, $e:expr) => {
         assert_eq!(specta::ts::export::<$t>(&Default::default()), Ok($e.into()))
@@ -130,6 +123,17 @@ fn typescript_types() {
         Recursive,
         "export type Recursive = { a: number; children: Recursive[] }"
     );
+
+    assert_ts_export!(
+        InlineEnumField,
+        "export type InlineEnumField = { A: { a: string } }"
+    );
+
+    // TODO: Fix this
+    // assert_ts_export!(
+    //     InlineOptionalType,
+    //     "export type InlineOptionalType = { optional_field: { a: string } | null }"
+    // );
 
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");
@@ -299,9 +303,23 @@ pub struct DocComments {
 #[derive(Type)]
 #[specta(export = false)]
 pub struct Recursive {
-    /// Field level doc comment
     a: i32,
     children: Vec<Recursive>,
+}
+
+#[derive(Type)]
+#[specta(export = false)]
+
+pub enum InlineEnumField {
+    #[specta(inline)]
+    A(DocComments),
+}
+
+#[derive(Type)]
+#[specta(export = false)]
+pub struct InlineOptionalType {
+    #[specta(inline)]
+    pub optional_field: Option<DocComments>,
 }
 
 // #[derive(Type)]

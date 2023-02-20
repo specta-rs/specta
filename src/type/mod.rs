@@ -63,7 +63,7 @@ pub trait Type {
     fn reference(opts: DefOpts, generics: &[DataType]) -> DataType {
         let category = Self::category_impl(
             DefOpts {
-                parent_inline: false,
+                parent_inline: opts.parent_inline,
                 type_map: opts.type_map,
             },
             generics,
@@ -78,7 +78,7 @@ pub trait Type {
                         .or_insert(DataType::Placeholder);
 
                     let definition = Self::definition(DefOpts {
-                        parent_inline: false,
+                        parent_inline: opts.parent_inline,
                         type_map: opts.type_map,
                     });
 

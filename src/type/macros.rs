@@ -44,20 +44,14 @@ macro_rules! impl_containers {
         impl<T: Type> Type for $container<T> {
             fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
                 generics.get(0).cloned().unwrap_or(T::inline(
-                    DefOpts {
-                        parent_inline: false,
-                        type_map: opts.type_map,
-                    },
+                    opts,
                     generics,
                 ))
             }
 
             fn reference(opts: DefOpts, generics: &[DataType]) -> DataType {
                 generics.get(0).cloned().unwrap_or(T::reference(
-                    DefOpts {
-                        parent_inline: false,
-                        type_map: opts.type_map,
-                    },
+                    opts,
                     generics,
                 ))
             }
@@ -84,20 +78,14 @@ macro_rules! impl_for_list {
         impl<T: Type> Type for $ty {
             fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
                 DataType::List(Box::new(generics.get(0).cloned().unwrap_or(T::inline(
-                    DefOpts {
-                        parent_inline: false,
-                        type_map: opts.type_map,
-                    },
+                    opts,
                     generics,
                 ))))
             }
 
             fn reference(opts: DefOpts, generics: &[DataType]) -> DataType {
                 DataType::List(Box::new(generics.get(0).cloned().unwrap_or(T::reference(
-                    DefOpts {
-                        parent_inline: false,
-                        type_map: opts.type_map,
-                    },
+                    opts,
                     generics,
                 ))))
             }
@@ -108,19 +96,19 @@ macro_rules! impl_for_list {
 macro_rules! impl_for_map {
     ($ty:path as $name:expr) => {
         impl<K: Type, V: Type> Type for $ty {
-            fn inline(defs: DefOpts, generics: &[DataType]) -> DataType {
+            fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
                 DataType::Record(Box::new((
                     generics.get(0).cloned().unwrap_or(<K as Type>::inline(
                         DefOpts {
-                            parent_inline: false,
-                            type_map: defs.type_map,
+                            parent_inline: opts.parent_inline,
+                            type_map: opts.type_map,
                         },
                         &[],
                     )),
                     generics.get(1).cloned().unwrap_or(<V as Type>::inline(
                         DefOpts {
-                            parent_inline: false,
-                            type_map: defs.type_map,
+                            parent_inline: opts.parent_inline,
+                            type_map: opts.type_map,
                         },
                         &[],
                     )),
@@ -131,14 +119,14 @@ macro_rules! impl_for_map {
                 DataType::Record(Box::new((
                     generics.get(0).cloned().unwrap_or(K::reference(
                         DefOpts {
-                            parent_inline: false,
+                            parent_inline: opts.parent_inline,
                             type_map: opts.type_map,
                         },
                         generics,
                     )),
                     generics.get(1).cloned().unwrap_or(V::reference(
                         DefOpts {
-                            parent_inline: false,
+                            parent_inline: opts.parent_inline,
                             type_map: opts.type_map,
                         },
                         generics,

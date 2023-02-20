@@ -7,6 +7,7 @@ pub struct VariantAttr {
     pub rename_all: Option<Inflection>,
     pub rename: Option<String>,
     pub skip: bool,
+    pub inline: bool,
 }
 
 impl_parse! {
@@ -16,6 +17,7 @@ impl_parse! {
         "skip" => out.skip = attr.parse_bool().unwrap_or(true),
         "skip_serializing" => out.skip = true,
         "skip_deserializing" => out.skip = true,
+        "inline" => out.inline = attr.parse_bool().unwrap_or(true),
     }
 }
 

@@ -26,7 +26,7 @@ pub mod ts;
 
 macro_rules! primitive_def {
     ($($t:ident)+) => {
-        $(DataType::Primitive(PrimitiveType::$t))|+
+        $(PrimitiveType::$t)|+
     }
 }
 
