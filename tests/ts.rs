@@ -115,11 +115,21 @@ fn typescript_types() {
     assert_ts!(SkipVariant2, r#"{ tag: "A"; data: string }"#);
     assert_ts!(SkipVariant3, "{ A: { a: string } }");
 
+    assert_ts!(
+        EnumMacroAttributes,
+        "{ A: string } | { bbb: number } | { cccc: number } | { D: { a: string; bbbbbb: number } }"
+    );
+
     assert_ts_export!(
         DocComments,
         "/**\n *  Type level doc comment\n */\nexport type DocComments = { a: string }"
     );
     assert_ts_export!(DocComments, "export type DocComments = { a: string }"; &ExportConfiguration::new().comment_style(None));
+
+    assert_ts_export!(
+        Recursive,
+        "export type Recursive = { a: number; children: Recursive[] }"
+    );
 
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");
@@ -262,12 +272,36 @@ enum SkipVariant3 {
     },
 }
 
+#[derive(Type)]
+#[specta(export = false)]
+pub enum EnumMacroAttributes {
+    A(#[specta(type = String)] i32),
+    #[specta(rename = "bbb")]
+    B(i32),
+    #[specta(rename = "cccc")]
+    C(#[specta(type = i32)] String),
+    D {
+        #[specta(type = String)]
+        a: i32,
+        #[specta(rename = "bbbbbb")]
+        b: i32,
+    },
+}
+
 /// Type level doc comment
 #[derive(Type)]
 #[specta(export = false)]
 pub struct DocComments {
     /// Field level doc comment
     a: String,
+}
+
+#[derive(Type)]
+#[specta(export = false)]
+pub struct Recursive {
+    /// Field level doc comment
+    a: i32,
+    children: Vec<Recursive>,
 }
 
 // #[derive(Type)]

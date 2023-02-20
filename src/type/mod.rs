@@ -72,29 +72,16 @@ pub trait Type {
         match category {
             TypeCategory::Inline(inline) => inline,
             TypeCategory::Reference(def) => {
-                opts.type_map
-                    .entry(def.sid)
-                    .or_insert(DataType::Placeholder);
+                if opts.type_map.get(&def.sid).is_none() {
+                    opts.type_map
+                        .entry(def.sid)
+                        .or_insert(DataType::Placeholder);
 
-                let definition = Self::definition(DefOpts {
-                    parent_inline: false,
-                    type_map: opts.type_map,
-                });
+                    let definition = Self::definition(DefOpts {
+                        parent_inline: false,
+                        type_map: opts.type_map,
+                    });
 
-                if let Some(ty) = opts.type_map.get(&def.sid) {
-                    // TODO: Properly detect duplicate name where SID don't match
-                    // todo!();
-                    // println!("{:#?} {:?}", ty, definition);
-                    // if matches!(ty.item, DataType::Placeholder) {
-                    //     opts.type_map.insert(Self::NAME, definition);
-                    // } else if ty.sid != definition.sid {
-                    //     // TODO: Return runtime error instead of panicking
-                    //     #[allow(clippy::panic)]
-                    //     {
-                    //         panic!("Specta: you have tried to export two types both called '{}' declared at '{}' and '{}'! You could give both types a unique name or put `#[specta(inline)]` on one/both of them to cause it to be exported without a name.", ty.name, ty.impl_location.as_str(), definition.impl_location.as_str());
-                    //     }
-                    // }
-                } else {
                     opts.type_map.insert(def.sid, definition);
                 }
 
