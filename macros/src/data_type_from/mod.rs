@@ -96,19 +96,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 #body
             }
         }
-
-        // #[automatically_derived]
-        // impl From<#ident> for #crate_ref::DataType {
-        //     fn from(t: #ident) -> Self {
-        //         // This impl is created as a unique type.
-        //         #crate_ref::DataType {
-        //             name: stringify!(#ident),
-        //             sid: #crate_ref::sid!(stringify!(#ident), #crate_ref::impl_location!().as_str()),
-        //             impl_location: #crate_ref::impl_location!(),
-        //             item: #body,
-        //         }
-        //     }
-        // }
     }
     .into())
 }
