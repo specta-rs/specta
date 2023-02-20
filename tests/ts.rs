@@ -11,27 +11,24 @@ use specta::{ts::ExportConfiguration, Type};
 
 macro_rules! assert_ts {
     ($t:ty, $e:expr) => {
-        assert_eq!(specta::ts::inline::<$t>(&Default::default()).unwrap(), $e)
+        assert_eq!(specta::ts::inline::<$t>(&Default::default()), Ok($e.into()))
     };
 }
 pub(crate) use assert_ts;
 
 macro_rules! assert_ts_export_err {
-    ($t:ty, $e:pat) => {
-        match specta::ts::export::<$t>(&Default::default()) {
-            Err($e) => {}
-            v => assert!(false, "got {:?} but expected {}'", v, stringify!($e)),
-        }
+    ($t:ty, $e:expr) => {
+        assert_eq!(specta::ts::export::<$t>(&Default::default()), Err($e));
     };
 }
 pub(crate) use assert_ts_export_err;
 
 macro_rules! assert_ts_export {
     ($t:ty, $e:expr) => {
-        assert_eq!(specta::ts::export::<$t>(&Default::default()).unwrap(), $e)
+        assert_eq!(specta::ts::export::<$t>(&Default::default()), Ok($e.into()))
     };
     ($t:ty, $e:expr; $cfg:expr) => {
-        assert_eq!(specta::ts::export::<$t>($cfg).unwrap(), $e)
+        assert_eq!(specta::ts::export::<$t>($cfg), Ok($e.into()))
     };
 }
 pub(crate) use assert_ts_export;

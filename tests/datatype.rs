@@ -20,8 +20,8 @@
 // fn test_datatype() {
 //     let dt: DataType = Procedures1 { queries: vec![] }.into();
 //     assert_eq!(
-//         &ts::datatype(&Default::default(), &dt).unwrap(),
-//         "{ queries: never }"
+//         &ts::datatype(&Default::default(), &dt),
+//         Ok("{ queries: never }".into())
 //     );
 
 //     let dt: DataType = Procedures1 {
@@ -34,14 +34,14 @@
 //     }
 //     .into();
 //     assert_eq!(
-//         &ts::datatype(&Default::default(), &dt).unwrap(),
-//         r#"{ queries: "A" | "B" | true | 42 }"#
+//         &ts::datatype(&Default::default(), &dt),
+//         Ok(r#"{ queries: "A" | "B" | true | 42 }"#.into())
 //     );
 
 //     let dt: DataType = Procedures2 { queries: vec![] }.into();
 //     assert_eq!(
-//         &ts::datatype(&Default::default(), &dt).unwrap(),
-//         "{ queries: never }"
+//         &ts::datatype(&Default::default(), &dt),
+//         Ok("{ queries: never }".into())
 //     );
 
 //     assert_ts!(Procedures2, "{ queries: string }");

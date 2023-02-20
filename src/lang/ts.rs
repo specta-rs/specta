@@ -127,6 +127,34 @@ pub enum TsExportError {
     Other(String),
 }
 
+impl PartialEq for TsExportError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Self::WithCtx {
+                    ty_name: l_ty_name,
+                    field_name: l_field_name,
+                    err: l_err,
+                },
+                Self::WithCtx {
+                    ty_name: r_ty_name,
+                    field_name: r_field_name,
+                    err: r_err,
+                },
+            ) => l_ty_name == r_ty_name && l_field_name == r_field_name && l_err == r_err,
+            (Self::ForbiddenTypeName(l0), Self::ForbiddenTypeName(r0)) => l0 == r0,
+            (Self::ForbiddenFieldName(l0, l1), Self::ForbiddenFieldName(r0, r1)) => {
+                l0 == r0 && l1 == r1
+            }
+            (Self::CannotExport(l0), Self::CannotExport(r0)) => l0 == r0,
+            (Self::InternalError(l0), Self::InternalError(r0)) => l0 == r0,
+            (Self::Io(l0), Self::Io(r0)) => l0.to_string() == r0.to_string(), // This is a bit hacky but it will be fine for usage in unit tests!
+            (Self::Other(l0), Self::Other(r0)) => l0 == r0,
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
+}
+
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string with an export.
 /// Eg. `export type Foo = { demo: string; };`
 pub fn export<T: Type>(conf: &ExportConfiguration) -> Result<String, TsExportError> {

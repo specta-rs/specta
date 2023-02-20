@@ -20,7 +20,7 @@ fn test_bigint_types() {
     for_bigint_types!(T -> assert!(specta::ts::inline::<T>(&ExportConfiguration::new().bigint(BigIntExportBehavior::Fail)).is_err()));
     for_bigint_types!(T -> assert!(specta::ts::inline::<T>(&ExportConfiguration::new().bigint(BigIntExportBehavior::FailWithReason("some reason"))).is_err()));
 
-    for_bigint_types!(T -> assert_eq!(specta::ts::inline::<T>(&ExportConfiguration::new().bigint(BigIntExportBehavior::String)).unwrap(), "string"));
-    for_bigint_types!(T -> assert_eq!(specta::ts::inline::<T>(&ExportConfiguration::new().bigint(BigIntExportBehavior::Number)).unwrap(), "number"));
-    for_bigint_types!(T -> assert_eq!(specta::ts::inline::<T>(&ExportConfiguration::new().bigint(BigIntExportBehavior::BigInt)).unwrap(), "BigInt"));
+    for_bigint_types!(T -> assert_eq!(specta::ts::inline::<T>(&ExportConfiguration::new().bigint(BigIntExportBehavior::String)), Ok("string".into())));
+    for_bigint_types!(T -> assert_eq!(specta::ts::inline::<T>(&ExportConfiguration::new().bigint(BigIntExportBehavior::Number)), Ok("number".into())));
+    for_bigint_types!(T -> assert_eq!(specta::ts::inline::<T>(&ExportConfiguration::new().bigint(BigIntExportBehavior::BigInt)), Ok("BigInt".into())));
 }
