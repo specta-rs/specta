@@ -20,7 +20,7 @@ pub struct DefOpts<'a> {
 }
 
 /// A wrapper around [DataTypeItem] to store general information about the type.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub enum DataType {
     // Always inlined
@@ -51,44 +51,12 @@ pub enum DataType {
 ///
 /// This doesn't account for flattening and inlining recursive types, however, which will
 /// require a more complex solution since it will require multiple processing stages.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub struct DataTypeReference {
     pub name: &'static str,
     pub sid: TypeSid,
     pub generics: Vec<DataType>,
-}
-
-impl PartialEq for DataType {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Any, Self::Any) => true,
-            (Self::Primitive(l0), Self::Primitive(r0)) => l0 == r0,
-            (Self::Literal(l0), Self::Literal(r0)) => l0 == r0,
-            (Self::List(l0), Self::List(r0)) => l0 == r0,
-            (Self::Nullable(l0), Self::Nullable(r0)) => l0 == r0,
-            (Self::Record(l0), Self::Record(r0)) => l0 == r0,
-            (Self::Tuple(l0), Self::Tuple(r0)) => l0 == r0,
-            (Self::Object(l0), Self::Object(r0)) => l0.sid == r0.sid,
-            (Self::Enum(l0), Self::Enum(r0)) => l0.sid == r0.sid,
-            // TODO: Should the `generics` come into this check?
-            // (
-            //     Self::Reference {
-            //         name: l_name,
-            //         generics: l_generics,
-            //         sid: l_sid,
-            //         ..
-            //     },
-            //     Self::Reference {
-            //         name: r_name,
-            //         generics: r_generics,
-            //         sid: r_sid,
-            //         ..
-            //     },
-            // ) => l_name == r_name && l_generics == r_generics && l_sid == r_sid,
-            (_, _) => todo!(),
-        }
-    }
 }
 
 impl DataType {
@@ -97,8 +65,9 @@ impl DataType {
             // TODO: Why did I comment these out? -> I think they can be removed?
             // DataTypeItem::Reference { .. } => true,
             // DataTypeItem::Generic(_) => true,
-            DataType::Object(obj) => obj.export.unwrap_or(default),
-            DataType::Enum(en) => en.export.unwrap_or(default),
+            DataType::Object(CustomDataType::Named { export, .. }) => export.unwrap_or(default),
+            DataType::Enum(CustomDataType::Named { export, .. }) => export.unwrap_or(default),
+
             _ => false,
         }
     }
@@ -110,8 +79,8 @@ impl DataType {
 
     pub fn sid(&self) -> Option<TypeSid> {
         match self {
-            DataType::Object(obj) => Some(obj.sid),
-            DataType::Enum(en) => Some(en.sid),
+            DataType::Object(CustomDataType::Named { sid, .. }) => Some(*sid),
+            DataType::Enum(CustomDataType::Named { sid, .. }) => Some(*sid),
             DataType::Reference(DataTypeReference { sid, .. }) => Some(*sid), // TODO: Should I have this case?
             _ => None,
         }
@@ -121,21 +90,24 @@ impl DataType {
 // TODO: Should a bunch of this stuff be moved into the `specta::datatype` module?
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct CustomDataType<T> {
-    /// The name of the type
-    pub name: &'static str,
-    /// The Specta ID for the type. The value for this should come from the `sid!();` macro.
-    pub sid: TypeSid,
-    /// The code location where this type is implemented. Used for error reporting.
-    pub impl_location: ImplLocation,
-    /// Rust documentation comments on the type
-    pub comments: &'static [&'static str],
-    // Whether the type should export when the `export` feature is enabled.
-    /// `None` will use the default which is why `false` is not just used.
-    pub export: Option<bool>,
-    /// The Rust deprecated comment if the type is deprecated.
-    pub deprecated: Option<&'static str>,
-    pub item: T,
+pub enum CustomDataType<T> {
+    Named {
+        /// The name of the type
+        name: &'static str,
+        /// The Specta ID for the type. The value for this should come from the `sid!();` macro.
+        sid: TypeSid,
+        /// The code location where this type is implemented. Used for error reporting.
+        impl_location: ImplLocation,
+        /// Rust documentation comments on the type
+        comments: &'static [&'static str],
+        // Whether the type should export when the `export` feature is enabled.
+        /// `None` will use the default which is why `false` is not just used.
+        export: Option<bool>,
+        /// The Rust deprecated comment if the type is deprecated.
+        deprecated: Option<&'static str>,
+        item: T,
+    },
+    Unnamed(T),
 }
 
 /// this is used internally to represent the types.
@@ -242,18 +214,16 @@ impl From<CustomDataType<EnumType>> for DataType {
     }
 }
 
-// impl From<ObjectType> for DataType {
-//     fn from(t: ObjectType) -> Self {
-//         // Self::Object(t)
-//         todo!();
-//     }
-// }
+impl From<ObjectType> for DataType {
+    fn from(t: ObjectType) -> Self {
+        Self::Object(CustomDataType::Unnamed(t))
+    }
+}
 
 // TODO: Remove this
 impl From<EnumType> for DataType {
     fn from(t: EnumType) -> Self {
-        // Self::Enum(t)
-        todo!();
+        Self::Enum(CustomDataType::Unnamed(t))
     }
 }
 
@@ -269,23 +239,22 @@ impl From<TupleType> for DataType {
     }
 }
 
-// TODO: Remove this and do within `ToDataType` derive macro -> needs be named cause enum. // TODO: Is requirement good?
+// TODO: Remove this and do within `ToDataType` derive macro so it can be a `Named` enum?
 impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
     fn from(t: Vec<T>) -> Self {
-        todo!();
-        // DataType::Enum(EnumType {
-        //     variants: t
-        //         .into_iter()
-        //         .map(|t| -> EnumVariant {
-        //             EnumVariant::Unnamed(TupleType {
-        //                 fields: vec![t.into()],
-        //                 generics: vec![],
-        //             })
-        //         })
-        //         .collect(),
-        //     generics: vec![],
-        //     repr: EnumRepr::Untagged,
-        // })
+        DataType::Enum(CustomDataType::Unnamed(EnumType {
+            variants: t
+                .into_iter()
+                .map(|t| -> EnumVariant {
+                    EnumVariant::Unnamed(TupleType {
+                        fields: vec![t.into()],
+                        generics: vec![],
+                    })
+                })
+                .collect(),
+            generics: vec![],
+            repr: EnumRepr::Untagged,
+        }))
     }
 }
 

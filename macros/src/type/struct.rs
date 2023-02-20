@@ -109,8 +109,8 @@ pub fn parse_struct(
                         }, &generics);
 
                         match &mut ty {
-                            #crate_ref::DataType::Enum(e) => {
-                                e.item.make_flattenable();
+                            #crate_ref::DataType::Enum(#crate_ref::CustomDataType::Named { item, .. }) => {
+                                item.make_flattenable();
                             }
                             _ => {}
                         }
@@ -155,8 +155,7 @@ pub fn parse_struct(
             };
 
             quote!(
-                // TODO: Do `CustomDataType` in a centeral place for both struct and enum
-                #crate_ref::CustomDataType {
+                #crate_ref::CustomDataType::Named {
                     name: #name,
                     sid: SID,
                     impl_location: #crate_ref::impl_location!(@with_specta_path; #crate_ref),
