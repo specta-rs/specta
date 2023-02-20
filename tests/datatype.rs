@@ -13,7 +13,7 @@
 // #[specta(rename = "ProceduresDef")]
 // struct Procedures2 {
 //     #[specta(type = String)] // This is a lie but just for the test
-//     pub queries: Vec<DataTyp>,
+//     pub queries: Vec<DataType>,
 // }
 
 // #[test]
@@ -46,3 +46,5 @@
 
 //     assert_ts!(Procedures2, "{ queries: string }");
 // }
+
+// TODO: Reenable tests
