@@ -22,7 +22,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             .unwrap_or_else(|| "specta".into())
     );
 
-    let body = match data {
+    let (body, impl_typ) = match data {
         Data::Struct(data) => match &data.fields {
             Fields::Named(_) => {
                 let fields = data
@@ -52,18 +52,19 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     })
                 });
 
-                quote! {
-                    #crate_ref::DataType::Object(
-                        #crate_ref::CustomDataType::Annonymous(
-                            #crate_ref::DataType::Object(#crate_ref::ObjectType {
-                                name: stringify!(#ident),
-                                generics: vec![],
-                                fields: vec![#(#fields),*],
-                                tag: None,
-                            })
-                        )
-                    )
-                }
+                let impl_typ = quote!(#crate_ref::ObjectType);
+
+                (
+                    quote! {
+                        #impl_typ {
+                            name: stringify!(#ident),
+                            generics: vec![],
+                            fields: vec![#(#fields),*],
+                            tag: None,
+                        }
+                    },
+                    impl_typ,
+                )
             }
             Fields::Unnamed(_) => {
                 let fields = data.fields.iter().enumerate().map(|(i, _)| {
@@ -71,27 +72,17 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     quote!(t.#i.into()) // TODO: Replace `into` with inline impl
                 });
 
-                // custom_data_type_wrapper(
-                //     crate_ref,
-                //     container_attrs,
-                //     name,
-                //     quote! {
-                //         #crate_name::TupleType {
-                //             generics: vec![],
-                //             fields: vec![#(#fields),*]
-                //         }
-                //     },
-                // )
-                quote! {
-                    #crate_ref::DataType::Tuple(
-                        #crate_ref::CustomDataType::Annonymous(
-                            #crate_ref::TupleType {
-                                generics: vec![],
-                                fields: vec![#(#fields),*]
-                            }
-                        )
-                    )
-                }
+                let impl_typ = quote!(#crate_ref::TupleType);
+
+                (
+                    quote! {
+                        #impl_typ {
+                            generics: vec![],
+                            fields: vec![#(#fields),*]
+                        }
+                    },
+                    impl_typ,
+                )
             }
             _ => todo!("ToDataType only supports named structs"),
         },
@@ -99,13 +90,12 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     };
 
     Ok(quote! {
-        // TODO: EnumType or ObjectType or TupleType -> Cause it could be any of them and we can't go straight to `DataType`
-        // #[automatically_derived]
-        // impl From<#ident> for #crate_ref::EnumType {
-        //     fn from(_: #ident) -> #crate_ref::EnumType {
-        //         todo!();
-        //     }
-        // }
+        #[automatically_derived]
+        impl From<#ident> for #impl_typ {
+            fn from(t: #ident) -> #impl_typ {
+                #body
+            }
+        }
 
         // #[automatically_derived]
         // impl From<#ident> for #crate_ref::DataType {

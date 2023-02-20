@@ -185,14 +185,14 @@ pub fn custom_data_type_wrapper(
     };
 
     quote! {
-            #crate_ref::CustomDataType::Named {
-                name: #name,
-                sid: SID,
-                impl_location: #crate_ref::impl_location!(@with_specta_path; #crate_ref),
-                comments: #comments,
-                export: #should_export,
-                deprecated: #deprecated,
-                item: #t
-        }
+        #crate_ref::CustomDataType::Named(#crate_ref::NamedCustomDataType {
+            name: #name,
+            sid: Some(SID),
+            impl_location: Some(#crate_ref::impl_location!(@with_specta_path; #crate_ref)),
+            comments: #comments,
+            export: #should_export,
+            deprecated: #deprecated,
+            item: #t
+        })
     }
 }

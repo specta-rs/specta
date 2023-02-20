@@ -1,10 +1,16 @@
 use std::collections::BTreeMap;
 
 mod r#enum;
+mod literal;
 mod object;
+mod primitive;
+mod tuple;
 
+pub use literal::*;
 pub use object::*;
+pub use primitive::*;
 pub use r#enum::*;
+pub use tuple::*;
 
 use crate::{ImplLocation, TypeSid};
 
@@ -59,26 +65,27 @@ pub struct DataTypeReference {
     pub generics: Vec<DataType>,
 }
 
-// TODO: Should a bunch of this stuff be moved into the `specta::datatype` module?
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct NamedCustomDataType<T> {
+    /// The name of the type
+    pub name: &'static str,
+    /// The Specta ID for the type. The value for this should come from the `sid!();` macro.
+    pub sid: Option<TypeSid>,
+    /// The code location where this type is implemented. Used for error reporting.
+    pub impl_location: Option<ImplLocation>,
+    /// Rust documentation comments on the type
+    pub comments: &'static [&'static str],
+    /// Whether the type should export when the `export` feature is enabled.
+    /// `None` will use the default which is why `false` is not just used.
+    pub export: Option<bool>,
+    /// The Rust deprecated comment if the type is deprecated.
+    pub deprecated: Option<&'static str>,
+    pub item: T,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CustomDataType<T> {
-    Named {
-        /// The name of the type
-        name: &'static str,
-        /// The Specta ID for the type. The value for this should come from the `sid!();` macro.
-        sid: TypeSid,
-        /// The code location where this type is implemented. Used for error reporting.
-        impl_location: ImplLocation,
-        /// Rust documentation comments on the type
-        comments: &'static [&'static str],
-        // Whether the type should export when the `export` feature is enabled.
-        /// `None` will use the default which is why `false` is not just used.
-        export: Option<bool>,
-        /// The Rust deprecated comment if the type is deprecated.
-        deprecated: Option<&'static str>,
-        item: T,
-    },
+    Named(NamedCustomDataType<T>),
     Anonymous(T),
 }
 
@@ -86,93 +93,6 @@ pub enum CustomDataType<T> {
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub struct GenericType(pub &'static str); // TODO: Include SID and maybe lookup based on that?
-
-/// this is used internally to represent the types.
-#[allow(non_camel_case_types)]
-#[derive(Debug, Clone, PartialEq)]
-#[allow(missing_docs)]
-pub enum PrimitiveType {
-    i8,
-    i16,
-    i32,
-    i64,
-    i128,
-    isize,
-    u8,
-    u16,
-    u32,
-    u64,
-    u128,
-    usize,
-    f32,
-    f64,
-    bool,
-    char,
-    String,
-}
-
-impl PrimitiveType {
-    /// Converts a `PrimitiveType` into a Rust code string.
-    pub fn to_rust_str(&self) -> &'static str {
-        match self {
-            Self::i8 => "i8",
-            Self::i16 => "i16",
-            Self::i32 => "i32",
-            Self::i64 => "i64",
-            Self::i128 => "i128",
-            Self::isize => "isize",
-            Self::u8 => "u8",
-            Self::u16 => "u16",
-            Self::u32 => "u32",
-            Self::u64 => "u64",
-            Self::u128 => "u128",
-            Self::usize => "usize",
-            Self::f32 => "f32",
-            Self::f64 => "f64",
-            Self::bool => "bool",
-            Self::char => "char",
-            Self::String => "String",
-        }
-    }
-}
-
-/// this is used internally to represent the types.
-#[derive(Debug, Clone, PartialEq)]
-#[allow(missing_docs)]
-pub struct TupleType {
-    pub fields: Vec<DataType>,
-    pub generics: Vec<&'static str>,
-}
-
-/// this is used internally to represent the types.
-#[allow(non_camel_case_types)]
-#[derive(Debug, Clone, PartialEq)]
-#[allow(missing_docs)]
-pub enum LiteralType {
-    i8(i8),
-    i16(i16),
-    i32(i32),
-    u8(u8),
-    u16(u16),
-    u32(u32),
-    f32(f32),
-    f64(f64),
-    bool(bool),
-    String(String),
-    None,
-}
-
-impl From<PrimitiveType> for DataType {
-    fn from(t: PrimitiveType) -> Self {
-        Self::Primitive(t)
-    }
-}
-
-impl From<LiteralType> for DataType {
-    fn from(t: LiteralType) -> Self {
-        Self::Literal(t)
-    }
-}
 
 impl From<CustomDataType<ObjectType>> for DataType {
     fn from(t: CustomDataType<ObjectType>) -> Self {
@@ -186,32 +106,12 @@ impl From<CustomDataType<EnumType>> for DataType {
     }
 }
 
-impl From<ObjectType> for DataType {
-    fn from(t: ObjectType) -> Self {
-        Self::Object(CustomDataType::Anonymous(t))
-    }
-}
-
-// TODO: Remove this
-impl From<EnumType> for DataType {
-    fn from(t: EnumType) -> Self {
-        Self::Enum(CustomDataType::Anonymous(t))
-    }
-}
-
 impl From<GenericType> for DataType {
     fn from(t: GenericType) -> Self {
         Self::Generic(t)
     }
 }
 
-impl From<TupleType> for DataType {
-    fn from(t: TupleType) -> Self {
-        DataType::Tuple(CustomDataType::Anonymous(t))
-    }
-}
-
-// TODO: Remove this and do within `ToDataType` derive macro so it can be a `Named` enum?
 impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
     fn from(t: Vec<T>) -> Self {
         DataType::Enum(CustomDataType::Anonymous(EnumType {
@@ -250,4 +150,10 @@ impl From<String> for DataType {
     fn from(t: String) -> Self {
         LiteralType::String(t).into()
     }
+}
+
+pub trait ToSpectaType {
+    type Type;
+
+    fn to_specta_type(self) -> Self::Type;
 }

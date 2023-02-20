@@ -1,4 +1,7 @@
-use crate::datatype::{DataType, ObjectType, TupleType};
+use crate::{
+    datatype::{DataType, ObjectType, TupleType},
+    CustomDataType,
+};
 
 /// this is used internally to represent the types.
 #[derive(Debug, Clone, PartialEq)]
@@ -8,6 +11,12 @@ pub struct EnumType {
     pub variants: Vec<(&'static str, EnumVariant)>,
     pub generics: Vec<&'static str>,
     pub repr: EnumRepr,
+}
+
+impl From<EnumType> for DataType {
+    fn from(t: EnumType) -> Self {
+        Self::Enum(CustomDataType::Anonymous(t))
+    }
 }
 
 impl EnumType {

@@ -109,7 +109,7 @@ pub fn parse_struct(
                         }, &generics);
 
                         match &mut ty {
-                            #crate_ref::DataType::Enum(#crate_ref::CustomDataType::Named { item, .. }) => {
+                            #crate_ref::DataType::Enum(#crate_ref::CustomDataType::Named(#crate_ref::NamedCustomDataType{ item, .. })) => {
                                 item.make_flattenable();
                             }
                             _ => {}
