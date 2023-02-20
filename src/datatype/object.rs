@@ -1,4 +1,4 @@
-use crate::{CustomDataType, DataType, NamedCustomDataType};
+use crate::{CustomDataType, DataType};
 
 /// this is used internally to represent the types.
 #[derive(Debug, Clone, PartialEq)]
@@ -21,20 +21,16 @@ pub struct ObjectType {
 
 impl ObjectType {
     pub fn to_anonymous(self) -> DataType {
-        self.into()
+        DataType::Object(CustomDataType::Anonymous(self))
     }
 
     pub fn to_named(self, name: &'static str) -> DataType {
-        DataType::Object(crate::CustomDataType::Named(NamedCustomDataType {
-            name,
-            item: self,
-            ..Default::default()
-        }))
+        DataType::Object(crate::CustomDataType::named(name, self))
     }
 }
 
 impl From<ObjectType> for DataType {
     fn from(t: ObjectType) -> Self {
-        Self::Object(CustomDataType::Anonymous(t))
+        t.to_anonymous()
     }
 }

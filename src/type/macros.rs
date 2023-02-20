@@ -25,10 +25,10 @@ macro_rules! impl_tuple {
                     }, &[]
                 ));)*
 
-                DataType::Tuple(CustomDataType::Anonymous(datatype::TupleType {
+                datatype::TupleType {
                     fields: vec![$($i),*],
                     generics: vec![]
-                }))
+                }.to_anonymous()
             }
         }
     };

@@ -185,7 +185,7 @@ pub fn custom_data_type_wrapper(
     };
 
     quote! {
-        #crate_ref::CustomDataType::Named(#crate_ref::NamedCustomDataType {
+        #crate_ref::CustomDataType::Named {
             name: #name,
             sid: Some(SID),
             impl_location: Some(#crate_ref::impl_location!(@with_specta_path; #crate_ref)),
@@ -193,6 +193,6 @@ pub fn custom_data_type_wrapper(
             export: #should_export,
             deprecated: #deprecated,
             item: #t
-        })
+        }
     }
 }

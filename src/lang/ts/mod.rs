@@ -51,14 +51,14 @@ pub fn export_datatype(
 
     let (declaration, comments) = match &typ {
         // Named struct
-        DataType::Object(CustomDataType::Named(NamedCustomDataType {
+        DataType::Object(CustomDataType::Named {
             name,
             comments,
             item: ObjectType {
                 generics, fields, ..
             },
             ..
-        })) => {
+        }) => {
             if name.is_empty() {
                 return Err(TsExportError::AnonymousType);
             } else if let Some(name) = RESERVED_WORDS.iter().find(|v| **v == *name) {
@@ -81,12 +81,12 @@ pub fn export_datatype(
             )
         }
         // Enum
-        DataType::Enum(CustomDataType::Named(NamedCustomDataType {
+        DataType::Enum(CustomDataType::Named {
             name,
             comments,
             item: EnumType { generics, .. },
             ..
-        })) => {
+        }) => {
             if name.is_empty() {
                 return Err(TsExportError::AnonymousType);
             } else if let Some(name) = RESERVED_WORDS.iter().find(|v| **v == *name) {
@@ -101,12 +101,12 @@ pub fn export_datatype(
             (format!("type {name}{generics} = {inline_ts}"), *comments)
         }
         // Struct with unnamed fields
-        DataType::Tuple(CustomDataType::Named(NamedCustomDataType {
+        DataType::Tuple(CustomDataType::Named {
             name,
             comments,
             item: TupleType { generics, .. },
             ..
-        })) => {
+        }) => {
             if let Some(name) = RESERVED_WORDS.iter().find(|v| *v == name) {
                 return Err(TsExportError::ForbiddenTypeName(name));
             }
@@ -157,10 +157,10 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
         }
         // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
         DataType::List(def) => format!("{}[]", datatype(conf, def)?),
-        DataType::Tuple(CustomDataType::Named(NamedCustomDataType {
+        DataType::Tuple(CustomDataType::Named {
             item: TupleType { fields, .. },
             ..
-        }))
+        })
         | DataType::Tuple(CustomDataType::Anonymous(TupleType { fields, .. })) => match &fields[..]
         {
             [] => "null".to_string(),
@@ -173,11 +173,11 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
                     .join(", ")
             ),
         },
-        DataType::Object(CustomDataType::Named(NamedCustomDataType { name, item, .. })) => {
+        DataType::Object(CustomDataType::Named { name, item, .. }) => {
             object_datatype(conf, Some(name), item)?
         }
         DataType::Object(CustomDataType::Anonymous(item)) => object_datatype(conf, None, item)?,
-        DataType::Enum(CustomDataType::Named(NamedCustomDataType { name, item, .. })) => {
+        DataType::Enum(CustomDataType::Named { name, item, .. }) => {
             enum_datatype(conf, Some(name), item)?
         }
         DataType::Enum(CustomDataType::Anonymous(item)) => enum_datatype(conf, None, item)?,
@@ -386,14 +386,14 @@ pub fn object_field_to_ts(
         true => (
             format!("{field_name_safe}?"),
             match &field.ty {
-                DataType::Nullable(ty) => &ty,
+                DataType::Nullable(ty) => ty,
                 ty => ty,
             },
         ),
         false => (field_name_safe, &field.ty),
     };
 
-    Ok(format!("{key}: {}", datatype(conf, &ty)?))
+    Ok(format!("{key}: {}", datatype(conf, ty)?))
 }
 
 /// sanitise a string to be a valid Typescript key
