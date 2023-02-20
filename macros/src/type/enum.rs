@@ -1,4 +1,6 @@
-use super::{attr::*, generics::construct_datatype, r#struct::decode_field_attrs};
+use super::{
+    attr::*, custom_data_type_wrapper, generics::construct_datatype, r#struct::decode_field_attrs,
+};
 use crate::utils::*;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -98,7 +100,6 @@ pub fn parse_enum(
         .map(|(variant, attrs)| {
             let variant_ident_str = unraw_raw_ident(&variant.ident);
 
-            // TODO: This was in `EnumVariant::Unit`. Should I worried it's unused.
             let variant_name_str = match (attrs.rename, container_attrs.rename_all) {
                 (Some(name), _) => name,
                 (_, Some(inflection)) => inflection.apply(&variant_ident_str),
@@ -109,7 +110,7 @@ pub fn parse_enum(
 
             Ok(match &variant.fields {
                 Fields::Unit => {
-                    quote!(#crate_ref::EnumVariant::Unit)
+                    quote!((#variant_name_str, #crate_ref::EnumVariant::Unit))
                 }
                 Fields::Unnamed(fields) => {
                     let fields = fields
@@ -134,11 +135,10 @@ pub fn parse_enum(
                         })
                         .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                    quote!(#crate_ref::EnumVariant::Unnamed(#crate_ref::TupleType {
-                        // name: #variant_name_str,
+                    quote!((#variant_name_str, #crate_ref::EnumVariant::Unnamed(#crate_ref::TupleType {
                         fields: vec![#(#fields),*],
                         generics: vec![]
-                    }))
+                    })))
                 }
                 Fields::Named(fields) => {
                     let fields = fields
@@ -178,24 +178,31 @@ pub fn parse_enum(
                         })
                         .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                    quote!(#crate_ref::EnumVariant::Named(#crate_ref::ObjectType {
-                        // name: #variant_name_str,
+                    quote!((#variant_name_str, #crate_ref::EnumVariant::Named(#crate_ref::ObjectType {
                         fields: vec![#(#fields),*],
                         generics: vec![],
                         tag: None,
-                    }))
+                    })))
                 }
             })
         })
         .collect::<syn::Result<Vec<TokenStream>>>()?;
 
+    let body = custom_data_type_wrapper(
+        crate_ref,
+        container_attrs,
+        name,
+        quote! {
+            #crate_ref::EnumType {
+                generics: vec![#(#definition_generics),*],
+                variants: vec![#(#variants),*],
+                repr: #crate_ref::EnumRepr::#repr_tokens,
+            }
+        },
+    );
+
     Ok((
-        quote!(#crate_ref::EnumType {
-            // name: <Self as #crate_ref::Type>::NAME,
-            generics: vec![#(#definition_generics),*],
-            variants: vec![#(#variants),*],
-            repr: #crate_ref::EnumRepr::#repr_tokens,
-        }.into()),
+        quote!(#crate_ref::DataType::Enum(#body)),
         quote! {
             #crate_ref::TypeCategory::Reference(#crate_ref::DataTypeReference {
                 name: #name,

@@ -184,9 +184,9 @@ pub fn construct_datatype(
                             parent_inline: #inline,
                             type_map: opts.type_map
                         },
-                        &[#crate_ref::GenericType(
+                        &[#crate_ref::DataType::Generic(#crate_ref::GenericType(
                             stringify!(#type_ident)
-                        ).into()]
+                        ))]
                     )
                 );
             });

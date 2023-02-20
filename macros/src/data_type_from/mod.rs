@@ -15,7 +15,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let mut attrs = parse_attrs(attrs)?;
     let container_attrs = ContainerAttr::from_attrs(&mut attrs)?;
 
-    let crate_name = format_ident!(
+    let crate_ref = format_ident!(
         "{}",
         container_attrs
             .crate_name
@@ -43,36 +43,42 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     let ident = &field.ident;
 
                     Some(quote! {
-                        #crate_name::ObjectField {
+                        #crate_ref::ObjectField {
                             key: stringify!(#ident),
                             optional: false,
                             flatten: false
-                            ty: t.#ident, // .into(), // DataTypeItem -> DataType // TODO: Fix this
+                            ty: t.#ident,
                         }
                     })
                 });
 
                 quote! {
-                    #crate_name::ObjectType {
+                    #crate_ref::DataType::Object(#crate_ref::ObjectType {
                         name: stringify!(#ident),
                         generics: vec![],
                         fields: vec![#(#fields),*],
                         tag: None,
-                    }.into()
+                    })
                 }
             }
             Fields::Unnamed(_) => {
                 let fields = data.fields.iter().enumerate().map(|(i, _)| {
                     let i = proc_macro2::Literal::usize_unsuffixed(i);
-                    quote!(t.#i.into()) // TODO: Maybe need to fix this `into`?
+                    quote!(t.#i.into()) // TODO: Replace `into` with inline impl
                 });
 
-                quote! {
-                    #crate_name::TupleType {
-                        generics: vec![],
-                        fields: vec![#(#fields),*]
-                    }.into() // TODO: Maybe need to fix this `into`?
-                }
+                // custom_data_type_wrapper(
+                //     crate_ref,
+                //     container_attrs,
+                //     name,
+                //     quote! {
+                //         #crate_name::TupleType {
+                //             generics: vec![],
+                //             fields: vec![#(#fields),*]
+                //         }
+                //     },
+                // )
+                todo!();
             }
             _ => todo!("ToDataType only supports named structs"),
         },
@@ -81,13 +87,13 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     Ok(quote! {
         #[automatically_derived]
-        impl From<#ident> for #crate_name::DataType {
+        impl From<#ident> for #crate_ref::DataType {
             fn from(t: #ident) -> Self {
                 // This impl is created as a unique type.
-                #crate_name::DataType {
+                #crate_ref::DataType {
                     name: stringify!(#ident),
-                    sid: #crate_name::sid!(stringify!(#ident), #crate_name::impl_location!().as_str()),
-                    impl_location: #crate_name::impl_location!(),
+                    sid: #crate_ref::sid!(stringify!(#ident), #crate_ref::impl_location!().as_str()),
+                    impl_location: #crate_ref::impl_location!(),
                     item: #body,
                 }
             }

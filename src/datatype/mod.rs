@@ -30,10 +30,10 @@ pub enum DataType {
     List(Box<DataType>),
     Nullable(Box<DataType>),
     Record(Box<(DataType, DataType)>),
-    Tuple(TupleType),
     // Reference types
     Object(CustomDataType<ObjectType>),
     Enum(CustomDataType<EnumType>),
+    Tuple(CustomDataType<TupleType>),
     // A reference type that has already been defined
     Reference(DataTypeReference),
     Generic(GenericType),
@@ -60,29 +60,16 @@ pub struct DataTypeReference {
 }
 
 impl DataType {
+    /// Returns `true` if the type should be exported when the `export` feature is enabled.
     pub fn should_export(&self, default: bool) -> bool {
         match self {
-            // TODO: Why did I comment these out? -> I think they can be removed?
-            // DataTypeItem::Reference { .. } => true,
-            // DataTypeItem::Generic(_) => true,
             DataType::Object(CustomDataType::Named { export, .. }) => export.unwrap_or(default),
             DataType::Enum(CustomDataType::Named { export, .. }) => export.unwrap_or(default),
-
+            DataType::Tuple(CustomDataType::Named { export, .. }) => export.unwrap_or(default),
+            DataType::Placeholder => {
+                unreachable!("Placeholder type should never be returned from the Specta functions!")
+            }
             _ => false,
-        }
-    }
-
-    pub fn type_name(&self) -> &'static str {
-        // TODO: Can this emit the name even if wrapped in primitves? Eg. `Option<MyAwesomeCustomStruct>`?
-        todo!();
-    }
-
-    pub fn sid(&self) -> Option<TypeSid> {
-        match self {
-            DataType::Object(CustomDataType::Named { sid, .. }) => Some(*sid),
-            DataType::Enum(CustomDataType::Named { sid, .. }) => Some(*sid),
-            DataType::Reference(DataTypeReference { sid, .. }) => Some(*sid), // TODO: Should I have this case?
-            _ => None,
         }
     }
 }
@@ -107,7 +94,7 @@ pub enum CustomDataType<T> {
         deprecated: Option<&'static str>,
         item: T,
     },
-    Unnamed(T),
+    Anonymous(T),
 }
 
 /// this is used internally to represent the types.
@@ -216,14 +203,14 @@ impl From<CustomDataType<EnumType>> for DataType {
 
 impl From<ObjectType> for DataType {
     fn from(t: ObjectType) -> Self {
-        Self::Object(CustomDataType::Unnamed(t))
+        Self::Object(CustomDataType::Anonymous(t))
     }
 }
 
 // TODO: Remove this
 impl From<EnumType> for DataType {
     fn from(t: EnumType) -> Self {
-        Self::Enum(CustomDataType::Unnamed(t))
+        Self::Enum(CustomDataType::Anonymous(t))
     }
 }
 
@@ -235,21 +222,24 @@ impl From<GenericType> for DataType {
 
 impl From<TupleType> for DataType {
     fn from(t: TupleType) -> Self {
-        DataType::Tuple(t)
+        DataType::Tuple(CustomDataType::Anonymous(t))
     }
 }
 
 // TODO: Remove this and do within `ToDataType` derive macro so it can be a `Named` enum?
 impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
     fn from(t: Vec<T>) -> Self {
-        DataType::Enum(CustomDataType::Unnamed(EnumType {
+        DataType::Enum(CustomDataType::Anonymous(EnumType {
             variants: t
                 .into_iter()
-                .map(|t| -> EnumVariant {
-                    EnumVariant::Unnamed(TupleType {
-                        fields: vec![t.into()],
-                        generics: vec![],
-                    })
+                .map(|t| {
+                    (
+                        "This is never used before of EnumRepr::Untagged", // TODO: Fix this!
+                        EnumVariant::Unnamed(TupleType {
+                            fields: vec![t.into()],
+                            generics: vec![],
+                        }),
+                    )
                 })
                 .collect(),
             generics: vec![],

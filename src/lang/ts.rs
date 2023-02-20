@@ -113,6 +113,8 @@ pub enum TsExportError {
     BigIntForbidden,
     #[error("Cannot export anonymous type. Try wrapping the type in a tuple struct which has the `ToDataType` derive macro on it.")]
     AnonymousType, // TODO: Include metadata about the type, `IMPL_LOCATION`, `NAME`, etc
+    #[error("Unable to export a tagged type which is unnamed")]
+    UnableToTagUnnamedType,
     #[error("You have defined a type with the name '{0}' which is a reserved name by the Typescript exporter. Try renaming it or using `#[specta(rename = \"new name\")]`")]
     ForbiddenTypeName(&'static str),
     #[error("You have defined a field '{1}' on type '{0}' which has a name that is reserved name by the Typescript exporter. Try renaming it or using `#[specta(rename = \"new name\")]`")]
@@ -190,15 +192,8 @@ pub fn export_datatype(
     conf: &ExportConfiguration,
     typ: &DataType,
 ) -> Result<String, TsExportError> {
-    let ty_name = typ.type_name();
-    if ty_name.is_empty() {
-        return Err(TsExportError::AnonymousType);
-    } else if let Some(name) = RESERVED_WORDS.iter().find(|v| **v == ty_name) {
-        return Err(TsExportError::ForbiddenTypeName(name));
-    }
-
     let inline_ts = datatype(conf, &typ).map_err(|err| TsExportError::WithCtx {
-        ty_name: Some(ty_name),
+        ty_name: Some("TODO"), // TODO: Fix this
         field_name: None,
         err: Box::new(err),
     })?;
@@ -206,49 +201,71 @@ pub fn export_datatype(
     let (declaration, comments) = match &typ {
         // Named struct
         DataType::Object(CustomDataType::Named {
+            name,
             comments,
             item: ObjectType {
                 generics, fields, ..
             },
             ..
-        }) => (
-            match fields.len() {
-                0 => format!("type {ty_name} = {inline_ts}"),
-                _ => {
-                    let generics = match generics.len() {
-                        0 => "".into(),
-                        _ => format!("<{}>", generics.to_vec().join(", ")),
-                    };
+        }) => {
+            if name.is_empty() {
+                return Err(TsExportError::AnonymousType);
+            } else if let Some(name) = RESERVED_WORDS.iter().find(|v| **v == *name) {
+                return Err(TsExportError::ForbiddenTypeName(name));
+            }
 
-                    format!("type {ty_name}{generics} = {inline_ts}")
-                }
-            },
-            *comments,
-        ),
+            (
+                match fields.len() {
+                    0 => format!("type {name} = {inline_ts}"),
+                    _ => {
+                        let generics = match generics.len() {
+                            0 => "".into(),
+                            _ => format!("<{}>", generics.to_vec().join(", ")),
+                        };
+
+                        format!("type {name}{generics} = {inline_ts}")
+                    }
+                },
+                *comments,
+            )
+        }
         // Enum
         DataType::Enum(CustomDataType::Named {
+            name,
             comments,
             item: EnumType { generics, .. },
             ..
         }) => {
+            if name.is_empty() {
+                return Err(TsExportError::AnonymousType);
+            } else if let Some(name) = RESERVED_WORDS.iter().find(|v| **v == *name) {
+                return Err(TsExportError::ForbiddenTypeName(name));
+            }
+
             let generics = match generics.len() {
                 0 => "".into(),
                 _ => format!("<{}>", generics.to_vec().join(", ")),
             };
 
-            (format!("type {ty_name}{generics} = {inline_ts}"), *comments)
+            (format!("type {name}{generics} = {inline_ts}"), *comments)
         }
-        // Unnamed struct
-        DataType::Tuple(TupleType { generics, .. }) => {
+        // Struct with unnamed fields
+        DataType::Tuple(CustomDataType::Named {
+            name,
+            comments,
+            item: TupleType { generics, .. },
+            ..
+        }) => {
+            if let Some(name) = RESERVED_WORDS.iter().find(|v| *v == name) {
+                return Err(TsExportError::ForbiddenTypeName(name));
+            }
+
             let generics = match generics.len() {
                 0 => "".into(),
                 _ => format!("<{}>", generics.to_vec().join(", ")),
             };
 
-            (
-                format!("type {ty_name}{generics} = {inline_ts}"),
-                &[] as &[&str],
-            )
+            (format!("type {name}{generics} = {inline_ts}"), *comments)
         }
         _ => return Err(TsExportError::CannotExport(typ.clone())), // TODO: Can this be enforced at a type system level
     };
@@ -263,7 +280,6 @@ pub fn export_datatype(
 /// Convert a DataType to a TypeScript string
 /// Eg. `{ demo: string; }`
 pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, TsExportError> {
-    let ty_name = typ.type_name();
     Ok(match &typ {
         DataType::Any => "any".into(),
         primitive_def!(i8 i16 i32 u8 u16 u32 f32 f64) => "number".into(),
@@ -290,7 +306,12 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
         }
         // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
         DataType::List(def) => format!("{}[]", datatype(conf, def)?),
-        DataType::Tuple(TupleType { fields, .. }) => match &fields[..] {
+        DataType::Tuple(CustomDataType::Named {
+            item: TupleType { fields, .. },
+            ..
+        })
+        | DataType::Tuple(CustomDataType::Anonymous(TupleType { fields, .. })) => match &fields[..]
+        {
             [] => "null".to_string(),
             [ty] => datatype(conf, ty)?,
             tys => format!(
@@ -301,154 +322,14 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
                     .join(", ")
             ),
         },
-        DataType::Object(CustomDataType::Named {
-            item: ObjectType { fields, tag, .. },
-            ..
-        })
-        | DataType::Object(CustomDataType::Unnamed(ObjectType { fields, tag, .. })) => {
-            match &fields[..] {
-                [] => "null".to_string(),
-                fields => {
-                    let mut field_sections = fields
-                        .iter()
-                        .filter(|f| f.flatten)
-                        .map(|field| {
-                            datatype(conf, &field.ty)
-                                .map(|type_str| format!("({type_str})"))
-                                .map_err(|err| TsExportError::WithCtx {
-                                    ty_name: None,
-                                    field_name: Some(field.key),
-                                    err: Box::new(err),
-                                })
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
-
-                    let mut unflattened_fields = fields
-                        .iter()
-                        .filter(|f| !f.flatten)
-                        .map(|field| {
-                            let field_name_safe = sanitise_name(ty_name, field.key)?;
-                            let field_ts_str = datatype(conf, &field.ty);
-
-                            // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
-                            let (key, result) = match field.optional {
-                                true => (
-                                    format!("{field_name_safe}?"),
-                                    match &field.ty {
-                                        DataType::Nullable(_) => field_ts_str,
-                                        _ => field_ts_str.map(|v| format!("{v} | null")),
-                                    },
-                                ),
-                                false => (field_name_safe, field_ts_str),
-                            };
-
-                            result.map(|v| format!("{key}: {v}")).map_err(|err| {
-                                TsExportError::WithCtx {
-                                    ty_name: None,
-                                    field_name: Some(field.key),
-                                    err: Box::new(err),
-                                }
-                            })
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
-
-                    if let Some(tag) = tag {
-                        unflattened_fields.push(format!("{tag}: \"{ty_name}\""));
-                    }
-
-                    if !unflattened_fields.is_empty() {
-                        field_sections.push(format!("{{ {} }}", unflattened_fields.join("; ")));
-                    }
-
-                    field_sections.join(" & ")
-                }
-            }
+        DataType::Object(CustomDataType::Named { name, item, .. }) => {
+            object_datatype(conf, Some(name), item)?
         }
-        DataType::Enum(CustomDataType::Named {
-            item: EnumType { variants, repr, .. },
-            ..
-        })
-        | DataType::Enum(CustomDataType::Unnamed(EnumType { variants, repr, .. })) => {
-            match &variants[..] {
-                [] => "never".to_string(),
-                variants => variants
-                    .iter()
-                    .map(|variant| {
-                        let sanitised_name = sanitise_name(ty_name, ty_name)?; // TODO: variant.name() // TODO: I would be suprised if this correct?
-
-                        Ok(match (repr, variant) {
-                            (EnumRepr::Internal { tag }, EnumVariant::Unit) => {
-                                format!("{{ {tag}: \"{sanitised_name}\" }}")
-                            }
-                            (EnumRepr::Internal { tag }, EnumVariant::Unnamed(tuple)) => {
-                                let typ = datatype(conf, &DataType::Tuple(tuple.clone())).map_err(
-                                    |err| {
-                                        TsExportError::WithCtx {
-                                            ty_name: None,
-                                            field_name: Some(ty_name), // variant.name()), // TODO: This is probs wrong
-                                            err: Box::new(err),
-                                        }
-                                    },
-                                )?;
-
-                                format!("({{ {tag}: \"{sanitised_name}\" }} & {typ})")
-                            }
-                            (EnumRepr::Internal { tag }, EnumVariant::Named(obj)) => {
-                                let mut fields = vec![format!("{tag}: \"{sanitised_name}\"")];
-
-                                fields.extend(
-                                    obj.fields
-                                        .iter()
-                                        .map(|v| object_field_to_ts(conf, ty_name, v))
-                                        .collect::<Result<Vec<_>, _>>()?,
-                                );
-
-                                format!("{{ {} }}", fields.join("; "))
-                            }
-                            (EnumRepr::External, EnumVariant::Unit) => {
-                                format!("\"{sanitised_name}\"")
-                            }
-                            (EnumRepr::External, v) => {
-                                let ts_values = datatype(conf, &v.data_type()).map_err(|err| {
-                                    TsExportError::WithCtx {
-                                        ty_name: None,
-                                        field_name: Some(ty_name), // variant.name()), // TODO: This is probs wrong
-                                        err: Box::new(err),
-                                    }
-                                })?;
-
-                                format!("{{ {sanitised_name}: {ts_values} }}")
-                            }
-                            (EnumRepr::Untagged, EnumVariant::Unit) => "null".to_string(),
-                            (EnumRepr::Untagged, v) => {
-                                datatype(conf, &v.data_type()).map_err(|err| {
-                                    TsExportError::WithCtx {
-                                        ty_name: None,
-                                        field_name: Some(ty_name), // variant.name()), // TODO: This is probs wrong
-                                        err: Box::new(err),
-                                    }
-                                })?
-                            }
-                            (EnumRepr::Adjacent { tag, .. }, EnumVariant::Unit) => {
-                                format!("{{ {tag}: \"{sanitised_name}\" }}")
-                            }
-                            (EnumRepr::Adjacent { tag, content }, v) => {
-                                let ts_values = datatype(conf, &v.data_type()).map_err(|err| {
-                                    TsExportError::WithCtx {
-                                        ty_name: None,
-                                        field_name: Some(ty_name), // variant.name()), // TODO: This is probs wrong
-                                        err: Box::new(err),
-                                    }
-                                })?;
-
-                                format!("{{ {tag}: \"{sanitised_name}\"; {content}: {ts_values} }}")
-                            }
-                        })
-                    })
-                    .collect::<Result<Vec<_>, TsExportError>>()?
-                    .join(" | "),
-            }
+        DataType::Object(CustomDataType::Anonymous(item)) => object_datatype(conf, None, item)?,
+        DataType::Enum(CustomDataType::Named { name, item, .. }) => {
+            enum_datatype(conf, Some(name), item)?
         }
+        DataType::Enum(CustomDataType::Anonymous(item)) => enum_datatype(conf, None, item)?,
         DataType::Reference(DataTypeReference { name, generics, .. }) => match &generics[..] {
             [] => name.to_string(),
             generics => {
@@ -467,6 +348,160 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
                 "Attempted to export a placeholder!",
             ))
         }
+    })
+}
+
+fn object_datatype(
+    conf: &ExportConfiguration,
+    name: Option<&'static str>,
+    ObjectType { fields, tag, .. }: &ObjectType,
+) -> Result<String, TsExportError> {
+    match &fields[..] {
+        [] => Ok("null".to_string()),
+        fields => {
+            let mut field_sections = fields
+                .iter()
+                .filter(|f| f.flatten)
+                .map(|field| {
+                    datatype(conf, &field.ty)
+                        .map(|type_str| format!("({type_str})"))
+                        .map_err(|err| TsExportError::WithCtx {
+                            ty_name: None,
+                            field_name: Some(field.key),
+                            err: Box::new(err),
+                        })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+
+            let mut unflattened_fields = fields
+                .iter()
+                .filter(|f| !f.flatten)
+                .map(|field| {
+                    let field_name_safe = sanitise_name("TODO", field.key)?;
+                    let field_ts_str = datatype(conf, &field.ty);
+
+                    // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
+                    let (key, result) = match field.optional {
+                        true => (
+                            format!("{field_name_safe}?"),
+                            match &field.ty {
+                                DataType::Nullable(_) => field_ts_str,
+                                _ => field_ts_str.map(|v| format!("{v} | null")),
+                            },
+                        ),
+                        false => (field_name_safe, field_ts_str),
+                    };
+
+                    result
+                        .map(|v| format!("{key}: {v}"))
+                        .map_err(|err| TsExportError::WithCtx {
+                            ty_name: None,
+                            field_name: Some(field.key),
+                            err: Box::new(err),
+                        })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+
+            if let Some(tag) = tag {
+                unflattened_fields.push(format!(
+                    "{tag}: \"{}\"",
+                    name.ok_or(TsExportError::UnableToTagUnnamedType)?
+                ));
+            }
+
+            if !unflattened_fields.is_empty() {
+                field_sections.push(format!("{{ {} }}", unflattened_fields.join("; ")));
+            }
+
+            Ok(field_sections.join(" & "))
+        }
+    }
+}
+
+fn enum_datatype(
+    conf: &ExportConfiguration,
+    _ty_name: Option<&'static str>,
+    EnumType { repr, variants, .. }: &EnumType,
+) -> Result<String, TsExportError> {
+    Ok(match &variants[..] {
+        [] => "never".to_string(),
+        variants => variants
+            .iter()
+            .map(|(variant_name, variant)| {
+                let sanitised_name = sanitise_name("TODO", variant_name)?;
+
+                Ok(match (repr.clone(), variant) {
+                    (EnumRepr::Internal { tag }, EnumVariant::Unit) => {
+                        format!("{{ {tag}: \"{sanitised_name}\" }}")
+                    }
+                    (EnumRepr::Internal { tag }, EnumVariant::Unnamed(tuple)) => {
+                        let typ = datatype(
+                            conf,
+                            &DataType::Tuple(CustomDataType::Anonymous(tuple.clone())),
+                        )
+                        .map_err(|err| TsExportError::WithCtx {
+                            ty_name: None,
+                            field_name: Some("TODO"),
+                            err: Box::new(err),
+                        })?;
+
+                        format!("({{ {tag}: \"{sanitised_name}\" }} & {typ})")
+                    }
+                    (EnumRepr::Internal { tag }, EnumVariant::Named(obj)) => {
+                        let mut fields = vec![format!("{tag}: \"{sanitised_name}\"")];
+
+                        fields.extend(
+                            obj.fields
+                                .iter()
+                                .map(|v| object_field_to_ts(conf, "TODO", v))
+                                .collect::<Result<Vec<_>, _>>()?,
+                        );
+
+                        format!("{{ {} }}", fields.join("; "))
+                    }
+                    (EnumRepr::External, EnumVariant::Unit) => {
+                        format!("\"{sanitised_name}\"")
+                    }
+
+                    (EnumRepr::External, v) => {
+                        let ts_values = datatype(conf, &v.data_type()).map_err(|err| {
+                            TsExportError::WithCtx {
+                                ty_name: None,
+                                field_name: Some("TODO"), // TODO
+                                err: Box::new(err),
+                            }
+                        })?;
+
+                        format!("{{ {sanitised_name}: {ts_values} }}")
+                    }
+                    (EnumRepr::Untagged, EnumVariant::Unit) => "null".to_string(),
+                    (EnumRepr::Untagged, v) => {
+                        datatype(conf, &v.data_type()).map_err(|err| {
+                            TsExportError::WithCtx {
+                                ty_name: None,
+                                field_name: Some("TODO"), // TODO
+                                err: Box::new(err),
+                            }
+                        })?
+                    }
+                    (EnumRepr::Adjacent { tag, .. }, EnumVariant::Unit) => {
+                        format!("{{ {tag}: \"{sanitised_name}\" }}")
+                    }
+                    (EnumRepr::Adjacent { tag, content }, v) => {
+                        let ts_values = datatype(conf, &v.data_type()).map_err(|err| {
+                            TsExportError::WithCtx {
+                                ty_name: None,
+                                field_name: Some("TODO"),
+                                err: Box::new(err),
+                            }
+                        })?;
+
+                        format!("{{ {tag}: \"{sanitised_name}\"; {content}: {ts_values} }}")
+                    }
+                })
+            })
+            .collect::<Result<Vec<_>, TsExportError>>()?
+            .join(" | "),
     })
 }
 

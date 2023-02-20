@@ -164,3 +164,35 @@ pub fn derive(
 
     }.into())
 }
+
+pub fn custom_data_type_wrapper(
+    crate_ref: &TokenStream,
+    container_attrs: &ContainerAttr,
+    name: &TokenStream,
+    t: TokenStream,
+) -> TokenStream {
+    let comments = {
+        let comments = &container_attrs.doc;
+        quote!(&[#(#comments),*])
+    };
+    let should_export = match container_attrs.export {
+        Some(export) => quote!(Some(#export)),
+        None => quote!(None),
+    };
+    let deprecated = match &container_attrs.deprecated {
+        Some(msg) => quote!(Some(#msg)),
+        None => quote!(None),
+    };
+
+    quote! {
+            #crate_ref::CustomDataType::Named {
+                name: #name,
+                sid: SID,
+                impl_location: #crate_ref::impl_location!(@with_specta_path; #crate_ref),
+                comments: #comments,
+                export: #should_export,
+                deprecated: #deprecated,
+                item: #t
+        }
+    }
+}

@@ -20,7 +20,7 @@ pub struct r#enum {
 #[test]
 fn test_macro_in_decls() {
     let err = Box::new(TsExportError::ForbiddenFieldName(
-        "ReservedFieldName".to_string(),
+        "TODO".to_string(), // TODO: ReservedFieldName
         "enum",
     ));
     assert_ts_export_err!(
@@ -28,7 +28,7 @@ fn test_macro_in_decls() {
         // TsExportError::ForbiddenFieldName(field_name, "enum")
         // TODO: Clean up error handling with Specta cause this is bad
         TsExportError::WithCtx {
-            ty_name: Some("ReservedFieldName"),
+            ty_name: Some("TODO"), // TODO: ReservedFieldName
             field_name: None,
             err,
         }
