@@ -53,12 +53,16 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 });
 
                 quote! {
-                    #crate_ref::DataType::Object(#crate_ref::ObjectType {
-                        name: stringify!(#ident),
-                        generics: vec![],
-                        fields: vec![#(#fields),*],
-                        tag: None,
-                    })
+                    #crate_ref::DataType::Object(
+                        #crate_ref::CustomDataType::Annonymous(
+                            #crate_ref::DataType::Object(#crate_ref::ObjectType {
+                                name: stringify!(#ident),
+                                generics: vec![],
+                                fields: vec![#(#fields),*],
+                                tag: None,
+                            })
+                        )
+                    )
                 }
             }
             Fields::Unnamed(_) => {
@@ -78,7 +82,16 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 //         }
                 //     },
                 // )
-                todo!();
+                quote! {
+                    #crate_ref::DataType::Tuple(
+                        #crate_ref::CustomDataType::Annonymous(
+                            #crate_ref::TupleType {
+                                generics: vec![],
+                                fields: vec![#(#fields),*]
+                            }
+                        )
+                    )
+                }
             }
             _ => todo!("ToDataType only supports named structs"),
         },
@@ -86,18 +99,26 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     };
 
     Ok(quote! {
-        #[automatically_derived]
-        impl From<#ident> for #crate_ref::DataType {
-            fn from(t: #ident) -> Self {
-                // This impl is created as a unique type.
-                #crate_ref::DataType {
-                    name: stringify!(#ident),
-                    sid: #crate_ref::sid!(stringify!(#ident), #crate_ref::impl_location!().as_str()),
-                    impl_location: #crate_ref::impl_location!(),
-                    item: #body,
-                }
-            }
-        }
+        // TODO: EnumType or ObjectType or TupleType -> Cause it could be any of them and we can't go straight to `DataType`
+        // #[automatically_derived]
+        // impl From<#ident> for #crate_ref::EnumType {
+        //     fn from(_: #ident) -> #crate_ref::EnumType {
+        //         todo!();
+        //     }
+        // }
+
+        // #[automatically_derived]
+        // impl From<#ident> for #crate_ref::DataType {
+        //     fn from(t: #ident) -> Self {
+        //         // This impl is created as a unique type.
+        //         #crate_ref::DataType {
+        //             name: stringify!(#ident),
+        //             sid: #crate_ref::sid!(stringify!(#ident), #crate_ref::impl_location!().as_str()),
+        //             impl_location: #crate_ref::impl_location!(),
+        //             item: #body,
+        //         }
+        //     }
+        // }
     }
     .into())
 }

@@ -21,9 +21,9 @@ fn main() {
 
     // You can also override the export configuration.
     export::ts_with_cfg(
+        "./bindings2.ts",
         // Be aware this won't be typesafe unless your using a ser/deserializer that converts BigInt types to a number.
         &ExportConfiguration::default().bigint(BigIntExportBehavior::Number),
-        "./bindings2.ts",
     )
     .unwrap();
 }

@@ -59,21 +59,6 @@ pub struct DataTypeReference {
     pub generics: Vec<DataType>,
 }
 
-impl DataType {
-    /// Returns `true` if the type should be exported when the `export` feature is enabled.
-    pub fn should_export(&self, default: bool) -> bool {
-        match self {
-            DataType::Object(CustomDataType::Named { export, .. }) => export.unwrap_or(default),
-            DataType::Enum(CustomDataType::Named { export, .. }) => export.unwrap_or(default),
-            DataType::Tuple(CustomDataType::Named { export, .. }) => export.unwrap_or(default),
-            DataType::Placeholder => {
-                unreachable!("Placeholder type should never be returned from the Specta functions!")
-            }
-            _ => false,
-        }
-    }
-}
-
 // TODO: Should a bunch of this stuff be moved into the `specta::datatype` module?
 
 #[derive(Debug, Clone, PartialEq)]

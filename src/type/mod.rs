@@ -144,8 +144,8 @@ pub const fn internal_sid_hash(
 #[macro_export]
 #[doc(hidden)]
 macro_rules! sid {
-    () => {
-        $crate::sid!(<Self as $crate::Type>::NAME, $crate::impl_location!().as_str())
+    ($name) => {
+        $crate::sid!($name, $crate::impl_location!().as_str())
     };
     // TODO: Maybe remove this variant?
     ($name:expr, $location:expr) => {
