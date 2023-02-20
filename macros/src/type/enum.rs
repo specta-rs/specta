@@ -5,6 +5,7 @@ use quote::{format_ident, quote};
 use syn::{DataEnum, Fields, GenericParam, Generics};
 
 pub fn parse_enum(
+    name: &TokenStream,
     enum_attrs: &EnumAttr,
     container_attrs: &ContainerAttr,
     generics: &Generics,
@@ -198,10 +199,11 @@ pub fn parse_enum(
         quote! {
             #crate_ref::TypeCategory::Reference {
                 reference: #crate_ref::DataType::Reference {
-                    name: <Self as #crate_ref::Type>::NAME,
+                    name: #name,
                     generics: vec![#(#reference_generics),*],
-                    sid: <Self as #crate_ref::Type>::SID,
-                }
+                    sid: SID,
+                },
+                sid: SID,
             }
         },
         can_flatten,

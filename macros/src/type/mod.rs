@@ -49,14 +49,21 @@ pub fn derive(
         .unwrap();
     let crate_ref = quote!(#crate_name); // TODO: Combine this with `crate_name`?
 
+    let name = container_attrs.rename.clone().unwrap_or_else(|| {
+        unraw_raw_ident(&format_ident!("{}", ident.to_string())).to_token_stream()
+    });
+
+
     let (inlines, category, can_flatten) = match data {
         Data::Struct(data) => parse_struct(
+            &name,
             (&container_attrs, StructAttr::from_attrs(&mut attrs)?),
             generics,
             &crate_ref,
             data,
         ),
         Data::Enum(data) => parse_enum(
+            &name,
             &EnumAttr::from_attrs(&container_attrs, &mut attrs)?,
             &container_attrs,
             generics,
@@ -82,9 +89,6 @@ pub fn derive(
             ))
         })?;
 
-    let name = container_attrs.rename.clone().unwrap_or_else(|| {
-        unraw_raw_ident(&format_ident!("{}", ident.to_string())).to_token_stream()
-    });
 
     let definition_generics = generics.type_params().map(|param| {
         let ident = &param.ident;
@@ -98,7 +102,10 @@ pub fn derive(
 
         let where_bound = add_type_to_where_clause(&quote!(#crate_ref::Type), generics);
 
-        quote!(impl #bounds #crate_ref::Flatten for #ident #type_args #where_bound {})
+        quote! {
+            #[automatically_derived]
+            impl #bounds #crate_ref::Flatten for #ident #type_args #where_bound {}
+        }
     });
 
     let type_impl_heading = impl_heading(quote!(#crate_ref::Type), &ident, generics);
@@ -131,26 +138,29 @@ pub fn derive(
     });
 
     Ok(quote! {
-        #[automatically_derived]
-        #type_impl_heading {
-            const NAME: &'static str = #name;
-            const SID:#crate_ref::TypeSid = #crate_ref::sid!(@with_specta_path; #crate_name);
+        const _: () = {
+            // We do this so `sid!()` is only called once, preventing the type ended up with multiple ids
+            const SID: #crate_ref::TypeSid = #crate_ref::sid!(@with_specta_path; #name; #crate_name);
 
-            fn inline(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::DataType {
-                #inlines
+            #[automatically_derived]
+            #type_impl_heading {
+                fn inline(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::DataType {
+                    #inlines
+                }
+    
+                fn category_impl(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::TypeCategory {
+                    #category
+                }
+    
+                fn definition_generics() -> Vec<#crate_ref::GenericType> {
+                    vec![#(#definition_generics),*]
+                }
             }
+    
+            #export
+    
+            #flatten_impl
+        };
 
-            fn category_impl(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::TypeCategory {
-                #category
-            }
-
-            fn definition_generics() -> Vec<#crate_ref::GenericType> {
-                vec![#(#definition_generics),*]
-            }
-        }
-
-        #export
-
-        #flatten_impl
     }.into())
 }

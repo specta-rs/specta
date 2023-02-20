@@ -22,18 +22,15 @@ pub enum TypeCategory {
         // /// require a more complex solution since it will require multiple processing stages.
         // placeholder: DataTypeItem,
         /// Datatype to use whenever a reference to the type is requested.
-        reference: DataType,
+        reference: DataType, // TODO: Maybe remove this and lookup using `SID`???
+        /// TODO
+        sid: TypeSid, // TODO: Is this needed or can it be gotten from `reference` if it's a `DataType::Reference`?
     },
 }
 
 /// Provides runtime type information that can be fed into a language exporter to generate a type definition in another language.
 /// Avoid implementing this trait yourself where possible and use the [`Type`](derive@crate::Type) macro instead.
 pub trait Type {
-    // TODO: Remove statics
-    const NAME: &'static str;
-    const SID: TypeSid;
-    // const IMPL_LOCATION: ImplLocation;
-
     /// Returns the inline definition of a type with generics substituted for those provided.
     /// This function defines the base structure of every type, and is used in both
     /// [`definition`](crate::Type::definition) and [`reference`](crate::Type::definition)
@@ -89,17 +86,15 @@ pub trait Type {
 
         match category {
             TypeCategory::Inline(inline) => inline,
-            TypeCategory::Reference { reference } => {
-                opts.type_map
-                    .entry(Self::NAME)
-                    .or_insert(DataType::Placeholder);
+            TypeCategory::Reference { reference, sid } => {
+                opts.type_map.entry(sid).or_insert(DataType::Placeholder);
 
                 let definition = Self::definition(DefOpts {
                     parent_inline: false,
                     type_map: opts.type_map,
                 });
 
-                if let Some(ty) = opts.type_map.get(&Self::NAME) {
+                if let Some(ty) = opts.type_map.get(&sid) {
                     // TODO: Properly detect duplicate name where SID don't match
                     // todo!();
                     // println!("{:#?} {:?}", ty, definition);
@@ -113,7 +108,7 @@ pub trait Type {
                     //     }
                     // }
                 } else {
-                    opts.type_map.insert(Self::NAME, definition);
+                    opts.type_map.insert(sid, definition);
                 }
 
                 reference
@@ -121,78 +116,6 @@ pub trait Type {
         }
     }
 }
-
-// /// TODO
-// pub trait CustomType {
-//     /// The name of the type
-//     const NAME: &'static str;
-
-//     /// Rust documentation comments on the type
-//     const COMMENTS: &'static [&'static str] = &[];
-
-//     /// The Specta ID for the type. The value for this should come from the `sid!();` macro.
-//     const SID: TypeSid;
-
-//     /// The code location where this type is implemented. Used for error reporting.
-//     const IMPL_LOCATION: ImplLocation;
-
-//     /// Whether the type should export when the `export` feature is enabled.
-//     /// `None` will use the default which is why `false` is not just used.
-//     const EXPORT: Option<bool> = Some(false);
-
-//     /// The Rust deprecated comment if the type is deprecated.
-//     const DEPRECATED: Option<&'static str> = None;
-// }
-
-// // TODO: Do this
-// impl<T: CustomType> Type for T {
-//     fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
-//         todo!()
-//     }
-
-//     fn reference(opts: DefOpts, generics: &[DataType]) -> DataType {
-//         let category = Self::category_impl(
-//             DefOpts {
-//                 parent_inline: false,
-//                 type_map: opts.type_map,
-//             },
-//             generics,
-//         );
-
-//         match category {
-//             TypeCategory::Inline(inline) => inline,
-//             TypeCategory::Reference { reference } => {
-//                 opts.type_map
-//                     .entry(Self::NAME)
-//                     .or_insert(DataType::Placeholder);
-
-//                 let definition = Self::definition(DefOpts {
-//                     parent_inline: false,
-//                     type_map: opts.type_map,
-//                 });
-
-//                 if let Some(ty) = opts.type_map.get(&Self::NAME) {
-//                     // TODO: Properly detect duplicate name where SID don't match
-//                     todo!();
-//                     // println!("{:#?} {:?}", ty, definition);
-//                     // if matches!(ty.item, DataType::Placeholder) {
-//                     //     opts.type_map.insert(Self::NAME, definition);
-//                     // } else if ty.sid != definition.sid {
-//                     //     // TODO: Return runtime error instead of panicking
-//                     //     #[allow(clippy::panic)]
-//                     //     {
-//                     //         panic!("Specta: you have tried to export two types both called '{}' declared at '{}' and '{}'! You could give both types a unique name or put `#[specta(inline)]` on one/both of them to cause it to be exported without a name.", ty.name, ty.impl_location.as_str(), definition.impl_location.as_str());
-//                     //     }
-//                     // }
-//                 } else {
-//                     opts.type_map.insert(Self::NAME, definition);
-//                 }
-
-//                 reference
-//             }
-//         }
-//     }
-// }
 
 /// A marker trait for compile-time validation of which types can be flattened.
 pub trait Flatten: Type {}
@@ -259,13 +182,13 @@ macro_rules! sid {
         )
     };
      // Using `$crate_path:path` here does not work because: https://github.com/rust-lang/rust/issues/48067
-    (@with_specta_path; $first:ident$(::$rest:ident)*) => {{
-        use $first$(::$rest)*::{internal_sid_hash, impl_location, Type};
+    (@with_specta_path; $name:expr; $first:ident$(::$rest:ident)*) => {{
+        use $first$(::$rest)*::{internal_sid_hash, impl_location};
 
         internal_sid_hash(
             module_path!(),
             impl_location!().as_str(),
-            <Self as Type>::NAME,
+            $name,
         )
     }};
 }

@@ -7,7 +7,7 @@ use std::sync::Mutex;
 /// Global type store for collecting custom types to export.
 ///
 /// Populated by `#[ctor]` functions defined in the [`Type`](derive@crate::Type) macro.
-pub static TYPES: Lazy<Mutex<BTreeMap<&'static str, DataType>>> = Lazy::new(Default::default);
+pub static TYPES: Lazy<Mutex<BTreeMap<TypeSid, DataType>>> = Lazy::new(Default::default);
 
 /// Exports all types in the [`TYPES`](static@crate::export::TYPES) map to the provided TypeScript file.
 pub fn ts(path: &str) -> Result<(), TsExportError> {

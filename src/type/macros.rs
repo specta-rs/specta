@@ -1,9 +1,6 @@
 macro_rules! impl_primitives {
     ($($i:ident)+) => {$(
         impl Type for $i {
-            const NAME: &'static str = stringify!($i);
-            const SID: $crate::TypeSid = $crate::sid!();
-
             fn inline(_: DefOpts, _: &[DataType]) -> DataType {
                 DataType::Primitive(datatype::PrimitiveType::$i)
             }
@@ -18,9 +15,6 @@ macro_rules! impl_tuple {
     ( impl $($i:ident),* ) => {
         #[allow(non_snake_case)]
         impl<$($i: Type + 'static),*> Type for ($($i),*) {
-            const NAME: &'static str = stringify!(($($i::NAME),*));
-            const SID: $crate::TypeSid = $crate::sid!();
-
             fn inline(_opts: DefOpts, generics: &[DataType]) -> DataType {
                 let mut _generics = generics.iter();
 
@@ -48,9 +42,6 @@ macro_rules! impl_tuple {
 macro_rules! impl_containers {
     ($($container:ident)+) => {$(
         impl<T: Type> Type for $container<T> {
-            const NAME: &'static str = stringify!($container);
-            const SID: $crate::TypeSid = $crate::sid!();
-
             fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
                 generics.get(0).cloned().unwrap_or(T::inline(
                     DefOpts {
@@ -77,9 +68,6 @@ macro_rules! impl_containers {
 macro_rules! impl_as {
     ($($ty:path as $tty:ident)+) => {$(
         impl Type for $ty {
-            const NAME: &'static str = stringify!($ty);
-            const SID: $crate::TypeSid = $crate::sid!();
-
             fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
                 <$tty as Type>::inline(opts, generics)
             }
@@ -94,9 +82,6 @@ macro_rules! impl_as {
 macro_rules! impl_for_list {
     ($($ty:path as $name:expr)+) => {$(
         impl<T: Type> Type for $ty {
-            const NAME: &'static str = $name;
-            const SID: $crate::TypeSid = $crate::sid!();
-
             fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
                 DataType::List(Box::new(generics.get(0).cloned().unwrap_or(T::inline(
                     DefOpts {
@@ -123,9 +108,6 @@ macro_rules! impl_for_list {
 macro_rules! impl_for_map {
     ($ty:path as $name:expr) => {
         impl<K: Type, V: Type> Type for $ty {
-            const NAME: &'static str = $name;
-            const SID: $crate::TypeSid = $crate::sid!();
-
             fn inline(defs: DefOpts, generics: &[DataType]) -> DataType {
                 DataType::Record(Box::new((
                     generics.get(0).cloned().unwrap_or(<K as Type>::inline(

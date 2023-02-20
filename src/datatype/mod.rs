@@ -9,7 +9,7 @@ pub use r#enum::*;
 use crate::{ImplLocation, TypeSid};
 
 /// A map of type definitions
-pub type TypeDefs = BTreeMap<&'static str, DataType>;
+pub type TypeDefs = BTreeMap<TypeSid, DataType>;
 
 /// arguments for [Type::inline](crate::Type::inline), [Type::reference](crate::Type::reference) and [Type::definition](crate::Type::definition).
 pub struct DefOpts<'a> {
@@ -20,7 +20,7 @@ pub struct DefOpts<'a> {
 }
 
 /// A wrapper around [DataTypeItem] to store general information about the type.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 #[allow(missing_docs)]
 pub enum DataType {
     // Always inlined
@@ -44,6 +44,38 @@ pub enum DataType {
     /// Used when the type is not yet known. This allows us to avoid stack overflows.
     /// It should never be returned from the Specta functions. Doing so is classed as a bug!
     Placeholder,
+}
+
+impl PartialEq for DataType {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Any, Self::Any) => true,
+            (Self::Primitive(l0), Self::Primitive(r0)) => l0 == r0,
+            (Self::Literal(l0), Self::Literal(r0)) => l0 == r0,
+            (Self::List(l0), Self::List(r0)) => l0 == r0,
+            (Self::Nullable(l0), Self::Nullable(r0)) => l0 == r0,
+            (Self::Record(l0), Self::Record(r0)) => l0 == r0,
+            (Self::Tuple(l0), Self::Tuple(r0)) => l0 == r0,
+            (Self::Object(l0), Self::Object(r0)) => l0.sid == r0.sid,
+            (Self::Enum(l0), Self::Enum(r0)) => l0.sid == r0.sid,
+            // TODO: Should the `generics` come into this check?
+            // (
+            //     Self::Reference {
+            //         name: l_name,
+            //         generics: l_generics,
+            //         sid: l_sid,
+            //         ..
+            //     },
+            //     Self::Reference {
+            //         name: r_name,
+            //         generics: r_generics,
+            //         sid: r_sid,
+            //         ..
+            //     },
+            // ) => l_name == r_name && l_generics == r_generics && l_sid == r_sid,
+            (_, _) => todo!(),
+        }
+    }
 }
 
 impl DataType {

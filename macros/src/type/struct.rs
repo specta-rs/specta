@@ -25,6 +25,7 @@ pub fn decode_field_attrs(field: &Field) -> syn::Result<(&Field, FieldAttr)> {
 }
 
 pub fn parse_struct(
+    name: &TokenStream,
     (container_attrs, struct_attrs): (&ContainerAttr, StructAttr),
     generics: &Generics,
     crate_ref: &TokenStream,
@@ -156,8 +157,8 @@ pub fn parse_struct(
             quote!(
                 // TODO: Do `CustomDataType` in a centeral place for both struct and enum
                 #crate_ref::CustomDataType {
-                    name: <Self as #crate_ref::Type>::NAME,
-                    sid: <Self as #crate_ref::Type>::SID, // #crate_ref::sid!(@with_specta_path; #crate_name)
+                    name: #name,
+                    sid: SID,
                     impl_location: #crate_ref::impl_location!(@with_specta_path; #crate_ref),
                     comments: #comments,
                     export: #should_export,
@@ -208,7 +209,6 @@ pub fn parse_struct(
                     .collect::<syn::Result<Vec<TokenStream>>>()?;
 
                 quote!(#crate_ref::TupleType {
-                    // name: <Self as #crate_ref::Type>::NAME,
                     generics: vec![#(#definition_generics),*],
                     fields: vec![#(#fields),*]
                 }.into())
@@ -216,7 +216,6 @@ pub fn parse_struct(
         }
         Fields::Unit => {
             quote!(#crate_ref::TupleType {
-                // name: <Self as #crate_ref::Type>::NAME,
                 generics: vec![#(#definition_generics),*],
                 fields: vec![],
             }.into())
@@ -229,14 +228,14 @@ pub fn parse_struct(
             <Self as #crate_ref::Type>::inline(opts, generics)
         }))
     } else {
-        // TODO: This whole block looks way overcomplicated
         quote! {
             #crate_ref::TypeCategory::Reference {
                 reference: #crate_ref::DataType::Reference {
-                    name: <Self as #crate_ref::Type>::NAME,
-                    sid: <Self as #crate_ref::Type>::SID,
+                    name: #name,
+                    sid: SID,
                     generics: vec![#(#reference_generics),*],
-                }
+                },
+                sid: SID,
             }
         }
     };
