@@ -35,15 +35,28 @@ pub enum DataType {
     Object(CustomDataType<ObjectType>),
     Enum(CustomDataType<EnumType>),
     // A reference type that has already been defined
-    Reference {
-        name: &'static str,
-        generics: Vec<DataType>,
-        sid: TypeSid,
-    },
+    Reference(DataTypeReference),
     Generic(GenericType),
     /// Used when the type is not yet known. This allows us to avoid stack overflows.
     /// It should never be returned from the Specta functions. Doing so is classed as a bug!
     Placeholder,
+}
+
+/// Datatype to be put in the type map while field types are being resolved. Used in order to
+/// support recursive types without causing an infinite loop.
+///
+/// This works since a child type that references a parent type does not care about the
+/// parent's fields, only really its name. Once all of the parent's fields have been
+/// resolved will the parent's definition be placed in the type map.
+///
+/// This doesn't account for flattening and inlining recursive types, however, which will
+/// require a more complex solution since it will require multiple processing stages.
+#[derive(Debug, Clone)]
+#[allow(missing_docs)]
+pub struct DataTypeReference {
+    pub name: &'static str,
+    pub sid: TypeSid,
+    pub generics: Vec<DataType>,
 }
 
 impl PartialEq for DataType {
@@ -99,7 +112,7 @@ impl DataType {
         match self {
             DataType::Object(obj) => Some(obj.sid),
             DataType::Enum(en) => Some(en.sid),
-            DataType::Reference { sid, .. } => Some(*sid), // TODO: Should I have this case?
+            DataType::Reference(DataTypeReference { sid, .. }) => Some(*sid), // TODO: Should I have this case?
             _ => None,
         }
     }

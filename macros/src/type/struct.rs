@@ -229,14 +229,11 @@ pub fn parse_struct(
         }))
     } else {
         quote! {
-            #crate_ref::TypeCategory::Reference {
-                reference: #crate_ref::DataType::Reference {
-                    name: #name,
-                    sid: SID,
-                    generics: vec![#(#reference_generics),*],
-                },
+            #crate_ref::TypeCategory::Reference(#crate_ref::DataTypeReference {
+                name: #name,
                 sid: SID,
-            }
+                generics: vec![#(#reference_generics),*],
+            })
         }
     };
 

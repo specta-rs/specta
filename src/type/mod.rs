@@ -10,22 +10,7 @@ pub enum TypeCategory {
     Inline(DataType),
     /// The type should be properly referenced and stored in the type map to be defined outside of
     /// where it is referenced.
-    Reference {
-        // /// Datatype to be put in the type map while field types are being resolved. Used in order to
-        // /// support recursive types without causing an infinite loop.
-        // ///
-        // /// This works since a child type that references a parent type does not care about the
-        // /// parent's fields, only really its name. Once all of the parent's fields have been
-        // /// resolved will the parent's definition be placed in the type map.
-        // ///
-        // /// This doesn't account for flattening and inlining recursive types, however, which will
-        // /// require a more complex solution since it will require multiple processing stages.
-        // placeholder: DataTypeItem,
-        /// Datatype to use whenever a reference to the type is requested.
-        reference: DataType, // TODO: Maybe remove this and lookup using `SID`???
-        /// TODO
-        sid: TypeSid, // TODO: Is this needed or can it be gotten from `reference` if it's a `DataType::Reference`?
-    },
+    Reference(DataTypeReference),
 }
 
 /// Provides runtime type information that can be fed into a language exporter to generate a type definition in another language.
@@ -86,15 +71,17 @@ pub trait Type {
 
         match category {
             TypeCategory::Inline(inline) => inline,
-            TypeCategory::Reference { reference, sid } => {
-                opts.type_map.entry(sid).or_insert(DataType::Placeholder);
+            TypeCategory::Reference(def) => {
+                opts.type_map
+                    .entry(def.sid)
+                    .or_insert(DataType::Placeholder);
 
                 let definition = Self::definition(DefOpts {
                     parent_inline: false,
                     type_map: opts.type_map,
                 });
 
-                if let Some(ty) = opts.type_map.get(&sid) {
+                if let Some(ty) = opts.type_map.get(&def.sid) {
                     // TODO: Properly detect duplicate name where SID don't match
                     // todo!();
                     // println!("{:#?} {:?}", ty, definition);
@@ -108,10 +95,10 @@ pub trait Type {
                     //     }
                     // }
                 } else {
-                    opts.type_map.insert(sid, definition);
+                    opts.type_map.insert(def.sid, definition);
                 }
 
-                reference
+                DataType::Reference(def)
             }
         }
     }

@@ -414,7 +414,7 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
                 .collect::<Result<Vec<_>, TsExportError>>()?
                 .join(" | "),
         },
-        DataType::Reference { name, generics, .. } => match &generics[..] {
+        DataType::Reference(DataTypeReference { name, generics, .. }) => match &generics[..] {
             [] => name.to_string(),
             generics => {
                 let generics = generics
