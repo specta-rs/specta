@@ -2,7 +2,7 @@ use core::fmt;
 
 use thiserror::Error;
 
-use crate::ExportError;
+use crate::{ExportError, ImplLocation};
 
 use super::ExportPath;
 
@@ -36,10 +36,8 @@ pub enum TsExportError {
     ForbiddenName(NamedLocation, ExportPath, &'static str),
     #[error("Attempted to export '{0}' with tagging but the type is not tagged.")]
     InvalidTagging(ExportPath),
-    #[error("Unable to export '{0}'")]
-    CannotExport(ExportPath),
-    #[error("Unable to export '{0}' due to an internal error. This likely is a bug in Specta itself and not your code: {0}")]
-    InternalError(ExportPath, &'static str),
+    #[error("Unable to export type named '{0}' from locations '{:?}' '{:?}'", .1.map(|v| v.as_str()), .2.map(|v| v.as_str()))]
+    DuplicateTypeName(&'static str, Option<ImplLocation>, Option<ImplLocation>),
     #[error("Generic export error: {0}")]
     SpectaExportError(#[from] ExportError),
     #[error("IO error: {0}")]
@@ -57,8 +55,9 @@ impl PartialEq for TsExportError {
                 l0 == r0 && l1 == r1 && l2 == r2
             }
             (Self::InvalidTagging(l0), Self::InvalidTagging(r0)) => l0 == r0,
-            (Self::CannotExport(l0), Self::CannotExport(r0)) => l0 == r0,
-            (Self::InternalError(l0, l1), Self::InternalError(r0, r1)) => l0 == r0 && l1 == r1,
+            (Self::DuplicateTypeName(l0, l1, l2), Self::DuplicateTypeName(r0, r1, r2)) => {
+                l0 == r0 && l1 == r1 && l2 == r2
+            }
             (Self::Io(l0), Self::Io(r0)) => l0.to_string() == r0.to_string(), // This is a bit hacky but it will be fine for usage in unit tests!
             (Self::Other(l0, l1), Self::Other(r0, r1)) => l0 == r0 && l1 == r1,
             _ => false,

@@ -7,7 +7,7 @@ use std::sync::Mutex;
 /// Global type store for collecting custom types to export.
 ///
 /// Populated by `#[ctor]` functions defined in the [`Type`](derive@crate::Type) macro.
-pub static TYPES: Lazy<Mutex<BTreeMap<TypeSid, DataType>>> = Lazy::new(Default::default);
+pub static TYPES: Lazy<Mutex<TypeDefs>> = Lazy::new(Default::default);
 
 /// Exports all types in the [`TYPES`](static@crate::export::TYPES) map to the provided TypeScript file.
 pub fn ts(path: &str) -> Result<(), TsExportError> {
@@ -21,18 +21,28 @@ pub fn ts_with_cfg(path: &str, conf: &ExportConfiguration) -> Result<(), TsExpor
     let export_by_default = conf.export_by_default.unwrap_or(true);
     let types = TYPES.lock().expect("Failed to acquire lock on 'TYPES'");
     let types = types
-        .values()
-        .filter_map(|v| match v {
-            DataType::Named(v) => v.export.unwrap_or(export_by_default).then(|| (v.name, v)),
-            DataType::Placeholder => {
+        .clone()
+        .into_iter()
+        .filter(|(_, v)| match v {
+            NamedDataTypeOrPlaceholder::Named(v) => v.export.unwrap_or(export_by_default),
+            NamedDataTypeOrPlaceholder::Placeholder => {
                 unreachable!("Placeholder type should never be returned from the Specta functions!")
             }
-            _ => None,
         })
         .collect::<BTreeMap<_, _>>();
 
+    for (ty_name, l0, l1) in detect_duplicate_type_names(&types) {
+        return Err(TsExportError::DuplicateTypeName(ty_name, l0, l1));
+    }
+
     for (_, typ) in types {
-        out += &ts::export_datatype(conf, typ)?;
+        out += &ts::export_datatype(
+            conf,
+            &match typ {
+                NamedDataTypeOrPlaceholder::Named(v) => v,
+                NamedDataTypeOrPlaceholder::Placeholder => unreachable!(),
+            },
+        )?;
         out += "\n\n";
     }
 

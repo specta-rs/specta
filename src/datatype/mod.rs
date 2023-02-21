@@ -15,7 +15,7 @@ pub use tuple::*;
 use crate::{ImplLocation, TypeSid};
 
 /// A map of type definitions
-pub type TypeDefs = BTreeMap<TypeSid, DataType>;
+pub type TypeDefs = BTreeMap<TypeSid, NamedDataTypeOrPlaceholder>;
 
 /// arguments for [Type::inline](crate::Type::inline), [Type::reference](crate::Type::reference) and [Type::definition](crate::Type::definition).
 pub struct DefOpts<'a> {
@@ -45,6 +45,13 @@ pub enum DataType {
     // A reference type that has already been defined
     Reference(DataTypeReference),
     Generic(GenericType),
+}
+
+/// TODO
+#[derive(Debug, Clone, PartialEq)]
+pub enum NamedDataTypeOrPlaceholder {
+    /// TODO
+    Named(NamedDataType),
     /// Used when the type is not yet known. This allows us to avoid stack overflows.
     /// It should never be returned from the Specta functions. Doing so is classed as a bug!
     Placeholder,

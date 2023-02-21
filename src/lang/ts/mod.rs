@@ -13,28 +13,42 @@ use crate::*;
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string with an export.
 /// Eg. `export type Foo = { demo: string; };`
 pub fn export<T: NamedType>(conf: &ExportConfiguration) -> Result<String, TsExportError> {
-    export_datatype(
+    let mut type_name = TypeDefs::default();
+    let result = export_datatype(
         conf,
         &T::definition_named_data_type(DefOpts {
             parent_inline: true,
-            type_map: &mut TypeDefs::default(),
+            type_map: &mut type_name,
         })?,
-    )
+    );
+
+    for (ty_name, l0, l1) in detect_duplicate_type_names(&type_name) {
+        return Err(TsExportError::DuplicateTypeName(ty_name, l0, l1));
+    }
+
+    result
 }
 
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string.
 /// Eg. `{ demo: string; };`
 pub fn inline<T: Type>(conf: &ExportConfiguration) -> Result<String, TsExportError> {
-    datatype(
+    let mut type_name = TypeDefs::default();
+    let result = datatype(
         conf,
         &T::inline(
             DefOpts {
                 parent_inline: true,
-                type_map: &mut TypeDefs::default(),
+                type_map: &mut type_name,
             },
             &[],
         )?,
-    )
+    );
+
+    for (ty_name, l0, l1) in detect_duplicate_type_names(&type_name) {
+        return Err(TsExportError::DuplicateTypeName(ty_name, l0, l1));
+    }
+
+    result
 }
 
 /// Convert a DataType to a TypeScript string
@@ -43,6 +57,8 @@ pub fn export_datatype(
     conf: &ExportConfiguration,
     typ: &NamedDataType,
 ) -> Result<String, TsExportError> {
+    // TODO: Duplicate type name detection?
+
     export_datatype_inner(ExportContext { conf, path: vec![] }, typ)
 }
 
@@ -109,6 +125,8 @@ fn export_datatype_inner(
 /// Convert a DataType to a TypeScript string
 /// Eg. `{ demo: string; }`
 pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, TsExportError> {
+    // TODO: Duplicate type name detection?
+
     datatype_inner(ExportContext { conf, path: vec![] }, typ)
 }
 
@@ -177,12 +195,6 @@ fn datatype_inner(ctx: ExportContext, typ: &DataType) -> Result<String, TsExport
             }
         },
         DataType::Generic(GenericType(ident)) => ident.to_string(),
-        DataType::Placeholder => {
-            return Err(TsExportError::InternalError(
-                ctx.export_path(),
-                "Attempted to export a placeholder!",
-            ))
-        }
     })
 }
 

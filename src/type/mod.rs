@@ -5,6 +5,9 @@ use crate::*;
 #[macro_use]
 mod macros;
 mod impls;
+mod post_process;
+
+pub use post_process::*;
 
 /// The category a type falls under. Determines how references are generated for a given type.
 pub enum TypeCategory {
@@ -85,14 +88,21 @@ pub trait Type {
                 if opts.type_map.get(&def.sid).is_none() {
                     opts.type_map
                         .entry(def.sid)
-                        .or_insert(DataType::Placeholder);
+                        .or_insert(NamedDataTypeOrPlaceholder::Placeholder);
 
                     let definition = Self::definition(DefOpts {
                         parent_inline: opts.parent_inline,
                         type_map: opts.type_map,
                     })?;
 
-                    opts.type_map.insert(def.sid, definition);
+                    // TODO: It would be nice if we removed the `TypeCategory` and used the `NamedType` trait or something so this unreachable isn't needed.
+                    let definition = match definition {
+                        DataType::Named(definition) => definition,
+                        _ => unreachable!(),
+                    };
+
+                    opts.type_map
+                        .insert(def.sid, NamedDataTypeOrPlaceholder::Named(definition));
                 }
 
                 DataType::Reference(def)
