@@ -47,14 +47,12 @@ impl EnumType {
             Self::Untagged { variants, repr, .. } => {
                 variants
                     .iter()
-                    .map(|variant| Self::make_flattenable_inner(variant, repr))
-                    .collect::<Result<_, _>>()?;
+                    .try_for_each(|variant| Self::make_flattenable_inner(variant, repr))?;
             }
             Self::Tagged { variants, repr, .. } => {
                 variants
                     .iter()
-                    .map(|(_, variant)| Self::make_flattenable_inner(variant, repr))
-                    .collect::<Result<_, _>>()?;
+                    .try_for_each(|(_, variant)| Self::make_flattenable_inner(variant, repr))?;
             }
         }
 

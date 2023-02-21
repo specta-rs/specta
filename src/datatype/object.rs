@@ -20,10 +20,12 @@ pub struct ObjectType {
 }
 
 impl ObjectType {
+    /// TODO
     pub fn to_anonymous(self) -> DataType {
         DataType::Object(self)
     }
 
+    /// TODO
     pub fn to_named(self, name: &'static str) -> DataType {
         DataType::Named(NamedDataType {
             name,

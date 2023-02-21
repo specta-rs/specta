@@ -73,6 +73,7 @@ pub struct NamedDataType {
     pub export: Option<bool>,
     /// The Rust deprecated comment if the type is deprecated.
     pub deprecated: Option<&'static str>,
+    /// TODO
     pub item: NamedDataTypeItem,
 }
 
@@ -85,8 +86,11 @@ impl From<NamedDataType> for DataType {
 /// TODO
 #[derive(Debug, Clone, PartialEq)]
 pub enum NamedDataTypeItem {
+    /// TODO
     Object(ObjectType),
+    /// TODO
     Enum(EnumType),
+    /// TODO
     Tuple(TupleType),
 }
 
@@ -155,8 +159,13 @@ impl From<String> for DataType {
     }
 }
 
+/// TODO
 pub trait ToSpectaType {
+    /// TODO
     type Type;
 
+    /// TODO
     fn to_specta_type(self) -> Self::Type;
 }
+
+// TODO: Trait with `to_anonymous` and `to_named`???

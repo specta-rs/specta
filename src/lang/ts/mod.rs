@@ -22,7 +22,7 @@ pub fn export<T: NamedType>(conf: &ExportConfiguration) -> Result<String, TsExpo
         })?,
     );
 
-    for (ty_name, l0, l1) in detect_duplicate_type_names(&type_name) {
+    if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_name).into_iter().next() {
         return Err(TsExportError::DuplicateTypeName(ty_name, l0, l1));
     }
 
@@ -44,7 +44,7 @@ pub fn inline<T: Type>(conf: &ExportConfiguration) -> Result<String, TsExportErr
         )?,
     );
 
-    for (ty_name, l0, l1) in detect_duplicate_type_names(&type_name) {
+    if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_name).into_iter().next() {
         return Err(TsExportError::DuplicateTypeName(ty_name, l0, l1));
     }
 
@@ -71,7 +71,7 @@ fn export_datatype_inner(
         ..
     }: &NamedDataType,
 ) -> Result<String, TsExportError> {
-    let ctx = ctx.new(PathItem::Type(name));
+    let ctx = ctx.with(PathItem::Type(name));
     if let Some(name) = RESERVED_WORDS.iter().find(|v| **v == *name) {
         return Err(TsExportError::ForbiddenName(
             NamedLocation::Type,
@@ -95,16 +95,16 @@ fn export_datatype_inner(
             generics, fields, ..
         }) => match fields.len() {
             0 => Some(generics),
-            _ => (!generics.is_empty()).then(|| generics),
+            _ => (!generics.is_empty()).then_some(generics),
         },
         // Enum
         NamedDataTypeItem::Enum(e) => {
             let generics = e.generics();
-            (!generics.is_empty()).then(|| generics)
+            (!generics.is_empty()).then_some(generics)
         }
         // Struct with unnamed fields
         NamedDataTypeItem::Tuple(TupleType { generics, .. }) => {
-            (!generics.is_empty()).then(|| generics)
+            (!generics.is_empty()).then_some(generics)
         }
     };
 
@@ -134,7 +134,7 @@ fn datatype_inner(ctx: ExportContext, typ: &DataType) -> Result<String, TsExport
     Ok(match &typ {
         DataType::Any => "any".into(),
         DataType::Primitive(p) => {
-            let ctx = ctx.new(PathItem::Type(p.to_rust_str()));
+            let ctx = ctx.with(PathItem::Type(p.to_rust_str()));
             match p {
                 primitive_def!(i8 i16 i32 u8 u16 u32 f32 f64) => "number".into(),
                 primitive_def!(usize isize i64 u64 i128 u128) => match ctx.conf.bigint {
@@ -168,26 +168,26 @@ fn datatype_inner(ctx: ExportContext, typ: &DataType) -> Result<String, TsExport
             name,
             item: NamedDataTypeItem::Tuple(TupleType { fields, .. }),
             ..
-        }) => tuple_datatype(ctx.new(PathItem::Type(name)), fields)?,
+        }) => tuple_datatype(ctx.with(PathItem::Type(name)), fields)?,
         DataType::Tuple(TupleType { fields, .. }) => tuple_datatype(ctx, fields)?,
         DataType::Named(NamedDataType {
             name,
             item: NamedDataTypeItem::Object(item),
             ..
-        }) => object_datatype(ctx.new(PathItem::Type(name)), Some(name), item)?,
+        }) => object_datatype(ctx.with(PathItem::Type(name)), Some(name), item)?,
         DataType::Object(item) => object_datatype(ctx, None, item)?,
         DataType::Named(NamedDataType {
             name,
             item: NamedDataTypeItem::Enum(item),
             ..
-        }) => enum_datatype(ctx.new(PathItem::Type(name)), Some(name), item)?,
+        }) => enum_datatype(ctx.with(PathItem::Type(name)), Some(name), item)?,
         DataType::Enum(item) => enum_datatype(ctx, None, item)?,
         DataType::Reference(DataTypeReference { name, generics, .. }) => match &generics[..] {
             [] => name.to_string(),
             generics => {
                 let generics = generics
                     .iter()
-                    .map(|v| datatype_inner(ctx.new(PathItem::Type(name)), v))
+                    .map(|v| datatype_inner(ctx.with(PathItem::Type(name)), v))
                     .collect::<Result<Vec<_>, _>>()?
                     .join(", ");
 
@@ -198,8 +198,8 @@ fn datatype_inner(ctx: ExportContext, typ: &DataType) -> Result<String, TsExport
     })
 }
 
-fn tuple_datatype(ctx: ExportContext, fields: &Vec<DataType>) -> Result<String, TsExportError> {
-    match &fields[..] {
+fn tuple_datatype(ctx: ExportContext, fields: &[DataType]) -> Result<String, TsExportError> {
+    match fields {
         [] => Ok("null".to_string()),
         [ty] => datatype_inner(ctx, ty),
         tys => Ok(format!(
@@ -224,7 +224,7 @@ fn object_datatype(
                 .iter()
                 .filter(|f| f.flatten)
                 .map(|field| {
-                    datatype_inner(ctx.new(PathItem::Field(field.key)), &field.ty)
+                    datatype_inner(ctx.with(PathItem::Field(field.key)), &field.ty)
                         .map(|type_str| format!("({type_str})"))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
@@ -233,7 +233,7 @@ fn object_datatype(
                 .iter()
                 .filter(|f| !f.flatten)
                 .map(|field| {
-                    let ctx = ctx.new(PathItem::Field(field.key));
+                    let ctx = ctx.with(PathItem::Field(field.key));
                     let field_name_safe =
                         sanitise_name(ctx.clone(), NamedLocation::Field, field.key)?;
                     let field_ts_str = datatype_inner(ctx, &field.ty);
@@ -283,7 +283,7 @@ fn enum_datatype(
         EnumType::Tagged { variants, repr, .. } => variants
             .iter()
             .map(|(variant_name, variant)| {
-                let ctx = ctx.new(PathItem::Variant(variant_name));
+                let ctx = ctx.with(PathItem::Variant(variant_name));
                 let sanitised_name =
                     sanitise_name(ctx.clone(), NamedLocation::Variant, variant_name)?;
 
@@ -302,7 +302,7 @@ fn enum_datatype(
                         fields.extend(
                             obj.fields
                                 .iter()
-                                .map(|v| object_field_to_ts(ctx.new(PathItem::Field(v.key)), v))
+                                .map(|v| object_field_to_ts(ctx.with(PathItem::Field(v.key)), v))
                                 .collect::<Result<Vec<_>, _>>()?,
                         );
 
@@ -378,7 +378,7 @@ fn object_field_to_ts(ctx: ExportContext, field: &ObjectField) -> Result<String,
         false => (field_name_safe, &field.ty),
     };
 
-    Ok(format!("{key}: {}", datatype_inner(ctx, &ty)?))
+    Ok(format!("{key}: {}", datatype_inner(ctx, ty)?))
 }
 
 /// sanitise a string to be a valid Typescript key

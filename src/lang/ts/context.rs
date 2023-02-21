@@ -16,7 +16,7 @@ pub(crate) struct ExportContext<'a> {
 }
 
 impl ExportContext<'_> {
-    pub(crate) fn new(&self, item: PathItem) -> Self {
+    pub(crate) fn with(&self, item: PathItem) -> Self {
         Self {
             path: self.path.iter().cloned().chain([item]).collect(),
             ..*self
@@ -33,19 +33,15 @@ impl ExportContext<'_> {
 pub struct ExportPath(String);
 
 impl ExportPath {
-    pub(crate) fn new(path: &Vec<PathItem>) -> Self {
+    pub(crate) fn new(path: &[PathItem]) -> Self {
         let mut s = String::new();
         let mut path = path.iter().peekable();
-        loop {
-            if let Some(item) = path.next() {
-                s.push_str(match item {
-                    PathItem::Type(v) => v,
-                    PathItem::Field(v) => v,
-                    PathItem::Variant(v) => v,
-                });
-            } else {
-                break;
-            }
+        while let Some(item) = path.next() {
+            s.push_str(match item {
+                PathItem::Type(v) => v,
+                PathItem::Field(v) => v,
+                PathItem::Variant(v) => v,
+            });
 
             if let Some(next) = path.peek() {
                 s.push_str(match next {

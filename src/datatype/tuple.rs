@@ -1,16 +1,21 @@
 use crate::{DataType, NamedDataType, NamedDataTypeItem};
 
+/// TODO
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct TupleType {
+    /// TODO
     pub fields: Vec<DataType>,
+    /// TODO
     pub generics: Vec<&'static str>,
 }
 
 impl TupleType {
+    /// TODO
     pub fn to_anonymous(self) -> DataType {
         DataType::Tuple(self)
     }
 
+    /// TODO
     pub fn to_named(self, name: &'static str) -> NamedDataType {
         NamedDataType {
             name,

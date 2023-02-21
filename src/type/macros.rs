@@ -50,7 +50,7 @@ macro_rules! impl_containers {
     ($($container:ident)+) => {$(
         impl<T: Type> Type for $container<T> {
             fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-                Ok(generics.get(0).cloned().map_or_else(
+                generics.get(0).cloned().map_or_else(
                     || {
                         T::inline(
                            opts,
@@ -58,11 +58,11 @@ macro_rules! impl_containers {
                         )
                     },
                     Ok,
-                )?)
+                )
             }
 
             fn reference(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-                Ok(generics.get(0).cloned().map_or_else(
+                generics.get(0).cloned().map_or_else(
                     || {
                         T::reference(
                            opts,
@@ -70,7 +70,7 @@ macro_rules! impl_containers {
                         )
                     },
                     Ok,
-                )?)
+                )
             }
         }
     )+}

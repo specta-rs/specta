@@ -69,7 +69,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             Fields::Unnamed(_) => {
                 let fields = data.fields.iter().enumerate().map(|(i, _)| {
                     let i = proc_macro2::Literal::usize_unsuffixed(i);
-                    quote!(t.#i.into()) // TODO: Replace `into` with inline impl
+                    quote!(t.#i.into())
                 });
 
                 let impl_typ = quote!(#crate_ref::TupleType);
