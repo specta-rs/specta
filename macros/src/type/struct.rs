@@ -48,15 +48,13 @@ pub fn parse_struct(
 
     let reference_generics = generic_idents.iter().map(|(i, ident)| {
         quote! {
-            generics.get(#i).cloned().unwrap_or_else(||
-                <#ident as #crate_ref::Type>::reference(
-                    #crate_ref::DefOpts {
-                        parent_inline: #parent_inline,
-                        type_map: opts.type_map
-                    },
-                    &[]
-                )
-            )
+            generics
+                .get(#i)
+                .cloned()
+                .map_or_else(|| <#ident as #crate_ref::Type>::reference(#crate_ref::DefOpts {
+                    parent_inline: #parent_inline,
+                    type_map: opts.type_map
+                }, &[]), Ok)?
         }
     });
 
@@ -116,14 +114,14 @@ pub fn parse_struct(
                         let mut ty = <#field_ty as #crate_ref::Type>::inline(#crate_ref::DefOpts {
                             parent_inline: #parent_inline,
                             type_map: opts.type_map
-                        }, &generics);
+                        }, &generics)?;
 
                         match &mut ty {
                             #crate_ref::DataType::Enum(item) => {
-                                item.make_flattenable();
+                                item.make_flattenable()?;
                             }
                             #crate_ref::DataType::Named(#crate_ref::NamedDataType { item: #crate_ref::NamedDataTypeItem::Enum(item), .. }) => {
-                                item.make_flattenable();
+                                item.make_flattenable()?;
                             }
                             _ => {}
                         }
@@ -239,7 +237,7 @@ pub fn parse_struct(
     let category = if container_attrs.inline {
         quote!(#crate_ref::TypeCategory::Inline({
             let generics = &[#(#reference_generics),*];
-            <Self as #crate_ref::Type>::inline(opts, generics)
+            <Self as #crate_ref::Type>::inline(opts, generics)?
         }))
     } else {
         quote! {

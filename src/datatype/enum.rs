@@ -1,4 +1,7 @@
-use crate::datatype::{DataType, ObjectType, TupleType};
+use crate::{
+    datatype::{DataType, ObjectType, TupleType},
+    ExportError,
+};
 
 /// this is used internally to represent the types.
 #[derive(Debug, Clone, PartialEq)]
@@ -39,37 +42,52 @@ impl EnumType {
 
     /// An enum may contain variants which are invalid and will cause a runtime errors during serialize/deserialization.
     /// This function will filter them out so types can be exported for valid variants.
-    pub fn make_flattenable(&mut self) {
-        // TODO: Throw error instead of using retain
+    pub fn make_flattenable(&mut self) -> Result<(), ExportError> {
         match self {
             Self::Untagged { variants, repr, .. } => {
-                variants.retain(|v| match repr {
-                    EnumRepr::External => match v {
-                        EnumVariant::Unnamed(v) if v.fields.len() == 1 => true,
-                        EnumVariant::Named(_) => true,
-                        _ => false,
-                    },
-                    EnumRepr::Untagged => matches!(v, EnumVariant::Unit | EnumVariant::Named(_)),
-                    EnumRepr::Adjacent { .. } => true,
-                    EnumRepr::Internal { .. } => {
-                        matches!(v, EnumVariant::Unit | EnumVariant::Named(_))
-                    }
-                });
+                variants
+                    .iter()
+                    .map(|variant| Self::make_flattenable_inner(variant, repr))
+                    .collect::<Result<_, _>>()?;
             }
             Self::Tagged { variants, repr, .. } => {
-                variants.retain(|(_, v)| match repr {
-                    EnumRepr::External => match v {
-                        EnumVariant::Unnamed(v) if v.fields.len() == 1 => true,
-                        EnumVariant::Named(_) => true,
-                        _ => false,
-                    },
-                    EnumRepr::Untagged => matches!(v, EnumVariant::Unit | EnumVariant::Named(_)),
-                    EnumRepr::Adjacent { .. } => true,
-                    EnumRepr::Internal { .. } => {
-                        matches!(v, EnumVariant::Unit | EnumVariant::Named(_))
-                    }
-                });
+                variants
+                    .iter()
+                    .map(|(_, variant)| Self::make_flattenable_inner(variant, repr))
+                    .collect::<Result<_, _>>()?;
             }
+        }
+
+        Ok(())
+    }
+
+    fn make_flattenable_inner(v: &EnumVariant, repr: &EnumRepr) -> Result<(), ExportError> {
+        match repr {
+            EnumRepr::External => match v {
+                EnumVariant::Unit => Err(ExportError::InvalidType(
+                    "`EnumRepr::External` with ` EnumVariant::Unit` is invalid!",
+                )),
+                EnumVariant::Unnamed(v) if v.fields.len() == 1 => Ok(()),
+                EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
+                    "`EnumRepr::External` with ` EnumVariant::Unnamed` containing more than a single field is invalid!",
+                )),
+                EnumVariant::Named(_) => Ok(()),
+            },
+            EnumRepr::Untagged => match v {
+                EnumVariant::Unit => Ok(()),
+                EnumVariant::Named(_) => Ok(()),
+                EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
+                    "`EnumRepr::Untagged` with ` EnumVariant::Unnamed` is invalid!",
+                )),
+            },
+            EnumRepr::Adjacent { .. } => Ok(()),
+            EnumRepr::Internal { .. } => match v {
+                EnumVariant::Unit => Ok(()),
+                EnumVariant::Named(_) => Ok(()),
+                EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
+                    "`EnumRepr::Internal` with ` EnumVariant::Unnamed` is invalid!",
+                )),
+            },
         }
     }
 }

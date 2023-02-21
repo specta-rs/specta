@@ -24,7 +24,7 @@ use crate::*;
 /// }
 ///
 /// fn main() {
-///     let typ = fn_datatype!(some_function);
+///     let typ = fn_datatype!(some_function).unwrap();
 ///
 ///     assert_eq!(typ.name, "some_function");
 ///     assert_eq!(typ.args.len(), 2);
@@ -64,7 +64,7 @@ pub trait SpectaFunction<TMarker> {
         name: &'static str,
         type_map: &mut TypeDefs,
         fields: &[&'static str],
-    ) -> FunctionDataType;
+    ) -> Result<FunctionDataType, ExportError>;
 }
 
 impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction<TResultMarker>
@@ -74,15 +74,16 @@ impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction
         name: &'static str,
         type_map: &mut TypeDefs,
         _fields: &[&'static str],
-    ) -> FunctionDataType {
-        FunctionDataType {
+    ) -> Result<FunctionDataType, ExportError> {
+        TResult::to_datatype(DefOpts {
+            parent_inline: false,
+            type_map,
+        })
+        .map(|result| FunctionDataType {
             name,
             args: vec![],
-            result: TResult::to_datatype(DefOpts {
-                parent_inline: false,
-                type_map,
-            }),
-        }
+            result,
+        })
     }
 }
 
@@ -93,7 +94,7 @@ pub fn get_datatype_internal<TMarker, T: SpectaFunction<TMarker>>(
     name: &'static str,
     type_map: &mut TypeDefs,
     fields: &[&'static str],
-) -> FunctionDataType {
+) -> Result<FunctionDataType, ExportError> {
     T::to_datatype(name, type_map, fields)
 }
 
@@ -110,19 +111,21 @@ macro_rules! impl_typed_command {
                     name: &'static str,
                     type_map: &mut TypeDefs,
                     fields: &[&'static str],
-                ) -> FunctionDataType {
+                ) -> Result<FunctionDataType, ExportError> {
                     let mut fields = fields.into_iter();
 
-                    FunctionDataType {
+                    Ok(FunctionDataType {
                         name,
                         args: [$(
-                            fields.next().and_then(|field|
-                                $i::to_datatype(DefOpts {
-                                    parent_inline: false,
-                                    type_map,
-                                })
-                                .map(|ty| (*field, ty))
-                            )
+                            fields
+                                .next()
+                                .map_or_else(
+                                    || Ok(None),
+                                    |field| $i::to_datatype(DefOpts {
+                                        parent_inline: false,
+                                        type_map,
+                                    }).map(|v| v.map(|ty| (*field, ty)))
+                                )?
                         ),*,]
                         .into_iter()
                         .filter_map(|v| v)
@@ -130,8 +133,8 @@ macro_rules! impl_typed_command {
                         result: TResult::to_datatype(DefOpts {
                             parent_inline: false,
                             type_map,
-                        }),
-                    }
+                        })?,
+                    })
                 }
             }
         }

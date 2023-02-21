@@ -1,3 +1,5 @@
+use thiserror::Error;
+
 use crate::*;
 
 #[macro_use]
@@ -13,6 +15,14 @@ pub enum TypeCategory {
     Reference(DataTypeReference),
 }
 
+/// Error which can be returned when exporting a type.
+#[derive(Error, Debug)]
+#[allow(missing_docs)]
+pub enum ExportError {
+    #[error("{0}")]
+    InvalidType(&'static str),
+}
+
 /// Provides runtime type information that can be fed into a language exporter to generate a type definition in another language.
 /// Avoid implementing this trait yourself where possible and use the [`Type`](derive@crate::Type) macro instead.
 pub trait Type {
@@ -21,7 +31,7 @@ pub trait Type {
     /// [`definition`](crate::Type::definition) and [`reference`](crate::Type::definition)
     ///
     /// Implemented internally or via the [`Type`](derive@crate::Type) macro
-    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType;
+    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError>;
 
     /// Returns the type parameter generics of a given type.
     /// Will usually be empty except for custom types.
@@ -36,7 +46,7 @@ pub trait Type {
     /// as the value for the `generics` arg.
     ///
     /// Implemented internally
-    fn definition(opts: DefOpts) -> DataType {
+    fn definition(opts: DefOpts) -> Result<DataType, ExportError> {
         Self::inline(
             opts,
             &Self::definition_generics()
@@ -50,8 +60,8 @@ pub trait Type {
     /// See [`TypeCategory`] for more info.
     ///
     /// Implemented internally or via the [`Type`](derive@crate::Type) macro
-    fn category_impl(opts: DefOpts, generics: &[DataType]) -> TypeCategory {
-        TypeCategory::Inline(Self::inline(opts, generics))
+    fn category_impl(opts: DefOpts, generics: &[DataType]) -> Result<TypeCategory, ExportError> {
+        Self::inline(opts, generics).map(TypeCategory::Inline)
     }
 
     /// Generates a datatype corresponding to a reference to this type,
@@ -60,16 +70,16 @@ pub trait Type {
     /// so the output of [`definition`](crate::Type::definition) will be put into the type map.
     ///
     /// Implemented internally
-    fn reference(opts: DefOpts, generics: &[DataType]) -> DataType {
+    fn reference(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
         let category = Self::category_impl(
             DefOpts {
                 parent_inline: opts.parent_inline,
                 type_map: opts.type_map,
             },
             generics,
-        );
+        )?;
 
-        match category {
+        Ok(match category {
             TypeCategory::Inline(inline) => inline,
             TypeCategory::Reference(def) => {
                 if opts.type_map.get(&def.sid).is_none() {
@@ -80,24 +90,27 @@ pub trait Type {
                     let definition = Self::definition(DefOpts {
                         parent_inline: opts.parent_inline,
                         type_map: opts.type_map,
-                    });
+                    })?;
 
                     opts.type_map.insert(def.sid, definition);
                 }
 
                 DataType::Reference(def)
             }
-        }
+        })
     }
 }
 
-/// TODO
+/// NamedType represents a type that can be converted into [NamedDataType].
+/// This will be all types created by the derive macro.
 pub trait NamedType: Type {
-    /// TODO
-    fn named_data_type(opts: DefOpts, generics: &[DataType]) -> NamedDataType;
+    /// this is equivalent to [Type::inline] but returns a [NamedDataType] instead.
+    /// This is a compile-time guaranteed alternative to extracting the `DataType::Named` variant.
+    fn named_data_type(opts: DefOpts, generics: &[DataType]) -> Result<NamedDataType, ExportError>;
 
-    /// TODO
-    fn inline_named_data_type(opts: DefOpts) -> NamedDataType {
+    /// this is equivalent to [Type::definition] but returns a [NamedDataType] instead.
+    /// This is a compile-time guaranteed alternative to extracting the `DataType::Named` variant.
+    fn definition_named_data_type(opts: DefOpts) -> Result<NamedDataType, ExportError> {
         Self::named_data_type(
             opts,
             &Self::definition_generics()

@@ -2,6 +2,8 @@ use core::fmt;
 
 use thiserror::Error;
 
+use crate::ExportError;
+
 use super::ExportPath;
 
 /// Describe where the error occurred
@@ -38,6 +40,8 @@ pub enum TsExportError {
     CannotExport(ExportPath),
     #[error("Unable to export '{0}' due to an internal error. This likely is a bug in Specta itself and not your code: {0}")]
     InternalError(ExportPath, &'static str),
+    #[error("Generic export error: {0}")]
+    SpectaExportError(#[from] ExportError),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
     #[error("Failed to export '{0}' due to error: {1}")]

@@ -33,15 +33,13 @@ pub fn parse_enum(
         let ident = &ident.clone();
 
         quote! {
-            generics.get(#i).cloned().unwrap_or_else(
-                || <#ident as #crate_ref::Type>::reference(
-                    #crate_ref::DefOpts {
-                        parent_inline: opts.parent_inline,
-                        type_map: opts.type_map
-                    },
-                    &[]
-                )
-            )
+            generics
+                .get(#i)
+                .cloned()
+                .map_or_else(|| <#ident as #crate_ref::Type>::reference(#crate_ref::DefOpts {
+                    parent_inline: opts.parent_inline,
+                    type_map: opts.type_map
+                }, &[]), Ok)?
         }
     });
 

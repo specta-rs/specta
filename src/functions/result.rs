@@ -1,11 +1,11 @@
 use std::future::Future;
 
-use crate::{DataType, DefOpts, Type};
+use crate::{DataType, DefOpts, ExportError, Type};
 
 /// is a trait which is implemented by all types which can be used as a command result.
 pub trait SpectaFunctionResult<TMarker> {
     /// convert result of the Rust function into a DataType
-    fn to_datatype(opts: DefOpts) -> DataType;
+    fn to_datatype(opts: DefOpts) -> Result<DataType, ExportError>;
 }
 
 #[cfg(feature = "serde")]
@@ -14,7 +14,7 @@ pub enum SpectaFunctionResultSerialize {}
 
 #[cfg(feature = "serde")]
 impl<T: serde::Serialize + Type> SpectaFunctionResult<SpectaFunctionResultSerialize> for T {
-    fn to_datatype(opts: DefOpts) -> DataType {
+    fn to_datatype(opts: DefOpts) -> Result<DataType, ExportError> {
         T::reference(opts, &[])
     }
 }
@@ -24,7 +24,7 @@ pub struct SpectaFunctionResultResult<TMarker>(TMarker);
 impl<TMarker, T: SpectaFunctionResult<TMarker>, E>
     SpectaFunctionResult<SpectaFunctionResultResult<TMarker>> for Result<T, E>
 {
-    fn to_datatype(opts: DefOpts) -> DataType {
+    fn to_datatype(opts: DefOpts) -> Result<DataType, ExportError> {
         T::to_datatype(opts)
     }
 }
@@ -34,7 +34,7 @@ pub struct SpectaFunctionResultFuture<TMarker>(TMarker);
 impl<TMarker, T: SpectaFunctionResult<TMarker>, TFut: Future<Output = T>>
     SpectaFunctionResult<SpectaFunctionResultFuture<TMarker>> for TFut
 {
-    fn to_datatype(opts: DefOpts) -> DataType {
+    fn to_datatype(opts: DefOpts) -> Result<DataType, ExportError> {
         T::to_datatype(opts)
     }
 }

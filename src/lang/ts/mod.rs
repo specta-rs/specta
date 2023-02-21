@@ -15,10 +15,10 @@ use crate::*;
 pub fn export<T: NamedType>(conf: &ExportConfiguration) -> Result<String, TsExportError> {
     export_datatype(
         conf,
-        &T::inline_named_data_type(DefOpts {
+        &T::definition_named_data_type(DefOpts {
             parent_inline: true,
             type_map: &mut TypeDefs::default(),
-        }),
+        })?,
     )
 }
 
@@ -33,7 +33,7 @@ pub fn inline<T: Type>(conf: &ExportConfiguration) -> Result<String, TsExportErr
                 type_map: &mut TypeDefs::default(),
             },
             &[],
-        ),
+        )?,
     )
 }
 
