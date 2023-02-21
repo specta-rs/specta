@@ -96,16 +96,13 @@ pub fn derive(
         quote!(#crate_ref::GenericType(stringify!(#ident)))
     });
 
-    let flatten_impl = can_flatten.then(|| {
-        let bounds = generics_with_ident_and_bounds_only(generics);
-        let type_args = generics_with_ident_only(generics);
+    let bounds = generics_with_ident_and_bounds_only(generics);
+    let type_args = generics_with_ident_only(generics);
+    let where_bound = add_type_to_where_clause(&quote!(#crate_ref::Type), generics);
 
-        let where_bound = add_type_to_where_clause(&quote!(#crate_ref::Type), generics);
-
-        quote! {
-            #[automatically_derived]
-            impl #bounds #crate_ref::Flatten for #ident #type_args #where_bound {}
-        }
+    let flatten_impl = can_flatten.then(|| quote! {
+        #[automatically_derived]
+        impl #bounds #crate_ref::Flatten for #ident #type_args #where_bound {}
     });
 
     let type_impl_heading = impl_heading(quote!(#crate_ref::Type), &ident, generics);
@@ -145,7 +142,7 @@ pub fn derive(
             #[automatically_derived]
             #type_impl_heading {
                 fn inline(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::DataType {
-                    #inlines
+                    #crate_ref::DataType::Named(<Self as #crate_ref::NamedType>::named_data_type(opts, generics))
                 }
     
                 fn category_impl(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::TypeCategory {
@@ -156,16 +153,23 @@ pub fn derive(
                     vec![#(#definition_generics),*]
                 }
             }
-    
-            #export
-    
+            
+            #[automatically_derived]
+            impl #bounds #crate_ref::NamedType for #ident #type_args #where_bound {
+                fn named_data_type(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::NamedDataType {
+                    #inlines
+                }
+            }
+            
             #flatten_impl
+
+            #export
         };
 
     }.into())
 }
 
-pub fn custom_data_type_wrapper(
+pub fn named_data_type_wrapper(
     crate_ref: &TokenStream,
     container_attrs: &ContainerAttr,
     name: &TokenStream,
@@ -185,7 +189,7 @@ pub fn custom_data_type_wrapper(
     };
 
     quote! {
-        #crate_ref::CustomDataType::Named {
+        #crate_ref::NamedDataType {
             name: #name,
             sid: Some(SID),
             impl_location: Some(#crate_ref::impl_location!(@with_specta_path; #crate_ref)),

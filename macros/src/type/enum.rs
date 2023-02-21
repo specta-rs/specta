@@ -1,5 +1,5 @@
 use super::{
-    attr::*, custom_data_type_wrapper, generics::construct_datatype, r#struct::decode_field_attrs,
+    attr::*, generics::construct_datatype, named_data_type_wrapper, r#struct::decode_field_attrs,
 };
 use crate::utils::*;
 use proc_macro2::TokenStream;
@@ -189,21 +189,23 @@ pub fn parse_enum(
         })
         .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-    let body = custom_data_type_wrapper(
+    let body = named_data_type_wrapper(
         crate_ref,
         container_attrs,
         name,
         quote! {
-            #crate_ref::EnumType {
-                generics: vec![#(#definition_generics),*],
-                variants: vec![#(#variants),*],
-                repr: #crate_ref::EnumRepr::#repr_tokens,
-            }
+            #crate_ref::NamedDataTypeItem::Enum(
+                #crate_ref::EnumType {
+                    generics: vec![#(#definition_generics),*],
+                    variants: vec![#(#variants),*],
+                    repr: #crate_ref::EnumRepr::#repr_tokens,
+                }
+            )
         },
     );
 
     Ok((
-        quote!(#crate_ref::DataType::Enum(#body)),
+        body,
         quote! {
             #crate_ref::TypeCategory::Reference(#crate_ref::DataTypeReference {
                 name: #name,

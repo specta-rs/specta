@@ -12,10 +12,10 @@ use crate::*;
 
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string with an export.
 /// Eg. `export type Foo = { demo: string; };`
-pub fn export<T: Type>(conf: &ExportConfiguration) -> Result<String, TsExportError> {
+pub fn export<T: NamedType>(conf: &ExportConfiguration) -> Result<String, TsExportError> {
     export_datatype(
         conf,
-        &T::definition(DefOpts {
+        &T::inline_named_data_type(DefOpts {
             parent_inline: true,
             type_map: &mut TypeDefs::default(),
         }),
@@ -41,104 +41,68 @@ pub fn inline<T: Type>(conf: &ExportConfiguration) -> Result<String, TsExportErr
 /// Eg. `{ demo: string; }`
 pub fn export_datatype(
     conf: &ExportConfiguration,
-    typ: &DataType,
+    typ: &NamedDataType,
 ) -> Result<String, TsExportError> {
     export_datatype_inner(ExportContext { conf, path: vec![] }, typ)
 }
 
-fn export_datatype_inner(ctx: ExportContext, typ: &DataType) -> Result<String, TsExportError> {
-    let (declaration, comments) = match &typ {
+fn export_datatype_inner(
+    ctx: ExportContext,
+    NamedDataType {
+        name,
+        comments,
+        item,
+        ..
+    }: &NamedDataType,
+) -> Result<String, TsExportError> {
+    let ctx = ctx.new(PathItem::Type(name));
+    if let Some(name) = RESERVED_WORDS.iter().find(|v| **v == *name) {
+        return Err(TsExportError::ForbiddenName(
+            NamedLocation::Type,
+            ctx.export_path(),
+            name,
+        ));
+    }
+
+    let inline_ts = datatype_inner(
+        ctx.clone(),
+        &match item {
+            NamedDataTypeItem::Object(obj) => DataType::Object(obj.clone()),
+            NamedDataTypeItem::Tuple(tuple) => DataType::Tuple(tuple.clone()),
+            NamedDataTypeItem::Enum(enum_) => DataType::Enum(enum_.clone()),
+        },
+    )?;
+
+    let generics = match item {
         // Named struct
-        DataType::Object(CustomDataType::Named {
-            name,
-            comments,
-            item: ObjectType {
-                generics, fields, ..
-            },
-            ..
-        }) => {
-            let ctx = ctx.new(PathItem::Type(name));
-            if let Some(name) = RESERVED_WORDS.iter().find(|v| **v == *name) {
-                return Err(TsExportError::ForbiddenName(
-                    NamedLocation::Type,
-                    ctx.export_path(),
-                    name,
-                ));
-            }
-
-            let inline_ts = datatype_inner(ctx, &typ)?;
-            (
-                match fields.len() {
-                    0 => format!("type {name} = {inline_ts}"),
-                    _ => {
-                        let generics = match generics.len() {
-                            0 => "".into(),
-                            _ => format!("<{}>", generics.to_vec().join(", ")),
-                        };
-
-                        format!("type {name}{generics} = {inline_ts}")
-                    }
-                },
-                *comments,
-            )
-        }
+        NamedDataTypeItem::Object(ObjectType {
+            generics, fields, ..
+        }) => match fields.len() {
+            0 => Some(generics),
+            _ => (!generics.is_empty()).then(|| generics),
+        },
         // Enum
-        DataType::Enum(CustomDataType::Named {
-            name,
-            comments,
-            item: EnumType { generics, .. },
-            ..
-        }) => {
-            let ctx = ctx.new(PathItem::Type(name));
-            if let Some(name) = RESERVED_WORDS.iter().find(|v| **v == *name) {
-                return Err(TsExportError::ForbiddenName(
-                    NamedLocation::Type,
-                    ctx.export_path(),
-                    name,
-                ));
-            }
-
-            let generics = match generics.len() {
-                0 => "".into(),
-                _ => format!("<{}>", generics.to_vec().join(", ")),
-            };
-
-            let inline_ts = datatype_inner(ctx, &typ)?;
-            (format!("type {name}{generics} = {inline_ts}"), *comments)
+        NamedDataTypeItem::Enum(EnumType { generics, .. }) => {
+            (!generics.is_empty()).then(|| generics)
         }
         // Struct with unnamed fields
-        DataType::Tuple(CustomDataType::Named {
-            name,
-            comments,
-            item: TupleType { generics, .. },
-            ..
-        }) => {
-            let ctx = ctx.new(PathItem::Type(name));
-            if let Some(name) = RESERVED_WORDS.iter().find(|v| *v == name) {
-                return Err(TsExportError::ForbiddenName(
-                    NamedLocation::Type,
-                    ctx.export_path(),
-                    name,
-                ));
-            }
-
-            let generics = match generics.len() {
-                0 => "".into(),
-                _ => format!("<{}>", generics.to_vec().join(", ")),
-            };
-
-            let inline_ts = datatype_inner(ctx, &typ)?;
-            (format!("type {name}{generics} = {inline_ts}"), *comments)
+        NamedDataTypeItem::Tuple(TupleType { generics, .. }) => {
+            (!generics.is_empty()).then(|| generics)
         }
-        _ => return Err(TsExportError::CannotExport(ctx.export_path())), // TODO: Enforce this at a type level
     };
+
+    let generics = generics
+        .map(|generics| format!("<{}>", generics.to_vec().join(", ")))
+        .unwrap_or_default();
 
     let comments = ctx
         .conf
         .comment_exporter
         .map(|v| v(comments))
         .unwrap_or_default();
-    Ok(format!("{comments}export {declaration}"))
+    Ok(format!(
+        "{comments}export type {name}{generics} = {inline_ts}"
+    ))
 }
 
 /// Convert a DataType to a TypeScript string
@@ -181,22 +145,24 @@ fn datatype_inner(ctx: ExportContext, typ: &DataType) -> Result<String, TsExport
         }
         // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
         DataType::List(def) => format!("{}[]", datatype_inner(ctx, def)?),
-        DataType::Tuple(CustomDataType::Named {
+        DataType::Named(NamedDataType {
             name,
-            item: TupleType { fields, .. },
+            item: NamedDataTypeItem::Tuple(TupleType { fields, .. }),
             ..
         }) => tuple_datatype(ctx.new(PathItem::Type(name)), fields)?,
-        DataType::Tuple(CustomDataType::Anonymous(TupleType { fields, .. })) => {
-            tuple_datatype(ctx, fields)?
-        }
-        DataType::Object(CustomDataType::Named { name, item, .. }) => {
-            object_datatype(ctx.new(PathItem::Type(name)), Some(name), item)?
-        }
-        DataType::Object(CustomDataType::Anonymous(item)) => object_datatype(ctx, None, item)?,
-        DataType::Enum(CustomDataType::Named { name, item, .. }) => {
-            enum_datatype(ctx.new(PathItem::Type(name)), Some(name), item)?
-        }
-        DataType::Enum(CustomDataType::Anonymous(item)) => enum_datatype(ctx, None, item)?,
+        DataType::Tuple(TupleType { fields, .. }) => tuple_datatype(ctx, fields)?,
+        DataType::Named(NamedDataType {
+            name,
+            item: NamedDataTypeItem::Object(item),
+            ..
+        }) => object_datatype(ctx.new(PathItem::Type(name)), Some(name), item)?,
+        DataType::Object(item) => object_datatype(ctx, None, item)?,
+        DataType::Named(NamedDataType {
+            name,
+            item: NamedDataTypeItem::Enum(item),
+            ..
+        }) => enum_datatype(ctx.new(PathItem::Type(name)), Some(name), item)?,
+        DataType::Enum(item) => enum_datatype(ctx, None, item)?,
         DataType::Reference(DataTypeReference { name, generics, .. }) => match &generics[..] {
             [] => name.to_string(),
             generics => {
@@ -310,10 +276,7 @@ fn enum_datatype(
                         format!("{{ {tag}: \"{sanitised_name}\" }}")
                     }
                     (EnumRepr::Internal { tag }, EnumVariant::Unnamed(tuple)) => {
-                        let typ = datatype_inner(
-                            ctx,
-                            &DataType::Tuple(CustomDataType::Anonymous(tuple.clone())),
-                        )?;
+                        let typ = datatype_inner(ctx, &DataType::Tuple(tuple.clone()))?;
 
                         format!("({{ {tag}: \"{sanitised_name}\" }} & {typ})")
                     }

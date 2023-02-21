@@ -3,7 +3,7 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{DataStruct, Field, Fields, GenericParam, Generics};
 
-use super::{attr::*, custom_data_type_wrapper, generics::construct_datatype};
+use super::{attr::*, generics::construct_datatype, named_data_type_wrapper};
 
 pub fn decode_field_attrs(field: &Field) -> syn::Result<(&Field, FieldAttr)> {
     // We pass all the attributes at the start and when decoding them pop them off the list.
@@ -119,7 +119,10 @@ pub fn parse_struct(
                         }, &generics);
 
                         match &mut ty {
-                            #crate_ref::DataType::Enum(#crate_ref::CustomDataType::Named { item, .. }) => {
+                            #crate_ref::DataType::Enum(item) => {
+                                item.make_flattenable();
+                            }
+                            #crate_ref::DataType::Named(#crate_ref::NamedDataType { item: #crate_ref::NamedDataTypeItem::Enum(item), .. }) => {
                                 item.make_flattenable();
                             }
                             _ => {}
@@ -151,19 +154,20 @@ pub fn parse_struct(
                 .map(|t| quote!(Some(#t)))
                 .unwrap_or(quote!(None));
 
-            let body = custom_data_type_wrapper(
+            named_data_type_wrapper(
                 crate_ref,
                 container_attrs,
                 name,
                 quote! {
-                    #crate_ref::ObjectType {
-                        generics: vec![#(#definition_generics),*],
-                        fields: vec![#(#fields),*],
-                        tag: #tag,
-                    }
+                    #crate_ref::NamedDataTypeItem::Object(
+                        #crate_ref::ObjectType {
+                            generics: vec![#(#definition_generics),*],
+                            fields: vec![#(#fields),*],
+                            tag: #tag,
+                        }
+                    )
                 },
-            );
-            quote!(#crate_ref::DataType::Object(#body))
+            )
         }
         Fields::Unnamed(_) => {
             if struct_attrs.transparent {
@@ -202,35 +206,34 @@ pub fn parse_struct(
                     })
                     .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                let body = custom_data_type_wrapper(
+                named_data_type_wrapper(
                     crate_ref,
                     container_attrs,
                     name,
                     quote! {
-                        #crate_ref::TupleType {
-                            generics: vec![#(#definition_generics),*],
-                            fields: vec![#(#fields),*],
-                        }
+                        #crate_ref::NamedDataTypeItem::Tuple(
+                            #crate_ref::TupleType {
+                                generics: vec![#(#definition_generics),*],
+                                fields: vec![#(#fields),*],
+                            }
+                        )
                     },
-                );
-                quote!(#crate_ref::DataType::Tuple(#body))
+                )
             }
         }
-        Fields::Unit => {
-            // TODO: Should this have a name?
-            let body = custom_data_type_wrapper(
-                crate_ref,
-                container_attrs,
-                name,
-                quote! {
+        Fields::Unit => named_data_type_wrapper(
+            crate_ref,
+            container_attrs,
+            name,
+            quote! {
+                #crate_ref::NamedDataTypeItem::Tuple(
                     #crate_ref::TupleType {
                         generics: vec![#(#definition_generics),*],
                         fields: vec![],
                     }
-                },
-            );
-            quote!(#crate_ref::DataType::Tuple(#body))
-        }
+                )
+            },
+        ),
     };
 
     let category = if container_attrs.inline {

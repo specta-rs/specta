@@ -36,16 +36,51 @@ pub enum DataType {
     List(Box<DataType>),
     Nullable(Box<DataType>),
     Record(Box<(DataType, DataType)>),
-    // Reference types
-    Object(CustomDataType<ObjectType>),
-    Enum(CustomDataType<EnumType>),
-    Tuple(CustomDataType<TupleType>),
+    // Named reference types
+    Named(NamedDataType),
+    // Anonymous Reference types
+    Object(ObjectType),
+    Enum(EnumType),
+    Tuple(TupleType),
     // A reference type that has already been defined
     Reference(DataTypeReference),
     Generic(GenericType),
     /// Used when the type is not yet known. This allows us to avoid stack overflows.
     /// It should never be returned from the Specta functions. Doing so is classed as a bug!
     Placeholder,
+}
+
+/// TODO
+#[derive(Debug, Clone, PartialEq)]
+pub struct NamedDataType {
+    /// The name of the type
+    pub name: &'static str,
+    /// The Specta ID for the type. The value for this should come from the `sid!();` macro.
+    pub sid: Option<TypeSid>,
+    /// The code location where this type is implemented. Used for error reporting.
+    pub impl_location: Option<ImplLocation>,
+    /// Rust documentation comments on the type
+    pub comments: &'static [&'static str],
+    /// Whether the type should export when the `export` feature is enabled.
+    /// `None` will use the default which is why `false` is not just used.
+    pub export: Option<bool>,
+    /// The Rust deprecated comment if the type is deprecated.
+    pub deprecated: Option<&'static str>,
+    pub item: NamedDataTypeItem,
+}
+
+impl From<NamedDataType> for DataType {
+    fn from(t: NamedDataType) -> Self {
+        Self::Named(t)
+    }
+}
+
+/// TODO
+#[derive(Debug, Clone, PartialEq)]
+pub enum NamedDataTypeItem {
+    Object(ObjectType),
+    Enum(EnumType),
+    Tuple(TupleType),
 }
 
 /// Datatype to be put in the type map while field types are being resolved. Used in order to
@@ -65,57 +100,10 @@ pub struct DataTypeReference {
     pub generics: Vec<DataType>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum CustomDataType<T> {
-    Named {
-        /// The name of the type
-        name: &'static str,
-        /// The Specta ID for the type. The value for this should come from the `sid!();` macro.
-        sid: Option<TypeSid>,
-        /// The code location where this type is implemented. Used for error reporting.
-        impl_location: Option<ImplLocation>,
-        /// Rust documentation comments on the type
-        comments: &'static [&'static str],
-        /// Whether the type should export when the `export` feature is enabled.
-        /// `None` will use the default which is why `false` is not just used.
-        export: Option<bool>,
-        /// The Rust deprecated comment if the type is deprecated.
-        deprecated: Option<&'static str>,
-        item: T,
-    },
-    Anonymous(T),
-}
-
-impl<T> CustomDataType<T> {
-    pub fn named(name: &'static str, item: T) -> Self {
-        Self::Named {
-            name,
-            item,
-            sid: None,
-            impl_location: None,
-            comments: &[],
-            export: None,
-            deprecated: None,
-        }
-    }
-}
-
 /// this is used internally to represent the types.
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
-pub struct GenericType(pub &'static str); // TODO: Include SID and maybe lookup based on that?
-
-impl From<CustomDataType<ObjectType>> for DataType {
-    fn from(t: CustomDataType<ObjectType>) -> Self {
-        Self::Object(t)
-    }
-}
-
-impl From<CustomDataType<EnumType>> for DataType {
-    fn from(t: CustomDataType<EnumType>) -> Self {
-        Self::Enum(t)
-    }
-}
+pub struct GenericType(pub &'static str);
 
 impl From<GenericType> for DataType {
     fn from(t: GenericType) -> Self {
@@ -125,7 +113,7 @@ impl From<GenericType> for DataType {
 
 impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
     fn from(t: Vec<T>) -> Self {
-        DataType::Enum(CustomDataType::Anonymous(EnumType {
+        DataType::Enum(EnumType {
             variants: t
                 .into_iter()
                 .map(|t| {
@@ -140,7 +128,7 @@ impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
                 .collect(),
             generics: vec![],
             repr: EnumRepr::Untagged,
-        }))
+        })
     }
 }
 

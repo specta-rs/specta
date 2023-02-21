@@ -91,6 +91,23 @@ pub trait Type {
     }
 }
 
+/// TODO
+pub trait NamedType: Type {
+    /// TODO
+    fn named_data_type(opts: DefOpts, generics: &[DataType]) -> NamedDataType;
+
+    /// TODO
+    fn inline_named_data_type(opts: DefOpts) -> NamedDataType {
+        Self::named_data_type(
+            opts,
+            &Self::definition_generics()
+                .into_iter()
+                .map(Into::into)
+                .collect::<Vec<_>>(),
+        )
+    }
+}
+
 /// A marker trait for compile-time validation of which types can be flattened.
 pub trait Flatten: Type {}
 

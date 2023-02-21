@@ -23,15 +23,7 @@ pub fn ts_with_cfg(path: &str, conf: &ExportConfiguration) -> Result<(), TsExpor
     let types = types
         .values()
         .filter_map(|v| match v {
-            DataType::Object(CustomDataType::Named { name, export, .. }) => {
-                export.unwrap_or(export_by_default).then(|| (name, v))
-            }
-            DataType::Enum(CustomDataType::Named { name, export, .. }) => {
-                export.unwrap_or(export_by_default).then(|| (name, v))
-            }
-            DataType::Tuple(CustomDataType::Named { name, export, .. }) => {
-                export.unwrap_or(export_by_default).then(|| (name, v))
-            }
+            DataType::Named(v) => v.export.unwrap_or(export_by_default).then(|| (v.name, v)),
             DataType::Placeholder => {
                 unreachable!("Placeholder type should never be returned from the Specta functions!")
             }

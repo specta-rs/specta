@@ -1,4 +1,4 @@
-use crate::{CustomDataType, DataType};
+use crate::{DataType, NamedDataType, NamedDataTypeItem};
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct TupleType {
@@ -8,11 +8,19 @@ pub struct TupleType {
 
 impl TupleType {
     pub fn to_anonymous(self) -> DataType {
-        DataType::Tuple(CustomDataType::Anonymous(self))
+        DataType::Tuple(self)
     }
 
-    pub fn to_named(self, name: &'static str) -> DataType {
-        DataType::Tuple(CustomDataType::named(name, self))
+    pub fn to_named(self, name: &'static str) -> NamedDataType {
+        NamedDataType {
+            name,
+            sid: None,
+            impl_location: None,
+            comments: &[],
+            export: None,
+            deprecated: None,
+            item: NamedDataTypeItem::Tuple(self),
+        }
     }
 }
 
