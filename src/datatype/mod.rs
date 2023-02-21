@@ -113,17 +113,14 @@ impl From<GenericType> for DataType {
 
 impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
     fn from(t: Vec<T>) -> Self {
-        DataType::Enum(EnumType {
+        DataType::Enum(EnumType::Untagged {
             variants: t
                 .into_iter()
                 .map(|t| {
-                    (
-                        "This is never used before of EnumRepr::Untagged", // TODO: Fix this!
-                        EnumVariant::Unnamed(TupleType {
-                            fields: vec![t.into()],
-                            generics: vec![],
-                        }),
-                    )
+                    EnumVariant::Unnamed(TupleType {
+                        fields: vec![t.into()],
+                        generics: vec![],
+                    })
                 })
                 .collect(),
             generics: vec![],

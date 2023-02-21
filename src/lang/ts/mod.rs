@@ -82,7 +82,8 @@ fn export_datatype_inner(
             _ => (!generics.is_empty()).then(|| generics),
         },
         // Enum
-        NamedDataTypeItem::Enum(EnumType { generics, .. }) => {
+        NamedDataTypeItem::Enum(e) => {
+            let generics = e.generics();
             (!generics.is_empty()).then(|| generics)
         }
         // Struct with unnamed fields
@@ -260,18 +261,21 @@ fn object_datatype(
 fn enum_datatype(
     ctx: ExportContext,
     _ty_name: Option<&'static str>,
-    EnumType { repr, variants, .. }: &EnumType,
+    e: &EnumType,
 ) -> Result<String, TsExportError> {
-    Ok(match &variants[..] {
-        [] => "never".to_string(),
-        variants => variants
+    if e.variants_len() == 0 {
+        return Ok("never".to_string());
+    }
+
+    Ok(match e {
+        EnumType::Tagged { variants, repr, .. } => variants
             .iter()
             .map(|(variant_name, variant)| {
                 let ctx = ctx.new(PathItem::Variant(variant_name));
                 let sanitised_name =
                     sanitise_name(ctx.clone(), NamedLocation::Variant, variant_name)?;
 
-                Ok(match (repr.clone(), variant) {
+                Ok(match (repr, variant) {
                     (EnumRepr::Internal { tag }, EnumVariant::Unit) => {
                         format!("{{ {tag}: \"{sanitised_name}\" }}")
                     }
@@ -311,6 +315,17 @@ fn enum_datatype(
 
                         format!("{{ {tag}: \"{sanitised_name}\"; {content}: {ts_values} }}")
                     }
+                })
+            })
+            .collect::<Result<Vec<_>, TsExportError>>()?
+            .join(" | "),
+        EnumType::Untagged { variants, repr, .. } => variants
+            .iter()
+            .map(|variant| {
+                Ok(match (repr, variant) {
+                    (EnumRepr::Untagged, EnumVariant::Unit) => "null".to_string(),
+                    (EnumRepr::Untagged, v) => datatype_inner(ctx.clone(), &v.data_type())?,
+                    (_, _) => todo!(),
                 })
             })
             .collect::<Result<Vec<_>, TsExportError>>()?

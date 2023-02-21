@@ -195,7 +195,7 @@ pub fn parse_enum(
         name,
         quote! {
             #crate_ref::NamedDataTypeItem::Enum(
-                #crate_ref::EnumType {
+                #crate_ref::EnumType::Tagged {
                     generics: vec![#(#definition_generics),*],
                     variants: vec![#(#variants),*],
                     repr: #crate_ref::EnumRepr::#repr_tokens,
