@@ -47,14 +47,14 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Build docs
-        run: cargo +nightly doc --all-features
+        run: cargo +nightly doc --all-features --no-deps
       
       - name: Add index redirect
         run: echo "<meta http-equiv=\"refresh\" content=\"0; url=specta\">" > target/doc/index.html
 
       - name: Create Vercel deployment
         id: vercel-deployment
-        run: DEPLOYMENT_URL=$(npx vercel --token ${VERCEL_TOKEN} deploy ./target/doc) && echo "DEPLOYMENT_URL=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+        run: DEPLOYMENT_URL=$(npx vercel --token ${VERCEL_TOKEN} deploy --archive=tgz ./target/doc) && echo "DEPLOYMENT_URL=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
