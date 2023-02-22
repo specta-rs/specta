@@ -2,9 +2,10 @@ use std::future::Future;
 
 use crate::{DataType, DefOpts, ExportError, Type};
 
-/// is a trait which is implemented by all types which can be used as a command result.
+/// Implemented by types that can be returned from a function annotated with
+/// [`specta`](crate::specta).
 pub trait SpectaFunctionResult<TMarker> {
-    /// convert result of the Rust function into a DataType
+    /// Gets the type of the result as a [`DataType`].
     fn to_datatype(opts: DefOpts) -> Result<DataType, ExportError>;
 }
 

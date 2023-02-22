@@ -1,6 +1,7 @@
 use crate::{DataType, NamedDataType, NamedDataTypeItem};
 
-/// represent the type for a tuple.
+/// Type of a tuple.
+/// Could be from an actual tuple or unnamed struct.
 #[derive(Debug, Clone, PartialEq, Default)]
 #[allow(missing_docs)]
 pub struct TupleType {

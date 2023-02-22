@@ -1,6 +1,11 @@
 use crate::DataType;
 
-/// used to represent a literal value in a type
+/// Type of a literal value for things like const generics.
+///
+/// This also allows constructing discriminated unions in TypeScript,
+/// and works well when combined with [`DataTypeFrom`](crate::DataTypeFrom).
+/// You'll probably never use this type directly,
+/// it's more for library authors.
 #[derive(Debug, Clone, PartialEq)]
 #[allow(non_camel_case_types)]
 #[allow(missing_docs)]

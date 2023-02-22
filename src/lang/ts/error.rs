@@ -6,7 +6,7 @@ use crate::{ExportError, ImplLocation};
 
 use super::ExportPath;
 
-/// Describe where the error occurred
+/// Describes where an error occurred.
 #[derive(Error, Debug, PartialEq)]
 #[allow(missing_docs)]
 pub enum NamedLocation {
@@ -25,7 +25,7 @@ impl fmt::Display for NamedLocation {
     }
 }
 
-/// The error type for the TypeScript exporter
+/// The error type for the TypeScript exporter.
 #[derive(Error, Debug)]
 #[allow(missing_docs)]
 pub enum TsExportError {

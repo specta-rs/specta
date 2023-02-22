@@ -3,7 +3,10 @@ use crate::{
     ExportError, ImplLocation,
 };
 
-/// this is used internally to represent the types.
+/// Type of an enum.
+///
+/// [`Untagged`](EnumType::Untagged) is here rather than in [`EnumRepr`] as it is the only enum representation that does not have tags on its variants.
+/// Separating it allows for better typesafety since `variants` doesn't have to be a [`Vec`] of tuples.
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub enum EnumType {
@@ -86,7 +89,9 @@ impl EnumType {
     }
 }
 
-/// this is used internally to represent the types.
+/// Serde representation of an enum.
+///
+/// Does not contain [`Untagged`](EnumType::Untagged) as that is handled by [`EnumType`].
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub enum EnumRepr {
@@ -98,10 +103,9 @@ pub enum EnumRepr {
         tag: &'static str,
         content: &'static str,
     },
-    // Untagged,
 }
 
-/// this is used internally to represent the types.
+/// Type of an [`EnumType`] variant.
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub enum EnumVariant {

@@ -30,8 +30,8 @@ pub fn ts_with_cfg(path: &str, conf: &ExportConfiguration) -> Result<(), TsExpor
         .clone()
         .into_iter()
         .filter(|(_, v)| match v {
-            NamedDataTypeOrPlaceholder::Named(v) => v.export.unwrap_or(export_by_default),
-            NamedDataTypeOrPlaceholder::Placeholder => {
+            Some(v) => v.export.unwrap_or(export_by_default),
+            None => {
                 unreachable!("Placeholder type should never be returned from the Specta functions!")
             }
         })
@@ -45,8 +45,8 @@ pub fn ts_with_cfg(path: &str, conf: &ExportConfiguration) -> Result<(), TsExpor
         out += &ts::export_datatype(
             conf,
             &match typ {
-                NamedDataTypeOrPlaceholder::Named(v) => v,
-                NamedDataTypeOrPlaceholder::Placeholder => unreachable!(),
+                Some(v) => v,
+                None => unreachable!(),
             },
         )?;
         out += "\n\n";

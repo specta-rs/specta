@@ -57,9 +57,9 @@ pub struct FunctionDataType {
     pub result: DataType,
 }
 
-/// is a trait which is implemented by all functions which can be used as a command.
+/// Implemented by functions that can be annoatated with [`specta`](crate::specta).
 pub trait SpectaFunction<TMarker> {
-    /// convert function into a DataType
+    /// Gets the type of a function as a [`FunctionDataType`].
     fn to_datatype(
         name: &'static str,
         type_map: &mut TypeDefs,
@@ -88,7 +88,8 @@ impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction
 }
 
 #[doc(hidden)]
-/// is a helper for exporting a command to a `CommandDataType`. You shouldn't use this directly and instead should use [`fn_datatype!`](crate::fn_datatype).
+/// A helper for exporting a command to a [`CommandDataType`].
+/// You shouldn't use this directly and instead should use [`fn_datatype!`](crate::fn_datatype).
 pub fn get_datatype_internal<TMarker, T: SpectaFunction<TMarker>>(
     _: T,
     name: &'static str,
@@ -170,7 +171,7 @@ impl_typed_command!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
 ///     let custom_type_defs = TypeDefs::default();
 ///
 ///     // `type_defs` is provided.
-///     // This can be used when integrating tauri-specta with other specta-enabled libraries.
+///     // This can be used when integrating multiple specta-enabled libraries.
 ///     let (functions, custom_type_defs) = functions::collect_types![
 ///         type_map: custom_type_defs,
 ///         some_function

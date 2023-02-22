@@ -11,6 +11,7 @@ pub use export_config::*;
 use crate::*;
 
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string with an export.
+///
 /// Eg. `export type Foo = { demo: string; };`
 pub fn export<T: NamedType>(conf: &ExportConfiguration) -> Result<String, TsExportError> {
     let mut type_name = TypeDefs::default();
@@ -30,6 +31,7 @@ pub fn export<T: NamedType>(conf: &ExportConfiguration) -> Result<String, TsExpo
 }
 
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string.
+///
 /// Eg. `{ demo: string; };`
 pub fn inline<T: Type>(conf: &ExportConfiguration) -> Result<String, TsExportError> {
     let mut type_name = TypeDefs::default();
@@ -52,6 +54,7 @@ pub fn inline<T: Type>(conf: &ExportConfiguration) -> Result<String, TsExportErr
 }
 
 /// Convert a DataType to a TypeScript string
+///
 /// Eg. `{ demo: string; }`
 pub fn export_datatype(
     conf: &ExportConfiguration,
@@ -123,6 +126,7 @@ fn export_datatype_inner(
 }
 
 /// Convert a DataType to a TypeScript string
+///
 /// Eg. `{ demo: string; }`
 pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, TsExportError> {
     // TODO: Duplicate type name detection?

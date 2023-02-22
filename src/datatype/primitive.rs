@@ -1,6 +1,6 @@
 use crate::DataType;
 
-/// this is used internally to represent the types.
+/// Type of primitives like numbers and strings.
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
@@ -25,7 +25,7 @@ pub enum PrimitiveType {
 }
 
 impl PrimitiveType {
-    /// Converts a `PrimitiveType` into a Rust code string.
+    /// Converts a [`PrimitiveType`] into a Rust code string.
     pub fn to_rust_str(&self) -> &'static str {
         match self {
             Self::i8 => "i8",

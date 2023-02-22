@@ -16,9 +16,11 @@ use crate::{ImplLocation, TypeSid};
 
 /// A map used to store the types "discovered" while exporting a type.
 /// You can iterate over this to export all types which the type/s you exported references on.
-pub type TypeDefs = BTreeMap<TypeSid, NamedDataTypeOrPlaceholder>;
+///
+/// [`None`] indicates that the entry is a placeholder.
+pub type TypeDefs = BTreeMap<TypeSid, Option<NamedDataType>>;
 
-/// Arguments for [Type::inline](crate::Type::inline), [Type::reference](crate::Type::reference) and [Type::definition](crate::Type::definition).
+/// Arguments for [`Type::inline`](crate::Type::inline), [`Type::reference`](crate::Type::reference) and [`Type::definition`](crate::Type::definition).
 pub struct DefOpts<'a> {
     /// is the parent type inlined?
     pub parent_inline: bool,
@@ -50,16 +52,6 @@ pub enum DataType {
     Generic(GenericType),
 }
 
-/// allows for storing either a [NamedDataType] or a placeholder in the type map.
-#[derive(Debug, Clone, PartialEq)]
-pub enum NamedDataTypeOrPlaceholder {
-    /// A named type represents a non-primitive type capable of being exported as it's own named entity.
-    Named(NamedDataType),
-    /// Used when the type is not yet known. This allows us to avoid stack overflows.
-    /// It should never be returned from the Specta functions. Doing so is classed as a bug!
-    Placeholder,
-}
-
 /// A named type represents a non-primitive type capable of being exported as it's own named entity.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NamedDataType {
@@ -86,7 +78,7 @@ impl From<NamedDataType> for DataType {
     }
 }
 
-/// The possible types for a [NamedDataType].
+/// The possible types for a [`NamedDataType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum NamedDataTypeItem {
     /// Represents an Rust struct with named fields
@@ -97,7 +89,7 @@ pub enum NamedDataTypeItem {
     Tuple(TupleType),
 }
 
-/// A reference to a datatype that can be used before a type is resolved in order to
+/// A reference to a [`DataType`] that can be used before a type is resolved in order to
 /// support recursive types without causing an infinite loop.
 ///
 /// This works since a child type that references a parent type does not care about the
@@ -114,7 +106,7 @@ pub struct DataTypeReference {
     pub generics: Vec<DataType>,
 }
 
-/// Is used to represent the type of a generic parameter to another type.
+/// A generic parameter to another type.
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub struct GenericType(pub &'static str);

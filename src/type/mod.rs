@@ -9,7 +9,8 @@ mod post_process;
 
 pub use post_process::*;
 
-/// The category a type falls under. Determines how references are generated for a given type.
+/// The category a type falls under.
+/// Determines how references are generated for a given type.
 pub enum TypeCategory {
     /// No references should be created, instead just copies the inline representation of the type.
     Inline(DataType),
@@ -18,7 +19,7 @@ pub enum TypeCategory {
     Reference(DataTypeReference),
 }
 
-/// Error which can be returned when exporting a type.
+/// Type exporting errors.
 #[derive(Error, Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub enum ExportError {
@@ -86,9 +87,7 @@ pub trait Type {
             TypeCategory::Inline(inline) => inline,
             TypeCategory::Reference(def) => {
                 if opts.type_map.get(&def.sid).is_none() {
-                    opts.type_map
-                        .entry(def.sid)
-                        .or_insert(NamedDataTypeOrPlaceholder::Placeholder);
+                    opts.type_map.entry(def.sid).or_default();
 
                     let definition = Self::definition(DefOpts {
                         parent_inline: opts.parent_inline,
@@ -101,8 +100,7 @@ pub trait Type {
                         _ => unreachable!(),
                     };
 
-                    opts.type_map
-                        .insert(def.sid, NamedDataTypeOrPlaceholder::Named(definition));
+                    opts.type_map.insert(def.sid, Some(definition));
                 }
 
                 DataType::Reference(def)

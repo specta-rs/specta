@@ -1,13 +1,13 @@
 use super::{comments, BigIntExportBehavior, CommentFormatterFn};
 
-/// allows you to control the behavior of the Typescript exporter
+/// Options for controlling the behavior of the Typescript exporter.
 pub struct ExportConfiguration {
-    /// control the bigint exporting behavior
+    /// How BigInts should be exported.
     pub(crate) bigint: BigIntExportBehavior,
-    /// control the style of exported comments
+    /// How comments should be rendered.
     pub(crate) comment_exporter: Option<CommentFormatterFn>,
-    /// Configure whether or not to export types by default.
-    /// This can be overridden on a type basis by using `#[specta(export)]`
+    /// Whether to export types by default.
+    /// This can be overridden on a type basis by using `#[specta(export)]`.
     #[cfg(feature = "export")]
     pub(crate) export_by_default: Option<bool>,
 }
@@ -31,7 +31,10 @@ impl ExportConfiguration {
     }
 
     /// Configure whether or not to export types by default.
-    /// Note: This parameter only work if this configuration if passed into [crate::export::ts]
+    ///
+    /// This can be overridden on a specific type by using `#[specta(export)]`.
+    ///
+    /// This parameter only takes effect when this configuration if passed into [`export::ts_with_cfg`](crate::export::ts_with_cfg)
     #[cfg(feature = "export")]
     pub fn export_by_default(mut self, x: Option<bool>) -> Self {
         self.export_by_default = x;
