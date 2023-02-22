@@ -52,7 +52,6 @@ pub fn derive(
         unraw_raw_ident(&format_ident!("{}", ident.to_string())).to_token_stream()
     });
 
-
     let (inlines, category, can_flatten) = match data {
         Data::Struct(data) => parse_struct(
             &name,
@@ -88,7 +87,6 @@ pub fn derive(
             ))
         })?;
 
-
     let definition_generics = generics.type_params().map(|param| {
         let ident = &param.ident;
 
@@ -99,9 +97,11 @@ pub fn derive(
     let type_args = generics_with_ident_only(generics);
     let where_bound = add_type_to_where_clause(&quote!(#crate_name::Type), generics);
 
-    let flatten_impl = can_flatten.then(|| quote! {
-        #[automatically_derived]
-        impl #bounds #crate_name::Flatten for #ident #type_args #where_bound {}
+    let flatten_impl = can_flatten.then(|| {
+        quote! {
+            #[automatically_derived]
+            impl #bounds #crate_name::Flatten for #ident #type_args #where_bound {}
+        }
     });
 
     let type_impl_heading = impl_heading(quote!(#crate_name::Type), &ident, generics);
@@ -146,23 +146,23 @@ pub fn derive(
                 fn inline(opts: #crate_name::DefOpts, generics: &[#crate_name::DataType]) -> std::result::Result<#crate_name::DataType, #crate_name::ExportError> {
                     Ok(#crate_name::DataType::Named(<Self as #crate_name::NamedType>::named_data_type(opts, generics)?))
                 }
-    
+
                 fn category_impl(opts: #crate_name::DefOpts, generics: &[#crate_name::DataType]) -> std::result::Result<#crate_name::TypeCategory, #crate_name::ExportError> {
                     Ok(#category)
                 }
-    
+
                 fn definition_generics() -> Vec<#crate_name::GenericType> {
                     vec![#(#definition_generics),*]
                 }
             }
-            
+
             #[automatically_derived]
             impl #bounds #crate_name::NamedType for #ident #type_args #where_bound {
                 fn named_data_type(opts: #crate_name::DefOpts, generics: &[#crate_name::DataType]) ->  std::result::Result<#crate_name::NamedDataType, #crate_name::ExportError> {
                     Ok(#inlines)
                 }
             }
-            
+
             #flatten_impl
 
             #export
