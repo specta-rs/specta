@@ -35,6 +35,7 @@ pub struct Demo {
 fn test_duplicate_ty_name() {
     assert_eq!(
         export::<Demo>(&Default::default()),
+        #[cfg(not(feature = "windows"))]
         Err(TsExportError::DuplicateTypeName(
             "One",
             Some(ImplLocation::internal_new(
@@ -42,6 +43,16 @@ fn test_duplicate_ty_name() {
             )),
             Some(ImplLocation::internal_new(
                 "tests/duplicate_ty_name.rs:9:14"
+            ))
+        ))
+        #[cfg(feature = "windows")]
+        Err(TsExportError::DuplicateTypeName(
+            "One",
+            Some(ImplLocation::internal_new(
+                "tests\\duplicate_ty_name.rs:19:14"
+            )),
+            Some(ImplLocation::internal_new(
+                "tests\\duplicate_ty_name.rs:9:14"
             ))
         ))
     );
