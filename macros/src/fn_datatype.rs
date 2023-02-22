@@ -3,7 +3,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{
     parse::{Parse, ParseStream},
-    Ident, Path, Token,
+    Ident, Path, PathArguments, Token,
 };
 
 pub struct FnDatatypeInput {
@@ -32,6 +32,7 @@ pub fn proc_macro(
         .expect("Function path is empty!");
 
     last.ident = format_fn_wrapper(&last.ident.clone());
+    last.arguments = PathArguments::None;
 
     let fn_signature = quote!(#specta_fn_macro!(@signature));
     let fn_name = quote!(#specta_fn_macro!(@name));
