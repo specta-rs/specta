@@ -21,8 +21,8 @@ pub fn ts_with_cfg(path: &str, conf: &ExportConfiguration) -> Result<(), TsExpor
     let export_by_default = conf.export_by_default.unwrap_or(true);
     let types = TYPES.lock().expect("Failed to acquire lock on 'TYPES'");
 
-    for err in types.1.clone() {
-        return Err(err.into());
+    if let Some(err) = types.1.iter().next() {
+        return Err(err.clone().into());
     }
 
     // We sort by name to detect duplicate types BUT also to ensure the output is deterministic. The SID can change between builds so is not suitable for this.
