@@ -88,7 +88,7 @@ fn test_bigint_types() {
             "EnumWithStructWithStructWithBigInt::A -> StructWithStructWithBigInt.abc -> StructWithBigInt.a -> i128"
         )))
     );
-    // TODO: Blocked on `inline` not working correctly with `Option`
+    // TODO: This required `inline` to work better on `Option<T>`
     // assert_eq!(
     //     specta::ts::inline::<StructWithOptionWithStructWithBigInt>(&ExportConfiguration::default()),
     //     Err(TsExportError::BigIntForbidden(ExportPath::new_unsafe(

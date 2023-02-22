@@ -44,17 +44,20 @@ pub fn parse_struct(
     let parent_inline = container_attrs
         .inline
         .then(|| quote!(true))
-        .unwrap_or(quote!(opts.parent_inline));
+        .unwrap_or(quote!(false));
 
     let reference_generics = generic_idents.iter().map(|(i, ident)| {
         quote! {
             generics
                 .get(#i)
                 .cloned()
-                .map_or_else(|| <#ident as #crate_ref::Type>::reference(#crate_ref::DefOpts {
-                    parent_inline: #parent_inline,
-                    type_map: opts.type_map
-                }, &[]), Ok)?
+                .map_or_else(|| <#ident as #crate_ref::Type>::reference(
+                    #crate_ref::DefOpts {
+                        parent_inline: #parent_inline,
+                        type_map: opts.type_map,
+                    },
+                    &[],
+                ), Ok)?
         }
     });
 
@@ -96,10 +99,10 @@ pub fn parse_struct(
                 let optional = field_attrs.optional;
                 let flatten = field_attrs.flatten;
 
-                let parent_inline = field_attrs
+                let parent_inline = container_attrs
                     .inline
                     .then(|| quote!(true))
-                    .unwrap_or(quote!(opts.parent_inline));
+                    .unwrap_or(parent_inline.clone());
 
                 let ty = if field_attrs.flatten {
                     quote! {

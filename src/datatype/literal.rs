@@ -1,5 +1,6 @@
 use crate::DataType;
 
+/// used to represent a literal value in a type
 #[derive(Debug, Clone, PartialEq)]
 #[allow(non_camel_case_types)]
 #[allow(missing_docs)]

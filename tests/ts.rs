@@ -119,21 +119,11 @@ fn typescript_types() {
     );
     assert_ts_export!(DocComments, "export type DocComments = { a: string }"; &ExportConfiguration::new().comment_style(None));
 
-    assert_ts_export!(
-        Recursive,
-        "export type Recursive = { a: number; children: Recursive[] }"
-    );
+    assert_ts!(Recursive, "{ a: number; children: Recursive[] }");
 
-    assert_ts_export!(
-        InlineEnumField,
-        "export type InlineEnumField = { A: { a: string } }"
-    );
+    assert_ts!(InlineEnumField, "{ A: { a: string } }");
 
-    // TODO: Fix this
-    // assert_ts_export!(
-    //     InlineOptionalType,
-    //     "export type InlineOptionalType = { optional_field: { a: string } | null }"
-    // );
+    assert_ts!(InlineOptionalType, "{ optional_field: DocComments | null }");
 
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");

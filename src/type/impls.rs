@@ -22,26 +22,26 @@ const _: () = {
 };
 
 impl<'a> Type for &'a str {
-    fn inline(defs: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-        String::inline(defs, generics)
+    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+        String::inline(opts, generics)
     }
 }
 
 impl<'a, T: Type + 'static> Type for &'a T {
-    fn inline(defs: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-        T::inline(defs, generics)
+    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+        T::inline(opts, generics)
     }
 }
 
 impl<T: Type> Type for [T] {
-    fn inline(defs: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-        T::inline(defs, generics)
+    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+        T::inline(opts, generics)
     }
 }
 
 impl<'a, T: ?Sized + ToOwned + Type + 'static> Type for std::borrow::Cow<'a, T> {
-    fn inline(defs: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-        T::inline(defs, generics)
+    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+        T::inline(opts, generics)
     }
 }
 

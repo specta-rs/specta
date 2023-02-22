@@ -65,7 +65,7 @@ macro_rules! impl_containers {
                 generics.get(0).cloned().map_or_else(
                     || {
                         T::reference(
-                           opts,
+                            opts,
                             generics,
                         )
                     },

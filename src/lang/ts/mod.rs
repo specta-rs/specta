@@ -17,7 +17,7 @@ pub fn export<T: NamedType>(conf: &ExportConfiguration) -> Result<String, TsExpo
     let result = export_datatype(
         conf,
         &T::definition_named_data_type(DefOpts {
-            parent_inline: true,
+            parent_inline: false,
             type_map: &mut type_name,
         })?,
     );
@@ -37,7 +37,7 @@ pub fn inline<T: Type>(conf: &ExportConfiguration) -> Result<String, TsExportErr
         conf,
         &T::inline(
             DefOpts {
-                parent_inline: true,
+                parent_inline: false,
                 type_map: &mut type_name,
             },
             &[],

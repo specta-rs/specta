@@ -25,6 +25,7 @@ impl fmt::Display for NamedLocation {
     }
 }
 
+/// The error type for the TypeScript exporter
 #[derive(Error, Debug)]
 #[allow(missing_docs)]
 pub enum TsExportError {
