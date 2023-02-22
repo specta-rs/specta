@@ -2,7 +2,7 @@
 mod test {
     use std::fmt;
 
-    use specta::{collect_types, functions, specta};
+    use specta::{functions, specta};
 
     #[specta]
     fn a() {}
@@ -23,7 +23,7 @@ mod test {
 
     #[test]
     fn test_function_export() {
-        let (functions, types) = functions::collect_types![a, b, c, d, a_generic_func::<i32>];
+        let (functions, types) = functions::collect_types![a, b, c, d, e::<i32>];
 
         // TODO: Asserts `functions` and `types` is correct
     }
