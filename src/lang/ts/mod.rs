@@ -317,8 +317,6 @@ fn enum_datatype(
 
                         format!("{{ {sanitised_name}: {ts_values} }}")
                     }
-                    (EnumRepr::Untagged, EnumVariant::Unit) => "null".to_string(),
-                    (EnumRepr::Untagged, v) => datatype_inner(ctx, &v.data_type())?,
                     (EnumRepr::Adjacent { tag, .. }, EnumVariant::Unit) => {
                         format!("{{ {tag}: \"{sanitised_name}\" }}")
                     }
@@ -331,13 +329,12 @@ fn enum_datatype(
             })
             .collect::<Result<Vec<_>, TsExportError>>()?
             .join(" | "),
-        EnumType::Untagged { variants, repr, .. } => variants
+        EnumType::Untagged { variants, .. } => variants
             .iter()
             .map(|variant| {
-                Ok(match (repr, variant) {
-                    (EnumRepr::Untagged, EnumVariant::Unit) => "null".to_string(),
-                    (EnumRepr::Untagged, v) => datatype_inner(ctx.clone(), &v.data_type())?,
-                    (_, _) => todo!(),
+                Ok(match variant {
+                    EnumVariant::Unit => "null".to_string(),
+                    v => datatype_inner(ctx.clone(), &v.data_type())?,
                 })
             })
             .collect::<Result<Vec<_>, TsExportError>>()?

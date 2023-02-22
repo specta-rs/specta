@@ -52,33 +52,6 @@ pub fn parse_enum(
     });
 
     let repr = enum_attrs.tagged()?;
-
-    let (repr_tokens, can_flatten) = match repr {
-        Tagged::Externally => (
-            quote!(External),
-            data.variants.iter().any(|v| match &v.fields {
-                Fields::Unnamed(f) if f.unnamed.len() == 1 => true,
-                Fields::Named(_) => true,
-                _ => false,
-            }),
-        ),
-        Tagged::Untagged => (
-            quote!(Untagged),
-            data.variants
-                .iter()
-                .any(|v| matches!(&v.fields, Fields::Unit | Fields::Named(_))),
-        ),
-        Tagged::Adjacently { tag, content } => {
-            (quote!(Adjacent { tag: #tag, content: #content }), true)
-        }
-        Tagged::Internally { tag } => (
-            quote!(Internal { tag: #tag }),
-            data.variants
-                .iter()
-                .any(|v| matches!(&v.fields, Fields::Unit | Fields::Named(_))),
-        ),
-    };
-
     let variants = data
         .variants
         .iter()
@@ -195,17 +168,63 @@ pub fn parse_enum(
         })
         .collect::<syn::Result<Vec<TokenStream>>>()?;
 
+    let (enum_impl, can_flatten) = match repr {
+        Tagged::Externally => (
+            quote! {
+                #crate_ref::EnumType::Tagged {
+                    generics: vec![#(#definition_generics),*],
+                    variants: vec![#(#variants),*],
+                    repr: #crate_ref::EnumRepr::External,
+                }
+            },
+            data.variants.iter().any(|v| match &v.fields {
+                Fields::Unnamed(f) if f.unnamed.len() == 1 => true,
+                Fields::Named(_) => true,
+                _ => false,
+            }),
+        ),
+        Tagged::Untagged => (
+            quote! {
+                #crate_ref::EnumType::Untagged {
+                    generics: vec![#(#definition_generics),*],
+                    variants: vec![#(#variants),*],
+                }
+            },
+            data.variants
+                .iter()
+                .any(|v| matches!(&v.fields, Fields::Unit | Fields::Named(_))),
+        ),
+        Tagged::Adjacently { tag, content } => (
+            quote! {
+                #crate_ref::EnumType::Tagged {
+                    generics: vec![#(#definition_generics),*],
+                    variants: vec![#(#variants),*],
+                    repr: #crate_ref::EnumRepr::Adjacent { tag: #tag, content: #content },
+                }
+            },
+            true,
+        ),
+        Tagged::Internally { tag } => (
+            quote! {
+                #crate_ref::EnumType::Tagged {
+                    generics: vec![#(#definition_generics),*],
+                    variants: vec![#(#variants),*],
+                    repr: #crate_ref::EnumRepr::Internal { tag: #tag },
+                }
+            },
+            data.variants
+                .iter()
+                .any(|v| matches!(&v.fields, Fields::Unit | Fields::Named(_))),
+        ),
+    };
+
     let body = named_data_type_wrapper(
         crate_ref,
         container_attrs,
         name,
         quote! {
             #crate_ref::NamedDataTypeItem::Enum(
-                #crate_ref::EnumType::Tagged {
-                    generics: vec![#(#definition_generics),*],
-                    variants: vec![#(#variants),*],
-                    repr: #crate_ref::EnumRepr::#repr_tokens,
-                }
+                #enum_impl
             )
         },
     );

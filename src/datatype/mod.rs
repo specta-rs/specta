@@ -88,10 +88,12 @@ impl From<NamedDataType> for DataType {
 
 /// The possible types for a [NamedDataType].
 #[derive(Debug, Clone, PartialEq)]
-#[allow(missing_docs)]
 pub enum NamedDataTypeItem {
+    /// Represents an Rust struct with named fields
     Object(ObjectType),
+    /// Represents an Rust enum
     Enum(EnumType),
+    /// Represents an Rust struct with unnamed fields
     Tuple(TupleType),
 }
 
@@ -136,7 +138,6 @@ impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
                 })
                 .collect(),
             generics: vec![],
-            repr: EnumRepr::Untagged,
         })
     }
 }

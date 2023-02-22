@@ -10,7 +10,6 @@ pub enum EnumType {
     Untagged {
         variants: Vec<EnumVariant>,
         generics: Vec<&'static str>,
-        repr: EnumRepr,
     },
     Tagged {
         variants: Vec<(&'static str, EnumVariant)>,
@@ -44,57 +43,46 @@ impl EnumType {
     /// This function will filter them out so types can be exported for valid variants.
     pub fn make_flattenable(&mut self, impl_location: ImplLocation) -> Result<(), ExportError> {
         match self {
-            Self::Untagged { variants, repr, .. } => {
-                variants.iter().try_for_each(|variant| {
-                    Self::make_flattenable_inner(impl_location, variant, repr)
+            Self::Untagged { variants, .. } => {
+                variants.iter().try_for_each(|v| match v {
+                    EnumVariant::Unit => Ok(()),
+                    EnumVariant::Named(_) => Ok(()),
+                    EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
+                        impl_location,
+                        "`EnumRepr::Untagged` with ` EnumVariant::Unnamed` is invalid!",
+                    )),
                 })?;
             }
             Self::Tagged { variants, repr, .. } => {
-                variants.iter().try_for_each(|(_, variant)| {
-                    Self::make_flattenable_inner(impl_location, variant, repr)
+                variants.iter().try_for_each(|(_, v)| {
+                    match repr {
+                        EnumRepr::External => match v {
+                            EnumVariant::Unit => Err(ExportError::InvalidType(
+                                impl_location,
+                                "`EnumRepr::External` with ` EnumVariant::Unit` is invalid!",
+                            )),
+                            EnumVariant::Unnamed(v) if v.fields.len() == 1 => Ok(()),
+                            EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
+                                impl_location,
+                                "`EnumRepr::External` with ` EnumVariant::Unnamed` containing more than a single field is invalid!",
+                            )),
+                            EnumVariant::Named(_) => Ok(()),
+                        },
+                        EnumRepr::Adjacent { .. } => Ok(()),
+                        EnumRepr::Internal { .. } => match v {
+                            EnumVariant::Unit => Ok(()),
+                            EnumVariant::Named(_) => Ok(()),
+                            EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
+                                impl_location,
+                                "`EnumRepr::Internal` with ` EnumVariant::Unnamed` is invalid!",
+                            )),
+                        },
+                    }
                 })?;
             }
         }
 
         Ok(())
-    }
-
-    fn make_flattenable_inner(
-        impl_location: ImplLocation,
-        v: &EnumVariant,
-        repr: &EnumRepr,
-    ) -> Result<(), ExportError> {
-        match repr {
-            EnumRepr::External => match v {
-                EnumVariant::Unit => Err(ExportError::InvalidType(
-                    impl_location,
-                    "`EnumRepr::External` with ` EnumVariant::Unit` is invalid!",
-                )),
-                EnumVariant::Unnamed(v) if v.fields.len() == 1 => Ok(()),
-                EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
-                    impl_location,
-                    "`EnumRepr::External` with ` EnumVariant::Unnamed` containing more than a single field is invalid!",
-                )),
-                EnumVariant::Named(_) => Ok(()),
-            },
-            EnumRepr::Untagged => match v {
-                EnumVariant::Unit => Ok(()),
-                EnumVariant::Named(_) => Ok(()),
-                EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
-                    impl_location,
-                    "`EnumRepr::Untagged` with ` EnumVariant::Unnamed` is invalid!",
-                )),
-            },
-            EnumRepr::Adjacent { .. } => Ok(()),
-            EnumRepr::Internal { .. } => match v {
-                EnumVariant::Unit => Ok(()),
-                EnumVariant::Named(_) => Ok(()),
-                EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
-                    impl_location,
-                    "`EnumRepr::Internal` with ` EnumVariant::Unnamed` is invalid!",
-                )),
-            },
-        }
     }
 }
 
@@ -110,7 +98,7 @@ pub enum EnumRepr {
         tag: &'static str,
         content: &'static str,
     },
-    Untagged,
+    // Untagged,
 }
 
 /// this is used internally to represent the types.
