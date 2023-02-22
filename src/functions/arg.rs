@@ -1,9 +1,13 @@
-use crate::{DataType, DefOpts, Type};
+use crate::{DataType, DefOpts, ExportError, Type};
 
-/// is a trait which is implemented by all types which can be used as a command argument.
+/// Implemented by types that can be used as an argument in a function annotated with
+/// [`specta`](crate::specta).
 pub trait SpectaFunctionArg<TMarker> {
-    /// convert argument of the Rust function into a DataType
-    fn to_datatype(opts: DefOpts) -> Option<DataType>;
+    /// Gets the type of an argument as a [`DataType`].
+    ///
+    /// Some argument types should be ignored (eg Tauri command State),
+    /// so the value is optional.
+    fn to_datatype(opts: DefOpts) -> Result<Option<DataType>, ExportError>;
 }
 
 #[doc(hidden)]
@@ -13,7 +17,7 @@ pub enum SpectaFunctionArgDeserializeMarker {}
 impl<'de, T: serde::Deserialize<'de> + Type> SpectaFunctionArg<SpectaFunctionArgDeserializeMarker>
     for T
 {
-    fn to_datatype(opts: DefOpts) -> Option<DataType> {
-        Some(T::reference(opts, &[]))
+    fn to_datatype(opts: DefOpts) -> Result<Option<DataType>, ExportError> {
+        T::reference(opts, &[]).map(Some)
     }
 }

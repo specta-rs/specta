@@ -22,42 +22,26 @@ const _: () = {
 };
 
 impl<'a> Type for &'a str {
-    const NAME: &'static str = String::NAME;
-    const SID: TypeSid = sid!();
-    const IMPL_LOCATION: ImplLocation = impl_location!();
-
-    fn inline(defs: DefOpts, generics: &[DataType]) -> DataType {
-        String::inline(defs, generics)
+    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+        String::inline(opts, generics)
     }
 }
 
 impl<'a, T: Type + 'static> Type for &'a T {
-    const NAME: &'static str = T::NAME;
-    const SID: TypeSid = sid!();
-    const IMPL_LOCATION: ImplLocation = impl_location!();
-
-    fn inline(defs: DefOpts, generics: &[DataType]) -> DataType {
-        T::inline(defs, generics)
+    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+        T::inline(opts, generics)
     }
 }
 
 impl<T: Type> Type for [T] {
-    const NAME: &'static str = T::NAME;
-    const SID: TypeSid = sid!();
-    const IMPL_LOCATION: ImplLocation = impl_location!();
-
-    fn inline(defs: DefOpts, generics: &[DataType]) -> DataType {
-        T::inline(defs, generics)
+    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+        T::inline(opts, generics)
     }
 }
 
 impl<'a, T: ?Sized + ToOwned + Type + 'static> Type for std::borrow::Cow<'a, T> {
-    const NAME: &'static str = T::NAME;
-    const SID: TypeSid = sid!();
-    const IMPL_LOCATION: ImplLocation = impl_location!();
-
-    fn inline(defs: DefOpts, generics: &[DataType]) -> DataType {
-        T::inline(defs, generics)
+    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+        T::inline(opts, generics)
     }
 }
 
@@ -136,62 +120,42 @@ impl_for_list!(
 );
 
 impl<'a, T: Type> Type for &'a [T] {
-    const NAME: &'static str = "&[T]";
-    const SID: TypeSid = sid!();
-    const IMPL_LOCATION: ImplLocation = impl_location!();
-
-    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
         <Vec<T>>::inline(opts, generics)
     }
 
-    fn category_impl(opts: DefOpts, generics: &[DataType]) -> TypeCategory {
+    fn category_impl(opts: DefOpts, generics: &[DataType]) -> Result<TypeCategory, ExportError> {
         <Vec<T>>::category_impl(opts, generics)
     }
 }
 
 impl<const N: usize, T: Type> Type for [T; N] {
-    const NAME: &'static str = "&[T; N]";
-    const SID: TypeSid = sid!();
-    const IMPL_LOCATION: ImplLocation = impl_location!();
-
-    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
         <Vec<T>>::inline(opts, generics)
     }
 
-    fn category_impl(opts: DefOpts, generics: &[DataType]) -> TypeCategory {
+    fn category_impl(opts: DefOpts, generics: &[DataType]) -> Result<TypeCategory, ExportError> {
         <Vec<T>>::category_impl(opts, generics)
     }
 }
 
 impl<T: Type> Type for Option<T> {
-    const NAME: &'static str = "Option";
-    const SID: TypeSid = sid!();
-    const IMPL_LOCATION: ImplLocation = impl_location!();
-
-    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
-        DataType::Nullable(Box::new(generics.get(0).cloned().unwrap_or_else(|| {
-            T::inline(
-                DefOpts {
-                    parent_inline: false,
-                    type_map: opts.type_map,
-                },
-                generics,
-            )
-        })))
+    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+        Ok(DataType::Nullable(Box::new(
+            generics
+                .get(0)
+                .cloned()
+                .map_or_else(|| T::inline(opts, generics), Ok)?,
+        )))
     }
 
-    fn category_impl(opts: DefOpts, generics: &[DataType]) -> TypeCategory {
-        TypeCategory::Inline(DataType::Nullable(Box::new(
-            generics.get(0).cloned().unwrap_or_else(|| {
-                T::reference(
-                    DefOpts {
-                        parent_inline: false,
-                        type_map: opts.type_map,
-                    },
-                    generics,
-                )
-            }),
-        )))
+    fn category_impl(opts: DefOpts, generics: &[DataType]) -> Result<TypeCategory, ExportError> {
+        Ok(TypeCategory::Inline(DataType::Nullable(Box::new(
+            generics
+                .get(0)
+                .cloned()
+                .map_or_else(|| T::reference(opts, generics), Ok)?,
+        ))))
     }
 }
 
@@ -213,12 +177,8 @@ const _: () = {
     impl<K: Type, V: Type> Flatten for serde_json::Map<K, V> {}
 
     impl Type for serde_json::Value {
-        const NAME: &'static str = "Value";
-        const SID: TypeSid = sid!();
-        const IMPL_LOCATION: ImplLocation = impl_location!();
-
-        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
-            DataType::Any
+        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
+            Ok(DataType::Any)
         }
     }
 };
@@ -241,22 +201,14 @@ const _: () = {
     );
 
     impl<T: TimeZone> Type for DateTime<T> {
-        const NAME: &'static str = "DateTime";
-        const SID: TypeSid = sid!();
-        const IMPL_LOCATION: ImplLocation = impl_location!();
-
-        fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
+        fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
             String::inline(opts, generics)
         }
     }
 
     #[allow(deprecated)]
     impl<T: TimeZone> Type for Date<T> {
-        const NAME: &'static str = "DateTime";
-        const SID: TypeSid = sid!();
-        const IMPL_LOCATION: ImplLocation = impl_location!();
-
-        fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
+        fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
             String::inline(opts, generics)
         }
     }

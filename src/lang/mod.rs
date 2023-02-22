@@ -1,32 +1,36 @@
-// /// Alpha: [OpenAPI](https://www.openapis.org) support.
+// /// Alpha: [OpenAPI](https://www.openapis.org) language exporter.
 // #[cfg(feature = "openapi")]
-// #[allow(missing_docs)] // TODO: Remove once this is stable
-// #[allow(warnings)] // TODO: Remove once this is out of dev
+// #[cfg_attr(docsrs, doc(cfg(feature = "openapi")))]
 // pub mod openapi;
 
-/// [TypeScript](https://www.typescriptlang.org) support.
+/// [TypeScript](https://www.typescriptlang.org) language exporter.
 #[cfg(feature = "typescript")]
+#[cfg_attr(docsrs, doc(cfg(feature = "typescript")))]
 pub mod ts;
 
-// /// [Rust](https://www.rust-lang.org) support.
+// /// [Rust](https://www.rust-lang.org) language exporter.
 // #[cfg(feature = "rust")]
+// #[cfg_attr(docsrs, doc(cfg(feature = "rust")))]
 // pub mod rust;
 
-// /// [Swift](https://www.swift.org) support.
+// /// [Swift](https://www.swift.org) language exporter.
 // #[cfg(feature = "swift")]
+// #[cfg_attr(docsrs, doc(cfg(feature = "swift")))]
 // pub mod swift;
 
-// /// [Kotlin](https://kotlinlang.org) support.
+// /// [Kotlin](https://kotlinlang.org) language exporter.
 // #[cfg(feature = "kotlin")]
+// #[cfg_attr(docsrs, doc(cfg(feature = "kotlin")))]
 // pub mod kotlin;
 
-// /// [Go Lang](https://go.dev) support.
+// /// [Go Lang](https://go.dev) language exporter.
 // #[cfg(feature = "go")]
+// #[cfg_attr(docsrs, doc(cfg(feature = "go")))]
 // pub mod go;
 
 macro_rules! primitive_def {
     ($($t:ident)+) => {
-        $(DataType::Primitive(PrimitiveType::$t))|+
+        $(PrimitiveType::$t)|+
     }
 }
 

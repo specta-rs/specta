@@ -1,21 +1,58 @@
-// TODO: Unit test multiple different types with the same name. Show throw runtime error.
+use specta::{
+    ts::{export, TsExportError},
+    ImplLocation, Type,
+};
 
-// TODO: This can't be done and support `--all-features` without the ability to exclude a type from being exported using the `export` flag. Make that then implement this test!
+mod one {
+    use super::*;
 
-pub struct One {
-    pub name: String,
+    #[derive(Type)]
+    #[specta(export = false)]
+    pub struct One {
+        pub a: String,
+    }
 }
 
-pub struct Two {
-    pub name: String,
+mod two {
+    use super::*;
+
+    #[derive(Type)]
+    #[specta(export = false)]
+    pub struct One {
+        pub b: String,
+        pub c: i32,
+    }
 }
 
-pub struct Three {
-    pub name: String,
+#[derive(Type)]
+#[specta(export = false)]
+pub struct Demo {
+    pub one: one::One,
+    pub two: two::One,
 }
 
-#[ignore] // TODO: Remove once working
 #[test]
 fn test_duplicate_ty_name() {
-    todo!();
+    #[cfg(not(target_os = "windows"))]
+    let err = Err(TsExportError::DuplicateTypeName(
+        "One",
+        Some(ImplLocation::internal_new(
+            "tests/duplicate_ty_name.rs:19:14",
+        )),
+        Some(ImplLocation::internal_new(
+            "tests/duplicate_ty_name.rs:9:14",
+        )),
+    ));
+    #[cfg(target_os = "windows")]
+    let err = Err(TsExportError::DuplicateTypeName(
+        "One",
+        Some(ImplLocation::internal_new(
+            "tests\\duplicate_ty_name.rs:9:14",
+        )),
+        Some(ImplLocation::internal_new(
+            "tests\\duplicate_ty_name.rs:19:14",
+        )),
+    ));
+
+    assert_eq!(export::<Demo>(&Default::default()), err);
 }

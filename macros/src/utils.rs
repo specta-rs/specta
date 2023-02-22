@@ -1,5 +1,4 @@
 use proc_macro2::Span;
-use quote::format_ident;
 use syn::{
     ext::IdentExt,
     parse::{Parse, ParseStream},
@@ -258,6 +257,7 @@ impl Inflection {
     }
 }
 
+#[cfg(feature = "functions")]
 pub fn format_fn_wrapper(function: &Ident) -> Ident {
-    format_ident!("__specta__fn__{}", function)
+    quote::format_ident!("__specta__fn__{}", function)
 }

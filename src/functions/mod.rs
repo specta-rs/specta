@@ -24,7 +24,7 @@ use crate::*;
 /// }
 ///
 /// fn main() {
-///     let typ = fn_datatype!(some_function);
+///     let typ = fn_datatype!(some_function).unwrap();
 ///
 ///     assert_eq!(typ.name, "some_function");
 ///     assert_eq!(typ.args.len(), 2);
@@ -57,14 +57,14 @@ pub struct FunctionDataType {
     pub result: DataType,
 }
 
-/// is a trait which is implemented by all functions which can be used as a command.
+/// Implemented by functions that can be annoatated with [`specta`](crate::specta).
 pub trait SpectaFunction<TMarker> {
-    /// convert function into a DataType
+    /// Gets the type of a function as a [`FunctionDataType`].
     fn to_datatype(
         name: &'static str,
         type_map: &mut TypeDefs,
         fields: &[&'static str],
-    ) -> FunctionDataType;
+    ) -> Result<FunctionDataType, ExportError>;
 }
 
 impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction<TResultMarker>
@@ -74,26 +74,28 @@ impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction
         name: &'static str,
         type_map: &mut TypeDefs,
         _fields: &[&'static str],
-    ) -> FunctionDataType {
-        FunctionDataType {
+    ) -> Result<FunctionDataType, ExportError> {
+        TResult::to_datatype(DefOpts {
+            parent_inline: false,
+            type_map,
+        })
+        .map(|result| FunctionDataType {
             name,
             args: vec![],
-            result: TResult::to_datatype(DefOpts {
-                parent_inline: false,
-                type_map,
-            }),
-        }
+            result,
+        })
     }
 }
 
 #[doc(hidden)]
-/// is a helper for exporting a command to a `CommandDataType`. You shouldn't use this directly and instead should use [`fn_datatype!`](crate::fn_datatype).
+/// A helper for exporting a command to a [`CommandDataType`].
+/// You shouldn't use this directly and instead should use [`fn_datatype!`](crate::fn_datatype).
 pub fn get_datatype_internal<TMarker, T: SpectaFunction<TMarker>>(
     _: T,
     name: &'static str,
     type_map: &mut TypeDefs,
     fields: &[&'static str],
-) -> FunctionDataType {
+) -> Result<FunctionDataType, ExportError> {
     T::to_datatype(name, type_map, fields)
 }
 
@@ -110,19 +112,21 @@ macro_rules! impl_typed_command {
                     name: &'static str,
                     type_map: &mut TypeDefs,
                     fields: &[&'static str],
-                ) -> FunctionDataType {
+                ) -> Result<FunctionDataType, ExportError> {
                     let mut fields = fields.into_iter();
 
-                    FunctionDataType {
+                    Ok(FunctionDataType {
                         name,
                         args: [$(
-                            fields.next().and_then(|field|
-                                $i::to_datatype(DefOpts {
-                                    parent_inline: false,
-                                    type_map,
-                                })
-                                .map(|ty| (*field, ty))
-                            )
+                            fields
+                                .next()
+                                .map_or_else(
+                                    || Ok(None),
+                                    |field| $i::to_datatype(DefOpts {
+                                        parent_inline: false,
+                                        type_map,
+                                    }).map(|v| v.map(|ty| (*field, ty)))
+                                )?
                         ),*,]
                         .into_iter()
                         .filter_map(|v| v)
@@ -130,8 +134,8 @@ macro_rules! impl_typed_command {
                         result: TResult::to_datatype(DefOpts {
                             parent_inline: false,
                             type_map,
-                        }),
-                    }
+                        })?,
+                    })
                 }
             }
         }
@@ -167,7 +171,7 @@ impl_typed_command!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
 ///     let custom_type_defs = TypeDefs::default();
 ///
 ///     // `type_defs` is provided.
-///     // This can be used when integrating tauri-specta with other specta-enabled libraries.
+///     // This can be used when integrating multiple specta-enabled libraries.
 ///     let (functions, custom_type_defs) = functions::collect_types![
 ///         type_map: custom_type_defs,
 ///         some_function

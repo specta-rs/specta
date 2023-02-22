@@ -15,14 +15,14 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let mut attrs = parse_attrs(attrs)?;
     let container_attrs = ContainerAttr::from_attrs(&mut attrs)?;
 
-    let crate_name = format_ident!(
+    let crate_ref = format_ident!(
         "{}",
         container_attrs
             .crate_name
             .unwrap_or_else(|| "specta".into())
     );
 
-    let body = match data {
+    Ok(match data {
         Data::Struct(data) => match &data.fields {
             Fields::Named(_) => {
                 let fields = data
@@ -43,23 +43,26 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     let ident = &field.ident;
 
                     Some(quote! {
-                        #crate_name::ObjectField {
-                            name: stringify!(#ident),
-                            ty: t.#ident.into(),
+                        #crate_ref::ObjectField {
+                            key: stringify!(#ident),
                             optional: false,
-                            flatten: false
+                            flatten: false,
+                            ty: t.#ident.into(),
                         }
                     })
                 });
 
                 quote! {
-                    #crate_name::ObjectType {
-                        name: stringify!(#ident),
-                        generics: vec![],
-                        fields: vec![#(#fields),*],
-                        tag: None,
-                        type_id: None
-                    }.into()
+                        #[automatically_derived]
+                        impl From<#ident> for #crate_ref::ObjectType {
+                            fn from(t: #ident) -> #crate_ref::ObjectType {
+                                #crate_ref::ObjectType {
+                                    generics: vec![],
+                                    fields: vec![#(#fields),*],
+                                    tag: None,
+                                }
+                        }
+                    }
                 }
             }
             Fields::Unnamed(_) => {
@@ -69,25 +72,24 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 });
 
                 quote! {
-                    #crate_name::TupleType {
-                        name: stringify!(#ident),
-                        generics: vec![],
-                        fields: vec![#(#fields),*]
-                    }.into()
+                    #[automatically_derived]
+                    impl From<#ident> for #crate_ref::TupleType {
+                        fn from(t: #ident) -> #crate_ref::TupleType {
+                            #crate_ref::TupleType {
+                                generics: vec![],
+                                fields: vec![#(#fields),*]
+                            }
+                        }
+                    }
                 }
             }
-            _ => todo!("ToDataType only supports named structs"),
-        },
-        _ => todo!("ToDataType only supports named structs"),
-    };
-
-    Ok(quote! {
-        #[automatically_derived]
-        impl From<#ident> for #crate_name::DataType {
-            fn from(t: #ident) -> Self {
-                #body
+            Fields::Unit => {
+                syn::Error::new_spanned(ident, "DataTypeFrom does not support unit structs")
+                    .into_compile_error()
             }
-        }
+        },
+        _ => syn::Error::new_spanned(ident, "DataTypeFrom only supports structs")
+            .into_compile_error(),
     }
     .into())
 }

@@ -12,8 +12,10 @@ keywords = ["async", "specta", "rspc", "typescript", "typesafe"]
 categories = ["web-programming", "asynchronous"]
 autotests = false
 
+# /bin/sh RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
 [package.metadata."docs.rs"]
 all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [[test]]
 name = "integration_tests"

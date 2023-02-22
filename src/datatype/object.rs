@@ -1,30 +1,49 @@
-use std::any::TypeId;
+use crate::{DataType, NamedDataType, NamedDataTypeItem};
 
-use crate::DataType;
-
-/// this is used internally to represent the types.
-#[derive(Debug, Clone)]
+/// A field in an [`ObjectType`].
+#[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub struct ObjectField {
-    pub name: &'static str,
-    pub ty: DataType,
+    pub key: &'static str,
     pub optional: bool,
     pub flatten: bool,
+    pub ty: DataType,
 }
 
-/// this is used internally to represent the types.
-#[derive(Debug, Clone)]
+/// Type of an object.
+/// Could be from a struct or named enum variant.
+#[derive(Debug, Clone, PartialEq, Default)]
 #[allow(missing_docs)]
 pub struct ObjectType {
-    pub name: &'static str,
     pub generics: Vec<&'static str>,
     pub fields: Vec<ObjectField>,
     pub tag: Option<&'static str>,
-    pub type_id: Option<TypeId>,
 }
 
-impl PartialEq for ObjectType {
-    fn eq(&self, other: &Self) -> bool {
-        self.type_id == other.type_id
+impl ObjectType {
+    /// Convert a [`ObjectType`] to an anonymous [`DataType`].
+    pub fn to_anonymous(self) -> DataType {
+        DataType::Object(self)
+    }
+
+    /// Convert a [`ObjectType`] to a named [`NamedDataType`].
+    ///
+    /// This can easily be converted to a [`DataType`] by putting it inside the [DataType::Named] variant.
+    pub fn to_named(self, name: &'static str) -> NamedDataType {
+        NamedDataType {
+            name,
+            sid: None,
+            impl_location: None,
+            comments: &[],
+            export: None,
+            deprecated: None,
+            item: NamedDataTypeItem::Object(self),
+        }
+    }
+}
+
+impl From<ObjectType> for DataType {
+    fn from(t: ObjectType) -> Self {
+        t.to_anonymous()
     }
 }

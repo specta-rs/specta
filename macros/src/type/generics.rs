@@ -92,6 +92,8 @@ pub fn construct_datatype(
         false => quote!(reference),
     };
 
+    let parent_inline = inline.then(|| quote!(true)).unwrap_or(quote!(false));
+
     let path = match ty {
         Type::Tuple(t) => {
             let elems = t
@@ -118,10 +120,13 @@ pub fn construct_datatype(
             return Ok(quote! {
                 #(#elems)*
 
-                let #var_ident = <#ty as #crate_ref::Type>::#method(#crate_ref::DefOpts {
-                    parent_inline: false,
-                    type_map: opts.type_map
-                }, &[#(#generic_var_idents),*]);
+                let #var_ident = <#ty as #crate_ref::Type>::#method(
+                    #crate_ref::DefOpts {
+                        parent_inline: #parent_inline,
+                        type_map: opts.type_map
+                    },
+                    &[#(#generic_var_idents),*]
+                )?;
             });
         }
         Type::Array(TypeArray { elem, .. }) | Type::Slice(TypeSlice { elem, .. }) => {
@@ -137,10 +142,13 @@ pub fn construct_datatype(
             return Ok(quote! {
                 #elem
 
-                let #var_ident = <#ty as #crate_ref::Type>::#method(#crate_ref::DefOpts {
-                    parent_inline: false,
-                    type_map: opts.type_map
-                }, &[#elem_var_ident]);
+                let #var_ident = <#ty as #crate_ref::Type>::#method(
+                    #crate_ref::DefOpts {
+                        parent_inline: #parent_inline,
+                        type_map: opts.type_map
+                    },
+                    &[#elem_var_ident]
+                )?;
             });
         }
         Type::Ptr(TypePtr { elem, .. }) | Type::Reference(TypeReference { elem, .. }) => {
@@ -155,10 +163,13 @@ pub fn construct_datatype(
         }
         Type::Macro(m) => {
             return Ok(quote! {
-                let #var_ident = <#m as #crate_ref::Type>::#method(#crate_ref::DefOpts {
-                    parent_inline: false,
-                    type_map: opts.type_map
-                }, &[]);
+                let #var_ident = <#m as #crate_ref::Type>::#method(
+                    #crate_ref::DefOpts {
+                        parent_inline: #parent_inline,
+                        type_map: opts.type_map
+                    },
+                    &[]
+                )?;
             });
         }
         ty => {
@@ -178,17 +189,20 @@ pub fn construct_datatype(
             .find(|(_, ident)| ident == &type_ident)
         {
             return Ok(quote! {
-                let #var_ident = generics.get(#i).map(Clone::clone).unwrap_or_else(||
-                    <#generic_ident as #crate_ref::Type>::#method(
-                        #crate_ref::DefOpts {
-                            parent_inline: #inline,
-                            type_map: opts.type_map
-                        },
-                        &[#crate_ref::GenericType(
-                            stringify!(#type_ident)
-                        ).into()]
-                    )
-                );
+                let #var_ident = generics.get(#i).cloned().map_or_else(
+                    || {
+                        <#generic_ident as #crate_ref::Type>::#method(
+                            #crate_ref::DefOpts {
+                                parent_inline: #parent_inline,
+                                type_map: opts.type_map
+                            },
+                            &[#crate_ref::DataType::Generic(#crate_ref::GenericType(
+                                stringify!(#type_ident)
+                            ))]
+                        )
+                    },
+                    Ok,
+                )?;
             });
         }
     }
@@ -234,10 +248,10 @@ pub fn construct_datatype(
 
         let #var_ident = <#ty as #crate_ref::Type>::#method(
             #crate_ref::DefOpts {
-                parent_inline: #inline,
+                parent_inline: #parent_inline,
                 type_map: opts.type_map
             },
             &[#(#generic_var_idents),*]
-        );
+        )?;
     })
 }

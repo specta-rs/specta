@@ -1,45 +1,98 @@
-use std::any::TypeId;
+use crate::{
+    datatype::{DataType, ObjectType, TupleType},
+    ExportError, ImplLocation,
+};
 
-use crate::datatype::{DataType, ObjectType, TupleType};
-
-/// this is used internally to represent the types.
-#[derive(Debug, Clone)]
+/// Type of an enum.
+///
+/// [`Untagged`](EnumType::Untagged) is here rather than in [`EnumRepr`] as it is the only enum representation that does not have tags on its variants.
+/// Separating it allows for better typesafety since `variants` doesn't have to be a [`Vec`] of tuples.
+#[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
-pub struct EnumType {
-    pub name: &'static str,
-    pub variants: Vec<EnumVariant>,
-    pub generics: Vec<&'static str>,
-    pub repr: EnumRepr,
-    pub type_id: TypeId,
+pub enum EnumType {
+    Untagged {
+        variants: Vec<EnumVariant>,
+        generics: Vec<&'static str>,
+    },
+    Tagged {
+        variants: Vec<(&'static str, EnumVariant)>,
+        generics: Vec<&'static str>,
+        repr: EnumRepr,
+    },
+}
+
+impl From<EnumType> for DataType {
+    fn from(t: EnumType) -> Self {
+        Self::Enum(t)
+    }
 }
 
 impl EnumType {
+    pub(crate) fn generics(&self) -> &Vec<&'static str> {
+        match self {
+            Self::Untagged { generics, .. } => generics,
+            Self::Tagged { generics, .. } => generics,
+        }
+    }
+
+    pub(crate) fn variants_len(&self) -> usize {
+        match self {
+            Self::Untagged { variants, .. } => variants.len(),
+            Self::Tagged { variants, .. } => variants.len(),
+        }
+    }
+
     /// An enum may contain variants which are invalid and will cause a runtime errors during serialize/deserialization.
     /// This function will filter them out so types can be exported for valid variants.
-    pub fn make_flattenable(&mut self) {
-        self.variants.retain(|v| match self.repr {
-            EnumRepr::External => match v {
-                EnumVariant::Unnamed(v) if v.fields.len() == 1 => true,
-                EnumVariant::Named(_) => true,
-                _ => false,
-            },
-            EnumRepr::Untagged => matches!(v, EnumVariant::Unit(_) | EnumVariant::Named(_)),
-            EnumRepr::Adjacent { .. } => true,
-            EnumRepr::Internal { .. } => {
-                matches!(v, EnumVariant::Unit(_) | EnumVariant::Named(_))
+    pub fn make_flattenable(&mut self, impl_location: ImplLocation) -> Result<(), ExportError> {
+        match self {
+            Self::Untagged { variants, .. } => {
+                variants.iter().try_for_each(|v| match v {
+                    EnumVariant::Unit => Ok(()),
+                    EnumVariant::Named(_) => Ok(()),
+                    EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
+                        impl_location,
+                        "`EnumRepr::Untagged` with ` EnumVariant::Unnamed` is invalid!",
+                    )),
+                })?;
             }
-        });
+            Self::Tagged { variants, repr, .. } => {
+                variants.iter().try_for_each(|(_, v)| {
+                    match repr {
+                        EnumRepr::External => match v {
+                            EnumVariant::Unit => Err(ExportError::InvalidType(
+                                impl_location,
+                                "`EnumRepr::External` with ` EnumVariant::Unit` is invalid!",
+                            )),
+                            EnumVariant::Unnamed(v) if v.fields.len() == 1 => Ok(()),
+                            EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
+                                impl_location,
+                                "`EnumRepr::External` with ` EnumVariant::Unnamed` containing more than a single field is invalid!",
+                            )),
+                            EnumVariant::Named(_) => Ok(()),
+                        },
+                        EnumRepr::Adjacent { .. } => Ok(()),
+                        EnumRepr::Internal { .. } => match v {
+                            EnumVariant::Unit => Ok(()),
+                            EnumVariant::Named(_) => Ok(()),
+                            EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
+                                impl_location,
+                                "`EnumRepr::Internal` with ` EnumVariant::Unnamed` is invalid!",
+                            )),
+                        },
+                    }
+                })?;
+            }
+        }
+
+        Ok(())
     }
 }
 
-impl PartialEq for EnumType {
-    fn eq(&self, other: &Self) -> bool {
-        self.type_id == other.type_id
-    }
-}
-
-/// this is used internally to represent the types.
-#[derive(Debug, Clone)]
+/// Serde representation of an enum.
+///
+/// Does not contain [`Untagged`](EnumType::Untagged) as that is handled by [`EnumType`].
+#[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub enum EnumRepr {
     External,
@@ -50,32 +103,22 @@ pub enum EnumRepr {
         tag: &'static str,
         content: &'static str,
     },
-    Untagged,
 }
 
-/// this is used internally to represent the types.
-#[derive(Debug, Clone)]
+/// Type of an [`EnumType`] variant.
+#[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub enum EnumVariant {
-    Unit(&'static str),
-    Unnamed(TupleType),
+    Unit,
     Named(ObjectType),
+    Unnamed(TupleType),
 }
 
 impl EnumVariant {
-    /// Get the name of the variant.
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Unit(name) => name,
-            Self::Unnamed(tuple_type) => tuple_type.name,
-            Self::Named(object_type) => object_type.name,
-        }
-    }
-
     /// Get the [`DataType`](crate::DataType) of the variant.
     pub fn data_type(&self) -> DataType {
         match self {
-            Self::Unit(_) => unreachable!("Unit enum variants have no type!"),
+            Self::Unit => unreachable!("Unit enum variants have no type!"), // TODO: Remove unreachable in type system + avoid following clones
             Self::Unnamed(tuple_type) => tuple_type.clone().into(),
             Self::Named(object_type) => object_type.clone().into(),
         }
