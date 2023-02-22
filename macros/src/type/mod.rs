@@ -120,15 +120,17 @@ pub fn derive(
             #[#crate_name::internal::ctor::ctor]
             #[allow(non_snake_case)]
             fn #export_fn_name() {
-                let type_map = &mut *#crate_name::export::TYPES.lock().unwrap();
+                let (type_map, errors) = &mut *#crate_name::export::TYPES.lock().unwrap();
 
-                #ty::reference(
+                if let Err(err) = #ty::reference(
                     #crate_name::DefOpts {
                         parent_inline: false,
                         type_map
                     },
                     &[]
-                );
+                ) {
+                    errors.push(err);
+                }
             }
         }
     });
@@ -137,6 +139,7 @@ pub fn derive(
         const _: () = {
             // We do this so `sid!()` is only called once, preventing the type ended up with multiple ids
             const SID: #crate_name::TypeSid = #crate_name::sid!(@with_specta_path; #name; #crate_name);
+            const IMPL_LOCATION: #crate_name::ImplLocation = #crate_name::impl_location!(@with_specta_path; #crate_name);
 
             #[automatically_derived]
             #type_impl_heading {
@@ -191,7 +194,7 @@ pub fn named_data_type_wrapper(
         #crate_ref::NamedDataType {
             name: #name,
             sid: Some(SID),
-            impl_location: Some(#crate_ref::impl_location!(@with_specta_path; #crate_ref)),
+            impl_location: Some(IMPL_LOCATION),
             comments: #comments,
             export: #should_export,
             deprecated: #deprecated,

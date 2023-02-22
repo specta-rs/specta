@@ -118,10 +118,10 @@ pub fn parse_struct(
 
                         match &mut ty {
                             #crate_ref::DataType::Enum(item) => {
-                                item.make_flattenable()?;
+                                item.make_flattenable(IMPL_LOCATION)?;
                             }
                             #crate_ref::DataType::Named(#crate_ref::NamedDataType { item: #crate_ref::NamedDataTypeItem::Enum(item), .. }) => {
-                                item.make_flattenable()?;
+                                item.make_flattenable(IMPL_LOCATION)?;
                             }
                             _ => {}
                         }

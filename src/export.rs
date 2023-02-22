@@ -7,7 +7,7 @@ use std::sync::Mutex;
 /// Global type store for collecting custom types to export.
 ///
 /// Populated by `#[ctor]` functions defined in the [`Type`](derive@crate::Type) macro.
-pub static TYPES: Lazy<Mutex<TypeDefs>> = Lazy::new(Default::default);
+pub static TYPES: Lazy<Mutex<(TypeDefs, Vec<ExportError>)>> = Lazy::new(Default::default);
 
 /// Exports all types in the [`TYPES`](static@crate::export::TYPES) map to the provided TypeScript file.
 pub fn ts(path: &str) -> Result<(), TsExportError> {
@@ -20,7 +20,13 @@ pub fn ts_with_cfg(path: &str, conf: &ExportConfiguration) -> Result<(), TsExpor
 
     let export_by_default = conf.export_by_default.unwrap_or(true);
     let types = TYPES.lock().expect("Failed to acquire lock on 'TYPES'");
+
+    for err in types.1.clone() {
+        return Err(err.into());
+    }
+
     let types = types
+        .0
         .clone()
         .into_iter()
         .filter(|(_, v)| match v {

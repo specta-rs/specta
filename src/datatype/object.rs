@@ -26,8 +26,8 @@ impl ObjectType {
     }
 
     /// TODO
-    pub fn to_named(self, name: &'static str) -> DataType {
-        DataType::Named(NamedDataType {
+    pub fn to_named(self, name: &'static str) -> NamedDataType {
+        NamedDataType {
             name,
             sid: None,
             impl_location: None,
@@ -35,7 +35,7 @@ impl ObjectType {
             export: None,
             deprecated: None,
             item: NamedDataTypeItem::Object(self),
-        })
+        }
     }
 }
 

@@ -22,7 +22,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             .unwrap_or_else(|| "specta".into())
     );
 
-    let (body, impl_typ) = match data {
+    Ok(match data {
         Data::Struct(data) => match &data.fields {
             Fields::Named(_) => {
                 let fields = data
@@ -46,25 +46,24 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         #crate_ref::ObjectField {
                             key: stringify!(#ident),
                             optional: false,
-                            flatten: false
-                            ty: t.#ident,
+                            flatten: false,
+                            ty: t.#ident.into(),
                         }
                     })
                 });
 
-                let impl_typ = quote!(#crate_ref::ObjectType);
-
-                (
-                    quote! {
-                        #impl_typ {
-                            name: stringify!(#ident),
-                            generics: vec![],
-                            fields: vec![#(#fields),*],
-                            tag: None,
+                quote! {
+                        #[automatically_derived]
+                        impl From<#ident> for #crate_ref::ObjectType {
+                            fn from(t: #ident) -> #crate_ref::ObjectType {
+                                #crate_ref::ObjectType {
+                                    generics: vec![],
+                                    fields: vec![#(#fields),*],
+                                    tag: None,
+                                }
                         }
-                    },
-                    impl_typ,
-                )
+                    }
+                }
             }
             Fields::Unnamed(_) => {
                 let fields = data.fields.iter().enumerate().map(|(i, _)| {
@@ -72,30 +71,21 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     quote!(t.#i.into())
                 });
 
-                let impl_typ = quote!(#crate_ref::TupleType);
-
-                (
-                    quote! {
-                        #impl_typ {
-                            generics: vec![],
-                            fields: vec![#(#fields),*]
+                quote! {
+                    #[automatically_derived]
+                    impl From<#ident> for #crate_ref::TupleType {
+                        fn from(t: #ident) -> #crate_ref::TupleType {
+                            #crate_ref::TupleType {
+                                generics: vec![],
+                                fields: vec![#(#fields),*]
+                            }
                         }
-                    },
-                    impl_typ,
-                )
+                    }
+                }
             }
             _ => todo!("ToDataType only supports named structs"),
         },
         _ => todo!("ToDataType only supports named structs"),
-    };
-
-    Ok(quote! {
-        #[automatically_derived]
-        impl From<#ident> for #impl_typ {
-            fn from(t: #ident) -> #impl_typ {
-                #body
-            }
-        }
     }
     .into())
 }

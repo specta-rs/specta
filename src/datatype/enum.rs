@@ -1,6 +1,6 @@
 use crate::{
     datatype::{DataType, ObjectType, TupleType},
-    ExportError,
+    ExportError, ImplLocation,
 };
 
 /// this is used internally to represent the types.
@@ -42,31 +42,37 @@ impl EnumType {
 
     /// An enum may contain variants which are invalid and will cause a runtime errors during serialize/deserialization.
     /// This function will filter them out so types can be exported for valid variants.
-    pub fn make_flattenable(&mut self) -> Result<(), ExportError> {
+    pub fn make_flattenable(&mut self, impl_location: ImplLocation) -> Result<(), ExportError> {
         match self {
             Self::Untagged { variants, repr, .. } => {
-                variants
-                    .iter()
-                    .try_for_each(|variant| Self::make_flattenable_inner(variant, repr))?;
+                variants.iter().try_for_each(|variant| {
+                    Self::make_flattenable_inner(impl_location, variant, repr)
+                })?;
             }
             Self::Tagged { variants, repr, .. } => {
-                variants
-                    .iter()
-                    .try_for_each(|(_, variant)| Self::make_flattenable_inner(variant, repr))?;
+                variants.iter().try_for_each(|(_, variant)| {
+                    Self::make_flattenable_inner(impl_location, variant, repr)
+                })?;
             }
         }
 
         Ok(())
     }
 
-    fn make_flattenable_inner(v: &EnumVariant, repr: &EnumRepr) -> Result<(), ExportError> {
+    fn make_flattenable_inner(
+        impl_location: ImplLocation,
+        v: &EnumVariant,
+        repr: &EnumRepr,
+    ) -> Result<(), ExportError> {
         match repr {
             EnumRepr::External => match v {
                 EnumVariant::Unit => Err(ExportError::InvalidType(
+                    impl_location,
                     "`EnumRepr::External` with ` EnumVariant::Unit` is invalid!",
                 )),
                 EnumVariant::Unnamed(v) if v.fields.len() == 1 => Ok(()),
                 EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
+                    impl_location,
                     "`EnumRepr::External` with ` EnumVariant::Unnamed` containing more than a single field is invalid!",
                 )),
                 EnumVariant::Named(_) => Ok(()),
@@ -75,6 +81,7 @@ impl EnumType {
                 EnumVariant::Unit => Ok(()),
                 EnumVariant::Named(_) => Ok(()),
                 EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
+                    impl_location,
                     "`EnumRepr::Untagged` with ` EnumVariant::Unnamed` is invalid!",
                 )),
             },
@@ -83,6 +90,7 @@ impl EnumType {
                 EnumVariant::Unit => Ok(()),
                 EnumVariant::Named(_) => Ok(()),
                 EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
+                    impl_location,
                     "`EnumRepr::Internal` with ` EnumVariant::Unnamed` is invalid!",
                 )),
             },

@@ -38,7 +38,7 @@ pub enum TsExportError {
     InvalidTagging(ExportPath),
     #[error("Unable to export type named '{0}' from locations '{:?}' '{:?}'", .1.map(|v| v.as_str()), .2.map(|v| v.as_str()))]
     DuplicateTypeName(&'static str, Option<ImplLocation>, Option<ImplLocation>),
-    #[error("Generic export error: {0}")]
+    #[error("{0}")]
     SpectaExportError(#[from] ExportError),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),

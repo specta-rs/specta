@@ -19,11 +19,11 @@ pub enum TypeCategory {
 }
 
 /// Error which can be returned when exporting a type.
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub enum ExportError {
-    #[error("{0}")]
-    InvalidType(&'static str),
+    #[error("Atemmpted to export type defined at '{}' but encountered error: {1}", .0.as_str())]
+    InvalidType(ImplLocation, &'static str),
 }
 
 /// Provides runtime type information that can be fed into a language exporter to generate a type definition in another language.
