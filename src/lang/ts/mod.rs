@@ -55,7 +55,7 @@ pub fn inline<T: Type>(conf: &ExportConfiguration) -> Result<String, TsExportErr
 
 /// Convert a DataType to a TypeScript string
 ///
-/// Eg. `{ demo: string; }`
+/// Eg. `export Name = { demo: string; }`
 pub fn export_datatype(
     conf: &ExportConfiguration,
     typ: &NamedDataType,

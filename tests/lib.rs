@@ -4,6 +4,7 @@ mod bigints;
 mod datatype;
 mod duplicate_ty_name;
 mod export;
+mod functions;
 mod macro_decls;
 mod reserved_keywords;
 pub mod ts;
