@@ -129,7 +129,7 @@ pub fn derive(
                     },
                     &[]
                 ) {
-                    errors.push(err);
+                    errors.insert(err);
                 }
             }
         }

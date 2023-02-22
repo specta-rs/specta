@@ -1,13 +1,13 @@
 use crate::ts::{ExportConfiguration, TsExportError};
 use crate::*;
 use once_cell::sync::Lazy;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 
 /// Global type store for collecting custom types to export.
 ///
 /// Populated by `#[ctor]` functions defined in the [`Type`](derive@crate::Type) macro.
-pub static TYPES: Lazy<Mutex<(TypeDefs, Vec<ExportError>)>> = Lazy::new(Default::default);
+pub static TYPES: Lazy<Mutex<(TypeDefs, BTreeSet<ExportError>)>> = Lazy::new(Default::default);
 
 /// Exports all types in the [`TYPES`](static@crate::export::TYPES) map to the provided TypeScript file.
 pub fn ts(path: &str) -> Result<(), TsExportError> {
@@ -25,6 +25,7 @@ pub fn ts_with_cfg(path: &str, conf: &ExportConfiguration) -> Result<(), TsExpor
         return Err(err.into());
     }
 
+    // We sort by name to detect duplicate types BUT also to ensure the output is deterministic. The SID can change between builds so is not suitable for this.
     let types = types
         .0
         .clone()
@@ -37,8 +38,25 @@ pub fn ts_with_cfg(path: &str, conf: &ExportConfiguration) -> Result<(), TsExpor
         })
         .collect::<BTreeMap<_, _>>();
 
-    for (ty_name, l0, l1) in detect_duplicate_type_names(&types) {
-        return Err(TsExportError::DuplicateTypeName(ty_name, l0, l1));
+    // This is a clone of `detect_duplicate_type_names` but using a `BTreeMap` for deterministic ordering
+    let mut map = BTreeMap::new();
+    for (sid, dt) in &types {
+        match dt {
+            Some(dt) => {
+                if let Some((existing_sid, existing_impl_location)) =
+                    map.insert(dt.name, (sid, dt.impl_location))
+                {
+                    if existing_sid != sid {
+                        return Err(TsExportError::DuplicateTypeName(
+                            dt.name,
+                            dt.impl_location,
+                            existing_impl_location,
+                        ));
+                    }
+                }
+            }
+            None => unreachable!(),
+        }
     }
 
     for (_, typ) in types {
