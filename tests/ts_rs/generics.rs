@@ -189,23 +189,16 @@ fn inline() {
 // TODO
 
 // #[test]
-// fn trait_bounds() {
+// fn test_generic_trait_bounds() {
 //     #[derive(Type)]
-//     // TODO
 //     struct A<T: ToString = i32> {
 //         t: T,
 //     }
-//     assert_ts_export!(
-//         ts_A::<i32>,
-//         "export type A<T = number> = { t: T, }"
-//     );
+//     assert_ts_export!(A::<i32>, "export type A<T = number> = { t: T, }");
 
 //     #[derive(Type)]
-//     struct B<T: ToString + Debug + Clone + 'static>(T);
-//     assert_ts_export!(
-//         ts_B::<&'static str>,
-//         "export type B<T> = T;"
-//     );
+//     struct B<T: ToString + std::fmt::Debug + Clone + 'static>(T);
+//     assert_ts_export!(B::<&'static str>, "export type B<T> = T;");
 
 //     #[derive(Type)]
 //     enum C<T: Copy + Clone + PartialEq, K: Copy + PartialOrd = i32> {
@@ -215,7 +208,7 @@ fn inline() {
 //         D(T, K),
 //     }
 //     assert_ts_export!(
-//         ts_C::<&'static str, i32>,
+//         C::<&'static str, i32>,
 //         "export type C<T, K = number> = { A: { t: T, } } | { B: T } | \"C\" | { D: [T, K] };"
 //     );
 
@@ -224,8 +217,5 @@ fn inline() {
 //         t: [T; N],
 //     }
 
-//     assert_ts_export!(
-//         ts_D::<&str, 41>,
-//         "export type D<T> = { t: Array<T>, }"
-//     )
+//     assert_ts_export!(D::<&str, 41>, "export type D<T> = { t: Array<T>, }")
 // }

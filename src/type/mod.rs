@@ -187,14 +187,6 @@ macro_rules! sid {
     ($name:expr) => {
         $crate::sid!($name, $crate::impl_location!().as_str())
     };
-    // TODO: Maybe remove this variant?
-    ($name:expr, $location:expr) => {
-        $crate::internal_sid_hash(
-            module_path!(),
-            $name,
-            $location
-        )
-    };
      // Using `$crate_path:path` here does not work because: https://github.com/rust-lang/rust/issues/48067
     (@with_specta_path; $name:expr; $first:ident$(::$rest:ident)*) => {{
         use $first$(::$rest)*::{internal_sid_hash, impl_location};

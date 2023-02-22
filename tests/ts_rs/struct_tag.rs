@@ -11,17 +11,11 @@ struct TaggedType {
 }
 
 #[test]
-#[cfg(feature = "serde")]
-fn test() {
+fn test_struct_tagging() {
     assert_ts!(
         TaggedType,
         r#"{ a: number; b: number; type: "TaggedType" }"#
     );
-}
 
-// TODO: Make it sure this test is run in CI. Won't run without `--all-features`.
-#[test]
-#[cfg(not(feature = "serde"))]
-fn test() {
-    assert_ts!(TaggedType, "{ a: number; b: number }");
+    // TODO: Better unit tests for this including asserting runtime error for invalid cases
 }

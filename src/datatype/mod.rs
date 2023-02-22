@@ -14,10 +14,11 @@ pub use tuple::*;
 
 use crate::{ImplLocation, TypeSid};
 
-/// A map of type definitions
+/// A map used to store the types "discovered" while exporting a type.
+/// You can iterate over this to export all types which the type/s you exported references on.
 pub type TypeDefs = BTreeMap<TypeSid, NamedDataTypeOrPlaceholder>;
 
-/// arguments for [Type::inline](crate::Type::inline), [Type::reference](crate::Type::reference) and [Type::definition](crate::Type::definition).
+/// Arguments for [Type::inline](crate::Type::inline), [Type::reference](crate::Type::reference) and [Type::definition](crate::Type::definition).
 pub struct DefOpts<'a> {
     /// is the parent type inlined?
     pub parent_inline: bool,
@@ -25,7 +26,9 @@ pub struct DefOpts<'a> {
     pub type_map: &'a mut TypeDefs,
 }
 
-/// A wrapper around [DataTypeItem] to store general information about the type.
+/// Runtime type-erased representation of a Rust type.
+///
+/// A language exporter takes this general format and converts it into a language specific syntax.
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub enum DataType {
@@ -47,17 +50,17 @@ pub enum DataType {
     Generic(GenericType),
 }
 
-/// TODO
+/// allows for storing either a [NamedDataType] or a placeholder in the type map.
 #[derive(Debug, Clone, PartialEq)]
 pub enum NamedDataTypeOrPlaceholder {
-    /// TODO
+    /// A named type represents a non-primitive type capable of being exported as it's own named entity.
     Named(NamedDataType),
     /// Used when the type is not yet known. This allows us to avoid stack overflows.
     /// It should never be returned from the Specta functions. Doing so is classed as a bug!
     Placeholder,
 }
 
-/// TODO
+/// A named type represents a non-primitive type capable of being exported as it's own named entity.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NamedDataType {
     /// The name of the type
@@ -73,7 +76,7 @@ pub struct NamedDataType {
     pub export: Option<bool>,
     /// The Rust deprecated comment if the type is deprecated.
     pub deprecated: Option<&'static str>,
-    /// TODO
+    /// the actual type definition.
     pub item: NamedDataTypeItem,
 }
 
@@ -83,26 +86,24 @@ impl From<NamedDataType> for DataType {
     }
 }
 
-/// TODO
+/// The possible types for a [NamedDataType].
 #[derive(Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub enum NamedDataTypeItem {
-    /// TODO
     Object(ObjectType),
-    /// TODO
     Enum(EnumType),
-    /// TODO
     Tuple(TupleType),
 }
 
-/// Datatype to be put in the type map while field types are being resolved. Used in order to
+/// A reference to a datatype that can be used before a type is resolved in order to
 /// support recursive types without causing an infinite loop.
 ///
 /// This works since a child type that references a parent type does not care about the
 /// parent's fields, only really its name. Once all of the parent's fields have been
 /// resolved will the parent's definition be placed in the type map.
 ///
-/// This doesn't account for flattening and inlining recursive types, however, which will
-/// require a more complex solution since it will require multiple processing stages.
+// This doesn't account for flattening and inlining recursive types, however, which will
+// require a more complex solution since it will require multiple processing stages.
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub struct DataTypeReference {
@@ -111,7 +112,7 @@ pub struct DataTypeReference {
     pub generics: Vec<DataType>,
 }
 
-/// this is used internally to represent the types.
+/// Is used to represent the type of a generic parameter to another type.
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub struct GenericType(pub &'static str);
@@ -158,14 +159,3 @@ impl From<String> for DataType {
         LiteralType::String(t).into()
     }
 }
-
-/// TODO
-pub trait ToSpectaType {
-    /// TODO
-    type Type;
-
-    /// TODO
-    fn to_specta_type(self) -> Self::Type;
-}
-
-// TODO: Trait with `to_anonymous` and `to_named`???

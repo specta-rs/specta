@@ -126,8 +126,7 @@ impl EnumVariant {
     /// Get the [`DataType`](crate::DataType) of the variant.
     pub fn data_type(&self) -> DataType {
         match self {
-            Self::Unit => unreachable!("Unit enum variants have no type!"), // TODO: Remove unreachable in type system
-            // TODO: Avoid clone
+            Self::Unit => unreachable!("Unit enum variants have no type!"), // TODO: Remove unreachable in type system + avoid following clones
             Self::Unnamed(tuple_type) => tuple_type.clone().into(),
             Self::Named(object_type) => object_type.clone().into(),
         }

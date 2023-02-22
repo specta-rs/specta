@@ -83,9 +83,13 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     }
                 }
             }
-            _ => todo!("ToDataType only supports named structs"),
+            _ => syn::Error::new_spanned(ident, "ToDataType only supports named structs")
+                .into_compile_error()
+                .into(),
         },
-        _ => todo!("ToDataType only supports named structs"),
+        _ => syn::Error::new_spanned(ident, "ToDataType only supports named structs")
+            .into_compile_error()
+            .into(),
     }
     .into())
 }

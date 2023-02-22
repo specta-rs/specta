@@ -1,6 +1,6 @@
 use crate::{DataType, NamedDataType, NamedDataTypeItem};
 
-/// this is used internally to represent the types.
+/// represent a the type for a field in an [ObjectType].
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub struct ObjectField {
@@ -10,7 +10,7 @@ pub struct ObjectField {
     pub ty: DataType,
 }
 
-/// this is used internally to represent the types.
+/// represent the type for an object.
 #[derive(Debug, Clone, PartialEq, Default)]
 #[allow(missing_docs)]
 pub struct ObjectType {
@@ -20,12 +20,14 @@ pub struct ObjectType {
 }
 
 impl ObjectType {
-    /// TODO
+    /// convert a [`ObjectType`] to an anonymous [`DataType`].
     pub fn to_anonymous(self) -> DataType {
         DataType::Object(self)
     }
 
-    /// TODO
+    /// convert a [`ObjectType`] to a named [`NamedDataType`].
+    ///
+    /// This can easily be converted to a [`DataType`] by putting it inside the [DataType::Named] variant.
     pub fn to_named(self, name: &'static str) -> NamedDataType {
         NamedDataType {
             name,
