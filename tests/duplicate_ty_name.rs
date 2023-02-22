@@ -47,10 +47,10 @@ fn test_duplicate_ty_name() {
     let err = Err(TsExportError::DuplicateTypeName(
         "One",
         Some(ImplLocation::internal_new(
-            "tests\\duplicate_ty_name.rs:19:14",
+            "tests\\duplicate_ty_name.rs:9:14",
         )),
         Some(ImplLocation::internal_new(
-            "tests\\duplicate_ty_name.rs:9:14",
+            "tests\\duplicate_ty_name.rs:19:14",
         )),
     ));
 
