@@ -166,7 +166,7 @@ impl_typed_command!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
 ///
 /// fn main() {
 ///     // `type_defs` is created internally
-///     let (functions, type_defs) = functions::collect_types![some_function];
+///     let (functions, type_defs) = functions::collect_types![some_function].unwrap();
 ///
 ///     let custom_type_defs = TypeDefs::default();
 ///
@@ -175,7 +175,7 @@ impl_typed_command!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
 ///     let (functions, custom_type_defs) = functions::collect_types![
 ///         type_map: custom_type_defs,
 ///         some_function
-///     ];
+///     ].unwrap();
 /// }
 /// ````
 #[macro_export]
