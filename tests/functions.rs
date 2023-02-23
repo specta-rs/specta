@@ -23,7 +23,7 @@ mod test {
 
     #[test]
     fn test_function_export() {
-        let (functions, types) = functions::collect_types![a, b, c, d, e::<i32>];
+        let (functions, types) = functions::collect_types![a, b, c, d, e::<i32>].unwrap();
 
         // TODO: Asserts `functions` and `types` is correct
     }

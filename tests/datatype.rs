@@ -19,6 +19,16 @@ struct Procedures3 {
     pub queries: Vec<DataType>,
 }
 
+// Using a type implementing `DataTypeFrom` as a field.
+#[derive(DataTypeFrom)]
+struct Procedures4 {
+    pub queries: Vec<Procedures2>,
+}
+
+// Using a type implementing `DataTypeFrom` as a field.
+#[derive(DataTypeFrom)]
+struct Procedures5(Vec<Procedures2>);
+
 #[test]
 fn test_datatype() {
     let val: TupleType = Procedures1(vec![
@@ -67,4 +77,30 @@ fn test_datatype() {
         Ok("export type MyEnum = { queries: \"A\" | \"B\" }".into())
     );
     assert_ts!(Procedures3, "{ queries: string }");
+
+    let val: ObjectType = Procedures4 {
+        queries: vec![Procedures2 {
+            queries: vec![
+                LiteralType::String("A".to_string()).into(),
+                LiteralType::String("B".to_string()).into(),
+            ],
+        }],
+    }
+    .into();
+    assert_eq!(
+        ts::datatype(&Default::default(), &val.clone().to_anonymous()),
+        Ok("{ queries: { queries: \"A\" | \"B\" } }".into())
+    );
+
+    let val: TupleType = Procedures5(vec![Procedures2 {
+        queries: vec![
+            LiteralType::String("A".to_string()).into(),
+            LiteralType::String("B".to_string()).into(),
+        ],
+    }])
+    .into();
+    assert_eq!(
+        ts::datatype(&Default::default(), &val.clone().to_anonymous()),
+        Ok("{ queries: \"A\" | \"B\" }".into())
+    );
 }

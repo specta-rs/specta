@@ -12,7 +12,7 @@ pub struct TupleType {
 impl TupleType {
     /// convert a [`TupleType`] to an anonymous [`DataType`].
     pub fn to_anonymous(self) -> DataType {
-        DataType::Tuple(self)
+        self.into()
     }
 
     /// convert a [`TupleType`] to a named [`NamedDataType`].

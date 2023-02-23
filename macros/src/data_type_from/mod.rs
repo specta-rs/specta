@@ -53,14 +53,21 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 });
 
                 quote! {
-                        #[automatically_derived]
-                        impl From<#ident> for #crate_ref::ObjectType {
-                            fn from(t: #ident) -> #crate_ref::ObjectType {
-                                #crate_ref::ObjectType {
-                                    generics: vec![],
-                                    fields: vec![#(#fields),*],
-                                    tag: None,
-                                }
+                    #[automatically_derived]
+                    impl From<#ident> for #crate_ref::ObjectType {
+                        fn from(t: #ident) -> #crate_ref::ObjectType {
+                            #crate_ref::ObjectType {
+                                generics: vec![],
+                                fields: vec![#(#fields),*],
+                                tag: None,
+                            }
+                        }
+                    }
+
+                    #[automatically_derived]
+                    impl From<#ident> for #crate_ref::DataType {
+                        fn from(t: #ident) -> #crate_ref::DataType {
+                            #crate_ref::DataType::Object(t.into())
                         }
                     }
                 }
@@ -79,6 +86,13 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                                 generics: vec![],
                                 fields: vec![#(#fields),*]
                             }
+                        }
+                    }
+
+                    #[automatically_derived]
+                    impl From<#ident> for #crate_ref::DataType {
+                        fn from(t: #ident) -> #crate_ref::DataType {
+                            #crate_ref::DataType::Tuple(t.into())
                         }
                     }
                 }
