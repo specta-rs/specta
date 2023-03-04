@@ -49,6 +49,8 @@ macro_rules! fn_datatype {
 /// Returned by [`fn_datatype`].
 #[derive(Debug, Clone)]
 pub struct FunctionDataType {
+    /// Whether the command is sync/async. This will be derived from the Rust function.
+    pub asyncness: bool,
     /// The name of the command. This will be derived from the Rust function name.
     pub name: &'static str,
     /// The input arguments of the command. The Rust functions arguments are converted into an [`DataType::Object`](crate::DataType::Object).
@@ -61,6 +63,7 @@ pub struct FunctionDataType {
 pub trait SpectaFunction<TMarker> {
     /// Gets the type of a function as a [`FunctionDataType`].
     fn to_datatype(
+        asyncness: bool,
         name: &'static str,
         type_map: &mut TypeDefs,
         fields: &[&'static str],
@@ -71,6 +74,7 @@ impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction
     for fn() -> TResult
 {
     fn to_datatype(
+        asyncness: bool,
         name: &'static str,
         type_map: &mut TypeDefs,
         _fields: &[&'static str],
@@ -80,6 +84,7 @@ impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction
             type_map,
         })
         .map(|result| FunctionDataType {
+            asyncness,
             name,
             args: vec![],
             result,
@@ -92,11 +97,12 @@ impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction
 /// You shouldn't use this directly and instead should use [`fn_datatype!`](crate::fn_datatype).
 pub fn get_datatype_internal<TMarker, T: SpectaFunction<TMarker>>(
     _: T,
+    asyncness: bool,
     name: &'static str,
     type_map: &mut TypeDefs,
     fields: &[&'static str],
 ) -> Result<FunctionDataType, ExportError> {
-    T::to_datatype(name, type_map, fields)
+    T::to_datatype(asyncness, name, type_map, fields)
 }
 
 macro_rules! impl_typed_command {
@@ -109,6 +115,7 @@ macro_rules! impl_typed_command {
                 $($i: SpectaFunctionArg<[<$i Marker>]>),*
             > SpectaFunction<(TResultMarker, $([<$i Marker>]),*)> for fn($($i),*) -> TResult {
                 fn to_datatype(
+                    asyncness: bool,
                     name: &'static str,
                     type_map: &mut TypeDefs,
                     fields: &[&'static str],
@@ -116,6 +123,7 @@ macro_rules! impl_typed_command {
                     let mut fields = fields.into_iter();
 
                     Ok(FunctionDataType {
+                        asyncness,
                         name,
                         args: [$(
                             fields

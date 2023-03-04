@@ -16,6 +16,10 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
     };
 
     let function_name = &function.sig.ident;
+    let function_asyncness = match function.sig.asyncness {
+        Some(_) => true,
+        None => false,
+    };
 
     let arg_names = function.sig.inputs.iter().map(|input| match input {
         FnArg::Receiver(_) => unreachable!("Commands cannot take 'self'"),
@@ -30,6 +34,7 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
         #maybe_macro_export
         #[doc(hidden)]
         macro_rules! #wrapper {
+            (@asyncness) => { #function_asyncness };
             (@name) => { stringify!(#function_name) };
             (@arg_names) => { &[#(stringify!(#arg_names)),* ] };
             (@signature) => { fn(#(#arg_signatures),*) -> _ };
