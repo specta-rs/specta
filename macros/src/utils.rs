@@ -1,10 +1,12 @@
 use proc_macro2::Span;
 use syn::{
+    braced,
     ext::IdentExt,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
-    Ident, Lit, Path, Result, Token,
+    token::Brace,
+    Expr, Ident, Lit, Path, Result, Token,
 };
 
 #[derive(Clone)]
@@ -14,6 +16,8 @@ pub enum AttributeValue {
     /// Path value. Eg. `#[specta(type = String)]` or `#[specta(type = ::std::string::String)]`
     /// Path doesn't follow the Rust spec hence the need for this custom parser. We are doing this anyway for backwards compatibility.
     Path(Path),
+    /// Expression surrounded by braces. Eg. `#[specta(rename_from_expr = { "hello" })]`
+    Expr(syn::Expr),
 }
 
 impl AttributeValue {
@@ -21,15 +25,21 @@ impl AttributeValue {
         match self {
             Self::Lit(lit) => lit.span(),
             Self::Path(path) => path.span(),
+            Self::Expr(expr) => expr.span(),
         }
     }
 }
 
 impl Parse for AttributeValue {
     fn parse(input: ParseStream) -> Result<Self> {
-        Ok(match input.peek(Lit) {
-            true => Self::Lit(input.parse()?),
-            false => Self::Path(input.parse()?),
+        Ok(match (input.peek(Brace), input.peek(Lit)) {
+            (true, _) => {
+                let content;
+                braced!(content in input);
+                Self::Expr(content.parse()?)
+            }
+            (_, true) => Self::Lit(input.parse()?),
+            (_, _) => Self::Path(input.parse()?),
         })
     }
 }
@@ -80,6 +90,16 @@ impl Attribute {
             _ => Err(syn::Error::new(
                 self.value_span(),
                 "specta: expected path. Eg. `String` or `std::string::String`",
+            )),
+        }
+    }
+
+    pub fn parse_expr(&self) -> Result<Expr> {
+        match &self.value {
+            Some(AttributeValue::Expr(expr)) => Ok(expr.clone()),
+            _ => Err(syn::Error::new(
+                self.value_span(),
+                "specta: expected an expression surrounded in braces. Eg. `{ ... }`",
             )),
         }
     }

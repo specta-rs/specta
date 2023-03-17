@@ -322,15 +322,18 @@ pub struct InlineOptionalType {
 const CONTAINER_NAME: &str = "RenameToValueNewName";
 const FIELD_NAME: &str = "demo_new_name";
 
+// This is very much an advanced API. It is not recommended to use this unless you know what your doing.
+// For personal reference: Is used in PCR to apply an inflection to the dynamic name of the include/select macro.
 #[derive(Type)]
-#[specta(rename_from_path = CONTAINER_NAME)]
+#[specta(export = false, rename_from_expr = { CONTAINER_NAME })]
 pub struct RenameToValue {
-    #[specta(rename_from_path = FIELD_NAME)]
+    #[specta(rename_from_expr = { FIELD_NAME })]
     pub demo: i32,
 }
 
 // Regression test for https://github.com/oscartbeaumont/specta/issues/56
 #[derive(Type, serde::Serialize)]
+#[specta(export = false)]
 enum Rename {
     OneWord,
     #[serde(rename = "Two words")]

@@ -35,8 +35,8 @@ impl_parse! {
                 quote::quote!( #expr )
             }))
         },
-        "rename_from_path" => {
-            let attr = attr.parse_path()?;
+        "rename_from_expr" => {
+            let attr = attr.parse_expr()?;
             out.rename = out.rename.take().or_else(|| Some({
                 let expr = attr.to_token_stream();
                 quote::quote!( #expr )
