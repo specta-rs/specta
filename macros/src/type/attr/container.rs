@@ -27,7 +27,15 @@ impl_parse! {
                 quote::quote!( #name )
             }))
         },
+        // TODO: This is deprecated and will be removed in a future version. Use `rename_from_path` method instead.
         "rename_to_value" => {
+            let attr = attr.parse_path()?;
+            out.rename = out.rename.take().or_else(|| Some({
+                let expr = attr.to_token_stream();
+                quote::quote!( #expr )
+            }))
+        },
+        "rename_from_path" => {
             let attr = attr.parse_path()?;
             out.rename = out.rename.take().or_else(|| Some({
                 let expr = attr.to_token_stream();

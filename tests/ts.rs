@@ -125,6 +125,11 @@ fn typescript_types() {
 
     assert_ts!(InlineOptionalType, "{ optional_field: DocComments | null }");
 
+    assert_ts_export!(
+        RenameToValue,
+        "export type RenameToValueNewName = { demo_new_name: number }"
+    );
+
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");
     // assert_ts_export!(DeprecatedFields, "");
@@ -310,6 +315,16 @@ pub enum InlineEnumField {
 pub struct InlineOptionalType {
     #[specta(inline)]
     pub optional_field: Option<DocComments>,
+}
+
+const CONTAINER_NAME: &str = "RenameToValueNewName";
+const FIELD_NAME: &str = "demo_new_name";
+
+#[derive(Type)]
+#[specta(rename_from_path = CONTAINER_NAME)]
+pub struct RenameToValue {
+    #[specta(rename_from_path = FIELD_NAME)]
+    pub demo: i32,
 }
 
 // #[derive(Type)]

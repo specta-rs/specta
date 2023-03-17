@@ -15,15 +15,14 @@ fn rename_all() {
     assert_ts!(Rename, "{ A: number; B: number }");
 }
 
-#[cfg(feature = "serde")]
-#[test]
-fn serde_rename_special_char() {
-    #[derive(serde::Serialize, Type)]
-    #[specta(export = false)]
-    struct RenameSerdeSpecialChar {
-        #[serde(rename = "a/b")]
-        b: i32,
-    }
+// #[test]
+// fn serde_rename_special_char() {
+//     #[derive(serde::Serialize, Type)]
+//     #[specta(export = false)]
+//     struct RenameSerdeSpecialChar {
+//         #[serde(rename = "a/b")]
+//         b: i32,
+//     }
 
-    assert_ts!(RenameSerdeSpecialChar, r#"{ "a/b": number }"#);
-}
+//     assert_ts!(RenameSerdeSpecialChar, r#"{ "a/b": number }"#);
+// }

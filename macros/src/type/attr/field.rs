@@ -1,10 +1,12 @@
+use proc_macro2::TokenStream;
+use quote::ToTokens;
 use syn::{Result, Type, TypePath};
 
 use crate::utils::Attribute;
 
 #[derive(Default)]
 pub struct FieldAttr {
-    pub rename: Option<String>,
+    pub rename: Option<TokenStream>,
     pub r#type: Option<Type>,
     pub inline: bool,
     pub skip: bool,
@@ -14,7 +16,20 @@ pub struct FieldAttr {
 
 impl_parse! {
     FieldAttr(attr, out) {
-        "rename" => out.rename = out.rename.take().or(Some(attr.parse_string()?)),
+        "rename" => {
+            let attr = attr.parse_string()?;
+            out.rename = out.rename.take().or_else(|| Some({
+                let name = crate::r#type::unraw_raw_ident(&quote::format_ident!("{}", attr));
+                quote::quote!( #name )
+            }))
+        },
+        "rename_from_path" => {
+            let attr = attr.parse_path()?;
+            out.rename = out.rename.take().or_else(|| Some({
+                let expr = attr.to_token_stream();
+                quote::quote!( #expr )
+            }))
+        },
         "type" => out.r#type = out.r#type.take().or(Some(Type::Path(TypePath {
             qself: None,
             path: attr.parse_path()?,

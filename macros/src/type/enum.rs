@@ -144,8 +144,11 @@ pub fn parse_enum(
 
                                 let field_name = match (field_attrs.rename, attrs.rename_all) {
                                     (Some(name), _) => name,
-                                    (_, Some(inflection)) => inflection.apply(&field_ident_str),
-                                    (_, _) => field_ident_str,
+                                    (_, Some(inflection)) => {
+                                        let name = inflection.apply(&field_ident_str);
+                                        quote::quote!(#name)
+                                    }
+                                    (_, _) => quote::quote!(#field_ident_str),
                                 };
 
                                 Ok(quote!(#crate_ref::ObjectField {
