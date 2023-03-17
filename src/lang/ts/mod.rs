@@ -239,7 +239,7 @@ fn object_datatype(
                 .map(|field| {
                     let ctx = ctx.with(PathItem::Field(field.key));
                     let field_name_safe =
-                        sanitise_name(ctx.clone(), NamedLocation::Field, field.key)?;
+                        sanitise_name(ctx.clone(), NamedLocation::Field, field.key, false)?;
                     let field_ts_str = datatype_inner(ctx, &field.ty);
 
                     // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
@@ -289,19 +289,18 @@ fn enum_datatype(
             .map(|(variant_name, variant)| {
                 let ctx = ctx.with(PathItem::Variant(variant_name));
                 let sanitised_name =
-                    sanitise_name(ctx.clone(), NamedLocation::Variant, variant_name)?;
+                    sanitise_name(ctx.clone(), NamedLocation::Variant, variant_name, true)?;
 
                 Ok(match (repr, variant) {
                     (EnumRepr::Internal { tag }, EnumVariant::Unit) => {
-                        format!("{{ {tag}: \"{sanitised_name}\" }}")
+                        format!("{{ {tag}: {sanitised_name} }}")
                     }
                     (EnumRepr::Internal { tag }, EnumVariant::Unnamed(tuple)) => {
                         let typ = datatype_inner(ctx, &DataType::Tuple(tuple.clone()))?;
-
-                        format!("({{ {tag}: \"{sanitised_name}\" }} & {typ})")
+                        format!("({{ {tag}: {sanitised_name} }} & {typ})")
                     }
                     (EnumRepr::Internal { tag }, EnumVariant::Named(obj)) => {
-                        let mut fields = vec![format!("{tag}: \"{sanitised_name}\"")];
+                        let mut fields = vec![format!("{tag}: {sanitised_name}")];
 
                         fields.extend(
                             obj.fields
@@ -313,21 +312,23 @@ fn enum_datatype(
                         format!("{{ {} }}", fields.join("; "))
                     }
                     (EnumRepr::External, EnumVariant::Unit) => {
-                        format!("\"{sanitised_name}\"")
+                        format!("{sanitised_name}")
                     }
 
                     (EnumRepr::External, v) => {
-                        let ts_values = datatype_inner(ctx, &v.data_type())?;
+                        let ts_values = datatype_inner(ctx.clone(), &v.data_type())?;
+                        let sanitised_name =
+                            sanitise_name(ctx, NamedLocation::Variant, variant_name, false)?;
 
                         format!("{{ {sanitised_name}: {ts_values} }}")
                     }
                     (EnumRepr::Adjacent { tag, .. }, EnumVariant::Unit) => {
-                        format!("{{ {tag}: \"{sanitised_name}\" }}")
+                        format!("{{ {tag}: {sanitised_name} }}")
                     }
                     (EnumRepr::Adjacent { tag, content }, v) => {
                         let ts_values = datatype_inner(ctx, &v.data_type())?;
 
-                        format!("{{ {tag}: \"{sanitised_name}\"; {content}: {ts_values} }}")
+                        format!("{{ {tag}: {sanitised_name}; {content}: {ts_values} }}")
                     }
                 })
             })
@@ -366,7 +367,7 @@ impl LiteralType {
 
 /// convert an object field into a Typescript string
 fn object_field_to_ts(ctx: ExportContext, field: &ObjectField) -> Result<String, TsExportError> {
-    let field_name_safe = sanitise_name(ctx.clone(), NamedLocation::Field, field.key)?;
+    let field_name_safe = sanitise_name(ctx.clone(), NamedLocation::Field, field.key, false)?;
 
     let (key, ty) = match field.optional {
         true => (
@@ -387,6 +388,7 @@ fn sanitise_name(
     ctx: ExportContext,
     loc: NamedLocation,
     field_name: &str,
+    force_string: bool,
 ) -> Result<String, TsExportError> {
     if let Some(name) = RESERVED_WORDS.iter().find(|v| **v == field_name) {
         return Err(TsExportError::ForbiddenName(loc, ctx.export_path(), name));
@@ -401,7 +403,7 @@ fn sanitise_name(
             .map(|first| !first.is_numeric())
             .unwrap_or(true);
 
-    Ok(if !valid {
+    Ok(if force_string || !valid {
         format!(r#""{field_name}""#)
     } else {
         field_name.to_string()

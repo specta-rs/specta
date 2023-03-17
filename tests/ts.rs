@@ -130,6 +130,8 @@ fn typescript_types() {
         "export type RenameToValueNewName = { demo_new_name: number }"
     );
 
+    assert_ts!(Rename, r#""OneWord" | "Two words""#);
+
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");
     // assert_ts_export!(DeprecatedFields, "");
@@ -325,6 +327,14 @@ const FIELD_NAME: &str = "demo_new_name";
 pub struct RenameToValue {
     #[specta(rename_from_path = FIELD_NAME)]
     pub demo: i32,
+}
+
+// Regression test for https://github.com/oscartbeaumont/specta/issues/56
+#[derive(Type, serde::Serialize)]
+enum Rename {
+    OneWord,
+    #[serde(rename = "Two words")]
+    TwoWords,
 }
 
 // #[derive(Type)]
