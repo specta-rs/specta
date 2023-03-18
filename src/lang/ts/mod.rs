@@ -75,13 +75,7 @@ fn export_datatype_inner(
     }: &NamedDataType,
 ) -> Result<String, TsExportError> {
     let ctx = ctx.with(PathItem::Type(name));
-    if let Some(name) = RESERVED_WORDS.iter().find(|v| **v == *name) {
-        return Err(TsExportError::ForbiddenName(
-            NamedLocation::Type,
-            ctx.export_path(),
-            name,
-        ));
-    }
+    let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
 
     let inline_ts = datatype_inner(
         ctx.clone(),
@@ -238,8 +232,7 @@ fn object_datatype(
                 .filter(|f| !f.flatten)
                 .map(|field| {
                     let ctx = ctx.with(PathItem::Field(field.key));
-                    let field_name_safe =
-                        sanitise_name(ctx.clone(), NamedLocation::Field, field.key, false)?;
+                    let field_name_safe = sanitise_key(field.key, false);
                     let field_ts_str = datatype_inner(ctx, &field.ty);
 
                     // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
@@ -288,8 +281,7 @@ fn enum_datatype(
             .iter()
             .map(|(variant_name, variant)| {
                 let ctx = ctx.with(PathItem::Variant(variant_name));
-                let sanitised_name =
-                    sanitise_name(ctx.clone(), NamedLocation::Variant, variant_name, true)?;
+                let sanitised_name = sanitise_key(variant_name, true);
 
                 Ok(match (repr, variant) {
                     (EnumRepr::Internal { tag }, EnumVariant::Unit) => {
@@ -317,8 +309,7 @@ fn enum_datatype(
 
                     (EnumRepr::External, v) => {
                         let ts_values = datatype_inner(ctx.clone(), &v.data_type())?;
-                        let sanitised_name =
-                            sanitise_name(ctx, NamedLocation::Variant, variant_name, false)?;
+                        let sanitised_name = sanitise_key(variant_name, false);
 
                         format!("{{ {sanitised_name}: {ts_values} }}")
                     }
@@ -367,7 +358,7 @@ impl LiteralType {
 
 /// convert an object field into a Typescript string
 fn object_field_to_ts(ctx: ExportContext, field: &ObjectField) -> Result<String, TsExportError> {
-    let field_name_safe = sanitise_name(ctx.clone(), NamedLocation::Field, field.key, false)?;
+    let field_name_safe = sanitise_key(field.key, false);
 
     let (key, ty) = match field.optional {
         true => (
@@ -384,16 +375,7 @@ fn object_field_to_ts(ctx: ExportContext, field: &ObjectField) -> Result<String,
 }
 
 /// sanitise a string to be a valid Typescript key
-fn sanitise_name(
-    ctx: ExportContext,
-    loc: NamedLocation,
-    field_name: &str,
-    force_string: bool,
-) -> Result<String, TsExportError> {
-    if let Some(name) = RESERVED_WORDS.iter().find(|v| **v == field_name) {
-        return Err(TsExportError::ForbiddenName(loc, ctx.export_path(), name));
-    }
-
+fn sanitise_key(field_name: &str, force_string: bool) -> String {
     let valid = field_name
         .chars()
         .all(|c| c.is_alphanumeric() || c == '_' || c == '$')
@@ -403,15 +385,27 @@ fn sanitise_name(
             .map(|first| !first.is_numeric())
             .unwrap_or(true);
 
-    Ok(if force_string || !valid {
+    if force_string || !valid {
         format!(r#""{field_name}""#)
     } else {
         field_name.to_string()
-    })
+    }
 }
 
-// Taken from: https://github.com/microsoft/TypeScript/issues/2536#issuecomment-87194347
-const RESERVED_WORDS: &[&str] = &[
+fn sanitise_type_name(
+    ctx: ExportContext,
+    loc: NamedLocation,
+    ident: &str,
+) -> Result<String, TsExportError> {
+    if let Some(name) = RESERVED_TYPE_NAMES.iter().find(|v| **v == ident) {
+        return Err(TsExportError::ForbiddenName(loc, ctx.export_path(), name));
+    }
+
+    Ok(ident.to_string())
+}
+
+/// Taken from: https://github.com/microsoft/TypeScript/blob/fad889283e710ee947e8412e173d2c050107a3c1/src/compiler/types.ts#L276
+const RESERVED_TYPE_NAMES: &[&str] = &[
     "break",
     "case",
     "catch",
@@ -433,7 +427,7 @@ const RESERVED_WORDS: &[&str] = &[
     "if",
     "import",
     "in",
-    "instanceof",
+    "instanceOf",
     "new",
     "null",
     "return",
@@ -443,7 +437,7 @@ const RESERVED_WORDS: &[&str] = &[
     "throw",
     "true",
     "try",
-    "typeof",
+    "typeOf",
     "var",
     "void",
     "while",
@@ -472,7 +466,54 @@ const RESERVED_WORDS: &[&str] = &[
     "type",
     "from",
     "of",
-    "namespace",
-    "async",
-    "await",
+];
+
+/// Taken from: https://github.com/microsoft/TypeScript/blob/fad889283e710ee947e8412e173d2c050107a3c1/src/compiler/types.ts#L276
+pub const RESERVED_IDENTS: &[&str] = &[
+    "break",
+    "case",
+    "catch",
+    "class",
+    "const",
+    "continue",
+    "debugger",
+    "default",
+    "delete",
+    "do",
+    "else",
+    "enum",
+    "export",
+    "extends",
+    "false",
+    "finally",
+    "for",
+    "function",
+    "if",
+    "import",
+    "in",
+    "instanceOf",
+    "new",
+    "null",
+    "return",
+    "super",
+    "switch",
+    "this",
+    "throw",
+    "true",
+    "try",
+    "typeOf",
+    "var",
+    "void",
+    "while",
+    "with",
+    "as",
+    "implements",
+    "interface",
+    "let",
+    "package",
+    "private",
+    "protected",
+    "public",
+    "static",
+    "yield",
 ];
