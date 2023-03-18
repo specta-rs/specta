@@ -329,9 +329,9 @@ const FIELD_NAME: &str = "demo_new_name";
 // This is very much an advanced API. It is not recommended to use this unless you know what your doing.
 // For personal reference: Is used in PCR to apply an inflection to the dynamic name of the include/select macro.
 #[derive(Type)]
-#[specta(export = false, rename_from_expr = { CONTAINER_NAME })]
+#[specta(export = false, rename_from_path = CONTAINER_NAME)]
 pub struct RenameToValue {
-    #[specta(rename_from_expr = { FIELD_NAME })]
+    #[specta(rename_from_path = FIELD_NAME)]
     pub demo: i32,
 }
 
