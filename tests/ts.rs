@@ -132,6 +132,9 @@ fn typescript_types() {
 
     assert_ts!(Rename, r#""OneWord" | "Two words""#);
 
+    assert_ts!(TransparentType, r#"TransparentTypeInner"#);
+    assert_ts!(TransparentType2, r#"null"#);
+
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");
     // assert_ts_export!(DeprecatedFields, "");
@@ -339,6 +342,22 @@ enum Rename {
     #[serde(rename = "Two words")]
     TwoWords,
 }
+
+#[derive(Type, serde::Serialize)]
+#[specta(export = false)]
+pub struct TransparentTypeInner {
+    inner: String,
+}
+
+#[derive(Type, serde::Serialize)]
+#[specta(export = false)]
+#[serde(transparent)]
+pub struct TransparentType(pub(crate) TransparentTypeInner);
+
+#[derive(Type, serde::Serialize)]
+#[specta(export = false)]
+#[serde(transparent)]
+pub struct TransparentType2(pub(crate) ());
 
 // #[derive(Type)]
 // #[specta(export = false)]

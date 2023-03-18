@@ -1,7 +1,7 @@
 use crate::utils::{parse_attrs, unraw_raw_ident};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::{DataStruct, Field, Fields, GenericParam, Generics};
+use syn::{spanned::Spanned, DataStruct, Field, Fields, GenericParam, Generics};
 
 use super::{attr::*, generics::construct_datatype, named_data_type_wrapper};
 
@@ -175,8 +175,45 @@ pub fn parse_struct(
         }
         Fields::Unnamed(_) => {
             if struct_attrs.transparent {
-                let ty = &data.fields.iter().next().unwrap().ty;
-                quote!(#ty)
+                if data.fields.len() != 1 {
+                    return Err(syn::Error::new(
+                        data.fields.span(),
+                        "specta: transparent structs must have exactly one field",
+                    ));
+                }
+
+                let (field, field_attrs) = decode_field_attrs(
+                    data.fields
+                        .iter()
+                        .next()
+                        .expect("Unreachable: we just checked this!"),
+                )?;
+
+                let ty = construct_datatype(
+                    format_ident!("ty"),
+                    &field.ty,
+                    &generic_idents,
+                    crate_ref,
+                    field_attrs.inline,
+                )?;
+
+                named_data_type_wrapper(
+                    crate_ref,
+                    container_attrs,
+                    name,
+                    quote! {
+                        #crate_ref::NamedDataTypeItem::Tuple(#crate_ref::TupleType {
+                            generics: vec![#(#definition_generics),*],
+                            fields: vec![
+                                {
+                                    #ty
+
+                                    ty
+                                }
+                            ]
+                        }),
+                    },
+                )
             } else {
                 let fields = data
                     .fields
