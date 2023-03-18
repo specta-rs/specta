@@ -49,15 +49,16 @@ macro_rules! fn_datatype {
 /// Returned by [`fn_datatype`].
 #[derive(Debug, Clone)]
 pub struct FunctionDataType {
-    /// Whether the command is sync/async. This will be derived from the Rust function.
+    /// Whether the function is async.
     pub asyncness: bool,
-    /// The name of the command. This will be derived from the Rust function name.
+    /// The function's name.
     pub name: &'static str,
-    /// The input arguments of the command. The Rust functions arguments are converted into an [`DataType::Object`](crate::DataType::Object).
+    /// The name and type of each of the function's arguments.
     pub args: Vec<(&'static str, DataType)>,
-    /// The result type of the command. This would be the return type of the Rust function.
+    /// The return type of the function.
     pub result: DataType,
-    pub docs: Option<&'static str>,
+    /// The function's documentation. Detects both `///` and `#[doc = ...]` style documentation.
+    pub docs: Vec<&'static str>,
 }
 
 /// Implemented by functions that can be annoatated with [`specta`](crate::specta).
@@ -68,7 +69,7 @@ pub trait SpectaFunction<TMarker> {
         name: &'static str,
         type_map: &mut TypeDefs,
         fields: &[&'static str],
-        docs: Option<&'static str>,
+        docs: Vec<&'static str>,
     ) -> Result<FunctionDataType, ExportError>;
 }
 
@@ -80,7 +81,7 @@ impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction
         name: &'static str,
         type_map: &mut TypeDefs,
         _fields: &[&'static str],
-        docs: Option<&'static str>,
+        docs: Vec<&'static str>,
     ) -> Result<FunctionDataType, ExportError> {
         TResult::to_datatype(DefOpts {
             parent_inline: false,
@@ -105,7 +106,7 @@ pub fn get_datatype_internal<TMarker, T: SpectaFunction<TMarker>>(
     name: &'static str,
     type_map: &mut TypeDefs,
     fields: &[&'static str],
-    docs: Option<&'static str>,
+    docs: Vec<&'static str>,
 ) -> Result<FunctionDataType, ExportError> {
     T::to_datatype(asyncness, name, type_map, fields, docs)
 }
@@ -124,7 +125,7 @@ macro_rules! impl_typed_command {
                     name: &'static str,
                     type_map: &mut TypeDefs,
                     fields: &[&'static str],
-                    docs: Option<&'static str>,
+                    docs: Vec<&'static str>,
                 ) -> Result<FunctionDataType, ExportError> {
                     let mut fields = fields.into_iter();
 

@@ -4,6 +4,8 @@ mod test {
 
     use specta::{functions, specta};
 
+    /// Multiline
+    /// Docs
     #[specta]
     fn a() {}
 
@@ -24,6 +26,8 @@ mod test {
     #[test]
     fn test_function_export() {
         let (functions, types) = functions::collect_types![a, b, c, d, e::<i32>].unwrap();
+
+        assert_eq!(functions[0].docs, vec![" Multiline", " Docs"]);
 
         // TODO: Asserts `functions` and `types` is correct
     }
