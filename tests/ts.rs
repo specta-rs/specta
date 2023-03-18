@@ -115,7 +115,7 @@ fn typescript_types() {
 
     assert_ts_export!(
         DocComments,
-        "/**\n *  Type level doc comment\n */\nexport type DocComments = { a: string }"
+        "/**\n * Type level doc comment\n */\nexport type DocComments = { a: string }"
     );
     assert_ts_export!(DocComments, "export type DocComments = { a: string }"; &ExportConfiguration::new().comment_style(None));
 

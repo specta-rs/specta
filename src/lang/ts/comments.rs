@@ -25,16 +25,17 @@ pub enum BigIntExportBehavior {
 }
 
 /// The signature for a function responsible for exporting Typescript comments.
-pub type CommentFormatterFn = fn(&'static [&'static str]) -> String;
+pub type CommentFormatterFn = fn(&[&str]) -> String;
 
 /// Converts Typescript comments into JSDoc comments.
-pub fn js_doc(comments: &'static [&'static str]) -> String {
+pub fn js_doc(comments: &[&str]) -> String {
     if comments.is_empty() {
         return "".to_owned();
     }
 
     let mut result = "/**\n".to_owned();
     for comment in comments {
+        let comment = comment.trim_start();
         result.push_str(&format!(" * {comment}\n"));
     }
     result.push_str(" */\n");
