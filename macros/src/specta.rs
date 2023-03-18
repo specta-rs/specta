@@ -28,6 +28,19 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
 
     let arg_signatures = function.sig.inputs.iter().map(|_| quote!(_));
 
+    let docs = function
+        .attrs
+        .iter()
+        .find(|attr| attr.path.is_ident("doc"))
+        .and_then(|attr| match attr.parse_meta() {
+            Ok(syn::Meta::NameValue(v)) => {
+                let lit = &v.lit;
+                Some(quote!(Some(#lit)))
+            }
+            _ => None,
+        })
+        .unwrap_or_else(|| quote!(None));
+
     Ok(quote! {
         #function
 
@@ -38,6 +51,7 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
             (@name) => { stringify!(#function_name) };
             (@arg_names) => { &[#(stringify!(#arg_names)),* ] };
             (@signature) => { fn(#(#arg_signatures),*) -> _ };
+            (@docs) => { #docs };
         }
 
         // allow the macro to be resolved with the same path as the function

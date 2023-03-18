@@ -57,6 +57,7 @@ pub struct FunctionDataType {
     pub args: Vec<(&'static str, DataType)>,
     /// The result type of the command. This would be the return type of the Rust function.
     pub result: DataType,
+    pub docs: Option<&'static str>,
 }
 
 /// Implemented by functions that can be annoatated with [`specta`](crate::specta).
@@ -67,6 +68,7 @@ pub trait SpectaFunction<TMarker> {
         name: &'static str,
         type_map: &mut TypeDefs,
         fields: &[&'static str],
+        docs: Option<&'static str>,
     ) -> Result<FunctionDataType, ExportError>;
 }
 
@@ -78,6 +80,7 @@ impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction
         name: &'static str,
         type_map: &mut TypeDefs,
         _fields: &[&'static str],
+        docs: Option<&'static str>,
     ) -> Result<FunctionDataType, ExportError> {
         TResult::to_datatype(DefOpts {
             parent_inline: false,
@@ -88,6 +91,7 @@ impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction
             name,
             args: vec![],
             result,
+            docs,
         })
     }
 }
@@ -101,8 +105,9 @@ pub fn get_datatype_internal<TMarker, T: SpectaFunction<TMarker>>(
     name: &'static str,
     type_map: &mut TypeDefs,
     fields: &[&'static str],
+    docs: Option<&'static str>,
 ) -> Result<FunctionDataType, ExportError> {
-    T::to_datatype(asyncness, name, type_map, fields)
+    T::to_datatype(asyncness, name, type_map, fields, docs)
 }
 
 macro_rules! impl_typed_command {
@@ -119,12 +124,14 @@ macro_rules! impl_typed_command {
                     name: &'static str,
                     type_map: &mut TypeDefs,
                     fields: &[&'static str],
+                    docs: Option<&'static str>,
                 ) -> Result<FunctionDataType, ExportError> {
                     let mut fields = fields.into_iter();
 
                     Ok(FunctionDataType {
                         asyncness,
                         name,
+                        docs,
                         args: [$(
                             fields
                                 .next()

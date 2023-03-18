@@ -34,18 +34,14 @@ pub fn proc_macro(
     last.ident = format_fn_wrapper(&last.ident.clone());
     last.arguments = PathArguments::None;
 
-    let fn_signature = quote!(#specta_fn_macro!(@signature));
-    let fn_asyncness = quote!(#specta_fn_macro!(@asyncness));
-    let fn_name = quote!(#specta_fn_macro!(@name));
-    let fn_arg_names = quote!(#specta_fn_macro!(@arg_names));
-
     Ok(quote! {
         specta::functions::get_datatype_internal(
-            #function as #fn_signature,
-            #fn_asyncness,
-            #fn_name,
+            #function as #specta_fn_macro!(@signature),
+            #specta_fn_macro!(@asyncness),
+            #specta_fn_macro!(@name),
             #type_map,
-            #fn_arg_names
+            #specta_fn_macro!(@arg_names),
+            #specta_fn_macro!(@docs)
         )
     })
 }
