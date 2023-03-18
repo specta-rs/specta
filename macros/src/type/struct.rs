@@ -189,9 +189,11 @@ pub fn parse_struct(
                         .expect("Unreachable: we just checked this!"),
                 )?;
 
+                let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
+
                 let ty = construct_datatype(
                     format_ident!("ty"),
-                    &field.ty,
+                    &field_ty,
                     &generic_idents,
                     crate_ref,
                     field_attrs.inline,

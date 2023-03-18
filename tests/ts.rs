@@ -134,6 +134,7 @@ fn typescript_types() {
 
     assert_ts!(TransparentType, r#"TransparentTypeInner"#);
     assert_ts!(TransparentType2, r#"null"#);
+    assert_ts!(TransparentTypeWithOverride, r#"string"#);
 
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");
@@ -358,6 +359,14 @@ pub struct TransparentType(pub(crate) TransparentTypeInner);
 #[specta(export = false)]
 #[serde(transparent)]
 pub struct TransparentType2(pub(crate) ());
+
+#[derive(serde::Serialize)]
+pub struct NonTypeType;
+
+#[derive(Type, serde::Serialize)]
+#[specta(export = false)]
+#[serde(transparent)]
+pub struct TransparentTypeWithOverride(#[specta(type = String)] NonTypeType);
 
 // #[derive(Type)]
 // #[specta(export = false)]
