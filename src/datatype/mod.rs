@@ -152,3 +152,9 @@ impl From<String> for DataType {
         LiteralType::String(t).into()
     }
 }
+
+impl From<Cow<'static, str>> for DataType {
+    fn from(t: Cow<'static, str>) -> Self {
+        LiteralType::String(t.to_string()).into()
+    }
+}
