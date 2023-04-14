@@ -196,7 +196,7 @@ impl_typed_command!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
 /// ````
 #[macro_export]
 macro_rules! collect_types {
-    (type_map: $type_map:ident, $($command:path),*) => {{
+    (type_map: $type_map:ident, $($command:path),* $(,)?) => {{
         let mut type_map: $crate::TypeDefs = $type_map;
 
         {
@@ -212,7 +212,7 @@ macro_rules! collect_types {
             export(type_map)
         }
     }};
-    ($($command:path),*) => {{
+    ($($command:path),* $(,)?) => {{
         let mut type_map = $crate::TypeDefs::default();
         $crate::functions::collect_types!(type_map: type_map, $($command),*)
     }};

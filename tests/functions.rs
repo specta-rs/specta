@@ -24,6 +24,12 @@ mod test {
     fn e<T: fmt::Debug>(window: T) {}
 
     #[test]
+    fn test_trailing_comma() {
+        functions::collect_types![a, b, c].unwrap();
+        functions::collect_types![a, b, c,].unwrap();
+    }
+
+    #[test]
     fn test_function_export() {
         let (functions, types) = functions::collect_types![a, b, c, d, e::<i32>].unwrap();
 
