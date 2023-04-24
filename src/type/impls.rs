@@ -159,6 +159,36 @@ impl<T: Type> Type for Option<T> {
     }
 }
 
+impl<T: Type> Type for std::ops::Range<T> {
+    fn inline(opts: DefOpts, _generics: &[DataType]) -> Result<DataType, ExportError> {
+        let ty = T::definition(opts)?;
+        Ok(DataType::Object(ObjectType {
+            generics: vec![],
+            fields: vec![
+                ObjectField {
+                    key: "start",
+                    optional: false,
+                    flatten: false,
+                    ty: ty.clone(),
+                },
+                ObjectField {
+                    key: "end",
+                    optional: false,
+                    flatten: false,
+                    ty,
+                },
+            ],
+            tag: None,
+        }))
+    }
+}
+
+impl<T: Type> Type for std::ops::RangeInclusive<T> {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+        std::ops::Range::<T>::inline(opts, generics) // Yeah Serde are cringe
+    }
+}
+
 impl_for_map!(HashMap<K, V> as "HashMap");
 impl_for_map!(BTreeMap<K, V> as "BTreeMap");
 impl<K: Type, V: Type> Flatten for std::collections::HashMap<K, V> {}

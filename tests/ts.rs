@@ -13,6 +13,15 @@ macro_rules! assert_ts {
     ($t:ty, $e:expr) => {
         assert_eq!(specta::ts::inline::<$t>(&Default::default()), Ok($e.into()))
     };
+
+    (() => $expr:expr, $e:expr) => {
+        let _: () = {
+            fn assert_ty_eq<T: Type>(_t: T) {
+                assert_eq!(specta::ts::inline::<T>(&Default::default()), Ok($e.into()));
+            }
+            assert_ty_eq($expr);
+        };
+    };
 }
 pub(crate) use assert_ts;
 
@@ -135,6 +144,14 @@ fn typescript_types() {
     assert_ts!(TransparentType, r#"TransparentTypeInner"#);
     assert_ts!(TransparentType2, r#"null"#);
     assert_ts!(TransparentTypeWithOverride, r#"string"#);
+
+    // I love serde but this is so mega cringe. Lack of support and the fact that `0..5` == `0..=5` is so dumb.
+    assert_ts!(() => 0..5, r#"{ start: number; end: number }"#);
+    // assert_ts!(() => 0.., r#"{ start: 0 }"#);
+    // assert_ts!(() => .., r#""#);
+    assert_ts!(() => 0..=5, r#"{ start: number; end: number }"#);
+    // assert_ts!(() => ..5, r#"{ end: 5 }"#);
+    // assert_ts!(() => ..=5, r#"{ end: 5 }"#);
 
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");
