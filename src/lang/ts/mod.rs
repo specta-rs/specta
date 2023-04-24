@@ -161,7 +161,14 @@ fn datatype_inner(ctx: ExportContext, typ: &DataType) -> Result<String, TsExport
             )
         }
         // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
-        DataType::List(def) => format!("{}[]", datatype_inner(ctx, def)?),
+        DataType::List(def) => {
+            let dt = datatype_inner(ctx, def)?;
+            if dt.contains(' ') {
+                format!("({dt})[]")
+            } else {
+                format!("{dt}[]")
+            }
+        }
         DataType::Named(NamedDataType {
             name,
             item: NamedDataTypeItem::Tuple(TupleType { fields, .. }),

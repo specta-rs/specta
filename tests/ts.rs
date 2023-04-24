@@ -153,6 +153,9 @@ fn typescript_types() {
     // assert_ts!(() => ..5, r#"{ end: 5 }"#);
     // assert_ts!(() => ..=5, r#"{ end: 5 }"#);
 
+    // https://github.com/oscartbeaumont/specta/issues/66
+    assert_ts!([Option<u8>; 16], r#"(number | null)[]"#);
+
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");
     // assert_ts_export!(DeprecatedFields, "");
