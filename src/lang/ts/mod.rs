@@ -151,7 +151,15 @@ fn datatype_inner(ctx: ExportContext, typ: &DataType) -> Result<String, TsExport
             }
         }
         DataType::Literal(literal) => literal.to_ts(),
-        DataType::Nullable(def) => format!("{} | null", datatype_inner(ctx, def)?),
+        DataType::Nullable(def) => {
+            let dt = datatype_inner(ctx, def)?;
+
+            if dt.ends_with(" | null") {
+                dt
+            } else {
+                format!("{dt} | null",)
+            }
+        }
         DataType::Record(def) => {
             let divider = match &def.0 {
                 DataType::Enum(_) => " in",

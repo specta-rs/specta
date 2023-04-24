@@ -160,6 +160,9 @@ fn typescript_types() {
     // https://github.com/oscartbeaumont/specta/issues/65
     assert_ts!(HashMap<BasicEnum, ()>, r#"{ [key in "A" | "B"]: null }"#);
 
+    // https://github.com/oscartbeaumont/specta/issues/60
+    assert_ts!(Option<Option<Option<Option<i32>>>>, r#"number | null"#);
+
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");
     // assert_ts_export!(DeprecatedFields, "");
