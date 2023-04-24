@@ -2,6 +2,7 @@
 
 use std::{
     cell::RefCell,
+    collections::HashMap,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
     path::PathBuf,
 };
@@ -155,6 +156,9 @@ fn typescript_types() {
 
     // https://github.com/oscartbeaumont/specta/issues/66
     assert_ts!([Option<u8>; 16], r#"(number | null)[]"#);
+
+    // https://github.com/oscartbeaumont/specta/issues/65
+    assert_ts!(HashMap<BasicEnum, ()>, r#"{ [key in "A" | "B"]: null }"#);
 
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");
@@ -387,6 +391,13 @@ pub struct NonTypeType;
 #[specta(export = false)]
 #[serde(transparent)]
 pub struct TransparentTypeWithOverride(#[specta(type = String)] NonTypeType);
+
+#[derive(Type, serde::Serialize)]
+#[specta(export = false)]
+pub enum BasicEnum {
+    A,
+    B,
+}
 
 // #[derive(Type)]
 // #[specta(export = false)]

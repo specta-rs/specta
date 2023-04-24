@@ -153,9 +153,18 @@ fn datatype_inner(ctx: ExportContext, typ: &DataType) -> Result<String, TsExport
         DataType::Literal(literal) => literal.to_ts(),
         DataType::Nullable(def) => format!("{} | null", datatype_inner(ctx, def)?),
         DataType::Record(def) => {
+            let divider = match &def.0 {
+                DataType::Enum(_) => " in",
+                DataType::Named(dt) => match dt.item {
+                    NamedDataTypeItem::Enum(_) => " in",
+                    _ => ":",
+                },
+                _ => ":",
+            };
+
             format!(
                 // We use this isn't of `Record<K, V>` to avoid issues with circular references.
-                "{{ [key: {}]: {} }}",
+                "{{ [key{divider} {}]: {} }}",
                 datatype_inner(ctx.clone(), &def.0)?,
                 datatype_inner(ctx, &def.1)?
             )
