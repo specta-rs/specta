@@ -18,6 +18,6 @@ struct Optional {
 fn test() {
     assert_ts!(
         Optional,
-        "{ a: number | null; b?: number | null; c?: string | null; d?: true }"
+        "{ a: number | null; b?: number | null; c?: string | null; d?: boolean }"
     );
 }
