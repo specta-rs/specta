@@ -368,13 +368,7 @@ fn object_field_to_ts(ctx: ExportContext, field: &ObjectField) -> Result<String,
 
     // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
     let (key, ty) = match field.optional {
-        true => (
-            format!("{field_name_safe}?"),
-            match &field.ty {
-                DataType::Nullable(ty) => ty,
-                ty => ty,
-            },
-        ),
+        true => (format!("{field_name_safe}?"), &field.ty),
         false => (field_name_safe, &field.ty),
     };
 
