@@ -56,7 +56,7 @@ pub struct FunctionDataType {
     /// The name and type of each of the function's arguments.
     pub args: Vec<(&'static str, DataType)>,
     /// The return type of the function.
-    pub result: DataType,
+    pub result: SpectaFunctionResultVariant,
     /// The function's documentation. Detects both `///` and `#[doc = ...]` style documentation.
     pub docs: Vec<&'static str>,
 }
