@@ -40,6 +40,7 @@ impl_parse! {
         "skip_deserializing" => out.skip = true,
         "skip_serializing_if" => out.optional = attr.parse_string()? == *"Option::is_none",
         "optional" => out.optional = attr.parse_bool().unwrap_or(true),
+        "default" => out.optional = attr.parse_bool().unwrap_or(true),
         "flatten" => out.flatten = attr.parse_bool().unwrap_or(true)
     }
 }

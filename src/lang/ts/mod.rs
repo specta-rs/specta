@@ -254,25 +254,7 @@ fn object_datatype(
             let mut unflattened_fields = fields
                 .iter()
                 .filter(|f| !f.flatten)
-                .map(|field| {
-                    let ctx = ctx.with(PathItem::Field(field.key));
-                    let field_name_safe = sanitise_key(field.key, false);
-                    let field_ts_str = datatype_inner(ctx, &field.ty);
-
-                    // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
-                    let (key, result) = match field.optional {
-                        true => (
-                            format!("{field_name_safe}?"),
-                            match &field.ty {
-                                DataType::Nullable(_) => field_ts_str,
-                                _ => field_ts_str.map(|v| format!("{v} | null")),
-                            },
-                        ),
-                        false => (field_name_safe, field_ts_str),
-                    };
-
-                    result.map(|v| format!("{key}: {v}"))
-                })
+                .map(|f| object_field_to_ts(ctx.with(PathItem::Field(f.key)), f))
                 .collect::<Result<Vec<_>, _>>()?;
 
             if let Some(tag) = tag {
@@ -384,14 +366,9 @@ impl LiteralType {
 fn object_field_to_ts(ctx: ExportContext, field: &ObjectField) -> Result<String, TsExportError> {
     let field_name_safe = sanitise_key(field.key, false);
 
+    // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
     let (key, ty) = match field.optional {
-        true => (
-            format!("{field_name_safe}?"),
-            match &field.ty {
-                DataType::Nullable(ty) => ty,
-                ty => ty,
-            },
-        ),
+        true => (format!("{field_name_safe}?"), &field.ty),
         false => (field_name_safe, &field.ty),
     };
 
