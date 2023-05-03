@@ -38,39 +38,24 @@ pub fn ts_with_cfg(path: &str, conf: &ExportConfiguration) -> Result<(), TsExpor
         })
         .collect::<BTreeMap<_, _>>();
 
-    // This is a clone of `detect_duplicate_type_names` but using a `BTreeMap` for deterministic ordering
-    let mut map = BTreeMap::new();
-    for (sid, dt) in &types {
-        match dt {
-            Some(dt) => {
-                if let Some((existing_sid, existing_impl_location)) =
-                    map.insert(dt.name, (sid, dt.impl_location))
-                {
-                    if existing_sid != sid {
-                        return Err(TsExportError::DuplicateTypeName(
-                            dt.name,
-                            dt.impl_location,
-                            existing_impl_location,
-                        ));
-                    }
-                }
-            }
-            None => unreachable!(),
-        }
-    }
-
-    // Print types using println
-    println!("Types: {:#?}", types);
-
-    // // Set the module_path field for all ObjectType objects
-    // for (_, typ) in types.iter_mut() {
-    //     if let Some(named_data_type) = typ {
-    //         if let Some(module_path) = named_data_type.module_path {
-    //             println!("Module path: {:#?}", module_path);
-    //             if let NamedDataTypeItem::Object(ref mut object_type) = named_data_type.item {
-    //                 object_type.module_path = Some(module_path);
+    // // This is a clone of `detect_duplicate_type_names` but using a `BTreeMap` for deterministic ordering
+    // let mut map = BTreeMap::new();
+    // for (sid, dt) in &types {
+    //     match dt {
+    //         Some(dt) => {
+    //             if let Some((existing_sid, existing_impl_location)) =
+    //                 map.insert(dt.name, (sid, dt.impl_location))
+    //             {
+    //                 if existing_sid != sid {
+    //                     return Err(TsExportError::DuplicateTypeName(
+    //                         dt.name,
+    //                         dt.impl_location,
+    //                         existing_impl_location,
+    //                     ));
+    //                 }
     //             }
     //         }
+    //         None => unreachable!(),
     //     }
     // }
 

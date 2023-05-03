@@ -23,9 +23,9 @@ pub fn export<T: NamedType>(conf: &ExportConfiguration) -> Result<String, TsExpo
         })?,
     );
 
-    if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_name).into_iter().next() {
-        return Err(TsExportError::DuplicateTypeName(ty_name, l0, l1));
-    }
+    // if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_name).into_iter().next() {
+    //     return Err(TsExportError::DuplicateTypeName(ty_name, l0, l1));
+    // }
 
     result
 }
@@ -46,9 +46,9 @@ pub fn inline<T: Type>(conf: &ExportConfiguration) -> Result<String, TsExportErr
         )?,
     );
 
-    if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_name).into_iter().next() {
-        return Err(TsExportError::DuplicateTypeName(ty_name, l0, l1));
-    }
+    // if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_name).into_iter().next() {
+    //     return Err(TsExportError::DuplicateTypeName(ty_name, l0, l1));
+    // }
 
     result
 }
@@ -84,14 +84,8 @@ fn export_datatype_inner(
     module_path.push('_');
     module_path.push_str(name);
 
-    println!("NamedDataType: {:?} -> {:?}", name, module_path);
-
-    // let name = path_name.as_str();
-
     let ctx = ctx.with(PathItem::Type(name));
     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, &module_path)?;
-
-    println!("Item: {:#?}", item);
 
     let inline_ts = datatype_inner(
         ctx.clone(),
@@ -101,8 +95,6 @@ fn export_datatype_inner(
             NamedDataTypeItem::Enum(enum_) => DataType::Enum(enum_.clone()),
         },
     )?;
-
-    println!("Result: {:?}", inline_ts);
 
     let generics = match item {
         // Named struct
@@ -133,13 +125,9 @@ fn export_datatype_inner(
         .map(|v| v(comments))
         .unwrap_or_default();
 
-    println!("Name: {:?}", name);
-
-    let final_result = format!("{comments}export type {name}{generics} = {inline_ts}");
-
-    println!("final_result: {:?}", final_result);
-
-    Ok(final_result)
+    Ok(format!(
+        "{comments}export type {name}{generics} = {inline_ts}"
+    ))
 }
 
 /// Convert a DataType to a TypeScript string
@@ -253,8 +241,6 @@ fn datatype_inner(ctx: ExportContext, typ: &DataType) -> Result<String, TsExport
         DataType::Generic(GenericType(ident)) => ident.to_string(),
     };
 
-    println!("Result: {:?}", result);
-
     Ok(result)
 }
 
@@ -282,25 +268,6 @@ fn object_datatype(
         ..
     }: &ObjectType,
 ) -> Result<String, TsExportError> {
-    println!("name: {:?}\nmodule_path: {:?}", name, module_path);
-
-    // let mut new_name: Option<String> = None;
-
-    // if let Some(n) = name.as_ref() {
-    //     println!("Name exists");
-    //     if let Some(path) = module_path {
-    //         println!("Setting out string {} {}", n, path);
-    //         let mut out_string = path.to_string();
-    //         out_string.push_str(n);
-
-    //         new_name = Some(out_string);
-    //     }
-    // }
-
-    // let name = new_name;
-
-    // println!("New name: {:?}", name);
-
     match &fields[..] {
         [] => Ok("null".to_string()),
         fields => {

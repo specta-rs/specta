@@ -22,8 +22,6 @@ pub fn derive(
     input: proc_macro::TokenStream,
     default_crate_name: String,
 ) -> syn::Result<proc_macro::TokenStream> {
-    println!("input: {:#?}", input.clone());
-
     let DeriveInput {
         ident,
         generics,
@@ -31,9 +29,6 @@ pub fn derive(
         attrs,
         ..
     } = &parse_macro_input::parse::<DeriveInput>(input)?;
-
-    // Print ident, generics, data, attrs
-    println!("ident: {:#?}", ident);
 
     // We pass all the attributes at the start and when decoding them pop them off the list.
     // This means at the end we can check for any that weren't consumed and throw an error.
