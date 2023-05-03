@@ -59,6 +59,21 @@ pub fn ts_with_cfg(path: &str, conf: &ExportConfiguration) -> Result<(), TsExpor
         }
     }
 
+    // Print types using println
+    println!("Types: {:#?}", types);
+
+    // // Set the module_path field for all ObjectType objects
+    // for (_, typ) in types.iter_mut() {
+    //     if let Some(named_data_type) = typ {
+    //         if let Some(module_path) = named_data_type.module_path {
+    //             println!("Module path: {:#?}", module_path);
+    //             if let NamedDataTypeItem::Object(ref mut object_type) = named_data_type.item {
+    //                 object_type.module_path = Some(module_path);
+    //             }
+    //         }
+    //     }
+    // }
+
     for (_, typ) in types {
         out += &ts::export_datatype(
             conf,

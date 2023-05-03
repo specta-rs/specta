@@ -71,11 +71,27 @@ fn export_datatype_inner(
         name,
         comments,
         item,
+        module_path,
         ..
     }: &NamedDataType,
 ) -> Result<String, TsExportError> {
+    // let out_temp: Vec<String> = module_path.iter().map(|m| m.to_string()).collect();
+    // let mut out = out_temp.join("_");
+    // out.push_str(name);
+
+    let module_path = String::from(module_path.unwrap_or(""));
+    let mut module_path = module_path.replace("::", "_");
+    module_path.push('_');
+    module_path.push_str(name);
+
+    println!("NamedDataType: {:?} -> {:?}", name, module_path);
+
+    // let name = path_name.as_str();
+
     let ctx = ctx.with(PathItem::Type(name));
-    let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
+    let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, &module_path)?;
+
+    println!("Item: {:#?}", item);
 
     let inline_ts = datatype_inner(
         ctx.clone(),
@@ -85,6 +101,8 @@ fn export_datatype_inner(
             NamedDataTypeItem::Enum(enum_) => DataType::Enum(enum_.clone()),
         },
     )?;
+
+    println!("Result: {:?}", inline_ts);
 
     let generics = match item {
         // Named struct
@@ -114,9 +132,14 @@ fn export_datatype_inner(
         .comment_exporter
         .map(|v| v(comments))
         .unwrap_or_default();
-    Ok(format!(
-        "{comments}export type {name}{generics} = {inline_ts}"
-    ))
+
+    println!("Name: {:?}", name);
+
+    let final_result = format!("{comments}export type {name}{generics} = {inline_ts}");
+
+    println!("final_result: {:?}", final_result);
+
+    Ok(final_result)
 }
 
 /// Convert a DataType to a TypeScript string
@@ -129,7 +152,7 @@ pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, Ts
 }
 
 fn datatype_inner(ctx: ExportContext, typ: &DataType) -> Result<String, TsExportError> {
-    Ok(match &typ {
+    let result = match &typ {
         DataType::Any => "any".into(),
         DataType::Primitive(p) => {
             let ctx = ctx.with(PathItem::Type(p.to_rust_str()));
@@ -204,8 +227,19 @@ fn datatype_inner(ctx: ExportContext, typ: &DataType) -> Result<String, TsExport
             ..
         }) => enum_datatype(ctx.with(PathItem::Type(name)), Some(name), item)?,
         DataType::Enum(item) => enum_datatype(ctx, None, item)?,
-        DataType::Reference(DataTypeReference { name, generics, .. }) => match &generics[..] {
-            [] => name.to_string(),
+        DataType::Reference(DataTypeReference {
+            name,
+            generics,
+            module_path,
+            ..
+        }) => match &generics[..] {
+            [] => {
+                let mut out_string = module_path.to_string();
+                out_string = out_string.replace("::", "_");
+                out_string.push('_');
+                out_string.push_str(name);
+                out_string
+            }
             generics => {
                 let generics = generics
                     .iter()
@@ -217,7 +251,11 @@ fn datatype_inner(ctx: ExportContext, typ: &DataType) -> Result<String, TsExport
             }
         },
         DataType::Generic(GenericType(ident)) => ident.to_string(),
-    })
+    };
+
+    println!("Result: {:?}", result);
+
+    Ok(result)
 }
 
 fn tuple_datatype(ctx: ExportContext, fields: &[DataType]) -> Result<String, TsExportError> {
@@ -237,8 +275,32 @@ fn tuple_datatype(ctx: ExportContext, fields: &[DataType]) -> Result<String, TsE
 fn object_datatype(
     ctx: ExportContext,
     name: Option<&'static str>,
-    ObjectType { fields, tag, .. }: &ObjectType,
+    ObjectType {
+        fields,
+        tag,
+        module_path,
+        ..
+    }: &ObjectType,
 ) -> Result<String, TsExportError> {
+    println!("name: {:?}\nmodule_path: {:?}", name, module_path);
+
+    // let mut new_name: Option<String> = None;
+
+    // if let Some(n) = name.as_ref() {
+    //     println!("Name exists");
+    //     if let Some(path) = module_path {
+    //         println!("Setting out string {} {}", n, path);
+    //         let mut out_string = path.to_string();
+    //         out_string.push_str(n);
+
+    //         new_name = Some(out_string);
+    //     }
+    // }
+
+    // let name = new_name;
+
+    // println!("New name: {:?}", name);
+
     match &fields[..] {
         [] => Ok("null".to_string()),
         fields => {
@@ -275,9 +337,14 @@ fn object_datatype(
                 })
                 .collect::<Result<Vec<_>, _>>()?;
 
+            let module_string = match module_path {
+                Some(path) => path.to_string(),
+                None => String::new(),
+            };
+
             if let Some(tag) = tag {
                 unflattened_fields.push(format!(
-                    "{tag}: \"{}\"",
+                    "{module_string}{tag}: \"{}\"",
                     name.ok_or_else(|| TsExportError::UnableToTagUnnamedType(ctx.export_path()))?
                 ));
             }

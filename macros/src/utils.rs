@@ -224,6 +224,7 @@ macro_rules! impl_parse {
 }
 
 pub fn unraw_raw_ident(ident: &Ident) -> String {
+    println!("unraw_raw_ident: {}", ident.to_string());
     let ident = ident.to_string();
     if ident.starts_with("r#") {
         ident.trim_start_matches("r#").to_owned()
