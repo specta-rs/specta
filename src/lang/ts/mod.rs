@@ -226,24 +226,25 @@ fn datatype_inner(ctx: ExportContext, typ: &DataType) -> Result<String, TsExport
             generics,
             module_path,
             ..
-        }) => match &generics[..] {
-            [] => {
-                let mut out_string = module_path.to_string();
-                out_string = out_string.replace("::", "_");
-                out_string.push('_');
-                out_string.push_str(name);
-                out_string
-            }
-            generics => {
-                let generics = generics
-                    .iter()
-                    .map(|v| datatype_inner(ctx.with(PathItem::Type(name)), v))
-                    .collect::<Result<Vec<_>, _>>()?
-                    .join(", ");
+        }) => {
+            let mut updated_name = module_path.to_string();
+            updated_name = updated_name.replace("::", "_");
+            updated_name.push('_');
+            updated_name.push_str(name);
 
-                format!("{name}<{generics}>")
+            match &generics[..] {
+                [] => updated_name,
+                generics => {
+                    let generics = generics
+                        .iter()
+                        .map(|v| datatype_inner(ctx.with(PathItem::Type(name)), v))
+                        .collect::<Result<Vec<_>, _>>()?
+                        .join(", ");
+
+                    format!("{updated_name}<{generics}>")
+                }
             }
-        },
+        }
         DataType::Generic(GenericType(ident)) => ident.to_string(),
     };
 
