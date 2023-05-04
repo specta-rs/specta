@@ -23,9 +23,12 @@ pub fn export<T: NamedType>(conf: &ExportConfiguration) -> Result<String, TsExpo
         })?,
     );
 
-    // if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_name).into_iter().next() {
-    //     return Err(TsExportError::DuplicateTypeName(ty_name, l0, l1));
-    // }
+    if conf.modules == ModuleExportBehavior::Disabled {
+        if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_name).into_iter().next()
+        {
+            return Err(TsExportError::DuplicateTypeName(ty_name, l0, l1));
+        }
+    }
 
     result
 }
@@ -46,9 +49,12 @@ pub fn inline<T: Type>(conf: &ExportConfiguration) -> Result<String, TsExportErr
         )?,
     );
 
-    // if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_name).into_iter().next() {
-    //     return Err(TsExportError::DuplicateTypeName(ty_name, l0, l1));
-    // }
+    if conf.modules == ModuleExportBehavior::Disabled {
+        if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_name).into_iter().next()
+        {
+            return Err(TsExportError::DuplicateTypeName(ty_name, l0, l1));
+        }
+    }
 
     result
 }

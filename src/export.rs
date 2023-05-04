@@ -1,4 +1,4 @@
-use crate::ts::{ExportConfiguration, TsExportError};
+use crate::ts::{ExportConfiguration, ModuleExportBehavior, TsExportError};
 use crate::*;
 use once_cell::sync::Lazy;
 use std::collections::{BTreeMap, BTreeSet};
@@ -38,26 +38,26 @@ pub fn ts_with_cfg(path: &str, conf: &ExportConfiguration) -> Result<(), TsExpor
         })
         .collect::<BTreeMap<_, _>>();
 
-    // // This is a clone of `detect_duplicate_type_names` but using a `BTreeMap` for deterministic ordering
-    // let mut map = BTreeMap::new();
-    // for (sid, dt) in &types {
-    //     match dt {
-    //         Some(dt) => {
-    //             if let Some((existing_sid, existing_impl_location)) =
-    //                 map.insert(dt.name, (sid, dt.impl_location))
-    //             {
-    //                 if existing_sid != sid {
-    //                     return Err(TsExportError::DuplicateTypeName(
-    //                         dt.name,
-    //                         dt.impl_location,
-    //                         existing_impl_location,
-    //                     ));
-    //                 }
-    //             }
-    //         }
-    //         None => unreachable!(),
-    //     }
-    // }
+    // This is a clone of `detect_duplicate_type_names` but using a `BTreeMap` for deterministic ordering
+    let mut map = BTreeMap::new();
+    for (sid, dt) in &types {
+        match dt {
+            Some(dt) => {
+                if let Some((existing_sid, existing_impl_location)) =
+                    map.insert(dt.name, (sid, dt.impl_location))
+                {
+                    if existing_sid != sid && conf.modules == ModuleExportBehavior::Disabled {
+                        return Err(TsExportError::DuplicateTypeName(
+                            dt.name,
+                            dt.impl_location,
+                            existing_impl_location,
+                        ));
+                    }
+                }
+            }
+            None => unreachable!(),
+        }
+    }
 
     for (_, typ) in types {
         out += &ts::export_datatype(
