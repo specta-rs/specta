@@ -25,6 +25,12 @@ impl ExportConfiguration {
         self
     }
 
+    /// Configure the module handling behavior
+    pub fn modules(mut self, modules: ModuleExportBehavior) -> Self {
+        self.modules = modules;
+        self
+    }
+
     /// Configure a function which is responsible for styling the comments to be exported
     pub fn comment_style(mut self, exporter: Option<CommentFormatterFn>) -> Self {
         self.comment_exporter = exporter;
