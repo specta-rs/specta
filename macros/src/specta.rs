@@ -1,7 +1,7 @@
 // inspired by https://github.com/tauri-apps/tauri/blob/2901145c497299f033ba7120af5f2e7ead16c75a/core/tauri-macros/src/command/handler.rs
 
 use quote::quote;
-use syn::{parse_macro_input, FnArg, ItemFn, Visibility};
+use syn::{parse_macro_input, FnArg, ItemFn, Pat, Visibility};
 
 use crate::utils::format_fn_wrapper;
 
@@ -23,7 +23,20 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
 
     let arg_names = function.sig.inputs.iter().map(|input| match input {
         FnArg::Receiver(_) => unreachable!("Commands cannot take 'self'"),
-        FnArg::Typed(arg) => &arg.pat,
+        FnArg::Typed(arg) => {
+            match &*arg.pat {
+                Pat::Ident(ident) => &ident.ident,
+                // TODO: Adding support for these
+                // Pat::Macro(m) => &m.mac.path.segments[0].ident,
+                // Pat::Struct(s) => {
+                //     s.
+                // }
+                // Pat::Slice()
+                // Pat::Tuple(t) => {},
+                // Pat::TupleStruct(t) => &t.path.segments[0].ident,
+                _ => unreachable!("Commands must take named arguments"),
+            }
+        }
     });
 
     let arg_signatures = function.sig.inputs.iter().map(|_| quote!(_));
