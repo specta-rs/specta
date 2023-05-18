@@ -71,13 +71,6 @@ impl_as!(
     SocketAddrV6 as String
 );
 
-use std::time::*;
-impl_as!(
-    SystemTime as String
-    Instant as String
-    Duration as String
-);
-
 use std::sync::atomic::*;
 impl_as!(
     AtomicBool as bool
@@ -193,6 +186,56 @@ impl_for_map!(HashMap<K, V> as "HashMap");
 impl_for_map!(BTreeMap<K, V> as "BTreeMap");
 impl<K: Type, V: Type> Flatten for std::collections::HashMap<K, V> {}
 impl<K: Type, V: Type> Flatten for std::collections::BTreeMap<K, V> {}
+
+use std::time::*;
+
+impl Type for SystemTime {
+    fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
+        Ok(DataType::Object(ObjectType {
+            generics: vec![],
+            fields: vec![
+                ObjectField {
+                    key: "duration_since_epoch",
+                    optional: false,
+                    flatten: false,
+                    // TODO: As far as serde is concerned this is a `u64`, We are lying so the exporter doesn't error about bigints.
+                    ty: DataType::Primitive(PrimitiveType::u32),
+                },
+                ObjectField {
+                    key: "duration_since_unix_epoch",
+                    optional: false,
+                    flatten: false,
+                    ty: DataType::Primitive(PrimitiveType::u32),
+                },
+            ],
+            tag: None,
+        }))
+    }
+}
+
+impl Type for Duration {
+    fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
+        Ok(DataType::Object(ObjectType {
+            generics: vec![],
+            fields: vec![
+                ObjectField {
+                    key: "secs",
+                    optional: false,
+                    flatten: false,
+                    // TODO: As far as serde is concerned this is a `u64`, We are lying so the exporter doesn't error about bigints.
+                    ty: DataType::Primitive(PrimitiveType::u32),
+                },
+                ObjectField {
+                    key: "nanos",
+                    optional: false,
+                    flatten: false,
+                    ty: DataType::Primitive(PrimitiveType::u32),
+                },
+            ],
+            tag: None,
+        }))
+    }
+}
 
 #[cfg(feature = "indexmap")]
 const _: () = {

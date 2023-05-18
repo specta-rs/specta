@@ -166,6 +166,13 @@ fn typescript_types() {
     // https://github.com/oscartbeaumont/specta/issues/71
     assert_ts!(Vec<DocComments>, r#"{ a: string }[]"#);
 
+    // https://github.com/oscartbeaumont/specta/issues/77
+    assert_ts!(
+        std::time::SystemTime,
+        r#"{ duration_since_epoch: number; duration_since_unix_epoch: number }"#
+    );
+    assert_ts!(std::time::Duration, r#"{ secs: number; nanos: number }"#);
+
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");
     // assert_ts_export!(DeprecatedFields, "");
