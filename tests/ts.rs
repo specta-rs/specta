@@ -163,6 +163,9 @@ fn typescript_types() {
     // https://github.com/oscartbeaumont/specta/issues/60
     assert_ts!(Option<Option<Option<Option<i32>>>>, r#"number | null"#);
 
+    // https://github.com/oscartbeaumont/specta/issues/71
+    assert_ts!(Vec<DocComments>, r#"{ a: string }[]"#);
+
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");
     // assert_ts_export!(DeprecatedFields, "");

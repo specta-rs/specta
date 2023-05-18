@@ -180,7 +180,7 @@ fn datatype_inner(ctx: ExportContext, typ: &DataType) -> Result<String, TsExport
         // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
         DataType::List(def) => {
             let dt = datatype_inner(ctx, def)?;
-            if dt.contains(' ') {
+            if dt.contains(' ') && !dt.ends_with("}") {
                 format!("({dt})[]")
             } else {
                 format!("{dt}[]")
