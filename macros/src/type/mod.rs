@@ -106,7 +106,7 @@ pub fn derive(
 
     let type_impl_heading = impl_heading(quote!(#crate_name::Type), &ident, generics);
 
-    let export = cfg!(feature = "export").then(|| {
+    let export = (cfg!(feature = "export") && container_attrs.export.unwrap_or(true)).then(|| {
         let export_fn_name = format_ident!("__push_specta_type_{}", ident);
 
         let generic_params = generics
@@ -196,7 +196,7 @@ pub fn named_data_type_wrapper(
             sid: Some(SID),
             impl_location: Some(IMPL_LOCATION),
             comments: #comments,
-            export: #should_export,
+            export: None,
             deprecated: #deprecated,
             item: #t
         }

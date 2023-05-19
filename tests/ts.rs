@@ -8,7 +8,10 @@ use std::{
 };
 
 use serde::Serialize;
-use specta::{ts::ExportConfiguration, Type};
+use specta::{
+    ts::{BigIntExportBehavior, ExportConfiguration},
+    Type,
+};
 
 macro_rules! assert_ts {
     ($t:ty, $e:expr) => {
@@ -167,11 +170,31 @@ fn typescript_types() {
     assert_ts!(Vec<DocComments>, r#"{ a: string }[]"#);
 
     // https://github.com/oscartbeaumont/specta/issues/77
-    assert_ts!(
-        std::time::SystemTime,
-        r#"{ duration_since_epoch: number; duration_since_unix_epoch: number }"#
+    assert_eq!(
+        specta::ts::inline::<std::time::SystemTime>(
+            &ExportConfiguration::new().bigint(BigIntExportBehavior::Number)
+        ),
+        Ok(r#"{ duration_since_epoch: number; duration_since_unix_epoch: number }"#.into())
     );
-    assert_ts!(std::time::Duration, r#"{ secs: number; nanos: number }"#);
+    assert_eq!(
+        specta::ts::inline::<std::time::SystemTime>(
+            &ExportConfiguration::new().bigint(BigIntExportBehavior::String)
+        ),
+        Ok(r#"{ duration_since_epoch: string; duration_since_unix_epoch: number }"#.into())
+    );
+
+    assert_eq!(
+        specta::ts::inline::<std::time::Duration>(
+            &ExportConfiguration::new().bigint(BigIntExportBehavior::Number)
+        ),
+        Ok(r#"{ secs: number; nanos: number }"#.into())
+    );
+    assert_eq!(
+        specta::ts::inline::<std::time::Duration>(
+            &ExportConfiguration::new().bigint(BigIntExportBehavior::String)
+        ),
+        Ok(r#"{ secs: string; nanos: number }"#.into())
+    );
 
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");

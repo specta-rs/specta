@@ -12,7 +12,8 @@ pub struct ContainerAttr {
     pub crate_name: Option<String>,
     pub inline: bool,
     pub remote: Option<String>,
-    pub export: Option<bool>, // Option is used because if not explicitly set, we enable it
+    /// DEPRECATED. This is not used and shouldn't be. Will be removed in Specta v2!
+    pub export: Option<bool>,
     pub doc: Vec<String>,
     pub deprecated: Option<String>,
 }

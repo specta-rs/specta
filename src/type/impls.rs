@@ -189,52 +189,20 @@ impl<K: Type, V: Type> Flatten for std::collections::BTreeMap<K, V> {}
 
 use std::time::*;
 
-impl Type for SystemTime {
-    fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
-        Ok(DataType::Object(ObjectType {
-            generics: vec![],
-            fields: vec![
-                ObjectField {
-                    key: "duration_since_epoch",
-                    optional: false,
-                    flatten: false,
-                    // TODO: As far as serde is concerned this is a `u64`, We are lying so the exporter doesn't error about bigints.
-                    ty: DataType::Primitive(PrimitiveType::u32),
-                },
-                ObjectField {
-                    key: "duration_since_unix_epoch",
-                    optional: false,
-                    flatten: false,
-                    ty: DataType::Primitive(PrimitiveType::u32),
-                },
-            ],
-            tag: None,
-        }))
-    }
+#[derive(Type)]
+#[specta(remote = "SystemTime", crate = "crate", export = false)]
+#[allow(dead_code)]
+struct SystemTimeDef {
+    duration_since_epoch: i64,
+    duration_since_unix_epoch: u32,
 }
 
-impl Type for Duration {
-    fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
-        Ok(DataType::Object(ObjectType {
-            generics: vec![],
-            fields: vec![
-                ObjectField {
-                    key: "secs",
-                    optional: false,
-                    flatten: false,
-                    // TODO: As far as serde is concerned this is a `u64`, We are lying so the exporter doesn't error about bigints.
-                    ty: DataType::Primitive(PrimitiveType::u32),
-                },
-                ObjectField {
-                    key: "nanos",
-                    optional: false,
-                    flatten: false,
-                    ty: DataType::Primitive(PrimitiveType::u32),
-                },
-            ],
-            tag: None,
-        }))
-    }
+#[derive(Type)]
+#[specta(remote = "Duration", crate = "crate", export = false)]
+#[allow(dead_code)]
+struct DurationDef {
+    secs: u64,
+    nanos: u32,
 }
 
 #[cfg(feature = "indexmap")]
@@ -343,7 +311,7 @@ const _: () = {
     );
 
     #[derive(Type)]
-    #[specta(remote = "Timestamp", crate = "crate")]
+    #[specta(remote = "Timestamp", crate = "crate", export = false)]
     #[allow(dead_code)]
     struct TimestampDef {
         time: NTP64,
@@ -356,7 +324,7 @@ const _: () = {
     use glam::*;
 
     #[derive(Type)]
-    #[specta(remote = "DVec2", crate = "crate")]
+    #[specta(remote = "DVec2", crate = "crate", export = false)]
     #[allow(dead_code)]
     struct DVec2Def {
         x: f64,
@@ -364,7 +332,7 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(remote = "IVec2", crate = "crate")]
+    #[specta(remote = "IVec2", crate = "crate", export = false)]
     #[allow(dead_code)]
     struct IVec2Def {
         x: i32,
@@ -372,7 +340,7 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(remote = "DMat2", crate = "crate")]
+    #[specta(remote = "DMat2", crate = "crate", export = false)]
     #[allow(dead_code)]
     struct DMat2Def {
         pub x_axis: DVec2,
@@ -380,7 +348,7 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(remote = "DAffine2", crate = "crate")]
+    #[specta(remote = "DAffine2", crate = "crate", export = false)]
     #[allow(dead_code)]
     struct DAffine2Def {
         matrix2: DMat2,
