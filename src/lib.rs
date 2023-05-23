@@ -146,7 +146,7 @@ pub use specta_macros::RSPCType;
 /// .into();
 ///
 /// let anon = val.clone().to_anonymous();
-/// let anon = ts::datatype(&Default::default(), &anon).unwrap();
+/// let anon = ts::datatype(&Default::default(), &anon, &Default::default()).unwrap();
 /// assert_eq!(anon, "\"A\" | \"B\"");
 ///
 /// let named = val.to_named("MyEnum");
@@ -166,7 +166,7 @@ pub use specta_macros::RSPCType;
 /// .into();
 ///
 /// let anon = val.clone().to_anonymous();
-/// let anon = ts::datatype(&Default::default(), &anon).unwrap();
+/// let anon = ts::datatype(&Default::default(), &anon, &Default::default()).unwrap();
 /// assert_eq!(anon, "{ a: \"A\" | \"B\" }");
 ///
 /// let named = val.to_named("MyObject");

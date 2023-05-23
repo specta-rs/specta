@@ -37,7 +37,11 @@ fn test_datatype() {
     ])
     .into();
     assert_eq!(
-        ts::datatype(&Default::default(), &val.clone().to_anonymous()),
+        ts::datatype(
+            &Default::default(),
+            &val.clone().to_anonymous(),
+            &Default::default()
+        ),
         Ok("\"A\" | \"B\"".into())
     );
     assert_eq!(
@@ -57,7 +61,11 @@ fn test_datatype() {
     }
     .into();
     assert_eq!(
-        ts::datatype(&Default::default(), &val.clone().to_anonymous()),
+        ts::datatype(
+            &Default::default(),
+            &val.clone().to_anonymous(),
+            &Default::default()
+        ),
         Ok("{ queries: \"A\" | \"B\" }".into())
     );
     assert_eq!(
@@ -77,7 +85,11 @@ fn test_datatype() {
     }
     .into();
     assert_eq!(
-        ts::datatype(&Default::default(), &val.clone().to_anonymous()),
+        ts::datatype(
+            &Default::default(),
+            &val.clone().to_anonymous(),
+            &Default::default()
+        ),
         Ok("{ queries: \"A\" | \"B\" }".into())
     );
     assert_eq!(
@@ -100,7 +112,11 @@ fn test_datatype() {
     }
     .into();
     assert_eq!(
-        ts::datatype(&Default::default(), &val.clone().to_anonymous()),
+        ts::datatype(
+            &Default::default(),
+            &val.clone().to_anonymous(),
+            &Default::default()
+        ),
         Ok("{ queries: { queries: \"A\" | \"B\" } }".into())
     );
 
@@ -112,7 +128,11 @@ fn test_datatype() {
     }])
     .into();
     assert_eq!(
-        ts::datatype(&Default::default(), &val.clone().to_anonymous()),
+        ts::datatype(
+            &Default::default(),
+            &val.clone().to_anonymous(),
+            &Default::default()
+        ),
         Ok("{ queries: \"A\" | \"B\" }".into())
     );
 }

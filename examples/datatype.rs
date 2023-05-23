@@ -24,7 +24,7 @@ fn main() {
     let anon = val.clone().to_anonymous();
     let named = val.to_named("MyEnum");
 
-    let anon = ts::datatype(&Default::default(), &anon).unwrap();
+    let anon = ts::datatype(&Default::default(), &anon, &Default::default()).unwrap();
     let named_export =
         ts::export_datatype(&Default::default(), &named, &Default::default()).unwrap();
 
@@ -48,7 +48,7 @@ fn main() {
     let anon = val.clone().to_anonymous();
     let named = val.to_named("MyObject");
 
-    let anon = ts::datatype(&Default::default(), &anon).unwrap();
+    let anon = ts::datatype(&Default::default(), &anon, &Default::default()).unwrap();
     let named_export =
         ts::export_datatype(&Default::default(), &named, &Default::default()).unwrap();
 
