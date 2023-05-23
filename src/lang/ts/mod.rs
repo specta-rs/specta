@@ -166,22 +166,24 @@ fn datatype_inner(
             }
         }
         DataType::Record(def) => {
-            let divider = match &def.0 {
-                DataType::Enum(_) => " in",
+            let is_enum = match &def.0 {
+                DataType::Enum(_) => true,
                 DataType::Named(dt) => match dt.item {
-                    NamedDataTypeItem::Enum(_) => " in",
-                    _ => ":",
+                    NamedDataTypeItem::Enum(_) => true,
+                    _ => false,
                 },
                 DataType::Reference(r) => {
                     let typ = type_map.get(&r.sid).unwrap().as_ref().unwrap();
 
                     match typ.item {
-                        NamedDataTypeItem::Enum(_) => " in",
-                        _ => unreachable!(),
+                        NamedDataTypeItem::Enum(_) => true,
+                        _ => false,
                     }
                 }
-                _ => ":",
+                _ => false,
             };
+
+            let divider = is_enum.then_some(" in").unwrap_or(":");
 
             format!(
                 // We use this isn't of `Record<K, V>` to avoid issues with circular references.
