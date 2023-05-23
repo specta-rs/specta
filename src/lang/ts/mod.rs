@@ -173,7 +173,11 @@ fn datatype_inner(
                     _ => false,
                 },
                 DataType::Reference(r) => {
-                    let typ = type_map.get(&r.sid).unwrap().as_ref().unwrap();
+                    let typ = type_map
+                        .get(&r.sid)
+                        .expect(&format!("Type {} not found!", r.name))
+                        .as_ref()
+                        .expect(&format!("Type {} has no value!", r.name));
 
                     match typ.item {
                         NamedDataTypeItem::Enum(_) => true,
