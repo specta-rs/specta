@@ -196,6 +196,12 @@ fn typescript_types() {
         Ok(r#"{ secs: string; nanos: number }"#.into())
     );
 
+    assert_ts!(HashMap<BasicEnum, i32>, r#"{ [key in "A" | "B"]: number }"#);
+    assert_ts_export!(
+        EnumReferenceRecordKey,
+        "export type EnumReferenceRecordKey = { a: { [key in BasicEnum]: number } }"
+    );
+
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");
     // assert_ts_export!(DeprecatedFields, "");
@@ -433,6 +439,11 @@ pub struct TransparentTypeWithOverride(#[specta(type = String)] NonTypeType);
 pub enum BasicEnum {
     A,
     B,
+}
+
+#[derive(Type)]
+pub struct EnumReferenceRecordKey {
+    a: HashMap<BasicEnum, i32>,
 }
 
 // #[derive(Type)]
