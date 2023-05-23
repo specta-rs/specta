@@ -442,6 +442,7 @@ pub enum BasicEnum {
 }
 
 #[derive(Type)]
+#[specta(export = false)]
 pub struct EnumReferenceRecordKey {
     a: HashMap<BasicEnum, i32>,
 }
