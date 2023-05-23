@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use specta::{
     ts::{self, ExportConfiguration},
     Type,
@@ -19,11 +21,16 @@ pub struct GenericType<A> {
     pub generic: A,
 }
 
-#[derive(Type)]
+#[derive(Type, Hash)]
 pub enum MyEnum {
     A,
     B,
     C,
+}
+
+#[derive(Type)]
+pub struct Something {
+    a: HashMap<MyEnum, i32>,
 }
 
 fn main() {
@@ -47,5 +54,12 @@ fn main() {
     assert_eq!(
         ts_str,
         r#"export type MyEnum = "A" | "B" | "C""#.to_string()
+    );
+
+    let ts_str = ts::export::<Something>(&ExportConfiguration::default()).unwrap();
+    println!("{ts_str}");
+    assert_eq!(
+        ts_str,
+        r#"export type Something = { a: { [key in MyEnum]: number } }"#.to_string()
     );
 }

@@ -25,7 +25,8 @@ fn main() {
     let named = val.to_named("MyEnum");
 
     let anon = ts::datatype(&Default::default(), &anon).unwrap();
-    let named_export = ts::export_datatype(&Default::default(), &named).unwrap();
+    let named_export =
+        ts::export_datatype(&Default::default(), &named, &Default::default()).unwrap();
 
     println!("anonymous enum: {anon}");
     println!("named enum export: {named_export}");
@@ -48,7 +49,8 @@ fn main() {
     let named = val.to_named("MyObject");
 
     let anon = ts::datatype(&Default::default(), &anon).unwrap();
-    let named_export = ts::export_datatype(&Default::default(), &named).unwrap();
+    let named_export =
+        ts::export_datatype(&Default::default(), &named, &Default::default()).unwrap();
 
     println!("anonymous object: {anon}");
     println!("named object export: {named_export}");

@@ -41,7 +41,11 @@ fn test_datatype() {
         Ok("\"A\" | \"B\"".into())
     );
     assert_eq!(
-        ts::export_datatype(&Default::default(), &val.to_named("MyEnum")),
+        ts::export_datatype(
+            &Default::default(),
+            &val.to_named("MyEnum"),
+            &Default::default()
+        ),
         Ok("export type MyEnum = \"A\" | \"B\"".into())
     );
 
@@ -57,7 +61,11 @@ fn test_datatype() {
         Ok("{ queries: \"A\" | \"B\" }".into())
     );
     assert_eq!(
-        ts::export_datatype(&Default::default(), &val.to_named("MyEnum")),
+        ts::export_datatype(
+            &Default::default(),
+            &val.to_named("MyEnum"),
+            &Default::default()
+        ),
         Ok("export type MyEnum = { queries: \"A\" | \"B\" }".into())
     );
 
@@ -73,7 +81,11 @@ fn test_datatype() {
         Ok("{ queries: \"A\" | \"B\" }".into())
     );
     assert_eq!(
-        ts::export_datatype(&Default::default(), &val.to_named("MyEnum")),
+        ts::export_datatype(
+            &Default::default(),
+            &val.to_named("MyEnum"),
+            &Default::default()
+        ),
         Ok("export type MyEnum = { queries: \"A\" | \"B\" }".into())
     );
     assert_ts!(Procedures3, "{ queries: string }");
