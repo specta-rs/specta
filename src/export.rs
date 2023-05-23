@@ -59,13 +59,14 @@ pub fn ts_with_cfg(path: &str, conf: &ExportConfiguration) -> Result<(), TsExpor
         }
     }
 
-    for (_, typ) in types {
+    for (_, typ) in &types {
         out += &ts::export_datatype(
             conf,
-            &match typ {
+            match typ {
                 Some(v) => v,
                 None => unreachable!(),
             },
+            &types,
         )?;
         out += "\n\n";
     }

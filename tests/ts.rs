@@ -196,6 +196,12 @@ fn typescript_types() {
         Ok(r#"{ secs: string; nanos: number }"#.into())
     );
 
+    assert_ts!(HashMap<BasicEnum, i32>, r#"{ [key in "A" | "B"]: number }"#);
+    assert_ts_export!(
+        EnumReferenceRecordKey,
+        "export type EnumReferenceRecordKey = { a: { [key in BasicEnum]: number } }"
+    );
+
     assert_ts!(
         FlattenOnNestedEnum,
         r#"({ type: "a"; value: string } | { type: "b"; value: number }) & { id: string }"#
@@ -453,6 +459,12 @@ pub struct FlattenOnNestedEnum {
     id: String,
     #[serde(flatten)]
     result: NestedEnum,
+}
+
+#[derive(Type)]
+#[specta(export = false)]
+pub struct EnumReferenceRecordKey {
+    a: HashMap<BasicEnum, i32>,
 }
 
 // #[derive(Type)]

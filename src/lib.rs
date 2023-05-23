@@ -150,7 +150,7 @@ pub use specta_macros::RSPCType;
 /// assert_eq!(anon, "\"A\" | \"B\"");
 ///
 /// let named = val.to_named("MyEnum");
-/// let named_export = ts::export_datatype(&Default::default(), &named).unwrap();
+/// let named_export = ts::export_datatype(&Default::default(), &named, &Default::default()).unwrap();
 /// assert_eq!(named_export, "export type MyEnum = \"A\" | \"B\"");
 ///
 /// //
@@ -170,7 +170,7 @@ pub use specta_macros::RSPCType;
 /// assert_eq!(anon, "{ a: \"A\" | \"B\" }");
 ///
 /// let named = val.to_named("MyObject");
-/// let named_export = ts::export_datatype(&Default::default(), &named).unwrap();
+/// let named_export = ts::export_datatype(&Default::default(), &named, &Default::default()).unwrap();
 /// assert_eq!(named_export, "export type MyObject = { a: \"A\" | \"B\" }");
 /// ```
 pub use specta_macros::DataTypeFrom;
