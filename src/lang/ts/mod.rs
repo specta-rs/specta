@@ -32,19 +32,20 @@ pub fn export<T: NamedType>(conf: &ExportConfiguration) -> Result<String, TsExpo
 ///
 /// Eg. `{ demo: string; };`
 pub fn inline<T: Type>(conf: &ExportConfiguration) -> Result<String, TsExportError> {
-    let mut type_name = TypeDefs::default();
+    let mut type_map = TypeDefs::default();
     let result = datatype(
         conf,
         &T::inline(
             DefOpts {
                 parent_inline: false,
-                type_map: &mut type_name,
+                type_map: &mut type_map,
             },
             &[],
         )?,
+        &type_map,
     );
 
-    if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_name).into_iter().next() {
+    if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_map).into_iter().next() {
         return Err(TsExportError::DuplicateTypeName(ty_name, l0, l1));
     }
 
@@ -123,10 +124,14 @@ fn export_datatype_inner(
 /// Convert a DataType to a TypeScript string
 ///
 /// Eg. `{ demo: string; }`
-pub fn datatype(conf: &ExportConfiguration, typ: &DataType) -> Result<String, TsExportError> {
+pub fn datatype(
+    conf: &ExportConfiguration,
+    typ: &DataType,
+    type_map: &TypeDefs,
+) -> Result<String, TsExportError> {
     // TODO: Duplicate type name detection?
 
-    datatype_inner(ExportContext { conf, path: vec![] }, typ, &TypeDefs::new())
+    datatype_inner(ExportContext { conf, path: vec![] }, typ, type_map)
 }
 
 fn datatype_inner(
