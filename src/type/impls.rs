@@ -355,3 +355,8 @@ const _: () = {
         translation: DVec2,
     }
 };
+
+#[cfg(feature = "url")]
+impl_as!(
+    url::Url as String
+);

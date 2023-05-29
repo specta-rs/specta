@@ -1,6 +1,8 @@
 mod arrays;
 #[cfg(feature = "chrono")]
 mod chrono;
+#[cfg(feature = "url")]
+mod url;
 mod field_rename;
 mod flatten;
 mod generic_fields;
