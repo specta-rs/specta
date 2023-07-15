@@ -50,10 +50,10 @@ error[E0277]: the trait bound `UnitExternal: specta::Flatten` is not satisfied
              FlattenExternal
              FlattenUntagged
              FlattenInternal
-             indexmap::map::IndexMap<K, V>
-             uhlc::timestamp::Timestamp
              serde_json::map::Map<K, V>
+             uhlc::timestamp::Timestamp
              HashMap<K, V>
+             indexmap::map::IndexMap<K, V>
              BTreeMap<K, V>
            and $N others
 note: required by a bound in `_::<impl NamedType for FlattenExternal>::named_data_type::validate_flatten`
@@ -73,10 +73,10 @@ error[E0277]: the trait bound `UnnamedMultiExternal: specta::Flatten` is not sat
              FlattenExternal
              FlattenUntagged
              FlattenInternal
-             indexmap::map::IndexMap<K, V>
-             uhlc::timestamp::Timestamp
              serde_json::map::Map<K, V>
+             uhlc::timestamp::Timestamp
              HashMap<K, V>
+             indexmap::map::IndexMap<K, V>
              BTreeMap<K, V>
            and $N others
 note: required by a bound in `_::<impl NamedType for FlattenExternal>::named_data_type::validate_flatten`
@@ -96,10 +96,10 @@ error[E0277]: the trait bound `UnnamedUntagged: specta::Flatten` is not satisfie
              FlattenExternal
              FlattenUntagged
              FlattenInternal
-             indexmap::map::IndexMap<K, V>
-             uhlc::timestamp::Timestamp
              serde_json::map::Map<K, V>
+             uhlc::timestamp::Timestamp
              HashMap<K, V>
+             indexmap::map::IndexMap<K, V>
              BTreeMap<K, V>
            and $N others
 note: required by a bound in `_::<impl NamedType for FlattenUntagged>::named_data_type::validate_flatten`
@@ -119,10 +119,10 @@ error[E0277]: the trait bound `UnnamedMultiUntagged: specta::Flatten` is not sat
              FlattenExternal
              FlattenUntagged
              FlattenInternal
-             indexmap::map::IndexMap<K, V>
-             uhlc::timestamp::Timestamp
              serde_json::map::Map<K, V>
+             uhlc::timestamp::Timestamp
              HashMap<K, V>
+             indexmap::map::IndexMap<K, V>
              BTreeMap<K, V>
            and $N others
 note: required by a bound in `_::<impl NamedType for FlattenUntagged>::named_data_type::validate_flatten`
@@ -142,10 +142,10 @@ error[E0277]: the trait bound `UnnamedInternal: specta::Flatten` is not satisfie
              FlattenExternal
              FlattenUntagged
              FlattenInternal
-             indexmap::map::IndexMap<K, V>
-             uhlc::timestamp::Timestamp
              serde_json::map::Map<K, V>
+             uhlc::timestamp::Timestamp
              HashMap<K, V>
+             indexmap::map::IndexMap<K, V>
              BTreeMap<K, V>
            and $N others
 note: required by a bound in `_::<impl NamedType for FlattenInternal>::named_data_type::validate_flatten`
