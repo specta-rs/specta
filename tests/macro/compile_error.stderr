@@ -154,4 +154,3 @@ note: required by a bound in `_::<impl NamedType for FlattenInternal>::named_dat
 67 | #[derive(Type)]
    |          ^^^^ required by this bound in `validate_flatten`
    = note: this error originates in the derive macro `Type` (in Nightly builds, run with -Z macro-backtrace for more info)
-   
