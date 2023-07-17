@@ -16,7 +16,7 @@ use crate::*;
 /// # Examples
 ///
 /// ```rust
-/// use specta::*;
+/// use specta::{*, functions::SpectaFunctionResultVariant};
 ///
 /// #[specta]
 /// fn some_function(name: String, age: i32) -> bool {
@@ -28,7 +28,7 @@ use crate::*;
 ///
 ///     assert_eq!(typ.name, "some_function");
 ///     assert_eq!(typ.args.len(), 2);
-///     assert_eq!(typ.result, DataType::Primitive(PrimitiveType::bool))
+///     assert_eq!(typ.result, SpectaFunctionResultVariant::Value(DataType::Primitive(PrimitiveType::bool)))
 /// }
 /// ```
 #[macro_export]

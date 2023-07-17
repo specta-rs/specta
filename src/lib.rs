@@ -69,6 +69,7 @@ pub mod export;
 #[cfg_attr(docsrs, doc(cfg(feature = "functions")))]
 pub mod functions;
 mod lang;
+mod selection;
 /// Contains [`Type`] and everything related to it, including implementations and helper macros
 pub mod r#type;
 
@@ -77,6 +78,7 @@ pub use datatype::*;
 pub use lang::*;
 #[doc(hidden)]
 pub use r#type::*;
+pub use selection::*;
 
 /// Implements [`Type`] for a given struct or enum.
 ///
