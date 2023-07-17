@@ -2,7 +2,7 @@ use std::future::Future;
 
 use crate::{DataType, DefOpts, ExportError, Type};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SpectaFunctionResultVariant {
     Value(DataType),
     Result(DataType, DataType),
