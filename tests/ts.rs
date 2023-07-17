@@ -196,6 +196,11 @@ fn typescript_types() {
         Ok(r#"{ secs: string; nanos: number }"#.into())
     );
 
+    assert_ts!(
+        FlattenOnNestedEnum,
+        r#"({ type: "a"; value: string } | { type: "b"; value: number }) & { id: string }"#
+    );
+
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");
     // assert_ts_export!(DeprecatedFields, "");
@@ -433,6 +438,21 @@ pub struct TransparentTypeWithOverride(#[specta(type = String)] NonTypeType);
 pub enum BasicEnum {
     A,
     B,
+}
+
+#[derive(Type)]
+#[serde(tag = "type", content = "value", rename_all = "camelCase")]
+pub enum NestedEnum {
+    A(String),
+    B(i32),
+}
+
+#[derive(Type)]
+#[serde(rename_all = "camelCase")]
+pub struct FlattenOnNestedEnum {
+    id: String,
+    #[serde(flatten)]
+    result: NestedEnum,
 }
 
 // #[derive(Type)]
