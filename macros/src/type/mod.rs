@@ -196,7 +196,7 @@ pub fn named_data_type_wrapper(
             sid: Some(SID),
             impl_location: Some(IMPL_LOCATION),
             comments: #comments,
-            export: None,
+            export: #should_export,
             deprecated: #deprecated,
             item: #t
         }
