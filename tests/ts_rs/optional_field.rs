@@ -10,12 +10,14 @@ struct Optional {
     b: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     c: Option<String>,
+    #[serde(default)]
+    d: bool,
 }
 
 #[test]
 fn test() {
     assert_ts!(
         Optional,
-        "{ a: number | null; b?: number | null; c?: string | null }"
+        "{ a: number | null; b?: number | null; c?: string | null; d?: boolean }"
     );
 }

@@ -3,12 +3,16 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
+    marker::PhantomData,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
     path::PathBuf,
 };
 
 use serde::Serialize;
-use specta::{ts::ExportConfiguration, Type};
+use specta::{
+    ts::{BigIntExportBehavior, ExportConfiguration},
+    Any, Type,
+};
 
 macro_rules! assert_ts {
     ($t:ty, $e:expr) => {
@@ -162,6 +166,61 @@ fn typescript_types() {
 
     // https://github.com/oscartbeaumont/specta/issues/60
     assert_ts!(Option<Option<Option<Option<i32>>>>, r#"number | null"#);
+
+    // https://github.com/oscartbeaumont/specta/issues/71
+    assert_ts!(Vec<DocComments>, r#"{ a: string }[]"#);
+
+    // https://github.com/oscartbeaumont/specta/issues/77
+    assert_eq!(
+        specta::ts::inline::<std::time::SystemTime>(
+            &ExportConfiguration::new().bigint(BigIntExportBehavior::Number)
+        ),
+        Ok(r#"{ duration_since_epoch: number; duration_since_unix_epoch: number }"#.into())
+    );
+    assert_eq!(
+        specta::ts::inline::<std::time::SystemTime>(
+            &ExportConfiguration::new().bigint(BigIntExportBehavior::String)
+        ),
+        Ok(r#"{ duration_since_epoch: string; duration_since_unix_epoch: number }"#.into())
+    );
+
+    assert_eq!(
+        specta::ts::inline::<std::time::Duration>(
+            &ExportConfiguration::new().bigint(BigIntExportBehavior::Number)
+        ),
+        Ok(r#"{ secs: number; nanos: number }"#.into())
+    );
+    assert_eq!(
+        specta::ts::inline::<std::time::Duration>(
+            &ExportConfiguration::new().bigint(BigIntExportBehavior::String)
+        ),
+        Ok(r#"{ secs: string; nanos: number }"#.into())
+    );
+
+    assert_ts!(HashMap<BasicEnum, i32>, r#"{ [key in "A" | "B"]: number }"#);
+    assert_ts_export!(
+        EnumReferenceRecordKey,
+        "export type EnumReferenceRecordKey = { a: { [key in BasicEnum]: number } }"
+    );
+
+    assert_ts!(
+        FlattenOnNestedEnum,
+        r#"({ type: "a"; value: string } | { type: "b"; value: number }) & { id: string }"#
+    );
+
+    assert_ts!(PhantomData<()>, r#"null"#);
+    assert_ts!(PhantomData<String>, r#"null"#);
+
+    assert_ts!(Result<String, i32>, r#"string | number"#);
+    assert_ts!(Result<i16, i32>, r#"number"#);
+
+    #[cfg(feature = "either")]
+    {
+        assert_ts!(either::Either<String, i32>, r#"string | number"#);
+        assert_ts!(either::Either<i16, i32>, r#"number"#);
+    }
+
+    assert_ts!(Any, r#"any"#);
 
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");
@@ -400,6 +459,27 @@ pub struct TransparentTypeWithOverride(#[specta(type = String)] NonTypeType);
 pub enum BasicEnum {
     A,
     B,
+}
+
+#[derive(Type)]
+#[serde(tag = "type", content = "value", rename_all = "camelCase")]
+pub enum NestedEnum {
+    A(String),
+    B(i32),
+}
+
+#[derive(Type)]
+#[serde(rename_all = "camelCase")]
+pub struct FlattenOnNestedEnum {
+    id: String,
+    #[serde(flatten)]
+    result: NestedEnum,
+}
+
+#[derive(Type)]
+#[specta(export = false)]
+pub struct EnumReferenceRecordKey {
+    a: HashMap<BasicEnum, i32>,
 }
 
 // #[derive(Type)]

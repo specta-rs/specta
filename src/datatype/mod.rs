@@ -47,6 +47,8 @@ pub enum DataType {
     Object(ObjectType),
     Enum(EnumType),
     Tuple(TupleType),
+    // Result
+    Result(Box<(DataType, DataType)>),
     // A reference type that has already been defined
     Reference(DataTypeReference),
     Generic(GenericType),
@@ -63,8 +65,7 @@ pub struct NamedDataType {
     pub impl_location: Option<ImplLocation>,
     /// Rust documentation comments on the type
     pub comments: &'static [&'static str],
-    /// Whether the type should export when the `export` feature is enabled.
-    /// `None` will use the default which is why `false` is not just used.
+    /// DEPRECATED. This is not used and shouldn't be. Will be removed in Specta v2!
     pub export: Option<bool>,
     /// The Rust deprecated comment if the type is deprecated.
     pub deprecated: Option<&'static str>,

@@ -69,6 +69,7 @@ pub mod export;
 #[cfg_attr(docsrs, doc(cfg(feature = "functions")))]
 pub mod functions;
 mod lang;
+mod selection;
 /// Contains [`Type`] and everything related to it, including implementations and helper macros
 pub mod r#type;
 
@@ -77,6 +78,7 @@ pub use datatype::*;
 pub use lang::*;
 #[doc(hidden)]
 pub use r#type::*;
+pub use selection::*;
 
 /// Implements [`Type`] for a given struct or enum.
 ///
@@ -146,11 +148,11 @@ pub use specta_macros::RSPCType;
 /// .into();
 ///
 /// let anon = val.clone().to_anonymous();
-/// let anon = ts::datatype(&Default::default(), &anon).unwrap();
+/// let anon = ts::datatype(&Default::default(), &anon, &Default::default()).unwrap();
 /// assert_eq!(anon, "\"A\" | \"B\"");
 ///
 /// let named = val.to_named("MyEnum");
-/// let named_export = ts::export_datatype(&Default::default(), &named).unwrap();
+/// let named_export = ts::export_named_datatype(&Default::default(), &named, &Default::default()).unwrap();
 /// assert_eq!(named_export, "export type MyEnum = \"A\" | \"B\"");
 ///
 /// //
@@ -166,11 +168,11 @@ pub use specta_macros::RSPCType;
 /// .into();
 ///
 /// let anon = val.clone().to_anonymous();
-/// let anon = ts::datatype(&Default::default(), &anon).unwrap();
+/// let anon = ts::datatype(&Default::default(), &anon, &Default::default()).unwrap();
 /// assert_eq!(anon, "{ a: \"A\" | \"B\" }");
 ///
 /// let named = val.to_named("MyObject");
-/// let named_export = ts::export_datatype(&Default::default(), &named).unwrap();
+/// let named_export = ts::export_named_datatype(&Default::default(), &named, &Default::default()).unwrap();
 /// assert_eq!(named_export, "export type MyObject = { a: \"A\" | \"B\" }");
 /// ```
 pub use specta_macros::DataTypeFrom;
@@ -200,3 +202,26 @@ pub mod internal {
 
 #[cfg(doctest)]
 doc_comment::doctest!("../README.md");
+
+/// A type that is unconstructable but is typed as `any` in TypeScript.
+///
+/// This can be use like the following:
+/// ```rust
+/// use serde::Serialize;
+/// use specta::{Type, Any};
+///
+/// #[derive(Serialize, Type)]
+/// pub struct Demo {
+///     #[specta(type = Any)]
+///     pub field: String,
+/// }
+/// ```
+pub enum Any {}
+
+impl Type for Any {
+    const MODULE_PATH: &'static str = module_path!();
+
+    fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
+        Ok(DataType::Any)
+    }
+}

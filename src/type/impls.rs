@@ -79,13 +79,6 @@ impl_as!(
     SocketAddrV6 as String
 );
 
-use std::time::*;
-impl_as!(
-    SystemTime as String
-    Instant as String
-    Duration as String
-);
-
 use std::sync::atomic::*;
 impl_as!(
     AtomicBool as bool
@@ -173,6 +166,37 @@ impl<T: Type> Type for Option<T> {
     }
 }
 
+impl<T: Type, E: Type> Type for Result<T, E> {
+    const MODULE_PATH: &'static str = module_path!();
+
+    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+        Ok(DataType::Result(Box::new((
+            T::inline(
+                DefOpts {
+                    parent_inline: opts.parent_inline,
+                    type_map: opts.type_map,
+                },
+                generics,
+            )?,
+            E::inline(
+                DefOpts {
+                    parent_inline: opts.parent_inline,
+                    type_map: opts.type_map,
+                },
+                generics,
+            )?,
+        ))))
+    }
+}
+
+impl<T> Type for std::marker::PhantomData<T> {
+    const MODULE_PATH: &'static str = module_path!();
+
+    fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
+        Ok(DataType::Literal(LiteralType::None))
+    }
+}
+
 impl<T: Type> Type for std::ops::Range<T> {
     const MODULE_PATH: &'static str = module_path!();
 
@@ -213,6 +237,22 @@ impl_for_map!(BTreeMap<K, V> as "BTreeMap");
 impl<K: Type, V: Type> Flatten for std::collections::HashMap<K, V> {}
 impl<K: Type, V: Type> Flatten for std::collections::BTreeMap<K, V> {}
 
+#[derive(Type)]
+#[specta(remote = std::time::SystemTime, crate = "crate", export = false)]
+#[allow(dead_code)]
+struct SystemTime {
+    duration_since_epoch: i64,
+    duration_since_unix_epoch: u32,
+}
+
+#[derive(Type)]
+#[specta(remote = std::time::Duration, crate = "crate", export = false)]
+#[allow(dead_code)]
+struct Duration {
+    secs: u64,
+    nanos: u32,
+}
+
 #[cfg(feature = "indexmap")]
 const _: () = {
     impl_for_list!(indexmap::IndexSet<T> as "IndexSet");
@@ -220,7 +260,7 @@ const _: () = {
     impl<K: Type, V: Type> Flatten for indexmap::IndexMap<K, V> {}
 };
 
-#[cfg(feature = "serde")]
+#[cfg(feature = "serde_json")]
 const _: () = {
     impl_for_map!(serde_json::Map<K, V> as "Map");
     impl<K: Type, V: Type> Flatten for serde_json::Map<K, V> {}
@@ -231,6 +271,131 @@ const _: () = {
         fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
             Ok(DataType::Any)
         }
+    }
+
+    impl Type for serde_json::Number {
+        const MODULE_PATH: &'static str = module_path!();
+
+        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
+            Ok(DataType::Enum(EnumType::Untagged {
+                variants: vec![
+                    EnumVariant::Unnamed(TupleType {
+                        fields: vec![DataType::Primitive(PrimitiveType::f64)],
+                        generics: vec![],
+                    }),
+                    EnumVariant::Unnamed(TupleType {
+                        fields: vec![DataType::Primitive(PrimitiveType::i64)],
+                        generics: vec![],
+                    }),
+                    EnumVariant::Unnamed(TupleType {
+                        fields: vec![DataType::Primitive(PrimitiveType::u64)],
+                        generics: vec![],
+                    }),
+                ],
+                generics: vec![],
+            }))
+        }
+    }
+};
+
+#[cfg(feature = "serde_yaml")]
+const _: () = {
+    impl Type for serde_yaml::Value {
+        const MODULE_PATH: &'static str = module_path!();
+
+        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
+            Ok(DataType::Any)
+        }
+    }
+
+    impl Type for serde_yaml::Mapping {
+        const MODULE_PATH: &'static str = module_path!();
+
+        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
+            Ok(DataType::Any)
+        }
+    }
+
+    impl Type for serde_yaml::value::TaggedValue {
+        const MODULE_PATH: &'static str = module_path!();
+
+        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
+            Ok(DataType::Any)
+        }
+    }
+
+    impl Type for serde_yaml::Number {
+        const MODULE_PATH: &'static str = module_path!();
+
+        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
+            Ok(DataType::Enum(EnumType::Untagged {
+                variants: vec![
+                    EnumVariant::Unnamed(TupleType {
+                        fields: vec![DataType::Primitive(PrimitiveType::f64)],
+                        generics: vec![],
+                    }),
+                    EnumVariant::Unnamed(TupleType {
+                        fields: vec![DataType::Primitive(PrimitiveType::i64)],
+                        generics: vec![],
+                    }),
+                    EnumVariant::Unnamed(TupleType {
+                        fields: vec![DataType::Primitive(PrimitiveType::u64)],
+                        generics: vec![],
+                    }),
+                ],
+                generics: vec![],
+            }))
+        }
+    }
+};
+
+#[cfg(feature = "toml")]
+const _: () = {
+    impl_for_map!(toml::map::Map<K, V> as "Map");
+    impl<K: Type, V: Type> Flatten for toml::map::Map<K, V> {}
+
+    impl Type for toml::Value {
+        const MODULE_PATH: &'static str = module_path!();
+
+        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
+            Ok(DataType::Any)
+        }
+    }
+
+    #[derive(Type)]
+    #[specta(remote = toml::value::Date, crate = "crate", export = false)]
+    #[allow(dead_code)]
+    struct Date {
+        year: u16,
+        month: u8,
+        day: u8,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = toml::value::Time, crate = "crate", export = false)]
+    #[allow(dead_code)]
+    struct Time {
+        hour: u8,
+        minute: u8,
+        second: u8,
+        nanosecond: u32,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = toml::value::Datetime, crate = "crate", export = false)]
+    #[allow(dead_code)]
+    struct Datetime {
+        pub date: Option<toml::value::Date>,
+        pub time: Option<toml::value::Time>,
+        pub offset: Option<toml::value::Offset>,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = toml::value::Offset, crate = "crate", export = false)]
+    #[allow(dead_code)]
+    pub enum Offset {
+        Z,
+        Custom { minutes: i16 },
     }
 };
 
@@ -325,9 +490,9 @@ const _: () = {
     );
 
     #[derive(Type)]
-    #[specta(remote = "Timestamp", crate = "crate")]
+    #[specta(remote = Timestamp, crate = "crate", export = false)]
     #[allow(dead_code)]
-    struct TimestampDef {
+    struct Timestamp {
         time: NTP64,
         id: ID,
     }
@@ -338,34 +503,70 @@ const _: () = {
     use glam::*;
 
     #[derive(Type)]
-    #[specta(remote = "DVec2", crate = "crate")]
+    #[specta(remote = DVec2, crate = "crate", export = false)]
     #[allow(dead_code)]
-    struct DVec2Def {
+    struct DVec2 {
         x: f64,
         y: f64,
     }
 
     #[derive(Type)]
-    #[specta(remote = "IVec2", crate = "crate")]
+    #[specta(remote = IVec2, crate = "crate", export = false)]
     #[allow(dead_code)]
-    struct IVec2Def {
+    struct IVec2 {
         x: i32,
         y: i32,
     }
 
     #[derive(Type)]
-    #[specta(remote = "DMat2", crate = "crate")]
+    #[specta(remote = DMat2, crate = "crate", export = false)]
     #[allow(dead_code)]
-    struct DMat2Def {
+    struct DMat2 {
         pub x_axis: DVec2,
         pub y_axis: DVec2,
     }
 
     #[derive(Type)]
-    #[specta(remote = "DAffine2", crate = "crate")]
+    #[specta(remote = DAffine2, crate = "crate", export = false)]
     #[allow(dead_code)]
-    struct DAffine2Def {
+    struct DAffine2 {
         matrix2: DMat2,
         translation: DVec2,
     }
 };
+
+#[cfg(feature = "url")]
+impl_as!(url::Url as String);
+
+#[cfg(feature = "either")]
+impl<L: Type, R: Type> Type for either::Either<L, R> {
+    const MODULE_PATH: &'static str = module_path!();
+
+    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+        Ok(DataType::Enum(EnumType::Untagged {
+            variants: vec![
+                EnumVariant::Unnamed(TupleType {
+                    fields: vec![L::inline(
+                        DefOpts {
+                            parent_inline: opts.parent_inline,
+                            type_map: opts.type_map,
+                        },
+                        generics,
+                    )?],
+                    generics: vec![],
+                }),
+                EnumVariant::Unnamed(TupleType {
+                    fields: vec![R::inline(
+                        DefOpts {
+                            parent_inline: opts.parent_inline,
+                            type_map: opts.type_map,
+                        },
+                        generics,
+                    )?],
+                    generics: vec![],
+                }),
+            ],
+            generics: vec![],
+        }))
+    }
+}
