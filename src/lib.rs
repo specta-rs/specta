@@ -207,6 +207,9 @@ doc_comment::doctest!("../README.md");
 ///
 /// This can be use like the following:
 /// ```rust
+/// use serde::Serialize;
+/// use specta::{Type, Any};
+///
 /// #[derive(Serialize, Type)]
 /// pub struct Demo {
 ///     #[specta(type = Any)]
