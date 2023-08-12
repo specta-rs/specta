@@ -13,6 +13,16 @@ use crate::*;
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string with an export.
 ///
 /// Eg. `export type Foo = { demo: string; };`
+pub fn export_ref<T: NamedType>(
+    _: &T,
+    conf: &ExportConfiguration,
+) -> Result<String, TsExportError> {
+    export::<T>(conf)
+}
+
+/// Convert a type which implements [`Type`](crate::Type) to a TypeScript string with an export.
+///
+/// Eg. `export type Foo = { demo: string; };`
 pub fn export<T: NamedType>(conf: &ExportConfiguration) -> Result<String, TsExportError> {
     let mut type_map = TypeDefs::default();
     let named_data_type = T::definition_named_data_type(DefOpts {
@@ -26,6 +36,13 @@ pub fn export<T: NamedType>(conf: &ExportConfiguration) -> Result<String, TsExpo
     }
 
     result
+}
+
+/// Convert a type which implements [`Type`](crate::Type) to a TypeScript string.
+///
+/// Eg. `{ demo: string; };`
+pub fn inline_ref<T: Type>(_: &T, conf: &ExportConfiguration) -> Result<String, TsExportError> {
+    inline::<T>(conf)
 }
 
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string.
