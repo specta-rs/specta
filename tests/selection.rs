@@ -1,9 +1,5 @@
 use specta::selection;
-use specta::{ts::inline, Type};
-
-fn ts_export_ref<T: Type>(_t: &T) -> String {
-    inline::<T>(&Default::default()).unwrap()
-}
+use specta::ts::inline_ref;
 
 #[derive(Clone)]
 #[allow(dead_code)]
@@ -25,14 +21,24 @@ fn test_selection_macros() {
         password: "password123".into(),
     };
 
+    // Trailing comma
+    selection!(user.clone(), { name, age, });
+    selection!(vec![user.clone()], [{ name, age, }]);
+
     let s1 = selection!(user.clone(), { name, age });
     assert_eq!(s1.name, "Monty Beaumont".to_string());
     assert_eq!(s1.age, 7);
-    assert_eq!(ts_export_ref(&s1), "{ name: string; age: number }");
+    assert_eq!(
+        inline_ref(&s1, &Default::default()).unwrap(),
+        "{ name: string; age: number }"
+    );
 
     let users = vec![user; 3];
     let s2 = selection!(users, [{ name, age }]);
     assert_eq!(s2[0].name, "Monty Beaumont".to_string());
     assert_eq!(s2[0].age, 7);
-    assert_eq!(ts_export_ref(&s2), "{ name: string; age: number }[]");
+    assert_eq!(
+        inline_ref(&s2, &Default::default()).unwrap(),
+        "{ name: string; age: number }[]"
+    );
 }
