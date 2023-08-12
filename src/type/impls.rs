@@ -154,31 +154,22 @@ impl<T: Type> Type for Option<T> {
 
 impl<T: Type, E: Type> Type for Result<T, E> {
     fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-        Ok(DataType::Enum(EnumType::Untagged {
-            variants: vec![
-                EnumVariant::Unnamed(TupleType {
-                    fields: vec![T::inline(
-                        DefOpts {
-                            parent_inline: opts.parent_inline,
-                            type_map: opts.type_map,
-                        },
-                        generics,
-                    )?],
-                    generics: vec![],
-                }),
-                EnumVariant::Unnamed(TupleType {
-                    fields: vec![E::inline(
-                        DefOpts {
-                            parent_inline: opts.parent_inline,
-                            type_map: opts.type_map,
-                        },
-                        generics,
-                    )?],
-                    generics: vec![],
-                }),
-            ],
-            generics: vec![],
-        }))
+        Ok(DataType::Result(Box::new((
+            T::inline(
+                DefOpts {
+                    parent_inline: opts.parent_inline,
+                    type_map: opts.type_map,
+                },
+                generics,
+            )?,
+            E::inline(
+                DefOpts {
+                    parent_inline: opts.parent_inline,
+                    type_map: opts.type_map,
+                },
+                generics,
+            )?,
+        ))))
     }
 }
 
@@ -223,20 +214,18 @@ impl_for_map!(BTreeMap<K, V> as "BTreeMap");
 impl<K: Type, V: Type> Flatten for std::collections::HashMap<K, V> {}
 impl<K: Type, V: Type> Flatten for std::collections::BTreeMap<K, V> {}
 
-use std::time::*;
-
 #[derive(Type)]
-#[specta(remote = SystemTime, crate = "crate", export = false)]
+#[specta(remote = std::time::SystemTime, crate = "crate", export = false)]
 #[allow(dead_code)]
-struct SystemTimeDef {
+struct SystemTime {
     duration_since_epoch: i64,
     duration_since_unix_epoch: u32,
 }
 
 #[derive(Type)]
-#[specta(remote = Duration, crate = "crate", export = false)]
+#[specta(remote = std::time::Duration, crate = "crate", export = false)]
 #[allow(dead_code)]
-struct DurationDef {
+struct Duration {
     secs: u64,
     nanos: u32,
 }
@@ -339,7 +328,7 @@ const _: () = {
     #[derive(Type)]
     #[specta(remote = toml::value::Date, crate = "crate", export = false)]
     #[allow(dead_code)]
-    struct DateDef {
+    struct Date {
         year: u16,
         month: u8,
         day: u8,
@@ -348,7 +337,7 @@ const _: () = {
     #[derive(Type)]
     #[specta(remote = toml::value::Time, crate = "crate", export = false)]
     #[allow(dead_code)]
-    struct TimeDef {
+    struct Time {
         hour: u8,
         minute: u8,
         second: u8,
@@ -358,7 +347,7 @@ const _: () = {
     #[derive(Type)]
     #[specta(remote = toml::value::Datetime, crate = "crate", export = false)]
     #[allow(dead_code)]
-    struct DatetimeDef {
+    struct Datetime {
         pub date: Option<toml::value::Date>,
         pub time: Option<toml::value::Time>,
         pub offset: Option<toml::value::Offset>,
@@ -462,7 +451,7 @@ const _: () = {
     #[derive(Type)]
     #[specta(remote = Timestamp, crate = "crate", export = false)]
     #[allow(dead_code)]
-    struct TimestampDef {
+    struct Timestamp {
         time: NTP64,
         id: ID,
     }
@@ -475,7 +464,7 @@ const _: () = {
     #[derive(Type)]
     #[specta(remote = DVec2, crate = "crate", export = false)]
     #[allow(dead_code)]
-    struct DVec2Def {
+    struct DVec2 {
         x: f64,
         y: f64,
     }
@@ -483,7 +472,7 @@ const _: () = {
     #[derive(Type)]
     #[specta(remote = IVec2, crate = "crate", export = false)]
     #[allow(dead_code)]
-    struct IVec2Def {
+    struct IVec2 {
         x: i32,
         y: i32,
     }
@@ -491,7 +480,7 @@ const _: () = {
     #[derive(Type)]
     #[specta(remote = DMat2, crate = "crate", export = false)]
     #[allow(dead_code)]
-    struct DMat2Def {
+    struct DMat2 {
         pub x_axis: DVec2,
         pub y_axis: DVec2,
     }
@@ -499,7 +488,7 @@ const _: () = {
     #[derive(Type)]
     #[specta(remote = DAffine2, crate = "crate", export = false)]
     #[allow(dead_code)]
-    struct DAffine2Def {
+    struct DAffine2 {
         matrix2: DMat2,
         translation: DVec2,
     }

@@ -47,6 +47,8 @@ pub enum DataType {
     Object(ObjectType),
     Enum(EnumType),
     Tuple(TupleType),
+    // Result
+    Result(Box<(DataType, DataType)>),
     // A reference type that has already been defined
     Reference(DataTypeReference),
     Generic(GenericType),

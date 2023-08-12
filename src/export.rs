@@ -59,8 +59,8 @@ pub fn ts_with_cfg(path: &str, conf: &ExportConfiguration) -> Result<(), TsExpor
         }
     }
 
-    for (_, typ) in &types {
-        out += &ts::export_datatype(
+    for (_, typ) in types.iter() {
+        out += &ts::export_named_datatype(
             conf,
             match typ {
                 Some(v) => v,
