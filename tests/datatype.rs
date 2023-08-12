@@ -45,7 +45,7 @@ fn test_datatype() {
         Ok("\"A\" | \"B\"".into())
     );
     assert_eq!(
-        ts::export_datatype(
+        ts::export_named_datatype(
             &Default::default(),
             &val.to_named("MyEnum"),
             &Default::default()
@@ -69,7 +69,7 @@ fn test_datatype() {
         Ok("{ queries: \"A\" | \"B\" }".into())
     );
     assert_eq!(
-        ts::export_datatype(
+        ts::export_named_datatype(
             &Default::default(),
             &val.to_named("MyEnum"),
             &Default::default()
@@ -93,7 +93,7 @@ fn test_datatype() {
         Ok("{ queries: \"A\" | \"B\" }".into())
     );
     assert_eq!(
-        ts::export_datatype(
+        ts::export_named_datatype(
             &Default::default(),
             &val.to_named("MyEnum"),
             &Default::default()

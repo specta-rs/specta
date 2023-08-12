@@ -19,7 +19,7 @@ pub fn export<T: NamedType>(conf: &ExportConfiguration) -> Result<String, TsExpo
         parent_inline: false,
         type_map: &mut type_map,
     })?;
-    let result = export_datatype(conf, &named_data_type, &type_map);
+    let result = export_named_datatype(conf, &named_data_type, &type_map);
 
     if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_map).into_iter().next() {
         return Err(TsExportError::DuplicateTypeName(ty_name, l0, l1));
@@ -55,7 +55,7 @@ pub fn inline<T: Type>(conf: &ExportConfiguration) -> Result<String, TsExportErr
 /// Convert a DataType to a TypeScript string
 ///
 /// Eg. `export Name = { demo: string; }`
-pub fn export_datatype(
+pub fn export_named_datatype(
     conf: &ExportConfiguration,
     typ: &NamedDataType,
     type_map: &TypeDefs,
@@ -173,26 +173,20 @@ fn datatype_inner(
         DataType::Record(def) => {
             let is_enum = match &def.0 {
                 DataType::Enum(_) => true,
-                DataType::Named(dt) => match dt.item {
-                    NamedDataTypeItem::Enum(_) => true,
-                    _ => false,
-                },
+                DataType::Named(dt) => matches!(dt.item, NamedDataTypeItem::Enum(_)),
                 DataType::Reference(r) => {
                     let typ = type_map
                         .get(&r.sid)
-                        .expect(&format!("Type {} not found!", r.name))
+                        .unwrap_or_else(|| panic!("Type {} not found!", r.name))
                         .as_ref()
-                        .expect(&format!("Type {} has no value!", r.name));
+                        .unwrap_or_else(|| panic!("Type {} has no value!", r.name));
 
-                    match typ.item {
-                        NamedDataTypeItem::Enum(_) => true,
-                        _ => false,
-                    }
+                    matches!(typ.item, NamedDataTypeItem::Enum(_))
                 }
                 _ => false,
             };
 
-            let divider = is_enum.then_some(" in").unwrap_or(":");
+            let divider = if is_enum { " in" } else { ":" };
 
             format!(
                 // We use this isn't of `Record<K, V>` to avoid issues with circular references.
@@ -204,7 +198,7 @@ fn datatype_inner(
         // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
         DataType::List(def) => {
             let dt = datatype_inner(ctx, def, type_map)?;
-            if dt.contains(' ') && !dt.ends_with("}") {
+            if dt.contains(' ') && !dt.ends_with('}') {
                 format!("({dt})[]")
             } else {
                 format!("{dt}[]")
@@ -228,6 +222,14 @@ fn datatype_inner(
             ..
         }) => enum_datatype(ctx.with(PathItem::Type(name)), Some(name), item, type_map)?,
         DataType::Enum(item) => enum_datatype(ctx, None, item, type_map)?,
+        DataType::Result(result) => {
+            let mut variants = vec![
+                datatype_inner(ctx.clone(), &result.0, type_map)?,
+                datatype_inner(ctx, &result.1, type_map)?,
+            ];
+            variants.dedup();
+            variants.join(" | ")
+        }
         DataType::Reference(DataTypeReference { name, generics, .. }) => match &generics[..] {
             [] => name.to_string(),
             generics => {
@@ -347,9 +349,7 @@ fn enum_datatype(
 
                             format!("{{ {} }}", fields.join("; "))
                         }
-                        (EnumRepr::External, EnumVariant::Unit) => {
-                            format!("{sanitised_name}")
-                        }
+                        (EnumRepr::External, EnumVariant::Unit) => sanitised_name.to_string(),
 
                         (EnumRepr::External, v) => {
                             let ts_values = datatype_inner(ctx.clone(), &v.data_type(), type_map)?;

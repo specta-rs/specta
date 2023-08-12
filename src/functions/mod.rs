@@ -1,12 +1,8 @@
 mod arg;
 mod result;
-#[cfg(feature = "tauri")]
-mod tauri;
 
-#[cfg(feature = "tauri")]
-pub use self::tauri::*;
-pub use arg::*;
-pub use result::*;
+pub(crate) use arg::*;
+pub(crate) use result::*;
 
 use crate::*;
 
@@ -16,7 +12,7 @@ use crate::*;
 /// # Examples
 ///
 /// ```rust
-/// use specta::{*, functions::SpectaFunctionResultVariant};
+/// use specta::*;
 ///
 /// #[specta]
 /// fn some_function(name: String, age: i32) -> bool {
@@ -28,7 +24,7 @@ use crate::*;
 ///
 ///     assert_eq!(typ.name, "some_function");
 ///     assert_eq!(typ.args.len(), 2);
-///     assert_eq!(typ.result, SpectaFunctionResultVariant::Value(DataType::Primitive(PrimitiveType::bool)))
+///     assert_eq!(typ.result, DataType::Primitive(PrimitiveType::bool));
 /// }
 /// ```
 #[macro_export]
@@ -36,9 +32,9 @@ macro_rules! fn_datatype {
     ($function:path) => {{
         let mut type_map = $crate::TypeDefs::default();
 
-        $crate::fn_datatype!(type_map, $function)
+        $crate::fn_datatype!(type_map; $function)
     }};
-    ($type_map:ident, $function:path) => {{
+    ($type_map:ident; $function:path) => {{
         let type_map: &mut $crate::TypeDefs = &mut $type_map;
 
         $crate::internal::fn_datatype!(type_map, $function)
@@ -56,7 +52,7 @@ pub struct FunctionDataType {
     /// The name and type of each of the function's arguments.
     pub args: Vec<(&'static str, DataType)>,
     /// The return type of the function.
-    pub result: SpectaFunctionResultVariant,
+    pub result: DataType,
     /// The function's documentation. Detects both `///` and `#[doc = ...]` style documentation.
     pub docs: Vec<&'static str>,
 }
@@ -189,21 +185,21 @@ impl_typed_command!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
 ///     // `type_defs` is provided.
 ///     // This can be used when integrating multiple specta-enabled libraries.
 ///     let (functions, custom_type_defs) = functions::collect_types![
-///         type_map: custom_type_defs,
+///         custom_type_defs; // You can provide a custom map to collect the types into
 ///         some_function
 ///     ].unwrap();
 /// }
 /// ````
 #[macro_export]
 macro_rules! collect_types {
-    (type_map: $type_map:ident, $($command:path),* $(,)?) => {{
+    ($type_map:ident; $($command:path),* $(,)?) => {{
         let mut type_map: $crate::TypeDefs = $type_map;
 
         {
             fn export(mut type_map: $crate::TypeDefs) -> ::std::result::Result<(Vec<$crate::functions::FunctionDataType>, $crate::TypeDefs), $crate::ExportError> {
                 Ok((
                     vec![
-                        $($crate::fn_datatype!(type_map, $command)?),*
+                        $($crate::fn_datatype!(type_map; $command)?),*
                     ],
                     type_map,
                 ))
@@ -214,7 +210,7 @@ macro_rules! collect_types {
     }};
     ($($command:path),* $(,)?) => {{
         let mut type_map = $crate::TypeDefs::default();
-        $crate::functions::collect_types!(type_map: type_map, $($command),*)
+        $crate::functions::collect_types!(type_map; $($command),*)
     }};
 }
 
