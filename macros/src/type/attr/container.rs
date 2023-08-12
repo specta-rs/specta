@@ -11,7 +11,7 @@ pub struct ContainerAttr {
     pub tag: Option<String>,
     pub crate_name: Option<String>,
     pub inline: bool,
-    pub remote: Option<String>,
+    pub remote: Option<TokenStream>,
     pub export: Option<bool>, // Option is used because if not explicitly set, we enable it
     pub doc: Vec<String>,
     pub deprecated: Option<String>,
@@ -49,7 +49,7 @@ impl_parse! {
             }
         },
         "inline" => out.inline = attr.parse_bool().unwrap_or(true),
-        "remote" => out.remote = out.remote.take().or(Some(attr.parse_string()?)),
+        "remote" => out.remote = out.remote.take().or(Some(attr.parse_path()?.to_token_stream())),
         "export" => out.export = out.export.take().or(Some(attr.parse_bool().unwrap_or(true))),
         "doc" => {
             if attr.key == "doc" {

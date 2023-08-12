@@ -1,4 +1,4 @@
-use specta::Type;
+use specta::{Any, Type};
 
 use crate::ts::assert_ts;
 
@@ -18,7 +18,7 @@ pub struct SpectaTypeOverride {
 #[derive(Type)]
 #[specta(export = false)]
 pub struct InvalidToValidType {
-    #[specta(type = Option<serde_json::Value>)]
+    #[specta(type = Option<Any>)]
     pub(crate) cause: Option<Box<dyn std::error::Error + Send + Sync>>,
 }
 

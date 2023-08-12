@@ -35,11 +35,11 @@ pub fn derive(
     let mut attrs = parse_attrs(attrs)?;
     let container_attrs = ContainerAttr::from_attrs(&mut attrs)?;
 
+    let raw_ident = ident;
     let ident = container_attrs
         .remote
-        .as_ref()
-        .map(|i| format_ident!("{}", i))
-        .unwrap_or_else(|| ident.clone());
+        .clone()
+        .unwrap_or_else(|| ident.to_token_stream());
 
     let crate_name: TokenStream = container_attrs
         .crate_name
@@ -49,7 +49,7 @@ pub fn derive(
         .unwrap();
 
     let name = container_attrs.rename.clone().unwrap_or_else(|| {
-        unraw_raw_ident(&format_ident!("{}", ident.to_string())).to_token_stream()
+        unraw_raw_ident(&format_ident!("{}", raw_ident.to_string())).to_token_stream()
     });
 
     let (inlines, category, can_flatten) = match data {
@@ -107,7 +107,7 @@ pub fn derive(
     let type_impl_heading = impl_heading(quote!(#crate_name::Type), &ident, generics);
 
     let export = (cfg!(feature = "export") && container_attrs.export.unwrap_or(true)).then(|| {
-        let export_fn_name = format_ident!("__push_specta_type_{}", ident);
+        let export_fn_name = format_ident!("__push_specta_type_{}", raw_ident);
 
         let generic_params = generics
             .params
