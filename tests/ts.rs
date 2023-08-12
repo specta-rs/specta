@@ -3,6 +3,7 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
+    marker::PhantomData,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
     path::PathBuf,
 };
@@ -10,7 +11,7 @@ use std::{
 use serde::Serialize;
 use specta::{
     ts::{BigIntExportBehavior, ExportConfiguration},
-    Type,
+    Any, Type,
 };
 
 macro_rules! assert_ts {
@@ -206,6 +207,20 @@ fn typescript_types() {
         FlattenOnNestedEnum,
         r#"({ type: "a"; value: string } | { type: "b"; value: number }) & { id: string }"#
     );
+
+    assert_ts!(PhantomData<()>, r#"null"#);
+    assert_ts!(PhantomData<String>, r#"null"#);
+
+    assert_ts!(Result<String, i32>, r#"string | number"#);
+    assert_ts!(Result<i16, i32>, r#"number"#);
+
+    #[cfg(feature = "either")]
+    {
+        assert_ts!(either::Either<String, i32>, r#"string | number"#);
+        assert_ts!(either::Either<i16, i32>, r#"number"#);
+    }
+
+    assert_ts!(Any, r#"any"#);
 
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");

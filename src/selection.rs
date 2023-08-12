@@ -1,5 +1,7 @@
 /// Specta compatible selection of struct fields.
 // TODO: better docs w/ example
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 #[macro_export]
 macro_rules! selection {
     ( $s:expr, { $($n:ident),+ } ) => {{

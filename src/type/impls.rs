@@ -152,6 +152,42 @@ impl<T: Type> Type for Option<T> {
     }
 }
 
+impl<T: Type, E: Type> Type for Result<T, E> {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+        Ok(DataType::Enum(EnumType::Untagged {
+            variants: vec![
+                EnumVariant::Unnamed(TupleType {
+                    fields: vec![T::inline(
+                        DefOpts {
+                            parent_inline: opts.parent_inline,
+                            type_map: opts.type_map,
+                        },
+                        generics,
+                    )?],
+                    generics: vec![],
+                }),
+                EnumVariant::Unnamed(TupleType {
+                    fields: vec![E::inline(
+                        DefOpts {
+                            parent_inline: opts.parent_inline,
+                            type_map: opts.type_map,
+                        },
+                        generics,
+                    )?],
+                    generics: vec![],
+                }),
+            ],
+            generics: vec![],
+        }))
+    }
+}
+
+impl<T> Type for std::marker::PhantomData<T> {
+    fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
+        Ok(DataType::Literal(LiteralType::None))
+    }
+}
+
 impl<T: Type> Type for std::ops::Range<T> {
     fn inline(opts: DefOpts, _generics: &[DataType]) -> Result<DataType, ExportError> {
         let ty = T::definition(opts)?;
@@ -190,7 +226,7 @@ impl<K: Type, V: Type> Flatten for std::collections::BTreeMap<K, V> {}
 use std::time::*;
 
 #[derive(Type)]
-#[specta(remote = "SystemTime", crate = "crate", export = false)]
+#[specta(remote = SystemTime, crate = "crate", export = false)]
 #[allow(dead_code)]
 struct SystemTimeDef {
     duration_since_epoch: i64,
@@ -198,7 +234,7 @@ struct SystemTimeDef {
 }
 
 #[derive(Type)]
-#[specta(remote = "Duration", crate = "crate", export = false)]
+#[specta(remote = Duration, crate = "crate", export = false)]
 #[allow(dead_code)]
 struct DurationDef {
     secs: u64,
@@ -212,7 +248,7 @@ const _: () = {
     impl<K: Type, V: Type> Flatten for indexmap::IndexMap<K, V> {}
 };
 
-#[cfg(feature = "serde")]
+#[cfg(feature = "serde_json")]
 const _: () = {
     impl_for_map!(serde_json::Map<K, V> as "Map");
     impl<K: Type, V: Type> Flatten for serde_json::Map<K, V> {}
@@ -221,6 +257,119 @@ const _: () = {
         fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
             Ok(DataType::Any)
         }
+    }
+
+    impl Type for serde_json::Number {
+        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
+            Ok(DataType::Enum(EnumType::Untagged {
+                variants: vec![
+                    EnumVariant::Unnamed(TupleType {
+                        fields: vec![DataType::Primitive(PrimitiveType::f64)],
+                        generics: vec![],
+                    }),
+                    EnumVariant::Unnamed(TupleType {
+                        fields: vec![DataType::Primitive(PrimitiveType::i64)],
+                        generics: vec![],
+                    }),
+                    EnumVariant::Unnamed(TupleType {
+                        fields: vec![DataType::Primitive(PrimitiveType::u64)],
+                        generics: vec![],
+                    }),
+                ],
+                generics: vec![],
+            }))
+        }
+    }
+};
+
+#[cfg(feature = "serde_yaml")]
+const _: () = {
+    impl Type for serde_yaml::Value {
+        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
+            Ok(DataType::Any)
+        }
+    }
+
+    impl Type for serde_yaml::Mapping {
+        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
+            Ok(DataType::Any)
+        }
+    }
+
+    impl Type for serde_yaml::value::TaggedValue {
+        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
+            Ok(DataType::Any)
+        }
+    }
+
+    impl Type for serde_yaml::Number {
+        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
+            Ok(DataType::Enum(EnumType::Untagged {
+                variants: vec![
+                    EnumVariant::Unnamed(TupleType {
+                        fields: vec![DataType::Primitive(PrimitiveType::f64)],
+                        generics: vec![],
+                    }),
+                    EnumVariant::Unnamed(TupleType {
+                        fields: vec![DataType::Primitive(PrimitiveType::i64)],
+                        generics: vec![],
+                    }),
+                    EnumVariant::Unnamed(TupleType {
+                        fields: vec![DataType::Primitive(PrimitiveType::u64)],
+                        generics: vec![],
+                    }),
+                ],
+                generics: vec![],
+            }))
+        }
+    }
+};
+
+#[cfg(feature = "toml")]
+const _: () = {
+    impl_for_map!(toml::map::Map<K, V> as "Map");
+    impl<K: Type, V: Type> Flatten for toml::map::Map<K, V> {}
+
+    impl Type for toml::Value {
+        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
+            Ok(DataType::Any)
+        }
+    }
+
+    #[derive(Type)]
+    #[specta(remote = toml::value::Date, crate = "crate", export = false)]
+    #[allow(dead_code)]
+    struct DateDef {
+        year: u16,
+        month: u8,
+        day: u8,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = toml::value::Time, crate = "crate", export = false)]
+    #[allow(dead_code)]
+    struct TimeDef {
+        hour: u8,
+        minute: u8,
+        second: u8,
+        nanosecond: u32,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = toml::value::Datetime, crate = "crate", export = false)]
+    #[allow(dead_code)]
+    struct DatetimeDef {
+        pub date: Option<toml::value::Date>,
+        pub time: Option<toml::value::Time>,
+        pub offset: Option<toml::value::Offset>,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = toml::value::Offset, crate = "crate", export = false)]
+    #[allow(dead_code)]
+    pub enum Offset {
+        Z,
+        Custom { minutes: i16 },
     }
 };
 
@@ -311,7 +460,7 @@ const _: () = {
     );
 
     #[derive(Type)]
-    #[specta(remote = "Timestamp", crate = "crate", export = false)]
+    #[specta(remote = Timestamp, crate = "crate", export = false)]
     #[allow(dead_code)]
     struct TimestampDef {
         time: NTP64,
@@ -324,7 +473,7 @@ const _: () = {
     use glam::*;
 
     #[derive(Type)]
-    #[specta(remote = "DVec2", crate = "crate", export = false)]
+    #[specta(remote = DVec2, crate = "crate", export = false)]
     #[allow(dead_code)]
     struct DVec2Def {
         x: f64,
@@ -332,7 +481,7 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(remote = "IVec2", crate = "crate", export = false)]
+    #[specta(remote = IVec2, crate = "crate", export = false)]
     #[allow(dead_code)]
     struct IVec2Def {
         x: i32,
@@ -340,7 +489,7 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(remote = "DMat2", crate = "crate", export = false)]
+    #[specta(remote = DMat2, crate = "crate", export = false)]
     #[allow(dead_code)]
     struct DMat2Def {
         pub x_axis: DVec2,
@@ -348,7 +497,7 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(remote = "DAffine2", crate = "crate", export = false)]
+    #[specta(remote = DAffine2, crate = "crate", export = false)]
     #[allow(dead_code)]
     struct DAffine2Def {
         matrix2: DMat2,
@@ -357,6 +506,35 @@ const _: () = {
 };
 
 #[cfg(feature = "url")]
-impl_as!(
-    url::Url as String
-);
+impl_as!(url::Url as String);
+
+#[cfg(feature = "either")]
+impl<L: Type, R: Type> Type for either::Either<L, R> {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+        Ok(DataType::Enum(EnumType::Untagged {
+            variants: vec![
+                EnumVariant::Unnamed(TupleType {
+                    fields: vec![L::inline(
+                        DefOpts {
+                            parent_inline: opts.parent_inline,
+                            type_map: opts.type_map,
+                        },
+                        generics,
+                    )?],
+                    generics: vec![],
+                }),
+                EnumVariant::Unnamed(TupleType {
+                    fields: vec![R::inline(
+                        DefOpts {
+                            parent_inline: opts.parent_inline,
+                            type_map: opts.type_map,
+                        },
+                        generics,
+                    )?],
+                    generics: vec![],
+                }),
+            ],
+            generics: vec![],
+        }))
+    }
+}

@@ -50,7 +50,7 @@ pub fn generics_with_ident_only(generics: &Generics) -> Option<TokenStream> {
 
 // Code copied from ts-rs. Thanks to it's original author!
 // generate start of the `impl #r#trait for #ty` block, up to (excluding) the open brace
-pub fn impl_heading(r#trait: TokenStream, ty: &Ident, generics: &Generics) -> TokenStream {
+pub fn impl_heading(r#trait: TokenStream, ty: &TokenStream, generics: &Generics) -> TokenStream {
     let bounds = generics_with_ident_and_bounds_only(generics);
     let type_args = generics_with_ident_only(generics);
 
