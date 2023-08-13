@@ -45,7 +45,7 @@ pub struct TypeOne {
     pub a: String,
     pub b: GenericType<i32>,
     #[serde(rename = "cccccc")]
-     pub c: MyEnum,
+    pub c: MyEnum,
 }
 
 #[derive(Type)]
