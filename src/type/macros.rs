@@ -73,6 +73,18 @@ macro_rules! impl_containers {
                 )
             }
         }
+
+        impl<T: NamedType> NamedType for $container<T> {
+            fn named_data_type(opts: DefOpts, generics: &[DataType]) -> Result<NamedDataType, ExportError> {
+                T::named_data_type(opts, generics)
+            }
+
+            fn definition_named_data_type(opts: DefOpts) -> Result<NamedDataType, ExportError> {
+                T::definition_named_data_type(opts)
+            }
+        }
+
+        impl<T: Flatten> Flatten for $container<T> {}
     )+}
 }
 
