@@ -1,5 +1,6 @@
 #![allow(unused_variables, dead_code)]
 
+mod advanced_types;
 mod bigints;
 mod datatype;
 mod duplicate_ty_name;
