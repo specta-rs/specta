@@ -35,7 +35,7 @@ pub struct Demo {
 fn test_duplicate_ty_name() {
     #[cfg(not(target_os = "windows"))]
     let err = Err(TsExportError::DuplicateTypeName(
-        "One",
+        "One".into(),
         Some(ImplLocation::internal_new(
             "tests/duplicate_ty_name.rs:19:14",
         )),
@@ -45,7 +45,7 @@ fn test_duplicate_ty_name() {
     ));
     #[cfg(target_os = "windows")]
     let err = Err(TsExportError::DuplicateTypeName(
-        "One",
+        "One".into(),
         Some(ImplLocation::internal_new(
             "tests\\duplicate_ty_name.rs:9:14",
         )),

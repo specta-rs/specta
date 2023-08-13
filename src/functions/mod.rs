@@ -1,6 +1,8 @@
 mod arg;
 mod result;
 
+use std::borrow::Cow;
+
 pub(crate) use arg::*;
 pub(crate) use result::*;
 
@@ -48,13 +50,13 @@ pub struct FunctionDataType {
     /// Whether the function is async.
     pub asyncness: bool,
     /// The function's name.
-    pub name: &'static str,
+    pub name: Cow<'static, str>,
     /// The name and type of each of the function's arguments.
-    pub args: Vec<(&'static str, DataType)>,
+    pub args: Vec<(Cow<'static, str>, DataType)>,
     /// The return type of the function.
     pub result: DataType,
     /// The function's documentation. Detects both `///` and `#[doc = ...]` style documentation.
-    pub docs: Vec<&'static str>,
+    pub docs: Vec<Cow<'static, str>>,
 }
 
 /// Implemented by functions that can be annoatated with [`specta`](crate::specta).
@@ -62,10 +64,10 @@ pub trait SpectaFunction<TMarker> {
     /// Gets the type of a function as a [`FunctionDataType`].
     fn to_datatype(
         asyncness: bool,
-        name: &'static str,
+        name: Cow<'static, str>,
         type_map: &mut TypeDefs,
-        fields: &[&'static str],
-        docs: Vec<&'static str>,
+        fields: &[Cow<'static, str>],
+        docs: Vec<Cow<'static, str>>,
     ) -> Result<FunctionDataType, ExportError>;
 }
 
@@ -74,10 +76,10 @@ impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction
 {
     fn to_datatype(
         asyncness: bool,
-        name: &'static str,
+        name: Cow<'static, str>,
         type_map: &mut TypeDefs,
-        _fields: &[&'static str],
-        docs: Vec<&'static str>,
+        _fields: &[Cow<'static, str>],
+        docs: Vec<Cow<'static, str>>,
     ) -> Result<FunctionDataType, ExportError> {
         TResult::to_datatype(DefOpts {
             parent_inline: false,
@@ -99,10 +101,10 @@ impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction
 pub fn get_datatype_internal<TMarker, T: SpectaFunction<TMarker>>(
     _: T,
     asyncness: bool,
-    name: &'static str,
+    name: Cow<'static, str>,
     type_map: &mut TypeDefs,
-    fields: &[&'static str],
-    docs: Vec<&'static str>,
+    fields: &[Cow<'static, str>],
+    docs: Vec<Cow<'static, str>>,
 ) -> Result<FunctionDataType, ExportError> {
     T::to_datatype(asyncness, name, type_map, fields, docs)
 }
@@ -118,10 +120,10 @@ macro_rules! impl_typed_command {
             > SpectaFunction<(TResultMarker, $([<$i Marker>]),*)> for fn($($i),*) -> TResult {
                 fn to_datatype(
                     asyncness: bool,
-                    name: &'static str,
+                    name: Cow<'static, str>,
                     type_map: &mut TypeDefs,
-                    fields: &[&'static str],
-                    docs: Vec<&'static str>,
+                    fields: &[Cow<'static, str>],
+                    docs: Vec<Cow<'static, str>>,
                 ) -> Result<FunctionDataType, ExportError> {
                     let mut fields = fields.into_iter();
 
@@ -137,7 +139,7 @@ macro_rules! impl_typed_command {
                                     |field| $i::to_datatype(DefOpts {
                                         parent_inline: false,
                                         type_map,
-                                    }).map(|v| v.map(|ty| (*field, ty)))
+                                    }).map(|v| v.map(|ty| (field.clone(), ty)))
                                 )?
                         ),*,]
                         .into_iter()

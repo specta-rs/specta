@@ -18,10 +18,7 @@ mod r#enum;
 mod generics;
 mod r#struct;
 
-pub fn derive(
-    input: proc_macro::TokenStream,
-    default_crate_name: String,
-) -> syn::Result<proc_macro::TokenStream> {
+pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
     let DeriveInput {
         ident,
         generics,
@@ -41,12 +38,7 @@ pub fn derive(
         .clone()
         .unwrap_or_else(|| ident.to_token_stream());
 
-    let crate_name: TokenStream = container_attrs
-        .crate_name
-        .clone()
-        .unwrap_or(default_crate_name)
-        .parse()
-        .unwrap();
+    let crate_name: TokenStream = container_attrs.crate_name.clone().unwrap_or(quote!(specta));
 
     let name = container_attrs.rename.clone().unwrap_or_else(|| {
         unraw_raw_ident(&format_ident!("{}", raw_ident.to_string())).to_token_stream()
@@ -88,9 +80,9 @@ pub fn derive(
         })?;
 
     let definition_generics = generics.type_params().map(|param| {
-        let ident = &param.ident;
+        let ident = param.ident.to_string();
 
-        quote!(#crate_name::GenericType(stringify!(#ident)))
+        quote!(#crate_name::GenericType(#ident.into()))
     });
 
     let bounds = generics_with_ident_and_bounds_only(generics);
@@ -179,20 +171,20 @@ pub fn named_data_type_wrapper(
 ) -> TokenStream {
     let comments = {
         let comments = &container_attrs.doc;
-        quote!(&[#(#comments),*])
+        quote!(vec![#(#comments.into()),*])
     };
     let should_export = match container_attrs.export {
         Some(export) => quote!(Some(#export)),
         None => quote!(None),
     };
     let deprecated = match &container_attrs.deprecated {
-        Some(msg) => quote!(Some(#msg)),
+        Some(msg) => quote!(Some(#msg.into())),
         None => quote!(None),
     };
 
     quote! {
         #crate_ref::NamedDataType {
-            name: #name,
+            name: #name.into(),
             sid: Some(SID),
             impl_location: Some(IMPL_LOCATION),
             comments: #comments,

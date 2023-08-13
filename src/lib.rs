@@ -106,11 +106,6 @@ pub use selection::*;
 /// ```
 pub use specta_macros::Type;
 
-#[doc(hidden)]
-/// This macro is exposed from rspc as a wrapper around [Type] with a correct import path.
-/// This is exposed from here so rspc doesn't need a macro package for 4 lines of code.
-pub use specta_macros::RSPCType;
-
 /// Generates an implementation to help converting a type into into [`DataType`].
 ///
 /// **This is an advanced feature and should probably be limited to usage in libraries built on top of Specta.**

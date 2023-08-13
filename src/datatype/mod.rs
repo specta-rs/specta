@@ -58,17 +58,17 @@ pub enum DataType {
 #[derive(Debug, Clone, PartialEq)]
 pub struct NamedDataType {
     /// The name of the type
-    pub name: &'static str,
+    pub name: Cow<'static, str>,
     /// The Specta ID for the type. The value for this should come from the `sid!();` macro.
     pub sid: Option<TypeSid>,
     /// The code location where this type is implemented. Used for error reporting.
     pub impl_location: Option<ImplLocation>,
     /// Rust documentation comments on the type
-    pub comments: &'static [&'static str],
+    pub comments: Vec<Cow<'static, str>>,
     /// DEPRECATED. This is not used and shouldn't be. Will be removed in Specta v2!
     pub export: Option<bool>,
     /// The Rust deprecated comment if the type is deprecated.
-    pub deprecated: Option<&'static str>,
+    pub deprecated: Option<Cow<'static, str>>,
     /// the actual type definition.
     pub item: NamedDataTypeItem,
 }
@@ -102,7 +102,7 @@ pub enum NamedDataTypeItem {
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub struct DataTypeReference {
-    pub name: &'static str,
+    pub name: Cow<'static, str>,
     pub sid: TypeSid,
     pub generics: Vec<DataType>,
 }
@@ -110,7 +110,7 @@ pub struct DataTypeReference {
 /// A generic parameter to another type.
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
-pub struct GenericType(pub &'static str);
+pub struct GenericType(pub Cow<'static, str>);
 
 impl From<GenericType> for DataType {
     fn from(t: GenericType) -> Self {

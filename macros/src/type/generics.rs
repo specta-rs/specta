@@ -188,6 +188,7 @@ pub fn construct_datatype(
             .iter()
             .find(|(_, ident)| ident == &type_ident)
         {
+            let type_ident = type_ident.to_string();
             return Ok(quote! {
                 let #var_ident = generics.get(#i).cloned().map_or_else(
                     || {
@@ -197,7 +198,7 @@ pub fn construct_datatype(
                                 type_map: opts.type_map
                             },
                             &[#crate_ref::DataType::Generic(#crate_ref::GenericType(
-                                stringify!(#type_ident)
+                                #type_ident.into()
                             ))]
                         )
                     },

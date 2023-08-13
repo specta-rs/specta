@@ -143,7 +143,7 @@ pub fn parse_struct(
                 };
 
                 Ok(quote!(#crate_ref::ObjectField {
-                    key: #field_name,
+                    key: #field_name.into(),
                     optional: #optional,
                     flatten: #flatten,
                     ty: {
@@ -155,7 +155,7 @@ pub fn parse_struct(
             let tag = container_attrs
                 .tag
                 .as_ref()
-                .map(|t| quote!(Some(#t)))
+                .map(|t| quote!(Some(#t.into())))
                 .unwrap_or(quote!(None));
 
             named_data_type_wrapper(
@@ -165,7 +165,7 @@ pub fn parse_struct(
                 quote! {
                     #crate_ref::NamedDataTypeItem::Object(
                         #crate_ref::ObjectType {
-                            generics: vec![#(#definition_generics),*],
+                            generics: vec![#(#definition_generics.into()),*],
                             fields: vec![#(#fields),*],
                             tag: #tag,
                         }
@@ -205,7 +205,7 @@ pub fn parse_struct(
                     name,
                     quote! {
                         #crate_ref::NamedDataTypeItem::Tuple(#crate_ref::TupleType {
-                            generics: vec![#(#definition_generics),*],
+                            generics: vec![#(#definition_generics.into()),*],
                             fields: vec![
                                 {
                                     #ty
@@ -256,7 +256,7 @@ pub fn parse_struct(
                     quote! {
                         #crate_ref::NamedDataTypeItem::Tuple(
                             #crate_ref::TupleType {
-                                generics: vec![#(#definition_generics),*],
+                                generics: vec![#(#definition_generics.into()),*],
                                 fields: vec![#(#fields),*],
                             }
                         )
@@ -271,7 +271,7 @@ pub fn parse_struct(
             quote! {
                 #crate_ref::NamedDataTypeItem::Tuple(
                     #crate_ref::TupleType {
-                        generics: vec![#(#definition_generics),*],
+                        generics: vec![#(#definition_generics.into()),*],
                         fields: vec![],
                     }
                 )
@@ -287,7 +287,7 @@ pub fn parse_struct(
     } else {
         quote! {
             #crate_ref::TypeCategory::Reference(#crate_ref::DataTypeReference {
-                name: #name,
+                name: #name.into(),
                 sid: SID,
                 generics: vec![#(#reference_generics),*],
             })

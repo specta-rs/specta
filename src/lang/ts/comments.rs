@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 /// Allows you to configure how Specta's Typescript exporter will deal with BigInt types ([i64], [i128] etc).
 ///
 /// WARNING: None of these settings affect how your data is actually ser/deserialized.
@@ -25,10 +27,10 @@ pub enum BigIntExportBehavior {
 }
 
 /// The signature for a function responsible for exporting Typescript comments.
-pub type CommentFormatterFn = fn(&[&str]) -> String;
+pub type CommentFormatterFn = fn(&[Cow<'static, str>]) -> String;
 
 /// Converts Typescript comments into JSDoc comments.
-pub fn js_doc(comments: &[&str]) -> String {
+pub fn js_doc(comments: &[Cow<'static, str>]) -> String {
     if comments.is_empty() {
         return "".to_owned();
     }

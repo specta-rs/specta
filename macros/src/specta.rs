@@ -16,6 +16,7 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
     };
 
     let function_name = &function.sig.ident;
+    let function_name_str = function_name.to_string();
     let function_asyncness = match function.sig.asyncness {
         Some(_) => true,
         None => false,
@@ -51,10 +52,10 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
         #[doc(hidden)]
         macro_rules! #wrapper {
             (@asyncness) => { #function_asyncness };
-            (@name) => { stringify!(#function_name) };
-            (@arg_names) => { &[#(stringify!(#arg_names)),* ] };
+            (@name) => { #function_name_str.into() };
+            (@arg_names) => { &[#(stringify!(#arg_names).into()),* ] };
             (@signature) => { fn(#(#arg_signatures),*) -> _ };
-            (@docs) => { vec![#(#docs),*] };
+            (@docs) => { vec![#(#docs.into()),*] };
         }
 
         // allow the macro to be resolved with the same path as the function

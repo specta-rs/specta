@@ -118,7 +118,7 @@ pub fn parse_enum(
                             .collect::<syn::Result<Vec<TokenStream>>>()?;
 
                         quote!(#crate_ref::EnumVariant::Unnamed(#crate_ref::TupleType {
-                            fields: vec![#(#fields),*],
+                            fields: vec![#(#fields.into()),*],
                             generics: vec![]
                         }))
                     }
@@ -152,7 +152,7 @@ pub fn parse_enum(
                                 };
 
                                 Ok(quote!(#crate_ref::ObjectField {
-                                    key: #field_name,
+                                    key: #field_name.into(),
                                     optional: false,
                                     flatten: false,
                                     ty: {
@@ -165,7 +165,7 @@ pub fn parse_enum(
                             .collect::<syn::Result<Vec<TokenStream>>>()?;
 
                         quote!(#crate_ref::EnumVariant::Named(#crate_ref::ObjectType {
-                            fields: vec![#(#fields),*],
+                            fields: vec![#(#fields.into()),*],
                             generics: vec![],
                             tag: None,
                         }))
@@ -181,7 +181,7 @@ pub fn parse_enum(
         Tagged::Untagged => (
             quote! {
                 #crate_ref::EnumType::Untagged {
-                    generics: vec![#(#definition_generics),*],
+                    generics: vec![#(#definition_generics.into()),*],
                     variants: vec![#(#variant_types),*],
                 }
             },
@@ -192,8 +192,8 @@ pub fn parse_enum(
         Tagged::Externally => (
             quote! {
                 #crate_ref::EnumType::Tagged {
-                    generics: vec![#(#definition_generics),*],
-                    variants: vec![#((#variant_names, #variant_types)),*],
+                    generics: vec![#(#definition_generics.into()),*],
+                    variants: vec![#((#variant_names.into(), #variant_types)),*],
                     repr: #crate_ref::EnumRepr::External,
                 }
             },
@@ -206,9 +206,9 @@ pub fn parse_enum(
         Tagged::Adjacently { tag, content } => (
             quote! {
                 #crate_ref::EnumType::Tagged {
-                    generics: vec![#(#definition_generics),*],
-                    variants: vec![#((#variant_names, #variant_types)),*],
-                    repr: #crate_ref::EnumRepr::Adjacent { tag: #tag, content: #content },
+                    generics: vec![#(#definition_generics.into()),*],
+                    variants: vec![#((#variant_names.into(), #variant_types)),*],
+                    repr: #crate_ref::EnumRepr::Adjacent { tag: #tag.into(), content: #content.into() },
                 }
             },
             true,
@@ -216,9 +216,9 @@ pub fn parse_enum(
         Tagged::Internally { tag } => (
             quote! {
                 #crate_ref::EnumType::Tagged {
-                    generics: vec![#(#definition_generics),*],
-                    variants: vec![#((#variant_names, #variant_types)),*],
-                    repr: #crate_ref::EnumRepr::Internal { tag: #tag },
+                    generics: vec![#(#definition_generics.into()),*],
+                    variants: vec![#((#variant_names.into(), #variant_types)),*],
+                    repr: #crate_ref::EnumRepr::Internal { tag: #tag.into() },
                 }
             },
             data.variants
@@ -242,7 +242,7 @@ pub fn parse_enum(
         body,
         quote! {
             #crate_ref::TypeCategory::Reference(#crate_ref::DataTypeReference {
-                name: #name,
+                name: #name.into(),
                 sid: SID,
                 generics: vec![#(#reference_generics),*],
             })

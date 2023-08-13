@@ -1,6 +1,6 @@
 mod attr;
 
-use quote::{format_ident, quote};
+use quote::quote;
 use syn::{parse_macro_input, Data, DeriveInput, Fields};
 
 use attr::*;
@@ -15,12 +15,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let mut attrs = parse_attrs(attrs)?;
     let container_attrs = ContainerAttr::from_attrs(&mut attrs)?;
 
-    let crate_ref = format_ident!(
-        "{}",
-        container_attrs
-            .crate_name
-            .unwrap_or_else(|| "specta".into())
-    );
+    let crate_ref = container_attrs.crate_name.unwrap_or_else(|| quote!(specta));
 
     Ok(match data {
         Data::Struct(data) => match &data.fields {
@@ -40,11 +35,16 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         return None;
                     }
 
-                    let ident = &field.ident;
+                    let ident = field
+                        .ident
+                        .as_ref()
+                        // TODO: Proper syn error would be nice
+                        .expect("'specta::DataTypeFrom' requires named fields.");
+                    let ident_str = ident.to_string();
 
                     Some(quote! {
                         #crate_ref::ObjectField {
-                            key: stringify!(#ident),
+                            key: #ident_str.into(),
                             optional: false,
                             flatten: false,
                             ty: t.#ident.into(),

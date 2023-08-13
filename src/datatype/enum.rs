@@ -1,9 +1,13 @@
+use std::borrow::Cow;
+
 use crate::{
     datatype::{DataType, ObjectType, TupleType},
     ExportError, ImplLocation,
 };
 
-/// Type of an enum.
+/// Enum type which dictates how the enum is represented.
+///
+/// The tagging refers to the [Serde concept](https://serde.rs/enum-representations.html).
 ///
 /// [`Untagged`](EnumType::Untagged) is here rather than in [`EnumRepr`] as it is the only enum representation that does not have tags on its variants.
 /// Separating it allows for better typesafety since `variants` doesn't have to be a [`Vec`] of tuples.
@@ -12,11 +16,11 @@ use crate::{
 pub enum EnumType {
     Untagged {
         variants: Vec<EnumVariant>,
-        generics: Vec<&'static str>,
+        generics: Vec<Cow<'static, str>>,
     },
     Tagged {
-        variants: Vec<(&'static str, EnumVariant)>,
-        generics: Vec<&'static str>,
+        variants: Vec<(Cow<'static, str>, EnumVariant)>,
+        generics: Vec<Cow<'static, str>>,
         repr: EnumRepr,
     },
 }
@@ -28,7 +32,7 @@ impl From<EnumType> for DataType {
 }
 
 impl EnumType {
-    pub(crate) fn generics(&self) -> &Vec<&'static str> {
+    pub(crate) fn generics(&self) -> &Vec<Cow<'static, str>> {
         match self {
             Self::Untagged { generics, .. } => generics,
             Self::Tagged { generics, .. } => generics,
@@ -97,11 +101,11 @@ impl EnumType {
 pub enum EnumRepr {
     External,
     Internal {
-        tag: &'static str,
+        tag: Cow<'static, str>,
     },
     Adjacent {
-        tag: &'static str,
-        content: &'static str,
+        tag: Cow<'static, str>,
+        content: Cow<'static, str>,
     },
 }
 

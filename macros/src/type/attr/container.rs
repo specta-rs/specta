@@ -9,10 +9,10 @@ pub struct ContainerAttr {
     pub rename_all: Option<Inflection>,
     pub rename: Option<TokenStream>,
     pub tag: Option<String>,
-    pub crate_name: Option<String>,
+    pub crate_name: Option<TokenStream>,
     pub inline: bool,
     pub remote: Option<TokenStream>,
-    pub export: Option<bool>, // Option is used because if not explicitly set, we enable it
+    pub export: Option<bool>,
     pub doc: Vec<String>,
     pub deprecated: Option<String>,
 }
@@ -22,18 +22,16 @@ impl_parse! {
         "rename_all" => out.rename_all = out.rename_all.take().or(Some(attr.parse_inflection()?)),
         "rename" => {
             let attr = attr.parse_string()?;
-            out.rename = out.rename.take().or_else(|| Some({
-                let name = crate::r#type::unraw_raw_ident(&quote::format_ident!("{}", attr));
-                quote::quote!( #name )
-            }))
+            out.rename = out.rename.take().or_else(|| Some(
+                crate::r#type::unraw_raw_ident(&quote::format_ident!("{}", attr)).to_token_stream()
+            ))
         },
         // TODO: This is deprecated and will be removed in a future version. Use `rename_from_path` method instead.
         "rename_to_value" => {
             let attr = attr.parse_path()?;
-            out.rename = out.rename.take().or_else(|| Some({
-                let expr = attr.to_token_stream();
-                quote::quote!( #expr )
-            }))
+            out.rename = out.rename.take().or_else(|| Some(
+                attr.to_token_stream()
+            ))
         },
         "rename_from_path" => {
             let attr = attr.parse_path()?;
@@ -45,7 +43,7 @@ impl_parse! {
         "tag" => out.tag = out.tag.take().or(Some(attr.parse_string()?)),
         "crate" => {
             if attr.root_ident == "specta" {
-                out.crate_name = out.crate_name.take().or(Some(attr.parse_string()?));
+                out.crate_name = out.crate_name.take().or(Some(attr.parse_path()?.to_token_stream()));
             }
         },
         "inline" => out.inline = attr.parse_bool().unwrap_or(true),

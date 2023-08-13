@@ -1,4 +1,5 @@
 use core::fmt;
+use std::borrow::Cow;
 
 use thiserror::Error;
 
@@ -38,7 +39,11 @@ pub enum TsExportError {
     #[error("Attempted to export '{0}' with tagging but the type is not tagged.")]
     InvalidTagging(ExportPath),
     #[error("Unable to export type named '{0}' from locations '{:?}' '{:?}'", .1.map(|v| v.as_str()), .2.map(|v| v.as_str()))]
-    DuplicateTypeName(&'static str, Option<ImplLocation>, Option<ImplLocation>),
+    DuplicateTypeName(
+        Cow<'static, str>,
+        Option<ImplLocation>,
+        Option<ImplLocation>,
+    ),
     #[error("{0}")]
     SpectaExportError(#[from] ExportError),
     #[error("IO error: {0}")]

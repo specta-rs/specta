@@ -44,11 +44,11 @@ pub fn ts_with_cfg(path: &str, conf: &ExportConfiguration) -> Result<(), TsExpor
         match dt {
             Some(dt) => {
                 if let Some((existing_sid, existing_impl_location)) =
-                    map.insert(dt.name, (sid, dt.impl_location))
+                    map.insert(dt.name.clone(), (sid, dt.impl_location))
                 {
                     if existing_sid != sid {
                         return Err(TsExportError::DuplicateTypeName(
-                            dt.name,
+                            dt.name.clone(),
                             dt.impl_location,
                             existing_impl_location,
                         ));

@@ -4,6 +4,8 @@ mod error;
 mod export_config;
 mod reserved_terms;
 
+use std::borrow::Cow;
+
 pub use comments::*;
 pub use context::*;
 pub use error::*;
@@ -94,7 +96,7 @@ fn export_datatype_inner(
     }: &NamedDataType,
     type_map: &TypeDefs,
 ) -> Result<String, TsExportError> {
-    let ctx = ctx.with(PathItem::Type(name));
+    let ctx = ctx.with(PathItem::Type(name.clone()));
     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
 
     let inline_ts = datatype_inner(
@@ -161,7 +163,7 @@ fn datatype_inner(
     Ok(match &typ {
         DataType::Any => "any".into(),
         DataType::Primitive(p) => {
-            let ctx = ctx.with(PathItem::Type(p.to_rust_str()));
+            let ctx = ctx.with(PathItem::Type(p.to_rust_str().into()));
             match p {
                 primitive_def!(i8 i16 i32 u8 u16 u32 f32 f64) => "number".into(),
                 primitive_def!(usize isize i64 u64 i128 u128) => match ctx.conf.bigint {
@@ -227,19 +229,29 @@ fn datatype_inner(
             name,
             item: NamedDataTypeItem::Tuple(TupleType { fields, .. }),
             ..
-        }) => tuple_datatype(ctx.with(PathItem::Type(name)), fields, type_map)?,
+        }) => tuple_datatype(ctx.with(PathItem::Type(name.clone())), fields, type_map)?,
         DataType::Tuple(TupleType { fields, .. }) => tuple_datatype(ctx, fields, type_map)?,
         DataType::Named(NamedDataType {
             name,
             item: NamedDataTypeItem::Object(item),
             ..
-        }) => object_datatype(ctx.with(PathItem::Type(name)), Some(name), item, type_map)?,
+        }) => object_datatype(
+            ctx.with(PathItem::Type(name.clone())),
+            Some(name),
+            item,
+            type_map,
+        )?,
         DataType::Object(item) => object_datatype(ctx, None, item, type_map)?,
         DataType::Named(NamedDataType {
             name,
             item: NamedDataTypeItem::Enum(item),
             ..
-        }) => enum_datatype(ctx.with(PathItem::Type(name)), Some(name), item, type_map)?,
+        }) => enum_datatype(
+            ctx.with(PathItem::Type(name.clone())),
+            Some(name),
+            item,
+            type_map,
+        )?,
         DataType::Enum(item) => enum_datatype(ctx, None, item, type_map)?,
         DataType::Result(result) => {
             let mut variants = vec![
@@ -254,7 +266,7 @@ fn datatype_inner(
             generics => {
                 let generics = generics
                     .iter()
-                    .map(|v| datatype_inner(ctx.with(PathItem::Type(name)), v, type_map))
+                    .map(|v| datatype_inner(ctx.with(PathItem::Type(name.clone())), v, type_map))
                     .collect::<Result<Vec<_>, _>>()?
                     .join(", ");
 
@@ -285,7 +297,7 @@ fn tuple_datatype(
 
 fn object_datatype(
     ctx: ExportContext,
-    name: Option<&'static str>,
+    name: Option<&Cow<'static, str>>,
     ObjectType { fields, tag, .. }: &ObjectType,
     type_map: &TypeDefs,
 ) -> Result<String, TsExportError> {
@@ -296,15 +308,19 @@ fn object_datatype(
                 .iter()
                 .filter(|f| f.flatten)
                 .map(|field| {
-                    datatype_inner(ctx.with(PathItem::Field(field.key)), &field.ty, type_map)
-                        .map(|type_str| format!("({type_str})"))
+                    datatype_inner(
+                        ctx.with(PathItem::Field(field.key.clone())),
+                        &field.ty,
+                        type_map,
+                    )
+                    .map(|type_str| format!("({type_str})"))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
 
             let mut unflattened_fields = fields
                 .iter()
                 .filter(|f| !f.flatten)
-                .map(|f| object_field_to_ts(ctx.with(PathItem::Field(f.key)), f, type_map))
+                .map(|f| object_field_to_ts(ctx.with(PathItem::Field(f.key.clone())), f, type_map))
                 .collect::<Result<Vec<_>, _>>()?;
 
             if let Some(tag) = tag {
@@ -325,7 +341,7 @@ fn object_datatype(
 
 fn enum_datatype(
     ctx: ExportContext,
-    _ty_name: Option<&'static str>,
+    _ty_name: Option<&Cow<'static, str>>,
     e: &EnumType,
     type_map: &TypeDefs,
 ) -> Result<String, TsExportError> {
@@ -338,7 +354,7 @@ fn enum_datatype(
             let mut variants = variants
                 .iter()
                 .map(|(variant_name, variant)| {
-                    let ctx = ctx.with(PathItem::Variant(variant_name));
+                    let ctx = ctx.with(PathItem::Variant(variant_name.clone()));
                     let sanitised_name = sanitise_key(variant_name, true);
 
                     Ok(match (repr, variant) {
@@ -358,7 +374,7 @@ fn enum_datatype(
                                     .iter()
                                     .map(|v| {
                                         object_field_to_ts(
-                                            ctx.with(PathItem::Field(v.key)),
+                                            ctx.with(PathItem::Field(v.key.clone())),
                                             v,
                                             type_map,
                                         )
@@ -430,7 +446,7 @@ fn object_field_to_ts(
     field: &ObjectField,
     type_map: &TypeDefs,
 ) -> Result<String, TsExportError> {
-    let field_name_safe = sanitise_key(field.key, false);
+    let field_name_safe = sanitise_key(&field.key, false);
 
     // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
     let (key, ty) = match field.optional {

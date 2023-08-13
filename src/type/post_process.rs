@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 
 use crate::{ImplLocation, TypeDefs};
 
@@ -6,7 +6,11 @@ use crate::{ImplLocation, TypeDefs};
 #[doc(hidden)]
 pub fn detect_duplicate_type_names(
     type_map: &TypeDefs,
-) -> Vec<(&'static str, Option<ImplLocation>, Option<ImplLocation>)> {
+) -> Vec<(
+    Cow<'static, str>,
+    Option<ImplLocation>,
+    Option<ImplLocation>,
+)> {
     let mut errors = Vec::new();
 
     let mut map = HashMap::with_capacity(type_map.len());
@@ -14,10 +18,10 @@ pub fn detect_duplicate_type_names(
         match dt {
             Some(dt) => {
                 if let Some((existing_sid, existing_impl_location)) =
-                    map.insert(dt.name, (sid, dt.impl_location))
+                    map.insert(dt.name.clone(), (sid, dt.impl_location))
                 {
                     if existing_sid != sid {
-                        errors.push((dt.name, dt.impl_location, existing_impl_location));
+                        errors.push((dt.name.clone(), dt.impl_location, existing_impl_location));
                     }
                 }
             }

@@ -1,10 +1,12 @@
+use std::borrow::Cow;
+
 use crate::{DataType, NamedDataType, NamedDataTypeItem};
 
 /// A field in an [`ObjectType`].
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub struct ObjectField {
-    pub key: &'static str,
+    pub key: Cow<'static, str>,
     pub optional: bool,
     pub flatten: bool,
     pub ty: DataType,
@@ -15,9 +17,9 @@ pub struct ObjectField {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[allow(missing_docs)]
 pub struct ObjectType {
-    pub generics: Vec<&'static str>,
+    pub generics: Vec<Cow<'static, str>>,
     pub fields: Vec<ObjectField>,
-    pub tag: Option<&'static str>,
+    pub tag: Option<Cow<'static, str>>,
 }
 
 impl ObjectType {
@@ -29,12 +31,12 @@ impl ObjectType {
     /// Convert a [`ObjectType`] to a named [`NamedDataType`].
     ///
     /// This can easily be converted to a [`DataType`] by putting it inside the [DataType::Named] variant.
-    pub fn to_named(self, name: &'static str) -> NamedDataType {
+    pub fn to_named(self, name: impl Into<Cow<'static, str>>) -> NamedDataType {
         NamedDataType {
-            name,
+            name: name.into(),
             sid: None,
             impl_location: None,
-            comments: &[],
+            comments: vec![],
             export: None,
             deprecated: None,
             item: NamedDataTypeItem::Object(self),

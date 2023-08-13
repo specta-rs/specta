@@ -1,12 +1,12 @@
-use std::fmt;
+use std::{borrow::Cow, fmt};
 
 use super::ExportConfiguration;
 
 #[derive(Clone, Debug)]
 pub(crate) enum PathItem {
-    Type(&'static str),
-    Field(&'static str),
-    Variant(&'static str),
+    Type(Cow<'static, str>),
+    Field(Cow<'static, str>),
+    Variant(Cow<'static, str>),
 }
 
 #[derive(Clone)]
