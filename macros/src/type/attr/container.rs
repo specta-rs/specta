@@ -26,13 +26,6 @@ impl_parse! {
                 crate::r#type::unraw_raw_ident(&quote::format_ident!("{}", attr)).to_token_stream()
             ))
         },
-        // TODO: This is deprecated and will be removed in a future version. Use `rename_from_path` method instead.
-        "rename_to_value" => {
-            let attr = attr.parse_path()?;
-            out.rename = out.rename.take().or_else(|| Some(
-                attr.to_token_stream()
-            ))
-        },
         "rename_from_path" => {
             let attr = attr.parse_path()?;
             out.rename = out.rename.take().or_else(|| Some({
