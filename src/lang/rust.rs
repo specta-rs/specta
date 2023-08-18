@@ -17,7 +17,7 @@ fn datatype(t: &DataTypeExt) -> Result<String, String> {
         DataType::Primitive(ty) => ty.to_rust_str().to_owned(),
         DataType::Literal(_) => todo!(),
         DataType::Nullable(t) => format!("Option<{}>", datatype(t)?),
-        DataType::Record(t) => format!("HashMap<{}, {}>", datatype(&t.0)?, datatype(&t.1)?),
+        DataType::Map(t) => format!("HashMap<{}, {}>", datatype(&t.0)?, datatype(&t.1)?),
         DataType::List(t) => format!("Vec<{}>", datatype(t)?),
         DataType::Tuple(TupleType { fields, .. }) => match &fields[..] {
             [] => "()".to_string(),

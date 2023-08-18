@@ -44,7 +44,7 @@ fn datatype(t: &DataTypeExt) -> Result<String, String> {
                     .join(", ")
             ),
         },
-        DataType::Record(t) => format!("[{}: {}]", datatype(&t.0)?, datatype(&t.1)?),
+        DataType::Map(t) => format!("[{}: {}]", datatype(&t.0)?, datatype(&t.1)?),
         DataType::Generic(GenericType(t)) => t.to_string(),
         DataType::Reference { name, generics, .. } => match &generics[..] {
             [] => name.to_string(),

@@ -40,7 +40,7 @@ pub enum DataType {
     Literal(LiteralType),
     List(Box<DataType>),
     Nullable(Box<DataType>),
-    Record(Box<(DataType, DataType)>),
+    Map(Box<(DataType, DataType)>),
     // Named reference types
     Named(NamedDataType),
     // Anonymous Reference types

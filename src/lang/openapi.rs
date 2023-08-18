@@ -85,7 +85,7 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
             // schema.schema_data.nullable = true; // TODO
             schema
         }
-        // DataType::Record(def) => {
+        // DataType::Map(def) => {
         //     format!("Record<{}, {}>", to_openapi(&def.0), to_openapi(&def.1))
         // }
         DataType::List(def) => ReferenceOr::Item(Schema {

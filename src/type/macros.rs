@@ -131,7 +131,7 @@ macro_rules! impl_for_map {
     ($ty:path as $name:expr) => {
         impl<K: Type, V: Type> Type for $ty {
             fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-                Ok(DataType::Record(Box::new((
+                Ok(DataType::Map(Box::new((
                     generics.get(0).cloned().map_or_else(
                         || {
                             K::inline(
@@ -160,7 +160,7 @@ macro_rules! impl_for_map {
             }
 
             fn reference(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-                Ok(DataType::Record(Box::new((
+                Ok(DataType::Map(Box::new((
                     generics.get(0).cloned().map_or_else(
                         || {
                             K::reference(

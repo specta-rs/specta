@@ -29,7 +29,7 @@ fn datatype(t: &DataTypeExt) -> Result<String, String> {
     //             "Specta does not currently support exporting tuple types to Go.".to_owned(),
     //         );
     //     }
-    //     DataType::Record(t) => format!("map[{}]{}", datatype(&t.0)?, datatype(&t.1)?),
+    //     DataType::Map(t) => format!("map[{}]{}", datatype(&t.0)?, datatype(&t.1)?),
     //     DataType::Generic(GenericType(t)) => t.to_string(),
     //     DataType::Reference { name, generics, .. } => match &generics[..] {
     //         [] => name.to_string(),

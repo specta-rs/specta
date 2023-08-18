@@ -194,7 +194,7 @@ fn datatype_inner(
                 format!("{dt} | null")
             }
         }
-        DataType::Record(def) => {
+        DataType::Map(def) => {
             let is_enum = match &def.0 {
                 DataType::Enum(_) => true,
                 DataType::Named(dt) => matches!(dt.item, NamedDataTypeItem::Enum(_)),

@@ -33,7 +33,7 @@ fn datatype(t: &DataTypeExt) -> Result<String, String> {
         .to_string(),
         DataType::List(t) => format!("List<{}>", datatype(t)?),
         DataType::Tuple(_) => return Err("Kotlin does not support tuple types".to_owned()),
-        DataType::Record(t) => format!("HashMap<{}, {}>", datatype(&t.0)?, datatype(&t.1)?),
+        DataType::Map(t) => format!("HashMap<{}, {}>", datatype(&t.0)?, datatype(&t.1)?),
         DataType::Generic(GenericType(t)) => t.to_string(),
         DataType::Reference { name, generics, .. } => match &generics[..] {
             [] => name.to_string(),
