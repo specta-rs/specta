@@ -2,6 +2,7 @@ mod comments;
 mod context;
 mod error;
 mod export_config;
+mod formatter;
 mod reserved_terms;
 
 use std::borrow::Cow;
@@ -10,6 +11,7 @@ pub use comments::*;
 pub use context::*;
 pub use error::*;
 pub use export_config::*;
+pub use formatter::*;
 use reserved_terms::*;
 
 use crate::*;
@@ -17,17 +19,14 @@ use crate::*;
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string with an export.
 ///
 /// Eg. `export type Foo = { demo: string; };`
-pub fn export_ref<T: NamedType>(
-    _: &T,
-    conf: &ExportConfiguration,
-) -> Result<String, TsExportError> {
+pub fn export_ref<T: NamedType>(_: &T, conf: &ExportConfig) -> Result<String, TsExportError> {
     export::<T>(conf)
 }
 
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string with an export.
 ///
 /// Eg. `export type Foo = { demo: string; };`
-pub fn export<T: NamedType>(conf: &ExportConfiguration) -> Result<String, TsExportError> {
+pub fn export<T: NamedType>(conf: &ExportConfig) -> Result<String, TsExportError> {
     let mut type_map = TypeMap::default();
     let named_data_type = T::definition_named_data_type(DefOpts {
         parent_inline: false,
@@ -45,14 +44,14 @@ pub fn export<T: NamedType>(conf: &ExportConfiguration) -> Result<String, TsExpo
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string.
 ///
 /// Eg. `{ demo: string; };`
-pub fn inline_ref<T: Type>(_: &T, conf: &ExportConfiguration) -> Result<String, TsExportError> {
+pub fn inline_ref<T: Type>(_: &T, conf: &ExportConfig) -> Result<String, TsExportError> {
     inline::<T>(conf)
 }
 
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string.
 ///
 /// Eg. `{ demo: string; };`
-pub fn inline<T: Type>(conf: &ExportConfiguration) -> Result<String, TsExportError> {
+pub fn inline<T: Type>(conf: &ExportConfig) -> Result<String, TsExportError> {
     let mut type_map = TypeMap::default();
     let result = datatype(
         conf,
@@ -77,7 +76,7 @@ pub fn inline<T: Type>(conf: &ExportConfiguration) -> Result<String, TsExportErr
 ///
 /// Eg. `export Name = { demo: string; }`
 pub fn export_named_datatype(
-    conf: &ExportConfiguration,
+    conf: &ExportConfig,
     typ: &NamedDataType,
     type_map: &TypeMap,
 ) -> Result<String, TsExportError> {
@@ -146,7 +145,7 @@ fn export_datatype_inner(
 ///
 /// Eg. `{ demo: string; }`
 pub fn datatype(
-    conf: &ExportConfiguration,
+    conf: &ExportConfig,
     typ: &DataType,
     type_map: &TypeMap,
 ) -> Result<String, TsExportError> {

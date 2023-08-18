@@ -1,5 +1,5 @@
 use specta::{
-    ts::{ExportConfiguration, ExportPath, NamedLocation, TsExportError},
+    ts::{ExportConfig, ExportPath, NamedLocation, TsExportError},
     Type,
 };
 
@@ -40,7 +40,7 @@ mod aenum {
 #[test]
 fn test_ts_reserved_keyworks() {
     assert_eq!(
-        specta::ts::export::<astruct::r#enum>(&ExportConfiguration::default()),
+        specta::ts::export::<astruct::r#enum>(&ExportConfig::default()),
         Err(TsExportError::ForbiddenName(
             NamedLocation::Type,
             ExportPath::new_unsafe("enum"),
@@ -48,7 +48,7 @@ fn test_ts_reserved_keyworks() {
         ))
     );
     assert_eq!(
-        specta::ts::export::<atuplestruct::r#enum>(&ExportConfiguration::default()),
+        specta::ts::export::<atuplestruct::r#enum>(&ExportConfig::default()),
         Err(TsExportError::ForbiddenName(
             NamedLocation::Type,
             ExportPath::new_unsafe("enum"),
@@ -56,7 +56,7 @@ fn test_ts_reserved_keyworks() {
         ))
     );
     assert_eq!(
-        specta::ts::export::<aenum::r#enum>(&ExportConfiguration::default()),
+        specta::ts::export::<aenum::r#enum>(&ExportConfig::default()),
         Err(TsExportError::ForbiddenName(
             NamedLocation::Type,
             ExportPath::new_unsafe("enum"),

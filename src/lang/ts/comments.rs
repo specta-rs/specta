@@ -1,10 +1,12 @@
 use std::borrow::Cow;
 
+use super::CommentFormatterFn;
+
 /// Allows you to configure how Specta's Typescript exporter will deal with BigInt types ([i64], [i128] etc).
 ///
 /// WARNING: None of these settings affect how your data is actually ser/deserialized.
 /// It's up to you to adjust your ser/deserialize settings.
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub enum BigIntExportBehavior {
     /// Export BigInt as a Typescript `string`
     ///
@@ -25,9 +27,6 @@ pub enum BigIntExportBehavior {
     #[doc(hidden)]
     FailWithReason(&'static str),
 }
-
-/// The signature for a function responsible for exporting Typescript comments.
-pub type CommentFormatterFn = fn(&[Cow<'static, str>]) -> String;
 
 /// Converts Typescript comments into JSDoc comments.
 pub fn js_doc(comments: &[Cow<'static, str>]) -> String {

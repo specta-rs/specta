@@ -10,7 +10,7 @@ use std::{
 
 use serde::Serialize;
 use specta::{
-    ts::{BigIntExportBehavior, ExportConfiguration},
+    ts::{BigIntExportBehavior, ExportConfig},
     Any, Type,
 };
 
@@ -131,7 +131,7 @@ fn typescript_types() {
         DocComments,
         "/**\n * Type level doc comment\n */\nexport type DocComments = { a: string }"
     );
-    assert_ts_export!(DocComments, "export type DocComments = { a: string }"; &ExportConfiguration::new().comment_style(None));
+    assert_ts_export!(DocComments, "export type DocComments = { a: string }"; &ExportConfig::new().comment_style(None));
 
     assert_ts!(Recursive, "{ a: number; children: Recursive[] }");
 
@@ -173,26 +173,26 @@ fn typescript_types() {
     // https://github.com/oscartbeaumont/specta/issues/77
     assert_eq!(
         specta::ts::inline::<std::time::SystemTime>(
-            &ExportConfiguration::new().bigint(BigIntExportBehavior::Number)
+            &ExportConfig::new().bigint(BigIntExportBehavior::Number)
         ),
         Ok(r#"{ duration_since_epoch: number; duration_since_unix_epoch: number }"#.into())
     );
     assert_eq!(
         specta::ts::inline::<std::time::SystemTime>(
-            &ExportConfiguration::new().bigint(BigIntExportBehavior::String)
+            &ExportConfig::new().bigint(BigIntExportBehavior::String)
         ),
         Ok(r#"{ duration_since_epoch: string; duration_since_unix_epoch: number }"#.into())
     );
 
     assert_eq!(
         specta::ts::inline::<std::time::Duration>(
-            &ExportConfiguration::new().bigint(BigIntExportBehavior::Number)
+            &ExportConfig::new().bigint(BigIntExportBehavior::Number)
         ),
         Ok(r#"{ secs: number; nanos: number }"#.into())
     );
     assert_eq!(
         specta::ts::inline::<std::time::Duration>(
-            &ExportConfiguration::new().bigint(BigIntExportBehavior::String)
+            &ExportConfig::new().bigint(BigIntExportBehavior::String)
         ),
         Ok(r#"{ secs: string; nanos: number }"#.into())
     );

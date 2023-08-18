@@ -1,6 +1,6 @@
 use specta::{
     export,
-    ts::{BigIntExportBehavior, ExportConfiguration},
+    ts::{BigIntExportBehavior, ExportConfig},
     Type,
 };
 
@@ -23,7 +23,7 @@ fn main() {
     export::ts_with_cfg(
         "./bindings2.ts",
         // Be aware this won't be typesafe unless your using a ser/deserializer that converts BigInt types to a number.
-        &ExportConfiguration::default().bigint(BigIntExportBehavior::Number),
+        &ExportConfig::default().bigint(BigIntExportBehavior::Number),
     )
     .unwrap();
 }

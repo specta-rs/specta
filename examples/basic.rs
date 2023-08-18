@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use specta::{
-    ts::{self, ExportConfiguration},
+    ts::{self, ExportConfig},
     Type,
 };
 
@@ -34,7 +34,7 @@ pub struct Something {
 }
 
 fn main() {
-    let ts_str = ts::export::<TypeOne>(&ExportConfiguration::default()).unwrap();
+    let ts_str = ts::export::<TypeOne>(&ExportConfig::default()).unwrap();
     println!("{ts_str}");
     assert_eq!(
         ts_str,
@@ -42,21 +42,21 @@ fn main() {
             .to_string()
     );
 
-    let ts_str = ts::export::<GenericType<()>>(&ExportConfiguration::default()).unwrap();
+    let ts_str = ts::export::<GenericType<()>>(&ExportConfig::default()).unwrap();
     println!("{ts_str}");
     assert_eq!(
         ts_str,
         "export type GenericType<A> = { my_field: string; generic: A }".to_string()
     );
 
-    let ts_str = ts::export::<MyEnum>(&ExportConfiguration::default()).unwrap();
+    let ts_str = ts::export::<MyEnum>(&ExportConfig::default()).unwrap();
     println!("{ts_str}");
     assert_eq!(
         ts_str,
         r#"export type MyEnum = "A" | "B" | "C""#.to_string()
     );
 
-    let ts_str = ts::export::<Something>(&ExportConfiguration::default()).unwrap();
+    let ts_str = ts::export::<Something>(&ExportConfig::default()).unwrap();
     println!("{ts_str}");
     assert_eq!(
         ts_str,

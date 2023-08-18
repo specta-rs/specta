@@ -28,7 +28,7 @@
 //!
 //! fn main() {
 //!     assert_eq!(
-//!         ts::export::<MyCustomType>(&ExportConfiguration::default()).unwrap(),
+//!         ts::export::<MyCustomType>(&ExportConfig::default()).unwrap(),
 //!         "export type MyCustomType = { my_field: string }".to_string()
 //!     );
 //! }

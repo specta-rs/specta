@@ -32,7 +32,7 @@ pub struct ReferingToUnexportedType {
 fn test_export_feature() {
     use specta::{
         export,
-        ts::{BigIntExportBehavior, ExportConfiguration},
+        ts::{BigIntExportBehavior, ExportConfig},
     };
     use std::fs;
 
