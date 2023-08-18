@@ -28,7 +28,7 @@ pub fn export_ref<T: NamedType>(
 ///
 /// Eg. `export type Foo = { demo: string; };`
 pub fn export<T: NamedType>(conf: &ExportConfiguration) -> Result<String, TsExportError> {
-    let mut type_map = TypeDefs::default();
+    let mut type_map = TypeMap::default();
     let named_data_type = T::definition_named_data_type(DefOpts {
         parent_inline: false,
         type_map: &mut type_map,
@@ -53,7 +53,7 @@ pub fn inline_ref<T: Type>(_: &T, conf: &ExportConfiguration) -> Result<String, 
 ///
 /// Eg. `{ demo: string; };`
 pub fn inline<T: Type>(conf: &ExportConfiguration) -> Result<String, TsExportError> {
-    let mut type_map = TypeDefs::default();
+    let mut type_map = TypeMap::default();
     let result = datatype(
         conf,
         &T::inline(
@@ -79,7 +79,7 @@ pub fn inline<T: Type>(conf: &ExportConfiguration) -> Result<String, TsExportErr
 pub fn export_named_datatype(
     conf: &ExportConfiguration,
     typ: &NamedDataType,
-    type_map: &TypeDefs,
+    type_map: &TypeMap,
 ) -> Result<String, TsExportError> {
     // TODO: Duplicate type name detection?
 
@@ -94,7 +94,7 @@ fn export_datatype_inner(
         item,
         ..
     }: &NamedDataType,
-    type_map: &TypeDefs,
+    type_map: &TypeMap,
 ) -> Result<String, TsExportError> {
     let ctx = ctx.with(PathItem::Type(name.clone()));
     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
@@ -148,7 +148,7 @@ fn export_datatype_inner(
 pub fn datatype(
     conf: &ExportConfiguration,
     typ: &DataType,
-    type_map: &TypeDefs,
+    type_map: &TypeMap,
 ) -> Result<String, TsExportError> {
     // TODO: Duplicate type name detection?
 
@@ -158,7 +158,7 @@ pub fn datatype(
 fn datatype_inner(
     ctx: ExportContext,
     typ: &DataType,
-    type_map: &TypeDefs,
+    type_map: &TypeMap,
 ) -> Result<String, TsExportError> {
     Ok(match &typ {
         DataType::Any => "any".into(),
@@ -280,7 +280,7 @@ fn datatype_inner(
 fn tuple_datatype(
     ctx: ExportContext,
     fields: &[DataType],
-    type_map: &TypeDefs,
+    type_map: &TypeMap,
 ) -> Result<String, TsExportError> {
     match fields {
         [] => Ok("null".to_string()),
@@ -299,7 +299,7 @@ fn object_datatype(
     ctx: ExportContext,
     name: Option<&Cow<'static, str>>,
     ObjectType { fields, tag, .. }: &ObjectType,
-    type_map: &TypeDefs,
+    type_map: &TypeMap,
 ) -> Result<String, TsExportError> {
     match &fields[..] {
         [] => Ok("null".to_string()),
@@ -343,7 +343,7 @@ fn enum_datatype(
     ctx: ExportContext,
     _ty_name: Option<&Cow<'static, str>>,
     e: &EnumType,
-    type_map: &TypeDefs,
+    type_map: &TypeMap,
 ) -> Result<String, TsExportError> {
     if e.variants_len() == 0 {
         return Ok("never".to_string());
@@ -444,7 +444,7 @@ impl LiteralType {
 fn object_field_to_ts(
     ctx: ExportContext,
     field: &ObjectField,
-    type_map: &TypeDefs,
+    type_map: &TypeMap,
 ) -> Result<String, TsExportError> {
     let field_name_safe = sanitise_key(&field.key, false);
 

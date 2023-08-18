@@ -32,12 +32,12 @@ use crate::*;
 #[macro_export]
 macro_rules! fn_datatype {
     ($function:path) => {{
-        let mut type_map = $crate::TypeDefs::default();
+        let mut type_map = $crate::TypeMap::default();
 
         $crate::fn_datatype!(type_map; $function)
     }};
     ($type_map:ident; $function:path) => {{
-        let type_map: &mut $crate::TypeDefs = &mut $type_map;
+        let type_map: &mut $crate::TypeMap = &mut $type_map;
 
         $crate::internal::fn_datatype!(type_map, $function)
     }};
@@ -65,7 +65,7 @@ pub trait SpectaFunction<TMarker> {
     fn to_datatype(
         asyncness: bool,
         name: Cow<'static, str>,
-        type_map: &mut TypeDefs,
+        type_map: &mut TypeMap,
         fields: &[Cow<'static, str>],
         docs: Vec<Cow<'static, str>>,
     ) -> Result<FunctionDataType, ExportError>;
@@ -77,7 +77,7 @@ impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction
     fn to_datatype(
         asyncness: bool,
         name: Cow<'static, str>,
-        type_map: &mut TypeDefs,
+        type_map: &mut TypeMap,
         _fields: &[Cow<'static, str>],
         docs: Vec<Cow<'static, str>>,
     ) -> Result<FunctionDataType, ExportError> {
@@ -102,7 +102,7 @@ pub fn get_datatype_internal<TMarker, T: SpectaFunction<TMarker>>(
     _: T,
     asyncness: bool,
     name: Cow<'static, str>,
-    type_map: &mut TypeDefs,
+    type_map: &mut TypeMap,
     fields: &[Cow<'static, str>],
     docs: Vec<Cow<'static, str>>,
 ) -> Result<FunctionDataType, ExportError> {
@@ -121,7 +121,7 @@ macro_rules! impl_typed_command {
                 fn to_datatype(
                     asyncness: bool,
                     name: Cow<'static, str>,
-                    type_map: &mut TypeDefs,
+                    type_map: &mut TypeMap,
                     fields: &[Cow<'static, str>],
                     docs: Vec<Cow<'static, str>>,
                 ) -> Result<FunctionDataType, ExportError> {
@@ -164,9 +164,9 @@ macro_rules! impl_typed_command {
 impl_typed_command!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
 
 /// Collects function types into a [`Vec`],
-/// and all downstream types into a [`TypeDefs`] instance.
+/// and all downstream types into a [`TypeMap`] instance.
 ///
-/// Specifying a `type_map` argument allows a custom [`TypeDefs`] to be used.
+/// Specifying a `type_map` argument allows a custom [`TypeMap`] to be used.
 ///
 /// # Examples
 ///
@@ -182,7 +182,7 @@ impl_typed_command!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
 ///     // `type_defs` is created internally
 ///     let (functions, type_defs) = functions::collect_types![some_function].unwrap();
 ///
-///     let custom_type_defs = TypeDefs::default();
+///     let custom_type_defs = TypeMap::default();
 ///
 ///     // `type_defs` is provided.
 ///     // This can be used when integrating multiple specta-enabled libraries.
@@ -195,10 +195,10 @@ impl_typed_command!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
 #[macro_export]
 macro_rules! collect_types {
     ($type_map:ident; $($command:path),* $(,)?) => {{
-        let mut type_map: $crate::TypeDefs = $type_map;
+        let mut type_map: $crate::TypeMap = $type_map;
 
         {
-            fn export(mut type_map: $crate::TypeDefs) -> ::std::result::Result<(Vec<$crate::functions::FunctionDataType>, $crate::TypeDefs), $crate::ExportError> {
+            fn export(mut type_map: $crate::TypeMap) -> ::std::result::Result<(Vec<$crate::functions::FunctionDataType>, $crate::TypeMap), $crate::ExportError> {
                 Ok((
                     vec![
                         $($crate::fn_datatype!(type_map; $command)?),*
@@ -211,7 +211,7 @@ macro_rules! collect_types {
         }
     }};
     ($($command:path),* $(,)?) => {{
-        let mut type_map = $crate::TypeDefs::default();
+        let mut type_map = $crate::TypeMap::default();
         $crate::functions::collect_types!(type_map; $($command),*)
     }};
 }

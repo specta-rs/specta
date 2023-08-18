@@ -106,23 +106,12 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             .iter()
             .filter(|param| matches!(param, syn::GenericParam::Type(_)))
             .map(|_| quote! { () });
-        let ty = quote!(<#ident<#(#generic_params),*> as #crate_name::Type>);
 
         quote! {
-            #[#crate_name::internal::ctor::ctor]
             #[allow(non_snake_case)]
+            #[#crate_name::internal::ctor::ctor]
             fn #export_fn_name() {
-                let (type_map, errors) = &mut *#crate_name::export::TYPES.lock().unwrap();
-
-                if let Err(err) = #ty::reference(
-                    #crate_name::DefOpts {
-                        parent_inline: false,
-                        type_map
-                    },
-                    &[]
-                ) {
-                    errors.insert(err);
-                }
+                #crate_name::export::register_ty::<#ident<#(#generic_params),*>>();
             }
         }
     });

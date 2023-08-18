@@ -17,15 +17,15 @@ use crate::{ImplLocation, TypeSid};
 /// A map used to store the types "discovered" while exporting a type.
 /// You can iterate over this to export all types which the type/s you exported references on.
 ///
-/// [`None`] indicates that the entry is a placeholder.
-pub type TypeDefs = BTreeMap<TypeSid, Option<NamedDataType>>;
+/// [`None`] indicates that the entry is a placeholder. It was reference but we haven't reached it's definition yet.
+pub type TypeMap = BTreeMap<TypeSid, Option<NamedDataType>>;
 
 /// Arguments for [`Type::inline`](crate::Type::inline), [`Type::reference`](crate::Type::reference) and [`Type::definition`](crate::Type::definition).
 pub struct DefOpts<'a> {
     /// is the parent type inlined?
     pub parent_inline: bool,
     /// a map of types which have been visited. This prevents stack overflows when a type references itself and also allows the caller to get a list of all types in the "schema".
-    pub type_map: &'a mut TypeDefs,
+    pub type_map: &'a mut TypeMap,
 }
 
 /// Runtime type-erased representation of a Rust type.

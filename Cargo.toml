@@ -24,7 +24,7 @@ harness = true
 
 [[example]]
 name = "export"
-required-features = ["export"]
+required-features = ["export", "typescript"]
 
 [features]
 default = ["serde", "typescript"]

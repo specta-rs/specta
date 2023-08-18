@@ -96,7 +96,7 @@ mod test {
     #[test]
     fn test_function_exporting() {
         {
-            let mut type_map = &mut specta::TypeDefs::default();
+            let mut type_map = &mut specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; a).unwrap();
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "a");
@@ -109,7 +109,7 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeDefs::default();
+            let mut type_map = &mut specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; b).unwrap();
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "b");
@@ -127,7 +127,7 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeDefs::default();
+            let mut type_map = &mut specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; c).unwrap();
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "c");
@@ -155,7 +155,7 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeDefs::default();
+            let mut type_map = &mut specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; d).unwrap();
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "d");
@@ -173,7 +173,7 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeDefs::default();
+            let mut type_map = &mut specta::TypeMap::default();
             let def: functions::FunctionDataType =
                 specta::fn_datatype!(type_map; e::<bool>).unwrap();
             assert_eq!(def.asyncness, false);
@@ -192,7 +192,7 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeDefs::default();
+            let mut type_map = &mut specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; f).unwrap();
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "f");
@@ -210,7 +210,7 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeDefs::default();
+            let mut type_map = &mut specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; g).unwrap();
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "g");
@@ -228,7 +228,7 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeDefs::default();
+            let mut type_map = &mut specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; h).unwrap();
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "h");
@@ -246,7 +246,7 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeDefs::default();
+            let mut type_map = &mut specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; i).unwrap();
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "i");
@@ -259,7 +259,7 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeDefs::default();
+            let mut type_map = &mut specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; k).unwrap();
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "k");
@@ -272,7 +272,7 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeDefs::default();
+            let mut type_map = &mut specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; l).unwrap();
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "l");
@@ -290,7 +290,7 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeDefs::default();
+            let mut type_map = &mut specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; m).unwrap();
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "m");
@@ -303,7 +303,7 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeDefs::default();
+            let mut type_map = &mut specta::TypeMap::default();
             let def: functions::FunctionDataType =
                 specta::fn_datatype!(type_map; async_fn).unwrap();
             assert_eq!(def.asyncness, true);
@@ -317,7 +317,7 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeDefs::default();
+            let mut type_map = &mut specta::TypeMap::default();
             let def: functions::FunctionDataType =
                 specta::fn_datatype!(type_map; with_docs).unwrap();
             assert_eq!(def.asyncness, false);
