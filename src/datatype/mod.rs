@@ -38,6 +38,7 @@ pub enum DataType {
     Any,
     Primitive(PrimitiveType),
     Literal(LiteralType),
+    /// Either a `Set` or a `Vec`
     List(Box<DataType>),
     Nullable(Box<DataType>),
     Map(Box<(DataType, DataType)>),

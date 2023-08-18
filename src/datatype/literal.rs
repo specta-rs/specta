@@ -20,6 +20,7 @@ pub enum LiteralType {
     f64(f64),
     bool(bool),
     String(String),
+    /// Standalone `null` without a known type
     None,
 }
 
