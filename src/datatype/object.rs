@@ -14,8 +14,7 @@ pub struct ObjectField {
 
 /// Type of an object.
 /// Could be from a struct or named enum variant.
-#[derive(Debug, Clone, PartialEq, Default)]
-#[allow(missing_docs)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ObjectType {
     pub generics: Vec<Cow<'static, str>>,
     pub fields: Vec<ObjectField>,

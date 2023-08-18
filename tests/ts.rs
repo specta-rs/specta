@@ -3,6 +3,7 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
+    convert::Infallible,
     marker::PhantomData,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
     path::PathBuf,
@@ -85,9 +86,14 @@ fn typescript_types() {
 
     assert_ts!(Option<i32>, "number | null");
 
+    // https://github.com/oscartbeaumont/specta/issues/88
     assert_ts!(Unit1, "null");
-    assert_ts!(Unit2, "null");
-    assert_ts!(Unit3, "null");
+    assert_ts!(Unit2, "Record<string, never>");
+    assert_ts!(Unit3, "[]");
+    assert_ts!(Unit4, "null");
+    assert_ts!(Unit5, r#""A""#);
+    assert_ts!(Unit6, "{ A: [] }");
+    assert_ts!(Unit7, "{ A: Record<string, never> }");
 
     assert_ts!(
         SimpleStruct,
@@ -210,6 +216,7 @@ fn typescript_types() {
 
     assert_ts!(PhantomData<()>, r#"null"#);
     assert_ts!(PhantomData<String>, r#"null"#);
+    assert_ts!(Infallible, r#"never"#);
 
     assert_ts!(Result<String, i32>, r#"string | number"#);
     assert_ts!(Result<i16, i32>, r#"number"#);
@@ -221,6 +228,12 @@ fn typescript_types() {
     }
 
     assert_ts!(Any, r#"any"#);
+
+    assert_ts!(MyEmptyInput, "Record<string, never>");
+    assert_ts_export!(
+        MyEmptyInput,
+        "export type MyEmptyInput = Record<string, never>"
+    );
 
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");
@@ -238,6 +251,28 @@ struct Unit2 {}
 #[derive(Type)]
 #[specta(export = false)]
 struct Unit3();
+
+#[derive(Type)]
+#[specta(export = false)]
+struct Unit4(());
+
+#[derive(Type)]
+#[specta(export = false)]
+enum Unit5 {
+    A,
+}
+
+#[derive(Type)]
+#[specta(export = false)]
+enum Unit6 {
+    A(),
+}
+
+#[derive(Type)]
+#[specta(export = false)]
+enum Unit7 {
+    A {},
+}
 
 #[derive(Type)]
 #[specta(export = false)]
@@ -481,6 +516,12 @@ pub struct FlattenOnNestedEnum {
 pub struct EnumReferenceRecordKey {
     a: HashMap<BasicEnum, i32>,
 }
+
+// https://github.com/oscartbeaumont/specta/issues/88
+#[derive(Type)]
+#[serde(rename_all = "camelCase")]
+#[serde(default)]
+pub(super) struct MyEmptyInput {}
 
 // #[derive(Type)]
 // #[specta(export = false)]

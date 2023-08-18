@@ -82,7 +82,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     #[automatically_derived]
                     impl From<#ident> for #crate_ref::TupleType {
                         fn from(t: #ident) -> #crate_ref::TupleType {
-                            #crate_ref::TupleType {
+                            #crate_ref::TupleType::Named {
                                 generics: vec![],
                                 fields: vec![#(#fields),*]
                             }

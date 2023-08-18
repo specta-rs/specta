@@ -80,6 +80,24 @@ impl From<NamedDataType> for DataType {
 }
 
 /// The possible types for a [`NamedDataType`].
+///
+/// This type will model the type of the Rust type that is being exported but be aware of the following:
+/// ```rust
+/// #[derive(serde::Serialize)]
+/// struct Demo {}
+/// // is: NamedDataTypeItem::Object
+/// // typescript: `{}`
+///
+/// #[derive(serde::Serialize)]
+/// struct Demo2();
+/// // is: NamedDataTypeItem::Tuple(TupleType::Unnamed)
+/// // typescript: `[]`
+///
+/// #[derive(specta::Type)]
+/// struct Demo3;
+///// is: NamedDataTypeItem::Tuple(TupleType::Named(_))
+/// // typescript: `null`
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 pub enum NamedDataTypeItem {
     /// Represents an Rust struct with named fields
@@ -124,7 +142,7 @@ impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
             variants: t
                 .into_iter()
                 .map(|t| {
-                    EnumVariant::Unnamed(TupleType {
+                    EnumVariant::Unnamed(TupleType::Named {
                         fields: vec![t.into()],
                         generics: vec![],
                     })

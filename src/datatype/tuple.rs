@@ -4,11 +4,20 @@ use crate::{DataType, NamedDataType, NamedDataTypeItem};
 
 /// Type of a tuple.
 /// Could be from an actual tuple or unnamed struct.
-#[derive(Debug, Clone, PartialEq, Default)]
-#[allow(missing_docs)]
-pub struct TupleType {
-    pub fields: Vec<DataType>,
-    pub generics: Vec<Cow<'static, str>>,
+#[derive(Debug, Clone, PartialEq)]
+pub enum TupleType {
+    /// An unnamed tuple.
+    ///
+    /// Represented in Rust as `pub struct Unit();` and in TypeScript as `[]`.
+    Unnamed,
+    /// A regular tuple
+    ///
+    /// Represented in Rust as `(...)` and in TypeScript as `[...]`.
+    /// Be aware `()` is treated specially as `null` in Typescript.
+    Named {
+        fields: Vec<DataType>,
+        generics: Vec<Cow<'static, str>>,
+    },
 }
 
 impl TupleType {

@@ -17,6 +17,6 @@ struct UnitC();
 #[test]
 fn test() {
     assert_ts!(UnitA, "null");
-    assert_ts!(UnitB, "null");
-    assert_ts!(UnitC, "null");
+    assert_ts!(UnitB, "Record<string, never>");
+    assert_ts!(UnitC, "[]");
 }

@@ -32,7 +32,7 @@ macro_rules! impl_tuple {
                     Ok,
                 )?;)*
 
-                Ok(datatype::TupleType {
+                Ok(datatype::TupleType::Named {
                     fields: vec![$($i),*],
                     generics: vec![]
                 }.to_anonymous())

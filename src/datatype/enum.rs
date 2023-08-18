@@ -68,11 +68,14 @@ impl EnumType {
                                 impl_location,
                                 "`EnumRepr::External` with ` EnumVariant::Unit` is invalid!",
                             )),
-                            EnumVariant::Unnamed(v) if v.fields.len() == 1 => Ok(()),
-                            EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
-                                impl_location,
-                                "`EnumRepr::External` with ` EnumVariant::Unnamed` containing more than a single field is invalid!",
-                            )),
+                            EnumVariant::Unnamed(v) => match v {
+                                TupleType::Unnamed =>  Ok(()),
+                                TupleType::Named { fields, .. } if fields.len() == 1 => Ok(()),
+                                TupleType::Named { .. } => Err(ExportError::InvalidType(
+                                    impl_location,
+                                    "`EnumRepr::External` with ` EnumVariant::Unnamed` containing more than a single field is invalid!",
+                                )),
+                            },
                             EnumVariant::Named(_) => Ok(()),
                         },
                         EnumRepr::Adjacent { .. } => Ok(()),

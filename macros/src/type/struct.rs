@@ -173,38 +173,38 @@ pub fn parse_struct(
                 },
             )
         }
-        Fields::Unnamed(_) => {
-            if struct_attrs.transparent {
-                if data.fields.len() != 1 {
-                    return Err(syn::Error::new(
-                        data.fields.span(),
-                        "specta: transparent structs must have exactly one field",
-                    ));
+        Fields::Unnamed(fields) => {
+            let inner = match (fields.unnamed.len(), struct_attrs.transparent) {
+                (0, _) => {
+                    quote!(#crate_ref::NamedDataTypeItem::Tuple(#crate_ref::TupleType::Unnamed),)
                 }
+                (_, true) => {
+                    if data.fields.len() != 1 {
+                        return Err(syn::Error::new(
+                            data.fields.span(),
+                            "specta: transparent structs must have exactly one field",
+                        ));
+                    }
 
-                let (field, field_attrs) = decode_field_attrs(
-                    data.fields
-                        .iter()
-                        .next()
-                        .expect("Unreachable: we just checked this!"),
-                )?;
+                    let (field, field_attrs) = decode_field_attrs(
+                        data.fields
+                            .iter()
+                            .next()
+                            .expect("Unreachable: we just checked this!"),
+                    )?;
 
-                let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
+                    let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
 
-                let ty = construct_datatype(
-                    format_ident!("ty"),
-                    &field_ty,
-                    &generic_idents,
-                    crate_ref,
-                    field_attrs.inline,
-                )?;
+                    let ty = construct_datatype(
+                        format_ident!("ty"),
+                        &field_ty,
+                        &generic_idents,
+                        crate_ref,
+                        field_attrs.inline,
+                    )?;
 
-                named_data_type_wrapper(
-                    crate_ref,
-                    container_attrs,
-                    name,
                     quote! {
-                        #crate_ref::NamedDataTypeItem::Tuple(#crate_ref::TupleType {
+                        #crate_ref::NamedDataTypeItem::Tuple(#crate_ref::TupleType::Named {
                             generics: vec![#(#definition_generics.into()),*],
                             fields: vec![
                                 {
@@ -214,67 +214,63 @@ pub fn parse_struct(
                                 }
                             ]
                         }),
-                    },
-                )
-            } else {
-                let fields = data
-                    .fields
-                    .iter()
-                    .map(decode_field_attrs)
-                    .collect::<syn::Result<Vec<_>>>()?
-                    .iter()
-                    .filter_map(|(field, field_attrs)| {
-                        if field_attrs.skip {
-                            return None;
-                        }
+                    }
+                }
+                (_, false) => {
+                    let fields = data
+                        .fields
+                        .iter()
+                        .map(decode_field_attrs)
+                        .collect::<syn::Result<Vec<_>>>()?
+                        .iter()
+                        .filter_map(|(field, field_attrs)| {
+                            if field_attrs.skip {
+                                return None;
+                            }
 
-                        Some((field, field_attrs))
-                    })
-                    .map(|(field, field_attrs)| {
-                        let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
+                            Some((field, field_attrs))
+                        })
+                        .map(|(field, field_attrs)| {
+                            let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
 
-                        let generic_vars = construct_datatype(
-                            format_ident!("gen"),
-                            field_ty,
-                            &generic_idents,
-                            crate_ref,
-                            field_attrs.inline,
-                        )?;
+                            let generic_vars = construct_datatype(
+                                format_ident!("gen"),
+                                field_ty,
+                                &generic_idents,
+                                crate_ref,
+                                field_attrs.inline,
+                            )?;
 
-                        Ok(quote! {{
-                            #generic_vars
+                            Ok(quote! {{
+                                #generic_vars
 
-                            gen
-                        }})
-                    })
-                    .collect::<syn::Result<Vec<TokenStream>>>()?;
+                                gen
+                            }})
+                        })
+                        .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                named_data_type_wrapper(
-                    crate_ref,
-                    container_attrs,
-                    name,
                     quote! {
                         #crate_ref::NamedDataTypeItem::Tuple(
-                            #crate_ref::TupleType {
+                            #crate_ref::TupleType::Named {
                                 generics: vec![#(#definition_generics.into()),*],
                                 fields: vec![#(#fields),*],
                             }
                         )
-                    },
-                )
-            }
+                    }
+                }
+            };
+
+            named_data_type_wrapper(crate_ref, container_attrs, name, inner)
         }
         Fields::Unit => named_data_type_wrapper(
             crate_ref,
             container_attrs,
             name,
             quote! {
-                #crate_ref::NamedDataTypeItem::Tuple(
-                    #crate_ref::TupleType {
-                        generics: vec![#(#definition_generics.into()),*],
-                        fields: vec![],
-                    }
-                )
+                #crate_ref::NamedDataTypeItem::Tuple(#crate_ref::TupleType::Named {
+                    generics:  vec![],
+                    fields: vec![],
+                })
             },
         ),
     };

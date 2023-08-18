@@ -117,17 +117,21 @@ fn export_datatype_inner(
             _ => (!generics.is_empty()).then_some(generics),
         },
         // Enum
-        NamedDataTypeItem::Enum(e) => {
-            let generics = e.generics();
-            (!generics.is_empty()).then_some(generics)
+        NamedDataTypeItem::Enum(EnumType::Tagged { generics, .. }) => {
+            (!generics.is_empty()).then_some(&*generics)
+        }
+        NamedDataTypeItem::Enum(EnumType::Untagged { generics, .. }) => {
+            (!generics.is_empty()).then_some(&*generics)
         }
         // Struct with unnamed fields
-        NamedDataTypeItem::Tuple(TupleType { generics, .. }) => {
-            (!generics.is_empty()).then_some(generics)
-        }
+        NamedDataTypeItem::Tuple(tuple) => match tuple {
+            TupleType::Unnamed => None,
+            TupleType::Named { generics, .. } => (!generics.is_empty()).then_some(generics),
+        },
     };
 
     let generics = generics
+        .filter(|generics| !generics.is_empty())
         .map(|generics| format!("<{}>", generics.to_vec().join(", ")))
         .unwrap_or_default();
 
@@ -226,10 +230,10 @@ fn datatype_inner(
         }
         DataType::Named(NamedDataType {
             name,
-            item: NamedDataTypeItem::Tuple(TupleType { fields, .. }),
+            item: NamedDataTypeItem::Tuple(tuple),
             ..
-        }) => tuple_datatype(ctx.with(PathItem::Type(name.clone())), fields, type_map)?,
-        DataType::Tuple(TupleType { fields, .. }) => tuple_datatype(ctx, fields, type_map)?,
+        }) => tuple_datatype(ctx.with(PathItem::Type(name.clone())), tuple, type_map)?,
+        DataType::Tuple(tuple) => tuple_datatype(ctx, tuple, type_map)?,
         DataType::Named(NamedDataType {
             name,
             item: NamedDataTypeItem::Object(item),
@@ -278,19 +282,22 @@ fn datatype_inner(
 
 fn tuple_datatype(
     ctx: ExportContext,
-    fields: &[DataType],
+    tuple: &TupleType,
     type_map: &TypeMap,
 ) -> Result<String, TsExportError> {
-    match fields {
-        [] => Ok("null".to_string()),
-        [ty] => datatype_inner(ctx, ty, type_map),
-        tys => Ok(format!(
-            "[{}]",
-            tys.iter()
-                .map(|v| datatype_inner(ctx.clone(), v, type_map))
-                .collect::<Result<Vec<_>, _>>()?
-                .join(", ")
-        )),
+    match tuple {
+        TupleType::Unnamed => Ok("[]".to_string()),
+        TupleType::Named { fields, generics } => match &fields[..] {
+            [] => Ok("null".to_string()),
+            [ty] => datatype_inner(ctx, ty, type_map),
+            tys => Ok(format!(
+                "[{}]",
+                tys.iter()
+                    .map(|v| datatype_inner(ctx.clone(), v, type_map))
+                    .collect::<Result<Vec<_>, _>>()?
+                    .join(", ")
+            )),
+        },
     }
 }
 
@@ -301,7 +308,7 @@ fn object_datatype(
     type_map: &TypeMap,
 ) -> Result<String, TsExportError> {
     match &fields[..] {
-        [] => Ok("null".to_string()),
+        [] => Ok("Record<string, never>".to_string()),
         fields => {
             let mut field_sections = fields
                 .iter()

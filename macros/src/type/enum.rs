@@ -94,33 +94,39 @@ pub fn parse_enum(
                         quote!(#crate_ref::EnumVariant::Unit)
                     }
                     Fields::Unnamed(fields) => {
-                        let fields = fields
-                            .unnamed
-                            .iter()
-                            .map(|field| {
-                                let (field, field_attrs) = decode_field_attrs(field)?;
-                                let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
+                        let inner = if fields.unnamed.len() == 0 {
+                            quote!(#crate_ref::TupleType::Unnamed)
+                        } else {
+                            let fields = fields
+                                .unnamed
+                                .iter()
+                                .map(|field| {
+                                    let (field, field_attrs) = decode_field_attrs(field)?;
+                                    let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
 
-                                let generic_vars = construct_datatype(
-                                    format_ident!("gen"),
-                                    field_ty,
-                                    &generic_idents,
-                                    crate_ref,
-                                    attrs.inline,
-                                )?;
+                                    let generic_vars = construct_datatype(
+                                        format_ident!("gen"),
+                                        field_ty,
+                                        &generic_idents,
+                                        crate_ref,
+                                        attrs.inline,
+                                    )?;
 
-                                Ok(quote!({
-                                    #generic_vars
+                                    Ok(quote!({
+                                        #generic_vars
 
-                                    gen
-                                }))
+                                        gen
+                                    }))
+                                })
+                                .collect::<syn::Result<Vec<TokenStream>>>()?;
+
+                            quote!(#crate_ref::TupleType::Named {
+                                fields: vec![#(#fields.into()),*],
+                                generics: vec![]
                             })
-                            .collect::<syn::Result<Vec<TokenStream>>>()?;
+                        };
 
-                        quote!(#crate_ref::EnumVariant::Unnamed(#crate_ref::TupleType {
-                            fields: vec![#(#fields.into()),*],
-                            generics: vec![]
-                        }))
+                        quote!(#crate_ref::EnumVariant::Unnamed(#inner))
                     }
                     Fields::Named(fields) => {
                         let fields = fields
