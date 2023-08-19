@@ -56,7 +56,7 @@ impl EnumType {
                     EnumVariant::Named(_) => Ok(()),
                     EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
                         impl_location,
-                        "`EnumRepr::Untagged` with ` EnumVariant::Unnamed` is invalid!",
+                        "`EnumRepr::Untagged` with `EnumVariant::Unnamed` is invalid!",
                     )),
                 })?;
             }
@@ -73,7 +73,7 @@ impl EnumType {
                                 TupleType::Named { fields, .. } if fields.len() == 1 => Ok(()),
                                 TupleType::Named { .. } => Err(ExportError::InvalidType(
                                     impl_location,
-                                    "`EnumRepr::External` with ` EnumVariant::Unnamed` containing more than a single field is invalid!",
+                                    "`EnumRepr::External` with `EnumVariant::Unnamed` containing more than a single field is invalid!",
                                 )),
                             },
                             EnumVariant::Named(_) => Ok(()),
@@ -84,7 +84,7 @@ impl EnumType {
                             EnumVariant::Named(_) => Ok(()),
                             EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
                                 impl_location,
-                                "`EnumRepr::Internal` with ` EnumVariant::Unnamed` is invalid!",
+                                "`EnumRepr::Internal` with `EnumVariant::Unnamed` is invalid!",
                             )),
                         },
                     }
