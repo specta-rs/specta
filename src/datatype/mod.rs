@@ -1,4 +1,7 @@
-use std::{borrow::Cow, collections::BTreeMap};
+use std::{
+    borrow::{Borrow, Cow},
+    collections::BTreeMap,
+};
 
 mod r#enum;
 mod literal;
@@ -109,6 +112,32 @@ pub enum NamedDataTypeItem {
     Tuple(TupleType),
 }
 
+impl NamedDataTypeItem {
+    /// Converts a [`NamedDataTypeItem`] into a [`DataType`]
+    pub fn datatype(self) -> DataType {
+        match self {
+            Self::Object(o) => o.into(),
+            Self::Enum(e) => e.into(),
+            Self::Tuple(t) => t.into(),
+        }
+    }
+
+    /// Returns the generics arguments for the type
+    pub fn generics(&self) -> Vec<GenericType> {
+        match self {
+            // Named struct
+            Self::Object(ObjectType { generics, .. }) => generics.clone(),
+            // Enum
+            Self::Enum(e) => e.generics().clone(),
+            // Struct with unnamed fields
+            Self::Tuple(tuple) => match tuple {
+                TupleType::Unnamed => vec![],
+                TupleType::Named { generics, .. } => generics.clone(),
+            },
+        }
+    }
+}
+
 /// A reference to a [`DataType`] that can be used before a type is resolved in order to
 /// support recursive types without causing an infinite loop.
 ///
@@ -126,10 +155,20 @@ pub struct DataTypeReference {
     pub generics: Vec<DataType>,
 }
 
-/// A generic parameter to another type.
+/// A generic ("placeholder") argument to a Specta-enabled type.
+///
+/// A generic does not hold a specific type instead it acts as a slot where a type can be provided when referencing this type.
+///
+/// A `GenericType` holds the identifier of the generic. Eg. Given a generic type `struct A<T>(T);` the generics will be represented as `vec![GenericType("A".into())]`
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub struct GenericType(pub Cow<'static, str>);
+
+impl Borrow<str> for GenericType {
+    fn borrow(&self) -> &str {
+        &self.0
+    }
+}
 
 impl From<GenericType> for DataType {
     fn from(t: GenericType) -> Self {

@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{DataType, NamedDataType, NamedDataTypeItem};
+use crate::{DataType, GenericType, NamedDataType, NamedDataTypeItem};
 
 /// Type of a tuple.
 /// Could be from an actual tuple or unnamed struct.
@@ -16,7 +16,7 @@ pub enum TupleType {
     /// Be aware `()` is treated specially as `null` in Typescript.
     Named {
         fields: Vec<DataType>,
-        generics: Vec<Cow<'static, str>>,
+        generics: Vec<GenericType>,
     },
 }
 
