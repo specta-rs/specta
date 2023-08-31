@@ -118,6 +118,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     Ok(quote! {
         const _: () = {
+        	// We do this so `sid!()` is only called once, preventing the type ended up with multiple ids
         	const SID: #crate_name::TypeSid = #crate_name::sid!(@with_specta_path; #name; #crate_name);
 	        const IMPL_LOCATION: #crate_name::ImplLocation = #crate_name::impl_location!(@with_specta_path; #crate_name);
 
