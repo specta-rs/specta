@@ -197,18 +197,10 @@ macro_rules! collect_functions {
     ($type_map:ident; $($command:path),* $(,)?) => {{
         let mut type_map: $crate::TypeMap = $type_map;
 
-        {
-            fn export(mut type_map: $crate::TypeMap) -> ::std::result::Result<(Vec<$crate::functions::FunctionDataType>, $crate::TypeMap), $crate::ExportError> {
-                Ok((
-                    vec![
-                        $($crate::fn_datatype!(type_map; $command)?),*
-                    ],
-                    type_map,
-                ))
-            }
-
-            export(type_map)
-        }
+        [$($crate::fn_datatype!(type_map; $command)),*]
+	        .into_iter()
+	        .collect::<::std::result::Result<Vec<_>, _>>()
+			.map(|v| (v, type_map))
     }};
     ($($command:path),* $(,)?) => {{
         let mut type_map = $crate::TypeMap::default();
