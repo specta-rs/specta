@@ -5,6 +5,55 @@ use crate::{
     ExportError, GenericType, ImplLocation,
 };
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct UntaggedEnum {
+    pub(crate) variants: Vec<EnumVariant>,
+    pub(crate) generics: Vec<GenericType>,
+}
+
+impl UntaggedEnum {
+    pub fn variants(&self) -> impl Iterator<Item = &EnumVariant> {
+        self.variants.iter()
+    }
+
+    pub fn generics(&self) -> impl Iterator<Item = &GenericType> {
+        self.generics.iter()
+    }
+}
+
+impl Into<EnumType> for UntaggedEnum {
+    fn into(self) -> EnumType {
+        EnumType::Untagged(self)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaggedEnum {
+    pub(crate) variants: Vec<(Cow<'static, str>, EnumVariant)>,
+    pub(crate) generics: Vec<GenericType>,
+    pub(crate) repr: EnumRepr,
+}
+
+impl TaggedEnum {
+    pub fn variants(&self) -> impl Iterator<Item = &(Cow<'static, str>, EnumVariant)> {
+        self.variants.iter()
+    }
+
+    pub fn generics(&self) -> impl Iterator<Item = &GenericType> {
+        self.generics.iter()
+    }
+
+    pub fn repr(&self) -> &EnumRepr {
+        &self.repr
+    }
+}
+
+impl Into<EnumType> for TaggedEnum {
+    fn into(self) -> EnumType {
+        EnumType::Tagged(self)
+    }
+}
+
 /// Enum type which dictates how the enum is represented.
 ///
 /// The tagging refers to the [Serde concept](https://serde.rs/enum-representations.html).
@@ -12,17 +61,9 @@ use crate::{
 /// [`Untagged`](EnumType::Untagged) is here rather than in [`EnumRepr`] as it is the only enum representation that does not have tags on its variants.
 /// Separating it allows for better typesafety since `variants` doesn't have to be a [`Vec`] of tuples.
 #[derive(Debug, Clone, PartialEq)]
-#[allow(missing_docs)]
 pub enum EnumType {
-    Untagged {
-        variants: Vec<EnumVariant>,
-        generics: Vec<GenericType>,
-    },
-    Tagged {
-        variants: Vec<(Cow<'static, str>, EnumVariant)>,
-        generics: Vec<GenericType>,
-        repr: EnumRepr,
-    },
+    Untagged(UntaggedEnum),
+    Tagged(TaggedEnum),
 }
 
 impl From<EnumType> for DataType {
@@ -34,15 +75,15 @@ impl From<EnumType> for DataType {
 impl EnumType {
     pub(crate) fn generics(&self) -> &Vec<GenericType> {
         match self {
-            Self::Untagged { generics, .. } => generics,
-            Self::Tagged { generics, .. } => generics,
+            Self::Untagged(UntaggedEnum { generics, .. }) => generics,
+            Self::Tagged(TaggedEnum { generics, .. }) => generics,
         }
     }
 
     pub(crate) fn variants_len(&self) -> usize {
         match self {
-            Self::Untagged { variants, .. } => variants.len(),
-            Self::Tagged { variants, .. } => variants.len(),
+            Self::Untagged(UntaggedEnum { variants, .. }) => variants.len(),
+            Self::Tagged(TaggedEnum { variants, .. }) => variants.len(),
         }
     }
 
@@ -50,7 +91,7 @@ impl EnumType {
     /// This function will filter them out so types can be exported for valid variants.
     pub fn make_flattenable(&mut self, impl_location: ImplLocation) -> Result<(), ExportError> {
         match self {
-            Self::Untagged { variants, .. } => {
+            Self::Untagged(UntaggedEnum { variants, .. }) => {
                 variants.iter().try_for_each(|v| match v {
                     EnumVariant::Unit => Ok(()),
                     EnumVariant::Named(_) => Ok(()),
@@ -60,7 +101,7 @@ impl EnumType {
                     )),
                 })?;
             }
-            Self::Tagged { variants, repr, .. } => {
+            Self::Tagged(TaggedEnum { variants, repr, .. }) => {
                 variants.iter().try_for_each(|(_, v)| {
                     match repr {
                         EnumRepr::External => match v {

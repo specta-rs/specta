@@ -62,4 +62,20 @@ pub mod construct {
             generics,
         }
     }
+
+    pub const fn untagged_enum(variants: Vec<EnumVariant>, generics: Vec<GenericType>) -> EnumType {
+        EnumType::Untagged(UntaggedEnum { variants, generics })
+    }
+
+    pub const fn tagged_enum(
+        variants: Vec<(Cow<'static, str>, EnumVariant)>,
+        generics: Vec<GenericType>,
+        repr: EnumRepr,
+    ) -> EnumType {
+        EnumType::Tagged(TaggedEnum {
+            variants,
+            generics,
+            repr,
+        })
+    }
 }

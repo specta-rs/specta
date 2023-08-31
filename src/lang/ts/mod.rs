@@ -321,7 +321,7 @@ fn enum_datatype(
     }
 
     Ok(match e {
-        EnumType::Tagged { variants, repr, .. } => {
+        EnumType::Tagged(TaggedEnum { variants, repr, .. }) => {
             let mut variants = variants
                 .iter()
                 .map(|(variant_name, variant)| {
@@ -376,7 +376,7 @@ fn enum_datatype(
             variants.dedup();
             variants.join(" | ")
         }
-        EnumType::Untagged { variants, .. } => {
+        EnumType::Untagged(UntaggedEnum { variants, .. }) => {
             let mut variants = variants
                 .iter()
                 .map(|variant| {

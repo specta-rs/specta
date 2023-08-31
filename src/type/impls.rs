@@ -255,23 +255,26 @@ const _: () = {
 
     impl Type for serde_json::Number {
         fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
-            Ok(DataType::Enum(EnumType::Untagged {
-                variants: vec![
-                    EnumVariant::Unnamed(TupleType::Named {
-                        fields: vec![DataType::Primitive(PrimitiveType::f64)],
-                        generics: vec![],
-                    }),
-                    EnumVariant::Unnamed(TupleType::Named {
-                        fields: vec![DataType::Primitive(PrimitiveType::i64)],
-                        generics: vec![],
-                    }),
-                    EnumVariant::Unnamed(TupleType::Named {
-                        fields: vec![DataType::Primitive(PrimitiveType::u64)],
-                        generics: vec![],
-                    }),
-                ],
-                generics: vec![],
-            }))
+            Ok(DataType::Enum(
+                UntaggedEnum {
+                    variants: vec![
+                        EnumVariant::Unnamed(TupleType::Named {
+                            fields: vec![DataType::Primitive(PrimitiveType::f64)],
+                            generics: vec![],
+                        }),
+                        EnumVariant::Unnamed(TupleType::Named {
+                            fields: vec![DataType::Primitive(PrimitiveType::i64)],
+                            generics: vec![],
+                        }),
+                        EnumVariant::Unnamed(TupleType::Named {
+                            fields: vec![DataType::Primitive(PrimitiveType::u64)],
+                            generics: vec![],
+                        }),
+                    ],
+                    generics: vec![],
+                }
+                .into(),
+            ))
         }
     }
 };
@@ -298,23 +301,26 @@ const _: () = {
 
     impl Type for serde_yaml::Number {
         fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
-            Ok(DataType::Enum(EnumType::Untagged {
-                variants: vec![
-                    EnumVariant::Unnamed(TupleType::Named {
-                        fields: vec![DataType::Primitive(PrimitiveType::f64)],
-                        generics: vec![],
-                    }),
-                    EnumVariant::Unnamed(TupleType::Named {
-                        fields: vec![DataType::Primitive(PrimitiveType::i64)],
-                        generics: vec![],
-                    }),
-                    EnumVariant::Unnamed(TupleType::Named {
-                        fields: vec![DataType::Primitive(PrimitiveType::u64)],
-                        generics: vec![],
-                    }),
-                ],
-                generics: vec![],
-            }))
+            Ok(DataType::Enum(
+                UntaggedEnum {
+                    variants: vec![
+                        EnumVariant::Unnamed(TupleType::Named {
+                            fields: vec![DataType::Primitive(PrimitiveType::f64)],
+                            generics: vec![],
+                        }),
+                        EnumVariant::Unnamed(TupleType::Named {
+                            fields: vec![DataType::Primitive(PrimitiveType::i64)],
+                            generics: vec![],
+                        }),
+                        EnumVariant::Unnamed(TupleType::Named {
+                            fields: vec![DataType::Primitive(PrimitiveType::u64)],
+                            generics: vec![],
+                        }),
+                    ],
+                    generics: vec![],
+                }
+                .into(),
+            ))
         }
     }
 };
@@ -505,7 +511,7 @@ impl_as!(url::Url as String);
 #[cfg(feature = "either")]
 impl<L: Type, R: Type> Type for either::Either<L, R> {
     fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-        Ok(DataType::Enum(EnumType::Untagged {
+        Ok(DataType::Enum(EnumType::Untagged(UntaggedEnum {
             variants: vec![
                 EnumVariant::Unnamed(TupleType::Named {
                     fields: vec![L::inline(
@@ -529,6 +535,6 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                 }),
             ],
             generics: vec![],
-        }))
+        })))
     }
 }
