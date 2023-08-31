@@ -1,12 +1,12 @@
 use std::borrow::Cow;
 
-use crate::{DataType, EnumType, GenericType, ImplLocation, StructType, TupleType, TypeSid};
+use crate::{DataType, EnumType, GenericType, ImplLocation, SpectaID, StructType, TupleType};
 
 /// A NamedDataTypeImpl includes extra information which is only available for [NamedDataType]'s that come from a real Rust type.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NamedDataTypeExt {
     /// The Specta ID for the type. The value for this should come from the `sid!();` macro.
-    pub(crate) sid: TypeSid,
+    pub(crate) sid: SpectaID,
     /// The code location where this type is implemented. Used for error reporting.
     pub(crate) impl_location: ImplLocation,
     // TODO: Undeprecate this and handle it properly!
@@ -16,7 +16,7 @@ pub struct NamedDataTypeExt {
 }
 
 impl NamedDataTypeExt {
-    pub fn sid(&self) -> &TypeSid {
+    pub fn sid(&self) -> &SpectaID {
         &self.sid
     }
 

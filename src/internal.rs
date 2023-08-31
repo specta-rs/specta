@@ -15,7 +15,7 @@ pub use specta_macros::fn_datatype;
 pub mod construct {
     use std::borrow::Cow;
 
-    use crate::{datatype::*, ImplLocation, TypeSid};
+    use crate::{datatype::*, ImplLocation, SpectaID};
 
     pub const fn r#struct(
         generics: Vec<GenericType>,
@@ -33,7 +33,7 @@ pub mod construct {
         name: Cow<'static, str>,
         comments: Vec<Cow<'static, str>>,
         deprecated: Option<Cow<'static, str>>,
-        sid: TypeSid,
+        sid: SpectaID,
         impl_location: ImplLocation,
         export: Option<bool>,
         item: NamedDataTypeItem,

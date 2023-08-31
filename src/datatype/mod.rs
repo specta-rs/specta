@@ -17,13 +17,13 @@ pub use r#enum::*;
 pub use r#struct::*;
 pub use tuple::*;
 
-use crate::TypeSid;
+use crate::SpectaID;
 
 /// A map used to store the types "discovered" while exporting a type.
 /// You can iterate over this to export all types which the type/s you exported references on.
 ///
 /// [`None`] indicates that the entry is a placeholder. It was reference but we haven't reached it's definition yet.
-pub type TypeMap = BTreeMap<TypeSid, Option<NamedDataType>>;
+pub type TypeMap = BTreeMap<SpectaID, Option<NamedDataType>>;
 
 /// Arguments for [`Type::inline`](crate::Type::inline), [`Type::reference`](crate::Type::reference) and [`Type::definition`](crate::Type::definition).
 pub struct DefOpts<'a> {
@@ -73,7 +73,7 @@ pub enum DataType {
 #[allow(missing_docs)]
 pub struct DataTypeReference {
     pub name: Cow<'static, str>,
-    pub sid: TypeSid,
+    pub sid: SpectaID,
     pub generics: Vec<DataType>,
 }
 

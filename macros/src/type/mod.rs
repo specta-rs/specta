@@ -118,7 +118,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     Ok(quote! {
         const _: () = {
         	// We do this so `sid!()` is only called once, preventing the type ended up with multiple ids
-        	const SID: #crate_name::TypeSid = #crate_name::sid!(@with_specta_path; #name; #crate_name);
+        	const SID: #crate_name::SpectaID = #crate_name::sid!(@with_specta_path; #name; #crate_name);
 	        const IMPL_LOCATION: #crate_name::ImplLocation = #crate_name::impl_location!(@with_specta_path; #crate_name);
 
             // We do this so `sid!()` is only called once, preventing the type ended up with multiple ids
@@ -139,7 +139,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
             #[automatically_derived]
             impl #bounds #crate_name::NamedType for #ident #type_args #where_bound {
-	            const SID: #crate_name::TypeSid = SID;
+	            const SID: #crate_name::SpectaID = SID;
 	            const IMPL_LOCATION: #crate_name::ImplLocation = IMPL_LOCATION;
 
                 fn named_data_type(opts: #crate_name::DefOpts, generics: &[#crate_name::DataType]) ->  std::result::Result<#crate_name::NamedDataType, #crate_name::ExportError> {

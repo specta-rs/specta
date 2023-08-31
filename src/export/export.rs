@@ -19,7 +19,7 @@ pub struct TypesIter {
 }
 
 impl Iterator for TypesIter {
-    type Item = (TypeSid, Option<NamedDataType>);
+    type Item = (SpectaID, Option<NamedDataType>);
 
     fn next(&mut self) -> Option<Self::Item> {
         let (k, v) = self.lock.0.iter().nth(self.index)?;
