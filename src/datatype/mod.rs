@@ -1,4 +1,7 @@
-use std::{borrow::Cow, collections::BTreeMap};
+use std::{
+    borrow::{Borrow, Cow},
+    collections::BTreeMap,
+};
 
 mod r#enum;
 mod literal;
@@ -120,14 +123,12 @@ impl NamedDataTypeItem {
     }
 
     /// Returns the generics arguments for the type
-    pub fn generics(&self) -> Vec<Cow<'static, str>> {
+    pub fn generics(&self) -> Vec<GenericType> {
         match self {
             // Named struct
             Self::Object(ObjectType { generics, .. }) => generics.clone(),
             // Enum
-            Self::Enum(EnumType::Tagged { generics, .. } | EnumType::Untagged { generics, .. }) => {
-                generics.clone()
-            }
+            Self::Enum(e) => e.generics().clone(),
             // Struct with unnamed fields
             Self::Tuple(tuple) => match tuple {
                 TupleType::Unnamed => vec![],
@@ -158,6 +159,12 @@ pub struct DataTypeReference {
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub struct GenericType(pub Cow<'static, str>);
+
+impl Borrow<str> for GenericType {
+    fn borrow(&self) -> &str {
+        &self.0
+    }
+}
 
 impl From<GenericType> for DataType {
     fn from(t: GenericType) -> Self {

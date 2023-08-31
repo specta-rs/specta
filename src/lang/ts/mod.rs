@@ -16,8 +16,9 @@ use reserved_terms::*;
 
 use crate::*;
 
+#[allow(missing_docs)]
 pub type Result<T> = std::result::Result<T, TsExportError>;
-pub type Output = Result<String>;
+type Output = Result<String>;
 
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string with an export.
 ///
@@ -105,7 +106,7 @@ fn export_datatype_inner(
 
     let generics = Some(item.generics())
         .filter(|generics| !generics.is_empty())
-        .map(|generics| format!("<{}>", generics.to_vec().join(", ")))
+        .map(|generics| format!("<{}>", generics.join(", ")))
         .unwrap_or_default();
 
     let comments = ctx

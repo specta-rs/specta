@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::{
     datatype::{DataType, ObjectType, TupleType},
-    ExportError, ImplLocation,
+    ExportError, GenericType, ImplLocation,
 };
 
 /// Enum type which dictates how the enum is represented.
@@ -16,11 +16,11 @@ use crate::{
 pub enum EnumType {
     Untagged {
         variants: Vec<EnumVariant>,
-        generics: Vec<Cow<'static, str>>,
+        generics: Vec<GenericType>,
     },
     Tagged {
         variants: Vec<(Cow<'static, str>, EnumVariant)>,
-        generics: Vec<Cow<'static, str>>,
+        generics: Vec<GenericType>,
         repr: EnumRepr,
     },
 }
@@ -32,7 +32,7 @@ impl From<EnumType> for DataType {
 }
 
 impl EnumType {
-    pub(crate) fn generics(&self) -> &Vec<Cow<'static, str>> {
+    pub(crate) fn generics(&self) -> &Vec<GenericType> {
         match self {
             Self::Untagged { generics, .. } => generics,
             Self::Tagged { generics, .. } => generics,

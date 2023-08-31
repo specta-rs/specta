@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{DataType, NamedDataType, NamedDataTypeItem};
+use crate::{DataType, GenericType, NamedDataType, NamedDataTypeItem};
 
 /// A field in an [`ObjectType`].
 #[derive(Debug, Clone, PartialEq)]
@@ -16,7 +16,7 @@ pub struct ObjectField {
 /// Could be from a struct or named enum variant.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ObjectType {
-    pub generics: Vec<Cow<'static, str>>,
+    pub generics: Vec<GenericType>,
     pub fields: Vec<ObjectField>,
     pub tag: Option<Cow<'static, str>>,
 }
