@@ -242,11 +242,11 @@ pub fn parse_enum(
     Ok((
         body,
         quote! {
-            #crate_ref::TypeCategory::Reference(#crate_ref::DataTypeReference {
-                name: #name.into(),
-                sid: SID,
-                generics: vec![#(#reference_generics),*],
-            })
+            #crate_ref::TypeCategory::Reference(#crate_ref::internal::construct::data_type_reference(
+                #name.into(),
+                SID,
+                vec![#(#reference_generics),*],
+            ))
         },
         can_flatten,
     ))

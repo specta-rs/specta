@@ -70,11 +70,24 @@ pub enum DataType {
 // This doesn't account for flattening and inlining recursive types, however, which will
 // require a more complex solution since it will require multiple processing stages.
 #[derive(Debug, Clone, PartialEq)]
-#[allow(missing_docs)]
 pub struct DataTypeReference {
-    pub name: Cow<'static, str>,
-    pub sid: SpectaID,
-    pub generics: Vec<DataType>,
+    pub(crate) name: Cow<'static, str>,
+    pub(crate) sid: SpectaID,
+    pub(crate) generics: Vec<DataType>,
+}
+
+impl DataTypeReference {
+    pub fn name(&self) -> &Cow<'static, str> {
+        &self.name
+    }
+
+    pub fn sid(&self) -> SpectaID {
+        self.sid
+    }
+
+    pub fn generics(&self) -> impl Iterator<Item = &DataType> {
+        self.generics.iter()
+    }
 }
 
 /// A generic ("placeholder") argument to a Specta-enabled type.
@@ -83,7 +96,6 @@ pub struct DataTypeReference {
 ///
 /// A `GenericType` holds the identifier of the generic. Eg. Given a generic type `struct A<T>(T);` the generics will be represented as `vec![GenericType("A".into())]`
 #[derive(Debug, Clone, PartialEq)]
-#[allow(missing_docs)]
 pub struct GenericType(pub(crate) Cow<'static, str>);
 
 impl Borrow<str> for GenericType {

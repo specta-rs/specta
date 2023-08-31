@@ -191,10 +191,10 @@ fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &TypeMap) -> Out
                 DataType::Named(dt) => matches!(dt.item, NamedDataTypeItem::Enum(_)),
                 DataType::Reference(r) => {
                     let typ = type_map
-                        .get(&r.sid)
-                        .unwrap_or_else(|| panic!("Type {} not found!", r.name))
+                        .get(&r.sid())
+                        .unwrap_or_else(|| panic!("Type {} not found!", r.name()))
                         .as_ref()
-                        .unwrap_or_else(|| panic!("Type {} has no value!", r.name));
+                        .unwrap_or_else(|| panic!("Type {} has no value!", r.name()));
 
                     matches!(typ.item, NamedDataTypeItem::Enum(_))
                 }

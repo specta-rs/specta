@@ -86,8 +86,8 @@ pub trait Type {
         Ok(match category {
             TypeCategory::Inline(inline) => inline,
             TypeCategory::Reference(def) => {
-                if opts.type_map.get(&def.sid).is_none() {
-                    opts.type_map.entry(def.sid).or_default();
+                if opts.type_map.get(&def.sid()).is_none() {
+                    opts.type_map.entry(def.sid()).or_default();
 
                     let definition = Self::definition(DefOpts {
                         parent_inline: opts.parent_inline,
@@ -100,7 +100,7 @@ pub trait Type {
                         _ => unreachable!(),
                     };
 
-                    opts.type_map.insert(def.sid, Some(definition));
+                    opts.type_map.insert(def.sid(), Some(definition));
                 }
 
                 DataType::Reference(def)

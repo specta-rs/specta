@@ -50,4 +50,16 @@ pub mod construct {
             item,
         }
     }
+
+    pub const fn data_type_reference(
+        name: Cow<'static, str>,
+        sid: SpectaID,
+        generics: Vec<DataType>,
+    ) -> DataTypeReference {
+        DataTypeReference {
+            name,
+            sid,
+            generics,
+        }
+    }
 }
