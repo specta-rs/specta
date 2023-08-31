@@ -143,14 +143,14 @@ pub fn parse_struct(
                     }
                 };
 
-                Ok(quote!(#crate_ref::StructField {
-                    key: #field_name.into(),
-                    optional: #optional,
-                    flatten: #flatten,
-                    ty: {
+                Ok(quote!(#crate_ref::internal::construct::struct_field(
+                    #field_name.into(),
+                    #optional,
+                    #flatten,
+                    {
                         #ty
                     }
-                }))
+                )))
             }).collect::<syn::Result<Vec<TokenStream>>>()?;
 
             let tag = container_attrs

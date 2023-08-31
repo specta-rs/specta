@@ -4,12 +4,29 @@ use crate::{DataType, GenericType, NamedDataType, NamedDataTypeItem};
 
 /// A field in an [`StructType`].
 #[derive(Debug, Clone, PartialEq)]
-#[allow(missing_docs)]
 pub struct StructField {
-    pub key: Cow<'static, str>,
-    pub optional: bool,
-    pub flatten: bool,
-    pub ty: DataType,
+    pub(crate) key: Cow<'static, str>,
+    pub(crate) optional: bool,
+    pub(crate) flatten: bool,
+    pub(crate) ty: DataType,
+}
+
+impl StructField {
+    pub fn key(&self) -> &Cow<'static, str> {
+        &self.key
+    }
+
+    pub fn optional(&self) -> bool {
+        self.optional
+    }
+
+    pub fn flatten(&self) -> bool {
+        self.flatten
+    }
+
+    pub fn ty(&self) -> &DataType {
+        &self.ty
+    }
 }
 
 /// Type of a struct.

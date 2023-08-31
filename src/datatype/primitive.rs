@@ -3,7 +3,6 @@ use crate::DataType;
 /// Type of primitives like numbers and strings.
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, PartialEq)]
-#[allow(missing_docs)]
 pub enum PrimitiveType {
     i8,
     i16,

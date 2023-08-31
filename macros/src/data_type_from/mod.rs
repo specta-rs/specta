@@ -43,12 +43,12 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     let ident_str = ident.to_string();
 
                     Some(quote! {
-                        #crate_ref::StructField {
-                            key: #ident_str.into(),
-                            optional: false,
-                            flatten: false,
-                            ty: t.#ident.into(),
-                        }
+                        #crate_ref::internal::construct::struct_field(
+                            #ident_str.into(),
+                            false,
+                            false,
+                            t.#ident.into(),
+                        )
                     })
                 });
 

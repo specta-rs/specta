@@ -29,6 +29,20 @@ pub mod construct {
         }
     }
 
+    pub const fn struct_field(
+        key: Cow<'static, str>,
+        optional: bool,
+        flatten: bool,
+        ty: DataType,
+    ) -> StructField {
+        StructField {
+            key,
+            optional,
+            flatten,
+            ty,
+        }
+    }
+
     pub const fn named_data_type(
         name: Cow<'static, str>,
         comments: Vec<Cow<'static, str>>,

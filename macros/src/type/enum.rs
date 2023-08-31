@@ -156,16 +156,16 @@ pub fn parse_enum(
                                     (_, _) => quote::quote!(#field_ident_str),
                                 };
 
-                                Ok(quote!(#crate_ref::StructField {
-                                    key: #field_name.into(),
-                                    optional: false,
-                                    flatten: false,
-                                    ty: {
+                                Ok(quote!(#crate_ref::internal::construct::struct_field(
+                                    #field_name.into(),
+                                    false,
+                                    false,
+                                    {
                                         #generic_vars
 
                                         gen
                                     },
-                                }))
+                                )))
                             })
                             .collect::<syn::Result<Vec<TokenStream>>>()?;
 
