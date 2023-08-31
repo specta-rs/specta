@@ -155,7 +155,11 @@ pub struct DataTypeReference {
     pub generics: Vec<DataType>,
 }
 
-/// A generic parameter to another type.
+/// A generic ("placeholder") argument to a Specta-enabled type.
+///
+/// A generic does not hold a specific type instead it acts as a slot where a type can be provided when referencing this type.
+///
+/// A `GenericType` holds the identifier of the generic. Eg. Given a generic type `struct A<T>(T);` the generics will be represented as `vec![GenericType("A".into())]`
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
 pub struct GenericType(pub Cow<'static, str>);
