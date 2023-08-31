@@ -81,8 +81,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let definition_generics = generics.type_params().map(|param| {
         let ident = param.ident.to_string();
-
-        quote!(#crate_name::GenericType(#ident.into()))
+        quote!(std::borrow::Cow::Borrowed(#ident).into())
     });
 
     let bounds = generics_with_ident_and_bounds_only(generics);

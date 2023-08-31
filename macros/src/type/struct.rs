@@ -61,9 +61,10 @@ pub fn parse_struct(
         }
     });
 
-    let definition_generics = generic_idents
-        .iter()
-        .map(|(_, ident)| quote!(stringify!(#ident)));
+    let definition_generics = generic_idents.iter().map(|(_, ident)| {
+        let ident = ident.to_string();
+        quote!(std::borrow::Cow::Borrowed(#ident).into())
+    });
 
     let definition = match &data.fields {
         Fields::Named(_) => {
@@ -163,7 +164,7 @@ pub fn parse_struct(
                 container_attrs,
                 name,
                 quote! {
-                    #crate_ref::NamedDataTypeItem::Struct(#crate_ref::internal::construct::r#struct(vec![#(#definition_generics.into()),*], vec![#(#fields),*], #tag))
+                    #crate_ref::NamedDataTypeItem::Struct(#crate_ref::internal::construct::r#struct(vec![#(#definition_generics),*], vec![#(#fields),*], #tag))
                 },
             )
         }
@@ -199,7 +200,7 @@ pub fn parse_struct(
 
                     quote! {
                         #crate_ref::NamedDataTypeItem::Tuple(#crate_ref::TupleType::Named {
-                            generics: vec![#(#definition_generics.into()),*],
+                            generics: vec![#(#definition_generics),*],
                             fields: vec![
                                 {
                                     #ty
@@ -246,7 +247,7 @@ pub fn parse_struct(
                     quote! {
                         #crate_ref::NamedDataTypeItem::Tuple(
                             #crate_ref::TupleType::Named {
-                                generics: vec![#(#definition_generics.into()),*],
+                                generics: vec![#(#definition_generics),*],
                                 fields: vec![#(#fields),*],
                             }
                         )

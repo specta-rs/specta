@@ -24,9 +24,8 @@ pub fn parse_enum(
         });
 
     let definition_generics = generic_idents.clone().map(|(_, ident)| {
-        let ident = &ident.clone();
-
-        quote!(stringify!(#ident))
+        let ident = ident.to_string();
+        quote!(std::borrow::Cow::Borrowed(#ident).into())
     });
 
     let parent_inline = container_attrs
@@ -183,7 +182,7 @@ pub fn parse_enum(
         Tagged::Untagged => (
             quote! {
                 #crate_ref::EnumType::Untagged {
-                    generics: vec![#(#definition_generics.into()),*],
+                    generics: vec![#(#definition_generics),*],
                     variants: vec![#(#variant_types),*],
                 }
             },
@@ -194,7 +193,7 @@ pub fn parse_enum(
         Tagged::Externally => (
             quote! {
                 #crate_ref::EnumType::Tagged {
-                    generics: vec![#(#definition_generics.into()),*],
+                    generics: vec![#(#definition_generics),*],
                     variants: vec![#((#variant_names.into(), #variant_types)),*],
                     repr: #crate_ref::EnumRepr::External,
                 }
@@ -208,7 +207,7 @@ pub fn parse_enum(
         Tagged::Adjacently { tag, content } => (
             quote! {
                 #crate_ref::EnumType::Tagged {
-                    generics: vec![#(#definition_generics.into()),*],
+                    generics: vec![#(#definition_generics),*],
                     variants: vec![#((#variant_names.into(), #variant_types)),*],
                     repr: #crate_ref::EnumRepr::Adjacent { tag: #tag.into(), content: #content.into() },
                 }
@@ -218,7 +217,7 @@ pub fn parse_enum(
         Tagged::Internally { tag } => (
             quote! {
                 #crate_ref::EnumType::Tagged {
-                    generics: vec![#(#definition_generics.into()),*],
+                    generics: vec![#(#definition_generics),*],
                     variants: vec![#((#variant_names.into(), #variant_types)),*],
                     repr: #crate_ref::EnumRepr::Internal { tag: #tag.into() },
                 }

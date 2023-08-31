@@ -194,12 +194,10 @@ pub fn construct_datatype(
                     || {
                         <#generic_ident as #crate_ref::Type>::#method(
                             #crate_ref::DefOpts {
-                                parent_inline: #parent_inline,
+                            parent_inline: #parent_inline,
                                 type_map: opts.type_map
                             },
-                            &[#crate_ref::DataType::Generic(#crate_ref::GenericType(
-                                #type_ident.into()
-                            ))]
+                            &[#crate_ref::DataType::Generic(std::borrow::Cow::Borrowed(#type_ident).into())]
                         )
                     },
                     Ok,

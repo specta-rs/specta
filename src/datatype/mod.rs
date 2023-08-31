@@ -162,7 +162,7 @@ pub struct DataTypeReference {
 /// A `GenericType` holds the identifier of the generic. Eg. Given a generic type `struct A<T>(T);` the generics will be represented as `vec![GenericType("A".into())]`
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
-pub struct GenericType(pub Cow<'static, str>);
+pub struct GenericType(pub(crate) Cow<'static, str>);
 
 impl Borrow<str> for GenericType {
     fn borrow(&self) -> &str {
@@ -170,9 +170,9 @@ impl Borrow<str> for GenericType {
     }
 }
 
-impl<'a> From<&'a str> for GenericType {
-    fn from(value: &'a str) -> Self {
-        Self(value.to_owned().into())
+impl From<Cow<'static, str>> for GenericType {
+    fn from(value: Cow<'static, str>) -> Self {
+        Self(value)
     }
 }
 
@@ -218,8 +218,8 @@ impl From<String> for DataType {
     }
 }
 
-impl From<Cow<'static, str>> for DataType {
-    fn from(t: Cow<'static, str>) -> Self {
+impl<'a> From<Cow<'a, str>> for DataType {
+    fn from(t: Cow<'a, str>) -> Self {
         LiteralType::String(t.to_string()).into()
     }
 }
