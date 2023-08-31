@@ -39,8 +39,8 @@ impl ExportConfig {
     ///
     /// Implementations:
     ///  - [`js_doc`](crate::lang::ts::js_doc)
-    pub fn comment_style(mut self, exporter: Option<CommentFormatterFn>) -> Self {
-        self.comment_exporter = exporter;
+    pub fn comment_style(mut self, exporter: CommentFormatterFn) -> Self {
+        self.comment_exporter = Some(exporter);
         self
     }
 
@@ -50,8 +50,8 @@ impl ExportConfig {
     /// Implementations:
     ///  - [`prettier`](crate::lang::ts::prettier)
     ///  - [`ESLint`](crate::lang::ts::eslint)
-    pub fn formatter(mut self, formatter: Option<FormatterFn>) -> Self {
-        self.formatter = formatter;
+    pub fn formatter(mut self, formatter: FormatterFn) -> Self {
+        self.formatter = Some(formatter);
         self
     }
 
