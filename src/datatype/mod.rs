@@ -5,14 +5,14 @@ use std::{
 
 mod r#enum;
 mod literal;
-mod object;
 mod primitive;
+mod r#struct;
 mod tuple;
 
 pub use literal::*;
-pub use object::*;
 pub use primitive::*;
 pub use r#enum::*;
+pub use r#struct::*;
 pub use tuple::*;
 
 use crate::{ImplLocation, TypeSid};
@@ -48,7 +48,7 @@ pub enum DataType {
     // Named reference types
     Named(NamedDataType),
     // Anonymous Reference types
-    Object(ObjectType),
+    Struct(ObjectType),
     Enum(EnumType),
     Tuple(TupleType),
     // Result

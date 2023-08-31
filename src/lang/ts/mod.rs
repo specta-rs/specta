@@ -219,7 +219,7 @@ fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &TypeMap) -> Out
                 format!("{dt}[]")
             }
         }
-        DataType::Object(item) => object_datatype(ctx, None, item, type_map)?,
+        DataType::Struct(item) => object_datatype(ctx, None, item, type_map)?,
         DataType::Enum(item) => enum_datatype(ctx, None, item, type_map)?,
         DataType::Tuple(tuple) => tuple_datatype(ctx, tuple, type_map)?,
         DataType::Named(typ) => {

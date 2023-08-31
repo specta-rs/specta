@@ -24,7 +24,7 @@ pub struct ObjectType {
 impl ObjectType {
     /// Convert a [`ObjectType`] to an anonymous [`DataType`].
     pub fn to_anonymous(self) -> DataType {
-        DataType::Object(self)
+        DataType::Struct(self)
     }
 
     /// Convert a [`ObjectType`] to a named [`NamedDataType`].

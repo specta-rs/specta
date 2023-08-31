@@ -187,7 +187,7 @@ pub enum Infallible {}
 impl<T: Type> Type for std::ops::Range<T> {
     fn inline(opts: DefOpts, _generics: &[DataType]) -> Result<DataType, ExportError> {
         let ty = T::definition(opts)?;
-        Ok(DataType::Object(ObjectType {
+        Ok(DataType::Struct(ObjectType {
             generics: vec![],
             fields: vec![
                 ObjectField {
