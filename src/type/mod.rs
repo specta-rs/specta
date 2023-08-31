@@ -135,7 +135,15 @@ pub trait NamedType: Type {
 /// A marker trait for compile-time validation of which types can be flattened.
 pub trait Flatten: Type {}
 
-/// The Specta ID for the type. Holds for the given properties `T::SID == T::SID`, `T::SID != S::SID` and `Type<T>::SID == Type<S>::SID` (unlike std::any::TypeId)
+/// The unique Specta ID for the type.
+///
+/// Be aware type aliases don't exist as far as Specta is concerned as they are flattened into their inner type by Rust's trait system.
+/// The Specta Type ID holds for the given properties:
+///  - `T::SID == T::SID`
+///  - `T::SID != S::SID`
+///  - `Type<T>::SID == Type<S>::SID` (unlike std::any::TypeId)
+///  - `Box<T> == Arc<T> == Rc<T>` (unlike std::any::TypeId)
+///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[doc(hidden)]
 pub struct TypeSid(u64);
