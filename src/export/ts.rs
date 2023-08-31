@@ -19,7 +19,11 @@ pub fn ts_with_cfg(path: &str, conf: &ExportConfig) -> Result<(), TsExportError>
     let types = get_types()?
         .into_iter()
         .filter(|(_, v)| match v {
-            Some(v) => v.export.unwrap_or(export_by_default),
+            Some(v) => v
+                .ext()
+                .as_ref()
+                .and_then(|ext| ext.export)
+                .unwrap_or(export_by_default),
             None => {
                 unreachable!("Placeholder type should never be returned from the Specta functions!")
             }
@@ -31,15 +35,17 @@ pub fn ts_with_cfg(path: &str, conf: &ExportConfig) -> Result<(), TsExportError>
     for (sid, dt) in &types {
         match dt {
             Some(dt) => {
-                if let Some((existing_sid, existing_impl_location)) =
-                    map.insert(dt.name.clone(), (sid, dt.impl_location))
-                {
-                    if existing_sid != sid {
-                        return Err(TsExportError::DuplicateTypeName(
-                            dt.name.clone(),
-                            dt.impl_location,
-                            existing_impl_location,
-                        ));
+                if let Some(ext) = &dt.ext {
+                    if let Some((existing_sid, existing_impl_location)) =
+                        map.insert(dt.name.clone(), (sid, ext.impl_location))
+                    {
+                        if existing_sid != sid {
+                            return Err(TsExportError::DuplicateTypeName(
+                                dt.name.clone(),
+                                ext.impl_location,
+                                existing_impl_location,
+                            ));
+                        }
                     }
                 }
             }

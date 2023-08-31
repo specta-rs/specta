@@ -175,14 +175,14 @@ pub fn named_data_type_wrapper(
     };
 
     quote! {
-        #crate_ref::NamedDataType {
-            name: #name.into(),
-            sid: Some(SID),
-            impl_location: Some(IMPL_LOCATION),
-            comments: #comments,
-            export: #should_export,
-            deprecated: #deprecated,
-            item: #t
-        }
+        #crate_ref::internal::construct::named_data_type(
+            #name.into(),
+            #comments,
+            #deprecated,
+            SID,
+            IMPL_LOCATION,
+            #should_export,
+            #t
+        )
     }
 }

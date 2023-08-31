@@ -33,11 +33,9 @@ impl StructType {
     pub fn to_named(self, name: impl Into<Cow<'static, str>>) -> NamedDataType {
         NamedDataType {
             name: name.into(),
-            sid: None,
-            impl_location: None,
             comments: vec![],
-            export: None,
             deprecated: None,
+            ext: None,
             item: NamedDataTypeItem::Struct(self),
         }
     }

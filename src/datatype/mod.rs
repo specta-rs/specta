@@ -5,17 +5,19 @@ use std::{
 
 mod r#enum;
 mod literal;
+mod named;
 mod primitive;
 mod r#struct;
 mod tuple;
 
 pub use literal::*;
+pub use named::*;
 pub use primitive::*;
 pub use r#enum::*;
 pub use r#struct::*;
 pub use tuple::*;
 
-use crate::{ImplLocation, TypeSid};
+use crate::TypeSid;
 
 /// A map used to store the types "discovered" while exporting a type.
 /// You can iterate over this to export all types which the type/s you exported references on.
@@ -56,86 +58,6 @@ pub enum DataType {
     // A reference type that has already been defined
     Reference(DataTypeReference),
     Generic(GenericType),
-}
-
-/// A named type represents a non-primitive type capable of being exported as it's own named entity.
-#[derive(Debug, Clone, PartialEq)]
-pub struct NamedDataType {
-    /// The name of the type
-    pub name: Cow<'static, str>,
-    /// The Specta ID for the type. The value for this should come from the `sid!();` macro.
-    pub sid: Option<TypeSid>,
-    /// The code location where this type is implemented. Used for error reporting.
-    pub impl_location: Option<ImplLocation>,
-    /// Rust documentation comments on the type
-    pub comments: Vec<Cow<'static, str>>,
-    /// DEPRECATED. This is not used and shouldn't be. Will be removed in Specta v2!
-    pub export: Option<bool>,
-    /// The Rust deprecated comment if the type is deprecated.
-    pub deprecated: Option<Cow<'static, str>>,
-    /// the actual type definition.
-    pub item: NamedDataTypeItem,
-}
-
-impl From<NamedDataType> for DataType {
-    fn from(t: NamedDataType) -> Self {
-        Self::Named(t)
-    }
-}
-
-/// The possible types for a [`NamedDataType`].
-///
-/// This type will model the type of the Rust type that is being exported but be aware of the following:
-/// ```rust
-/// #[derive(serde::Serialize)]
-/// struct Demo {}
-/// // is: NamedDataTypeItem::Struct
-/// // typescript: `{}`
-///
-/// #[derive(serde::Serialize)]
-/// struct Demo2();
-/// // is: NamedDataTypeItem::Tuple(TupleType::Unnamed)
-/// // typescript: `[]`
-///
-/// #[derive(specta::Type)]
-/// struct Demo3;
-///// is: NamedDataTypeItem::Tuple(TupleType::Named(_))
-/// // typescript: `null`
-/// ```
-#[derive(Debug, Clone, PartialEq)]
-pub enum NamedDataTypeItem {
-    /// Represents an Rust struct with named fields
-    Struct(StructType),
-    /// Represents an Rust enum
-    Enum(EnumType),
-    /// Represents an Rust struct with unnamed fields
-    Tuple(TupleType),
-}
-
-impl NamedDataTypeItem {
-    /// Converts a [`NamedDataTypeItem`] into a [`DataType`]
-    pub fn datatype(self) -> DataType {
-        match self {
-            Self::Struct(o) => o.into(),
-            Self::Enum(e) => e.into(),
-            Self::Tuple(t) => t.into(),
-        }
-    }
-
-    /// Returns the generics arguments for the type
-    pub fn generics(&self) -> Vec<GenericType> {
-        match self {
-            // Named struct
-            Self::Struct(StructType { generics, .. }) => generics.clone(),
-            // Enum
-            Self::Enum(e) => e.generics().clone(),
-            // Struct with unnamed fields
-            Self::Tuple(tuple) => match tuple {
-                TupleType::Unnamed => vec![],
-                TupleType::Named { generics, .. } => generics.clone(),
-            },
-        }
-    }
 }
 
 /// A reference to a [`DataType`] that can be used before a type is resolved in order to

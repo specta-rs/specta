@@ -28,7 +28,7 @@ impl fmt::Display for NamedLocation {
 
 /// The error type for the TypeScript exporter.
 #[derive(Error, Debug)]
-#[allow(missing_docs)]
+#[non_exhaustive]
 pub enum TsExportError {
     #[error("Attempted to export '{0}' but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!")]
     BigIntForbidden(ExportPath),
@@ -38,12 +38,8 @@ pub enum TsExportError {
     ForbiddenName(NamedLocation, ExportPath, &'static str),
     #[error("Attempted to export '{0}' with tagging but the type is not tagged.")]
     InvalidTagging(ExportPath),
-    #[error("Unable to export type named '{0}' from locations '{:?}' '{:?}'", .1.map(|v| v.as_str()), .2.map(|v| v.as_str()))]
-    DuplicateTypeName(
-        Cow<'static, str>,
-        Option<ImplLocation>,
-        Option<ImplLocation>,
-    ),
+    #[error("Unable to export type named '{0}' from locations '{:?}' '{:?}'", .1.as_str(), .2.as_str())]
+    DuplicateTypeName(Cow<'static, str>, ImplLocation, ImplLocation),
     #[error("{0}")]
     SpectaExportError(#[from] ExportError),
     #[error("IO error: {0}")]
