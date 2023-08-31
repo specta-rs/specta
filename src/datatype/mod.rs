@@ -109,6 +109,34 @@ pub enum NamedDataTypeItem {
     Tuple(TupleType),
 }
 
+impl NamedDataTypeItem {
+    /// Converts a [`NamedDataTypeItem`] into a [`DataType`]
+    pub fn datatype(self) -> DataType {
+        match self {
+            Self::Object(o) => o.into(),
+            Self::Enum(e) => e.into(),
+            Self::Tuple(t) => t.into(),
+        }
+    }
+
+    /// Returns the generics arguments for the type
+    pub fn generics(&self) -> Vec<Cow<'static, str>> {
+        match self {
+            // Named struct
+            Self::Object(ObjectType { generics, .. }) => generics.clone(),
+            // Enum
+            Self::Enum(EnumType::Tagged { generics, .. } | EnumType::Untagged { generics, .. }) => {
+                generics.clone()
+            }
+            // Struct with unnamed fields
+            Self::Tuple(tuple) => match tuple {
+                TupleType::Unnamed => vec![],
+                TupleType::Named { generics, .. } => generics.clone(),
+            },
+        }
+    }
+}
+
 /// A reference to a [`DataType`] that can be used before a type is resolved in order to
 /// support recursive types without causing an infinite loop.
 ///
