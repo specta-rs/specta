@@ -48,7 +48,7 @@ pub enum DataType {
     // Named reference types
     Named(NamedDataType),
     // Anonymous Reference types
-    Struct(ObjectType),
+    Struct(StructType),
     Enum(EnumType),
     Tuple(TupleType),
     // Result
@@ -89,7 +89,7 @@ impl From<NamedDataType> for DataType {
 /// ```rust
 /// #[derive(serde::Serialize)]
 /// struct Demo {}
-/// // is: NamedDataTypeItem::Object
+/// // is: NamedDataTypeItem::Struct
 /// // typescript: `{}`
 ///
 /// #[derive(serde::Serialize)]
@@ -105,7 +105,7 @@ impl From<NamedDataType> for DataType {
 #[derive(Debug, Clone, PartialEq)]
 pub enum NamedDataTypeItem {
     /// Represents an Rust struct with named fields
-    Object(ObjectType),
+    Struct(StructType),
     /// Represents an Rust enum
     Enum(EnumType),
     /// Represents an Rust struct with unnamed fields
@@ -116,7 +116,7 @@ impl NamedDataTypeItem {
     /// Converts a [`NamedDataTypeItem`] into a [`DataType`]
     pub fn datatype(self) -> DataType {
         match self {
-            Self::Object(o) => o.into(),
+            Self::Struct(o) => o.into(),
             Self::Enum(e) => e.into(),
             Self::Tuple(t) => t.into(),
         }
@@ -126,7 +126,7 @@ impl NamedDataTypeItem {
     pub fn generics(&self) -> Vec<GenericType> {
         match self {
             // Named struct
-            Self::Object(ObjectType { generics, .. }) => generics.clone(),
+            Self::Struct(StructType { generics, .. }) => generics.clone(),
             // Enum
             Self::Enum(e) => e.generics().clone(),
             // Struct with unnamed fields

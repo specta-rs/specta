@@ -142,7 +142,7 @@ pub fn parse_struct(
                     }
                 };
 
-                Ok(quote!(#crate_ref::ObjectField {
+                Ok(quote!(#crate_ref::StructField {
                     key: #field_name.into(),
                     optional: #optional,
                     flatten: #flatten,
@@ -163,13 +163,7 @@ pub fn parse_struct(
                 container_attrs,
                 name,
                 quote! {
-                    #crate_ref::NamedDataTypeItem::Object(
-                        #crate_ref::ObjectType {
-                            generics: vec![#(#definition_generics.into()),*],
-                            fields: vec![#(#fields),*],
-                            tag: #tag,
-                        }
-                    )
+                    #crate_ref::NamedDataTypeItem::Struct(#crate_ref::internal::construct::r#struct(vec![#(#definition_generics.into()),*], vec![#(#fields),*], #tag))
                 },
             )
         }

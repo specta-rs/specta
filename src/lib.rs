@@ -58,6 +58,9 @@
 #![warn(clippy::all, clippy::unwrap_used, clippy::panic, missing_docs)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+#[doc(hidden)]
+pub mod internal;
+
 /// Types related to working with [`DataType`](crate::DataType). Exposed for advanced users.
 pub mod datatype;
 /// Provides the global type store and a method to export them to other languages.
@@ -115,7 +118,7 @@ pub use specta_macros::Type;
 /// at runtime inside the targeted type, providing an easy way to construct types at
 /// runtime from other types which are known statically via [`Type`].
 ///
-/// Along with inner data types such as [`ObjectType`] and [`EnumType`], some builtin types
+/// Along with inner data types such as [`StructType`] and [`EnumType`], some builtin types
 /// can easily be convert to a [`DataType`]:
 /// - [`Vec`] will become [`DataType::Enum`]
 /// - [`Option`] will become the value it contains or [`LiteralType::None`] if it is [`None`]
@@ -123,7 +126,7 @@ pub use specta_macros::Type;
 ///
 /// # Example
 /// ```rust
-/// use specta::{datatype::LiteralType, ts, DataType, DataTypeFrom, ObjectType, TupleType};
+/// use specta::{datatype::LiteralType, ts, DataType, DataTypeFrom, StructType, TupleType};
 ///
 /// #[derive(Clone, DataTypeFrom)]
 /// pub struct MyEnum(pub Vec<DataType>);
@@ -155,7 +158,7 @@ pub use specta_macros::Type;
 /// // Object
 /// //
 ///
-/// let val: ObjectType = MyObject {
+/// let val: StructType = MyObject {
 ///     a: vec![
 ///         LiteralType::String("A".to_string()).into(),
 ///         LiteralType::String("B".to_string()).into(),
@@ -186,15 +189,6 @@ pub use specta_macros::DataTypeFrom;
 #[cfg(feature = "functions")]
 #[cfg_attr(docsrs, doc(cfg(feature = "functions")))]
 pub use specta_macros::specta;
-
-#[doc(hidden)]
-pub mod internal {
-    #[cfg(feature = "export")]
-    pub use ctor;
-
-    #[cfg(feature = "functions")]
-    pub use specta_macros::fn_datatype;
-}
 
 #[cfg(doctest)]
 doc_comment::doctest!("../README.md");

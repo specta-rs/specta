@@ -138,7 +138,7 @@ fn named_datatype_inner(ctx: ExportContext, typ: &NamedDataType, type_map: &Type
     let name = Some(&typ.name);
 
     match &typ.item {
-        NamedDataTypeItem::Object(o) => object_datatype(ctx, name, o, type_map),
+        NamedDataTypeItem::Struct(o) => object_datatype(ctx, name, o, type_map),
         NamedDataTypeItem::Enum(e) => enum_datatype(ctx, name, e, type_map),
         NamedDataTypeItem::Tuple(t) => tuple_datatype(ctx, t, type_map),
     }
@@ -269,7 +269,7 @@ fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, type_map: &TypeMap) -> 
 fn object_datatype(
     ctx: ExportContext,
     name: Option<&Cow<'static, str>>,
-    ObjectType { fields, tag, .. }: &ObjectType,
+    StructType { fields, tag, .. }: &StructType,
     type_map: &TypeMap,
 ) -> Output {
     match &fields[..] {
@@ -341,8 +341,7 @@ fn enum_datatype(
                             let mut fields = vec![format!("{tag}: {sanitised_name}")];
 
                             fields.extend(
-                                obj.fields
-                                    .iter()
+                                obj.fields()
                                     .map(|v| {
                                         object_field_to_ts(
                                             ctx.with(PathItem::Field(v.key.clone())),
@@ -412,7 +411,7 @@ impl LiteralType {
 }
 
 /// convert an object field into a Typescript string
-fn object_field_to_ts(ctx: ExportContext, field: &ObjectField, type_map: &TypeMap) -> Output {
+fn object_field_to_ts(ctx: ExportContext, field: &StructField, type_map: &TypeMap) -> Output {
     let field_name_safe = sanitise_key(&field.key, false);
 
     // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211

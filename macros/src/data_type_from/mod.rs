@@ -43,7 +43,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     let ident_str = ident.to_string();
 
                     Some(quote! {
-                        #crate_ref::ObjectField {
+                        #crate_ref::StructField {
                             key: #ident_str.into(),
                             optional: false,
                             flatten: false,
@@ -54,20 +54,16 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
                 quote! {
                     #[automatically_derived]
-                    impl From<#ident> for #crate_ref::ObjectType {
-                        fn from(t: #ident) -> #crate_ref::ObjectType {
-                            #crate_ref::ObjectType {
-                                generics: vec![],
-                                fields: vec![#(#fields),*],
-                                tag: None,
-                            }
+                    impl From<#ident> for #crate_ref::StructType {
+                        fn from(t: #ident) -> #crate_ref::StructType {
+                            #crate_ref::internal::construct::r#struct(vec![], vec![#(#fields),*], None)
                         }
                     }
 
                     #[automatically_derived]
                     impl From<#ident> for #crate_ref::DataType {
                         fn from(t: #ident) -> #crate_ref::DataType {
-                            #crate_ref::DataType::Object(t.into())
+                            #crate_ref::DataType::Struct(t.into())
                         }
                     }
                 }

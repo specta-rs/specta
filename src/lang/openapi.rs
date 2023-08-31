@@ -7,7 +7,7 @@ use crate::*;
 // pub fn to_openapi_export(def: &DataType) -> Result<openapiv3::Schema, String> {
 //     Ok(match &def {
 //         // Named struct
-//         // DataType::Object(ObjectType {
+//         // DataType::Struct(StructType {
 //         //     name,
 //         //     generics,
 //         //     fields,
@@ -112,7 +112,7 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
             [ty] => to_openapi(ty),
             tys => todo!(),
         },
-        DataType::Object(ObjectType {
+        DataType::Struct(StructType {
             fields, tag, name, ..
         }) => match &fields[..] {
             [] => todo!(), // "null".to_string(),
@@ -217,7 +217,7 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
                                     to_openapi(&DataType::Tuple(tuple.clone()))
                                 }
                                 EnumVariant::Named(obj) => {
-                                    to_openapi(&DataType::Object(obj.clone()))
+                                    to_openapi(&DataType::Struct(obj.clone()))
                                 }
                             })
                             .collect(),

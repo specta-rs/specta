@@ -157,7 +157,7 @@ pub fn parse_enum(
                                     (_, _) => quote::quote!(#field_ident_str),
                                 };
 
-                                Ok(quote!(#crate_ref::ObjectField {
+                                Ok(quote!(#crate_ref::StructField {
                                     key: #field_name.into(),
                                     optional: false,
                                     flatten: false,
@@ -170,11 +170,7 @@ pub fn parse_enum(
                             })
                             .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                        quote!(#crate_ref::EnumVariant::Named(#crate_ref::ObjectType {
-                            fields: vec![#(#fields.into()),*],
-                            generics: vec![],
-                            tag: None,
-                        }))
+                        quote!(#crate_ref::EnumVariant::Named(#crate_ref::internal::construct::r#struct(vec![], vec![#(#fields),*], None)))
                     }
                 },
             ))

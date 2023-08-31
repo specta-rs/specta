@@ -48,7 +48,7 @@ fn datatype(t: &DataTypeExt) -> Result<String, String> {
             }
         },
         DataType::Nullable(t) => format!("{}?", datatype(t)?),
-        DataType::Object(ObjectType {
+        DataType::Struct(StructType {
             name,
             generics,
             fields,

@@ -1,4 +1,4 @@
-use specta::{ts, DataType, DataTypeFrom, LiteralType, ObjectType, TupleType};
+use specta::{ts, DataType, DataTypeFrom, LiteralType, StructType, TupleType};
 
 use crate::ts::assert_ts;
 
@@ -53,7 +53,7 @@ fn test_datatype() {
         Ok("export type MyEnum = \"A\" | \"B\"".into())
     );
 
-    let val: ObjectType = Procedures2 {
+    let val: StructType = Procedures2 {
         queries: vec![
             LiteralType::String("A".to_string()).into(),
             LiteralType::String("B".to_string()).into(),
@@ -77,7 +77,7 @@ fn test_datatype() {
         Ok("export type MyEnum = { queries: \"A\" | \"B\" }".into())
     );
 
-    let val: ObjectType = Procedures3 {
+    let val: StructType = Procedures3 {
         queries: vec![
             LiteralType::String("A".to_string()).into(),
             LiteralType::String("B".to_string()).into(),
@@ -102,7 +102,7 @@ fn test_datatype() {
     );
     assert_ts!(Procedures3, "{ queries: string }");
 
-    let val: ObjectType = Procedures4 {
+    let val: StructType = Procedures4 {
         queries: vec![Procedures2 {
             queries: vec![
                 LiteralType::String("A".to_string()).into(),

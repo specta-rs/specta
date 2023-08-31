@@ -30,7 +30,7 @@ fn datatype(t: &DataTypeExt) -> Result<String, String> {
                     .join(", ")
             ),
         },
-        DataType::Object(ObjectType {
+        DataType::Struct(StructType {
             name,
             generics,
             fields,

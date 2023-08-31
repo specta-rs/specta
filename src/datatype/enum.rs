@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use crate::{
-    datatype::{DataType, ObjectType, TupleType},
+    datatype::{DataType, StructType, TupleType},
     ExportError, GenericType, ImplLocation,
 };
 
@@ -117,7 +117,7 @@ pub enum EnumRepr {
 #[allow(missing_docs)]
 pub enum EnumVariant {
     Unit,
-    Named(ObjectType),
+    Named(StructType),
     Unnamed(TupleType),
 }
 

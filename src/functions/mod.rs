@@ -207,3 +207,5 @@ macro_rules! collect_functions {
         $crate::functions::collect_functions!(type_map; $($command),*)
     }};
 }
+
+pub use crate::collect_functions;

@@ -2,32 +2,32 @@ use std::borrow::Cow;
 
 use crate::{DataType, GenericType, NamedDataType, NamedDataTypeItem};
 
-/// A field in an [`ObjectType`].
+/// A field in an [`StructType`].
 #[derive(Debug, Clone, PartialEq)]
 #[allow(missing_docs)]
-pub struct ObjectField {
+pub struct StructField {
     pub key: Cow<'static, str>,
     pub optional: bool,
     pub flatten: bool,
     pub ty: DataType,
 }
 
-/// Type of an object.
+/// Type of a struct.
 /// Could be from a struct or named enum variant.
 #[derive(Debug, Clone, PartialEq)]
-pub struct ObjectType {
-    pub generics: Vec<GenericType>,
-    pub fields: Vec<ObjectField>,
-    pub tag: Option<Cow<'static, str>>,
+pub struct StructType {
+    pub(crate) generics: Vec<GenericType>,
+    pub(crate) fields: Vec<StructField>,
+    pub(crate) tag: Option<Cow<'static, str>>,
 }
 
-impl ObjectType {
-    /// Convert a [`ObjectType`] to an anonymous [`DataType`].
+impl StructType {
+    /// Convert a [`StructType`] to an anonymous [`DataType`].
     pub fn to_anonymous(self) -> DataType {
         DataType::Struct(self)
     }
 
-    /// Convert a [`ObjectType`] to a named [`NamedDataType`].
+    /// Convert a [`StructType`] to a named [`NamedDataType`].
     ///
     /// This can easily be converted to a [`DataType`] by putting it inside the [DataType::Named] variant.
     pub fn to_named(self, name: impl Into<Cow<'static, str>>) -> NamedDataType {
@@ -38,13 +38,25 @@ impl ObjectType {
             comments: vec![],
             export: None,
             deprecated: None,
-            item: NamedDataTypeItem::Object(self),
+            item: NamedDataTypeItem::Struct(self),
         }
+    }
+
+    pub fn generics(&self) -> impl Iterator<Item = &GenericType> {
+        self.generics.iter()
+    }
+
+    pub fn fields(&self) -> impl Iterator<Item = &StructField> {
+        self.fields.iter()
+    }
+
+    pub fn tag(&self) -> &Option<Cow<'static, str>> {
+        &self.tag
     }
 }
 
-impl From<ObjectType> for DataType {
-    fn from(t: ObjectType) -> Self {
+impl From<StructType> for DataType {
+    fn from(t: StructType) -> Self {
         t.to_anonymous()
     }
 }

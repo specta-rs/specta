@@ -1,7 +1,7 @@
 //! This file show how to use an advanced API of Specta.
 //! You probably shouldn't be using this in application code but if you're building a library on Specta it will be useful.
 
-use specta::{datatype::LiteralType, ts, DataType, DataTypeFrom, ObjectType, TupleType};
+use specta::{datatype::LiteralType, ts, DataType, DataTypeFrom, StructType, TupleType};
 
 #[derive(Clone, DataTypeFrom)]
 pub struct MyEnum(pub Vec<DataType>);
@@ -37,7 +37,7 @@ fn main() {
     //
     // Object
     //
-    let val: ObjectType = MyObject {
+    let val: StructType = MyObject {
         a: vec![
             LiteralType::String("A".to_string()).into(),
             LiteralType::String("B".to_string()).into(),
