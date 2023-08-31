@@ -112,6 +112,9 @@ pub trait Type {
 /// NamedType represents a type that can be converted into [NamedDataType].
 /// This will be all types created by the derive macro.
 pub trait NamedType: Type {
+    const SID: TypeSid;
+    const IMPL_LOCATION: ImplLocation;
+
     /// this is equivalent to [Type::inline] but returns a [NamedDataType] instead.
     /// This is a compile-time guaranteed alternative to extracting the `DataType::Named` variant.
     fn named_data_type(opts: DefOpts, generics: &[DataType]) -> Result<NamedDataType, ExportError>;

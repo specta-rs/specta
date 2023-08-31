@@ -75,6 +75,9 @@ macro_rules! impl_containers {
         }
 
         impl<T: NamedType> NamedType for $container<T> {
+	        const SID: TypeSid = T::SID;
+	        const IMPL_LOCATION: ImplLocation = T::IMPL_LOCATION;
+
             fn named_data_type(opts: DefOpts, generics: &[DataType]) -> Result<NamedDataType, ExportError> {
                 T::named_data_type(opts, generics)
             }
