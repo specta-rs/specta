@@ -170,6 +170,12 @@ impl Borrow<str> for GenericType {
     }
 }
 
+impl<'a> From<&'a str> for GenericType {
+    fn from(value: &'a str) -> Self {
+        Self(value.to_owned().into())
+    }
+}
+
 impl From<GenericType> for DataType {
     fn from(t: GenericType) -> Self {
         Self::Generic(t)

@@ -84,13 +84,13 @@ mod test {
 
     #[test]
     fn test_trailing_comma() {
-        functions::collect_types![a].unwrap();
-        functions::collect_types![a,].unwrap();
-        functions::collect_types![a, b, c].unwrap();
-        functions::collect_types![a, b, c,].unwrap();
+        functions::collect_functions![a].unwrap();
+        functions::collect_functions![a,].unwrap();
+        functions::collect_functions![a, b, c].unwrap();
+        functions::collect_functions![a, b, c,].unwrap();
 
         let (functions, types) =
-            functions::collect_types![a, b, c, d, e::<i32>, f, g, h, i, k].unwrap();
+            functions::collect_functions![a, b, c, d, e::<i32>, f, g, h, i, k].unwrap();
     }
 
     #[test]
