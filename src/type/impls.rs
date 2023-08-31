@@ -187,7 +187,7 @@ pub enum Infallible {}
 impl<T: Type> Type for std::ops::Range<T> {
     fn inline(opts: DefOpts, _generics: &[DataType]) -> Result<DataType, ExportError> {
         let ty = T::definition(opts)?;
-        Ok(DataType::Struct(StructType {
+        Ok(DataType::Struct(StructType::Named(StructNamedFields {
             generics: vec![],
             fields: vec![
                 StructField {
@@ -204,7 +204,7 @@ impl<T: Type> Type for std::ops::Range<T> {
                 },
             ],
             tag: None,
-        }))
+        })))
     }
 }
 
@@ -258,15 +258,15 @@ const _: () = {
             Ok(DataType::Enum(
                 UntaggedEnum {
                     variants: vec![
-                        EnumVariant::Unnamed(TupleType::Named {
+                        EnumVariant::Unnamed(TupleType {
                             fields: vec![DataType::Primitive(PrimitiveType::f64)],
                             generics: vec![],
                         }),
-                        EnumVariant::Unnamed(TupleType::Named {
+                        EnumVariant::Unnamed(TupleType {
                             fields: vec![DataType::Primitive(PrimitiveType::i64)],
                             generics: vec![],
                         }),
-                        EnumVariant::Unnamed(TupleType::Named {
+                        EnumVariant::Unnamed(TupleType {
                             fields: vec![DataType::Primitive(PrimitiveType::u64)],
                             generics: vec![],
                         }),
@@ -304,15 +304,15 @@ const _: () = {
             Ok(DataType::Enum(
                 UntaggedEnum {
                     variants: vec![
-                        EnumVariant::Unnamed(TupleType::Named {
+                        EnumVariant::Unnamed(TupleType {
                             fields: vec![DataType::Primitive(PrimitiveType::f64)],
                             generics: vec![],
                         }),
-                        EnumVariant::Unnamed(TupleType::Named {
+                        EnumVariant::Unnamed(TupleType {
                             fields: vec![DataType::Primitive(PrimitiveType::i64)],
                             generics: vec![],
                         }),
-                        EnumVariant::Unnamed(TupleType::Named {
+                        EnumVariant::Unnamed(TupleType {
                             fields: vec![DataType::Primitive(PrimitiveType::u64)],
                             generics: vec![],
                         }),
@@ -513,7 +513,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
     fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
         Ok(DataType::Enum(EnumType::Untagged(UntaggedEnum {
             variants: vec![
-                EnumVariant::Unnamed(TupleType::Named {
+                EnumVariant::Unnamed(TupleType {
                     fields: vec![L::inline(
                         DefOpts {
                             parent_inline: opts.parent_inline,
@@ -523,7 +523,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                     )?],
                     generics: vec![],
                 }),
-                EnumVariant::Unnamed(TupleType::Named {
+                EnumVariant::Unnamed(TupleType {
                     fields: vec![R::inline(
                         DefOpts {
                             parent_inline: opts.parent_inline,

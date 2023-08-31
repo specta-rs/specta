@@ -123,7 +123,7 @@ impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
                 variants: t
                     .into_iter()
                     .map(|t| {
-                        EnumVariant::Unnamed(TupleType::Named {
+                        EnumVariant::Unnamed(TupleType {
                             fields: vec![t.into()],
                             generics: vec![],
                         })

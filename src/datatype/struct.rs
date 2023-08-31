@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{DataType, GenericType, NamedDataType, NamedDataTypeItem};
+use crate::{DataType, GenericType, NamedDataType, NamedDataTypeItem, TupleType};
 
 /// A field in an [`StructType`].
 #[derive(Debug, Clone, PartialEq)]
@@ -29,13 +29,41 @@ impl StructField {
     }
 }
 
-/// Type of a struct.
-/// Could be from a struct or named enum variant.
 #[derive(Debug, Clone, PartialEq)]
-pub struct StructType {
+pub struct StructNamedFields {
     pub(crate) generics: Vec<GenericType>,
     pub(crate) fields: Vec<StructField>,
     pub(crate) tag: Option<Cow<'static, str>>,
+}
+
+impl StructNamedFields {
+    pub fn generics(&self) -> impl Iterator<Item = &GenericType> {
+        self.generics.iter()
+    }
+
+    pub fn fields(&self) -> impl Iterator<Item = &StructField> {
+        self.fields.iter()
+    }
+
+    pub fn tag(&self) -> &Option<Cow<'static, str>> {
+        &self.tag
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum StructType {
+    /// A unit struct.
+    ///
+    /// Represented in Rust as `pub struct Unit;` and in TypeScript as `null`.
+    Unit,
+    /// A struct with unnamed fields.
+    ///
+    /// Represented in Rust as `pub struct Unit();` and in TypeScript as `[]`.
+    Unnamed(TupleType),
+    /// A struct with named fields.
+    ///
+    /// Represented in Rust as `pub struct Unit{};` and in TypeScript as `{}`.
+    Named(StructNamedFields),
 }
 
 impl StructType {
@@ -57,16 +85,39 @@ impl StructType {
         }
     }
 
-    pub fn generics(&self) -> impl Iterator<Item = &GenericType> {
-        self.generics.iter()
+    pub fn generics(&self) -> Vec<GenericType> {
+        match self {
+            StructType::Unit => vec![], // TODO: Cringe this means we can't return `&Vec<_>`
+            StructType::Unnamed(unnamed) => unnamed.generics.clone(),
+            StructType::Named(named) => named.generics.clone(),
+        }
     }
 
-    pub fn fields(&self) -> impl Iterator<Item = &StructField> {
-        self.fields.iter()
+    pub fn fields(&self) -> Vec<StructField> {
+        match self {
+            StructType::Unit => vec![], // TODO: Cringe this means we can't return `&Vec<_>`
+            StructType::Unnamed(unnamed) => unnamed
+                .fields
+                .clone()
+                .into_iter()
+                // TODO: This is a bad conversions. Refactor to avoid it!
+                .map(|f| StructField {
+                    key: "".into(),
+                    optional: false,
+                    flatten: false,
+                    ty: f,
+                })
+                .collect(),
+            StructType::Named(named) => named.fields.clone(),
+        }
     }
 
-    pub fn tag(&self) -> &Option<Cow<'static, str>> {
-        &self.tag
+    pub fn tag(&self) -> Option<&Cow<'static, str>> {
+        match self {
+            StructType::Unit => None, // TODO: Cringe this means we can't return `&Vec<_>`
+            StructType::Unnamed(_) => None, // TODO: unnamed.tag.as_ref(),
+            StructType::Named(named) => named.tag.as_ref(),
+        }
     }
 }
 

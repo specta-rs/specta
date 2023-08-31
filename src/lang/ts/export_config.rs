@@ -50,7 +50,6 @@ impl ExportConfig {
     /// Implementations:
     ///  - [`prettier`](crate::lang::ts::prettier)
     ///  - [`ESLint`](crate::lang::ts::eslint)
-    #[cfg(feature = "export")]
     pub fn formatter(mut self, formatter: Option<FormatterFn>) -> Self {
         self.formatter = formatter;
         self

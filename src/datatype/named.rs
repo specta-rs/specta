@@ -81,12 +81,12 @@ impl From<NamedDataType> for DataType {
 ///
 /// #[derive(serde::Serialize)]
 /// struct Demo2();
-/// // is: NamedDataTypeItem::Tuple(TupleType::Unnamed)
+/// // is: NamedDataTypeItem::Tuple(TupleType::Unnamed) // TODO Fix this
 /// // typescript: `[]`
 ///
 /// #[derive(specta::Type)]
 /// struct Demo3;
-///// is: NamedDataTypeItem::Tuple(TupleType::Named(_))
+///// is: NamedDataTypeItem::Tuple(TupleType(_))
 /// // typescript: `null`
 /// ```
 #[derive(Debug, Clone, PartialEq)]
@@ -113,13 +113,16 @@ impl NamedDataTypeItem {
     pub fn generics(&self) -> Vec<GenericType> {
         match self {
             // Named struct
-            Self::Struct(StructType { generics, .. }) => generics.clone(),
+            Self::Struct(s) => match s {
+                StructType::Unit => vec![],
+                StructType::Unnamed(s) => s.generics.clone(),
+                StructType::Named(s) => s.generics.clone(),
+            },
             // Enum
             Self::Enum(e) => e.generics().clone(),
             // Struct with unnamed fields
             Self::Tuple(tuple) => match tuple {
-                TupleType::Unnamed => vec![],
-                TupleType::Named { generics, .. } => generics.clone(),
+                TupleType { generics, .. } => generics.clone(),
             },
         }
     }

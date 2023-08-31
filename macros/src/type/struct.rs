@@ -164,16 +164,13 @@ pub fn parse_struct(
                 container_attrs,
                 name,
                 quote! {
-                    #crate_ref::NamedDataTypeItem::Struct(#crate_ref::internal::construct::r#struct(vec![#(#definition_generics),*], vec![#(#fields),*], #tag))
+                    #crate_ref::NamedDataTypeItem::Struct(#crate_ref::internal::construct::named_struct(vec![#(#definition_generics),*], vec![#(#fields),*], #tag))
                 },
             )
         }
-        Fields::Unnamed(fields) => {
-            let inner = match (fields.unnamed.len(), struct_attrs.transparent) {
-                (0, _) => {
-                    quote!(#crate_ref::NamedDataTypeItem::Tuple(#crate_ref::TupleType::Unnamed),)
-                }
-                (_, true) => {
+        Fields::Unnamed(_) => {
+            let inner = match struct_attrs.transparent {
+                true => {
                     if data.fields.len() != 1 {
                         return Err(syn::Error::new(
                             data.fields.span(),
@@ -199,19 +196,19 @@ pub fn parse_struct(
                     )?;
 
                     quote! {
-                        #crate_ref::NamedDataTypeItem::Tuple(#crate_ref::TupleType::Named {
-                            generics: vec![#(#definition_generics),*],
-                            fields: vec![
+                        #crate_ref::NamedDataTypeItem::Struct(#crate_ref::internal::construct::unnamed_struct(
+                            vec![#(#definition_generics),*],
+                            vec![
                                 {
                                     #ty
 
                                     ty
                                 }
                             ]
-                        }),
+                        )),
                     }
                 }
-                (_, false) => {
+                false => {
                     let fields = data
                         .fields
                         .iter()
@@ -246,10 +243,10 @@ pub fn parse_struct(
 
                     quote! {
                         #crate_ref::NamedDataTypeItem::Tuple(
-                            #crate_ref::TupleType::Named {
-                                generics: vec![#(#definition_generics),*],
-                                fields: vec![#(#fields),*],
-                            }
+                            #crate_ref::internal::construct::tuple_type(
+                                vec![#(#definition_generics),*],
+                                vec![#(#fields),*],
+                        )
                         )
                     }
                 }
@@ -262,10 +259,7 @@ pub fn parse_struct(
             container_attrs,
             name,
             quote! {
-                #crate_ref::NamedDataTypeItem::Tuple(#crate_ref::TupleType::Named {
-                    generics:  vec![],
-                    fields: vec![],
-                })
+                #crate_ref::NamedDataTypeItem::Struct(#crate_ref::internal::construct::unit_struct())
             },
         ),
     };

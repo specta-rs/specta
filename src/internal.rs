@@ -17,16 +17,25 @@ pub mod construct {
 
     use crate::{datatype::*, ImplLocation, SpectaID};
 
-    pub const fn r#struct(
+    pub const fn unit_struct() -> StructType {
+        StructType::Unit
+    }
+
+    // TODO: By taking in `DataType` how does `flatten` and `inline` work
+    pub const fn unnamed_struct(generics: Vec<GenericType>, fields: Vec<DataType>) -> StructType {
+        StructType::Unnamed(TupleType { generics, fields })
+    }
+
+    pub const fn named_struct(
         generics: Vec<GenericType>,
         fields: Vec<StructField>,
         tag: Option<Cow<'static, str>>,
     ) -> StructType {
-        StructType {
+        StructType::Named(StructNamedFields {
             generics,
             fields,
             tag,
-        }
+        })
     }
 
     pub const fn struct_field(
@@ -91,5 +100,9 @@ pub mod construct {
             generics,
             repr,
         })
+    }
+
+    pub const fn tuple_type(generics: Vec<GenericType>, fields: Vec<DataType>) -> TupleType {
+        TupleType { fields, generics }
     }
 }

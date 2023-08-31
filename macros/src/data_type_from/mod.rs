@@ -56,7 +56,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     #[automatically_derived]
                     impl From<#ident> for #crate_ref::StructType {
                         fn from(t: #ident) -> #crate_ref::StructType {
-                            #crate_ref::internal::construct::r#struct(vec![], vec![#(#fields),*], None)
+                            #crate_ref::internal::construct::named_struct(vec![], vec![#(#fields),*], None)
                         }
                     }
 
@@ -78,10 +78,10 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     #[automatically_derived]
                     impl From<#ident> for #crate_ref::TupleType {
                         fn from(t: #ident) -> #crate_ref::TupleType {
-                            #crate_ref::TupleType::Named {
-                                generics: vec![],
-                                fields: vec![#(#fields),*]
-                            }
+                            #crate_ref::internal::construct::tuple_type(
+                                vec![],
+                                vec![#(#fields),*]
+                            )
                         }
                     }
 
