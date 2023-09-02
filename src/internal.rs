@@ -12,6 +12,7 @@ pub use specta_macros::fn_datatype;
 
 /// Functions used to construct `crate::datatype` types (they have private fields so can't be constructed directly).
 /// We intentionally keep their fields private so we can modify them without a major version bump.
+/// As this module is `#[doc(hidden)]` we allowed to make breaking changes within a minor version as it's only used by the macros.
 pub mod construct {
     use std::borrow::Cow;
 
@@ -70,8 +71,7 @@ pub mod construct {
         }
     }
 
-    // TODO: `const`
-    pub fn named_data_type(
+    pub const fn named_data_type(
         name: Cow<'static, str>,
         comments: Vec<Cow<'static, str>>,
         deprecated: Option<Cow<'static, str>>,
@@ -89,7 +89,7 @@ pub mod construct {
                 impl_location,
                 export,
             }),
-            item: Box::new(item),
+            item,
         }
     }
 

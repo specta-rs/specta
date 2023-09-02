@@ -170,7 +170,6 @@ fn datatype_inner(
         DataType::Map(def) => {
             let is_enum = match &def.0 {
                 DataType::Enum(_) => true,
-                DataType::Named(dt) => matches!(*dt.item, DataType::Enum(_)),
                 DataType::Reference(r) => {
                     let typ = type_map
                         .get(&r.sid())
@@ -178,7 +177,7 @@ fn datatype_inner(
                         .as_ref()
                         .unwrap_or_else(|| panic!("Type {} has no value!", r.name()));
 
-                    matches!(*typ.item, DataType::Enum(_))
+                    matches!(typ.item, DataType::Enum(_))
                 }
                 _ => false,
             };
@@ -204,12 +203,6 @@ fn datatype_inner(
         DataType::Struct(item) => struct_datatype(ctx, None, item, type_map)?,
         DataType::Enum(item) => enum_datatype(ctx, None, item, type_map)?,
         DataType::Tuple(tuple) => tuple_datatype(ctx, tuple, type_map, empty_tuple_fallback)?,
-        DataType::Named(typ) => datatype_inner(
-            ctx.with(PathItem::Type(typ.name.clone())),
-            &typ.item,
-            type_map,
-            "null",
-        )?,
         DataType::Result(result) => {
             let mut variants = vec![
                 datatype_inner(ctx.clone(), &result.0, type_map, "null")?,

@@ -142,16 +142,15 @@ fn test_datatype() {
         Ok("{ queries: \"A\" | \"B\" }".into())
     );
 
-    // TODO: Fix this test
-    // let val: TupleType = Procedures7().into();
-    // assert_eq!(
-    //     ts::datatype(
-    //         &Default::default(),
-    //         &val.clone().to_anonymous(),
-    //         &Default::default()
-    //     ),
-    //     Ok("[]".into())
-    // );
+    let val: TupleType = Procedures7().into();
+    assert_eq!(
+        ts::datatype(
+            &Default::default(),
+            &val.clone().to_anonymous(),
+            &Default::default()
+        ),
+        Ok("null".into()) // This is equivalent of `()` Because this is a `TupleType` not an `EnumType`.
+    );
 
     let val: StructType = Procedures8 {}.into();
     assert_eq!(

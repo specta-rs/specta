@@ -110,7 +110,7 @@ impl StructType {
             comments: vec![],
             deprecated: None,
             ext: None,
-            item: Box::new(DataType::Struct(self)),
+            item: DataType::Struct(self),
         }
     }
 

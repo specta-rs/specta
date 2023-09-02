@@ -13,7 +13,7 @@ mod private {
     pub enum SpectaFunctionResultMarker {}
     impl<T: Type> SpectaFunctionResult<SpectaFunctionResultMarker> for T {
         fn to_datatype(opts: DefOpts) -> Result<DataType, ExportError> {
-            T::reference(opts, &[])
+            T::reference(opts, &[]).map(|r| r.inner)
         }
     }
 
@@ -24,7 +24,7 @@ mod private {
         F::Output: Type,
     {
         fn to_datatype(opts: DefOpts) -> Result<DataType, ExportError> {
-            F::Output::reference(opts, &[])
+            F::Output::reference(opts, &[]).map(|r| r.inner)
         }
     }
 }

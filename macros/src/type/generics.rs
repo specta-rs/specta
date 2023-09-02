@@ -87,9 +87,9 @@ pub fn construct_datatype(
     crate_ref: &TokenStream,
     inline: bool,
 ) -> syn::Result<TokenStream> {
-    let method = match inline {
-        true => quote!(inline),
-        false => quote!(reference),
+    let (method, transform) = match inline {
+        true => (quote!(inline), quote!()),
+        false => (quote!(reference), quote!(.map(|r| r.inner))),
     };
 
     let parent_inline = inline.then(|| quote!(true)).unwrap_or(quote!(false));
@@ -126,7 +126,7 @@ pub fn construct_datatype(
                         type_map: opts.type_map
                     },
                     &[#(#generic_var_idents),*]
-                )?;
+                )#transform?;
             });
         }
         Type::Array(TypeArray { elem, .. }) | Type::Slice(TypeSlice { elem, .. }) => {
@@ -148,7 +148,7 @@ pub fn construct_datatype(
                         type_map: opts.type_map
                     },
                     &[#elem_var_ident]
-                )?;
+                )#transform?;
             });
         }
         Type::Ptr(TypePtr { elem, .. }) | Type::Reference(TypeReference { elem, .. }) => {
@@ -169,7 +169,7 @@ pub fn construct_datatype(
                         type_map: opts.type_map
                     },
                     &[]
-                )?;
+                )#transform?;
             });
         }
         ty => {
@@ -198,7 +198,7 @@ pub fn construct_datatype(
                                 type_map: opts.type_map
                             },
                             &[#crate_ref::DataType::Generic(std::borrow::Cow::Borrowed(#type_ident).into())]
-                        )
+                        )#transform
                     },
                     Ok,
                 )?;
@@ -251,6 +251,6 @@ pub fn construct_datatype(
                 type_map: opts.type_map
             },
             &[#(#generic_var_idents),*]
-        )?;
+        )#transform?;
     })
 }

@@ -1,6 +1,4 @@
-use super::{
-    attr::*, generics::construct_datatype, named_data_type_wrapper, r#struct::decode_field_attrs,
-};
+use super::{attr::*, generics::construct_datatype, r#struct::decode_field_attrs};
 use crate::utils::*;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -46,7 +44,7 @@ pub fn parse_enum(
                         type_map: opts.type_map,
                     },
                     &[],
-                ), Ok)?
+                ).map(|r| r.inner), Ok)?
         }
     });
 
@@ -219,26 +217,16 @@ pub fn parse_enum(
         ),
     };
 
-    let body = named_data_type_wrapper(
-        crate_ref,
-        container_attrs,
-        name,
-        quote! {
-            #crate_ref::DataType::Enum(
-                #enum_impl
-            )
-        },
-    );
-
     Ok((
-        body,
-        quote! {
-            #crate_ref::TypeCategory::Reference(#crate_ref::internal::construct::data_type_reference(
+        quote!(#crate_ref::DataType::Enum(#enum_impl)),
+        quote!({
+            let generics = vec![#(#reference_generics),*];
+            #crate_ref::reference::reference::<Self>(opts, &generics, #crate_ref::internal::construct::data_type_reference(
                 #name.into(),
                 SID,
-                vec![#(#reference_generics),*],
+                generics.clone() // TODO: This `clone` is cringe
             ))
-        },
+        }),
         can_flatten,
     ))
 }

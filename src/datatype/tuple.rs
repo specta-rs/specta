@@ -26,7 +26,7 @@ impl TupleType {
             comments: vec![],
             deprecated: None,
             ext: None,
-            item: Box::new(DataType::Tuple(self)),
+            item: DataType::Tuple(self),
         }
     }
 

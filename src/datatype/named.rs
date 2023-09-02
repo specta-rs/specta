@@ -42,8 +42,8 @@ pub struct NamedDataType {
     /// This will be `None` when constructing [NamedDataType] using `StructType::to_named` or `TupleType::to_named` since those types do not correspond to actual Rust types.
     pub(crate) ext: Option<NamedDataTypeExt>,
     /// the actual type definition.
-    // This field is public because we match on it in flattening code. // TODO: Review if this can be fixed when reviewing the flattening logic/error handling
-    pub item: Box<DataType>,
+    // This field is public because we match on it in flattening code. // TODO: Review if this can be made private when reviewing the flattening logic/error handling
+    pub item: DataType,
 }
 
 impl NamedDataType {
@@ -61,11 +61,5 @@ impl NamedDataType {
 
     pub fn ext(&self) -> &Option<NamedDataTypeExt> {
         &self.ext
-    }
-}
-
-impl From<NamedDataType> for DataType {
-    fn from(t: NamedDataType) -> Self {
-        Self::Named(t)
     }
 }

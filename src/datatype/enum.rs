@@ -81,7 +81,7 @@ impl EnumType {
             comments: vec![],
             deprecated: None,
             ext: None,
-            item: Box::new(DataType::Enum(self)),
+            item: DataType::Enum(self),
         }
     }
 

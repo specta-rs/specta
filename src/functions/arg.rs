@@ -15,7 +15,7 @@ mod private {
 
     impl<T: Type> SpectaFunctionArg<FunctionArgMarker> for T {
         fn to_datatype(opts: DefOpts) -> Result<Option<DataType>, ExportError> {
-            T::reference(opts, &[]).map(Some)
+            T::reference(opts, &[]).map(|r| Some(r.inner))
         }
     }
 

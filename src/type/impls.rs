@@ -1,4 +1,4 @@
-use crate::*;
+use crate::{reference::Reference, *};
 
 impl_primitives!(
     i8 i16 i32 i64 i128 isize
@@ -116,19 +116,11 @@ impl<'a, T: Type> Type for &'a [T] {
     fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
         <Vec<T>>::inline(opts, generics)
     }
-
-    fn category_impl(opts: DefOpts, generics: &[DataType]) -> Result<TypeCategory, ExportError> {
-        <Vec<T>>::category_impl(opts, generics)
-    }
 }
 
 impl<const N: usize, T: Type> Type for [T; N] {
     fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
         <Vec<T>>::inline(opts, generics)
-    }
-
-    fn category_impl(opts: DefOpts, generics: &[DataType]) -> Result<TypeCategory, ExportError> {
-        <Vec<T>>::category_impl(opts, generics)
     }
 }
 
@@ -140,15 +132,6 @@ impl<T: Type> Type for Option<T> {
                 .cloned()
                 .map_or_else(|| T::inline(opts, generics), Ok)?,
         )))
-    }
-
-    fn category_impl(opts: DefOpts, generics: &[DataType]) -> Result<TypeCategory, ExportError> {
-        Ok(TypeCategory::Inline(DataType::Nullable(Box::new(
-            generics
-                .get(0)
-                .cloned()
-                .map_or_else(|| T::reference(opts, generics), Ok)?,
-        ))))
     }
 }
 

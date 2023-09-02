@@ -3,7 +3,7 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{spanned::Spanned, DataStruct, Field, Fields, GenericParam, Generics};
 
-use super::{attr::*, generics::construct_datatype, named_data_type_wrapper};
+use super::{attr::*, generics::construct_datatype};
 
 pub fn decode_field_attrs(field: &Field) -> syn::Result<(&Field, FieldAttr)> {
     // We pass all the attributes at the start and when decoding them pop them off the list.
@@ -57,7 +57,7 @@ pub fn parse_struct(
                         type_map: opts.type_map,
                     },
                     &[],
-                ), Ok)?
+                ).map(|r| r.inner), Ok)?
         }
     });
 
@@ -127,11 +127,6 @@ pub fn parse_struct(
                             #crate_ref::DataType::Enum(item) => {
                                 item.make_flattenable(IMPL_LOCATION)?;
                             }
-                            #crate_ref::DataType::Named(#crate_ref::NamedDataType { item, .. }) => {
-                                if let #crate_ref::DataType::Enum(item) = &mut **item {
-                                    item.make_flattenable(IMPL_LOCATION)?;
-                                }
-                            }
                             _ => {}
                         }
 
@@ -161,14 +156,7 @@ pub fn parse_struct(
                 .map(|t| quote!(Some(#t.into())))
                 .unwrap_or(quote!(None));
 
-            named_data_type_wrapper(
-                crate_ref,
-                container_attrs,
-                name,
-                quote! {
-                    #crate_ref::DataType::Struct(#crate_ref::internal::construct::named_struct(vec![#(#definition_generics),*], vec![#(#fields),*], #tag))
-                },
-            )
+            quote!(#crate_ref::DataType::Struct(#crate_ref::internal::construct::named_struct(vec![#(#definition_generics),*], vec![#(#fields),*], #tag)))
         }
         Fields::Unnamed(_) => {
             let inner = match struct_attrs.transparent {
@@ -252,31 +240,27 @@ pub fn parse_struct(
                 }
             };
 
-            named_data_type_wrapper(crate_ref, container_attrs, name, inner)
+            inner
         }
-        Fields::Unit => named_data_type_wrapper(
-            crate_ref,
-            container_attrs,
-            name,
-            quote! {
-                #crate_ref::DataType::Struct(#crate_ref::internal::construct::unit_struct())
-            },
-        ),
+        Fields::Unit => {
+            quote!(#crate_ref::DataType::Struct(#crate_ref::internal::construct::unit_struct()))
+        }
     };
 
     let category = if container_attrs.inline {
-        quote!(#crate_ref::TypeCategory::Inline({
+        quote!({
             let generics = &[#(#reference_generics),*];
-            <Self as #crate_ref::Type>::inline(opts, generics)?
-        }))
+            #crate_ref::reference::inline::<Self>(opts, generics)
+        })
     } else {
-        quote! {
-            #crate_ref::TypeCategory::Reference(#crate_ref::internal::construct::data_type_reference(
+        quote!({
+            let generics = vec![#(#reference_generics),*];
+            #crate_ref::reference::reference::<Self>(opts, &generics, #crate_ref::internal::construct::data_type_reference(
                 #name.into(),
                 SID,
-                vec![#(#reference_generics),*],
+                generics.clone() // TODO: This `clone` is cringe
             ))
-        }
+        })
     };
 
     Ok((definition, category, true))

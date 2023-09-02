@@ -47,8 +47,6 @@ pub enum DataType {
     List(Box<DataType>),
     Nullable(Box<DataType>),
     Map(Box<(DataType, DataType)>),
-    // Named reference types
-    Named(NamedDataType),
     // Anonymous Reference types
     Struct(StructType),
     Enum(EnumType),

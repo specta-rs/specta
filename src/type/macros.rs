@@ -27,7 +27,7 @@ macro_rules! impl_tuple {
                                 type_map: opts.type_map,
                             },
                             generics,
-                        )
+                        ).map(|r| r.inner)
                     },
                     Ok,
                 )?;)*
@@ -60,16 +60,14 @@ macro_rules! impl_containers {
                 )
             }
 
-            fn reference(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-                generics.get(0).cloned().map_or_else(
-                    || {
-                        T::reference(
-                            opts,
-                            generics,
-                        )
-                    },
-                    Ok,
-                )
+            fn reference(opts: DefOpts, generics: &[DataType]) -> Result<Reference, ExportError> {
+                Ok(Reference {
+                    inner: generics.get(0).cloned().map_or_else(
+                        || T::reference(opts, generics).map(|r| r.inner),
+                        Ok,
+                    )?,
+                    _priv: (),
+                })
             }
         }
 
@@ -97,7 +95,7 @@ macro_rules! impl_as {
                 <$tty as Type>::inline(opts, generics)
             }
 
-            fn reference(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+            fn reference(opts: DefOpts, generics: &[DataType]) -> Result<Reference, ExportError> {
                 <$tty as Type>::reference(opts, generics)
             }
         }
@@ -114,16 +112,14 @@ macro_rules! impl_for_list {
                 )?))))
             }
 
-            fn reference(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-                Ok(DataType::List(Box::new(generics.get(0).cloned().map_or_else(
-                    || {
-                        T::reference(
-                           opts,
-                            generics,
-                        )
-                    },
-                    Ok,
-                )?)))
+            fn reference(opts: DefOpts, generics: &[DataType]) -> Result<Reference, ExportError> {
+                Ok(Reference {
+                    inner: DataType::List(Box::new(generics.get(0).cloned().map_or_else(
+                        || T::reference(opts, generics).map(|r| r.inner),
+                        Ok,
+                    )?)),
+                    _priv: (),
+                })
             }
         }
     )+};
@@ -161,33 +157,38 @@ macro_rules! impl_for_map {
                 ))))
             }
 
-            fn reference(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-                Ok(DataType::Map(Box::new((
-                    generics.get(0).cloned().map_or_else(
-                        || {
-                            K::reference(
-                                DefOpts {
-                                    parent_inline: opts.parent_inline,
-                                    type_map: opts.type_map,
-                                },
-                                generics,
-                            )
-                        },
-                        Ok,
-                    )?,
-                    generics.get(1).cloned().map_or_else(
-                        || {
-                            V::reference(
-                                DefOpts {
-                                    parent_inline: opts.parent_inline,
-                                    type_map: opts.type_map,
-                                },
-                                generics,
-                            )
-                        },
-                        Ok,
-                    )?,
-                ))))
+            fn reference(opts: DefOpts, generics: &[DataType]) -> Result<Reference, ExportError> {
+                Ok(Reference {
+                    inner: DataType::Map(Box::new((
+                        generics.get(0).cloned().map_or_else(
+                            || {
+                                K::reference(
+                                    DefOpts {
+                                        parent_inline: opts.parent_inline,
+                                        type_map: opts.type_map,
+                                    },
+                                    generics,
+                                )
+                                .map(|r| r.inner)
+                            },
+                            Ok,
+                        )?,
+                        generics.get(1).cloned().map_or_else(
+                            || {
+                                V::reference(
+                                    DefOpts {
+                                        parent_inline: opts.parent_inline,
+                                        type_map: opts.type_map,
+                                    },
+                                    generics,
+                                )
+                                .map(|r| r.inner)
+                            },
+                            Ok,
+                        )?,
+                    ))),
+                    _priv: (),
+                })
             }
         }
     };
