@@ -102,9 +102,10 @@ fn export_datatype_inner(
     let ctx = ctx.with(PathItem::Type(name.clone()));
     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
 
-    let inline_ts = named_datatype_inner(ctx.clone(), typ, type_map)?;
+    let inline_ts = datatype_inner(ctx.clone(), &typ.item, type_map, "null")?;
 
-    let generics = Some(item.generics())
+    let generics = item
+        .generics()
         .filter(|generics| !generics.is_empty())
         .map(|generics| format!("<{}>", generics.join(", ")))
         .unwrap_or_default();
@@ -118,30 +119,6 @@ fn export_datatype_inner(
     Ok(format!(
         "{comments}export type {name}{generics} = {inline_ts}"
     ))
-}
-
-/// Convert a NamedDataType to a TypeScript string
-///
-/// Eg. `{ scalar_field: number, generc_field: T }`
-pub fn named_datatype(conf: &ExportConfig, typ: &NamedDataType, type_map: &TypeMap) -> Output {
-    named_datatype_inner(
-        ExportContext {
-            conf,
-            path: vec![PathItem::Type(typ.name.clone())],
-        },
-        typ,
-        type_map,
-    )
-}
-
-fn named_datatype_inner(ctx: ExportContext, typ: &NamedDataType, type_map: &TypeMap) -> Output {
-    let name = Some(&typ.name);
-
-    match &typ.item {
-        NamedDataTypeItem::Struct(o) => struct_datatype(ctx, name, o, type_map),
-        NamedDataTypeItem::Enum(e) => enum_datatype(ctx, name, e, type_map),
-        NamedDataTypeItem::Tuple(t) => tuple_datatype(ctx, t, type_map, "[]"),
-    }
 }
 
 /// Convert a DataType to a TypeScript string
@@ -193,7 +170,7 @@ fn datatype_inner(
         DataType::Map(def) => {
             let is_enum = match &def.0 {
                 DataType::Enum(_) => true,
-                DataType::Named(dt) => matches!(dt.item, NamedDataTypeItem::Enum(_)),
+                DataType::Named(dt) => matches!(*dt.item, DataType::Enum(_)),
                 DataType::Reference(r) => {
                     let typ = type_map
                         .get(&r.sid())
@@ -201,7 +178,7 @@ fn datatype_inner(
                         .as_ref()
                         .unwrap_or_else(|| panic!("Type {} has no value!", r.name()));
 
-                    matches!(typ.item, NamedDataTypeItem::Enum(_))
+                    matches!(*typ.item, DataType::Enum(_))
                 }
                 _ => false,
             };
@@ -227,9 +204,12 @@ fn datatype_inner(
         DataType::Struct(item) => struct_datatype(ctx, None, item, type_map)?,
         DataType::Enum(item) => enum_datatype(ctx, None, item, type_map)?,
         DataType::Tuple(tuple) => tuple_datatype(ctx, tuple, type_map, empty_tuple_fallback)?,
-        DataType::Named(typ) => {
-            named_datatype_inner(ctx.with(PathItem::Type(typ.name.clone())), typ, type_map)?
-        }
+        DataType::Named(typ) => datatype_inner(
+            ctx.with(PathItem::Type(typ.name.clone())),
+            &typ.item,
+            type_map,
+            "null",
+        )?,
         DataType::Result(result) => {
             let mut variants = vec![
                 datatype_inner(ctx.clone(), &result.0, type_map, "null")?,
@@ -261,6 +241,25 @@ fn datatype_inner(
     })
 }
 
+fn struct_unnamed_datatype(
+    ctx: ExportContext,
+    StructUnnamedFields { fields, .. }: &StructUnnamedFields,
+    type_map: &TypeMap,
+    empty_tuple_fallback: &'static str,
+) -> Output {
+    match &fields[..] {
+        [] => Ok(empty_tuple_fallback.to_string()),
+        [ty] => datatype_inner(ctx, ty, type_map, "null"),
+        tys => Ok(format!(
+            "[{}]",
+            tys.iter()
+                .map(|v| datatype_inner(ctx.clone(), v, type_map, "null"))
+                .collect::<Result<Vec<_>>>()?
+                .join(", ")
+        )),
+    }
+}
+
 fn tuple_datatype(
     ctx: ExportContext,
     tuple: &TupleType,
@@ -290,7 +289,7 @@ fn struct_datatype(
 ) -> Output {
     match s {
         StructType::Unit => return Ok("null".into()),
-        StructType::Unnamed(tuple) => tuple_datatype(ctx, tuple, type_map, "[]"),
+        StructType::Unnamed(s) => struct_unnamed_datatype(ctx, s, type_map, "[]"),
         StructType::Named(s) => {
             if s.fields.len() == 0 {
                 return Ok("Record<string, never>".into());
@@ -357,12 +356,7 @@ fn enum_datatype(
                             format!("{{ {tag}: {sanitised_name} }}")
                         }
                         (EnumRepr::Internal { tag }, EnumVariant::Unnamed(tuple)) => {
-                            let typ = datatype_inner(
-                                ctx,
-                                &DataType::Tuple(tuple.clone()),
-                                type_map,
-                                "[]",
-                            )?;
+                            let typ = struct_unnamed_datatype(ctx, &tuple, type_map, "[]")?;
                             format!("({{ {tag}: {sanitised_name} }} & {typ})")
                         }
                         (EnumRepr::Internal { tag }, EnumVariant::Named(obj)) => {
@@ -370,7 +364,6 @@ fn enum_datatype(
 
                             fields.extend(
                                 obj.fields()
-                                    .iter()
                                     .map(|v| {
                                         object_field_to_ts(
                                             ctx.with(PathItem::Field(v.key.clone())),

@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
 use crate::{
-    datatype::{DataType, StructType, TupleType},
-    ExportError, GenericType, ImplLocation,
+    datatype::DataType, ExportError, GenericType, ImplLocation, NamedDataType, StructNamedFields,
+    StructUnnamedFields,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -66,14 +66,26 @@ pub enum EnumType {
     Tagged(TaggedEnum),
 }
 
-impl From<EnumType> for DataType {
-    fn from(t: EnumType) -> Self {
-        Self::Enum(t)
-    }
-}
-
 impl EnumType {
-    pub(crate) fn generics(&self) -> &Vec<GenericType> {
+    /// Convert a [`EnumType`] to an anonymous [`DataType`].
+    pub fn to_anonymous(self) -> DataType {
+        DataType::Enum(self)
+    }
+
+    /// Convert a [`EnumType`] to a named [`NamedDataType`].
+    ///
+    /// This can easily be converted to a [`DataType`] by putting it inside the [DataType::Named] variant.
+    pub fn to_named(self, name: impl Into<Cow<'static, str>>) -> NamedDataType {
+        NamedDataType {
+            name: name.into(),
+            comments: vec![],
+            deprecated: None,
+            ext: None,
+            item: Box::new(DataType::Enum(self)),
+        }
+    }
+
+    pub fn generics(&self) -> &Vec<GenericType> {
         match self {
             Self::Untagged(UntaggedEnum { generics, .. }) => generics,
             Self::Tagged(TaggedEnum { generics, .. }) => generics,
@@ -110,8 +122,8 @@ impl EnumType {
                                 "`EnumRepr::External` with ` EnumVariant::Unit` is invalid!",
                             )),
                             EnumVariant::Unnamed(v) => match v {
-                                TupleType { fields, .. } if fields.len() == 1 => Ok(()),
-                                TupleType { .. } => Err(ExportError::InvalidType(
+                                StructUnnamedFields { fields, .. } if fields.len() == 1 => Ok(()),
+                                StructUnnamedFields { .. } => Err(ExportError::InvalidType(
                                     impl_location,
                                     "`EnumRepr::External` with `EnumVariant::Unnamed` containing more than a single field is invalid!",
                                 )),
@@ -136,6 +148,12 @@ impl EnumType {
     }
 }
 
+impl From<EnumType> for DataType {
+    fn from(t: EnumType) -> Self {
+        Self::Enum(t)
+    }
+}
+
 /// Serde representation of an enum.
 ///
 /// Does not contain [`Untagged`](EnumType::Untagged) as that is handled by [`EnumType`].
@@ -157,8 +175,9 @@ pub enum EnumRepr {
 #[allow(missing_docs)]
 pub enum EnumVariant {
     Unit,
-    Named(StructType),
-    Unnamed(TupleType),
+    // TODO: Should these be holding the `struct` types or have their own???
+    Named(StructNamedFields),
+    Unnamed(StructUnnamedFields),
 }
 
 impl EnumVariant {
@@ -166,8 +185,8 @@ impl EnumVariant {
     pub fn data_type(&self) -> DataType {
         match self {
             Self::Unit => unreachable!("Unit enum variants have no type!"), // TODO: Remove unreachable in type system + avoid following clones
-            Self::Unnamed(tuple_type) => tuple_type.clone().into(),
-            Self::Named(object_type) => object_type.clone().into(),
+            Self::Unnamed(tuple_type) => DataType::Struct(tuple_type.clone().into()),
+            Self::Named(object_type) => DataType::Struct(object_type.clone().into()),
         }
     }
 }

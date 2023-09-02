@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{DataType, GenericType, NamedDataType, NamedDataTypeItem, TupleType};
+use crate::{DataType, GenericType, NamedDataType};
 
 /// A field in an [`StructType`].
 #[derive(Debug, Clone, PartialEq)]
@@ -30,9 +30,32 @@ impl StructField {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct StructUnnamedFields {
+    pub(crate) fields: Vec<DataType>, // TODO: should use `StructField` but without `name` for flatten/inline
+    pub(crate) generics: Vec<GenericType>,
+}
+
+impl StructUnnamedFields {
+    pub fn generics(&self) -> impl Iterator<Item = &GenericType> {
+        self.generics.iter()
+    }
+
+    // TODO: Make this work
+    // pub fn fields(&self) -> impl Iterator<Item = &StructField> {
+    //     self.fields.iter()
+    // }
+}
+
+impl Into<StructType> for StructUnnamedFields {
+    fn into(self) -> StructType {
+        StructType::Unnamed(self)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct StructNamedFields {
     pub(crate) generics: Vec<GenericType>,
-    pub(crate) fields: Vec<StructField>,
+    pub(crate) fields: Vec<StructField>, // TODO: StructField but with name
     pub(crate) tag: Option<Cow<'static, str>>,
 }
 
@@ -50,6 +73,12 @@ impl StructNamedFields {
     }
 }
 
+impl Into<StructType> for StructNamedFields {
+    fn into(self) -> StructType {
+        StructType::Named(self)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum StructType {
     /// A unit struct.
@@ -59,10 +88,10 @@ pub enum StructType {
     /// A struct with unnamed fields.
     ///
     /// Represented in Rust as `pub struct Unit();` and in TypeScript as `[]`.
-    Unnamed(TupleType),
+    Unnamed(StructUnnamedFields),
     /// A struct with named fields.
     ///
-    /// Represented in Rust as `pub struct Unit{};` and in TypeScript as `{}`.
+    /// Represented in Rust as `pub struct Unit {}` and in TypeScript as `{}`.
     Named(StructNamedFields),
 }
 
@@ -81,7 +110,7 @@ impl StructType {
             comments: vec![],
             deprecated: None,
             ext: None,
-            item: NamedDataTypeItem::Struct(self),
+            item: Box::new(DataType::Struct(self)),
         }
     }
 

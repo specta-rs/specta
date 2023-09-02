@@ -34,7 +34,6 @@ macro_rules! impl_tuple {
 
                 Ok(datatype::TupleType {
                     fields: vec![$($i),*],
-                    generics: vec![]
                 }.to_anonymous())
             }
         }

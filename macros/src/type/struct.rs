@@ -127,8 +127,10 @@ pub fn parse_struct(
                             #crate_ref::DataType::Enum(item) => {
                                 item.make_flattenable(IMPL_LOCATION)?;
                             }
-                            #crate_ref::DataType::Named(#crate_ref::NamedDataType { item: #crate_ref::NamedDataTypeItem::Enum(item), .. }) => {
-                                item.make_flattenable(IMPL_LOCATION)?;
+                            #crate_ref::DataType::Named(#crate_ref::NamedDataType { item, .. }) => {
+                                if let #crate_ref::DataType::Enum(item) = &mut **item {
+                                    item.make_flattenable(IMPL_LOCATION)?;
+                                }
                             }
                             _ => {}
                         }
@@ -164,7 +166,7 @@ pub fn parse_struct(
                 container_attrs,
                 name,
                 quote! {
-                    #crate_ref::NamedDataTypeItem::Struct(#crate_ref::internal::construct::named_struct(vec![#(#definition_generics),*], vec![#(#fields),*], #tag))
+                    #crate_ref::DataType::Struct(#crate_ref::internal::construct::named_struct(vec![#(#definition_generics),*], vec![#(#fields),*], #tag))
                 },
             )
         }
@@ -196,7 +198,7 @@ pub fn parse_struct(
                     )?;
 
                     quote! {
-                        #crate_ref::NamedDataTypeItem::Struct(#crate_ref::internal::construct::unnamed_struct(
+                        #crate_ref::DataType::Struct(#crate_ref::internal::construct::unnamed_struct(
                             vec![#(#definition_generics),*],
                             vec![
                                 {
@@ -242,12 +244,10 @@ pub fn parse_struct(
                         .collect::<syn::Result<Vec<TokenStream>>>()?;
 
                     quote! {
-                        #crate_ref::NamedDataTypeItem::Tuple(
-                            #crate_ref::internal::construct::tuple_type(
-                                vec![#(#definition_generics),*],
-                                vec![#(#fields),*],
-                        )
-                        )
+                        #crate_ref::DataType::Struct(#crate_ref::internal::construct::unnamed_struct(
+                            vec![#(#definition_generics),*],
+                            vec![#(#fields),*],
+                        ))
                     }
                 }
             };
@@ -259,7 +259,7 @@ pub fn parse_struct(
             container_attrs,
             name,
             quote! {
-                #crate_ref::NamedDataTypeItem::Struct(#crate_ref::internal::construct::unit_struct())
+                #crate_ref::DataType::Struct(#crate_ref::internal::construct::unit_struct())
             },
         ),
     };

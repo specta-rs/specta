@@ -39,8 +39,12 @@ impl ExportConfig {
     ///
     /// Implementations:
     ///  - [`js_doc`](crate::lang::ts::js_doc)
-    pub fn comment_style(mut self, exporter: CommentFormatterFn) -> Self {
-        self.comment_exporter = Some(exporter);
+    ///
+    /// Not calling this method will default to the [`js_doc`](crate::lang::ts::js_doc) exporter.
+    /// `None` will disable comment exporting.
+    /// `Some(exporter)` will enable comment exporting using the provided exporter.
+    pub fn comment_style(mut self, exporter: Option<CommentFormatterFn>) -> Self {
+        self.comment_exporter = exporter;
         self
     }
 

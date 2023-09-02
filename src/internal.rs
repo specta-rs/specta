@@ -21,11 +21,29 @@ pub mod construct {
         StructType::Unit
     }
 
-    // TODO: By taking in `DataType` how does `flatten` and `inline` work
-    pub const fn unnamed_struct(generics: Vec<GenericType>, fields: Vec<DataType>) -> StructType {
-        StructType::Unnamed(TupleType { generics, fields })
+    pub const fn unnamed_struct_fields(
+        generics: Vec<GenericType>,
+        fields: Vec<DataType>,
+    ) -> StructUnnamedFields {
+        StructUnnamedFields { generics, fields }
     }
 
+    // TODO: By taking in `DataType` how does `flatten` and `inline` work
+    pub const fn unnamed_struct(generics: Vec<GenericType>, fields: Vec<DataType>) -> StructType {
+        StructType::Unnamed(StructUnnamedFields { generics, fields })
+    }
+
+    pub const fn named_struct_fields(
+        generics: Vec<GenericType>,
+        fields: Vec<StructField>,
+        tag: Option<Cow<'static, str>>,
+    ) -> StructNamedFields {
+        StructNamedFields {
+            generics,
+            fields,
+            tag,
+        }
+    }
     pub const fn named_struct(
         generics: Vec<GenericType>,
         fields: Vec<StructField>,
@@ -52,14 +70,15 @@ pub mod construct {
         }
     }
 
-    pub const fn named_data_type(
+    // TODO: `const`
+    pub fn named_data_type(
         name: Cow<'static, str>,
         comments: Vec<Cow<'static, str>>,
         deprecated: Option<Cow<'static, str>>,
         sid: SpectaID,
         impl_location: ImplLocation,
         export: Option<bool>,
-        item: NamedDataTypeItem,
+        item: DataType,
     ) -> NamedDataType {
         NamedDataType {
             name,
@@ -70,7 +89,7 @@ pub mod construct {
                 impl_location,
                 export,
             }),
-            item,
+            item: Box::new(item),
         }
     }
 
@@ -86,13 +105,13 @@ pub mod construct {
         }
     }
 
-    pub const fn untagged_enum(variants: Vec<EnumVariant>, generics: Vec<GenericType>) -> EnumType {
+    pub const fn untagged_enum(generics: Vec<GenericType>, variants: Vec<EnumVariant>) -> EnumType {
         EnumType::Untagged(UntaggedEnum { variants, generics })
     }
 
     pub const fn tagged_enum(
-        variants: Vec<(Cow<'static, str>, EnumVariant)>,
         generics: Vec<GenericType>,
+        variants: Vec<(Cow<'static, str>, EnumVariant)>,
         repr: EnumRepr,
     ) -> EnumType {
         EnumType::Tagged(TaggedEnum {
@@ -102,7 +121,7 @@ pub mod construct {
         })
     }
 
-    pub const fn tuple_type(generics: Vec<GenericType>, fields: Vec<DataType>) -> TupleType {
-        TupleType { fields, generics }
+    pub const fn tuple(fields: Vec<DataType>) -> TupleType {
+        TupleType { fields }
     }
 }

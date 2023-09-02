@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{DataType, GenericType, NamedDataType, NamedDataTypeItem};
+use crate::{DataType, NamedDataType};
 
 /// A regular tuple
 ///
@@ -9,7 +9,6 @@ use crate::{DataType, GenericType, NamedDataType, NamedDataTypeItem};
 #[derive(Debug, Clone, PartialEq)]
 pub struct TupleType {
     pub(crate) fields: Vec<DataType>,
-    pub(crate) generics: Vec<GenericType>,
 }
 
 impl TupleType {
@@ -27,16 +26,12 @@ impl TupleType {
             comments: vec![],
             deprecated: None,
             ext: None,
-            item: NamedDataTypeItem::Tuple(self),
+            item: Box::new(DataType::Tuple(self)),
         }
     }
 
     pub fn fields(&self) -> impl Iterator<Item = &DataType> {
         self.fields.iter()
-    }
-
-    pub fn generics(&self) -> impl Iterator<Item = &GenericType> {
-        self.generics.iter()
     }
 }
 

@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{DataType, EnumType, GenericType, ImplLocation, SpectaID, StructType, TupleType};
+use crate::{DataType, ImplLocation, SpectaID};
 
 /// A NamedDataTypeImpl includes extra information which is only available for [NamedDataType]'s that come from a real Rust type.
 #[derive(Debug, Clone, PartialEq)]
@@ -43,7 +43,7 @@ pub struct NamedDataType {
     pub(crate) ext: Option<NamedDataTypeExt>,
     /// the actual type definition.
     // This field is public because we match on it in flattening code. // TODO: Review if this can be fixed when reviewing the flattening logic/error handling
-    pub item: NamedDataTypeItem,
+    pub item: Box<DataType>,
 }
 
 impl NamedDataType {
@@ -67,63 +67,5 @@ impl NamedDataType {
 impl From<NamedDataType> for DataType {
     fn from(t: NamedDataType) -> Self {
         Self::Named(t)
-    }
-}
-
-/// The possible types for a [`NamedDataType`].
-///
-/// This type will model the type of the Rust type that is being exported but be aware of the following:
-/// ```rust
-/// #[derive(serde::Serialize)]
-/// struct Demo {}
-/// // is: NamedDataTypeItem::Struct
-/// // typescript: `{}`
-///
-/// #[derive(serde::Serialize)]
-/// struct Demo2();
-/// // is: NamedDataTypeItem::Tuple(TupleType::Unnamed) // TODO Fix this
-/// // typescript: `[]`
-///
-/// #[derive(specta::Type)]
-/// struct Demo3;
-///// is: NamedDataTypeItem::Tuple(TupleType(_))
-/// // typescript: `null`
-/// ```
-#[derive(Debug, Clone, PartialEq)]
-pub enum NamedDataTypeItem {
-    /// Represents an Rust struct with named fields
-    Struct(StructType),
-    /// Represents an Rust enum
-    Enum(EnumType),
-    /// Represents an Rust struct with unnamed fields
-    Tuple(TupleType),
-}
-
-impl NamedDataTypeItem {
-    /// Converts a [`NamedDataTypeItem`] into a [`DataType`]
-    pub fn datatype(self) -> DataType {
-        match self {
-            Self::Struct(o) => o.into(),
-            Self::Enum(e) => e.into(),
-            Self::Tuple(t) => t.into(),
-        }
-    }
-
-    /// Returns the generics arguments for the type
-    pub fn generics(&self) -> Vec<GenericType> {
-        match self {
-            // Named struct
-            Self::Struct(s) => match s {
-                StructType::Unit => vec![],
-                StructType::Unnamed(s) => s.generics.clone(),
-                StructType::Named(s) => s.generics.clone(),
-            },
-            // Enum
-            Self::Enum(e) => e.generics().clone(),
-            // Struct with unnamed fields
-            Self::Tuple(tuple) => match tuple {
-                TupleType { generics, .. } => generics.clone(),
-            },
-        }
     }
 }

@@ -258,15 +258,15 @@ const _: () = {
             Ok(DataType::Enum(
                 UntaggedEnum {
                     variants: vec![
-                        EnumVariant::Unnamed(TupleType {
+                        EnumVariant::Unnamed(StructUnnamedFields {
                             fields: vec![DataType::Primitive(PrimitiveType::f64)],
                             generics: vec![],
                         }),
-                        EnumVariant::Unnamed(TupleType {
+                        EnumVariant::Unnamed(StructUnnamedFields {
                             fields: vec![DataType::Primitive(PrimitiveType::i64)],
                             generics: vec![],
                         }),
-                        EnumVariant::Unnamed(TupleType {
+                        EnumVariant::Unnamed(StructUnnamedFields {
                             fields: vec![DataType::Primitive(PrimitiveType::u64)],
                             generics: vec![],
                         }),
@@ -304,15 +304,15 @@ const _: () = {
             Ok(DataType::Enum(
                 UntaggedEnum {
                     variants: vec![
-                        EnumVariant::Unnamed(TupleType {
+                        EnumVariant::Unnamed(StructUnnamedFields {
                             fields: vec![DataType::Primitive(PrimitiveType::f64)],
                             generics: vec![],
                         }),
-                        EnumVariant::Unnamed(TupleType {
+                        EnumVariant::Unnamed(StructUnnamedFields {
                             fields: vec![DataType::Primitive(PrimitiveType::i64)],
                             generics: vec![],
                         }),
-                        EnumVariant::Unnamed(TupleType {
+                        EnumVariant::Unnamed(StructUnnamedFields {
                             fields: vec![DataType::Primitive(PrimitiveType::u64)],
                             generics: vec![],
                         }),
@@ -513,7 +513,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
     fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
         Ok(DataType::Enum(EnumType::Untagged(UntaggedEnum {
             variants: vec![
-                EnumVariant::Unnamed(TupleType {
+                EnumVariant::Unnamed(StructUnnamedFields {
                     fields: vec![L::inline(
                         DefOpts {
                             parent_inline: opts.parent_inline,
@@ -523,7 +523,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                     )?],
                     generics: vec![],
                 }),
-                EnumVariant::Unnamed(TupleType {
+                EnumVariant::Unnamed(StructUnnamedFields {
                     fields: vec![R::inline(
                         DefOpts {
                             parent_inline: opts.parent_inline,

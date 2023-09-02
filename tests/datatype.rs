@@ -1,4 +1,4 @@
-use specta::{ts, DataType, DataTypeFrom, LiteralType, StructType, TupleType};
+use specta::{ts, DataType, DataTypeFrom, EnumType, LiteralType, StructType, TupleType};
 
 use crate::ts::assert_ts;
 
@@ -28,6 +28,12 @@ struct Procedures4 {
 // Using a type implementing `DataTypeFrom` as a field.
 #[derive(DataTypeFrom)]
 struct Procedures5(Vec<Procedures2>);
+
+#[derive(DataTypeFrom)]
+struct Procedures7();
+
+#[derive(DataTypeFrom)]
+struct Procedures8 {}
 
 #[test]
 fn test_datatype() {
@@ -134,5 +140,26 @@ fn test_datatype() {
             &Default::default()
         ),
         Ok("{ queries: \"A\" | \"B\" }".into())
+    );
+
+    // TODO: Fix this test
+    // let val: TupleType = Procedures7().into();
+    // assert_eq!(
+    //     ts::datatype(
+    //         &Default::default(),
+    //         &val.clone().to_anonymous(),
+    //         &Default::default()
+    //     ),
+    //     Ok("[]".into())
+    // );
+
+    let val: StructType = Procedures8 {}.into();
+    assert_eq!(
+        ts::datatype(
+            &Default::default(),
+            &val.clone().to_anonymous(),
+            &Default::default()
+        ),
+        Ok("Record<string, never>".into())
     );
 }

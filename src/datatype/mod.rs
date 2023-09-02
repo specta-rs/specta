@@ -60,6 +60,16 @@ pub enum DataType {
     Generic(GenericType),
 }
 
+impl DataType {
+    pub fn generics(&self) -> Option<Vec<GenericType>> {
+        match self {
+            Self::Struct(s) => Some(s.generics()),
+            Self::Enum(e) => Some(e.generics().clone()), // TODO: Cringe clone
+            _ => None,
+        }
+    }
+}
+
 /// A reference to a [`DataType`] that can be used before a type is resolved in order to
 /// support recursive types without causing an infinite loop.
 ///
@@ -123,7 +133,7 @@ impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
                 variants: t
                     .into_iter()
                     .map(|t| {
-                        EnumVariant::Unnamed(TupleType {
+                        EnumVariant::Unnamed(StructUnnamedFields {
                             fields: vec![t.into()],
                             generics: vec![],
                         })
