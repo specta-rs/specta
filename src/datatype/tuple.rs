@@ -26,12 +26,12 @@ impl TupleType {
             comments: vec![],
             deprecated: None,
             ext: None,
-            item: DataType::Tuple(self),
+            inner: DataType::Tuple(self),
         }
     }
 
-    pub fn fields(&self) -> impl Iterator<Item = &DataType> {
-        self.fields.iter()
+    pub fn fields(&self) -> &Vec<DataType> {
+        &self.fields
     }
 }
 

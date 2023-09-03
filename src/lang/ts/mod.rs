@@ -35,7 +35,8 @@ pub fn export<T: NamedType>(conf: &ExportConfig) -> Output {
     let named_data_type = T::definition_named_data_type(DefOpts {
         parent_inline: false,
         type_map: &mut type_map,
-    })?;
+    });
+    is_valid_ty(&named_data_type.inner, &type_map)?;
     let result = export_named_datatype(conf, &named_data_type, &type_map);
 
     if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_map).into_iter().next() {
@@ -57,17 +58,15 @@ pub fn inline_ref<T: Type>(_: &T, conf: &ExportConfig) -> Output {
 /// Eg. `{ demo: string; };`
 pub fn inline<T: Type>(conf: &ExportConfig) -> Output {
     let mut type_map = TypeMap::default();
-    let result = datatype(
-        conf,
-        &T::inline(
-            DefOpts {
-                parent_inline: false,
-                type_map: &mut type_map,
-            },
-            &[],
-        )?,
-        &type_map,
+    let ty = T::inline(
+        DefOpts {
+            parent_inline: false,
+            type_map: &mut type_map,
+        },
+        &[],
     );
+    is_valid_ty(&ty, &type_map)?;
+    let result = datatype(conf, &ty, &type_map);
 
     if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_map).into_iter().next() {
         return Err(TsExportError::DuplicateTypeName(ty_name, l0, l1));
@@ -86,6 +85,7 @@ pub fn export_named_datatype(
 ) -> Output {
     // TODO: Duplicate type name detection?
 
+    is_valid_ty(&typ.inner, type_map)?;
     export_datatype_inner(ExportContext { conf, path: vec![] }, typ, type_map)
 }
 
@@ -94,7 +94,7 @@ fn export_datatype_inner(
     typ @ NamedDataType {
         name,
         comments,
-        item,
+        inner: item,
         ..
     }: &NamedDataType,
     type_map: &TypeMap,
@@ -102,7 +102,7 @@ fn export_datatype_inner(
     let ctx = ctx.with(PathItem::Type(name.clone()));
     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
 
-    let inline_ts = datatype_inner(ctx.clone(), &typ.item, type_map, "null")?;
+    let inline_ts = datatype_inner(ctx.clone(), &typ.inner, type_map, "null")?;
 
     let generics = item
         .generics()
@@ -168,25 +168,9 @@ fn datatype_inner(
             }
         }
         DataType::Map(def) => {
-            let is_enum = match &def.0 {
-                DataType::Enum(_) => true,
-                DataType::Reference(r) => {
-                    let typ = type_map
-                        .get(&r.sid())
-                        .unwrap_or_else(|| panic!("Type {} not found!", r.name()))
-                        .as_ref()
-                        .unwrap_or_else(|| panic!("Type {} has no value!", r.name()));
-
-                    matches!(typ.item, DataType::Enum(_))
-                }
-                _ => false,
-            };
-
-            let divider = if is_enum { " in" } else { ":" };
-
             format!(
                 // We use this isn't of `Record<K, V>` to avoid issues with circular references.
-                "{{ [key{divider} {}]: {} }}",
+                "{{ [key in {}]: {} }}",
                 datatype_inner(ctx.clone(), &def.0, type_map, "null")?,
                 datatype_inner(ctx, &def.1, type_map, "null")?
             )
@@ -501,6 +485,7 @@ impl LiteralType {
             Self::f64(v) => v.to_string(),
             Self::bool(v) => v.to_string(),
             Self::String(v) => format!(r#""{v}""#),
+            Self::char(v) => format!(r#""{v}""#),
             Self::None => "null".to_string(),
         }
     }

@@ -89,7 +89,7 @@ pub mod construct {
         sid: SpectaID,
         impl_location: ImplLocation,
         export: Option<bool>,
-        item: DataType,
+        inner: DataType,
     ) -> NamedDataType {
         NamedDataType {
             name,
@@ -100,7 +100,7 @@ pub mod construct {
                 impl_location,
                 export,
             }),
-            item,
+            inner,
         }
     }
 

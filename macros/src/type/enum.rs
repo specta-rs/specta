@@ -38,13 +38,13 @@ pub fn parse_enum(
             generics
                 .get(#i)
                 .cloned()
-                .map_or_else(|| <#ident as #crate_ref::Type>::reference(
+                .unwrap_or_else(|| <#ident as #crate_ref::Type>::reference(
                     #crate_ref::DefOpts {
                         parent_inline: #parent_inline,
                         type_map: opts.type_map,
                     },
                     &[],
-                ).map(|r| r.inner), Ok)?
+                ).inner)
         }
     });
 

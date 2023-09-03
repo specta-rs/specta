@@ -56,7 +56,7 @@ fn test() {
 
     assert_ts_export!(
         Container1,
-        "export type Container1 = { foo: Generic1<number>; bar: Generic1<number>[]; baz: { [key: string]: Generic1<string> } }"
+        "export type Container1 = { foo: Generic1<number>; bar: Generic1<number>[]; baz: { [key in string]: Generic1<string> } }"
     );
 }
 

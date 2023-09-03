@@ -40,7 +40,7 @@ impl StructType {
             comments: vec![],
             deprecated: None,
             ext: None,
-            item: DataType::Struct(self),
+            inner: DataType::Struct(self),
         }
     }
 

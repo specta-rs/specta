@@ -1,9 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{
-    datatype::DataType, ExportError, GenericType, ImplLocation, NamedDataType, NamedFields,
-    UnnamedFields,
-};
+use crate::{datatype::DataType, GenericType, NamedDataType, NamedFields, UnnamedFields};
 
 /// Enum type which dictates how the enum is represented.
 ///
@@ -34,7 +31,7 @@ impl EnumType {
             comments: vec![],
             deprecated: None,
             ext: None,
-            item: DataType::Enum(self),
+            inner: DataType::Enum(self),
         }
     }
 
@@ -52,55 +49,6 @@ impl EnumType {
 
     pub fn generics(&self) -> &Vec<GenericType> {
         &self.generics
-    }
-
-    /// An enum may contain variants which are invalid and will cause a runtime errors during serialize/deserialization.
-    /// This function will filter them out so types can be exported for valid variants.
-    pub fn make_flattenable(&mut self, impl_location: ImplLocation) -> Result<(), ExportError> {
-        match &self.repr {
-            EnumRepr::Untagged => {
-                self.variants.iter().try_for_each(|(_, v)| match v {
-                    EnumVariant::Unit => Ok(()),
-                    EnumVariant::Named(_) => Ok(()),
-                    EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
-                        impl_location,
-                        "`EnumRepr::Untagged` with `EnumVariant::Unnamed` is invalid!",
-                    )),
-                })?;
-            }
-            repr => {
-                self.variants.iter().try_for_each(|(_, v)| {
-                    match repr {
-                        EnumRepr::Untagged => Ok(()),
-                        EnumRepr::External => match v {
-                            EnumVariant::Unit => Err(ExportError::InvalidType(
-                                impl_location,
-                                "`EnumRepr::External` with ` EnumVariant::Unit` is invalid!",
-                            )),
-                            EnumVariant::Unnamed(v) => match v {
-                                UnnamedFields { fields, .. } if fields.len() == 1 => Ok(()),
-                                UnnamedFields { .. } => Err(ExportError::InvalidType(
-                                    impl_location,
-                                    "`EnumRepr::External` with `EnumVariant::Unnamed` containing more than a single field is invalid!",
-                                )),
-                            },
-                            EnumVariant::Named(_) => Ok(()),
-                        },
-                        EnumRepr::Adjacent { .. } => Ok(()),
-                        EnumRepr::Internal { .. } => match v {
-                            EnumVariant::Unit => Ok(()),
-                            EnumVariant::Named(_) => Ok(()),
-                            EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
-                                impl_location,
-                                "`EnumRepr::Internal` with `EnumVariant::Unnamed` is invalid!",
-                            )),
-                        },
-                    }
-                })?;
-            }
-        }
-
-        Ok(())
     }
 }
 

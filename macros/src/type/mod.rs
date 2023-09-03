@@ -136,15 +136,15 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
             #[automatically_derived]
             #type_impl_heading {
-                fn inline(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::Result<#crate_ref::DataType> {
-                    Ok(#inlines)
+                fn inline(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::DataType {
+                    #inlines
                 }
 
                 fn definition_generics() -> Vec<#crate_ref::GenericType> {
                     vec![#(#definition_generics),*]
                 }
 
-                fn reference(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::Result<#crate_ref::reference::Reference> {
+                fn reference(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::reference::Reference {
                     #reference
                 }
             }
@@ -154,16 +154,16 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 	            const SID: #crate_ref::SpectaID = SID;
 	            const IMPL_LOCATION: #crate_ref::ImplLocation = IMPL_LOCATION;
 
-                fn named_data_type(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::Result<#crate_ref::NamedDataType> {
-                    Ok(#crate_ref::internal::construct::named_data_type(
+                fn named_data_type(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::NamedDataType {
+                    #crate_ref::internal::construct::named_data_type(
                         #name.into(),
                         #comments,
                         #deprecated,
                         SID,
                         IMPL_LOCATION,
                         #should_export,
-                        <Self as #crate_ref::Type>::inline(opts, generics)?
-                    ))
+                        <Self as #crate_ref::Type>::inline(opts, generics)
+                    )
                 }
             }
 

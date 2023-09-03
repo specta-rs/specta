@@ -1,4 +1,4 @@
-use crate::{DataType, DefOpts, ExportError, Type};
+use crate::{DataType, DefOpts, Type};
 
 /// A type that is unconstructable but is typed as `any` in TypeScript.
 ///
@@ -16,7 +16,7 @@ use crate::{DataType, DefOpts, ExportError, Type};
 pub enum Any {}
 
 impl Type for Any {
-    fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
-        Ok(DataType::Any)
+    fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+        DataType::Any
     }
 }

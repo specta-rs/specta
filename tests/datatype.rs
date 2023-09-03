@@ -1,4 +1,4 @@
-use specta::{ts, DataType, DataTypeFrom, EnumType, LiteralType, StructType, TupleType};
+use specta::{ts, DataType, DataTypeFrom, LiteralType, StructType, TupleType};
 
 use crate::ts::assert_ts;
 

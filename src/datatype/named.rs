@@ -43,7 +43,7 @@ pub struct NamedDataType {
     pub(crate) ext: Option<NamedDataTypeExt>,
     /// the actual type definition.
     // This field is public because we match on it in flattening code. // TODO: Review if this can be made private when reviewing the flattening logic/error handling
-    pub item: DataType,
+    pub inner: DataType,
 }
 
 impl NamedDataType {

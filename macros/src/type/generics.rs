@@ -89,7 +89,7 @@ pub fn construct_datatype(
 ) -> syn::Result<TokenStream> {
     let (method, transform) = match inline {
         true => (quote!(inline), quote!()),
-        false => (quote!(reference), quote!(.map(|r| r.inner))),
+        false => (quote!(reference), quote!(.inner)),
     };
 
     let parent_inline = inline.then(|| quote!(true)).unwrap_or(quote!(false));
@@ -126,7 +126,7 @@ pub fn construct_datatype(
                         type_map: opts.type_map
                     },
                     &[#(#generic_var_idents),*]
-                )#transform?;
+                )#transform;
             });
         }
         Type::Array(TypeArray { elem, .. }) | Type::Slice(TypeSlice { elem, .. }) => {
@@ -148,7 +148,7 @@ pub fn construct_datatype(
                         type_map: opts.type_map
                     },
                     &[#elem_var_ident]
-                )#transform?;
+                )#transform;
             });
         }
         Type::Ptr(TypePtr { elem, .. }) | Type::Reference(TypeReference { elem, .. }) => {
@@ -169,7 +169,7 @@ pub fn construct_datatype(
                         type_map: opts.type_map
                     },
                     &[]
-                )#transform?;
+                )#transform;
             });
         }
         ty => {
@@ -190,7 +190,7 @@ pub fn construct_datatype(
         {
             let type_ident = type_ident.to_string();
             return Ok(quote! {
-                let #var_ident = generics.get(#i).cloned().map_or_else(
+                let #var_ident = generics.get(#i).cloned().unwrap_or_else(
                     || {
                         <#generic_ident as #crate_ref::Type>::#method(
                             #crate_ref::DefOpts {
@@ -200,8 +200,7 @@ pub fn construct_datatype(
                             &[#crate_ref::DataType::Generic(std::borrow::Cow::Borrowed(#type_ident).into())]
                         )#transform
                     },
-                    Ok,
-                )?;
+                );
             });
         }
     }
@@ -251,6 +250,6 @@ pub fn construct_datatype(
                 type_map: opts.type_map
             },
             &[#(#generic_var_idents),*]
-        )#transform?;
+        )#transform;
     })
 }

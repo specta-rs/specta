@@ -16,7 +16,7 @@ pub fn ts_with_cfg(path: &str, conf: &ExportConfig) -> Result<(), TsExportError>
     let export_by_default = conf.export_by_default.unwrap_or(true);
 
     // We sort by name to detect duplicate types BUT also to ensure the output is deterministic. The SID can change between builds so is not suitable for this.
-    let types = get_types()?
+    let types = get_types()
         .into_iter()
         .filter(|(_, v)| match v {
             Some(v) => v

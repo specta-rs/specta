@@ -1,5 +1,3 @@
-use thiserror::Error;
-
 use crate::*;
 
 #[macro_use]
@@ -11,16 +9,6 @@ pub use post_process::*;
 
 use self::reference::Reference;
 
-pub type Result<T> = std::result::Result<T, ExportError>;
-
-/// Type exporting errors.
-#[derive(Error, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-#[non_exhaustive]
-pub enum ExportError {
-    #[error("Atemmpted to export type defined at '{}' but encountered error: {1}", .0.as_str())]
-    InvalidType(ImplLocation, &'static str),
-}
-
 /// Provides runtime type information that can be fed into a language exporter to generate a type definition in another language.
 /// Avoid implementing this trait yourself where possible and use the [`Type`](derive@crate::Type) macro instead.
 pub trait Type {
@@ -29,7 +17,7 @@ pub trait Type {
     /// [`definition`](crate::Type::definition) and [`reference`](crate::Type::definition)
     ///
     /// Implemented internally or via the [`Type`](derive@crate::Type) macro
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType>;
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType;
 
     /// Returns the type parameter generics of a given type.
     /// Will usually be empty except for custom types.
@@ -44,7 +32,7 @@ pub trait Type {
     /// as the value for the `generics` arg.
     ///
     /// Implemented internally
-    fn definition(opts: DefOpts) -> Result<DataType> {
+    fn definition(opts: DefOpts) -> DataType {
         Self::inline(
             opts,
             &Self::definition_generics()
@@ -58,7 +46,7 @@ pub trait Type {
     /// as determined by its category. Getting a reference to a type implies that
     /// it should belong in the type map (since it has to be referenced from somewhere),
     /// so the output of [`definition`](crate::Type::definition) will be put into the type map.
-    fn reference(opts: DefOpts, generics: &[DataType]) -> Result<Reference> {
+    fn reference(opts: DefOpts, generics: &[DataType]) -> Reference {
         reference::inline::<Self>(opts, generics)
     }
 }
@@ -70,10 +58,10 @@ pub trait NamedType: Type {
     const IMPL_LOCATION: ImplLocation;
 
     /// this is equivalent to [Type::inline] but returns a [NamedDataType] instead.
-    fn named_data_type(opts: DefOpts, generics: &[DataType]) -> Result<NamedDataType>;
+    fn named_data_type(opts: DefOpts, generics: &[DataType]) -> NamedDataType;
 
     /// this is equivalent to [Type::definition] but returns a [NamedDataType] instead.
-    fn definition_named_data_type(opts: DefOpts) -> Result<NamedDataType> {
+    fn definition_named_data_type(opts: DefOpts) -> NamedDataType {
         Self::named_data_type(
             opts,
             &Self::definition_generics()
@@ -96,18 +84,18 @@ pub mod reference {
         pub(crate) _priv: (),
     }
 
-    pub fn inline<T: Type + ?Sized>(opts: DefOpts, generics: &[DataType]) -> Result<Reference> {
-        Ok(Reference {
-            inner: T::inline(opts, generics)?,
+    pub fn inline<T: Type + ?Sized>(opts: DefOpts, generics: &[DataType]) -> Reference {
+        Reference {
+            inner: T::inline(opts, generics),
             _priv: (),
-        })
+        }
     }
 
     pub fn reference<T: NamedType>(
         opts: DefOpts,
         generics: &[DataType],
         reference: DataTypeReference,
-    ) -> Result<Reference> {
+    ) -> Reference {
         if opts.type_map.get(&T::SID).is_none() {
             // It's important we don't put `None` into the map here. By putting a *real* value we ensure that we don't stack overflow for recursive types when calling `named_data_type`.
             opts.type_map.entry(T::SID).or_insert(Some(NamedDataType {
@@ -115,7 +103,7 @@ pub mod reference {
                 comments: vec![],
                 deprecated: None,
                 ext: None,
-                item: DataType::Any,
+                inner: DataType::Any,
             }));
 
             let dt = T::named_data_type(
@@ -124,14 +112,14 @@ pub mod reference {
                     type_map: opts.type_map,
                 },
                 generics,
-            )?;
+            );
             opts.type_map.insert(T::SID, Some(dt));
         }
 
-        Ok(Reference {
+        Reference {
             inner: DataType::Reference(reference),
             _priv: (),
-        })
+        }
     }
 }
 

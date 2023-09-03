@@ -22,25 +22,25 @@ const _: () = {
 };
 
 impl<'a> Type for &'a str {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType> {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         String::inline(opts, generics)
     }
 }
 
 impl<'a, T: Type + 'static> Type for &'a T {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType> {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         T::inline(opts, generics)
     }
 }
 
 impl<T: Type> Type for [T] {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType> {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         T::inline(opts, generics)
     }
 }
 
 impl<'a, T: ?Sized + ToOwned + Type + 'static> Type for std::borrow::Cow<'a, T> {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType> {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         T::inline(opts, generics)
     }
 }
@@ -113,64 +113,65 @@ impl_for_list!(
 );
 
 impl<'a, T: Type> Type for &'a [T] {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType> {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         <Vec<T>>::inline(opts, generics)
     }
 }
 
 impl<const N: usize, T: Type> Type for [T; N] {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType> {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         <Vec<T>>::inline(opts, generics)
     }
 }
 
 impl<T: Type> Type for Option<T> {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType> {
-        Ok(DataType::Nullable(Box::new(
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
+        DataType::Nullable(Box::new(
             generics
                 .get(0)
                 .cloned()
-                .map_or_else(|| T::inline(opts, generics), Ok)?,
-        )))
+                .unwrap_or_else(|| T::inline(opts, generics)),
+        ))
     }
 }
 
 impl<T: Type, E: Type> Type for std::result::Result<T, E> {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType> {
-        Ok(DataType::Result(Box::new((
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
+        DataType::Result(Box::new((
             T::inline(
                 DefOpts {
                     parent_inline: opts.parent_inline,
                     type_map: opts.type_map,
                 },
                 generics,
-            )?,
+            ),
             E::inline(
                 DefOpts {
                     parent_inline: opts.parent_inline,
                     type_map: opts.type_map,
                 },
                 generics,
-            )?,
-        ))))
+            ),
+        )))
     }
 }
 
 impl<T> Type for std::marker::PhantomData<T> {
-    fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType> {
-        Ok(DataType::Literal(LiteralType::None))
+    fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+        DataType::Literal(LiteralType::None)
     }
 }
 
+// Serde does no support `Infallible` as it can't be constructed so a `&self` method is uncallable on it.
 #[allow(unused)]
 #[derive(Type)]
 #[specta(remote = std::convert::Infallible, crate = crate)]
 pub enum Infallible {}
 
 impl<T: Type> Type for std::ops::Range<T> {
-    fn inline(opts: DefOpts, _generics: &[DataType]) -> Result<DataType> {
-        let ty = T::definition(opts)?;
-        Ok(DataType::Struct(StructType {
+    fn inline(opts: DefOpts, _generics: &[DataType]) -> DataType {
+        let ty = T::definition(opts);
+        DataType::Struct(StructType {
             name: "Range".into(),
             generics: vec![],
             fields: StructFields::Named(NamedFields {
@@ -194,12 +195,12 @@ impl<T: Type> Type for std::ops::Range<T> {
                 ],
                 tag: None,
             }),
-        }))
+        })
     }
 }
 
 impl<T: Type> Type for std::ops::RangeInclusive<T> {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType> {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         std::ops::Range::<T>::inline(opts, generics) // Yeah Serde are cringe
     }
 }
@@ -238,14 +239,14 @@ const _: () = {
     impl<K: Type, V: Type> Flatten for serde_json::Map<K, V> {}
 
     impl Type for serde_json::Value {
-        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType> {
-            Ok(DataType::Any)
+        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+            DataType::Any
         }
     }
 
     impl Type for serde_json::Number {
-        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType> {
-            Ok(DataType::Enum(
+        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+            DataType::Enum(
                 EnumType {
                     name: "Number".into(),
                     repr: EnumRepr::Untagged,
@@ -284,7 +285,7 @@ const _: () = {
                     generics: vec![],
                 }
                 .into(),
-            ))
+            )
         }
     }
 };
@@ -292,26 +293,26 @@ const _: () = {
 #[cfg(feature = "serde_yaml")]
 const _: () = {
     impl Type for serde_yaml::Value {
-        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType> {
-            Ok(DataType::Any)
+        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+            DataType::Any
         }
     }
 
     impl Type for serde_yaml::Mapping {
-        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType> {
-            Ok(DataType::Any)
+        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+            DataType::Any
         }
     }
 
     impl Type for serde_yaml::value::TaggedValue {
-        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType> {
-            Ok(DataType::Any)
+        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+            DataType::Any
         }
     }
 
     impl Type for serde_yaml::Number {
-        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType> {
-            Ok(DataType::Enum(
+        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+            DataType::Enum(
                 EnumType {
                     name: "Number".into(),
                     repr: EnumRepr::Untagged,
@@ -350,7 +351,7 @@ const _: () = {
                     generics: vec![],
                 }
                 .into(),
-            ))
+            )
         }
     }
 };
@@ -361,8 +362,8 @@ const _: () = {
     impl<K: Type, V: Type> Flatten for toml::map::Map<K, V> {}
 
     impl Type for toml::Value {
-        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType> {
-            Ok(DataType::Any)
+        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+            DataType::Any
         }
     }
 
@@ -421,14 +422,14 @@ const _: () = {
     );
 
     impl<T: TimeZone> Type for DateTime<T> {
-        fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType> {
+        fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
             String::inline(opts, generics)
         }
     }
 
     #[allow(deprecated)]
     impl<T: TimeZone> Type for Date<T> {
-        fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType> {
+        fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
             String::inline(opts, generics)
         }
     }
@@ -540,8 +541,8 @@ impl_as!(url::Url as String);
 
 #[cfg(feature = "either")]
 impl<L: Type, R: Type> Type for either::Either<L, R> {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType> {
-        Ok(DataType::Enum(EnumType {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
+        DataType::Enum(EnumType {
             name: "Either".into(),
             repr: EnumRepr::Untagged,
             variants: vec![
@@ -557,7 +558,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                                     type_map: opts.type_map,
                                 },
                                 generics,
-                            )?,
+                            ),
                         }],
                     }),
                 ),
@@ -573,12 +574,12 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                                     type_map: opts.type_map,
                                 },
                                 generics,
-                            )?,
+                            ),
                         }],
                     }),
                 ),
             ],
             generics: vec![],
-        }))
+        })
     }
 }

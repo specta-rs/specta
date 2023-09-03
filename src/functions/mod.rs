@@ -22,7 +22,7 @@ use crate::*;
 /// }
 ///
 /// fn main() {
-///     let typ = fn_datatype!(some_function).unwrap();
+///     let typ = fn_datatype!(some_function);
 ///
 ///     assert_eq!(typ.name, "some_function");
 ///     assert_eq!(typ.args.len(), 2);
@@ -68,7 +68,7 @@ pub trait SpectaFunction<TMarker> {
         type_map: &mut TypeMap,
         fields: &[Cow<'static, str>],
         docs: Vec<Cow<'static, str>>,
-    ) -> Result<FunctionDataType>;
+    ) -> FunctionDataType;
 }
 
 impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction<TResultMarker>
@@ -80,18 +80,17 @@ impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction
         type_map: &mut TypeMap,
         _fields: &[Cow<'static, str>],
         docs: Vec<Cow<'static, str>>,
-    ) -> Result<FunctionDataType> {
-        TResult::to_datatype(DefOpts {
-            parent_inline: false,
-            type_map,
-        })
-        .map(|result| FunctionDataType {
+    ) -> FunctionDataType {
+        FunctionDataType {
             asyncness,
             name,
             args: vec![],
-            result,
+            result: TResult::to_datatype(DefOpts {
+                parent_inline: false,
+                type_map,
+            }),
             docs,
-        })
+        }
     }
 }
 
@@ -105,7 +104,7 @@ pub fn get_datatype_internal<TMarker, T: SpectaFunction<TMarker>>(
     type_map: &mut TypeMap,
     fields: &[Cow<'static, str>],
     docs: Vec<Cow<'static, str>>,
-) -> Result<FunctionDataType> {
+) -> FunctionDataType {
     T::to_datatype(asyncness, name, type_map, fields, docs)
 }
 
@@ -124,10 +123,10 @@ macro_rules! impl_typed_command {
                     type_map: &mut TypeMap,
                     fields: &[Cow<'static, str>],
                     docs: Vec<Cow<'static, str>>,
-                ) -> Result<FunctionDataType> {
+                ) -> FunctionDataType {
                     let mut fields = fields.into_iter();
 
-                    Ok(FunctionDataType {
+                    FunctionDataType {
                         asyncness,
                         name,
                         docs,
@@ -135,21 +134,21 @@ macro_rules! impl_typed_command {
                             fields
                                 .next()
                                 .map_or_else(
-                                    || Ok(None),
+                                    || None,
                                     |field| $i::to_datatype(DefOpts {
                                         parent_inline: false,
                                         type_map,
-                                    }).map(|v| v.map(|ty| (field.clone(), ty)))
-                                )?
+                                    }).map(|ty| (field.clone(), ty))
+                                )
                         ),*,]
-                        .into_iter()
-                        .filter_map(|v| v)
-                        .collect(),
+                            .into_iter()
+                            .filter_map(|v| v)
+                            .collect::<Vec<_>>(),
                         result: TResult::to_datatype(DefOpts {
                             parent_inline: false,
                             type_map,
-                        })?,
-                    })
+                        }),
+                    }
                 }
             }
         }
@@ -180,7 +179,7 @@ impl_typed_command!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
 ///
 /// fn main() {
 ///     // `type_defs` is created internally
-///     let (functions, type_defs) = functions::collect_functions![some_function].unwrap();
+///     let (functions, type_defs) = functions::collect_functions![some_function];
 ///
 ///     let custom_type_defs = TypeMap::default();
 ///
@@ -189,18 +188,16 @@ impl_typed_command!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
 ///     let (functions, custom_type_defs) = functions::collect_functions![
 ///         custom_type_defs; // You can provide a custom map to collect the types into
 ///         some_function
-///     ].unwrap();
+///     ];
 /// }
 /// ````
 #[macro_export]
 macro_rules! collect_functions {
     ($type_map:ident; $($command:path),* $(,)?) => {{
         let mut type_map: $crate::TypeMap = $type_map;
-
-        [$($crate::fn_datatype!(type_map; $command)),*]
-	        .into_iter()
-	        .collect::<::std::result::Result<Vec<_>, _>>()
-			.map(|v| (v, type_map))
+        ([$($crate::fn_datatype!(type_map; $command)),*]
+            .into_iter()
+            .collect::<Vec<_>>(), type_map)
     }};
     ($($command:path),* $(,)?) => {{
         let mut type_map = $crate::TypeMap::default();
