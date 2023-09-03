@@ -53,14 +53,11 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         .expect("'specta::DataTypeFrom' requires named fields.");
                     let ident_str = ident.to_string();
 
-                    Some(quote! {
-                        #crate_ref::internal::construct::struct_field(
-                            #ident_str.into(),
-                            false,
-                            false,
-                            t.#ident.into(),
-                        )
-                    })
+                    Some(quote!((#ident_str.into(), #crate_ref::internal::construct::field(
+                        false,
+                        false,
+                        t.#ident.into(),
+                    ))))
                 });
 
                 let struct_name = ident.to_string();
@@ -68,7 +65,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     #[automatically_derived]
                     impl From<#ident> for #crate_ref::StructType {
                         fn from(t: #ident) -> #crate_ref::StructType {
-                            #crate_ref::internal::construct::struct_named(#struct_name.into(), vec![], vec![#(#fields),*], None)
+                            #crate_ref::internal::construct::r#struct(#struct_name.into(), vec![], #crate_ref::internal::construct::struct_named(vec![#(#fields),*], None))
                         }
                     }
 
@@ -81,10 +78,15 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 }
             }
             Fields::Unnamed(_) => {
-                let fields = data.fields.iter().enumerate().map(|(i, _)| {
-                    let i = proc_macro2::Literal::usize_unsuffixed(i);
-                    quote!(t.#i.into())
-                }).collect::<Vec<_>>();
+                let fields = data
+                    .fields
+                    .iter()
+                    .enumerate()
+                    .map(|(i, _)| {
+                        let i = proc_macro2::Literal::usize_unsuffixed(i);
+                        quote!(t.#i.into())
+                    })
+                    .collect::<Vec<_>>();
 
                 quote! {
                     #[automatically_derived]

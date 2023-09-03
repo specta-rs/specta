@@ -49,46 +49,43 @@ pub fn parse_enum(
     });
 
     let repr = enum_attrs.tagged()?;
-    let variant_types = data
-        .variants
-        .iter()
-        .map(|v| {
-            // We pass all the attributes at the start and when decoding them pop them off the list.
-            // This means at the end we can check for any that weren't consumed and throw an error.
-            let mut attrs = parse_attrs(&v.attrs)?;
-            let variant_attrs = VariantAttr::from_attrs(&mut attrs)?;
+    let variant_types =
+        data.variants
+            .iter()
+            .map(|v| {
+                // We pass all the attributes at the start and when decoding them pop them off the list.
+                // This means at the end we can check for any that weren't consumed and throw an error.
+                let mut attrs = parse_attrs(&v.attrs)?;
+                let variant_attrs = VariantAttr::from_attrs(&mut attrs)?;
 
-            attrs
-                .iter()
-                .find(|attr| attr.root_ident == "specta")
-                .map_or(Ok(()), |attr| {
-                    Err(syn::Error::new(
-                        attr.key.span(),
-                        format!("specta: Found unsupported enum attribute '{}'", attr.key),
-                    ))
-                })?;
+                attrs
+                    .iter()
+                    .find(|attr| attr.root_ident == "specta")
+                    .map_or(Ok(()), |attr| {
+                        Err(syn::Error::new(
+                            attr.key.span(),
+                            format!("specta: Found unsupported enum attribute '{}'", attr.key),
+                        ))
+                    })?;
 
-            Ok((v, variant_attrs))
-        })
-        .collect::<syn::Result<Vec<_>>>()?
-        .into_iter()
-        .filter(|(_, attrs)| !attrs.skip)
-        .map(|(variant, attrs)| {
-            let variant_ident_str = unraw_raw_ident(&variant.ident);
+                Ok((v, variant_attrs))
+            })
+            .collect::<syn::Result<Vec<_>>>()?
+            .into_iter()
+            .filter(|(_, attrs)| !attrs.skip)
+            .map(|(variant, attrs)| {
+                let variant_ident_str = unraw_raw_ident(&variant.ident);
 
-            let variant_name_str = match (attrs.rename, container_attrs.rename_all) {
-                (Some(name), _) => name,
-                (_, Some(inflection)) => inflection.apply(&variant_ident_str),
-                (_, _) => variant_ident_str,
-            };
+                let variant_name_str = match (attrs.rename, container_attrs.rename_all) {
+                    (Some(name), _) => name,
+                    (_, Some(inflection)) => inflection.apply(&variant_ident_str),
+                    (_, _) => variant_ident_str,
+                };
 
-            let generic_idents = generic_idents.clone().collect::<Vec<_>>();
+                let generic_idents = generic_idents.clone().collect::<Vec<_>>();
 
-            Ok(
-                match &variant.fields {
-                    Fields::Unit => {
-                        quote!(#crate_ref::EnumVariant::Unit(#variant_name_str.into()))
-                    }
+                let inner = match &variant.fields {
+                    Fields::Unit => quote!(#crate_ref::internal::construct::enum_variant_unit()),
                     Fields::Unnamed(fields) => {
                         let fields = fields
                             .unnamed
@@ -105,87 +102,80 @@ pub fn parse_enum(
                                     attrs.inline,
                                 )?;
 
-                                Ok(quote!({
-                                    #generic_vars
-
-                                    gen
-                                }))
-                            })
-                            .collect::<syn::Result<Vec<TokenStream>>>()?;
-
-                            quote!(#crate_ref::EnumVariant::Unnamed(#crate_ref::internal::construct::enum_field_unnamed(
-                                #variant_name_str.into(),
-                                vec![],
-                                vec![#(#fields.into()),*],
-                            )))
-                    }
-                    Fields::Named(fields) => {
-                        let fields = fields
-                            .named
-                            .iter()
-                            .map(|field| {
-                                let (field, field_attrs) = decode_field_attrs(field)?;
-
-                                let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
-
-                                let generic_vars = construct_datatype(
-                                    format_ident!("gen"),
-                                    field_ty,
-                                    &generic_idents,
-                                    crate_ref,
-                                    attrs.inline,
-                                )?;
-
-                                let field_ident_str =
-                                    unraw_raw_ident(field.ident.as_ref().unwrap());
-
-                                let field_name = match (field_attrs.rename, attrs.rename_all) {
-                                    (Some(name), _) => name,
-                                    (_, Some(inflection)) => {
-                                        let name = inflection.apply(&field_ident_str);
-                                        quote::quote!(#name)
-                                    }
-                                    (_, _) => quote::quote!(#field_ident_str),
-                                };
-
-                                Ok(quote!(#crate_ref::internal::construct::struct_field(
-                                    #field_name.into(),
+                                Ok(quote!(#crate_ref::internal::construct::field(
                                     false,
                                     false,
-                                    {
+                                        {
                                         #generic_vars
 
                                         gen
-                                    },
+                                    }
                                 )))
                             })
                             .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                        quote!(#crate_ref::EnumVariant::Named(#crate_ref::internal::construct::enum_field_named(#variant_name_str.into(), vec![], vec![#(#fields),*], None)))
+                        quote!(#crate_ref::internal::construct::enum_variant_unnamed(
+                            vec![#(#fields),*],
+                        ))
                     }
-                },
-            )
-        })
-        .collect::<syn::Result<Vec<_>>>()?;
+                    Fields::Named(fields) => {
+                        let fields = fields
+                        .named
+                        .iter()
+                        .map(|field| {
+                            let (field, field_attrs) = decode_field_attrs(field)?;
 
-    let (enum_impl, can_flatten) = match repr {
+                            let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
+
+                            let generic_vars = construct_datatype(
+                                format_ident!("gen"),
+                                field_ty,
+                                &generic_idents,
+                                crate_ref,
+                                attrs.inline,
+                            )?;
+
+                            let field_ident_str =
+                                unraw_raw_ident(field.ident.as_ref().unwrap());
+
+                            let field_name = match (field_attrs.rename, attrs.rename_all) {
+                                (Some(name), _) => name,
+                                (_, Some(inflection)) => {
+                                    let name = inflection.apply(&field_ident_str);
+                                    quote::quote!(#name)
+                                }
+                                (_, _) => quote::quote!(#field_ident_str),
+                            };
+
+                            Ok(quote!((#field_name.into(), #crate_ref::internal::construct::field(
+                                false,
+                                false,
+                                {
+                                    #generic_vars
+
+                                    gen
+                                },
+                            ))))
+                        })
+                        .collect::<syn::Result<Vec<TokenStream>>>()?;
+
+                        quote!(#crate_ref::internal::construct::enum_variant_named(vec![#(#fields),*], None))
+                    }
+                };
+
+                Ok(quote!((#variant_name_str.into(), #inner)))
+            })
+            .collect::<syn::Result<Vec<_>>>()?;
+
+    let (repr, can_flatten) = match repr {
         Tagged::Untagged => (
-            quote! {
-                #crate_ref::internal::construct::enum_untagged(#name.into(), vec![#(#definition_generics),*], vec![#(#variant_types),*])
-            },
+            quote!(#crate_ref::EnumRepr::Untagged),
             data.variants
                 .iter()
                 .any(|v| matches!(&v.fields, Fields::Unit | Fields::Named(_))),
         ),
         Tagged::Externally => (
-            quote! {
-                #crate_ref::internal::construct::enum_tagged(
-                    #name.into(),
-                    vec![#(#definition_generics),*],
-                    vec![#(#variant_types),*],
-                    #crate_ref::EnumRepr::External
-                )
-            },
+            quote!(#crate_ref::EnumRepr::External),
             data.variants.iter().any(|v| match &v.fields {
                 Fields::Unnamed(f) if f.unnamed.len() == 1 => true,
                 Fields::Named(_) => true,
@@ -193,25 +183,11 @@ pub fn parse_enum(
             }),
         ),
         Tagged::Adjacently { tag, content } => (
-            quote! {
-                #crate_ref::internal::construct::enum_tagged(
-                    #name.into(),
-                    vec![#(#definition_generics),*],
-                    vec![#(#variant_types),*],
-                    #crate_ref::EnumRepr::Adjacent { tag: #tag.into(), content: #content.into() }
-                )
-            },
+            quote!(#crate_ref::EnumRepr::Adjacent { tag: #tag.into(), content: #content.into() }),
             true,
         ),
         Tagged::Internally { tag } => (
-            quote! {
-                #crate_ref::internal::construct::enum_tagged(
-                    #name.into(),
-                    vec![#(#definition_generics),*],
-                    vec![#(#variant_types),*],
-                    #crate_ref::EnumRepr::Internal { tag: #tag.into() },
-                )
-            },
+            quote!(#crate_ref::EnumRepr::Internal { tag: #tag.into() }),
             data.variants
                 .iter()
                 .any(|v| matches!(&v.fields, Fields::Unit | Fields::Named(_))),
@@ -219,7 +195,7 @@ pub fn parse_enum(
     };
 
     Ok((
-        quote!(#crate_ref::DataType::Enum(#enum_impl)),
+        quote!(#crate_ref::DataType::Enum(#crate_ref::internal::construct::r#enum(#name.into(), #repr, vec![#(#definition_generics),*], vec![#(#variant_types),*]))),
         quote!({
             let generics = vec![#(#reference_generics),*];
             #crate_ref::reference::reference::<Self>(opts, &generics, #crate_ref::internal::construct::data_type_reference(

@@ -55,7 +55,7 @@
 //! This results in a loss of information and lack of compatability with types from other crates.
 //!
 #![forbid(unsafe_code)]
-#![warn(clippy::all, clippy::unwrap_used, clippy::panic, missing_docs)]
+#![warn(clippy::all, clippy::unwrap_used, clippy::panic)] // TODO: missing_docs
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[doc(hidden)]

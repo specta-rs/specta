@@ -4,12 +4,14 @@ use std::{
 };
 
 mod r#enum;
+mod fields;
 mod literal;
 mod named;
 mod primitive;
 mod r#struct;
 mod tuple;
 
+pub use fields::*;
 pub use literal::*;
 pub use named::*;
 pub use primitive::*;
@@ -59,10 +61,10 @@ pub enum DataType {
 }
 
 impl DataType {
-    pub fn generics(&self) -> Option<Vec<GenericType>> {
+    pub fn generics(&self) -> Option<&Vec<GenericType>> {
         match self {
             Self::Struct(s) => Some(s.generics()),
-            Self::Enum(e) => Some(e.generics().clone()), // TODO: Cringe clone
+            Self::Enum(e) => Some(e.generics()),
             _ => None,
         }
     }
@@ -93,8 +95,8 @@ impl DataTypeReference {
         self.sid
     }
 
-    pub fn generics(&self) -> impl Iterator<Item = &DataType> {
-        self.generics.iter()
+    pub fn generics(&self) -> &Vec<DataType> {
+        &self.generics
     }
 }
 
@@ -129,20 +131,26 @@ impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
         DataType::Enum(
             EnumType {
                 name: "Vec".into(),
-                taging: EnumTag::Untagged,
+                repr: EnumRepr::Untagged,
                 variants: t
                     .into_iter()
                     .map(|t| {
-                        let dt: DataType = t.into();
-                        EnumVariant::Unnamed(EnumUnnamedFields {
-                            name: match &dt {
-                                DataType::Struct(StructType::Named(s)) => s.name.clone(),
+                        let ty: DataType = t.into();
+                        (
+                            match &ty {
+                                DataType::Struct(s) => s.name.clone(),
                                 DataType::Enum(e) => e.name().clone(),
+                                // TODO: This is probs gonna cause problems so we should try and remove the need for this entire impl block if we can.
                                 _ => "".into(),
                             },
-                            fields: vec![dt],
-                            generics: vec![],
-                        })
+                            EnumVariant::Unnamed(UnnamedFields {
+                                fields: vec![Field {
+                                    optional: false,
+                                    flatten: false,
+                                    ty,
+                                }],
+                            }),
+                        )
                     })
                     .collect(),
                 generics: vec![],

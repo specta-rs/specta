@@ -18,117 +18,68 @@ pub mod construct {
 
     use crate::{datatype::*, ImplLocation, SpectaID};
 
-    pub const fn unit_struct() -> StructType {
-        StructType::Unit
-    }
-
-    // TODO: By taking in `DataType` how does `flatten` and `inline` work?
-    pub const fn struct_unnamed(
-        name: Cow<'static, str>,
-        generics: Vec<GenericType>,
-        fields: Vec<DataType>,
-    ) -> StructType {
-        StructType::Unnamed(StructUnnamedFields {
-            name,
-            generics,
-            fields,
-        })
-    }
-
-    pub const fn struct_named(
-        name: Cow<'static, str>,
-        generics: Vec<GenericType>,
-        fields: Vec<StructField>,
-        tag: Option<Cow<'static, str>>,
-    ) -> StructType {
-        StructType::Named(StructNamedFields {
-            name,
-            generics,
-            fields,
-            tag,
-        })
-    }
-
-    pub const fn struct_field(
-        key: Cow<'static, str>,
-        optional: bool,
-        flatten: bool,
-        ty: DataType,
-    ) -> StructField {
-        StructField {
-            key,
+    pub const fn field(optional: bool, flatten: bool, ty: DataType) -> Field {
+        Field {
             optional,
             flatten,
             ty,
         }
     }
 
-    // pub const fn struct_field_named(
-    //     name: Cow<'static, str>,
-    //     generics: Vec<GenericType>,
-    //     fields: Vec<StructField>,
-    //     tag: Option<Cow<'static, str>>,
-    // ) -> StructNamedFields {
-    //     StructNamedFields {
-    //         name,
-    //         generics,
-    //         fields,
-    //         tag,
-    //     }
-    // }
-
-    // TODO: Should this take `optional` and `flatten` as args??
-    pub const fn enum_field_named(
+    pub const fn r#struct(
         name: Cow<'static, str>,
         generics: Vec<GenericType>,
-        fields: Vec<StructField>, // TODO: Should probs be `EnumField` or similar
+        fields: StructFields,
+    ) -> StructType {
+        StructType {
+            name,
+            generics,
+            fields,
+        }
+    }
+
+    pub const fn struct_unit() -> StructFields {
+        StructFields::Unit
+    }
+
+    pub const fn struct_unnamed(fields: Vec<Field>) -> StructFields {
+        StructFields::Unnamed(UnnamedFields { fields })
+    }
+
+    pub const fn struct_named(
+        fields: Vec<(Cow<'static, str>, Field)>,
         tag: Option<Cow<'static, str>>,
-    ) -> EnumNamedFields {
-        EnumNamedFields {
-            name,
-            generics,
-            fields,
-            tag,
-        }
+    ) -> StructFields {
+        StructFields::Named(NamedFields { fields, tag })
     }
 
-    pub const fn enum_field_unnamed(
+    pub const fn r#enum(
         name: Cow<'static, str>,
-        generics: Vec<GenericType>,
-        fields: Vec<DataType>,
-    ) -> EnumUnnamedFields {
-        EnumUnnamedFields {
-            name,
-            fields,
-            generics,
-        }
-    }
-
-    pub const fn enum_untagged(
-        name: Cow<'static, str>,
-        generics: Vec<GenericType>,
-        variants: Vec<EnumVariant>,
-    ) -> EnumType {
-        EnumType {
-            name,
-            taging: EnumTag::Untagged,
-            variants,
-            generics,
-        }
-    }
-
-    pub const fn enum_tagged(
-        name: Cow<'static, str>,
-        generics: Vec<GenericType>,
-        variants: Vec<EnumVariant>,
         repr: EnumRepr,
+        generics: Vec<GenericType>,
+        variants: Vec<(Cow<'static, str>, EnumVariant)>,
     ) -> EnumType {
         EnumType {
             name,
-            taging: EnumTag::Tagged(repr),
-            variants,
+            repr,
             generics,
+            variants,
         }
+    }
+
+    pub const fn enum_variant_unit() -> EnumVariant {
+        EnumVariant::Unit
+    }
+
+    pub const fn enum_variant_unnamed(fields: Vec<Field>) -> EnumVariant {
+        EnumVariant::Unnamed(UnnamedFields { fields })
+    }
+
+    pub const fn enum_variant_named(
+        fields: Vec<(Cow<'static, str>, Field)>,
+        tag: Option<Cow<'static, str>>,
+    ) -> EnumVariant {
+        EnumVariant::Named(NamedFields { fields, tag })
     }
 
     pub const fn named_data_type(
