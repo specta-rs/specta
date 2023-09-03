@@ -142,7 +142,7 @@ pub fn parse_attrs(attrs: &[syn::Attribute]) -> syn::Result<Vec<Attribute>> {
                 .expect("Attribute path must be an ident")
                 .clone();
 
-            if !(ident == "specta" || ident == "serde" || ident == "doc") {
+            if !(ident == "specta" || ident == "serde" || ident == "doc" || ident == "repr") {
                 return Ok(vec![]);
             }
 
