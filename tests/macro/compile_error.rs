@@ -91,4 +91,8 @@ struct InvalidAttrs4 {
     a: String,
 }
 
+#[derive(Type)]
+#[specta(transparent)]
+pub enum TransparentEnum {}
+
 // TODO: https://docs.rs/trybuild/latest/trybuild/#what-to-test

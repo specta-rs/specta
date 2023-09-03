@@ -6,6 +6,11 @@ use crate::ts::assert_ts;
 #[specta(export = false, transparent)]
 struct TupleStruct(String);
 
+#[repr(transparent)]
+#[derive(Type)]
+#[specta(export = false)]
+struct TupleStructWithRep(String);
+
 #[derive(Type)]
 #[specta(export = false, transparent)]
 struct GenericTupleStruct<T>(T);
@@ -21,6 +26,16 @@ fn transparent() {
     // We check the datatype layer can TS can look correct but be wrong!
     assert_eq!(
         TupleStruct::inline(
+            DefOpts {
+                parent_inline: false,
+                type_map: &mut Default::default(),
+            },
+            &[]
+        ),
+        DataType::Primitive(PrimitiveType::String)
+    );
+    assert_eq!(
+        TupleStructWithRep::inline(
             DefOpts {
                 parent_inline: false,
                 type_map: &mut Default::default(),
@@ -51,6 +66,7 @@ fn transparent() {
     );
 
     assert_ts!(TupleStruct, "string");
+    assert_ts!(TupleStructWithRep, "string");
     assert_ts!(GenericTupleStruct::<String>, "string");
     assert_ts!(BracedStruct, "string");
 }

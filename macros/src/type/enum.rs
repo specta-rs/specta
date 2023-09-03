@@ -2,7 +2,7 @@ use super::{attr::*, generics::construct_datatype, r#struct::decode_field_attrs}
 use crate::utils::*;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::{DataEnum, Fields, GenericParam, Generics};
+use syn::{spanned::Spanned, DataEnum, Fields, GenericParam, Generics};
 
 pub fn parse_enum(
     name: &TokenStream,
@@ -12,6 +12,13 @@ pub fn parse_enum(
     crate_ref: &TokenStream,
     data: &DataEnum,
 ) -> syn::Result<(TokenStream, TokenStream, bool)> {
+    if container_attrs.transparent {
+        return Err(syn::Error::new(
+            data.enum_token.span(),
+            "#[specta(transparent)] is not allowed on an enum",
+        ));
+    }
+
     let generic_idents = generics
         .params
         .iter()

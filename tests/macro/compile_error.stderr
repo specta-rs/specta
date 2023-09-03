@@ -34,11 +34,17 @@ error: specta: Found unsupported field attribute 'noshot'
 90 |     #[specta(noshot)]
    |              ^^^^^^
 
-error[E0601]: `main` function not found in crate `$CRATE`
-  --> tests/macro/compile_error.rs:92:2
+error: #[specta(transparent)] is not allowed on an enum
+  --> tests/macro/compile_error.rs:96:5
    |
-92 | }
-   |  ^ consider adding a `main` function to `$DIR/tests/macro/compile_error.rs`
+96 | pub enum TransparentEnum {}
+   |     ^^^^
+
+error[E0601]: `main` function not found in crate `$CRATE`
+  --> tests/macro/compile_error.rs:96:28
+   |
+96 | pub enum TransparentEnum {}
+   |                            ^ consider adding a `main` function to `$DIR/tests/macro/compile_error.rs`
 
 error[E0277]: the trait bound `UnitExternal: specta::Flatten` is not satisfied
   --> tests/macro/compile_error.rs:32:11

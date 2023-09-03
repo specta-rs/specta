@@ -26,7 +26,7 @@ pub fn decode_field_attrs(field: &Field) -> syn::Result<(&Field, FieldAttr)> {
 
 pub fn parse_struct(
     name: &TokenStream,
-    (container_attrs, struct_attrs): (&ContainerAttr, StructAttr),
+    container_attrs: &ContainerAttr,
     generics: &Generics,
     crate_ref: &TokenStream,
     data: &DataStruct,
@@ -66,7 +66,7 @@ pub fn parse_struct(
         quote!(std::borrow::Cow::Borrowed(#ident).into())
     });
 
-    let definition = if struct_attrs.transparent {
+    let definition = if container_attrs.transparent {
         if let Fields::Unit = data.fields {
             return Err(syn::Error::new(
                 data.fields.span(),
