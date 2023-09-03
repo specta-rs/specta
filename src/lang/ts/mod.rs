@@ -18,6 +18,7 @@ use crate::*;
 
 #[allow(missing_docs)]
 pub type Result<T> = std::result::Result<T, TsExportError>;
+
 type Output = Result<String>;
 
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string with an export.

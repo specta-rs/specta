@@ -9,7 +9,6 @@ use super::ExportPath;
 
 /// Describes where an error occurred.
 #[derive(Error, Debug, PartialEq)]
-#[allow(missing_docs)]
 pub enum NamedLocation {
     Type,
     Field,

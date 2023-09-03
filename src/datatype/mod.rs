@@ -39,7 +39,6 @@ pub struct DefOpts<'a> {
 ///
 /// A language exporter takes this general format and converts it into a language specific syntax.
 #[derive(Debug, Clone, PartialEq)]
-#[allow(missing_docs)]
 pub enum DataType {
     // Always inlined
     Any,
