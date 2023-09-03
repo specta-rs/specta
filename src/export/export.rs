@@ -30,7 +30,7 @@ impl Iterator for TypesIter {
 }
 
 /// Get the global type store for collecting custom types to export.
-pub fn get_types() -> Result<TypesIter, TsExportError> {
+pub fn get_types() -> Result<TypesIter> {
     let types = TYPES.read().unwrap_or_else(PoisonError::into_inner);
 
     // TODO: Return all errors at once?

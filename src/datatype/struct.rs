@@ -31,6 +31,7 @@ impl StructField {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StructUnnamedFields {
+    pub(crate) name: Cow<'static, str>,
     pub(crate) fields: Vec<DataType>, // TODO: should use `StructField` but without `name` for flatten/inline
     pub(crate) generics: Vec<GenericType>,
 }
@@ -54,6 +55,7 @@ impl Into<StructType> for StructUnnamedFields {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StructNamedFields {
+    pub(crate) name: Cow<'static, str>,
     pub(crate) generics: Vec<GenericType>,
     pub(crate) fields: Vec<StructField>, // TODO: StructField but with name
     pub(crate) tag: Option<Cow<'static, str>>,

@@ -68,7 +68,7 @@ pub trait SpectaFunction<TMarker> {
         type_map: &mut TypeMap,
         fields: &[Cow<'static, str>],
         docs: Vec<Cow<'static, str>>,
-    ) -> Result<FunctionDataType, ExportError>;
+    ) -> Result<FunctionDataType>;
 }
 
 impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction<TResultMarker>
@@ -80,7 +80,7 @@ impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction
         type_map: &mut TypeMap,
         _fields: &[Cow<'static, str>],
         docs: Vec<Cow<'static, str>>,
-    ) -> Result<FunctionDataType, ExportError> {
+    ) -> Result<FunctionDataType> {
         TResult::to_datatype(DefOpts {
             parent_inline: false,
             type_map,
@@ -105,7 +105,7 @@ pub fn get_datatype_internal<TMarker, T: SpectaFunction<TMarker>>(
     type_map: &mut TypeMap,
     fields: &[Cow<'static, str>],
     docs: Vec<Cow<'static, str>>,
-) -> Result<FunctionDataType, ExportError> {
+) -> Result<FunctionDataType> {
     T::to_datatype(asyncness, name, type_map, fields, docs)
 }
 
@@ -124,7 +124,7 @@ macro_rules! impl_typed_command {
                     type_map: &mut TypeMap,
                     fields: &[Cow<'static, str>],
                     docs: Vec<Cow<'static, str>>,
-                ) -> Result<FunctionDataType, ExportError> {
+                ) -> Result<FunctionDataType> {
                     let mut fields = fields.into_iter();
 
                     Ok(FunctionDataType {

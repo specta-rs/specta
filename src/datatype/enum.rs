@@ -5,55 +5,6 @@ use crate::{
     StructUnnamedFields,
 };
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct UntaggedEnum {
-    pub(crate) variants: Vec<EnumVariant>,
-    pub(crate) generics: Vec<GenericType>,
-}
-
-impl UntaggedEnum {
-    pub fn variants(&self) -> impl Iterator<Item = &EnumVariant> {
-        self.variants.iter()
-    }
-
-    pub fn generics(&self) -> impl Iterator<Item = &GenericType> {
-        self.generics.iter()
-    }
-}
-
-impl Into<EnumType> for UntaggedEnum {
-    fn into(self) -> EnumType {
-        EnumType::Untagged(self)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct TaggedEnum {
-    pub(crate) variants: Vec<(Cow<'static, str>, EnumVariant)>,
-    pub(crate) generics: Vec<GenericType>,
-    pub(crate) repr: EnumRepr,
-}
-
-impl TaggedEnum {
-    pub fn variants(&self) -> impl Iterator<Item = &(Cow<'static, str>, EnumVariant)> {
-        self.variants.iter()
-    }
-
-    pub fn generics(&self) -> impl Iterator<Item = &GenericType> {
-        self.generics.iter()
-    }
-
-    pub fn repr(&self) -> &EnumRepr {
-        &self.repr
-    }
-}
-
-impl Into<EnumType> for TaggedEnum {
-    fn into(self) -> EnumType {
-        EnumType::Tagged(self)
-    }
-}
-
 /// Enum type which dictates how the enum is represented.
 ///
 /// The tagging refers to the [Serde concept](https://serde.rs/enum-representations.html).
@@ -61,9 +12,11 @@ impl Into<EnumType> for TaggedEnum {
 /// [`Untagged`](EnumType::Untagged) is here rather than in [`EnumRepr`] as it is the only enum representation that does not have tags on its variants.
 /// Separating it allows for better typesafety since `variants` doesn't have to be a [`Vec`] of tuples.
 #[derive(Debug, Clone, PartialEq)]
-pub enum EnumType {
-    Untagged(UntaggedEnum),
-    Tagged(TaggedEnum),
+pub struct EnumType {
+    pub(crate) name: Cow<'static, str>,
+    pub(crate) taging: EnumTag,
+    pub(crate) variants: Vec<EnumVariant>,
+    pub(crate) generics: Vec<GenericType>,
 }
 
 impl EnumType {
@@ -85,27 +38,29 @@ impl EnumType {
         }
     }
 
-    pub fn generics(&self) -> &Vec<GenericType> {
-        match self {
-            Self::Untagged(UntaggedEnum { generics, .. }) => generics,
-            Self::Tagged(TaggedEnum { generics, .. }) => generics,
-        }
+    pub fn name(&self) -> &Cow<'static, str> {
+        &self.name
     }
 
-    pub(crate) fn variants_len(&self) -> usize {
-        match self {
-            Self::Untagged(UntaggedEnum { variants, .. }) => variants.len(),
-            Self::Tagged(TaggedEnum { variants, .. }) => variants.len(),
-        }
+    pub fn taging(&self) -> &EnumTag {
+        &self.taging
+    }
+
+    pub fn variants(&self) -> &Vec<EnumVariant> {
+        &self.variants
+    }
+
+    pub fn generics(&self) -> &Vec<GenericType> {
+        &self.generics
     }
 
     /// An enum may contain variants which are invalid and will cause a runtime errors during serialize/deserialization.
     /// This function will filter them out so types can be exported for valid variants.
     pub fn make_flattenable(&mut self, impl_location: ImplLocation) -> Result<(), ExportError> {
-        match self {
-            Self::Untagged(UntaggedEnum { variants, .. }) => {
-                variants.iter().try_for_each(|v| match v {
-                    EnumVariant::Unit => Ok(()),
+        match &self.taging {
+            EnumTag::Untagged => {
+                self.variants.iter().try_for_each(|v| match v {
+                    EnumVariant::Unit(_) => Ok(()),
                     EnumVariant::Named(_) => Ok(()),
                     EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
                         impl_location,
@@ -113,17 +68,17 @@ impl EnumType {
                     )),
                 })?;
             }
-            Self::Tagged(TaggedEnum { variants, repr, .. }) => {
-                variants.iter().try_for_each(|(_, v)| {
+            EnumTag::Tagged(repr) => {
+                self.variants.iter().try_for_each(|v| {
                     match repr {
                         EnumRepr::External => match v {
-                            EnumVariant::Unit => Err(ExportError::InvalidType(
+                            EnumVariant::Unit (_)=> Err(ExportError::InvalidType(
                                 impl_location,
                                 "`EnumRepr::External` with ` EnumVariant::Unit` is invalid!",
                             )),
                             EnumVariant::Unnamed(v) => match v {
-                                StructUnnamedFields { fields, .. } if fields.len() == 1 => Ok(()),
-                                StructUnnamedFields { .. } => Err(ExportError::InvalidType(
+                                EnumUnnamedFields { fields, .. } if fields.len() == 1 => Ok(()),
+                                EnumUnnamedFields { .. } => Err(ExportError::InvalidType(
                                     impl_location,
                                     "`EnumRepr::External` with `EnumVariant::Unnamed` containing more than a single field is invalid!",
                                 )),
@@ -132,7 +87,7 @@ impl EnumType {
                         },
                         EnumRepr::Adjacent { .. } => Ok(()),
                         EnumRepr::Internal { .. } => match v {
-                            EnumVariant::Unit => Ok(()),
+                            EnumVariant::Unit(_) => Ok(()),
                             EnumVariant::Named(_) => Ok(()),
                             EnumVariant::Unnamed(_) => Err(ExportError::InvalidType(
                                 impl_location,
@@ -158,7 +113,6 @@ impl From<EnumType> for DataType {
 ///
 /// Does not contain [`Untagged`](EnumType::Untagged) as that is handled by [`EnumType`].
 #[derive(Debug, Clone, PartialEq)]
-#[allow(missing_docs)]
 pub enum EnumRepr {
     External,
     Internal {
@@ -170,23 +124,47 @@ pub enum EnumRepr {
     },
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum EnumTag {
+    Untagged,
+    Tagged(EnumRepr),
+}
+
 /// Type of an [`EnumType`] variant.
 #[derive(Debug, Clone, PartialEq)]
-#[allow(missing_docs)]
 pub enum EnumVariant {
-    Unit,
-    // TODO: Should these be holding the `struct` types or have their own???
+    Unit(Cow<'static, str>),
     Named(StructNamedFields),
-    Unnamed(StructUnnamedFields),
+    Unnamed(EnumUnnamedFields),
+}
+
+// TODO: Should this be the case or should it be it's own type???
+pub type EnumNamedFields = StructNamedFields;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnumUnnamedFields {
+    pub(crate) name: Cow<'static, str>,
+    pub(crate) fields: Vec<DataType>, // TODO: should use `StructField` but without `name` for flatten/inline
+    pub(crate) generics: Vec<GenericType>,
+}
+
+impl EnumUnnamedFields {
+    pub fn generics(&self) -> impl Iterator<Item = &GenericType> {
+        self.generics.iter()
+    }
+
+    // TODO: Make this work
+    // pub fn fields(&self) -> impl Iterator<Item = &StructField> {
+    //     self.fields.iter()
+    // }
 }
 
 impl EnumVariant {
-    /// Get the [`DataType`](crate::DataType) of the variant.
-    pub fn data_type(&self) -> DataType {
+    pub fn name(&self) -> &Cow<'static, str> {
         match self {
-            Self::Unit => unreachable!("Unit enum variants have no type!"), // TODO: Remove unreachable in type system + avoid following clones
-            Self::Unnamed(tuple_type) => DataType::Struct(tuple_type.clone().into()),
-            Self::Named(object_type) => DataType::Struct(object_type.clone().into()),
+            Self::Unit(name) => &name,
+            Self::Unnamed(v) => &v.name,
+            Self::Named(v) => &v.name,
         }
     }
 }

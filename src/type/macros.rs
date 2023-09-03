@@ -1,7 +1,7 @@
 macro_rules! impl_primitives {
     ($($i:ident)+) => {$(
         impl Type for $i {
-            fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
+            fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType> {
                 Ok(DataType::Primitive(datatype::PrimitiveType::$i))
             }
         }
@@ -16,7 +16,7 @@ macro_rules! impl_tuple {
         #[allow(non_snake_case)]
         impl<$($i: Type + 'static),*> Type for ($($i),*) {
             #[allow(unused)]
-            fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+            fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType> {
                 let mut _generics = generics.iter();
 
                 $(let $i = _generics.next().map(Clone::clone).map_or_else(
@@ -48,7 +48,7 @@ macro_rules! impl_tuple {
 macro_rules! impl_containers {
     ($($container:ident)+) => {$(
         impl<T: Type> Type for $container<T> {
-            fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+            fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType> {
                 generics.get(0).cloned().map_or_else(
                     || {
                         T::inline(
@@ -60,7 +60,7 @@ macro_rules! impl_containers {
                 )
             }
 
-            fn reference(opts: DefOpts, generics: &[DataType]) -> Result<Reference, ExportError> {
+            fn reference(opts: DefOpts, generics: &[DataType]) -> Result<Reference> {
                 Ok(Reference {
                     inner: generics.get(0).cloned().map_or_else(
                         || T::reference(opts, generics).map(|r| r.inner),
@@ -75,11 +75,11 @@ macro_rules! impl_containers {
 	        const SID: SpectaID = T::SID;
 	        const IMPL_LOCATION: ImplLocation = T::IMPL_LOCATION;
 
-            fn named_data_type(opts: DefOpts, generics: &[DataType]) -> Result<NamedDataType, ExportError> {
+            fn named_data_type(opts: DefOpts, generics: &[DataType]) -> Result<NamedDataType> {
                 T::named_data_type(opts, generics)
             }
 
-            fn definition_named_data_type(opts: DefOpts) -> Result<NamedDataType, ExportError> {
+            fn definition_named_data_type(opts: DefOpts) -> Result<NamedDataType> {
                 T::definition_named_data_type(opts)
             }
         }
@@ -91,11 +91,11 @@ macro_rules! impl_containers {
 macro_rules! impl_as {
     ($($ty:path as $tty:ident)+) => {$(
         impl Type for $ty {
-            fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+            fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType> {
                 <$tty as Type>::inline(opts, generics)
             }
 
-            fn reference(opts: DefOpts, generics: &[DataType]) -> Result<Reference, ExportError> {
+            fn reference(opts: DefOpts, generics: &[DataType]) -> Result<Reference> {
                 <$tty as Type>::reference(opts, generics)
             }
         }
@@ -105,14 +105,14 @@ macro_rules! impl_as {
 macro_rules! impl_for_list {
     ($($ty:path as $name:expr)+) => {$(
         impl<T: Type> Type for $ty {
-            fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+            fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType> {
                 Ok(DataType::List(Box::new(generics.get(0).cloned().unwrap_or(T::inline(
                     opts,
                     generics,
                 )?))))
             }
 
-            fn reference(opts: DefOpts, generics: &[DataType]) -> Result<Reference, ExportError> {
+            fn reference(opts: DefOpts, generics: &[DataType]) -> Result<Reference> {
                 Ok(Reference {
                     inner: DataType::List(Box::new(generics.get(0).cloned().map_or_else(
                         || T::reference(opts, generics).map(|r| r.inner),
@@ -128,7 +128,7 @@ macro_rules! impl_for_list {
 macro_rules! impl_for_map {
     ($ty:path as $name:expr) => {
         impl<K: Type, V: Type> Type for $ty {
-            fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+            fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType> {
                 Ok(DataType::Map(Box::new((
                     generics.get(0).cloned().map_or_else(
                         || {
@@ -157,7 +157,7 @@ macro_rules! impl_for_map {
                 ))))
             }
 
-            fn reference(opts: DefOpts, generics: &[DataType]) -> Result<Reference, ExportError> {
+            fn reference(opts: DefOpts, generics: &[DataType]) -> Result<Reference> {
                 Ok(Reference {
                     inner: DataType::Map(Box::new((
                         generics.get(0).cloned().map_or_else(

@@ -22,35 +22,27 @@ pub mod construct {
         StructType::Unit
     }
 
-    pub const fn unnamed_struct_fields(
+    // TODO: By taking in `DataType` how does `flatten` and `inline` work?
+    pub const fn struct_unnamed(
+        name: Cow<'static, str>,
         generics: Vec<GenericType>,
         fields: Vec<DataType>,
-    ) -> StructUnnamedFields {
-        StructUnnamedFields { generics, fields }
-    }
-
-    // TODO: By taking in `DataType` how does `flatten` and `inline` work
-    pub const fn unnamed_struct(generics: Vec<GenericType>, fields: Vec<DataType>) -> StructType {
-        StructType::Unnamed(StructUnnamedFields { generics, fields })
-    }
-
-    pub const fn named_struct_fields(
-        generics: Vec<GenericType>,
-        fields: Vec<StructField>,
-        tag: Option<Cow<'static, str>>,
-    ) -> StructNamedFields {
-        StructNamedFields {
+    ) -> StructType {
+        StructType::Unnamed(StructUnnamedFields {
+            name,
             generics,
             fields,
-            tag,
-        }
+        })
     }
-    pub const fn named_struct(
+
+    pub const fn struct_named(
+        name: Cow<'static, str>,
         generics: Vec<GenericType>,
         fields: Vec<StructField>,
         tag: Option<Cow<'static, str>>,
     ) -> StructType {
         StructType::Named(StructNamedFields {
+            name,
             generics,
             fields,
             tag,
@@ -68,6 +60,74 @@ pub mod construct {
             optional,
             flatten,
             ty,
+        }
+    }
+
+    // pub const fn struct_field_named(
+    //     name: Cow<'static, str>,
+    //     generics: Vec<GenericType>,
+    //     fields: Vec<StructField>,
+    //     tag: Option<Cow<'static, str>>,
+    // ) -> StructNamedFields {
+    //     StructNamedFields {
+    //         name,
+    //         generics,
+    //         fields,
+    //         tag,
+    //     }
+    // }
+
+    // TODO: Should this take `optional` and `flatten` as args??
+    pub const fn enum_field_named(
+        name: Cow<'static, str>,
+        generics: Vec<GenericType>,
+        fields: Vec<StructField>, // TODO: Should probs be `EnumField` or similar
+        tag: Option<Cow<'static, str>>,
+    ) -> EnumNamedFields {
+        EnumNamedFields {
+            name,
+            generics,
+            fields,
+            tag,
+        }
+    }
+
+    pub const fn enum_field_unnamed(
+        name: Cow<'static, str>,
+        generics: Vec<GenericType>,
+        fields: Vec<DataType>,
+    ) -> EnumUnnamedFields {
+        EnumUnnamedFields {
+            name,
+            fields,
+            generics,
+        }
+    }
+
+    pub const fn enum_untagged(
+        name: Cow<'static, str>,
+        generics: Vec<GenericType>,
+        variants: Vec<EnumVariant>,
+    ) -> EnumType {
+        EnumType {
+            name,
+            taging: EnumTag::Untagged,
+            variants,
+            generics,
+        }
+    }
+
+    pub const fn enum_tagged(
+        name: Cow<'static, str>,
+        generics: Vec<GenericType>,
+        variants: Vec<EnumVariant>,
+        repr: EnumRepr,
+    ) -> EnumType {
+        EnumType {
+            name,
+            taging: EnumTag::Tagged(repr),
+            variants,
+            generics,
         }
     }
 
@@ -103,22 +163,6 @@ pub mod construct {
             sid,
             generics,
         }
-    }
-
-    pub const fn untagged_enum(generics: Vec<GenericType>, variants: Vec<EnumVariant>) -> EnumType {
-        EnumType::Untagged(UntaggedEnum { variants, generics })
-    }
-
-    pub const fn tagged_enum(
-        generics: Vec<GenericType>,
-        variants: Vec<(Cow<'static, str>, EnumVariant)>,
-        repr: EnumRepr,
-    ) -> EnumType {
-        EnumType::Tagged(TaggedEnum {
-            variants,
-            generics,
-            repr,
-        })
     }
 
     pub const fn tuple(fields: Vec<DataType>) -> TupleType {

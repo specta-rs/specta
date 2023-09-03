@@ -127,12 +127,20 @@ impl From<GenericType> for DataType {
 impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
     fn from(t: Vec<T>) -> Self {
         DataType::Enum(
-            UntaggedEnum {
+            EnumType {
+                name: "Vec".into(),
+                taging: EnumTag::Untagged,
                 variants: t
                     .into_iter()
                     .map(|t| {
-                        EnumVariant::Unnamed(StructUnnamedFields {
-                            fields: vec![t.into()],
+                        let dt: DataType = t.into();
+                        EnumVariant::Unnamed(EnumUnnamedFields {
+                            name: match &dt {
+                                DataType::Struct(StructType::Named(s)) => s.name.clone(),
+                                DataType::Enum(e) => e.name().clone(),
+                                _ => "".into(),
+                            },
+                            fields: vec![dt],
                             generics: vec![],
                         })
                     })

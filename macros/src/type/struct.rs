@@ -156,7 +156,7 @@ pub fn parse_struct(
                 .map(|t| quote!(Some(#t.into())))
                 .unwrap_or(quote!(None));
 
-            quote!(#crate_ref::DataType::Struct(#crate_ref::internal::construct::named_struct(vec![#(#definition_generics),*], vec![#(#fields),*], #tag)))
+            quote!(#crate_ref::DataType::Struct(#crate_ref::internal::construct::struct_named(#name.into(), vec![#(#definition_generics),*], vec![#(#fields),*], #tag)))
         }
         Fields::Unnamed(_) => {
             let inner = match struct_attrs.transparent {
@@ -172,7 +172,7 @@ pub fn parse_struct(
                         data.fields
                             .iter()
                             .next()
-                            .expect("Unreachable: we just checked this!"),
+                            .expect("unreachable: we just checked this!"),
                     )?;
 
                     let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
@@ -186,7 +186,8 @@ pub fn parse_struct(
                     )?;
 
                     quote! {
-                        #crate_ref::DataType::Struct(#crate_ref::internal::construct::unnamed_struct(
+                        #crate_ref::DataType::Struct(#crate_ref::internal::construct::struct_unnamed(
+                            #name.into(),
                             vec![#(#definition_generics),*],
                             vec![
                                 {
@@ -194,8 +195,8 @@ pub fn parse_struct(
 
                                     ty
                                 }
-                            ]
-                        )),
+                            ],
+                        ))
                     }
                 }
                 false => {
@@ -223,16 +224,17 @@ pub fn parse_struct(
                                 field_attrs.inline,
                             )?;
 
-                            Ok(quote! {{
+                            Ok(quote!({
                                 #generic_vars
 
                                 gen
-                            }})
+                            }))
                         })
                         .collect::<syn::Result<Vec<TokenStream>>>()?;
 
                     quote! {
-                        #crate_ref::DataType::Struct(#crate_ref::internal::construct::unnamed_struct(
+                        #crate_ref::DataType::Struct(#crate_ref::internal::construct::struct_unnamed(
+                            #name.into(),
                             vec![#(#definition_generics),*],
                             vec![#(#fields),*],
                         ))

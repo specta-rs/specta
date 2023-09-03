@@ -11,6 +11,8 @@ pub use post_process::*;
 
 use self::reference::Reference;
 
+pub type Result<T> = std::result::Result<T, ExportError>;
+
 /// Type exporting errors.
 #[derive(Error, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[non_exhaustive]
@@ -27,7 +29,7 @@ pub trait Type {
     /// [`definition`](crate::Type::definition) and [`reference`](crate::Type::definition)
     ///
     /// Implemented internally or via the [`Type`](derive@crate::Type) macro
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError>;
+    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType>;
 
     /// Returns the type parameter generics of a given type.
     /// Will usually be empty except for custom types.
@@ -42,7 +44,7 @@ pub trait Type {
     /// as the value for the `generics` arg.
     ///
     /// Implemented internally
-    fn definition(opts: DefOpts) -> Result<DataType, ExportError> {
+    fn definition(opts: DefOpts) -> Result<DataType> {
         Self::inline(
             opts,
             &Self::definition_generics()
@@ -56,7 +58,7 @@ pub trait Type {
     /// as determined by its category. Getting a reference to a type implies that
     /// it should belong in the type map (since it has to be referenced from somewhere),
     /// so the output of [`definition`](crate::Type::definition) will be put into the type map.
-    fn reference(opts: DefOpts, generics: &[DataType]) -> Result<Reference, ExportError> {
+    fn reference(opts: DefOpts, generics: &[DataType]) -> Result<Reference> {
         reference::inline::<Self>(opts, generics)
     }
 }
@@ -68,10 +70,10 @@ pub trait NamedType: Type {
     const IMPL_LOCATION: ImplLocation;
 
     /// this is equivalent to [Type::inline] but returns a [NamedDataType] instead.
-    fn named_data_type(opts: DefOpts, generics: &[DataType]) -> Result<NamedDataType, ExportError>;
+    fn named_data_type(opts: DefOpts, generics: &[DataType]) -> Result<NamedDataType>;
 
     /// this is equivalent to [Type::definition] but returns a [NamedDataType] instead.
-    fn definition_named_data_type(opts: DefOpts) -> Result<NamedDataType, ExportError> {
+    fn definition_named_data_type(opts: DefOpts) -> Result<NamedDataType> {
         Self::named_data_type(
             opts,
             &Self::definition_generics()
@@ -94,10 +96,7 @@ pub mod reference {
         pub(crate) _priv: (),
     }
 
-    pub fn inline<T: Type + ?Sized>(
-        opts: DefOpts,
-        generics: &[DataType],
-    ) -> Result<Reference, ExportError> {
+    pub fn inline<T: Type + ?Sized>(opts: DefOpts, generics: &[DataType]) -> Result<Reference> {
         Ok(Reference {
             inner: T::inline(opts, generics)?,
             _priv: (),
@@ -108,7 +107,7 @@ pub mod reference {
         opts: DefOpts,
         generics: &[DataType],
         reference: DataTypeReference,
-    ) -> Result<Reference, ExportError> {
+    ) -> Result<Reference> {
         if opts.type_map.get(&T::SID).is_none() {
             // It's important we don't put `None` into the map here. By putting a *real* value we ensure that we don't stack overflow for recursive types when calling `named_data_type`.
             opts.type_map.entry(T::SID).or_insert(Some(NamedDataType {
