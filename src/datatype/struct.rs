@@ -65,8 +65,8 @@ impl StructType {
         self.fields.iter()
     }
 
-    pub fn tag(&self) -> &Option<Cow<'static, str>> {
-        &self.tag
+    pub fn tag(&self) -> Option<&Cow<'static, str>> {
+        self.tag.as_ref()
     }
 }
 

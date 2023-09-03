@@ -24,8 +24,8 @@ impl NamedDataTypeExt {
         &self.impl_location
     }
 
-    pub fn export(&self) -> &Option<bool> {
-        &self.export
+    pub fn export(&self) -> Option<bool> {
+        self.export
     }
 }
 
@@ -55,12 +55,12 @@ impl NamedDataType {
         &self.comments
     }
 
-    pub fn deprecated(&self) -> &Option<Cow<'static, str>> {
-        &self.deprecated
+    pub fn deprecated(&self) -> Option<&Cow<'static, str>> {
+        self.deprecated.as_ref()
     }
 
-    pub fn ext(&self) -> &Option<NamedDataTypeExt> {
-        &self.ext
+    pub fn ext(&self) -> Option<&NamedDataTypeExt> {
+        self.ext.as_ref()
     }
 }
 
