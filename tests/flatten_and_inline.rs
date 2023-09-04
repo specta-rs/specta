@@ -83,15 +83,16 @@ pub enum H {
     B,
 }
 
-#[derive(Type)]
-#[specta(export = false, tag = "type")]
-pub enum I {
-    A(String),
-    B,
-    #[specta(inline)]
-    C(A),
-    D(#[specta(flatten)] A),
-}
+// TODO: Invalid Serde type but unit test this at the datamodel level cause it might be valid in other langs.
+// #[derive(Type)]
+// #[specta(export = false, tag = "type")]
+// pub enum I {
+//     A(String),
+//     B,
+//     #[specta(inline)]
+//     C(A),
+//     D(#[specta(flatten)] A),
+// }
 
 #[derive(Type)]
 #[specta(export = false, tag = "t", content = "c")]
@@ -100,7 +101,7 @@ pub enum J {
     B,
     #[specta(inline)]
     C(A),
-    D(#[specta(flatten)] A),
+    D(A),
 }
 
 #[derive(Type)]
@@ -110,14 +111,7 @@ pub enum K {
     B,
     #[specta(inline)]
     C(A),
-    D(#[specta(flatten)] A),
-}
-
-#[derive(Type)]
-#[specta(export = false, tag = "type")]
-pub enum L {
-    A,
-    B(u32),
+    D(A),
 }
 
 #[test]
@@ -132,10 +126,6 @@ fn serde() {
     assert_ts!(F, "({ a: string }) & ({ a: string })");
     assert_ts!(G, "({ a: string }) & ({ a: number })");
     assert_ts!(H, "{ A: string } | \"B\"");
-
-    // TODO: First variant is wrong, Last one is `& A` not it's inlined representation
-    // assert_ts!(I, "({ type: \"A\" } & string) | { type: \"B\" } | ({ type: \"C\" } & { a: string }) | ({ type: \"D\" } & A)");
-    // assert_ts!(J, "");
-    // assert_ts!(K, "");
-    // assert_ts!(error; L, SerdeError::); // TODO: cannot serialize tagged newtype variant Demo::B containing an integer
+    assert_ts!(J, "{ t: \"A\"; c: string } | { t: \"B\" } | { t: \"C\"; c: { a: string } } | { t: \"D\"; c: A }");
+    assert_ts!(K, "string | null | { a: string } | A");
 }
