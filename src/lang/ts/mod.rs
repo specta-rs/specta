@@ -411,13 +411,24 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                             format!("{{ {tag}: {sanitised_name} }}")
                         }
                         (EnumRepr::Internal { tag }, EnumVariant::Unnamed(tuple)) => {
-                            let typ = unnamed_fields_datatype(
+                            let mut typ = unnamed_fields_datatype(
                                 ctx.clone(),
                                 &tuple.fields,
                                 type_map,
                                 "[]",
                             )?;
-                            format!("({{ {tag}: {sanitised_name} }} & {typ})")
+
+                            // TODO: This `null` check is a bad fix for an internally tagged type with a `null` variant being exported as `{ type: "A" } & null` (which is `never` in TS)
+                            // TODO: Move this check into the macros so it can apply to any language cause it should (it's just hard to do in the macros)
+                            if typ == "null" {
+                                format!("({{ {tag}: {sanitised_name} }})")
+                            } else {
+                                // We wanna be sure `... & ... | ...` becomes `... & (... | ...)`
+                                if typ.contains("|") {
+                                    typ = format!("({typ})");
+                                }
+                                format!("({{ {tag}: {sanitised_name} }} & {typ})")
+                            }
                         }
                         (EnumRepr::Internal { tag }, EnumVariant::Named(obj)) => {
                             let mut fields = vec![format!("{tag}: {sanitised_name}")];

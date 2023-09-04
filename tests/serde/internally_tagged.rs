@@ -92,7 +92,8 @@ pub struct IInner(String);
 #[serde(export = false, tag = "type")]
 pub enum L {
     // Internally tag enum with inlined field that is itself internally tagged
-    A(#[specta(inline)] LInner),
+    #[specta(inline)]
+    A(LInner),
 }
 
 #[derive(Type)]
@@ -107,7 +108,8 @@ pub enum LInner {
 pub enum M {
     // Internally tag enum with inlined field that is untagged
     // `MInner` is `null` - Test `B` in `untagged.rs`
-    A(#[specta(inline)] MInner),
+    #[specta(inline)]
+    A(MInner),
 }
 
 #[derive(Type)]
@@ -123,11 +125,11 @@ fn internally_tagged() {
     assert_ts!(error; B, SerdeError::InvalidInternallyTaggedEnum);
     assert_ts!(error; C, SerdeError::InvalidInternallyTaggedEnum);
     assert_ts!(D, "({ type: \"A\" } & { [key in string]: string })");
-    assert_ts!(E, "{ type: \"A\" }"); // TODO: Specta adding `& null` becomes `never` in TS. Serde ignores it.
+    assert_ts!(E, "({ type: \"A\" })");
     assert_ts!(F, "({ type: \"A\" } & FInner)");
     assert_ts!(error; G, SerdeError::InvalidInternallyTaggedEnum);
     assert_ts!(H, "({ type: \"A\" } & HInner)");
     assert_ts!(error; I, SerdeError::InvalidInternallyTaggedEnum);
-    assert_ts!(L, "{ type: \"A\" } & ({ type: \"A\" } | { type: \"B\" })"); // TODO: Is not inlining correctly
-    assert_ts!(M, "{ type: \"A\" }"); // `MInner` resolves to `null`. `null & { ... }` should become `{ ... }` as that's Serde's behaviour. // TODO: Is not inlining correctly
+    assert_ts!(L, "({ type: \"A\" } & ({ type: \"A\" } | { type: \"B\" }))");
+    assert_ts!(M, "({ type: \"A\" })");
 }
