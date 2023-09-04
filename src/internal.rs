@@ -119,4 +119,35 @@ pub mod construct {
     pub const fn tuple(fields: Vec<DataType>) -> TupleType {
         TupleType { fields }
     }
+
+    pub const fn impl_location(loc: &'static str) -> ImplLocation {
+        ImplLocation(loc)
+    }
+
+    /// Compute an SID hash for a given type.
+    /// This will produce a type hash from the arguments.
+    /// This hashing function was derived from https://stackoverflow.com/a/71464396
+    pub const fn sid(type_name: &'static str, type_identifier: &'static str) -> SpectaID {
+        let mut hash = 0xcbf29ce484222325;
+        let prime = 0x00000100000001B3;
+
+        let mut bytes = type_name.as_bytes();
+        let mut i = 0;
+
+        while i < bytes.len() {
+            hash ^= bytes[i] as u64;
+            hash = hash.wrapping_mul(prime);
+            i += 1;
+        }
+
+        bytes = type_identifier.as_bytes();
+        i = 0;
+        while i < bytes.len() {
+            hash ^= bytes[i] as u64;
+            hash = hash.wrapping_mul(prime);
+            i += 1;
+        }
+
+        SpectaID { type_name, hash }
+    }
 }

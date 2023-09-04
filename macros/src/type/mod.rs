@@ -122,11 +122,13 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         None => quote!(None),
     };
 
+    let sid = quote!(#crate_ref::internal::construct::sid(#name, concat!("::", module_path!(), ":", line!(), ":", column!())));
+    let impl_location = quote!(#crate_ref::internal::construct::impl_location(concat!(file!(), ":", line!(), ":", column!())));
+
     Ok(quote! {
         const _: () = {
-        	// We do this so `sid!()` is only called once, as it does a hashing operation.
-        	const SID: #crate_ref::SpectaID = #crate_ref::sid!(@with_specta_path; #name; #crate_ref);
-	        const IMPL_LOCATION: #crate_ref::ImplLocation = #crate_ref::impl_location!(@with_specta_path; #crate_ref);
+        	const SID: #crate_ref::SpectaID = #sid;
+	        const IMPL_LOCATION: #crate_ref::ImplLocation = #impl_location;
 
             #[automatically_derived]
             #type_impl_heading {

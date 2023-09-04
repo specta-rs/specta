@@ -1,6 +1,6 @@
 use specta::{
     ts::{export, TsExportError},
-    ImplLocation, Type,
+    Type,
 };
 
 mod one {
@@ -33,17 +33,20 @@ pub struct Demo {
 
 #[test]
 fn test_duplicate_ty_name() {
+    // DO NOT COPY THIS. This is a hack to construct the impl locations but IS NOT STABLE.
+    use specta::internal::construct::impl_location;
+
     #[cfg(not(target_os = "windows"))]
     let err = Err(TsExportError::DuplicateTypeName(
         "One".into(),
-        ImplLocation::internal_new("tests/duplicate_ty_name.rs:19:14"),
-        ImplLocation::internal_new("tests/duplicate_ty_name.rs:9:14"),
+        impl_location("tests/duplicate_ty_name.rs:19:14"),
+        impl_location("tests/duplicate_ty_name.rs:9:14"),
     ));
     #[cfg(target_os = "windows")]
     let err = Err(TsExportError::DuplicateTypeName(
         "One".into(),
-        ImplLocation::internal_new("tests\\duplicate_ty_name.rs:9:14"),
-        ImplLocation::internal_new("tests\\duplicate_ty_name.rs:19:14"),
+        impl_location("tests\\duplicate_ty_name.rs:9:14"),
+        impl_location("tests\\duplicate_ty_name.rs:19:14"),
     ));
 
     assert_eq!(export::<Demo>(&Default::default()), err);

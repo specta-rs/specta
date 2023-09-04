@@ -13,6 +13,7 @@ mod rename;
 mod reserved_keywords;
 mod selection;
 mod serde;
+mod sid;
 mod transparent;
 pub mod ts;
 mod ts_rs;
