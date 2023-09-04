@@ -37,7 +37,7 @@ pub fn get_types() -> TypesIter {
 
 // Called within ctor functions to register a type.
 #[doc(hidden)]
-pub fn register_ty<T: Type>() -> () {
+pub fn register_ty<T: Type>() {
     let type_map = &mut *TYPES.write().unwrap_or_else(PoisonError::into_inner);
 
     // We call this for it's side effects on the `type_map`

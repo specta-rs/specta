@@ -231,11 +231,11 @@ fn datatype_inner(
 // Can be used with `StructUnnamedFields.fields` or `EnumNamedFields.fields`
 fn unnamed_fields_datatype(
     ctx: ExportContext,
-    fields: &Vec<Field>,
+    fields: &[Field],
     type_map: &TypeMap,
     empty_tuple_fallback: &'static str,
 ) -> Output {
-    match &fields[..] {
+    match fields {
         [] => Ok(empty_tuple_fallback.to_string()),
         [field] => datatype_inner(ctx, &field.ty, type_map, "null"),
         fields => Ok(format!(
@@ -255,39 +255,33 @@ fn tuple_datatype(
     type_map: &TypeMap,
     empty_tuple_fallback: &'static str,
 ) -> Output {
-    match tuple {
-        TupleType { fields, .. } => match &fields[..] {
-            [] => Ok(empty_tuple_fallback.to_string()),
-            [ty] => datatype_inner(ctx, ty, type_map, "null"),
-            tys => Ok(format!(
-                "[{}]",
-                tys.iter()
-                    .map(|v| datatype_inner(ctx.clone(), v, type_map, "null"))
-                    .collect::<Result<Vec<_>>>()?
-                    .join(", ")
-            )),
-        },
+    match &tuple.fields[..] {
+        [] => Ok(empty_tuple_fallback.to_string()),
+        [ty] => datatype_inner(ctx, ty, type_map, "null"),
+        tys => Ok(format!(
+            "[{}]",
+            tys.iter()
+                .map(|v| datatype_inner(ctx.clone(), v, type_map, "null"))
+                .collect::<Result<Vec<_>>>()?
+                .join(", ")
+        )),
     }
 }
 
-fn struct_datatype(
-    ctx: ExportContext,
-    key: &Cow<'static, str>,
-    s: &StructType,
-    type_map: &TypeMap,
-) -> Output {
+fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &TypeMap) -> Output {
     match &s.fields {
-        StructFields::Unit => return Ok("null".into()),
+        StructFields::Unit => Ok("null".into()),
         StructFields::Unnamed(s) => unnamed_fields_datatype(ctx, &s.fields, type_map, "[]"),
         StructFields::Named(s) => {
-            if s.fields.len() == 0 {
+            if s.fields.is_empty() {
                 return Ok("Record<string, never>".into());
             }
 
-            let mut field_sections = s
-                .fields
-                .iter()
-                .filter(|(_, f)| f.flatten)
+            let (flattened, non_flattened): (Vec<_>, Vec<_>) =
+                s.fields.iter().partition(|(_, f)| f.flatten);
+
+            let mut field_sections = flattened
+                .into_iter()
                 .map(|(key, field)| {
                     datatype_inner(
                         ctx.with(PathItem::Field(key.clone())),
@@ -299,12 +293,15 @@ fn struct_datatype(
                 })
                 .collect::<Result<Vec<_>>>()?;
 
-            let mut unflattened_fields = s
-                .fields
-                .iter()
-                .filter(|(_, f)| !f.flatten)
+            let mut unflattened_fields = non_flattened
+                .into_iter()
                 .map(|(key, f)| {
-                    object_field_to_ts(ctx.with(PathItem::Field(key.clone())), &key, f, type_map)
+                    object_field_to_ts(
+                        ctx.with(PathItem::Field(key.clone())),
+                        key.clone(),
+                        f,
+                        type_map,
+                    )
                 })
                 .collect::<Result<Vec<_>>>()?;
 
@@ -324,7 +321,7 @@ fn struct_datatype(
 fn enum_variant_datatype(
     ctx: ExportContext,
     type_map: &TypeMap,
-    name: &Cow<'static, str>,
+    name: Cow<'static, str>,
     variant: &EnumVariant,
 ) -> Output {
     match variant {
@@ -332,19 +329,19 @@ fn enum_variant_datatype(
         EnumVariant::Unit => unreachable!("Unit enum variants have no type!"),
         EnumVariant::Named(obj) => {
             let mut fields = if let Some(tag) = &obj.tag {
-                let sanitised_name = sanitise_key(&name, true);
+                let sanitised_name = sanitise_key(name, true);
                 vec![format!("{tag}: {sanitised_name}")]
             } else {
                 vec![]
             };
 
             fields.extend(
-                obj.fields()
+                obj.fields
                     .iter()
                     .map(|(name, field)| {
                         object_field_to_ts(
                             ctx.with(PathItem::Field(name.clone())),
-                            &name,
+                            name.clone(),
                             field,
                             type_map,
                         )
@@ -366,7 +363,7 @@ fn enum_variant_datatype(
 
             Ok(match &fields[..] {
                 [] => "[]".to_string(),
-                [field] => format!("{}", field),
+                [field] => field.to_string(),
                 fields => format!("[{}]", fields.join(", ")),
             })
         }
@@ -374,7 +371,7 @@ fn enum_variant_datatype(
 }
 
 fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output {
-    if e.variants().len() == 0 {
+    if e.variants().is_empty() {
         return Ok("never".to_string());
     }
 
@@ -389,7 +386,7 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                         v => enum_variant_datatype(
                             ctx.with(PathItem::Variant(name.clone())),
                             type_map,
-                            name,
+                            name.clone(),
                             v,
                         )?,
                     })
@@ -403,7 +400,7 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                 .variants
                 .iter()
                 .map(|(variant_name, variant)| {
-                    let sanitised_name = sanitise_key(variant_name, true);
+                    let sanitised_name = sanitise_key(variant_name.clone(), true);
 
                     Ok(match (repr, variant) {
                         (EnumRepr::Untagged, _) => unreachable!(),
@@ -424,7 +421,7 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                                 format!("({{ {tag}: {sanitised_name} }})")
                             } else {
                                 // We wanna be sure `... & ... | ...` becomes `... & (... | ...)`
-                                if typ.contains("|") {
+                                if typ.contains('|') {
                                     typ = format!("({typ})");
                                 }
                                 format!("({{ {tag}: {sanitised_name} }} & {typ})")
@@ -434,12 +431,12 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                             let mut fields = vec![format!("{tag}: {sanitised_name}")];
 
                             fields.extend(
-                                obj.fields()
+                                obj.fields
                                     .iter()
                                     .map(|(name, field)| {
                                         object_field_to_ts(
                                             ctx.with(PathItem::Field(name.clone())),
-                                            &name,
+                                            name.clone(),
                                             field,
                                             type_map,
                                         )
@@ -455,10 +452,10 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                             let ts_values = enum_variant_datatype(
                                 ctx.with(PathItem::Variant(variant_name.clone())),
                                 type_map,
-                                variant_name,
-                                &v,
+                                variant_name.clone(),
+                                v,
                             )?;
-                            let sanitised_name = sanitise_key(variant_name, false);
+                            let sanitised_name = sanitise_key(variant_name.clone(), false);
 
                             format!("{{ {sanitised_name}: {ts_values} }}")
                         }
@@ -469,8 +466,8 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                             let ts_values = enum_variant_datatype(
                                 ctx.with(PathItem::Variant(variant_name.clone())),
                                 type_map,
-                                variant_name,
-                                &v,
+                                variant_name.clone(),
+                                v,
                             )?;
 
                             format!("{{ {tag}: {sanitised_name}; {content}: {ts_values} }}")
@@ -506,15 +503,15 @@ impl LiteralType {
 /// convert an object field into a Typescript string
 fn object_field_to_ts(
     ctx: ExportContext,
-    key: &Cow<'static, str>,
+    key: Cow<'static, str>,
     field: &Field,
     type_map: &TypeMap,
 ) -> Output {
-    let field_name_safe = sanitise_key(&key, false);
+    let field_name_safe = sanitise_key(key, false);
 
     // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
     let (key, ty) = match field.optional {
-        true => (format!("{field_name_safe}?"), &field.ty),
+        true => (format!("{field_name_safe}?").into(), &field.ty),
         false => (field_name_safe, &field.ty),
     };
 
@@ -525,7 +522,7 @@ fn object_field_to_ts(
 }
 
 /// sanitise a string to be a valid Typescript key
-fn sanitise_key(field_name: &str, force_string: bool) -> String {
+fn sanitise_key<'a>(field_name: Cow<'static, str>, force_string: bool) -> Cow<'a, str> {
     let valid = field_name
         .chars()
         .all(|c| c.is_alphanumeric() || c == '_' || c == '$')
@@ -536,9 +533,9 @@ fn sanitise_key(field_name: &str, force_string: bool) -> String {
             .unwrap_or(true);
 
     if force_string || !valid {
-        format!(r#""{field_name}""#)
+        format!(r#""{field_name}""#).into()
     } else {
-        field_name.to_string()
+        field_name
     }
 }
 

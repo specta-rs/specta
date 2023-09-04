@@ -19,7 +19,7 @@ pub enum SerdeError {
 /// This can be used by exporters which wanna do export-time checks that all types are compatible with Serde formats.
 pub(crate) fn is_valid_ty(dt: &DataType, type_map: &TypeMap) -> Result<(), SerdeError> {
     match dt {
-        DataType::Nullable(ty) => is_valid_ty(&ty, type_map)?,
+        DataType::Nullable(ty) => is_valid_ty(ty, type_map)?,
         DataType::Map(ty) => {
             is_valid_map_key(&ty.0, type_map)?;
             is_valid_ty(&ty.1, type_map)?;
@@ -38,7 +38,7 @@ pub(crate) fn is_valid_ty(dt: &DataType, type_map: &TypeMap) -> Result<(), Serde
             }
         },
         DataType::Enum(ty) => {
-            validate_enum(&ty, type_map)?;
+            validate_enum(ty, type_map)?;
 
             for (_variant_name, variant) in ty.variants().iter() {
                 match variant {
@@ -58,7 +58,7 @@ pub(crate) fn is_valid_ty(dt: &DataType, type_map: &TypeMap) -> Result<(), Serde
         }
         DataType::Tuple(ty) => {
             for field in ty.fields.iter() {
-                is_valid_ty(&field, type_map)?;
+                is_valid_ty(field, type_map)?;
             }
         }
         DataType::Result(ty) => {
@@ -67,7 +67,7 @@ pub(crate) fn is_valid_ty(dt: &DataType, type_map: &TypeMap) -> Result<(), Serde
         }
         DataType::Reference(ty) => {
             for generic in &ty.generics {
-                is_valid_ty(&generic, type_map)?;
+                is_valid_ty(generic, type_map)?;
             }
 
             let ty = type_map
@@ -157,10 +157,9 @@ fn is_valid_map_key(key_ty: &DataType, type_map: &TypeMap) -> Result<(), SerdeEr
 
 // Serde does not allow serializing a variant of certain types of enum's.
 fn validate_enum(e: &EnumType, type_map: &TypeMap) -> Result<(), SerdeError> {
-    match &e.repr {
-        // Only internally tagged enums can be invalid.
-        EnumRepr::Internal { .. } => validate_internally_tag_enum(e, type_map)?,
-        _ => {}
+    // Only internally tagged enums can be invalid.
+    if let EnumRepr::Internal { .. } = e.repr() {
+        validate_internally_tag_enum(e, type_map)?;
     }
 
     Ok(())
@@ -209,7 +208,7 @@ fn validate_internally_tag_enum_datatype(
             EnumRepr::Adjacent { .. } => {}
         },
         // `()` is `null` and is valid
-        DataType::Tuple(ty) if ty.fields.len() == 0 => {}
+        DataType::Tuple(ty) if ty.fields.is_empty() => {}
         // Are valid as they are serialized as an map-type. Eg. `"Ok": 5` or `"Error": "todo"`
         DataType::Result(_) => {}
         // References need to be checked against the same rules.

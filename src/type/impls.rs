@@ -246,46 +246,43 @@ const _: () = {
 
     impl Type for serde_json::Number {
         fn inline(_: DefOpts, _: &[DataType]) -> DataType {
-            DataType::Enum(
-                EnumType {
-                    name: "Number".into(),
-                    repr: EnumRepr::Untagged,
-                    variants: vec![
-                        (
-                            "f64".into(),
-                            EnumVariant::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    ty: DataType::Primitive(PrimitiveType::f64),
-                                }],
-                            }),
-                        ),
-                        (
-                            "i64".into(),
-                            EnumVariant::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    ty: DataType::Primitive(PrimitiveType::i64),
-                                }],
-                            }),
-                        ),
-                        (
-                            "u64".into(),
-                            EnumVariant::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    ty: DataType::Primitive(PrimitiveType::u64),
-                                }],
-                            }),
-                        ),
-                    ],
-                    generics: vec![],
-                }
-                .into(),
-            )
+            DataType::Enum(EnumType {
+                name: "Number".into(),
+                repr: EnumRepr::Untagged,
+                variants: vec![
+                    (
+                        "f64".into(),
+                        EnumVariant::Unnamed(UnnamedFields {
+                            fields: vec![Field {
+                                optional: false,
+                                flatten: false,
+                                ty: DataType::Primitive(PrimitiveType::f64),
+                            }],
+                        }),
+                    ),
+                    (
+                        "i64".into(),
+                        EnumVariant::Unnamed(UnnamedFields {
+                            fields: vec![Field {
+                                optional: false,
+                                flatten: false,
+                                ty: DataType::Primitive(PrimitiveType::i64),
+                            }],
+                        }),
+                    ),
+                    (
+                        "u64".into(),
+                        EnumVariant::Unnamed(UnnamedFields {
+                            fields: vec![Field {
+                                optional: false,
+                                flatten: false,
+                                ty: DataType::Primitive(PrimitiveType::u64),
+                            }],
+                        }),
+                    ),
+                ],
+                generics: vec![],
+            })
         }
     }
 };
@@ -312,46 +309,43 @@ const _: () = {
 
     impl Type for serde_yaml::Number {
         fn inline(_: DefOpts, _: &[DataType]) -> DataType {
-            DataType::Enum(
-                EnumType {
-                    name: "Number".into(),
-                    repr: EnumRepr::Untagged,
-                    variants: vec![
-                        (
-                            "f64".into(),
-                            EnumVariant::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    ty: DataType::Primitive(PrimitiveType::f64),
-                                }],
-                            }),
-                        ),
-                        (
-                            "i64".into(),
-                            EnumVariant::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    ty: DataType::Primitive(PrimitiveType::i64),
-                                }],
-                            }),
-                        ),
-                        (
-                            "u64".into(),
-                            EnumVariant::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    ty: DataType::Primitive(PrimitiveType::u64),
-                                }],
-                            }),
-                        ),
-                    ],
-                    generics: vec![],
-                }
-                .into(),
-            )
+            DataType::Enum(EnumType {
+                name: "Number".into(),
+                repr: EnumRepr::Untagged,
+                variants: vec![
+                    (
+                        "f64".into(),
+                        EnumVariant::Unnamed(UnnamedFields {
+                            fields: vec![Field {
+                                optional: false,
+                                flatten: false,
+                                ty: DataType::Primitive(PrimitiveType::f64),
+                            }],
+                        }),
+                    ),
+                    (
+                        "i64".into(),
+                        EnumVariant::Unnamed(UnnamedFields {
+                            fields: vec![Field {
+                                optional: false,
+                                flatten: false,
+                                ty: DataType::Primitive(PrimitiveType::i64),
+                            }],
+                        }),
+                    ),
+                    (
+                        "u64".into(),
+                        EnumVariant::Unnamed(UnnamedFields {
+                            fields: vec![Field {
+                                optional: false,
+                                flatten: false,
+                                ty: DataType::Primitive(PrimitiveType::u64),
+                            }],
+                        }),
+                    ),
+                ],
+                generics: vec![],
+            })
         }
     }
 };
