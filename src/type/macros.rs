@@ -1,8 +1,8 @@
 macro_rules! impl_primitives {
     ($($i:ident)+) => {$(
         impl Type for $i {
-            fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
-                Ok(DataType::Primitive(datatype::PrimitiveType::$i))
+            fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+                DataType::Primitive(datatype::PrimitiveType::$i)
             }
         }
     )+};
@@ -16,10 +16,10 @@ macro_rules! impl_tuple {
         #[allow(non_snake_case)]
         impl<$($i: Type + 'static),*> Type for ($($i),*) {
             #[allow(unused)]
-            fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+            fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
                 let mut _generics = generics.iter();
 
-                $(let $i = _generics.next().map(Clone::clone).map_or_else(
+                $(let $i = _generics.next().map(Clone::clone).unwrap_or_else(
                     || {
                         $i::reference(
                             DefOpts {
@@ -27,15 +27,13 @@ macro_rules! impl_tuple {
                                 type_map: opts.type_map,
                             },
                             generics,
-                        )
+                        ).inner
                     },
-                    Ok,
-                )?;)*
+                );)*
 
-                Ok(datatype::TupleType::Named {
+                datatype::TupleType {
                     fields: vec![$($i),*],
-                    generics: vec![]
-                }.to_anonymous())
+                }.to_anonymous()
             }
         }
     };
@@ -49,28 +47,24 @@ macro_rules! impl_tuple {
 macro_rules! impl_containers {
     ($($container:ident)+) => {$(
         impl<T: Type> Type for $container<T> {
-            fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-                generics.get(0).cloned().map_or_else(
+            fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
+                generics.get(0).cloned().unwrap_or_else(
                     || {
                         T::inline(
                            opts,
                             generics,
                         )
                     },
-                    Ok,
                 )
             }
 
-            fn reference(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-                generics.get(0).cloned().map_or_else(
-                    || {
-                        T::reference(
-                            opts,
-                            generics,
-                        )
-                    },
-                    Ok,
-                )
+            fn reference(opts: DefOpts, generics: &[DataType]) -> Reference {
+                Reference {
+                    inner: generics.get(0).cloned().unwrap_or_else(
+                        || T::reference(opts, generics).inner,
+                    ),
+                    _priv: (),
+                }
             }
         }
 
@@ -78,11 +72,11 @@ macro_rules! impl_containers {
 	        const SID: SpectaID = T::SID;
 	        const IMPL_LOCATION: ImplLocation = T::IMPL_LOCATION;
 
-            fn named_data_type(opts: DefOpts, generics: &[DataType]) -> Result<NamedDataType, ExportError> {
+            fn named_data_type(opts: DefOpts, generics: &[DataType]) -> NamedDataType {
                 T::named_data_type(opts, generics)
             }
 
-            fn definition_named_data_type(opts: DefOpts) -> Result<NamedDataType, ExportError> {
+            fn definition_named_data_type(opts: DefOpts) -> NamedDataType {
                 T::definition_named_data_type(opts)
             }
         }
@@ -94,11 +88,11 @@ macro_rules! impl_containers {
 macro_rules! impl_as {
     ($($ty:path as $tty:ident)+) => {$(
         impl Type for $ty {
-            fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+            fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
                 <$tty as Type>::inline(opts, generics)
             }
 
-            fn reference(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+            fn reference(opts: DefOpts, generics: &[DataType]) -> Reference {
                 <$tty as Type>::reference(opts, generics)
             }
         }
@@ -108,23 +102,20 @@ macro_rules! impl_as {
 macro_rules! impl_for_list {
     ($($ty:path as $name:expr)+) => {$(
         impl<T: Type> Type for $ty {
-            fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-                Ok(DataType::List(Box::new(generics.get(0).cloned().unwrap_or(T::inline(
+            fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
+                DataType::List(Box::new(generics.get(0).cloned().unwrap_or_else(|| T::inline(
                     opts,
                     generics,
-                )?))))
+                ))))
             }
 
-            fn reference(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-                Ok(DataType::List(Box::new(generics.get(0).cloned().map_or_else(
-                    || {
-                        T::reference(
-                           opts,
-                            generics,
-                        )
-                    },
-                    Ok,
-                )?)))
+            fn reference(opts: DefOpts, generics: &[DataType]) -> Reference {
+                Reference {
+                    inner: DataType::List(Box::new(generics.get(0).cloned().unwrap_or_else(
+                        || T::reference(opts, generics).inner,
+                    ))),
+                    _priv: (),
+                }
             }
         }
     )+};
@@ -133,39 +124,33 @@ macro_rules! impl_for_list {
 macro_rules! impl_for_map {
     ($ty:path as $name:expr) => {
         impl<K: Type, V: Type> Type for $ty {
-            fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-                Ok(DataType::Map(Box::new((
-                    generics.get(0).cloned().map_or_else(
-                        || {
-                            K::inline(
-                                DefOpts {
-                                    parent_inline: opts.parent_inline,
-                                    type_map: opts.type_map,
-                                },
-                                generics,
-                            )
-                        },
-                        Ok,
-                    )?,
-                    generics.get(1).cloned().map_or_else(
-                        || {
-                            V::inline(
-                                DefOpts {
-                                    parent_inline: opts.parent_inline,
-                                    type_map: opts.type_map,
-                                },
-                                generics,
-                            )
-                        },
-                        Ok,
-                    )?,
-                ))))
+            fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
+                DataType::Map(Box::new((
+                    generics.get(0).cloned().unwrap_or_else(|| {
+                        K::inline(
+                            DefOpts {
+                                parent_inline: opts.parent_inline,
+                                type_map: opts.type_map,
+                            },
+                            generics,
+                        )
+                    }),
+                    generics.get(1).cloned().unwrap_or_else(|| {
+                        V::inline(
+                            DefOpts {
+                                parent_inline: opts.parent_inline,
+                                type_map: opts.type_map,
+                            },
+                            generics,
+                        )
+                    }),
+                )))
             }
 
-            fn reference(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-                Ok(DataType::Map(Box::new((
-                    generics.get(0).cloned().map_or_else(
-                        || {
+            fn reference(opts: DefOpts, generics: &[DataType]) -> Reference {
+                Reference {
+                    inner: DataType::Map(Box::new((
+                        generics.get(0).cloned().unwrap_or_else(|| {
                             K::reference(
                                 DefOpts {
                                     parent_inline: opts.parent_inline,
@@ -173,11 +158,9 @@ macro_rules! impl_for_map {
                                 },
                                 generics,
                             )
-                        },
-                        Ok,
-                    )?,
-                    generics.get(1).cloned().map_or_else(
-                        || {
+                            .inner
+                        }),
+                        generics.get(1).cloned().unwrap_or_else(|| {
                             V::reference(
                                 DefOpts {
                                     parent_inline: opts.parent_inline,
@@ -185,10 +168,11 @@ macro_rules! impl_for_map {
                                 },
                                 generics,
                             )
-                        },
-                        Ok,
-                    )?,
-                ))))
+                            .inner
+                        }),
+                    ))),
+                    _priv: (),
+                }
             }
         }
     };

@@ -1,23 +1,14 @@
 use std::borrow::Cow;
 
-use crate::{DataType, GenericType, NamedDataType, NamedDataTypeItem};
+use crate::{DataType, NamedDataType};
 
-/// Type of a tuple.
-/// Could be from an actual tuple or unnamed struct.
+/// A regular tuple
+///
+/// Represented in Rust as `(...)` and in TypeScript as `[...]`.
+/// Be aware `()` is treated specially as `null` in Typescript.
 #[derive(Debug, Clone, PartialEq)]
-pub enum TupleType {
-    /// An unnamed tuple.
-    ///
-    /// Represented in Rust as `pub struct Unit();` and in TypeScript as `[]`.
-    Unnamed,
-    /// A regular tuple
-    ///
-    /// Represented in Rust as `(...)` and in TypeScript as `[...]`.
-    /// Be aware `()` is treated specially as `null` in Typescript.
-    Named {
-        fields: Vec<DataType>,
-        generics: Vec<GenericType>,
-    },
+pub struct TupleType {
+    pub(crate) fields: Vec<DataType>,
 }
 
 impl TupleType {
@@ -35,8 +26,12 @@ impl TupleType {
             comments: vec![],
             deprecated: None,
             ext: None,
-            item: NamedDataTypeItem::Tuple(self),
+            inner: DataType::Tuple(self),
         }
+    }
+
+    pub fn fields(&self) -> &Vec<DataType> {
+        &self.fields
     }
 }
 

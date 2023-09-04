@@ -15,6 +15,9 @@ pub struct ContainerAttr {
     pub export: Option<bool>,
     pub doc: Vec<String>,
     pub deprecated: Option<String>,
+
+    // Struct ony (we pass it anyway so enums get nice errors)
+    pub transparent: bool,
 }
 
 impl_parse! {
@@ -53,6 +56,7 @@ impl_parse! {
                 out.deprecated = out.deprecated.take().or(Some(attr.parse_string()?));
             }
         },
+        "transparent" => out.transparent = attr.parse_bool().unwrap_or(true)
     }
 }
 
@@ -62,6 +66,7 @@ impl ContainerAttr {
         Self::try_from_attrs("specta", attrs, &mut result)?;
         #[cfg(feature = "serde")]
         Self::try_from_attrs("serde", attrs, &mut result)?;
+        Self::try_from_attrs("repr", attrs, &mut result)?; // To handle `#[repr(transparent)]`
         Self::try_from_attrs("doc", attrs, &mut result)?;
         Ok(result)
     }

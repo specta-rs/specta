@@ -39,6 +39,7 @@ impl_parse! {
         "skip_serializing" => out.skip = true,
         "skip_deserializing" => out.skip = true,
         "skip_serializing_if" => out.optional = attr.parse_string()? == *"Option::is_none",
+        // Specta only attribute
         "optional" => out.optional = attr.parse_bool().unwrap_or(true),
         "default" => out.optional = attr.parse_bool().unwrap_or(true),
         "flatten" => out.flatten = attr.parse_bool().unwrap_or(true)

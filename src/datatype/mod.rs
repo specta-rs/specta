@@ -4,12 +4,14 @@ use std::{
 };
 
 mod r#enum;
+mod fields;
 mod literal;
 mod named;
 mod primitive;
 mod r#struct;
 mod tuple;
 
+pub use fields::*;
 pub use literal::*;
 pub use named::*;
 pub use primitive::*;
@@ -37,7 +39,6 @@ pub struct DefOpts<'a> {
 ///
 /// A language exporter takes this general format and converts it into a language specific syntax.
 #[derive(Debug, Clone, PartialEq)]
-#[allow(missing_docs)]
 pub enum DataType {
     // Always inlined
     Any,
@@ -47,8 +48,6 @@ pub enum DataType {
     List(Box<DataType>),
     Nullable(Box<DataType>),
     Map(Box<(DataType, DataType)>),
-    // Named reference types
-    Named(NamedDataType),
     // Anonymous Reference types
     Struct(StructType),
     Enum(EnumType),
@@ -58,6 +57,16 @@ pub enum DataType {
     // A reference type that has already been defined
     Reference(DataTypeReference),
     Generic(GenericType),
+}
+
+impl DataType {
+    pub fn generics(&self) -> Option<&Vec<GenericType>> {
+        match self {
+            Self::Struct(s) => Some(s.generics()),
+            Self::Enum(e) => Some(e.generics()),
+            _ => None,
+        }
+    }
 }
 
 /// A reference to a [`DataType`] that can be used before a type is resolved in order to
@@ -85,8 +94,8 @@ impl DataTypeReference {
         self.sid
     }
 
-    pub fn generics(&self) -> impl Iterator<Item = &DataType> {
-        self.generics.iter()
+    pub fn generics(&self) -> &Vec<DataType> {
+        &self.generics
     }
 }
 
@@ -118,21 +127,32 @@ impl From<GenericType> for DataType {
 
 impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
     fn from(t: Vec<T>) -> Self {
-        DataType::Enum(
-            UntaggedEnum {
-                variants: t
-                    .into_iter()
-                    .map(|t| {
-                        EnumVariant::Unnamed(TupleType::Named {
-                            fields: vec![t.into()],
-                            generics: vec![],
-                        })
-                    })
-                    .collect(),
-                generics: vec![],
-            }
-            .into(),
-        )
+        DataType::Enum(EnumType {
+            name: "Vec".into(),
+            repr: EnumRepr::Untagged,
+            variants: t
+                .into_iter()
+                .map(|t| {
+                    let ty: DataType = t.into();
+                    (
+                        match &ty {
+                            DataType::Struct(s) => s.name.clone(),
+                            DataType::Enum(e) => e.name().clone(),
+                            // TODO: This is probs gonna cause problems so we should try and remove the need for this entire impl block if we can.
+                            _ => "".into(),
+                        },
+                        EnumVariant::Unnamed(UnnamedFields {
+                            fields: vec![Field {
+                                optional: false,
+                                flatten: false,
+                                ty,
+                            }],
+                        }),
+                    )
+                })
+                .collect(),
+            generics: vec![],
+        })
     }
 }
 

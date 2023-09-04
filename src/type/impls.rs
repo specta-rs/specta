@@ -1,4 +1,4 @@
-use crate::*;
+use crate::{reference::Reference, *};
 
 impl_primitives!(
     i8 i16 i32 i64 i128 isize
@@ -22,25 +22,25 @@ const _: () = {
 };
 
 impl<'a> Type for &'a str {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         String::inline(opts, generics)
     }
 }
 
 impl<'a, T: Type + 'static> Type for &'a T {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         T::inline(opts, generics)
     }
 }
 
 impl<T: Type> Type for [T] {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         T::inline(opts, generics)
     }
 }
 
 impl<'a, T: ?Sized + ToOwned + Type + 'static> Type for std::borrow::Cow<'a, T> {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         T::inline(opts, generics)
     }
 }
@@ -113,103 +113,94 @@ impl_for_list!(
 );
 
 impl<'a, T: Type> Type for &'a [T] {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         <Vec<T>>::inline(opts, generics)
-    }
-
-    fn category_impl(opts: DefOpts, generics: &[DataType]) -> Result<TypeCategory, ExportError> {
-        <Vec<T>>::category_impl(opts, generics)
     }
 }
 
 impl<const N: usize, T: Type> Type for [T; N] {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         <Vec<T>>::inline(opts, generics)
-    }
-
-    fn category_impl(opts: DefOpts, generics: &[DataType]) -> Result<TypeCategory, ExportError> {
-        <Vec<T>>::category_impl(opts, generics)
     }
 }
 
 impl<T: Type> Type for Option<T> {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-        Ok(DataType::Nullable(Box::new(
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
+        DataType::Nullable(Box::new(
             generics
                 .get(0)
                 .cloned()
-                .map_or_else(|| T::inline(opts, generics), Ok)?,
-        )))
-    }
-
-    fn category_impl(opts: DefOpts, generics: &[DataType]) -> Result<TypeCategory, ExportError> {
-        Ok(TypeCategory::Inline(DataType::Nullable(Box::new(
-            generics
-                .get(0)
-                .cloned()
-                .map_or_else(|| T::reference(opts, generics), Ok)?,
-        ))))
+                .unwrap_or_else(|| T::inline(opts, generics)),
+        ))
     }
 }
 
-impl<T: Type, E: Type> Type for Result<T, E> {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-        Ok(DataType::Result(Box::new((
+impl<T: Type, E: Type> Type for std::result::Result<T, E> {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
+        DataType::Result(Box::new((
             T::inline(
                 DefOpts {
                     parent_inline: opts.parent_inline,
                     type_map: opts.type_map,
                 },
                 generics,
-            )?,
+            ),
             E::inline(
                 DefOpts {
                     parent_inline: opts.parent_inline,
                     type_map: opts.type_map,
                 },
                 generics,
-            )?,
-        ))))
+            ),
+        )))
     }
 }
 
 impl<T> Type for std::marker::PhantomData<T> {
-    fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
-        Ok(DataType::Literal(LiteralType::None))
+    fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+        DataType::Literal(LiteralType::None)
     }
 }
 
+// Serde does no support `Infallible` as it can't be constructed so a `&self` method is uncallable on it.
 #[allow(unused)]
 #[derive(Type)]
 #[specta(remote = std::convert::Infallible, crate = crate)]
 pub enum Infallible {}
 
 impl<T: Type> Type for std::ops::Range<T> {
-    fn inline(opts: DefOpts, _generics: &[DataType]) -> Result<DataType, ExportError> {
-        let ty = T::definition(opts)?;
-        Ok(DataType::Struct(StructType {
+    fn inline(opts: DefOpts, _generics: &[DataType]) -> DataType {
+        let ty = T::definition(opts);
+        DataType::Struct(StructType {
+            name: "Range".into(),
             generics: vec![],
-            fields: vec![
-                StructField {
-                    key: "start".into(),
-                    optional: false,
-                    flatten: false,
-                    ty: ty.clone(),
-                },
-                StructField {
-                    key: "end".into(),
-                    optional: false,
-                    flatten: false,
-                    ty,
-                },
-            ],
-            tag: None,
-        }))
+            fields: StructFields::Named(NamedFields {
+                fields: vec![
+                    (
+                        "start".into(),
+                        Field {
+                            optional: false,
+                            flatten: false,
+                            ty: ty.clone(),
+                        },
+                    ),
+                    (
+                        "end".into(),
+                        Field {
+                            optional: false,
+                            flatten: false,
+                            ty,
+                        },
+                    ),
+                ],
+                tag: None,
+            }),
+        })
     }
 }
 
 impl<T: Type> Type for std::ops::RangeInclusive<T> {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         std::ops::Range::<T>::inline(opts, generics) // Yeah Serde are cringe
     }
 }
@@ -248,33 +239,50 @@ const _: () = {
     impl<K: Type, V: Type> Flatten for serde_json::Map<K, V> {}
 
     impl Type for serde_json::Value {
-        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
-            Ok(DataType::Any)
+        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+            DataType::Any
         }
     }
 
     impl Type for serde_json::Number {
-        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
-            Ok(DataType::Enum(
-                UntaggedEnum {
-                    variants: vec![
-                        EnumVariant::Unnamed(TupleType::Named {
-                            fields: vec![DataType::Primitive(PrimitiveType::f64)],
-                            generics: vec![],
+        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+            DataType::Enum(EnumType {
+                name: "Number".into(),
+                repr: EnumRepr::Untagged,
+                variants: vec![
+                    (
+                        "f64".into(),
+                        EnumVariant::Unnamed(UnnamedFields {
+                            fields: vec![Field {
+                                optional: false,
+                                flatten: false,
+                                ty: DataType::Primitive(PrimitiveType::f64),
+                            }],
                         }),
-                        EnumVariant::Unnamed(TupleType::Named {
-                            fields: vec![DataType::Primitive(PrimitiveType::i64)],
-                            generics: vec![],
+                    ),
+                    (
+                        "i64".into(),
+                        EnumVariant::Unnamed(UnnamedFields {
+                            fields: vec![Field {
+                                optional: false,
+                                flatten: false,
+                                ty: DataType::Primitive(PrimitiveType::i64),
+                            }],
                         }),
-                        EnumVariant::Unnamed(TupleType::Named {
-                            fields: vec![DataType::Primitive(PrimitiveType::u64)],
-                            generics: vec![],
+                    ),
+                    (
+                        "u64".into(),
+                        EnumVariant::Unnamed(UnnamedFields {
+                            fields: vec![Field {
+                                optional: false,
+                                flatten: false,
+                                ty: DataType::Primitive(PrimitiveType::u64),
+                            }],
                         }),
-                    ],
-                    generics: vec![],
-                }
-                .into(),
-            ))
+                    ),
+                ],
+                generics: vec![],
+            })
         }
     }
 };
@@ -282,45 +290,62 @@ const _: () = {
 #[cfg(feature = "serde_yaml")]
 const _: () = {
     impl Type for serde_yaml::Value {
-        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
-            Ok(DataType::Any)
+        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+            DataType::Any
         }
     }
 
     impl Type for serde_yaml::Mapping {
-        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
-            Ok(DataType::Any)
+        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+            DataType::Any
         }
     }
 
     impl Type for serde_yaml::value::TaggedValue {
-        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
-            Ok(DataType::Any)
+        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+            DataType::Any
         }
     }
 
     impl Type for serde_yaml::Number {
-        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
-            Ok(DataType::Enum(
-                UntaggedEnum {
-                    variants: vec![
-                        EnumVariant::Unnamed(TupleType::Named {
-                            fields: vec![DataType::Primitive(PrimitiveType::f64)],
-                            generics: vec![],
+        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+            DataType::Enum(EnumType {
+                name: "Number".into(),
+                repr: EnumRepr::Untagged,
+                variants: vec![
+                    (
+                        "f64".into(),
+                        EnumVariant::Unnamed(UnnamedFields {
+                            fields: vec![Field {
+                                optional: false,
+                                flatten: false,
+                                ty: DataType::Primitive(PrimitiveType::f64),
+                            }],
                         }),
-                        EnumVariant::Unnamed(TupleType::Named {
-                            fields: vec![DataType::Primitive(PrimitiveType::i64)],
-                            generics: vec![],
+                    ),
+                    (
+                        "i64".into(),
+                        EnumVariant::Unnamed(UnnamedFields {
+                            fields: vec![Field {
+                                optional: false,
+                                flatten: false,
+                                ty: DataType::Primitive(PrimitiveType::i64),
+                            }],
                         }),
-                        EnumVariant::Unnamed(TupleType::Named {
-                            fields: vec![DataType::Primitive(PrimitiveType::u64)],
-                            generics: vec![],
+                    ),
+                    (
+                        "u64".into(),
+                        EnumVariant::Unnamed(UnnamedFields {
+                            fields: vec![Field {
+                                optional: false,
+                                flatten: false,
+                                ty: DataType::Primitive(PrimitiveType::u64),
+                            }],
                         }),
-                    ],
-                    generics: vec![],
-                }
-                .into(),
-            ))
+                    ),
+                ],
+                generics: vec![],
+            })
         }
     }
 };
@@ -331,8 +356,8 @@ const _: () = {
     impl<K: Type, V: Type> Flatten for toml::map::Map<K, V> {}
 
     impl Type for toml::Value {
-        fn inline(_: DefOpts, _: &[DataType]) -> Result<DataType, ExportError> {
-            Ok(DataType::Any)
+        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+            DataType::Any
         }
     }
 
@@ -391,14 +416,14 @@ const _: () = {
     );
 
     impl<T: TimeZone> Type for DateTime<T> {
-        fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+        fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
             String::inline(opts, generics)
         }
     }
 
     #[allow(deprecated)]
     impl<T: TimeZone> Type for Date<T> {
-        fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
+        fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
             String::inline(opts, generics)
         }
     }
@@ -510,31 +535,45 @@ impl_as!(url::Url as String);
 
 #[cfg(feature = "either")]
 impl<L: Type, R: Type> Type for either::Either<L, R> {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-        Ok(DataType::Enum(EnumType::Untagged(UntaggedEnum {
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
+        DataType::Enum(EnumType {
+            name: "Either".into(),
+            repr: EnumRepr::Untagged,
             variants: vec![
-                EnumVariant::Unnamed(TupleType::Named {
-                    fields: vec![L::inline(
-                        DefOpts {
-                            parent_inline: opts.parent_inline,
-                            type_map: opts.type_map,
-                        },
-                        generics,
-                    )?],
-                    generics: vec![],
-                }),
-                EnumVariant::Unnamed(TupleType::Named {
-                    fields: vec![R::inline(
-                        DefOpts {
-                            parent_inline: opts.parent_inline,
-                            type_map: opts.type_map,
-                        },
-                        generics,
-                    )?],
-                    generics: vec![],
-                }),
+                (
+                    "Left".into(),
+                    EnumVariant::Unnamed(UnnamedFields {
+                        fields: vec![Field {
+                            optional: false,
+                            flatten: false,
+                            ty: L::inline(
+                                DefOpts {
+                                    parent_inline: opts.parent_inline,
+                                    type_map: opts.type_map,
+                                },
+                                generics,
+                            ),
+                        }],
+                    }),
+                ),
+                (
+                    "Right".into(),
+                    EnumVariant::Unnamed(UnnamedFields {
+                        fields: vec![Field {
+                            optional: false,
+                            flatten: false,
+                            ty: R::inline(
+                                DefOpts {
+                                    parent_inline: opts.parent_inline,
+                                    type_map: opts.type_map,
+                                },
+                                generics,
+                            ),
+                        }],
+                    }),
+                ),
             ],
             generics: vec![],
-        })))
+        })
     }
 }

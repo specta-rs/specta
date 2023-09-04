@@ -8,7 +8,6 @@ use crate::DataType;
 /// it's more for library authors.
 #[derive(Debug, Clone, PartialEq)]
 #[allow(non_camel_case_types)]
-#[allow(missing_docs)]
 #[non_exhaustive]
 pub enum LiteralType {
     i8(i8),
@@ -21,6 +20,7 @@ pub enum LiteralType {
     f64(f64),
     bool(bool),
     String(String),
+    char(char),
     /// Standalone `null` without a known type
     None,
 }

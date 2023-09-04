@@ -16,6 +16,12 @@ use specta::{
 };
 
 macro_rules! assert_ts {
+    (error; $t:ty, $e:expr) => {
+        assert_eq!(
+            specta::ts::inline::<$t>(&Default::default()),
+            Err($e.into())
+        )
+    };
     ($t:ty, $e:expr) => {
         assert_eq!(specta::ts::inline::<$t>(&Default::default()), Ok($e.into()))
     };
@@ -35,8 +41,17 @@ macro_rules! assert_ts_export {
     ($t:ty, $e:expr) => {
         assert_eq!(specta::ts::export::<$t>(&Default::default()), Ok($e.into()))
     };
+    (error; $t:ty, $e:expr) => {
+        assert_eq!(
+            specta::ts::export::<$t>(&Default::default()),
+            Err($e.into())
+        )
+    };
     ($t:ty, $e:expr; $cfg:expr) => {
         assert_eq!(specta::ts::export::<$t>($cfg), Ok($e.into()))
+    };
+    (error; $t:ty, $e:expr; $cfg:expr) => {
+        assert_eq!(specta::ts::export::<$t>($cfg), Err($e.into()))
     };
 }
 pub(crate) use assert_ts_export;
@@ -122,7 +137,7 @@ fn typescript_types() {
     );
 
     assert_ts!(OverridenStruct, "{ overriden_field: string }");
-    assert_ts!(HasGenericAlias, r#"{ [key: number]: string }"#);
+    assert_ts!(HasGenericAlias, r#"{ [key in number]: string }"#);
 
     assert_ts!(SkipVariant, "{ A: string }");
     assert_ts!(SkipVariant2, r#"{ tag: "A"; data: string }"#);
@@ -152,7 +167,7 @@ fn typescript_types() {
 
     assert_ts!(Rename, r#""OneWord" | "Two words""#);
 
-    assert_ts!(TransparentType, r#"TransparentTypeInner"#);
+    assert_ts!(TransparentType, r#"TransparentTypeInner"#); // TODO: I don't think this is correct for `Type::inline`
     assert_ts!(TransparentType2, r#"null"#);
     assert_ts!(TransparentTypeWithOverride, r#"string"#);
 

@@ -3,7 +3,7 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{spanned::Spanned, DataStruct, Field, Fields, GenericParam, Generics};
 
-use super::{attr::*, generics::construct_datatype, named_data_type_wrapper};
+use super::{attr::*, generics::construct_datatype};
 
 pub fn decode_field_attrs(field: &Field) -> syn::Result<(&Field, FieldAttr)> {
     // We pass all the attributes at the start and when decoding them pop them off the list.
@@ -26,7 +26,7 @@ pub fn decode_field_attrs(field: &Field) -> syn::Result<(&Field, FieldAttr)> {
 
 pub fn parse_struct(
     name: &TokenStream,
-    (container_attrs, struct_attrs): (&ContainerAttr, StructAttr),
+    container_attrs: &ContainerAttr,
     generics: &Generics,
     crate_ref: &TokenStream,
     data: &DataStruct,
@@ -51,13 +51,13 @@ pub fn parse_struct(
             generics
                 .get(#i)
                 .cloned()
-                .map_or_else(|| <#ident as #crate_ref::Type>::reference(
+                .unwrap_or_else(|| <#ident as #crate_ref::Type>::reference(
                     #crate_ref::DefOpts {
                         parent_inline: #parent_inline,
                         type_map: opts.type_map,
                     },
                     &[],
-                ), Ok)?
+                ).inner)
         }
     });
 
@@ -66,224 +66,192 @@ pub fn parse_struct(
         quote!(std::borrow::Cow::Borrowed(#ident).into())
     });
 
-    let definition = match &data.fields {
-        Fields::Named(_) => {
-            let fields = data.fields.iter().map(decode_field_attrs)
-            .collect::<syn::Result<Vec<_>>>()?
-            .iter()
-            .filter_map(|(field, field_attrs)| {
-
-                if field_attrs.skip {
-                    return None;
-                }
-
-                Some((field, field_attrs))
-            }).map(|(field, field_attrs)| {
-                let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
-
-                let ty = construct_datatype(
-                    format_ident!("ty"),
-                    field_ty,
-                    &generic_idents,
-                    crate_ref,
-                    field_attrs.inline,
-                )?;
-
-                let field_ident_str = unraw_raw_ident(field.ident.as_ref().unwrap());
-
-                let field_name = match (field_attrs.rename.clone(), container_attrs.rename_all) {
-                    (Some(name), _) => name,
-                    (_, Some(inflection)) => {
-                        let name = inflection.apply(&field_ident_str);
-                        quote::quote!(#name)
-                    },
-                    (_, _) => quote::quote!(#field_ident_str),
-                };
-
-                let optional = field_attrs.optional;
-                let flatten = field_attrs.flatten;
-
-                let parent_inline = container_attrs
-                    .inline
-                    .then(|| quote!(true))
-                    .unwrap_or(parent_inline.clone());
-
-                let ty = if field_attrs.flatten {
-                    quote! {
-                        #[allow(warnings)]
-                        {
-                            #ty
-                        }
-
-                        fn validate_flatten<T: #crate_ref::Flatten>() {}
-                        validate_flatten::<#field_ty>();
-
-                        let mut ty = <#field_ty as #crate_ref::Type>::inline(#crate_ref::DefOpts {
-                            parent_inline: #parent_inline,
-                            type_map: opts.type_map
-                        }, &generics)?;
-
-                        match &mut ty {
-                            #crate_ref::DataType::Enum(item) => {
-                                item.make_flattenable(IMPL_LOCATION)?;
-                            }
-                            #crate_ref::DataType::Named(#crate_ref::NamedDataType { item: #crate_ref::NamedDataTypeItem::Enum(item), .. }) => {
-                                item.make_flattenable(IMPL_LOCATION)?;
-                            }
-                            _ => {}
-                        }
-
-                        ty
-                    }
-                } else {
-                    quote! {
-                        #ty
-
-                        ty
-                    }
-                };
-
-                Ok(quote!(#crate_ref::internal::construct::struct_field(
-                    #field_name.into(),
-                    #optional,
-                    #flatten,
-                    {
-                        #ty
-                    }
-                )))
-            }).collect::<syn::Result<Vec<TokenStream>>>()?;
-
-            let tag = container_attrs
-                .tag
-                .as_ref()
-                .map(|t| quote!(Some(#t.into())))
-                .unwrap_or(quote!(None));
-
-            named_data_type_wrapper(
-                crate_ref,
-                container_attrs,
-                name,
-                quote! {
-                    #crate_ref::NamedDataTypeItem::Struct(#crate_ref::internal::construct::r#struct(vec![#(#definition_generics),*], vec![#(#fields),*], #tag))
-                },
-            )
+    let definition = if container_attrs.transparent {
+        if let Fields::Unit = data.fields {
+            return Err(syn::Error::new(
+                data.fields.span(),
+                "specta: unit structs cannot be transparent",
+            ));
+        } else if data.fields.len() != 1 {
+            return Err(syn::Error::new(
+                data.fields.span(),
+                "specta: transparent structs must have exactly one field",
+            ));
         }
-        Fields::Unnamed(fields) => {
-            let inner = match (fields.unnamed.len(), struct_attrs.transparent) {
-                (0, _) => {
-                    quote!(#crate_ref::NamedDataTypeItem::Tuple(#crate_ref::TupleType::Unnamed),)
-                }
-                (_, true) => {
-                    if data.fields.len() != 1 {
-                        return Err(syn::Error::new(
-                            data.fields.span(),
-                            "specta: transparent structs must have exactly one field",
-                        ));
+
+        let (field, field_attrs) = decode_field_attrs(
+            data.fields
+                .iter()
+                .next()
+                .expect("unreachable: we just checked this!"),
+        )?;
+
+        let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
+
+        let ty = construct_datatype(
+            format_ident!("ty"),
+            &field_ty,
+            &generic_idents,
+            crate_ref,
+            field_attrs.inline,
+        )?;
+
+        quote!({
+            #ty
+
+            ty
+        })
+    } else {
+        let fields = match &data.fields {
+            Fields::Named(_) => {
+                let fields = data.fields.iter().map(decode_field_attrs)
+                .collect::<syn::Result<Vec<_>>>()?
+                .iter()
+                .filter_map(|(field, field_attrs)| {
+    
+                    if field_attrs.skip {
+                        return None;
                     }
-
-                    let (field, field_attrs) = decode_field_attrs(
-                        data.fields
-                            .iter()
-                            .next()
-                            .expect("Unreachable: we just checked this!"),
-                    )?;
-
+    
+                    Some((field, field_attrs))
+                }).map(|(field, field_attrs)| {
                     let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
-
+    
                     let ty = construct_datatype(
                         format_ident!("ty"),
-                        &field_ty,
+                        field_ty,
                         &generic_idents,
                         crate_ref,
                         field_attrs.inline,
                     )?;
-
-                    quote! {
-                        #crate_ref::NamedDataTypeItem::Tuple(#crate_ref::TupleType::Named {
-                            generics: vec![#(#definition_generics),*],
-                            fields: vec![
-                                {
-                                    #ty
-
-                                    ty
-                                }
-                            ]
-                        }),
-                    }
-                }
-                (_, false) => {
-                    let fields = data
-                        .fields
-                        .iter()
-                        .map(decode_field_attrs)
-                        .collect::<syn::Result<Vec<_>>>()?
-                        .iter()
-                        .filter_map(|(field, field_attrs)| {
-                            if field_attrs.skip {
-                                return None;
+    
+                    let field_ident_str = unraw_raw_ident(field.ident.as_ref().unwrap());
+    
+                    let field_name = match (field_attrs.rename.clone(), container_attrs.rename_all) {
+                        (Some(name), _) => name,
+                        (_, Some(inflection)) => {
+                            let name = inflection.apply(&field_ident_str);
+                            quote::quote!(#name)
+                        },
+                        (_, _) => quote::quote!(#field_ident_str),
+                    };
+    
+                    let optional = field_attrs.optional;
+                    let flatten = field_attrs.flatten;
+    
+                    let parent_inline = container_attrs
+                        .inline
+                        .then(|| quote!(true))
+                        .unwrap_or(parent_inline.clone());
+    
+                    let ty = if field_attrs.flatten {
+                        quote! {
+                            #[allow(warnings)]
+                            {
+                                #ty
                             }
+    
+                            fn validate_flatten<T: #crate_ref::Flatten>() {}
+                            validate_flatten::<#field_ty>();
+    
+                            let mut ty = <#field_ty as #crate_ref::Type>::inline(#crate_ref::DefOpts {
+                                parent_inline: #parent_inline,
+                                type_map: opts.type_map
+                            }, &generics);
+    
+                            ty
+                        }
+                    } else {
+                        quote! {
+                            #ty
+    
+                            ty
+                        }
+                    };
+    
+                    Ok(quote!((#field_name.into(), #crate_ref::internal::construct::field(
+                        #optional,
+                        #flatten,
+                        {
+                            #ty
+                        }
+                    ))))
+                }).collect::<syn::Result<Vec<TokenStream>>>()?;
+    
+                let tag = container_attrs
+                    .tag
+                    .as_ref()
+                    .map(|t| quote!(Some(#t.into())))
+                    .unwrap_or(quote!(None));
+    
 
-                            Some((field, field_attrs))
-                        })
-                        .map(|(field, field_attrs)| {
-                            let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
+                quote!(#crate_ref::internal::construct::struct_named(vec![#(#fields),*], #tag))
+            }
+            Fields::Unnamed(_) => {
+                let fields = data
+                    .fields
+                    .iter()
+                    .map(decode_field_attrs)
+                    .collect::<syn::Result<Vec<_>>>()?
+                    .iter()
+                    .filter_map(|(field, field_attrs)| {
+                        if field_attrs.skip {
+                            return None;
+                        }
+    
+                        Some((field, field_attrs))
+                    })
+                    .map(|(field, field_attrs)| {
+                        let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
+    
+                        let generic_vars = construct_datatype(
+                            format_ident!("gen"),
+                            field_ty,
+                            &generic_idents,
+                            crate_ref,
+                            field_attrs.inline,
+                        )?;
+    
+                        let optional = field_attrs.optional;
+                        let flatten = field_attrs.flatten;
+                        Ok(quote!({
+                            #generic_vars
+    
+                            #crate_ref::internal::construct::field(#optional, #flatten, gen)
+                        }))
+                    })
+                    .collect::<syn::Result<Vec<TokenStream>>>()?;
+    
 
-                            let generic_vars = construct_datatype(
-                                format_ident!("gen"),
-                                field_ty,
-                                &generic_idents,
-                                crate_ref,
-                                field_attrs.inline,
-                            )?;
+                quote!(#crate_ref::internal::construct::struct_unnamed(vec![#(#fields),*]))
+            }
+            Fields::Unit => quote!(#crate_ref::internal::construct::struct_unit()),
+        };
 
-                            Ok(quote! {{
-                                #generic_vars
-
-                                gen
-                            }})
-                        })
-                        .collect::<syn::Result<Vec<TokenStream>>>()?;
-
-                    quote! {
-                        #crate_ref::NamedDataTypeItem::Tuple(
-                            #crate_ref::TupleType::Named {
-                                generics: vec![#(#definition_generics),*],
-                                fields: vec![#(#fields),*],
-                            }
-                        )
-                    }
-                }
-            };
-
-            named_data_type_wrapper(crate_ref, container_attrs, name, inner)
-        }
-        Fields::Unit => named_data_type_wrapper(
-            crate_ref,
-            container_attrs,
-            name,
-            quote! {
-                #crate_ref::NamedDataTypeItem::Tuple(#crate_ref::TupleType::Named {
-                    generics:  vec![],
-                    fields: vec![],
-                })
-            },
-        ),
+        quote!(#crate_ref::DataType::Struct(#crate_ref::internal::construct::r#struct(#name.into(), vec![#(#definition_generics),*], #fields)))
     };
+
+ 
 
     let category = if container_attrs.inline {
-        quote!(#crate_ref::TypeCategory::Inline({
+        quote!({
             let generics = &[#(#reference_generics),*];
-            <Self as #crate_ref::Type>::inline(opts, generics)?
-        }))
+            #crate_ref::reference::inline::<Self>(opts, generics)
+        })
     } else {
-        quote! {
-            #crate_ref::TypeCategory::Reference(#crate_ref::internal::construct::data_type_reference(
+        quote!({
+            let generics = vec![#(#reference_generics),*];
+            #crate_ref::reference::reference::<Self>(opts, &generics, #crate_ref::internal::construct::data_type_reference(
                 #name.into(),
                 SID,
-                vec![#(#reference_generics),*],
+                generics.clone() // TODO: This `clone` is cringe
             ))
-        }
+        })
     };
 
-    Ok((definition, category, true))
+    Ok((
+        definition,
+        category,
+        true,
+    ))
 }

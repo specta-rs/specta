@@ -29,6 +29,12 @@ struct Procedures4 {
 #[derive(DataTypeFrom)]
 struct Procedures5(Vec<Procedures2>);
 
+#[derive(DataTypeFrom)]
+struct Procedures7();
+
+#[derive(DataTypeFrom)]
+struct Procedures8 {}
+
 #[test]
 fn test_datatype() {
     let val: TupleType = Procedures1(vec![
@@ -134,5 +140,25 @@ fn test_datatype() {
             &Default::default()
         ),
         Ok("{ queries: \"A\" | \"B\" }".into())
+    );
+
+    let val: TupleType = Procedures7().into();
+    assert_eq!(
+        ts::datatype(
+            &Default::default(),
+            &val.clone().to_anonymous(),
+            &Default::default()
+        ),
+        Ok("null".into()) // This is equivalent of `()` Because this is a `TupleType` not an `EnumType`.
+    );
+
+    let val: StructType = Procedures8 {}.into();
+    assert_eq!(
+        ts::datatype(
+            &Default::default(),
+            &val.clone().to_anonymous(),
+            &Default::default()
+        ),
+        Ok("Record<string, never>".into())
     );
 }

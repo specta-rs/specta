@@ -52,6 +52,14 @@ pub enum EnumWithStructWithStructWithBigInt {
     A(StructWithStructWithBigInt),
 }
 
+#[derive(Type)]
+#[specta(export = false)]
+
+pub enum EnumWithInlineStructWithBigInt {
+    #[specta(inline)]
+    B { a: i128 },
+}
+
 #[test]
 fn test_bigint_types() {
     for_bigint_types!(T -> |name| assert_eq!(specta::ts::inline::<T>(&ExportConfig::default()), Err(TsExportError::BigIntForbidden(ExportPath::new_unsafe(name)))));
@@ -99,6 +107,12 @@ fn test_bigint_types() {
         specta::ts::inline::<EnumWithStructWithStructWithBigInt>(&ExportConfig::default()),
         Err(TsExportError::BigIntForbidden(ExportPath::new_unsafe(
             "EnumWithStructWithStructWithBigInt::A -> StructWithStructWithBigInt.abc -> StructWithBigInt.a -> i128"
+        )))
+    );
+    assert_eq!(
+        specta::ts::inline::<EnumWithInlineStructWithBigInt>(&ExportConfig::default()),
+        Err(TsExportError::BigIntForbidden(ExportPath::new_unsafe(
+            "EnumWithInlineStructWithBigInt::B.a -> i128"
         )))
     );
 }

@@ -55,7 +55,8 @@
 //! This results in a loss of information and lack of compatability with types from other crates.
 //!
 #![forbid(unsafe_code)]
-#![warn(clippy::all, clippy::unwrap_used, clippy::panic, missing_docs)]
+#![warn(clippy::all, clippy::unwrap_used, clippy::panic)] // TODO: missing_docs
+#![allow(clippy::module_inception)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[doc(hidden)]
@@ -73,6 +74,7 @@ pub mod export;
 pub mod functions;
 mod lang;
 mod selection;
+mod serde;
 mod static_types;
 /// Contains [`Type`] and everything related to it, including implementations and helper macros
 pub mod r#type;
@@ -82,6 +84,7 @@ pub use datatype::*;
 pub use lang::*;
 pub use r#type::*;
 pub use selection::*;
+pub use serde::*;
 pub use static_types::*;
 
 /// Implements [`Type`] for a given struct or enum.

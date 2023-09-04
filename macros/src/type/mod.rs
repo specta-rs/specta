@@ -38,26 +38,20 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         .clone()
         .unwrap_or_else(|| ident.to_token_stream());
 
-    let crate_name: TokenStream = container_attrs.crate_name.clone().unwrap_or(quote!(specta));
+    let crate_ref: TokenStream = container_attrs.crate_name.clone().unwrap_or(quote!(specta));
 
     let name = container_attrs.rename.clone().unwrap_or_else(|| {
         unraw_raw_ident(&format_ident!("{}", raw_ident.to_string())).to_token_stream()
     });
 
-    let (inlines, category, can_flatten) = match data {
-        Data::Struct(data) => parse_struct(
-            &name,
-            (&container_attrs, StructAttr::from_attrs(&mut attrs)?),
-            generics,
-            &crate_name,
-            data,
-        ),
+    let (inlines, reference, can_flatten) = match data {
+        Data::Struct(data) => parse_struct(&name, &container_attrs, generics, &crate_ref, data),
         Data::Enum(data) => parse_enum(
             &name,
             &EnumAttr::from_attrs(&container_attrs, &mut attrs)?,
             &container_attrs,
             generics,
-            &crate_name,
+            &crate_ref,
             data,
         ),
         Data::Union(data) => Err(syn::Error::new_spanned(
@@ -86,16 +80,16 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let bounds = generics_with_ident_and_bounds_only(generics);
     let type_args = generics_with_ident_only(generics);
-    let where_bound = add_type_to_where_clause(&quote!(#crate_name::Type), generics);
+    let where_bound = add_type_to_where_clause(&quote!(#crate_ref::Type), generics);
 
     let flatten_impl = can_flatten.then(|| {
         quote! {
             #[automatically_derived]
-            impl #bounds #crate_name::Flatten for #ident #type_args #where_bound {}
+            impl #bounds #crate_ref::Flatten for #ident #type_args #where_bound {}
         }
     });
 
-    let type_impl_heading = impl_heading(quote!(#crate_name::Type), &ident, generics);
+    let type_impl_heading = impl_heading(quote!(#crate_ref::Type), &ident, generics);
 
     let export = (cfg!(feature = "export") && container_attrs.export.unwrap_or(true)).then(|| {
         let export_fn_name = format_ident!("__push_specta_type_{}", raw_ident);
@@ -108,59 +102,13 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
         quote! {
             #[allow(non_snake_case)]
-            #[#crate_name::internal::ctor::ctor]
+            #[#crate_ref::internal::ctor::ctor]
             fn #export_fn_name() {
-                #crate_name::export::register_ty::<#ident<#(#generic_params),*>>();
+                #crate_ref::export::register_ty::<#ident<#(#generic_params),*>>();
             }
         }
     });
 
-    Ok(quote! {
-        const _: () = {
-        	// We do this so `sid!()` is only called once, preventing the type ended up with multiple ids
-        	const SID: #crate_name::SpectaID = #crate_name::sid!(@with_specta_path; #name; #crate_name);
-	        const IMPL_LOCATION: #crate_name::ImplLocation = #crate_name::impl_location!(@with_specta_path; #crate_name);
-
-            // We do this so `sid!()` is only called once, preventing the type ended up with multiple ids
-            #[automatically_derived]
-            #type_impl_heading {
-                fn inline(opts: #crate_name::DefOpts, generics: &[#crate_name::DataType]) -> std::result::Result<#crate_name::DataType, #crate_name::ExportError> {
-                    Ok(#crate_name::DataType::Named(<Self as #crate_name::NamedType>::named_data_type(opts, generics)?))
-                }
-
-                fn category_impl(opts: #crate_name::DefOpts, generics: &[#crate_name::DataType]) -> std::result::Result<#crate_name::TypeCategory, #crate_name::ExportError> {
-                    Ok(#category)
-                }
-
-                fn definition_generics() -> Vec<#crate_name::GenericType> {
-                    vec![#(#definition_generics),*]
-                }
-            }
-
-            #[automatically_derived]
-            impl #bounds #crate_name::NamedType for #ident #type_args #where_bound {
-	            const SID: #crate_name::SpectaID = SID;
-	            const IMPL_LOCATION: #crate_name::ImplLocation = IMPL_LOCATION;
-
-                fn named_data_type(opts: #crate_name::DefOpts, generics: &[#crate_name::DataType]) ->  std::result::Result<#crate_name::NamedDataType, #crate_name::ExportError> {
-                    Ok(#inlines)
-                }
-            }
-
-            #flatten_impl
-
-            #export
-        };
-
-    }.into())
-}
-
-pub fn named_data_type_wrapper(
-    crate_ref: &TokenStream,
-    container_attrs: &ContainerAttr,
-    name: &TokenStream,
-    t: TokenStream,
-) -> TokenStream {
     let comments = {
         let comments = &container_attrs.doc;
         quote!(vec![#(#comments.into()),*])
@@ -174,15 +122,49 @@ pub fn named_data_type_wrapper(
         None => quote!(None),
     };
 
-    quote! {
-        #crate_ref::internal::construct::named_data_type(
-            #name.into(),
-            #comments,
-            #deprecated,
-            SID,
-            IMPL_LOCATION,
-            #should_export,
-            #t
-        )
-    }
+    Ok(quote! {
+        const _: () = {
+        	// We do this so `sid!()` is only called once, as it does a hashing operation.
+        	const SID: #crate_ref::SpectaID = #crate_ref::sid!(@with_specta_path; #name; #crate_ref);
+	        const IMPL_LOCATION: #crate_ref::ImplLocation = #crate_ref::impl_location!(@with_specta_path; #crate_ref);
+
+            #[automatically_derived]
+            #type_impl_heading {
+                fn inline(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::DataType {
+                    #inlines
+                }
+
+                fn definition_generics() -> Vec<#crate_ref::GenericType> {
+                    vec![#(#definition_generics),*]
+                }
+
+                fn reference(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::reference::Reference {
+                    #reference
+                }
+            }
+
+            #[automatically_derived]
+            impl #bounds #crate_ref::NamedType for #ident #type_args #where_bound {
+	            const SID: #crate_ref::SpectaID = SID;
+	            const IMPL_LOCATION: #crate_ref::ImplLocation = IMPL_LOCATION;
+
+                fn named_data_type(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::NamedDataType {
+                    #crate_ref::internal::construct::named_data_type(
+                        #name.into(),
+                        #comments,
+                        #deprecated,
+                        SID,
+                        IMPL_LOCATION,
+                        #should_export,
+                        <Self as #crate_ref::Type>::inline(opts, generics)
+                    )
+                }
+            }
+
+            #flatten_impl
+
+            #export
+        };
+
+    }.into())
 }

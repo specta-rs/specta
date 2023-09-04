@@ -12,35 +12,74 @@ pub use specta_macros::fn_datatype;
 
 /// Functions used to construct `crate::datatype` types (they have private fields so can't be constructed directly).
 /// We intentionally keep their fields private so we can modify them without a major version bump.
+/// As this module is `#[doc(hidden)]` we allowed to make breaking changes within a minor version as it's only used by the macros.
 pub mod construct {
     use std::borrow::Cow;
 
     use crate::{datatype::*, ImplLocation, SpectaID};
 
-    pub const fn r#struct(
-        generics: Vec<GenericType>,
-        fields: Vec<StructField>,
-        tag: Option<Cow<'static, str>>,
-    ) -> StructType {
-        StructType {
-            generics,
-            fields,
-            tag,
-        }
-    }
-
-    pub const fn struct_field(
-        key: Cow<'static, str>,
-        optional: bool,
-        flatten: bool,
-        ty: DataType,
-    ) -> StructField {
-        StructField {
-            key,
+    pub const fn field(optional: bool, flatten: bool, ty: DataType) -> Field {
+        Field {
             optional,
             flatten,
             ty,
         }
+    }
+
+    pub const fn r#struct(
+        name: Cow<'static, str>,
+        generics: Vec<GenericType>,
+        fields: StructFields,
+    ) -> StructType {
+        StructType {
+            name,
+            generics,
+            fields,
+        }
+    }
+
+    pub const fn struct_unit() -> StructFields {
+        StructFields::Unit
+    }
+
+    pub const fn struct_unnamed(fields: Vec<Field>) -> StructFields {
+        StructFields::Unnamed(UnnamedFields { fields })
+    }
+
+    pub const fn struct_named(
+        fields: Vec<(Cow<'static, str>, Field)>,
+        tag: Option<Cow<'static, str>>,
+    ) -> StructFields {
+        StructFields::Named(NamedFields { fields, tag })
+    }
+
+    pub const fn r#enum(
+        name: Cow<'static, str>,
+        repr: EnumRepr,
+        generics: Vec<GenericType>,
+        variants: Vec<(Cow<'static, str>, EnumVariant)>,
+    ) -> EnumType {
+        EnumType {
+            name,
+            repr,
+            generics,
+            variants,
+        }
+    }
+
+    pub const fn enum_variant_unit() -> EnumVariant {
+        EnumVariant::Unit
+    }
+
+    pub const fn enum_variant_unnamed(fields: Vec<Field>) -> EnumVariant {
+        EnumVariant::Unnamed(UnnamedFields { fields })
+    }
+
+    pub const fn enum_variant_named(
+        fields: Vec<(Cow<'static, str>, Field)>,
+        tag: Option<Cow<'static, str>>,
+    ) -> EnumVariant {
+        EnumVariant::Named(NamedFields { fields, tag })
     }
 
     pub const fn named_data_type(
@@ -50,7 +89,7 @@ pub mod construct {
         sid: SpectaID,
         impl_location: ImplLocation,
         export: Option<bool>,
-        item: NamedDataTypeItem,
+        inner: DataType,
     ) -> NamedDataType {
         NamedDataType {
             name,
@@ -61,7 +100,7 @@ pub mod construct {
                 impl_location,
                 export,
             }),
-            item,
+            inner,
         }
     }
 
@@ -77,19 +116,7 @@ pub mod construct {
         }
     }
 
-    pub const fn untagged_enum(variants: Vec<EnumVariant>, generics: Vec<GenericType>) -> EnumType {
-        EnumType::Untagged(UntaggedEnum { variants, generics })
-    }
-
-    pub const fn tagged_enum(
-        variants: Vec<(Cow<'static, str>, EnumVariant)>,
-        generics: Vec<GenericType>,
-        repr: EnumRepr,
-    ) -> EnumType {
-        EnumType::Tagged(TaggedEnum {
-            variants,
-            generics,
-            repr,
-        })
+    pub const fn tuple(fields: Vec<DataType>) -> TupleType {
+        TupleType { fields }
     }
 }

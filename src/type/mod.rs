@@ -1,5 +1,3 @@
-use thiserror::Error;
-
 use crate::*;
 
 #[macro_use]
@@ -9,23 +7,7 @@ mod post_process;
 
 pub use post_process::*;
 
-/// The category a type falls under.
-/// Determines how references are generated for a given type.
-pub enum TypeCategory {
-    /// No references should be created, instead just copies the inline representation of the type.
-    Inline(DataType),
-    /// The type should be properly referenced and stored in the type map to be defined outside of
-    /// where it is referenced.
-    Reference(DataTypeReference),
-}
-
-/// Type exporting errors.
-#[derive(Error, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-#[non_exhaustive]
-pub enum ExportError {
-    #[error("Atemmpted to export type defined at '{}' but encountered error: {1}", .0.as_str())]
-    InvalidType(ImplLocation, &'static str),
-}
+use self::reference::Reference;
 
 /// Provides runtime type information that can be fed into a language exporter to generate a type definition in another language.
 /// Avoid implementing this trait yourself where possible and use the [`Type`](derive@crate::Type) macro instead.
@@ -35,7 +17,7 @@ pub trait Type {
     /// [`definition`](crate::Type::definition) and [`reference`](crate::Type::definition)
     ///
     /// Implemented internally or via the [`Type`](derive@crate::Type) macro
-    fn inline(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError>;
+    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType;
 
     /// Returns the type parameter generics of a given type.
     /// Will usually be empty except for custom types.
@@ -50,7 +32,7 @@ pub trait Type {
     /// as the value for the `generics` arg.
     ///
     /// Implemented internally
-    fn definition(opts: DefOpts) -> Result<DataType, ExportError> {
+    fn definition(opts: DefOpts) -> DataType {
         Self::inline(
             opts,
             &Self::definition_generics()
@@ -60,68 +42,26 @@ pub trait Type {
         )
     }
 
-    /// Defines which category this type falls into, determining how references to it are created.
-    /// See [`TypeCategory`] for more info.
-    ///
-    /// Implemented internally or via the [`Type`](derive@crate::Type) macro
-    fn category_impl(opts: DefOpts, generics: &[DataType]) -> Result<TypeCategory, ExportError> {
-        Self::inline(opts, generics).map(TypeCategory::Inline)
-    }
-
     /// Generates a datatype corresponding to a reference to this type,
     /// as determined by its category. Getting a reference to a type implies that
     /// it should belong in the type map (since it has to be referenced from somewhere),
     /// so the output of [`definition`](crate::Type::definition) will be put into the type map.
-    ///
-    /// Implemented internally
-    fn reference(opts: DefOpts, generics: &[DataType]) -> Result<DataType, ExportError> {
-        let category = Self::category_impl(
-            DefOpts {
-                parent_inline: opts.parent_inline,
-                type_map: opts.type_map,
-            },
-            generics,
-        )?;
-
-        Ok(match category {
-            TypeCategory::Inline(inline) => inline,
-            TypeCategory::Reference(def) => {
-                if opts.type_map.get(&def.sid()).is_none() {
-                    opts.type_map.entry(def.sid()).or_default();
-
-                    let definition = Self::definition(DefOpts {
-                        parent_inline: opts.parent_inline,
-                        type_map: opts.type_map,
-                    })?;
-
-                    // TODO: It would be nice if we removed the `TypeCategory` and used the `NamedType` trait or something so this unreachable isn't needed.
-                    let definition = match definition {
-                        DataType::Named(definition) => definition,
-                        _ => unreachable!(),
-                    };
-
-                    opts.type_map.insert(def.sid(), Some(definition));
-                }
-
-                DataType::Reference(def)
-            }
-        })
+    fn reference(opts: DefOpts, generics: &[DataType]) -> Reference {
+        reference::inline::<Self>(opts, generics)
     }
 }
 
 /// NamedType represents a type that can be converted into [NamedDataType].
-/// This will be all types created by the derive macro.
+/// This will be implemented for all types with the [Type] derive macro.
 pub trait NamedType: Type {
     const SID: SpectaID;
     const IMPL_LOCATION: ImplLocation;
 
     /// this is equivalent to [Type::inline] but returns a [NamedDataType] instead.
-    /// This is a compile-time guaranteed alternative to extracting the `DataType::Named` variant.
-    fn named_data_type(opts: DefOpts, generics: &[DataType]) -> Result<NamedDataType, ExportError>;
+    fn named_data_type(opts: DefOpts, generics: &[DataType]) -> NamedDataType;
 
     /// this is equivalent to [Type::definition] but returns a [NamedDataType] instead.
-    /// This is a compile-time guaranteed alternative to extracting the `DataType::Named` variant.
-    fn definition_named_data_type(opts: DefOpts) -> Result<NamedDataType, ExportError> {
+    fn definition_named_data_type(opts: DefOpts) -> NamedDataType {
         Self::named_data_type(
             opts,
             &Self::definition_generics()
@@ -129,6 +69,57 @@ pub trait NamedType: Type {
                 .map(Into::into)
                 .collect::<Vec<_>>(),
         )
+    }
+}
+
+/// Helpers for generating [Type::reference] implementations.
+pub mod reference {
+    use super::*;
+
+    /// A reference datatype.
+    ///
+    // This type exists to force the user to use [reference::inline] or [reference::reference] which provides some extra safety.
+    pub struct Reference {
+        pub inner: DataType,
+        pub(crate) _priv: (),
+    }
+
+    pub fn inline<T: Type + ?Sized>(opts: DefOpts, generics: &[DataType]) -> Reference {
+        Reference {
+            inner: T::inline(opts, generics),
+            _priv: (),
+        }
+    }
+
+    pub fn reference<T: NamedType>(
+        opts: DefOpts,
+        generics: &[DataType],
+        reference: DataTypeReference,
+    ) -> Reference {
+        if opts.type_map.get(&T::SID).is_none() {
+            // It's important we don't put `None` into the map here. By putting a *real* value we ensure that we don't stack overflow for recursive types when calling `named_data_type`.
+            opts.type_map.entry(T::SID).or_insert(Some(NamedDataType {
+                name: "placeholder".into(),
+                comments: vec![],
+                deprecated: None,
+                ext: None,
+                inner: DataType::Any,
+            }));
+
+            let dt = T::named_data_type(
+                DefOpts {
+                    parent_inline: true,
+                    type_map: opts.type_map,
+                },
+                generics,
+            );
+            opts.type_map.insert(T::SID, Some(dt));
+        }
+
+        Reference {
+            inner: DataType::Reference(reference),
+            _priv: (),
+        }
     }
 }
 
