@@ -1,6 +1,8 @@
 use thiserror::Error;
 
-use crate::{DataType, EnumRepr, EnumVariant, LiteralType, PrimitiveType, StructFields, TypeMap};
+use crate::{
+    DataType, EnumRepr, EnumType, EnumVariant, LiteralType, PrimitiveType, StructFields, TypeMap,
+};
 
 // TODO: The error should show a path to the type causing the issue like the BigInt error reporting.
 
@@ -8,6 +10,8 @@ use crate::{DataType, EnumRepr, EnumVariant, LiteralType, PrimitiveType, StructF
 pub enum SerdeError {
     #[error("A map key must be a 'string' or 'number' type")]
     InvalidMapKey,
+    #[error("#[specta(tag = \"...\")] cannot be used with tuple variants")]
+    InvalidInternallyTaggedEnum,
 }
 
 /// Check that a [DataType] is a valid for Serde.
@@ -34,6 +38,8 @@ pub(crate) fn is_valid_ty(dt: &DataType, type_map: &TypeMap) -> Result<(), Serde
             }
         },
         DataType::Enum(ty) => {
+            validate_enum(&ty, type_map)?;
+
             for (_variant_name, variant) in ty.variants().iter() {
                 match variant {
                     EnumVariant::Unit => {}
@@ -63,6 +69,15 @@ pub(crate) fn is_valid_ty(dt: &DataType, type_map: &TypeMap) -> Result<(), Serde
             for generic in &ty.generics {
                 is_valid_ty(&generic, type_map)?;
             }
+
+            let ty = type_map
+                .get(&ty.sid)
+                .as_ref()
+                .expect("Reference type not found")
+                .as_ref()
+                .expect("Type was never populated"); // TODO: Error properly
+
+            is_valid_ty(&ty.inner, type_map)?;
         }
         _ => {}
     }
@@ -138,4 +153,78 @@ fn is_valid_map_key(key_ty: &DataType, type_map: &TypeMap) -> Result<(), SerdeEr
         }
         _ => Err(SerdeError::InvalidMapKey),
     }
+}
+
+// Serde does not allow serializing a variant of certain types of enum's.
+fn validate_enum(e: &EnumType, type_map: &TypeMap) -> Result<(), SerdeError> {
+    match &e.repr {
+        // Only internally tagged enums can be invalid.
+        EnumRepr::Internal { .. } => validate_internally_tag_enum(e, type_map)?,
+        _ => {}
+    }
+
+    Ok(())
+}
+
+// Checks for specially internally tagged enums.
+fn validate_internally_tag_enum(e: &EnumType, type_map: &TypeMap) -> Result<(), SerdeError> {
+    for (_variant_name, variant) in &e.variants {
+        match variant {
+            EnumVariant::Unit => {}
+            EnumVariant::Named(_) => {}
+            EnumVariant::Unnamed(item) => {
+                let fields = item.fields();
+                if fields.len() > 1 {
+                    return Err(SerdeError::InvalidInternallyTaggedEnum);
+                }
+
+                validate_internally_tag_enum_datatype(&fields[0].ty, type_map)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// Internally tagged enums require map-type's (with a couple of exceptions like `null`)
+// Which makes sense when you can't represent `{ "type": "A" } & string` in a single JSON value.
+fn validate_internally_tag_enum_datatype(
+    ty: &DataType,
+    type_map: &TypeMap,
+) -> Result<(), SerdeError> {
+    match ty {
+        // `serde_json::Any` can be *technically* be either valid or invalid based on the actual data but we are being strict and reject it.
+        DataType::Any => return Err(SerdeError::InvalidInternallyTaggedEnum),
+        DataType::Map(_) => {}
+        // Structs's are always map-types unless they are transparent then it depends on inner type. However, transparent passes through when calling `Type::inline` so we don't need to specially check that case.
+        DataType::Struct(_) => {}
+        DataType::Enum(ty) => match ty.repr {
+            // Is only valid if the enum itself is also valid.
+            EnumRepr::Untagged => validate_internally_tag_enum(ty, type_map)?,
+            // Eg. `{ "Variant": "value" }` is a map-type so valid.
+            EnumRepr::External => {}
+            // Eg. `{ "type": "variant", "field": "value" }` is a map-type so valid.
+            EnumRepr::Internal { .. } => {}
+            // Eg. `{ "type": "variant", "c": {} }` is a map-type so valid.
+            EnumRepr::Adjacent { .. } => {}
+        },
+        // `()` is `null` and is valid
+        DataType::Tuple(ty) if ty.fields.len() == 0 => {}
+        // Are valid as they are serialized as an map-type. Eg. `"Ok": 5` or `"Error": "todo"`
+        DataType::Result(_) => {}
+        // References need to be checked against the same rules.
+        DataType::Reference(ty) => {
+            let ty = type_map
+                .get(&ty.sid)
+                .as_ref()
+                .expect("Reference type not found")
+                .as_ref()
+                .expect("Type was never populated"); // TODO: Error properly
+
+            validate_internally_tag_enum_datatype(&ty.inner, type_map)?;
+        }
+        _ => return Err(SerdeError::InvalidInternallyTaggedEnum),
+    }
+
+    Ok(())
 }

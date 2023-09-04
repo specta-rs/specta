@@ -1,8 +1,8 @@
 use std::{collections::HashMap, sync::Arc};
 
-use specta::{DefOpts, SerdeError, Type};
+use specta::Type;
 
-use crate::ts::{assert_ts, assert_ts_export};
+use crate::ts::assert_ts;
 
 #[derive(Type)]
 #[specta(export = false)]
@@ -113,12 +113,12 @@ pub enum K {
     D(#[specta(flatten)] A),
 }
 
-// #[derive(Serialize)]
-// #[serde(tag = "type")]
-// pub enum L {
-//     A,
-//     B(u32),
-// }
+#[derive(Type)]
+#[specta(export = false, tag = "type")]
+pub enum L {
+    A,
+    B(u32),
+}
 
 #[test]
 fn serde() {
@@ -133,12 +133,9 @@ fn serde() {
     assert_ts!(G, "({ a: string }) & ({ a: number })");
     assert_ts!(H, "{ A: string } | \"B\"");
 
-    // TODO: This stuff is WIP
-
     // TODO: First variant is wrong, Last one is `& A` not it's inlined representation
     // assert_ts!(I, "({ type: \"A\" } & string) | { type: \"B\" } | ({ type: \"C\" } & { a: string }) | ({ type: \"D\" } & A)");
     // assert_ts!(J, "");
     // assert_ts!(K, "");
-
     // assert_ts!(error; L, SerdeError::); // TODO: cannot serialize tagged newtype variant Demo::B containing an integer
 }
