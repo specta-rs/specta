@@ -99,7 +99,7 @@ thiserror = [
 ] # We use `thiserror` internally regardless but this feature makes changing that non-breaking.
 
 [dependencies]
-specta-macros = { version = "2.0.0-rc.1", path = "./macros" }
+specta-macros = { version = "2.0.0-rc.2", path = "./macros" }
 serde = { version = "1.0.183", optional = true, default-features = false, features = [
     "derive",
 ] }
