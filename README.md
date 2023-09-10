@@ -2,7 +2,7 @@
     <img height="150" src=".github/logo.png" alt="Specta Logo"></img>
     <h1>Specta</h1>
     <p><b>Easily export your Rust types to other languages</b></p>
-    <a href="https://discord.gg/4V9M5sksw8"><img src="https://img.shields.io/discord/1011665225809924136?style=flat-square" alt="Discord"></a>
+    <a href="https://discord.gg/JgqH8b4ycw"><img src="https://img.shields.io/discord/1011665225809924136?style=flat-square" alt="Discord"></a>
     <a href="https://crates.io/crates/specta"><img src="https://img.shields.io/crates/d/specta?style=flat-square" alt="Crates.io"></a>
     <a href="https://crates.io/crates/specta"><img src="https://img.shields.io/crates/v/specta.svg?style=flat-square"
     alt="crates.io" /></a>
