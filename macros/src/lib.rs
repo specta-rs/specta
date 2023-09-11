@@ -3,7 +3,11 @@
 //! This crate contains the macro which are reexported by the `specta` crate.
 //! You shouldn't need to use this crate directly.
 //! Checkout [Specta](https://docs.rs/specta).
-//!
+#![doc(
+    html_logo_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png",
+    html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
+)]
+
 #[macro_use]
 mod utils;
 mod data_type_from;
