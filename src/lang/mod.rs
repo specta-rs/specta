@@ -3,10 +3,18 @@
 // #[cfg_attr(docsrs, doc(cfg(feature = "openapi")))]
 // pub mod openapi;
 
+#[cfg(any(feature = "javascript", feature = "typescript"))]
+pub mod js_ts;
+
 /// [TypeScript](https://www.typescriptlang.org) language exporter.
 #[cfg(feature = "typescript")]
 #[cfg_attr(docsrs, doc(cfg(feature = "typescript")))]
 pub mod ts;
+
+/// [TypeScript](https://www.typescriptlang.org) language exporter.
+#[cfg(feature = "javascript")]
+#[cfg_attr(docsrs, doc(cfg(feature = "javascript")))]
+pub mod js;
 
 // /// [Rust](https://www.rust-lang.org) language exporter.
 // #[cfg(feature = "rust")]

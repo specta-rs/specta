@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt};
 
-use super::ExportConfig;
+use super::export_config::ExportConfig;
 
 #[derive(Clone, Debug)]
 pub(crate) enum PathItem {
@@ -11,7 +11,7 @@ pub(crate) enum PathItem {
 
 #[derive(Clone)]
 pub(crate) struct ExportContext<'a> {
-    pub(crate) conf: &'a ExportConfig,
+    pub(crate) cfg: &'a ExportConfig,
     pub(crate) path: Vec<PathItem>,
 }
 

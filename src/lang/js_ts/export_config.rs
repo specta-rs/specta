@@ -1,6 +1,6 @@
 use std::{borrow::Cow, io, path::PathBuf};
 
-use super::{comments, BigIntExportBehavior};
+use crate::lang::js_ts::{js_doc, BigIntExportBehavior};
 
 /// The signature for a function responsible for exporting Typescript comments.
 pub type CommentFormatterFn = fn(&[Cow<'static, str>]) -> String;
@@ -83,7 +83,7 @@ impl Default for ExportConfig {
     fn default() -> Self {
         Self {
             bigint: Default::default(),
-            comment_exporter: Some(comments::js_doc),
+            comment_exporter: Some(js_doc),
             formatter: None,
             #[cfg(feature = "export")]
             export_by_default: None,

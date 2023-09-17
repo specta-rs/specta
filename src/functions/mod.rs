@@ -205,4 +205,6 @@ macro_rules! collect_functions {
     }};
 }
 
+pub type CollectFunctionsResult = (Vec<FunctionDataType>, TypeMap);
+
 pub use crate::collect_functions;

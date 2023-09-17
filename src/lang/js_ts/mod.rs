@@ -1,6 +1,24 @@
+mod context;
+mod datatype;
+mod error;
+mod export_config;
+mod formatter;
+mod reserved_terms;
+
+pub use context::*;
+pub(crate) use datatype::*;
+pub use error::*;
+pub use export_config::*;
+pub use formatter::*;
+
 use std::borrow::Cow;
 
-use super::CommentFormatterFn;
+use self::reserved_terms::RESERVED_TYPE_NAMES;
+
+#[allow(missing_docs)]
+pub type Result<T> = std::result::Result<T, ExportError>;
+
+pub type Output = Result<String>;
 
 /// Allows you to configure how Specta's Typescript exporter will deal with BigInt types ([i64], [i128] etc).
 ///
@@ -28,6 +46,17 @@ pub enum BigIntExportBehavior {
     FailWithReason(&'static str),
 }
 
+// Assert that the function signature matches the expected type.
+const _: CommentFormatterFn = js_doc;
+
+pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: &str) -> Output {
+    if let Some(name) = RESERVED_TYPE_NAMES.iter().find(|v| **v == ident) {
+        return Err(ExportError::ForbiddenName(loc, ctx.export_path(), name));
+    }
+
+    Ok(ident.to_string())
+}
+
 /// Converts Typescript comments into JSDoc comments.
 pub fn js_doc(comments: &[Cow<'static, str>]) -> String {
     if comments.is_empty() {
@@ -42,6 +71,3 @@ pub fn js_doc(comments: &[Cow<'static, str>]) -> String {
     result.push_str(" */\n");
     result
 }
-
-// Assert that the function signature matches the expected type.
-const _: CommentFormatterFn = js_doc;

@@ -1,6 +1,7 @@
 use std::{
     borrow::{Borrow, Cow},
     collections::BTreeMap,
+    fmt::Display,
 };
 
 mod r#enum;
@@ -106,6 +107,12 @@ impl DataTypeReference {
 /// A `GenericType` holds the identifier of the generic. Eg. Given a generic type `struct A<T>(T);` the generics will be represented as `vec![GenericType("A".into())]`
 #[derive(Debug, Clone, PartialEq)]
 pub struct GenericType(pub(crate) Cow<'static, str>);
+
+impl Display for GenericType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
 
 impl Borrow<str> for GenericType {
     fn borrow(&self) -> &str {
