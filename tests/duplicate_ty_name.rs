@@ -1,5 +1,5 @@
 use specta::{
-    ts::{export, TsExportError},
+    ts::{export, ExportError},
     Type,
 };
 
@@ -37,13 +37,13 @@ fn test_duplicate_ty_name() {
     use specta::internal::construct::impl_location;
 
     #[cfg(not(target_os = "windows"))]
-    let err = Err(TsExportError::DuplicateTypeName(
+    let err = Err(ExportError::DuplicateTypeName(
         "One".into(),
         impl_location("tests/duplicate_ty_name.rs:19:14"),
         impl_location("tests/duplicate_ty_name.rs:9:14"),
     ));
     #[cfg(target_os = "windows")]
-    let err = Err(TsExportError::DuplicateTypeName(
+    let err = Err(ExportError::DuplicateTypeName(
         "One".into(),
         impl_location("tests\\duplicate_ty_name.rs:9:14"),
         impl_location("tests\\duplicate_ty_name.rs:19:14"),
