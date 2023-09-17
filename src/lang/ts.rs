@@ -110,20 +110,3 @@ fn export_datatype_inner(
         "{comments}export type {name}{generics} = {inline_ts}"
     ))
 }
-
-/// Convert a DataType to a TypeScript string
-///
-/// Eg. `{ demo: string; }`
-pub fn datatype(conf: &ExportConfig, typ: &DataType, type_map: &TypeMap) -> Output {
-    // TODO: Duplicate type name detection?
-
-    datatype_inner(
-        ExportContext {
-            cfg: conf,
-            path: vec![],
-        },
-        typ,
-        type_map,
-        "null",
-    )
-}
