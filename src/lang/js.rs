@@ -25,7 +25,7 @@ fn typedef_named_datatype_inner(
     let generics = item
         .generics()
         .filter(|generics| !generics.is_empty())
-        .map(|generics| format!("{}", generics.join(", ")).into());
+        .map(|generics| generics.join(", ").into());
 
     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
 
