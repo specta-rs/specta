@@ -49,7 +49,7 @@ tauri = ["dep:tauri"]
 
 #! Languages
 ## Support for [TypeScript](https://www.typescriptlang.org) language exporting
-typescript = ["serde"]
+typescript = ["serde"] # TODO: Probally don't keep `serde` here for v2???
 ## Support for [JSDoc](https://jsdoc.app) exporting helpers.
 ## Also requires `typescript` feature to be enabled.
 js_doc = ["typescript"]
