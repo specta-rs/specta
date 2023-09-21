@@ -27,7 +27,7 @@ fn format_comment_inner(
 
     let inline_ts = datatype_inner(ctx.clone(), &typ.inner, type_map, "null")?;
 
-    Ok(js_doc(
+    Ok(comments::js_doc(
         &comments
             .iter()
             .cloned()
