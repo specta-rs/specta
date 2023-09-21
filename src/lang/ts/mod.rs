@@ -146,12 +146,7 @@ pub fn datatype(conf: &ExportConfig, typ: &DataType, type_map: &TypeMap) -> Outp
     )
 }
 
-pub(crate) fn datatype_inner(
-    ctx: ExportContext,
-    typ: &DataType,
-    type_map: &TypeMap,
-    empty_tuple_fallback: &'static str,
-) -> Output {
+pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &TypeMap) -> Output {
     Ok(match &typ {
         DataType::Any => ANY.into(),
         DataType::Primitive(p) => {
@@ -225,14 +220,7 @@ pub(crate) fn datatype_inner(
             generics => {
                 let generics = generics
                     .iter()
-                    .map(|v| {
-                        datatype_inner(
-                            ctx.with(PathItem::Type(name.clone())),
-                            v,
-                            type_map,
-                            empty_tuple_fallback,
-                        )
-                    })
+                    .map(|v| datatype_inner(ctx.with(PathItem::Type(name.clone())), v, type_map))
                     .collect::<Result<Vec<_>>>()?
                     .join(", ");
 
