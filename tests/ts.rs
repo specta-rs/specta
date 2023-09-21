@@ -11,7 +11,7 @@ use std::{
 
 use serde::Serialize;
 use specta::{
-    ts::{BigIntExportBehavior, ExportConfig},
+    ts::{BigIntExportBehavior, ExportConfig, ExportError, ExportPath, NamedLocation},
     Any, Type,
 };
 
@@ -260,6 +260,23 @@ fn typescript_types() {
     // https://github.com/oscartbeaumont/specta/issues/148
     assert_ts!(ExtraBracketsInTupleVariant, "{ A: string }");
     assert_ts!(ExtraBracketsInUnnamedStruct, "string");
+
+    // https://github.com/oscartbeaumont/specta/issues/90
+    assert_ts!(RenameWithWeirdCharsField, r#"{ "@odata.context": string }"#);
+    assert_ts!(
+        RenameWithWeirdCharsVariant,
+        r#"{ "@odata.context": string }"#
+    );
+    assert_ts_export!(
+        error;
+        RenameWithWeirdCharsStruct,
+        ExportError::InvalidName(NamedLocation::Type, ExportPath::new_unsafe("@odata.context"), r#"@odata.context"#.to_string())
+    );
+    assert_ts_export!(
+        error;
+        RenameWithWeirdCharsEnum,
+        ExportError::InvalidName(NamedLocation::Type, ExportPath::new_unsafe("@odata.context"), r#"@odata.context"#.to_string())
+    );
 
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");
@@ -523,14 +540,19 @@ pub enum BasicEnum {
 }
 
 #[derive(Type)]
-#[serde(tag = "type", content = "value", rename_all = "camelCase")]
+#[serde(
+    export = false,
+    tag = "type",
+    content = "value",
+    rename_all = "camelCase"
+)]
 pub enum NestedEnum {
     A(String),
     B(i32),
 }
 
 #[derive(Type)]
-#[serde(rename_all = "camelCase")]
+#[serde(export = false, rename_all = "camelCase")]
 pub struct FlattenOnNestedEnum {
     id: String,
     #[serde(flatten)]
@@ -551,6 +573,7 @@ pub(super) struct MyEmptyInput {}
 
 #[derive(Type)]
 #[specta(export = false)]
+#[allow(unused_parens)]
 pub enum ExtraBracketsInTupleVariant {
     A((String)),
 }
@@ -559,6 +582,30 @@ pub enum ExtraBracketsInTupleVariant {
 #[specta(export = false)]
 #[allow(unused_parens)]
 pub struct ExtraBracketsInUnnamedStruct((String));
+
+#[derive(Type)]
+#[specta(export = false)]
+#[allow(unused_parens)]
+pub struct RenameWithWeirdCharsField {
+    #[specta(rename = "@odata.context")]
+    odata_context: String,
+}
+
+#[derive(Type)]
+#[specta(export = false)]
+#[allow(unused_parens)]
+pub enum RenameWithWeirdCharsVariant {
+    #[specta(rename = "@odata.context")]
+    A(String),
+}
+
+#[derive(Type)]
+#[specta(export = false, rename = "@odata.context")]
+pub struct RenameWithWeirdCharsStruct(String);
+
+#[derive(Type)]
+#[specta(export = false, rename = "@odata.context")]
+pub enum RenameWithWeirdCharsEnum {}
 
 // #[derive(Type)]
 // #[specta(export = false)]

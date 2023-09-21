@@ -25,9 +25,7 @@ impl_parse! {
         "rename_all" => out.rename_all = out.rename_all.take().or(Some(attr.parse_inflection()?)),
         "rename" => {
             let attr = attr.parse_string()?;
-            out.rename = out.rename.take().or_else(|| Some(
-                crate::r#type::unraw_raw_ident(&quote::format_ident!("{}", attr)).to_token_stream()
-            ))
+            out.rename = out.rename.take().or_else(|| Some(attr.to_token_stream()))
         },
         "rename_from_path" => {
             let attr = attr.parse_path()?;

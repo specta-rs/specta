@@ -1,7 +1,7 @@
 use super::{attr::*, generics::construct_datatype, r#struct::decode_field_attrs};
 use crate::utils::*;
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::{format_ident, quote, ToTokens};
 use syn::{spanned::Spanned, DataEnum, Fields, GenericParam, Generics};
 
 pub fn parse_enum(
@@ -85,8 +85,8 @@ pub fn parse_enum(
 
                 let variant_name_str = match (attrs.rename, container_attrs.rename_all) {
                     (Some(name), _) => name,
-                    (_, Some(inflection)) => inflection.apply(&variant_ident_str),
-                    (_, _) => variant_ident_str,
+                    (_, Some(inflection)) => inflection.apply(&variant_ident_str).to_token_stream(),
+                    (_, _) => variant_ident_str.to_token_stream(),
                 };
 
                 let generic_idents = generic_idents.clone().collect::<Vec<_>>();

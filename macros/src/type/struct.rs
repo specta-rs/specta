@@ -1,6 +1,6 @@
 use crate::utils::{parse_attrs, unraw_raw_ident};
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::{format_ident, quote, ToTokens};
 use syn::{spanned::Spanned, DataStruct, Field, Fields, GenericParam, Generics};
 
 use super::{attr::*, generics::construct_datatype};
@@ -129,11 +129,8 @@ pub fn parse_struct(
     
                     let field_name = match (field_attrs.rename.clone(), container_attrs.rename_all) {
                         (Some(name), _) => name,
-                        (_, Some(inflection)) => {
-                            let name = inflection.apply(&field_ident_str);
-                            quote::quote!(#name)
-                        },
-                        (_, _) => quote::quote!(#field_ident_str),
+                        (_, Some(inflection)) => inflection.apply(&field_ident_str).to_token_stream(),
+                        (_, _) => field_ident_str.to_token_stream(),
                     };
     
                     let optional = field_attrs.optional;

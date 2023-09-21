@@ -18,10 +18,9 @@ impl_parse! {
     FieldAttr(attr, out) {
         "rename" => {
             let attr = attr.parse_string()?;
-            out.rename = out.rename.take().or_else(|| Some({
-                let name = crate::r#type::unraw_raw_ident(&quote::format_ident!("{}", attr));
-                quote::quote!( #name )
-            }))
+            out.rename = out.rename.take().or_else(|| Some(
+                attr.to_token_stream()
+            ))
         },
         "rename_from_path" => {
             let attr = attr.parse_path()?;

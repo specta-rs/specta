@@ -37,6 +37,8 @@ pub enum ExportError {
     // UnableToTagUnnamedType(ExportPath),
     #[error("Attempted to export '{1}' but was unable to due to {0} name '{2}' conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`")]
     ForbiddenName(NamedLocation, ExportPath, &'static str),
+    #[error("Attempted to export '{1}' but was unable to due to {0} name '{2}' containing an invalid character")]
+    InvalidName(NamedLocation, ExportPath, String),
     #[error("Attempted to export '{0}' with tagging but the type is not tagged.")]
     InvalidTagging(ExportPath),
     #[error("Unable to export type named '{0}' from locations '{:?}' '{:?}'", .1.as_str(), .2.as_str())]
@@ -55,6 +57,9 @@ impl PartialEq for ExportError {
             (Self::Serde(l0), Self::Serde(r0)) => l0 == r0,
             // (Self::UnableToTagUnnamedType(l0), Self::UnableToTagUnnamedType(r0)) => l0 == r0,
             (Self::ForbiddenName(l0, l1, l2), Self::ForbiddenName(r0, r1, r2)) => {
+                l0 == r0 && l1 == r1 && l2 == r2
+            }
+            (Self::InvalidName(l0, l1, l2), Self::InvalidName(r0, r1, r2)) => {
                 l0 == r0 && l1 == r1 && l2 == r2
             }
             (Self::InvalidTagging(l0), Self::InvalidTagging(r0)) => l0 == r0,

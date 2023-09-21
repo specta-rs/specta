@@ -522,6 +522,27 @@ pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: 
         return Err(ExportError::ForbiddenName(loc, ctx.export_path(), name));
     }
 
+    if let Some(first_char) = ident.chars().nth(0) {
+        if !first_char.is_alphabetic() && first_char != '_' {
+            return Err(ExportError::InvalidName(
+                loc,
+                ctx.export_path(),
+                ident.to_string(),
+            ));
+        }
+    }
+
+    if ident
+        .find(|c: char| !c.is_alphanumeric() && c != '_')
+        .is_some()
+    {
+        return Err(ExportError::InvalidName(
+            loc,
+            ctx.export_path(),
+            ident.to_string(),
+        ));
+    }
+
     Ok(ident.to_string())
 }
 
