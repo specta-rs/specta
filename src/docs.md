@@ -39,7 +39,8 @@ fn main() {
 If you are using [Prisma Client Rust](https://prisma.brendonovich.dev) you can enable the `rspc` feature on it to allow for Specta support on types coming directly from your database. This includes support for the types created via a selection.
 
 ## Feature flags
-[//]: # (FEATURE_FLAGS_START)Internal Features
+[//]: # (FEATURE_FLAGS_START)
+Internal Features
 
 - `functions` - Support for exporting the types of Rust functions.
 - `export` - Support for collecting up a global type map

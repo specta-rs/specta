@@ -26,6 +26,7 @@ harness = true
 name = "export"
 required-features = ["export", "typescript"]
 
+# Run `node ./.github/features.js` to update the docs
 [features]
 default = []
 

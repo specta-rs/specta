@@ -75,7 +75,7 @@ const resultDocs = docs.replace(
     docs.indexOf(START_MARKER),
     docs.lastIndexOf(END_MARKER) + END_MARKER.length
   ),
-  START_MARKER + markdown_result + "\n\n" + END_MARKER
+  START_MARKER + "\n" + markdown_result + "\n\n" + END_MARKER
 );
 
 fs.writeFileSync(docsPath, resultDocs);
