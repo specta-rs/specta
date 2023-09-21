@@ -8,9 +8,11 @@
 #[cfg_attr(docsrs, doc(cfg(feature = "typescript")))]
 pub mod ts;
 
-/// [JSDoc](https://jsdoc.app) language exporter.
-#[cfg(feature = "javascript")]
-#[cfg_attr(docsrs, doc(cfg(feature = "javascript")))]
+/// [JSDoc](https://jsdoc.app) helpers.
+///
+/// Also requires `typescript` feature to be enabled.
+#[cfg(all(feature = "js_doc", feature = "typescript"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "js_doc", feature = "typescript"))))]
 pub mod js_doc;
 
 // /// [Rust](https://www.rust-lang.org) language exporter.

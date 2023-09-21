@@ -50,7 +50,9 @@ tauri = ["dep:tauri"]
 #! Languages
 ## Support for [TypeScript](https://www.typescriptlang.org) language exporting
 typescript = []
-javascript = ["typescript"]
+## Support for [JSDoc](https://jsdoc.app) exporting helpers.
+## Also requires `typescript` feature to be enabled.
+js_doc = ["typescript"]
 # ## Support for [Rust](https://www.rust-lang.org) language exporting
 # rust = []
 # ## Support for [Swift](https://www.swift.org/) language exporting
@@ -96,7 +98,8 @@ url = ["dep:url"]
 ## [either](https://docs.rs/either) crate
 either = ["dep:either"]
 ## [thiserror](https://docs.rs/thiserror) crate
-thiserror = [] # We use `thiserror` internally regardless but this feature makes changing that non-breaking.
+thiserror = [
+] # We use `thiserror` internally regardless but this feature makes changing that non-breaking.
 
 [dependencies]
 specta-macros = { version = "2.0.0-rc.2", path = "./macros" }
