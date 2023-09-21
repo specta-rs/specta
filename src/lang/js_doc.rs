@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::*;
 
 pub use super::ts::*;
@@ -18,20 +20,26 @@ fn format_comment_inner(
 ) -> Output {
     let ctx = ctx.with(PathItem::Type(name.clone()));
 
-    let generics = item
-        .generics()
-        .filter(|generics| !generics.is_empty())
-        .map(|generics| generics.join(", ").into());
-
     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
 
     let inline_ts = datatype_inner(ctx.clone(), &typ.inner, type_map)?;
+
+    // TODO: Export deprecated
 
     Ok(comments::js_doc(
         &comments
             .iter()
             .cloned()
-            .chain(generics)
+            .chain(
+                item.generics()
+                    .map(|generics| {
+                        generics
+                            .iter()
+                            .map(|generic| Cow::Owned(format!("@template {}", generic)))
+                            .collect::<Vec<_>>() // TODO: We should be able to avoid this alloc with some work
+                    })
+                    .unwrap_or_default(),
+            )
             .chain([format!(r#"@typedef {{ {inline_ts} }} {name}"#).into()])
             .collect::<Vec<_>>(),
     ))
