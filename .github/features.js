@@ -33,14 +33,17 @@ const endIndex = featuresPart.findIndex(
 const featuresLine = featuresPart.slice(0, endIndex);
 
 let comments = "";
-let group = "";
+let group = null;
 let result = {};
 for (const line of featuresLine) {
   if (line == "") {
     continue;
   }
 
-  if (line.startsWith("##")) {
+  if (line.startsWith("##!")) {
+    group = "";
+    result[group] = {};
+  } else if (line.startsWith("##")) {
     comments += line.slice(2).trim() + "\n";
   } else if (line.startsWith("#!")) {
     group = line.substring(2).trim();
@@ -51,7 +54,7 @@ for (const line of featuresLine) {
     const parts = line.split("=");
     if (parts.length !== 2) throw new Error(`Invalid feature line: '${line}'`);
 
-    if (group !== "") {
+    if (group !== null) {
       result[group][parts[0].trim()] = comments;
       comments = "";
     }

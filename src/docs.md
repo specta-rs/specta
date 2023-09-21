@@ -40,7 +40,7 @@ If you are using [Prisma Client Rust](https://prisma.brendonovich.dev) you can e
 
 ## Feature flags
 [//]: # (FEATURE_FLAGS_START)
-Internal Features
+
 
 - `functions` - Support for exporting the types of Rust functions.
 - `export` - Support for collecting up a global type map

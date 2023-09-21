@@ -30,7 +30,7 @@ required-features = ["export", "typescript"]
 [features]
 default = []
 
-#! Internal Features
+##! Internal Features
 ## Support for exporting the types of Rust functions.
 functions = ["serde", "specta-macros/functions"]
 ## Support for collecting up a global type map
