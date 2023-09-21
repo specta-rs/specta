@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt};
 
-use super::export_config::ExportConfig;
+use super::ExportConfig;
 
 #[derive(Clone, Debug)]
 pub(crate) enum PathItem {

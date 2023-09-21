@@ -1,16 +1,12 @@
 use crate::*;
 
-pub use super::js_ts::*;
+pub use super::ts::*;
 
-pub fn typedef_named_datatype(
-    cfg: &ExportConfig,
-    typ: &NamedDataType,
-    type_map: &TypeMap,
-) -> Output {
-    typedef_named_datatype_inner(&ExportContext { cfg, path: vec![] }, typ, type_map)
+pub fn format_comment(cfg: &ExportConfig, typ: &NamedDataType, type_map: &TypeMap) -> Output {
+    format_comment_inner(&ExportContext { cfg, path: vec![] }, typ, type_map)
 }
 
-fn typedef_named_datatype_inner(
+fn format_comment_inner(
     ctx: &ExportContext,
     typ @ NamedDataType {
         name,

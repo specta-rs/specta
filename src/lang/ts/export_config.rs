@@ -1,6 +1,6 @@
 use std::{borrow::Cow, io, path::PathBuf};
 
-use crate::lang::js_ts::{js_doc, BigIntExportBehavior};
+use crate::lang::ts::{js_doc, BigIntExportBehavior};
 
 /// The signature for a function responsible for exporting Typescript comments.
 pub type CommentFormatterFn = fn(&[Cow<'static, str>]) -> String;
