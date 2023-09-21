@@ -29,23 +29,11 @@ required-features = ["export", "typescript"]
 [features]
 default = []
 
-##! Internal Features
+#! Internal Features
 ## Support for exporting the types of Rust functions.
 functions = ["serde", "specta-macros/functions"]
+## Support for collecting up a global type map
 export = ["dep:ctor", "specta-macros/export"]
-
-#! Compatability
-## Support for [serde](https://serde.rs)
-serde = ["dep:serde", "specta-macros/serde"]
-## Support for [serde-json](https://github.com/serde-rs/json)
-serde_json = ["dep:serde_json"]
-## Support for [serde_yaml](https://github.com/dtolnay/serde-yaml)
-serde_yaml = ["dep:serde_yaml"]
-## Support for [toml](https://github.com/toml-rs/toml)
-toml = ["dep:toml"]
-
-## Support for [Tauri](https://tauri.app). This is required when using [`specta::function`](macro@crate::specta) with Tauri Commands.
-tauri = ["dep:tauri"]
 
 #! Languages
 ## Support for [TypeScript](https://www.typescriptlang.org) language exporting
@@ -63,6 +51,19 @@ js_doc = []
 # go = []
 # ## Support for [OpenAPI](https://www.openapis.org) language exporting
 # openapi = ["dep:openapiv3"]
+
+#! Compatability
+## Support for [serde](https://serde.rs)
+serde = ["dep:serde", "specta-macros/serde"]
+## Support for [serde-json](https://github.com/serde-rs/json)
+serde_json = ["dep:serde_json"]
+## Support for [serde_yaml](https://github.com/dtolnay/serde-yaml)
+serde_yaml = ["dep:serde_yaml"]
+## Support for [toml](https://github.com/toml-rs/toml)
+toml = ["dep:toml"]
+
+## Support for [Tauri](https://tauri.app). This is required when using [`specta::function`](macro@crate::specta) with Tauri Commands.
+tauri = ["dep:tauri"]
 
 #! External types
 ## [uuid](https://docs.rs/uuid) crate

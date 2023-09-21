@@ -39,7 +39,43 @@ fn main() {
 If you are using [Prisma Client Rust](https://prisma.brendonovich.dev) you can enable the `rspc` feature on it to allow for Specta support on types coming directly from your database. This includes support for the types created via a selection.
 
 ## Feature flags
-[//]: # (FEATURE_FLAGS_START)
+[//]: # (FEATURE_FLAGS_START)Internal Features
+
+- `functions` - Support for exporting the types of Rust functions.
+- `export` - Support for collecting up a global type map
+
+Languages
+
+- `typescript` - Support for [TypeScript](https://www.typescriptlang.org) language exporting
+- `js_doc` - Support for [JSDoc](https://jsdoc.app) exporting helpers. Also requires `typescript` feature to be enabled.
+
+Compatability
+
+- `serde` - Support for [serde](https://serde.rs)
+- `serde_json` - Support for [serde-json](https://github.com/serde-rs/json)
+- `serde_yaml` - Support for [serde_yaml](https://github.com/dtolnay/serde-yaml)
+- `toml` - Support for [toml](https://github.com/toml-rs/toml)
+- `tauri` - Support for [Tauri](https://tauri.app). This is required when using [`specta::function`](macro@crate::specta) with Tauri Commands.
+
+External types
+
+- `uuid` - [uuid](https://docs.rs/uuid) crate
+- `chrono` - [chrono](https://docs.rs/chrono) crate
+- `time` - [time](https://docs.rs/time) crate
+- `bigdecimal` - [bigdecimal](https://docs.rs/bigdecimal) crate
+- `rust_decimal` - [rust_decimal](https://docs.rs/rust_decimal) crate
+- `indexmap` - [indexmap](https://docs.rs/indexmap) crate
+- `ipnetwork` - [ipnetwork](https://docs.rs/ipnetwork) crate
+- `mac_address` - [mac_address](https://docs.rs/mac_address) crate
+- `bit-vec` - [bit-vec](https://docs.rs/bit-vec) crate
+- `bson` - [bson](https://docs.rs/bson) crate
+- `uhlc` - [uhlc](https://docs.rs/uhlc) crate
+- `bytesize` - [bytesize](https://docs.rs/bytesize) crate
+- `glam` - [glam](https://docs.rs/glam) crate
+- `tokio` - [tokio](https://docs.rs/tokio) crate
+- `url` - [url](https://docs.rs/url) crate
+- `either` - [either](https://docs.rs/either) crate
+
 [//]: # (FEATURE_FLAGS_END)
 ## Alternatives
 
