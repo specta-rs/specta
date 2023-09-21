@@ -25,7 +25,7 @@ fn format_comment_inner(
 
     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
 
-    let inline_ts = datatype_inner(ctx.clone(), &typ.inner, type_map, "null")?;
+    let inline_ts = datatype_inner(ctx.clone(), &typ.inner, type_map)?;
 
     Ok(comments::js_doc(
         &comments

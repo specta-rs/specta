@@ -122,7 +122,7 @@ fn export_datatype_inner(
         .map(|generics| format!("<{}>", generics.join(", ")))
         .unwrap_or_default();
 
-    let inline_ts = datatype_inner(ctx.clone(), &typ.inner, type_map, "null")?;
+    let inline_ts = datatype_inner(ctx.clone(), &typ.inner, type_map)?;
 
     Ok(format!(
         "{comments}export type {name}{generics} = {inline_ts}"
@@ -142,7 +142,6 @@ pub fn datatype(conf: &ExportConfig, typ: &DataType, type_map: &TypeMap) -> Outp
         },
         typ,
         type_map,
-        "null",
     )
 }
 
@@ -170,7 +169,7 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
         }
         DataType::Literal(literal) => literal.to_ts(),
         DataType::Nullable(def) => {
-            let dt = datatype_inner(ctx, def, type_map, NULL)?;
+            let dt = datatype_inner(ctx, def, type_map)?;
 
             if dt.ends_with(&format!(" | {NULL}")) {
                 dt
@@ -182,13 +181,13 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
             format!(
                 // We use this isn't of `Record<K, V>` to avoid issues with circular references.
                 "{{ [key in {}]: {} }}",
-                datatype_inner(ctx.clone(), &def.0, type_map, NULL)?,
-                datatype_inner(ctx, &def.1, type_map, NULL)?
+                datatype_inner(ctx.clone(), &def.0, type_map)?,
+                datatype_inner(ctx, &def.1, type_map)?
             )
         }
         // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
         DataType::List(def) => {
-            let dt = datatype_inner(ctx, def, type_map, NULL)?;
+            let dt = datatype_inner(ctx, def, type_map)?;
             if dt.contains(' ') && !dt.ends_with('}') {
                 format!("({dt})[]")
             } else {
@@ -209,8 +208,8 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
         DataType::Tuple(tuple) => tuple_datatype(ctx, tuple, type_map)?,
         DataType::Result(result) => {
             let mut variants = vec![
-                datatype_inner(ctx.clone(), &result.0, type_map, NULL)?,
-                datatype_inner(ctx, &result.1, type_map, NULL)?,
+                datatype_inner(ctx.clone(), &result.0, type_map)?,
+                datatype_inner(ctx, &result.1, type_map)?,
             ];
             variants.dedup();
             variants.join(" | ")
@@ -234,12 +233,12 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
 // Can be used with `StructUnnamedFields.fields` or `EnumNamedFields.fields`
 fn unnamed_fields_datatype(ctx: ExportContext, fields: &[Field], type_map: &TypeMap) -> Output {
     match fields {
-        [field] => datatype_inner(ctx, &field.ty, type_map, NULL),
+        [field] => datatype_inner(ctx, &field.ty, type_map),
         fields => Ok(format!(
             "[{}]",
             fields
                 .iter()
-                .map(|field| datatype_inner(ctx.clone(), &field.ty, type_map, NULL))
+                .map(|field| datatype_inner(ctx.clone(), &field.ty, type_map))
                 .collect::<Result<Vec<_>>>()?
                 .join(", ")
         )),
@@ -249,11 +248,11 @@ fn unnamed_fields_datatype(ctx: ExportContext, fields: &[Field], type_map: &Type
 fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, type_map: &TypeMap) -> Output {
     match &tuple.fields[..] {
         [] => Ok(NULL.to_string()),
-        [ty] => datatype_inner(ctx, ty, type_map, NULL),
+        [ty] => datatype_inner(ctx, ty, type_map),
         tys => Ok(format!(
             "[{}]",
             tys.iter()
-                .map(|v| datatype_inner(ctx.clone(), v, type_map, NULL))
+                .map(|v| datatype_inner(ctx.clone(), v, type_map))
                 .collect::<Result<Vec<_>>>()?
                 .join(", ")
         )),
@@ -275,13 +274,8 @@ fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &Typ
             let mut field_sections = flattened
                 .into_iter()
                 .map(|(key, field)| {
-                    datatype_inner(
-                        ctx.with(PathItem::Field(key.clone())),
-                        &field.ty,
-                        type_map,
-                        "[]",
-                    )
-                    .map(|type_str| format!("({type_str})"))
+                    datatype_inner(ctx.with(PathItem::Field(key.clone())), &field.ty, type_map)
+                        .map(|type_str| format!("({type_str})"))
                 })
                 .collect::<Result<Vec<_>>>()?;
 
@@ -350,7 +344,7 @@ fn enum_variant_datatype(
             let fields = obj
                 .fields
                 .iter()
-                .map(|field| datatype_inner(ctx.clone(), &field.ty, type_map, "[]"))
+                .map(|field| datatype_inner(ctx.clone(), &field.ty, type_map))
                 .collect::<Result<Vec<_>>>()?;
 
             Ok(match &fields[..] {
@@ -503,10 +497,7 @@ fn object_field_to_ts(
         false => (field_name_safe, &field.ty),
     };
 
-    Ok(format!(
-        "{key}: {}",
-        datatype_inner(ctx, ty, type_map, NULL)?
-    ))
+    Ok(format!("{key}: {}", datatype_inner(ctx, ty, type_map)?))
 }
 
 /// sanitise a string to be a valid Typescript key
