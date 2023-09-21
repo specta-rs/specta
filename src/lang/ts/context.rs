@@ -11,7 +11,7 @@ pub(crate) enum PathItem {
 
 #[derive(Clone)]
 pub(crate) struct ExportContext<'a> {
-    pub(crate) conf: &'a ExportConfig,
+    pub(crate) cfg: &'a ExportConfig,
     pub(crate) path: Vec<PathItem>,
 }
 

@@ -1,5 +1,3 @@
-use indoc::formatdoc;
-
 use crate::*;
 
 /// TODO
@@ -84,12 +82,7 @@ fn datatype(t: &DataTypeExt) -> Result<String, String> {
                     format!("data class {name}{generics} ({fields}{tag})")
                 }
             };
-            formatdoc! {
-                r#"
-                    @Serializable
-                    {decl}\n
-                "#
-            }
+            format!("@Serializable\n{decl}\n")
         }
         DataType::Literal(_) => return Err("Kotlin does not support literal types!".to_owned()),
         _ => todo!(),

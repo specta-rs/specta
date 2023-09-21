@@ -1,5 +1,5 @@
 use specta::{
-    ts::{BigIntExportBehavior, ExportConfig, ExportPath, TsExportError},
+    ts::{BigIntExportBehavior, ExportConfig, ExportError, ExportPath},
     Type,
 };
 
@@ -62,10 +62,10 @@ pub enum EnumWithInlineStructWithBigInt {
 
 #[test]
 fn test_bigint_types() {
-    for_bigint_types!(T -> |name| assert_eq!(specta::ts::inline::<T>(&ExportConfig::default()), Err(TsExportError::BigIntForbidden(ExportPath::new_unsafe(name)))));
-    for_bigint_types!(T -> |name| assert_eq!(specta::ts::inline::<T>(&ExportConfig::new()), Err(TsExportError::BigIntForbidden(ExportPath::new_unsafe(name)))));
-    for_bigint_types!(T -> |name| assert_eq!(specta::ts::inline::<T>(&ExportConfig::new().bigint(BigIntExportBehavior::Fail)), Err(TsExportError::BigIntForbidden(ExportPath::new_unsafe(name)))));
-    for_bigint_types!(T -> |name| assert_eq!(specta::ts::inline::<T>(&ExportConfig::new().bigint(BigIntExportBehavior::FailWithReason("some reason"))), Err(TsExportError::Other(ExportPath::new_unsafe(name), "some reason".into()))));
+    for_bigint_types!(T -> |name| assert_eq!(specta::ts::inline::<T>(&ExportConfig::default()), Err(ExportError::BigIntForbidden(ExportPath::new_unsafe(name)))));
+    for_bigint_types!(T -> |name| assert_eq!(specta::ts::inline::<T>(&ExportConfig::new()), Err(ExportError::BigIntForbidden(ExportPath::new_unsafe(name)))));
+    for_bigint_types!(T -> |name| assert_eq!(specta::ts::inline::<T>(&ExportConfig::new().bigint(BigIntExportBehavior::Fail)), Err(ExportError::BigIntForbidden(ExportPath::new_unsafe(name)))));
+    for_bigint_types!(T -> |name| assert_eq!(specta::ts::inline::<T>(&ExportConfig::new().bigint(BigIntExportBehavior::FailWithReason("some reason"))), Err(ExportError::Other(ExportPath::new_unsafe(name), "some reason".into()))));
 
     for_bigint_types!(T -> |name| assert_eq!(specta::ts::inline::<T>(&ExportConfig::new().bigint(BigIntExportBehavior::String)), Ok("string".into())));
     for_bigint_types!(T -> |name| assert_eq!(specta::ts::inline::<T>(&ExportConfig::new().bigint(BigIntExportBehavior::Number)), Ok("number".into())));
@@ -74,44 +74,44 @@ fn test_bigint_types() {
     // Check error messages are working correctly -> These tests second for `ExportPath` which is why they are so comprehensive
     assert_eq!(
         specta::ts::inline::<StructWithBigInt>(&ExportConfig::default()),
-        Err(TsExportError::BigIntForbidden(ExportPath::new_unsafe(
+        Err(ExportError::BigIntForbidden(ExportPath::new_unsafe(
             "StructWithBigInt.a -> i128"
         )))
     );
     assert_eq!(
         specta::ts::inline::<StructWithStructWithBigInt>(&ExportConfig::default()),
-        Err(TsExportError::BigIntForbidden(ExportPath::new_unsafe(
+        Err(ExportError::BigIntForbidden(ExportPath::new_unsafe(
             "StructWithStructWithBigInt.abc -> StructWithBigInt.a -> i128"
         )))
     );
     assert_eq!(
         specta::ts::inline::<StructWithStructWithStructWithBigInt>(&ExportConfig::default()),
-        Err(TsExportError::BigIntForbidden(ExportPath::new_unsafe(
+        Err(ExportError::BigIntForbidden(ExportPath::new_unsafe(
             "StructWithStructWithStructWithBigInt.field1 -> StructWithStructWithBigInt.abc -> StructWithBigInt.a -> i128"
         )))
     );
     assert_eq!(
         specta::ts::inline::<EnumWithStructWithStructWithBigInt>(&ExportConfig::default()),
-        Err(TsExportError::BigIntForbidden(ExportPath::new_unsafe(
+        Err(ExportError::BigIntForbidden(ExportPath::new_unsafe(
             "EnumWithStructWithStructWithBigInt::A -> StructWithStructWithBigInt.abc -> StructWithBigInt.a -> i128"
         )))
     );
     // TODO: This required `inline` to work better on `Option<T>`
     // assert_eq!(
     //     specta::ts::inline::<StructWithOptionWithStructWithBigInt>(&ExportConfiguration::default()),
-    //     Err(TsExportError::BigIntForbidden(ExportPath::new_unsafe(
+    //     Err(ExportError::BigIntForbidden(ExportPath::new_unsafe(
     //         "StructWithOptionWithStructWithBigInt.optional_field -> StructWithStructWithBigInt.abc -> StructWithBigInt.a -> i128"
     //     )))
     // );
     assert_eq!(
         specta::ts::inline::<EnumWithStructWithStructWithBigInt>(&ExportConfig::default()),
-        Err(TsExportError::BigIntForbidden(ExportPath::new_unsafe(
+        Err(ExportError::BigIntForbidden(ExportPath::new_unsafe(
             "EnumWithStructWithStructWithBigInt::A -> StructWithStructWithBigInt.abc -> StructWithBigInt.a -> i128"
         )))
     );
     assert_eq!(
         specta::ts::inline::<EnumWithInlineStructWithBigInt>(&ExportConfig::default()),
-        Err(TsExportError::BigIntForbidden(ExportPath::new_unsafe(
+        Err(ExportError::BigIntForbidden(ExportPath::new_unsafe(
             "EnumWithInlineStructWithBigInt::B.a -> i128"
         )))
     );

@@ -8,6 +8,16 @@
 #[cfg_attr(docsrs, doc(cfg(feature = "typescript")))]
 pub mod ts;
 
+#[cfg(all(feature = "js_doc", not(feature = "typescript")))]
+compile_error!("`js_doc` feature requires `typescript` feature to be enabled");
+
+/// [JSDoc](https://jsdoc.app) helpers.
+///
+/// Also requires `typescript` feature to be enabled.
+#[cfg(all(feature = "js_doc", feature = "typescript"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "js_doc", feature = "typescript"))))]
+pub mod js_doc;
+
 // /// [Rust](https://www.rust-lang.org) language exporter.
 // #[cfg(feature = "rust")]
 // #[cfg_attr(docsrs, doc(cfg(feature = "rust")))]

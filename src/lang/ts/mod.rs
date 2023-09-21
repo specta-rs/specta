@@ -1,13 +1,12 @@
 use std::borrow::Cow;
 
-mod comments;
+pub mod comments;
 mod context;
 mod error;
 mod export_config;
 mod formatter;
 mod reserved_terms;
 
-pub use comments::*;
 pub use context::*;
 pub use error::*;
 pub use export_config::*;
@@ -17,9 +16,9 @@ use reserved_terms::*;
 use crate::*;
 
 #[allow(missing_docs)]
-pub type Result<T> = std::result::Result<T, TsExportError>;
+pub type Result<T> = std::result::Result<T, ExportError>;
 
-type Output = Result<String>;
+pub(crate) type Output = Result<String>;
 
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string with an export.
 ///
@@ -41,7 +40,7 @@ pub fn export<T: NamedType>(conf: &ExportConfig) -> Output {
     let result = export_named_datatype(conf, &named_data_type, &type_map);
 
     if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_map).into_iter().next() {
-        return Err(TsExportError::DuplicateTypeName(ty_name, l0, l1));
+        return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
     }
 
     result
@@ -70,7 +69,7 @@ pub fn inline<T: Type>(conf: &ExportConfig) -> Output {
     let result = datatype(conf, &ty, &type_map);
 
     if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_map).into_iter().next() {
-        return Err(TsExportError::DuplicateTypeName(ty_name, l0, l1));
+        return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
     }
 
     result
@@ -87,7 +86,14 @@ pub fn export_named_datatype(
     // TODO: Duplicate type name detection?
 
     is_valid_ty(&typ.inner, type_map)?;
-    export_datatype_inner(ExportContext { conf, path: vec![] }, typ, type_map)
+    export_datatype_inner(
+        ExportContext {
+            cfg: conf,
+            path: vec![],
+        },
+        typ,
+        type_map,
+    )
 }
 
 fn export_datatype_inner(
@@ -101,9 +107,14 @@ fn export_datatype_inner(
     type_map: &TypeMap,
 ) -> Output {
     let ctx = ctx.with(PathItem::Type(name.clone()));
-    let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
 
-    let inline_ts = datatype_inner(ctx.clone(), &typ.inner, type_map, "null")?;
+    let comments = ctx
+        .cfg
+        .comment_exporter
+        .map(|v| v(comments))
+        .unwrap_or_default();
+
+    let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
 
     let generics = item
         .generics()
@@ -111,11 +122,7 @@ fn export_datatype_inner(
         .map(|generics| format!("<{}>", generics.join(", ")))
         .unwrap_or_default();
 
-    let comments = ctx
-        .conf
-        .comment_exporter
-        .map(|v| v(comments))
-        .unwrap_or_default();
+    let inline_ts = datatype_inner(ctx.clone(), &typ.inner, type_map)?;
 
     Ok(format!(
         "{comments}export type {name}{generics} = {inline_ts}"
@@ -128,57 +135,59 @@ fn export_datatype_inner(
 pub fn datatype(conf: &ExportConfig, typ: &DataType, type_map: &TypeMap) -> Output {
     // TODO: Duplicate type name detection?
 
-    datatype_inner(ExportContext { conf, path: vec![] }, typ, type_map, "null")
+    datatype_inner(
+        ExportContext {
+            cfg: conf,
+            path: vec![],
+        },
+        typ,
+        type_map,
+    )
 }
 
-fn datatype_inner(
-    ctx: ExportContext,
-    typ: &DataType,
-    type_map: &TypeMap,
-    empty_tuple_fallback: &'static str,
-) -> Output {
+pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &TypeMap) -> Output {
     Ok(match &typ {
-        DataType::Any => "any".into(),
+        DataType::Any => ANY.into(),
         DataType::Primitive(p) => {
             let ctx = ctx.with(PathItem::Type(p.to_rust_str().into()));
             match p {
-                primitive_def!(i8 i16 i32 u8 u16 u32 f32 f64) => "number".into(),
-                primitive_def!(usize isize i64 u64 i128 u128) => match ctx.conf.bigint {
-                    BigIntExportBehavior::String => "string".into(),
-                    BigIntExportBehavior::Number => "number".into(),
-                    BigIntExportBehavior::BigInt => "BigInt".into(),
+                primitive_def!(i8 i16 i32 u8 u16 u32 f32 f64) => NUMBER.into(),
+                primitive_def!(usize isize i64 u64 i128 u128) => match ctx.cfg.bigint {
+                    BigIntExportBehavior::String => STRING.into(),
+                    BigIntExportBehavior::Number => NUMBER.into(),
+                    BigIntExportBehavior::BigInt => BIGINT.into(),
                     BigIntExportBehavior::Fail => {
-                        return Err(TsExportError::BigIntForbidden(ctx.export_path()))
+                        return Err(ExportError::BigIntForbidden(ctx.export_path()))
                     }
                     BigIntExportBehavior::FailWithReason(reason) => {
-                        return Err(TsExportError::Other(ctx.export_path(), reason.to_owned()))
+                        return Err(ExportError::Other(ctx.export_path(), reason.to_owned()))
                     }
                 },
-                primitive_def!(String char) => "string".into(),
-                primitive_def!(bool) => "boolean".into(),
+                primitive_def!(String char) => STRING.into(),
+                primitive_def!(bool) => BOOLEAN.into(),
             }
         }
         DataType::Literal(literal) => literal.to_ts(),
         DataType::Nullable(def) => {
-            let dt = datatype_inner(ctx, def, type_map, "null")?;
+            let dt = datatype_inner(ctx, def, type_map)?;
 
-            if dt.ends_with(" | null") {
+            if dt.ends_with(&format!(" | {NULL}")) {
                 dt
             } else {
-                format!("{dt} | null")
+                format!("{dt} | {NULL}")
             }
         }
         DataType::Map(def) => {
             format!(
                 // We use this isn't of `Record<K, V>` to avoid issues with circular references.
                 "{{ [key in {}]: {} }}",
-                datatype_inner(ctx.clone(), &def.0, type_map, "null")?,
-                datatype_inner(ctx, &def.1, type_map, "null")?
+                datatype_inner(ctx.clone(), &def.0, type_map)?,
+                datatype_inner(ctx, &def.1, type_map)?
             )
         }
         // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
         DataType::List(def) => {
-            let dt = datatype_inner(ctx, def, type_map, "null")?;
+            let dt = datatype_inner(ctx, def, type_map)?;
             if dt.contains(' ') && !dt.ends_with('}') {
                 format!("({dt})[]")
             } else {
@@ -196,11 +205,11 @@ fn datatype_inner(
             item,
             type_map,
         )?,
-        DataType::Tuple(tuple) => tuple_datatype(ctx, tuple, type_map, empty_tuple_fallback)?,
+        DataType::Tuple(tuple) => tuple_datatype(ctx, tuple, type_map)?,
         DataType::Result(result) => {
             let mut variants = vec![
-                datatype_inner(ctx.clone(), &result.0, type_map, "null")?,
-                datatype_inner(ctx, &result.1, type_map, "null")?,
+                datatype_inner(ctx.clone(), &result.0, type_map)?,
+                datatype_inner(ctx, &result.1, type_map)?,
             ];
             variants.dedup();
             variants.join(" | ")
@@ -210,14 +219,7 @@ fn datatype_inner(
             generics => {
                 let generics = generics
                     .iter()
-                    .map(|v| {
-                        datatype_inner(
-                            ctx.with(PathItem::Type(name.clone())),
-                            v,
-                            type_map,
-                            empty_tuple_fallback,
-                        )
-                    })
+                    .map(|v| datatype_inner(ctx.with(PathItem::Type(name.clone())), v, type_map))
                     .collect::<Result<Vec<_>>>()?
                     .join(", ");
 
@@ -229,39 +231,28 @@ fn datatype_inner(
 }
 
 // Can be used with `StructUnnamedFields.fields` or `EnumNamedFields.fields`
-fn unnamed_fields_datatype(
-    ctx: ExportContext,
-    fields: &[Field],
-    type_map: &TypeMap,
-    empty_tuple_fallback: &'static str,
-) -> Output {
+fn unnamed_fields_datatype(ctx: ExportContext, fields: &[Field], type_map: &TypeMap) -> Output {
     match fields {
-        [] => Ok(empty_tuple_fallback.to_string()),
-        [field] => datatype_inner(ctx, &field.ty, type_map, "null"),
+        [field] => datatype_inner(ctx, &field.ty, type_map),
         fields => Ok(format!(
             "[{}]",
             fields
                 .iter()
-                .map(|field| datatype_inner(ctx.clone(), &field.ty, type_map, "null"))
+                .map(|field| datatype_inner(ctx.clone(), &field.ty, type_map))
                 .collect::<Result<Vec<_>>>()?
                 .join(", ")
         )),
     }
 }
 
-fn tuple_datatype(
-    ctx: ExportContext,
-    tuple: &TupleType,
-    type_map: &TypeMap,
-    empty_tuple_fallback: &'static str,
-) -> Output {
+fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, type_map: &TypeMap) -> Output {
     match &tuple.fields[..] {
-        [] => Ok(empty_tuple_fallback.to_string()),
-        [ty] => datatype_inner(ctx, ty, type_map, "null"),
+        [] => Ok(NULL.to_string()),
+        [ty] => datatype_inner(ctx, ty, type_map),
         tys => Ok(format!(
             "[{}]",
             tys.iter()
-                .map(|v| datatype_inner(ctx.clone(), v, type_map, "null"))
+                .map(|v| datatype_inner(ctx.clone(), v, type_map))
                 .collect::<Result<Vec<_>>>()?
                 .join(", ")
         )),
@@ -270,11 +261,11 @@ fn tuple_datatype(
 
 fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &TypeMap) -> Output {
     match &s.fields {
-        StructFields::Unit => Ok("null".into()),
-        StructFields::Unnamed(s) => unnamed_fields_datatype(ctx, &s.fields, type_map, "[]"),
+        StructFields::Unit => Ok(NULL.into()),
+        StructFields::Unnamed(s) => unnamed_fields_datatype(ctx, &s.fields, type_map),
         StructFields::Named(s) => {
             if s.fields.is_empty() {
-                return Ok("Record<string, never>".into());
+                return Ok(format!("Record<{STRING}, {NEVER}>"));
             }
 
             let (flattened, non_flattened): (Vec<_>, Vec<_>) =
@@ -283,13 +274,8 @@ fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &Typ
             let mut field_sections = flattened
                 .into_iter()
                 .map(|(key, field)| {
-                    datatype_inner(
-                        ctx.with(PathItem::Field(key.clone())),
-                        &field.ty,
-                        type_map,
-                        "[]",
-                    )
-                    .map(|type_str| format!("({type_str})"))
+                    datatype_inner(ctx.with(PathItem::Field(key.clone())), &field.ty, type_map)
+                        .map(|type_str| format!("({type_str})"))
                 })
                 .collect::<Result<Vec<_>>>()?;
 
@@ -350,7 +336,7 @@ fn enum_variant_datatype(
             );
 
             Ok(match &fields[..] {
-                [] => "Record<string, never>".to_string(),
+                [] => format!("Record<{STRING}, {NEVER}>").to_string(),
                 fields => format!("{{ {} }}", fields.join("; ")),
             })
         }
@@ -358,7 +344,7 @@ fn enum_variant_datatype(
             let fields = obj
                 .fields
                 .iter()
-                .map(|field| datatype_inner(ctx.clone(), &field.ty, type_map, "[]"))
+                .map(|field| datatype_inner(ctx.clone(), &field.ty, type_map))
                 .collect::<Result<Vec<_>>>()?;
 
             Ok(match &fields[..] {
@@ -372,7 +358,7 @@ fn enum_variant_datatype(
 
 fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output {
     if e.variants().is_empty() {
-        return Ok("never".to_string());
+        return Ok(NEVER.to_string());
     }
 
     Ok(match &e.repr {
@@ -382,7 +368,7 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                 .iter()
                 .map(|(name, variant)| {
                     Ok(match variant {
-                        EnumVariant::Unit => "null".to_string(),
+                        EnumVariant::Unit => NULL.to_string(),
                         v => enum_variant_datatype(
                             ctx.with(PathItem::Variant(name.clone())),
                             type_map,
@@ -408,12 +394,8 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                             format!("{{ {tag}: {sanitised_name} }}")
                         }
                         (EnumRepr::Internal { tag }, EnumVariant::Unnamed(tuple)) => {
-                            let mut typ = unnamed_fields_datatype(
-                                ctx.clone(),
-                                &tuple.fields,
-                                type_map,
-                                "[]",
-                            )?;
+                            let mut typ =
+                                unnamed_fields_datatype(ctx.clone(), &tuple.fields, type_map)?;
 
                             // TODO: This `null` check is a bad fix for an internally tagged type with a `null` variant being exported as `{ type: "A" } & null` (which is `never` in TS)
                             // TODO: Move this check into the macros so it can apply to any language cause it should (it's just hard to do in the macros)
@@ -495,7 +477,7 @@ impl LiteralType {
             Self::bool(v) => v.to_string(),
             Self::String(v) => format!(r#""{v}""#),
             Self::char(v) => format!(r#""{v}""#),
-            Self::None => "null".to_string(),
+            Self::None => NULL.to_string(),
         }
     }
 }
@@ -515,10 +497,7 @@ fn object_field_to_ts(
         false => (field_name_safe, &field.ty),
     };
 
-    Ok(format!(
-        "{key}: {}",
-        datatype_inner(ctx, ty, type_map, "null")?
-    ))
+    Ok(format!("{key}: {}", datatype_inner(ctx, ty, type_map)?))
 }
 
 /// sanitise a string to be a valid Typescript key
@@ -539,10 +518,18 @@ fn sanitise_key<'a>(field_name: Cow<'static, str>, force_string: bool) -> Cow<'a
     }
 }
 
-fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: &str) -> Output {
+pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: &str) -> Output {
     if let Some(name) = RESERVED_TYPE_NAMES.iter().find(|v| **v == ident) {
-        return Err(TsExportError::ForbiddenName(loc, ctx.export_path(), name));
+        return Err(ExportError::ForbiddenName(loc, ctx.export_path(), name));
     }
 
     Ok(ident.to_string())
 }
+
+const ANY: &str = "any";
+const NUMBER: &str = "number";
+const STRING: &str = "string";
+const BOOLEAN: &str = "boolean";
+const NULL: &str = "null";
+const NEVER: &str = "never";
+const BIGINT: &str = "BigInt";

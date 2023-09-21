@@ -28,7 +28,7 @@ impl fmt::Display for NamedLocation {
 /// The error type for the TypeScript exporter.
 #[derive(Error, Debug)]
 #[non_exhaustive]
-pub enum TsExportError {
+pub enum ExportError {
     #[error("Attempted to export '{0}' but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!")]
     BigIntForbidden(ExportPath),
     #[error("Serde error: {0}")]
@@ -48,7 +48,7 @@ pub enum TsExportError {
 }
 
 // TODO: This `impl` is cringe
-impl PartialEq for TsExportError {
+impl PartialEq for ExportError {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::BigIntForbidden(l0), Self::BigIntForbidden(r0)) => l0 == r0,

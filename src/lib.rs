@@ -83,12 +83,12 @@ mod static_types;
 /// Contains [`Type`] and everything related to it, including implementations and helper macros
 pub mod r#type;
 
+pub use crate::serde::*;
 #[doc(hidden)]
 pub use datatype::*;
 pub use lang::*;
 pub use r#type::*;
 pub use selection::*;
-pub use serde::*;
 pub use static_types::*;
 
 /// Implements [`Type`] for a given struct or enum.
