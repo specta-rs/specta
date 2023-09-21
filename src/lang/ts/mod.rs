@@ -1,7 +1,5 @@
 use std::borrow::Cow;
 
-use const_format::formatcp;
-
 mod comments;
 mod context;
 mod error;
@@ -180,7 +178,7 @@ pub(crate) fn datatype_inner(
         DataType::Nullable(def) => {
             let dt = datatype_inner(ctx, def, type_map, NULL)?;
 
-            if dt.ends_with(formatcp!(" | {NULL}")) {
+            if dt.ends_with(&format!(" | {NULL}")) {
                 dt
             } else {
                 format!("{dt} | {NULL}")
@@ -292,7 +290,7 @@ fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &Typ
         StructFields::Unnamed(s) => unnamed_fields_datatype(ctx, &s.fields, type_map, "[]"),
         StructFields::Named(s) => {
             if s.fields.is_empty() {
-                return Ok(formatcp!("Record<{STRING}, {NEVER}>").into());
+                return Ok(format!("Record<{STRING}, {NEVER}>"));
             }
 
             let (flattened, non_flattened): (Vec<_>, Vec<_>) =
@@ -368,7 +366,7 @@ fn enum_variant_datatype(
             );
 
             Ok(match &fields[..] {
-                [] => formatcp!("Record<{STRING}, {NEVER}>").to_string(),
+                [] => format!("Record<{STRING}, {NEVER}>").to_string(),
                 fields => format!("{{ {} }}", fields.join("; ")),
             })
         }
