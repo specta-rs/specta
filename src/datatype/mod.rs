@@ -100,6 +100,28 @@ impl DataTypeReference {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum DeprecatedType {
+    /// A type that has been deprecated without a message.
+    ///
+    /// Eg. `#[deprecated]`
+    Deprecated,
+    /// A type that has been deprecated with a message.
+    ///
+    /// Eg. `#[deprecated = "Use something else"]`
+    #[non_exhaustive]
+    DeprecatedWithMsg { message: Cow<'static, str> },
+    /// A type that has been deprecated with a message and a `since` version.
+    ///
+    /// Eg. `#[deprecated(since = "1.0.0", message = "Use something else")]`
+    #[non_exhaustive]
+    DeprecatedWithSince {
+        since: Option<Cow<'static, str>>,
+        message: Option<Cow<'static, str>>,
+    },
+}
+
 /// A generic ("placeholder") argument to a Specta-enabled type.
 ///
 /// A generic does not hold a specific type instead it acts as a slot where a type can be provided when referencing this type.

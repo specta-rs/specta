@@ -72,6 +72,14 @@ pub enum EnumRepr {
     },
 }
 
+// TODO: Refactor into this instead
+// pub struct EnumVariant {
+//     name: Cow<'static, str>,
+//     deprecated: Option<DeprecatedTy>,
+//     comments: Vec<Cow<'static, str>>,
+//     variant: EnumVariantTy,
+// }
+
 /// Type of an [`EnumType`] variant.
 #[derive(Debug, Clone, PartialEq)]
 pub enum EnumVariant {
