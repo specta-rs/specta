@@ -31,7 +31,7 @@ fn format_comment_inner(
         &comments
             .iter()
             .cloned()
-            .chain(generics.into_iter())
+            .chain(generics)
             .chain([format!(r#"@typedef {{ {inline_ts} }} {name}"#).into()])
             .collect::<Vec<_>>(),
     ))
