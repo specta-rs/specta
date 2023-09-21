@@ -250,6 +250,13 @@ fn typescript_types() {
         "export type MyEmptyInput = Record<string, never>"
     );
 
+    // https://github.com/oscartbeaumont/specta/issues/142
+    #[allow(unused_parens)]
+    {
+        assert_ts!((String), r#"string"#);
+        assert_ts!((String,), r#"[string]"#);
+    }
+
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");
     // assert_ts_export!(DeprecatedFields, "");

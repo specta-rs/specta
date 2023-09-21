@@ -9,12 +9,9 @@ macro_rules! impl_primitives {
 }
 
 macro_rules! impl_tuple {
-    ( impl $i:ident ) => {
-        impl_tuple!(impl); // This does tuple struct
-    }; // T = (T1)
     ( impl $($i:ident),* ) => {
         #[allow(non_snake_case)]
-        impl<$($i: Type + 'static),*> Type for ($($i),*) {
+        impl<$($i: Type + 'static),*> Type for ($($i,)*) {
             #[allow(unused)]
             fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
                 let mut _generics = generics.iter();
@@ -38,7 +35,7 @@ macro_rules! impl_tuple {
         }
     };
     ( $i2:ident $(, $i:ident)* ) => {
-        impl_tuple!(impl $i2 $(, $i)* );
+        impl_tuple!(impl $($i),* );
         impl_tuple!($($i),*);
     };
     () => {};

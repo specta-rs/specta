@@ -1,4 +1,4 @@
-use specta::{ts, DataType, DataTypeFrom, LiteralType, StructType, TupleType};
+use specta::{ts, DataType, DataTypeFrom, LiteralType, PrimitiveType, StructType, TupleType};
 
 use crate::ts::assert_ts;
 
@@ -35,19 +35,18 @@ struct Procedures7();
 #[derive(DataTypeFrom)]
 struct Procedures8 {}
 
+#[derive(DataTypeFrom)]
+struct Procedures9(DataType, DataType);
+
 #[test]
 fn test_datatype() {
-    let val: TupleType = Procedures1(vec![
+    let val: DataType = Procedures1(vec![
         LiteralType::String("A".to_string()).into(),
         LiteralType::String("B".to_string()).into(),
     ])
     .into();
     assert_eq!(
-        ts::datatype(
-            &Default::default(),
-            &val.clone().to_anonymous(),
-            &Default::default()
-        ),
+        ts::datatype(&Default::default(), &val, &Default::default()),
         Ok("\"A\" | \"B\"".into())
     );
     assert_eq!(
@@ -126,7 +125,7 @@ fn test_datatype() {
         Ok("{ queries: { queries: \"A\" | \"B\" } }".into())
     );
 
-    let val: TupleType = Procedures5(vec![Procedures2 {
+    let val: DataType = Procedures5(vec![Procedures2 {
         queries: vec![
             LiteralType::String("A".to_string()).into(),
             LiteralType::String("B".to_string()).into(),
@@ -134,21 +133,13 @@ fn test_datatype() {
     }])
     .into();
     assert_eq!(
-        ts::datatype(
-            &Default::default(),
-            &val.clone().to_anonymous(),
-            &Default::default()
-        ),
+        ts::datatype(&Default::default(), &val, &Default::default()),
         Ok("{ queries: \"A\" | \"B\" }".into())
     );
 
-    let val: TupleType = Procedures7().into();
+    let val: DataType = Procedures7().into();
     assert_eq!(
-        ts::datatype(
-            &Default::default(),
-            &val.clone().to_anonymous(),
-            &Default::default()
-        ),
+        ts::datatype(&Default::default(), &val, &Default::default()),
         Ok("null".into()) // This is equivalent of `()` Because this is a `TupleType` not an `EnumType`.
     );
 
@@ -160,5 +151,12 @@ fn test_datatype() {
             &Default::default()
         ),
         Ok("Record<string, never>".into())
+    );
+
+    let val: DataType =
+        Procedures9(DataType::Any, DataType::Primitive(PrimitiveType::String)).into();
+    assert_eq!(
+        ts::datatype(&Default::default(), &val, &Default::default()),
+        Ok("[any, string]".into())
     );
 }

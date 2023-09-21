@@ -92,14 +92,12 @@ pub use specta_macros::Type;
 /// // Enum
 /// //
 ///
-/// let val: TupleType = MyEnum(vec![
+/// let val: DataType = MyEnum(vec![
 ///     LiteralType::String("A".to_string()).into(),
 ///     LiteralType::String("B".to_string()).into(),
-/// ])
-/// .into();
+/// ]).into();
 ///
-/// let anon = val.clone().to_anonymous();
-/// let anon = ts::datatype(&Default::default(), &anon, &Default::default()).unwrap();
+/// let anon = ts::datatype(&Default::default(), &val, &Default::default()).unwrap();
 /// assert_eq!(anon, "\"A\" | \"B\"");
 ///
 /// let named = val.to_named("MyEnum");

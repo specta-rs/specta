@@ -88,20 +88,21 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     })
                     .collect::<Vec<_>>();
 
-                quote! {
-                    #[automatically_derived]
-                    impl From<#ident> for #crate_ref::TupleType {
-                        fn from(t: #ident) -> #crate_ref::TupleType {
-                            #crate_ref::internal::construct::tuple(
-                                vec![#(#fields),*]
-                            )
-                        }
+                let implementation = if fields.len() == 1 {
+                    fields[0].clone()
+                } else {
+                    quote! {
+                        DataType::Tuple(#crate_ref::internal::construct::tuple(
+                            vec![#(#fields),*]
+                        ))
                     }
+                };
 
+                quote! {
                     #[automatically_derived]
                     impl From<#ident> for #crate_ref::DataType {
                         fn from(t: #ident) -> #crate_ref::DataType {
-                            Self::Tuple(t.into())
+                            #implementation
                         }
                     }
                 }

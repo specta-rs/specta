@@ -8,7 +8,7 @@ impl_primitives!(
     String
 );
 
-impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
+impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13); // Technically we only support 12-tuples but the `T13` is required due to how the macro works
 
 const _: () = {
     use std::{cell::*, rc::Rc, sync::*};

@@ -68,6 +68,19 @@ impl DataType {
             _ => None,
         }
     }
+
+    /// convert a [`DataType`] to a named [`NamedDataType`].
+    ///
+    /// This is perfect if you want to export a type as a named type.
+    pub fn to_named(self, name: impl Into<Cow<'static, str>>) -> NamedDataType {
+        NamedDataType {
+            name: name.into(),
+            comments: vec![],
+            deprecated: None,
+            ext: None,
+            inner: self,
+        }
+    }
 }
 
 /// A reference to a [`DataType`] that can be used before a type is resolved in order to

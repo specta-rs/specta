@@ -248,7 +248,6 @@ fn unnamed_fields_datatype(ctx: ExportContext, fields: &[Field], type_map: &Type
 fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, type_map: &TypeMap) -> Output {
     match &tuple.fields[..] {
         [] => Ok(NULL.to_string()),
-        [ty] => datatype_inner(ctx, ty, type_map),
         tys => Ok(format!(
             "[{}]",
             tys.iter()
