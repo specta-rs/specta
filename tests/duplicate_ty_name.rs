@@ -45,8 +45,8 @@ fn test_duplicate_ty_name() {
     #[cfg(target_os = "windows")]
     let err = Err(ExportError::DuplicateTypeName(
         "One".into(),
-        impl_location("tests\\duplicate_ty_name.rs:9:14"),
         impl_location("tests\\duplicate_ty_name.rs:19:14"),
+        impl_location("tests\\duplicate_ty_name.rs:9:14"),
     ));
 
     assert_eq!(export::<Demo>(&Default::default()), err);
