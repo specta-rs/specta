@@ -129,6 +129,9 @@ pub fn construct_datatype(
                 )#transform;
             });
         }
+        Type::Paren(p) => {
+            return construct_datatype(var_ident, &p.elem, generic_idents, crate_ref, inline)
+        }
         Type::Array(TypeArray { elem, .. }) | Type::Slice(TypeSlice { elem, .. }) => {
             let elem_var_ident = format_ident!("{}_el", &var_ident);
             let elem = construct_datatype(

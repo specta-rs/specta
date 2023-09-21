@@ -257,6 +257,10 @@ fn typescript_types() {
         assert_ts!((String,), r#"[string]"#);
     }
 
+    // https://github.com/oscartbeaumont/specta/issues/148
+    assert_ts!(ExtraBracketsInTupleVariant, "{ A: string }");
+    assert_ts!(ExtraBracketsInUnnamedStruct, "string");
+
     // assert_ts_export!(DeprecatedType, "");
     // assert_ts_export!(DeprecatedTypeWithMsg, "");
     // assert_ts_export!(DeprecatedFields, "");
@@ -541,9 +545,20 @@ pub struct EnumReferenceRecordKey {
 
 // https://github.com/oscartbeaumont/specta/issues/88
 #[derive(Type)]
-#[serde(rename_all = "camelCase")]
+#[serde(export = false, rename_all = "camelCase")]
 #[serde(default)]
 pub(super) struct MyEmptyInput {}
+
+#[derive(Type)]
+#[specta(export = false)]
+pub enum ExtraBracketsInTupleVariant {
+    A((String)),
+}
+
+#[derive(Type)]
+#[specta(export = false)]
+#[allow(unused_parens)]
+pub struct ExtraBracketsInUnnamedStruct((String));
 
 // #[derive(Type)]
 // #[specta(export = false)]
