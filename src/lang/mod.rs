@@ -8,6 +8,9 @@
 #[cfg_attr(docsrs, doc(cfg(feature = "typescript")))]
 pub mod ts;
 
+#[cfg(all(feature = "js_doc", not(feature = "typescript")))]
+compile_error!("`js_doc` feature requires `typescript` feature to be enabled");
+
 /// [JSDoc](https://jsdoc.app) helpers.
 ///
 /// Also requires `typescript` feature to be enabled.
