@@ -211,7 +211,7 @@ pub(crate) fn datatype_inner(
             item,
             type_map,
         )?,
-        DataType::Tuple(tuple) => tuple_datatype(ctx, tuple, type_map, empty_tuple_fallback)?,
+        DataType::Tuple(tuple) => tuple_datatype(ctx, tuple, type_map)?,
         DataType::Result(result) => {
             let mut variants = vec![
                 datatype_inner(ctx.clone(), &result.0, type_map, NULL)?,
@@ -244,14 +244,8 @@ pub(crate) fn datatype_inner(
 }
 
 // Can be used with `StructUnnamedFields.fields` or `EnumNamedFields.fields`
-fn unnamed_fields_datatype(
-    ctx: ExportContext,
-    fields: &[Field],
-    type_map: &TypeMap,
-    empty_tuple_fallback: &'static str,
-) -> Output {
+fn unnamed_fields_datatype(ctx: ExportContext, fields: &[Field], type_map: &TypeMap) -> Output {
     match fields {
-        [] => Ok(empty_tuple_fallback.to_string()),
         [field] => datatype_inner(ctx, &field.ty, type_map, NULL),
         fields => Ok(format!(
             "[{}]",
@@ -264,14 +258,9 @@ fn unnamed_fields_datatype(
     }
 }
 
-fn tuple_datatype(
-    ctx: ExportContext,
-    tuple: &TupleType,
-    type_map: &TypeMap,
-    empty_tuple_fallback: &'static str,
-) -> Output {
+fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, type_map: &TypeMap) -> Output {
     match &tuple.fields[..] {
-        [] => Ok(empty_tuple_fallback.to_string()),
+        [] => Ok(NULL.to_string()),
         [ty] => datatype_inner(ctx, ty, type_map, NULL),
         tys => Ok(format!(
             "[{}]",
@@ -286,7 +275,7 @@ fn tuple_datatype(
 fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &TypeMap) -> Output {
     match &s.fields {
         StructFields::Unit => Ok(NULL.into()),
-        StructFields::Unnamed(s) => unnamed_fields_datatype(ctx, &s.fields, type_map, "[]"),
+        StructFields::Unnamed(s) => unnamed_fields_datatype(ctx, &s.fields, type_map),
         StructFields::Named(s) => {
             if s.fields.is_empty() {
                 return Ok(format!("Record<{STRING}, {NEVER}>"));
@@ -423,12 +412,8 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                             format!("{{ {tag}: {sanitised_name} }}")
                         }
                         (EnumRepr::Internal { tag }, EnumVariant::Unnamed(tuple)) => {
-                            let mut typ = unnamed_fields_datatype(
-                                ctx.clone(),
-                                &tuple.fields,
-                                type_map,
-                                "[]",
-                            )?;
+                            let mut typ =
+                                unnamed_fields_datatype(ctx.clone(), &tuple.fields, type_map)?;
 
                             // TODO: This `null` check is a bad fix for an internally tagged type with a `null` variant being exported as `{ type: "A" } & null` (which is `never` in TS)
                             // TODO: Move this check into the macros so it can apply to any language cause it should (it's just hard to do in the macros)
