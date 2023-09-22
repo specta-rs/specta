@@ -102,6 +102,7 @@ pub fn parse_enum(
                                 let skip = field_attrs.skip;
                                 let optional = field_attrs.optional;
                                 let flatten = field_attrs.flatten;
+                                let doc = field_attrs.doc;
 
                                 let generic_vars = construct_datatype(
                                     format_ident!("gen"),
@@ -115,6 +116,7 @@ pub fn parse_enum(
                                     #skip,
                                     #optional,
                                     #flatten,
+                                    #doc.into(),
                                     {
                                         #generic_vars
 
@@ -159,11 +161,13 @@ pub fn parse_enum(
                             let skip = field_attrs.skip;
                             let optional = field_attrs.optional;
                             let flatten = field_attrs.flatten;
+                            let doc = field_attrs.doc;
 
                             Ok(quote!((#field_name.into(), #crate_ref::internal::construct::field(
                                 #skip,
                                 #optional,
                                 #flatten,
+                                #doc.into(),
                                 {
                                     #generic_vars
 
@@ -178,7 +182,8 @@ pub fn parse_enum(
                 };
 
                 let skip = attrs.skip;
-                Ok(quote!((#variant_name_str.into(), #crate_ref::internal::construct::enum_variant(#skip, #inner))))
+                let doc = attrs.doc;
+                Ok(quote!((#variant_name_str.into(), #crate_ref::internal::construct::enum_variant(#skip, #doc.into(), #inner))))
             })
             .collect::<syn::Result<Vec<_>>>()?;
 

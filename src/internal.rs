@@ -18,11 +18,18 @@ pub mod construct {
 
     use crate::{datatype::*, ImplLocation, SpectaID};
 
-    pub const fn field(skip: bool, optional: bool, flatten: bool, ty: DataType) -> Field {
+    pub const fn field(
+        skip: bool,
+        optional: bool,
+        flatten: bool,
+        docs: Cow<'static, str>,
+        ty: DataType,
+    ) -> Field {
         Field {
             skip,
             optional,
             flatten,
+            docs,
             ty,
         }
     }
@@ -68,8 +75,12 @@ pub mod construct {
         }
     }
 
-    pub const fn enum_variant(skip: bool, inner: EnumVariants) -> EnumVariant {
-        EnumVariant { skip, inner }
+    pub const fn enum_variant(
+        skip: bool,
+        docs: Cow<'static, str>,
+        inner: EnumVariants,
+    ) -> EnumVariant {
+        EnumVariant { skip, docs, inner }
     }
 
     pub const fn enum_variant_unit() -> EnumVariants {
@@ -89,7 +100,7 @@ pub mod construct {
 
     pub const fn named_data_type(
         name: Cow<'static, str>,
-        comments: Vec<Cow<'static, str>>,
+        docs: Cow<'static, str>,
         deprecated: Option<Cow<'static, str>>,
         sid: SpectaID,
         impl_location: ImplLocation,
@@ -98,7 +109,7 @@ pub mod construct {
     ) -> NamedDataType {
         NamedDataType {
             name,
-            comments,
+            docs,
             deprecated,
             ext: Some(NamedDataTypeExt {
                 sid,

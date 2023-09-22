@@ -23,7 +23,7 @@ impl TupleType {
     pub fn to_named(self, name: impl Into<Cow<'static, str>>) -> NamedDataType {
         NamedDataType {
             name: name.into(),
-            comments: vec![],
+            docs: Cow::Borrowed(""),
             deprecated: None,
             ext: None,
             inner: DataType::Tuple(self),

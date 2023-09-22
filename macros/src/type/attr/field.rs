@@ -12,6 +12,7 @@ pub struct FieldAttr {
     pub skip: bool,
     pub optional: bool,
     pub flatten: bool,
+    pub doc: String,
 }
 
 impl_parse! {
@@ -41,7 +42,16 @@ impl_parse! {
         // Specta only attribute
         "optional" => out.optional = attr.parse_bool().unwrap_or(true),
         "default" => out.optional = attr.parse_bool().unwrap_or(true),
-        "flatten" => out.flatten = attr.parse_bool().unwrap_or(true)
+        "flatten" => out.flatten = attr.parse_bool().unwrap_or(true),
+        "doc" => {
+            if attr.key == "doc" {
+                if !out.doc.is_empty() {
+                    out.doc.push_str("\n");
+                }
+
+                out.doc.push_str(&attr.parse_string()?);
+            }
+        },
     }
 }
 
@@ -51,6 +61,7 @@ impl FieldAttr {
         Self::try_from_attrs("specta", attrs, &mut result)?;
         #[cfg(feature = "serde")]
         Self::try_from_attrs("serde", attrs, &mut result)?;
+        Self::try_from_attrs("doc", attrs, &mut result)?;
         Ok(result)
     }
 }

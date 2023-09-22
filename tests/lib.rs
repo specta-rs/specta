@@ -2,6 +2,7 @@
 
 mod advanced_types;
 mod bigints;
+mod comments;
 mod datatype;
 mod duplicate_ty_name;
 mod export;

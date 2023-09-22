@@ -1,5 +1,7 @@
 use crate::{reference::Reference, *};
 
+use std::borrow::Cow;
+
 impl_primitives!(
     i8 i16 i32 i64 i128 isize
     u8 u16 u32 u64 u128 usize
@@ -182,6 +184,7 @@ impl<T: Type> Type for std::ops::Range<T> {
                             skip: false,
                             optional: false,
                             flatten: false,
+                            docs: Cow::Borrowed(""),
                             ty: ty.clone(),
                         },
                     ),
@@ -191,6 +194,7 @@ impl<T: Type> Type for std::ops::Range<T> {
                             skip: false,
                             optional: false,
                             flatten: false,
+                            docs: Cow::Borrowed(""),
                             ty,
                         },
                     ),
@@ -256,11 +260,13 @@ const _: () = {
                         "f64".into(),
                         EnumVariant {
                             skip: false,
+                            docs: Cow::Borrowed(""),
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     skip: false,
                                     optional: false,
                                     flatten: false,
+                                    docs: Cow::Borrowed(""),
                                     ty: DataType::Primitive(PrimitiveType::f64),
                                 }],
                             }),
@@ -270,11 +276,13 @@ const _: () = {
                         "i64".into(),
                         EnumVariant {
                             skip: false,
+                            docs: Cow::Borrowed(""),
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     skip: false,
                                     optional: false,
                                     flatten: false,
+                                    docs: Cow::Borrowed(""),
                                     ty: DataType::Primitive(PrimitiveType::i64),
                                 }],
                             }),
@@ -284,11 +292,13 @@ const _: () = {
                         "u64".into(),
                         EnumVariant {
                             skip: false,
+                            docs: Cow::Borrowed(""),
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     skip: false,
                                     optional: false,
                                     flatten: false,
+                                    docs: Cow::Borrowed(""),
                                     ty: DataType::Primitive(PrimitiveType::u64),
                                 }],
                             }),
@@ -331,11 +341,13 @@ const _: () = {
                         "f64".into(),
                         EnumVariant {
                             skip: false,
+                            docs: Cow::Borrowed(""),
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     skip: false,
                                     optional: false,
                                     flatten: false,
+                                    docs: Cow::Borrowed(""),
                                     ty: DataType::Primitive(PrimitiveType::f64),
                                 }],
                             }),
@@ -345,11 +357,13 @@ const _: () = {
                         "i64".into(),
                         EnumVariant {
                             skip: false,
+                            docs: Cow::Borrowed(""),
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     skip: false,
                                     optional: false,
                                     flatten: false,
+                                    docs: Cow::Borrowed(""),
                                     ty: DataType::Primitive(PrimitiveType::i64),
                                 }],
                             }),
@@ -359,11 +373,13 @@ const _: () = {
                         "u64".into(),
                         EnumVariant {
                             skip: false,
+                            docs: Cow::Borrowed(""),
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     skip: false,
                                     optional: false,
                                     flatten: false,
+                                    docs: Cow::Borrowed(""),
                                     ty: DataType::Primitive(PrimitiveType::u64),
                                 }],
                             }),
@@ -570,11 +586,13 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                     "Left".into(),
                     EnumVariant {
                         skip: false,
+                        docs: Cow::Borrowed(""),
                         inner: EnumVariants::Unnamed(UnnamedFields {
                             fields: vec![Field {
                                 skip: false,
                                 optional: false,
                                 flatten: false,
+                                docs: Cow::Borrowed(""),
                                 ty: L::inline(
                                     DefOpts {
                                         parent_inline: opts.parent_inline,
@@ -590,11 +608,13 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                     "Right".into(),
                     EnumVariant {
                         skip: false,
+                        docs: Cow::Borrowed(""),
                         inner: EnumVariants::Unnamed(UnnamedFields {
                             fields: vec![Field {
                                 skip: false,
                                 optional: false,
                                 flatten: false,
+                                docs: Cow::Borrowed(""),
                                 ty: R::inline(
                                     DefOpts {
                                         parent_inline: opts.parent_inline,

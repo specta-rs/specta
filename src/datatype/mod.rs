@@ -75,7 +75,7 @@ impl DataType {
     pub fn to_named(self, name: impl Into<Cow<'static, str>>) -> NamedDataType {
         NamedDataType {
             name: name.into(),
-            comments: vec![],
+            docs: Cow::Borrowed(""),
             deprecated: None,
             ext: None,
             inner: self,
@@ -163,11 +163,13 @@ impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
                         },
                         EnumVariant {
                             skip: false,
+                            docs: Cow::Borrowed(""),
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     skip: false,
                                     optional: false,
                                     flatten: false,
+                                    docs: Cow::Borrowed(""),
                                     ty,
                                 }],
                             }),

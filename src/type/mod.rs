@@ -76,6 +76,8 @@ pub trait NamedType: Type {
 
 /// Helpers for generating [Type::reference] implementations.
 pub mod reference {
+    use std::borrow::Cow;
+
     use super::*;
 
     /// A reference datatype.
@@ -102,7 +104,7 @@ pub mod reference {
             // It's important we don't put `None` into the map here. By putting a *real* value we ensure that we don't stack overflow for recursive types when calling `named_data_type`.
             opts.type_map.entry(T::SID).or_insert(Some(NamedDataType {
                 name: "placeholder".into(),
-                comments: vec![],
+                docs: Cow::Borrowed(""),
                 deprecated: None,
                 ext: None,
                 inner: DataType::Any,

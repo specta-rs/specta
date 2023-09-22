@@ -129,6 +129,7 @@ pub fn parse_struct(
                     let optional = field_attrs.optional;
                     let flatten = field_attrs.flatten;
                     let skip = field_attrs.skip;
+                    let doc = field_attrs.doc;
 
                     let parent_inline = container_attrs
                         .inline
@@ -164,6 +165,7 @@ pub fn parse_struct(
                         #skip,
                         #optional,
                         #flatten,
+                        #doc.into(),
                         {
                             #ty
                         }
@@ -197,10 +199,11 @@ pub fn parse_struct(
                         let optional = field_attrs.optional;
                         let flatten = field_attrs.flatten;
                         let skip = field_attrs.skip;
+                        let doc = field_attrs.doc;
                         Ok(quote!({
                             #generic_vars
 
-                            #crate_ref::internal::construct::field(#skip, #optional, #flatten, gen)
+                            #crate_ref::internal::construct::field(#skip, #optional, #flatten, #doc.into(), gen)
                         }))
                     })
                     .collect::<syn::Result<Vec<TokenStream>>>()?;

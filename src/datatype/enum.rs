@@ -28,7 +28,7 @@ impl EnumType {
     pub fn to_named(self, name: impl Into<Cow<'static, str>>) -> NamedDataType {
         NamedDataType {
             name: name.into(),
-            comments: vec![],
+            docs: Cow::Borrowed(""),
             deprecated: None,
             ext: None,
             inner: DataType::Enum(self),
@@ -79,6 +79,8 @@ pub struct EnumVariant {
     /// You might think, well why not apply this in the macro and just not emit the variant?
     /// Well in Serde `A(String)` and `A(#[serde(skip)] (), String)` export as different Typescript types so the exporter needs runtime knowledge of this.
     pub(crate) skip: bool,
+    /// Documentation comments for the field.
+    pub(crate) docs: Cow<'static, str>,
     /// The type of the variant.
     pub(crate) inner: EnumVariants,
 }
@@ -86,6 +88,10 @@ pub struct EnumVariant {
 impl EnumVariant {
     pub fn skip(&self) -> bool {
         self.skip
+    }
+
+    pub fn docs(&self) -> &Cow<'static, str> {
+        &self.docs
     }
 
     pub fn inner(&self) -> &EnumVariants {

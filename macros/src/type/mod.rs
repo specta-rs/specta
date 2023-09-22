@@ -109,10 +109,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         }
     });
 
-    let comments = {
-        let comments = &container_attrs.doc;
-        quote!(vec![#(#comments.into()),*])
-    };
+    let comments = &container_attrs.doc;
     let should_export = match container_attrs.export {
         Some(export) => quote!(Some(#export)),
         None => quote!(None),
@@ -153,7 +150,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 fn named_data_type(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::NamedDataType {
                     #crate_ref::internal::construct::named_data_type(
                         #name.into(),
-                        #comments,
+                        #comments.into(),
                         #deprecated,
                         SID,
                         IMPL_LOCATION,

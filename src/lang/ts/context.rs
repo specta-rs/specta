@@ -13,6 +13,8 @@ pub(crate) enum PathItem {
 pub(crate) struct ExportContext<'a> {
     pub(crate) cfg: &'a ExportConfig,
     pub(crate) path: Vec<PathItem>,
+    // `false` when inline'ing and `true` when exporting as named.
+    pub(crate) is_export: bool,
 }
 
 impl ExportContext<'_> {

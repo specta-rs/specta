@@ -13,7 +13,7 @@ pub struct ContainerAttr {
     pub inline: bool,
     pub remote: Option<TokenStream>,
     pub export: Option<bool>,
-    pub doc: Vec<String>,
+    pub doc: String,
     pub deprecated: Option<String>,
 
     // Struct ony (we pass it anyway so enums get nice errors)
@@ -45,7 +45,11 @@ impl_parse! {
         "export" => out.export = out.export.take().or(Some(attr.parse_bool().unwrap_or(true))),
         "doc" => {
             if attr.key == "doc" {
-                out.doc.push(attr.parse_string()?);
+                if !out.doc.is_empty() {
+                    out.doc.push_str("\n");
+                }
+
+                out.doc.push_str(&attr.parse_string()?);
             }
         },
         // TODO: Finish implementing by supporting the official `#[deprecated]` attribute: https://github.com/oscartbeaumont/specta/issues/32

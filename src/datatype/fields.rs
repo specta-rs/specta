@@ -15,16 +15,26 @@ pub struct Field {
     pub(crate) optional: bool,
     /// Did the user apply a `#[serde(flatten)]` or `#[specta(flatten)]` attribute.
     pub(crate) flatten: bool,
+    /// Documentation comments for the field.
+    pub(crate) docs: Cow<'static, str>,
     pub(crate) ty: DataType,
 }
 
 impl Field {
+    pub fn skip(&self) -> bool {
+        self.skip
+    }
+
     pub fn optional(&self) -> bool {
         self.optional
     }
 
     pub fn flatten(&self) -> bool {
         self.flatten
+    }
+
+    pub fn docs(&self) -> &Cow<'static, str> {
+        &self.docs
     }
 
     pub fn ty(&self) -> &DataType {

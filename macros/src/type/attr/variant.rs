@@ -10,6 +10,7 @@ pub struct VariantAttr {
     pub rename: Option<TokenStream>,
     pub skip: bool,
     pub inline: bool,
+    pub doc: String,
 }
 
 impl_parse! {
@@ -20,6 +21,15 @@ impl_parse! {
         "skip_serializing" => out.skip = true,
         "skip_deserializing" => out.skip = true,
         "inline" => out.inline = attr.parse_bool().unwrap_or(true),
+        "doc" => {
+            if attr.key == "doc" {
+                if !out.doc.is_empty() {
+                    out.doc.push_str("\n");
+                }
+
+                out.doc.push_str(&attr.parse_string()?);
+            }
+        },
     }
 }
 
@@ -29,6 +39,7 @@ impl VariantAttr {
         Self::try_from_attrs("specta", attrs, &mut result)?;
         #[cfg(feature = "serde")]
         Self::try_from_attrs("serde", attrs, &mut result)?;
+        Self::try_from_attrs("doc", attrs, &mut result)?;
         Ok(result)
     }
 }

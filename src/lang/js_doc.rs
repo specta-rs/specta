@@ -5,14 +5,23 @@ use crate::*;
 pub use super::ts::*;
 
 pub fn format_comment(cfg: &ExportConfig, typ: &NamedDataType, type_map: &TypeMap) -> Output {
-    format_comment_inner(&ExportContext { cfg, path: vec![] }, typ, type_map)
+    format_comment_inner(
+        &ExportContext {
+            cfg,
+            path: vec![],
+            // TODO: Should JS doc support per field or variant comments???
+            is_export: false,
+        },
+        typ,
+        type_map,
+    )
 }
 
 fn format_comment_inner(
     ctx: &ExportContext,
     typ @ NamedDataType {
         name,
-        comments,
+        docs: comments,
         inner: item,
         ..
     }: &NamedDataType,
@@ -28,8 +37,9 @@ fn format_comment_inner(
 
     Ok(comments::js_doc(
         &comments
-            .iter()
-            .cloned()
+            .split("\n")
+            // TODO: Can this be efficient
+            .map(|line| Cow::Owned(line.to_string()))
             .chain(
                 item.generics()
                     .map(|generics| {

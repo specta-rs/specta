@@ -35,7 +35,7 @@ pub struct NamedDataType {
     /// The name of the type
     pub(crate) name: Cow<'static, str>,
     /// Rust documentation comments on the type
-    pub(crate) comments: Vec<Cow<'static, str>>,
+    pub(crate) docs: Cow<'static, str>,
     /// The Rust deprecated comment if the type is deprecated.
     pub(crate) deprecated: Option<Cow<'static, str>>,
     /// Extra information that comes from a real Rust type (using the `Type` macro).
@@ -51,8 +51,8 @@ impl NamedDataType {
         &self.name
     }
 
-    pub fn comments(&self) -> &Vec<Cow<'static, str>> {
-        &self.comments
+    pub fn docs(&self) -> &Cow<'static, str> {
+        &self.docs
     }
 
     pub fn deprecated(&self) -> Option<&Cow<'static, str>> {

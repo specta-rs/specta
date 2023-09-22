@@ -54,6 +54,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         #skip,
                         false,
                         false,
+                        std::borrow::Cow::Borrowed(""),
                         t.#ident.into(),
                     )))
                 });
