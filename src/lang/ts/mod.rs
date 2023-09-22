@@ -261,14 +261,29 @@ fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, type_map: &TypeMap) -> 
 fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &TypeMap) -> Output {
     match &s.fields {
         StructFields::Unit => Ok(NULL.into()),
-        StructFields::Unnamed(s) => unnamed_fields_datatype(ctx, &s.fields, type_map),
+        StructFields::Unnamed(s) => unnamed_fields_datatype(
+            ctx,
+            &s.fields
+                .iter()
+                .cloned()
+                .filter(|field| !field.skip)
+                .collect::<Vec<_>>()[..],
+            type_map,
+        ),
         StructFields::Named(s) => {
-            if s.fields.is_empty() {
+            let fields = s
+                .fields
+                .iter()
+                .cloned()
+                .filter(|(_, field)| !field.skip)
+                .collect::<Vec<_>>();
+
+            if fields.is_empty() {
                 return Ok(format!("Record<{STRING}, {NEVER}>"));
             }
 
             let (flattened, non_flattened): (Vec<_>, Vec<_>) =
-                s.fields.iter().partition(|(_, f)| f.flatten);
+                fields.iter().partition(|(_, f)| f.flatten);
 
             let mut field_sections = flattened
                 .into_iter()
@@ -308,11 +323,11 @@ fn enum_variant_datatype(
     type_map: &TypeMap,
     name: Cow<'static, str>,
     variant: &EnumVariant,
-) -> Output {
-    match variant {
+) -> Result<Option<String>> {
+    match &variant.inner {
         // TODO: Remove unreachable in type system
-        EnumVariant::Unit => unreachable!("Unit enum variants have no type!"),
-        EnumVariant::Named(obj) => {
+        EnumVariants::Unit => unreachable!("Unit enum variants have no type!"),
+        EnumVariants::Named(obj) => {
             let mut fields = if let Some(tag) = &obj.tag {
                 let sanitised_name = sanitise_key(name, true);
                 vec![format!("{tag}: {sanitised_name}")]
@@ -323,6 +338,7 @@ fn enum_variant_datatype(
             fields.extend(
                 obj.fields
                     .iter()
+                    .filter(|(_, field)| !field.skip)
                     .map(|(name, field)| {
                         object_field_to_ts(
                             ctx.with(PathItem::Field(name.clone())),
@@ -334,22 +350,32 @@ fn enum_variant_datatype(
                     .collect::<Result<Vec<_>>>()?,
             );
 
-            Ok(match &fields[..] {
+            Ok(Some(match &fields[..] {
                 [] => format!("Record<{STRING}, {NEVER}>").to_string(),
                 fields => format!("{{ {} }}", fields.join("; ")),
-            })
+            }))
         }
-        EnumVariant::Unnamed(obj) => {
+        EnumVariants::Unnamed(obj) => {
             let fields = obj
                 .fields
                 .iter()
+                .filter(|field| !field.skip)
                 .map(|field| datatype_inner(ctx.clone(), &field.ty, type_map))
                 .collect::<Result<Vec<_>>>()?;
 
             Ok(match &fields[..] {
-                [] => "[]".to_string(),
-                [field] => field.to_string(),
-                fields => format!("[{}]", fields.join(", ")),
+                [] => {
+                    // If the actual length is 0, we know `#[serde(skip)]` was not used.
+                    if obj.fields.len() == 0 {
+                        Some("[]".to_string())
+                    } else {
+                        // We wanna render `{tag}` not `{tag}: {type}` (where `{type}` is what this function returns)
+                        None
+                    }
+                }
+                // If the actual length is 1, we know `#[serde(skip)]` was not used.
+                [field] if obj.fields.len() == 1 => Some(field.to_string()),
+                fields => Some(format!("[{}]", fields.join(", "))),
             })
         }
     }
@@ -365,15 +391,17 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
             let mut variants = e
                 .variants
                 .iter()
+                .filter(|(_, variant)| !variant.skip)
                 .map(|(name, variant)| {
-                    Ok(match variant {
-                        EnumVariant::Unit => NULL.to_string(),
-                        v => enum_variant_datatype(
+                    Ok(match variant.inner {
+                        EnumVariants::Unit => NULL.to_string(),
+                        _ => enum_variant_datatype(
                             ctx.with(PathItem::Variant(name.clone())),
                             type_map,
                             name.clone(),
-                            v,
-                        )?,
+                            variant,
+                        )?
+                        .expect("Invalid Serde type"),
                     })
                 })
                 .collect::<Result<Vec<_>>>()?;
@@ -384,15 +412,16 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
             let mut variants = e
                 .variants
                 .iter()
+                .filter(|(_, variant)| !variant.skip)
                 .map(|(variant_name, variant)| {
                     let sanitised_name = sanitise_key(variant_name.clone(), true);
 
-                    Ok(match (repr, variant) {
+                    Ok(match (repr, &variant.inner) {
                         (EnumRepr::Untagged, _) => unreachable!(),
-                        (EnumRepr::Internal { tag }, EnumVariant::Unit) => {
+                        (EnumRepr::Internal { tag }, EnumVariants::Unit) => {
                             format!("{{ {tag}: {sanitised_name} }}")
                         }
-                        (EnumRepr::Internal { tag }, EnumVariant::Unnamed(tuple)) => {
+                        (EnumRepr::Internal { tag }, EnumVariants::Unnamed(tuple)) => {
                             let mut typ =
                                 unnamed_fields_datatype(ctx.clone(), &tuple.fields, type_map)?;
 
@@ -408,7 +437,7 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                                 format!("({{ {tag}: {sanitised_name} }} & {typ})")
                             }
                         }
-                        (EnumRepr::Internal { tag }, EnumVariant::Named(obj)) => {
+                        (EnumRepr::Internal { tag }, EnumVariants::Named(obj)) => {
                             let mut fields = vec![format!("{tag}: {sanitised_name}")];
 
                             fields.extend(
@@ -427,29 +456,32 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
 
                             format!("{{ {} }}", fields.join("; "))
                         }
-                        (EnumRepr::External, EnumVariant::Unit) => sanitised_name.to_string(),
-
-                        (EnumRepr::External, v) => {
+                        (EnumRepr::External, EnumVariants::Unit) => sanitised_name.to_string(),
+                        (EnumRepr::External, _) => {
                             let ts_values = enum_variant_datatype(
                                 ctx.with(PathItem::Variant(variant_name.clone())),
                                 type_map,
                                 variant_name.clone(),
-                                v,
+                                variant,
                             )?;
                             let sanitised_name = sanitise_key(variant_name.clone(), false);
 
-                            format!("{{ {sanitised_name}: {ts_values} }}")
+                            match ts_values {
+                                Some(ts_values) => format!("{{ {sanitised_name}: {ts_values} }}"),
+                                None => format!(r#""{sanitised_name}""#),
+                            }
                         }
-                        (EnumRepr::Adjacent { tag, .. }, EnumVariant::Unit) => {
+                        (EnumRepr::Adjacent { tag, .. }, EnumVariants::Unit) => {
                             format!("{{ {tag}: {sanitised_name} }}")
                         }
-                        (EnumRepr::Adjacent { tag, content }, v) => {
+                        (EnumRepr::Adjacent { tag, content }, _) => {
                             let ts_values = enum_variant_datatype(
                                 ctx.with(PathItem::Variant(variant_name.clone())),
                                 type_map,
                                 variant_name.clone(),
-                                v,
-                            )?;
+                                variant,
+                            )?
+                            .expect("Invalid Serde type");
 
                             format!("{{ {tag}: {sanitised_name}; {content}: {ts_values} }}")
                         }

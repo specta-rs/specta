@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 use crate::{
-    DataType, EnumRepr, EnumType, EnumVariant, LiteralType, PrimitiveType, StructFields, TypeMap,
+    DataType, EnumRepr, EnumType, EnumVariants, LiteralType, PrimitiveType, StructFields, TypeMap,
 };
 
 // TODO: The error should show a path to the type causing the issue like the BigInt error reporting.
@@ -12,6 +12,8 @@ pub enum SerdeError {
     InvalidMapKey,
     #[error("#[specta(tag = \"...\")] cannot be used with tuple variants")]
     InvalidInternallyTaggedEnum,
+    #[error("the usage of #[specta(skip)] means the type can't be serialized")]
+    InvalidUsageOfSkip,
 }
 
 /// Check that a [DataType] is a valid for Serde.
@@ -41,14 +43,14 @@ pub(crate) fn is_valid_ty(dt: &DataType, type_map: &TypeMap) -> Result<(), Serde
             validate_enum(ty, type_map)?;
 
             for (_variant_name, variant) in ty.variants().iter() {
-                match variant {
-                    EnumVariant::Unit => {}
-                    EnumVariant::Named(variant) => {
+                match &variant.inner {
+                    EnumVariants::Unit => {}
+                    EnumVariants::Named(variant) => {
                         for (_field_name, field) in variant.fields.iter() {
                             is_valid_ty(&field.ty, type_map)?;
                         }
                     }
-                    EnumVariant::Unnamed(variant) => {
+                    EnumVariants::Unnamed(variant) => {
                         for field in variant.fields.iter() {
                             is_valid_ty(&field.ty, type_map)?;
                         }
@@ -124,9 +126,9 @@ fn is_valid_map_key(key_ty: &DataType, type_map: &TypeMap) -> Result<(), SerdeEr
         // Enum of other valid types are also valid Eg. `"A" | "B"` or `"A" | 5` are valid
         DataType::Enum(ty) => {
             for (_variant_name, variant) in &ty.variants {
-                match variant {
-                    EnumVariant::Unit => {}
-                    EnumVariant::Unnamed(item) => {
+                match &variant.inner {
+                    EnumVariants::Unit => {}
+                    EnumVariants::Unnamed(item) => {
                         if item.fields.len() > 1 {
                             return Err(SerdeError::InvalidMapKey);
                         }
@@ -157,6 +159,12 @@ fn is_valid_map_key(key_ty: &DataType, type_map: &TypeMap) -> Result<(), SerdeEr
 
 // Serde does not allow serializing a variant of certain types of enum's.
 fn validate_enum(e: &EnumType, type_map: &TypeMap) -> Result<(), SerdeError> {
+    // You can't `#[serde(skip)]` your way to an empty enum.
+    let valid_variants = e.variants().iter().filter(|(_, v)| !v.skip).count();
+    if valid_variants == 0 && e.variants().len() != 0 {
+        return Err(SerdeError::InvalidUsageOfSkip);
+    }
+
     // Only internally tagged enums can be invalid.
     if let EnumRepr::Internal { .. } = e.repr() {
         validate_internally_tag_enum(e, type_map)?;
@@ -168,10 +176,10 @@ fn validate_enum(e: &EnumType, type_map: &TypeMap) -> Result<(), SerdeError> {
 // Checks for specially internally tagged enums.
 fn validate_internally_tag_enum(e: &EnumType, type_map: &TypeMap) -> Result<(), SerdeError> {
     for (_variant_name, variant) in &e.variants {
-        match variant {
-            EnumVariant::Unit => {}
-            EnumVariant::Named(_) => {}
-            EnumVariant::Unnamed(item) => {
+        match &variant.inner {
+            EnumVariants::Unit => {}
+            EnumVariants::Named(_) => {}
+            EnumVariants::Unnamed(item) => {
                 let fields = item.fields();
                 if fields.len() > 1 {
                     return Err(SerdeError::InvalidInternallyTaggedEnum);

@@ -41,23 +41,21 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         Ok((field, field_attrs))
                     })
                     .collect::<syn::Result<Vec<_>>>()?;
-                let fields = fields.iter().filter_map(|(field, attrs)| {
-                    if attrs.skip {
-                        return None;
-                    }
-
+                let fields = fields.iter().map(|(field, attrs)| {
                     let ident = field
                         .ident
                         .as_ref()
                         // TODO: Proper syn error would be nice
                         .expect("'specta::DataTypeFrom' requires named fields.");
                     let ident_str = ident.to_string();
+                    let skip = attrs.skip;
 
-                    Some(quote!((#ident_str.into(), #crate_ref::internal::construct::field(
+                    quote!((#ident_str.into(), #crate_ref::internal::construct::field(
+                        #skip,
                         false,
                         false,
                         t.#ident.into(),
-                    ))))
+                    )))
                 });
 
                 let struct_name = ident.to_string();

@@ -9,6 +9,7 @@ mod flatten_and_inline;
 mod functions;
 mod macro_decls;
 mod map_keys;
+mod optional;
 mod rename;
 mod reserved_keywords;
 mod selection;

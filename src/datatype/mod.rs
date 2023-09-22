@@ -161,13 +161,17 @@ impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
                             // TODO: This is probs gonna cause problems so we should try and remove the need for this entire impl block if we can.
                             _ => "".into(),
                         },
-                        EnumVariant::Unnamed(UnnamedFields {
-                            fields: vec![Field {
-                                optional: false,
-                                flatten: false,
-                                ty,
-                            }],
-                        }),
+                        EnumVariant {
+                            skip: false,
+                            inner: EnumVariants::Unnamed(UnnamedFields {
+                                fields: vec![Field {
+                                    skip: false,
+                                    optional: false,
+                                    flatten: false,
+                                    ty,
+                                }],
+                            }),
+                        },
                     )
                 })
                 .collect(),

@@ -179,6 +179,7 @@ impl<T: Type> Type for std::ops::Range<T> {
                     (
                         "start".into(),
                         Field {
+                            skip: false,
                             optional: false,
                             flatten: false,
                             ty: ty.clone(),
@@ -187,6 +188,7 @@ impl<T: Type> Type for std::ops::Range<T> {
                     (
                         "end".into(),
                         Field {
+                            skip: false,
                             optional: false,
                             flatten: false,
                             ty,
@@ -252,33 +254,45 @@ const _: () = {
                 variants: vec![
                     (
                         "f64".into(),
-                        EnumVariant::Unnamed(UnnamedFields {
-                            fields: vec![Field {
-                                optional: false,
-                                flatten: false,
-                                ty: DataType::Primitive(PrimitiveType::f64),
-                            }],
-                        }),
+                        EnumVariant {
+                            skip: false,
+                            inner: EnumVariants::Unnamed(UnnamedFields {
+                                fields: vec![Field {
+                                    skip: false,
+                                    optional: false,
+                                    flatten: false,
+                                    ty: DataType::Primitive(PrimitiveType::f64),
+                                }],
+                            }),
+                        },
                     ),
                     (
                         "i64".into(),
-                        EnumVariant::Unnamed(UnnamedFields {
-                            fields: vec![Field {
-                                optional: false,
-                                flatten: false,
-                                ty: DataType::Primitive(PrimitiveType::i64),
-                            }],
-                        }),
+                        EnumVariant {
+                            skip: false,
+                            inner: EnumVariants::Unnamed(UnnamedFields {
+                                fields: vec![Field {
+                                    skip: false,
+                                    optional: false,
+                                    flatten: false,
+                                    ty: DataType::Primitive(PrimitiveType::i64),
+                                }],
+                            }),
+                        },
                     ),
                     (
                         "u64".into(),
-                        EnumVariant::Unnamed(UnnamedFields {
-                            fields: vec![Field {
-                                optional: false,
-                                flatten: false,
-                                ty: DataType::Primitive(PrimitiveType::u64),
-                            }],
-                        }),
+                        EnumVariant {
+                            skip: false,
+                            inner: EnumVariants::Unnamed(UnnamedFields {
+                                fields: vec![Field {
+                                    skip: false,
+                                    optional: false,
+                                    flatten: false,
+                                    ty: DataType::Primitive(PrimitiveType::u64),
+                                }],
+                            }),
+                        },
                     ),
                 ],
                 generics: vec![],
@@ -315,33 +329,45 @@ const _: () = {
                 variants: vec![
                     (
                         "f64".into(),
-                        EnumVariant::Unnamed(UnnamedFields {
-                            fields: vec![Field {
-                                optional: false,
-                                flatten: false,
-                                ty: DataType::Primitive(PrimitiveType::f64),
-                            }],
-                        }),
+                        EnumVariant {
+                            skip: false,
+                            inner: EnumVariants::Unnamed(UnnamedFields {
+                                fields: vec![Field {
+                                    skip: false,
+                                    optional: false,
+                                    flatten: false,
+                                    ty: DataType::Primitive(PrimitiveType::f64),
+                                }],
+                            }),
+                        },
                     ),
                     (
                         "i64".into(),
-                        EnumVariant::Unnamed(UnnamedFields {
-                            fields: vec![Field {
-                                optional: false,
-                                flatten: false,
-                                ty: DataType::Primitive(PrimitiveType::i64),
-                            }],
-                        }),
+                        EnumVariant {
+                            skip: false,
+                            inner: EnumVariants::Unnamed(UnnamedFields {
+                                fields: vec![Field {
+                                    skip: false,
+                                    optional: false,
+                                    flatten: false,
+                                    ty: DataType::Primitive(PrimitiveType::i64),
+                                }],
+                            }),
+                        },
                     ),
                     (
                         "u64".into(),
-                        EnumVariant::Unnamed(UnnamedFields {
-                            fields: vec![Field {
-                                optional: false,
-                                flatten: false,
-                                ty: DataType::Primitive(PrimitiveType::u64),
-                            }],
-                        }),
+                        EnumVariant {
+                            skip: false,
+                            inner: EnumVariants::Unnamed(UnnamedFields {
+                                fields: vec![Field {
+                                    skip: false,
+                                    optional: false,
+                                    flatten: false,
+                                    ty: DataType::Primitive(PrimitiveType::u64),
+                                }],
+                            }),
+                        },
                     ),
                 ],
                 generics: vec![],
@@ -542,35 +568,43 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
             variants: vec![
                 (
                     "Left".into(),
-                    EnumVariant::Unnamed(UnnamedFields {
-                        fields: vec![Field {
-                            optional: false,
-                            flatten: false,
-                            ty: L::inline(
-                                DefOpts {
-                                    parent_inline: opts.parent_inline,
-                                    type_map: opts.type_map,
-                                },
-                                generics,
-                            ),
-                        }],
-                    }),
+                    EnumVariant {
+                        skip: false,
+                        inner: EnumVariants::Unnamed(UnnamedFields {
+                            fields: vec![Field {
+                                skip: false,
+                                optional: false,
+                                flatten: false,
+                                ty: L::inline(
+                                    DefOpts {
+                                        parent_inline: opts.parent_inline,
+                                        type_map: opts.type_map,
+                                    },
+                                    generics,
+                                ),
+                            }],
+                        }),
+                    },
                 ),
                 (
                     "Right".into(),
-                    EnumVariant::Unnamed(UnnamedFields {
-                        fields: vec![Field {
-                            optional: false,
-                            flatten: false,
-                            ty: R::inline(
-                                DefOpts {
-                                    parent_inline: opts.parent_inline,
-                                    type_map: opts.type_map,
-                                },
-                                generics,
-                            ),
-                        }],
-                    }),
+                    EnumVariant {
+                        skip: false,
+                        inner: EnumVariants::Unnamed(UnnamedFields {
+                            fields: vec![Field {
+                                skip: false,
+                                optional: false,
+                                flatten: false,
+                                ty: R::inline(
+                                    DefOpts {
+                                        parent_inline: opts.parent_inline,
+                                        type_map: opts.type_map,
+                                    },
+                                    generics,
+                                ),
+                            }],
+                        }),
+                    },
                 ),
             ],
             generics: vec![],

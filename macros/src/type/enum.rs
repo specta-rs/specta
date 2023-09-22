@@ -79,7 +79,6 @@ pub fn parse_enum(
             })
             .collect::<syn::Result<Vec<_>>>()?
             .into_iter()
-            .filter(|(_, attrs)| !attrs.skip)
             .map(|(variant, attrs)| {
                 let variant_ident_str = unraw_raw_ident(&variant.ident);
 
@@ -98,8 +97,11 @@ pub fn parse_enum(
                             .unnamed
                             .iter()
                             .map(|field| {
-                                let (field, field_attrs) = decode_field_attrs(field)?;
+                                let field_attrs = decode_field_attrs(field)?;
                                 let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
+                                let skip = field_attrs.skip;
+                                let optional = field_attrs.optional;
+                                let flatten = field_attrs.flatten;
 
                                 let generic_vars = construct_datatype(
                                     format_ident!("gen"),
@@ -110,9 +112,10 @@ pub fn parse_enum(
                                 )?;
 
                                 Ok(quote!(#crate_ref::internal::construct::field(
-                                    false,
-                                    false,
-                                        {
+                                    #skip,
+                                    #optional,
+                                    #flatten,
+                                    {
                                         #generic_vars
 
                                         gen
@@ -130,7 +133,7 @@ pub fn parse_enum(
                         .named
                         .iter()
                         .map(|field| {
-                            let (field, field_attrs) = decode_field_attrs(field)?;
+                            let field_attrs = decode_field_attrs(field)?;
 
                             let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
 
@@ -153,10 +156,14 @@ pub fn parse_enum(
                                 }
                                 (_, _) => quote::quote!(#field_ident_str),
                             };
+                            let skip = field_attrs.skip;
+                            let optional = field_attrs.optional;
+                            let flatten = field_attrs.flatten;
 
                             Ok(quote!((#field_name.into(), #crate_ref::internal::construct::field(
-                                false,
-                                false,
+                                #skip,
+                                #optional,
+                                #flatten,
                                 {
                                     #generic_vars
 
@@ -170,7 +177,8 @@ pub fn parse_enum(
                     }
                 };
 
-                Ok(quote!((#variant_name_str.into(), #inner)))
+                let skip = attrs.skip;
+                Ok(quote!((#variant_name_str.into(), #crate_ref::internal::construct::enum_variant(#skip, #inner))))
             })
             .collect::<syn::Result<Vec<_>>>()?;
 

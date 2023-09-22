@@ -72,9 +72,30 @@ pub enum EnumRepr {
     },
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnumVariant {
+    /// Did the user apply a `#[serde(skip)]` or `#[specta(skip)]` attribute.
+    ///
+    /// You might think, well why not apply this in the macro and just not emit the variant?
+    /// Well in Serde `A(String)` and `A(#[serde(skip)] (), String)` export as different Typescript types so the exporter needs runtime knowledge of this.
+    pub(crate) skip: bool,
+    /// The type of the variant.
+    pub(crate) inner: EnumVariants,
+}
+
+impl EnumVariant {
+    pub fn skip(&self) -> bool {
+        self.skip
+    }
+
+    pub fn inner(&self) -> &EnumVariants {
+        &self.inner
+    }
+}
+
 /// Type of an [`EnumType`] variant.
 #[derive(Debug, Clone, PartialEq)]
-pub enum EnumVariant {
+pub enum EnumVariants {
     /// A unit enum variant
     /// Eg. `Variant`
     Unit,

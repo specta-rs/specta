@@ -6,7 +6,14 @@ use crate::DataType;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Field {
+    /// Did the user apply a `#[serde(skip)]` or `#[specta(skip)]` attribute.
+    ///
+    /// You might think, well why not apply this in the macro and just not emit the variant?
+    /// Well in Serde `A(String)` and `A(#[serde(skip)] (), String)` export as different Typescript types so the exporter needs runtime knowledge of this.
+    pub(crate) skip: bool,
+    /// Did the user apply a `#[specta(optional)]` attribute.
     pub(crate) optional: bool,
+    /// Did the user apply a `#[serde(flatten)]` or `#[specta(flatten)]` attribute.
     pub(crate) flatten: bool,
     pub(crate) ty: DataType,
 }
