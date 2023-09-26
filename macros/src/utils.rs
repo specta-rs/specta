@@ -1,9 +1,10 @@
 use proc_macro2::Span;
 use syn::{
     ext::IdentExt,
+    parenthesized,
     parse::{Parse, ParseStream},
-    punctuated::Punctuated,
     spanned::Spanned,
+    token::Paren,
     Ident, Lit, Path, Result, Token,
 };
 
@@ -14,6 +15,8 @@ pub enum AttributeValue {
     /// Path value. Eg. `#[specta(type = String)]` or `#[specta(type = ::std::string::String)]`
     /// Path doesn't follow the Rust spec hence the need for this custom parser. We are doing this anyway for backwards compatibility.
     Path(Path),
+    /// A nested attribute. Eg. the `deprecated(note = "some note") in `#[specta(deprecated(note = "some note"))]`
+    Attribute { span: Span, attr: Vec<Attribute> },
 }
 
 impl AttributeValue {
@@ -21,6 +24,7 @@ impl AttributeValue {
         match self {
             Self::Lit(lit) => lit.span(),
             Self::Path(path) => path.span(),
+            Self::Attribute { span, .. } => *span,
         }
     }
 }
@@ -36,12 +40,10 @@ impl Parse for AttributeValue {
 
 #[derive(Clone)]
 pub struct Attribute {
-    /// Root ident of the attribute. Eg. `specta` in `#[specta(type = String)]`
-    pub root_ident: Ident,
-    /// Key of the item. Eg. `type` in `#[specta(type = String)]`
+    /// Key of the current item. Eg. `specta` or `type`in `#[specta(type = String)]`
     pub key: Ident,
     /// Value of the item. Eg. `String` in `#[specta(type = String)]`
-    value: Option<AttributeValue>,
+    pub value: Option<AttributeValue>,
 }
 
 impl Attribute {
@@ -110,67 +112,99 @@ impl Attribute {
     }
 }
 
-/// This parser is an alternative to `attr.parse_meta()?` from `syn`.
-/// We do this to allow `#[specta(type = String)]`.
-/// This is technically against the Rust spec,
-/// but it's nicer for DX (and the API that we had before these changes).
-impl Parse for Attribute {
-    fn parse(input: ParseStream) -> Result<Self> {
-        Ok(Self {
-            root_ident: Ident::new("TEMP", input.span()),
-            key: input.call(Ident::parse_any)?,
-            value: match input.peek(Token![=]) {
-                true => {
-                    input.parse::<Token![=]>()?;
-                    Some(input.parse()?)
-                }
-                false => None,
-            },
-        })
+fn parse_attribute(input: ParseStream) -> Result<Vec<Attribute>> {
+    // (demo = "hello")
+    // ^              ^
+    let content_owned;
+    let content;
+    if input.peek(Paren) {
+        parenthesized!(content_owned in input);
+        content = &content_owned;
+    } else {
+        content = input;
     }
+
+    let mut result = Vec::new();
+    while !content.is_empty() {
+        // (demo = "hello")
+        //  ^^^^
+        let key = content.call(Ident::parse_any)?;
+        let key_span = key.span();
+
+        result.push(Attribute {
+            key,
+            value: match false {
+                // `(demo(...))`
+                //       ^^^^^
+                _ if content.peek(Paren) => Some(AttributeValue::Attribute {
+                    span: key_span,
+                    attr: parse_attribute(content)?,
+                }),
+                // `(demo = "hello")`
+                //        ^^^^^^^^^
+                _ if content.peek(Token![=]) => {
+                    content.parse::<Token![=]>()?;
+                    Some(AttributeValue::parse(content)?)
+                }
+                // `(demo)`
+                _ => None,
+            },
+        });
+
+        if content.peek(Token![,]) {
+            content.parse::<Token![,]>()?;
+        }
+    }
+
+    Ok(result)
 }
 
 /// pass all of the attributes into a single structure.
 /// We can then remove them from the struct while passing an any left over must be invalid and an error can be thrown.
 pub fn parse_attrs(attrs: &[syn::Attribute]) -> syn::Result<Vec<Attribute>> {
-    Ok(attrs
-        .iter()
-        .map(|attr| {
-            let ident = attr
-                .path
-                .get_ident()
-                .expect("Attribute path must be an ident")
-                .clone();
+    let mut result = Vec::new();
 
-            if !(ident == "specta" || ident == "serde" || ident == "doc" || ident == "repr") {
-                return Ok(vec![]);
-            }
+    for attr in attrs {
+        let ident = attr
+            .path
+            .get_ident()
+            .expect("Attribute path must be an ident")
+            .clone();
 
-            if ident == "doc" {
-                let meta = attr.parse_meta()?;
-                return match meta {
-                    syn::Meta::NameValue(value) => Ok(vec![Attribute {
-                        root_ident: ident.clone(),
-                        key: ident,
-                        value: Some(AttributeValue::Lit(value.lit)),
-                    }]),
-                    _ => Err(syn::Error::new(meta.span(), "specta: invalid doc comment")),
-                };
-            }
+        // TODO: We should somehow build this up from the macro output automatically -> if not our attribute parser is applied to stuff like `allow` and that's bad.
+        if !(ident == "specta"
+            || ident == "serde"
+            || ident == "doc"
+            || ident == "repr"
+            || ident == "deprecated")
+        {
+            continue;
+        }
 
-            Ok(attr
-                .parse_args_with(Punctuated::<Attribute, Token![,]>::parse_terminated)?
-                .into_iter()
-                .map(|a| Attribute {
-                    root_ident: ident.clone(),
-                    ..a
-                })
-                .collect::<Vec<_>>())
-        })
-        .collect::<Result<Vec<_>>>()?
-        .into_iter()
-        .flatten()
-        .collect())
+        let parser = |input: ParseStream| {
+            Ok(Attribute {
+                key: ident.clone(),
+                value: match false {
+                    // `#[demo]`
+                    _ if input.is_empty() => None,
+                    // `#[demo = "todo"]`
+                    _ if input.peek(Token![=]) => {
+                        input.parse::<Token![=]>()?;
+                        Some(AttributeValue::parse(input)?)
+                    }
+                    // `#[demo(...)]`
+                    _ => Some(AttributeValue::Attribute {
+                        span: ident.span(),
+                        attr: parse_attribute(input)?,
+                    }),
+                },
+            })
+        };
+        let attr = syn::parse::Parser::parse2(parser, attr.tokens.clone().into())?;
+        result.push(attr);
+    }
+
+    Ok(result)
 }
 
 macro_rules! impl_parse {
@@ -181,41 +215,42 @@ macro_rules! impl_parse {
                 attrs: &mut Vec<crate::utils::Attribute>,
                 $out: &mut Self,
             ) -> syn::Result<()> {
-                use itertools::{Either, Itertools};
+                // Technically we can have multiple root-level attributes
+                // Eg. `#[specta(...)]` can exist multiple times on a single type
+                for attr in attrs.iter_mut().filter(|attr| attr.key == ident) {
+                    match &mut attr.value {
+                        Some($crate::utils::AttributeValue::Attribute { attr, .. }) => {
+                            *attr = std::mem::take(attr)
+                                .into_iter()
+                                .map(|$attr_parser| {
+                                    let mut was_passed_by_user = true;
 
-                let (filtered_attrs, mut rest): (Vec<_>, Vec<_>) = std::mem::take(attrs)
-                    .into_iter()
-                    .partition_map(|attr| match attr.root_ident == ident {
-                        true => Either::Left(attr),
-                        false => Either::Right(attr),
-                    });
+                                    match $attr_parser.key.to_string().as_str() {
+                                        $($k => $e,)*
+                                        #[allow(unreachable_patterns)]
+                                        _ => {
+                                            was_passed_by_user = false;
+                                        }
+                                    }
 
-                let mut new_attrs = filtered_attrs
-                    .into_iter()
-                    .map(|$attr_parser| {
-                        let mut was_passed_by_user = true;
-                        match $attr_parser.key.to_string().as_str() {
-                            $($k => $e,)*
-                            #[allow(unreachable_patterns)]
-                            _ => {
-                                was_passed_by_user = false;
-                            }
+                                    Ok(($attr_parser, was_passed_by_user))
+                                })
+                                .collect::<syn::Result<Vec<(Attribute, bool)>>>()?
+                                .into_iter()
+                                .filter_map(
+                                    |(attr, was_passed_by_user)| {
+                                        if was_passed_by_user {
+                                            None
+                                        } else {
+                                            Some(attr)
+                                        }
+                                    },
+                                )
+                                .collect();
                         }
-
-                        Ok(($attr_parser, was_passed_by_user))
-                    })
-                    .collect::<syn::Result<Vec<(Attribute, bool)>>>()?
-                    .into_iter()
-                    .filter_map(|(attr, was_passed_by_user)| {
-                        if was_passed_by_user {
-                            None
-                        } else {
-                            Some(attr)
-                        }
-                    })
-                    .collect::<Vec<Attribute>>();
-                new_attrs.append(&mut rest);
-                let _ = std::mem::replace(attrs, new_attrs);
+                        _ => {}
+                    }
+                }
 
                 Ok(())
             }

@@ -7,7 +7,7 @@ use syn::{parse_macro_input, Data, DeriveInput};
 
 use generics::impl_heading;
 
-use crate::utils::{parse_attrs, unraw_raw_ident};
+use crate::utils::{parse_attrs, unraw_raw_ident, AttributeValue};
 
 use self::generics::{
     add_type_to_where_clause, generics_with_ident_and_bounds_only, generics_with_ident_only,
@@ -60,18 +60,29 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         )),
     }?;
 
-    attrs
-        .iter()
-        .find(|attr| attr.root_ident == "specta")
-        .map_or(Ok(()), |attr| {
-            Err(syn::Error::new(
-                attr.key.span(),
-                format!(
-                    "specta: Found unsupported container attribute '{}'",
-                    attr.key
-                ),
-            ))
-        })?;
+    // The expectation is that when an attribute is processed it will be removed so if any are left over we know they are invalid
+    // but we only throw errors for Specta-specific attributes so we don't continually break other attributes.
+    if let Some(attrs) = attrs.iter().find(|attr| attr.key == "specta") {
+        match &attrs.value {
+            Some(AttributeValue::Attribute { attr, .. }) => {
+                if let Some(attr) = attr.first() {
+                    return Err(syn::Error::new(
+                        attr.key.span(),
+                        format!(
+                            "specta: Found unsupported container attribute '{}'",
+                            attr.key
+                        ),
+                    ));
+                }
+            }
+            _ => {
+                return Err(syn::Error::new(
+                    attrs.key.span(),
+                    "specta: invalid formatted attribute",
+                ))
+            }
+        }
+    }
 
     let definition_generics = generics.type_params().map(|param| {
         let ident = param.ident.to_string();
@@ -109,15 +120,12 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         }
     });
 
-    let comments = &container_attrs.doc;
+    let comments = &container_attrs.common.doc;
     let should_export = match container_attrs.export {
         Some(export) => quote!(Some(#export)),
         None => quote!(None),
     };
-    let deprecated = match &container_attrs.deprecated {
-        Some(msg) => quote!(Some(#msg.into())),
-        None => quote!(None),
-    };
+    let deprecated = container_attrs.common.deprecated_as_tokens(&crate_ref);
 
     let sid = quote!(#crate_ref::internal::construct::sid(#name, concat!("::", module_path!(), ":", line!(), ":", column!())));
     let impl_location = quote!(#crate_ref::internal::construct::impl_location(concat!(file!(), ":", line!(), ":", column!())));

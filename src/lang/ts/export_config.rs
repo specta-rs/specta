@@ -1,9 +1,18 @@
 use std::{borrow::Cow, io, path::PathBuf};
 
+use crate::DeprecatedType;
+
 use super::comments;
 
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct CommentFormatterArgs<'a> {
+    pub docs: &'a Cow<'static, str>,
+    pub deprecated: Option<&'a DeprecatedType>,
+}
+
 /// The signature for a function responsible for exporting Typescript comments.
-pub type CommentFormatterFn = fn(&[Cow<'static, str>]) -> String;
+pub type CommentFormatterFn = fn(CommentFormatterArgs) -> String; // TODO: Returning `Cow`???
 
 /// The signature for a function responsible for formatter a Typescript file.
 pub type FormatterFn = fn(PathBuf) -> io::Result<()>;

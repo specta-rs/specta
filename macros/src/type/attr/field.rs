@@ -4,6 +4,8 @@ use syn::{Result, Type, TypePath};
 
 use crate::utils::Attribute;
 
+use super::CommonAttr;
+
 #[derive(Default)]
 pub struct FieldAttr {
     pub rename: Option<TokenStream>,
@@ -12,7 +14,7 @@ pub struct FieldAttr {
     pub skip: bool,
     pub optional: bool,
     pub flatten: bool,
-    pub doc: String,
+    pub common: CommonAttr,
 }
 
 impl_parse! {
@@ -43,25 +45,16 @@ impl_parse! {
         "optional" => out.optional = attr.parse_bool().unwrap_or(true),
         "default" => out.optional = attr.parse_bool().unwrap_or(true),
         "flatten" => out.flatten = attr.parse_bool().unwrap_or(true),
-        "doc" => {
-            if attr.key == "doc" {
-                if !out.doc.is_empty() {
-                    out.doc.push_str("\n");
-                }
-
-                out.doc.push_str(&attr.parse_string()?);
-            }
-        },
     }
 }
 
 impl FieldAttr {
     pub fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
         let mut result = Self::default();
+        result.common = CommonAttr::from_attrs(attrs)?;
         Self::try_from_attrs("specta", attrs, &mut result)?;
         #[cfg(feature = "serde")]
         Self::try_from_attrs("serde", attrs, &mut result)?;
-        Self::try_from_attrs("doc", attrs, &mut result)?;
         Ok(result)
     }
 }

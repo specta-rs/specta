@@ -54,6 +54,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         #skip,
                         false,
                         false,
+                        None,
                         std::borrow::Cow::Borrowed(""),
                         t.#ident.into(),
                     )))
@@ -91,7 +92,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     fields[0].clone()
                 } else {
                     quote! {
-                        DataType::Tuple(#crate_ref::internal::construct::tuple(
+                        #crate_ref::DataType::Tuple(#crate_ref::internal::construct::tuple(
                             vec![#(#fields),*]
                         ))
                     }

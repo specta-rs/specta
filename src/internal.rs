@@ -22,6 +22,7 @@ pub mod construct {
         skip: bool,
         optional: bool,
         flatten: bool,
+        deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
         ty: DataType,
     ) -> Field {
@@ -29,6 +30,7 @@ pub mod construct {
             skip,
             optional,
             flatten,
+            deprecated,
             docs,
             ty,
         }
@@ -77,10 +79,16 @@ pub mod construct {
 
     pub const fn enum_variant(
         skip: bool,
+        deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
         inner: EnumVariants,
     ) -> EnumVariant {
-        EnumVariant { skip, docs, inner }
+        EnumVariant {
+            skip,
+            docs,
+            deprecated,
+            inner,
+        }
     }
 
     pub const fn enum_variant_unit() -> EnumVariants {
@@ -101,7 +109,7 @@ pub mod construct {
     pub const fn named_data_type(
         name: Cow<'static, str>,
         docs: Cow<'static, str>,
-        deprecated: Option<Cow<'static, str>>,
+        deprecated: Option<DeprecatedType>,
         sid: SpectaID,
         impl_location: ImplLocation,
         export: Option<bool>,

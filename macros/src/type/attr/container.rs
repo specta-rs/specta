@@ -4,6 +4,8 @@ use syn::Result;
 
 use crate::utils::{Attribute, Inflection};
 
+use super::CommonAttr;
+
 #[derive(Default, Clone)]
 pub struct ContainerAttr {
     pub rename_all: Option<Inflection>,
@@ -13,8 +15,7 @@ pub struct ContainerAttr {
     pub inline: bool,
     pub remote: Option<TokenStream>,
     pub export: Option<bool>,
-    pub doc: String,
-    pub deprecated: Option<String>,
+    pub common: CommonAttr,
 
     // Struct ony (we pass it anyway so enums get nice errors)
     pub transparent: bool,
@@ -36,40 +37,25 @@ impl_parse! {
         },
         "tag" => out.tag = out.tag.take().or(Some(attr.parse_string()?)),
         "crate" => {
-            if attr.root_ident == "specta" {
+            // if attr.key == "specta" { // TODO: Fix this check
                 out.crate_name = out.crate_name.take().or(Some(attr.parse_path()?.to_token_stream()));
-            }
+            // }
         },
         "inline" => out.inline = attr.parse_bool().unwrap_or(true),
         "remote" => out.remote = out.remote.take().or(Some(attr.parse_path()?.to_token_stream())),
         "export" => out.export = out.export.take().or(Some(attr.parse_bool().unwrap_or(true))),
-        "doc" => {
-            if attr.key == "doc" {
-                if !out.doc.is_empty() {
-                    out.doc.push_str("\n");
-                }
-
-                out.doc.push_str(&attr.parse_string()?);
-            }
-        },
-        // TODO: Finish implementing by supporting the official `#[deprecated]` attribute: https://github.com/oscartbeaumont/specta/issues/32
-        "deprecated" => {
-            if attr.key == "specta" {
-                out.deprecated = out.deprecated.take().or(Some(attr.parse_string()?));
-            }
-        },
-        "transparent" => out.transparent = attr.parse_bool().unwrap_or(true)
+        "transparent" => out.transparent = attr.parse_bool().unwrap_or(true),
     }
 }
 
 impl ContainerAttr {
     pub fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
         let mut result = Self::default();
+        result.common = CommonAttr::from_attrs(attrs)?;
         Self::try_from_attrs("specta", attrs, &mut result)?;
         #[cfg(feature = "serde")]
         Self::try_from_attrs("serde", attrs, &mut result)?;
         Self::try_from_attrs("repr", attrs, &mut result)?; // To handle `#[repr(transparent)]`
-        Self::try_from_attrs("doc", attrs, &mut result)?;
         Ok(result)
     }
 }

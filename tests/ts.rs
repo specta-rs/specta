@@ -1,5 +1,3 @@
-#![allow(deprecated)]
-
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -274,10 +272,6 @@ fn typescript_types() {
         RenameWithWeirdCharsEnum,
         ExportError::InvalidName(NamedLocation::Type, ExportPath::new_unsafe("@odata.context"), r#"@odata.context"#.to_string())
     );
-
-    // assert_ts_export!(DeprecatedType, "");
-    // assert_ts_export!(DeprecatedTypeWithMsg, "");
-    // assert_ts_export!(DeprecatedFields, "");
 }
 
 #[derive(Type)]
@@ -601,36 +595,3 @@ pub struct RenameWithWeirdCharsStruct(String);
 #[derive(Type)]
 #[specta(export = false, rename = "@odata.context")]
 pub enum RenameWithWeirdCharsEnum {}
-
-// #[derive(Type)]
-// #[specta(export = false)]
-// #[deprecated]
-// struct DeprecatedType {
-//     a: i32,
-// }
-
-// #[derive(Type)]
-// #[specta(export = false)]
-// #[deprecated = "Look at you big man using a deprecation message"]
-// struct DeprecatedTypeWithMsg {
-//     a: i32,
-// }
-
-// #[derive(Type)]
-// #[specta(export = false)]
-// #[deprecated(note = "Look at you big man using a deprecation message")]
-// struct DeprecatedTypeWithMsg2 {
-//     a: i32,
-// }
-
-// #[derive(Type)]
-// #[specta(export = false)]
-// struct DeprecatedFields {
-//     a: i32,
-//     // #[deprecated]
-//     b: String,
-//     #[deprecated = "This field is cringe!"]
-//     c: String,
-//     #[deprecated(note = "This field is cringe!")]
-//     d: String,
-// }

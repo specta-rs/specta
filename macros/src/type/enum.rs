@@ -65,15 +65,24 @@ pub fn parse_enum(
                 let mut attrs = parse_attrs(&v.attrs)?;
                 let variant_attrs = VariantAttr::from_attrs(&mut attrs)?;
 
-                attrs
-                    .iter()
-                    .find(|attr| attr.root_ident == "specta")
-                    .map_or(Ok(()), |attr| {
-                        Err(syn::Error::new(
-                            attr.key.span(),
-                            format!("specta: Found unsupported enum attribute '{}'", attr.key),
-                        ))
-                    })?;
+                // The expectation is that when an attribute is processed it will be removed so if any are left over we know they are invalid
+                // but we only throw errors for Specta-specific attributes so we don't continually break other attributes.
+                if let Some(attrs) = attrs.iter().find(|attr| attr.key == "specta") {
+                    match &attrs.value {
+                        Some(AttributeValue::Attribute { attr, .. }) => {
+                            if let Some(attr) = attr.first() {
+                                return Err(syn::Error::new(
+                                    attr.key.span(),
+                                    format!(
+                                        "specta: Found unsupported enum attribute '{}'",
+                                        attr.key
+                                    ),
+                                ));
+                            }
+                        }
+                        _ => todo!(),
+                    }
+                }
 
                 Ok((v, variant_attrs))
             })
@@ -98,11 +107,12 @@ pub fn parse_enum(
                             .iter()
                             .map(|field| {
                                 let field_attrs = decode_field_attrs(field)?;
+                                let deprecated = field_attrs.common.deprecated_as_tokens(crate_ref);
                                 let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
                                 let skip = field_attrs.skip;
                                 let optional = field_attrs.optional;
                                 let flatten = field_attrs.flatten;
-                                let doc = field_attrs.doc;
+                                let doc = field_attrs.common.doc;
 
                                 let generic_vars = construct_datatype(
                                     format_ident!("gen"),
@@ -116,6 +126,7 @@ pub fn parse_enum(
                                     #skip,
                                     #optional,
                                     #flatten,
+                                    #deprecated,
                                     #doc.into(),
                                     {
                                         #generic_vars
@@ -158,15 +169,17 @@ pub fn parse_enum(
                                 }
                                 (_, _) => quote::quote!(#field_ident_str),
                             };
+                            let deprecated = field_attrs.common.deprecated_as_tokens(crate_ref);
                             let skip = field_attrs.skip;
                             let optional = field_attrs.optional;
                             let flatten = field_attrs.flatten;
-                            let doc = field_attrs.doc;
+                            let doc = field_attrs.common.doc;
 
                             Ok(quote!((#field_name.into(), #crate_ref::internal::construct::field(
                                 #skip,
                                 #optional,
                                 #flatten,
+                                #deprecated,
                                 #doc.into(),
                                 {
                                     #generic_vars
@@ -181,9 +194,10 @@ pub fn parse_enum(
                     }
                 };
 
+                let deprecated = attrs.common.deprecated_as_tokens(crate_ref);
                 let skip = attrs.skip;
-                let doc = attrs.doc;
-                Ok(quote!((#variant_name_str.into(), #crate_ref::internal::construct::enum_variant(#skip, #doc.into(), #inner))))
+                let doc = attrs.common.doc;
+                Ok(quote!((#variant_name_str.into(), #crate_ref::internal::construct::enum_variant(#skip, #deprecated, #doc.into(), #inner))))
             })
             .collect::<syn::Result<Vec<_>>>()?;
 

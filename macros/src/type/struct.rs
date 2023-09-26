@@ -1,4 +1,4 @@
-use crate::utils::{parse_attrs, unraw_raw_ident};
+use crate::utils::{parse_attrs, unraw_raw_ident, AttributeValue};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use syn::{spanned::Spanned, DataStruct, Field, Fields, GenericParam, Generics};
@@ -11,15 +11,26 @@ pub fn decode_field_attrs(field: &Field) -> syn::Result<FieldAttr> {
     let mut attrs = parse_attrs(&field.attrs)?;
     let field_attrs = FieldAttr::from_attrs(&mut attrs)?;
 
-    attrs
-        .iter()
-        .find(|attr| attr.root_ident == "specta")
-        .map_or(Ok(()), |attr| {
-            Err(syn::Error::new(
-                attr.key.span(),
-                format!("specta: Found unsupported field attribute '{}'", attr.key),
-            ))
-        })?;
+    // The expectation is that when an attribute is processed it will be removed so if any are left over we know they are invalid
+    // but we only throw errors for Specta-specific attributes so we don't continually break other attributes.
+    if let Some(attrs) = attrs.iter().find(|attr| attr.key == "specta") {
+        match &attrs.value {
+            Some(AttributeValue::Attribute { attr, .. }) => {
+                if let Some(attr) = attr.first() {
+                    return Err(syn::Error::new(
+                        attr.key.span(),
+                        format!("specta: Found unsupported field attribute '{}'", attr.key),
+                    ));
+                }
+            }
+            _ => {
+                return Err(syn::Error::new(
+                    attrs.key.span(),
+                    "specta: invalid formatted attribute",
+                ))
+            }
+        }
+    }
 
     Ok(field_attrs)
 }
@@ -126,10 +137,11 @@ pub fn parse_struct(
                         (_, _) => field_ident_str.to_token_stream(),
                     };
 
+                    let deprecated = field_attrs.common.deprecated_as_tokens(crate_ref);
                     let optional = field_attrs.optional;
                     let flatten = field_attrs.flatten;
                     let skip = field_attrs.skip;
-                    let doc = field_attrs.doc;
+                    let doc = field_attrs.common.doc;
 
                     let parent_inline = container_attrs
                         .inline
@@ -165,6 +177,7 @@ pub fn parse_struct(
                         #skip,
                         #optional,
                         #flatten,
+                        #deprecated,
                         #doc.into(),
                         {
                             #ty
@@ -196,14 +209,16 @@ pub fn parse_struct(
                             field_attrs.inline,
                         )?;
 
+                        let deprecated = field_attrs.common.deprecated_as_tokens(crate_ref);
                         let optional = field_attrs.optional;
                         let flatten = field_attrs.flatten;
                         let skip = field_attrs.skip;
-                        let doc = field_attrs.doc;
+                        let doc = field_attrs.common.doc;
+
                         Ok(quote!({
                             #generic_vars
 
-                            #crate_ref::internal::construct::field(#skip, #optional, #flatten, #doc.into(), gen)
+                            #crate_ref::internal::construct::field(#skip, #optional, #flatten, #deprecated, #doc.into(), gen)
                         }))
                     })
                     .collect::<syn::Result<Vec<TokenStream>>>()?;

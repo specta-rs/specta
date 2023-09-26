@@ -83,6 +83,22 @@ impl DataType {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum DeprecatedType {
+    /// A type that has been deprecated without a message.
+    ///
+    /// Eg. `#[deprecated]`
+    Deprecated,
+    /// A type that has been deprecated with a message and an optional `since` version.
+    ///
+    /// Eg. `#[deprecated = "Use something else"]` or `#[deprecated(since = "1.0.0", message = "Use something else")]`
+    DeprecatedWithSince {
+        since: Option<Cow<'static, str>>,
+        note: Cow<'static, str>,
+    },
+}
+
 /// A reference to a [`DataType`] that can be used before a type is resolved in order to
 /// support recursive types without causing an infinite loop.
 ///
@@ -164,11 +180,13 @@ impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
                         EnumVariant {
                             skip: false,
                             docs: Cow::Borrowed(""),
+                            deprecated: None,
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     skip: false,
                                     optional: false,
                                     flatten: false,
+                                    deprecated: None,
                                     docs: Cow::Borrowed(""),
                                     ty,
                                 }],

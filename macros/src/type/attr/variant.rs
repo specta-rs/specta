@@ -4,13 +4,15 @@ use syn::Result;
 
 use crate::utils::{Attribute, Inflection};
 
+use super::CommonAttr;
+
 #[derive(Default)]
 pub struct VariantAttr {
     pub rename_all: Option<Inflection>,
     pub rename: Option<TokenStream>,
     pub skip: bool,
     pub inline: bool,
-    pub doc: String,
+    pub common: CommonAttr,
 }
 
 impl_parse! {
@@ -21,25 +23,16 @@ impl_parse! {
         "skip_serializing" => out.skip = true,
         "skip_deserializing" => out.skip = true,
         "inline" => out.inline = attr.parse_bool().unwrap_or(true),
-        "doc" => {
-            if attr.key == "doc" {
-                if !out.doc.is_empty() {
-                    out.doc.push_str("\n");
-                }
-
-                out.doc.push_str(&attr.parse_string()?);
-            }
-        },
     }
 }
 
 impl VariantAttr {
     pub fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
         let mut result = Self::default();
+        result.common = CommonAttr::from_attrs(attrs)?;
         Self::try_from_attrs("specta", attrs, &mut result)?;
         #[cfg(feature = "serde")]
         Self::try_from_attrs("serde", attrs, &mut result)?;
-        Self::try_from_attrs("doc", attrs, &mut result)?;
         Ok(result)
     }
 }

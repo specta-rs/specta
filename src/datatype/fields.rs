@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use crate::DataType;
+use crate::{DataType, DeprecatedType};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Field {
@@ -15,6 +15,8 @@ pub struct Field {
     pub(crate) optional: bool,
     /// Did the user apply a `#[serde(flatten)]` or `#[specta(flatten)]` attribute.
     pub(crate) flatten: bool,
+    /// Deprecated attribute for the field.
+    pub(crate) deprecated: Option<DeprecatedType>,
     /// Documentation comments for the field.
     pub(crate) docs: Cow<'static, str>,
     pub(crate) ty: DataType,
@@ -31,6 +33,10 @@ impl Field {
 
     pub fn flatten(&self) -> bool {
         self.flatten
+    }
+
+    pub fn deprecated(&self) -> Option<&DeprecatedType> {
+        self.deprecated.as_ref()
     }
 
     pub fn docs(&self) -> &Cow<'static, str> {

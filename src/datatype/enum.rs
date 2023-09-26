@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 
-use crate::{datatype::DataType, GenericType, NamedDataType, NamedFields, UnnamedFields};
+use crate::{
+    datatype::DataType, DeprecatedType, GenericType, NamedDataType, NamedFields, UnnamedFields,
+};
 
 /// Enum type which dictates how the enum is represented.
 ///
@@ -81,6 +83,8 @@ pub struct EnumVariant {
     pub(crate) skip: bool,
     /// Documentation comments for the field.
     pub(crate) docs: Cow<'static, str>,
+    /// Deprecated attribute for the field.
+    pub(crate) deprecated: Option<DeprecatedType>,
     /// The type of the variant.
     pub(crate) inner: EnumVariants,
 }
@@ -92,6 +96,10 @@ impl EnumVariant {
 
     pub fn docs(&self) -> &Cow<'static, str> {
         &self.docs
+    }
+
+    pub fn deprecated(&self) -> Option<&DeprecatedType> {
+        self.deprecated.as_ref()
     }
 
     pub fn inner(&self) -> &EnumVariants {

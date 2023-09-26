@@ -97,60 +97,43 @@ pub fn export_named_datatype(
     )
 }
 
-fn inner_comments(ctx: ExportContext, doc: &Cow<'static, str>, other: String) -> String {
+fn inner_comments(
+    ctx: ExportContext,
+    deprecated: Option<&DeprecatedType>,
+    docs: &Cow<'static, str>,
+    other: String,
+    start_with_newline: bool,
+) -> String {
     if !ctx.is_export {
         return other;
     }
 
-    let comments = if doc == "" {
-        Cow::Borrowed("")
-    } else {
-        Cow::Owned(
-            ctx.cfg
-                .comment_exporter
-                .map(|v| {
-                    v(&doc
-                        .split('\n')
-                        // TODO: Do this more efficiently
-                        .map(|v| Cow::Owned(v.to_string()))
-                        .collect::<Vec<_>>())
-                })
-                .unwrap_or_default(),
-        )
+    let comments = ctx
+        .cfg
+        .comment_exporter
+        .map(|v| v(CommentFormatterArgs { docs, deprecated }))
+        .unwrap_or_default();
+
+    let prefix = match start_with_newline && !comments.is_empty() {
+        true => "\n",
+        false => "",
     };
 
-    format!("{comments}{other}",)
+    format!("{prefix}{comments}{other}")
 }
 
 fn export_datatype_inner(
     ctx: ExportContext,
     typ @ NamedDataType {
         name,
-        docs: comments,
+        docs,
+        deprecated,
         inner: item,
         ..
     }: &NamedDataType,
     type_map: &TypeMap,
 ) -> Output {
     let ctx = ctx.with(PathItem::Type(name.clone()));
-
-    let comments = if comments == "" {
-        Cow::Borrowed("")
-    } else {
-        Cow::Owned(
-            ctx.cfg
-                .comment_exporter
-                .map(|v| {
-                    v(&comments
-                        .split('\n')
-                        // TODO: Do this more efficiently
-                        .map(|v| Cow::Owned(v.to_string()))
-                        .collect::<Vec<_>>())
-                })
-                .unwrap_or_default(),
-        )
-    };
-
     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
 
     let generics = item
@@ -161,8 +144,12 @@ fn export_datatype_inner(
 
     let inline_ts = datatype_inner(ctx.clone(), &typ.inner, type_map)?;
 
-    Ok(format!(
-        "{comments}export type {name}{generics} = {inline_ts}"
+    Ok(inner_comments(
+        ctx,
+        deprecated.as_ref(),
+        docs,
+        format!("export type {name}{generics} = {inline_ts}"),
+        false,
     ))
 }
 
@@ -273,8 +260,10 @@ fn unnamed_fields_datatype(ctx: ExportContext, fields: &[Field], type_map: &Type
     match fields {
         [field] => Ok(inner_comments(
             ctx.clone(),
+            field.deprecated(),
             field.docs(),
             datatype_inner(ctx, &field.ty, type_map)?,
+            true,
         )),
         fields => Ok(format!(
             "[{}]",
@@ -282,8 +271,10 @@ fn unnamed_fields_datatype(ctx: ExportContext, fields: &[Field], type_map: &Type
                 .iter()
                 .map(|field| Ok(inner_comments(
                     ctx.clone(),
+                    field.deprecated(),
                     field.docs(),
-                    datatype_inner(ctx.clone(), &field.ty, type_map)?
+                    datatype_inner(ctx.clone(), &field.ty, type_map)?,
+                    true
                 )))
                 .collect::<Result<Vec<_>>>()?
                 .join(", ")
@@ -336,7 +327,13 @@ fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &Typ
                 .map(|(key, field)| {
                     datatype_inner(ctx.with(PathItem::Field(key.clone())), &field.ty, type_map).map(
                         |type_str| {
-                            inner_comments(ctx.clone(), field.docs(), format!("({type_str})"))
+                            inner_comments(
+                                ctx.clone(),
+                                field.deprecated(),
+                                field.docs(),
+                                format!("({type_str})"),
+                                true,
+                            )
                         },
                     )
                 })
@@ -347,6 +344,7 @@ fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &Typ
                 .map(|(key, field)| {
                     Ok(inner_comments(
                         ctx.clone(),
+                        field.deprecated(),
                         field.docs(),
                         object_field_to_ts(
                             ctx.with(PathItem::Field(key.clone())),
@@ -354,6 +352,7 @@ fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &Typ
                             field,
                             type_map,
                         )?,
+                        true,
                     ))
                 })
                 .collect::<Result<Vec<_>>>()?;
@@ -395,6 +394,7 @@ fn enum_variant_datatype(
                     .map(|(name, field)| {
                         Ok(inner_comments(
                             ctx.clone(),
+                            field.deprecated(),
                             field.docs(),
                             object_field_to_ts(
                                 ctx.with(PathItem::Field(name.clone())),
@@ -402,6 +402,7 @@ fn enum_variant_datatype(
                                 field,
                                 type_map,
                             )?,
+                            true,
                         ))
                     })
                     .collect::<Result<Vec<_>>>()?,
@@ -454,6 +455,7 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                         EnumVariants::Unit => NULL.to_string(),
                         _ => inner_comments(
                             ctx.clone(),
+                            variant.deprecated(),
                             variant.docs(),
                             enum_variant_datatype(
                                 ctx.with(PathItem::Variant(name.clone())),
@@ -462,6 +464,7 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                                 variant,
                             )?
                             .expect("Invalid Serde type"),
+                            true,
                         ),
                     })
                 })
@@ -479,6 +482,7 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
 
                     Ok(inner_comments(
                         ctx.clone(),
+                        variant.deprecated(),
                         variant.docs(),
                         match (repr, &variant.inner) {
                             (EnumRepr::Untagged, _) => unreachable!(),
@@ -552,6 +556,7 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                                 format!("{{ {tag}: {sanitised_name}; {content}: {ts_values} }}")
                             }
                         },
+                        true,
                     ))
                 })
                 .collect::<Result<Vec<_>>>()?;

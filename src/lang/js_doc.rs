@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use crate::*;
 
 pub use super::ts::*;
@@ -21,7 +19,8 @@ fn format_comment_inner(
     ctx: &ExportContext,
     typ @ NamedDataType {
         name,
-        docs: comments,
+        docs,
+        deprecated,
         inner: item,
         ..
     }: &NamedDataType,
@@ -33,24 +32,15 @@ fn format_comment_inner(
 
     let inline_ts = datatype_inner(ctx.clone(), &typ.inner, type_map)?;
 
-    // TODO: Export deprecated
-
-    Ok(comments::js_doc(
-        &comments
-            .split("\n")
-            // TODO: Can this be efficient
-            .map(|line| Cow::Owned(line.to_string()))
-            .chain(
-                item.generics()
-                    .map(|generics| {
-                        generics
-                            .iter()
-                            .map(|generic| Cow::Owned(format!("@template {}", generic)))
-                            .collect::<Vec<_>>() // TODO: We should be able to avoid this alloc with some work
-                    })
-                    .unwrap_or_default(),
-            )
-            .chain([format!(r#"@typedef {{ {inline_ts} }} {name}"#).into()])
-            .collect::<Vec<_>>(),
+    Ok(comments::js_doc_internal(
+        CommentFormatterArgs {
+            docs,
+            deprecated: deprecated.as_ref(),
+        },
+        item.generics()
+            .into_iter()
+            .flatten()
+            .map(|generic| format!("@template {}", generic))
+            .chain([format!(r#"@typedef {{ {inline_ts} }} {name}"#).into()]),
     ))
 }

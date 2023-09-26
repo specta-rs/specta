@@ -184,6 +184,7 @@ impl<T: Type> Type for std::ops::Range<T> {
                             skip: false,
                             optional: false,
                             flatten: false,
+                            deprecated: None,
                             docs: Cow::Borrowed(""),
                             ty: ty.clone(),
                         },
@@ -194,6 +195,7 @@ impl<T: Type> Type for std::ops::Range<T> {
                             skip: false,
                             optional: false,
                             flatten: false,
+                            deprecated: None,
                             docs: Cow::Borrowed(""),
                             ty,
                         },
@@ -261,11 +263,13 @@ const _: () = {
                         EnumVariant {
                             skip: false,
                             docs: Cow::Borrowed(""),
+                            deprecated: None,
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     skip: false,
                                     optional: false,
                                     flatten: false,
+                                    deprecated: None,
                                     docs: Cow::Borrowed(""),
                                     ty: DataType::Primitive(PrimitiveType::f64),
                                 }],
@@ -277,11 +281,13 @@ const _: () = {
                         EnumVariant {
                             skip: false,
                             docs: Cow::Borrowed(""),
+                            deprecated: None,
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     skip: false,
                                     optional: false,
                                     flatten: false,
+                                    deprecated: None,
                                     docs: Cow::Borrowed(""),
                                     ty: DataType::Primitive(PrimitiveType::i64),
                                 }],
@@ -293,11 +299,13 @@ const _: () = {
                         EnumVariant {
                             skip: false,
                             docs: Cow::Borrowed(""),
+                            deprecated: None,
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     skip: false,
                                     optional: false,
                                     flatten: false,
+                                    deprecated: None,
                                     docs: Cow::Borrowed(""),
                                     ty: DataType::Primitive(PrimitiveType::u64),
                                 }],
@@ -342,11 +350,13 @@ const _: () = {
                         EnumVariant {
                             skip: false,
                             docs: Cow::Borrowed(""),
+                            deprecated: None,
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     skip: false,
                                     optional: false,
                                     flatten: false,
+                                    deprecated: None,
                                     docs: Cow::Borrowed(""),
                                     ty: DataType::Primitive(PrimitiveType::f64),
                                 }],
@@ -358,11 +368,13 @@ const _: () = {
                         EnumVariant {
                             skip: false,
                             docs: Cow::Borrowed(""),
+                            deprecated: None,
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     skip: false,
                                     optional: false,
                                     flatten: false,
+                                    deprecated: None,
                                     docs: Cow::Borrowed(""),
                                     ty: DataType::Primitive(PrimitiveType::i64),
                                 }],
@@ -374,11 +386,13 @@ const _: () = {
                         EnumVariant {
                             skip: false,
                             docs: Cow::Borrowed(""),
+                            deprecated: None,
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     skip: false,
                                     optional: false,
                                     flatten: false,
+                                    deprecated: None,
                                     docs: Cow::Borrowed(""),
                                     ty: DataType::Primitive(PrimitiveType::u64),
                                 }],
@@ -587,11 +601,13 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                     EnumVariant {
                         skip: false,
                         docs: Cow::Borrowed(""),
+                        deprecated: None,
                         inner: EnumVariants::Unnamed(UnnamedFields {
                             fields: vec![Field {
                                 skip: false,
                                 optional: false,
                                 flatten: false,
+                                deprecated: None,
                                 docs: Cow::Borrowed(""),
                                 ty: L::inline(
                                     DefOpts {
@@ -609,11 +625,13 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                     EnumVariant {
                         skip: false,
                         docs: Cow::Borrowed(""),
+                        deprecated: None,
                         inner: EnumVariants::Unnamed(UnnamedFields {
                             fields: vec![Field {
                                 skip: false,
                                 optional: false,
                                 flatten: false,
+                                deprecated: None,
                                 docs: Cow::Borrowed(""),
                                 ty: R::inline(
                                     DefOpts {

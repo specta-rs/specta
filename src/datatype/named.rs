@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{DataType, ImplLocation, SpectaID};
+use crate::{DataType, DeprecatedType, ImplLocation, SpectaID};
 
 /// A NamedDataTypeImpl includes extra information which is only available for [NamedDataType]'s that come from a real Rust type.
 #[derive(Debug, Clone, PartialEq)]
@@ -37,7 +37,7 @@ pub struct NamedDataType {
     /// Rust documentation comments on the type
     pub(crate) docs: Cow<'static, str>,
     /// The Rust deprecated comment if the type is deprecated.
-    pub(crate) deprecated: Option<Cow<'static, str>>,
+    pub(crate) deprecated: Option<DeprecatedType>,
     /// Extra information that comes from a real Rust type (using the `Type` macro).
     /// This will be `None` when constructing [NamedDataType] using `StructType::to_named` or `TupleType::to_named` since those types do not correspond to actual Rust types.
     pub(crate) ext: Option<NamedDataTypeExt>,
@@ -55,7 +55,7 @@ impl NamedDataType {
         &self.docs
     }
 
-    pub fn deprecated(&self) -> Option<&Cow<'static, str>> {
+    pub fn deprecated(&self) -> Option<&DeprecatedType> {
         self.deprecated.as_ref()
     }
 

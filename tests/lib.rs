@@ -4,6 +4,7 @@ mod advanced_types;
 mod bigints;
 mod comments;
 mod datatype;
+mod deprecated;
 mod duplicate_ty_name;
 mod export;
 mod flatten_and_inline;
