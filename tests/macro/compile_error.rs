@@ -95,4 +95,12 @@ struct InvalidAttrs4 {
 #[specta(transparent)]
 pub enum TransparentEnum {}
 
+#[derive(Type)]
+#[specta]
+pub struct InvalidSpectaAttribute1;
+
+#[derive(Type)]
+#[specta = "todo"]
+pub struct InvalidSpectaAttribute2;
+
 // TODO: https://docs.rs/trybuild/latest/trybuild/#what-to-test

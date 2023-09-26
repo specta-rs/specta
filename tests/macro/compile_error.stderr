@@ -40,11 +40,23 @@ error: #[specta(transparent)] is not allowed on an enum
 96 | pub enum TransparentEnum {}
    |     ^^^^
 
-error[E0601]: `main` function not found in crate `$CRATE`
-  --> tests/macro/compile_error.rs:96:28
+error: specta: invalid formatted attribute
+  --> tests/macro/compile_error.rs:99:3
    |
-96 | pub enum TransparentEnum {}
-   |                            ^ consider adding a `main` function to `$DIR/tests/macro/compile_error.rs`
+99 | #[specta]
+   |   ^^^^^^
+
+error: specta: invalid formatted attribute
+   --> tests/macro/compile_error.rs:103:3
+    |
+103 | #[specta = "todo"]
+    |   ^^^^^^
+
+error[E0601]: `main` function not found in crate `$CRATE`
+   --> tests/macro/compile_error.rs:104:36
+    |
+104 | pub struct InvalidSpectaAttribute2;
+    |                                    ^ consider adding a `main` function to `$DIR/tests/macro/compile_error.rs`
 
 error[E0277]: the trait bound `UnitExternal: specta::Flatten` is not satisfied
   --> tests/macro/compile_error.rs:32:11
