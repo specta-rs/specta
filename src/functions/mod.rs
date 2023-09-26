@@ -56,7 +56,9 @@ pub struct FunctionDataType {
     /// The return type of the function.
     pub result: DataType,
     /// The function's documentation. Detects both `///` and `#[doc = ...]` style documentation.
-    pub docs: Vec<Cow<'static, str>>,
+    pub docs: Cow<'static, str>,
+    /// The deprecated status of the function.
+    pub deprecated: Option<DeprecatedType>,
 }
 
 /// Implemented by functions that can be annoatated with [`specta`](crate::specta).
@@ -67,7 +69,8 @@ pub trait SpectaFunction<TMarker> {
         name: Cow<'static, str>,
         type_map: &mut TypeMap,
         fields: &[Cow<'static, str>],
-        docs: Vec<Cow<'static, str>>,
+        docs: Cow<'static, str>,
+        deprecated: Option<DeprecatedType>,
     ) -> FunctionDataType;
 }
 
@@ -79,7 +82,8 @@ impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction
         name: Cow<'static, str>,
         type_map: &mut TypeMap,
         _fields: &[Cow<'static, str>],
-        docs: Vec<Cow<'static, str>>,
+        docs: Cow<'static, str>,
+        deprecated: Option<DeprecatedType>,
     ) -> FunctionDataType {
         FunctionDataType {
             asyncness,
@@ -90,6 +94,7 @@ impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction
                 type_map,
             }),
             docs,
+            deprecated,
         }
     }
 }
@@ -103,9 +108,10 @@ pub fn get_datatype_internal<TMarker, T: SpectaFunction<TMarker>>(
     name: Cow<'static, str>,
     type_map: &mut TypeMap,
     fields: &[Cow<'static, str>],
-    docs: Vec<Cow<'static, str>>,
+    docs: Cow<'static, str>,
+    deprecated: Option<DeprecatedType>,
 ) -> FunctionDataType {
-    T::to_datatype(asyncness, name, type_map, fields, docs)
+    T::to_datatype(asyncness, name, type_map, fields, docs, deprecated)
 }
 
 macro_rules! impl_typed_command {
@@ -122,7 +128,8 @@ macro_rules! impl_typed_command {
                     name: Cow<'static, str>,
                     type_map: &mut TypeMap,
                     fields: &[Cow<'static, str>],
-                    docs: Vec<Cow<'static, str>>,
+                    docs: Cow<'static, str>,
+                    deprecated: Option<DeprecatedType>,
                 ) -> FunctionDataType {
                     let mut fields = fields.into_iter();
 
@@ -130,6 +137,7 @@ macro_rules! impl_typed_command {
                         asyncness,
                         name,
                         docs,
+                        deprecated,
                         args: [$(
                             fields
                                 .next()

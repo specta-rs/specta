@@ -33,10 +33,8 @@ fn format_comment_inner(
     let inline_ts = datatype_inner(ctx.clone(), &typ.inner, type_map)?;
 
     Ok(comments::js_doc_internal(
-        CommentFormatterArgs {
-            docs,
-            deprecated: deprecated.as_ref(),
-        },
+        docs,
+        deprecated.as_ref(),
         item.generics()
             .into_iter()
             .flatten()

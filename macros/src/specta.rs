@@ -3,9 +3,10 @@
 use quote::{quote, ToTokens};
 use syn::{parse_macro_input, FnArg, ItemFn, Pat, Visibility};
 
-use crate::utils::format_fn_wrapper;
+use crate::utils::{format_fn_wrapper, parse_attrs};
 
 pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
+    let crate_ref = quote!(specta);
     let function = parse_macro_input::parse::<ItemFn>(item)?;
     let wrapper = format_fn_wrapper(&function.sig.ident);
 
@@ -36,14 +37,11 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
 
     let arg_signatures = function.sig.inputs.iter().map(|_| quote!(_));
 
-    let docs = function
-        .attrs
-        .iter()
-        .filter(|attr| attr.path.is_ident("doc"))
-        .filter_map(|attr| match attr.parse_meta() {
-            Ok(syn::Meta::NameValue(v)) => Some(v.lit),
-            _ => None,
-        });
+    let mut attrs = parse_attrs(&function.attrs)?;
+    let common = crate::r#type::attr::CommonAttr::from_attrs(&mut attrs)?;
+
+    let deprecated = common.deprecated_as_tokens(&crate_ref);
+    let docs = common.doc;
 
     Ok(quote! {
         #function
@@ -55,7 +53,8 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
             (@name) => { #function_name_str.into() };
             (@arg_names) => { &[#(stringify!(#arg_names).into()),* ] };
             (@signature) => { fn(#(#arg_signatures),*) -> _ };
-            (@docs) => { vec![#(#docs.into()),*] };
+            (@docs) => { std::borrow::Cow::Borrowed(#docs) };
+            (@deprecated) => { #deprecated };
         }
 
         // allow the macro to be resolved with the same path as the function

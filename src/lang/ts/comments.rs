@@ -1,4 +1,4 @@
-use std::iter;
+use std::{borrow::Cow, iter};
 
 use crate::DeprecatedType;
 
@@ -9,28 +9,29 @@ const _: CommentFormatterFn = js_doc;
 
 /// Converts Typescript comments into JSDoc comments.
 pub fn js_doc(arg: CommentFormatterArgs) -> String {
-    js_doc_internal(arg, iter::empty())
+    js_doc_internal(arg.docs, arg.deprecated, iter::empty())
 }
 
 pub(crate) fn js_doc_internal(
-    arg: CommentFormatterArgs,
+    docs: &Cow<'static, str>,
+    deprecated: Option<&DeprecatedType>,
     extra_lines: impl Iterator<Item = String>,
 ) -> String {
-    if arg.docs.is_empty() && arg.deprecated.is_none() {
+    if docs.is_empty() && deprecated.is_none() {
         return "".into();
     }
 
-    let mut comment = String::with_capacity(arg.docs.len());
+    let mut comment = String::with_capacity(docs.len());
     comment.push_str("/**\n");
-    if !arg.docs.is_empty() {
-        for line in arg.docs.split('\n') {
+    if !docs.is_empty() {
+        for line in docs.split('\n') {
             comment.push_str(" * ");
             comment.push_str(line.trim());
             comment.push('\n');
         }
     }
 
-    if let Some(deprecated) = arg.deprecated {
+    if let Some(deprecated) = deprecated {
         comment.push_str(" * @deprecated");
         if let DeprecatedType::DeprecatedWithSince {
             since,

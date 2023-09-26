@@ -1,6 +1,6 @@
 #[cfg(feature = "functions")]
 mod test {
-    use std::fmt;
+    use std::{borrow::Cow, fmt};
 
     use specta::{functions, specta, ts::ExportConfig, Type};
 
@@ -300,7 +300,7 @@ mod test {
                 specta::ts::datatype(&ExportConfig::default(), &def.result, type_map).unwrap(),
                 "null"
             );
-            assert_eq!(def.docs, vec![" Testing Doc Comment"]);
+            assert_eq!(def.docs, Cow::Borrowed(" Testing Doc Comment"));
         }
     }
 }

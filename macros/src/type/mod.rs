@@ -13,7 +13,7 @@ use self::generics::{
     add_type_to_where_clause, generics_with_ident_and_bounds_only, generics_with_ident_only,
 };
 
-mod attr;
+pub(crate) mod attr;
 mod r#enum;
 mod generics;
 mod r#struct;
