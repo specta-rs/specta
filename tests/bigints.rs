@@ -69,7 +69,7 @@ fn test_bigint_types() {
 
     for_bigint_types!(T -> |name| assert_eq!(specta::ts::inline::<T>(&ExportConfig::new().bigint(BigIntExportBehavior::String)), Ok("string".into())));
     for_bigint_types!(T -> |name| assert_eq!(specta::ts::inline::<T>(&ExportConfig::new().bigint(BigIntExportBehavior::Number)), Ok("number".into())));
-    for_bigint_types!(T -> |name| assert_eq!(specta::ts::inline::<T>(&ExportConfig::new().bigint(BigIntExportBehavior::BigInt)), Ok("BigInt".into())));
+    for_bigint_types!(T -> |name| assert_eq!(specta::ts::inline::<T>(&ExportConfig::new().bigint(BigIntExportBehavior::BigInt)), Ok("bigint".into())));
 
     // Check error messages are working correctly -> These tests second for `ExportPath` which is why they are so comprehensive
     assert_eq!(
