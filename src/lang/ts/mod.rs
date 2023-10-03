@@ -656,4 +656,4 @@ const STRING: &str = "string";
 const BOOLEAN: &str = "boolean";
 const NULL: &str = "null";
 const NEVER: &str = "never";
-const BIGINT: &str = "BigInt";
+const BIGINT: &str = "bigint";
