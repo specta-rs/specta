@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use crate::*;
 
 pub use super::ts::*;
@@ -32,13 +34,92 @@ fn format_comment_inner(
 
     let inline_ts = datatype_inner(ctx.clone(), &typ.inner, type_map)?;
 
-    Ok(comments::js_doc_internal(
+    let mut builder = ts::comments::js_doc_builder(CommentFormatterArgs {
         docs,
-        deprecated.as_ref(),
-        item.generics()
-            .into_iter()
-            .flatten()
-            .map(|generic| format!("@template {}", generic))
-            .chain([format!(r#"@typedef {{ {inline_ts} }} {name}"#).into()]),
-    ))
+        deprecated: deprecated.as_ref(),
+    });
+
+    item.generics()
+        .into_iter()
+        .flatten()
+        .for_each(|generic| builder.push_generic(generic));
+
+    builder.push_internal(["@typedef { ", &inline_ts, " } ", &name]);
+
+    Ok(builder.build())
+}
+
+const START: &str = "/**\n";
+
+pub struct Builder {
+    value: String,
+}
+
+impl Builder {
+    pub fn push(&mut self, line: &str) {
+        self.push_internal([line.trim()]);
+    }
+
+    pub(crate) fn push_internal<'a>(&mut self, parts: impl IntoIterator<Item = &'a str>) {
+        self.value.push_str(" * ");
+
+        for part in parts.into_iter() {
+            self.value.push_str(part);
+        }
+
+        self.value.push_str("\n");
+    }
+
+    pub fn push_deprecated(&mut self, typ: &DeprecatedType) {
+        self.push_internal(
+            ["@deprecated"].into_iter().chain(
+                match typ {
+                    DeprecatedType::DeprecatedWithSince {
+                        note: message,
+                        since,
+                    } => Some((since.as_ref(), message)),
+                    _ => None,
+                }
+                .map(|(since, message)| {
+                    [" ", message.trim()].into_iter().chain(
+                        since
+                            .map(|since| [" since ", since.trim()])
+                            .into_iter()
+                            .flatten(),
+                    )
+                })
+                .into_iter()
+                .flatten(),
+            ),
+        );
+    }
+
+    pub fn push_generic(&mut self, generic: &GenericType) {
+        self.push_internal(["@template ", generic.borrow()])
+    }
+
+    pub fn build(mut self) -> String {
+        if self.value == START {
+            return String::new();
+        }
+
+        self.value.push_str(" */\n");
+        self.value
+    }
+}
+
+impl Default for Builder {
+    fn default() -> Self {
+        Self {
+            value: START.to_string(),
+        }
+    }
+}
+
+impl<T: AsRef<str>> Extend<T> for Builder {
+    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        for item in iter {
+            self.push(item.as_ref());
+        }
+    }
 }
