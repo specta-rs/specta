@@ -4,8 +4,12 @@ use crate::*;
 
 pub use super::ts::*;
 
-pub fn format_comment(cfg: &ExportConfig, typ: &NamedDataType, type_map: &TypeMap) -> Output {
-    format_comment_inner(
+pub fn typedef_named_datatype(
+    cfg: &ExportConfig,
+    typ: &NamedDataType,
+    type_map: &TypeMap,
+) -> Output {
+    typedef_named_datatype_inner(
         &ExportContext {
             cfg,
             path: vec![],
@@ -17,7 +21,7 @@ pub fn format_comment(cfg: &ExportConfig, typ: &NamedDataType, type_map: &TypeMa
     )
 }
 
-fn format_comment_inner(
+fn typedef_named_datatype_inner(
     ctx: &ExportContext,
     typ @ NamedDataType {
         name,
