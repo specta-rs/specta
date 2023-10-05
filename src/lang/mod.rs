@@ -16,7 +16,9 @@ compile_error!("`js_doc` feature requires `typescript` feature to be enabled");
 /// Also requires `typescript` feature to be enabled.
 #[cfg(all(feature = "js_doc", feature = "typescript"))]
 #[cfg_attr(docsrs, doc(cfg(all(feature = "js_doc", feature = "typescript"))))]
-pub mod js_doc;
+pub mod js_doc {
+    pub use super::ts::js_doc::*;
+}
 
 // /// [Rust](https://www.rust-lang.org) language exporter.
 // #[cfg(feature = "rust")]

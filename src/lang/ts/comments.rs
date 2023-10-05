@@ -1,4 +1,4 @@
-use crate::js_doc;
+use super::js_doc;
 
 use super::{CommentFormatterArgs, CommentFormatterFn};
 

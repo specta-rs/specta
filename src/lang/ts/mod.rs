@@ -5,6 +5,7 @@ mod context;
 mod error;
 mod export_config;
 mod formatter;
+pub(crate) mod js_doc;
 mod reserved_terms;
 
 pub use context::*;

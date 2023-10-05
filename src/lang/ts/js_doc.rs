@@ -1,7 +1,5 @@
 use std::borrow::Borrow;
 
-use crate::*;
-
 pub use super::ts::*;
 
 pub fn typedef_named_datatype(
