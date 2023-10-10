@@ -5,7 +5,7 @@ use syn::{parse_macro_input, Data, DeriveInput, Fields};
 
 use attr::*;
 
-use crate::utils::parse_attrs;
+use crate::utils::{parse_attrs, then_option};
 
 pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
     let DeriveInput {
@@ -48,15 +48,15 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         // TODO: Proper syn error would be nice
                         .expect("'specta::DataTypeFrom' requires named fields.");
                     let ident_str = ident.to_string();
-                    let skip = attrs.skip;
+
+                    let ty = then_option(attrs.skip, quote!(t.#ident.into()));
 
                     quote!((#ident_str.into(), #crate_ref::internal::construct::field(
-                        #skip,
                         false,
                         false,
                         None,
                         std::borrow::Cow::Borrowed(""),
-                        t.#ident.into(),
+                        #ty
                     )))
                 });
 

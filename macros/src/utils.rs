@@ -1,4 +1,5 @@
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream};
+use quote::quote;
 use syn::{
     ext::IdentExt,
     parenthesized,
@@ -295,4 +296,10 @@ impl Inflection {
 #[cfg(feature = "functions")]
 pub fn format_fn_wrapper(function: &Ident) -> Ident {
     quote::format_ident!("__specta__fn__{}", function)
+}
+
+pub fn then_option(condition: bool, inner: TokenStream) -> TokenStream {
+    condition
+        .then(|| quote!(None))
+        .unwrap_or_else(|| quote!(Some(#inner)))
 }

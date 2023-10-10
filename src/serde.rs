@@ -1,6 +1,7 @@
 use thiserror::Error;
 
 use crate::{
+    internal::{skip_fields, skip_fields_named},
     DataType, EnumRepr, EnumType, EnumVariants, LiteralType, PrimitiveType, StructFields, TypeMap,
 };
 
@@ -29,13 +30,13 @@ pub(crate) fn is_valid_ty(dt: &DataType, type_map: &TypeMap) -> Result<(), Serde
         DataType::Struct(ty) => match ty.fields() {
             StructFields::Unit => {}
             StructFields::Unnamed(ty) => {
-                for field in ty.fields().iter() {
-                    is_valid_ty(&field.ty, type_map)?;
+                for (_, ty) in skip_fields(ty.fields()) {
+                    is_valid_ty(ty, type_map)?;
                 }
             }
             StructFields::Named(ty) => {
-                for (_field_name, field) in ty.fields().iter() {
-                    is_valid_ty(&field.ty, type_map)?;
+                for (_, (_, ty)) in skip_fields_named(ty.fields()) {
+                    is_valid_ty(ty, type_map)?;
                 }
             }
         },
@@ -46,21 +47,21 @@ pub(crate) fn is_valid_ty(dt: &DataType, type_map: &TypeMap) -> Result<(), Serde
                 match &variant.inner {
                     EnumVariants::Unit => {}
                     EnumVariants::Named(variant) => {
-                        for (_field_name, field) in variant.fields.iter() {
-                            is_valid_ty(&field.ty, type_map)?;
+                        for (_, (_, ty)) in skip_fields_named(variant.fields()) {
+                            is_valid_ty(ty, type_map)?;
                         }
                     }
                     EnumVariants::Unnamed(variant) => {
-                        for field in variant.fields.iter() {
-                            is_valid_ty(&field.ty, type_map)?;
+                        for (_, ty) in skip_fields(variant.fields()) {
+                            is_valid_ty(ty, type_map)?;
                         }
                     }
                 }
             }
         }
         DataType::Tuple(ty) => {
-            for field in ty.fields.iter() {
-                is_valid_ty(field, type_map)?;
+            for ty in ty.elements() {
+                is_valid_ty(ty, type_map)?;
             }
         }
         DataType::Result(ty) => {
@@ -68,7 +69,7 @@ pub(crate) fn is_valid_ty(dt: &DataType, type_map: &TypeMap) -> Result<(), Serde
             is_valid_ty(&ty.1, type_map)?;
         }
         DataType::Reference(ty) => {
-            for generic in &ty.generics {
+            for generic in ty.generics() {
                 is_valid_ty(generic, type_map)?;
             }
 
@@ -180,12 +181,17 @@ fn validate_internally_tag_enum(e: &EnumType, type_map: &TypeMap) -> Result<(), 
             EnumVariants::Unit => {}
             EnumVariants::Named(_) => {}
             EnumVariants::Unnamed(item) => {
-                let fields = item.fields();
-                if fields.len() > 1 {
+                let mut fields = skip_fields(item.fields());
+
+                let Some(first_field) = fields.next() else {
+                    continue;
+                };
+
+                if fields.next().is_some() {
                     return Err(SerdeError::InvalidInternallyTaggedEnum);
                 }
 
-                validate_internally_tag_enum_datatype(&fields[0].ty, type_map)?;
+                validate_internally_tag_enum_datatype(first_field.1, type_map)?;
             }
         }
     }
@@ -216,7 +222,7 @@ fn validate_internally_tag_enum_datatype(
             EnumRepr::Adjacent { .. } => {}
         },
         // `()` is `null` and is valid
-        DataType::Tuple(ty) if ty.fields.is_empty() => {}
+        DataType::Tuple(ty) if ty.elements.is_empty() => {}
         // Are valid as they are serialized as an map-type. Eg. `"Ok": 5` or `"Error": "todo"`
         DataType::Result(_) => {}
         // References need to be checked against the same rules.

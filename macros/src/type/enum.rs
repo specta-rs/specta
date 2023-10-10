@@ -109,7 +109,6 @@ pub fn parse_enum(
                                 let field_attrs = decode_field_attrs(field)?;
                                 let deprecated = field_attrs.common.deprecated_as_tokens(crate_ref);
                                 let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
-                                let skip = field_attrs.skip;
                                 let optional = field_attrs.optional;
                                 let flatten = field_attrs.flatten;
                                 let doc = field_attrs.common.doc;
@@ -122,17 +121,18 @@ pub fn parse_enum(
                                     attrs.inline,
                                 )?;
 
+                                let ty = then_option(field_attrs.skip, quote! {{
+                                    #generic_vars
+
+                                    gen
+                                }});
+
                                 Ok(quote!(#crate_ref::internal::construct::field(
-                                    #skip,
                                     #optional,
                                     #flatten,
                                     #deprecated,
                                     #doc.into(),
-                                    {
-                                        #generic_vars
-
-                                        gen
-                                    }
+                                    #ty
                                 )))
                             })
                             .collect::<syn::Result<Vec<TokenStream>>>()?;
@@ -170,22 +170,22 @@ pub fn parse_enum(
                                 (_, _) => quote::quote!(#field_ident_str),
                             };
                             let deprecated = field_attrs.common.deprecated_as_tokens(crate_ref);
-                            let skip = field_attrs.skip;
                             let optional = field_attrs.optional;
                             let flatten = field_attrs.flatten;
                             let doc = field_attrs.common.doc;
 
+                            let ty = then_option(field_attrs.skip, quote! {{
+								#generic_vars
+
+								gen
+							}});
+
                             Ok(quote!((#field_name.into(), #crate_ref::internal::construct::field(
-                                #skip,
                                 #optional,
                                 #flatten,
                                 #deprecated,
                                 #doc.into(),
-                                {
-                                    #generic_vars
-
-                                    gen
-                                },
+                                #ty
                             ))))
                         })
                         .collect::<syn::Result<Vec<TokenStream>>>()?;

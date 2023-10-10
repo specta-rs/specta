@@ -29,7 +29,7 @@ macro_rules! impl_tuple {
                 );)*
 
                 datatype::TupleType {
-                    fields: vec![$($i),*],
+                    elements: vec![$($i),*],
                 }.to_anonymous()
             }
         }
