@@ -4,11 +4,15 @@
 //!
 //! DO NOT USE THEM! You have been warned!
 
+use std::borrow::Cow;
+
 #[cfg(feature = "export")]
 pub use ctor;
 
 #[cfg(feature = "functions")]
 pub use specta_macros::fn_datatype;
+
+use crate::{DataType, Field};
 
 /// Functions used to construct `crate::datatype` types (they have private fields so can't be constructed directly).
 /// We intentionally keep their fields private so we can modify them without a major version bump.
@@ -19,15 +23,13 @@ pub mod construct {
     use crate::{datatype::*, ImplLocation, SpectaID};
 
     pub const fn field(
-        skip: bool,
         optional: bool,
         flatten: bool,
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
-        ty: DataType,
+        ty: Option<DataType>,
     ) -> Field {
         Field {
-            skip,
             optional,
             flatten,
             deprecated,
@@ -141,7 +143,7 @@ pub mod construct {
     }
 
     pub const fn tuple(fields: Vec<DataType>) -> TupleType {
-        TupleType { fields }
+        TupleType { elements: fields }
     }
 
     pub const fn impl_location(loc: &'static str) -> ImplLocation {
@@ -174,4 +176,22 @@ pub mod construct {
 
         SpectaID { type_name, hash }
     }
+}
+
+pub type NonSkipField<'a> = (&'a Field, &'a DataType);
+
+pub fn skip_fields<'a>(
+    fields: impl IntoIterator<Item = &'a Field>,
+) -> impl Iterator<Item = NonSkipField<'a>> {
+    fields
+        .into_iter()
+        .filter_map(|field| field.ty().map(|ty| (field, ty)))
+}
+
+pub fn skip_fields_named<'a>(
+    fields: impl IntoIterator<Item = &'a (Cow<'static, str>, Field)>,
+) -> impl Iterator<Item = (&'a Cow<'static, str>, NonSkipField<'a>)> {
+    fields
+        .into_iter()
+        .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
 }

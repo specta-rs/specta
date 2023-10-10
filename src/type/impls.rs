@@ -172,7 +172,7 @@ pub enum Infallible {}
 
 impl<T: Type> Type for std::ops::Range<T> {
     fn inline(opts: DefOpts, _generics: &[DataType]) -> DataType {
-        let ty = T::definition(opts);
+        let ty = Some(T::definition(opts));
         DataType::Struct(StructType {
             name: "Range".into(),
             generics: vec![],
@@ -181,7 +181,6 @@ impl<T: Type> Type for std::ops::Range<T> {
                     (
                         "start".into(),
                         Field {
-                            skip: false,
                             optional: false,
                             flatten: false,
                             deprecated: None,
@@ -192,7 +191,6 @@ impl<T: Type> Type for std::ops::Range<T> {
                     (
                         "end".into(),
                         Field {
-                            skip: false,
                             optional: false,
                             flatten: false,
                             deprecated: None,
@@ -266,12 +264,11 @@ const _: () = {
                             deprecated: None,
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
-                                    skip: false,
                                     optional: false,
                                     flatten: false,
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
-                                    ty: DataType::Primitive(PrimitiveType::f64),
+                                    ty: Some(DataType::Primitive(PrimitiveType::f64)),
                                 }],
                             }),
                         },
@@ -284,12 +281,11 @@ const _: () = {
                             deprecated: None,
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
-                                    skip: false,
                                     optional: false,
                                     flatten: false,
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
-                                    ty: DataType::Primitive(PrimitiveType::i64),
+                                    ty: Some(DataType::Primitive(PrimitiveType::i64)),
                                 }],
                             }),
                         },
@@ -302,12 +298,11 @@ const _: () = {
                             deprecated: None,
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
-                                    skip: false,
                                     optional: false,
                                     flatten: false,
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
-                                    ty: DataType::Primitive(PrimitiveType::u64),
+                                    ty: Some(DataType::Primitive(PrimitiveType::u64)),
                                 }],
                             }),
                         },
@@ -353,12 +348,11 @@ const _: () = {
                             deprecated: None,
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
-                                    skip: false,
                                     optional: false,
                                     flatten: false,
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
-                                    ty: DataType::Primitive(PrimitiveType::f64),
+                                    ty: Some(DataType::Primitive(PrimitiveType::f64)),
                                 }],
                             }),
                         },
@@ -371,12 +365,11 @@ const _: () = {
                             deprecated: None,
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
-                                    skip: false,
                                     optional: false,
                                     flatten: false,
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
-                                    ty: DataType::Primitive(PrimitiveType::i64),
+                                    ty: Some(DataType::Primitive(PrimitiveType::i64)),
                                 }],
                             }),
                         },
@@ -389,12 +382,11 @@ const _: () = {
                             deprecated: None,
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
-                                    skip: false,
                                     optional: false,
                                     flatten: false,
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
-                                    ty: DataType::Primitive(PrimitiveType::u64),
+                                    ty: Some(DataType::Primitive(PrimitiveType::u64)),
                                 }],
                             }),
                         },
@@ -604,18 +596,17 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                         deprecated: None,
                         inner: EnumVariants::Unnamed(UnnamedFields {
                             fields: vec![Field {
-                                skip: false,
                                 optional: false,
                                 flatten: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
-                                ty: L::inline(
+                                ty: Some(L::inline(
                                     DefOpts {
                                         parent_inline: opts.parent_inline,
                                         type_map: opts.type_map,
                                     },
                                     generics,
-                                ),
+                                )),
                             }],
                         }),
                     },
@@ -628,18 +619,17 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                         deprecated: None,
                         inner: EnumVariants::Unnamed(UnnamedFields {
                             fields: vec![Field {
-                                skip: false,
                                 optional: false,
                                 flatten: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
-                                ty: R::inline(
+                                ty: Some(R::inline(
                                     DefOpts {
                                         parent_inline: opts.parent_inline,
                                         type_map: opts.type_map,
                                     },
                                     generics,
-                                ),
+                                )),
                             }],
                         }),
                     },

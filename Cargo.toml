@@ -28,7 +28,7 @@ required-features = ["export", "typescript"]
 
 # Run `node ./.github/features.js` to update the docs
 [features]
-default = []
+default = ["typescript"]
 
 ##! Internal Features
 ## Support for exporting the types of Rust functions.

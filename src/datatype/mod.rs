@@ -183,12 +183,11 @@ impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
                             deprecated: None,
                             inner: EnumVariants::Unnamed(UnnamedFields {
                                 fields: vec![Field {
-                                    skip: false,
                                     optional: false,
                                     flatten: false,
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
-                                    ty,
+                                    ty: Some(ty),
                                 }],
                             }),
                         },

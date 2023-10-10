@@ -14,7 +14,10 @@ pub use export_config::*;
 pub use formatter::*;
 use reserved_terms::*;
 
-use crate::*;
+use crate::{
+    internal::{skip_fields, skip_fields_named, NonSkipField},
+    *,
+};
 
 #[allow(missing_docs)]
 pub type Result<T> = std::result::Result<T, ExportError>;
@@ -257,24 +260,28 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
 }
 
 // Can be used with `StructUnnamedFields.fields` or `EnumNamedFields.fields`
-fn unnamed_fields_datatype(ctx: ExportContext, fields: &[Field], type_map: &TypeMap) -> Output {
+fn unnamed_fields_datatype(
+    ctx: ExportContext,
+    fields: &[NonSkipField],
+    type_map: &TypeMap,
+) -> Output {
     match fields {
-        [field] => Ok(inner_comments(
+        [(field, ty)] => Ok(inner_comments(
             ctx.clone(),
             field.deprecated(),
             field.docs(),
-            datatype_inner(ctx, &field.ty, type_map)?,
+            datatype_inner(ctx, ty, type_map)?,
             true,
         )),
         fields => Ok(format!(
             "[{}]",
             fields
                 .iter()
-                .map(|field| Ok(inner_comments(
+                .map(|(field, ty)| Ok(inner_comments(
                     ctx.clone(),
                     field.deprecated(),
                     field.docs(),
-                    datatype_inner(ctx.clone(), &field.ty, type_map)?,
+                    datatype_inner(ctx.clone(), ty, type_map)?,
                     true
                 )))
                 .collect::<Result<Vec<_>>>()?
@@ -284,7 +291,7 @@ fn unnamed_fields_datatype(ctx: ExportContext, fields: &[Field], type_map: &Type
 }
 
 fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, type_map: &TypeMap) -> Output {
-    match &tuple.fields[..] {
+    match &tuple.elements[..] {
         [] => Ok(NULL.to_string()),
         tys => Ok(format!(
             "[{}]",
@@ -299,34 +306,23 @@ fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, type_map: &TypeMap) -> 
 fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &TypeMap) -> Output {
     match &s.fields {
         StructFields::Unit => Ok(NULL.into()),
-        StructFields::Unnamed(s) => unnamed_fields_datatype(
-            ctx,
-            &s.fields
-                .iter()
-                .cloned()
-                .filter(|field| !field.skip)
-                .collect::<Vec<_>>()[..],
-            type_map,
-        ),
+        StructFields::Unnamed(s) => {
+            unnamed_fields_datatype(ctx, &skip_fields(s.fields()).collect::<Vec<_>>(), type_map)
+        }
         StructFields::Named(s) => {
-            let fields = s
-                .fields
-                .iter()
-                .cloned()
-                .filter(|(_, field)| !field.skip)
-                .collect::<Vec<_>>();
+            let fields = skip_fields_named(s.fields()).collect::<Vec<_>>();
 
             if fields.is_empty() {
                 return Ok(format!("Record<{STRING}, {NEVER}>"));
             }
 
             let (flattened, non_flattened): (Vec<_>, Vec<_>) =
-                fields.iter().partition(|(_, f)| f.flatten);
+                fields.iter().partition(|(_, (f, _))| f.flatten);
 
             let mut field_sections = flattened
                 .into_iter()
-                .map(|(key, field)| {
-                    datatype_inner(ctx.with(PathItem::Field(key.clone())), &field.ty, type_map).map(
+                .map(|(key, (field, ty))| {
+                    datatype_inner(ctx.with(PathItem::Field(key.clone())), ty, type_map).map(
                         |type_str| {
                             inner_comments(
                                 ctx.clone(),
@@ -342,7 +338,9 @@ fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &Typ
 
             let mut unflattened_fields = non_flattened
                 .into_iter()
-                .map(|(key, field)| {
+                .map(|(key, field_ref)| {
+                    let (field, _) = field_ref;
+
                     Ok(inner_comments(
                         ctx.clone(),
                         field.deprecated(),
@@ -350,7 +348,7 @@ fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &Typ
                         object_field_to_ts(
                             ctx.with(PathItem::Field(key.clone())),
                             key.clone(),
-                            field,
+                            field_ref,
                             type_map,
                         )?,
                         true,
@@ -389,10 +387,10 @@ fn enum_variant_datatype(
             };
 
             fields.extend(
-                obj.fields
-                    .iter()
-                    .filter(|(_, field)| !field.skip)
-                    .map(|(name, field)| {
+                skip_fields_named(obj.fields())
+                    .map(|(name, field_ref)| {
+                        let (field, _) = field_ref;
+
                         Ok(inner_comments(
                             ctx.clone(),
                             field.deprecated(),
@@ -400,7 +398,7 @@ fn enum_variant_datatype(
                             object_field_to_ts(
                                 ctx.with(PathItem::Field(name.clone())),
                                 name.clone(),
-                                field,
+                                field_ref,
                                 type_map,
                             )?,
                             true,
@@ -415,11 +413,8 @@ fn enum_variant_datatype(
             }))
         }
         EnumVariants::Unnamed(obj) => {
-            let fields = obj
-                .fields
-                .iter()
-                .filter(|field| !field.skip)
-                .map(|field| datatype_inner(ctx.clone(), &field.ty, type_map))
+            let fields = skip_fields(obj.fields())
+                .map(|(_, ty)| datatype_inner(ctx.clone(), ty, type_map))
                 .collect::<Result<Vec<_>>>()?;
 
             Ok(match &fields[..] {
@@ -491,8 +486,11 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                                 format!("{{ {tag}: {sanitised_name} }}")
                             }
                             (EnumRepr::Internal { tag }, EnumVariants::Unnamed(tuple)) => {
-                                let mut typ =
-                                    unnamed_fields_datatype(ctx.clone(), &tuple.fields, type_map)?;
+                                let mut typ = unnamed_fields_datatype(
+                                    ctx.clone(),
+                                    &skip_fields(tuple.fields()).collect::<Vec<_>>(),
+                                    type_map,
+                                )?;
 
                                 // TODO: This `null` check is a bad fix for an internally tagged type with a `null` variant being exported as `{ type: "A" } & null` (which is `never` in TS)
                                 // TODO: Move this check into the macros so it can apply to any language cause it should (it's just hard to do in the macros)
@@ -510,8 +508,7 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                                 let mut fields = vec![format!("{tag}: {sanitised_name}")];
 
                                 fields.extend(
-                                    obj.fields
-                                        .iter()
+                                    skip_fields_named(obj.fields())
                                         .map(|(name, field)| {
                                             object_field_to_ts(
                                                 ctx.with(PathItem::Field(name.clone())),
@@ -590,15 +587,15 @@ impl LiteralType {
 fn object_field_to_ts(
     ctx: ExportContext,
     key: Cow<'static, str>,
-    field: &Field,
+    (field, ty): NonSkipField,
     type_map: &TypeMap,
 ) -> Output {
     let field_name_safe = sanitise_key(key, false);
 
     // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
     let (key, ty) = match field.optional {
-        true => (format!("{field_name_safe}?").into(), &field.ty),
-        false => (field_name_safe, &field.ty),
+        true => (format!("{field_name_safe}?").into(), ty),
+        false => (field_name_safe, ty),
     };
 
     Ok(format!("{key}: {}", datatype_inner(ctx, ty, type_map)?))

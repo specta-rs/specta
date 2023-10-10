@@ -1,4 +1,4 @@
-use crate::utils::{parse_attrs, unraw_raw_ident, AttributeValue};
+use crate::utils::{parse_attrs, then_option, unraw_raw_ident, AttributeValue};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use syn::{spanned::Spanned, DataStruct, Field, Fields, GenericParam, Generics};
@@ -140,7 +140,6 @@ pub fn parse_struct(
                     let deprecated = field_attrs.common.deprecated_as_tokens(crate_ref);
                     let optional = field_attrs.optional;
                     let flatten = field_attrs.flatten;
-                    let skip = field_attrs.skip;
                     let doc = field_attrs.common.doc;
 
                     let parent_inline = container_attrs
@@ -173,15 +172,16 @@ pub fn parse_struct(
                         }
                     };
 
+                    let ty = then_option(field_attrs.skip, quote! {{
+                    	#ty
+                    }});
+
                     Ok(quote!((#field_name.into(), #crate_ref::internal::construct::field(
-                        #skip,
                         #optional,
                         #flatten,
                         #deprecated,
                         #doc.into(),
-                        {
-                            #ty
-                        }
+                        #ty
                     ))))
                 }).collect::<syn::Result<Vec<TokenStream>>>()?;
 
@@ -212,14 +212,15 @@ pub fn parse_struct(
                         let deprecated = field_attrs.common.deprecated_as_tokens(crate_ref);
                         let optional = field_attrs.optional;
                         let flatten = field_attrs.flatten;
-                        let skip = field_attrs.skip;
                         let doc = field_attrs.common.doc;
 
-                        Ok(quote!({
-                            #generic_vars
+                        let ty = then_option(field_attrs.skip, quote! {{
+                        	#generic_vars
 
-                            #crate_ref::internal::construct::field(#skip, #optional, #flatten, #deprecated, #doc.into(), gen)
-                        }))
+                         	gen
+                        }});
+
+                        Ok(quote!(#crate_ref::internal::construct::field(#optional, #flatten, #deprecated, #doc.into(), #ty)))
                     })
                     .collect::<syn::Result<Vec<TokenStream>>>()?;
 

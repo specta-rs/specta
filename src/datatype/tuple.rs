@@ -8,7 +8,7 @@ use crate::{DataType, NamedDataType};
 /// Be aware `()` is treated specially as `null` in Typescript.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TupleType {
-    pub(crate) fields: Vec<DataType>,
+    pub(crate) elements: Vec<DataType>,
 }
 
 impl TupleType {
@@ -30,8 +30,8 @@ impl TupleType {
         }
     }
 
-    pub fn fields(&self) -> &Vec<DataType> {
-        &self.fields
+    pub fn elements(&self) -> &Vec<DataType> {
+        &self.elements
     }
 }
 
