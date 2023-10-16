@@ -58,6 +58,8 @@ pub(crate) use assert_ts_export;
 
 #[test]
 fn typescript_types() {
+    assert_ts!(Vec<MyEnum>, r#"({ A: string } | { B: number })[]"#);
+
     assert_ts!(i8, "number");
     assert_ts!(u8, "number");
     assert_ts!(i16, "number");
@@ -272,6 +274,9 @@ fn typescript_types() {
         RenameWithWeirdCharsEnum,
         ExportError::InvalidName(NamedLocation::Type, ExportPath::new_unsafe("@odata.context"), r#"@odata.context"#.to_string())
     );
+
+    // https://github.com/oscartbeaumont/specta/issues/156
+    assert_ts!(Vec<MyEnum>, r#"({ A: string } | { B: number })[]"#);
 }
 
 #[derive(Type)]
@@ -595,3 +600,9 @@ pub struct RenameWithWeirdCharsStruct(String);
 #[derive(Type)]
 #[specta(export = false, rename = "@odata.context")]
 pub enum RenameWithWeirdCharsEnum {}
+
+#[derive(Serialize, Type)]
+pub enum MyEnum {
+    A(String),
+    B(u32),
+}
