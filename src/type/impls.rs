@@ -576,6 +576,104 @@ const _: () = {
         matrix2: DMat2,
         translation: DVec2,
     }
+
+    #[derive(Type)]
+    #[specta(remote = Vec2, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Vec2 {
+        pub x: f32,
+        pub y: f32,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = Vec3, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Vec3 {
+        pub x: f32,
+        pub y: f32,
+        pub z: f32,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = Vec3A, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Vec3A {
+        pub x: f32,
+        pub y: f32,
+        pub z: f32,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = Vec4, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Vec4 {
+        x: f32,
+        y: f32,
+        z: f32,
+        w: f32,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = Mat2, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Mat2 {
+        pub x_axis: Vec2,
+        pub y_axis: Vec2,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = Mat3, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Mat3 {
+        pub x_axis: Vec3,
+        pub y_axis: Vec3,
+        pub z_axis: Vec3,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = Mat3A, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Mat3A {
+        pub x_axis: Vec3A,
+        pub y_axis: Vec3A,
+        pub z_axis: Vec3A,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = Mat4, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Mat4 {
+        pub x_axis: Vec4,
+        pub y_axis: Vec4,
+        pub z_axis: Vec4,
+        pub w_axis: Vec4,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = Quat, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Quat {
+        pub x: f32,
+        pub y: f32,
+        pub z: f32,
+        pub w: f32,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = Affine2, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Affine2 {
+        pub matrix2: Mat2,
+        pub translation: Vec2,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = Affine3A, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Affine3A {
+        matrix3: Mat3A,
+        translation: Vec3A,
+    }
 };
 
 #[cfg(feature = "url")]

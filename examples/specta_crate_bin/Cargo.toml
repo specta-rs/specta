@@ -1,0 +1,20 @@
+[package]
+name = "specta_crate_bin"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "dyn_dtom"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "cli"
+path = "src/bin.rs"
+
+[features]
+cli = ["clap", "specta"]
+
+[dependencies]
+specta = { version = "1.0.5", features = ["typescript", "export"], optional = true }
+clap = { version = "4.4.6", features = ["derive"], optional = true }
