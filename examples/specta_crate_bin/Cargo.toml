@@ -4,9 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "dyn_dtom"
+name = "specta_crate_bin"
 path = "src/lib.rs"
-crate-type = ["cdylib", "rlib"]
 
 [[bin]]
 name = "cli"
