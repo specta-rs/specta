@@ -60,6 +60,7 @@ Compatability
 
 External types
 
+- `ulid` - [ulid](https://docs.rs/ulid) crate
 - `uuid` - [uuid](https://docs.rs/uuid) crate
 - `chrono` - [chrono](https://docs.rs/chrono) crate
 - `time` - [time](https://docs.rs/time) crate

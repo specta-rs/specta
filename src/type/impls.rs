@@ -446,6 +446,9 @@ const _: () = {
     }
 };
 
+#[cfg(feature = "ulid")]
+impl_as!(ulid::Ulid as String);
+
 #[cfg(feature = "uuid")]
 impl_as!(
     uuid::Uuid as String
