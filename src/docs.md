@@ -77,6 +77,7 @@ External types
 - `tokio` - [tokio](https://docs.rs/tokio) crate
 - `url` - [url](https://docs.rs/url) crate
 - `either` - [either](https://docs.rs/either) crate
+- `bevy_ecs` - [bevy_ecs](https://docs.rs/bevy_ecs) crate
 
 [//]: # (FEATURE_FLAGS_END)
 ## Alternatives
