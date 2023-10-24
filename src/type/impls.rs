@@ -738,3 +738,19 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
         })
     }
 }
+
+#[cfg(feature = "bevy_ecs")]
+const _: () = {
+    #[derive(Type)]
+    #[specta(remote = bevy_ecs::entity::Entity, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Entity {
+        generation: u32,
+        index: u32,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = bevy_ecs::world::WorldId, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct WorldId(usize);
+};
