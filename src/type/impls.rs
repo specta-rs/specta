@@ -577,6 +577,104 @@ const _: () = {
         matrix2: glam::DMat2,
         translation: glam::DVec2,
     }
+
+    #[derive(Type)]
+    #[specta(remote = glam::Vec2, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Vec2 {
+        pub x: f32,
+        pub y: f32,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = glam::Vec3, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Vec3 {
+        pub x: f32,
+        pub y: f32,
+        pub z: f32,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = glam::Vec3A, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Vec3A {
+        pub x: f32,
+        pub y: f32,
+        pub z: f32,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = glam::Vec4, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Vec4 {
+        x: f32,
+        y: f32,
+        z: f32,
+        w: f32,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = glam::Mat2, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Mat2 {
+        pub x_axis: glam::Vec2,
+        pub y_axis: glam::Vec2,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = glam::Mat3, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Mat3 {
+        pub x_axis: glam::Vec3,
+        pub y_axis: glam::Vec3,
+        pub z_axis: glam::Vec3,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = glam::Mat3A, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Mat3A {
+        pub x_axis: glam::Vec3A,
+        pub y_axis: glam::Vec3A,
+        pub z_axis: glam::Vec3A,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = glam::Mat4, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Mat4 {
+        pub x_axis: glam::Vec4,
+        pub y_axis: glam::Vec4,
+        pub z_axis: glam::Vec4,
+        pub w_axis: glam::Vec4,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = glam::Quat, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Quat {
+        pub x: f32,
+        pub y: f32,
+        pub z: f32,
+        pub w: f32,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = glam::Affine2, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Affine2 {
+        pub matrix2: glam::Mat2,
+        pub translation: glam::Vec2,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = glam::Affine3A, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct Affine3A {
+        matrix3: glam::Mat3A,
+        translation: glam::Vec3A,
+    }
 };
 
 #[cfg(feature = "url")]
