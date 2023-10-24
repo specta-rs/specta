@@ -22,6 +22,9 @@ pub mod ts;
 mod ts_rs;
 mod ty_override;
 
+#[cfg(all(feature = "ulid", feature = "typescript"))]
+mod ulid;
+
 #[test]
 fn test_compile_errors() {
     let t = trybuild::TestCases::new();
