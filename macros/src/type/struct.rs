@@ -1,4 +1,4 @@
-use crate::utils::{parse_attrs, then_option, unraw_raw_ident, AttributeValue};
+use crate::utils::{parse_attrs, unraw_raw_ident, AttributeValue};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use syn::{spanned::Spanned, DataStruct, Field, Fields, GenericParam, Generics};
@@ -101,7 +101,7 @@ pub fn parse_struct(
 
         let ty = construct_datatype(
             format_ident!("ty"),
-            &field_ty,
+            field_ty,
             &generic_idents,
             crate_ref,
             field_attrs.inline,

@@ -546,10 +546,8 @@ const _: () = {
 
 #[cfg(feature = "glam")]
 const _: () = {
-    use glam::*;
-
     #[derive(Type)]
-    #[specta(remote = DVec2, crate = crate, export = false)]
+    #[specta(remote = glam::DVec2, crate = crate, export = false)]
     #[allow(dead_code)]
     struct DVec2 {
         x: f64,
@@ -557,7 +555,7 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(remote = IVec2, crate = crate, export = false)]
+    #[specta(remote = glam::IVec2, crate = crate, export = false)]
     #[allow(dead_code)]
     struct IVec2 {
         x: i32,
@@ -565,19 +563,19 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(remote = DMat2, crate = crate, export = false)]
+    #[specta(remote = glam::DMat2, crate = crate, export = false)]
     #[allow(dead_code)]
     struct DMat2 {
-        pub x_axis: DVec2,
-        pub y_axis: DVec2,
+        pub x_axis: glam::DVec2,
+        pub y_axis: glam::DVec2,
     }
 
     #[derive(Type)]
-    #[specta(remote = DAffine2, crate = crate, export = false)]
+    #[specta(remote = glam::DAffine2, crate = crate, export = false)]
     #[allow(dead_code)]
     struct DAffine2 {
-        matrix2: DMat2,
-        translation: DVec2,
+        matrix2: glam::DMat2,
+        translation: glam::DVec2,
     }
 };
 
