@@ -604,26 +604,7 @@ const _: () = {
     #[derive(Type)]
     #[specta(remote = glam::Mat4, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Mat4(
-        (
-            f32,
-            f32,
-            f32,
-            f32,
-            f32,
-            f32,
-            f32,
-            f32,
-            f32,
-            f32,
-            f32,
-            f32,
-            f32,
-            f32,
-            f32,
-            f32,
-        ),
-    );
+    struct Mat4([f32; 16]);
 
     #[derive(Type)]
     #[specta(remote = glam::Quat, crate = crate, export = false)]
