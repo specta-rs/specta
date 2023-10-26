@@ -549,77 +549,96 @@ const _: () = {
     #[derive(Type)]
     #[specta(remote = glam::DVec2, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct DVec2([f64; 2]);
+    struct DVec2((f64, f64));
 
     #[derive(Type)]
     #[specta(remote = glam::IVec2, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct IVec2([i32; 2]);
+    struct IVec2((i32, i32));
 
     #[derive(Type)]
     #[specta(remote = glam::DMat2, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct DMat2([f64; 4]);
+    struct DMat2((f64, f64, f64, f64));
 
     #[derive(Type)]
     #[specta(remote = glam::DAffine2, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct DAffine2([f64; 6]);
+    struct DAffine2((f64, f64, f64, f64, f64, f64));
 
     #[derive(Type)]
     #[specta(remote = glam::Vec2, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Vec2([f32; 2]);
+    struct Vec2((f32, f32));
 
     #[derive(Type)]
     #[specta(remote = glam::Vec3, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Vec3([f32; 3]);
+    struct Vec3((f32, f32, f32));
 
     #[derive(Type)]
     #[specta(remote = glam::Vec3A, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Vec3A([f32; 3]);
+    struct Vec3A((f32, f32, f32));
 
     #[derive(Type)]
     #[specta(remote = glam::Vec4, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Vec4([f32; 4]);
+    struct Vec4((f32, f32, f32, f32));
 
     #[derive(Type)]
     #[specta(remote = glam::Mat2, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Mat2([f32; 4]);
+    struct Mat2((f32, f32, f32, f32));
 
     #[derive(Type)]
     #[specta(remote = glam::Mat3, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Mat3([f32; 9]);
+    struct Mat3((f32, f32, f32, f32, f32, f32, f32, f32, f32));
 
     #[derive(Type)]
     #[specta(remote = glam::Mat3A, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Mat3A([f32; 9]);
+    struct Mat3A((f32, f32, f32, f32, f32, f32, f32, f32, f32));
 
     #[derive(Type)]
     #[specta(remote = glam::Mat4, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Mat4([f32; 16]);
+    struct Mat4(
+        (
+            f32,
+            f32,
+            f32,
+            f32,
+            f32,
+            f32,
+            f32,
+            f32,
+            f32,
+            f32,
+            f32,
+            f32,
+            f32,
+            f32,
+            f32,
+            f32,
+        ),
+    );
 
     #[derive(Type)]
     #[specta(remote = glam::Quat, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Quat([f32; 4]);
+    struct Quat((f32, f32, f32, f32));
 
     #[derive(Type)]
     #[specta(remote = glam::Affine2, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Affine2([f32; 6]);
+    struct Affine2((f32, f32, f32, f32, f32, f32));
 
     #[derive(Type)]
     #[specta(remote = glam::Affine3A, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Affine3A([f32; 12]);
+    struct Affine3A((f32, f32, f32, f32, f32, f32, f32, f32, f32, f32, f32, f32));
 };
 
 #[cfg(feature = "url")]
