@@ -279,7 +279,7 @@ fn typescript_types() {
     assert_ts!(Vec<MyEnum>, r#"({ A: string } | { B: number })[]"#);
 
     #[cfg(feature = "glam")]
-    assert_ts!(glam::DVec2, "{ x: number; y: number }");
+    assert_ts!(glam::DVec2, "number[]");
 }
 
 #[derive(Type)]
