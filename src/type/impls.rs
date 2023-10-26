@@ -690,9 +690,4 @@ const _: () = {
     #[specta(remote = bevy_ecs::entity::Entity, crate = crate, transparent, export = false)]
     #[allow(dead_code)]
     struct Entity(u64);
-
-    #[derive(Type)]
-    #[specta(remote = bevy_ecs::world::WorldId, crate = crate, transparent, export = false)]
-    #[allow(dead_code)]
-    struct WorldId(usize);
 };
