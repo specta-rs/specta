@@ -110,13 +110,10 @@ pub mod reference {
                 inner: DataType::Any,
             }));
 
-            let dt = T::named_data_type(
-                DefOpts {
-                    parent_inline: true,
-                    type_map: opts.type_map,
-                },
-                generics,
-            );
+            let dt = T::definition_named_data_type(DefOpts {
+                parent_inline: true,
+                type_map: opts.type_map,
+            });
             opts.type_map.insert(T::SID, Some(dt));
         }
 
