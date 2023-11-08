@@ -112,7 +112,7 @@ pub enum DeprecatedType {
 pub struct DataTypeReference {
     pub(crate) name: Cow<'static, str>,
     pub(crate) sid: SpectaID,
-    pub(crate) generics: Vec<DataType>,
+    pub(crate) generics: Vec<(GenericType, DataType)>,
 }
 
 impl DataTypeReference {
@@ -124,7 +124,7 @@ impl DataTypeReference {
         self.sid
     }
 
-    pub fn generics(&self) -> &Vec<DataType> {
+    pub fn generics(&self) -> &Vec<(GenericType, DataType)> {
         &self.generics
     }
 }

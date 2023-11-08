@@ -40,18 +40,22 @@ pub fn parse_enum(
 
     let reference_generics = generic_idents.clone().map(|(i, ident)| {
         let ident = &ident.clone();
+        let ident_str = ident.to_string();
 
         quote! {
-            generics
-                .get(#i)
-                .cloned()
-                .unwrap_or_else(|| <#ident as #crate_ref::Type>::reference(
-                    #crate_ref::DefOpts {
-                        parent_inline: #parent_inline,
-                        type_map: opts.type_map,
-                    },
-                    &[],
-                ).inner)
+            (
+                std::borrow::Cow::Borrowed(#ident_str).into(),
+                generics
+                    .get(#i)
+                    .cloned()
+                    .unwrap_or_else(|| <#ident as #crate_ref::Type>::reference(
+                        #crate_ref::DefOpts {
+                            parent_inline: #parent_inline,
+                            type_map: opts.type_map,
+                        },
+                        &[],
+                    ).inner)
+            )
         }
     });
 
@@ -240,10 +244,10 @@ pub fn parse_enum(
         quote!(#crate_ref::DataType::Enum(#crate_ref::internal::construct::r#enum(#name.into(), #repr, vec![#(#definition_generics),*], vec![#(#variant_types),*]))),
         quote!({
             let generics = vec![#(#reference_generics),*];
-            #crate_ref::reference::reference::<Self>(opts, &generics, #crate_ref::internal::construct::data_type_reference(
+            #crate_ref::reference::reference::<Self>(opts, #crate_ref::internal::construct::data_type_reference(
                 #name.into(),
                 SID,
-                generics.clone() // TODO: This `clone` is cringe
+                generics
             ))
         }),
         can_flatten,

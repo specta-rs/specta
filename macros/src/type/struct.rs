@@ -71,6 +71,19 @@ pub fn parse_struct(
                 ).inner)
         }
     });
+    let reference_generics =
+        quote!(let generics: &[#crate_ref::DataType] = &[#(#reference_generics),*];);
+
+    let reference_generics2 = generic_idents.iter().map(|(i, ident)| {
+        let ident_str = ident.to_string();
+
+        quote! {
+            (
+                std::borrow::Cow::Borrowed(#ident_str).into(),
+                generics[#i].clone()
+            )
+        }
+    });
 
     let definition_generics = generic_idents.iter().map(|(_, ident)| {
         let ident = ident.to_string();
@@ -241,17 +254,17 @@ pub fn parse_struct(
 
     let category = if container_attrs.inline {
         quote!({
-            let generics = &[#(#reference_generics),*];
+            #reference_generics
             #crate_ref::reference::inline::<Self>(opts, generics)
         })
     } else {
         quote!({
-            let generics = vec![#(#reference_generics),*];
-            #crate_ref::reference::reference::<Self>(opts, &generics, #crate_ref::internal::construct::data_type_reference(
-                #name.into(),
-                SID,
-                generics.clone() // TODO: This `clone` is cringe
-            ))
+                #reference_generics
+                #crate_ref::reference::reference::<Self>(opts, #crate_ref::internal::construct::data_type_reference(
+                    #name.into(),
+                    SID,
+                    vec![#(#reference_generics2),*]
+                ))
         })
     };
 

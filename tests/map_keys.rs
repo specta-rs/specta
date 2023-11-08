@@ -61,7 +61,15 @@ pub struct ValidMaybeValidKey(HashMap<MaybeValidKey<String>, ()>);
 
 #[derive(Type)]
 #[specta(export = false, transparent)]
+pub struct ValidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<String>>, ()>);
+
+#[derive(Type)]
+#[specta(export = false, transparent)]
 pub struct InvalidMaybeValidKey(HashMap<MaybeValidKey<()>, ()>);
+
+#[derive(Type)]
+#[specta(export = false, transparent)]
+pub struct InvalidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<()>>, ()>);
 
 #[test]
 fn map_keys() {
@@ -80,10 +88,20 @@ fn map_keys() {
         ValidMaybeValidKey,
         "export type ValidMaybeValidKey = { [key in MaybeValidKey<string>]: null }"
     );
+    assert_ts!(
+        ValidMaybeValidKeyNested,
+        "{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }"
+    );
+    assert_ts_export!(
+        ValidMaybeValidKeyNested,
+        "export type ValidMaybeValidKeyNested = { [key in MaybeValidKey<MaybeValidKey<string>>]: null }"
+    );
 
     assert_ts!(error; HashMap<() /* `null` */, ()>, SerdeError::InvalidMapKey);
     assert_ts!(error; HashMap<RegularStruct, ()>, SerdeError::InvalidMapKey);
     assert_ts!(error; HashMap<Variants, ()>, SerdeError::InvalidMapKey);
     assert_ts!(error; InvalidMaybeValidKey, SerdeError::InvalidMapKey);
     assert_ts_export!(error; InvalidMaybeValidKey, SerdeError::InvalidMapKey);
+    assert_ts!(error; InvalidMaybeValidKeyNested, SerdeError::InvalidMapKey);
+    assert_ts_export!(error; InvalidMaybeValidKeyNested, SerdeError::InvalidMapKey);
 }

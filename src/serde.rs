@@ -2,7 +2,8 @@ use thiserror::Error;
 
 use crate::{
     internal::{skip_fields, skip_fields_named},
-    DataType, EnumRepr, EnumType, EnumVariants, LiteralType, PrimitiveType, StructFields, TypeMap,
+    DataType, EnumRepr, EnumType, EnumVariants, GenericType, LiteralType, PrimitiveType,
+    StructFields, TypeMap,
 };
 
 // TODO: The error should show a path to the type causing the issue like the BigInt error reporting.
@@ -69,7 +70,7 @@ pub(crate) fn is_valid_ty(dt: &DataType, type_map: &TypeMap) -> Result<(), Serde
             is_valid_ty(&ty.1, type_map)?;
         }
         DataType::Reference(ty) => {
-            for generic in ty.generics() {
+            for (_, generic) in ty.generics() {
                 is_valid_ty(generic, type_map)?;
             }
 
@@ -144,15 +145,15 @@ fn is_valid_map_key(key_ty: &DataType, type_map: &TypeMap) -> Result<(), SerdeEr
 
             Ok(())
         }
-        DataType::Reference(ty) => {
+        DataType::Reference(r) => {
             let ty = type_map
-                .get(&ty.sid)
+                .get(&r.sid)
                 .as_ref()
                 .expect("Reference type not found")
                 .as_ref()
                 .expect("Type was never populated"); // TODO: Error properly
 
-            is_valid_map_key(&ty.inner, type_map)
+            is_valid_map_key(&resolve_generics(ty.inner.clone(), &r.generics), type_map)
         }
         _ => Err(SerdeError::InvalidMapKey),
     }
@@ -240,4 +241,79 @@ fn validate_internally_tag_enum_datatype(
     }
 
     Ok(())
+}
+
+// TODO: Maybe make this a public utility?
+fn resolve_generics(mut dt: DataType, generics: &Vec<(GenericType, DataType)>) -> DataType {
+    match dt {
+        DataType::Primitive(_) | DataType::Literal(_) | DataType::Any => dt,
+        DataType::List(v) => DataType::List(Box::new(resolve_generics(*v, generics))),
+        DataType::Nullable(v) => DataType::Nullable(Box::new(resolve_generics(*v, generics))),
+        DataType::Map(v) => DataType::Map(Box::new({
+            let (k, v) = *v;
+            (resolve_generics(k, generics), resolve_generics(v, generics))
+        })),
+        DataType::Struct(ref mut v) => match &mut v.fields {
+            StructFields::Unit => dt,
+            StructFields::Unnamed(f) => {
+                for field in f.fields.iter_mut() {
+                    field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
+                }
+
+                dt
+            }
+            StructFields::Named(f) => {
+                for (_, field) in f.fields.iter_mut() {
+                    field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
+                }
+
+                dt
+            }
+        },
+        DataType::Enum(ref mut v) => {
+            for (_, v) in v.variants.iter_mut() {
+                match &mut v.inner {
+                    EnumVariants::Unit => {}
+                    EnumVariants::Named(f) => {
+                        for (_, field) in f.fields.iter_mut() {
+                            field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
+                        }
+                    }
+                    EnumVariants::Unnamed(f) => {
+                        for field in f.fields.iter_mut() {
+                            field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
+                        }
+                    }
+                }
+            }
+
+            dt
+        }
+        DataType::Tuple(ref mut v) => {
+            for ty in v.elements.iter_mut() {
+                *ty = resolve_generics(ty.clone(), generics);
+            }
+
+            dt
+        }
+        DataType::Result(result) => DataType::Result(Box::new({
+            let (ok, err) = *result;
+            (
+                resolve_generics(ok, generics),
+                resolve_generics(err, generics),
+            )
+        })),
+        DataType::Reference(ref mut r) => {
+            for (_, generic) in r.generics.iter_mut() {
+                *generic = resolve_generics(generic.clone(), generics);
+            }
+
+            dt
+        }
+        DataType::Generic(g) => generics
+            .iter()
+            .find(|(name, _)| name == &g)
+            .map(|(_, ty)| ty.clone())
+            .unwrap_or_else(|| format!("Generic type `{g}` was referenced but not found").into()), // TODO: Error properly
+    }
 }

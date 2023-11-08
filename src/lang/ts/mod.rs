@@ -252,7 +252,9 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
             generics => {
                 let generics = generics
                     .iter()
-                    .map(|v| datatype_inner(ctx.with(PathItem::Type(name.clone())), v, type_map))
+                    .map(|(_, v)| {
+                        datatype_inner(ctx.with(PathItem::Type(name.clone())), v, type_map)
+                    })
                     .collect::<Result<Vec<_>>>()?
                     .join(", ");
 

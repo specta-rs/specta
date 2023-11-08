@@ -95,11 +95,7 @@ pub mod reference {
         }
     }
 
-    pub fn reference<T: NamedType>(
-        opts: DefOpts,
-        generics: &[DataType],
-        reference: DataTypeReference,
-    ) -> Reference {
+    pub fn reference<T: NamedType>(opts: DefOpts, reference: DataTypeReference) -> Reference {
         if opts.type_map.get(&T::SID).is_none() {
             // It's important we don't put `None` into the map here. By putting a *real* value we ensure that we don't stack overflow for recursive types when calling `named_data_type`.
             opts.type_map.entry(T::SID).or_insert(Some(NamedDataType {
