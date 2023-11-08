@@ -80,6 +80,16 @@ pub enum SkipNamedFieldInVariant {
     },
 }
 
+// https://github.com/oscartbeaumont/specta/issues/170
+#[derive(Type)]
+#[specta(transparent, export = false)]
+pub struct TransparentWithSkip((), #[specta(skip)] String);
+
+// https://github.com/oscartbeaumont/specta/issues/170
+#[derive(Type)]
+#[specta(transparent, export = false)]
+pub struct TransparentWithSkip2(#[specta(skip)] (), String);
+
 #[test]
 fn skip() {
     assert_ts!(SkipOnlyField, "Record<string, never>");
@@ -94,4 +104,6 @@ fn skip() {
         SkipNamedFieldInVariant,
         "{ A: Record<string, never> } | { B: { b: number } }"
     );
+    assert_ts!(TransparentWithSkip, "null");
+    assert_ts!(TransparentWithSkip2, "string");
 }

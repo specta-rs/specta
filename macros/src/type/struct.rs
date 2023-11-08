@@ -96,21 +96,56 @@ pub fn parse_struct(
                 data.fields.span(),
                 "specta: unit structs cannot be transparent",
             ));
-        } else if data.fields.len() != 1 {
-            return Err(syn::Error::new(
-                data.fields.span(),
-                "specta: transparent structs must have exactly one field",
-            ));
         }
 
-        let field = data
-            .fields
-            .iter()
-            .next()
-            .expect("unreachable: we just checked this!");
-        let field_attrs = decode_field_attrs(field)?;
+        let (field_ty, field_attrs) = match data.fields {
+            Fields::Named(_) => {
+                let fields = data
+                    .fields
+                    .iter()
+                    .map(|field| decode_field_attrs(field).map(|v| (field.ty.clone(), v)))
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .filter(|(_, attrs)| !attrs.skip)
+                    .collect::<Vec<_>>();
 
-        let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
+                if fields.len() != 1 {
+                    return Err(syn::Error::new(
+                        data.fields.span(),
+                        "specta: transparent structs must have exactly one field",
+                    ));
+                }
+
+                fields.into_iter().next().expect("fields.len() != 1")
+            }
+            Fields::Unnamed(_) => {
+                let fields = data
+                    .fields
+                    .iter()
+                    .map(|field| decode_field_attrs(field).map(|v| (field.ty.clone(), v)))
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .filter(|(_, attrs)| !attrs.skip)
+                    .collect::<Vec<_>>();
+
+                if fields.len() != 1 {
+                    return Err(syn::Error::new(
+                        data.fields.span(),
+                        "specta: transparent structs must have exactly one field",
+                    ));
+                }
+
+                fields.into_iter().next().expect("fields.len() != 1")
+            }
+            Fields::Unit => {
+                return Err(syn::Error::new(
+                    data.fields.span(),
+                    "specta: transparent structs must have exactly one field",
+                ));
+            }
+        };
+
+        let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field_ty);
 
         let ty = construct_datatype(
             format_ident!("ty"),
@@ -151,7 +186,6 @@ pub fn parse_struct(
                         .inline
                         .then(|| quote!(true))
                         .unwrap_or(parent_inline.clone());
-
 
                     let ty = field_attrs.skip.then(|| Ok(quote!(None)))
                         .unwrap_or_else(|| {
