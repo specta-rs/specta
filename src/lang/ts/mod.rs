@@ -4,14 +4,13 @@ pub mod comments;
 mod context;
 mod error;
 mod export_config;
-mod formatter;
+pub mod formatter;
 pub(crate) mod js_doc;
 mod reserved_terms;
 
 pub use context::*;
 pub use error::*;
 pub use export_config::*;
-pub use formatter::*;
 use reserved_terms::*;
 
 use crate::{
