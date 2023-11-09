@@ -27,8 +27,7 @@ macro_rules! router {
                 pub use std::{collections::HashMap, borrow::Cow, marker::PhantomData};
 
                 pub struct Route<H> {
-                    // TODO: Types
-
+                    pub ty: specta::DataType,
                     pub exec: H
                 }
 
@@ -56,14 +55,15 @@ macro_rules! router {
                         name: impl Into<std::borrow::Cow<'static, str>>,
                         handler: H,
                     ) -> Self where $($handler_bound)* {
+                        let name = name.into();
                         let handler_fn = assert_valid_handler_fn::<H, <Self as $crate::IntoHandler>::Handler, _>($handler_fn);
 
-                        // TODO: Error for duplicate `name`
+                        if self.routes.contains_key(&name) {
+                            // TODO
+                        }
 
-
-                        self.routes.insert(name.into(), Route {
-                            // TODO: Store type
-                            // TODO: Store user-defined generics
+                        self.routes.insert(name, Route {
+                            ty: specta::DataType::Any, // TODO: Make this work
                             exec: (handler_fn)(handler),
                         });
 

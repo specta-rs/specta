@@ -1,3 +1,8 @@
+//! This example shows an rspc-like router implemented using specta-rpc.
+//!
+//! Your functions can be either sync or async and take two arguments.
+//! The first argument is a fixed context type and the second is a generic per-action argument.
+
 use std::{
     future::{ready, Future},
     marker::PhantomData,
@@ -74,8 +79,11 @@ async fn main() {
         .mount("async", |_ctx, _: ()| async move { "Hello, World Async!" })
         .mount("echo", |_ctx, arg: String| arg);
 
-    // TODO: Export types
+    // Export types
+    // TODO
 
+    // Execute actions on the router
+    // You could hook this up with Axum, Tauri, gRPC, or literally anything else.
     {
         let route = router.routes().get("sync").expect("Failed to get 'sync'");
         let result = (route.exec)(Context {}, json!(null)).await;
