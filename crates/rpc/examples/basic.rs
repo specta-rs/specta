@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use specta_rpc::router;
 
-router!(Router::<H, M> where H: Handler<M>);
+router!(Router<Ctx> <H, M> where H: Handler<M>);
 
 pub trait Handler<M> {}
 
