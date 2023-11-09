@@ -117,7 +117,7 @@ pub fn parse_enum(
                                 let flatten = field_attrs.flatten;
                                 let doc = field_attrs.common.doc;
 
-                                let ty = field_attrs.skip.then(|| Ok(quote!(None)))
+                                let ty = (attrs.skip || field_attrs.skip).then(|| Ok(quote!(None)))
                                     .unwrap_or_else(|| {
 	                                    construct_datatype(
 	                                        format_ident!("gen"),
@@ -173,7 +173,7 @@ pub fn parse_enum(
                             let flatten = field_attrs.flatten;
                             let doc = field_attrs.common.doc;
 
-                            let ty = field_attrs.skip.then(|| Ok(quote!(None)))
+                            let ty = (attrs.skip || field_attrs.skip).then(|| Ok(quote!(None)))
                                 .unwrap_or_else(|| {
 	                                 construct_datatype(
 			                            format_ident!("gen"),
