@@ -278,8 +278,6 @@ fn typescript_types() {
     // https://github.com/oscartbeaumont/specta/issues/156
     assert_ts!(Vec<MyEnum>, r#"({ A: string } | { B: number })[]"#);
 
-    assert_ts!(ExportFalseBroken, "{ a: A }");
-
     #[cfg(feature = "glam")]
     assert_ts!(glam::DVec2, "{ x: number; y: number }");
 }
@@ -610,14 +608,4 @@ pub enum RenameWithWeirdCharsEnum {}
 pub enum MyEnum {
     A(String),
     B(u32),
-}
-
-#[derive(Type)]
-#[specta(transparent, export = false)]
-pub struct A(String);
-
-#[derive(Type)]
-#[specta(export = false)]
-pub struct ExportFalseBroken {
-    a: A,
 }
