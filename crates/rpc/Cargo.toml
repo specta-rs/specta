@@ -10,3 +10,4 @@ paste = "1.0.14"
 [dev-dependencies]
 serde = { version = "1.0.192", features = ["derive"] }
 serde_json = "1.0.108"
+tokio = { version = "1.33.0", features = ["macros", "rt-multi-thread"] }
