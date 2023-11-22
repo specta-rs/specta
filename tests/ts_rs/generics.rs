@@ -116,7 +116,7 @@ fn generic_struct() {
 
     assert_ts_export!(
         GenericStruct2::<()>,
-        "export type GenericStruct2<T> = { a: T; b: [T, T]; c: [T, [T, T]]; d: T[]; e: ([T, T])[]; f: T[]; g: T[][]; h: (([T, T])[])[] }"
+        "export type GenericStruct2<T> = { a: T; b: [T, T]; c: [T, [T, T]]; d: [T, T, T]; e: [([T, T]), ([T, T]), ([T, T])]; f: T[]; g: T[][]; h: ([([T, T]), ([T, T]), ([T, T])])[] }"
     )
 }
 

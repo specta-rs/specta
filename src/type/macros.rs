@@ -60,7 +60,6 @@ macro_rules! impl_containers {
                     inner: generics.get(0).cloned().unwrap_or_else(
                         || T::reference(opts, generics).inner,
                     ),
-                    _priv: (),
                 }
             }
         }
@@ -100,18 +99,23 @@ macro_rules! impl_for_list {
     ($($ty:path as $name:expr)+) => {$(
         impl<T: Type> Type for $ty {
             fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
-                DataType::List(Box::new(generics.get(0).cloned().unwrap_or_else(|| T::inline(
-                    opts,
-                    generics,
-                ))))
+                DataType::List(List {
+                    ty: Box::new(generics.get(0).cloned().unwrap_or_else(|| T::inline(
+                        opts,
+                        generics,
+                    ))),
+                    length: None,
+                })
             }
 
             fn reference(opts: DefOpts, generics: &[DataType]) -> Reference {
                 Reference {
-                    inner: DataType::List(Box::new(generics.get(0).cloned().unwrap_or_else(
-                        || T::reference(opts, generics).inner,
-                    ))),
-                    _priv: (),
+                    inner: DataType::List(List {
+                        ty: Box::new(generics.get(0).cloned().unwrap_or_else(
+                            || T::reference(opts, generics).inner,
+                        )),
+                        length: None,
+                    }),
                 }
             }
         }
@@ -168,7 +172,6 @@ macro_rules! impl_for_map {
                             .inner
                         }),
                     ))),
-                    _priv: (),
                 }
             }
         }

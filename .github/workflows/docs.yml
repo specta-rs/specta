@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Create status check
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
             const data = await github.rest.repos.createCommitStatus({
@@ -61,7 +61,7 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       
       - name: Update status check
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         env:
           DEPLOYMENT_URL: "${{ steps.vercel-deployment.outputs.DEPLOYMENT_URL }}"
         with:

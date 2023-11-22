@@ -4,14 +4,13 @@ pub mod comments;
 mod context;
 mod error;
 mod export_config;
-mod formatter;
+pub mod formatter;
 pub(crate) mod js_doc;
 mod reserved_terms;
 
 pub use context::*;
 pub use error::*;
 pub use export_config::*;
-pub use formatter::*;
 use reserved_terms::*;
 
 use crate::{
@@ -177,6 +176,7 @@ pub fn datatype(conf: &ExportConfig, typ: &DataType, type_map: &TypeMap) -> Outp
 pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &TypeMap) -> Output {
     Ok(match &typ {
         DataType::Any => ANY.into(),
+        DataType::Unknown => UNKNOWN.into(),
         DataType::Primitive(p) => {
             let ctx = ctx.with(PathItem::Type(p.to_rust_str().into()));
             match p {
@@ -216,13 +216,26 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
         }
         // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
         DataType::List(def) => {
-            let dt = datatype_inner(ctx, def, type_map)?;
-            if (dt.contains(' ') && !dt.ends_with('}'))
+            let dt = datatype_inner(ctx, &def.ty, type_map)?;
+            let dt = if (dt.contains(' ') && !dt.ends_with('}'))
                 // This is to do with maintaining order of operations.
                 // Eg `{} | {}` must be wrapped in parens like `({} | {})[]` but `{}` doesn't cause `{}[]` is valid
                 || (dt.contains(' ') && (dt.contains("&") || dt.contains("|")))
             {
-                format!("({dt})[]")
+                format!("({dt})")
+            } else {
+                format!("{dt}")
+            };
+
+            if let Some(length) = def.length {
+                format!(
+                    "[{}]",
+                    (0..length)
+                        .into_iter()
+                        .map(|_| dt.clone())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
             } else {
                 format!("{dt}[]")
             }
@@ -252,7 +265,9 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
             generics => {
                 let generics = generics
                     .iter()
-                    .map(|v| datatype_inner(ctx.with(PathItem::Type(name.clone())), v, type_map))
+                    .map(|(_, v)| {
+                        datatype_inner(ctx.with(PathItem::Type(name.clone())), v, type_map)
+                    })
                     .collect::<Result<Vec<_>>>()?
                     .join(", ");
 
@@ -317,7 +332,11 @@ fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &Typ
             let fields = skip_fields_named(s.fields()).collect::<Vec<_>>();
 
             if fields.is_empty() {
-                return Ok(format!("Record<{STRING}, {NEVER}>"));
+                return Ok(s
+                    .tag()
+                    .as_ref()
+                    .map(|tag| format!("{{ \"{tag}\": \"{key}\" }}"))
+                    .unwrap_or_else(|| format!("Record<{STRING}, {NEVER}>")));
             }
 
             let (flattened, non_flattened): (Vec<_>, Vec<_>) =
@@ -653,6 +672,7 @@ pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: 
 }
 
 const ANY: &str = "any";
+const UNKNOWN: &str = "unknown";
 const NUMBER: &str = "number";
 const STRING: &str = "string";
 const BOOLEAN: &str = "boolean";

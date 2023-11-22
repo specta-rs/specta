@@ -6,6 +6,7 @@ use std::{
 
 mod r#enum;
 mod fields;
+mod list;
 mod literal;
 mod named;
 mod primitive;
@@ -13,6 +14,7 @@ mod r#struct;
 mod tuple;
 
 pub use fields::*;
+pub use list::*;
 pub use literal::*;
 pub use named::*;
 pub use primitive::*;
@@ -43,10 +45,11 @@ pub struct DefOpts<'a> {
 pub enum DataType {
     // Always inlined
     Any,
+    Unknown,
     Primitive(PrimitiveType),
     Literal(LiteralType),
     /// Either a `Set` or a `Vec`
-    List(Box<DataType>),
+    List(List),
     Nullable(Box<DataType>),
     Map(Box<(DataType, DataType)>),
     // Anonymous Reference types
@@ -112,7 +115,7 @@ pub enum DeprecatedType {
 pub struct DataTypeReference {
     pub(crate) name: Cow<'static, str>,
     pub(crate) sid: SpectaID,
-    pub(crate) generics: Vec<DataType>,
+    pub(crate) generics: Vec<(GenericType, DataType)>,
 }
 
 impl DataTypeReference {
@@ -124,7 +127,7 @@ impl DataTypeReference {
         self.sid
     }
 
-    pub fn generics(&self) -> &Vec<DataType> {
+    pub fn generics(&self) -> &Vec<(GenericType, DataType)> {
         &self.generics
     }
 }

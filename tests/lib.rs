@@ -3,6 +3,7 @@
 mod advanced_types;
 mod bigints;
 mod comments;
+mod const_types;
 mod datatype;
 mod deprecated;
 mod duplicate_ty_name;
@@ -17,11 +18,12 @@ mod reserved_keywords;
 mod selection;
 mod serde;
 mod sid;
+mod static_types;
 mod transparent;
 pub mod ts;
 mod ts_rs;
 mod ty_override;
-
+mod type_map;
 #[cfg(all(feature = "ulid", feature = "typescript"))]
 mod ulid;
 

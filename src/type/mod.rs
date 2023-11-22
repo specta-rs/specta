@@ -83,23 +83,18 @@ pub mod reference {
     /// A reference datatype.
     ///
     // This type exists to force the user to use [reference::inline] or [reference::reference] which provides some extra safety.
+    #[non_exhaustive]
     pub struct Reference {
         pub inner: DataType,
-        pub(crate) _priv: (),
     }
 
     pub fn inline<T: Type + ?Sized>(opts: DefOpts, generics: &[DataType]) -> Reference {
         Reference {
             inner: T::inline(opts, generics),
-            _priv: (),
         }
     }
 
-    pub fn reference<T: NamedType>(
-        opts: DefOpts,
-        generics: &[DataType],
-        reference: DataTypeReference,
-    ) -> Reference {
+    pub fn reference<T: NamedType>(opts: DefOpts, reference: DataTypeReference) -> Reference {
         if opts.type_map.get(&T::SID).is_none() {
             // It's important we don't put `None` into the map here. By putting a *real* value we ensure that we don't stack overflow for recursive types when calling `named_data_type`.
             opts.type_map.entry(T::SID).or_insert(Some(NamedDataType {
@@ -110,19 +105,15 @@ pub mod reference {
                 inner: DataType::Any,
             }));
 
-            let dt = T::named_data_type(
-                DefOpts {
-                    parent_inline: true,
-                    type_map: opts.type_map,
-                },
-                generics,
-            );
+            let dt = T::definition_named_data_type(DefOpts {
+                parent_inline: true,
+                type_map: opts.type_map,
+            });
             opts.type_map.insert(T::SID, Some(dt));
         }
 
         Reference {
             inner: DataType::Reference(reference),
-            _priv: (),
         }
     }
 }

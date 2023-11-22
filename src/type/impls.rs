@@ -122,7 +122,45 @@ impl<'a, T: Type> Type for &'a [T] {
 
 impl<const N: usize, T: Type> Type for [T; N] {
     fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
-        <Vec<T>>::inline(opts, generics)
+        DataType::List(List {
+            ty: Box::new(
+                // TODO: This is cursed. Fix it properly!!!
+                match Vec::<T>::inline(
+                    DefOpts {
+                        parent_inline: opts.parent_inline,
+                        type_map: opts.type_map,
+                    },
+                    generics,
+                ) {
+                    DataType::List(List { ty, .. }) => *ty,
+                    _ => unreachable!(),
+                },
+            ),
+            length: Some(N),
+        })
+    }
+
+    fn reference(opts: DefOpts, generics: &[DataType]) -> Reference {
+        Reference {
+            inner: DataType::List(List {
+                ty: Box::new(
+                    // TODO: This is cursed. Fix it properly!!!
+                    match Vec::<T>::reference(
+                        DefOpts {
+                            parent_inline: opts.parent_inline,
+                            type_map: opts.type_map,
+                        },
+                        generics,
+                    )
+                    .inner
+                    {
+                        DataType::List(List { ty, .. }) => *ty,
+                        _ => unreachable!(),
+                    },
+                ),
+                length: Some(N),
+            }),
+        }
     }
 }
 

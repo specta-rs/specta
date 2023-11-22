@@ -44,7 +44,7 @@ fn named() {
     }
     assert_ts!(
         Struct1,
-        "{ a: string[]; b: [string[], string[]]; c: string[][] }"
+        "{ a: string[]; b: [string[], string[]]; c: [string[], string[], string[]] }"
     );
 }
 
@@ -59,7 +59,7 @@ fn named_nested() {
     }
     assert_ts!(
         Struct2,
-        "{ a: string[][]; b: [string[][], string[][]]; c: string[][][] }"
+        "{ a: string[][]; b: [string[][], string[][]]; c: [string[][], string[][], string[][]] }"
     );
 }
 
@@ -68,7 +68,10 @@ fn tuple() {
     #[derive(Type)]
     #[specta(export = false)]
     struct Tuple1(Vec<i32>, (Vec<i32>, Vec<i32>), [Vec<i32>; 3]);
-    assert_ts!(Tuple1, "[number[], [number[], number[]], number[][]]");
+    assert_ts!(
+        Tuple1,
+        "[number[], [number[], number[]], [number[], number[], number[]]]"
+    );
 }
 
 #[test]
@@ -82,6 +85,6 @@ fn tuple_nested() {
     );
     assert_ts!(
         Tuple2,
-        "[number[][], [number[][], number[][]], number[][][]]"
+        "[number[][], [number[][], number[][]], [number[][], number[][], number[][]]]"
     );
 }

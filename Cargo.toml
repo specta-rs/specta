@@ -105,7 +105,7 @@ either = ["dep:either"]
 bevy_ecs = ["dep:bevy_ecs"]
 
 [dependencies]
-specta-macros = { version = "2.0.0-rc.6", path = "./macros" }
+specta-macros = { version = "=2.0.0-rc.6", path = "./macros" }
 serde = { version = "1.0.183", optional = true, default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.104", optional = true, default-features = false, features = ["std"] }
 serde_yaml = { version = "0.9.25", optional = true, default-features = false, features = [] }

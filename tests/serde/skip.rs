@@ -1,3 +1,5 @@
+use std::any::Any;
+
 use specta::{SerdeError, Type};
 
 use crate::ts::assert_ts;
@@ -80,6 +82,35 @@ pub enum SkipNamedFieldInVariant {
     },
 }
 
+// https://github.com/oscartbeaumont/specta/issues/170
+#[derive(Type)]
+#[specta(transparent, export = false)]
+pub struct TransparentWithSkip((), #[specta(skip)] String);
+
+// https://github.com/oscartbeaumont/specta/issues/170
+#[derive(Type)]
+#[specta(transparent, export = false)]
+pub struct TransparentWithSkip2(#[specta(skip)] (), String);
+
+// https://github.com/oscartbeaumont/specta/issues/170
+#[derive(Type)]
+#[specta(transparent, export = false)]
+pub struct TransparentWithSkip3(#[specta(type = String)] Box<dyn Any>);
+
+/// This is intentionally just a compile or not compile test
+/// https://github.com/oscartbeaumont/specta/issues/167
+#[derive(Type)]
+#[specta(export = false)]
+pub enum LazilySkip {
+    #[specta(skip)]
+    A(Box<dyn Any>),
+    B(#[specta(skip)] Box<dyn Any>),
+    C {
+        #[specta(skip)]
+        a: Box<dyn Any>,
+    },
+}
+
 #[test]
 fn skip() {
     assert_ts!(SkipOnlyField, "Record<string, never>");
@@ -94,4 +125,7 @@ fn skip() {
         SkipNamedFieldInVariant,
         "{ A: Record<string, never> } | { B: { b: number } }"
     );
+    assert_ts!(TransparentWithSkip, "null");
+    assert_ts!(TransparentWithSkip2, "string");
+    assert_ts!(TransparentWithSkip3, "string");
 }
