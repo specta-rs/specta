@@ -318,7 +318,11 @@ fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &Typ
             let fields = skip_fields_named(s.fields()).collect::<Vec<_>>();
 
             if fields.is_empty() {
-                return Ok(format!("Record<{STRING}, {NEVER}>"));
+                return Ok(s
+                    .tag()
+                    .as_ref()
+                    .map(|tag| format!("{{ \"{tag}\": \"{key}\" }}"))
+                    .unwrap_or_else(|| format!("Record<{STRING}, {NEVER}>")));
             }
 
             let (flattened, non_flattened): (Vec<_>, Vec<_>) =
