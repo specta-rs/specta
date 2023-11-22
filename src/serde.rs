@@ -86,6 +86,7 @@ fn is_valid_ty_internal(
                 is_valid_ty_internal(generic, type_map, checked_references)?;
             }
 
+            #[allow(clippy::panic)]
             if !checked_references.contains(&ty.sid) {
                 checked_references.insert(ty.sid);
                 let ty = type_map
@@ -170,7 +171,7 @@ fn is_valid_map_key(key_ty: &DataType, type_map: &TypeMap) -> Result<(), SerdeEr
 fn validate_enum(e: &EnumType, type_map: &TypeMap) -> Result<(), SerdeError> {
     // You can't `#[serde(skip)]` your way to an empty enum.
     let valid_variants = e.variants().iter().filter(|(_, v)| !v.skip).count();
-    if valid_variants == 0 && e.variants().len() != 0 {
+    if valid_variants == 0 && !e.variants().is_empty() {
         return Err(SerdeError::InvalidUsageOfSkip);
     }
 

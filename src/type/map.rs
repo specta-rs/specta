@@ -13,6 +13,7 @@ pub struct TypeMap {
 impl TypeMap {
     #[track_caller]
     pub fn get(&self, sid: SpectaID) -> Option<&NamedDataType> {
+        #[allow(clippy::bind_instead_of_map)]
         self.map.get(&sid).as_ref().and_then(|v| match v {
             Some(ndt) => Some(ndt),
             // If this method is used during type construction this case could be hit when it's actually valid
@@ -30,12 +31,17 @@ impl TypeMap {
         self.map.insert(sid, Some(dt));
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+
     pub fn len(&self) -> usize {
         self.map.len()
     }
 
     // TODO: It would be nice if this would a proper `Iterator` or `IntoIterator` implementation!
     pub fn iter(&self) -> impl Iterator<Item = (SpectaID, &NamedDataType)> {
+        #[allow(clippy::unnecessary_filter_map)]
         self.map.iter().filter_map(|(sid, ndt)| match ndt {
             Some(ndt) => Some((*sid, ndt)),
             None => {

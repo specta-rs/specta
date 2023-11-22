@@ -200,6 +200,7 @@ pub fn flatten<T: Type>(
 ) -> DataType {
     type_map.flatten_stack.push(sid);
 
+    #[allow(clippy::panic)]
     if type_map.flatten_stack.len() > 25 {
         // TODO: Handle this error without panicking
         panic!("Type recursion limit exceeded!");
@@ -210,7 +211,7 @@ pub fn flatten<T: Type>(
             parent_inline,
             type_map,
         },
-        &generics,
+        generics,
     );
 
     type_map.flatten_stack.pop();
