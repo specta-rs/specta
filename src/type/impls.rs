@@ -241,16 +241,28 @@ const _: () = {
 
 #[cfg(feature = "serde_json")]
 const _: () = {
-    impl_for_map!(serde_json::Map<K, V> as "Map");
-    impl<K: Type, V: Type> Flatten for serde_json::Map<K, V> {}
+    use serde_json::{Map, Number, Value};
 
-    impl Type for serde_json::Value {
-        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
-            DataType::Any
-        }
+    // TODO: Copy these changes to `serde_yaml`, etc
+
+    impl_for_map!(Map<K, V> as "Map");
+    impl<K: Type, V: Type> Flatten for Map<K, V> {}
+
+    #[derive(Type)]
+    #[specta(rename = "Value", remote = Value, crate = crate, export = false)]
+    pub enum ValueDef {
+        Null,
+        Bool(bool),
+        // TODO: This could be a bigint type and errors.
+        // Number(Number),
+        String(String),
+        // TODO: Fix recursive types
+        // Array(Vec<Value>),
+        // Object(Map<String, Value>),
     }
 
-    impl Type for serde_json::Number {
+    // TODO: Change to remote impl
+    impl Type for Number {
         fn inline(_: DefOpts, _: &[DataType]) -> DataType {
             DataType::Enum(EnumType {
                 name: "Number".into(),
