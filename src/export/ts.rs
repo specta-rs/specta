@@ -47,6 +47,7 @@ pub fn ts_with_cfg(path: &str, conf: &ExportConfig) -> Result<(), ExportError> {
                     .iter()
                     .map(|(k, v)| (*k, Some(v.clone())))
                     .collect::<BTreeMap<_, _>>(),
+                flatten_stack: vec![],
             },
         )?;
         out += "\n\n";

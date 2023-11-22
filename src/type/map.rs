@@ -7,9 +7,11 @@ use crate::{NamedDataType, SpectaID};
 pub struct TypeMap {
     // `None` indicates that the entry is a placeholder. It was reference and we are currently working out it's definition.
     pub(crate) map: BTreeMap<SpectaID, Option<NamedDataType>>,
+    pub(crate) flatten_stack: Vec<SpectaID>,
 }
 
 impl TypeMap {
+    #[track_caller]
     pub fn get(&self, sid: SpectaID) -> Option<&NamedDataType> {
         self.map.get(&sid).as_ref().and_then(|v| match v {
             Some(ndt) => Some(ndt),
