@@ -205,7 +205,7 @@ impl<T> Type for std::marker::PhantomData<T> {
 // Serde does no support `Infallible` as it can't be constructed so a `&self` method is uncallable on it.
 #[allow(unused)]
 #[derive(Type)]
-#[specta(remote = std::convert::Infallible, crate = crate)]
+#[specta(remote = std::convert::Infallible, crate = crate, export = false)]
 pub enum Infallible {}
 
 impl<T: Type> Type for std::ops::Range<T> {

@@ -26,10 +26,6 @@ pub struct ExportConfig {
     pub(crate) comment_exporter: Option<CommentFormatterFn>,
     /// How the resulting file should be formatted.
     pub(crate) formatter: Option<FormatterFn>,
-    /// Whether to export types by default.
-    /// This can be overridden on a type basis by using `#[specta(export)]`.
-    #[cfg(feature = "export")]
-    pub(crate) export_by_default: Option<bool>,
 }
 
 impl ExportConfig {
@@ -68,17 +64,6 @@ impl ExportConfig {
         self
     }
 
-    /// Configure whether or not to export types by default.
-    ///
-    /// This can be overridden on a specific type by using `#[specta(export)]`.
-    ///
-    /// This parameter only takes effect when this configuration if passed into [`export::ts_with_cfg`](crate::export::ts_with_cfg)
-    #[cfg(feature = "export")]
-    pub fn export_by_default(mut self, export: Option<bool>) -> Self {
-        self.export_by_default = export;
-        self
-    }
-
     /// Run the specified formatter on the given path.
     pub fn run_format(&self, path: PathBuf) -> io::Result<()> {
         if let Some(formatter) = self.formatter {
@@ -94,8 +79,6 @@ impl Default for ExportConfig {
             bigint: Default::default(),
             comment_exporter: Some(comments::js_doc),
             formatter: None,
-            #[cfg(feature = "export")]
-            export_by_default: None,
         }
     }
 }

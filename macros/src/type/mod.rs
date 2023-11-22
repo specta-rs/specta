@@ -162,7 +162,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         #deprecated,
                         SID,
                         IMPL_LOCATION,
-                        #should_export,
                         <Self as #crate_ref::Type>::inline(opts, generics)
                     )
                 }

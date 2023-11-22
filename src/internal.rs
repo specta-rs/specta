@@ -114,18 +114,13 @@ pub mod construct {
         deprecated: Option<DeprecatedType>,
         sid: SpectaID,
         impl_location: ImplLocation,
-        export: Option<bool>,
         inner: DataType,
     ) -> NamedDataType {
         NamedDataType {
             name,
             docs,
             deprecated,
-            ext: Some(NamedDataTypeExt {
-                sid,
-                impl_location,
-                export,
-            }),
+            ext: Some(NamedDataTypeExt { sid, impl_location }),
             inner,
         }
     }
