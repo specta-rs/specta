@@ -246,7 +246,7 @@ fn validate_internally_tag_enum_datatype(
 // TODO: Maybe make this a public utility?
 fn resolve_generics(mut dt: DataType, generics: &Vec<(GenericType, DataType)>) -> DataType {
     match dt {
-        DataType::Primitive(_) | DataType::Literal(_) | DataType::Any => dt,
+        DataType::Primitive(_) | DataType::Literal(_) | DataType::Any | DataType::Unknown => dt,
         DataType::List(v) => DataType::List(Box::new(resolve_generics(*v, generics))),
         DataType::Nullable(v) => DataType::Nullable(Box::new(resolve_generics(*v, generics))),
         DataType::Map(v) => DataType::Map(Box::new({

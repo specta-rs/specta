@@ -43,6 +43,7 @@ pub struct DefOpts<'a> {
 pub enum DataType {
     // Always inlined
     Any,
+    Unknown,
     Primitive(PrimitiveType),
     Literal(LiteralType),
     /// Either a `Set` or a `Vec`

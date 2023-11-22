@@ -176,6 +176,7 @@ pub fn datatype(conf: &ExportConfig, typ: &DataType, type_map: &TypeMap) -> Outp
 pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &TypeMap) -> Output {
     Ok(match &typ {
         DataType::Any => ANY.into(),
+        DataType::Unknown => UNKNOWN.into(),
         DataType::Primitive(p) => {
             let ctx = ctx.with(PathItem::Type(p.to_rust_str().into()));
             match p {
@@ -658,6 +659,7 @@ pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: 
 }
 
 const ANY: &str = "any";
+const UNKNOWN: &str = "unknown";
 const NUMBER: &str = "number";
 const STRING: &str = "string";
 const BOOLEAN: &str = "boolean";
