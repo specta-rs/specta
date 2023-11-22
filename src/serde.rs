@@ -89,10 +89,7 @@ fn is_valid_ty_internal(
             if !checked_references.contains(&ty.sid) {
                 checked_references.insert(ty.sid);
                 let ty = type_map
-                    .get(&ty.sid)
-                    .as_ref()
-                    .unwrap_or_else(|| panic!("Reference type not found for: {}", ty.sid.type_name))
-                    .as_ref()
+                    .get(ty.sid)
                     .unwrap_or_else(|| panic!("Type '{}' was never populated.", ty.sid.type_name)); // TODO: Error properly
 
                 is_valid_ty_internal(&ty.inner, type_map, checked_references)?;
@@ -161,12 +158,7 @@ fn is_valid_map_key(key_ty: &DataType, type_map: &TypeMap) -> Result<(), SerdeEr
             Ok(())
         }
         DataType::Reference(r) => {
-            let ty = type_map
-                .get(&r.sid)
-                .as_ref()
-                .expect("Reference type not found")
-                .as_ref()
-                .expect("Type was never populated"); // TODO: Error properly
+            let ty = type_map.get(r.sid).expect("Type was never populated"); // TODO: Error properly
 
             is_valid_map_key(&resolve_generics(ty.inner.clone(), &r.generics), type_map)
         }
@@ -243,12 +235,7 @@ fn validate_internally_tag_enum_datatype(
         DataType::Result(_) => {}
         // References need to be checked against the same rules.
         DataType::Reference(ty) => {
-            let ty = type_map
-                .get(&ty.sid)
-                .as_ref()
-                .expect("Reference type not found")
-                .as_ref()
-                .expect("Type was never populated"); // TODO: Error properly
+            let ty = type_map.get(ty.sid).expect("Type was never populated"); // TODO: Error properly
 
             validate_internally_tag_enum_datatype(&ty.inner, type_map)?;
         }

@@ -202,9 +202,9 @@ pub fn parse_struct(
 	                                    validate_flatten::<#field_ty>();
 
 										// if let Some(None) = opts.type_map.get(&SID) {
-          //                                   todo!();
-          //                               }
-          //                              	opts.type_map.insert(SID, None);
+                                        //                                   todo!();
+                                        //                               }
+                                        //                              	opts.type_map.insert(SID, None);
 
 	                                    let mut ty = <#field_ty as #crate_ref::Type>::inline(#crate_ref::DefOpts {
 	                                        parent_inline: #parent_inline,

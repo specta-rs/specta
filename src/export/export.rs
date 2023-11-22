@@ -15,13 +15,17 @@ pub struct TypesIter {
 }
 
 impl Iterator for TypesIter {
-    type Item = (SpectaID, Option<NamedDataType>);
+    type Item = (SpectaID, NamedDataType);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let (k, v) = self.lock.iter().nth(self.index)?;
+        let (k, v) = self.lock.map.iter().nth(self.index)?;
         self.index += 1;
         // We have to clone, because we can't invent a lifetime
-        Some((*k, v.clone()))
+        Some((
+            *k,
+            v.clone()
+                .expect("specta: `TypesIter` found a type placeholder!"),
+        ))
     }
 }
 

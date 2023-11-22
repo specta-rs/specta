@@ -10,24 +10,15 @@ pub fn detect_duplicate_type_names(
     let mut errors = Vec::new();
 
     let mut map = HashMap::with_capacity(type_map.len());
-    for (sid, dt) in type_map {
-        match dt {
-            Some(dt) => {
-                if let Some(ext) = &dt.ext {
-                    if let Some((existing_sid, existing_impl_location)) =
-                        map.insert(dt.name.clone(), (sid, ext.impl_location))
-                    {
-                        if existing_sid != sid {
-                            errors.push((
-                                dt.name.clone(),
-                                ext.impl_location,
-                                existing_impl_location,
-                            ));
-                        }
-                    }
+    for (sid, dt) in type_map.iter() {
+        if let Some(ext) = &dt.ext {
+            if let Some((existing_sid, existing_impl_location)) =
+                map.insert(dt.name.clone(), (sid, ext.impl_location))
+            {
+                if existing_sid != sid {
+                    errors.push((dt.name.clone(), ext.impl_location, existing_impl_location));
                 }
             }
-            None => {} // TODO: unreachable!()},
         }
     }
 

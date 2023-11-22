@@ -3,9 +3,11 @@ use crate::*;
 #[macro_use]
 mod macros;
 mod impls;
+mod map;
 mod post_process;
 mod specta_id;
 
+pub use map::*;
 pub use post_process::*;
 pub use specta_id::*;
 
@@ -78,8 +80,6 @@ pub trait NamedType: Type {
 
 /// Helpers for generating [Type::reference] implementations.
 pub mod reference {
-    use std::borrow::Cow;
-
     use super::*;
 
     /// A reference datatype.
@@ -98,26 +98,19 @@ pub mod reference {
     }
 
     pub fn reference<T: NamedType>(opts: DefOpts, reference: DataTypeReference) -> Reference {
-        println!("REFERENCE {:?} {:?}", T::SID, opts.type_map.get(&T::SID));
-        if opts.type_map.get(&T::SID).is_none() {
-            // It's important we don't put `None` into the map here. By putting a *real* value we ensure that we don't stack overflow for recursive types when calling `named_data_type`.
-            opts.type_map.entry(T::SID).or_insert(Some(NamedDataType {
-                name: "placeholder".into(),
-                docs: Cow::Borrowed(""),
-                deprecated: None,
-                ext: None,
-                inner: DataType::Any,
-            }));
+        println!(
+            "REFERENCE {:?} {:?}",
+            T::SID,
+            opts.type_map.map.get(&T::SID)
+        );
+        if opts.type_map.map.get(&T::SID).is_none() {
+            opts.type_map.map.entry(T::SID).or_insert(None);
 
             let dt = T::definition_named_data_type(DefOpts {
                 parent_inline: true,
                 type_map: opts.type_map,
             });
-            opts.type_map.insert(T::SID, Some(dt));
-        } else {
-            // let v = opts.type_map.get(&T::SID).unwrap().as_ref().unwrap(); // TODO: Fix this
-            // println!("V: {:?}", v);
-            // panic!("{:#?}", backtrace::Backtrace::new());
+            opts.type_map.map.insert(T::SID, Some(dt));
         }
 
         Reference {

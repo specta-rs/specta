@@ -134,16 +134,8 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             #[automatically_derived]
             #type_impl_heading {
                 fn inline(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::DataType {
-                    println!("IMPL INLINE {:?} {:?}", SID, opts.type_map.get(&SID));
-                    // if opts.type_map.get(&SID).is_some() {
-                    //     todo!();
-                    // }
-
-                    // if let Some(None) = opts.type_map.get(&SID) {
-                    //     todo!();
-                    // }
-                   	// opts.type_map.insert(SID, None);
-
+                    println!("IMPL INLINE {:?}", SID);
+                    
                     #inlines
                 }
 
