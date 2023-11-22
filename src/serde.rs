@@ -77,9 +77,9 @@ pub(crate) fn is_valid_ty(dt: &DataType, type_map: &TypeMap) -> Result<(), Serde
             let ty = type_map
                 .get(&ty.sid)
                 .as_ref()
-                .expect(format!("Reference type not found for: {}", ty.sid.type_name).as_str())
+                .unwrap_or_else(|| panic!("Reference type not found for: {}", ty.sid.type_name))
                 .as_ref()
-                .expect(format!("Type '{}' was never populated.", ty.sid.type_name).as_str()); // TODO: Error properly
+                .unwrap_or_else(|| panic!("Type '{}' was never populated.", ty.sid.type_name)); // TODO: Error properly
 
             is_valid_ty(&ty.inner, type_map)?;
         }
