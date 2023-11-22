@@ -3,6 +3,7 @@
 mod advanced_types;
 mod bigints;
 mod comments;
+mod const_types;
 mod datatype;
 mod deprecated;
 mod duplicate_ty_name;

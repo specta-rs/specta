@@ -216,13 +216,26 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
         }
         // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
         DataType::List(def) => {
-            let dt = datatype_inner(ctx, def, type_map)?;
-            if (dt.contains(' ') && !dt.ends_with('}'))
+            let dt = datatype_inner(ctx, &def.ty, type_map)?;
+            let dt = if (dt.contains(' ') && !dt.ends_with('}'))
                 // This is to do with maintaining order of operations.
                 // Eg `{} | {}` must be wrapped in parens like `({} | {})[]` but `{}` doesn't cause `{}[]` is valid
                 || (dt.contains(' ') && (dt.contains("&") || dt.contains("|")))
             {
-                format!("({dt})[]")
+                format!("({dt})")
+            } else {
+                format!("{dt}")
+            };
+
+            if let Some(length) = def.length {
+                format!(
+                    "[{}]",
+                    (0..length)
+                        .into_iter()
+                        .map(|_| dt.clone())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
             } else {
                 format!("{dt}[]")
             }

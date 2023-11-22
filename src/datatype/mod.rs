@@ -6,6 +6,7 @@ use std::{
 
 mod r#enum;
 mod fields;
+mod list;
 mod literal;
 mod named;
 mod primitive;
@@ -13,6 +14,7 @@ mod r#struct;
 mod tuple;
 
 pub use fields::*;
+pub use list::*;
 pub use literal::*;
 pub use named::*;
 pub use primitive::*;
@@ -47,7 +49,7 @@ pub enum DataType {
     Primitive(PrimitiveType),
     Literal(LiteralType),
     /// Either a `Set` or a `Vec`
-    List(Box<DataType>),
+    List(List),
     Nullable(Box<DataType>),
     Map(Box<(DataType, DataType)>),
     // Anonymous Reference types

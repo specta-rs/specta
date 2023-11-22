@@ -83,15 +83,14 @@ pub mod reference {
     /// A reference datatype.
     ///
     // This type exists to force the user to use [reference::inline] or [reference::reference] which provides some extra safety.
+    #[non_exhaustive]
     pub struct Reference {
         pub inner: DataType,
-        pub(crate) _priv: (),
     }
 
     pub fn inline<T: Type + ?Sized>(opts: DefOpts, generics: &[DataType]) -> Reference {
         Reference {
             inner: T::inline(opts, generics),
-            _priv: (),
         }
     }
 
@@ -115,7 +114,6 @@ pub mod reference {
 
         Reference {
             inner: DataType::Reference(reference),
-            _priv: (),
         }
     }
 }

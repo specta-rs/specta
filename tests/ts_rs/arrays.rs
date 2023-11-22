@@ -3,7 +3,7 @@ use specta::Type;
 
 #[test]
 fn free() {
-    assert_ts!([String; 10], "string[]")
+    assert_ts!([String; 3], "[string, string, string]")
 }
 
 #[test]
@@ -12,17 +12,17 @@ fn interface() {
     #[specta(export = false)]
     struct Interface {
         #[allow(dead_code)]
-        a: [i32; 10],
+        a: [i32; 3],
     }
 
-    assert_ts!(Interface, "{ a: number[] }")
+    assert_ts!(Interface, "{ a: [number, number, number] }")
 }
 
 #[test]
 fn newtype() {
     #[derive(Type)]
     #[specta(export = false)]
-    struct Newtype(#[allow(dead_code)] [i32; 10]);
+    struct Newtype(#[allow(dead_code)] [i32; 3]);
 
-    assert_ts!(Newtype, "number[]")
+    assert_ts!(Newtype, "[number, number, number]")
 }

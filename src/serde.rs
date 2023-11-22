@@ -2,7 +2,7 @@ use thiserror::Error;
 
 use crate::{
     internal::{skip_fields, skip_fields_named},
-    DataType, EnumRepr, EnumType, EnumVariants, GenericType, LiteralType, PrimitiveType,
+    DataType, EnumRepr, EnumType, EnumVariants, GenericType, List, LiteralType, PrimitiveType,
     StructFields, TypeMap,
 };
 
@@ -247,7 +247,10 @@ fn validate_internally_tag_enum_datatype(
 fn resolve_generics(mut dt: DataType, generics: &Vec<(GenericType, DataType)>) -> DataType {
     match dt {
         DataType::Primitive(_) | DataType::Literal(_) | DataType::Any | DataType::Unknown => dt,
-        DataType::List(v) => DataType::List(Box::new(resolve_generics(*v, generics))),
+        DataType::List(v) => DataType::List(List {
+            ty: Box::new(resolve_generics(*v.ty, generics)),
+            length: v.length,
+        }),
         DataType::Nullable(v) => DataType::Nullable(Box::new(resolve_generics(*v, generics))),
         DataType::Map(v) => DataType::Map(Box::new({
             let (k, v) = *v;
