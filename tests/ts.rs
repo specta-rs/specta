@@ -609,13 +609,3 @@ pub enum MyEnum {
     A(String),
     B(u32),
 }
-
-#[derive(Type)]
-#[specta(transparent, export = false)]
-pub struct A(String);
-
-#[derive(Type)]
-#[specta(export = false)]
-pub struct ExportFalseBroken {
-    a: A,
-}

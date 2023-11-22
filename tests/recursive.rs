@@ -33,13 +33,9 @@ pub struct RecursiveInline {
     demo: Box<RecursiveInline>,
 }
 
-// #[derive(Type)]
-// #[specta(transparent, export = false)]
-// pub struct RecursiveTransparent(Box<RecursiveInline>);
-
-// #[derive(Type)]
-// #[specta(export = false)]
-// pub struct RecursiveMapKey(HashMap<RecursiveMapKey, ()>);
+#[derive(Type)]
+#[specta(transparent, export = false)]
+pub struct RecursiveTransparent(Box<RecursiveInline>);
 
 #[test]
 fn test_recursive_types() {
@@ -63,9 +59,6 @@ fn test_recursive_types() {
         "export type RecursiveMapValue = { demo: { [key in string]: RecursiveMapValue } }"
     );
 
-    // assert_ts!(RecursiveInline, "");
-    // assert_ts_export!(RecursiveInline, "");
-
-    // assert_ts!(RecursiveTransparent, "");
-    // assert_ts_export!(RecursiveTransparent, "");
+    assert_ts!(RecursiveTransparent, "");
+    assert_ts_export!(RecursiveTransparent, "");
 }

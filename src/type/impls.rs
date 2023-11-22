@@ -282,15 +282,10 @@ const _: () = {
     impl_for_map!(serde_json::Map<K, V> as "Map");
     impl<K: Type, V: Type> Flatten for serde_json::Map<K, V> {}
 
-    #[derive(Type)]
-    #[specta(remote = serde_json::Value, crate = crate, untagged)]
-    pub enum JsonValue {
-        Null(()),
-        Bool(bool),
-        Number(serde_json::Number),
-        String(String),
-        Array(Vec<serde_json::Value>),
-        Object(serde_json::Map<String, serde_json::Value>),
+    impl Type for serde_json::Value {
+        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+            DataType::Any
+        }
     }
 
     // TODO: Using remote impl

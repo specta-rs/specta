@@ -32,8 +32,6 @@ fn is_valid_ty_internal(
     type_map: &TypeMap,
     checked_references: &mut HashSet<SpectaID>,
 ) -> Result<(), SerdeError> {
-    println!("IS VALID {dt:?}");
-
     match dt {
         DataType::Nullable(ty) => is_valid_ty(ty, type_map)?,
         DataType::Map(ty) => {
