@@ -64,6 +64,8 @@ pub trait NamedType: Type {
 
     /// this is equivalent to [Type::definition] but returns a [NamedDataType] instead.
     fn definition_named_data_type(opts: DefOpts) -> NamedDataType {
+        println!("DEFINITION NAMED DATA TYPE");
+
         Self::named_data_type(
             opts,
             &Self::definition_generics()
@@ -89,12 +91,14 @@ pub mod reference {
     }
 
     pub fn inline<T: Type + ?Sized>(opts: DefOpts, generics: &[DataType]) -> Reference {
+        println!("REFERENCE INLINE");
         Reference {
             inner: T::inline(opts, generics),
         }
     }
 
     pub fn reference<T: NamedType>(opts: DefOpts, reference: DataTypeReference) -> Reference {
+        println!("REFERENCE {:?} {:?}", T::SID, opts.type_map.get(&T::SID));
         if opts.type_map.get(&T::SID).is_none() {
             // It's important we don't put `None` into the map here. By putting a *real* value we ensure that we don't stack overflow for recursive types when calling `named_data_type`.
             opts.type_map.entry(T::SID).or_insert(Some(NamedDataType {
@@ -110,6 +114,10 @@ pub mod reference {
                 type_map: opts.type_map,
             });
             opts.type_map.insert(T::SID, Some(dt));
+        } else {
+            // let v = opts.type_map.get(&T::SID).unwrap().as_ref().unwrap(); // TODO: Fix this
+            // println!("V: {:?}", v);
+            // panic!("{:#?}", backtrace::Backtrace::new());
         }
 
         Reference {

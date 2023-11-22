@@ -121,10 +121,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     });
 
     let comments = &container_attrs.common.doc;
-    let should_export = match container_attrs.export {
-        Some(export) => quote!(Some(#export)),
-        None => quote!(None),
-    };
     let deprecated = container_attrs.common.deprecated_as_tokens(&crate_ref);
 
     let sid = quote!(#crate_ref::internal::construct::sid(#name, concat!("::", module_path!(), ":", line!(), ":", column!())));
@@ -138,6 +134,16 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             #[automatically_derived]
             #type_impl_heading {
                 fn inline(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::DataType {
+                    println!("IMPL INLINE {:?} {:?}", SID, opts.type_map.get(&SID));
+                    // if opts.type_map.get(&SID).is_some() {
+                    //     todo!();
+                    // }
+
+                    // if let Some(None) = opts.type_map.get(&SID) {
+                    //     todo!();
+                    // }
+                   	// opts.type_map.insert(SID, None);
+
                     #inlines
                 }
 
@@ -146,6 +152,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 }
 
                 fn reference(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::reference::Reference {
+                    println!("IMPL REFERENCE");
                     #reference
                 }
             }
@@ -156,6 +163,8 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 	            const IMPL_LOCATION: #crate_ref::ImplLocation = IMPL_LOCATION;
 
                 fn named_data_type(opts: #crate_ref::DefOpts, generics: &[#crate_ref::DataType]) -> #crate_ref::NamedDataType {
+                    println!("NAMED DATA TYPE");
+
                     #crate_ref::internal::construct::named_data_type(
                         #name.into(),
                         #comments.into(),

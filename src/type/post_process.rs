@@ -27,7 +27,7 @@ pub fn detect_duplicate_type_names(
                     }
                 }
             }
-            None => unreachable!(),
+            None => {} // TODO: unreachable!()},
         }
     }
 

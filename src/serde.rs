@@ -1,9 +1,11 @@
+use std::collections::HashSet;
+
 use thiserror::Error;
 
 use crate::{
     internal::{skip_fields, skip_fields_named},
     DataType, EnumRepr, EnumType, EnumVariants, GenericType, List, LiteralType, PrimitiveType,
-    StructFields, TypeMap,
+    SpectaID, StructFields, TypeMap,
 };
 
 // TODO: The error should show a path to the type causing the issue like the BigInt error reporting.
@@ -22,22 +24,32 @@ pub enum SerdeError {
 ///
 /// This can be used by exporters which wanna do export-time checks that all types are compatible with Serde formats.
 pub(crate) fn is_valid_ty(dt: &DataType, type_map: &TypeMap) -> Result<(), SerdeError> {
+    is_valid_ty_internal(dt, type_map, &mut Default::default())
+}
+
+fn is_valid_ty_internal(
+    dt: &DataType,
+    type_map: &TypeMap,
+    checked_references: &mut HashSet<SpectaID>,
+) -> Result<(), SerdeError> {
+    println!("IS VALID {dt:?}");
+
     match dt {
         DataType::Nullable(ty) => is_valid_ty(ty, type_map)?,
         DataType::Map(ty) => {
             is_valid_map_key(&ty.0, type_map)?;
-            is_valid_ty(&ty.1, type_map)?;
+            is_valid_ty_internal(&ty.1, type_map, checked_references)?;
         }
         DataType::Struct(ty) => match ty.fields() {
             StructFields::Unit => {}
             StructFields::Unnamed(ty) => {
                 for (_, ty) in skip_fields(ty.fields()) {
-                    is_valid_ty(ty, type_map)?;
+                    is_valid_ty_internal(ty, type_map, checked_references)?;
                 }
             }
             StructFields::Named(ty) => {
                 for (_, (_, ty)) in skip_fields_named(ty.fields()) {
-                    is_valid_ty(ty, type_map)?;
+                    is_valid_ty_internal(ty, type_map, checked_references)?;
                 }
             }
         },
@@ -49,12 +61,12 @@ pub(crate) fn is_valid_ty(dt: &DataType, type_map: &TypeMap) -> Result<(), Serde
                     EnumVariants::Unit => {}
                     EnumVariants::Named(variant) => {
                         for (_, (_, ty)) in skip_fields_named(variant.fields()) {
-                            is_valid_ty(ty, type_map)?;
+                            is_valid_ty_internal(ty, type_map, checked_references)?;
                         }
                     }
                     EnumVariants::Unnamed(variant) => {
                         for (_, ty) in skip_fields(variant.fields()) {
-                            is_valid_ty(ty, type_map)?;
+                            is_valid_ty_internal(ty, type_map, checked_references)?;
                         }
                     }
                 }
@@ -62,26 +74,29 @@ pub(crate) fn is_valid_ty(dt: &DataType, type_map: &TypeMap) -> Result<(), Serde
         }
         DataType::Tuple(ty) => {
             for ty in ty.elements() {
-                is_valid_ty(ty, type_map)?;
+                is_valid_ty_internal(ty, type_map, checked_references)?;
             }
         }
         DataType::Result(ty) => {
-            is_valid_ty(&ty.0, type_map)?;
-            is_valid_ty(&ty.1, type_map)?;
+            is_valid_ty_internal(&ty.0, type_map, checked_references)?;
+            is_valid_ty_internal(&ty.1, type_map, checked_references)?;
         }
         DataType::Reference(ty) => {
             for (_, generic) in ty.generics() {
-                is_valid_ty(generic, type_map)?;
+                is_valid_ty_internal(generic, type_map, checked_references)?;
             }
 
-            let ty = type_map
-                .get(&ty.sid)
-                .as_ref()
-                .unwrap_or_else(|| panic!("Reference type not found for: {}", ty.sid.type_name))
-                .as_ref()
-                .unwrap_or_else(|| panic!("Type '{}' was never populated.", ty.sid.type_name)); // TODO: Error properly
+            if !checked_references.contains(&ty.sid) {
+                checked_references.insert(ty.sid);
+                let ty = type_map
+                    .get(&ty.sid)
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("Reference type not found for: {}", ty.sid.type_name))
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("Type '{}' was never populated.", ty.sid.type_name)); // TODO: Error properly
 
-            is_valid_ty(&ty.inner, type_map)?;
+                is_valid_ty_internal(&ty.inner, type_map, checked_references)?;
+            }
         }
         _ => {}
     }

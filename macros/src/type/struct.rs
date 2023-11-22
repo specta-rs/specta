@@ -198,13 +198,13 @@ pub fn parse_struct(
                             ).map(|ty| {
 	                            let ty = if field_attrs.flatten {
 	                                quote! {
-	                                    #[allow(warnings)]
-	                                    {
-	                                        #ty
-	                                    }
-
 	                                    fn validate_flatten<T: #crate_ref::Flatten>() {}
 	                                    validate_flatten::<#field_ty>();
+
+										// if let Some(None) = opts.type_map.get(&SID) {
+          //                                   todo!();
+          //                               }
+          //                              	opts.type_map.insert(SID, None);
 
 	                                    let mut ty = <#field_ty as #crate_ref::Type>::inline(#crate_ref::DefOpts {
 	                                        parent_inline: #parent_inline,

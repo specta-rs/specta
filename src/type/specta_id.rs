@@ -10,7 +10,7 @@ use std::cmp::Ordering;
 ///  - `&'a T::SID == &'b T::SID` (unlike std::any::TypeId which forces a static lifetime)
 ///  - `Box<T> == Arc<T> == Rc<T>` (unlike std::any::TypeId)
 ///
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash)]
 pub struct SpectaID {
     pub(crate) type_name: &'static str,
     pub(crate) hash: u64,
