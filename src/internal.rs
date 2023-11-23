@@ -40,11 +40,13 @@ pub mod construct {
 
     pub const fn r#struct(
         name: Cow<'static, str>,
+        sid: Option<SpectaID>,
         generics: Vec<GenericType>,
         fields: StructFields,
     ) -> StructType {
         StructType {
             name,
+            sid,
             generics,
             fields,
         }
@@ -67,6 +69,7 @@ pub mod construct {
 
     pub const fn r#enum(
         name: Cow<'static, str>,
+        sid: SpectaID,
         repr: EnumRepr,
         skip_bigint_checks: bool,
         generics: Vec<GenericType>,
@@ -74,6 +77,7 @@ pub mod construct {
     ) -> EnumType {
         EnumType {
             name,
+            sid: Some(sid),
             repr,
             skip_bigint_checks,
             generics,

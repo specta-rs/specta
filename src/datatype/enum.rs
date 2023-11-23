@@ -1,7 +1,8 @@
 use std::borrow::Cow;
 
 use crate::{
-    datatype::DataType, DeprecatedType, GenericType, NamedDataType, NamedFields, UnnamedFields,
+    datatype::DataType, DeprecatedType, GenericType, NamedDataType, NamedFields, SpectaID,
+    UnnamedFields,
 };
 
 /// Enum type which dictates how the enum is represented.
@@ -13,6 +14,10 @@ use crate::{
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnumType {
     pub(crate) name: Cow<'static, str>,
+    // Associating a SpectaID will allow exporter to lookup more detailed information about the type to provide better errors.
+    pub(crate) sid: Option<SpectaID>,
+    // This is used to allow `serde_json::Number` and `toml::Value` to contain BigInt numbers without an error.
+    // I don't know if we should block bigints in these any types. Really I think we should but we need a good DX around overriding it on a per-type basis.
     pub(crate) skip_bigint_checks: bool,
     pub(crate) repr: EnumRepr,
     pub(crate) generics: Vec<GenericType>,

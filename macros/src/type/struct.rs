@@ -280,7 +280,7 @@ pub fn parse_struct(
             Fields::Unit => quote!(#crate_ref::internal::construct::struct_unit()),
         };
 
-        quote!(#crate_ref::DataType::Struct(#crate_ref::internal::construct::r#struct(#name.into(), vec![#(#definition_generics),*], #fields)))
+        quote!(#crate_ref::DataType::Struct(#crate_ref::internal::construct::r#struct(#name.into(), Some(SID), vec![#(#definition_generics),*], #fields)))
     };
 
     let category = if container_attrs.inline {

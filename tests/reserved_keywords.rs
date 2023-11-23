@@ -43,7 +43,7 @@ fn test_ts_reserved_keyworks() {
         specta::ts::export::<astruct::r#enum>(&ExportConfig::default()),
         Err(ExportError::ForbiddenName(
             NamedLocation::Type,
-            ExportPath::new_unsafe("enum"),
+            ExportPath::new_unsafe("tests/reserved_keywords.rs:10:14"),
             "enum"
         ))
     );
@@ -51,7 +51,7 @@ fn test_ts_reserved_keyworks() {
         specta::ts::export::<atuplestruct::r#enum>(&ExportConfig::default()),
         Err(ExportError::ForbiddenName(
             NamedLocation::Type,
-            ExportPath::new_unsafe("enum"),
+            ExportPath::new_unsafe("tests/reserved_keywords.rs:22:14"),
             "enum"
         ))
     );
@@ -59,7 +59,7 @@ fn test_ts_reserved_keyworks() {
         specta::ts::export::<aenum::r#enum>(&ExportConfig::default()),
         Err(ExportError::ForbiddenName(
             NamedLocation::Type,
-            ExportPath::new_unsafe("enum"),
+            ExportPath::new_unsafe("tests/reserved_keywords.rs:32:14"),
             "enum"
         ))
     );

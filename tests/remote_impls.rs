@@ -35,9 +35,24 @@ fn typescript_types_glam() {
 #[test]
 #[cfg(feature = "bevy_ecs")]
 fn typescript_types_bevy_ecs() {
-    use specta::ts::ExportPath;
+    use specta::ts::{self, BigIntExportBehavior, ExportConfig, ExportPath};
 
     use crate::ts::assert_ts;
 
-    assert_ts!(error; bevy_ecs::entity::Entity, specta::ts::ExportError::BigIntForbidden(ExportPath::new_unsafe("bevy_ecs::entity::Entity -> u64")));
+    assert_eq!(
+        ts::inline::<bevy_ecs::entity::Entity>(
+            &ExportConfig::default().bigint(BigIntExportBehavior::Number)
+        ),
+        Ok("number".into())
+    );
+    // TODO: As we inline `Entity` never ends up in the type map so it falls back to "Entity" in the error instead of the path to the type. Is this what we want or not?
+    assert_ts!(error; bevy_ecs::entity::Entity, specta::ts::ExportError::BigIntForbidden(ExportPath::new_unsafe("Entity -> u64")));
+
+    // https://github.com/oscartbeaumont/specta/issues/161#issuecomment-1822735951
+    assert_eq!(
+        ts::export::<bevy_ecs::entity::Entity>(
+            &ExportConfig::default().bigint(BigIntExportBehavior::Number)
+        ),
+        Ok("export Entity = number;".into())
+    );
 }

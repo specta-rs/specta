@@ -161,6 +161,7 @@ impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
     fn from(t: Vec<T>) -> Self {
         DataType::Enum(EnumType {
             name: "Vec".into(),
+            sid: None,
             repr: EnumRepr::Untagged,
             skip_bigint_checks: false,
             variants: t

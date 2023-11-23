@@ -270,12 +270,12 @@ fn typescript_types() {
     assert_ts_export!(
         error;
         RenameWithWeirdCharsStruct,
-        ExportError::InvalidName(NamedLocation::Type, ExportPath::new_unsafe("@odata.context"), r#"@odata.context"#.to_string())
+        ExportError::InvalidName(NamedLocation::Type, ExportPath::new_unsafe("tests/ts.rs:599:10"), r#"@odata.context"#.to_string())
     );
     assert_ts_export!(
         error;
         RenameWithWeirdCharsEnum,
-        ExportError::InvalidName(NamedLocation::Type, ExportPath::new_unsafe("@odata.context"), r#"@odata.context"#.to_string())
+        ExportError::InvalidName(NamedLocation::Type, ExportPath::new_unsafe("tests/ts.rs:603:10"), r#"@odata.context"#.to_string())
     );
 
     // https://github.com/oscartbeaumont/specta/issues/156

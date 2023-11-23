@@ -130,6 +130,7 @@ fn export_datatype_inner(
     ctx: ExportContext,
     typ @ NamedDataType {
         name,
+        ext,
         docs,
         deprecated,
         inner: item,
@@ -137,7 +138,11 @@ fn export_datatype_inner(
     }: &NamedDataType,
     type_map: &TypeMap,
 ) -> Output {
-    let ctx = ctx.with(PathItem::Type(name.clone()));
+    let ctx = ctx.with(
+        ext.clone()
+            .map(|v| PathItem::TypeExtended(name.clone(), v.impl_location))
+            .unwrap_or_else(|| PathItem::Type(name.clone())),
+    );
     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
 
     let generics = item
@@ -187,7 +192,7 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
                     BigIntExportBehavior::Number => NUMBER.into(),
                     BigIntExportBehavior::BigInt => BIGINT.into(),
                     BigIntExportBehavior::Fail => {
-                        return Err(ExportError::BigIntForbidden(ctx.export_path()))
+                        return Err(ExportError::BigIntForbidden(ctx.export_path()));
                     }
                     BigIntExportBehavior::FailWithReason(reason) => {
                         return Err(ExportError::Other(ctx.export_path(), reason.to_owned()))
@@ -241,7 +246,13 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
             }
         }
         DataType::Struct(item) => struct_datatype(
-            ctx.with(PathItem::Type(item.name().clone())),
+            ctx.with(
+                item.sid
+                    .and_then(|sid| type_map.get(sid))
+                    .and_then(|v| v.ext())
+                    .map(|v| PathItem::TypeExtended(item.name().clone(), v.impl_location))
+                    .unwrap_or_else(|| PathItem::Type(item.name().clone())),
+            ),
             item.name(),
             item,
             type_map,

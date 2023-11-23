@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{DataType, GenericType, NamedDataType, NamedFields, UnnamedFields};
+use crate::{DataType, GenericType, NamedDataType, NamedFields, SpectaID, UnnamedFields};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum StructFields {
@@ -21,6 +21,8 @@ pub enum StructFields {
 #[derive(Debug, Clone, PartialEq)]
 pub struct StructType {
     pub(crate) name: Cow<'static, str>,
+    // Associating a SpectaID will allow exporter to lookup more detailed information about the type to provide better errors.
+    pub(crate) sid: Option<SpectaID>,
     pub(crate) generics: Vec<GenericType>,
     pub(crate) fields: StructFields,
 }

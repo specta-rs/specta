@@ -213,6 +213,7 @@ impl<T: Type> Type for std::ops::Range<T> {
         let ty = Some(T::definition(opts));
         DataType::Struct(StructType {
             name: "Range".into(),
+            sid: None,
             generics: vec![],
             fields: StructFields::Named(NamedFields {
                 fields: vec![
@@ -299,6 +300,7 @@ const _: () = {
         fn inline(_: DefOpts, _: &[DataType]) -> DataType {
             DataType::Enum(EnumType {
                 name: "Number".into(),
+                sid: None,
                 repr: EnumRepr::Untagged,
                 skip_bigint_checks: true,
                 variants: vec![
@@ -396,6 +398,7 @@ const _: () = {
         fn inline(_: DefOpts, _: &[DataType]) -> DataType {
             DataType::Enum(EnumType {
                 name: "Number".into(),
+                sid: None,
                 repr: EnumRepr::Untagged,
                 skip_bigint_checks: true,
                 variants: vec![
@@ -669,6 +672,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
     fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
         DataType::Enum(EnumType {
             name: "Either".into(),
+            sid: None,
             repr: EnumRepr::Untagged,
             skip_bigint_checks: false,
             variants: vec![
@@ -727,7 +731,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
 #[cfg(feature = "bevy_ecs")]
 const _: () = {
     #[derive(Type)]
-    #[specta(rename = "bevy_ecs::entity::Entity", remote = bevy_ecs::entity::Entity, crate = crate, export = false)]
+    #[specta(rename = "Entity", remote = bevy_ecs::entity::Entity, crate = crate, export = false)]
     #[allow(dead_code)]
     struct EntityDef(u64);
 };

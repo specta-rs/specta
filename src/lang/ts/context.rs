@@ -1,10 +1,13 @@
 use std::{borrow::Cow, fmt};
 
+use crate::ImplLocation;
+
 use super::ExportConfig;
 
 #[derive(Clone, Debug)]
 pub(crate) enum PathItem {
     Type(Cow<'static, str>),
+    TypeExtended(Cow<'static, str>, ImplLocation),
     Field(Cow<'static, str>),
     Variant(Cow<'static, str>),
 }
@@ -41,6 +44,7 @@ impl ExportPath {
         while let Some(item) = path.next() {
             s.push_str(match item {
                 PathItem::Type(v) => v,
+                PathItem::TypeExtended(_, loc) => loc.as_str(),
                 PathItem::Field(v) => v,
                 PathItem::Variant(v) => v,
             });
@@ -48,6 +52,7 @@ impl ExportPath {
             if let Some(next) = path.peek() {
                 s.push_str(match next {
                     PathItem::Type(_) => " -> ",
+                    PathItem::TypeExtended(_, _) => " -> ",
                     PathItem::Field(_) => ".",
                     PathItem::Variant(_) => "::",
                 });

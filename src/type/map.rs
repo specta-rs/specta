@@ -1,13 +1,20 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt};
 
 use crate::{NamedDataType, SpectaID};
 
 /// A map used to store the types "discovered" while exporting a type.
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Default, Clone, PartialEq)]
 pub struct TypeMap {
     // `None` indicates that the entry is a placeholder. It was reference and we are currently working out it's definition.
     pub(crate) map: BTreeMap<SpectaID, Option<NamedDataType>>,
+    // A stack of types that are currently being flattened. This is used to detect cycles.
     pub(crate) flatten_stack: Vec<SpectaID>,
+}
+
+impl fmt::Debug for TypeMap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("TypeMap").field(&self.map).finish()
+    }
 }
 
 impl TypeMap {
