@@ -287,16 +287,15 @@ const _: () = {
     impl<K: Type, V: Type> Flatten for Map<K, V> {}
 
     #[derive(Type)]
-    #[specta(rename = "Value", remote = Value, crate = crate, export = false)]
-    pub enum ValueDef {
+    #[specta(rename = "Value", untagged, remote = Value, crate = crate, export = false)]
+    pub enum JsonValue {
         Null,
         Bool(bool),
         // TODO: This could be a bigint type and errors.
-        // Number(Number),
+        Number(Number),
         String(String),
-        // TODO: Fix recursive types
-        // Array(Vec<Value>),
-        // Object(Map<String, Value>),
+        Array(Vec<Value>),
+        Object(Map<String, Value>),
     }
 
     // TODO: Change to remote impl
@@ -305,6 +304,7 @@ const _: () = {
             DataType::Enum(EnumType {
                 name: "Number".into(),
                 repr: EnumRepr::Untagged,
+                skip_bigint_checks: true,
                 variants: vec![
                     (
                         "f64".into(),
@@ -389,6 +389,7 @@ const _: () = {
             DataType::Enum(EnumType {
                 name: "Number".into(),
                 repr: EnumRepr::Untagged,
+                skip_bigint_checks: false,
                 variants: vec![
                     (
                         "f64".into(),
@@ -681,6 +682,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
         DataType::Enum(EnumType {
             name: "Either".into(),
             repr: EnumRepr::Untagged,
+            skip_bigint_checks: false,
             variants: vec![
                 (
                     "Left".into(),

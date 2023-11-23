@@ -246,11 +246,19 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
             item,
             type_map,
         )?,
-        DataType::Enum(item) => enum_datatype(
-            ctx.with(PathItem::Variant(item.name.clone())),
-            item,
-            type_map,
-        )?,
+        DataType::Enum(item) => {
+            let mut ctx = ctx.clone();
+            let cfg = ctx.cfg.clone().bigint(BigIntExportBehavior::Number);
+            if item.skip_bigint_checks {
+                ctx.cfg = &cfg;
+            }
+
+            enum_datatype(
+                ctx.with(PathItem::Variant(item.name.clone())),
+                item,
+                type_map,
+            )?
+        }
         DataType::Tuple(tuple) => tuple_datatype(ctx, tuple, type_map)?,
         DataType::Result(result) => {
             let mut variants = vec![

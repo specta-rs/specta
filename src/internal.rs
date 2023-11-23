@@ -74,6 +74,7 @@ pub mod construct {
         EnumType {
             name,
             repr,
+            skip_bigint_checks: false,
             generics,
             variants,
         }

@@ -13,6 +13,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnumType {
     pub(crate) name: Cow<'static, str>,
+    pub(crate) skip_bigint_checks: bool,
     pub(crate) repr: EnumRepr,
     pub(crate) generics: Vec<GenericType>,
     pub(crate) variants: Vec<(Cow<'static, str>, EnumVariant)>,

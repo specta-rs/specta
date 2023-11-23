@@ -4,10 +4,9 @@ fn serde_json() {
     use crate::ts::assert_ts;
 
     assert_ts!(
-        // TODO: Can this be `JsonValue` instead by default?
         serde_json::Value,
-        "null | boolean | number | string | Array<any> | Object<any>"
+        "null | boolean | number | string | Value[] | { [key in string]: Value }"
     );
-    assert_ts!(serde_json::Map<(), ()>, "");
-    assert_ts!(serde_json::Number, "");
+    assert_ts!(serde_json::Map<String, ()>, "{ [key in string]: null }");
+    assert_ts!(serde_json::Number, "number");
 }
