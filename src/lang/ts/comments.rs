@@ -18,7 +18,7 @@ pub(crate) fn js_doc_builder(arg: CommentFormatterArgs) -> js_doc::Builder {
     }
 
     if let Some(deprecated) = arg.deprecated {
-        builder.push_deprecated(&deprecated);
+        builder.push_deprecated(deprecated);
     }
 
     builder

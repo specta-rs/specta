@@ -163,33 +163,37 @@ pub fn parse_struct(
     } else {
         let fields = match &data.fields {
             Fields::Named(_) => {
-                let fields = data.fields
-                .iter()
-                .map(|field| {
-                    let field_attrs = decode_field_attrs(field)?;
-                    let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
+                let fields =
+                    data.fields
+                        .iter()
+                        .map(|field| {
+                            let field_attrs = decode_field_attrs(field)?;
+                            let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
 
-                    let field_ident_str = unraw_raw_ident(field.ident.as_ref().unwrap());
+                            let field_ident_str = unraw_raw_ident(field.ident.as_ref().unwrap());
 
-                    let field_name = match (field_attrs.rename.clone(), container_attrs.rename_all) {
-                        (Some(name), _) => name,
-                        (_, Some(inflection)) => inflection.apply(&field_ident_str).to_token_stream(),
-                        (_, _) => field_ident_str.to_token_stream(),
-                    };
+                            let field_name =
+                                match (field_attrs.rename.clone(), container_attrs.rename_all) {
+                                    (Some(name), _) => name,
+                                    (_, Some(inflection)) => {
+                                        inflection.apply(&field_ident_str).to_token_stream()
+                                    }
+                                    (_, _) => field_ident_str.to_token_stream(),
+                                };
 
-                    let deprecated = field_attrs.common.deprecated_as_tokens(crate_ref);
-                    let optional = field_attrs.optional;
-                    let flatten = field_attrs.flatten;
-                    let doc = field_attrs.common.doc;
+                            let deprecated = field_attrs.common.deprecated_as_tokens(crate_ref);
+                            let optional = field_attrs.optional;
+                            let flatten = field_attrs.flatten;
+                            let doc = field_attrs.common.doc;
 
-                    let parent_inline = container_attrs
-                        .inline
-                        .then(|| quote!(true))
-                        .unwrap_or(parent_inline.clone());
+                            let parent_inline = container_attrs
+                                .inline
+                                .then(|| quote!(true))
+                                .unwrap_or(parent_inline.clone());
 
-                    let ty = field_attrs.skip.then(|| Ok(quote!(None)))
-                        .unwrap_or_else(|| {
-                            construct_datatype(
+                            let ty = field_attrs.skip.then(|| Ok(quote!(None))).unwrap_or_else(
+                                || {
+                                    construct_datatype(
                                 format_ident!("ty"),
                                 field_ty,
                                 &generic_idents,
@@ -198,20 +202,9 @@ pub fn parse_struct(
                             ).map(|ty| {
 	                            let ty = if field_attrs.flatten {
 	                                quote! {
-	                                    #[allow(warnings)]
-	                                    {
-	                                        #ty
-	                                    }
-
 	                                    fn validate_flatten<T: #crate_ref::Flatten>() {}
 	                                    validate_flatten::<#field_ty>();
-
-	                                    let mut ty = <#field_ty as #crate_ref::Type>::inline(#crate_ref::DefOpts {
-	                                        parent_inline: #parent_inline,
-	                                        type_map: opts.type_map
-	                                    }, &generics);
-
-	                                    ty
+										#crate_ref::internal::flatten::<#field_ty>(SID, opts.type_map, #parent_inline, &generics)
 	                                }
 	                            } else {
 	                                quote! {
@@ -225,16 +218,20 @@ pub fn parse_struct(
 	                            	#ty
 	                            })}
                             })
-                        })?;
+                                },
+                            )?;
 
-                    Ok(quote!((#field_name.into(), #crate_ref::internal::construct::field(
-                        #optional,
-                        #flatten,
-                        #deprecated,
-                        #doc.into(),
-                        #ty
-                    ))))
-                }).collect::<syn::Result<Vec<TokenStream>>>()?;
+                            Ok(
+                                quote!((#field_name.into(), #crate_ref::internal::construct::field(
+                                    #optional,
+                                    #flatten,
+                                    #deprecated,
+                                    #doc.into(),
+                                    #ty
+                                ))),
+                            )
+                        })
+                        .collect::<syn::Result<Vec<TokenStream>>>()?;
 
                 let tag = container_attrs
                     .tag

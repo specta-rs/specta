@@ -288,6 +288,7 @@ const _: () = {
         }
     }
 
+    // TODO: Using remote impl
     impl Type for serde_json::Number {
         fn inline(_: DefOpts, _: &[DataType]) -> DataType {
             DataType::Enum(EnumType {

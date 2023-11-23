@@ -1,6 +1,5 @@
 use std::{
     borrow::{Borrow, Cow},
-    collections::BTreeMap,
     fmt::Display,
 };
 
@@ -22,13 +21,7 @@ pub use r#enum::*;
 pub use r#struct::*;
 pub use tuple::*;
 
-use crate::SpectaID;
-
-/// A map used to store the types "discovered" while exporting a type.
-/// You can iterate over this to export all types which the type/s you exported references on.
-///
-/// [`None`] indicates that the entry is a placeholder. It was reference but we haven't reached it's definition yet.
-pub type TypeMap = BTreeMap<SpectaID, Option<NamedDataType>>;
+use crate::{SpectaID, TypeMap};
 
 /// Arguments for [`Type::inline`](crate::Type::inline), [`Type::reference`](crate::Type::reference) and [`Type::definition`](crate::Type::definition).
 pub struct DefOpts<'a> {

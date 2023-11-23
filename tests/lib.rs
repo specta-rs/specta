@@ -13,6 +13,7 @@ mod functions;
 mod macro_decls;
 mod map_keys;
 mod optional;
+mod recursive;
 mod remote_impls;
 mod rename;
 mod reserved_keywords;
