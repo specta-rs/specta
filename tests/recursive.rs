@@ -37,6 +37,15 @@ pub struct RecursiveInline {
 #[specta(transparent, export = false)]
 pub struct RecursiveTransparent(Box<RecursiveInline>);
 
+#[derive(Type)]
+#[specta(export = false)]
+pub enum RecursiveInEnum {
+    A {
+        #[specta(flatten)]
+        demo: Box<RecursiveInEnum>,
+    },
+}
+
 #[test]
 fn test_recursive_types() {
     assert_ts!(Recursive, "{ demo: Recursive }");
@@ -58,7 +67,28 @@ fn test_recursive_types() {
         RecursiveMapValue,
         "export type RecursiveMapValue = { demo: { [key in string]: RecursiveMapValue } }"
     );
+}
 
+#[test]
+#[should_panic]
+fn test_recursive_types_panic1() {
     assert_ts!(RecursiveTransparent, "");
+}
+
+#[test]
+#[should_panic]
+fn test_recursive_types_panic2() {
     assert_ts_export!(RecursiveTransparent, "");
+}
+
+#[test]
+#[should_panic]
+fn test_recursive_types_panic3() {
+    assert_ts!(RecursiveInEnum, "");
+}
+
+#[test]
+#[should_panic]
+fn test_recursive_types_panic4() {
+    assert_ts_export!(RecursiveInEnum, "");
 }
