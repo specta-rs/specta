@@ -128,7 +128,7 @@ fn internally_tagged() {
     assert_ts!(E, "({ type: \"A\" })");
     assert_ts!(F, "({ type: \"A\" } & FInner)");
     assert_ts!(error; G, SerdeError::InvalidInternallyTaggedEnum);
-    assert_ts!(H, "({ type: \"A\" } & HInner)");
+    assert_ts!(H, "({ type: \"A\" })");
     assert_ts!(error; I, SerdeError::InvalidInternallyTaggedEnum);
     assert_ts!(L, "({ type: \"A\" } & ({ type: \"A\" } | { type: \"B\" }))");
     assert_ts!(M, "({ type: \"A\" })");

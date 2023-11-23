@@ -10,6 +10,7 @@ struct A {}
 #[specta(export = false, tag = "a")]
 struct B {}
 
+// https://github.com/oscartbeaumont/specta/issues/174
 #[test]
 fn empty_enums() {
     assert_ts!(A, "Record<string, never>");

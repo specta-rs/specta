@@ -53,6 +53,6 @@ fn typescript_types_bevy_ecs() {
         ts::export::<bevy_ecs::entity::Entity>(
             &ExportConfig::default().bigint(BigIntExportBehavior::Number)
         ),
-        Ok("export Entity = number;".into())
+        Ok("export type Entity = number".into())
     );
 }

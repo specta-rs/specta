@@ -528,15 +528,24 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                                 format!("{{ {tag}: {sanitised_name} }}")
                             }
                             (EnumRepr::Internal { tag }, EnumVariants::Unnamed(tuple)) => {
-                                let mut typ = unnamed_fields_datatype(
-                                    ctx.clone(),
-                                    &skip_fields(tuple.fields()).collect::<Vec<_>>(),
-                                    type_map,
-                                )?;
+                                let fields = skip_fields(tuple.fields()).collect::<Vec<_>>();
 
-                                // TODO: This `null` check is a bad fix for an internally tagged type with a `null` variant being exported as `{ type: "A" } & null` (which is `never` in TS)
-                                // TODO: Move this check into the macros so it can apply to any language cause it should (it's just hard to do in the macros)
-                                if typ == "null" {
+                                // This field is only required for `{ty}` not `[...]` so we only need to check when there one field
+                                let dont_join_ty = if tuple.fields().len() == 1 {
+                                    let (_, ty) = fields.first().expect("checked length above");
+                                    validate_type_for_tagged_intersection(
+                                        ctx.clone(),
+                                        (**ty).clone(),
+                                        type_map,
+                                    )?
+                                } else {
+                                    false
+                                };
+
+                                let mut typ =
+                                    unnamed_fields_datatype(ctx.clone(), &fields, type_map)?;
+
+                                if dont_join_ty {
                                     format!("({{ {tag}: {sanitised_name} }})")
                                 } else {
                                     // We wanna be sure `... & ... | ...` becomes `... & (... | ...)`
@@ -688,6 +697,76 @@ pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: 
     }
 
     Ok(ident.to_string())
+}
+
+fn validate_type_for_tagged_intersection(
+    ctx: ExportContext,
+    ty: DataType,
+    type_map: &TypeMap,
+) -> Result<bool> {
+    match ty {
+        DataType::Any
+        | DataType::Unknown
+        | DataType::Primitive(_)
+        // `T & null` is `never` but `T & (U | null)` (this variant) is `T & U` so it's fine.
+        | DataType::Nullable(_)
+        | DataType::List(_)
+        | DataType::Map(_)
+        | DataType::Result(_)
+        | DataType::Generic(_) => Ok(false),
+        DataType::Literal(v) => match v {
+            LiteralType::None => Ok(true),
+            _ => Ok(false),
+        },
+        DataType::Struct(v) => match v.fields {
+            StructFields::Unit => Ok(true),
+            StructFields::Unnamed(_) => {
+                Err(ExportError::InvalidTaggedVariantContainingTupleStruct(
+                   ctx.export_path()
+                ))
+            }
+            StructFields::Named(fields) => {
+                // Prevent `{ tag: "{tag}" } & Record<string | never>`
+                if fields.tag.is_none() && fields.fields.len() == 0 {
+                    return Ok(true);
+                }
+
+                return Ok(false);
+            }
+        },
+        DataType::Enum(v) => {
+            match v.repr {
+                EnumRepr::Untagged => {
+                    Ok(v.variants.iter().any(|(_, v)| match &v.inner {
+                        // `{ .. } & null` is `never`
+                        EnumVariants::Unit => true,
+                         // `{ ... } & Record<string, never>` is not useful
+                        EnumVariants::Named(v) => v.tag.is_none() && v.fields().len() == 0,
+                        EnumVariants::Unnamed(_) => false,
+                    }))
+                },
+                // All of these repr's are always objects.
+                EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. } | EnumRepr::External => Ok(false),
+            }
+        }
+        DataType::Tuple(v) => {
+            // Empty tuple is `null`
+            if v.elements.len() == 0 {
+                return Ok(true);
+            }
+
+            Ok(false)
+        }
+        DataType::Reference(r) => validate_type_for_tagged_intersection(
+            ctx,
+            type_map
+                .get(r.sid)
+                .expect("TypeMap should have been populated by now")
+                .inner
+                .clone(),
+            type_map,
+        ),
+    }
 }
 
 const ANY: &str = "any";

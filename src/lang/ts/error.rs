@@ -41,6 +41,8 @@ pub enum ExportError {
     InvalidName(NamedLocation, ExportPath, String),
     #[error("Attempted to export '{0}' with tagging but the type is not tagged.")]
     InvalidTagging(ExportPath),
+    #[error("Attempted to export '{0}' with internal tagging but the variant is a tuple struct.")]
+    InvalidTaggedVariantContainingTupleStruct(ExportPath),
     #[error("Unable to export type named '{0}' from locations '{:?}' '{:?}'", .1.as_str(), .2.as_str())]
     DuplicateTypeName(Cow<'static, str>, ImplLocation, ImplLocation),
     #[error("IO error: {0}")]
@@ -63,6 +65,10 @@ impl PartialEq for ExportError {
                 l0 == r0 && l1 == r1 && l2 == r2
             }
             (Self::InvalidTagging(l0), Self::InvalidTagging(r0)) => l0 == r0,
+            (
+                Self::InvalidTaggedVariantContainingTupleStruct(l0),
+                Self::InvalidTaggedVariantContainingTupleStruct(r0),
+            ) => l0 == r0,
             (Self::DuplicateTypeName(l0, l1, l2), Self::DuplicateTypeName(r0, r1, r2)) => {
                 l0 == r0 && l1 == r1 && l2 == r2
             }
