@@ -121,10 +121,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     });
 
     let comments = &container_attrs.common.doc;
-    let should_export = match container_attrs.export {
-        Some(export) => quote!(Some(#export)),
-        None => quote!(None),
-    };
     let deprecated = container_attrs.common.deprecated_as_tokens(&crate_ref);
 
     let sid = quote!(#crate_ref::internal::construct::sid(#name, concat!("::", module_path!(), ":", line!(), ":", column!())));
@@ -162,7 +158,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         #deprecated,
                         SID,
                         IMPL_LOCATION,
-                        #should_export,
                         <Self as #crate_ref::Type>::inline(opts, generics)
                     )
                 }

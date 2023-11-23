@@ -100,6 +100,7 @@ pub fn export_named_datatype(
     )
 }
 
+#[allow(clippy::ptr_arg)]
 fn inner_comments(
     ctx: ExportContext,
     deprecated: Option<&DeprecatedType>,
@@ -176,6 +177,7 @@ pub fn datatype(conf: &ExportConfig, typ: &DataType, type_map: &TypeMap) -> Outp
 pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &TypeMap) -> Output {
     Ok(match &typ {
         DataType::Any => ANY.into(),
+        DataType::Unknown => UNKNOWN.into(),
         DataType::Primitive(p) => {
             let ctx = ctx.with(PathItem::Type(p.to_rust_str().into()));
             match p {
@@ -215,13 +217,25 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
         }
         // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
         DataType::List(def) => {
-            let dt = datatype_inner(ctx, def, type_map)?;
-            if (dt.contains(' ') && !dt.ends_with('}'))
+            let dt = datatype_inner(ctx, &def.ty, type_map)?;
+            let dt = if (dt.contains(' ') && !dt.ends_with('}'))
                 // This is to do with maintaining order of operations.
                 // Eg `{} | {}` must be wrapped in parens like `({} | {})[]` but `{}` doesn't cause `{}[]` is valid
-                || (dt.contains(' ') && (dt.contains("&") || dt.contains("|")))
+                || (dt.contains(' ') && (dt.contains('&') || dt.contains('|')))
             {
-                format!("({dt})[]")
+                format!("({dt})")
+            } else {
+                dt
+            };
+
+            if let Some(length) = def.length {
+                format!(
+                    "[{}]",
+                    (0..length)
+                        .map(|_| dt.clone())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
             } else {
                 format!("{dt}[]")
             }
@@ -429,7 +443,7 @@ fn enum_variant_datatype(
             Ok(match &fields[..] {
                 [] => {
                     // If the actual length is 0, we know `#[serde(skip)]` was not used.
-                    if obj.fields.len() == 0 {
+                    if obj.fields.is_empty() {
                         Some("[]".to_string())
                     } else {
                         // We wanna render `{tag}` not `{tag}: {type}` (where `{type}` is what this function returns)
@@ -633,7 +647,7 @@ pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: 
         return Err(ExportError::ForbiddenName(loc, ctx.export_path(), name));
     }
 
-    if let Some(first_char) = ident.chars().nth(0) {
+    if let Some(first_char) = ident.chars().next() {
         if !first_char.is_alphabetic() && first_char != '_' {
             return Err(ExportError::InvalidName(
                 loc,
@@ -658,6 +672,7 @@ pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: 
 }
 
 const ANY: &str = "any";
+const UNKNOWN: &str = "unknown";
 const NUMBER: &str = "number";
 const STRING: &str = "string";
 const BOOLEAN: &str = "boolean";

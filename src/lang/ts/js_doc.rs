@@ -69,7 +69,7 @@ impl Builder {
             self.value.push_str(part);
         }
 
-        self.value.push_str("\n");
+        self.value.push('\n');
     }
 
     pub fn push_deprecated(&mut self, typ: &DeprecatedType) {

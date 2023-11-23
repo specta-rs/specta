@@ -97,7 +97,7 @@ fn typescript_types() {
 
     assert_ts!(Vec<i32>, "number[]");
     assert_ts!(&[i32], "number[]");
-    assert_ts!(&[i32; 5], "number[]");
+    assert_ts!(&[i32; 3], "[number, number, number]");
 
     assert_ts!(Option<i32>, "number | null");
 
@@ -177,7 +177,10 @@ fn typescript_types() {
     // assert_ts!(() => ..=5, r#"{ end: 5 }"#);
 
     // https://github.com/oscartbeaumont/specta/issues/66
-    assert_ts!([Option<u8>; 16], r#"(number | null)[]"#);
+    assert_ts!(
+        [Option<u8>; 3],
+        r#"[(number | null), (number | null), (number | null)]"#
+    );
 
     // https://github.com/oscartbeaumont/specta/issues/65
     assert_ts!(HashMap<BasicEnum, ()>, r#"{ [key in "A" | "B"]: null }"#);
@@ -277,9 +280,6 @@ fn typescript_types() {
 
     // https://github.com/oscartbeaumont/specta/issues/156
     assert_ts!(Vec<MyEnum>, r#"({ A: string } | { B: number })[]"#);
-
-    #[cfg(feature = "glam")]
-    assert_ts!(glam::DVec2, "{ x: number; y: number }");
 }
 
 #[derive(Type)]

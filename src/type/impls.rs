@@ -122,7 +122,45 @@ impl<'a, T: Type> Type for &'a [T] {
 
 impl<const N: usize, T: Type> Type for [T; N] {
     fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
-        <Vec<T>>::inline(opts, generics)
+        DataType::List(List {
+            ty: Box::new(
+                // TODO: This is cursed. Fix it properly!!!
+                match Vec::<T>::inline(
+                    DefOpts {
+                        parent_inline: opts.parent_inline,
+                        type_map: opts.type_map,
+                    },
+                    generics,
+                ) {
+                    DataType::List(List { ty, .. }) => *ty,
+                    _ => unreachable!(),
+                },
+            ),
+            length: Some(N),
+        })
+    }
+
+    fn reference(opts: DefOpts, generics: &[DataType]) -> Reference {
+        Reference {
+            inner: DataType::List(List {
+                ty: Box::new(
+                    // TODO: This is cursed. Fix it properly!!!
+                    match Vec::<T>::reference(
+                        DefOpts {
+                            parent_inline: opts.parent_inline,
+                            type_map: opts.type_map,
+                        },
+                        generics,
+                    )
+                    .inner
+                    {
+                        DataType::List(List { ty, .. }) => *ty,
+                        _ => unreachable!(),
+                    },
+                ),
+                length: Some(N),
+            }),
+        }
     }
 }
 
@@ -167,7 +205,7 @@ impl<T> Type for std::marker::PhantomData<T> {
 // Serde does no support `Infallible` as it can't be constructed so a `&self` method is uncallable on it.
 #[allow(unused)]
 #[derive(Type)]
-#[specta(remote = std::convert::Infallible, crate = crate)]
+#[specta(remote = std::convert::Infallible, crate = crate, export = false)]
 pub enum Infallible {}
 
 impl<T: Type> Type for std::ops::Range<T> {
@@ -561,132 +599,77 @@ const _: () = {
     #[derive(Type)]
     #[specta(remote = glam::DVec2, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct DVec2 {
-        x: f64,
-        y: f64,
-    }
+    struct DVec2([f64; 2]);
 
     #[derive(Type)]
     #[specta(remote = glam::IVec2, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct IVec2 {
-        x: i32,
-        y: i32,
-    }
+    struct IVec2([i32; 2]);
 
     #[derive(Type)]
     #[specta(remote = glam::DMat2, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct DMat2 {
-        pub x_axis: glam::DVec2,
-        pub y_axis: glam::DVec2,
-    }
+    struct DMat2([f64; 4]);
 
     #[derive(Type)]
     #[specta(remote = glam::DAffine2, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct DAffine2 {
-        matrix2: glam::DMat2,
-        translation: glam::DVec2,
-    }
+    struct DAffine2([f64; 6]);
 
     #[derive(Type)]
     #[specta(remote = glam::Vec2, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Vec2 {
-        pub x: f32,
-        pub y: f32,
-    }
+    struct Vec2([f32; 2]);
 
     #[derive(Type)]
     #[specta(remote = glam::Vec3, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Vec3 {
-        pub x: f32,
-        pub y: f32,
-        pub z: f32,
-    }
+    struct Vec3([f32; 3]);
 
     #[derive(Type)]
     #[specta(remote = glam::Vec3A, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Vec3A {
-        pub x: f32,
-        pub y: f32,
-        pub z: f32,
-    }
+    struct Vec3A([f32; 3]);
 
     #[derive(Type)]
     #[specta(remote = glam::Vec4, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Vec4 {
-        x: f32,
-        y: f32,
-        z: f32,
-        w: f32,
-    }
+    struct Vec4([f32; 4]);
 
     #[derive(Type)]
     #[specta(remote = glam::Mat2, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Mat2 {
-        pub x_axis: glam::Vec2,
-        pub y_axis: glam::Vec2,
-    }
+    struct Mat2([f32; 4]);
 
     #[derive(Type)]
     #[specta(remote = glam::Mat3, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Mat3 {
-        pub x_axis: glam::Vec3,
-        pub y_axis: glam::Vec3,
-        pub z_axis: glam::Vec3,
-    }
+    struct Mat3([f32; 9]);
 
     #[derive(Type)]
     #[specta(remote = glam::Mat3A, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Mat3A {
-        pub x_axis: glam::Vec3A,
-        pub y_axis: glam::Vec3A,
-        pub z_axis: glam::Vec3A,
-    }
+    struct Mat3A([f32; 9]);
 
     #[derive(Type)]
     #[specta(remote = glam::Mat4, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Mat4 {
-        pub x_axis: glam::Vec4,
-        pub y_axis: glam::Vec4,
-        pub z_axis: glam::Vec4,
-        pub w_axis: glam::Vec4,
-    }
+    struct Mat4([f32; 16]);
 
     #[derive(Type)]
     #[specta(remote = glam::Quat, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Quat {
-        pub x: f32,
-        pub y: f32,
-        pub z: f32,
-        pub w: f32,
-    }
+    struct Quat([f32; 4]);
 
     #[derive(Type)]
     #[specta(remote = glam::Affine2, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Affine2 {
-        pub matrix2: glam::Mat2,
-        pub translation: glam::Vec2,
-    }
+    struct Affine2([f32; 6]);
 
     #[derive(Type)]
     #[specta(remote = glam::Affine3A, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Affine3A {
-        matrix3: glam::Mat3A,
-        translation: glam::Vec3A,
-    }
+    struct Affine3A([f32; 12]);
 };
 
 #[cfg(feature = "url")]
@@ -754,15 +737,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
 #[cfg(feature = "bevy_ecs")]
 const _: () = {
     #[derive(Type)]
-    #[specta(remote = bevy_ecs::entity::Entity, crate = crate, export = false)]
+    #[specta(rename = "bevy_ecs::entity::Entity", remote = bevy_ecs::entity::Entity, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Entity {
-        generation: u32,
-        index: u32,
-    }
-
-    #[derive(Type)]
-    #[specta(remote = bevy_ecs::world::WorldId, crate = crate, export = false)]
-    #[allow(dead_code)]
-    struct WorldId(usize);
+    struct EntityDef(u64);
 };

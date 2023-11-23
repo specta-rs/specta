@@ -9,10 +9,6 @@ pub struct NamedDataTypeExt {
     pub(crate) sid: SpectaID,
     /// The code location where this type is implemented. Used for error reporting.
     pub(crate) impl_location: ImplLocation,
-    // TODO: Undeprecate this and handle it properly!
-    // TODO: Support different export contexts
-    /// DEPRECATED. This is not used and shouldn't be. Will be removed in Specta v2!
-    pub(crate) export: Option<bool>,
 }
 
 impl NamedDataTypeExt {
@@ -22,10 +18,6 @@ impl NamedDataTypeExt {
 
     pub fn impl_location(&self) -> &ImplLocation {
         &self.impl_location
-    }
-
-    pub fn export(&self) -> Option<bool> {
-        self.export
     }
 }
 
