@@ -68,12 +68,14 @@ pub mod construct {
     pub const fn r#enum(
         name: Cow<'static, str>,
         repr: EnumRepr,
+        skip_bigint_checks: bool,
         generics: Vec<GenericType>,
         variants: Vec<(Cow<'static, str>, EnumVariant)>,
     ) -> EnumType {
         EnumType {
             name,
             repr,
+            skip_bigint_checks,
             generics,
             variants,
         }

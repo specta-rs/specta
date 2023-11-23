@@ -162,6 +162,7 @@ impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
         DataType::Enum(EnumType {
             name: "Vec".into(),
             repr: EnumRepr::Untagged,
+            skip_bigint_checks: false,
             variants: t
                 .into_iter()
                 .map(|t| {

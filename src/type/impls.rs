@@ -279,21 +279,28 @@ const _: () = {
 
 #[cfg(feature = "serde_json")]
 const _: () = {
-    impl_for_map!(serde_json::Map<K, V> as "Map");
-    impl<K: Type, V: Type> Flatten for serde_json::Map<K, V> {}
+    use serde_json::{Map, Number, Value};
 
-    impl Type for serde_json::Value {
-        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
-            DataType::Any
-        }
+    impl_for_map!(Map<K, V> as "Map");
+    impl<K: Type, V: Type> Flatten for Map<K, V> {}
+
+    #[derive(Type)]
+    #[specta(rename = "JsonValue", untagged, remote = Value, crate = crate, export = false)]
+    pub enum JsonValue {
+        Null,
+        Bool(bool),
+        Number(Number),
+        String(String),
+        Array(Vec<Value>),
+        Object(Map<String, Value>),
     }
 
-    // TODO: Using remote impl
-    impl Type for serde_json::Number {
+    impl Type for Number {
         fn inline(_: DefOpts, _: &[DataType]) -> DataType {
             DataType::Enum(EnumType {
                 name: "Number".into(),
                 repr: EnumRepr::Untagged,
+                skip_bigint_checks: true,
                 variants: vec![
                     (
                         "f64".into(),
@@ -355,21 +362,33 @@ const _: () = {
 
 #[cfg(feature = "serde_yaml")]
 const _: () = {
-    impl Type for serde_yaml::Value {
-        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
-            DataType::Any
-        }
+    use serde_yaml::{value::TaggedValue, Mapping, Number, Sequence, Value};
+
+    #[derive(Type)]
+    #[specta(rename = "YamlValue", untagged, remote = Value, crate = crate, export = false)]
+    pub enum YamlValue {
+        Null,
+        Bool(bool),
+        Number(Number),
+        String(String),
+        Sequence(Sequence),
+        Mapping(Mapping),
+        Tagged(Box<TaggedValue>),
     }
 
     impl Type for serde_yaml::Mapping {
         fn inline(_: DefOpts, _: &[DataType]) -> DataType {
-            DataType::Any
+            // We don't type this more accurately because `serde_json` doesn't allow non-string map keys so neither does Specta
+            DataType::Unknown
         }
     }
 
     impl Type for serde_yaml::value::TaggedValue {
         fn inline(_: DefOpts, _: &[DataType]) -> DataType {
-            DataType::Any
+            DataType::Map(Box::new((
+                DataType::Primitive(PrimitiveType::String),
+                DataType::Unknown,
+            )))
         }
     }
 
@@ -378,6 +397,7 @@ const _: () = {
             DataType::Enum(EnumType {
                 name: "Number".into(),
                 repr: EnumRepr::Untagged,
+                skip_bigint_checks: true,
                 variants: vec![
                     (
                         "f64".into(),
@@ -439,49 +459,29 @@ const _: () = {
 
 #[cfg(feature = "toml")]
 const _: () = {
+    use toml::{value::Array, value::Datetime, value::Table, Value};
+
     impl_for_map!(toml::map::Map<K, V> as "Map");
     impl<K: Type, V: Type> Flatten for toml::map::Map<K, V> {}
 
-    impl Type for toml::Value {
-        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
-            DataType::Any
-        }
+    #[derive(Type)]
+    #[specta(rename = "TomlValue", untagged, remote = Value, crate = crate, export = false, unstable_skip_bigint_checks)]
+    pub enum TomlValue {
+        String(String),
+        Integer(i64),
+        Float(f64),
+        Boolean(bool),
+        Datetime(Datetime),
+        Array(Array),
+        Table(Table),
     }
 
     #[derive(Type)]
-    #[specta(remote = toml::value::Date, crate = crate, export = false)]
+    #[specta(rename = "Datetime", remote = Datetime, crate = crate, export = false)]
     #[allow(dead_code)]
-    struct Date {
-        year: u16,
-        month: u8,
-        day: u8,
-    }
-
-    #[derive(Type)]
-    #[specta(remote = toml::value::Time, crate = crate, export = false)]
-    #[allow(dead_code)]
-    struct Time {
-        hour: u8,
-        minute: u8,
-        second: u8,
-        nanosecond: u32,
-    }
-
-    #[derive(Type)]
-    #[specta(remote = toml::value::Datetime, crate = crate, export = false)]
-    #[allow(dead_code)]
-    struct Datetime {
-        pub date: Option<toml::value::Date>,
-        pub time: Option<toml::value::Time>,
-        pub offset: Option<toml::value::Offset>,
-    }
-
-    #[derive(Type)]
-    #[specta(remote = toml::value::Offset, crate = crate, export = false)]
-    #[allow(dead_code)]
-    pub enum Offset {
-        Z,
-        Custom { minutes: i16 },
+    struct DatetimeDef {
+        #[specta(rename = "$__toml_private_datetime")]
+        pub v: String,
     }
 };
 
@@ -670,6 +670,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
         DataType::Enum(EnumType {
             name: "Either".into(),
             repr: EnumRepr::Untagged,
+            skip_bigint_checks: false,
             variants: vec![
                 (
                     "Left".into(),
