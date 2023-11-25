@@ -21,15 +21,7 @@ pub use r#enum::*;
 pub use r#struct::*;
 pub use tuple::*;
 
-use crate::{SpectaID, TypeMap};
-
-/// Arguments for [`Type::inline`](crate::Type::inline), [`Type::reference`](crate::Type::reference) and [`Type::definition`](crate::Type::definition).
-pub struct DefOpts<'a> {
-    /// is the parent type inlined?
-    pub parent_inline: bool,
-    /// a map of types which have been visited. This prevents stack overflows when a type references itself and also allows the caller to get a list of all types in the "schema".
-    pub type_map: &'a mut TypeMap,
-}
+use crate::SpectaID;
 
 /// Runtime type-erased representation of a Rust type.
 ///

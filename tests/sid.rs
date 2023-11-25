@@ -1,4 +1,4 @@
-use specta::{DefOpts, Type, TypeMap};
+use specta::{Type, TypeMap};
 
 #[derive(Type)]
 #[specta(export = false)]
@@ -31,10 +31,7 @@ fn test_sid() {
     // TODO: This is so hard for an end-user to work with. Add some convenience API's!!!
     let mut type_map = TypeMap::default();
     // We are calling this for it's side-effects
-    BagOfTypes::definition(DefOpts {
-        parent_inline: false,
-        type_map: &mut type_map,
-    });
+    BagOfTypes::definition(&mut type_map);
 
     // `TypeMap` is a `BTreeMap` so it's sorted by SID. It should be sorted alphabetically by name
     assert_eq!(

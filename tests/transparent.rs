@@ -1,4 +1,4 @@
-use specta::{DataType, DefOpts, PrimitiveType, Type};
+use specta::{DataType, PrimitiveType, Type};
 
 use crate::ts::assert_ts;
 
@@ -25,43 +25,19 @@ pub struct BracedStruct {
 fn transparent() {
     // We check the datatype layer can TS can look correct but be wrong!
     assert_eq!(
-        TupleStruct::inline(
-            DefOpts {
-                parent_inline: false,
-                type_map: &mut Default::default(),
-            },
-            &[]
-        ),
+        TupleStruct::inline(&mut Default::default(), &[]),
         DataType::Primitive(PrimitiveType::String)
     );
     assert_eq!(
-        TupleStructWithRep::inline(
-            DefOpts {
-                parent_inline: false,
-                type_map: &mut Default::default(),
-            },
-            &[]
-        ),
+        TupleStructWithRep::inline(&mut Default::default(), &[]),
         DataType::Primitive(PrimitiveType::String)
     );
     assert_eq!(
-        GenericTupleStruct::<String>::inline(
-            DefOpts {
-                parent_inline: false,
-                type_map: &mut Default::default(),
-            },
-            &[]
-        ),
+        GenericTupleStruct::<String>::inline(&mut Default::default(), &[]),
         DataType::Primitive(PrimitiveType::String)
     );
     assert_eq!(
-        BracedStruct::inline(
-            DefOpts {
-                parent_inline: false,
-                type_map: &mut Default::default(),
-            },
-            &[]
-        ),
+        BracedStruct::inline(&mut Default::default(), &[]),
         DataType::Primitive(PrimitiveType::String)
     );
 

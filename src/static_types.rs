@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::{DataType, DefOpts, Type};
+use crate::{DataType, Type, TypeMap};
 
 /// Easily convert a non-Specta type into a Specta compatible type.
 /// This will be typed as `any` in Typescript.
@@ -34,7 +34,7 @@ use crate::{DataType, DefOpts, Type};
 pub struct Any<T = ()>(T);
 
 impl<T> Type for Any<T> {
-    fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+    fn inline(_: &mut TypeMap, _: &[DataType]) -> DataType {
         DataType::Any
     }
 }
@@ -91,7 +91,7 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
 pub struct Unknown<T = ()>(T);
 
 impl<T> Type for Unknown<T> {
-    fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+    fn inline(_: &mut TypeMap, _: &[DataType]) -> DataType {
         DataType::Unknown
     }
 }
