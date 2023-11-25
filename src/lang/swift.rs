@@ -3,7 +3,6 @@ use crate::*;
 /// TODO
 pub fn export<T: Type>() -> Result<String, String> {
     datatype(&T::definition(DefOpts {
-        parent_inline: true,
         type_map: &mut TypeDefs::default(),
     }))
 }

@@ -32,7 +32,6 @@ fn test_sid() {
     let mut type_map = TypeMap::default();
     // We are calling this for it's side-effects
     BagOfTypes::definition(DefOpts {
-        parent_inline: false,
         type_map: &mut type_map,
     });
 

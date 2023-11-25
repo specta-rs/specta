@@ -127,7 +127,6 @@ impl<const N: usize, T: Type> Type for [T; N] {
                 // TODO: This is cursed. Fix it properly!!!
                 match Vec::<T>::inline(
                     DefOpts {
-                        parent_inline: opts.parent_inline,
                         type_map: opts.type_map,
                     },
                     generics,
@@ -147,7 +146,6 @@ impl<const N: usize, T: Type> Type for [T; N] {
                     // TODO: This is cursed. Fix it properly!!!
                     match Vec::<T>::reference(
                         DefOpts {
-                            parent_inline: opts.parent_inline,
                             type_map: opts.type_map,
                         },
                         generics,
@@ -180,14 +178,12 @@ impl<T: Type, E: Type> Type for std::result::Result<T, E> {
         DataType::Result(Box::new((
             T::inline(
                 DefOpts {
-                    parent_inline: opts.parent_inline,
                     type_map: opts.type_map,
                 },
                 generics,
             ),
             E::inline(
                 DefOpts {
-                    parent_inline: opts.parent_inline,
                     type_map: opts.type_map,
                 },
                 generics,
@@ -690,7 +686,6 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                                 docs: Cow::Borrowed(""),
                                 ty: Some(L::inline(
                                     DefOpts {
-                                        parent_inline: opts.parent_inline,
                                         type_map: opts.type_map,
                                     },
                                     generics,
@@ -713,7 +708,6 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                                 docs: Cow::Borrowed(""),
                                 ty: Some(R::inline(
                                     DefOpts {
-                                        parent_inline: opts.parent_inline,
                                         type_map: opts.type_map,
                                     },
                                     generics,

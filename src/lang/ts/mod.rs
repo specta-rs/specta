@@ -36,7 +36,6 @@ pub fn export_ref<T: NamedType>(_: &T, conf: &ExportConfig) -> Output {
 pub fn export<T: NamedType>(conf: &ExportConfig) -> Output {
     let mut type_map = TypeMap::default();
     let named_data_type = T::definition_named_data_type(DefOpts {
-        parent_inline: false,
         type_map: &mut type_map,
     });
     is_valid_ty(&named_data_type.inner, &type_map)?;
@@ -63,7 +62,6 @@ pub fn inline<T: Type>(conf: &ExportConfig) -> Output {
     let mut type_map = TypeMap::default();
     let ty = T::inline(
         DefOpts {
-            parent_inline: false,
             type_map: &mut type_map,
         },
         &[],

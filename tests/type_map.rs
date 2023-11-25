@@ -17,7 +17,6 @@ fn test_generic_type_in_type_map() {
     let mut type_map = TypeMap::default();
     ActualType::inline(
         DefOpts {
-            parent_inline: false,
             type_map: &mut type_map,
         },
         &[],

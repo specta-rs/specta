@@ -89,10 +89,7 @@ impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction
             asyncness,
             name,
             args: vec![],
-            result: TResult::to_datatype(DefOpts {
-                parent_inline: false,
-                type_map,
-            }),
+            result: TResult::to_datatype(DefOpts { type_map }),
             docs,
             deprecated,
         }
@@ -144,7 +141,6 @@ macro_rules! impl_typed_command {
                                 .map_or_else(
                                     || None,
                                     |field| $i::to_datatype(DefOpts {
-                                        parent_inline: false,
                                         type_map,
                                     }).map(|ty| (field.clone(), ty))
                                 )
@@ -153,7 +149,6 @@ macro_rules! impl_typed_command {
                             .filter_map(|v| v)
                             .collect::<Vec<_>>(),
                         result: TResult::to_datatype(DefOpts {
-                            parent_inline: false,
                             type_map,
                         }),
                     }

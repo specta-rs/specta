@@ -27,7 +27,6 @@ fn transparent() {
     assert_eq!(
         TupleStruct::inline(
             DefOpts {
-                parent_inline: false,
                 type_map: &mut Default::default(),
             },
             &[]
@@ -37,7 +36,6 @@ fn transparent() {
     assert_eq!(
         TupleStructWithRep::inline(
             DefOpts {
-                parent_inline: false,
                 type_map: &mut Default::default(),
             },
             &[]
@@ -47,7 +45,6 @@ fn transparent() {
     assert_eq!(
         GenericTupleStruct::<String>::inline(
             DefOpts {
-                parent_inline: false,
                 type_map: &mut Default::default(),
             },
             &[]
@@ -57,7 +54,6 @@ fn transparent() {
     assert_eq!(
         BracedStruct::inline(
             DefOpts {
-                parent_inline: false,
                 type_map: &mut Default::default(),
             },
             &[]

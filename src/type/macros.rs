@@ -20,7 +20,6 @@ macro_rules! impl_tuple {
                     || {
                         $i::reference(
                             DefOpts {
-                                parent_inline: opts.parent_inline,
                                 type_map: opts.type_map,
                             },
                             generics,
@@ -130,7 +129,6 @@ macro_rules! impl_for_map {
                     generics.get(0).cloned().unwrap_or_else(|| {
                         K::inline(
                             DefOpts {
-                                parent_inline: opts.parent_inline,
                                 type_map: opts.type_map,
                             },
                             generics,
@@ -139,7 +137,6 @@ macro_rules! impl_for_map {
                     generics.get(1).cloned().unwrap_or_else(|| {
                         V::inline(
                             DefOpts {
-                                parent_inline: opts.parent_inline,
                                 type_map: opts.type_map,
                             },
                             generics,
@@ -154,7 +151,6 @@ macro_rules! impl_for_map {
                         generics.get(0).cloned().unwrap_or_else(|| {
                             K::reference(
                                 DefOpts {
-                                    parent_inline: opts.parent_inline,
                                     type_map: opts.type_map,
                                 },
                                 generics,
@@ -164,7 +160,6 @@ macro_rules! impl_for_map {
                         generics.get(1).cloned().unwrap_or_else(|| {
                             V::reference(
                                 DefOpts {
-                                    parent_inline: opts.parent_inline,
                                     type_map: opts.type_map,
                                 },
                                 generics,

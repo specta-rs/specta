@@ -99,7 +99,6 @@ pub mod reference {
             opts.type_map.map.entry(T::SID).or_insert(None);
 
             let dt = T::definition_named_data_type(DefOpts {
-                parent_inline: true,
                 type_map: opts.type_map,
             });
             opts.type_map.map.insert(T::SID, Some(dt));

@@ -33,11 +33,6 @@ pub fn parse_enum(
         quote!(std::borrow::Cow::Borrowed(#ident).into())
     });
 
-    let parent_inline = container_attrs
-        .inline
-        .then(|| quote!(true))
-        .unwrap_or(quote!(false));
-
     let reference_generics = generic_idents.clone().map(|(i, ident)| {
         let ident = &ident.clone();
         let ident_str = ident.to_string();
@@ -50,7 +45,6 @@ pub fn parse_enum(
                     .cloned()
                     .unwrap_or_else(|| <#ident as #crate_ref::Type>::reference(
                         #crate_ref::DefOpts {
-                            parent_inline: #parent_inline,
                             type_map: opts.type_map,
                         },
                         &[],
