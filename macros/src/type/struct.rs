@@ -52,23 +52,12 @@ pub fn parse_struct(
         })
         .collect::<Vec<_>>();
 
-    let parent_inline = container_attrs
-        .inline
-        .then(|| quote!(true))
-        .unwrap_or(quote!(false));
-
     let reference_generics = generic_idents.iter().map(|(i, ident)| {
         quote! {
             generics
                 .get(#i)
                 .cloned()
-                .unwrap_or_else(|| <#ident as #crate_ref::Type>::reference(
-                    #crate_ref::DefOpts {
-                        parent_inline: #parent_inline,
-                        type_map: opts.type_map,
-                    },
-                    &[],
-                ).inner)
+                .unwrap_or_else(|| <#ident as #crate_ref::Type>::reference(type_map, &[]).inner)
         }
     });
     let reference_generics =
@@ -186,38 +175,34 @@ pub fn parse_struct(
                             let flatten = field_attrs.flatten;
                             let doc = field_attrs.common.doc;
 
-                            let parent_inline = container_attrs
-                                .inline
-                                .then(|| quote!(true))
-                                .unwrap_or(parent_inline.clone());
-
                             let ty = field_attrs.skip.then(|| Ok(quote!(None))).unwrap_or_else(
                                 || {
                                     construct_datatype(
-                                format_ident!("ty"),
-                                field_ty,
-                                &generic_idents,
-                                crate_ref,
-                                field_attrs.inline,
-                            ).map(|ty| {
-	                            let ty = if field_attrs.flatten {
-	                                quote! {
-	                                    fn validate_flatten<T: #crate_ref::Flatten>() {}
-	                                    validate_flatten::<#field_ty>();
-										#crate_ref::internal::flatten::<#field_ty>(SID, opts.type_map, #parent_inline, &generics)
-	                                }
-	                            } else {
-	                                quote! {
-	                                    #ty
+                                        format_ident!("ty"),
+                                        field_ty,
+                                        &generic_idents,
+                                        crate_ref,
+                                        field_attrs.inline,
+                                    )
+                                    .map(|ty| {
+                                        let ty = if field_attrs.flatten {
+                                            quote! {
+                                                fn validate_flatten<T: #crate_ref::Flatten>() {}
+                                                validate_flatten::<#field_ty>();
+                                                #crate_ref::internal::flatten::<#field_ty>(SID, type_map, &generics)
+                                            }
+                                        } else {
+                                            quote! {
+                                                #ty
 
-	                                    ty
-	                                }
-	                            };
+                                                ty
+                                            }
+                                        };
 
-	                            quote! {Some({
-	                            	#ty
-	                            })}
-                            })
+                                        quote! {Some({
+                                            #ty
+                                        })}
+                                    })
                                 },
                             )?;
 
@@ -286,12 +271,12 @@ pub fn parse_struct(
     let category = if container_attrs.inline {
         quote!({
             #reference_generics
-            #crate_ref::reference::inline::<Self>(opts, generics)
+            #crate_ref::reference::inline::<Self>(type_map, generics)
         })
     } else {
         quote!({
                 #reference_generics
-                #crate_ref::reference::reference::<Self>(opts, #crate_ref::internal::construct::data_type_reference(
+                #crate_ref::reference::reference::<Self>(type_map, #crate_ref::internal::construct::data_type_reference(
                     #name.into(),
                     SID,
                     vec![#(#reference_generics2),*]

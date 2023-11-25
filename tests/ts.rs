@@ -270,16 +270,32 @@ fn typescript_types() {
     assert_ts_export!(
         error;
         RenameWithWeirdCharsStruct,
-        ExportError::InvalidName(NamedLocation::Type, ExportPath::new_unsafe("tests/ts.rs:599:10"), r#"@odata.context"#.to_string())
+        ExportError::InvalidName(
+            NamedLocation::Type,
+            #[cfg(not(windows))]
+            ExportPath::new_unsafe("tests/ts.rs:615:10"),
+            #[cfg(windows)]
+            ExportPath::new_unsafe("tests\ts.rs:615:10"),
+            r#"@odata.context"#.to_string()
+        )
     );
     assert_ts_export!(
         error;
         RenameWithWeirdCharsEnum,
-        ExportError::InvalidName(NamedLocation::Type, ExportPath::new_unsafe("tests/ts.rs:603:10"), r#"@odata.context"#.to_string())
+        ExportError::InvalidName(
+            NamedLocation::Type,
+            #[cfg(not(windows))]
+            ExportPath::new_unsafe("tests/ts.rs:619:10"),
+            #[cfg(windows)]
+            ExportPath::new_unsafe("tests\ts.rs:619:10"),
+            r#"@odata.context"#.to_string()
+        )
     );
 
     // https://github.com/oscartbeaumont/specta/issues/156
     assert_ts!(Vec<MyEnum>, r#"({ A: string } | { B: number })[]"#);
+
+    assert_ts!(InlineTuple, r#"{ demo: [string, boolean] }"#);
 }
 
 #[derive(Type)]
@@ -604,8 +620,14 @@ pub struct RenameWithWeirdCharsStruct(String);
 #[specta(export = false, rename = "@odata.context")]
 pub enum RenameWithWeirdCharsEnum {}
 
-#[derive(Serialize, Type)]
+#[derive(Type)]
 pub enum MyEnum {
     A(String),
     B(u32),
+}
+
+#[derive(Type)]
+pub struct InlineTuple {
+    #[specta(inline)]
+    demo: (String, bool),
 }

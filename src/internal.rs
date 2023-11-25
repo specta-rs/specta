@@ -15,7 +15,7 @@ pub use specta_macros::fn_datatype;
 mod intersperse;
 pub use intersperse::*;
 
-use crate::{DataType, DefOpts, Field, SpectaID, Type, TypeMap};
+use crate::{DataType, Field, SpectaID, Type, TypeMap};
 
 /// Functions used to construct `crate::datatype` types (they have private fields so can't be constructed directly).
 /// We intentionally keep their fields private so we can modify them without a major version bump.
@@ -210,12 +210,7 @@ pub fn skip_fields_named<'a>(
 }
 
 #[track_caller]
-pub fn flatten<T: Type>(
-    sid: SpectaID,
-    type_map: &mut TypeMap,
-    parent_inline: bool,
-    generics: &[DataType],
-) -> DataType {
+pub fn flatten<T: Type>(sid: SpectaID, type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
     type_map.flatten_stack.push(sid);
 
     #[allow(clippy::panic)]
@@ -224,13 +219,7 @@ pub fn flatten<T: Type>(
         panic!("Type recursion limit exceeded!");
     }
 
-    let ty = T::inline(
-        DefOpts {
-            parent_inline,
-            type_map,
-        },
-        generics,
-    );
+    let ty = T::inline(type_map, generics);
 
     type_map.flatten_stack.pop();
 

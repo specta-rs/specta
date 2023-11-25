@@ -24,26 +24,26 @@ const _: () = {
 };
 
 impl<'a> Type for &'a str {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
-        String::inline(opts, generics)
+    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
+        String::inline(type_map, generics)
     }
 }
 
 impl<'a, T: Type + 'static> Type for &'a T {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
-        T::inline(opts, generics)
+    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
+        T::inline(type_map, generics)
     }
 }
 
 impl<T: Type> Type for [T] {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
-        T::inline(opts, generics)
+    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
+        T::inline(type_map, generics)
     }
 }
 
 impl<'a, T: ?Sized + ToOwned + Type + 'static> Type for std::borrow::Cow<'a, T> {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
-        T::inline(opts, generics)
+    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
+        T::inline(type_map, generics)
     }
 }
 
@@ -115,23 +115,17 @@ impl_for_list!(
 );
 
 impl<'a, T: Type> Type for &'a [T] {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
-        <Vec<T>>::inline(opts, generics)
+    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
+        <Vec<T>>::inline(type_map, generics)
     }
 }
 
 impl<const N: usize, T: Type> Type for [T; N] {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
+    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
         DataType::List(List {
             ty: Box::new(
                 // TODO: This is cursed. Fix it properly!!!
-                match Vec::<T>::inline(
-                    DefOpts {
-                        parent_inline: opts.parent_inline,
-                        type_map: opts.type_map,
-                    },
-                    generics,
-                ) {
+                match Vec::<T>::inline(type_map, generics) {
                     DataType::List(List { ty, .. }) => *ty,
                     _ => unreachable!(),
                 },
@@ -140,20 +134,12 @@ impl<const N: usize, T: Type> Type for [T; N] {
         })
     }
 
-    fn reference(opts: DefOpts, generics: &[DataType]) -> Reference {
+    fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
         Reference {
             inner: DataType::List(List {
                 ty: Box::new(
                     // TODO: This is cursed. Fix it properly!!!
-                    match Vec::<T>::reference(
-                        DefOpts {
-                            parent_inline: opts.parent_inline,
-                            type_map: opts.type_map,
-                        },
-                        generics,
-                    )
-                    .inner
-                    {
+                    match Vec::<T>::reference(type_map, generics).inner {
                         DataType::List(List { ty, .. }) => *ty,
                         _ => unreachable!(),
                     },
@@ -165,39 +151,27 @@ impl<const N: usize, T: Type> Type for [T; N] {
 }
 
 impl<T: Type> Type for Option<T> {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
+    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
         DataType::Nullable(Box::new(
             generics
                 .get(0)
                 .cloned()
-                .unwrap_or_else(|| T::inline(opts, generics)),
+                .unwrap_or_else(|| T::inline(type_map, generics)),
         ))
     }
 }
 
 impl<T: Type, E: Type> Type for std::result::Result<T, E> {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
+    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
         DataType::Result(Box::new((
-            T::inline(
-                DefOpts {
-                    parent_inline: opts.parent_inline,
-                    type_map: opts.type_map,
-                },
-                generics,
-            ),
-            E::inline(
-                DefOpts {
-                    parent_inline: opts.parent_inline,
-                    type_map: opts.type_map,
-                },
-                generics,
-            ),
+            T::inline(type_map, generics),
+            E::inline(type_map, generics),
         )))
     }
 }
 
 impl<T> Type for std::marker::PhantomData<T> {
-    fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+    fn inline(_: &mut TypeMap, _: &[DataType]) -> DataType {
         DataType::Literal(LiteralType::None)
     }
 }
@@ -209,8 +183,8 @@ impl<T> Type for std::marker::PhantomData<T> {
 pub enum Infallible {}
 
 impl<T: Type> Type for std::ops::Range<T> {
-    fn inline(opts: DefOpts, _generics: &[DataType]) -> DataType {
-        let ty = Some(T::definition(opts));
+    fn inline(type_map: &mut TypeMap, _generics: &[DataType]) -> DataType {
+        let ty = Some(T::definition(type_map));
         DataType::Struct(StructType {
             name: "Range".into(),
             sid: None,
@@ -245,8 +219,8 @@ impl<T: Type> Type for std::ops::Range<T> {
 }
 
 impl<T: Type> Type for std::ops::RangeInclusive<T> {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
-        std::ops::Range::<T>::inline(opts, generics) // Yeah Serde are cringe
+    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
+        std::ops::Range::<T>::inline(type_map, generics) // Yeah Serde are cringe
     }
 }
 
@@ -297,7 +271,7 @@ const _: () = {
     }
 
     impl Type for Number {
-        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+        fn inline(_: &mut TypeMap, _: &[DataType]) -> DataType {
             DataType::Enum(EnumType {
                 name: "Number".into(),
                 sid: None,
@@ -379,14 +353,14 @@ const _: () = {
     }
 
     impl Type for serde_yaml::Mapping {
-        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+        fn inline(_: &mut TypeMap, _: &[DataType]) -> DataType {
             // We don't type this more accurately because `serde_json` doesn't allow non-string map keys so neither does Specta
             DataType::Unknown
         }
     }
 
     impl Type for serde_yaml::value::TaggedValue {
-        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+        fn inline(_: &mut TypeMap, _: &[DataType]) -> DataType {
             DataType::Map(Box::new((
                 DataType::Primitive(PrimitiveType::String),
                 DataType::Unknown,
@@ -395,7 +369,7 @@ const _: () = {
     }
 
     impl Type for serde_yaml::Number {
-        fn inline(_: DefOpts, _: &[DataType]) -> DataType {
+        fn inline(_: &mut TypeMap, _: &[DataType]) -> DataType {
             DataType::Enum(EnumType {
                 name: "Number".into(),
                 sid: None,
@@ -509,15 +483,15 @@ const _: () = {
     );
 
     impl<T: TimeZone> Type for DateTime<T> {
-        fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
-            String::inline(opts, generics)
+        fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
+            String::inline(type_map, generics)
         }
     }
 
     #[allow(deprecated)]
     impl<T: TimeZone> Type for Date<T> {
-        fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
-            String::inline(opts, generics)
+        fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
+            String::inline(type_map, generics)
         }
     }
 };
@@ -669,7 +643,7 @@ impl_as!(url::Url as String);
 
 #[cfg(feature = "either")]
 impl<L: Type, R: Type> Type for either::Either<L, R> {
-    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType {
+    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
         DataType::Enum(EnumType {
             name: "Either".into(),
             sid: None,
@@ -688,13 +662,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                                 flatten: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
-                                ty: Some(L::inline(
-                                    DefOpts {
-                                        parent_inline: opts.parent_inline,
-                                        type_map: opts.type_map,
-                                    },
-                                    generics,
-                                )),
+                                ty: Some(L::inline(type_map, generics)),
                             }],
                         }),
                     },
@@ -711,13 +679,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                                 flatten: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
-                                ty: Some(R::inline(
-                                    DefOpts {
-                                        parent_inline: opts.parent_inline,
-                                        type_map: opts.type_map,
-                                    },
-                                    generics,
-                                )),
+                                ty: Some(R::inline(type_map, generics)),
                             }],
                         }),
                     },
