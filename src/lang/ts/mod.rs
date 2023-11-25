@@ -144,6 +144,10 @@ fn export_datatype_inner(
             .unwrap_or_else(|| PathItem::Type(name.clone())),
     );
     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
+    let name = ctx
+        .cfg
+        .layout
+        .construct_name_from_ext(&name.into(), None, ext);
 
     let generics = item
         .generics()
@@ -279,20 +283,24 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
             variants.dedup();
             variants.join(" | ")
         }
-        DataType::Reference(DataTypeReference { name, generics, .. }) => match &generics[..] {
-            [] => name.to_string(),
-            generics => {
-                let generics = generics
-                    .iter()
-                    .map(|(_, v)| {
-                        datatype_inner(ctx.with(PathItem::Type(name.clone())), v, type_map)
-                    })
-                    .collect::<Result<Vec<_>>>()?
-                    .join(", ");
+        DataType::Reference(r @ DataTypeReference { name, generics, .. }) => {
+            let name = ctx.cfg.layout.construct_name_from_ref(name, r, type_map);
 
-                format!("{name}<{generics}>")
+            match &generics[..] {
+                [] => name.to_string(),
+                generics => {
+                    let generics = generics
+                        .iter()
+                        .map(|(_, v)| {
+                            datatype_inner(ctx.with(PathItem::Type(name.clone())), v, type_map)
+                        })
+                        .collect::<Result<Vec<_>>>()?
+                        .join(", ");
+
+                    format!("{name}<{generics}>")
+                }
             }
-        },
+        }
         DataType::Generic(GenericType(ident)) => ident.to_string(),
     })
 }
@@ -727,11 +735,11 @@ fn validate_type_for_tagged_intersection(
             }
             StructFields::Named(fields) => {
                 // Prevent `{ tag: "{tag}" } & Record<string | never>`
-                if fields.tag.is_none() && fields.fields.len() == 0 {
+                if fields.tag.is_none() && fields.fields.is_empty() {
                     return Ok(true);
                 }
 
-                return Ok(false);
+                Ok(false)
             }
         },
         DataType::Enum(v) => {
@@ -741,7 +749,7 @@ fn validate_type_for_tagged_intersection(
                         // `{ .. } & null` is `never`
                         EnumVariants::Unit => true,
                          // `{ ... } & Record<string, never>` is not useful
-                        EnumVariants::Named(v) => v.tag.is_none() && v.fields().len() == 0,
+                        EnumVariants::Named(v) => v.tag.is_none() && v.fields().is_empty(),
                         EnumVariants::Unnamed(_) => false,
                     }))
                 },
@@ -751,7 +759,7 @@ fn validate_type_for_tagged_intersection(
         }
         DataType::Tuple(v) => {
             // Empty tuple is `null`
-            if v.elements.len() == 0 {
+            if v.elements.is_empty() {
                 return Ok(true);
             }
 
