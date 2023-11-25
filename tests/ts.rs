@@ -273,9 +273,9 @@ fn typescript_types() {
         ExportError::InvalidName(
             NamedLocation::Type,
             #[cfg(not(windows))]
-            ExportPath::new_unsafe("tests/ts.rs:613:10"),
+            ExportPath::new_unsafe("tests/ts.rs:615:10"),
             #[cfg(windows)]
-            ExportPath::new_unsafe("tests\ts.rs:613:10"),
+            ExportPath::new_unsafe("tests\ts.rs:615:10"),
             r#"@odata.context"#.to_string()
         )
     );
@@ -285,15 +285,17 @@ fn typescript_types() {
         ExportError::InvalidName(
             NamedLocation::Type,
             #[cfg(not(windows))]
-            ExportPath::new_unsafe("tests/ts.rs:617:10"),
+            ExportPath::new_unsafe("tests/ts.rs:619:10"),
             #[cfg(windows)]
-            ExportPath::new_unsafe("tests\ts.rs:617:10"),
+            ExportPath::new_unsafe("tests\ts.rs:619:10"),
             r#"@odata.context"#.to_string()
         )
     );
 
     // https://github.com/oscartbeaumont/specta/issues/156
     assert_ts!(Vec<MyEnum>, r#"({ A: string } | { B: number })[]"#);
+
+    assert_ts!(InlineTuple, r#"{ demo: [string, boolean] }"#);
 }
 
 #[derive(Type)]
@@ -618,8 +620,14 @@ pub struct RenameWithWeirdCharsStruct(String);
 #[specta(export = false, rename = "@odata.context")]
 pub enum RenameWithWeirdCharsEnum {}
 
-#[derive(Serialize, Type)]
+#[derive(Type)]
 pub enum MyEnum {
     A(String),
     B(u32),
+}
+
+#[derive(Type)]
+pub struct InlineTuple {
+    #[specta(inline)]
+    demo: (String, bool),
 }
