@@ -9,6 +9,7 @@ mod list;
 mod literal;
 mod named;
 mod primitive;
+pub mod reference;
 mod r#struct;
 mod tuple;
 
