@@ -4,6 +4,10 @@ use std::{
     path::PathBuf,
 };
 
+// TODO: Issues:
+// - Can we make these `impls`'s show up in the docs???
+// - Can we avoid using a global directory. It should lock to the target dir so it's not gonna have race conditions.
+
 fn main() {
     // TODO: Windows support
     let path = PathBuf::from("/tmp") // std::env::var("CARGO_TARGET_DIR").unwrap())
