@@ -86,7 +86,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let definition_generics = generics.type_params().map(|param| {
         let ident = param.ident.to_string();
-        quote!(std::borrow::Cow::Borrowed(#ident).into())
+        quote!(#crate_ref::internal::construct::generic_data_type(#ident))
     });
 
     let bounds = generics_with_ident_and_bounds_only(generics);
@@ -130,6 +130,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         const _: () = {
         	const SID: #crate_ref::SpectaID = #sid;
 	        const IMPL_LOCATION: #crate_ref::ImplLocation = #impl_location;
+            const DEFINITION_GENERICS: &[#crate_ref::DataType] = &[#(#definition_generics),*];
 
             #[automatically_derived]
             #type_impl_heading {
@@ -137,8 +138,11 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     #inlines
                 }
 
-                fn definition_generics() -> Vec<#crate_ref::GenericType> {
-                    vec![#(#definition_generics),*]
+                fn definition(type_map: &mut #crate_ref::TypeMap) -> #crate_ref::DataType {
+                    Self::inline(
+                        type_map,
+                        &DEFINITION_GENERICS
+                    )
                 }
 
                 fn reference(type_map: &mut #crate_ref::TypeMap, generics: &[#crate_ref::DataType]) -> #crate_ref::reference::Reference {
@@ -159,6 +163,13 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         SID,
                         IMPL_LOCATION,
                         <Self as #crate_ref::Type>::inline(type_map, generics)
+                    )
+                }
+
+                fn definition_named_data_type(type_map: &mut #crate_ref::TypeMap) -> #crate_ref::NamedDataType {
+                    Self::named_data_type(
+                        type_map,
+                        &DEFINITION_GENERICS
                     )
                 }
             }

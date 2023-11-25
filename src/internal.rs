@@ -147,6 +147,10 @@ pub mod construct {
         TupleType { elements: fields }
     }
 
+    pub const fn generic_data_type(name: &'static str) -> DataType {
+        DataType::Generic(GenericType(Cow::Borrowed(name)))
+    }
+
     pub const fn impl_location(loc: &'static str) -> ImplLocation {
         ImplLocation(loc)
     }

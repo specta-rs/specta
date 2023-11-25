@@ -23,27 +23,14 @@ pub trait Type {
     /// Implemented internally or via the [`Type`](derive@crate::Type) macro
     fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType;
 
-    /// Returns the type parameter generics of a given type.
-    /// Will usually be empty except for custom types.
-    ///
-    /// Implemented internally or via the [`Type`](derive@crate::Type) macro
-    fn definition_generics() -> Vec<GenericType> {
-        vec![]
-    }
-
     /// Small wrapper around [`inline`](crate::Type::inline) that provides
     /// [`definition_generics`](crate::Type::definition_generics)
     /// as the value for the `generics` arg.
     ///
-    /// Implemented internally
+    /// If your type is generic you *must* override the default implementation!
     fn definition(type_map: &mut TypeMap) -> DataType {
-        Self::inline(
-            type_map,
-            &Self::definition_generics()
-                .into_iter()
-                .map(Into::into)
-                .collect::<Vec<_>>(),
-        )
+        // TODO: Remove this default impl?
+        Self::inline(type_map, &[])
     }
 
     /// Generates a datatype corresponding to a reference to this type,
@@ -59,21 +46,13 @@ pub trait Type {
 /// This will be implemented for all types with the [Type] derive macro.
 pub trait NamedType: Type {
     const SID: SpectaID;
-    const IMPL_LOCATION: ImplLocation;
+    const IMPL_LOCATION: ImplLocation; // TODO: I don't think this is used so maybe remove it?
 
     /// this is equivalent to [Type::inline] but returns a [NamedDataType] instead.
     fn named_data_type(type_map: &mut TypeMap, generics: &[DataType]) -> NamedDataType;
 
     /// this is equivalent to [Type::definition] but returns a [NamedDataType] instead.
-    fn definition_named_data_type(type_map: &mut TypeMap) -> NamedDataType {
-        Self::named_data_type(
-            type_map,
-            &Self::definition_generics()
-                .into_iter()
-                .map(Into::into)
-                .collect::<Vec<_>>(),
-        )
-    }
+    fn definition_named_data_type(type_map: &mut TypeMap) -> NamedDataType;
 }
 
 /// Helpers for generating [Type::reference] implementations.
