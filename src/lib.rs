@@ -12,7 +12,8 @@
 pub mod internal;
 
 pub mod impls {
-    include!("/tmp/_specta/impls.rs");
+    // TODO: Can we make these `impls`'s show up in the docs???
+    specta_impls::impls!();
 }
 
 /// Types related to working with [`DataType`](crate::DataType). Exposed for advanced users.
