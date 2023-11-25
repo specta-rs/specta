@@ -21,7 +21,7 @@ pub use r#enum::*;
 pub use r#struct::*;
 pub use tuple::*;
 
-use crate::{SpectaID, TypeMap};
+use crate::SpectaID;
 
 /// Runtime type-erased representation of a Rust type.
 ///

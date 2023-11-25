@@ -718,11 +718,11 @@ fn validate_type_for_tagged_intersection(
             }
             StructFields::Named(fields) => {
                 // Prevent `{ tag: "{tag}" } & Record<string | never>`
-                if fields.tag.is_none() && fields.fields.len() == 0 {
+                if fields.tag.is_none() && fields.fields.is_empty() {
                     return Ok(true);
                 }
 
-                return Ok(false);
+                Ok(false)
             }
         },
         DataType::Enum(v) => {
@@ -732,7 +732,7 @@ fn validate_type_for_tagged_intersection(
                         // `{ .. } & null` is `never`
                         EnumVariants::Unit => true,
                          // `{ ... } & Record<string, never>` is not useful
-                        EnumVariants::Named(v) => v.tag.is_none() && v.fields().len() == 0,
+                        EnumVariants::Named(v) => v.tag.is_none() && v.fields().is_empty(),
                         EnumVariants::Unnamed(_) => false,
                     }))
                 },
@@ -742,7 +742,7 @@ fn validate_type_for_tagged_intersection(
         }
         DataType::Tuple(v) => {
             // Empty tuple is `null`
-            if v.elements.len() == 0 {
+            if v.elements.is_empty() {
                 return Ok(true);
             }
 
