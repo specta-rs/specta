@@ -11,6 +11,10 @@
 #[doc(hidden)]
 pub mod internal;
 
+pub mod impls {
+    include!("/tmp/_specta/impls.rs");
+}
+
 /// Types related to working with [`DataType`](crate::DataType). Exposed for advanced users.
 pub mod datatype;
 /// Provides the global type store and a method to export them to other languages.
