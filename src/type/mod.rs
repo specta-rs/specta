@@ -21,7 +21,7 @@ pub trait Type {
     /// [`definition`](crate::Type::definition) and [`reference`](crate::Type::definition)
     ///
     /// Implemented internally or via the [`Type`](derive@crate::Type) macro
-    fn inline(opts: DefOpts, generics: &[DataType]) -> DataType;
+    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType;
 
     /// Returns the type parameter generics of a given type.
     /// Will usually be empty except for custom types.
@@ -36,9 +36,9 @@ pub trait Type {
     /// as the value for the `generics` arg.
     ///
     /// Implemented internally
-    fn definition(opts: DefOpts) -> DataType {
+    fn definition(type_map: &mut TypeMap) -> DataType {
         Self::inline(
-            opts,
+            type_map,
             &Self::definition_generics()
                 .into_iter()
                 .map(Into::into)
@@ -50,8 +50,8 @@ pub trait Type {
     /// as determined by its category. Getting a reference to a type implies that
     /// it should belong in the type map (since it has to be referenced from somewhere),
     /// so the output of [`definition`](crate::Type::definition) will be put into the type map.
-    fn reference(opts: DefOpts, generics: &[DataType]) -> Reference {
-        reference::inline::<Self>(opts, generics)
+    fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
+        reference::inline::<Self>(type_map, generics)
     }
 }
 
@@ -62,12 +62,12 @@ pub trait NamedType: Type {
     const IMPL_LOCATION: ImplLocation;
 
     /// this is equivalent to [Type::inline] but returns a [NamedDataType] instead.
-    fn named_data_type(opts: DefOpts, generics: &[DataType]) -> NamedDataType;
+    fn named_data_type(type_map: &mut TypeMap, generics: &[DataType]) -> NamedDataType;
 
     /// this is equivalent to [Type::definition] but returns a [NamedDataType] instead.
-    fn definition_named_data_type(opts: DefOpts) -> NamedDataType {
+    fn definition_named_data_type(type_map: &mut TypeMap) -> NamedDataType {
         Self::named_data_type(
-            opts,
+            type_map,
             &Self::definition_generics()
                 .into_iter()
                 .map(Into::into)
@@ -88,20 +88,21 @@ pub mod reference {
         pub inner: DataType,
     }
 
-    pub fn inline<T: Type + ?Sized>(opts: DefOpts, generics: &[DataType]) -> Reference {
+    pub fn inline<T: Type + ?Sized>(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
         Reference {
-            inner: T::inline(opts, generics),
+            inner: T::inline(type_map, generics),
         }
     }
 
-    pub fn reference<T: NamedType>(opts: DefOpts, reference: DataTypeReference) -> Reference {
-        if opts.type_map.map.get(&T::SID).is_none() {
-            opts.type_map.map.entry(T::SID).or_insert(None);
+    pub fn reference<T: NamedType>(
+        type_map: &mut TypeMap,
+        reference: DataTypeReference,
+    ) -> Reference {
+        if type_map.map.get(&T::SID).is_none() {
+            type_map.map.entry(T::SID).or_insert(None);
 
-            let dt = T::definition_named_data_type(DefOpts {
-                type_map: opts.type_map,
-            });
-            opts.type_map.map.insert(T::SID, Some(dt));
+            let dt = T::definition_named_data_type(type_map);
+            type_map.map.insert(T::SID, Some(dt));
         }
 
         Reference {

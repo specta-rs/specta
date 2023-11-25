@@ -57,12 +57,7 @@ pub fn parse_struct(
             generics
                 .get(#i)
                 .cloned()
-                .unwrap_or_else(|| <#ident as #crate_ref::Type>::reference(
-                    #crate_ref::DefOpts {
-                        type_map: opts.type_map,
-                    },
-                    &[],
-                ).inner)
+                .unwrap_or_else(|| <#ident as #crate_ref::Type>::reference(type_map, &[]).inner)
         }
     });
     let reference_generics =
@@ -194,7 +189,7 @@ pub fn parse_struct(
                                             quote! {
                                                 fn validate_flatten<T: #crate_ref::Flatten>() {}
                                                 validate_flatten::<#field_ty>();
-                                                #crate_ref::internal::flatten::<#field_ty>(SID, opts.type_map, &generics)
+                                                #crate_ref::internal::flatten::<#field_ty>(SID, type_map, &generics)
                                             }
                                         } else {
                                             quote! {
@@ -276,12 +271,12 @@ pub fn parse_struct(
     let category = if container_attrs.inline {
         quote!({
             #reference_generics
-            #crate_ref::reference::inline::<Self>(opts, generics)
+            #crate_ref::reference::inline::<Self>(type_map, generics)
         })
     } else {
         quote!({
                 #reference_generics
-                #crate_ref::reference::reference::<Self>(opts, #crate_ref::internal::construct::data_type_reference(
+                #crate_ref::reference::reference::<Self>(type_map, #crate_ref::internal::construct::data_type_reference(
                     #name.into(),
                     SID,
                     vec![#(#reference_generics2),*]

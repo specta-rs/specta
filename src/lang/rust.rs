@@ -2,9 +2,7 @@ use crate::*;
 
 /// TODO
 pub fn export<T: Type>() -> Result<String, String> {
-    datatype(&T::definition(DefOpts {
-        type_map: &mut TypeDefs::default(),
-    }))
+    datatype(&T::definition(&mut TypeDefs::default())
 }
 
 fn datatype(t: &DataTypeExt) -> Result<String, String> {

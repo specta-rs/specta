@@ -23,12 +23,6 @@ pub use tuple::*;
 
 use crate::{SpectaID, TypeMap};
 
-/// Arguments for [`Type::inline`](crate::Type::inline), [`Type::reference`](crate::Type::reference) and [`Type::definition`](crate::Type::definition).
-pub struct DefOpts<'a> {
-    /// a map of types which have been visited. This prevents stack overflows when a type references itself and also allows the caller to get a list of all types in the "schema".
-    pub type_map: &'a mut TypeMap,
-}
-
 /// Runtime type-erased representation of a Rust type.
 ///
 /// A language exporter takes this general format and converts it into a language specific syntax.

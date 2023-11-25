@@ -1,5 +1,5 @@
 mod private {
-    use crate::{DataType, DefOpts, Type};
+    use crate::{DataType, Type, TypeMap};
 
     /// Implemented by types that can be used as an argument in a function annotated with
     /// [`specta`](crate::specta).
@@ -8,14 +8,14 @@ mod private {
         ///
         /// Some argument types should be ignored (eg Tauri command State),
         /// so the value is optional.
-        fn to_datatype(opts: DefOpts) -> Option<DataType>;
+        fn to_datatype(type_map: &mut TypeMap) -> Option<DataType>;
     }
 
     pub enum FunctionArgMarker {}
 
     impl<T: Type> SpectaFunctionArg<FunctionArgMarker> for T {
-        fn to_datatype(opts: DefOpts) -> Option<DataType> {
-            Some(T::reference(opts, &[]).inner)
+        fn to_datatype(type_map: &mut TypeMap) -> Option<DataType> {
+            Some(T::reference(type_map, &[]).inner)
         }
     }
 
@@ -24,7 +24,7 @@ mod private {
         pub enum FunctionArgTauriMarker {}
 
         impl<R: tauri::Runtime> SpectaFunctionArg<FunctionArgTauriMarker> for tauri::Window<R> {
-            fn to_datatype(_: DefOpts) -> Option<DataType> {
+            fn to_datatype(_: &mut TypeMap) -> Option<DataType> {
                 None
             }
         }
@@ -32,13 +32,13 @@ mod private {
         impl<'r, T: Send + Sync + 'static> SpectaFunctionArg<FunctionArgTauriMarker>
             for tauri::State<'r, T>
         {
-            fn to_datatype(_: DefOpts) -> Option<DataType> {
+            fn to_datatype(_: &mut TypeMap) -> Option<DataType> {
                 None
             }
         }
 
         impl<R: tauri::Runtime> SpectaFunctionArg<FunctionArgTauriMarker> for tauri::AppHandle<R> {
-            fn to_datatype(_: DefOpts) -> Option<DataType> {
+            fn to_datatype(_: &mut TypeMap) -> Option<DataType> {
                 None
             }
         }

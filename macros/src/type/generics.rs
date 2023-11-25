@@ -118,12 +118,7 @@ pub fn construct_datatype(
             return Ok(quote! {
                 #(#elems)*
 
-                let #var_ident = <#ty as #crate_ref::Type>::#method(
-                    #crate_ref::DefOpts {
-                        type_map: opts.type_map
-                    },
-                    &[#(#generic_var_idents),*]
-                )#transform;
+                let #var_ident = <#ty as #crate_ref::Type>::#method(type_map, &[#(#generic_var_idents),*])#transform;
             });
         }
         Type::Paren(p) => {
@@ -142,12 +137,7 @@ pub fn construct_datatype(
             return Ok(quote! {
                 #elem
 
-                let #var_ident = <#ty as #crate_ref::Type>::#method(
-                    #crate_ref::DefOpts {
-                        type_map: opts.type_map
-                    },
-                    &[#elem_var_ident]
-                )#transform;
+                let #var_ident = <#ty as #crate_ref::Type>::#method(type_map, &[#elem_var_ident])#transform;
             });
         }
         Type::Ptr(TypePtr { elem, .. }) | Type::Reference(TypeReference { elem, .. }) => {
@@ -162,12 +152,7 @@ pub fn construct_datatype(
         }
         Type::Macro(m) => {
             return Ok(quote! {
-                let #var_ident = <#m as #crate_ref::Type>::#method(
-                    #crate_ref::DefOpts {
-                        type_map: opts.type_map
-                    },
-                    &[]
-                )#transform;
+                let #var_ident = <#m as #crate_ref::Type>::#method(type_map, &[])#transform;
             });
         }
         ty => {
@@ -190,12 +175,7 @@ pub fn construct_datatype(
             return Ok(quote! {
                 let #var_ident = generics.get(#i).cloned().unwrap_or_else(
                     || {
-                        <#generic_ident as #crate_ref::Type>::#method(
-                            #crate_ref::DefOpts {
-                                type_map: opts.type_map
-                            },
-                            &[#crate_ref::DataType::Generic(std::borrow::Cow::Borrowed(#type_ident).into())]
-                        )#transform
+                        <#generic_ident as #crate_ref::Type>::#method(type_map, &[#crate_ref::DataType::Generic(std::borrow::Cow::Borrowed(#type_ident).into())])#transform
                     },
                 );
             });
@@ -241,11 +221,6 @@ pub fn construct_datatype(
     Ok(quote! {
         #(#generic_vars)*
 
-        let #var_ident = <#ty as #crate_ref::Type>::#method(
-            #crate_ref::DefOpts {
-                type_map: opts.type_map
-            },
-            &[#(#generic_var_idents),*]
-        )#transform;
+        let #var_ident = <#ty as #crate_ref::Type>::#method(type_map, &[#(#generic_var_idents),*])#transform;
     })
 }
