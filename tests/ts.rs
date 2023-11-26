@@ -273,9 +273,9 @@ fn typescript_types() {
         ExportError::InvalidName(
             NamedLocation::Type,
             #[cfg(not(windows))]
-            ExportPath::new_unsafe("tests/ts.rs:615:10"),
+            ExportPath::new_unsafe("tests/ts.rs:619:10"),
             #[cfg(windows)]
-            ExportPath::new_unsafe("tests\ts.rs:615:10"),
+            ExportPath::new_unsafe("tests\ts.rs:619:10"),
             r#"@odata.context"#.to_string()
         )
     );
@@ -285,9 +285,9 @@ fn typescript_types() {
         ExportError::InvalidName(
             NamedLocation::Type,
             #[cfg(not(windows))]
-            ExportPath::new_unsafe("tests/ts.rs:619:10"),
+            ExportPath::new_unsafe("tests/ts.rs:623:10"),
             #[cfg(windows)]
-            ExportPath::new_unsafe("tests\ts.rs:619:10"),
+            ExportPath::new_unsafe("tests\ts.rs:623:10"),
             r#"@odata.context"#.to_string()
         )
     );
@@ -296,6 +296,10 @@ fn typescript_types() {
     assert_ts!(Vec<MyEnum>, r#"({ A: string } | { B: number })[]"#);
 
     assert_ts!(InlineTuple, r#"{ demo: [string, boolean] }"#);
+    assert_ts!(
+        InlineTuple2,
+        r#"{ demo: [{ demo: [string, boolean] }, boolean] }"#
+    );
 }
 
 #[derive(Type)]
@@ -630,4 +634,10 @@ pub enum MyEnum {
 pub struct InlineTuple {
     #[specta(inline)]
     demo: (String, bool),
+}
+
+#[derive(Type)]
+pub struct InlineTuple2 {
+    #[specta(inline)]
+    demo: (InlineTuple, bool),
 }
