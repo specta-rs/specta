@@ -51,6 +51,12 @@ impl<T: Clone> Clone for Any<T> {
     }
 }
 
+impl<T: Default> Default for Any<T> {
+    fn default() -> Self {
+        Self(T::default())
+    }
+}
+
 #[cfg(feature = "serde")]
 impl<T: serde::Serialize> serde::Serialize for Any<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -105,6 +111,12 @@ impl<T: Debug> Debug for Unknown<T> {
 impl<T: Clone> Clone for Unknown<T> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
+    }
+}
+
+impl<T: Default> Default for Unknown<T> {
+    fn default() -> Self {
+        Self(T::default())
     }
 }
 
