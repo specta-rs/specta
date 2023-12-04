@@ -19,7 +19,6 @@ pub fn inline<T: Type + ?Sized>(type_map: &mut TypeMap, generics: &[DataType]) -
 pub fn reference<T: NamedType>(type_map: &mut TypeMap, reference: DataTypeReference) -> Reference {
     if type_map.map.get(&T::SID).is_none() {
         type_map.map.entry(T::SID).or_insert(None);
-
         let dt = T::definition_named_data_type(type_map);
         type_map.map.insert(T::SID, Some(dt));
     }
@@ -27,4 +26,11 @@ pub fn reference<T: NamedType>(type_map: &mut TypeMap, reference: DataTypeRefere
     Reference {
         inner: DataType::Reference(reference),
     }
+}
+
+/// Construct a reference from a custom [DataType].
+///
+/// This function is advanced and should only be used if you know what you're doing.
+pub fn custom(inner: DataType) -> Reference {
+    Reference { inner }
 }

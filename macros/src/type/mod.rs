@@ -167,9 +167,13 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 }
 
                 fn definition_named_data_type(type_map: &mut #crate_ref::TypeMap) -> #crate_ref::NamedDataType {
-                    Self::named_data_type(
-                        type_map,
-                        &DEFINITION_GENERICS
+                    #crate_ref::internal::construct::named_data_type(
+                        #name.into(),
+                        #comments.into(),
+                        #deprecated,
+                        SID,
+                        IMPL_LOCATION,
+                        <Self as #crate_ref::Type>::definition(type_map)
                     )
                 }
             }
