@@ -38,6 +38,12 @@ struct Procedures8 {}
 #[derive(DataTypeFrom)]
 struct Procedures9(DataType, DataType);
 
+#[derive(DataTypeFrom)]
+struct Procedures10 {
+    #[specta(rename = "b")]
+    pub a: DataType,
+}
+
 #[test]
 fn test_datatype() {
     let val: DataType = Procedures1(vec![
@@ -158,5 +164,15 @@ fn test_datatype() {
     assert_eq!(
         ts::datatype(&Default::default(), &val, &Default::default()),
         Ok("[any, string]".into())
+    );
+
+    let val: StructType = Procedures10 { a: DataType::Any }.into();
+    assert_eq!(
+        ts::datatype(
+            &Default::default(),
+            &val.clone().to_anonymous(),
+            &Default::default()
+        ),
+        Ok("{ b: any }".into())
     );
 }

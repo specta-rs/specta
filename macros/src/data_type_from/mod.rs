@@ -1,6 +1,6 @@
 mod attr;
 
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::{parse_macro_input, Data, DeriveInput, Fields};
 
 use attr::*;
@@ -47,7 +47,11 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         .as_ref()
                         // TODO: Proper syn error would be nice
                         .expect("'specta::DataTypeFrom' requires named fields.");
-                    let ident_str = ident.to_string();
+
+                    let ident_str = match &attrs.rename {
+                        Some(rename) => rename.to_token_stream(),
+                        None => ident.to_string().to_token_stream(),
+                    };
 
                     let ty = then_option(attrs.skip, quote!(t.#ident.into()));
 

@@ -1,3 +1,5 @@
+use proc_macro2::TokenStream;
+use quote::ToTokens;
 use syn::Result;
 
 use crate::utils::Attribute;
@@ -5,11 +7,18 @@ use crate::utils::Attribute;
 #[derive(Default)]
 pub struct FieldAttr {
     pub skip: bool,
+    pub rename: Option<TokenStream>,
 }
 
 impl_parse! {
     FieldAttr(attr, out) {
         "skip" => out.skip = true,
+        "rename" => {
+            let attr = attr.parse_string()?;
+            out.rename = out.rename.take().or_else(|| Some(
+                attr.to_token_stream()
+            ))
+        },
     }
 }
 
