@@ -141,4 +141,4 @@ serde = { version = "1.0.183", features = ["derive"] }
 trybuild = "1.0.82"
 
 [workspace]
-members = ["./cli", "./macros", "./macros-support"]
+members = ["./cli", "./cli/example", "./macros", "./macros-support"]
