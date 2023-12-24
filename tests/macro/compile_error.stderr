@@ -52,11 +52,25 @@ error: specta: invalid formatted attribute
 103 | #[specta = "todo"]
     |   ^^^^^^
 
-error[E0601]: `main` function not found in crate `$CRATE`
-   --> tests/macro/compile_error.rs:104:36
+error: cannot find attribute `specta` in this scope
+   --> tests/macro/compile_error.rs:107:3
     |
-104 | pub struct InvalidSpectaAttribute2;
-    |                                    ^ consider adding a `main` function to `$DIR/tests/macro/compile_error.rs`
+107 | #[specta]
+    |   ^^^^^^
+    |
+    = note: `specta` is in scope, but it is a crate, not an attribute
+help: consider importing one of these items
+    |
+3   + use specta::specta;
+    |
+3   + use specta_macros::specta;
+    |
+
+error[E0601]: `main` function not found in crate `$CRATE`
+   --> tests/macro/compile_error.rs:108:20
+    |
+108 | pub fn testing() {}
+    |                    ^ consider adding a `main` function to `$DIR/tests/macro/compile_error.rs`
 
 error[E0277]: the trait bound `UnitExternal: specta::Flatten` is not satisfied
   --> tests/macro/compile_error.rs:32:11

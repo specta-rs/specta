@@ -121,6 +121,7 @@ impl<const N: usize, T: Type> Type for [T; N] {
                 },
             ),
             length: Some(N),
+            unique: false, // TODO: Properly hook this up
         })
     }
 
@@ -135,6 +136,7 @@ impl<const N: usize, T: Type> Type for [T; N] {
                     },
                 ),
                 length: Some(N),
+                unique: false, // TODO: Properly hook this up
             }),
         }
     }
@@ -369,10 +371,11 @@ const _: () = {
 
     impl Type for serde_yaml::value::TaggedValue {
         fn inline(_: &mut TypeMap, _: &[DataType]) -> DataType {
-            DataType::Map(Box::new((
-                DataType::Primitive(PrimitiveType::String),
-                DataType::Unknown,
-            )))
+            DataType::Map(crate::datatype::Map {
+                key_ty: Box::new(DataType::Primitive(PrimitiveType::String)),
+                value_ty: Box::new(DataType::Unknown),
+                unique: false, // TODO: Properly hook this up
+            })
         }
     }
 

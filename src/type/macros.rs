@@ -108,6 +108,7 @@ macro_rules! impl_for_list {
                         generics,
                     ))),
                     length: None,
+                    unique: false, // TODO: Properly hook this up
                 })
             }
 
@@ -118,6 +119,7 @@ macro_rules! impl_for_list {
                             || T::reference(type_map, generics).inner,
                         )),
                         length: None,
+                        unique: false, // TODO: Properly hook this up
                     }),
                 }
             }
@@ -129,30 +131,42 @@ macro_rules! impl_for_map {
     ($ty:path as $name:expr) => {
         impl<K: Type, V: Type> Type for $ty {
             fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
-                DataType::Map(Box::new((
-                    generics
-                        .get(0)
-                        .cloned()
-                        .unwrap_or_else(|| K::inline(type_map, generics)),
-                    generics
-                        .get(1)
-                        .cloned()
-                        .unwrap_or_else(|| V::inline(type_map, generics)),
-                )))
+                // TODO: This is a private-only API. We need a public alternative that somehow deals with `inline` vs `reference`.
+                DataType::Map(crate::datatype::Map {
+                    key_ty: Box::new(
+                        generics
+                            .get(0)
+                            .cloned()
+                            .unwrap_or_else(|| K::inline(type_map, generics)),
+                    ),
+                    value_ty: Box::new(
+                        generics
+                            .get(1)
+                            .cloned()
+                            .unwrap_or_else(|| V::inline(type_map, generics)),
+                    ),
+                    unique: false, // TODO: Properly hook this up
+                })
             }
 
             fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
                 Reference {
-                    inner: DataType::Map(Box::new((
-                        generics
-                            .get(0)
-                            .cloned()
-                            .unwrap_or_else(|| K::reference(type_map, generics).inner),
-                        generics
-                            .get(1)
-                            .cloned()
-                            .unwrap_or_else(|| V::reference(type_map, generics).inner),
-                    ))),
+                    // TODO: This is a private-only API. We need a public alternative that somehow deals with `inline` vs `reference`.
+                    inner: DataType::Map(crate::datatype::Map {
+                        key_ty: Box::new(
+                            generics
+                                .get(0)
+                                .cloned()
+                                .unwrap_or_else(|| K::reference(type_map, generics).inner),
+                        ),
+                        value_ty: Box::new(
+                            generics
+                                .get(1)
+                                .cloned()
+                                .unwrap_or_else(|| V::reference(type_map, generics).inner),
+                        ),
+                        unique: false, // TODO: Properly hook this up
+                    }),
                 }
             }
         }

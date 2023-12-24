@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::{
     internal::{skip_fields, skip_fields_named},
-    DataType, EnumRepr, EnumType, EnumVariants, GenericType, List, LiteralType, PrimitiveType,
+    DataType, EnumRepr, EnumType, EnumVariants, GenericType, List, LiteralType, Map, PrimitiveType,
     SpectaID, StructFields, TypeMap,
 };
 
@@ -35,8 +35,8 @@ fn is_valid_ty_internal(
     match dt {
         DataType::Nullable(ty) => is_valid_ty(ty, type_map)?,
         DataType::Map(ty) => {
-            is_valid_map_key(&ty.0, type_map)?;
-            is_valid_ty_internal(&ty.1, type_map, checked_references)?;
+            is_valid_map_key(ty.key_ty(), type_map)?;
+            is_valid_ty_internal(ty.value_ty(), type_map, checked_references)?;
         }
         DataType::Struct(ty) => match ty.fields() {
             StructFields::Unit => {}
@@ -251,12 +251,14 @@ fn resolve_generics(mut dt: DataType, generics: &Vec<(GenericType, DataType)>) -
         DataType::List(v) => DataType::List(List {
             ty: Box::new(resolve_generics(*v.ty, generics)),
             length: v.length,
+            unique: v.unique,
         }),
         DataType::Nullable(v) => DataType::Nullable(Box::new(resolve_generics(*v, generics))),
-        DataType::Map(v) => DataType::Map(Box::new({
-            let (k, v) = *v;
-            (resolve_generics(k, generics), resolve_generics(v, generics))
-        })),
+        DataType::Map(v) => DataType::Map(Map {
+            key_ty: Box::new(resolve_generics(*v.key_ty, generics)),
+            value_ty: Box::new(resolve_generics(*v.value_ty, generics)),
+            unique: v.unique,
+        }),
         DataType::Struct(ref mut v) => match &mut v.fields {
             StructFields::Unit => dt,
             StructFields::Unnamed(f) => {

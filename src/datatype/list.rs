@@ -6,6 +6,8 @@ pub struct List {
     pub(crate) ty: Box<DataType>,
     // Length is set for `[Type; N]` arrays.
     pub(crate) length: Option<usize>,
+    // Are each elements unique? Eg. `HashSet` or `BTreeSet`
+    pub(crate) unique: bool,
 }
 
 impl List {
@@ -15,5 +17,9 @@ impl List {
 
     pub fn length(&self) -> Option<usize> {
         self.length
+    }
+
+    pub fn unique(&self) -> bool {
+        self.unique
     }
 }

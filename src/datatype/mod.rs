@@ -7,6 +7,7 @@ mod r#enum;
 mod fields;
 mod list;
 mod literal;
+mod map;
 mod named;
 mod primitive;
 pub mod reference;
@@ -16,6 +17,7 @@ mod tuple;
 pub use fields::*;
 pub use list::*;
 pub use literal::*;
+pub use map::*;
 pub use named::*;
 pub use primitive::*;
 pub use r#enum::*;
@@ -33,7 +35,7 @@ pub enum DataType {
     Primitive(PrimitiveType),
     Literal(LiteralType),
     List(List),
-    Map(Box<(DataType, DataType)>),
+    Map(Map),
     Enum(EnumType),
     Tuple(TupleType),
     Reference(DataTypeReference),
