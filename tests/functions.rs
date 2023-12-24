@@ -80,6 +80,9 @@ mod test {
     #[specta]
     fn with_docs() {}
 
+    #[specta]
+    pub fn public_function() {}
+
     // TODO: Finish fixing these
 
     #[test]

@@ -11,9 +11,16 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
     let wrapper = format_fn_wrapper(&function.sig.ident);
 
     let visibility = &function.vis;
-    let maybe_macro_export = match &visibility {
-        Visibility::Public(_) => quote!(#[macro_export]),
-        _ => Default::default(),
+    let (maybe_macro_export, pub_the_trait) = match &visibility {
+        Visibility::Public(_) => (quote!(#[macro_export]), Default::default()),
+        _ => (
+            Default::default(),
+            quote! {
+                // allow the macro to be resolved with the same path as the function
+                #[allow(unused_imports)]
+                #visibility use #wrapper;
+            },
+        ),
     };
 
     let function_name = &function.sig.ident;
@@ -63,9 +70,7 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
             (@no_return_type) => { #no_return_type };
         }
 
-        // allow the macro to be resolved with the same path as the function
-        #[allow(unused_imports)]
-        #visibility use #wrapper;
+        #pub_the_trait
     }
     .into())
 }
