@@ -43,6 +43,11 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
     let deprecated = common.deprecated_as_tokens(&crate_ref);
     let docs = common.doc;
 
+    let no_return_type = match function.sig.output {
+        syn::ReturnType::Default => true,
+        syn::ReturnType::Type(_, _) => false,
+    };
+
     Ok(quote! {
         #function
 
@@ -55,6 +60,7 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
             (@signature) => { fn(#(#arg_signatures),*) -> _ };
             (@docs) => { std::borrow::Cow::Borrowed(#docs) };
             (@deprecated) => { #deprecated };
+            (@no_return_type) => { #no_return_type };
         }
 
         // allow the macro to be resolved with the same path as the function

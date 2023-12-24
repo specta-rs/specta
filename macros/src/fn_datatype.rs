@@ -35,14 +35,15 @@ pub fn proc_macro(
     last.arguments = PathArguments::None;
 
     Ok(quote! {
-        specta::functions::get_datatype_internal(
+        specta::internal::get_fn_datatype(
             #function as #specta_fn_macro!(@signature),
             #specta_fn_macro!(@asyncness),
             #specta_fn_macro!(@name),
             #type_map,
             #specta_fn_macro!(@arg_names),
             #specta_fn_macro!(@docs),
-            #specta_fn_macro!(@deprecated)
+            #specta_fn_macro!(@deprecated),
+            #specta_fn_macro!(@no_return_type),
         )
     })
 }

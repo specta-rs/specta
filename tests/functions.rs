@@ -100,10 +100,7 @@ mod test {
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "a");
             assert_eq!(def.args.len(), 0);
-            assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.result, type_map).unwrap(),
-                "null"
-            );
+            assert_eq!(def.result, None);
         }
 
         {
@@ -116,10 +113,7 @@ mod test {
                 specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
                 "string"
             );
-            assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.result, type_map).unwrap(),
-                "null"
-            );
+            assert_eq!(def.result, None);
         }
 
         {
@@ -140,10 +134,7 @@ mod test {
                 specta::ts::datatype(&ExportConfig::default(), &def.args[2].1, type_map).unwrap(),
                 "boolean"
             );
-            assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.result, type_map).unwrap(),
-                "null"
-            );
+            assert_eq!(def.result, None);
         }
 
         {
@@ -157,8 +148,15 @@ mod test {
                 "string"
             );
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.result, type_map).unwrap(),
-                "number"
+                def.result
+                    .and_then(|result| {
+                        Some(
+                            specta::ts::datatype(&ExportConfig::default(), &result, type_map)
+                                .unwrap(),
+                        )
+                    })
+                    .as_deref(),
+                Some("number")
             );
         }
 
@@ -172,10 +170,7 @@ mod test {
                 specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
                 "boolean"
             );
-            assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.result, type_map).unwrap(),
-                "null"
-            );
+            assert_eq!(def.result, None);
         }
 
         {
@@ -189,8 +184,15 @@ mod test {
                 "string"
             );
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.result, type_map).unwrap(),
-                "number"
+                def.result
+                    .and_then(|result| {
+                        Some(
+                            specta::ts::datatype(&ExportConfig::default(), &result, type_map)
+                                .unwrap(),
+                        )
+                    })
+                    .as_deref(),
+                Some("number")
             );
         }
 
@@ -204,10 +206,7 @@ mod test {
                 specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
                 "string"
             );
-            assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.result, type_map).unwrap(),
-                "null"
-            );
+            assert_eq!(def.result, None);
         }
 
         {
@@ -220,10 +219,7 @@ mod test {
                 specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
                 "string"
             );
-            assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.result, type_map).unwrap(),
-                "null"
-            );
+            assert_eq!(def.result, None);
         }
 
         {
@@ -233,8 +229,15 @@ mod test {
             assert_eq!(def.name, "i");
             assert_eq!(def.args.len(), 0);
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.result, type_map).unwrap(),
-                "number"
+                def.result
+                    .and_then(|result| {
+                        Some(
+                            specta::ts::datatype(&ExportConfig::default(), &result, type_map)
+                                .unwrap(),
+                        )
+                    })
+                    .as_deref(),
+                Some("number")
             );
         }
 
@@ -245,8 +248,15 @@ mod test {
             assert_eq!(def.name, "k");
             assert_eq!(def.args.len(), 0);
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.result, type_map).unwrap(),
-                "string | number"
+                def.result
+                    .and_then(|result| {
+                        Some(
+                            specta::ts::datatype(&ExportConfig::default(), &result, type_map)
+                                .unwrap(),
+                        )
+                    })
+                    .as_deref(),
+                Some("string | number")
             );
         }
 
@@ -264,6 +274,7 @@ mod test {
                 specta::ts::datatype(&ExportConfig::default(), &def.args[1].1, type_map).unwrap(),
                 "[string, number]"
             );
+            assert_eq!(def.result, None);
         }
 
         {
@@ -276,6 +287,7 @@ mod test {
                 specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
                 "Demo"
             );
+            assert_eq!(def.result, None);
         }
 
         {
@@ -284,10 +296,7 @@ mod test {
             assert_eq!(def.asyncness, true);
             assert_eq!(def.name, "async_fn");
             assert_eq!(def.args.len(), 0);
-            assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.result, type_map).unwrap(),
-                "null"
-            );
+            assert_eq!(def.result, None);
         }
 
         {
@@ -296,10 +305,7 @@ mod test {
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "with_docs");
             assert_eq!(def.args.len(), 0);
-            assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.result, type_map).unwrap(),
-                "null"
-            );
+            assert_eq!(def.result, None);
             assert_eq!(def.docs, Cow::Borrowed(" Testing Doc Comment"));
         }
     }

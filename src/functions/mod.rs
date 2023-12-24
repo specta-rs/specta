@@ -26,7 +26,7 @@ use crate::*;
 ///
 ///     assert_eq!(typ.name, "some_function");
 ///     assert_eq!(typ.args.len(), 2);
-///     assert_eq!(typ.result, DataType::Primitive(PrimitiveType::bool));
+///     assert_eq!(typ.result, Some(DataType::Primitive(PrimitiveType::bool)));
 /// }
 /// ```
 #[macro_export]
@@ -54,7 +54,7 @@ pub struct FunctionDataType {
     /// The name and type of each of the function's arguments.
     pub args: Vec<(Cow<'static, str>, DataType)>,
     /// The return type of the function.
-    pub result: DataType,
+    pub result: Option<DataType>,
     /// The function's documentation. Detects both `///` and `#[doc = ...]` style documentation.
     pub docs: Cow<'static, str>,
     /// The deprecated status of the function.
@@ -71,6 +71,7 @@ pub trait SpectaFunction<TMarker> {
         fields: &[Cow<'static, str>],
         docs: Cow<'static, str>,
         deprecated: Option<DeprecatedType>,
+        no_return_type: bool,
     ) -> FunctionDataType;
 }
 
@@ -84,31 +85,17 @@ impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction
         _fields: &[Cow<'static, str>],
         docs: Cow<'static, str>,
         deprecated: Option<DeprecatedType>,
+        no_return_type: bool,
     ) -> FunctionDataType {
         FunctionDataType {
             asyncness,
             name,
             args: vec![],
-            result: TResult::to_datatype(type_map),
+            result: (!no_return_type).then(|| TResult::to_datatype(type_map)),
             docs,
             deprecated,
         }
     }
-}
-
-#[doc(hidden)]
-/// A helper for exporting a command to a [`CommandDataType`].
-/// You shouldn't use this directly and instead should use [`fn_datatype!`](crate::fn_datatype).
-pub fn get_datatype_internal<TMarker, T: SpectaFunction<TMarker>>(
-    _: T,
-    asyncness: bool,
-    name: Cow<'static, str>,
-    type_map: &mut TypeMap,
-    fields: &[Cow<'static, str>],
-    docs: Cow<'static, str>,
-    deprecated: Option<DeprecatedType>,
-) -> FunctionDataType {
-    T::to_datatype(asyncness, name, type_map, fields, docs, deprecated)
 }
 
 macro_rules! impl_typed_command {
@@ -127,6 +114,7 @@ macro_rules! impl_typed_command {
                     fields: &[Cow<'static, str>],
                     docs: Cow<'static, str>,
                     deprecated: Option<DeprecatedType>,
+                    no_return_type: bool,
                 ) -> FunctionDataType {
                     let mut fields = fields.into_iter();
 
@@ -146,7 +134,7 @@ macro_rules! impl_typed_command {
                             .into_iter()
                             .filter_map(|v| v)
                             .collect::<Vec<_>>(),
-                        result: TResult::to_datatype(type_map),
+                        result: (!no_return_type).then(|| TResult::to_datatype(type_map)),
                     }
                 }
             }
