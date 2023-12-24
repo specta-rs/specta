@@ -1,10 +1,14 @@
+use nanoid::nanoid;
+use quote::quote;
 use std::{
     fs, io,
     path::{Path, PathBuf},
+    process::Command,
+    time::Instant,
 };
 
 use clap::Parser;
-use syn::Item;
+use syn::{Item, ItemStruct, Type};
 
 #[derive(Debug, Parser)]
 struct Args {
@@ -16,6 +20,8 @@ struct Args {
 
 // TODO: Improved error handling + render them nicely
 fn main() {
+    let start = Instant::now(); // TODO: Tracing spans
+
     let args = Args::parse();
 
     for path in args.path {
@@ -42,6 +48,8 @@ const TS_APPEND_CONTENT: &'static str = r#"{content}"#;"##,
         ))
         .unwrap();
     }
+
+    println!("Finished in {:?}", start.elapsed());
 }
 
 fn crawl_dir(path: &Path) -> io::Result<()> {
@@ -91,7 +99,8 @@ fn parse_file(path: &Path) {
                 // TODO: Support enums
             }
             Item::Struct(s) => {
-                println!("FOUND STRUCT: {s:#?}");
+                temp_parse_struct(s);
+                // println!("FOUND STRUCT: {s:#?}");
                 // TODO: Support structs
             }
             node => {
@@ -102,4 +111,76 @@ fn parse_file(path: &Path) {
     }
 
     // TODO:
+}
+
+// TODO: Abstract this and move it into the macro-support crate
+fn temp_parse_struct(item: ItemStruct) {
+    println!("STRUCT {}", item.ident.to_string());
+    for field in item.fields {
+        // TODO: Account for Specta and Serde attributes (including `cfg_attr` and the current features, idk how that would work)
+
+        println!(
+            "\t{} {:?}",
+            field.ident.unwrap().to_string(),
+            resolve_type(field.ty)
+        );
+    }
+}
+
+// TODO: Allow this to run in parallel without the Cargo `target` dir lock being an issue????
+// TODO: Maybe short circuit out of this for primitive types (but check `use`'s that they weren't redefined)
+// TODO: Cache the result if the type shows up more than once in a single file.
+fn resolve_type(ty: Type) -> String {
+    let crate_path = "./"; // TODO: Proper determine this using `cargo metadata`
+
+    // TODO: Error out if `specta` is not in their dependencies for the current crate (as we use it in the generated code)
+    // TODO: Also check feature flags for TS, etc unless we serialize the AST to JSON and do it in the macro
+
+    let examples_dir = Path::new(crate_path).join("examples");
+
+    let has_examples_dir = examples_dir.exists();
+    fs::create_dir_all(&examples_dir).unwrap();
+    let name = nanoid!(5);
+    let path = examples_dir.join(format!("{}.rs", name));
+
+    // TODO: On drop handler to ensure this file is cleaned up
+
+    // TODO: What if this refers to an external type, Eg. `Uuid`? We will need to move over the `use uuid::Uuid`;
+    // TODO: What if the `use` came from a macro expansion - We would need to error out due to the type being ambiguous
+
+    fs::write(
+        &path,
+        quote! {
+            fn main() {
+                // TODO: Handle errors properly
+                // TODO: This should `reference` not `inline`
+                let ty = specta::ts::inline::<#ty>(&Default::default()).unwrap();
+                println!("{ty}");
+            }
+        }
+        .to_string(),
+    )
+    .unwrap();
+
+    let command = Command::new("cargo")
+        .arg("run")
+        .arg("--example")
+        .arg(name)
+        // .current_dir(dir) // TODO
+        .output()
+        .unwrap();
+    // TODO: Check `command.status`
+
+    // TODO: Why is it `stderr`???
+    let result = String::from_utf8(command.stdout)
+        .expect("non-utf8 command output")
+        .trim()
+        .to_string();
+
+    fs::remove_file(path).unwrap();
+    if !has_examples_dir {
+        fs::remove_dir(examples_dir).unwrap();
+    }
+
+    return result;
 }
