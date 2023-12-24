@@ -103,4 +103,8 @@ pub struct InvalidSpectaAttribute1;
 #[specta = "todo"]
 pub struct InvalidSpectaAttribute2;
 
+#[wasm_bindgen::prelude::wasm_bindgen]
+#[specta]
+pub fn testing() {}
+
 // TODO: https://docs.rs/trybuild/latest/trybuild/#what-to-test

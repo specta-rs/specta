@@ -10,6 +10,20 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
     let function = parse_macro_input::parse::<ItemFn>(item)?;
     let wrapper = format_fn_wrapper(&function.sig.ident);
 
+    // While using wasm_bindgen and Specta is rare, this should make the DX nicer.
+    if function.sig.unsafety.is_some()
+        && function
+            .sig
+            .ident
+            .to_string()
+            .starts_with("__wasm_bindgen_generated")
+    {
+        return Err(syn::Error::new_spanned(
+            function.sig.ident,
+            "specta: You must apply the #[specta] macro before the #[wasm_bindgen] macro",
+        ));
+    }
+
     let visibility = &function.vis;
     let (maybe_macro_export, pub_the_trait) = match &visibility {
         Visibility::Public(_) => (quote!(#[macro_export]), Default::default()),

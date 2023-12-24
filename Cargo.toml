@@ -139,3 +139,4 @@ once_cell = "1.18.0"
 doc-comment = "0.3.3"
 serde = { version = "1.0.183", features = ["derive"] }
 trybuild = "1.0.82"
+wasm-bindgen = "0.2.89"

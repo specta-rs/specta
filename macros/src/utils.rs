@@ -168,9 +168,11 @@ pub fn parse_attrs(attrs: &[syn::Attribute]) -> syn::Result<Vec<Attribute>> {
     for attr in attrs {
         let ident = attr
             .path
-            .get_ident()
-            .expect("Attribute path must be an ident")
-            .clone();
+            .segments
+            .last()
+            .expect("Attribute path must have at least one segment")
+            .clone()
+            .ident;
 
         // TODO: We should somehow build this up from the macro output automatically -> if not our attribute parser is applied to stuff like `allow` and that's bad.
         if !(ident == "specta"
