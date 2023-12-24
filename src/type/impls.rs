@@ -192,42 +192,16 @@ impl<T> Type for std::marker::PhantomData<T> {
 #[allow(unused)]
 #[derive(Type)]
 #[specta(remote = std::convert::Infallible, crate = crate, export = false)]
-pub enum Infallible {}
+enum Infallible {}
 
-impl<T: Type> Type for std::ops::Range<T> {
-    fn inline(type_map: &mut TypeMap, _generics: &[DataType]) -> DataType {
-        let ty = Some(T::definition(type_map));
-        DataType::Struct(StructType {
-            name: "Range".into(),
-            sid: None,
-            generics: vec![],
-            fields: StructFields::Named(NamedFields {
-                fields: vec![
-                    (
-                        "start".into(),
-                        Field {
-                            optional: false,
-                            flatten: false,
-                            deprecated: None,
-                            docs: Cow::Borrowed(""),
-                            ty: ty.clone(),
-                        },
-                    ),
-                    (
-                        "end".into(),
-                        Field {
-                            optional: false,
-                            flatten: false,
-                            deprecated: None,
-                            docs: Cow::Borrowed(""),
-                            ty,
-                        },
-                    ),
-                ],
-                tag: None,
-            }),
-        })
-    }
+#[allow(unused)]
+#[derive(Type)]
+#[specta(remote = std::ops::Range, crate = crate, export = false)]
+struct Range<T> {
+    // TODO: Why is this introducing `'static` bound???
+    // TODO: Flatten these fields???
+    start: T,
+    end: T,
 }
 
 impl<T: Type> Type for std::ops::RangeInclusive<T> {
@@ -280,69 +254,13 @@ const _: () = {
         Object(Map<String, Value>),
     }
 
-    impl Type for Number {
-        fn inline(_: &mut TypeMap, _: &[DataType]) -> DataType {
-            DataType::Enum(EnumType {
-                name: "Number".into(),
-                sid: None,
-                repr: EnumRepr::Untagged,
-                skip_bigint_checks: true,
-                variants: vec![
-                    (
-                        "f64".into(),
-                        EnumVariant {
-                            skip: false,
-                            docs: Cow::Borrowed(""),
-                            deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    deprecated: None,
-                                    docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(PrimitiveType::f64)),
-                                }],
-                            }),
-                        },
-                    ),
-                    (
-                        "i64".into(),
-                        EnumVariant {
-                            skip: false,
-                            docs: Cow::Borrowed(""),
-                            deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    deprecated: None,
-                                    docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(PrimitiveType::i64)),
-                                }],
-                            }),
-                        },
-                    ),
-                    (
-                        "u64".into(),
-                        EnumVariant {
-                            skip: false,
-                            docs: Cow::Borrowed(""),
-                            deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    deprecated: None,
-                                    docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(PrimitiveType::u64)),
-                                }],
-                            }),
-                        },
-                    ),
-                ],
-                generics: vec![],
-            })
-        }
+    #[allow(non_camel_case_types)]
+    #[derive(Type)]
+    #[specta(remote = Number, crate = crate, export = false)]
+    enum NumberDef {
+        f64(f64),
+        i64(i64),
+        u64(u64),
     }
 };
 
@@ -379,69 +297,13 @@ const _: () = {
         }
     }
 
-    impl Type for serde_yaml::Number {
-        fn inline(_: &mut TypeMap, _: &[DataType]) -> DataType {
-            DataType::Enum(EnumType {
-                name: "Number".into(),
-                sid: None,
-                repr: EnumRepr::Untagged,
-                skip_bigint_checks: true,
-                variants: vec![
-                    (
-                        "f64".into(),
-                        EnumVariant {
-                            skip: false,
-                            docs: Cow::Borrowed(""),
-                            deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    deprecated: None,
-                                    docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(PrimitiveType::f64)),
-                                }],
-                            }),
-                        },
-                    ),
-                    (
-                        "i64".into(),
-                        EnumVariant {
-                            skip: false,
-                            docs: Cow::Borrowed(""),
-                            deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    deprecated: None,
-                                    docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(PrimitiveType::i64)),
-                                }],
-                            }),
-                        },
-                    ),
-                    (
-                        "u64".into(),
-                        EnumVariant {
-                            skip: false,
-                            docs: Cow::Borrowed(""),
-                            deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    deprecated: None,
-                                    docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(PrimitiveType::u64)),
-                                }],
-                            }),
-                        },
-                    ),
-                ],
-                generics: vec![],
-            })
-        }
+    #[allow(non_camel_case_types)]
+    #[derive(Type)]
+    #[specta(remote = serde_yaml::Number, crate = crate, export = false)]
+    enum NumberDef {
+        f64(f64),
+        i64(i64),
+        u64(u64),
     }
 };
 
@@ -649,100 +511,11 @@ const _: () = {
 impl_as!(url::Url as String);
 
 #[cfg(feature = "either")]
-impl<L: Type, R: Type> Type for either::Either<L, R> {
-    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
-        DataType::Enum(EnumType {
-            name: "Either".into(),
-            sid: None,
-            repr: EnumRepr::Untagged,
-            skip_bigint_checks: false,
-            variants: vec![
-                (
-                    "Left".into(),
-                    EnumVariant {
-                        skip: false,
-                        docs: Cow::Borrowed(""),
-                        deprecated: None,
-                        inner: EnumVariants::Unnamed(UnnamedFields {
-                            fields: vec![Field {
-                                optional: false,
-                                flatten: false,
-                                deprecated: None,
-                                docs: Cow::Borrowed(""),
-                                ty: Some(L::inline(type_map, generics)),
-                            }],
-                        }),
-                    },
-                ),
-                (
-                    "Right".into(),
-                    EnumVariant {
-                        skip: false,
-                        docs: Cow::Borrowed(""),
-                        deprecated: None,
-                        inner: EnumVariants::Unnamed(UnnamedFields {
-                            fields: vec![Field {
-                                optional: false,
-                                flatten: false,
-                                deprecated: None,
-                                docs: Cow::Borrowed(""),
-                                ty: Some(R::inline(type_map, generics)),
-                            }],
-                        }),
-                    },
-                ),
-            ],
-            generics: vec![],
-        })
-    }
-
-    fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
-        Reference {
-            inner: DataType::Enum(EnumType {
-                name: "Either".into(),
-                sid: None,
-                repr: EnumRepr::Untagged,
-                skip_bigint_checks: false,
-                variants: vec![
-                    (
-                        "Left".into(),
-                        EnumVariant {
-                            skip: false,
-                            docs: Cow::Borrowed(""),
-                            deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    deprecated: None,
-                                    docs: Cow::Borrowed(""),
-                                    ty: Some(L::reference(type_map, generics).inner),
-                                }],
-                            }),
-                        },
-                    ),
-                    (
-                        "Right".into(),
-                        EnumVariant {
-                            skip: false,
-                            docs: Cow::Borrowed(""),
-                            deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    deprecated: None,
-                                    docs: Cow::Borrowed(""),
-                                    ty: Some(R::reference(type_map, generics).inner),
-                                }],
-                            }),
-                        },
-                    ),
-                ],
-                generics: vec![],
-            }),
-        }
-    }
+#[derive(Type)]
+#[specta(untagged, remote = either::Either, crate = crate, export = false)]
+enum Either<L: Type, R: Type> {
+    Left(L),
+    Right(R),
 }
 
 #[cfg(feature = "bevy_ecs")]

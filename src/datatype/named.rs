@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{DataType, DeprecatedType, ImplLocation, SpectaID};
+use crate::{DataType, DeprecatedType, EnumType, ImplLocation, SpectaID, StructType};
 
 /// A NamedDataTypeImpl includes extra information which is only available for [NamedDataType]'s that come from a real Rust type.
 #[derive(Debug, Clone, PartialEq)]
@@ -37,6 +37,13 @@ pub struct NamedDataType {
     // This field is public because we match on it in flattening code. // TODO: Review if this can be made private when reviewing the flattening logic/error handling
     pub inner: DataType,
 }
+
+// // TODO: Rename this
+// #[derive(Debug, Clone, PartialEq)]
+// pub enum NamedDataTypeTODO {
+//     Struct(StructType),
+//     Enum(EnumType), // TODO
+// }
 
 impl NamedDataType {
     pub fn name(&self) -> &Cow<'static, str> {

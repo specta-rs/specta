@@ -31,7 +31,6 @@ use crate::SpectaID;
 /// A language exporter takes this general format and converts it into a language specific syntax.
 #[derive(Debug, Clone, PartialEq)]
 pub enum DataType {
-    Nullable(Box<DataType>),
     Primitive(PrimitiveType),
     Literal(LiteralType),
     List(List),
@@ -41,6 +40,9 @@ pub enum DataType {
     Reference(DataTypeReference),
     Generic(GenericType),
 
+    // TODO: Can we avoid these being nestable
+    Nullable(Box<DataType>),
+
     // TODO: Should we keep this - https://github.com/oscartbeaumont/specta/issues/192
     Result(Box<(DataType, DataType)>),
 
@@ -48,13 +50,14 @@ pub enum DataType {
     Any,
     Unknown,
     Struct(StructType),
+    // TODO: Introduce this
     // Named(NamedDataType)
 }
 
 impl DataType {
     pub fn generics(&self) -> Option<&Vec<GenericType>> {
         match self {
-            Self::Struct(s) => Some(s.generics()),
+            // Self::Struct(s) => Some(s.generics()),
             Self::Enum(e) => Some(e.generics()),
             _ => None,
         }
