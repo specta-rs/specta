@@ -1,3 +1,15 @@
+macro_rules! impl_passthrough {
+    ($t:ty) => {
+        fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
+            <$t>::inline(type_map, generics)
+        }
+
+        fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
+            <$t>::reference(type_map, generics)
+        }
+    };
+}
+
 macro_rules! impl_primitives {
     ($($i:ident)+) => {$(
         impl Type for $i {

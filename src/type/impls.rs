@@ -24,27 +24,19 @@ const _: () = {
 };
 
 impl<'a> Type for &'a str {
-    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
-        String::inline(type_map, generics)
-    }
+    impl_passthrough!(String);
 }
 
 impl<'a, T: Type + 'static> Type for &'a T {
-    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
-        T::inline(type_map, generics)
-    }
+    impl_passthrough!(T);
 }
 
 impl<T: Type> Type for [T] {
-    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
-        T::inline(type_map, generics)
-    }
+    impl_passthrough!(T);
 }
 
 impl<'a, T: ?Sized + ToOwned + Type + 'static> Type for std::borrow::Cow<'a, T> {
-    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
-        T::inline(type_map, generics)
-    }
+    impl_passthrough!(T);
 }
 
 use std::ffi::*;
@@ -115,9 +107,7 @@ impl_for_list!(
 );
 
 impl<'a, T: Type> Type for &'a [T] {
-    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
-        <Vec<T>>::inline(type_map, generics)
-    }
+    impl_passthrough!(Vec<T>);
 }
 
 impl<const N: usize, T: Type> Type for [T; N] {
@@ -159,6 +149,17 @@ impl<T: Type> Type for Option<T> {
                 .unwrap_or_else(|| T::inline(type_map, generics)),
         ))
     }
+
+    fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
+        Reference {
+            inner: DataType::Nullable(Box::new(
+                generics
+                    .get(0)
+                    .cloned()
+                    .unwrap_or_else(|| T::reference(type_map, generics).inner),
+            )),
+        }
+    }
 }
 
 impl<T: Type, E: Type> Type for std::result::Result<T, E> {
@@ -167,6 +168,15 @@ impl<T: Type, E: Type> Type for std::result::Result<T, E> {
             T::inline(type_map, generics),
             E::inline(type_map, generics),
         )))
+    }
+
+    fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
+        Reference {
+            inner: DataType::Result(Box::new((
+                T::reference(type_map, generics).inner,
+                E::reference(type_map, generics).inner,
+            ))),
+        }
     }
 }
 
@@ -219,9 +229,7 @@ impl<T: Type> Type for std::ops::Range<T> {
 }
 
 impl<T: Type> Type for std::ops::RangeInclusive<T> {
-    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
-        std::ops::Range::<T>::inline(type_map, generics) // Yeah Serde are cringe
-    }
+    impl_passthrough!(std::ops::Range<T>); // Yeah Serde are cringe
 }
 
 impl_for_map!(HashMap<K, V> as "HashMap");
@@ -483,16 +491,12 @@ const _: () = {
     );
 
     impl<T: TimeZone> Type for DateTime<T> {
-        fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
-            String::inline(type_map, generics)
-        }
+        impl_passthrough!(String);
     }
 
     #[allow(deprecated)]
     impl<T: TimeZone> Type for Date<T> {
-        fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
-            String::inline(type_map, generics)
-        }
+        impl_passthrough!(String);
     }
 };
 
@@ -687,6 +691,54 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
             ],
             generics: vec![],
         })
+    }
+
+    fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
+        Reference {
+            inner: DataType::Enum(EnumType {
+                name: "Either".into(),
+                sid: None,
+                repr: EnumRepr::Untagged,
+                skip_bigint_checks: false,
+                variants: vec![
+                    (
+                        "Left".into(),
+                        EnumVariant {
+                            skip: false,
+                            docs: Cow::Borrowed(""),
+                            deprecated: None,
+                            inner: EnumVariants::Unnamed(UnnamedFields {
+                                fields: vec![Field {
+                                    optional: false,
+                                    flatten: false,
+                                    deprecated: None,
+                                    docs: Cow::Borrowed(""),
+                                    ty: Some(L::reference(type_map, generics).inner),
+                                }],
+                            }),
+                        },
+                    ),
+                    (
+                        "Right".into(),
+                        EnumVariant {
+                            skip: false,
+                            docs: Cow::Borrowed(""),
+                            deprecated: None,
+                            inner: EnumVariants::Unnamed(UnnamedFields {
+                                fields: vec![Field {
+                                    optional: false,
+                                    flatten: false,
+                                    deprecated: None,
+                                    docs: Cow::Borrowed(""),
+                                    ty: Some(R::reference(type_map, generics).inner),
+                                }],
+                            }),
+                        },
+                    ),
+                ],
+                generics: vec![],
+            }),
+        }
     }
 }
 
