@@ -1,4 +1,4 @@
-use specta::{ts, Type, TypeMap};
+use specta::{ts, Generics, Type, TypeMap};
 
 #[derive(Type)]
 #[specta(untagged)]
@@ -15,7 +15,7 @@ pub struct ActualType {
 #[test]
 fn test_generic_type_in_type_map() {
     let mut type_map = TypeMap::default();
-    ActualType::inline(&mut type_map, &[]);
+    ActualType::inline(&mut type_map, Generics::NONE);
 
     assert_eq!(type_map.len(), 1);
     let first = type_map.iter().next().unwrap().1;

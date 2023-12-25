@@ -1,6 +1,6 @@
 //! Helpers for generating [Type::reference] implementations.
 
-use crate::{DataType, DataTypeReference, NamedType, Type, TypeMap};
+use crate::{DataType, DataTypeReference, Generics, NamedType, Type, TypeMap};
 
 /// A reference datatype.
 ///
@@ -12,15 +12,17 @@ pub struct Reference {
 
 pub fn inline<T: Type + ?Sized>(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
     Reference {
-        inner: T::inline(type_map, generics),
+        inner: T::inline(type_map, Generics::Provided(generics)),
     }
 }
 
 pub fn reference<T: NamedType>(type_map: &mut TypeMap, reference: DataTypeReference) -> Reference {
-    if type_map.map.get(&T::SID).is_none() {
-        type_map.map.entry(T::SID).or_insert(None);
+    let sid = T::sid();
+
+    if type_map.map.get(&sid).is_none() {
+        type_map.map.entry(sid).or_insert(None);
         let dt = T::definition_named_data_type(type_map);
-        type_map.map.insert(T::SID, Some(dt));
+        type_map.map.insert(sid, Some(dt));
     }
 
     Reference {

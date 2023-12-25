@@ -40,6 +40,7 @@ pub fn parse_struct(
     container_attrs: &ContainerAttr,
     generics: &Generics,
     crate_ref: &TokenStream,
+    sid: &TokenStream,
     data: &DataStruct,
 ) -> syn::Result<(TokenStream, TokenStream, bool)> {
     let generic_idents = generics
@@ -189,7 +190,7 @@ pub fn parse_struct(
                                             quote! {
                                                 fn validate_flatten<T: #crate_ref::Flatten>() {}
                                                 validate_flatten::<#field_ty>();
-                                                #crate_ref::internal::flatten::<#field_ty>(SID, type_map, &generics)
+                                                #crate_ref::internal::flatten::<#field_ty>(#sid, type_map, &generics)
                                             }
                                         } else {
                                             quote! {
@@ -265,7 +266,7 @@ pub fn parse_struct(
             Fields::Unit => quote!(#crate_ref::internal::construct::struct_unit()),
         };
 
-        quote!(#crate_ref::DataType::Struct(#crate_ref::internal::construct::r#struct(#name.into(), Some(SID), vec![#(#definition_generics),*], #fields)))
+        quote!(#crate_ref::DataType::Struct(#crate_ref::internal::construct::r#struct(#name.into(), Some(#sid), vec![#(#definition_generics),*], #fields)))
     };
 
     let category = if container_attrs.inline {
@@ -278,7 +279,7 @@ pub fn parse_struct(
                 #reference_generics
                 #crate_ref::reference::reference::<Self>(type_map, #crate_ref::internal::construct::data_type_reference(
                     #name.into(),
-                    SID,
+                    #sid,
                     vec![#(#reference_generics2),*]
                 ))
         })

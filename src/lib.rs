@@ -29,7 +29,7 @@ mod static_types;
 pub mod r#type;
 
 pub use crate::serde::*;
-#[doc(hidden)]
+#[doc(hidden)] // TODO: Should we actually do this? I think not
 pub use datatype::*;
 pub use lang::*;
 pub use r#type::*;
