@@ -154,13 +154,13 @@ macro_rules! impl_for_map {
                             generics
                                 .get(0)
                                 .cloned()
-                                .unwrap_or_else(|| K::inline(type_map, generics)),
+                                .unwrap_or_else(|| K::reference(type_map, generics).inner),
                         ),
                         value_ty: Box::new(
                             generics
                                 .get(1)
                                 .cloned()
-                                .unwrap_or_else(|| V::inline(type_map, generics)),
+                                .unwrap_or_else(|| V::reference(type_map, generics).inner),
                         ),
                     }),
                 }
