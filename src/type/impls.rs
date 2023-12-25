@@ -1,3 +1,4 @@
+use crate::util::as_ref;
 use crate::{reference::Reference, *};
 
 use std::borrow::Cow;
@@ -111,7 +112,7 @@ impl<'a, T: Type> Type for &'a [T] {
 }
 
 impl<const N: usize, T: Type> Type for [T; N] {
-    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
+    fn inline(type_map: &mut TypeMap, generics: Generics) -> DataType {
         DataType::List(List {
             ty: Box::new(
                 // TODO: This is cursed. Fix it properly!!!
@@ -124,7 +125,7 @@ impl<const N: usize, T: Type> Type for [T; N] {
         })
     }
 
-    fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
+    fn reference(type_map: &mut TypeMap, generics: Cow<[DataType]>) -> Reference {
         Reference {
             inner: DataType::List(List {
                 ty: Box::new(
@@ -141,16 +142,19 @@ impl<const N: usize, T: Type> Type for [T; N] {
 }
 
 impl<T: Type> Type for Option<T> {
-    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
-        DataType::Nullable(Box::new(
-            generics
-                .get(0)
-                .cloned()
-                .unwrap_or_else(|| T::inline(type_map, generics)),
-        ))
+    fn inline(type_map: &mut TypeMap, generics: Generics) -> DataType {
+        let mut ty = None;
+        if let Generics::Provided(generics) = &generics {
+            ty = generics.get(0).cloned()
+        }
+
+        DataType::Nullable(Box::new(match ty {
+            Some(ty) => ty,
+            None => T::inline(type_map, generics),
+        }))
     }
 
-    fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
+    fn reference(type_map: &mut TypeMap, generics: Cow<[DataType]>) -> Reference {
         Reference {
             inner: DataType::Nullable(Box::new(
                 generics
@@ -163,17 +167,17 @@ impl<T: Type> Type for Option<T> {
 }
 
 impl<T: Type, E: Type> Type for std::result::Result<T, E> {
-    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
+    fn inline(type_map: &mut TypeMap, generics: Generics) -> DataType {
         DataType::Result(Box::new((
-            T::inline(type_map, generics),
+            T::inline(type_map, generics.as_ref()),
             E::inline(type_map, generics),
         )))
     }
 
-    fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
+    fn reference(type_map: &mut TypeMap, generics: Cow<[DataType]>) -> Reference {
         Reference {
             inner: DataType::Result(Box::new((
-                T::reference(type_map, generics).inner,
+                T::reference(type_map, as_ref(&generics)).inner,
                 E::reference(type_map, generics).inner,
             ))),
         }
@@ -181,7 +185,7 @@ impl<T: Type, E: Type> Type for std::result::Result<T, E> {
 }
 
 impl<T> Type for std::marker::PhantomData<T> {
-    fn inline(_: &mut TypeMap, _: &[DataType]) -> DataType {
+    fn inline(_: &mut TypeMap, _: Generics) -> DataType {
         DataType::Literal(LiteralType::None)
     }
 }
@@ -193,8 +197,8 @@ impl<T> Type for std::marker::PhantomData<T> {
 pub enum Infallible {}
 
 impl<T: Type> Type for std::ops::Range<T> {
-    fn inline(type_map: &mut TypeMap, _generics: &[DataType]) -> DataType {
-        let ty = Some(T::definition(type_map));
+    fn inline(type_map: &mut TypeMap, _generics: Generics) -> DataType {
+        let ty = Some(T::inline(type_map, Generics::Definition));
         DataType::Struct(StructType {
             name: "Range".into(),
             sid: None,
@@ -279,7 +283,7 @@ const _: () = {
     }
 
     impl Type for Number {
-        fn inline(_: &mut TypeMap, _: &[DataType]) -> DataType {
+        fn inline(_: &mut TypeMap, _: Generics) -> DataType {
             DataType::Enum(EnumType {
                 name: "Number".into(),
                 sid: None,
@@ -361,14 +365,14 @@ const _: () = {
     }
 
     impl Type for serde_yaml::Mapping {
-        fn inline(_: &mut TypeMap, _: &[DataType]) -> DataType {
+        fn inline(_: &mut TypeMap, _: Generics) -> DataType {
             // We don't type this more accurately because `serde_json` doesn't allow non-string map keys so neither does Specta
             DataType::Unknown
         }
     }
 
     impl Type for serde_yaml::value::TaggedValue {
-        fn inline(_: &mut TypeMap, _: &[DataType]) -> DataType {
+        fn inline(_: &mut TypeMap, _: Generics) -> DataType {
             DataType::Map(Box::new((
                 DataType::Primitive(PrimitiveType::String),
                 DataType::Unknown,
@@ -377,7 +381,7 @@ const _: () = {
     }
 
     impl Type for serde_yaml::Number {
-        fn inline(_: &mut TypeMap, _: &[DataType]) -> DataType {
+        fn inline(_: &mut TypeMap, _: Generics) -> DataType {
             DataType::Enum(EnumType {
                 name: "Number".into(),
                 sid: None,
@@ -647,7 +651,7 @@ impl_as!(url::Url as String);
 
 #[cfg(feature = "either")]
 impl<L: Type, R: Type> Type for either::Either<L, R> {
-    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
+    fn inline(type_map: &mut TypeMap, generics: Generics) -> DataType {
         DataType::Enum(EnumType {
             name: "Either".into(),
             sid: None,
@@ -666,7 +670,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                                 flatten: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
-                                ty: Some(L::inline(type_map, generics)),
+                                ty: Some(L::inline(type_map, generics.as_ref())),
                             }],
                         }),
                     },
@@ -693,7 +697,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
         })
     }
 
-    fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
+    fn reference(type_map: &mut TypeMap, generics: Cow<[DataType]>) -> Reference {
         Reference {
             inner: DataType::Enum(EnumType {
                 name: "Either".into(),
@@ -713,7 +717,10 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                                     flatten: false,
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
-                                    ty: Some(L::reference(type_map, generics).inner),
+                                    ty: Some(
+                                        L::reference(type_map, Cow::Borrowed(generics.as_ref()))
+                                            .inner,
+                                    ),
                                 }],
                             }),
                         },

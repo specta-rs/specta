@@ -5,40 +5,77 @@ mod map;
 mod post_process;
 mod specta_id;
 
+use std::borrow::Cow;
+
 pub use map::*;
 pub use post_process::*;
 pub use specta_id::*;
 
-use crate::{reference, DataType, NamedDataType};
+use crate::{reference::Reference, DataType, NamedDataType};
 
-use self::reference::Reference;
+// TODO: Break out into it's own file?
+pub enum Generics<'a> {
+    /// The types "definition generics" will be used.
+    ///
+    /// These generics are Rust generics provided to the type itself when it was instantiated.
+    /// You will always have these but they will always be concrete types instead of a generic.
+    ///
+    /// For example given `Demo<String>` the generic will become `String` and not `T`
+    Definition,
+
+    /// The generics will be substituted for those provided, if you don't provide enough the definition generic will be used as a fallback
+    ///
+    /// TODO: Discuss the problem with this approach and why we can't solve it
+    Provided(Cow<'a, [DataType]>),
+}
+
+impl<'a> Generics<'a> {
+    // TODO: Is a distrinction between `None` and `Provided(Cow::Borrowed(&[]))` needed cause aren't they theoretically the same thing.
+    pub const NONE: Self = Self::Provided(Cow::Borrowed(&[]));
+
+    pub fn as_ref<'b>(&'b self) -> Generics<'b> {
+        match self {
+            Generics::Definition => Generics::Definition,
+            Generics::Provided(generics) => Generics::Provided(Cow::Borrowed(&generics[..])),
+        }
+    }
+}
+
+impl From<Vec<DataType>> for Generics<'_> {
+    fn from(generics: Vec<DataType>) -> Self {
+        Generics::Provided(Cow::Owned(generics))
+    }
+}
+
+impl<'a, const N: usize> From<&'a [DataType; N]> for Generics<'a> {
+    fn from(generics: &'a [DataType; N]) -> Self {
+        Generics::Provided(Cow::Borrowed(&generics[..]))
+    }
+}
+
+impl<'a> From<&'a [DataType]> for Generics<'a> {
+    fn from(generics: &'a [DataType]) -> Self {
+        Generics::Provided(Cow::Borrowed(generics))
+    }
+}
 
 /// Provides runtime type information that can be fed into a language exporter to generate a type definition in another language.
 /// Avoid implementing this trait yourself where possible and use the [`Type`](derive@crate::Type) macro instead.
 pub trait Type {
-    /// Returns the inline definition of a type with generics substituted for those provided.
-    /// This function defines the base structure of every type, and is used in both
-    /// [`definition`](crate::Type::definition) and [`reference`](crate::Type::definition)
+    // TODO: Rename this method
+    /// Returns the definition of a type using the provided generics.
     ///
-    /// Implemented internally or via the [`Type`](derive@crate::Type) macro
-    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType;
-
-    /// Small wrapper around [`inline`](crate::Type::inline) that provides
-    /// [`definition_generics`](crate::Type::definition_generics)
-    /// as the value for the `generics` arg.
-    ///
-    /// If your type is generic you *must* override the default implementation!
-    fn definition(type_map: &mut TypeMap) -> DataType {
-        // TODO: Remove this default impl?
-        Self::inline(type_map, &[])
-    }
+    /// This should be only implemented via the [`Type`](derive@crate::Type) macro.
+    fn inline(type_map: &mut TypeMap, generics: Generics) -> DataType;
 
     /// Generates a datatype corresponding to a reference to this type,
     /// as determined by its category. Getting a reference to a type implies that
     /// it should belong in the type map (since it has to be referenced from somewhere),
     /// so the output of [`definition`](crate::Type::definition) will be put into the type map.
-    fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
-        reference::inline::<Self>(type_map, generics)
+    // TODO: `DataTypeReference` a return type
+    fn reference(type_map: &mut TypeMap, generics: Cow<[DataType]>) -> Reference {
+        // reference::inline::<Self>(type_map, generics)
+        todo!();
     }
 }
 

@@ -152,7 +152,7 @@ pub fn construct_datatype(
         }
         Type::Macro(m) => {
             return Ok(quote! {
-                let #var_ident = <#m as #crate_ref::Type>::#method(type_map, &[])#transform;
+                let #var_ident = <#m as #crate_ref::Type>::#method(type_map, std::borrow::Cow::Borrowed(&[]))#transform;
             });
         }
         ty => {

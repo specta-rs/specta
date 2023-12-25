@@ -57,7 +57,7 @@ pub fn parse_struct(
             generics
                 .get(#i)
                 .cloned()
-                .unwrap_or_else(|| <#ident as #crate_ref::Type>::reference(type_map, &[]).inner)
+                .unwrap_or_else(|| <#ident as #crate_ref::Type>::reference(type_map, std::borrow::Cow::Borrowed(&[])).inner)
         }
     });
     let reference_generics =
