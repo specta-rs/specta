@@ -4,7 +4,7 @@ macro_rules! impl_passthrough {
             <$t>::inline(type_map, generics)
         }
 
-        fn reference(type_map: &mut TypeMap, generics: Cow<[DataType]>) -> Reference {
+        fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
             <$t>::reference(type_map, generics)
         }
     };
@@ -29,14 +29,14 @@ macro_rules! impl_tuple {
                 datatype::TupleType {
                     elements: match generics {
                         Generics::Definition => {
-                            vec![$($i::reference(type_map, Cow::Borrowed(&[])).inner),*]
+                            vec![$($i::reference(type_map, &[]).inner),*]
                         },
                         Generics::Provided(generics) => {
                             let mut _generics = generics.iter();
 
                             $(let $i = match _generics.next() {
                                 Some(generic) => generic.clone(),
-                                None => $i::reference(type_map, crate::util::as_ref(&generics)).inner,
+                                None => $i::reference(type_map, generics).inner,
                             };)*
 
                             vec![$($i),*]
@@ -80,7 +80,7 @@ macro_rules! impl_containers {
                 todo!();
             }
 
-            fn reference(type_map: &mut TypeMap, generics: Cow<[DataType]>) -> Reference {
+            fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
                 // Reference {
                 //     inner: generics.get(0).cloned().unwrap_or_else(
                 //         || T::reference(type_map, generics).inner,
@@ -114,7 +114,7 @@ macro_rules! impl_as {
                 <$tty as Type>::inline(type_map, generics)
             }
 
-            fn reference(type_map: &mut TypeMap, generics: Cow<[DataType]>) -> Reference {
+            fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
                 <$tty as Type>::reference(type_map, generics)
             }
         }
@@ -136,7 +136,7 @@ macro_rules! impl_for_list {
                 todo!();
             }
 
-            fn reference(type_map: &mut TypeMap, generics: Cow<[DataType]>) -> Reference {
+            fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
                 Reference {
                     inner: DataType::List(List {
                         ty: Box::new(generics.get(0).cloned().unwrap_or_else(
@@ -172,7 +172,7 @@ macro_rules! impl_for_map {
                 todo!();
             }
 
-            fn reference(type_map: &mut TypeMap, generics: Cow<[DataType]>) -> Reference {
+            fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
                 // Reference {
                 //     inner: DataType::Map(crate::datatype::Map {
                 //         key_ty: Box::new(

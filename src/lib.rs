@@ -27,7 +27,6 @@ mod serde;
 mod static_types;
 /// Contains [`Type`] and everything related to it, including implementations and helper macros
 pub mod r#type;
-pub(crate) mod util;
 
 pub use crate::serde::*;
 #[doc(hidden)] // TODO: Should we actually do this? I think not

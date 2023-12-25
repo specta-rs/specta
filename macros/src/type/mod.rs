@@ -152,8 +152,9 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     todo!();
                 }
 
-                fn reference(type_map: &mut #crate_ref::TypeMap, generics: std::borrow::Cow<[#crate_ref::DataType]>) -> #crate_ref::reference::Reference {
-                    #reference
+                fn reference(type_map: &mut #crate_ref::TypeMap, generics: &[#crate_ref::DataType]) -> #crate_ref::reference::Reference {
+                    // #reference
+                    todo!();
                 }
             }
 

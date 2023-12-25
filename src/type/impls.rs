@@ -1,4 +1,3 @@
-use crate::util::as_ref;
 use crate::{reference::Reference, *};
 
 use std::borrow::Cow;
@@ -126,7 +125,7 @@ impl<const N: usize, T: Type> Type for [T; N] {
         })
     }
 
-    fn reference(type_map: &mut TypeMap, generics: Cow<[DataType]>) -> Reference {
+    fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
         Reference {
             inner: DataType::List(List {
                 ty: Box::new(
@@ -156,7 +155,7 @@ impl<T: Type> Type for Option<T> {
         }))
     }
 
-    fn reference(type_map: &mut TypeMap, generics: Cow<[DataType]>) -> Reference {
+    fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
         Reference {
             inner: DataType::Nullable(Box::new(
                 generics
@@ -171,15 +170,15 @@ impl<T: Type> Type for Option<T> {
 impl<T: Type, E: Type> Type for std::result::Result<T, E> {
     fn inline(type_map: &mut TypeMap, generics: Generics) -> DataType {
         DataType::Result(Box::new((
-            T::inline(type_map, generics.as_ref()),
+            T::inline(type_map, generics),
             E::inline(type_map, generics),
         )))
     }
 
-    fn reference(type_map: &mut TypeMap, generics: Cow<[DataType]>) -> Reference {
+    fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
         Reference {
             inner: DataType::Result(Box::new((
-                T::reference(type_map, as_ref(&generics)).inner,
+                T::reference(type_map, generics).inner,
                 E::reference(type_map, generics).inner,
             ))),
         }
@@ -672,7 +671,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                                 flatten: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
-                                ty: Some(L::inline(type_map, generics.as_ref())),
+                                ty: Some(L::inline(type_map, generics)),
                             }],
                         }),
                     },
@@ -699,7 +698,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
         })
     }
 
-    fn reference(type_map: &mut TypeMap, generics: Cow<[DataType]>) -> Reference {
+    fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
         Reference {
             inner: DataType::Enum(EnumType {
                 name: "Either".into(),
@@ -719,10 +718,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                                     flatten: false,
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
-                                    ty: Some(
-                                        L::reference(type_map, Cow::Borrowed(generics.as_ref()))
-                                            .inner,
-                                    ),
+                                    ty: Some(L::reference(type_map, generics).inner),
                                 }],
                             }),
                         },

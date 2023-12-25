@@ -10,9 +10,9 @@ pub struct Reference {
     pub inner: DataType,
 }
 
-pub fn inline<T: Type + ?Sized>(type_map: &mut TypeMap, generics: Generics) -> Reference {
+pub fn inline<T: Type + ?Sized>(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
     Reference {
-        inner: T::inline(type_map, generics),
+        inner: T::inline(type_map, Generics::Provided(generics)),
     }
 }
 

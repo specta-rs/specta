@@ -202,11 +202,7 @@ pub fn skip_fields_named<'a>(
 }
 
 #[track_caller]
-pub fn flatten<T: Type>(
-    sid: SpectaID,
-    type_map: &mut TypeMap,
-    generics: Cow<[DataType]>,
-) -> DataType {
+pub fn flatten<T: Type>(sid: SpectaID, type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
     type_map.flatten_stack.push(sid);
 
     #[allow(clippy::panic)]
