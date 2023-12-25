@@ -99,7 +99,7 @@ macro_rules! impl_as {
 }
 
 macro_rules! impl_for_list {
-    ($($ty:path as $name:expr)+) => {$(
+    ($($unique:expr; $ty:path as $name:expr)+) => {$(
         impl<T: Type> Type for $ty {
             fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
                 DataType::List(List {
@@ -108,6 +108,7 @@ macro_rules! impl_for_list {
                         generics,
                     ))),
                     length: None,
+                    unique: $unique,
                 })
             }
 
@@ -118,6 +119,7 @@ macro_rules! impl_for_list {
                             || T::reference(type_map, generics).inner,
                         )),
                         length: None,
+                        unique: $unique,
                     }),
                 }
             }
@@ -129,30 +131,38 @@ macro_rules! impl_for_map {
     ($ty:path as $name:expr) => {
         impl<K: Type, V: Type> Type for $ty {
             fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
-                DataType::Map(Box::new((
-                    generics
-                        .get(0)
-                        .cloned()
-                        .unwrap_or_else(|| K::inline(type_map, generics)),
-                    generics
-                        .get(1)
-                        .cloned()
-                        .unwrap_or_else(|| V::inline(type_map, generics)),
-                )))
+                DataType::Map(crate::datatype::Map {
+                    key_ty: Box::new(
+                        generics
+                            .get(0)
+                            .cloned()
+                            .unwrap_or_else(|| K::inline(type_map, generics)),
+                    ),
+                    value_ty: Box::new(
+                        generics
+                            .get(1)
+                            .cloned()
+                            .unwrap_or_else(|| V::inline(type_map, generics)),
+                    ),
+                })
             }
 
             fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
                 Reference {
-                    inner: DataType::Map(Box::new((
-                        generics
-                            .get(0)
-                            .cloned()
-                            .unwrap_or_else(|| K::reference(type_map, generics).inner),
-                        generics
-                            .get(1)
-                            .cloned()
-                            .unwrap_or_else(|| V::reference(type_map, generics).inner),
-                    ))),
+                    inner: DataType::Map(crate::datatype::Map {
+                        key_ty: Box::new(
+                            generics
+                                .get(0)
+                                .cloned()
+                                .unwrap_or_else(|| K::inline(type_map, generics)),
+                        ),
+                        value_ty: Box::new(
+                            generics
+                                .get(1)
+                                .cloned()
+                                .unwrap_or_else(|| V::inline(type_map, generics)),
+                        ),
+                    }),
                 }
             }
         }

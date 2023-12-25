@@ -98,12 +98,12 @@ impl_as!(
 
 use std::collections::*;
 impl_for_list!(
-    Vec<T> as "Vec"
-    VecDeque<T> as "VecDeque"
-    BinaryHeap<T> as "BinaryHeap"
-    LinkedList<T> as "LinkedList"
-    HashSet<T> as "HashSet"
-    BTreeSet<T> as "BTreeSet"
+    false; Vec<T> as "Vec"
+    false; VecDeque<T> as "VecDeque"
+    false; BinaryHeap<T> as "BinaryHeap"
+    false; LinkedList<T> as "LinkedList"
+    true; HashSet<T> as "HashSet"
+    true; BTreeSet<T> as "BTreeSet"
 );
 
 impl<'a, T: Type> Type for &'a [T] {
@@ -121,6 +121,7 @@ impl<const N: usize, T: Type> Type for [T; N] {
                 },
             ),
             length: Some(N),
+            unique: false,
         })
     }
 
@@ -135,6 +136,7 @@ impl<const N: usize, T: Type> Type for [T; N] {
                     },
                 ),
                 length: Some(N),
+                unique: false,
             }),
         }
     }
@@ -255,7 +257,7 @@ struct Duration {
 
 #[cfg(feature = "indexmap")]
 const _: () = {
-    impl_for_list!(indexmap::IndexSet<T> as "IndexSet");
+    impl_for_list!(true; indexmap::IndexSet<T> as "IndexSet");
     impl_for_map!(indexmap::IndexMap<K, V> as "IndexMap");
     impl<K: Type, V: Type> Flatten for indexmap::IndexMap<K, V> {}
 };
@@ -369,10 +371,10 @@ const _: () = {
 
     impl Type for serde_yaml::value::TaggedValue {
         fn inline(_: &mut TypeMap, _: &[DataType]) -> DataType {
-            DataType::Map(Box::new((
-                DataType::Primitive(PrimitiveType::String),
-                DataType::Unknown,
-            )))
+            DataType::Map(Map {
+                key_ty: Box::new(DataType::Primitive(PrimitiveType::String)),
+                value_ty: Box::new(DataType::Unknown),
+            })
         }
     }
 
