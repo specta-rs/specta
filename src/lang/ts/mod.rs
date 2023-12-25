@@ -255,8 +255,8 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
             format!(
                 // We use this isn't of `Record<K, V>` to avoid issues with circular references.
                 "{{ [key in {}]: {} }}",
-                datatype_inner(ctx.clone(), &def.0, type_map)?,
-                datatype_inner(ctx, &def.1, type_map)?
+                datatype_inner(ctx.clone(), def.key_ty(), type_map)?,
+                datatype_inner(ctx, def.value_ty(), type_map)?
             )
         }
         // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
