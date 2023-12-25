@@ -135,26 +135,16 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             #[automatically_derived]
             #type_impl_heading {
                 fn inline(type_map: &mut #crate_ref::TypeMap, generics: #crate_ref::Generics) -> #crate_ref::DataType {
-                    // let generics = match generics {
+                    let generics = match generics {
+                        #crate_ref::Generics::Definition => DEFINITION_GENERICS,
+                        #crate_ref::Generics::Provided(generics) => generics,
+                    };
 
-                    // };
-
-
-                    // #inlines
-
-
-                    // fn definition(type_map: &mut #crate_ref::TypeMap) -> #crate_ref::DataType {
-                    //     Self::inline(
-                    //         type_map,
-                    //         &DEFINITION_GENERICS
-                    //     )
-                    // }
-                    todo!();
+                    #inlines
                 }
 
                 fn reference(type_map: &mut #crate_ref::TypeMap, generics: &[#crate_ref::DataType]) -> #crate_ref::reference::Reference {
-                    // #reference
-                    todo!();
+                    #reference
                 }
             }
 
@@ -164,27 +154,25 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 	            const IMPL_LOCATION: #crate_ref::ImplLocation = IMPL_LOCATION;
 
                 fn named_data_type(type_map: &mut #crate_ref::TypeMap, generics: &[#crate_ref::DataType]) -> #crate_ref::NamedDataType {
-                    // #crate_ref::internal::construct::named_data_type(
-                    //     #name.into(),
-                    //     #comments.into(),
-                    //     #deprecated,
-                    //     SID,
-                    //     IMPL_LOCATION,
-                    //     <Self as #crate_ref::Type>::inline(type_map, generics)
-                    // )
-                    todo!();
+                    #crate_ref::internal::construct::named_data_type(
+                        #name.into(),
+                        #comments.into(),
+                        #deprecated,
+                        SID,
+                        IMPL_LOCATION,
+                        <Self as #crate_ref::Type>::inline(type_map, #crate_ref::Generics::Provided(generics))
+                    )
                 }
 
                 fn definition_named_data_type(type_map: &mut #crate_ref::TypeMap) -> #crate_ref::NamedDataType {
-                    // #crate_ref::internal::construct::named_data_type(
-                    //     #name.into(),
-                    //     #comments.into(),
-                    //     #deprecated,
-                    //     SID,
-                    //     IMPL_LOCATION,
-                    //     <Self as #crate_ref::Type>::definition(type_map)
-                    // )
-                    todo!();
+                    #crate_ref::internal::construct::named_data_type(
+                        #name.into(),
+                        #comments.into(),
+                        #deprecated,
+                        SID,
+                        IMPL_LOCATION,
+                        <Self as #crate_ref::Type>::inline(type_map, #crate_ref::Generics::Definition)
+                    )
                 }
             }
 

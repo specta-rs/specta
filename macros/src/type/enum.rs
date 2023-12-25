@@ -43,7 +43,7 @@ pub fn parse_enum(
                 generics
                     .get(#i)
                     .cloned()
-                    .unwrap_or_else(|| <#ident as #crate_ref::Type>::reference(type_map, std::borrow::Cow::Borrowed(&[])).inner)
+                    .unwrap_or_else(|| <#ident as #crate_ref::Type>::reference(type_map, &[]).inner)
             )
         }
     });

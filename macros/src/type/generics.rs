@@ -80,6 +80,11 @@ pub fn add_type_to_where_clause(ty: &TokenStream, generics: &Generics) -> Option
     }
 }
 
+type DtGenericFn = fn(&TokenStream, TokenStream) -> TokenStream;
+fn dt_generic_fn(f: DtGenericFn) -> DtGenericFn {
+    f
+}
+
 pub fn construct_datatype(
     var_ident: Ident,
     ty: &Type,
@@ -87,9 +92,17 @@ pub fn construct_datatype(
     crate_ref: &TokenStream,
     inline: bool,
 ) -> syn::Result<TokenStream> {
-    let (method, transform) = match inline {
-        true => (quote!(inline), quote!()),
-        false => (quote!(reference), quote!(.inner)),
+    let (method, transform, generics) = match inline {
+        true => (
+            quote!(inline),
+            quote!(),
+            dt_generic_fn(|crate_ref, tokens| quote!(#crate_ref::Generics::Provided(#tokens))),
+        ),
+        false => (
+            quote!(reference),
+            quote!(.inner),
+            dt_generic_fn(|_, tokens| tokens),
+        ),
     };
 
     let path = match ty {
@@ -115,10 +128,11 @@ pub fn construct_datatype(
                 .enumerate()
                 .map(|(i, _)| format_ident!("{}_{}", &var_ident, i));
 
+            let generics = generics(&crate_ref, quote!(&[#(#generic_var_idents),*]));
             return Ok(quote! {
                 #(#elems)*
 
-                let #var_ident = <#ty as #crate_ref::Type>::#method(type_map, &[#(#generic_var_idents),*])#transform;
+                let #var_ident = <#ty as #crate_ref::Type>::#method(type_map, #generics)#transform;
             });
         }
         Type::Paren(p) => {
@@ -134,10 +148,11 @@ pub fn construct_datatype(
                 inline,
             )?;
 
+            let generics = generics(&crate_ref, quote!(&[#elem_var_ident]));
             return Ok(quote! {
                 #elem
 
-                let #var_ident = <#ty as #crate_ref::Type>::#method(type_map, &[#elem_var_ident])#transform;
+                let #var_ident = <#ty as #crate_ref::Type>::#method(type_map, #generics)#transform;
             });
         }
         Type::Ptr(TypePtr { elem, .. }) | Type::Reference(TypeReference { elem, .. }) => {
@@ -151,8 +166,9 @@ pub fn construct_datatype(
             ));
         }
         Type::Macro(m) => {
+            let generics = generics(&crate_ref, quote!(&[]));
             return Ok(quote! {
-                let #var_ident = <#m as #crate_ref::Type>::#method(type_map, std::borrow::Cow::Borrowed(&[]))#transform;
+                let #var_ident = <#m as #crate_ref::Type>::#method(type_map, #generics)#transform;
             });
         }
         ty => {
@@ -172,10 +188,14 @@ pub fn construct_datatype(
             .find(|(_, ident)| ident == &type_ident)
         {
             let type_ident = type_ident.to_string();
+            let generics = generics(
+                &crate_ref,
+                quote!(&[#crate_ref::DataType::Generic(std::borrow::Cow::Borrowed(#type_ident).into())]),
+            );
             return Ok(quote! {
                 let #var_ident = generics.get(#i).cloned().unwrap_or_else(
                     || {
-                        <#generic_ident as #crate_ref::Type>::#method(type_map, &[#crate_ref::DataType::Generic(std::borrow::Cow::Borrowed(#type_ident).into())])#transform
+                        <#generic_ident as #crate_ref::Type>::#method(type_map, #generics)#transform
                     },
                 );
             });
@@ -218,9 +238,10 @@ pub fn construct_datatype(
         .iter()
         .map(|(i, _)| format_ident!("{}_{}", &var_ident, i));
 
+    let generics = generics(&crate_ref, quote!(&[#(#generic_var_idents),*]));
     Ok(quote! {
         #(#generic_vars)*
 
-        let #var_ident = <#ty as #crate_ref::Type>::#method(type_map, &[#(#generic_var_idents),*])#transform;
+        let #var_ident = <#ty as #crate_ref::Type>::#method(type_map, #generics)#transform;
     })
 }

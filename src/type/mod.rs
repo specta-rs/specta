@@ -63,9 +63,11 @@ pub trait NamedType: Type {
     const SID: SpectaID;
     const IMPL_LOCATION: ImplLocation; // TODO: I don't think this is used so maybe remove it?
 
+    // TODO: Should take `Generics` instead of `&[DataType]` but I plan to remove this trait so not fixing it for now.
     /// this is equivalent to [Type::inline] but returns a [NamedDataType] instead.
     fn named_data_type(type_map: &mut TypeMap, generics: &[DataType]) -> NamedDataType;
 
+    // TODO: Just remove this method given we removed `Type::definition`
     /// this is equivalent to [Type::definition] but returns a [NamedDataType] instead.
     fn definition_named_data_type(type_map: &mut TypeMap) -> NamedDataType;
 }
