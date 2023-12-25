@@ -25,7 +25,7 @@ pub enum Generics<'a> {
     /// For example given `Demo<String>` the generic will become `String` and not `T`
     Definition,
 
-    /// The generics will be substituted for those provided, if you don't provide enough the definition generic will be used as a fallback
+    /// The generics will be substituted for those provided, if you don't provide the correct amount the definition generic will be used as a fallback
     ///
     /// TODO: Discuss the problem with this approach and why we can't solve it
     // TODO: Is the variant's name good?
