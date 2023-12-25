@@ -24,7 +24,7 @@ pub use r#enum::*;
 pub use r#struct::*;
 pub use tuple::*;
 
-use crate::{SpectaID, TypeMap};
+use crate::SpectaID;
 
 /// Runtime type-erased representation of a Rust type.
 ///
@@ -103,17 +103,10 @@ pub enum DeprecatedType {
 pub struct DataTypeReference {
     pub(crate) name: Cow<'static, str>,
     pub(crate) sid: SpectaID,
-    // TODO: Providing both `generics` and `inline` is invalid. We should probs use an enum.
     pub(crate) generics: Vec<(GenericType, DataType)>,
-    // pub(crate) inline: bool,
 }
 
 impl DataTypeReference {
-    // TODO: Is this the correct abstraction???
-    pub fn inline(type_map: &mut TypeMap, generics: &[DataType], repr: DataType) -> Self {
-        todo!();
-    }
-
     pub fn name(&self) -> &Cow<'static, str> {
         &self.name
     }

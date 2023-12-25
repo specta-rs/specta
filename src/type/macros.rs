@@ -26,7 +26,27 @@ macro_rules! impl_tuple {
         impl<$($i: Type),*> Type for ($($i,)*) {
             #[allow(unused)]
             fn inline(type_map: &mut TypeMap, generics: Generics) -> DataType {
-                // let mut _generics = generics.iter();
+                datatype::TupleType {
+                    elements: match generics {
+                        Generics::Definition => {
+                            vec![$($i::reference(type_map, Cow::Borrowed(&[])).inner),*]
+                        },
+                        Generics::Provided(generics) => {
+                            let mut _generics = generics.iter();
+
+                            $(let $i = match _generics.next() {
+                                Some(generic) => generic.clone(),
+                                None => $i::reference(type_map, crate::util::as_ref(&generics)).inner,
+                            };)*
+
+                            vec![$($i),*]
+                        }
+                    }
+                }.to_anonymous()
+
+
+
+
 
                 // $(let $i = _generics.next().map(Clone::clone).unwrap_or_else(
                 //     || {
@@ -37,7 +57,7 @@ macro_rules! impl_tuple {
                 // datatype::TupleType {
                 //     elements: vec![$($i),*],
                 // }.to_anonymous()
-                todo!();
+                // todo!();
             }
         }
     };

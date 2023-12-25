@@ -26,6 +26,8 @@ pub enum Generics<'a> {
     /// The generics will be substituted for those provided, if you don't provide enough the definition generic will be used as a fallback
     ///
     /// TODO: Discuss the problem with this approach and why we can't solve it
+    // TODO: Is the variant's name good?
+    // TODO: Should this be a `Cow` or just `&[]`. Really we don't need ownership so probs the later given the DX improvements.
     Provided(Cow<'a, [DataType]>),
 }
 
@@ -33,10 +35,20 @@ impl<'a> Generics<'a> {
     // TODO: Is a distrinction between `None` and `Provided(Cow::Borrowed(&[]))` needed cause aren't they theoretically the same thing.
     pub const NONE: Self = Self::Provided(Cow::Borrowed(&[]));
 
+    // TODO: is this a good name for this method, I don't know it acts the same as a Rust developer might expect.
+    // TODO: This could possible be `Clone` but I think it sends the wrong message given `Cow::clone` allocates and maintain the variant.
     pub fn as_ref<'b>(&'b self) -> Generics<'b> {
         match self {
             Generics::Definition => Generics::Definition,
             Generics::Provided(generics) => Generics::Provided(Cow::Borrowed(&generics[..])),
+        }
+    }
+
+    // TODO: Naming is hard
+    pub fn as_cow<'b>(&'b self) -> Cow<'b, [DataType]> {
+        match self {
+            Generics::Definition => Cow::Borrowed(&[]),
+            Generics::Provided(generics) => Cow::Borrowed(&generics[..]),
         }
     }
 }

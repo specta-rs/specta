@@ -1,21 +1,19 @@
 //! Helpers for generating [Type::reference] implementations.
 
-use crate::{DataType, DataTypeReference, NamedType, Type, TypeMap};
+use crate::{DataType, DataTypeReference, Generics, NamedType, Type, TypeMap};
 
 /// A reference datatype.
 ///
 // This type exists to force the user to use [reference::inline] or [reference::reference] which provides some extra safety.
 #[non_exhaustive]
-// #[deprecated] // TODO
 pub struct Reference {
     pub inner: DataType,
 }
 
-pub fn inline<T: Type + ?Sized>(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
-    // Reference {
-    //     inner: T::inline(type_map, generics),
-    // }
-    todo!();
+pub fn inline<T: Type + ?Sized>(type_map: &mut TypeMap, generics: Generics) -> Reference {
+    Reference {
+        inner: T::inline(type_map, generics),
+    }
 }
 
 pub fn reference<T: NamedType>(type_map: &mut TypeMap, reference: DataTypeReference) -> Reference {

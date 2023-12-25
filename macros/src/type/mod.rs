@@ -135,6 +135,11 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             #[automatically_derived]
             #type_impl_heading {
                 fn inline(type_map: &mut #crate_ref::TypeMap, generics: #crate_ref::Generics) -> #crate_ref::DataType {
+                    // let generics = match generics {
+
+                    // };
+
+
                     // #inlines
 
 
