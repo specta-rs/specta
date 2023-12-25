@@ -9,7 +9,7 @@ pub use map::*;
 pub use post_process::*;
 pub use specta_id::*;
 
-use crate::{reference, DataType, NamedDataType};
+use crate::{reference, DataType, NamedDataType, TypeImpl};
 
 use self::reference::Reference;
 
@@ -21,16 +21,19 @@ pub trait Type {
     /// [`definition`](crate::Type::definition) and [`reference`](crate::Type::definition)
     ///
     /// Implemented internally or via the [`Type`](derive@crate::Type) macro
-    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType;
+    fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> TypeImpl;
 
+    // TODO: Remove this in favor of it being an implementation detail of `inline`/`reference`???
     /// Small wrapper around [`inline`](crate::Type::inline) that provides
     /// [`definition_generics`](crate::Type::definition_generics)
     /// as the value for the `generics` arg.
     ///
     /// If your type is generic you *must* override the default implementation!
+    // TODO: TypeImpl
     fn definition(type_map: &mut TypeMap) -> DataType {
         // TODO: Remove this default impl?
-        Self::inline(type_map, &[])
+        // Self::inline(type_map, &[])
+        todo!();
     }
 
     /// Generates a datatype corresponding to a reference to this type,
@@ -42,6 +45,7 @@ pub trait Type {
     }
 }
 
+// TODO: This probs needs to go now because it's not relevant.
 /// NamedType represents a type that can be converted into [NamedDataType].
 /// This will be implemented for all types with the [Type] derive macro.
 pub trait NamedType: Type {

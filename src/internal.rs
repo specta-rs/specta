@@ -249,3 +249,34 @@ mod functions {
 }
 #[cfg(feature = "functions")]
 pub use functions::*;
+
+// This code is taken from `erased-serde` - https://github.com/dtolnay/erased-serde/blob/master/src/any.rs
+#[allow(unsafe_code)]
+pub(crate) mod type_id {
+    use std::{any::TypeId, marker::PhantomData};
+
+    trait NonStaticAny {
+        fn get_type_id(&self) -> TypeId
+        where
+            Self: 'static;
+    }
+
+    impl<T: ?Sized> NonStaticAny for PhantomData<T> {
+        fn get_type_id(&self) -> TypeId
+        where
+            Self: 'static,
+        {
+            TypeId::of::<T>()
+        }
+    }
+
+    pub fn non_static_type_id<T: ?Sized>() -> TypeId {
+        let non_static_thing = PhantomData::<T>;
+        let thing = unsafe {
+            std::mem::transmute::<&dyn NonStaticAny, &(dyn NonStaticAny + 'static)>(
+                &non_static_thing,
+            )
+        };
+        NonStaticAny::get_type_id(thing)
+    }
+}

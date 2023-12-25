@@ -49,6 +49,11 @@ impl PartialEq<Self> for SpectaID {
 pub struct ImplLocation(pub(crate) &'static str);
 
 impl ImplLocation {
+    #[track_caller]
+    pub fn new() -> Self {
+        Self(concat!(file!(), ":", line!(), ":", column!()))
+    }
+
     /// Get the location as a string
     pub const fn as_str(&self) -> &'static str {
         self.0

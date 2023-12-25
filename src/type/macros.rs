@@ -1,11 +1,13 @@
 macro_rules! impl_passthrough {
     ($t:ty) => {
         fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
-            <$t>::inline(type_map, generics)
+            // <$t>::inline(type_map, generics)
+            todo!();
         }
 
         fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
-            <$t>::reference(type_map, generics)
+            // <$t>::reference(type_map, generics)
+            todo!();
         }
     };
 }

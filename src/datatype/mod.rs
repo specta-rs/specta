@@ -13,6 +13,7 @@ mod primitive;
 pub mod reference;
 mod r#struct;
 mod tuple;
+mod r#type;
 
 pub use fields::*;
 pub use list::*;
@@ -22,6 +23,7 @@ pub use named::*;
 pub use primitive::*;
 pub use r#enum::*;
 pub use r#struct::*;
+pub use r#type::*;
 pub use tuple::*;
 
 use crate::SpectaID;
