@@ -78,7 +78,6 @@ macro_rules! impl_containers {
 
         impl<T: NamedType> NamedType for $container<T> {
 	        const SID: SpectaID = T::SID;
-	        const IMPL_LOCATION: ImplLocation = T::IMPL_LOCATION;
 
             fn named_data_type(type_map: &mut TypeMap, generics: &[DataType]) -> NamedDataType {
                 T::named_data_type(type_map, generics)

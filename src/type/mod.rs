@@ -61,7 +61,6 @@ pub trait Type {
 /// This will be implemented for all types with the [Type] derive macro.
 pub trait NamedType: Type {
     const SID: SpectaID;
-    const IMPL_LOCATION: ImplLocation; // TODO: I don't think this is used so maybe remove it?
 
     // TODO: Should take `Generics` instead of `&[DataType]` but I plan to remove this trait so not fixing it for now.
     /// this is equivalent to [Type::inline] but returns a [NamedDataType] instead.

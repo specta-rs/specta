@@ -151,7 +151,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             #[automatically_derived]
             impl #bounds #crate_ref::NamedType for #ident #type_args #where_bound {
 	            const SID: #crate_ref::SpectaID = SID;
-	            const IMPL_LOCATION: #crate_ref::ImplLocation = IMPL_LOCATION;
 
                 fn named_data_type(type_map: &mut #crate_ref::TypeMap, generics: &[#crate_ref::DataType]) -> #crate_ref::NamedDataType {
                     #crate_ref::internal::construct::named_data_type(
