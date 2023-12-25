@@ -72,10 +72,10 @@ pub fn add_type_to_where_clause(ty: &TokenStream, generics: &Generics) -> Option
         return generics.where_clause.clone();
     }
     match generics.where_clause {
-        None => Some(parse_quote! { where #( #generic_types : #ty + 'static ),* }),
+        None => Some(parse_quote! { where #( #generic_types : #ty ),* }),
         Some(ref w) => {
             let bounds = w.predicates.iter();
-            Some(parse_quote! { where #(#bounds,)* #( #generic_types : #ty + 'static ),* })
+            Some(parse_quote! { where #(#bounds,)* #( #generic_types : #ty ),* })
         }
     }
 }

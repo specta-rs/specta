@@ -23,7 +23,7 @@ macro_rules! impl_primitives {
 macro_rules! impl_tuple {
     ( impl $($i:ident),* ) => {
         #[allow(non_snake_case)]
-        impl<$($i: Type + 'static),*> Type for ($($i,)*) {
+        impl<$($i: Type),*> Type for ($($i,)*) {
             #[allow(unused)]
             fn inline(type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
                 let mut _generics = generics.iter();
