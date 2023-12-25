@@ -21,13 +21,23 @@ pub struct SpectaID {
 }
 
 impl SpectaID {
-    // TODO: Unit test this well including with non-static types.
+    // TODO: Unit test this (including with non-static types)
     pub fn from<T>() -> Self {
-        let type_name = std::any::type_name::<T>();
-        let last_segment = type_name.rfind("::").unwrap_or(type_name.len());
+        // I am aware `std::any::type_name`'s format is not guaranteed but plz just let me order my types by name without a macro in peace.
+        let type_name = std::any::type_name::<T>(); // Current output is in the form `some::Type<some::Generic>`
+
+        // Strip from `<` to the end of the string
+        let end_offset = type_name.rfind("<").unwrap_or(type_name.len());
+
+        // Strip everything before the last `::`
+        let start_offset = type_name[0..end_offset]
+            .rfind("::")
+            // +2 to skip the ::
+            .map(|v| v + 2)
+            .unwrap_or(0);
 
         SpectaID {
-            type_name: &type_name[0..last_segment],
+            type_name: &type_name[start_offset..end_offset],
             tid: non_static_type_id::<T>(),
         }
     }
