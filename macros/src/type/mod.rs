@@ -134,15 +134,13 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
             #[automatically_derived]
             #type_impl_heading {
-                fn inline(type_map: &mut #crate_ref::TypeMap, generics: &[#crate_ref::DataType]) -> #crate_ref::DataType {
-                    #inlines
-                }
+                fn inline(type_map: &mut #crate_ref::TypeMap, generics: #crate_ref::Generics) -> #crate_ref::DataType {
+                    let generics = match generics {
+                        #crate_ref::Generics::Definition => DEFINITION_GENERICS,
+                        #crate_ref::Generics::Provided(generics) => generics,
+                    };
 
-                fn definition(type_map: &mut #crate_ref::TypeMap) -> #crate_ref::DataType {
-                    Self::inline(
-                        type_map,
-                        &DEFINITION_GENERICS
-                    )
+                    #inlines
                 }
 
                 fn reference(type_map: &mut #crate_ref::TypeMap, generics: &[#crate_ref::DataType]) -> #crate_ref::reference::Reference {
@@ -162,7 +160,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         #deprecated,
                         SID,
                         IMPL_LOCATION,
-                        <Self as #crate_ref::Type>::inline(type_map, generics)
+                        <Self as #crate_ref::Type>::inline(type_map, #crate_ref::Generics::Provided(generics))
                     )
                 }
 
@@ -173,7 +171,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         #deprecated,
                         SID,
                         IMPL_LOCATION,
-                        <Self as #crate_ref::Type>::definition(type_map)
+                        <Self as #crate_ref::Type>::inline(type_map, #crate_ref::Generics::Definition)
                     )
                 }
             }
