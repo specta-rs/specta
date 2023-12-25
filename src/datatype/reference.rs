@@ -17,10 +17,12 @@ pub fn inline<T: Type + ?Sized>(type_map: &mut TypeMap, generics: &[DataType]) -
 }
 
 pub fn reference<T: NamedType>(type_map: &mut TypeMap, reference: DataTypeReference) -> Reference {
-    if type_map.map.get(&T::SID).is_none() {
-        type_map.map.entry(T::SID).or_insert(None);
+    let sid = T::sid();
+
+    if type_map.map.get(&sid).is_none() {
+        type_map.map.entry(sid).or_insert(None);
         let dt = T::definition_named_data_type(type_map);
-        type_map.map.insert(T::SID, Some(dt));
+        type_map.map.insert(sid, Some(dt));
     }
 
     Reference {

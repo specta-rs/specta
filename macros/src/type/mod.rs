@@ -44,14 +44,18 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         unraw_raw_ident(&format_ident!("{}", raw_ident.to_string())).to_token_stream()
     });
 
+    let sid = quote!(#crate_ref::internal::construct::sid(#name, concat!("::", module_path!(), ":", line!(), ":", column!())));
     let (inlines, reference, can_flatten) = match data {
-        Data::Struct(data) => parse_struct(&name, &container_attrs, generics, &crate_ref, data),
+        Data::Struct(data) => {
+            parse_struct(&name, &container_attrs, generics, &crate_ref, &sid, data)
+        }
         Data::Enum(data) => parse_enum(
             &name,
             &EnumAttr::from_attrs(&container_attrs, &mut attrs)?,
             &container_attrs,
             generics,
             &crate_ref,
+            &sid,
             data,
         ),
         Data::Union(data) => Err(syn::Error::new_spanned(
@@ -123,12 +127,10 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let comments = &container_attrs.common.doc;
     let deprecated = container_attrs.common.deprecated_as_tokens(&crate_ref);
 
-    let sid = quote!(#crate_ref::internal::construct::sid(#name, concat!("::", module_path!(), ":", line!(), ":", column!())));
     let impl_location = quote!(#crate_ref::internal::construct::impl_location(concat!(file!(), ":", line!(), ":", column!())));
 
     Ok(quote! {
         const _: () = {
-        	const SID: #crate_ref::SpectaID = #sid;
 	        const IMPL_LOCATION: #crate_ref::ImplLocation = #impl_location;
             const DEFINITION_GENERICS: &[#crate_ref::DataType] = &[#(#definition_generics),*];
 
@@ -150,14 +152,16 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
             #[automatically_derived]
             impl #bounds #crate_ref::NamedType for #ident #type_args #where_bound {
-	            const SID: #crate_ref::SpectaID = SID;
+                fn sid() -> #crate_ref::SpectaID {
+                    #sid
+                }
 
                 fn named_data_type(type_map: &mut #crate_ref::TypeMap, generics: &[#crate_ref::DataType]) -> #crate_ref::NamedDataType {
                     #crate_ref::internal::construct::named_data_type(
                         #name.into(),
                         #comments.into(),
                         #deprecated,
-                        SID,
+                        #sid,
                         IMPL_LOCATION,
                         <Self as #crate_ref::Type>::inline(type_map, #crate_ref::Generics::Provided(generics))
                     )
@@ -168,7 +172,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         #name.into(),
                         #comments.into(),
                         #deprecated,
-                        SID,
+                        #sid,
                         IMPL_LOCATION,
                         <Self as #crate_ref::Type>::inline(type_map, #crate_ref::Generics::Definition)
                     )

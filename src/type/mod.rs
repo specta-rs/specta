@@ -60,7 +60,8 @@ pub trait Type {
 /// NamedType represents a type that can be converted into [NamedDataType].
 /// This will be implemented for all types with the [Type] derive macro.
 pub trait NamedType: Type {
-    const SID: SpectaID;
+    // TODO: I hate this being a method
+    fn sid() -> SpectaID;
 
     // TODO: Should take `Generics` instead of `&[DataType]` but I plan to remove this trait so not fixing it for now.
     /// this is equivalent to [Type::inline] but returns a [NamedDataType] instead.

@@ -10,6 +10,7 @@ pub fn parse_enum(
     container_attrs: &ContainerAttr,
     generics: &Generics,
     crate_ref: &TokenStream,
+    sid: &TokenStream,
     data: &DataEnum,
 ) -> syn::Result<(TokenStream, TokenStream, bool)> {
     if container_attrs.transparent {
@@ -232,12 +233,12 @@ pub fn parse_enum(
     let skip_bigint_checs = enum_attrs.unstable_skip_bigint_checks;
 
     Ok((
-        quote!(#crate_ref::DataType::Enum(#crate_ref::internal::construct::r#enum(#name.into(), SID, #repr, #skip_bigint_checs, vec![#(#definition_generics),*], vec![#(#variant_types),*]))),
+        quote!(#crate_ref::DataType::Enum(#crate_ref::internal::construct::r#enum(#name.into(), #sid, #repr, #skip_bigint_checs, vec![#(#definition_generics),*], vec![#(#variant_types),*]))),
         quote!({
             let generics = vec![#(#reference_generics),*];
             #crate_ref::reference::reference::<Self>(type_map, #crate_ref::internal::construct::data_type_reference(
                 #name.into(),
-                SID,
+                #sid,
                 generics
             ))
         }),
