@@ -14,7 +14,6 @@ pub use export_config::*;
 use reserved_terms::*;
 
 use crate::{
-    functions::FunctionDataType,
     internal::{skip_fields, skip_fields_named, NonSkipField},
     *,
 };
@@ -96,7 +95,12 @@ pub fn export_named_datatype(
 /// If your function requires a function body you can copy this function into your own codebase.
 ///
 /// Eg. `function name();`
-pub fn export_function_header(dt: FunctionDataType, config: &ExportConfig) -> Result<String> {
+#[cfg(feature = "functions")]
+#[cfg_attr(docsrs, doc(cfg(feature = "functions")))]
+pub fn export_function_header(
+    dt: crate::functions::FunctionDataType,
+    config: &ExportConfig,
+) -> Result<String> {
     let type_map = TypeMap::default();
 
     let mut s = config
