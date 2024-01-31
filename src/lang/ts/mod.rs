@@ -294,7 +294,14 @@ fn enum_datatype(
                         format!("{{ {tag}: {sanitised_name} }}")
                     }
                     (EnumRepr::Internal { tag }, EnumVariant::Unnamed(tuple)) => {
-                        let typ = datatype_inner(ctx, &DataType::Tuple(tuple.clone()))?;
+                        let fields = tuple.fields.clone();
+                        let typ = match &fields[..] {
+                            [DataType::Nullable(x)] => {
+                                let typ = datatype_inner(ctx, x)?;
+                                format!("({typ} | {{ }})")
+                            }
+                            _ => datatype_inner(ctx, &DataType::Tuple(tuple.clone()))?,
+                        };
                         format!("({{ {tag}: {sanitised_name} }} & {typ})")
                     }
                     (EnumRepr::Internal { tag }, EnumVariant::Named(obj)) => {
