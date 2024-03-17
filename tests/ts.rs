@@ -300,6 +300,9 @@ fn typescript_types() {
         InlineTuple2,
         r#"{ demo: [{ demo: [string, boolean] }, boolean] }"#
     );
+
+    // https://github.com/oscartbeaumont/specta/issues/220
+    assert_ts!(Box<str>, r#"string"#);
 }
 
 #[derive(Type)]

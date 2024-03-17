@@ -27,6 +27,10 @@ impl<'a> Type for &'a str {
     impl_passthrough!(String);
 }
 
+impl Type for Box<str> {
+    impl_passthrough!(String);
+}
+
 impl<'a, T: Type + 'static> Type for &'a T {
     impl_passthrough!(T);
 }
