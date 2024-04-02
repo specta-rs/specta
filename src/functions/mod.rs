@@ -3,7 +3,8 @@ mod result;
 
 use std::borrow::Cow;
 
-pub(crate) use arg::*;
+pub use arg::FunctionArg;
+
 pub(crate) use result::*;
 
 use crate::*;
