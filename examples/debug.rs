@@ -3,14 +3,14 @@ use specta::{specta, Type};
 pub struct A;
 
 // #[specta]
-#[specta_macros::testing]
-fn hello_world(a: String) -> String {
-    todo!();
-}
+// #[specta_macros::testing]
+// fn hello_world(a: String) -> String {
+//     todo!();
+// }
 
-fn hello_world2(a: B<String, _>) -> String {
-    todo!();
-}
+// fn hello_world2(a: B<String, _>) -> String {
+//     todo!();
+// }
 
 // #[specta(unstable_map_params = B<T, _>)]
 // fn hello_world() -> String {
