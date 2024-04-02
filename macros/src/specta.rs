@@ -1,7 +1,7 @@
 // inspired by https://github.com/tauri-apps/tauri/blob/2901145c497299f033ba7120af5f2e7ead16c75a/core/tauri-macros/src/command/handler.rs
 
-use quote::{quote, ToTokens};
-use syn::{parse_macro_input, FnArg, ItemFn, Pat, Visibility};
+use quote::quote;
+use syn::{parse_macro_input, FnArg, ItemFn, Visibility};
 
 use crate::utils::{format_fn_wrapper, parse_attrs};
 
@@ -9,6 +9,14 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
     let crate_ref = quote!(specta);
     let function = parse_macro_input::parse::<ItemFn>(item)?;
     let wrapper = format_fn_wrapper(&function.sig.ident);
+
+    println!("{:?}", function.attrs);
+
+    // TODO
+    // let rename_all = function
+    //     .attrs
+    //     .iter()
+    //     .find(|attr| attr.path.is_ident("specta") && attr.tokens.to_string() == "rename_all");
 
     // While using wasm_bindgen and Specta is rare, this should make the DX nicer.
     if function.sig.unsafety.is_some()
@@ -44,30 +52,33 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
         None => false,
     };
 
-    let arg_names = function.sig.inputs.iter().map(|input| match input {
-        FnArg::Receiver(_) => unreachable!("Commands cannot take 'self'"),
-        FnArg::Typed(arg) => match &*arg.pat {
-            Pat::Ident(ident) => ident.ident.to_token_stream(),
-            Pat::Macro(m) => m.mac.tokens.to_token_stream(),
-            Pat::Struct(s) => s.path.to_token_stream(),
-            Pat::Slice(s) => s.attrs[0].to_token_stream(),
-            Pat::Tuple(s) => s.elems[0].to_token_stream(),
-            _ => unreachable!("Commands must take named arguments"),
-        },
-    });
-
-    let arg_signatures = function.sig.inputs.iter().map(|_| quote!(_));
-
     let mut attrs = parse_attrs(&function.attrs)?;
     let common = crate::r#type::attr::CommonAttr::from_attrs(&mut attrs)?;
 
     let deprecated = common.deprecated_as_tokens(&crate_ref);
     let docs = common.doc;
 
-    let no_return_type = match function.sig.output {
-        syn::ReturnType::Default => true,
-        syn::ReturnType::Type(_, _) => false,
+    let args = function.sig.inputs.iter().map(|input| match input {
+        FnArg::Receiver(_) => unreachable!("Commands cannot take 'self'"),
+        FnArg::Typed(arg) => {
+            let arg_name = &arg.pat;
+            let arg_ty = &arg.ty;
+            quote! {
+                (stringify!(#arg_name).into(), <#arg_ty as #crate_ref::Type>::reference(type_map, &[]).inner)
+            }
+        }
+    });
+
+    let return_type = match &function.sig.output {
+        syn::ReturnType::Default => quote!(None),
+        syn::ReturnType::Type(_, ty) => {
+            // TODO: Move SpectaFunctionResult into `internal`
+            quote!(Some(<#ty as #crate_ref::functions::private::SpectaFunctionResult<_>>::to_datatype(type_map)))
+        }
     };
+
+    let generic_params = &function.sig.generics.params;
+    let where_clause = &function.sig.generics.where_clause;
 
     Ok(quote! {
         #function
@@ -75,13 +86,18 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
         #maybe_macro_export
         #[doc(hidden)]
         macro_rules! #wrapper {
-            (@asyncness) => { #function_asyncness };
-            (@name) => { #function_name_str.into() };
-            (@arg_names) => { &[#(stringify!(#arg_names).into()),* ] };
-            (@signature) => { fn(#(#arg_signatures),*) -> _ };
-            (@docs) => { std::borrow::Cow::Borrowed(#docs) };
-            (@deprecated) => { #deprecated };
-            (@no_return_type) => { #no_return_type };
+            (@infer) => {
+                fn export<#generic_params>(type_map: &mut #crate_ref::TypeMap) -> #crate_ref::functions::FunctionDataType #where_clause {
+                    #crate_ref::functions::FunctionDataType {
+                        asyncness: #function_asyncness,
+                        name: #function_name_str.into(),
+                        args: vec![#(#args),*],
+                        result: #return_type,
+                        docs: std::borrow::Cow::Borrowed(#docs),
+                        deprecated: #deprecated,
+                    }
+                }
+            }
         }
 
         #pub_the_trait

@@ -12,7 +12,7 @@
 mod utils;
 mod data_type_from;
 #[cfg(feature = "functions")]
-mod fn_datatype;
+mod internal_fn_datatype;
 #[cfg(feature = "functions")]
 mod specta;
 mod r#type;
@@ -30,18 +30,49 @@ pub fn derive_data_type_from(input: proc_macro::TokenStream) -> proc_macro::Toke
 #[proc_macro_attribute]
 #[cfg(feature = "functions")]
 pub fn specta(
-    _: proc_macro::TokenStream,
+    attribute: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
+    println!("{:?}", attribute.to_string());
+
     specta::attribute(item).unwrap_or_else(|err| err.into_compile_error().into())
 }
 
+/// This should not be used directly. It's an internal function used by [specta::fn_datatype].
+#[doc(hidden)]
 #[proc_macro]
 #[cfg(feature = "functions")]
-pub fn fn_datatype(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn internal_fn_datatype(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     use syn::parse_macro_input;
 
-    fn_datatype::proc_macro(parse_macro_input!(input as fn_datatype::FnDatatypeInput))
-        .unwrap_or_else(|err| err.into_compile_error())
-        .into()
+    internal_fn_datatype::proc_macro(parse_macro_input!(
+        input as internal_fn_datatype::FnDatatypeInput
+    ))
+    .unwrap_or_else(|err| err.into_compile_error())
+    .into()
+}
+
+// TODO: This would be Tauri Specta
+// TODO: Could this apply `specta::specta` to the function too and still work
+#[proc_macro_attribute]
+pub fn testing(
+    _: proc_macro::TokenStream,
+    input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    let mut func = syn::parse_macro_input!(input as syn::ItemFn);
+
+    func.sig.inputs.iter_mut().for_each(|arg| {
+        // if let syn::FnArg::Typed(pat) = arg {
+        //     if let syn::Pat::Ident(ident) = &*pat.pat {
+        //         if ident.ident == "a" {
+        //             ident.ident = syn::Ident::new("b", ident.ident.span());
+        //         }
+        //     }
+        // }
+    });
+
+    quote::quote! {
+        #func
+    }
+    .into()
 }

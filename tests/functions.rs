@@ -20,8 +20,12 @@ mod test {
         42
     }
 
+    // TODO: Fix this
+    // #[specta]
+    // fn e<T: fmt::Debug>(window: T) {}
+
     #[specta]
-    fn e<T: fmt::Debug>(window: T) {}
+    fn e<T>() {}
 
     // https://github.com/oscartbeaumont/tauri-specta/issues/24
     #[specta]
@@ -83,10 +87,18 @@ mod test {
     #[specta]
     pub fn public_function() {}
 
+    // TODO
+    // #[tauri::command(rename_all = "snake_case")]
+    // fn test_rename_all(demo: String) -> i32 {
+    //     42
+    // }
+
     // TODO: Finish fixing these
 
     #[test]
     fn test_trailing_comma() {
+        // let y = __specta__fn__a!(@infer);
+
         functions::collect_functions![a];
         functions::collect_functions![a,];
         functions::collect_functions![a, b, c];
@@ -98,7 +110,7 @@ mod test {
     #[test]
     fn test_function_exporting() {
         {
-            let mut type_map = &mut specta::TypeMap::default();
+            let mut type_map = specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; a);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "a");
@@ -107,54 +119,59 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeMap::default();
+            let mut type_map = specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; b);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "b");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
+                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, &mut type_map)
+                    .unwrap(),
                 "string"
             );
             assert_eq!(def.result, None);
         }
 
         {
-            let mut type_map = &mut specta::TypeMap::default();
+            let mut type_map = specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; c);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "c");
             assert_eq!(def.args.len(), 3);
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
+                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, &mut type_map)
+                    .unwrap(),
                 "string"
             );
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[1].1, type_map).unwrap(),
+                specta::ts::datatype(&ExportConfig::default(), &def.args[1].1, &mut type_map)
+                    .unwrap(),
                 "number"
             );
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[2].1, type_map).unwrap(),
+                specta::ts::datatype(&ExportConfig::default(), &def.args[2].1, &mut type_map)
+                    .unwrap(),
                 "boolean"
             );
             assert_eq!(def.result, None);
         }
 
         {
-            let mut type_map = &mut specta::TypeMap::default();
+            let mut type_map = specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; d);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "d");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
+                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, &mut type_map)
+                    .unwrap(),
                 "string"
             );
             assert_eq!(
                 def.result
                     .and_then(|result| {
                         Some(
-                            specta::ts::datatype(&ExportConfig::default(), &result, type_map)
+                            specta::ts::datatype(&ExportConfig::default(), &result, &mut type_map)
                                 .unwrap(),
                         )
                     })
@@ -164,33 +181,35 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeMap::default();
+            let mut type_map = specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; e::<bool>);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "e");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
+                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, &mut type_map)
+                    .unwrap(),
                 "boolean"
             );
             assert_eq!(def.result, None);
         }
 
         {
-            let mut type_map = &mut specta::TypeMap::default();
+            let mut type_map = specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; f);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "f");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
+                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, &mut type_map)
+                    .unwrap(),
                 "string"
             );
             assert_eq!(
                 def.result
                     .and_then(|result| {
                         Some(
-                            specta::ts::datatype(&ExportConfig::default(), &result, type_map)
+                            specta::ts::datatype(&ExportConfig::default(), &result, &mut type_map)
                                 .unwrap(),
                         )
                     })
@@ -200,33 +219,35 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeMap::default();
+            let mut type_map = specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; g);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "g");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
+                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, &mut type_map)
+                    .unwrap(),
                 "string"
             );
             assert_eq!(def.result, None);
         }
 
         {
-            let mut type_map = &mut specta::TypeMap::default();
+            let mut type_map = specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; h);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "h");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
+                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, &mut type_map)
+                    .unwrap(),
                 "string"
             );
             assert_eq!(def.result, None);
         }
 
         {
-            let mut type_map = &mut specta::TypeMap::default();
+            let mut type_map = specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; i);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "i");
@@ -235,7 +256,7 @@ mod test {
                 def.result
                     .and_then(|result| {
                         Some(
-                            specta::ts::datatype(&ExportConfig::default(), &result, type_map)
+                            specta::ts::datatype(&ExportConfig::default(), &result, &mut type_map)
                                 .unwrap(),
                         )
                     })
@@ -245,7 +266,7 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeMap::default();
+            let mut type_map = specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; k);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "k");
@@ -254,7 +275,7 @@ mod test {
                 def.result
                     .and_then(|result| {
                         Some(
-                            specta::ts::datatype(&ExportConfig::default(), &result, type_map)
+                            specta::ts::datatype(&ExportConfig::default(), &result, &mut type_map)
                                 .unwrap(),
                         )
                     })
@@ -264,37 +285,40 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeMap::default();
+            let mut type_map = specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; l);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "l");
             assert_eq!(def.args.len(), 2);
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
+                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, &mut type_map)
+                    .unwrap(),
                 "Demo"
             );
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[1].1, type_map).unwrap(),
+                specta::ts::datatype(&ExportConfig::default(), &def.args[1].1, &mut type_map)
+                    .unwrap(),
                 "[string, number]"
             );
             assert_eq!(def.result, None);
         }
 
         {
-            let mut type_map = &mut specta::TypeMap::default();
+            let mut type_map = specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; m);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "m");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
+                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, &mut type_map)
+                    .unwrap(),
                 "Demo"
             );
             assert_eq!(def.result, None);
         }
 
         {
-            let mut type_map = &mut specta::TypeMap::default();
+            let mut type_map = specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; async_fn);
             assert_eq!(def.asyncness, true);
             assert_eq!(def.name, "async_fn");
@@ -303,7 +327,7 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeMap::default();
+            let mut type_map = specta::TypeMap::default();
             let def: functions::FunctionDataType = specta::fn_datatype!(type_map; with_docs);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "with_docs");

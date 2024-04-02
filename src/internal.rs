@@ -9,10 +9,9 @@ use std::borrow::Cow;
 #[cfg(feature = "export")]
 pub use ctor;
 
-#[cfg(feature = "functions")]
-pub use specta_macros::fn_datatype;
+pub use specta_macros::internal_fn_datatype;
 
-use crate::{DataType, DeprecatedType, Field, Generics, SpectaID, Type, TypeMap};
+use crate::{DataType, Field, Generics, SpectaID, Type, TypeMap};
 
 /// Functions used to construct `crate::datatype` types (they have private fields so can't be constructed directly).
 /// We intentionally keep their fields private so we can modify them without a major version bump.
@@ -217,35 +216,3 @@ pub fn flatten<T: Type>(sid: SpectaID, type_map: &mut TypeMap, generics: &[DataT
 
     ty
 }
-
-#[cfg(feature = "functions")]
-mod functions {
-    use super::*;
-    use crate::functions::{FunctionDataType, SpectaFunction};
-
-    #[doc(hidden)]
-    /// A helper for exporting a command to a [`CommandDataType`].
-    /// You shouldn't use this directly and instead should use [`fn_datatype!`](crate::fn_datatype).
-    pub fn get_fn_datatype<TMarker, T: SpectaFunction<TMarker>>(
-        _: T,
-        asyncness: bool,
-        name: Cow<'static, str>,
-        type_map: &mut TypeMap,
-        fields: &[Cow<'static, str>],
-        docs: Cow<'static, str>,
-        deprecated: Option<DeprecatedType>,
-        no_return_type: bool,
-    ) -> FunctionDataType {
-        T::to_datatype(
-            asyncness,
-            name,
-            type_map,
-            fields,
-            docs,
-            deprecated,
-            no_return_type,
-        )
-    }
-}
-#[cfg(feature = "functions")]
-pub use functions::*;

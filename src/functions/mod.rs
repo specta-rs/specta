@@ -1,10 +1,9 @@
-mod arg;
 mod result;
 
 use std::borrow::Cow;
 
-pub(crate) use arg::*;
-pub(crate) use result::*;
+// TODO: Not pub
+pub use result::*;
 
 use crate::*;
 
@@ -32,14 +31,14 @@ use crate::*;
 #[macro_export]
 macro_rules! fn_datatype {
     ($function:path) => {{
-        let mut type_map = $crate::TypeMap::default();
-
-        $crate::fn_datatype!(type_map; $function)
+        let type_map = &mut $crate::TypeMap::default();
+        specta::internal::internal_fn_datatype!($function);
+        result
     }};
     ($type_map:ident; $function:path) => {{
         let type_map: &mut $crate::TypeMap = &mut $type_map;
-
-        $crate::internal::fn_datatype!(type_map, $function)
+        specta::internal::internal_fn_datatype!($function);
+        result
     }};
 }
 
@@ -60,94 +59,6 @@ pub struct FunctionDataType {
     /// The deprecated status of the function.
     pub deprecated: Option<DeprecatedType>,
 }
-
-/// Implemented by functions that can be annoatated with [`specta`](crate::specta).
-pub trait SpectaFunction<TMarker> {
-    /// Gets the type of a function as a [`FunctionDataType`].
-    fn to_datatype(
-        asyncness: bool,
-        name: Cow<'static, str>,
-        type_map: &mut TypeMap,
-        fields: &[Cow<'static, str>],
-        docs: Cow<'static, str>,
-        deprecated: Option<DeprecatedType>,
-        no_return_type: bool,
-    ) -> FunctionDataType;
-}
-
-impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction<TResultMarker>
-    for fn() -> TResult
-{
-    fn to_datatype(
-        asyncness: bool,
-        name: Cow<'static, str>,
-        type_map: &mut TypeMap,
-        _fields: &[Cow<'static, str>],
-        docs: Cow<'static, str>,
-        deprecated: Option<DeprecatedType>,
-        no_return_type: bool,
-    ) -> FunctionDataType {
-        FunctionDataType {
-            asyncness,
-            name,
-            args: vec![],
-            result: (!no_return_type).then(|| TResult::to_datatype(type_map)),
-            docs,
-            deprecated,
-        }
-    }
-}
-
-macro_rules! impl_typed_command {
-    ( impl $($i:ident),* ) => {
-       paste::paste! {
-            impl<
-                TResultMarker,
-                TResult: SpectaFunctionResult<TResultMarker>,
-                $([<$i Marker>]),*,
-                $($i: SpectaFunctionArg<[<$i Marker>]>),*
-            > SpectaFunction<(TResultMarker, $([<$i Marker>]),*)> for fn($($i),*) -> TResult {
-                fn to_datatype(
-                    asyncness: bool,
-                    name: Cow<'static, str>,
-                    type_map: &mut TypeMap,
-                    fields: &[Cow<'static, str>],
-                    docs: Cow<'static, str>,
-                    deprecated: Option<DeprecatedType>,
-                    no_return_type: bool,
-                ) -> FunctionDataType {
-                    let mut fields = fields.into_iter();
-
-                    FunctionDataType {
-                        asyncness,
-                        name,
-                        docs,
-                        deprecated,
-                        args: [$(
-                            fields
-                                .next()
-                                .map_or_else(
-                                    || None,
-                                    |field| $i::to_datatype(type_map).map(|ty| (field.clone(), ty))
-                                )
-                        ),*,]
-                            .into_iter()
-                            .filter_map(|v| v)
-                            .collect::<Vec<_>>(),
-                        result: (!no_return_type).then(|| TResult::to_datatype(type_map)),
-                    }
-                }
-            }
-        }
-    };
-    ( $i2:ident $(, $i:ident)* ) => {
-        impl_typed_command!(impl $i2 $(, $i)* );
-        impl_typed_command!($($i),*);
-    };
-    () => {};
-}
-
-impl_typed_command!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
 
 /// Collects function types into a [`Vec`],
 /// and all downstream types into a [`TypeMap`] instance.

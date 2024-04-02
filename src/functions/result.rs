@@ -1,4 +1,5 @@
-mod private {
+// TODO: Not pub
+pub mod private {
     use std::future::Future;
 
     use crate::{DataType, Type, TypeMap};
