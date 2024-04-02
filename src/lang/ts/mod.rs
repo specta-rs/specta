@@ -98,7 +98,7 @@ pub fn export_named_datatype(
 #[cfg(feature = "functions")]
 #[cfg_attr(docsrs2, doc(cfg(feature = "functions")))]
 pub fn export_function_header(
-    dt: crate::functions::FunctionDataType,
+    dt: crate::function::FunctionDataType,
     config: &ExportConfig,
 ) -> Result<String> {
     let type_map = TypeMap::default();

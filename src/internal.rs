@@ -221,7 +221,7 @@ pub fn flatten<T: Type>(sid: SpectaID, type_map: &mut TypeMap, generics: &[DataT
 #[cfg(feature = "functions")]
 mod functions {
     use super::*;
-    use crate::functions::{Function, FunctionDataType};
+    use crate::function::{Function, FunctionDataType};
 
     #[doc(hidden)]
     /// A helper for exporting a command to a [`CommandDataType`].

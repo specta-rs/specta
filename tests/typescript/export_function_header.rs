@@ -1,6 +1,6 @@
 #![allow(deprecated)]
 
-use specta::{fn_datatype, functions::FunctionDataType, specta, ts::export_function_header};
+use specta::{fn_datatype, function::FunctionDataType, specta, ts::export_function_header};
 
 #[specta]
 fn a() {}

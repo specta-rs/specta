@@ -20,7 +20,7 @@ pub mod export;
 /// Support for exporting Rust functions.
 #[cfg(feature = "functions")]
 #[cfg_attr(docsrs2, doc(cfg(feature = "functions")))]
-pub mod functions;
+pub mod function;
 mod lang;
 mod selection;
 mod serde;

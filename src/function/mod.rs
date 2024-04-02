@@ -57,13 +57,13 @@ macro_rules! fn_datatype {
 ///
 /// fn main() {
 ///     // `type_defs` is created internally
-///     let (functions, type_defs) = functions::collect_functions![some_function];
+///     let (functions, type_defs) = function::collect_functions![some_function];
 ///
 ///     let custom_type_defs = TypeMap::default();
 ///
 ///     // `type_defs` is provided.
 ///     // This can be used when integrating multiple specta-enabled libraries.
-///     let (functions, custom_type_defs) = functions::collect_functions![
+///     let (functions, custom_type_defs) = function::collect_functions![
 ///         custom_type_defs; // You can provide a custom map to collect the types into
 ///         some_function
 ///     ];
@@ -79,7 +79,7 @@ macro_rules! collect_functions {
     }};
     ($($command:path),* $(,)?) => {{
         let mut type_map = $crate::TypeMap::default();
-        $crate::functions::collect_functions!(type_map; $($command),*)
+        $crate::function::collect_functions!(type_map; $($command),*)
     }};
 }
 
