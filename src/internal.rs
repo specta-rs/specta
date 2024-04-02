@@ -10,7 +10,7 @@ use std::borrow::Cow;
 pub use ctor;
 
 #[cfg(feature = "functions")]
-pub use specta_macros::fn_datatype;
+pub use specta_macros::internal_fn_datatype;
 
 use crate::{DataType, DeprecatedType, Field, Generics, SpectaID, Type, TypeMap};
 

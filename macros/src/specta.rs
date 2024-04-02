@@ -73,15 +73,22 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
         #function
 
         #maybe_macro_export
-        #[doc(hidden)]
+        #[doc(hidden)] // We take in `$function` from the invocation so we have `name::<concrete_generics_types>`
         macro_rules! #wrapper {
-            (@asyncness) => { #function_asyncness };
-            (@name) => { #function_name_str.into() };
-            (@arg_names) => { &[#(stringify!(#arg_names).into()),* ] };
-            (@signature) => { fn(#(#arg_signatures),*) -> _ };
-            (@docs) => { std::borrow::Cow::Borrowed(#docs) };
-            (@deprecated) => { #deprecated };
-            (@no_return_type) => { #no_return_type };
+            (@export_fn; $function:path) => {
+                fn export(type_map: &mut #crate_ref::TypeMap) -> #crate_ref::functions::FunctionDataType {
+                    specta::internal::get_fn_datatype(
+                        $function as fn(#(#arg_signatures),*) -> _,
+                        #function_asyncness,
+                        #function_name_str.into(),
+                        type_map,
+                        &[#(stringify!(#arg_names).into()),* ],
+                        std::borrow::Cow::Borrowed(#docs),
+                        #deprecated,
+                        #no_return_type,
+                    )
+                }
+            }
         }
 
         #pub_the_trait
