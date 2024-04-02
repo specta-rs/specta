@@ -62,7 +62,7 @@ pub struct FunctionDataType {
 }
 
 /// Implemented by functions that can be annoatated with [`specta`](crate::specta).
-pub trait SpectaFunction<TMarker> {
+pub trait Function<TMarker> {
     /// Gets the type of a function as a [`FunctionDataType`].
     fn to_datatype(
         asyncness: bool,
@@ -75,7 +75,7 @@ pub trait SpectaFunction<TMarker> {
     ) -> FunctionDataType;
 }
 
-impl<TResultMarker, TResult: SpectaFunctionResult<TResultMarker>> SpectaFunction<TResultMarker>
+impl<TResultMarker, TResult: FunctionResult<TResultMarker>> Function<TResultMarker>
     for fn() -> TResult
 {
     fn to_datatype(
@@ -103,10 +103,10 @@ macro_rules! impl_typed_command {
        paste::paste! {
             impl<
                 TResultMarker,
-                TResult: SpectaFunctionResult<TResultMarker>,
+                TResult: FunctionResult<TResultMarker>,
                 $([<$i Marker>]),*,
-                $($i: SpectaFunctionArg<[<$i Marker>]>),*
-            > SpectaFunction<(TResultMarker, $([<$i Marker>]),*)> for fn($($i),*) -> TResult {
+                $($i: FunctionArg<[<$i Marker>]>),*
+            > Function<(TResultMarker, $([<$i Marker>]),*)> for fn($($i),*) -> TResult {
                 fn to_datatype(
                     asyncness: bool,
                     name: Cow<'static, str>,

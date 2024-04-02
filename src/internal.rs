@@ -221,12 +221,12 @@ pub fn flatten<T: Type>(sid: SpectaID, type_map: &mut TypeMap, generics: &[DataT
 #[cfg(feature = "functions")]
 mod functions {
     use super::*;
-    use crate::functions::{FunctionDataType, SpectaFunction};
+    use crate::functions::{Function, FunctionDataType};
 
     #[doc(hidden)]
     /// A helper for exporting a command to a [`CommandDataType`].
     /// You shouldn't use this directly and instead should use [`fn_datatype!`](crate::fn_datatype).
-    pub fn get_fn_datatype<TMarker, T: SpectaFunction<TMarker>>(
+    pub fn get_fn_datatype<TMarker, T: Function<TMarker>>(
         _: T,
         asyncness: bool,
         name: Cow<'static, str>,

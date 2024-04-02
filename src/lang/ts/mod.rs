@@ -96,7 +96,7 @@ pub fn export_named_datatype(
 ///
 /// Eg. `function name();`
 #[cfg(feature = "functions")]
-#[cfg_attr(docsrs, doc(cfg(feature = "functions")))]
+#[cfg_attr(docsrs2, doc(cfg(feature = "functions")))]
 pub fn export_function_header(
     dt: crate::functions::FunctionDataType,
     config: &ExportConfig,

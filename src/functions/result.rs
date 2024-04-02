@@ -5,20 +5,20 @@ mod private {
 
     /// Implemented by types that can be returned from a function annotated with
     /// [`specta`](crate::specta).
-    pub trait SpectaFunctionResult<TMarker> {
+    pub trait FunctionResult<TMarker> {
         /// Gets the type of the result as a [`DataType`].
         fn to_datatype(type_map: &mut TypeMap) -> DataType;
     }
 
-    pub enum SpectaFunctionResultMarker {}
-    impl<T: Type> SpectaFunctionResult<SpectaFunctionResultMarker> for T {
+    pub enum FunctionResultMarker {}
+    impl<T: Type> FunctionResult<FunctionResultMarker> for T {
         fn to_datatype(type_map: &mut TypeMap) -> DataType {
             T::reference(type_map, &[]).inner
         }
     }
 
-    pub enum SpectaFunctionResultFutureMarker {}
-    impl<F> SpectaFunctionResult<SpectaFunctionResultFutureMarker> for F
+    pub enum FunctionResultFutureMarker {}
+    impl<F> FunctionResult<FunctionResultFutureMarker> for F
     where
         F: Future,
         F::Output: Type,
@@ -29,4 +29,4 @@ mod private {
     }
 }
 
-pub(crate) use private::SpectaFunctionResult;
+pub(crate) use private::FunctionResult;

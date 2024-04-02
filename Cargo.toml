@@ -12,10 +12,10 @@ keywords = ["async", "specta", "rspc", "typescript", "typesafe"]
 categories = ["web-programming", "asynchronous"]
 autotests = false
 
-# /bin/sh RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
+# /bin/sh RUSTDOCFLAGS="--cfg docsrs2" cargo +nightly doc --all-features
 [package.metadata."docs.rs"]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = ["--cfg", "docsrs2"] # TODO: Rename to `docsrs2` once Tokio fixes https://github.com/tokio-rs/tokio/pull/6360
 
 [[test]]
 name = "integration_tests"
@@ -62,9 +62,6 @@ serde_json = ["dep:serde_json"]
 serde_yaml = ["dep:serde_yaml"]
 ## Support for [toml](https://github.com/toml-rs/toml)
 toml = ["dep:toml"]
-
-## Support for [Tauri](https://tauri.app). This is required when using [`specta::function`](macro@crate::specta) with Tauri Commands.
-tauri = ["dep:tauri"]
 
 #! External types
 ## [uuid](https://docs.rs/uuid) crate
