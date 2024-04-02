@@ -18,8 +18,8 @@ pub mod datatype;
 #[cfg_attr(docsrs2, doc(cfg(feature = "export")))]
 pub mod export;
 /// Support for exporting Rust functions.
-#[cfg(feature = "functions")]
-#[cfg_attr(docsrs2, doc(cfg(feature = "functions")))]
+#[cfg(feature = "function")]
+#[cfg_attr(docsrs2, doc(cfg(feature = "function")))]
 pub mod function;
 mod lang;
 mod selection;
@@ -136,8 +136,8 @@ pub use specta_macros::DataTypeFrom;
 ///     "Hello World"
 /// }
 /// ```
-#[cfg(feature = "functions")]
-#[cfg_attr(docsrs2, doc(cfg(feature = "functions")))]
+#[cfg(feature = "function")]
+#[cfg_attr(docsrs2, doc(cfg(feature = "function")))]
 pub use specta_macros::specta;
 
 #[cfg(doctest)]

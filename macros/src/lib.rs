@@ -11,9 +11,9 @@
 #[macro_use]
 mod utils;
 mod data_type_from;
-#[cfg(feature = "functions")]
+#[cfg(feature = "function")]
 mod internal_fn_datatype;
-#[cfg(feature = "functions")]
+#[cfg(feature = "function")]
 mod specta;
 mod r#type;
 
@@ -28,7 +28,7 @@ pub fn derive_data_type_from(input: proc_macro::TokenStream) -> proc_macro::Toke
 }
 
 #[proc_macro_attribute]
-#[cfg(feature = "functions")]
+#[cfg(feature = "function")]
 pub fn specta(
     _: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
@@ -38,7 +38,7 @@ pub fn specta(
 
 #[proc_macro]
 #[doc(hidden)]
-#[cfg(feature = "functions")]
+#[cfg(feature = "function")]
 pub fn internal_fn_datatype(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     use syn::parse_macro_input;
 

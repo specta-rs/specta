@@ -9,7 +9,7 @@ use std::borrow::Cow;
 #[cfg(feature = "export")]
 pub use ctor;
 
-#[cfg(feature = "functions")]
+#[cfg(feature = "function")]
 pub use specta_macros::internal_fn_datatype;
 
 use crate::{DataType, DeprecatedType, Field, Generics, SpectaID, Type, TypeMap};
@@ -218,7 +218,7 @@ pub fn flatten<T: Type>(sid: SpectaID, type_map: &mut TypeMap, generics: &[DataT
     ty
 }
 
-#[cfg(feature = "functions")]
+#[cfg(feature = "function")]
 mod functions {
     use super::*;
     use crate::function::{Function, FunctionDataType};
@@ -247,5 +247,5 @@ mod functions {
         )
     }
 }
-#[cfg(feature = "functions")]
+#[cfg(feature = "function")]
 pub use functions::*;

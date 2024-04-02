@@ -15,7 +15,7 @@ proc-macro = true
 
 [features]
 serde = []
-functions = []
+function = []
 export = []
 
 [dependencies]

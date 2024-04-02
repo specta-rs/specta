@@ -95,8 +95,8 @@ pub fn export_named_datatype(
 /// If your function requires a function body you can copy this function into your own codebase.
 ///
 /// Eg. `function name();`
-#[cfg(feature = "functions")]
-#[cfg_attr(docsrs2, doc(cfg(feature = "functions")))]
+#[cfg(feature = "function")]
+#[cfg_attr(docsrs2, doc(cfg(feature = "function")))]
 pub fn export_function_header(
     dt: crate::function::FunctionDataType,
     config: &ExportConfig,

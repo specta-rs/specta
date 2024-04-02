@@ -32,7 +32,7 @@ default = []
 
 ##! Internal Features
 ## Support for exporting the types of Rust functions.
-functions = ["serde", "specta-macros/functions"]
+function = ["serde", "specta-macros/function"]
 ## Support for collecting up a global type map
 export = ["dep:ctor", "specta-macros/export"]
 

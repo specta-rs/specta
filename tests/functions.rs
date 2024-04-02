@@ -1,4 +1,4 @@
-#[cfg(feature = "functions")]
+#[cfg(feature = "function")]
 mod test {
     use std::{borrow::Cow, fmt};
 
