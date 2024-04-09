@@ -751,10 +751,108 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
     }
 }
 
-#[cfg(feature = "bevy_ecs")]
+#[cfg(feature = "bevy")]
 const _: () = {
     #[derive(Type)]
     #[specta(rename = "Entity", remote = bevy_ecs::entity::Entity, crate = crate, export = false)]
     #[allow(dead_code)]
     struct EntityDef(u64);
+
+    #[derive(Type)]
+    #[specta(remote = bevy_input::ButtonState, crate = crate, export = false)]
+    #[allow(dead_code)]
+    enum ButtonState {
+        /// The button is pressed.
+        Pressed,
+        /// The button is not pressed.
+        Released,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = bevy_input::keyboard::KeyboardInput, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct KeyboardInput {
+        /// The physical key code of the key.
+        pub key_code: bevy_input::keyboard::KeyCode,
+        /// The logical key of the input
+        pub logical_key: bevy_input::keyboard::Key,
+        /// The press state of the key.
+        pub state: bevy_input::ButtonState,
+        /// Window that received the input.
+        pub window: bevy_ecs::entity::Entity,
+    }
+
+    // Reduced KeyCode and Key to String to avoid redefining a quite large enum (for now)
+    impl_as!(
+        bevy_input::keyboard::KeyCode as String
+        bevy_input::keyboard::Key as String
+    );
+
+    #[derive(Type)]
+    #[specta(remote = bevy_input::mouse::MouseButtonInput, crate = crate, export = false)]
+    #[allow(dead_code)]
+    pub struct MouseButtonInput {
+        /// The mouse button assigned to the event.
+        pub button: bevy_input::mouse::MouseButton,
+        /// The pressed state of the button.
+        pub state: bevy_input::ButtonState,
+        /// Window that received the input.
+        pub window: bevy_ecs::entity::Entity,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = bevy_input::mouse::MouseButton, crate = crate, export = false)]
+    #[allow(dead_code)]
+    pub enum MouseButton {
+        /// The left mouse button.
+        Left,
+        /// The right mouse button.
+        Right,
+        /// The middle mouse button.
+        Middle,
+        /// The back mouse button.
+        Back,
+        /// The forward mouse button.
+        Forward,
+        /// Another mouse button with the associated number.
+        Other(u16),
+    }
+
+    #[derive(Type)]
+    #[specta(remote = bevy_input::mouse::MouseWheel, crate = crate, export = false)]
+    #[allow(dead_code)]
+    pub struct MouseWheel {
+        /// The mouse scroll unit.
+        pub unit: bevy_input::mouse::MouseScrollUnit,
+        /// The horizontal scroll value.
+        pub x: f32,
+        /// The vertical scroll value.
+        pub y: f32,
+        /// Window that received the input.
+        pub window: bevy_ecs::entity::Entity,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = bevy_input::mouse::MouseScrollUnit, crate = crate, export = false)]
+    #[allow(dead_code)]
+    pub enum MouseScrollUnit {
+        /// The line scroll unit.
+        ///
+        /// The delta of the associated [`MouseWheel`] event corresponds
+        /// to the amount of lines or rows to scroll.
+        Line,
+        /// The pixel scroll unit.
+        ///
+        /// The delta of the associated [`MouseWheel`] event corresponds
+        /// to the amount of pixels to scroll.
+        Pixel,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = bevy_input::mouse::MouseMotion, crate = crate, export = false)]
+    #[allow(dead_code)]
+    pub struct MouseMotion {
+        /// The change in the position of the pointing device since the last event was sent.
+        pub delta: glam::Vec2,
+    }
 };
