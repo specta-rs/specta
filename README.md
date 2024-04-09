@@ -23,8 +23,9 @@
 
 Specta can be used in your application either directly or through a library which simplifies the process of using it.
 
- - [rspc](https://github.com/oscartbeaumont/rspc) for easily building end-to-end typesafe APIs
- - [tauri-specta](https://github.com/oscartbeaumont/tauri-specta) for typesafe Tauri commands
+ - [rspc](https://github.com/oscartbeaumont/rspc) - Easily building end-to-end typesafe APIs
+ - [tauri-specta](https://github.com/oscartbeaumont/tauri-specta) - Typesafe Tauri commands and events
+ - [TauRPC](https://github.com/MatsDK/TauRPC) - Tauri extension to give you a fully-typed IPC layer.
 
 ## Usage
 
