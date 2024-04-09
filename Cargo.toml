@@ -98,9 +98,9 @@ tokio = ["dep:tokio"]
 url = ["dep:url"]
 ## [either](https://docs.rs/either) crate
 either = ["dep:either"]
-# [bevy_ecs](https://docs.rs/bevy_ecs)
+# [bevy_ecs](https://docs.rs/bevy_ecs) crate
 bevy_ecs = ["dep:bevy_ecs"]
-# [bevy_input](https://docs.rs/bevy_input)
+# [bevy_input](https://docs.rs/bevy_input) crate
 bevy_input = ["dep:bevy_input", "dep:bevy_ecs", "dep:glam"]
 
 [dependencies]
