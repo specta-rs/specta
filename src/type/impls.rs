@@ -758,3 +758,76 @@ const _: () = {
     #[allow(dead_code)]
     struct EntityDef(u64);
 };
+
+#[cfg(feature = "bevy_input")]
+const _: () = {
+    #[derive(Type)]
+    #[specta(remote = bevy_input::ButtonState, crate = crate, export = false)]
+    #[allow(dead_code)]
+    enum ButtonState {
+        Pressed,
+        Released,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = bevy_input::keyboard::KeyboardInput, crate = crate, export = false)]
+    #[allow(dead_code)]
+    struct KeyboardInput {
+        pub key_code: bevy_input::keyboard::KeyCode,
+        pub logical_key: bevy_input::keyboard::Key,
+        pub state: bevy_input::ButtonState,
+        pub window: bevy_ecs::entity::Entity,
+    }
+
+    // Reduced KeyCode and Key to String to avoid redefining a quite large enum (for now)
+    impl_as!(
+        bevy_input::keyboard::KeyCode as String
+        bevy_input::keyboard::Key as String
+    );
+
+    #[derive(Type)]
+    #[specta(remote = bevy_input::mouse::MouseButtonInput, crate = crate, export = false)]
+    #[allow(dead_code)]
+    pub struct MouseButtonInput {
+        pub button: bevy_input::mouse::MouseButton,
+        pub state: bevy_input::ButtonState,
+        pub window: bevy_ecs::entity::Entity,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = bevy_input::mouse::MouseButton, crate = crate, export = false)]
+    #[allow(dead_code)]
+    pub enum MouseButton {
+        Left,
+        Right,
+        Middle,
+        Back,
+        Forward,
+        Other(u16),
+    }
+
+    #[derive(Type)]
+    #[specta(remote = bevy_input::mouse::MouseWheel, crate = crate, export = false)]
+    #[allow(dead_code)]
+    pub struct MouseWheel {
+        pub unit: bevy_input::mouse::MouseScrollUnit,
+        pub x: f32,
+        pub y: f32,
+        pub window: bevy_ecs::entity::Entity,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = bevy_input::mouse::MouseScrollUnit, crate = crate, export = false)]
+    #[allow(dead_code)]
+    pub enum MouseScrollUnit {
+        Line,
+        Pixel,
+    }
+
+    #[derive(Type)]
+    #[specta(remote = bevy_input::mouse::MouseMotion, crate = crate, export = false)]
+    #[allow(dead_code)]
+    pub struct MouseMotion {
+        pub delta: glam::Vec2,
+    }
+};
