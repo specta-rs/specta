@@ -751,13 +751,16 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
     }
 }
 
-#[cfg(feature = "bevy")]
+#[cfg(feature = "bevy_ecs")]
 const _: () = {
     #[derive(Type)]
     #[specta(rename = "Entity", remote = bevy_ecs::entity::Entity, crate = crate, export = false)]
     #[allow(dead_code)]
     struct EntityDef(u64);
+};
 
+#[cfg(feature = "bevy_input")]
+const _: () = {
     #[derive(Type)]
     #[specta(remote = bevy_input::ButtonState, crate = crate, export = false)]
     #[allow(dead_code)]

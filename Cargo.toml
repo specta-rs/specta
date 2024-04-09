@@ -98,8 +98,10 @@ tokio = ["dep:tokio"]
 url = ["dep:url"]
 ## [either](https://docs.rs/either) crate
 either = ["dep:either"]
-# [bevy_ecs](https://docs.rs/bevy_ecs) and [bevy_input](https://docs.rs/bevy_input) crate
-bevy = ["dep:bevy_ecs", "dep:bevy_input"]
+# [bevy_ecs](https://docs.rs/bevy_ecs)
+bevy_ecs = ["dep:bevy_ecs"]
+# [bevy_input](https://docs.rs/bevy_input)
+bevy_input = ["dep:bevy_input", "dep:bevy_ecs", "dep:glam"]
 
 [dependencies]
 specta-macros = { version = "=2.0.0-rc.9", path = "./macros" }
