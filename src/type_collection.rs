@@ -1,7 +1,4 @@
-use std::{
-    borrow::{Borrow, Cow},
-    collections::HashMap,
-};
+use std::{borrow::Borrow, collections::HashMap};
 
 use crate::{NamedDataType, NamedType, SpectaID, TypeMap};
 
