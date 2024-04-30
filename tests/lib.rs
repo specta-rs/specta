@@ -25,6 +25,7 @@ mod transparent;
 pub mod ts;
 mod ts_rs;
 mod ty_override;
+mod type_collection;
 mod type_map;
 mod typescript;
 #[cfg(all(feature = "ulid", feature = "typescript"))]

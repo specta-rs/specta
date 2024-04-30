@@ -60,6 +60,16 @@ error: specta: You must apply the #[specta] macro before the #[wasm_bindgen] mac
     |
     = note: this error originates in the attribute macro `wasm_bindgen` (in Nightly builds, run with -Z macro-backtrace for more info)
 
+error[E0255]: the name `__specta__fn__testing` is defined multiple times
+   --> tests/macro/compile_error.rs:110:8
+    |
+109 | #[specta]
+    | --------- previous definition of the macro `__specta__fn__testing` here
+110 | pub fn testing() {}
+    |        ^^^^^^^ `__specta__fn__testing` reimported here
+    |
+    = note: `__specta__fn__testing` must be defined only once in the macro namespace of this module
+
 error[E0601]: `main` function not found in crate `$CRATE`
    --> tests/macro/compile_error.rs:110:20
     |

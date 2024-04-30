@@ -46,6 +46,30 @@ pub fn export<T: NamedType>(conf: &ExportConfig) -> Output {
     result
 }
 
+impl TypeCollection {
+    /// Export a collection into a Typescript string.
+    pub fn export_ts(&mut self, conf: &ExportConfig) -> Output {
+        let mut type_map = TypeMap::default();
+        self.export(&mut type_map);
+
+        let mut result = String::new();
+        for (_, typ) in type_map.iter() {
+            is_valid_ty(&typ.inner, &type_map)?;
+
+            let ty = export_named_datatype(conf, typ, &type_map)?;
+            if let Some((ty_name, l0, l1)) =
+                detect_duplicate_type_names(&type_map).into_iter().next()
+            {
+                return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
+            }
+            result.push_str(&ty);
+            result.push('\n');
+        }
+
+        Ok(result)
+    }
+}
+
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string.
 ///
 /// Eg. `{ demo: string; };`
