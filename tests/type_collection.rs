@@ -35,10 +35,16 @@ fn type_collection_merge() {
     let mut type_map = TypeMap::default();
     TypeCollection::default()
         .register::<D>()
-        .join(a)
-        .join(b)
+        .extend(a)
+        .extend(b)
         .export(&mut type_map);
     assert_eq!(type_map.len(), 4);
+
+    // Check it compile with any valid arg
+    TypeCollection::default()
+        .extend(&TypeCollection::default())
+        .extend(&mut TypeCollection::default())
+        .extend(TypeCollection::default());
 }
 
 #[test]

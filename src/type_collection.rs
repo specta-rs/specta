@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    borrow::{Borrow, Cow},
+    collections::HashMap,
+};
 
 use crate::{NamedDataType, NamedType, SpectaID, TypeMap};
 
@@ -18,8 +21,8 @@ impl Default for TypeCollection {
 
 impl TypeCollection {
     /// Join another type collection into this one.
-    pub fn join(&mut self, collection: TypeCollection) -> &mut Self {
-        self.types.extend(collection.types);
+    pub fn extend(&mut self, collection: impl Borrow<TypeCollection>) -> &mut Self {
+        self.types.extend(collection.borrow().types.iter());
         self
     }
 
@@ -31,7 +34,7 @@ impl TypeCollection {
     }
 
     /// Export all the types in the collection.
-    pub fn export(&mut self, mut type_map: &mut crate::TypeMap) {
+    pub fn export(&self, mut type_map: &mut crate::TypeMap) {
         for (sid, export) in self.types.iter() {
             let dt = export(&mut type_map);
             type_map.insert(*sid, dt);
