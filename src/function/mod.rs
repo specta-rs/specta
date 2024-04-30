@@ -75,7 +75,7 @@ macro_rules! collect_functions {
         let mut type_map: $crate::TypeMap = $type_map;
         ([$($crate::fn_datatype!(type_map; $command)),*]
             .into_iter()
-            .collect::<Vec<_>>(), type_map)
+            .collect::<Vec<$crate::function::FunctionDataType>>(), type_map)
     }};
     ($($command:path),* $(,)?) => {{
         let mut type_map = $crate::TypeMap::default();

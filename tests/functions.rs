@@ -83,6 +83,13 @@ mod test {
     #[specta]
     pub fn public_function() {}
 
+    mod nested {
+        use super::*;
+
+        #[specta]
+        pub fn nested() {}
+    }
+
     // TODO: Finish fixing these
 
     #[test]
@@ -92,7 +99,8 @@ mod test {
         function::collect_functions![a, b, c];
         function::collect_functions![a, b, c,];
 
-        let (functions, types) = function::collect_functions![a, b, c, d, e::<i32>, f, g, h, i, k];
+        let (functions, types) =
+            function::collect_functions![a, b, c, d, e::<i32>, f, g, h, i, k, nested::nested];
     }
 
     #[test]
