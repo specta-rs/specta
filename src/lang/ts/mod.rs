@@ -661,15 +661,19 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                                 format!("{{ {tag}: {sanitised_name} }}")
                             }
                             (EnumRepr::Adjacent { tag, content }, _) => {
-                                let ts_values = enum_variant_datatype(
+                                let ts_value = enum_variant_datatype(
                                     ctx.with(PathItem::Variant(variant_name.clone())),
                                     type_map,
                                     variant_name.clone(),
                                     variant,
-                                )?
-                                .expect("Invalid Serde type");
+                                )?;
 
-                                format!("{{ {tag}: {sanitised_name}; {content}: {ts_values} }}")
+                                let mut result = format!("{{ {tag}: {sanitised_name}");
+                                if let Some(ts_value) = ts_value {
+                                    result.push_str(&format!("; {content}: {ts_value}"));
+                                }
+                                result.push_str(" }");
+                                result
                             }
                         },
                         true,

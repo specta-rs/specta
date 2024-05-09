@@ -261,6 +261,23 @@ fn typescript_types() {
     assert_ts!(ExtraBracketsInTupleVariant, "{ A: string }");
     assert_ts!(ExtraBracketsInUnnamedStruct, "string");
 
+    // https://github.com/oscartbeaumont/specta/issues/156
+    assert_ts!(Vec<MyEnum>, r#"({ A: string } | { B: number })[]"#);
+
+    assert_ts!(InlineTuple, r#"{ demo: [string, boolean] }"#);
+    assert_ts!(
+        InlineTuple2,
+        r#"{ demo: [{ demo: [string, boolean] }, boolean] }"#
+    );
+
+    // https://github.com/oscartbeaumont/specta/issues/220
+    assert_ts!(Box<str>, r#"string"#);
+
+    assert_ts!(
+        SkippedFieldWithinVariant,
+        r#"{ type: "A" } | { type: "B"; data: string }"#
+    );
+
     // https://github.com/oscartbeaumont/specta/issues/90
     assert_ts!(RenameWithWeirdCharsField, r#"{ "@odata.context": string }"#);
     assert_ts!(
@@ -291,18 +308,6 @@ fn typescript_types() {
             r#"@odata.context"#.to_string()
         )
     );
-
-    // https://github.com/oscartbeaumont/specta/issues/156
-    assert_ts!(Vec<MyEnum>, r#"({ A: string } | { B: number })[]"#);
-
-    assert_ts!(InlineTuple, r#"{ demo: [string, boolean] }"#);
-    assert_ts!(
-        InlineTuple2,
-        r#"{ demo: [{ demo: [string, boolean] }, boolean] }"#
-    );
-
-    // https://github.com/oscartbeaumont/specta/issues/220
-    assert_ts!(Box<str>, r#"string"#);
 }
 
 #[derive(Type)]
@@ -643,4 +648,11 @@ pub struct InlineTuple {
 pub struct InlineTuple2 {
     #[specta(inline)]
     demo: (InlineTuple, bool),
+}
+
+#[derive(Type)]
+#[serde(tag = "type", content = "data")]
+pub enum SkippedFieldWithinVariant {
+    A(#[serde(skip)] String),
+    B(String),
 }
