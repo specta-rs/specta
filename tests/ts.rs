@@ -278,6 +278,9 @@ fn typescript_types() {
         r#"{ type: "A" } | { type: "B"; data: string }"#
     );
 
+    // https://github.com/oscartbeaumont/specta/issues/239
+    assert_ts!(KebabCase, r#"{ "test-ing": string }"#);
+
     // https://github.com/oscartbeaumont/specta/issues/90
     assert_ts!(RenameWithWeirdCharsField, r#"{ "@odata.context": string }"#);
     assert_ts!(
@@ -655,4 +658,10 @@ pub struct InlineTuple2 {
 pub enum SkippedFieldWithinVariant {
     A(#[serde(skip)] String),
     B(String),
+}
+
+#[derive(Type)]
+#[serde(rename_all = "kebab-case")]
+pub struct KebabCase {
+    test_ing: String,
 }

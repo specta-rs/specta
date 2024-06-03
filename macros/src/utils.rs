@@ -89,22 +89,22 @@ impl Attribute {
 
     pub fn parse_inflection(&self) -> Result<Inflection> {
         match &self.value {
-            Some(AttributeValue::Lit(Lit::Str(lit))) => {
-                Ok(match lit.value().to_lowercase().replace('_', "").as_str() {
-                    "lowercase" => Inflection::Lower,
-                    "uppercase" => Inflection::Upper,
-                    "camelcase" => Inflection::Camel,
-                    "snakecase" => Inflection::Snake,
-                    "pascalcase" => Inflection::Pascal,
-                    "screamingsnakecase" => Inflection::ScreamingSnake,
-                    _ => {
-                        return Err(syn::Error::new_spanned(
-                            lit,
-                            "specta: found string literal containing an unsupported inflection",
-                        ))
-                    }
-                })
-            }
+            Some(AttributeValue::Lit(Lit::Str(lit))) => Ok(match lit.value().as_str() {
+                "lowercase" => Inflection::Lower,
+                "UPPERCASE" => Inflection::Upper,
+                "PascalCase" => Inflection::Pascal,
+                "camelCase" => Inflection::Camel,
+                "snake_case" => Inflection::Snake,
+                "SCREAMING_SNAKE_CASE" => Inflection::ScreamingSnake,
+                "kebab-case" => Inflection::Kebab,
+                "SCREAMING-KEBAB-CASE" => Inflection::ScreamingKebab,
+                _ => {
+                    return Err(syn::Error::new_spanned(
+                        lit,
+                        "specta: found string literal containing an unsupported inflection",
+                    ))
+                }
+            }),
             _ => Err(syn::Error::new(
                 self.value_span(),
                 "specta: expected string literal containing an inflection",
@@ -278,6 +278,8 @@ pub enum Inflection {
     Snake,
     Pascal,
     ScreamingSnake,
+    Kebab,
+    ScreamingKebab,
 }
 
 impl Inflection {
@@ -291,6 +293,8 @@ impl Inflection {
             Inflection::Snake => string.to_snake_case(),
             Inflection::Pascal => string.to_pascal_case(),
             Inflection::ScreamingSnake => string.to_screaming_snake_case(),
+            Inflection::Kebab => string.to_kebab_case(),
+            Inflection::ScreamingKebab => string.to_kebab_case().to_uppercase(),
         }
     }
 }
