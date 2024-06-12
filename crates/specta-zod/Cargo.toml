@@ -1,0 +1,15 @@
+[package]
+name = "specta-zod"
+description = "Export your Rust types to Zod schemas for TypeScript"
+version = "0.0.1"
+authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/oscartbeaumont/specta"
+documentation = "https://docs.rs/specta-zod/latest/specta-zod"
+keywords = ["async", "specta", "rspc", "typescript", "typesafe"]
+categories = ["web-programming", "asynchronous"]
+
+[dependencies]
+specta = { path = "../../", features = ["typescript"] }
+thiserror = "1.0.60"
