@@ -13,10 +13,6 @@ pub mod internal;
 
 /// Types related to working with [`DataType`](crate::DataType). Exposed for advanced users.
 pub mod datatype;
-/// Provides the global type store and a method to export them to other languages.
-#[cfg(feature = "export")]
-#[cfg_attr(docsrs2, doc(cfg(feature = "export")))]
-pub mod export;
 /// Support for exporting Rust functions.
 #[cfg(feature = "function")]
 #[cfg_attr(docsrs2, doc(cfg(feature = "function")))]

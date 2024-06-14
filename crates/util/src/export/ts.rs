@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::BTreeMap, path::Path};
 
-use crate::{
+use specta::{
     ts::{self, ExportConfig, ExportError},
     TypeMap,
 };
