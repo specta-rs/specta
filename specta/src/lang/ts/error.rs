@@ -47,6 +47,8 @@ pub enum ExportError {
     DuplicateTypeName(Cow<'static, str>, ImplLocation, ImplLocation),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+    #[error("fmt error: {0}")]
+    Fmt(#[from] std::fmt::Error),
     #[error("Failed to export '{0}' due to error: {1}")]
     Other(ExportPath, String),
 }

@@ -11,5 +11,5 @@ keywords = ["async", "specta", "rspc", "typescript", "typesafe"]
 categories = ["web-programming", "asynchronous"]
 
 [dependencies]
-specta = { path = "../../", features = ["typescript"] }
+specta = { path = "../specta", features = ["typescript"] }
 thiserror = "1.0.60"

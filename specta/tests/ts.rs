@@ -293,9 +293,9 @@ fn typescript_types() {
         ExportError::InvalidName(
             NamedLocation::Type,
             #[cfg(not(windows))]
-            ExportPath::new_unsafe("tests/ts.rs:619:10"),
+            ExportPath::new_unsafe("specta/tests/ts.rs:630:10"),
             #[cfg(windows)]
-            ExportPath::new_unsafe("tests\ts.rs:619:10"),
+            ExportPath::new_unsafe("specta\tests\ts.rs:630:10"),
             r#"@odata.context"#.to_string()
         )
     );
@@ -305,9 +305,9 @@ fn typescript_types() {
         ExportError::InvalidName(
             NamedLocation::Type,
             #[cfg(not(windows))]
-            ExportPath::new_unsafe("tests/ts.rs:623:10"),
+            ExportPath::new_unsafe("specta/tests/ts.rs:634:10"),
             #[cfg(windows)]
-            ExportPath::new_unsafe("tests\ts.rs:623:10"),
+            ExportPath::new_unsafe("specta|tests\ts.rs:634:10"),
             r#"@odata.context"#.to_string()
         )
     );

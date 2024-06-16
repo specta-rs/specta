@@ -34,7 +34,8 @@ fn typedef_named_datatype_inner(
 
     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
 
-    let inline_ts = datatype_inner(ctx.clone(), &typ.inner, type_map)?;
+    let mut inline_ts = String::new();
+    datatype_inner(ctx.clone(), &typ.inner, type_map, &mut inline_ts)?;
 
     let mut builder = ts::comments::js_doc_builder(CommentFormatterArgs {
         docs,

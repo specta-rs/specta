@@ -139,4 +139,4 @@ pub use specta_macros::DataTypeFrom;
 pub use specta_macros::specta;
 
 #[cfg(doctest)]
-doc_comment::doctest!("../README.md");
+doc_comment::doctest!("../../README.md");

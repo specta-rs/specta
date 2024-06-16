@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::fmt::Write;
 
 pub mod comments;
 mod context;
@@ -218,7 +219,8 @@ fn export_datatype_inner(
         .map(|generics| format!("<{}>", generics.join(", ")))
         .unwrap_or_default();
 
-    let inline_ts = datatype_inner(ctx.clone(), &typ.inner, type_map)?;
+    let mut inline_ts = String::new();
+    datatype_inner(ctx.clone(), &typ.inner, type_map, &mut inline_ts)?;
 
     Ok(inner_comments(
         ctx,
@@ -235,6 +237,7 @@ fn export_datatype_inner(
 pub fn datatype(conf: &ExportConfig, typ: &DataType, type_map: &TypeMap) -> Output {
     // TODO: Duplicate type name detection?
 
+    let mut s = String::new();
     datatype_inner(
         ExportContext {
             cfg: conf,
@@ -243,21 +246,28 @@ pub fn datatype(conf: &ExportConfig, typ: &DataType, type_map: &TypeMap) -> Outp
         },
         typ,
         type_map,
+        &mut s,
     )
+    .map(|_| s)
 }
 
-pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &TypeMap) -> Output {
+pub(crate) fn datatype_inner(
+    ctx: ExportContext,
+    typ: &DataType,
+    type_map: &TypeMap,
+    s: &mut String,
+) -> Result<()> {
     Ok(match &typ {
-        DataType::Any => ANY.into(),
-        DataType::Unknown => UNKNOWN.into(),
+        DataType::Any => s.push_str(ANY),
+        DataType::Unknown => s.push_str(UNKNOWN),
         DataType::Primitive(p) => {
             let ctx = ctx.with(PathItem::Type(p.to_rust_str().into()));
-            match p {
-                primitive_def!(i8 i16 i32 u8 u16 u32 f32 f64) => NUMBER.into(),
+            let str = match p {
+                primitive_def!(i8 i16 i32 u8 u16 u32 f32 f64) => NUMBER,
                 primitive_def!(usize isize i64 u64 i128 u128) => match ctx.cfg.bigint {
-                    BigIntExportBehavior::String => STRING.into(),
-                    BigIntExportBehavior::Number => NUMBER.into(),
-                    BigIntExportBehavior::BigInt => BIGINT.into(),
+                    BigIntExportBehavior::String => STRING,
+                    BigIntExportBehavior::Number => NUMBER,
+                    BigIntExportBehavior::BigInt => BIGINT,
                     BigIntExportBehavior::Fail => {
                         return Err(ExportError::BigIntForbidden(ctx.export_path()));
                     }
@@ -265,31 +275,40 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
                         return Err(ExportError::Other(ctx.export_path(), reason.to_owned()))
                     }
                 },
-                primitive_def!(String char) => STRING.into(),
-                primitive_def!(bool) => BOOLEAN.into(),
-            }
+                primitive_def!(String char) => STRING,
+                primitive_def!(bool) => BOOLEAN,
+            };
+
+            write!(s, "{str}")?;
         }
-        DataType::Literal(literal) => literal.to_ts(),
+        DataType::Literal(literal) => write!(s, "{literal}")?,
         DataType::Nullable(def) => {
-            let dt = datatype_inner(ctx, def, type_map)?;
+            let mut dt = String::new();
+            datatype_inner(ctx, def, type_map, &mut dt)?;
 
             if dt.ends_with(&format!(" | {NULL}")) {
-                dt
+                write!(s, "{dt}")?;
             } else {
-                format!("{dt} | {NULL}")
+                write!(s, "{dt} | {NULL}")?;
             }
         }
         DataType::Map(def) => {
-            format!(
+            let mut key = String::new();
+            datatype_inner(ctx.clone(), def.key_ty(), type_map, &mut key)?;
+            let mut value = String::new();
+            datatype_inner(ctx, def.value_ty(), type_map, &mut value)?;
+
+            write!(
+                s,
                 // We use this isn't of `Record<K, V>` to avoid issues with circular references.
-                "{{ [key in {}]: {} }}",
-                datatype_inner(ctx.clone(), def.key_ty(), type_map)?,
-                datatype_inner(ctx, def.value_ty(), type_map)?
-            )
+                "{{ [key in {key}]: {value} }}",
+            )?;
         }
         // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
         DataType::List(def) => {
-            let dt = datatype_inner(ctx, &def.ty, type_map)?;
+            let mut dt = String::new();
+            datatype_inner(ctx, &def.ty, type_map, &mut dt)?;
+
             let dt = if (dt.contains(' ') && !dt.ends_with('}'))
                 // This is to do with maintaining order of operations.
                 // Eg `{} | {}` must be wrapped in parens like `({} | {})[]` but `{}` doesn't cause `{}[]` is valid
@@ -301,15 +320,16 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
             };
 
             if let Some(length) = def.length {
-                format!(
+                write!(
+                    s,
                     "[{}]",
                     (0..length)
                         .map(|_| dt.clone())
                         .collect::<Vec<_>>()
                         .join(", ")
-                )
+                )?;
             } else {
-                format!("{dt}[]")
+                write!(s, "{dt}[]")?;
             }
         }
         DataType::Struct(item) => struct_datatype(
@@ -323,6 +343,7 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
             item.name(),
             item,
             type_map,
+            s,
         )?,
         DataType::Enum(item) => {
             let mut ctx = ctx.clone();
@@ -335,32 +356,43 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
                 ctx.with(PathItem::Variant(item.name.clone())),
                 item,
                 type_map,
+                s,
             )?
         }
-        DataType::Tuple(tuple) => tuple_datatype(ctx, tuple, type_map)?,
+        DataType::Tuple(tuple) => s.push_str(&tuple_datatype(ctx, tuple, type_map)?),
         DataType::Result(result) => {
             let mut variants = vec![
-                datatype_inner(ctx.clone(), &result.0, type_map)?,
-                datatype_inner(ctx, &result.1, type_map)?,
+                {
+                    let mut v = String::new();
+                    datatype_inner(ctx.clone(), &result.0, type_map, &mut v)?;
+                    v
+                },
+                {
+                    let mut v = String::new();
+                    datatype_inner(ctx, &result.1, type_map, &mut v)?;
+                    v
+                },
             ];
             variants.dedup();
-            variants.join(" | ")
+            s.push_str(&variants.join(" | "));
         }
         DataType::Reference(DataTypeReference { name, generics, .. }) => match &generics[..] {
-            [] => name.to_string(),
+            [] => write!(s, "{name}")?,
             generics => {
                 let generics = generics
                     .iter()
                     .map(|(_, v)| {
-                        datatype_inner(ctx.with(PathItem::Type(name.clone())), v, type_map)
+                        let mut s = String::new();
+                        datatype_inner(ctx.with(PathItem::Type(name.clone())), v, type_map, &mut s)
+                            .map(|_| s)
                     })
                     .collect::<Result<Vec<_>>>()?
                     .join(", ");
 
-                format!("{name}<{generics}>")
+                write!(s, "{name}<{generics}>")?;
             }
         },
-        DataType::Generic(GenericType(ident)) => ident.to_string(),
+        DataType::Generic(GenericType(ident)) => s.push_str(&ident.to_string()),
     })
 }
 
@@ -369,30 +401,32 @@ fn unnamed_fields_datatype(
     ctx: ExportContext,
     fields: &[NonSkipField],
     type_map: &TypeMap,
-) -> Output {
-    match fields {
-        [(field, ty)] => Ok(inner_comments(
-            ctx.clone(),
-            field.deprecated(),
-            field.docs(),
-            datatype_inner(ctx, ty, type_map)?,
-            true,
-        )),
-        fields => Ok(format!(
+    s: &mut String,
+) -> Result<()> {
+    Ok(match fields {
+        [(field, ty)] => {
+            let mut v = String::new();
+            datatype_inner(ctx.clone(), ty, type_map, &mut v)?;
+            write!(
+                s,
+                "{}",
+                inner_comments(ctx, field.deprecated(), field.docs(), v, true)
+            )?
+        }
+        fields => write!(
+            s,
             "[{}]",
             fields
                 .iter()
-                .map(|(field, ty)| Ok(inner_comments(
-                    ctx.clone(),
-                    field.deprecated(),
-                    field.docs(),
-                    datatype_inner(ctx.clone(), ty, type_map)?,
-                    true
-                )))
+                .map(|(field, ty)| Ok({
+                    let mut v = String::new();
+                    datatype_inner(ctx.clone(), ty, type_map, &mut v)?;
+                    inner_comments(ctx.clone(), field.deprecated(), field.docs(), v, true)
+                }))
                 .collect::<Result<Vec<_>>>()?
                 .join(", ")
-        )),
-    }
+        )?,
+    })
 }
 
 fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, type_map: &TypeMap) -> Output {
@@ -401,28 +435,39 @@ fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, type_map: &TypeMap) -> 
         tys => Ok(format!(
             "[{}]",
             tys.iter()
-                .map(|v| datatype_inner(ctx.clone(), v, type_map))
+                .map(|v| {
+                    let mut s = String::new();
+                    datatype_inner(ctx.clone(), v, type_map, &mut s).map(|_| s)
+                })
                 .collect::<Result<Vec<_>>>()?
                 .join(", ")
         )),
     }
 }
 
-fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &TypeMap) -> Output {
-    match &s.fields {
-        StructFields::Unit => Ok(NULL.into()),
-        StructFields::Unnamed(s) => {
-            unnamed_fields_datatype(ctx, &skip_fields(s.fields()).collect::<Vec<_>>(), type_map)
-        }
-        StructFields::Named(s) => {
-            let fields = skip_fields_named(s.fields()).collect::<Vec<_>>();
+fn struct_datatype(
+    ctx: ExportContext,
+    key: &str,
+    strct: &StructType,
+    type_map: &TypeMap,
+    s: &mut String,
+) -> Result<()> {
+    match &strct.fields {
+        StructFields::Unit => Ok(write!(s, "{NULL}")?),
+        StructFields::Unnamed(unnamed) => unnamed_fields_datatype(
+            ctx,
+            &skip_fields(unnamed.fields()).collect::<Vec<_>>(),
+            type_map,
+            s,
+        ),
+        StructFields::Named(named) => {
+            let fields = skip_fields_named(named.fields()).collect::<Vec<_>>();
 
             if fields.is_empty() {
-                return Ok(s
-                    .tag()
-                    .as_ref()
-                    .map(|tag| format!("{{ \"{tag}\": \"{key}\" }}"))
-                    .unwrap_or_else(|| format!("Record<{STRING}, {NEVER}>")));
+                return Ok(match named.tag().as_ref() {
+                    Some(tag) => write!(s, r#"{{ "{tag}": "{key}" }}"#)?,
+                    None => write!(s, "Record<{STRING}, {NEVER}>")?,
+                });
             }
 
             let (flattened, non_flattened): (Vec<_>, Vec<_>) =
@@ -431,17 +476,17 @@ fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &Typ
             let mut field_sections = flattened
                 .into_iter()
                 .map(|(key, (field, ty))| {
-                    datatype_inner(ctx.with(PathItem::Field(key.clone())), ty, type_map).map(
-                        |type_str| {
+                    let mut s = String::new();
+                    datatype_inner(ctx.with(PathItem::Field(key.clone())), ty, type_map, &mut s)
+                        .map(|_| {
                             inner_comments(
                                 ctx.clone(),
                                 field.deprecated(),
                                 field.docs(),
-                                format!("({type_str})"),
+                                format!("({s})"),
                                 true,
                             )
-                        },
-                    )
+                        })
                 })
                 .collect::<Result<Vec<_>>>()?;
 
@@ -450,22 +495,26 @@ fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &Typ
                 .map(|(key, field_ref)| {
                     let (field, _) = field_ref;
 
+                    let mut other = String::new();
+                    object_field_to_ts(
+                        ctx.with(PathItem::Field(key.clone())),
+                        key.clone(),
+                        field_ref,
+                        type_map,
+                        &mut other,
+                    )?;
+
                     Ok(inner_comments(
                         ctx.clone(),
                         field.deprecated(),
                         field.docs(),
-                        object_field_to_ts(
-                            ctx.with(PathItem::Field(key.clone())),
-                            key.clone(),
-                            field_ref,
-                            type_map,
-                        )?,
+                        other,
                         true,
                     ))
                 })
                 .collect::<Result<Vec<_>>>()?;
 
-            if let Some(tag) = &s.tag {
+            if let Some(tag) = &named.tag {
                 unflattened_fields.push(format!("{tag}: \"{key}\""));
             }
 
@@ -473,7 +522,7 @@ fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &Typ
                 field_sections.push(format!("{{ {} }}", unflattened_fields.join("; ")));
             }
 
-            Ok(field_sections.join(" & "))
+            Ok(write!(s, "{}", field_sections.join(" & "))?)
         }
     }
 }
@@ -500,16 +549,20 @@ fn enum_variant_datatype(
                     .map(|(name, field_ref)| {
                         let (field, _) = field_ref;
 
+                        let mut other = String::new();
+                        object_field_to_ts(
+                            ctx.with(PathItem::Field(name.clone())),
+                            name.clone(),
+                            field_ref,
+                            type_map,
+                            &mut other,
+                        )?;
+
                         Ok(inner_comments(
                             ctx.clone(),
                             field.deprecated(),
                             field.docs(),
-                            object_field_to_ts(
-                                ctx.with(PathItem::Field(name.clone())),
-                                name.clone(),
-                                field_ref,
-                                type_map,
-                            )?,
+                            other,
                             true,
                         ))
                     })
@@ -523,7 +576,10 @@ fn enum_variant_datatype(
         }
         EnumVariants::Unnamed(obj) => {
             let fields = skip_fields(obj.fields())
-                .map(|(_, ty)| datatype_inner(ctx.clone(), ty, type_map))
+                .map(|(_, ty)| {
+                    let mut s = String::new();
+                    datatype_inner(ctx.clone(), ty, type_map, &mut s).map(|_| s)
+                })
                 .collect::<Result<Vec<_>>>()?;
 
             Ok(match &fields[..] {
@@ -544,9 +600,14 @@ fn enum_variant_datatype(
     }
 }
 
-fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output {
+fn enum_datatype(
+    ctx: ExportContext,
+    e: &EnumType,
+    type_map: &TypeMap,
+    s: &mut String,
+) -> Result<()> {
     if e.variants().is_empty() {
-        return Ok(NEVER.to_string());
+        return Ok(write!(s, "{NEVER}")?);
     }
 
     Ok(match &e.repr {
@@ -575,7 +636,7 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                 })
                 .collect::<Result<Vec<_>>>()?;
             variants.dedup();
-            variants.join(" | ")
+            s.push_str(&variants.join(" | "));
         }
         repr => {
             let mut variants = e
@@ -609,8 +670,9 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                                     false
                                 };
 
-                                let mut typ =
-                                    unnamed_fields_datatype(ctx.clone(), &fields, type_map)?;
+                                let mut typ = String::new();
+
+                                unnamed_fields_datatype(ctx.clone(), &fields, type_map, &mut typ)?;
 
                                 if dont_join_ty {
                                     format!("({{ {tag}: {sanitised_name} }})")
@@ -625,18 +687,17 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                             (EnumRepr::Internal { tag }, EnumVariants::Named(obj)) => {
                                 let mut fields = vec![format!("{tag}: {sanitised_name}")];
 
-                                fields.extend(
-                                    skip_fields_named(obj.fields())
-                                        .map(|(name, field)| {
-                                            object_field_to_ts(
-                                                ctx.with(PathItem::Field(name.clone())),
-                                                name.clone(),
-                                                field,
-                                                type_map,
-                                            )
-                                        })
-                                        .collect::<Result<Vec<_>>>()?,
-                                );
+                                for (name, field) in skip_fields_named(obj.fields()) {
+                                    let mut other = String::new();
+                                    object_field_to_ts(
+                                        ctx.with(PathItem::Field(name.clone())),
+                                        name.clone(),
+                                        field,
+                                        type_map,
+                                        &mut other,
+                                    )?;
+                                    fields.push(other);
+                                }
 
                                 format!("{{ {} }}", fields.join("; "))
                             }
@@ -668,12 +729,18 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                                     variant,
                                 )?;
 
-                                let mut result = format!("{{ {tag}: {sanitised_name}");
+                                let mut s = String::new();
+
+                                s.push_str("{ ");
+
+                                write!(s, "{tag}: {sanitised_name}")?;
                                 if let Some(ts_value) = ts_value {
-                                    result.push_str(&format!("; {content}: {ts_value}"));
+                                    write!(s, "; {content}: {ts_value}")?;
                                 }
-                                result.push_str(" }");
-                                result
+
+                                s.push_str(" }");
+
+                                s
                             }
                         },
                         true,
@@ -681,26 +748,26 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output
                 })
                 .collect::<Result<Vec<_>>>()?;
             variants.dedup();
-            variants.join(" | ")
+            s.push_str(&variants.join(" | "));
         }
     })
 }
 
-impl LiteralType {
-    fn to_ts(&self) -> String {
+impl std::fmt::Display for LiteralType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::i8(v) => v.to_string(),
-            Self::i16(v) => v.to_string(),
-            Self::i32(v) => v.to_string(),
-            Self::u8(v) => v.to_string(),
-            Self::u16(v) => v.to_string(),
-            Self::u32(v) => v.to_string(),
-            Self::f32(v) => v.to_string(),
-            Self::f64(v) => v.to_string(),
-            Self::bool(v) => v.to_string(),
-            Self::String(v) => format!(r#""{v}""#),
-            Self::char(v) => format!(r#""{v}""#),
-            Self::None => NULL.to_string(),
+            Self::i8(v) => write!(f, "{v}"),
+            Self::i16(v) => write!(f, "{v}"),
+            Self::i32(v) => write!(f, "{v}"),
+            Self::u8(v) => write!(f, "{v}"),
+            Self::u16(v) => write!(f, "{v}"),
+            Self::u32(v) => write!(f, "{v}"),
+            Self::f32(v) => write!(f, "{v}"),
+            Self::f64(v) => write!(f, "{v}"),
+            Self::bool(v) => write!(f, "{v}"),
+            Self::String(v) => write!(f, r#""{v}""#),
+            Self::char(v) => write!(f, r#""{v}""#),
+            Self::None => write!(f, "{NULL}"),
         }
     }
 }
@@ -711,7 +778,8 @@ fn object_field_to_ts(
     key: Cow<'static, str>,
     (field, ty): NonSkipField,
     type_map: &TypeMap,
-) -> Output {
+    s: &mut String,
+) -> Result<()> {
     let field_name_safe = sanitise_key(key, false);
 
     // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
@@ -720,7 +788,10 @@ fn object_field_to_ts(
         false => (field_name_safe, ty),
     };
 
-    Ok(format!("{key}: {}", datatype_inner(ctx, ty, type_map)?))
+    let mut value = String::new();
+    datatype_inner(ctx, ty, type_map, &mut value)?;
+
+    Ok(write!(s, "{key}: {value}",)?)
 }
 
 /// sanitise a string to be a valid Typescript key

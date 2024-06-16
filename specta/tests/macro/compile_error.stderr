@@ -85,8 +85,8 @@ error[E0277]: the trait bound `UnitExternal: specta::Flatten` is not satisfied
    = help: the following other types implement trait `specta::Flatten`:
              toml::map::Map<K, V>
              FlattenExternal
-             toml_datetime::datetime::Datetime
              FlattenUntagged
+             toml_datetime::datetime::Datetime
              FlattenInternal
              Box<T>
              serde_json::map::Map<K, V>
@@ -108,8 +108,8 @@ error[E0277]: the trait bound `UnnamedMultiExternal: specta::Flatten` is not sat
    = help: the following other types implement trait `specta::Flatten`:
              toml::map::Map<K, V>
              FlattenExternal
-             toml_datetime::datetime::Datetime
              FlattenUntagged
+             toml_datetime::datetime::Datetime
              FlattenInternal
              Box<T>
              serde_json::map::Map<K, V>
@@ -131,8 +131,8 @@ error[E0277]: the trait bound `UnnamedUntagged: specta::Flatten` is not satisfie
    = help: the following other types implement trait `specta::Flatten`:
              toml::map::Map<K, V>
              FlattenExternal
-             toml_datetime::datetime::Datetime
              FlattenUntagged
+             toml_datetime::datetime::Datetime
              FlattenInternal
              Box<T>
              serde_json::map::Map<K, V>
@@ -154,8 +154,8 @@ error[E0277]: the trait bound `UnnamedMultiUntagged: specta::Flatten` is not sat
    = help: the following other types implement trait `specta::Flatten`:
              toml::map::Map<K, V>
              FlattenExternal
-             toml_datetime::datetime::Datetime
              FlattenUntagged
+             toml_datetime::datetime::Datetime
              FlattenInternal
              Box<T>
              serde_json::map::Map<K, V>
@@ -177,8 +177,8 @@ error[E0277]: the trait bound `UnnamedInternal: specta::Flatten` is not satisfie
    = help: the following other types implement trait `specta::Flatten`:
              toml::map::Map<K, V>
              FlattenExternal
-             toml_datetime::datetime::Datetime
              FlattenUntagged
+             toml_datetime::datetime::Datetime
              FlattenInternal
              Box<T>
              serde_json::map::Map<K, V>

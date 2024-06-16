@@ -44,9 +44,9 @@ fn test_ts_reserved_keyworks() {
         Err(ExportError::ForbiddenName(
             NamedLocation::Type,
             #[cfg(not(windows))]
-            ExportPath::new_unsafe("tests/reserved_keywords.rs:10:14"),
+            ExportPath::new_unsafe("specta/tests/reserved_keywords.rs:10:14"),
             #[cfg(windows)]
-            ExportPath::new_unsafe("tests\reserved_keywords.rs:10:14"),
+            ExportPath::new_unsafe("specta\tests\reserved_keywords.rs:10:14"),
             "enum"
         ))
     );
@@ -55,9 +55,9 @@ fn test_ts_reserved_keyworks() {
         Err(ExportError::ForbiddenName(
             NamedLocation::Type,
             #[cfg(not(windows))]
-            ExportPath::new_unsafe("tests/reserved_keywords.rs:22:14"),
+            ExportPath::new_unsafe("specta/tests/reserved_keywords.rs:22:14"),
             #[cfg(windows)]
-            ExportPath::new_unsafe("tests\reserved_keywords.rs:22:14"),
+            ExportPath::new_unsafe("specta\tests\reserved_keywords.rs:22:14"),
             "enum"
         ))
     );
@@ -66,9 +66,9 @@ fn test_ts_reserved_keyworks() {
         Err(ExportError::ForbiddenName(
             NamedLocation::Type,
             #[cfg(not(windows))]
-            ExportPath::new_unsafe("tests/reserved_keywords.rs:32:14"),
+            ExportPath::new_unsafe("specta/tests/reserved_keywords.rs:32:14"),
             #[cfg(windows)]
-            ExportPath::new_unsafe("tests\reserved_keywords.rs:32:14"),
+            ExportPath::new_unsafe("specta\tests\reserved_keywords.rs:32:14"),
             "enum"
         ))
     );
