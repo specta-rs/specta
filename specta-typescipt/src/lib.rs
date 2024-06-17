@@ -1,3 +1,5 @@
+//! [TypeScript](https://www.typescriptlang.org) language exporter.
+
 use std::fmt::Write;
 use std::{borrow::Cow, fmt::Display};
 

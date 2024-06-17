@@ -30,23 +30,6 @@ default = []
 ## Support for exporting the types of Rust functions.
 function = ["serde", "specta-macros/function"]
 
-#! Languages
-## Support for [TypeScript](https://www.typescriptlang.org) language exporting
-typescript = ["serde"] # TODO: Probally don't keep `serde` here for v2???
-## Support for [JSDoc](https://jsdoc.app) exporting helpers.
-## Also requires `typescript` feature to be enabled.
-js_doc = []
-# ## Support for [Rust](https://www.rust-lang.org) language exporting
-# rust = []
-# ## Support for [Swift](https://www.swift.org/) language exporting
-# swift = []
-# ## Support for [Kotlin](https://kotlinlang.org/) language exporting
-# kotlin = []
-# ## Support for [Go Lang](https://go.dev/) language exporting
-# go = []
-# ## Support for [OpenAPI](https://www.openapis.org) language exporting
-# openapi = ["dep:openapiv3"]
-
 #! Compatability
 ## Support for [serde](https://serde.rs)
 serde = ["dep:serde", "specta-macros/serde"]
@@ -117,7 +100,6 @@ ipnetwork = { version = "0.20.0", optional = true, default-features = false, fea
 mac_address = { version = "1.1.5", optional = true, default-features = false, features = [] }
 bit-vec = { version = "0.6.3", optional = true, default-features = false, features = [] }
 bson = { version = "2.6.1", optional = true, default-features = false, features = [] }
-openapiv3 = { version = "1.0.2", optional = true, default-features = false, features = [] }
 uhlc = { version = "0.6.0", optional = true, default-features = false, features = [] }
 bytesize = { version = "1.2.0", optional = true, default-features = false, features = [] }
 glam = { version = "0.25", optional = true, default-features = false, features = ["std"] }

@@ -1,8 +1,10 @@
+//! [OpenAPI](https://www.openapis.org) language exporter.
+
 use openapiv3::{
     ArrayType, NumberType, ReferenceOr, Schema, SchemaData, SchemaKind, StringType, Type,
 };
 
-use crate::*;
+use specta::*;
 
 // pub fn to_openapi_export(def: &DataType) -> Result<openapiv3::Schema, String> {
 //     Ok(match &def {

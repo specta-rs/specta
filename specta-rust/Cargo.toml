@@ -1,0 +1,14 @@
+[package]
+name = "specta-rust"
+description = "Export your Rust types to Rust"
+version = "0.0.1"
+authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/oscartbeaumont/specta"
+documentation = "https://docs.rs/specta-zod/latest/specta-zod"
+keywords = ["async", "specta", "rspc", "rust", "typesafe"]
+categories = ["web-programming", "asynchronous"]
+
+[dependencies]
+specta = { path = "../specta" }

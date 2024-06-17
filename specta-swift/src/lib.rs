@@ -1,4 +1,6 @@
-use crate::*;
+//! [Swift](https://www.swift.org) language exporter.
+
+use specta::*;
 
 /// TODO
 pub fn export<T: Type>() -> Result<String, String> {

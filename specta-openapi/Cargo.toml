@@ -1,0 +1,15 @@
+[package]
+name = "specta-openapi"
+description = "Export your Rust types to OpenAPI"
+version = "0.0.1"
+authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/oscartbeaumont/specta"
+documentation = "https://docs.rs/specta-zod/latest/specta-zod"
+keywords = ["async", "specta", "rspc", "openapi", "typesafe"]
+categories = ["web-programming", "asynchronous"]
+
+[dependencies]
+specta = { path = "../specta" }
+openapiv3 = { version = "1.0.2", default-features = false, features = [] }

@@ -17,7 +17,6 @@ pub mod datatype;
 #[cfg(feature = "function")]
 #[cfg_attr(docsrs2, doc(cfg(feature = "function")))]
 pub mod function;
-mod lang;
 mod selection;
 mod serde;
 mod static_types;

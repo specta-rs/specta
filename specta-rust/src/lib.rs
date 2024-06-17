@@ -1,4 +1,6 @@
-use crate::*;
+//! [Rust](https://www.rust-lang.org) language exporter.
+
+use specta::*;
 
 /// TODO
 pub fn export<T: Type>() -> Result<String, String> {
