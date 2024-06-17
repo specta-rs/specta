@@ -1,5 +1,5 @@
-use std::borrow::Cow;
 use std::fmt::Write;
+use std::{borrow::Cow, fmt::Display};
 
 pub mod comments;
 mod context;
@@ -279,30 +279,24 @@ pub(crate) fn datatype_inner(
                 primitive_def!(bool) => BOOLEAN,
             };
 
-            write!(s, "{str}")?;
+            s.push_str(str);
         }
         DataType::Literal(literal) => write!(s, "{literal}")?,
         DataType::Nullable(def) => {
-            let mut dt = String::new();
-            datatype_inner(ctx, def, type_map, &mut dt)?;
+            datatype_inner(ctx, def, type_map, s)?;
 
-            if dt.ends_with(&format!(" | {NULL}")) {
-                write!(s, "{dt}")?;
-            } else {
-                write!(s, "{dt} | {NULL}")?;
+            let or_null = format!(" | {NULL}");
+            if !s.ends_with(&or_null) {
+                s.push_str(&or_null);
             }
         }
         DataType::Map(def) => {
-            let mut key = String::new();
-            datatype_inner(ctx.clone(), def.key_ty(), type_map, &mut key)?;
-            let mut value = String::new();
-            datatype_inner(ctx, def.value_ty(), type_map, &mut value)?;
-
-            write!(
-                s,
-                // We use this isn't of `Record<K, V>` to avoid issues with circular references.
-                "{{ [key in {key}]: {value} }}",
-            )?;
+            // We use this instead of `Record<K, V>` to avoid issues with circular references.
+            s.push_str("{ [key in ");
+            datatype_inner(ctx.clone(), def.key_ty(), type_map, s)?;
+            s.push_str("]: ");
+            datatype_inner(ctx.clone(), def.value_ty(), type_map, s)?;
+            s.push_str(" }");
         }
         // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
         DataType::List(def) => {
@@ -320,14 +314,17 @@ pub(crate) fn datatype_inner(
             };
 
             if let Some(length) = def.length {
-                write!(
-                    s,
-                    "[{}]",
-                    (0..length)
-                        .map(|_| dt.clone())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )?;
+                s.push('[');
+
+                for n in 0..length {
+                    if n != 0 {
+                        s.push_str(", ");
+                    }
+
+                    s.push_str(&dt);
+                }
+
+                s.push(']');
             } else {
                 write!(s, "{dt}[]")?;
             }
@@ -377,22 +374,23 @@ pub(crate) fn datatype_inner(
             s.push_str(&variants.join(" | "));
         }
         DataType::Reference(DataTypeReference { name, generics, .. }) => match &generics[..] {
-            [] => write!(s, "{name}")?,
+            [] => s.push_str(&name),
             generics => {
-                let generics = generics
-                    .iter()
-                    .map(|(_, v)| {
-                        let mut s = String::new();
-                        datatype_inner(ctx.with(PathItem::Type(name.clone())), v, type_map, &mut s)
-                            .map(|_| s)
-                    })
-                    .collect::<Result<Vec<_>>>()?
-                    .join(", ");
+                s.push_str(&name);
+                s.push('<');
 
-                write!(s, "{name}<{generics}>")?;
+                for (i, (_, v)) in generics.iter().enumerate() {
+                    if i != 0 {
+                        s.push_str(", ");
+                    }
+
+                    datatype_inner(ctx.with(PathItem::Type(name.clone())), v, type_map, s)?;
+                }
+
+                s.push('>');
             }
         },
-        DataType::Generic(GenericType(ident)) => s.push_str(&ident.to_string()),
+        DataType::Generic(GenericType(ident)) => s.push_str(&ident),
     })
 }
 
@@ -407,25 +405,35 @@ fn unnamed_fields_datatype(
         [(field, ty)] => {
             let mut v = String::new();
             datatype_inner(ctx.clone(), ty, type_map, &mut v)?;
-            write!(
-                s,
-                "{}",
-                inner_comments(ctx, field.deprecated(), field.docs(), v, true)
-            )?
+            s.push_str(&inner_comments(
+                ctx,
+                field.deprecated(),
+                field.docs(),
+                v,
+                true,
+            ));
         }
-        fields => write!(
-            s,
-            "[{}]",
-            fields
-                .iter()
-                .map(|(field, ty)| Ok({
-                    let mut v = String::new();
-                    datatype_inner(ctx.clone(), ty, type_map, &mut v)?;
-                    inner_comments(ctx.clone(), field.deprecated(), field.docs(), v, true)
-                }))
-                .collect::<Result<Vec<_>>>()?
-                .join(", ")
-        )?,
+        fields => {
+            s.push('[');
+
+            for (i, (field, ty)) in fields.iter().enumerate() {
+                if i != 0 {
+                    s.push_str(", ");
+                }
+
+                let mut v = String::new();
+                datatype_inner(ctx.clone(), ty, type_map, &mut v)?;
+                s.push_str(&inner_comments(
+                    ctx.clone(),
+                    field.deprecated(),
+                    field.docs(),
+                    v,
+                    true,
+                ));
+            }
+
+            s.push(']');
+        }
     })
 }
 
@@ -452,14 +460,14 @@ fn struct_datatype(
     type_map: &TypeMap,
     s: &mut String,
 ) -> Result<()> {
-    match &strct.fields {
-        StructFields::Unit => Ok(write!(s, "{NULL}")?),
+    Ok(match &strct.fields {
+        StructFields::Unit => s.push_str(NULL),
         StructFields::Unnamed(unnamed) => unnamed_fields_datatype(
             ctx,
             &skip_fields(unnamed.fields()).collect::<Vec<_>>(),
             type_map,
             s,
-        ),
+        )?,
         StructFields::Named(named) => {
             let fields = skip_fields_named(named.fields()).collect::<Vec<_>>();
 
@@ -522,9 +530,9 @@ fn struct_datatype(
                 field_sections.push(format!("{{ {} }}", unflattened_fields.join("; ")));
             }
 
-            Ok(write!(s, "{}", field_sections.join(" & "))?)
+            s.push_str(&field_sections.join(" & "));
         }
-    }
+    })
 }
 
 fn enum_variant_datatype(
@@ -767,7 +775,7 @@ impl std::fmt::Display for LiteralType {
             Self::bool(v) => write!(f, "{v}"),
             Self::String(v) => write!(f, r#""{v}""#),
             Self::char(v) => write!(f, r#""{v}""#),
-            Self::None => write!(f, "{NULL}"),
+            Self::None => f.write_str(NULL),
         }
     }
 }
