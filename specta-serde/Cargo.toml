@@ -1,6 +1,6 @@
 [package]
-name = "specta-zod"
-description = "Export your Rust types to Zod schemas for TypeScript"
+name = "specta-serde"
+description = "Serde support for Specta"
 version = "0.0.1"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2021"
@@ -12,4 +12,3 @@ categories = ["web-programming", "asynchronous"]
 
 [dependencies]
 specta = { path = "../specta" }
-thiserror = "1.0.60"

@@ -17,15 +17,11 @@ pub mod datatype;
 #[cfg(feature = "function")]
 #[cfg_attr(docsrs2, doc(cfg(feature = "function")))]
 pub mod function;
-mod selection;
-mod serde;
 /// Contains [`Type`] and everything related to it, including implementations and helper macros
 pub mod r#type;
 
-pub use crate::serde::*;
 #[doc(hidden)] // TODO: Should we actually do this? I think not
 pub use datatype::*;
-pub use lang::*;
 pub use r#type::*;
 
 /// Implements [`Type`] for a given struct or enum.
@@ -53,70 +49,6 @@ pub use r#type::*;
 /// }
 /// ```
 pub use specta_macros::Type;
-
-/// Generates an implementation to help converting a type into into [`DataType`].
-///
-/// **This is an advanced feature and should probably be limited to usage in libraries built on top of Specta.**
-///
-/// This differs from [`Type`] in that you can use other [`DataType`] values
-/// at runtime inside the targeted type, providing an easy way to construct types at
-/// runtime from other types which are known statically via [`Type`].
-///
-/// Along with inner data types such as [`StructType`] and [`EnumType`], some builtin types
-/// can easily be convert to a [`DataType`]:
-/// - [`Vec`] will become [`DataType::Enum`]
-/// - [`Option`] will become the value it contains or [`LiteralType::None`] if it is [`None`]
-/// - [`String`] and [`&str`] will become [`LiteralType::String`]
-///
-/// # Example
-/// ```rust
-/// use specta::{datatype::LiteralType, ts, DataType, DataTypeFrom, StructType, TupleType};
-///
-/// #[derive(Clone, DataTypeFrom)]
-/// pub struct MyEnum(pub Vec<DataType>);
-///
-/// #[derive(Clone, DataTypeFrom)]
-/// pub struct MyObject {
-///     a: Vec<DataType>,
-/// }
-///
-/// //
-/// // Enum
-/// //
-///
-/// let val: DataType = MyEnum(vec![
-///     LiteralType::String("A".to_string()).into(),
-///     LiteralType::String("B".to_string()).into(),
-/// ]).into();
-///
-/// let anon = ts::datatype(&Default::default(), &val, &Default::default()).unwrap();
-/// assert_eq!(anon, "\"A\" | \"B\"");
-///
-/// let named = val.to_named("MyEnum");
-/// let named_export = ts::export_named_datatype(&Default::default(), &named, &Default::default()).unwrap();
-/// assert_eq!(named_export, "export type MyEnum = \"A\" | \"B\"");
-///
-/// //
-/// // Object
-/// //
-///
-/// let val: StructType = MyObject {
-///     a: vec![
-///         LiteralType::String("A".to_string()).into(),
-///         LiteralType::String("B".to_string()).into(),
-///     ],
-/// }
-/// .into();
-///
-/// let anon = val.clone().to_anonymous();
-/// let anon = ts::datatype(&Default::default(), &anon, &Default::default()).unwrap();
-/// assert_eq!(anon, "{ a: \"A\" | \"B\" }");
-///
-/// let named = val.to_named("MyObject");
-/// let named_export = ts::export_named_datatype(&Default::default(), &named, &Default::default()).unwrap();
-/// assert_eq!(named_export, "export type MyObject = { a: \"A\" | \"B\" }");
-/// ```
-pub use specta_macros::DataTypeFrom;
 
 /// Prepares a function to have its types extracted using [`fn_datatype`]
 ///

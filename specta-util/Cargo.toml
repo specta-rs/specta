@@ -10,10 +10,6 @@ documentation = "https://docs.rs/specta-util/latest/specta-util"
 keywords = ["async", "specta", "rspc", "typescript", "typesafe"]
 categories = ["web-programming", "asynchronous"]
 
-[[example]]
-name = "export"
-required-features = ["export", "typescript"]
-
 [features]
 default = []
 

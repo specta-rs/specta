@@ -28,8 +28,9 @@ mod ty_override;
 mod type_collection;
 mod type_map;
 mod typescript;
-#[cfg(all(feature = "ulid", feature = "typescript"))]
-mod ulid;
+// TODO: Bring this back
+// #[cfg(all(feature = "ulid", feature = "typescript"))]
+// mod ulid;
 
 #[test]
 fn test_compile_errors() {

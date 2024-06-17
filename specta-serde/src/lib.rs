@@ -1,3 +1,5 @@
+//! Serde support for Specta
+
 use std::collections::HashSet;
 
 use thiserror::Error;

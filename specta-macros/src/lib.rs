@@ -10,7 +10,6 @@
 
 #[macro_use]
 mod utils;
-mod data_type_from;
 #[cfg(feature = "function")]
 mod internal_fn_datatype;
 #[cfg(feature = "function")]
