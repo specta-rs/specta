@@ -22,11 +22,6 @@ pub fn derive_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     r#type::derive(input).unwrap_or_else(|err| err.into_compile_error().into())
 }
 
-#[proc_macro_derive(DataTypeFrom, attributes(specta))]
-pub fn derive_data_type_from(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    data_type_from::derive(input).unwrap_or_else(|err| err.into_compile_error().into())
-}
-
 #[proc_macro_attribute]
 #[cfg(feature = "function")]
 pub fn specta(
