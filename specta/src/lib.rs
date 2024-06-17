@@ -19,19 +19,14 @@ pub mod datatype;
 pub mod function;
 mod selection;
 mod serde;
-mod static_types;
 /// Contains [`Type`] and everything related to it, including implementations and helper macros
 pub mod r#type;
-mod type_collection;
 
 pub use crate::serde::*;
 #[doc(hidden)] // TODO: Should we actually do this? I think not
 pub use datatype::*;
 pub use lang::*;
 pub use r#type::*;
-pub use selection::*;
-pub use static_types::*;
-pub use type_collection::TypeCollection;
 
 /// Implements [`Type`] for a given struct or enum.
 ///
