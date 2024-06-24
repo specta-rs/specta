@@ -1,5 +1,8 @@
 // inspired by https://github.com/tauri-apps/tauri/blob/2901145c497299f033ba7120af5f2e7ead16c75a/core/tauri-macros/src/command/handler.rs
 
+use std::str::FromStr;
+
+use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{parse_macro_input, FnArg, ItemFn, Pat, Visibility};
 
@@ -39,16 +42,28 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
         None => false,
     };
 
-    let arg_names = function.sig.inputs.iter().map(|input| match input {
-        FnArg::Receiver(_) => unreachable!("Commands cannot take 'self'"),
-        FnArg::Typed(arg) => match &*arg.pat {
-            Pat::Ident(ident) => ident.ident.to_token_stream(),
-            Pat::Macro(m) => m.mac.tokens.to_token_stream(),
-            Pat::Struct(s) => s.path.to_token_stream(),
-            Pat::Slice(s) => s.attrs[0].to_token_stream(),
-            Pat::Tuple(s) => s.elems[0].to_token_stream(),
-            _ => unreachable!("Commands must take named arguments"),
-        },
+    let arg_names = function.sig.inputs.iter().map(|input| {
+        let arg = match input {
+            FnArg::Receiver(_) => unreachable!("Commands cannot take 'self'"),
+            FnArg::Typed(arg) => match &*arg.pat {
+                Pat::Ident(ident) => ident.ident.to_token_stream(),
+                Pat::Macro(m) => m.mac.tokens.to_token_stream(),
+                Pat::Struct(s) => s.path.to_token_stream(),
+                Pat::Slice(s) => s.attrs[0].to_token_stream(),
+                Pat::Tuple(s) => s.elems[0].to_token_stream(),
+                _ => unreachable!("Commands must take named arguments"),
+            },
+        };
+
+        let mut s = arg.to_string();
+
+        let s = if s.starts_with("r#") {
+            s.split_off(2)
+        } else {
+            s
+        };
+
+        TokenStream::from_str(&s).unwrap()
     });
 
     let arg_signatures = function.sig.inputs.iter().map(|_| quote!(_));
