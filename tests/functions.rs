@@ -90,6 +90,9 @@ mod test {
         pub fn nested() {}
     }
 
+    #[specta]
+    fn raw(r#type: i32) {}
+
     // TODO: Finish fixing these
 
     #[test]
@@ -318,6 +321,12 @@ mod test {
             assert_eq!(def.args.len(), 0);
             assert_eq!(def.result, None);
             assert_eq!(def.docs, Cow::Borrowed(" Testing Doc Comment"));
+        }
+
+        {
+            let mut type_map = &mut specta::TypeMap::default();
+            let def: function::FunctionDataType = specta::fn_datatype!(type_map; raw);
+            assert_eq!(def.args[0].0, "type");
         }
     }
 }
