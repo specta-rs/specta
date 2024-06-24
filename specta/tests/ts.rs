@@ -307,7 +307,7 @@ fn typescript_types() {
             #[cfg(not(windows))]
             ExportPath::new_unsafe("specta/tests/ts.rs:634:10"),
             #[cfg(windows)]
-            ExportPath::new_unsafe("specta|tests\ts.rs:634:10"),
+            ExportPath::new_unsafe("specta\tests\ts.rs:634:10"),
             r#"@odata.context"#.to_string()
         )
     );
