@@ -1,11 +1,11 @@
-use specta::*;
+use specta::{DataType, Generics, Type, TypeMap};
 
 /// TODO
 pub fn export<T: Type>() -> Result<String, String> {
-    datatype(&T::definition(&mut TypeDefs::default()))
+    datatype(&T::inline(&mut TypeMap::default(), Generics::Definition))
 }
 
-fn datatype(t: &DataTypeExt) -> Result<String, String> {
+fn datatype(t: &DataType) -> Result<String, String> {
     todo!();
     // Ok(match t.inner {
     //     DataType::Any => "*interface{}".into(),

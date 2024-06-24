@@ -1,9 +1,10 @@
 use core::fmt;
 use std::borrow::Cow;
 
+use specta_serde::SerdeError;
 use thiserror::Error;
 
-use crate::{ImplLocation, SerdeError};
+use specta::ImplLocation;
 
 use super::ExportPath;
 

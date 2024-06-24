@@ -16,10 +16,15 @@ pub use error::*;
 pub use export_config::*;
 use reserved_terms::*;
 
-use crate::{
+use specta::{
+    detect_duplicate_type_names,
     internal::{skip_fields, skip_fields_named, NonSkipField},
-    *,
+    DataType, DeprecatedType, Generics, NamedDataType, NamedType, PrimitiveType, Type, TypeMap,
 };
+use specta::{
+    EnumRepr, EnumType, EnumVariant, EnumVariants, LiteralType, StructFields, StructType, TupleType,
+};
+use specta_serde::is_valid_ty;
 
 #[allow(missing_docs)]
 pub type Result<T> = std::result::Result<T, ExportError>;
@@ -49,29 +54,30 @@ pub fn export<T: NamedType>(conf: &ExportConfig) -> Output {
     result
 }
 
-impl TypeCollection {
-    /// Export a collection into a Typescript string.
-    pub fn export_ts(&mut self, conf: &ExportConfig) -> Output {
-        let mut type_map = TypeMap::default();
-        self.export(&mut type_map);
+// TODO: Bring this back
+// impl TypeCollection {
+//     /// Export a collection into a Typescript string.
+//     pub fn export_ts(&mut self, conf: &ExportConfig) -> Output {
+//         let mut type_map = TypeMap::default();
+//         self.export(&mut type_map);
 
-        let mut result = String::new();
-        for (_, typ) in type_map.iter() {
-            is_valid_ty(&typ.inner, &type_map)?;
+//         let mut result = String::new();
+//         for (_, typ) in type_map.iter() {
+//             is_valid_ty(&typ.inner, &type_map)?;
 
-            let ty = export_named_datatype(conf, typ, &type_map)?;
-            if let Some((ty_name, l0, l1)) =
-                detect_duplicate_type_names(&type_map).into_iter().next()
-            {
-                return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
-            }
-            result.push_str(&ty);
-            result.push('\n');
-        }
+//             let ty = export_named_datatype(conf, typ, &type_map)?;
+//             if let Some((ty_name, l0, l1)) =
+//                 detect_duplicate_type_names(&type_map).into_iter().next()
+//             {
+//                 return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
+//             }
+//             result.push_str(&ty);
+//             result.push('\n');
+//         }
 
-        Ok(result)
-    }
-}
+//         Ok(result)
+//     }
+// }
 
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string.
 ///
@@ -196,21 +202,16 @@ fn inner_comments(
     format!("{prefix}{comments}{other}")
 }
 
-fn export_datatype_inner(
-    ctx: ExportContext,
-    typ @ NamedDataType {
-        name,
-        ext,
-        docs,
-        deprecated,
-        inner: item,
-        ..
-    }: &NamedDataType,
-    type_map: &TypeMap,
-) -> Output {
+fn export_datatype_inner(ctx: ExportContext, typ: &NamedDataType, type_map: &TypeMap) -> Output {
+    let name = typ.name();
+    let docs = typ.docs();
+    let ext = typ.ext();
+    let deprecated = typ.deprecated();
+    let item = &typ.inner;
+
     let ctx = ctx.with(
         ext.clone()
-            .map(|v| PathItem::TypeExtended(name.clone(), v.impl_location))
+            .map(|v| PathItem::TypeExtended(name.clone(), *v.impl_location()))
             .unwrap_or_else(|| PathItem::Type(name.clone())),
     );
     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
@@ -226,7 +227,7 @@ fn export_datatype_inner(
 
     Ok(inner_comments(
         ctx,
-        deprecated.as_ref(),
+        deprecated,
         docs,
         format!("export type {name}{generics} = {inline_ts}"),
         false,
@@ -251,6 +252,12 @@ pub fn datatype(conf: &ExportConfig, typ: &DataType, type_map: &TypeMap) -> Outp
         &mut s,
     )
     .map(|_| s)
+}
+
+macro_rules! primitive_def {
+    ($($t:ident)+) => {
+        $(PrimitiveType::$t)|+
+    }
 }
 
 pub(crate) fn datatype_inner(
@@ -283,7 +290,21 @@ pub(crate) fn datatype_inner(
 
             s.push_str(str);
         }
-        DataType::Literal(literal) => write!(s, "{literal}")?,
+        DataType::Literal(literal) => match literal {
+            LiteralType::i8(v) => write!(s, "{v}")?,
+            LiteralType::i16(v) => write!(s, "{v}")?,
+            LiteralType::i32(v) => write!(s, "{v}")?,
+            LiteralType::u8(v) => write!(s, "{v}")?,
+            LiteralType::u16(v) => write!(s, "{v}")?,
+            LiteralType::u32(v) => write!(s, "{v}")?,
+            LiteralType::f32(v) => write!(s, "{v}")?,
+            LiteralType::f64(v) => write!(s, "{v}")?,
+            LiteralType::bool(v) => write!(s, "{v}")?,
+            LiteralType::String(v) => write!(s, r#""{v}""#)?,
+            LiteralType::char(v) => write!(s, r#""{v}""#)?,
+            LiteralType::None => s.write_str(NULL)?,
+            _ => unreachable!(),
+        },
         DataType::Nullable(def) => {
             datatype_inner(ctx, def, type_map, s)?;
 
@@ -303,7 +324,7 @@ pub(crate) fn datatype_inner(
         // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
         DataType::List(def) => {
             let mut dt = String::new();
-            datatype_inner(ctx, &def.ty, type_map, &mut dt)?;
+            datatype_inner(ctx, &def.ty(), type_map, &mut dt)?;
 
             let dt = if (dt.contains(' ') && !dt.ends_with('}'))
                 // This is to do with maintaining order of operations.
@@ -315,7 +336,7 @@ pub(crate) fn datatype_inner(
                 dt
             };
 
-            if let Some(length) = def.length {
+            if let Some(length) = def.length() {
                 s.push('[');
 
                 for n in 0..length {
@@ -333,10 +354,10 @@ pub(crate) fn datatype_inner(
         }
         DataType::Struct(item) => struct_datatype(
             ctx.with(
-                item.sid
-                    .and_then(|sid| type_map.get(sid))
+                item.sid()
+                    .and_then(|sid| type_map.get(*sid))
                     .and_then(|v| v.ext())
-                    .map(|v| PathItem::TypeExtended(item.name().clone(), v.impl_location))
+                    .map(|v| PathItem::TypeExtended(item.name().clone(), *v.impl_location()))
                     .unwrap_or_else(|| PathItem::Type(item.name().clone())),
             ),
             item.name(),
@@ -347,12 +368,12 @@ pub(crate) fn datatype_inner(
         DataType::Enum(item) => {
             let mut ctx = ctx.clone();
             let cfg = ctx.cfg.clone().bigint(BigIntExportBehavior::Number);
-            if item.skip_bigint_checks {
+            if item.skip_bigint_checks() {
                 ctx.cfg = &cfg;
             }
 
             enum_datatype(
-                ctx.with(PathItem::Variant(item.name.clone())),
+                ctx.with(PathItem::Variant(item.name().clone())),
                 item,
                 type_map,
                 s,
@@ -375,10 +396,10 @@ pub(crate) fn datatype_inner(
             variants.dedup();
             s.push_str(&variants.join(" | "));
         }
-        DataType::Reference(DataTypeReference { name, generics, .. }) => match &generics[..] {
-            [] => s.push_str(&name),
+        DataType::Reference(reference) => match &reference.generics()[..] {
+            [] => s.push_str(&reference.name()),
             generics => {
-                s.push_str(&name);
+                s.push_str(&reference.name());
                 s.push('<');
 
                 for (i, (_, v)) in generics.iter().enumerate() {
@@ -386,13 +407,18 @@ pub(crate) fn datatype_inner(
                         s.push_str(", ");
                     }
 
-                    datatype_inner(ctx.with(PathItem::Type(name.clone())), v, type_map, s)?;
+                    datatype_inner(
+                        ctx.with(PathItem::Type(reference.name().clone())),
+                        v,
+                        type_map,
+                        s,
+                    )?;
                 }
 
                 s.push('>');
             }
         },
-        DataType::Generic(GenericType(ident)) => s.push_str(&ident),
+        DataType::Generic(ident) => s.push_str(&ident.to_string()),
     })
 }
 
@@ -440,7 +466,7 @@ fn unnamed_fields_datatype(
 }
 
 fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, type_map: &TypeMap) -> Output {
-    match &tuple.elements[..] {
+    match &tuple.elements()[..] {
         [] => Ok(NULL.to_string()),
         tys => Ok(format!(
             "[{}]",
@@ -462,7 +488,7 @@ fn struct_datatype(
     type_map: &TypeMap,
     s: &mut String,
 ) -> Result<()> {
-    Ok(match &strct.fields {
+    Ok(match &strct.fields() {
         StructFields::Unit => s.push_str(NULL),
         StructFields::Unnamed(unnamed) => unnamed_fields_datatype(
             ctx,
@@ -481,7 +507,7 @@ fn struct_datatype(
             }
 
             let (flattened, non_flattened): (Vec<_>, Vec<_>) =
-                fields.iter().partition(|(_, (f, _))| f.flatten);
+                fields.iter().partition(|(_, (f, _))| f.flatten());
 
             let mut field_sections = flattened
                 .into_iter()
@@ -524,7 +550,7 @@ fn struct_datatype(
                 })
                 .collect::<Result<Vec<_>>>()?;
 
-            if let Some(tag) = &named.tag {
+            if let Some(tag) = &named.tag() {
                 unflattened_fields.push(format!("{tag}: \"{key}\""));
             }
 
@@ -543,11 +569,11 @@ fn enum_variant_datatype(
     name: Cow<'static, str>,
     variant: &EnumVariant,
 ) -> Result<Option<String>> {
-    match &variant.inner {
+    match &variant.inner() {
         // TODO: Remove unreachable in type system
         EnumVariants::Unit => unreachable!("Unit enum variants have no type!"),
         EnumVariants::Named(obj) => {
-            let mut fields = if let Some(tag) = &obj.tag {
+            let mut fields = if let Some(tag) = &obj.tag() {
                 let sanitised_name = sanitise_key(name, true);
                 vec![format!("{tag}: {sanitised_name}")]
             } else {
@@ -595,7 +621,7 @@ fn enum_variant_datatype(
             Ok(match &fields[..] {
                 [] => {
                     // If the actual length is 0, we know `#[serde(skip)]` was not used.
-                    if obj.fields.is_empty() {
+                    if obj.fields().is_empty() {
                         Some("[]".to_string())
                     } else {
                         // We wanna render `{tag}` not `{tag}: {type}` (where `{type}` is what this function returns)
@@ -603,7 +629,7 @@ fn enum_variant_datatype(
                     }
                 }
                 // If the actual length is 1, we know `#[serde(skip)]` was not used.
-                [field] if obj.fields.len() == 1 => Some(field.to_string()),
+                [field] if obj.fields().len() == 1 => Some(field.to_string()),
                 fields => Some(format!("[{}]", fields.join(", "))),
             })
         }
@@ -620,14 +646,14 @@ fn enum_datatype(
         return Ok(write!(s, "{NEVER}")?);
     }
 
-    Ok(match &e.repr {
+    Ok(match &e.repr() {
         EnumRepr::Untagged => {
             let mut variants = e
-                .variants
+                .variants()
                 .iter()
-                .filter(|(_, variant)| !variant.skip)
+                .filter(|(_, variant)| !variant.skip())
                 .map(|(name, variant)| {
-                    Ok(match variant.inner {
+                    Ok(match variant.inner() {
                         EnumVariants::Unit => NULL.to_string(),
                         _ => inner_comments(
                             ctx.clone(),
@@ -650,9 +676,9 @@ fn enum_datatype(
         }
         repr => {
             let mut variants = e
-                .variants
+                .variants()
                 .iter()
-                .filter(|(_, variant)| !variant.skip)
+                .filter(|(_, variant)| !variant.skip())
                 .map(|(variant_name, variant)| {
                     let sanitised_name = sanitise_key(variant_name.clone(), true);
 
@@ -660,7 +686,7 @@ fn enum_datatype(
                         ctx.clone(),
                         variant.deprecated(),
                         variant.docs(),
-                        match (repr, &variant.inner) {
+                        match (repr, &variant.inner()) {
                             (EnumRepr::Untagged, _) => unreachable!(),
                             (EnumRepr::Internal { tag }, EnumVariants::Unit) => {
                                 format!("{{ {tag}: {sanitised_name} }}")
@@ -763,24 +789,24 @@ fn enum_datatype(
     })
 }
 
-impl std::fmt::Display for LiteralType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::i8(v) => write!(f, "{v}"),
-            Self::i16(v) => write!(f, "{v}"),
-            Self::i32(v) => write!(f, "{v}"),
-            Self::u8(v) => write!(f, "{v}"),
-            Self::u16(v) => write!(f, "{v}"),
-            Self::u32(v) => write!(f, "{v}"),
-            Self::f32(v) => write!(f, "{v}"),
-            Self::f64(v) => write!(f, "{v}"),
-            Self::bool(v) => write!(f, "{v}"),
-            Self::String(v) => write!(f, r#""{v}""#),
-            Self::char(v) => write!(f, r#""{v}""#),
-            Self::None => f.write_str(NULL),
-        }
-    }
-}
+// impl std::fmt::Display for LiteralType {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self {
+//             Self::i8(v) => write!(f, "{v}"),
+//             Self::i16(v) => write!(f, "{v}"),
+//             Self::i32(v) => write!(f, "{v}"),
+//             Self::u8(v) => write!(f, "{v}"),
+//             Self::u16(v) => write!(f, "{v}"),
+//             Self::u32(v) => write!(f, "{v}"),
+//             Self::f32(v) => write!(f, "{v}"),
+//             Self::f64(v) => write!(f, "{v}"),
+//             Self::bool(v) => write!(f, "{v}"),
+//             Self::String(v) => write!(f, r#""{v}""#),
+//             Self::char(v) => write!(f, r#""{v}""#),
+//             Self::None => f.write_str(NULL),
+//         }
+//     }
+// }
 
 /// convert an object field into a Typescript string
 fn object_field_to_ts(
@@ -793,7 +819,7 @@ fn object_field_to_ts(
     let field_name_safe = sanitise_key(key, false);
 
     // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
-    let (key, ty) = match field.optional {
+    let (key, ty) = match field.optional() {
         true => (format!("{field_name_safe}?").into(), ty),
         false => (field_name_safe, ty),
     };
@@ -870,7 +896,7 @@ fn validate_type_for_tagged_intersection(
             LiteralType::None => Ok(true),
             _ => Ok(false),
         },
-        DataType::Struct(v) => match v.fields {
+        DataType::Struct(v) => match v.fields() {
             StructFields::Unit => Ok(true),
             StructFields::Unnamed(_) => {
                 Err(ExportError::InvalidTaggedVariantContainingTupleStruct(
@@ -879,7 +905,7 @@ fn validate_type_for_tagged_intersection(
             }
             StructFields::Named(fields) => {
                 // Prevent `{ tag: "{tag}" } & Record<string | never>`
-                if fields.tag.is_none() && fields.fields.is_empty() {
+                if fields.tag().is_none() && fields.fields().is_empty() {
                     return Ok(true);
                 }
 
@@ -887,13 +913,13 @@ fn validate_type_for_tagged_intersection(
             }
         },
         DataType::Enum(v) => {
-            match v.repr {
+            match v.repr() {
                 EnumRepr::Untagged => {
-                    Ok(v.variants.iter().any(|(_, v)| match &v.inner {
+                    Ok(v.variants().iter().any(|(_, v)| match &v.inner() {
                         // `{ .. } & null` is `never`
                         EnumVariants::Unit => true,
                          // `{ ... } & Record<string, never>` is not useful
-                        EnumVariants::Named(v) => v.tag.is_none() && v.fields().is_empty(),
+                        EnumVariants::Named(v) => v.tag().is_none() && v.fields().is_empty(),
                         EnumVariants::Unnamed(_) => false,
                     }))
                 },
@@ -903,7 +929,7 @@ fn validate_type_for_tagged_intersection(
         }
         DataType::Tuple(v) => {
             // Empty tuple is `null`
-            if v.elements.is_empty() {
+            if v.elements().is_empty() {
                 return Ok(true);
             }
 
@@ -912,7 +938,7 @@ fn validate_type_for_tagged_intersection(
         DataType::Reference(r) => validate_type_for_tagged_intersection(
             ctx,
             type_map
-                .get(r.sid)
+                .get(r.sid())
                 .expect("TypeMap should have been populated by now")
                 .inner
                 .clone(),

@@ -50,6 +50,10 @@ impl StructType {
         &self.name
     }
 
+    pub fn sid(&self) -> Option<&SpectaID> {
+        self.sid.as_ref()
+    }
+
     pub fn generics(&self) -> &Vec<GenericType> {
         &self.generics
     }

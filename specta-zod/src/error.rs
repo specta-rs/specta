@@ -1,9 +1,10 @@
 use core::fmt;
 use std::borrow::Cow;
 
+use specta_serde::SerdeError;
 use thiserror::Error;
 
-use crate::{context::ExportPath, ImplLocation, SerdeError};
+use crate::{context::ExportPath, ImplLocation};
 
 /// Describes where an error occurred.
 #[derive(Error, Debug, PartialEq)]

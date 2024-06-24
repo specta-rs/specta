@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::Result;
 
-use crate::utils::Attribute;
+use crate::utils::{impl_parse, Attribute};
 
 #[derive(Default)]
 pub struct FieldAttr {

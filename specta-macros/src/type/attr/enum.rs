@@ -1,7 +1,7 @@
 use proc_macro2::Span;
 use syn::{Error, Result};
 
-use crate::utils::Attribute;
+use crate::utils::{impl_parse, Attribute};
 
 use super::ContainerAttr;
 

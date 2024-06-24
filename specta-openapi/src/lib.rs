@@ -3,8 +3,7 @@
 use openapiv3::{
     ArrayType, NumberType, ReferenceOr, Schema, SchemaData, SchemaKind, StringType, Type,
 };
-
-use specta::*;
+use specta::{DataType, PrimitiveType};
 
 // pub fn to_openapi_export(def: &DataType) -> Result<openapiv3::Schema, String> {
 //     Ok(match &def {
@@ -93,7 +92,7 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
         DataType::List(def) => ReferenceOr::Item(Schema {
             schema_data,
             schema_kind: SchemaKind::Type(Type::Array(ArrayType {
-                items: Some(match to_openapi(def) {
+                items: Some(match to_openapi(def.ty()) {
                     ReferenceOr::Item(schema) => ReferenceOr::Item(Box::new(schema)),
                     ReferenceOr::Reference { reference } => ReferenceOr::Reference { reference },
                 }),
@@ -103,7 +102,7 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
                 unique_items: false,
             })),
         }),
-        DataType::Tuple(TupleType { fields, .. }) => match &fields[..] {
+        DataType::Tuple(tuple) => match &tuple.elements()[..] {
             [] => {
                 schema_data.nullable = true;
                 ReferenceOr::Item(Schema {
@@ -114,125 +113,137 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
             [ty] => to_openapi(ty),
             tys => todo!(),
         },
-        DataType::Struct(StructType {
-            fields, tag, name, ..
-        }) => match &fields[..] {
-            [] => todo!(), // "null".to_string(),
-            fields => {
-                // let mut out = match tag {
-                //     Some(tag) => vec![format!("{tag}: \"{name}\"")],
-                //     None => vec![],
-                // };
+        DataType::Struct(s) => {
+            let fields = s.fields();
+            let name = s.name();
 
-                // let field_defs = object_fields(fields);
+            // match &fields[..] {
+            //     [] => todo!(), // "null".to_string(),
+            //     fields => {
+            //         // let mut out = match tag {
+            //         //     Some(tag) => vec![format!("{tag}: \"{name}\"")],
+            //         //     None => vec![],
+            //         // };
 
-                // out.extend(field_defs);
+            //         // let field_defs = object_fields(fields);
 
-                // format!("{{ {} }}", out.join(", "))
+            //         // out.extend(field_defs);
 
-                ReferenceOr::Item(Schema {
-                    schema_data,
-                    schema_kind: SchemaKind::Type(Type::Object(openapiv3::ObjectType {
-                        properties: fields
-                            .iter()
-                            .map(
-                                |ObjectField {
-                                     name, ty, optional, ..
-                                 }| {
-                                    (
-                                        name.clone(),
-                                        match to_openapi(ty) {
-                                            ReferenceOr::Item(v) => ReferenceOr::Item(Box::new(v)),
-                                            ReferenceOr::Reference { reference } => {
-                                                ReferenceOr::Reference { reference }
-                                            }
-                                        },
-                                    )
-                                },
-                            )
-                            .collect(),
-                        ..Default::default()
-                    })),
-                })
-            }
-        },
-        DataType::Enum(EnumType { variants, repr, .. }) => match &variants[..] {
-            [] => todo!(), // "never".to_string(),
-            variants => {
-                // variants
-                // .iter()
-                // .map(|variant| {
-                //     let sanitised_name = sanitise_name(variant.name());
+            //         // format!("{{ {} }}", out.join(", "))
 
-                //     match (repr, variant) {
-                //         (EnumRepr::Internal { tag }, EnumVariant::Unit(_)) => {
-                //             format!("{{ {tag}: \"{sanitised_name}\" }}")
-                //         }
-                //         (EnumRepr::Internal { tag }, EnumVariant::Unnamed(tuple)) => {
-                //             let typ = to_openapi(&DataType::Tuple(tuple.clone()));
+            //         ReferenceOr::Item(Schema {
+            //             schema_data,
+            //             schema_kind: SchemaKind::Type(Type::Object(openapiv3::ObjectType {
+            //                 properties: fields
+            //                     .iter()
+            //                     .map(
+            //                         |ObjectField {
+            //                              name, ty, optional, ..
+            //                          }| {
+            //                             (
+            //                                 name.clone(),
+            //                                 match to_openapi(ty) {
+            //                                     ReferenceOr::Item(v) => {
+            //                                         ReferenceOr::Item(Box::new(v))
+            //                                     }
+            //                                     ReferenceOr::Reference { reference } => {
+            //                                         ReferenceOr::Reference { reference }
+            //                                     }
+            //                                 },
+            //                             )
+            //                         },
+            //                     )
+            //                     .collect(),
+            //                 ..Default::default()
+            //             })),
+            //         })
+            //     }
+            // }
+            todo!();
+        }
+        DataType::Enum(e) => {
+            // let variants = e.variants();
 
-                //             format!("{{ {tag}: \"{sanitised_name}\" }} & {typ}")
-                //         }
-                //         (EnumRepr::Internal { tag }, EnumVariant::Named(obj)) => {
-                //             let mut fields = vec![format!("{tag}: \"{sanitised_name}\"")];
+            // match &variants[..] {
+            //     [] => todo!(), // "never".to_string(),
+            //     variants => {
+            //         // variants
+            //         // .iter()
+            //         // .map(|variant| {
+            //         //     let sanitised_name = sanitise_name(variant.name());
 
-                //             fields.extend(object_fields(&obj.fields));
+            //         //     match (repr, variant) {
+            //         //         (EnumRepr::Internal { tag }, EnumVariant::Unit(_)) => {
+            //         //             format!("{{ {tag}: \"{sanitised_name}\" }}")
+            //         //         }
+            //         //         (EnumRepr::Internal { tag }, EnumVariant::Unnamed(tuple)) => {
+            //         //             let typ = to_openapi(&DataType::Tuple(tuple.clone()));
 
-                //             format!("{{ {} }}", fields.join(", "))
-                //         }
-                //         (EnumRepr::External, EnumVariant::Unit(_)) => {
-                //             format!("\"{sanitised_name}\"")
-                //         }
-                //         (EnumRepr::External, v) => {
-                //             let ts_values = to_openapi(&v.data_type());
+            //         //             format!("{{ {tag}: \"{sanitised_name}\" }} & {typ}")
+            //         //         }
+            //         //         (EnumRepr::Internal { tag }, EnumVariant::Named(obj)) => {
+            //         //             let mut fields = vec![format!("{tag}: \"{sanitised_name}\"")];
 
-                //             format!("{{ {sanitised_name}: {ts_values} }}")
-                //         }
-                //         (EnumRepr::Untagged, EnumVariant::Unit(_)) => "null".to_string(),
-                //         (EnumRepr::Untagged, v) => to_openapi(&v.data_type()),
-                //         (EnumRepr::Adjacent { tag, .. }, EnumVariant::Unit(_)) => {
-                //             format!("{{ {tag}: \"{sanitised_name}\" }}")
-                //         }
-                //         (EnumRepr::Adjacent { tag, content }, v) => {
-                //             let ts_values = to_openapi(&v.data_type());
+            //         //             fields.extend(object_fields(&obj.fields));
 
-                //             format!("{{ {tag}: \"{sanitised_name}\", {content}: {ts_values} }}")
-                //         }
-                //     }
-                // })
-                // .collect::<Vec<_>>()
-                // .join(" | ");
+            //         //             format!("{{ {} }}", fields.join(", "))
+            //         //         }
+            //         //         (EnumRepr::External, EnumVariant::Unit(_)) => {
+            //         //             format!("\"{sanitised_name}\"")
+            //         //         }
+            //         //         (EnumRepr::External, v) => {
+            //         //             let ts_values = to_openapi(&v.data_type());
 
-                ReferenceOr::Item(Schema {
-                    schema_data,
-                    schema_kind: SchemaKind::AnyOf {
-                        any_of: variants
-                            .iter()
-                            .map(|variant| match variant {
-                                EnumVariant::Unit(_) => ReferenceOr::Item(Schema {
-                                    schema_data: Default::default(),
-                                    schema_kind: SchemaKind::Type(Type::Object(
-                                        openapiv3::ObjectType::default(), // TODO: Is this correct?
-                                    )),
-                                }),
-                                EnumVariant::Unnamed(tuple) => {
-                                    to_openapi(&DataType::Tuple(tuple.clone()))
-                                }
-                                EnumVariant::Named(obj) => {
-                                    to_openapi(&DataType::Struct(obj.clone()))
-                                }
-                            })
-                            .collect(),
-                    },
-                })
-            }
-        },
-        DataType::Reference { name, generics, .. } => match &generics[..] {
+            //         //             format!("{{ {sanitised_name}: {ts_values} }}")
+            //         //         }
+            //         //         (EnumRepr::Untagged, EnumVariant::Unit(_)) => "null".to_string(),
+            //         //         (EnumRepr::Untagged, v) => to_openapi(&v.data_type()),
+            //         //         (EnumRepr::Adjacent { tag, .. }, EnumVariant::Unit(_)) => {
+            //         //             format!("{{ {tag}: \"{sanitised_name}\" }}")
+            //         //         }
+            //         //         (EnumRepr::Adjacent { tag, content }, v) => {
+            //         //             let ts_values = to_openapi(&v.data_type());
+
+            //         //             format!("{{ {tag}: \"{sanitised_name}\", {content}: {ts_values} }}")
+            //         //         }
+            //         //     }
+            //         // })
+            //         // .collect::<Vec<_>>()
+            //         // .join(" | ");
+
+            //         ReferenceOr::Item(Schema {
+            //             schema_data,
+            //             schema_kind: SchemaKind::AnyOf {
+            //                 any_of: variants
+            //                     .iter()
+            //                     .map(|variant| match variant {
+            //                         EnumVariants::Unit(_) => ReferenceOr::Item(Schema {
+            //                             schema_data: Default::default(),
+            //                             schema_kind: SchemaKind::Type(Type::Object(
+            //                                 openapiv3::ObjectType::default(), // TODO: Is this correct?
+            //                             )),
+            //                         }),
+            //                         EnumVariants::Unnamed(tuple) => {
+            //                             to_openapi(&DataType::Tuple(tuple.clone()))
+            //                         }
+            //                         EnumVariant::Named(obj) => {
+            //                             to_openapi(&DataType::Struct(obj.clone()))
+            //                         }
+            //                     })
+            //                     .collect(),
+            //             },
+            //         })
+            //     }
+            // }
+
+            todo!();
+        }
+        DataType::Reference(reference) => match &reference.generics()[..] {
             [] => ReferenceOr::Item(Schema {
                 schema_data,
                 schema_kind: SchemaKind::OneOf {
                     one_of: vec![ReferenceOr::Reference {
-                        reference: format!("#/components/schemas/{}", name),
+                        reference: format!("#/components/schemas/{}", reference.name()),
                     }],
                 },
             }),

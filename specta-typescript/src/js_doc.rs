@@ -1,6 +1,8 @@
 use std::borrow::Borrow;
 
-pub use super::ts::*;
+use specta::{DeprecatedType, GenericType, TypeMap};
+
+pub use super::*;
 
 pub fn typedef_named_datatype(
     cfg: &ExportConfig,
@@ -21,15 +23,14 @@ pub fn typedef_named_datatype(
 
 fn typedef_named_datatype_inner(
     ctx: &ExportContext,
-    typ @ NamedDataType {
-        name,
-        docs,
-        deprecated,
-        inner: item,
-        ..
-    }: &NamedDataType,
+    typ: &NamedDataType,
     type_map: &TypeMap,
 ) -> Output {
+    let name = typ.name();
+    let docs = typ.docs();
+    let deprecated = typ.deprecated();
+    let item = &typ.inner;
+
     let ctx = ctx.with(PathItem::Type(name.clone()));
 
     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
@@ -37,10 +38,7 @@ fn typedef_named_datatype_inner(
     let mut inline_ts = String::new();
     datatype_inner(ctx.clone(), &typ.inner, type_map, &mut inline_ts)?;
 
-    let mut builder = ts::comments::js_doc_builder(CommentFormatterArgs {
-        docs,
-        deprecated: deprecated.as_ref(),
-    });
+    let mut builder = super::comments::js_doc_builder(CommentFormatterArgs { docs, deprecated });
 
     item.generics()
         .into_iter()

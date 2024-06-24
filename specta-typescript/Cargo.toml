@@ -12,4 +12,6 @@ categories = ["web-programming", "asynchronous"]
 
 [dependencies]
 specta = { path = "../specta" }
+# TODO: Don't depend on serde
+specta-serde = { path = "../specta-serde" }
 thiserror = "1.0.60"

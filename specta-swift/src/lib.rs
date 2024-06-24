@@ -1,14 +1,14 @@
 //! [Swift](https://www.swift.org) language exporter.
 
-use specta::*;
+use specta::{reference, DataType, Generics, PrimitiveType, Type, TypeMap};
 
 /// TODO
 pub fn export<T: Type>() -> Result<String, String> {
-    datatype(&T::definition(&mut TypeDefs::default()))
+    datatype(&T::inline(&mut TypeMap::default(), Generics::Definition))
 }
 
-fn datatype(t: &DataTypeExt) -> Result<String, String> {
-    Ok(match t.inner {
+fn datatype(t: &DataType) -> Result<String, String> {
+    Ok(match t {
         DataType::Primitive(p) => match p {
             PrimitiveType::String | PrimitiveType::char => "String",
             PrimitiveType::i8 => "Int8",
@@ -30,8 +30,8 @@ fn datatype(t: &DataTypeExt) -> Result<String, String> {
         }
         .to_string(),
         DataType::Any => "Codable".to_string(),
-        DataType::List(t) => format!("[{}]", datatype(&t)?),
-        DataType::Tuple(TupleType { fields, .. }) => match &fields[..] {
+        DataType::List(t) => format!("[{}]", datatype(&t.ty())?),
+        DataType::Tuple(tuple) => match &tuple.elements()[..] {
             [] => "CodableVoid".to_string(),
             [ty] => datatype(ty)?,
             tys => format!(
@@ -42,69 +42,65 @@ fn datatype(t: &DataTypeExt) -> Result<String, String> {
                     .join(", ")
             ),
         },
-        DataType::Map(t) => format!("[{}: {}]", datatype(&t.0)?, datatype(&t.1)?),
-        DataType::Generic(GenericType(t)) => t.to_string(),
-        DataType::Reference { name, generics, .. } => match &generics[..] {
-            [] => name.to_string(),
+        DataType::Map(t) => format!("[{}: {}]", datatype(&t.key_ty())?, datatype(&t.value_ty())?),
+        DataType::Generic(t) => t.to_string(),
+        DataType::Reference(reference) => match &reference.generics()[..] {
+            [] => reference.name().to_string(),
             generics => {
                 let generics = generics
                     .iter()
-                    .map(datatype)
+                    .map(|(_, t)| datatype(t))
                     .collect::<Result<Vec<_>, _>>()?
                     .join(", ");
 
-                format!("{name}<{generics}>")
+                format!("{}<{generics}>", reference.name())
             }
         },
         DataType::Nullable(t) => format!("{}?", datatype(t)?),
-        DataType::Struct(StructType {
-            fields,
-            tag,
-            name,
-            generics,
-            ..
-        }) => match &fields[..] {
-            [] => "CodableVoid".to_string(),
-            fields => {
-                // TODO: Handle invalid field names
-                let generics = (!generics.is_empty())
-                    .then(|| {
-                        format!(
-                            "<{}>",
-                            generics
-                                .iter()
-                                .map(|g| format!("{}: Codable", g))
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        )
-                    })
-                    .unwrap_or_default();
+        DataType::Struct(s) => {
+            //         match &s.fields()[..] {
+            //             [] => "CodableVoid".to_string(),
+            //             fields => {
+            //                 // TODO: Handle invalid field names
+            //                 let generics = (!s.generics().is_empty())
+            //                     .then(|| {
+            //                         format!(
+            //                             "<{}>",
+            //                             s.generics()
+            //                                 .iter()
+            //                                 .map(|g| format!("{}: Codable", g))
+            //                                 .collect::<Vec<_>>()
+            //                                 .join(", ")
+            //                         )
+            //                     })
+            //                     .unwrap_or_default();
 
-                let fields = fields
-                    .iter()
-                    .map(|f| {
-                        let name = &f.name;
-                        let typ = datatype(&f.ty)?;
+            //                 let fields = fields
+            //                     .iter()
+            //                     .map(|f| {
+            //                         let name = &f.name;
+            //                         let typ = datatype(&f.ty)?;
 
-                        Ok(format!("\tpublic let {name}: {typ}"))
-                    })
-                    .collect::<Result<Vec<_>, String>>()?
-                    .join("\n");
+            //                         Ok(format!("\tpublic let {name}: {typ}"))
+            //                     })
+            //                     .collect::<Result<Vec<_>, String>>()?
+            //                     .join("\n");
 
-                let tag = tag
-                    .clone()
-                    .map(|t| format!("\t{t}: String"))
-                    .unwrap_or_default();
+            //                 let tag = s
+            //                     .tag()
+            //                     .clone()
+            //                     .map(|t| format!("\t{t}: String"))
+            //                     .unwrap_or_default();
 
-                formatdoc! {
-                    r#"
-                        public struct {name}{generics}: Codable {{
-                        {tag}{fields}
-                        }}
-                    "#
-                }
-            }
-        },
+            //                 r#"public struct {name}{generics}: Codable {{
+            //     {tag}{fields}
+            // }}"#
+            //                 .to_string()
+            //             }
+            //         }
+
+            todo!();
+        }
         DataType::Literal(_) => return Err("Swift does not support literal types!".to_owned()),
         _ => todo!(),
     })

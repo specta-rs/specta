@@ -1,6 +1,6 @@
 use std::{borrow::Borrow, collections::HashMap};
 
-use crate::{NamedDataType, NamedType, SpectaID, TypeMap};
+use specta::{NamedDataType, NamedType, SpectaID, TypeMap};
 
 /// Define a set of types which can be exported together
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,7 +31,7 @@ impl TypeCollection {
     }
 
     /// Export all the types in the collection.
-    pub fn export(&self, mut type_map: &mut crate::TypeMap) {
+    pub fn export(&self, mut type_map: &mut TypeMap) {
         for (sid, export) in self.types.iter() {
             let dt = export(&mut type_map);
             type_map.insert(*sid, dt);

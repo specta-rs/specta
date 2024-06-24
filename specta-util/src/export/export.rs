@@ -1,5 +1,5 @@
 use once_cell::sync::Lazy;
-use specta::*;
+use specta::{NamedDataType, SpectaID, Type, TypeMap};
 use std::sync::{PoisonError, RwLock, RwLockReadGuard};
 
 // Global type store for collecting custom types to export.
@@ -18,14 +18,10 @@ impl Iterator for TypesIter {
     type Item = (SpectaID, NamedDataType);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let (k, v) = self.lock.map.iter().nth(self.index)?;
+        let (k, v) = self.lock.iter().nth(self.index)?;
         self.index += 1;
         // We have to clone, because we can't invent a lifetime
-        Some((
-            *k,
-            v.clone()
-                .expect("specta: `TypesIter` found a type placeholder!"),
-        ))
+        Some((k, v.clone()))
     }
 }
 

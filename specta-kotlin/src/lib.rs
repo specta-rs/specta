@@ -1,12 +1,12 @@
-use specta::*;
+use specta::{DataType, Generics, PrimitiveType, Type, TypeMap};
 
 /// TODO
 pub fn export<T: Type>() -> Result<String, String> {
-    datatype(&T::definition(&mut TypeDefs::default()))
+    datatype(&T::inline(&mut TypeMap::default(), Generics::Definition))
 }
 
-fn datatype(t: &DataTypeExt) -> Result<String, String> {
-    Ok(match t.inner {
+fn datatype(t: &DataType) -> Result<String, String> {
+    Ok(match t {
         DataType::Primitive(p) => match p {
             PrimitiveType::String => "String",
             PrimitiveType::char => "Char",
@@ -26,60 +26,69 @@ fn datatype(t: &DataTypeExt) -> Result<String, String> {
             }
         }
         .to_string(),
-        DataType::List(t) => format!("List<{}>", datatype(t)?),
+        DataType::List(t) => format!("List<{}>", datatype(t.ty())?),
         DataType::Tuple(_) => return Err("Kotlin does not support tuple types".to_owned()),
-        DataType::Map(t) => format!("HashMap<{}, {}>", datatype(&t.0)?, datatype(&t.1)?),
-        DataType::Generic(GenericType(t)) => t.to_string(),
-        DataType::Reference { name, generics, .. } => match &generics[..] {
-            [] => name.to_string(),
-            generics => {
-                let generics = generics
-                    .iter()
-                    .map(datatype)
-                    .collect::<Result<Vec<_>, _>>()?
-                    .join(", ");
+        DataType::Map(t) => format!(
+            "HashMap<{}, {}>",
+            datatype(&t.key_ty())?,
+            datatype(&t.value_ty())?
+        ),
+        DataType::Generic(t) => t.to_string(),
+        DataType::Reference(reference) => {
+            let name = reference.name();
+            let generics = reference.generics();
 
-                format!("{name}<{generics}>")
-            }
-        },
-        DataType::Nullable(t) => format!("{}?", datatype(t)?),
-        DataType::Struct(StructType {
-            name,
-            generics,
-            fields,
-            tag,
-            ..
-        }) => {
-            let decl = match &fields[..] {
-                [] => "class {name}".to_string(),
-                fields => {
-                    let generics = (!generics.is_empty())
-                        .then(|| format!("<{}>", generics.join(", ")))
-                        .unwrap_or_default();
-
-                    let fields = fields
+            match &generics[..] {
+                [] => name.to_string(),
+                generics => {
+                    let generics = generics
                         .iter()
-                        .map(|f| {
-                            let name = &f.name;
-                            let typ = datatype(&f.ty)?;
-                            let optional = matches!(f.ty, DataType::Nullable(_))
-                                .then(|| "= null")
-                                .unwrap_or_default();
-
-                            Ok(format!("\tvar {name}: {typ}{optional}"))
-                        })
-                        .collect::<Result<Vec<_>, String>>()?
+                        .map(|(_, t)| datatype(t))
+                        .collect::<Result<Vec<_>, _>>()?
                         .join(", ");
 
-                    let tag = tag
-                        .clone()
-                        .map(|t| format!("var {t}: String"))
-                        .unwrap_or_default();
-
-                    format!("data class {name}{generics} ({fields}{tag})")
+                    format!("{name}<{generics}>")
                 }
-            };
-            format!("@Serializable\n{decl}\n")
+            }
+        }
+        DataType::Nullable(t) => format!("{}?", datatype(&t)?),
+        DataType::Struct(s) => {
+            let name = s.name();
+            let generics = s.generics();
+            let fields = s.fields();
+            let tag = s.tag();
+
+            // let decl = match &fields[..] {
+            //     [] => "class {name}".to_string(),
+            //     fields => {
+            //         let generics = (!generics.is_empty())
+            //             .then(|| format!("<{}>", generics.join(", ")))
+            //             .unwrap_or_default();
+
+            //         let fields = fields
+            //             .iter()
+            //             .map(|f| {
+            //                 let name = &f.name;
+            //                 let typ = datatype(&f.ty)?;
+            //                 let optional = matches!(f.ty, DataType::Nullable(_))
+            //                     .then(|| "= null")
+            //                     .unwrap_or_default();
+
+            //                 Ok(format!("\tvar {name}: {typ}{optional}"))
+            //             })
+            //             .collect::<Result<Vec<_>, String>>()?
+            //             .join(", ");
+
+            //         let tag = tag
+            //             .clone()
+            //             .map(|t| format!("var {t}: String"))
+            //             .unwrap_or_default();
+
+            //         format!("data class {name}{generics} ({fields}{tag})")
+            //     }
+            // };
+            // format!("@Serializable\n{decl}\n")
+            todo!();
         }
         DataType::Literal(_) => return Err("Kotlin does not support literal types!".to_owned()),
         _ => todo!(),

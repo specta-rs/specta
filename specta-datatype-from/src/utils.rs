@@ -1,3 +1,5 @@
+//! DO NOT MODIFY! This file is copied from `specta-macros/src/utils.rs` automatically.
+
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{
@@ -210,6 +212,7 @@ pub fn parse_attrs(attrs: &[syn::Attribute]) -> syn::Result<Vec<Attribute>> {
     Ok(result)
 }
 
+#[macro_use]
 macro_rules! impl_parse {
     ($i:ident ($attr_parser:ident, $out:ident) { $($k:pat => $e:expr),* $(,)? }) => {
         impl $i {

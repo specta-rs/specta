@@ -64,6 +64,7 @@
 //! ```
 
 mod data_type_from;
+mod utils;
 
 #[proc_macro_derive(DataTypeFrom, attributes(specta))]
 pub fn derive_data_type_from(input: proc_macro::TokenStream) -> proc_macro::TokenStream {

@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use std::{borrow::Cow, cmp::Ordering};
 
 /// The unique Specta ID for the type.
 ///
@@ -15,6 +15,12 @@ use std::cmp::Ordering;
 pub struct SpectaID {
     pub(crate) type_name: &'static str,
     pub(crate) hash: u64,
+}
+
+impl SpectaID {
+    pub fn type_name(&self) -> Cow<'static, str> {
+        Cow::Borrowed(self.type_name)
+    }
 }
 
 // We do custom impls so the order prefers type_name over hash.

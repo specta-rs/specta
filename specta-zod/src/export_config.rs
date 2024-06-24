@@ -1,6 +1,6 @@
 use std::{borrow::Cow, io, path::PathBuf};
 
-use specta::ts::{comments, CommentFormatterFn};
+use specta_typescript::{comments, CommentFormatterFn};
 
 use crate::DeprecatedType;
 

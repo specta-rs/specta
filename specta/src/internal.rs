@@ -15,7 +15,7 @@ pub mod interop;
 #[cfg(feature = "function")]
 pub use specta_macros::internal_fn_datatype;
 
-use crate::{DataType, DeprecatedType, Field, Generics, SpectaID, Type, TypeMap};
+use crate::{DataType, Field, Generics, SpectaID, Type, TypeMap};
 
 /// Functions used to construct `crate::datatype` types (they have private fields so can't be constructed directly).
 /// We intentionally keep their fields private so we can modify them without a major version bump.
@@ -224,7 +224,10 @@ pub fn flatten<T: Type>(sid: SpectaID, type_map: &mut TypeMap, generics: &[DataT
 #[cfg(feature = "function")]
 mod functions {
     use super::*;
-    use crate::function::{Function, FunctionDataType};
+    use crate::{
+        function::{Function, FunctionDataType},
+        DeprecatedType,
+    };
 
     #[doc(hidden)]
     /// A helper for exporting a command to a [`CommandDataType`].

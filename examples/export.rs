@@ -1,4 +1,4 @@
-use specta::{
+use specta_util::{
     export,
     ts::{BigIntExportBehavior, ExportConfig},
     Type,
@@ -28,3 +28,5 @@ fn main() {
     )
     .unwrap();
 }
+
+fn main() {}

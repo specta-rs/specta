@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt};
 
-use crate::ImplLocation;
+use specta::ImplLocation;
 
 use super::ExportConfig;
 

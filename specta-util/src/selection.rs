@@ -32,8 +32,6 @@
 /// }]), &Default::default()).unwrap(), "{ name: string; age: number }[]");
 /// ```
 // TODO: better docs w/ example
-#[cfg(feature = "serde")]
-#[cfg_attr(docsrs2, doc(cfg(feature = "serde")))]
 #[macro_export]
 macro_rules! selection {
     ( $s:expr, { $($n:ident),+ $(,)? } ) => {{

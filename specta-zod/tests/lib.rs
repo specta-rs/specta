@@ -7,7 +7,8 @@ use std::{
     path::PathBuf,
 };
 
-use specta::{Any, Type};
+use specta::Type;
+use specta_util::Any;
 use specta_zod::{BigIntExportBehavior, ExportConfig, ExportError, ExportPath, NamedLocation};
 
 macro_rules! assert_zod {

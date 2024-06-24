@@ -8,13 +8,12 @@
     html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
 )]
 
-#[macro_use]
-mod utils;
 #[cfg(feature = "function")]
 mod internal_fn_datatype;
 #[cfg(feature = "function")]
 mod specta;
 mod r#type;
+mod utils;
 
 #[proc_macro_derive(Type, attributes(specta, serde))]
 pub fn derive_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {

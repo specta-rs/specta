@@ -1,6 +1,6 @@
 use std::{borrow::Cow, io, path::PathBuf};
 
-use crate::DeprecatedType;
+use specta::DeprecatedType;
 
 use super::comments;
 

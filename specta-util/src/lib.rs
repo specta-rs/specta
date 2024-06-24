@@ -11,10 +11,14 @@
 #[cfg_attr(docsrs2, doc(cfg(feature = "export")))]
 pub mod export;
 
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs2, doc(cfg(feature = "serde")))]
 mod selection;
 mod static_types;
 mod type_collection;
 
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs2, doc(cfg(feature = "serde")))]
 pub use selection::selection;
 pub use static_types::{Any, Unknown};
 pub use type_collection::TypeCollection;

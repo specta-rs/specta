@@ -58,6 +58,10 @@ impl EnumType {
     pub fn generics(&self) -> &Vec<GenericType> {
         &self.generics
     }
+
+    pub fn skip_bigint_checks(&self) -> bool {
+        self.skip_bigint_checks
+    }
 }
 
 impl From<EnumType> for DataType {

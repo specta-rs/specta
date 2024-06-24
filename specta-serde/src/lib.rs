@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use thiserror::Error;
 
-use crate::{
+use specta::{
     internal::{skip_fields, skip_fields_named},
     DataType, EnumRepr, EnumType, EnumVariants, GenericType, List, LiteralType, Map, PrimitiveType,
     SpectaID, StructFields, TypeMap,
@@ -25,7 +25,7 @@ pub enum SerdeError {
 /// Check that a [DataType] is a valid for Serde.
 ///
 /// This can be used by exporters which wanna do export-time checks that all types are compatible with Serde formats.
-pub(crate) fn is_valid_ty(dt: &DataType, type_map: &TypeMap) -> Result<(), SerdeError> {
+pub fn is_valid_ty(dt: &DataType, type_map: &TypeMap) -> Result<(), SerdeError> {
     is_valid_ty_internal(dt, type_map, &mut Default::default())
 }
 
@@ -57,7 +57,7 @@ fn is_valid_ty_internal(
             validate_enum(ty, type_map)?;
 
             for (_variant_name, variant) in ty.variants().iter() {
-                match &variant.inner {
+                match &variant.inner() {
                     EnumVariants::Unit => {}
                     EnumVariants::Named(variant) => {
                         for (_, (_, ty)) in skip_fields_named(variant.fields()) {
@@ -87,11 +87,11 @@ fn is_valid_ty_internal(
             }
 
             #[allow(clippy::panic)]
-            if !checked_references.contains(&ty.sid) {
-                checked_references.insert(ty.sid);
-                let ty = type_map
-                    .get(ty.sid)
-                    .unwrap_or_else(|| panic!("Type '{}' was never populated.", ty.sid.type_name)); // TODO: Error properly
+            if !checked_references.contains(&ty.sid()) {
+                checked_references.insert(ty.sid());
+                let ty = type_map.get(ty.sid()).unwrap_or_else(|| {
+                    panic!("Type '{}' was never populated.", ty.sid().type_name())
+                }); // TODO: Error properly
 
                 is_valid_ty_internal(&ty.inner, type_map, checked_references)?;
             }
@@ -140,15 +140,15 @@ fn is_valid_map_key(key_ty: &DataType, type_map: &TypeMap) -> Result<(), SerdeEr
         },
         // Enum of other valid types are also valid Eg. `"A" | "B"` or `"A" | 5` are valid
         DataType::Enum(ty) => {
-            for (_variant_name, variant) in &ty.variants {
-                match &variant.inner {
+            for (_variant_name, variant) in ty.variants() {
+                match &variant.inner() {
                     EnumVariants::Unit => {}
                     EnumVariants::Unnamed(item) => {
-                        if item.fields.len() > 1 {
+                        if item.fields().len() > 1 {
                             return Err(SerdeError::InvalidMapKey);
                         }
 
-                        if ty.repr != EnumRepr::Untagged {
+                        if *ty.repr() != EnumRepr::Untagged {
                             return Err(SerdeError::InvalidMapKey);
                         }
                     }
@@ -159,9 +159,9 @@ fn is_valid_map_key(key_ty: &DataType, type_map: &TypeMap) -> Result<(), SerdeEr
             Ok(())
         }
         DataType::Reference(r) => {
-            let ty = type_map.get(r.sid).expect("Type was never populated"); // TODO: Error properly
+            let ty = type_map.get(r.sid()).expect("Type was never populated"); // TODO: Error properly
 
-            is_valid_map_key(&resolve_generics(ty.inner.clone(), &r.generics), type_map)
+            is_valid_map_key(&resolve_generics(ty.inner.clone(), r.generics()), type_map)
         }
         _ => Err(SerdeError::InvalidMapKey),
     }
@@ -170,7 +170,7 @@ fn is_valid_map_key(key_ty: &DataType, type_map: &TypeMap) -> Result<(), SerdeEr
 // Serde does not allow serializing a variant of certain types of enum's.
 fn validate_enum(e: &EnumType, type_map: &TypeMap) -> Result<(), SerdeError> {
     // You can't `#[serde(skip)]` your way to an empty enum.
-    let valid_variants = e.variants().iter().filter(|(_, v)| !v.skip).count();
+    let valid_variants = e.variants().iter().filter(|(_, v)| !v.skip()).count();
     if valid_variants == 0 && !e.variants().is_empty() {
         return Err(SerdeError::InvalidUsageOfSkip);
     }
@@ -185,8 +185,8 @@ fn validate_enum(e: &EnumType, type_map: &TypeMap) -> Result<(), SerdeError> {
 
 // Checks for specially internally tagged enums.
 fn validate_internally_tag_enum(e: &EnumType, type_map: &TypeMap) -> Result<(), SerdeError> {
-    for (_variant_name, variant) in &e.variants {
-        match &variant.inner {
+    for (_variant_name, variant) in e.variants() {
+        match &variant.inner() {
             EnumVariants::Unit => {}
             EnumVariants::Named(_) => {}
             EnumVariants::Unnamed(item) => {
@@ -220,7 +220,7 @@ fn validate_internally_tag_enum_datatype(
         DataType::Map(_) => {}
         // Structs's are always map-types unless they are transparent then it depends on inner type. However, transparent passes through when calling `Type::inline` so we don't need to specially check that case.
         DataType::Struct(_) => {}
-        DataType::Enum(ty) => match ty.repr {
+        DataType::Enum(ty) => match ty.repr() {
             // Is only valid if the enum itself is also valid.
             EnumRepr::Untagged => validate_internally_tag_enum(ty, type_map)?,
             // Eg. `{ "Variant": "value" }` is a map-type so valid.
@@ -231,12 +231,12 @@ fn validate_internally_tag_enum_datatype(
             EnumRepr::Adjacent { .. } => {}
         },
         // `()` is `null` and is valid
-        DataType::Tuple(ty) if ty.elements.is_empty() => {}
+        DataType::Tuple(ty) if ty.elements().is_empty() => {}
         // Are valid as they are serialized as an map-type. Eg. `"Ok": 5` or `"Error": "todo"`
         DataType::Result(_) => {}
         // References need to be checked against the same rules.
         DataType::Reference(ty) => {
-            let ty = type_map.get(ty.sid).expect("Type was never populated"); // TODO: Error properly
+            let ty = type_map.get(ty.sid()).expect("Type was never populated"); // TODO: Error properly
 
             validate_internally_tag_enum_datatype(&ty.inner, type_map)?;
         }
@@ -248,79 +248,81 @@ fn validate_internally_tag_enum_datatype(
 
 // TODO: Maybe make this a public utility?
 fn resolve_generics(mut dt: DataType, generics: &Vec<(GenericType, DataType)>) -> DataType {
-    match dt {
-        DataType::Primitive(_) | DataType::Literal(_) | DataType::Any | DataType::Unknown => dt,
-        DataType::List(v) => DataType::List(List {
-            ty: Box::new(resolve_generics(*v.ty, generics)),
-            length: v.length,
-            unique: v.unique,
-        }),
-        DataType::Nullable(v) => DataType::Nullable(Box::new(resolve_generics(*v, generics))),
-        DataType::Map(v) => DataType::Map(Map {
-            key_ty: Box::new(resolve_generics(*v.key_ty, generics)),
-            value_ty: Box::new(resolve_generics(*v.value_ty, generics)),
-        }),
-        DataType::Struct(ref mut v) => match &mut v.fields {
-            StructFields::Unit => dt,
-            StructFields::Unnamed(f) => {
-                for field in f.fields.iter_mut() {
-                    field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
-                }
+    // match dt {
+    //     DataType::Primitive(_) | DataType::Literal(_) | DataType::Any | DataType::Unknown => dt,
+    //     DataType::List(v) => DataType::List(List {
+    //         ty: Box::new(resolve_generics(*v.ty(), generics)),
+    //         length: v.length,
+    //         unique: v.unique,
+    //     }),
+    //     DataType::Nullable(v) => DataType::Nullable(Box::new(resolve_generics(*v, generics))),
+    //     DataType::Map(v) => DataType::Map(Map {
+    //         key_ty: Box::new(resolve_generics(*v.key_ty(), generics)),
+    //         value_ty: Box::new(resolve_generics(*v.value_ty(), generics)),
+    //     }),
+    //     DataType::Struct(ref mut v) => match &mut v.fields {
+    //         StructFields::Unit => dt,
+    //         StructFields::Unnamed(f) => {
+    //             for field in f.fields.iter_mut() {
+    //                 field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
+    //             }
 
-                dt
-            }
-            StructFields::Named(f) => {
-                for (_, field) in f.fields.iter_mut() {
-                    field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
-                }
+    //             dt
+    //         }
+    //         StructFields::Named(f) => {
+    //             for (_, field) in f.fields.iter_mut() {
+    //                 field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
+    //             }
 
-                dt
-            }
-        },
-        DataType::Enum(ref mut v) => {
-            for (_, v) in v.variants.iter_mut() {
-                match &mut v.inner {
-                    EnumVariants::Unit => {}
-                    EnumVariants::Named(f) => {
-                        for (_, field) in f.fields.iter_mut() {
-                            field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
-                        }
-                    }
-                    EnumVariants::Unnamed(f) => {
-                        for field in f.fields.iter_mut() {
-                            field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
-                        }
-                    }
-                }
-            }
+    //             dt
+    //         }
+    //     },
+    //     DataType::Enum(ref mut v) => {
+    //         for (_, v) in v.variants().iter_mut() {
+    //             match &mut v.inner() {
+    //                 EnumVariants::Unit => {}
+    //                 EnumVariants::Named(f) => {
+    //                     for (_, field) in f.fields().iter_mut() {
+    //                         field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
+    //                     }
+    //                 }
+    //                 EnumVariants::Unnamed(f) => {
+    //                     for field in f.fields.iter_mut() {
+    //                         field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
+    //                     }
+    //                 }
+    //             }
+    //         }
 
-            dt
-        }
-        DataType::Tuple(ref mut v) => {
-            for ty in v.elements.iter_mut() {
-                *ty = resolve_generics(ty.clone(), generics);
-            }
+    //         dt
+    //     }
+    //     DataType::Tuple(ref mut v) => {
+    //         for ty in v.elements.iter_mut() {
+    //             *ty = resolve_generics(ty.clone(), generics);
+    //         }
 
-            dt
-        }
-        DataType::Result(result) => DataType::Result(Box::new({
-            let (ok, err) = *result;
-            (
-                resolve_generics(ok, generics),
-                resolve_generics(err, generics),
-            )
-        })),
-        DataType::Reference(ref mut r) => {
-            for (_, generic) in r.generics.iter_mut() {
-                *generic = resolve_generics(generic.clone(), generics);
-            }
+    //         dt
+    //     }
+    //     DataType::Result(result) => DataType::Result(Box::new({
+    //         let (ok, err) = *result;
+    //         (
+    //             resolve_generics(ok, generics),
+    //             resolve_generics(err, generics),
+    //         )
+    //     })),
+    //     DataType::Reference(ref mut r) => {
+    //         for (_, generic) in r.generics.iter_mut() {
+    //             *generic = resolve_generics(generic.clone(), generics);
+    //         }
 
-            dt
-        }
-        DataType::Generic(g) => generics
-            .iter()
-            .find(|(name, _)| name == &g)
-            .map(|(_, ty)| ty.clone())
-            .unwrap_or_else(|| format!("Generic type `{g}` was referenced but not found").into()), // TODO: Error properly
-    }
+    //         dt
+    //     }
+    //     DataType::Generic(g) => generics
+    //         .iter()
+    //         .find(|(name, _)| name == &g)
+    //         .map(|(_, ty)| ty.clone())
+    //         .unwrap_or_else(|| format!("Generic type `{g}` was referenced but not found").into()), // TODO: Error properly
+    // }
+
+    todo!();
 }
