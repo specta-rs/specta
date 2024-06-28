@@ -1,4 +1,5 @@
-use specta::{Type, TypeCollection, TypeMap};
+use specta::{Type, TypeMap};
+use specta_util::TypeCollection;
 
 #[derive(Type)]
 struct A2(String);

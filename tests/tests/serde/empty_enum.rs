@@ -1,7 +1,5 @@
-use specta::{
-    ts::{ExportError, ExportPath},
-    Type,
-};
+use specta::Type;
+use specta_typescript::{ExportError, ExportPath};
 
 use crate::ts::assert_ts;
 
@@ -63,7 +61,7 @@ enum H {
 }
 
 #[derive(Type)]
-#[specta(transparent)]
+#[specta(export = false, transparent)]
 pub struct Demo(());
 
 #[derive(Type)]

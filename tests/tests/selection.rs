@@ -1,5 +1,5 @@
-use specta::selection;
-use specta::ts::inline_ref;
+use specta_typescript::inline_ref;
+use specta_util::selection;
 
 #[derive(Clone)]
 #[allow(dead_code)]

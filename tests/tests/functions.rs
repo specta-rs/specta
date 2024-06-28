@@ -124,7 +124,7 @@ mod test {
             assert_eq!(def.name, "b");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
                 "string"
             );
             assert_eq!(def.result, None);
@@ -137,15 +137,15 @@ mod test {
             assert_eq!(def.name, "c");
             assert_eq!(def.args.len(), 3);
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
                 "string"
             );
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[1].1, type_map).unwrap(),
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[1].1, type_map).unwrap(),
                 "number"
             );
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[2].1, type_map).unwrap(),
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[2].1, type_map).unwrap(),
                 "boolean"
             );
             assert_eq!(def.result, None);
@@ -158,14 +158,14 @@ mod test {
             assert_eq!(def.name, "d");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
                 "string"
             );
             assert_eq!(
                 def.result
                     .and_then(|result| {
                         Some(
-                            specta::ts::datatype(&ExportConfig::default(), &result, type_map)
+                            specta_typescript::datatype(&ExportConfig::default(), &result, type_map)
                                 .unwrap(),
                         )
                     })
@@ -181,7 +181,7 @@ mod test {
             assert_eq!(def.name, "e");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
                 "boolean"
             );
             assert_eq!(def.result, None);
@@ -194,14 +194,14 @@ mod test {
             assert_eq!(def.name, "f");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
                 "string"
             );
             assert_eq!(
                 def.result
                     .and_then(|result| {
                         Some(
-                            specta::ts::datatype(&ExportConfig::default(), &result, type_map)
+                            specta_typescript::datatype(&ExportConfig::default(), &result, type_map)
                                 .unwrap(),
                         )
                     })
@@ -217,7 +217,7 @@ mod test {
             assert_eq!(def.name, "g");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
                 "string"
             );
             assert_eq!(def.result, None);
@@ -230,7 +230,7 @@ mod test {
             assert_eq!(def.name, "h");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
                 "string"
             );
             assert_eq!(def.result, None);
@@ -246,7 +246,7 @@ mod test {
                 def.result
                     .and_then(|result| {
                         Some(
-                            specta::ts::datatype(&ExportConfig::default(), &result, type_map)
+                            specta_typescript::datatype(&ExportConfig::default(), &result, type_map)
                                 .unwrap(),
                         )
                     })
@@ -265,7 +265,7 @@ mod test {
                 def.result
                     .and_then(|result| {
                         Some(
-                            specta::ts::datatype(&ExportConfig::default(), &result, type_map)
+                            specta_typescript::datatype(&ExportConfig::default(), &result, type_map)
                                 .unwrap(),
                         )
                     })
@@ -281,11 +281,11 @@ mod test {
             assert_eq!(def.name, "l");
             assert_eq!(def.args.len(), 2);
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
                 "Demo"
             );
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[1].1, type_map).unwrap(),
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[1].1, type_map).unwrap(),
                 "[string, number]"
             );
             assert_eq!(def.result, None);
@@ -298,7 +298,7 @@ mod test {
             assert_eq!(def.name, "m");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta::ts::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, type_map).unwrap(),
                 "Demo"
             );
             assert_eq!(def.result, None);

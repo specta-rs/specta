@@ -1,3 +1,5 @@
+// TODO: Should `specta-util` rexport `specta` for these macros???
+
 /// Specta compatible selection of struct fields.
 ///
 /// ```rust
@@ -37,7 +39,7 @@ macro_rules! selection {
     ( $s:expr, { $($n:ident),+ $(,)? } ) => {{
         #[allow(non_camel_case_types)]
         mod selection {
-            #[derive(serde::Serialize, $crate::Type)]
+            #[derive(serde::Serialize, specta::Type)]
             #[specta(inline)]
             pub struct Selection<$($n,)*> {
                 $(pub $n: $n),*
@@ -50,7 +52,7 @@ macro_rules! selection {
     ( $s:expr, [{ $($n:ident),+ $(,)? }] ) => {{
         #[allow(non_camel_case_types)]
         mod selection {
-            #[derive(serde::Serialize, $crate::Type)]
+            #[derive(serde::Serialize, specta::Type)]
             #[specta(inline)]
             pub struct Selection<$($n,)*> {
                 $(pub $n: $n,)*

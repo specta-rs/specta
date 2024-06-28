@@ -8,26 +8,33 @@ use std::{
 };
 
 use serde::Serialize;
-use specta::{
-    ts::{BigIntExportBehavior, ExportConfig, ExportError, ExportPath, NamedLocation},
-    Any, Type,
+use specta::Type;
+use specta_typescript::{
+    BigIntExportBehavior, ExportConfig, ExportError, ExportPath, NamedLocation,
 };
+use specta_util::Any;
 
 macro_rules! assert_ts {
     (error; $t:ty, $e:expr) => {
         assert_eq!(
-            specta::ts::inline::<$t>(&Default::default()),
+            specta_typescript::inline::<$t>(&Default::default()),
             Err($e.into())
         )
     };
     ($t:ty, $e:expr) => {
-        assert_eq!(specta::ts::inline::<$t>(&Default::default()), Ok($e.into()))
+        assert_eq!(
+            specta_typescript::inline::<$t>(&Default::default()),
+            Ok($e.into())
+        )
     };
 
     (() => $expr:expr, $e:expr) => {
         let _: () = {
             fn assert_ty_eq<T: Type>(_t: T) {
-                assert_eq!(specta::ts::inline::<T>(&Default::default()), Ok($e.into()));
+                assert_eq!(
+                    specta_typescript::inline::<T>(&Default::default()),
+                    Ok($e.into())
+                );
             }
             assert_ty_eq($expr);
         };
@@ -37,19 +44,22 @@ pub(crate) use assert_ts;
 
 macro_rules! assert_ts_export {
     ($t:ty, $e:expr) => {
-        assert_eq!(specta::ts::export::<$t>(&Default::default()), Ok($e.into()))
+        assert_eq!(
+            specta_typescript::export::<$t>(&Default::default()),
+            Ok($e.into())
+        )
     };
     (error; $t:ty, $e:expr) => {
         assert_eq!(
-            specta::ts::export::<$t>(&Default::default()),
+            specta_typescript::export::<$t>(&Default::default()),
             Err($e.into())
         )
     };
     ($t:ty, $e:expr; $cfg:expr) => {
-        assert_eq!(specta::ts::export::<$t>($cfg), Ok($e.into()))
+        assert_eq!(specta_typescript::export::<$t>($cfg), Ok($e.into()))
     };
     (error; $t:ty, $e:expr; $cfg:expr) => {
-        assert_eq!(specta::ts::export::<$t>($cfg), Err($e.into()))
+        assert_eq!(specta_typescript::export::<$t>($cfg), Err($e.into()))
     };
 }
 pub(crate) use assert_ts_export;
@@ -193,26 +203,26 @@ fn typescript_types() {
 
     // https://github.com/oscartbeaumont/specta/issues/77
     assert_eq!(
-        specta::ts::inline::<std::time::SystemTime>(
+        specta_typescript::inline::<std::time::SystemTime>(
             &ExportConfig::new().bigint(BigIntExportBehavior::Number)
         ),
         Ok(r#"{ duration_since_epoch: number; duration_since_unix_epoch: number }"#.into())
     );
     assert_eq!(
-        specta::ts::inline::<std::time::SystemTime>(
+        specta_typescript::inline::<std::time::SystemTime>(
             &ExportConfig::new().bigint(BigIntExportBehavior::String)
         ),
         Ok(r#"{ duration_since_epoch: string; duration_since_unix_epoch: number }"#.into())
     );
 
     assert_eq!(
-        specta::ts::inline::<std::time::Duration>(
+        specta_typescript::inline::<std::time::Duration>(
             &ExportConfig::new().bigint(BigIntExportBehavior::Number)
         ),
         Ok(r#"{ secs: number; nanos: number }"#.into())
     );
     assert_eq!(
-        specta::ts::inline::<std::time::Duration>(
+        specta_typescript::inline::<std::time::Duration>(
             &ExportConfig::new().bigint(BigIntExportBehavior::String)
         ),
         Ok(r#"{ secs: string; nanos: number }"#.into())
@@ -293,9 +303,9 @@ fn typescript_types() {
         ExportError::InvalidName(
             NamedLocation::Type,
             #[cfg(not(windows))]
-            ExportPath::new_unsafe("specta/tests/ts.rs:630:10"),
+            ExportPath::new_unsafe("tests/tests/ts.rs:640:10"),
             #[cfg(windows)]
-            ExportPath::new_unsafe("specta\tests\ts.rs:630:10"),
+            ExportPath::new_unsafe("tests\tests\ts.rs:640:10"),
             r#"@odata.context"#.to_string()
         )
     );
@@ -305,9 +315,9 @@ fn typescript_types() {
         ExportError::InvalidName(
             NamedLocation::Type,
             #[cfg(not(windows))]
-            ExportPath::new_unsafe("specta/tests/ts.rs:634:10"),
+            ExportPath::new_unsafe("tests/tests/ts.rs:644:10"),
             #[cfg(windows)]
-            ExportPath::new_unsafe("specta\tests\ts.rs:634:10"),
+            ExportPath::new_unsafe("tests\tests\ts.rs:644:10"),
             r#"@odata.context"#.to_string()
         )
     );

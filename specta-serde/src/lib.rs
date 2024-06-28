@@ -5,9 +5,9 @@ use std::collections::HashSet;
 use thiserror::Error;
 
 use specta::{
-    internal::{skip_fields, skip_fields_named},
-    DataType, EnumRepr, EnumType, EnumVariants, GenericType, List, LiteralType, Map, PrimitiveType,
-    SpectaID, StructFields, TypeMap,
+    internal::{resolve_generics, skip_fields, skip_fields_named},
+    DataType, EnumRepr, EnumType, EnumVariants, LiteralType, PrimitiveType, SpectaID, StructFields,
+    TypeMap,
 };
 
 // TODO: The error should show a path to the type causing the issue like the BigInt error reporting.
@@ -244,85 +244,4 @@ fn validate_internally_tag_enum_datatype(
     }
 
     Ok(())
-}
-
-// TODO: Maybe make this a public utility?
-fn resolve_generics(mut dt: DataType, generics: &Vec<(GenericType, DataType)>) -> DataType {
-    // match dt {
-    //     DataType::Primitive(_) | DataType::Literal(_) | DataType::Any | DataType::Unknown => dt,
-    //     DataType::List(v) => DataType::List(List {
-    //         ty: Box::new(resolve_generics(*v.ty(), generics)),
-    //         length: v.length,
-    //         unique: v.unique,
-    //     }),
-    //     DataType::Nullable(v) => DataType::Nullable(Box::new(resolve_generics(*v, generics))),
-    //     DataType::Map(v) => DataType::Map(Map {
-    //         key_ty: Box::new(resolve_generics(*v.key_ty(), generics)),
-    //         value_ty: Box::new(resolve_generics(*v.value_ty(), generics)),
-    //     }),
-    //     DataType::Struct(ref mut v) => match &mut v.fields {
-    //         StructFields::Unit => dt,
-    //         StructFields::Unnamed(f) => {
-    //             for field in f.fields.iter_mut() {
-    //                 field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
-    //             }
-
-    //             dt
-    //         }
-    //         StructFields::Named(f) => {
-    //             for (_, field) in f.fields.iter_mut() {
-    //                 field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
-    //             }
-
-    //             dt
-    //         }
-    //     },
-    //     DataType::Enum(ref mut v) => {
-    //         for (_, v) in v.variants().iter_mut() {
-    //             match &mut v.inner() {
-    //                 EnumVariants::Unit => {}
-    //                 EnumVariants::Named(f) => {
-    //                     for (_, field) in f.fields().iter_mut() {
-    //                         field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
-    //                     }
-    //                 }
-    //                 EnumVariants::Unnamed(f) => {
-    //                     for field in f.fields.iter_mut() {
-    //                         field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
-    //                     }
-    //                 }
-    //             }
-    //         }
-
-    //         dt
-    //     }
-    //     DataType::Tuple(ref mut v) => {
-    //         for ty in v.elements.iter_mut() {
-    //             *ty = resolve_generics(ty.clone(), generics);
-    //         }
-
-    //         dt
-    //     }
-    //     DataType::Result(result) => DataType::Result(Box::new({
-    //         let (ok, err) = *result;
-    //         (
-    //             resolve_generics(ok, generics),
-    //             resolve_generics(err, generics),
-    //         )
-    //     })),
-    //     DataType::Reference(ref mut r) => {
-    //         for (_, generic) in r.generics.iter_mut() {
-    //             *generic = resolve_generics(generic.clone(), generics);
-    //         }
-
-    //         dt
-    //     }
-    //     DataType::Generic(g) => generics
-    //         .iter()
-    //         .find(|(name, _)| name == &g)
-    //         .map(|(_, ty)| ty.clone())
-    //         .unwrap_or_else(|| format!("Generic type `{g}` was referenced but not found").into()), // TODO: Error properly
-    // }
-
-    todo!();
 }

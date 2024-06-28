@@ -22,8 +22,11 @@ export = ["dep:ctor", "specta-macros/export"]
 ## Support for [TypeScript](https://www.typescriptlang.org) language exporting
 typescript = []
 
+serde = []
+
 [dependencies]
 specta = { path = "../specta" }
 specta-macros = { path = "../specta-macros" }
 ctor = { version = "0.2.4", optional = true }
 once_cell = "1.18.0"
+serde = "1.0.203"

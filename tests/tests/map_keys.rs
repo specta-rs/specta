@@ -1,6 +1,8 @@
 use std::{collections::HashMap, convert::Infallible};
 
-use specta::{Any, SerdeError, Type};
+use specta::Type;
+use specta_serde::SerdeError;
+use specta_util::Any;
 
 use crate::ts::{assert_ts, assert_ts_export};
 

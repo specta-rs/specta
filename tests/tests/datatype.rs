@@ -1,5 +1,6 @@
-use specta::{ts, DataType, LiteralType, PrimitiveType, StructType};
+use specta::{DataType, LiteralType, PrimitiveType, StructType};
 use specta_datatype_from::DataTypeFrom;
+use specta_typescript as ts;
 
 use crate::ts::assert_ts;
 

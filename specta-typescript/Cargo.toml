@@ -10,6 +10,12 @@ documentation = "https://docs.rs/specta-zod/latest/specta-zod"
 keywords = ["async", "specta", "rspc", "typescript", "typesafe"]
 categories = ["web-programming", "asynchronous"]
 
+[features]
+default = []
+
+# TODO: Remove this?
+function = ["specta/function"]
+
 [dependencies]
 specta = { path = "../specta" }
 # TODO: Don't depend on serde

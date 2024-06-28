@@ -1,4 +1,5 @@
-use specta::{ts, Generics, Type, TypeMap};
+use specta::{Generics, Type, TypeMap};
+use specta_typescript as ts;
 
 #[derive(Type)]
 #[specta(untagged)]

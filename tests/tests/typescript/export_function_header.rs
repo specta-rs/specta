@@ -1,6 +1,7 @@
 #![allow(deprecated)]
 
-use specta::{fn_datatype, function::FunctionDataType, specta, ts::export_function_header};
+use specta::{fn_datatype, function::FunctionDataType, specta};
+use specta_typescript::export_function_header;
 
 #[specta]
 fn a() {}
@@ -38,7 +39,7 @@ fn test_export_function_header() {
 }
 
 #[track_caller]
-fn assert(dt: FunctionDataType, result: specta::ts::Result<&str>) {
+fn assert(dt: FunctionDataType, result: specta_typescript::Result<&str>) {
     match export_function_header(dt, &Default::default()) {
         Ok(s) => assert_eq!(result, Ok(s.as_str())),
         Err(e) => assert_eq!(result, Err(e)),

@@ -10,17 +10,11 @@ repository = "https://github.com/oscartbeaumont/specta"
 documentation = "https://docs.rs/specta/latest/specta"
 keywords = ["async", "specta", "rspc", "typescript", "typesafe"]
 categories = ["web-programming", "asynchronous"]
-autotests = false
 
 # /bin/sh RUSTDOCFLAGS="--cfg docsrs2" cargo +nightly doc --all-features
 [package.metadata."docs.rs"]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs2"] # TODO: Rename to `docsrs2` once Tokio fixes https://github.com/tokio-rs/tokio/pull/6360
-
-[[test]]
-name = "integration_tests"
-path = "tests/lib.rs"
-harness = true
 
 # Run `node ./.github/features.js` to update the docs
 [features]
@@ -115,5 +109,3 @@ specta1 = { package = "specta", version = "1", optional = true, default-features
 [dev-dependencies]
 doc-comment = "0.3.3"
 serde = { version = "1.0.183", features = ["derive"] }
-trybuild = "1.0.82"
-wasm-bindgen = "0.2.89"

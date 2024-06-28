@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use specta::{ts::ExportError, SerdeError, Type};
+use specta::Type;
+use specta_serde::SerdeError;
+use specta_typescript::ExportError;
 
 use crate::ts::{assert_ts, assert_ts_export};
 
