@@ -39,7 +39,6 @@ impl EnumAttr {
         };
 
         Self::try_from_attrs("specta", attrs, &mut result)?;
-        #[cfg(feature = "serde")]
         Self::try_from_attrs("serde", attrs, &mut result)?;
         Ok(result)
     }

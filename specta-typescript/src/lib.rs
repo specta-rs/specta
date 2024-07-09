@@ -1,7 +1,12 @@
 //! [TypeScript](https://www.typescriptlang.org) language exporter.
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![doc(
+    html_logo_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png",
+    html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
+)]
 
+use std::borrow::Cow;
 use std::fmt::Write;
-use std::{borrow::Cow, fmt::Display};
 
 pub mod comments;
 mod context;
@@ -10,11 +15,13 @@ mod export_config;
 pub mod formatter;
 pub(crate) mod js_doc;
 mod reserved_terms;
+mod typescript;
 
 pub use context::*;
 pub use error::*;
 pub use export_config::*;
 use reserved_terms::*;
+pub use typescript::Typescript;
 
 use specta::{
     detect_duplicate_type_names,
@@ -129,7 +136,7 @@ pub fn export_named_datatype(
 ///
 /// Eg. `function name();`
 #[cfg(feature = "function")]
-#[cfg_attr(docsrs2, doc(cfg(feature = "function")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "function")))]
 pub fn export_function_header(
     dt: specta::function::FunctionDataType,
     config: &ExportConfig,

@@ -1,4 +1,9 @@
 //! [OpenAPI](https://www.openapis.org) language exporter.
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![doc(
+    html_logo_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png",
+    html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
+)]
 
 use openapiv3::{
     ArrayType, BooleanType, NumberType, ReferenceOr, Schema, SchemaData, SchemaKind, StringType,

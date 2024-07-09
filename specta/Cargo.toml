@@ -11,22 +11,25 @@ documentation = "https://docs.rs/specta/latest/specta"
 keywords = ["async", "specta", "rspc", "typescript", "typesafe"]
 categories = ["web-programming", "asynchronous"]
 
-# /bin/sh RUSTDOCFLAGS="--cfg docsrs2" cargo +nightly doc --all-features
+# /bin/sh RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
 [package.metadata."docs.rs"]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs2"] # TODO: Rename to `docsrs2` once Tokio fixes https://github.com/tokio-rs/tokio/pull/6360
+rustdoc-args = ["--cfg", "docsrs"]
 
 # Run `node ./.github/features.js` to update the docs
 [features]
 default = []
 
+## Derive macros
+derive = ["dep:specta-macros"]
+
 #! Features
 ## Support for exporting the types of Rust functions.
-function = ["serde", "specta-macros/function"]
+function = ["serde", "specta-macros/DO_NOT_USE_function"]
 
 #! Compatability
 ## Support for [serde](https://serde.rs)
-serde = ["dep:serde", "specta-macros/serde"]
+serde = ["dep:serde"]
 ## Support for [serde-json](https://github.com/serde-rs/json)
 serde_json = ["dep:serde_json"]
 ## Support for [serde_yaml](https://github.com/dtolnay/serde-yaml)
@@ -76,6 +79,9 @@ bevy_input = ["dep:bevy_input", "dep:bevy_ecs", "dep:glam"]
 
 # Internal features (unstable)
 interop = ["dep:specta1"]
+
+[lints]
+workspace = true
 
 [dependencies]
 specta-macros = { version = "=2.0.0-rc.13", optional = true, path = "../specta-macros" }

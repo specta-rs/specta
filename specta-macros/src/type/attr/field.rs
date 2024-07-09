@@ -53,7 +53,6 @@ impl FieldAttr {
         let mut result = Self::default();
         result.common = CommonAttr::from_attrs(attrs)?;
         Self::try_from_attrs("specta", attrs, &mut result)?;
-        #[cfg(feature = "serde")]
         Self::try_from_attrs("serde", attrs, &mut result)?;
         Ok(result)
     }

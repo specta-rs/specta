@@ -1,6 +1,9 @@
 #[macro_use]
 mod macros;
 mod impls;
+// TODO: We don't care much about these cause they are gonna go so this will do for now.
+#[cfg(feature = "derive")]
+mod legacy_impls;
 mod map;
 mod post_process;
 mod specta_id;

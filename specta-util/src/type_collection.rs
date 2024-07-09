@@ -1,6 +1,6 @@
-use std::{borrow::Borrow, collections::HashMap};
+use std::{borrow::Borrow, collections::HashMap, path::Path};
 
-use specta::{NamedDataType, NamedType, SpectaID, TypeMap};
+use specta::{Language, NamedDataType, NamedType, SpectaID, TypeMap};
 
 /// Define a set of types which can be exported together
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,6 +17,10 @@ impl Default for TypeCollection {
 }
 
 impl TypeCollection {
+    pub(crate) fn from_raw(types: HashMap<SpectaID, fn(&mut TypeMap) -> NamedDataType>) -> Self {
+        Self { types }
+    }
+
     /// Join another type collection into this one.
     pub fn extend(&mut self, collection: impl Borrow<TypeCollection>) -> &mut Self {
         self.types.extend(collection.borrow().types.iter());
@@ -30,11 +34,27 @@ impl TypeCollection {
         self
     }
 
-    /// Export all the types in the collection.
-    pub fn export(&self, mut type_map: &mut TypeMap) {
+    /// Export all the types in the collection into the given type map.
+    pub fn collect(&self, mut type_map: &mut TypeMap) {
         for (sid, export) in self.types.iter() {
             let dt = export(&mut type_map);
             type_map.insert(*sid, dt);
         }
+    }
+
+    /// TODO
+    pub fn export<L: Language>(&self, language: L) -> Result<String, L::Error> {
+        let mut type_map = TypeMap::default();
+        self.collect(&mut type_map);
+        language.export(type_map)
+    }
+
+    /// TODO
+    pub fn export_to<L: Language>(
+        &self,
+        language: L,
+        path: impl AsRef<Path>,
+    ) -> Result<(), L::Error> {
+        std::fs::write(path, self.export(language)?).map_err(Into::into)
     }
 }

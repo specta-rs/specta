@@ -8,9 +8,9 @@
     html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
 )]
 
-#[cfg(feature = "function")]
+#[cfg(feature = "DO_NOT_USE_function")]
 mod internal_fn_datatype;
-#[cfg(feature = "function")]
+#[cfg(feature = "DO_NOT_USE_function")]
 mod specta;
 mod r#type;
 mod utils;
@@ -21,7 +21,7 @@ pub fn derive_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 }
 
 #[proc_macro_attribute]
-#[cfg(feature = "function")]
+#[cfg(feature = "DO_NOT_USE_function")]
 pub fn specta(
     _: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
@@ -31,7 +31,7 @@ pub fn specta(
 
 #[proc_macro]
 #[doc(hidden)]
-#[cfg(feature = "function")]
+#[cfg(feature = "DO_NOT_USE_function")]
 pub fn internal_fn_datatype(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     use syn::parse_macro_input;
 

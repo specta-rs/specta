@@ -2,7 +2,7 @@
 #![forbid(unsafe_code)]
 #![warn(clippy::all, clippy::unwrap_used, clippy::panic)] // TODO: missing_docs
 #![allow(clippy::module_inception)]
-#![cfg_attr(docsrs2, feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
     html_logo_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png",
     html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
@@ -15,13 +15,15 @@ pub mod internal;
 pub mod datatype;
 /// Support for exporting Rust functions.
 #[cfg(feature = "function")]
-#[cfg_attr(docsrs2, doc(cfg(feature = "function")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "function")))]
 pub mod function;
+mod language;
 /// Contains [`Type`] and everything related to it, including implementations and helper macros
 pub mod r#type;
 
 #[doc(hidden)] // TODO: Should we actually do this? I think not
 pub use datatype::*;
+pub use language::Language;
 pub use r#type::*;
 
 /// Implements [`Type`] for a given struct or enum.
@@ -48,6 +50,8 @@ pub use r#type::*;
 ///     VariantThree { name: String, age: i32 },
 /// }
 /// ```
+#[cfg(feature = "derive")]
+#[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use specta_macros::Type;
 
 /// Prepares a function to have its types extracted using [`fn_datatype`]
@@ -61,7 +65,7 @@ pub use specta_macros::Type;
 /// }
 /// ```
 #[cfg(feature = "function")]
-#[cfg_attr(docsrs2, doc(cfg(feature = "function")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "function")))]
 pub use specta_macros::specta;
 
 #[cfg(doctest)]

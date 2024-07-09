@@ -10,7 +10,7 @@ permissions:
   statuses: write
 
 env:
-  RUSTDOCFLAGS: --cfg docsrs2
+  RUSTDOCFLAGS: --cfg docsrs
 
 jobs:
   deploy-docs:

@@ -62,6 +62,10 @@
 //! let named_export = ts::export_named_datatype(&Default::default(), &named, &Default::default()).unwrap();
 //! assert_eq!(named_export, "export type MyObject = { a: \"A\" | \"B\" }");
 //! ```
+#![doc(
+    html_logo_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png",
+    html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
+)]
 
 mod data_type_from;
 mod utils;

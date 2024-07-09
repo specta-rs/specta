@@ -10,6 +10,14 @@ documentation = "https://docs.rs/specta-zod/latest/specta-zod"
 keywords = ["async", "specta", "rspc", "go", "typesafe"]
 categories = ["web-programming", "asynchronous"]
 
+# /bin/sh RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
+[package.metadata."docs.rs"]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true
+
 [dependencies]
 specta = { path = "../specta" }
 thiserror = "1.0.61"

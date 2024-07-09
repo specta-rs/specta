@@ -107,24 +107,24 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let type_impl_heading = impl_heading(quote!(#crate_ref::Type), &ident, generics);
 
-    let export = (cfg!(feature = "export") && container_attrs.export.unwrap_or(true)).then(|| {
-        let export_fn_name = format_ident!("__push_specta_type_{}", raw_ident);
+    let export = (cfg!(feature = "DO_NOT_USE_export") && container_attrs.export.unwrap_or(true))
+        .then(|| {
+            let export_fn_name = format_ident!("__push_specta_type_{}", raw_ident);
 
-        let generic_params = generics
-            .params
-            .iter()
-            .filter(|param| matches!(param, syn::GenericParam::Type(_)))
-            .map(|_| quote! { () });
+            let generic_params = generics
+                .params
+                .iter()
+                .filter(|param| matches!(param, syn::GenericParam::Type(_)))
+                .map(|_| quote! { () });
 
-        quote! {
-            // TODO: Bring this back
-            // #[allow(non_snake_case)]
-            // #[#internal_crate_ref::internal::ctor::ctor]
-            // fn #export_fn_name() {
-            //     #crate_ref::export::register_ty::<#ident<#(#generic_params),*>>();
-            // }
-        }
-    });
+            quote! {
+                #[allow(non_snake_case)]
+                #[#internal_crate_ref::export::internal::ctor]
+                fn #export_fn_name() {
+                    #internal_crate_ref::export::internal::register::<#ident<#(#generic_params),*>>();
+                }
+            }
+        });
 
     let comments = &container_attrs.common.doc;
     let deprecated = container_attrs.common.deprecated_as_tokens(&crate_ref);
@@ -163,7 +163,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         #name.into(),
                         #comments.into(),
                         #deprecated,
-                        #sid,
+                        Self::sid(),
                         IMPL_LOCATION,
                         <Self as #crate_ref::Type>::inline(type_map, #crate_ref::Generics::Provided(generics))
                     )
@@ -174,7 +174,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         #name.into(),
                         #comments.into(),
                         #deprecated,
-                        #sid,
+                        Self::sid(),
                         IMPL_LOCATION,
                         <Self as #crate_ref::Type>::inline(type_map, #crate_ref::Generics::Definition)
                     )

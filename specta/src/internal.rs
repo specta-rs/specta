@@ -6,9 +6,6 @@
 
 use std::borrow::Cow;
 
-#[cfg(feature = "export")]
-pub use ctor;
-
 #[cfg(feature = "interop")]
 pub mod interop;
 
