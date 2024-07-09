@@ -19,5 +19,5 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
-specta = { path = "../specta" }
+specta = { version = "=2.0.0-rc.14", path = "../specta" }
 thiserror = "1.0.61"
