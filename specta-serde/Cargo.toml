@@ -1,7 +1,7 @@
 [package]
 name = "specta-serde"
 description = "Serde support for Specta"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2021"
 license = "MIT"
@@ -19,5 +19,5 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
-specta = { version = "=2.0.0-rc.14", path = "../specta" }
+specta = { version = "=2.0.0-rc.15", path = "../specta" }
 thiserror = "1.0.61"

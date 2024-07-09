@@ -17,6 +17,7 @@ impl Default for TypeCollection {
 }
 
 impl TypeCollection {
+    #[allow(unused)]
     pub(crate) fn from_raw(types: HashMap<SpectaID, fn(&mut TypeMap) -> NamedDataType>) -> Self {
         Self { types }
     }
