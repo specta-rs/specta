@@ -22,7 +22,7 @@ fn type_collection_export() {
     let mut type_map = TypeMap::default();
     TypeCollection::default()
         .register::<A>()
-        .export(&mut type_map);
+        .collect(&mut type_map);
     assert_eq!(type_map.len(), 2);
 }
 
@@ -38,7 +38,7 @@ fn type_collection_merge() {
         .register::<D>()
         .extend(a)
         .extend(b)
-        .export(&mut type_map);
+        .collect(&mut type_map);
     assert_eq!(type_map.len(), 4);
 
     // Check it compile with any valid arg
@@ -54,7 +54,7 @@ fn type_collection_duplicate_register_ty() {
     TypeCollection::default()
         .register::<C>()
         .register::<C>()
-        .export(&mut type_map);
+        .collect(&mut type_map);
     assert_eq!(type_map.len(), 1);
 }
 
