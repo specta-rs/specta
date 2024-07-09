@@ -147,23 +147,23 @@ pub fn export_function_header(
         .comment_exporter
         .map(|v| {
             v(CommentFormatterArgs {
-                docs: &dt.docs,
-                deprecated: dt.deprecated.as_ref(),
+                docs: &dt.docs(),
+                deprecated: dt.deprecated(),
             })
         })
         .unwrap_or_default();
 
     s.push_str("export ");
 
-    if dt.asyncness {
+    if dt.asyncness() {
         s.push_str("async ");
     }
 
     s.push_str("function ");
 
-    s.push_str(&dt.name);
+    s.push_str(&dt.name());
     s.push_str("(");
-    for (i, (name, ty)) in dt.args.into_iter().enumerate() {
+    for (i, (name, ty)) in dt.args().enumerate() {
         if i != 0 {
             s.push_str(", ");
         }
@@ -174,7 +174,7 @@ pub fn export_function_header(
     }
     s.push_str(")");
 
-    if let Some(ty) = dt.result {
+    if let Some(ty) = dt.result() {
         s.push_str(": ");
         s.push_str(&datatype(config, &ty, &type_map)?);
     }

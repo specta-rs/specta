@@ -42,16 +42,27 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
         None => false,
     };
 
-    let arg_names = function.sig.inputs.iter().map(|input| {
+    let mut arg_names = Vec::new();
+    for input in function.sig.inputs.iter() {
         let arg = match input {
-            FnArg::Receiver(_) => unreachable!("Commands cannot take 'self'"),
+            FnArg::Receiver(_) => {
+                return Err(syn::Error::new_spanned(
+                    input,
+                    "functions with `#[specta]` cannot take 'self'",
+                ))
+            }
             FnArg::Typed(arg) => match &*arg.pat {
                 Pat::Ident(ident) => ident.ident.to_token_stream(),
                 Pat::Macro(m) => m.mac.tokens.to_token_stream(),
                 Pat::Struct(s) => s.path.to_token_stream(),
                 Pat::Slice(s) => s.attrs[0].to_token_stream(),
                 Pat::Tuple(s) => s.elems[0].to_token_stream(),
-                _ => unreachable!("Commands must take named arguments"),
+                _ => {
+                    return Err(syn::Error::new_spanned(
+                        input,
+                        "functions with `#[specta]` must take named arguments",
+                    ))
+                }
             },
         };
 
@@ -63,8 +74,8 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
             s
         };
 
-        TokenStream::from_str(&s).unwrap()
-    });
+        arg_names.push(TokenStream::from_str(&s).unwrap());
+    }
 
     let arg_signatures = function.sig.inputs.iter().map(|_| quote!(_));
 

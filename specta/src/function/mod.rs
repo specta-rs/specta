@@ -1,3 +1,7 @@
+//! Support for exporting Rust function.
+//!
+//! TODO: Docs. Talk about how Specta doesn't export functions but it helps you to.
+
 mod arg;
 pub(crate) mod result;
 
@@ -88,23 +92,49 @@ pub type CollectFunctionsResult = (Vec<FunctionDataType>, TypeMap);
 pub use crate::collect_functions;
 use crate::{DataType, DeprecatedType, TypeMap};
 
-// TODO: Probs move this into the `DataType` module???
+// TODO: Probs move this into the `DataType` module??? // TODO
 /// Contains type information about a function annotated with [`specta`](macro@crate::specta).
 /// Returned by [`fn_datatype`].
 #[derive(Debug, Clone)]
 pub struct FunctionDataType {
     /// Whether the function is async.
-    pub asyncness: bool,
+    asyncness: bool,
     /// The function's name.
-    pub name: Cow<'static, str>,
+    name: Cow<'static, str>,
     /// The name and type of each of the function's arguments.
-    pub args: Vec<(Cow<'static, str>, DataType)>,
+    args: Vec<(Cow<'static, str>, DataType)>,
     /// The return type of the function.
-    pub result: Option<DataType>,
+    result: Option<DataType>,
     /// The function's documentation. Detects both `///` and `#[doc = ...]` style documentation.
-    pub docs: Cow<'static, str>,
+    docs: Cow<'static, str>,
     /// The deprecated status of the function.
-    pub deprecated: Option<DeprecatedType>,
+    deprecated: Option<DeprecatedType>,
+}
+
+impl FunctionDataType {
+    pub fn asyncness(&self) -> bool {
+        self.asyncness
+    }
+
+    pub fn name(&self) -> &Cow<'static, str> {
+        &self.name
+    }
+
+    pub fn args(&self) -> impl Iterator<Item = &(Cow<'static, str>, DataType)> {
+        self.args.iter()
+    }
+
+    pub fn result(&self) -> Option<&DataType> {
+        self.result.as_ref()
+    }
+
+    pub fn docs(&self) -> &Cow<'static, str> {
+        &self.docs
+    }
+
+    pub fn deprecated(&self) -> Option<&DeprecatedType> {
+        self.deprecated.as_ref()
+    }
 }
 
 /// Implemented by functions that can be annoatated with [`specta`](crate::specta).
