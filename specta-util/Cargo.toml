@@ -27,6 +27,6 @@ serde = []
 [dependencies]
 specta = { path = "../specta" }
 specta-macros = { path = "../specta-macros" }
-ctor = { version = "0.2.4", optional = true }
-once_cell = "1.18.0"
-serde = "1.0.203"
+ctor = { version = "0.2.8", optional = true }
+once_cell = "1.19.0"
+serde = "1.0.204"

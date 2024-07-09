@@ -1,7 +1,8 @@
 //! [OpenAPI](https://www.openapis.org) language exporter.
 
 use openapiv3::{
-    ArrayType, NumberType, ReferenceOr, Schema, SchemaData, SchemaKind, StringType, Type,
+    ArrayType, BooleanType, NumberType, ReferenceOr, Schema, SchemaData, SchemaKind, StringType,
+    Type,
 };
 use specta::{DataType, PrimitiveType};
 
@@ -78,7 +79,7 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
         }),
         primitive_def!(bool) => ReferenceOr::Item(Schema {
             schema_data,
-            schema_kind: SchemaKind::Type(Type::Boolean {}),
+            schema_kind: SchemaKind::Type(Type::Boolean(BooleanType::default())),
         }),
         // primitive_def!(Never) => "never".into(),
         DataType::Nullable(def) => {

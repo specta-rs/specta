@@ -1,7 +1,7 @@
 mod attr;
 
 use quote::{quote, ToTokens};
-use syn::{parse_macro_input, Data, DeriveInput, Fields};
+use syn::{parse, Data, DeriveInput, Fields};
 
 use attr::*;
 
@@ -14,7 +14,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         attrs,
         generics,
         ..
-    } = &parse_macro_input::parse::<DeriveInput>(input)?;
+    } = &parse::<DeriveInput>(input)?;
 
     let mut attrs = parse_attrs(attrs)?;
     let container_attrs = ContainerAttr::from_attrs(&mut attrs)?;

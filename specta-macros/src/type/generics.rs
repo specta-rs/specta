@@ -2,7 +2,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use syn::{
     parse_quote, spanned::Spanned, ConstParam, Error, GenericArgument, GenericParam, Generics,
-    Ident, LifetimeDef, PathArguments, Type, TypeArray, TypeParam, TypePtr, TypeReference,
+    Ident, LifetimeParam, PathArguments, Type, TypeArray, TypeParam, TypePtr, TypeReference,
     TypeSlice, WhereClause,
 };
 
@@ -17,7 +17,7 @@ pub fn generics_with_ident_and_bounds_only(generics: &Generics) -> Option<TokenS
                     bounds,
                     ..
                 }) => quote!(#ident #colon_token #bounds),
-                Lifetime(LifetimeDef {
+                Lifetime(LifetimeParam {
                     lifetime,
                     colon_token,
                     bounds,
@@ -42,7 +42,7 @@ pub fn generics_with_ident_only(generics: &Generics) -> Option<TokenStream> {
 
             generics.params.iter().map(|param| match param {
                 Type(TypeParam { ident, .. }) | Const(ConstParam { ident, .. }) => quote!(#ident),
-                Lifetime(LifetimeDef { lifetime, .. }) => quote!(#lifetime),
+                Lifetime(LifetimeParam { lifetime, .. }) => quote!(#lifetime),
             })
         })
         .map(|gs| quote!(<#(#gs),*>))

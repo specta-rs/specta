@@ -4,13 +4,13 @@ use std::str::FromStr;
 
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{parse_macro_input, FnArg, ItemFn, Pat, Visibility};
+use syn::{parse, FnArg, ItemFn, Pat, Visibility};
 
 use crate::utils::{format_fn_wrapper, parse_attrs};
 
 pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
     let crate_ref = quote!(specta);
-    let function = parse_macro_input::parse::<ItemFn>(item)?;
+    let function = parse::<ItemFn>(item)?;
     let wrapper = format_fn_wrapper(&function.sig.ident);
 
     // While using wasm_bindgen and Specta is rare, this should make the DX nicer.

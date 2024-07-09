@@ -1,12 +1,11 @@
 use proc_macro2::{Span, TokenStream};
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::{
     ext::IdentExt,
-    parenthesized,
     parse::{Parse, ParseStream},
     spanned::Spanned,
     token::Paren,
-    Ident, Lit, Path, Result, Token,
+    Ident, Lit, Meta, Path, Result, Token,
 };
 
 #[derive(Clone)]
@@ -113,19 +112,9 @@ impl Attribute {
     }
 }
 
-fn parse_attribute(input: ParseStream) -> Result<Vec<Attribute>> {
-    // (demo = "hello")
-    // ^              ^
-    let content_owned;
-    let content;
-    if input.peek(Paren) {
-        parenthesized!(content_owned in input);
-        content = &content_owned;
-    } else {
-        content = input;
-    }
-
+fn parse_attribute(content: ParseStream) -> Result<Vec<Attribute>> {
     let mut result = Vec::new();
+
     while !content.is_empty() {
         // (demo = "hello")
         //  ^^^^
@@ -167,7 +156,7 @@ pub fn parse_attrs(attrs: &[syn::Attribute]) -> syn::Result<Vec<Attribute>> {
 
     for attr in attrs {
         let ident = attr
-            .path
+            .path()
             .segments
             .last()
             .expect("Attribute path must have at least one segment")
@@ -184,27 +173,22 @@ pub fn parse_attrs(attrs: &[syn::Attribute]) -> syn::Result<Vec<Attribute>> {
             continue;
         }
 
-        let parser = |input: ParseStream| {
-            Ok(Attribute {
+        result.append(&mut match &attr.meta {
+            Meta::Path(_) => vec![Attribute {
                 key: ident.clone(),
-                value: match false {
-                    // `#[demo]`
-                    _ if input.is_empty() => None,
-                    // `#[demo = "todo"]`
-                    _ if input.peek(Token![=]) => {
-                        input.parse::<Token![=]>()?;
-                        Some(AttributeValue::parse(input)?)
-                    }
-                    // `#[demo(...)]`
-                    _ => Some(AttributeValue::Attribute {
-                        span: ident.span(),
-                        attr: parse_attribute(input)?,
-                    }),
-                },
-            })
-        };
-        let attr = syn::parse::Parser::parse2(parser, attr.tokens.clone().into())?;
-        result.push(attr);
+                value: None,
+            }],
+            Meta::List(meta) => vec![Attribute {
+                key: ident.clone(),
+                value: Some(AttributeValue::Attribute {
+                    span: ident.span(),
+                    attr: syn::parse::Parser::parse2(parse_attribute, meta.tokens.clone())?,
+                }),
+            }],
+            Meta::NameValue(meta) => {
+                syn::parse::Parser::parse2(parse_attribute, meta.to_token_stream().clone())?
+            }
+        });
     }
 
     Ok(result)

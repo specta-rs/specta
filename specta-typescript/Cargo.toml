@@ -20,4 +20,4 @@ function = ["specta/function"]
 specta = { path = "../specta" }
 # TODO: Don't depend on serde
 specta-serde = { path = "../specta-serde" }
-thiserror = "1.0.60"
+thiserror = "1.0.61"

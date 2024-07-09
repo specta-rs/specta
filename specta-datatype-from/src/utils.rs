@@ -169,7 +169,7 @@ pub fn parse_attrs(attrs: &[syn::Attribute]) -> syn::Result<Vec<Attribute>> {
 
     for attr in attrs {
         let ident = attr
-            .path
+            .path()
             .segments
             .last()
             .expect("Attribute path must have at least one segment")
@@ -205,7 +205,7 @@ pub fn parse_attrs(attrs: &[syn::Attribute]) -> syn::Result<Vec<Attribute>> {
                 },
             })
         };
-        let attr = syn::parse::Parser::parse2(parser, attr.tokens.clone().into())?;
+        let attr = attr.parse_args_with(parser)?;
         result.push(attr);
     }
 
