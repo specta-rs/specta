@@ -1,3 +1,5 @@
+//! Types related to working with [`DataType`](crate::DataType). Exposed for advanced users.
+
 use std::{
     borrow::{Borrow, Cow},
     fmt::Display,
@@ -5,6 +7,7 @@ use std::{
 
 mod r#enum;
 mod fields;
+mod function;
 mod list;
 mod literal;
 mod map;
@@ -15,6 +18,7 @@ mod r#struct;
 mod tuple;
 
 pub use fields::*;
+pub use function::*;
 pub use list::*;
 pub use literal::*;
 pub use map::*;

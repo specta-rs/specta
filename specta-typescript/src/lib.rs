@@ -24,7 +24,7 @@ use reserved_terms::*;
 pub use typescript::Typescript;
 
 use specta::{
-    detect_duplicate_type_names,
+    internal::detect_duplicate_type_names,
     internal::{skip_fields, skip_fields_named, NonSkipField},
     DataType, DeprecatedType, Generics, NamedDataType, NamedType, PrimitiveType, Type, TypeMap,
 };
@@ -131,14 +131,14 @@ pub fn export_named_datatype(
     )
 }
 
-/// Convert a [FunctionDataType] into a function header like would be used in a `.d.ts` file.
+/// Convert a [Function](crate::datatype::Function) into a function header like would be used in a `.d.ts` file.
 /// If your function requires a function body you can copy this function into your own codebase.
 ///
 /// Eg. `function name();`
 #[cfg(feature = "function")]
 #[cfg_attr(docsrs, doc(cfg(feature = "function")))]
 pub fn export_function_header(
-    dt: specta::function::FunctionDataType,
+    dt: specta::datatype::Function,
     config: &ExportConfig,
 ) -> Result<String> {
     let type_map = TypeMap::default();

@@ -4,7 +4,7 @@
 //!
 //! DO NOT USE THEM! You have been warned!
 
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::HashMap};
 
 #[cfg(feature = "interop")]
 pub mod interop;
@@ -13,8 +13,8 @@ pub mod interop;
 pub use paste::paste;
 
 use crate::{
-    DataType, EnumVariants, Field, GenericType, Generics, List, Map, SpectaID, StructFields, Type,
-    TypeMap,
+    DataType, EnumVariants, Field, GenericType, Generics, ImplLocation, List, Map, SpectaID,
+    StructFields, Type, TypeMap,
 };
 
 /// Functions used to construct `crate::datatype` types (they have private fields so can't be constructed directly).
@@ -224,15 +224,12 @@ pub fn flatten<T: Type>(sid: SpectaID, type_map: &mut TypeMap, generics: &[DataT
 #[cfg(feature = "function")]
 mod functions {
     use super::*;
-    use crate::{
-        function::{Function, FunctionDataType},
-        DeprecatedType,
-    };
+    use crate::{datatype::Function, function::SpectaFn, DeprecatedType};
 
     #[doc(hidden)]
     /// A helper for exporting a command to a [`CommandDataType`].
     /// You shouldn't use this directly and instead should use [`fn_datatype!`](crate::fn_datatype).
-    pub fn get_fn_datatype<TMarker, T: Function<TMarker>>(
+    pub fn get_fn_datatype<TMarker, T: SpectaFn<TMarker>>(
         _: T,
         asyncness: bool,
         name: Cow<'static, str>,
@@ -241,7 +238,7 @@ mod functions {
         docs: Cow<'static, str>,
         deprecated: Option<DeprecatedType>,
         no_return_type: bool,
-    ) -> FunctionDataType {
+    ) -> Function {
         T::to_datatype(
             asyncness,
             name,
@@ -334,4 +331,27 @@ pub fn resolve_generics(mut dt: DataType, generics: &Vec<(GenericType, DataType)
             .map(|(_, ty)| ty.clone())
             .unwrap_or_else(|| format!("Generic type `{g}` was referenced but not found").into()), // TODO: Error properly
     }
+}
+
+// TODO: This should go
+/// post process the type map to detect duplicate type names
+pub fn detect_duplicate_type_names(
+    type_map: &TypeMap,
+) -> Vec<(Cow<'static, str>, ImplLocation, ImplLocation)> {
+    let mut errors = Vec::new();
+
+    let mut map = HashMap::with_capacity(type_map.len());
+    for (sid, dt) in type_map.iter() {
+        if let Some(ext) = &dt.ext {
+            if let Some((existing_sid, existing_impl_location)) =
+                map.insert(dt.name.clone(), (sid, ext.impl_location))
+            {
+                if existing_sid != sid {
+                    errors.push((dt.name.clone(), ext.impl_location, existing_impl_location));
+                }
+            }
+        }
+    }
+
+    errors
 }

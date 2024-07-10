@@ -1,5 +1,5 @@
 //! TODO: These are all planned to be removed from the core and into the ecosystem for the v2 release.
-use crate::{reference::Reference, *};
+use crate::{r#type::macros::*, reference::Reference, *};
 
 use std::borrow::Cow;
 

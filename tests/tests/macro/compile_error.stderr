@@ -1,3 +1,57 @@
+error: specta: found string literal containing an unsupported inflection
+ --> tests/macro/compile_error.rs:7:22
+  |
+7 | #[serde(rename_all = "camelCase123")]
+  |                      ^^^^^^^^^^^^^^
+
+error: specta: trait objects are not currently supported.
+  --> tests/macro/compile_error.rs:13:34
+   |
+13 |     pub(crate) cause: Option<Box<dyn std::error::Error + Send + Sync>>,
+   |                                  ^^^
+
+error: specta: Found unsupported container attribute 'noshot'
+  --> tests/macro/compile_error.rs:75:10
+   |
+75 | #[specta(noshot = true)]
+   |          ^^^^^^
+
+error: specta: Found unsupported container attribute 'noshot'
+  --> tests/macro/compile_error.rs:79:10
+   |
+79 | #[specta(noshot)]
+   |          ^^^^^^
+
+error: specta: Found unsupported field attribute 'noshot'
+  --> tests/macro/compile_error.rs:84:14
+   |
+84 |     #[specta(noshot = true)]
+   |              ^^^^^^
+
+error: specta: Found unsupported field attribute 'noshot'
+  --> tests/macro/compile_error.rs:90:14
+   |
+90 |     #[specta(noshot)]
+   |              ^^^^^^
+
+error: #[specta(transparent)] is not allowed on an enum
+  --> tests/macro/compile_error.rs:96:5
+   |
+96 | pub enum TransparentEnum {}
+   |     ^^^^
+
+error: specta: invalid formatted attribute
+  --> tests/macro/compile_error.rs:99:3
+   |
+99 | #[specta]
+   |   ^^^^^^
+
+error: specta: invalid formatted attribute
+   --> tests/macro/compile_error.rs:103:3
+    |
+103 | #[specta = "todo"]
+    |   ^^^^^^
+
 error: specta: You must apply the #[specta] macro before the #[wasm_bindgen] macro
    --> tests/macro/compile_error.rs:108:1
     |
@@ -16,332 +70,123 @@ error[E0255]: the name `__specta__fn__testing` is defined multiple times
     |
     = note: `__specta__fn__testing` must be defined only once in the macro namespace of this module
 
-error: expected `fn`
-  --> tests/macro/compile_error.rs:76:1
-   |
-76 | struct InvalidAttrs1;
-   | ^^^^^^
-
-error: expected `fn`
-  --> tests/macro/compile_error.rs:80:1
-   |
-80 | struct InvalidAttrs2;
-   | ^^^^^^
-
-error: expected non-macro attribute, found attribute macro `specta`
-  --> tests/macro/compile_error.rs:84:7
-   |
-84 |     #[specta(noshot = true)]
-   |       ^^^^^^ not a non-macro attribute
-
-error: expected non-macro attribute, found attribute macro `specta`
-  --> tests/macro/compile_error.rs:90:7
-   |
-90 |     #[specta(noshot)]
-   |       ^^^^^^ not a non-macro attribute
-
-error: expected `fn`
-  --> tests/macro/compile_error.rs:96:5
-   |
-96 | pub enum TransparentEnum {}
-   |     ^^^^
-
-error: expected `fn`
-   --> tests/macro/compile_error.rs:100:5
-    |
-100 | pub struct InvalidSpectaAttribute1;
-    |     ^^^^^^
-
-error: key-value macro attributes are not supported
-   --> tests/macro/compile_error.rs:103:1
-    |
-103 | #[specta = "todo"]
-    | ^^^^^^^^^^^^^^^^^^
-
-error: expected `fn`
-   --> tests/macro/compile_error.rs:104:5
-    |
-104 | pub struct InvalidSpectaAttribute2;
-    |     ^^^^^^
-
-error: cannot find derive macro `Type` in this scope
- --> tests/macro/compile_error.rs:6:10
-  |
-6 | #[derive(Type)]
-  |          ^^^^
-  |
-note: `Type` is imported here, but it is only a trait, without a derive macro
- --> tests/macro/compile_error.rs:3:22
-  |
-3 | use specta::{specta, Type};
-  |                      ^^^^
-
-error: cannot find attribute `serde` in this scope
- --> tests/macro/compile_error.rs:7:3
-  |
-7 | #[serde(rename_all = "camelCase123")]
-  |   ^^^^^
-  |
-  = note: `serde` is in scope, but it is a crate, not an attribute
-
-error: cannot find derive macro `Type` in this scope
-  --> tests/macro/compile_error.rs:11:10
-   |
-11 | #[derive(Type)]
-   |          ^^^^
-   |
-note: `Type` is imported here, but it is only a trait, without a derive macro
-  --> tests/macro/compile_error.rs:3:22
-   |
-3  | use specta::{specta, Type};
-   |                      ^^^^
-
-error: cannot find derive macro `Type` in this scope
-  --> tests/macro/compile_error.rs:19:10
-   |
-19 | #[derive(Type)]
-   |          ^^^^
-   |
-note: `Type` is imported here, but it is only a trait, without a derive macro
-  --> tests/macro/compile_error.rs:3:22
-   |
-3  | use specta::{specta, Type};
-   |                      ^^^^
-
-error: cannot find derive macro `Type` in this scope
-  --> tests/macro/compile_error.rs:24:10
-   |
-24 | #[derive(Type)]
-   |          ^^^^
-   |
-note: `Type` is imported here, but it is only a trait, without a derive macro
-  --> tests/macro/compile_error.rs:3:22
-   |
-3  | use specta::{specta, Type};
-   |                      ^^^^
-
-error: cannot find derive macro `Type` in this scope
-  --> tests/macro/compile_error.rs:29:10
-   |
-29 | #[derive(Type)]
-   |          ^^^^
-   |
-note: `Type` is imported here, but it is only a trait, without a derive macro
-  --> tests/macro/compile_error.rs:3:22
-   |
-3  | use specta::{specta, Type};
-   |                      ^^^^
-
-error: cannot find attribute `serde` in this scope
-  --> tests/macro/compile_error.rs:31:7
-   |
-31 |     #[serde(flatten)]
-   |       ^^^^^
-   |
-   = note: `serde` is in scope, but it is a crate, not an attribute
-
-error: cannot find attribute `serde` in this scope
-  --> tests/macro/compile_error.rs:33:7
-   |
-33 |     #[serde(flatten)]
-   |       ^^^^^
-   |
-   = note: `serde` is in scope, but it is a crate, not an attribute
-
-error: cannot find derive macro `Type` in this scope
-  --> tests/macro/compile_error.rs:37:10
-   |
-37 | #[derive(Type)]
-   |          ^^^^
-   |
-note: `Type` is imported here, but it is only a trait, without a derive macro
-  --> tests/macro/compile_error.rs:3:22
-   |
-3  | use specta::{specta, Type};
-   |                      ^^^^
-
-error: cannot find attribute `serde` in this scope
-  --> tests/macro/compile_error.rs:38:3
-   |
-38 | #[serde(untagged)]
-   |   ^^^^^
-   |
-   = note: `serde` is in scope, but it is a crate, not an attribute
-
-error: cannot find derive macro `Type` in this scope
-  --> tests/macro/compile_error.rs:43:10
-   |
-43 | #[derive(Type)]
-   |          ^^^^
-   |
-note: `Type` is imported here, but it is only a trait, without a derive macro
-  --> tests/macro/compile_error.rs:3:22
-   |
-3  | use specta::{specta, Type};
-   |                      ^^^^
-
-error: cannot find attribute `serde` in this scope
-  --> tests/macro/compile_error.rs:44:3
-   |
-44 | #[serde(untagged)]
-   |   ^^^^^
-   |
-   = note: `serde` is in scope, but it is a crate, not an attribute
-
-error: cannot find derive macro `Type` in this scope
-  --> tests/macro/compile_error.rs:49:10
-   |
-49 | #[derive(Type)]
-   |          ^^^^
-   |
-note: `Type` is imported here, but it is only a trait, without a derive macro
-  --> tests/macro/compile_error.rs:3:22
-   |
-3  | use specta::{specta, Type};
-   |                      ^^^^
-
-error: cannot find attribute `serde` in this scope
-  --> tests/macro/compile_error.rs:51:7
-   |
-51 |     #[serde(flatten)]
-   |       ^^^^^
-   |
-   = note: `serde` is in scope, but it is a crate, not an attribute
-
-error: cannot find attribute `serde` in this scope
-  --> tests/macro/compile_error.rs:53:7
-   |
-53 |     #[serde(flatten)]
-   |       ^^^^^
-   |
-   = note: `serde` is in scope, but it is a crate, not an attribute
-
-error: cannot find derive macro `Type` in this scope
-  --> tests/macro/compile_error.rs:59:10
-   |
-59 | #[derive(Type)]
-   |          ^^^^
-   |
-note: `Type` is imported here, but it is only a trait, without a derive macro
-  --> tests/macro/compile_error.rs:3:22
-   |
-3  | use specta::{specta, Type};
-   |                      ^^^^
-
-error: cannot find attribute `serde` in this scope
-  --> tests/macro/compile_error.rs:60:3
-   |
-60 | #[serde(tag = "tag")]
-   |   ^^^^^
-   |
-   = note: `serde` is in scope, but it is a crate, not an attribute
-
-error: cannot find derive macro `Type` in this scope
-  --> tests/macro/compile_error.rs:67:10
-   |
-67 | #[derive(Type)]
-   |          ^^^^
-   |
-note: `Type` is imported here, but it is only a trait, without a derive macro
-  --> tests/macro/compile_error.rs:3:22
-   |
-3  | use specta::{specta, Type};
-   |                      ^^^^
-
-error: cannot find attribute `serde` in this scope
-  --> tests/macro/compile_error.rs:69:7
-   |
-69 |     #[serde(flatten)]
-   |       ^^^^^
-   |
-   = note: `serde` is in scope, but it is a crate, not an attribute
-
-error: cannot find derive macro `Type` in this scope
-  --> tests/macro/compile_error.rs:74:10
-   |
-74 | #[derive(Type)]
-   |          ^^^^
-   |
-note: `Type` is imported here, but it is only a trait, without a derive macro
-  --> tests/macro/compile_error.rs:3:22
-   |
-3  | use specta::{specta, Type};
-   |                      ^^^^
-
-error: cannot find derive macro `Type` in this scope
-  --> tests/macro/compile_error.rs:78:10
-   |
-78 | #[derive(Type)]
-   |          ^^^^
-   |
-note: `Type` is imported here, but it is only a trait, without a derive macro
-  --> tests/macro/compile_error.rs:3:22
-   |
-3  | use specta::{specta, Type};
-   |                      ^^^^
-
-error: cannot find derive macro `Type` in this scope
-  --> tests/macro/compile_error.rs:82:10
-   |
-82 | #[derive(Type)]
-   |          ^^^^
-   |
-note: `Type` is imported here, but it is only a trait, without a derive macro
-  --> tests/macro/compile_error.rs:3:22
-   |
-3  | use specta::{specta, Type};
-   |                      ^^^^
-
-error: cannot find derive macro `Type` in this scope
-  --> tests/macro/compile_error.rs:88:10
-   |
-88 | #[derive(Type)]
-   |          ^^^^
-   |
-note: `Type` is imported here, but it is only a trait, without a derive macro
-  --> tests/macro/compile_error.rs:3:22
-   |
-3  | use specta::{specta, Type};
-   |                      ^^^^
-
-error: cannot find derive macro `Type` in this scope
-  --> tests/macro/compile_error.rs:94:10
-   |
-94 | #[derive(Type)]
-   |          ^^^^
-   |
-note: `Type` is imported here, but it is only a trait, without a derive macro
-  --> tests/macro/compile_error.rs:3:22
-   |
-3  | use specta::{specta, Type};
-   |                      ^^^^
-
-error: cannot find derive macro `Type` in this scope
-  --> tests/macro/compile_error.rs:98:10
-   |
-98 | #[derive(Type)]
-   |          ^^^^
-   |
-note: `Type` is imported here, but it is only a trait, without a derive macro
-  --> tests/macro/compile_error.rs:3:22
-   |
-3  | use specta::{specta, Type};
-   |                      ^^^^
-
-error: cannot find derive macro `Type` in this scope
-   --> tests/macro/compile_error.rs:102:10
-    |
-102 | #[derive(Type)]
-    |          ^^^^
-    |
-note: `Type` is imported here, but it is only a trait, without a derive macro
-   --> tests/macro/compile_error.rs:3:22
-    |
-3   | use specta::{specta, Type};
-    |                      ^^^^
-
 error[E0601]: `main` function not found in crate `$CRATE`
    --> tests/macro/compile_error.rs:110:20
     |
 110 | pub fn testing() {}
     |                    ^ consider adding a `main` function to `$DIR/tests/macro/compile_error.rs`
+
+error[E0277]: the trait bound `UnitExternal: specta::Flatten` is not satisfied
+  --> tests/macro/compile_error.rs:32:11
+   |
+32 |     unit: UnitExternal,
+   |           ^^^^^^^^^^^^ the trait `specta::Flatten` is not implemented for `UnitExternal`
+   |
+   = help: the following other types implement trait `specta::Flatten`:
+             Arc<T>
+             BTreeMap<K, V>
+             Box<T>
+             Cell<T>
+             Duration
+             FlattenExternal
+             FlattenInternal
+             FlattenUntagged
+           and $N others
+note: required by a bound in `_::<impl Type for FlattenExternal>::inline::validate_flatten`
+  --> tests/macro/compile_error.rs:29:10
+   |
+29 | #[derive(Type)]
+   |          ^^^^ required by this bound in `validate_flatten`
+   = note: this error originates in the derive macro `Type` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `UnnamedMultiExternal: specta::Flatten` is not satisfied
+  --> tests/macro/compile_error.rs:34:20
+   |
+34 |     unnamed_multi: UnnamedMultiExternal,
+   |                    ^^^^^^^^^^^^^^^^^^^^ the trait `specta::Flatten` is not implemented for `UnnamedMultiExternal`
+   |
+   = help: the following other types implement trait `specta::Flatten`:
+             Arc<T>
+             BTreeMap<K, V>
+             Box<T>
+             Cell<T>
+             Duration
+             FlattenExternal
+             FlattenInternal
+             FlattenUntagged
+           and $N others
+note: required by a bound in `_::<impl Type for FlattenExternal>::inline::validate_flatten`
+  --> tests/macro/compile_error.rs:29:10
+   |
+29 | #[derive(Type)]
+   |          ^^^^ required by this bound in `validate_flatten`
+   = note: this error originates in the derive macro `Type` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `UnnamedUntagged: specta::Flatten` is not satisfied
+  --> tests/macro/compile_error.rs:52:14
+   |
+52 |     unnamed: UnnamedUntagged,
+   |              ^^^^^^^^^^^^^^^ the trait `specta::Flatten` is not implemented for `UnnamedUntagged`
+   |
+   = help: the following other types implement trait `specta::Flatten`:
+             Arc<T>
+             BTreeMap<K, V>
+             Box<T>
+             Cell<T>
+             Duration
+             FlattenExternal
+             FlattenInternal
+             FlattenUntagged
+           and $N others
+note: required by a bound in `_::<impl Type for FlattenUntagged>::inline::validate_flatten`
+  --> tests/macro/compile_error.rs:49:10
+   |
+49 | #[derive(Type)]
+   |          ^^^^ required by this bound in `validate_flatten`
+   = note: this error originates in the derive macro `Type` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `UnnamedMultiUntagged: specta::Flatten` is not satisfied
+  --> tests/macro/compile_error.rs:54:20
+   |
+54 |     unnamed_multi: UnnamedMultiUntagged,
+   |                    ^^^^^^^^^^^^^^^^^^^^ the trait `specta::Flatten` is not implemented for `UnnamedMultiUntagged`
+   |
+   = help: the following other types implement trait `specta::Flatten`:
+             Arc<T>
+             BTreeMap<K, V>
+             Box<T>
+             Cell<T>
+             Duration
+             FlattenExternal
+             FlattenInternal
+             FlattenUntagged
+           and $N others
+note: required by a bound in `_::<impl Type for FlattenUntagged>::inline::validate_flatten`
+  --> tests/macro/compile_error.rs:49:10
+   |
+49 | #[derive(Type)]
+   |          ^^^^ required by this bound in `validate_flatten`
+   = note: this error originates in the derive macro `Type` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `UnnamedInternal: specta::Flatten` is not satisfied
+  --> tests/macro/compile_error.rs:70:14
+   |
+70 |     unnamed: UnnamedInternal,
+   |              ^^^^^^^^^^^^^^^ the trait `specta::Flatten` is not implemented for `UnnamedInternal`
+   |
+   = help: the following other types implement trait `specta::Flatten`:
+             Arc<T>
+             BTreeMap<K, V>
+             Box<T>
+             Cell<T>
+             Duration
+             FlattenExternal
+             FlattenInternal
+             FlattenUntagged
+           and $N others
+note: required by a bound in `_::<impl Type for FlattenInternal>::inline::validate_flatten`
+  --> tests/macro/compile_error.rs:67:10
+   |
+67 | #[derive(Type)]
+   |          ^^^^ required by this bound in `validate_flatten`
+   = note: this error originates in the derive macro `Type` (in Nightly builds, run with -Z macro-backtrace for more info)

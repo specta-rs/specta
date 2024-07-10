@@ -94,12 +94,13 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
         #function
 
         #maybe_macro_export
-        #[doc(hidden)] // We take in `$function` from the invocation so we have `name::<concrete_generics_types>`
+        #[doc(hidden)]
         macro_rules! #wrapper {
-            (@export_fn) => {
-                fn export(type_map: &mut #crate_ref::TypeMap) -> #crate_ref::function::FunctionDataType {
-                    specta::internal::get_fn_datatype(
-                        $function_name as fn(#(#arg_signatures),*) -> _,
+            // We take in `$function` from the invocation so we have `name::<concrete_generics_types>`
+            (@export_fn; $function:ident) => {{
+                fn export(type_map: &mut #crate_ref::TypeMap) -> #crate_ref::datatype::Function {
+                    #crate_ref::internal::get_fn_datatype(
+                        $function as fn(#(#arg_signatures),*) -> _,
                         #function_asyncness,
                         #function_name_str.into(),
                         type_map,
@@ -109,7 +110,9 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
                         #no_return_type,
                     )
                 }
-            }
+
+                export
+            }}
         }
 
         // allow the macro to be resolved with the same path as the function

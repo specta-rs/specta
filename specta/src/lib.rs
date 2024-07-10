@@ -1,72 +1,37 @@
 #![doc = include_str!("./docs.md")]
-#![forbid(unsafe_code)]
-#![warn(clippy::all, clippy::unwrap_used, clippy::panic)] // TODO: missing_docs
-#![allow(clippy::module_inception)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
     html_logo_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png",
     html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
 )]
 
-#[doc(hidden)]
-pub mod internal;
-
-/// Types related to working with [`DataType`](crate::DataType). Exposed for advanced users.
 pub mod datatype;
-/// Support for exporting Rust functions.
 #[cfg(feature = "function")]
 #[cfg_attr(docsrs, doc(cfg(feature = "function")))]
 pub mod function;
+#[doc(hidden)]
+pub mod internal;
 mod language;
-/// Contains [`Type`] and everything related to it, including implementations and helper macros
-pub mod r#type;
+mod specta_id;
+mod r#type;
+mod type_map;
+
+// TODO: Can we just move the trait here or `#[doc(inline)]`
+pub use r#type::{Flatten, Generics, NamedType, Type};
+// #[doc(inline)]
+pub use specta_id::{ImplLocation, SpectaID};
+pub use type_map::TypeMap;
 
 #[doc(hidden)] // TODO: Should we actually do this? I think not
 pub use datatype::*;
 pub use language::Language;
-pub use r#type::*;
 
-/// Implements [`Type`] for a given struct or enum.
-///
-/// ## Example
-///
-/// ```rust
-/// use specta::Type;
-///
-/// // Use it on structs
-/// #[derive(Type)]
-/// pub struct MyCustomStruct {
-///     pub name: String,
-/// }
-///
-/// #[derive(Type)]
-/// pub struct MyCustomStruct2(String, i32, bool);
-///
-/// // Use it on enums
-/// #[derive(Type)]
-/// pub enum MyCustomType {
-///     VariantOne,
-///     VariantTwo(String, i32),
-///     VariantThree { name: String, age: i32 },
-/// }
-/// ```
+#[doc(inline)]
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use specta_macros::Type;
 
-/// Prepares a function to have its types extracted using [`fn_datatype`]
-///
-/// ## Example
-///
-/// ```rust
-/// #[specta::specta]
-/// fn my_function(arg1: i32, arg2: bool) -> &'static str {
-///     "Hello World"
-/// }
-/// ```
+#[doc(inline)]
 #[cfg(feature = "function")]
 #[cfg_attr(docsrs, doc(cfg(feature = "function")))]
 pub use specta_macros::specta;
-
-#[cfg(doctest)]
-doc_comment::doctest!("../../README.md");

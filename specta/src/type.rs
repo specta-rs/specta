@@ -1,22 +1,15 @@
-#[macro_use]
-mod macros;
+use crate::{
+    reference::{self, Reference},
+    DataType, NamedDataType, SpectaID, TypeMap,
+};
+
 mod impls;
+mod macros;
 // TODO: We don't care much about these cause they are gonna go so this will do for now.
 #[cfg(feature = "derive")]
 mod legacy_impls;
-mod map;
-mod post_process;
-mod specta_id;
 
-pub use map::*;
-pub use post_process::*;
-pub use specta_id::*;
-
-use crate::{
-    reference::{self, Reference},
-    DataType, NamedDataType,
-};
-
+/// TODO
 // TODO: Break out into it's own file?
 #[derive(Debug, Clone, Copy)]
 pub enum Generics<'a> {
@@ -37,7 +30,7 @@ pub enum Generics<'a> {
 }
 
 impl<'a> Generics<'a> {
-    // TODO: Is a distrinction between `Self::Definition` and `Self::Provided(Cow::Borrowed(&[]))` cause aren't they theoretically the same thing.
+    // TODO: Is a distinction between `Self::Definition` and `Self::Provided(Cow::Borrowed(&[]))` cause aren't they theoretically the same thing.
     #[doc(hidden)] // TODO: Probs remove this
     pub const NONE: Self = Self::Provided(&[]);
 }
@@ -60,7 +53,7 @@ pub trait Type {
     }
 }
 
-/// NamedType represents a type that can be converted into [NamedDataType].
+/// represents a type that can be converted into [NamedDataType].
 /// This will be implemented for all types with the [Type] derive macro.
 pub trait NamedType: Type {
     // TODO: I hate this being a method

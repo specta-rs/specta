@@ -3,14 +3,16 @@
 //! TODO: Docs. Talk about how Specta doesn't export functions but it helps you to.
 
 mod arg;
-pub(crate) mod result;
-
-use std::borrow::Cow;
+mod result;
+mod specta_fn;
 
 pub use arg::FunctionArg;
-pub(crate) use result::*;
+pub use result::FunctionResult;
+#[doc(hidden)]
+pub use result::{FunctionResultFutureMarker, FunctionResultMarker};
+pub(crate) use specta_fn::SpectaFn;
 
-/// Returns a [`FunctionDataType`] for a given function that has been annotated with
+/// Returns a [`Function`](crate::datatype::Function) for a given function that has been annotated with
 /// [`specta`](macro@crate::specta).
 ///
 /// # Examples
@@ -24,35 +26,23 @@ pub(crate) use result::*;
 /// }
 ///
 /// fn main() {
-///     let typ = fn_datatype!(some_function);
+///     let typ = fn_datatype!(some_function)(&mut TypeMap::default())
 ///
 ///     assert_eq!(typ.name, "some_function");
 ///     assert_eq!(typ.args.len(), 2);
 ///     assert_eq!(typ.result, Some(DataType::Primitive(PrimitiveType::bool)));
 /// }
 /// ```
+#[doc(hidden)]
 #[macro_export]
-macro_rules! fn_datatype {
-    // TODO: Removing `type_map`???
-    ($function:path) => {{
-        let mut type_map = specta::TypeMap::default();
-        $crate::fn_datatype!(type_map; $function)
-    }};
-    ($type_map:ident; $function:path) => {{
-        let type_map: &mut $crate::TypeMap = &mut $type_map;
-
-        // This defines `export` function
-        $crate::internal::paste! { [<__specta__fn__ $function>]!(@export_fn) }
-
-        // `let` is to workaround: error: macro expansion ignores token `;` and any following
-        let result = export(type_map);
-
-        result
-    }};
+macro_rules! _fn_datatype {
+    ($function:path) => {
+        $crate::internal::paste! { [<__specta__fn__ $function>]!(@export_fn; $function) }
+    };
 }
 
 /// Collects function types into a [`Vec`],
-/// and all downstream types into a [`TypeMap`] instance.
+/// and all downstream types into a [`TypeMap`](crate::TypeMap) instance.
 ///
 /// Specifying a `type_map` argument allows a custom [`TypeMap`] to be used.
 ///
@@ -67,167 +57,22 @@ macro_rules! fn_datatype {
 /// }
 ///
 /// fn main() {
-///     // `type_defs` is created internally
-///     let (functions, type_defs) = function::collect_functions![some_function];
-///
-///     let custom_type_defs = TypeMap::default();
-///
-///     // `type_defs` is provided.
-///     // This can be used when integrating multiple specta-enabled libraries.
-///     let (functions, custom_type_defs) = function::collect_functions![
-///         custom_type_defs; // You can provide a custom map to collect the types into
-///         some_function
-///     ];
+///     let functions = function::collect_functions![some_function](&mut TypeMap::default());
 /// }
 /// ````
+#[doc(hidden)]
 #[macro_export]
-macro_rules! collect_functions {
-    // TODO: Removing `type_map`???
-    ($type_map:ident; $($command:path),* $(,)?) => {{
-        let mut type_map: $crate::TypeMap = $type_map;
-        ([$($crate::fn_datatype!(type_map; $command)),*]
-            .into_iter()
-            .collect::<Vec<$crate::function::FunctionDataType>>(), type_map)
-    }};
+macro_rules! _collect_functions {
     ($($command:path),* $(,)?) => {{
-        let mut type_map = $crate::TypeMap::default();
-        $crate::function::collect_functions!(type_map; $($command),*)
+        fn export(type_map: &mut $crate::TypeMap) -> Vec<$crate::datatype::Function> {
+            vec![$($crate::fn_datatype!($command)(type_map)),*]
+        }
+
+        export
     }};
 }
 
-pub type CollectFunctionsResult = (Vec<FunctionDataType>, TypeMap);
-
-pub use crate::collect_functions;
-use crate::{DataType, DeprecatedType, TypeMap};
-
-// TODO: Probs move this into the `DataType` module??? // TODO
-/// Contains type information about a function annotated with [`specta`](macro@crate::specta).
-/// Returned by [`fn_datatype`].
-#[derive(Debug, Clone)]
-pub struct FunctionDataType {
-    /// Whether the function is async.
-    asyncness: bool,
-    /// The function's name.
-    name: Cow<'static, str>,
-    /// The name and type of each of the function's arguments.
-    args: Vec<(Cow<'static, str>, DataType)>,
-    /// The return type of the function.
-    result: Option<DataType>,
-    /// The function's documentation. Detects both `///` and `#[doc = ...]` style documentation.
-    docs: Cow<'static, str>,
-    /// The deprecated status of the function.
-    deprecated: Option<DeprecatedType>,
-}
-
-impl FunctionDataType {
-    pub fn asyncness(&self) -> bool {
-        self.asyncness
-    }
-
-    pub fn name(&self) -> &Cow<'static, str> {
-        &self.name
-    }
-
-    pub fn args(&self) -> impl Iterator<Item = &(Cow<'static, str>, DataType)> {
-        self.args.iter()
-    }
-
-    pub fn result(&self) -> Option<&DataType> {
-        self.result.as_ref()
-    }
-
-    pub fn docs(&self) -> &Cow<'static, str> {
-        &self.docs
-    }
-
-    pub fn deprecated(&self) -> Option<&DeprecatedType> {
-        self.deprecated.as_ref()
-    }
-}
-
-/// Implemented by functions that can be annoatated with [`specta`](crate::specta).
-pub trait Function<TMarker> {
-    /// Gets the type of a function as a [`FunctionDataType`].
-    fn to_datatype(
-        asyncness: bool,
-        name: Cow<'static, str>,
-        type_map: &mut TypeMap,
-        fields: &[Cow<'static, str>],
-        docs: Cow<'static, str>,
-        deprecated: Option<DeprecatedType>,
-        no_return_type: bool,
-    ) -> FunctionDataType;
-}
-
-impl<TResultMarker, TResult: FunctionResult<TResultMarker>> Function<TResultMarker>
-    for fn() -> TResult
-{
-    fn to_datatype(
-        asyncness: bool,
-        name: Cow<'static, str>,
-        type_map: &mut TypeMap,
-        _fields: &[Cow<'static, str>],
-        docs: Cow<'static, str>,
-        deprecated: Option<DeprecatedType>,
-        no_return_type: bool,
-    ) -> FunctionDataType {
-        FunctionDataType {
-            asyncness,
-            name,
-            args: vec![],
-            result: (!no_return_type).then(|| TResult::to_datatype(type_map)),
-            docs,
-            deprecated,
-        }
-    }
-}
-
-macro_rules! impl_typed_command {
-    ( impl $($i:ident),* ) => {
-       paste::paste! {
-            impl<
-                TResultMarker,
-                TResult: FunctionResult<TResultMarker>,
-                $($i: FunctionArg),*
-            > Function<TResultMarker> for fn($($i),*) -> TResult {
-                fn to_datatype(
-                    asyncness: bool,
-                    name: Cow<'static, str>,
-                    type_map: &mut TypeMap,
-                    fields: &[Cow<'static, str>],
-                    docs: Cow<'static, str>,
-                    deprecated: Option<DeprecatedType>,
-                    no_return_type: bool,
-                ) -> FunctionDataType {
-                    let mut fields = fields.into_iter();
-
-                    FunctionDataType {
-                        asyncness,
-                        name,
-                        docs,
-                        deprecated,
-                        args: [$(
-                            fields
-                                .next()
-                                .map_or_else(
-                                    || None,
-                                    |field| $i::to_datatype(type_map).map(|ty| (field.clone(), ty))
-                                )
-                        ),*,]
-                            .into_iter()
-                            .filter_map(|v| v)
-                            .collect::<Vec<_>>(),
-                        result: (!no_return_type).then(|| TResult::to_datatype(type_map)),
-                    }
-                }
-            }
-        }
-    };
-    ( $i2:ident $(, $i:ident)* ) => {
-        impl_typed_command!(impl $i2 $(, $i)* );
-        impl_typed_command!($($i),*);
-    };
-    () => {};
-}
-
-impl_typed_command!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
+#[doc(inline)]
+pub use _collect_functions as collect_functions;
+#[doc(inline)]
+pub use _fn_datatype as fn_datatype;

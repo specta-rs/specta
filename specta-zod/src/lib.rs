@@ -10,8 +10,10 @@ mod error;
 mod export_config;
 
 use context::{ExportContext, PathItem};
-use internal::{skip_fields, skip_fields_named, NonSkipField};
-use specta::*;
+use specta::{
+    internal::{detect_duplicate_type_names, skip_fields, skip_fields_named, NonSkipField},
+    *,
+};
 use std::{borrow::Cow, collections::VecDeque};
 
 pub use context::*;
