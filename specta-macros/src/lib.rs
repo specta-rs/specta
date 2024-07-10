@@ -9,8 +9,6 @@
 )]
 
 #[cfg(feature = "DO_NOT_USE_function")]
-mod internal_fn_datatype;
-#[cfg(feature = "DO_NOT_USE_function")]
 mod specta;
 mod r#type;
 mod utils;
@@ -27,17 +25,4 @@ pub fn specta(
     item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
     specta::attribute(item).unwrap_or_else(|err| err.into_compile_error().into())
-}
-
-#[proc_macro]
-#[doc(hidden)]
-#[cfg(feature = "DO_NOT_USE_function")]
-pub fn internal_fn_datatype(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    use syn::parse_macro_input;
-
-    internal_fn_datatype::proc_macro(parse_macro_input!(
-        input as internal_fn_datatype::FnDatatypeInput
-    ))
-    .unwrap_or_else(|err| err.into_compile_error())
-    .into()
 }

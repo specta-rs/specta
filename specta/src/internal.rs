@@ -10,7 +10,7 @@ use std::borrow::Cow;
 pub mod interop;
 
 #[cfg(feature = "function")]
-pub use specta_macros::internal_fn_datatype;
+pub use paste::paste;
 
 use crate::{
     DataType, EnumVariants, Field, GenericType, Generics, List, Map, SpectaID, StructFields, Type,

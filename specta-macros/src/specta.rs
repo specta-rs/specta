@@ -96,10 +96,10 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
         #maybe_macro_export
         #[doc(hidden)] // We take in `$function` from the invocation so we have `name::<concrete_generics_types>`
         macro_rules! #wrapper {
-            (@export_fn; $function:path) => {
+            (@export_fn) => {
                 fn export(type_map: &mut #crate_ref::TypeMap) -> #crate_ref::function::FunctionDataType {
                     specta::internal::get_fn_datatype(
-                        $function as fn(#(#arg_signatures),*) -> _,
+                        $function_name as fn(#(#arg_signatures),*) -> _,
                         #function_asyncness,
                         #function_name_str.into(),
                         type_map,

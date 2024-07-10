@@ -33,13 +33,20 @@ pub(crate) use result::*;
 /// ```
 #[macro_export]
 macro_rules! fn_datatype {
+    // TODO: Removing `type_map`???
     ($function:path) => {{
-        let mut type_map = $crate::TypeMap::default();
+        let mut type_map = specta::TypeMap::default();
         $crate::fn_datatype!(type_map; $function)
     }};
     ($type_map:ident; $function:path) => {{
         let type_map: &mut $crate::TypeMap = &mut $type_map;
-        $crate::internal::internal_fn_datatype!($function);
+
+        // This defines `export` function
+        $crate::internal::paste! { [<__specta__fn__ $function>]!(@export_fn) }
+
+        // `let` is to workaround: error: macro expansion ignores token `;` and any following
+        let result = export(type_map);
+
         result
     }};
 }
@@ -75,6 +82,7 @@ macro_rules! fn_datatype {
 /// ````
 #[macro_export]
 macro_rules! collect_functions {
+    // TODO: Removing `type_map`???
     ($type_map:ident; $($command:path),* $(,)?) => {{
         let mut type_map: $crate::TypeMap = $type_map;
         ([$($crate::fn_datatype!(type_map; $command)),*]
