@@ -254,18 +254,6 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
             )?
         }
         DataType::Tuple(tuple) => tuple_datatype(ctx, tuple, type_map)?,
-        DataType::Result(result) => {
-            let mut variants = vec![
-                datatype_inner(ctx.clone(), &result.0, type_map)?,
-                datatype_inner(ctx, &result.1, type_map)?,
-            ];
-            variants.dedup();
-            if variants.len() == 1 {
-                variants.pop().expect("Vec is not empty")
-            } else {
-                format!("z.union([{}])", variants.join(", "))
-            }
-        }
         DataType::Reference(reference) => match &reference.generics()[..] {
             [] => reference.name().to_string(),
             _generics => {
@@ -736,7 +724,6 @@ fn validate_type_for_tagged_intersection(
         | DataType::Nullable(_)
         | DataType::List(_)
         | DataType::Map(_)
-        | DataType::Result(_)
         | DataType::Generic(_) => Ok(false),
         DataType::Literal(v) => match v {
             LiteralType::None => Ok(true),

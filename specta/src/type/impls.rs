@@ -171,24 +171,6 @@ impl<T: Type> Type for Option<T> {
     }
 }
 
-impl<T: Type, E: Type> Type for std::result::Result<T, E> {
-    fn inline(type_map: &mut TypeMap, generics: Generics) -> DataType {
-        DataType::Result(Box::new((
-            T::inline(type_map, generics),
-            E::inline(type_map, generics),
-        )))
-    }
-
-    fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
-        Reference {
-            inner: DataType::Result(Box::new((
-                T::reference(type_map, generics).inner,
-                E::reference(type_map, generics).inner,
-            ))),
-        }
-    }
-}
-
 impl<T> Type for std::marker::PhantomData<T> {
     fn inline(_: &mut TypeMap, _: Generics) -> DataType {
         DataType::Literal(LiteralType::None)

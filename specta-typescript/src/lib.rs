@@ -387,22 +387,6 @@ pub(crate) fn datatype_inner(
             )?
         }
         DataType::Tuple(tuple) => s.push_str(&tuple_datatype(ctx, tuple, type_map)?),
-        DataType::Result(result) => {
-            let mut variants = vec![
-                {
-                    let mut v = String::new();
-                    datatype_inner(ctx.clone(), &result.0, type_map, &mut v)?;
-                    v
-                },
-                {
-                    let mut v = String::new();
-                    datatype_inner(ctx, &result.1, type_map, &mut v)?;
-                    v
-                },
-            ];
-            variants.dedup();
-            s.push_str(&variants.join(" | "));
-        }
         DataType::Reference(reference) => match &reference.generics()[..] {
             [] => s.push_str(&reference.name()),
             generics => {
@@ -897,7 +881,6 @@ fn validate_type_for_tagged_intersection(
         | DataType::Nullable(_)
         | DataType::List(_)
         | DataType::Map(_)
-        | DataType::Result(_)
         | DataType::Generic(_) => Ok(false),
         DataType::Literal(v) => match v {
             LiteralType::None => Ok(true),

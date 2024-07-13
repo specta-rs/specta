@@ -311,13 +311,6 @@ pub fn resolve_generics(mut dt: DataType, generics: &Vec<(GenericType, DataType)
 
             dt
         }
-        DataType::Result(result) => DataType::Result(Box::new({
-            let (ok, err) = *result;
-            (
-                resolve_generics(ok, generics),
-                resolve_generics(err, generics),
-            )
-        })),
         DataType::Reference(ref mut r) => {
             for (_, generic) in r.generics.iter_mut() {
                 *generic = resolve_generics(generic.clone(), generics);

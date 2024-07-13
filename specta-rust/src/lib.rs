@@ -17,7 +17,6 @@ fn datatype(t: &DataType) -> Result<String, String> {
     // TODO: Serde serialize + deserialize on types
 
     Ok(match t {
-        DataType::Result(_) => todo!(),
         DataType::Unknown => todo!(),
         DataType::Any => "serde_json::Value".to_owned(),
         DataType::Primitive(ty) => ty.to_rust_str().to_owned(),

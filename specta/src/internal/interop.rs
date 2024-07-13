@@ -341,7 +341,6 @@ pub fn specta_v2_to_v1(datatype: DataType) -> specta1::DataType {
             fields: t.elements.into_iter().map(specta_v2_to_v1).collect(),
             generics: vec![],
         }),
-        DataType::Result(_) => panic!("Specta v1 does not support Result types"),
         DataType::Reference(r) => specta1::DataType::Reference(specta1::DataTypeReference {
             name: match r.name {
                 Cow::Borrowed(v) => v,

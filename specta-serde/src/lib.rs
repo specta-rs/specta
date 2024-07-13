@@ -82,10 +82,6 @@ fn is_valid_ty_internal(
                 is_valid_ty_internal(ty, type_map, checked_references)?;
             }
         }
-        DataType::Result(ty) => {
-            is_valid_ty_internal(&ty.0, type_map, checked_references)?;
-            is_valid_ty_internal(&ty.1, type_map, checked_references)?;
-        }
         DataType::Reference(ty) => {
             for (_, generic) in ty.generics() {
                 is_valid_ty_internal(generic, type_map, checked_references)?;
@@ -237,8 +233,6 @@ fn validate_internally_tag_enum_datatype(
         },
         // `()` is `null` and is valid
         DataType::Tuple(ty) if ty.elements().is_empty() => {}
-        // Are valid as they are serialized as an map-type. Eg. `"Ok": 5` or `"Error": "todo"`
-        DataType::Result(_) => {}
         // References need to be checked against the same rules.
         DataType::Reference(ty) => {
             let ty = type_map.get(ty.sid()).expect("Type was never populated"); // TODO: Error properly
