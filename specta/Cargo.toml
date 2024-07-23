@@ -25,7 +25,7 @@ derive = ["dep:specta-macros"]
 
 #! Features
 ## Support for exporting the types of Rust functions.
-function = ["specta-macros/DO_NOT_USE_function", "dep:paste"] # TODO: Why does this depend on `serde`???
+function = ["specta-macros?/DO_NOT_USE_function", "dep:paste"] # TODO: Why does this depend on `serde`???
 
 #! Compatability
 ## Support for [serde](https://serde.rs)
