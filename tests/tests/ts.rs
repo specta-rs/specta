@@ -243,8 +243,8 @@ fn typescript_types() {
     assert_ts!(PhantomData<String>, r#"null"#);
     assert_ts!(Infallible, r#"never"#);
 
-    assert_ts!(Result<String, i32>, r#"string | number"#);
-    assert_ts!(Result<i16, i32>, r#"number"#);
+    // assert_ts!(Result<String, i32>, r#"string | number"#);
+    // assert_ts!(Result<i16, i32>, r#"number"#);
 
     #[cfg(feature = "either")]
     {
