@@ -256,6 +256,8 @@ impl_as!(
     time::OffsetDateTime as String
     time::Date as String
     time::Time as String
+    time::Duration as String
+    time::Weekday as String
 );
 
 #[cfg(feature = "bigdecimal")]
