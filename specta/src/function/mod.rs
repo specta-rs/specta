@@ -33,11 +33,27 @@ pub(crate) use specta_fn::SpectaFn;
 ///     assert_eq!(typ.result, Some(DataType::Primitive(PrimitiveType::bool)));
 /// }
 /// ```
+///
+// TODO: Hide implementation details in inner macro like Serde does
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _fn_datatype {
-    ($function:path) => {
-        $crate::internal::paste! { [<__specta__fn__ $function>]!(@export_fn; $function) }
+    ([$($path:tt)*] [$($full:tt)*] [$last:tt]) => {
+        $crate::internal::paste! {
+            $($path)* [<__specta__fn__ $last>]!(@export_fn; $($full)*)
+        }
+    };
+    ([$($path:tt)*] [$($full:tt)*] [$($last:tt)?] $t:tt :: <$($g:path)*> $($rest:tt)*) => {
+        $crate::function::fn_datatype!([$($path)* $($last)*] [$($full)* $t::<$($g)*>] [$t] $($rest)*)
+    };
+    ([$($path:tt)*] [$($full:tt)*] [$($last:tt)?] $t:tt $($rest:tt)*) => {
+        $crate::function::fn_datatype!([$($path)* $($last)*] [$($full)* $t] [$t] $($rest)*)
+    };
+    () => {{
+            compile_error!("fn_datatype must be provided a function path as an argument");
+    }};
+    ($($rest:tt)*) => {
+        $crate::function::fn_datatype!([] [] [] $($rest)*)
     };
 }
 
@@ -60,16 +76,29 @@ macro_rules! _fn_datatype {
 ///     let functions = function::collect_functions![some_function](&mut TypeMap::default());
 /// }
 /// ````
+// TODO: Hide implementation details in inner macro like Serde does
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _collect_functions {
-    ($($command:path),* $(,)?) => {{
-        fn export(type_map: &mut $crate::TypeMap) -> Vec<$crate::datatype::Function> {
-            vec![$($crate::fn_datatype!($command)(type_map)),*]
+    ($tm:ident [] [$($result:expr)*]) => {{
+        fn export($tm: &mut $crate::TypeMap) -> Vec<$crate::datatype::Function> {
+            vec![$($result),*]
         }
 
         export
     }};
+    ($tm:ident [$($parts:tt)*] [$($result:expr)*]) => {
+        $crate::function::collect_functions!($tm [] [$($result)* $crate::function::fn_datatype!($($parts)*)($tm)])
+    };
+    ($tm:ident [$($parts:tt)*] [$($result:expr)*] , $($rest:tt)*) => {
+        $crate::function::collect_functions!($tm [] [$($result)* $crate::function::fn_datatype!($($parts)*)($tm)] $($rest)*)
+    };
+    ($tm:ident [$($parts:tt)*] [$($result:expr)*] $t:tt $($rest:tt)*) => {
+        $crate::function::collect_functions!($tm [$($parts)* $t] [$($result)*] $($rest)*)
+    };
+    ($($command:tt)*) => {
+        $crate::function::collect_functions!(type_map [] [] $($command)*)
+    };
 }
 
 #[doc(inline)]
