@@ -13,11 +13,22 @@ pub struct Function {
     /// The name and type of each of the function's arguments.
     pub(crate) args: Vec<(Cow<'static, str>, DataType)>,
     /// The return type of the function.
-    pub(crate) result: Option<DataType>,
+    pub(crate) result: Option<FunctionResultVariant>,
     /// The function's documentation. Detects both `///` and `#[doc = ...]` style documentation.
     pub(crate) docs: Cow<'static, str>,
     /// The deprecated status of the function.
     pub(crate) deprecated: Option<DeprecatedType>,
+}
+
+/// The type of a function's return type.
+///
+/// This gives the flexibility of the result's structure to the downstream implementer.
+#[derive(Debug, Clone)]
+pub enum FunctionResultVariant {
+    /// The function returns a `T`.
+    Value(DataType),
+    /// The function returns a `Result<T, E>`.
+    Result(DataType, DataType),
 }
 
 impl Function {
@@ -33,7 +44,7 @@ impl Function {
         self.args.iter()
     }
 
-    pub fn result(&self) -> Option<&DataType> {
+    pub fn result(&self) -> Option<&FunctionResultVariant> {
         self.result.as_ref()
     }
 
