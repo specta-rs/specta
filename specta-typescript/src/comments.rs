@@ -1,6 +1,6 @@
-use super::js_doc;
+use crate::typescript::{CommentFormatterArgs, CommentFormatterFn};
 
-use super::{CommentFormatterArgs, CommentFormatterFn};
+use super::js_doc;
 
 // Assert that the function signature matches the expected type.
 const _: CommentFormatterFn = js_doc;

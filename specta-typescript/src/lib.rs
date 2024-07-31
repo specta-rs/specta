@@ -11,7 +11,6 @@ use std::fmt::Write;
 pub mod comments;
 mod context;
 mod error;
-mod export_config;
 pub mod formatter;
 #[cfg(feature = "function")]
 #[cfg_attr(docsrs, doc(cfg(feature = "function")))]
@@ -22,9 +21,8 @@ mod typescript;
 
 pub use context::*;
 pub use error::*;
-pub use export_config::*;
 use reserved_terms::*;
-pub use typescript::Typescript;
+pub use typescript::*;
 
 use specta::{
     internal::{detect_duplicate_type_names, skip_fields, skip_fields_named, NonSkipField},
@@ -44,14 +42,14 @@ pub(crate) type Output = Result<String>;
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string with an export.
 ///
 /// Eg. `export type Foo = { demo: string; };`
-pub fn export_ref<T: NamedType>(_: &T, conf: &ExportConfig) -> Output {
+pub fn export_ref<T: NamedType>(_: &T, conf: &Typescript) -> Output {
     export::<T>(conf)
 }
 
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string with an export.
 ///
 /// Eg. `export type Foo = { demo: string; };`
-pub fn export<T: NamedType>(conf: &ExportConfig) -> Output {
+pub fn export<T: NamedType>(conf: &Typescript) -> Output {
     let mut type_map = TypeMap::default();
     let named_data_type = T::definition_named_data_type(&mut type_map);
     is_valid_ty(&named_data_type.inner, &type_map)?;
@@ -67,14 +65,14 @@ pub fn export<T: NamedType>(conf: &ExportConfig) -> Output {
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string.
 ///
 /// Eg. `{ demo: string; };`
-pub fn inline_ref<T: Type>(_: &T, conf: &ExportConfig) -> Output {
+pub fn inline_ref<T: Type>(_: &T, conf: &Typescript) -> Output {
     inline::<T>(conf)
 }
 
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string.
 ///
 /// Eg. `{ demo: string; };`
-pub fn inline<T: Type>(conf: &ExportConfig) -> Output {
+pub fn inline<T: Type>(conf: &Typescript) -> Output {
     let mut type_map = TypeMap::default();
     let ty = T::inline(&mut type_map, Generics::NONE);
     is_valid_ty(&ty, &type_map)?;
@@ -90,11 +88,7 @@ pub fn inline<T: Type>(conf: &ExportConfig) -> Output {
 /// Convert a DataType to a TypeScript string
 ///
 /// Eg. `export Name = { demo: string; }`
-pub fn export_named_datatype(
-    conf: &ExportConfig,
-    typ: &NamedDataType,
-    type_map: &TypeMap,
-) -> Output {
+pub fn export_named_datatype(conf: &Typescript, typ: &NamedDataType, type_map: &TypeMap) -> Output {
     // TODO: Duplicate type name detection?
 
     is_valid_ty(&typ.inner, type_map)?;
@@ -175,7 +169,7 @@ fn export_datatype_inner(ctx: ExportContext, typ: &NamedDataType, type_map: &Typ
 /// Convert a DataType to a TypeScript string
 ///
 /// Eg. `{ demo: string; }`
-pub fn datatype(conf: &ExportConfig, typ: &FunctionResultVariant, type_map: &TypeMap) -> Output {
+pub fn datatype(conf: &Typescript, typ: &FunctionResultVariant, type_map: &TypeMap) -> Output {
     // TODO: Duplicate type name detection?
 
     let mut s = String::new();

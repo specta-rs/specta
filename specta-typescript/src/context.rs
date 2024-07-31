@@ -2,7 +2,7 @@ use std::{borrow::Cow, fmt};
 
 use specta::ImplLocation;
 
-use super::ExportConfig;
+use crate::Typescript;
 
 #[derive(Clone, Debug)]
 pub(crate) enum PathItem {
@@ -14,7 +14,7 @@ pub(crate) enum PathItem {
 
 #[derive(Clone)]
 pub(crate) struct ExportContext<'a> {
-    pub(crate) cfg: &'a ExportConfig,
+    pub(crate) cfg: &'a Typescript,
     pub(crate) path: Vec<PathItem>,
     // `false` when inline'ing and `true` when exporting as named.
     pub(crate) is_export: bool,
