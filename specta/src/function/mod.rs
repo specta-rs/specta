@@ -34,10 +34,18 @@ pub(crate) use specta_fn::SpectaFn;
 /// }
 /// ```
 ///
-// TODO: Hide implementation details in inner macro like Serde does
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _fn_datatype {
+    // Hide distracting implementation details from the generated rustdoc.
+    ($($json:tt)+) => {
+        $crate::function::_fn_datatype_inner!($($json)+)
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! _fn_datatype_inner {
     ([$($path:tt)*] [$($full:tt)*] [$last:tt]) => {
         $crate::internal::paste! {
             $($path)* [<__specta__fn__ $last>]!(@export_fn; $($full)*)
@@ -76,10 +84,18 @@ macro_rules! _fn_datatype {
 ///     let functions = function::collect_functions![some_function](&mut TypeMap::default());
 /// }
 /// ````
-// TODO: Hide implementation details in inner macro like Serde does
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _collect_functions {
+// Hide distracting implementation details from the generated rustdoc.
+($($json:tt)+) => {
+    $crate::function::_collect_functions_inner!($($json)+)
+};
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! _collect_functions_inner {
     ($tm:ident [] [$($result:expr)*]) => {{
         fn export($tm: &mut $crate::TypeMap) -> Vec<$crate::datatype::Function> {
             vec![$($result),*]
@@ -103,5 +119,9 @@ macro_rules! _collect_functions {
 
 #[doc(inline)]
 pub use _collect_functions as collect_functions;
+#[doc(hidden)]
+pub use _collect_functions_inner;
 #[doc(inline)]
 pub use _fn_datatype as fn_datatype;
+#[doc(hidden)]
+pub use _fn_datatype_inner;
