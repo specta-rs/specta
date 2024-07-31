@@ -33,3 +33,7 @@ pub use specta_macros::Type;
 #[cfg(feature = "function")]
 #[cfg_attr(docsrs, doc(cfg(feature = "function")))]
 pub use specta_macros::specta;
+
+// This existing is really a mistake but it's depended on by the Tauri alpha's so keeping it for now.
+#[doc(hidden)]
+pub use datatype::DataType;
