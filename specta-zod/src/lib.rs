@@ -26,8 +26,7 @@ macro_rules! primitive_def {
     }
 }
 
-#[allow(missing_docs)]
-pub type Result<T> = std::result::Result<T, ExportError>;
+type Result<T> = std::result::Result<T, ExportError>;
 
 pub(crate) type Output = Result<String>;
 

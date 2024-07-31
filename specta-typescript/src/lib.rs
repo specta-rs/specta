@@ -12,9 +12,6 @@ pub mod comments;
 mod context;
 mod error;
 pub mod formatter;
-#[cfg(feature = "function")]
-#[cfg_attr(docsrs, doc(cfg(feature = "function")))]
-pub mod function;
 pub mod js_doc;
 mod reserved_terms;
 mod typescript;
