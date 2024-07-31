@@ -38,8 +38,8 @@ pub(crate) use specta_fn::SpectaFn;
 #[macro_export]
 macro_rules! _fn_datatype {
     // Hide distracting implementation details from the generated rustdoc.
-    ($($json:tt)+) => {
-        $crate::function::_fn_datatype_inner!($($json)+)
+    ($($json:tt)*) => {
+        $crate::function::_fn_datatype_inner!($($json)*)
     };
 }
 
@@ -87,10 +87,10 @@ macro_rules! _fn_datatype_inner {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _collect_functions {
-// Hide distracting implementation details from the generated rustdoc.
-($($json:tt)+) => {
-    $crate::function::_collect_functions_inner!($($json)+)
-};
+    // Hide distracting implementation details from the generated rustdoc.
+    ($($json:tt)*) => {
+        $crate::function::_collect_functions_inner!($($json)*)
+    };
 }
 
 #[doc(hidden)]
