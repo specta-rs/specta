@@ -13,7 +13,10 @@ mod context;
 mod error;
 mod export_config;
 pub mod formatter;
-pub(crate) mod js_doc;
+#[cfg(feature = "function")]
+#[cfg_attr(docsrs, doc(cfg(feature = "function")))]
+pub mod function;
+pub mod js_doc;
 mod reserved_terms;
 mod typescript;
 
@@ -24,9 +27,9 @@ use reserved_terms::*;
 pub use typescript::Typescript;
 
 use specta::{
-    internal::detect_duplicate_type_names,
-    internal::{skip_fields, skip_fields_named, NonSkipField},
-    DataType, DeprecatedType, Generics, NamedDataType, NamedType, PrimitiveType, Type, TypeMap,
+    internal::{detect_duplicate_type_names, skip_fields, skip_fields_named, NonSkipField},
+    DataType, DeprecatedType, FunctionResultVariant, Generics, NamedDataType, NamedType,
+    PrimitiveType, Type, TypeMap,
 };
 use specta::{
     EnumRepr, EnumType, EnumVariant, EnumVariants, LiteralType, StructFields, StructType, TupleType,
@@ -61,31 +64,6 @@ pub fn export<T: NamedType>(conf: &ExportConfig) -> Output {
     result
 }
 
-// TODO: Bring this back
-// impl TypeCollection {
-//     /// Export a collection into a Typescript string.
-//     pub fn export_ts(&mut self, conf: &ExportConfig) -> Output {
-//         let mut type_map = TypeMap::default();
-//         self.export(&mut type_map);
-
-//         let mut result = String::new();
-//         for (_, typ) in type_map.iter() {
-//             is_valid_ty(&typ.inner, &type_map)?;
-
-//             let ty = export_named_datatype(conf, typ, &type_map)?;
-//             if let Some((ty_name, l0, l1)) =
-//                 detect_duplicate_type_names(&type_map).into_iter().next()
-//             {
-//                 return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
-//             }
-//             result.push_str(&ty);
-//             result.push('\n');
-//         }
-
-//         Ok(result)
-//     }
-// }
-
 /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string.
 ///
 /// Eg. `{ demo: string; };`
@@ -100,7 +78,7 @@ pub fn inline<T: Type>(conf: &ExportConfig) -> Output {
     let mut type_map = TypeMap::default();
     let ty = T::inline(&mut type_map, Generics::NONE);
     is_valid_ty(&ty, &type_map)?;
-    let result = datatype(conf, &ty, &type_map);
+    let result = datatype(conf, &FunctionResultVariant::Value(ty.clone()), &type_map);
 
     if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_map).into_iter().next() {
         return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
@@ -129,58 +107,6 @@ pub fn export_named_datatype(
         typ,
         type_map,
     )
-}
-
-/// Convert a [Function](crate::datatype::Function) into a function header like would be used in a `.d.ts` file.
-/// If your function requires a function body you can copy this function into your own codebase.
-///
-/// Eg. `function name();`
-#[cfg(feature = "function")]
-#[cfg_attr(docsrs, doc(cfg(feature = "function")))]
-pub fn export_function_header(
-    dt: specta::datatype::Function,
-    config: &ExportConfig,
-) -> Result<String> {
-    let type_map = TypeMap::default();
-
-    let mut s = config
-        .comment_exporter
-        .map(|v| {
-            v(CommentFormatterArgs {
-                docs: &dt.docs(),
-                deprecated: dt.deprecated(),
-            })
-        })
-        .unwrap_or_default();
-
-    s.push_str("export ");
-
-    if dt.asyncness() {
-        s.push_str("async ");
-    }
-
-    s.push_str("function ");
-
-    s.push_str(&dt.name());
-    s.push_str("(");
-    for (i, (name, ty)) in dt.args().enumerate() {
-        if i != 0 {
-            s.push_str(", ");
-        }
-
-        s.push_str(&name);
-        s.push_str(": ");
-        s.push_str(&datatype(config, &ty, &type_map)?);
-    }
-    s.push_str(")");
-
-    if let Some(ty) = dt.result() {
-        s.push_str(": ");
-        s.push_str(&datatype(config, &ty, &type_map)?);
-    }
-
-    s.push_str(";");
-    Ok(s)
 }
 
 #[allow(clippy::ptr_arg)]
@@ -230,7 +156,12 @@ fn export_datatype_inner(ctx: ExportContext, typ: &NamedDataType, type_map: &Typ
         .unwrap_or_default();
 
     let mut inline_ts = String::new();
-    datatype_inner(ctx.clone(), &typ.inner, type_map, &mut inline_ts)?;
+    datatype_inner(
+        ctx.clone(),
+        &FunctionResultVariant::Value((typ.inner).clone()),
+        type_map,
+        &mut inline_ts,
+    )?;
 
     Ok(inner_comments(
         ctx,
@@ -244,7 +175,7 @@ fn export_datatype_inner(ctx: ExportContext, typ: &NamedDataType, type_map: &Typ
 /// Convert a DataType to a TypeScript string
 ///
 /// Eg. `{ demo: string; }`
-pub fn datatype(conf: &ExportConfig, typ: &DataType, type_map: &TypeMap) -> Output {
+pub fn datatype(conf: &ExportConfig, typ: &FunctionResultVariant, type_map: &TypeMap) -> Output {
     // TODO: Duplicate type name detection?
 
     let mut s = String::new();
@@ -269,10 +200,41 @@ macro_rules! primitive_def {
 
 pub(crate) fn datatype_inner(
     ctx: ExportContext,
-    typ: &DataType,
+    typ: &FunctionResultVariant,
     type_map: &TypeMap,
     s: &mut String,
 ) -> Result<()> {
+    let typ = match typ {
+        FunctionResultVariant::Value(t) => t,
+        FunctionResultVariant::Result(t, e) => {
+            let mut variants = vec![
+                {
+                    let mut v = String::new();
+                    datatype_inner(
+                        ctx.clone(),
+                        &FunctionResultVariant::Value(t.clone()),
+                        type_map,
+                        &mut v,
+                    )?;
+                    v
+                },
+                {
+                    let mut v = String::new();
+                    datatype_inner(
+                        ctx,
+                        &FunctionResultVariant::Value(e.clone()),
+                        type_map,
+                        &mut v,
+                    )?;
+                    v
+                },
+            ];
+            variants.dedup();
+            s.push_str(&variants.join(" | "));
+            return Ok(());
+        }
+    };
+
     Ok(match &typ {
         DataType::Any => s.push_str(ANY),
         DataType::Unknown => s.push_str(UNKNOWN),
@@ -313,7 +275,12 @@ pub(crate) fn datatype_inner(
             _ => unreachable!(),
         },
         DataType::Nullable(def) => {
-            datatype_inner(ctx, def, type_map, s)?;
+            datatype_inner(
+                ctx,
+                &FunctionResultVariant::Value((**def).clone()),
+                type_map,
+                s,
+            )?;
 
             let or_null = format!(" | {NULL}");
             if !s.ends_with(&or_null) {
@@ -323,15 +290,30 @@ pub(crate) fn datatype_inner(
         DataType::Map(def) => {
             // We use this instead of `Record<K, V>` to avoid issues with circular references.
             s.push_str("{ [key in ");
-            datatype_inner(ctx.clone(), def.key_ty(), type_map, s)?;
+            datatype_inner(
+                ctx.clone(),
+                &FunctionResultVariant::Value(def.key_ty().clone()),
+                type_map,
+                s,
+            )?;
             s.push_str("]: ");
-            datatype_inner(ctx.clone(), def.value_ty(), type_map, s)?;
+            datatype_inner(
+                ctx.clone(),
+                &FunctionResultVariant::Value(def.value_ty().clone()),
+                type_map,
+                s,
+            )?;
             s.push_str(" }");
         }
         // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
         DataType::List(def) => {
             let mut dt = String::new();
-            datatype_inner(ctx, &def.ty(), type_map, &mut dt)?;
+            datatype_inner(
+                ctx,
+                &FunctionResultVariant::Value(def.ty().clone()),
+                type_map,
+                &mut dt,
+            )?;
 
             let dt = if (dt.contains(' ') && !dt.ends_with('}'))
                 // This is to do with maintaining order of operations.
@@ -400,7 +382,7 @@ pub(crate) fn datatype_inner(
 
                     datatype_inner(
                         ctx.with(PathItem::Type(reference.name().clone())),
-                        v,
+                        &FunctionResultVariant::Value(v.clone()),
                         type_map,
                         s,
                     )?;
@@ -423,7 +405,12 @@ fn unnamed_fields_datatype(
     Ok(match fields {
         [(field, ty)] => {
             let mut v = String::new();
-            datatype_inner(ctx.clone(), ty, type_map, &mut v)?;
+            datatype_inner(
+                ctx.clone(),
+                &FunctionResultVariant::Value((*ty).clone()),
+                type_map,
+                &mut v,
+            )?;
             s.push_str(&inner_comments(
                 ctx,
                 field.deprecated(),
@@ -441,7 +428,12 @@ fn unnamed_fields_datatype(
                 }
 
                 let mut v = String::new();
-                datatype_inner(ctx.clone(), ty, type_map, &mut v)?;
+                datatype_inner(
+                    ctx.clone(),
+                    &FunctionResultVariant::Value((*ty).clone()),
+                    type_map,
+                    &mut v,
+                )?;
                 s.push_str(&inner_comments(
                     ctx.clone(),
                     field.deprecated(),
@@ -464,7 +456,13 @@ fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, type_map: &TypeMap) -> 
             tys.iter()
                 .map(|v| {
                     let mut s = String::new();
-                    datatype_inner(ctx.clone(), v, type_map, &mut s).map(|_| s)
+                    datatype_inner(
+                        ctx.clone(),
+                        &FunctionResultVariant::Value(v.clone()),
+                        type_map,
+                        &mut s,
+                    )
+                    .map(|_| s)
                 })
                 .collect::<Result<Vec<_>>>()?
                 .join(", ")
@@ -504,16 +502,21 @@ fn struct_datatype(
                 .into_iter()
                 .map(|(key, (field, ty))| {
                     let mut s = String::new();
-                    datatype_inner(ctx.with(PathItem::Field(key.clone())), ty, type_map, &mut s)
-                        .map(|_| {
-                            inner_comments(
-                                ctx.clone(),
-                                field.deprecated(),
-                                field.docs(),
-                                format!("({s})"),
-                                true,
-                            )
-                        })
+                    datatype_inner(
+                        ctx.with(PathItem::Field(key.clone())),
+                        &FunctionResultVariant::Value(ty.clone()),
+                        type_map,
+                        &mut s,
+                    )
+                    .map(|_| {
+                        inner_comments(
+                            ctx.clone(),
+                            field.deprecated(),
+                            field.docs(),
+                            format!("({s})"),
+                            true,
+                        )
+                    })
                 })
                 .collect::<Result<Vec<_>>>()?;
 
@@ -605,7 +608,13 @@ fn enum_variant_datatype(
             let fields = skip_fields(obj.fields())
                 .map(|(_, ty)| {
                     let mut s = String::new();
-                    datatype_inner(ctx.clone(), ty, type_map, &mut s).map(|_| s)
+                    datatype_inner(
+                        ctx.clone(),
+                        &FunctionResultVariant::Value(ty.clone()),
+                        type_map,
+                        &mut s,
+                    )
+                    .map(|_| s)
                 })
                 .collect::<Result<Vec<_>>>()?;
 
@@ -816,7 +825,12 @@ fn object_field_to_ts(
     };
 
     let mut value = String::new();
-    datatype_inner(ctx, ty, type_map, &mut value)?;
+    datatype_inner(
+        ctx,
+        &FunctionResultVariant::Value(ty.clone()),
+        type_map,
+        &mut value,
+    )?;
 
     Ok(write!(s, "{key}: {value}",)?)
 }
