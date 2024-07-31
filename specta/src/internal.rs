@@ -160,7 +160,7 @@ pub mod construct {
 
     /// Compute an SID hash for a given type.
     /// This will produce a type hash from the arguments.
-    /// This hashing function was derived from https://stackoverflow.com/a/71464396
+    /// This hashing function was derived from <https://stackoverflow.com/a/71464396>
     pub const fn sid(type_name: &'static str, type_identifier: &'static str) -> SpectaID {
         let mut hash = 0xcbf29ce484222325;
         let prime = 0x00000100000001B3;

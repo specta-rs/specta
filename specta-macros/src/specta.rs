@@ -8,6 +8,14 @@ use syn::{parse, FnArg, ItemFn, Pat, Visibility};
 
 use crate::utils::{format_fn_wrapper, parse_attrs};
 
+fn unraw(s: &str) -> &str {
+    if s.starts_with("r#") {
+        s.split_at(2).1
+    } else {
+        s.as_ref()
+    }
+}
+
 pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
     let crate_ref = quote!(specta);
     let function = parse::<ItemFn>(item)?;
@@ -36,7 +44,7 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
     };
 
     let function_name = &function.sig.ident;
-    let function_name_str = function_name.to_string();
+    let function_name_str = unraw(&function_name.to_string()).to_string();
     let function_asyncness = match function.sig.asyncness {
         Some(_) => true,
         None => false,

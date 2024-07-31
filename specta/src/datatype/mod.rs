@@ -1,4 +1,4 @@
-//! Types related to working with [`DataType`](crate::DataType). Exposed for advanced users.
+//! Types related to working with [`DataType`]. Exposed for advanced users.
 
 use std::{
     borrow::{Borrow, Cow},
