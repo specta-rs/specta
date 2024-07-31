@@ -9,9 +9,7 @@ use std::{
 
 use serde::Serialize;
 use specta::Type;
-use specta_typescript::{
-    BigIntExportBehavior, ExportConfig, ExportError, ExportPath, NamedLocation,
-};
+use specta_typescript::{BigIntExportBehavior, ExportError, ExportPath, NamedLocation, Typescript};
 use specta_util::Any;
 
 macro_rules! assert_ts {
@@ -204,26 +202,26 @@ fn typescript_types() {
     // https://github.com/oscartbeaumont/specta/issues/77
     assert_eq!(
         specta_typescript::inline::<std::time::SystemTime>(
-            &ExportConfig::new().bigint(BigIntExportBehavior::Number)
+            &Typescript::new().bigint(BigIntExportBehavior::Number)
         ),
         Ok(r#"{ duration_since_epoch: number; duration_since_unix_epoch: number }"#.into())
     );
     assert_eq!(
         specta_typescript::inline::<std::time::SystemTime>(
-            &ExportConfig::new().bigint(BigIntExportBehavior::String)
+            &Typescript::new().bigint(BigIntExportBehavior::String)
         ),
         Ok(r#"{ duration_since_epoch: string; duration_since_unix_epoch: number }"#.into())
     );
 
     assert_eq!(
         specta_typescript::inline::<std::time::Duration>(
-            &ExportConfig::new().bigint(BigIntExportBehavior::Number)
+            &Typescript::new().bigint(BigIntExportBehavior::Number)
         ),
         Ok(r#"{ secs: number; nanos: number }"#.into())
     );
     assert_eq!(
         specta_typescript::inline::<std::time::Duration>(
-            &ExportConfig::new().bigint(BigIntExportBehavior::String)
+            &Typescript::new().bigint(BigIntExportBehavior::String)
         ),
         Ok(r#"{ secs: string; nanos: number }"#.into())
     );

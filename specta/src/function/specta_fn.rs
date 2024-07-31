@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{datatype::Function, DeprecatedType, TypeMap};
+use crate::{datatype::DeprecatedType, datatype::Function, TypeMap};
 
 use super::{FunctionArg, FunctionResult};
 

@@ -1,6 +1,8 @@
 //! Helpers for generating [Type::reference] implementations.
 
-use crate::{DataType, DataTypeReference, Generics, NamedType, Type, TypeMap};
+use crate::{Generics, NamedType, Type, TypeMap};
+
+use super::{DataType, DataTypeReference};
 
 /// A reference datatype.
 ///

@@ -22,8 +22,6 @@ pub use r#type::{Flatten, Generics, NamedType, Type};
 pub use specta_id::{ImplLocation, SpectaID};
 pub use type_map::TypeMap;
 
-#[doc(hidden)] // TODO: Should we actually do this? I think not
-pub use datatype::*;
 pub use language::Language;
 
 #[doc(inline)]

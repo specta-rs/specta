@@ -5,7 +5,7 @@
     html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
 )]
 
-use specta::{DataType, Generics, Type, TypeMap};
+use specta::{datatype::DataType, Generics, Type, TypeMap};
 
 /// TODO
 pub fn export<T: Type>() -> Result<String, String> {

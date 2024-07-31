@@ -1,9 +1,8 @@
 use std::borrow::Cow;
 
-use crate::{
-    datatype::DataType, DeprecatedType, GenericType, NamedDataType, NamedFields, SpectaID,
-    UnnamedFields,
-};
+use crate::SpectaID;
+
+use super::{DataType, DeprecatedType, GenericType, NamedDataType, NamedFields, UnnamedFields};
 
 /// Enum type which dictates how the enum is represented.
 ///

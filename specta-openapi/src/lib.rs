@@ -9,7 +9,7 @@ use openapiv3::{
     ArrayType, BooleanType, NumberType, ReferenceOr, Schema, SchemaData, SchemaKind, StringType,
     Type,
 };
-use specta::{DataType, PrimitiveType};
+use specta::datatype::{DataType, PrimitiveType};
 
 // pub fn to_openapi_export(def: &DataType) -> Result<openapiv3::Schema, String> {
 //     Ok(match &def {

@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 
-use crate::{DataType, DeprecatedType, ImplLocation, SpectaID};
+use crate::ImplLocation;
+
+use super::{DataType, DeprecatedType, SpectaID};
 
 /// A NamedDataTypeImpl includes extra information which is only available for [NamedDataType]'s that come from a real Rust type.
 #[derive(Debug, Clone, PartialEq)]

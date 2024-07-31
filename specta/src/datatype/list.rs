@@ -1,4 +1,4 @@
-use crate::DataType;
+use super::DataType;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct List {

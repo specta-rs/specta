@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{DataType, NamedDataType};
+use super::{DataType, NamedDataType};
 
 /// A regular tuple
 ///

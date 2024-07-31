@@ -10,9 +10,11 @@ use std::collections::HashSet;
 use thiserror::Error;
 
 use specta::{
+    datatype::{
+        DataType, EnumRepr, EnumType, EnumVariants, LiteralType, PrimitiveType, StructFields,
+    },
     internal::{resolve_generics, skip_fields, skip_fields_named},
-    DataType, EnumRepr, EnumType, EnumVariants, LiteralType, PrimitiveType, SpectaID, StructFields,
-    TypeMap,
+    SpectaID, TypeMap,
 };
 
 // TODO: The error should show a path to the type causing the issue like the BigInt error reporting.

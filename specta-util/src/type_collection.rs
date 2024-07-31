@@ -1,6 +1,6 @@
 use std::{borrow::Borrow, collections::HashMap, path::Path};
 
-use specta::{Language, NamedDataType, NamedType, SpectaID, TypeMap};
+use specta::{datatype::NamedDataType, Language, NamedType, SpectaID, TypeMap};
 
 /// Define a set of types which can be exported together
 #[derive(Debug, Clone, PartialEq, Eq)]

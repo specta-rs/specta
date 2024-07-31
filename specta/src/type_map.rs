@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, fmt};
 
-use crate::{NamedDataType, SpectaID};
+use crate::{datatype::NamedDataType, SpectaID};
 
 /// A map used to store the types "discovered" while exporting a type.
 #[derive(Default, Clone, PartialEq)]

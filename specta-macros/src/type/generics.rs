@@ -190,7 +190,7 @@ pub fn construct_datatype(
             let type_ident = type_ident.to_string();
             let generics = generics(
                 &crate_ref,
-                quote!(&[#crate_ref::DataType::Generic(std::borrow::Cow::Borrowed(#type_ident).into())]),
+                quote!(&[#crate_ref::datatype::DataType::Generic(std::borrow::Cow::Borrowed(#type_ident).into())]),
             );
             return Ok(quote! {
                 let #var_ident = generics.get(#i).cloned().unwrap_or_else(

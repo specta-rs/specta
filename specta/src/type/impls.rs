@@ -1,4 +1,4 @@
-use crate::{r#type::macros::*, reference::Reference, *};
+use crate::{datatype::reference::Reference, datatype::*, r#type::macros::*, *};
 
 use std::borrow::Cow;
 

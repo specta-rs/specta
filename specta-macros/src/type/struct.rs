@@ -62,7 +62,7 @@ pub fn parse_struct(
         }
     });
     let reference_generics =
-        quote!(let generics: &[#crate_ref::DataType] = &[#(#reference_generics),*];);
+        quote!(let generics: &[#crate_ref::datatype::DataType] = &[#(#reference_generics),*];);
 
     let reference_generics2 = generic_idents.iter().map(|(i, ident)| {
         let ident_str = ident.to_string();
@@ -266,18 +266,18 @@ pub fn parse_struct(
             Fields::Unit => quote!(#crate_ref::internal::construct::struct_unit()),
         };
 
-        quote!(#crate_ref::DataType::Struct(#crate_ref::internal::construct::r#struct(#name.into(), Some(#sid), vec![#(#definition_generics),*], #fields)))
+        quote!(#crate_ref::datatype::DataType::Struct(#crate_ref::internal::construct::r#struct(#name.into(), Some(#sid), vec![#(#definition_generics),*], #fields)))
     };
 
     let category = if container_attrs.inline {
         quote!({
             #reference_generics
-            #crate_ref::reference::inline::<Self>(type_map, generics)
+            #crate_ref::datatype::reference::inline::<Self>(type_map, generics)
         })
     } else {
         quote!({
                 #reference_generics
-                #crate_ref::reference::reference::<Self>(type_map, #crate_ref::internal::construct::data_type_reference(
+                #crate_ref::datatype::reference::reference::<Self>(type_map, #crate_ref::internal::construct::data_type_reference(
                     #name.into(),
                     #sid,
                     vec![#(#reference_generics2),*]

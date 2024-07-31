@@ -11,6 +11,7 @@ mod export_config;
 
 use context::{ExportContext, PathItem};
 use specta::{
+    datatype::*,
     internal::{detect_duplicate_type_names, skip_fields, skip_fields_named, NonSkipField},
     *,
 };

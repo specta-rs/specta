@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use crate::{DataType, DeprecatedType};
+use super::{DataType, DeprecatedType};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Field {

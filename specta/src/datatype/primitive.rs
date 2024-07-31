@@ -1,4 +1,4 @@
-use crate::DataType;
+use super::DataType;
 
 /// Type of primitives like numbers and strings.
 #[allow(non_camel_case_types)]

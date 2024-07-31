@@ -105,7 +105,7 @@ impl CommonAttr {
     ) -> proc_macro2::TokenStream {
         match &self.deprecated {
             Some(DeprecatedType::Deprecated) => {
-                quote!(Some(#crate_ref::DeprecatedType::Deprecated))
+                quote!(Some(#crate_ref::datatype::DeprecatedType::Deprecated))
             }
             Some(DeprecatedType::DeprecatedWithSince { since, note }) => {
                 let since = since
@@ -113,7 +113,7 @@ impl CommonAttr {
                     .map(|v| quote!(#v.into()))
                     .unwrap_or(quote!(None));
 
-                quote!(Some(#crate_ref::DeprecatedType::DeprecatedWithSince {
+                quote!(Some(#crate_ref::datatype::DeprecatedType::DeprecatedWithSince {
                     since: #since,
                     note: #note.into(),
                 }))

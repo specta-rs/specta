@@ -1,6 +1,6 @@
 use std::{borrow::Cow, io, path::PathBuf};
 
-use specta::{DeprecatedType, Language, TypeMap};
+use specta::{datatype::DeprecatedType, Language, TypeMap};
 use specta_serde::is_valid_ty;
 
 use crate::{comments, detect_duplicate_type_names, export_named_datatype, ExportError};
@@ -76,6 +76,11 @@ impl Default for Typescript {
 }
 
 impl Typescript {
+    /// Construct a new Typescript exporter with the default options configured.
+    pub fn new() -> Self {
+        Default::default()
+    }
+
     /// Configure a header for the file.
     ///
     /// This is perfect for configuring lint ignore rules or other file-level comments.

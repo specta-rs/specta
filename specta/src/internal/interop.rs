@@ -4,7 +4,10 @@ use std::borrow::Cow;
 
 use specta1::NamedDataType;
 
-use crate::{DataType, DeprecatedType, LiteralType, PrimitiveType, TypeMap};
+use crate::{
+    datatype::{DataType, DeprecatedType, LiteralType, PrimitiveType},
+    TypeMap,
+};
 
 /// Allow for conversion between Specta v2 and v1 data types.
 pub fn specta_v2_to_v1(datatype: DataType) -> specta1::DataType {
@@ -67,8 +70,8 @@ pub fn specta_v2_to_v1(datatype: DataType) -> specta1::DataType {
                 })
                 .collect(),
             fields: match s.fields {
-                crate::StructFields::Unit => vec![],
-                crate::StructFields::Unnamed(f) => f
+                crate::datatype::StructFields::Unit => vec![],
+                crate::datatype::StructFields::Unnamed(f) => f
                     .fields
                     .into_iter()
                     .map(|f| specta1::ObjectField {
@@ -78,7 +81,7 @@ pub fn specta_v2_to_v1(datatype: DataType) -> specta1::DataType {
                         ty: specta_v2_to_v1(f.ty.unwrap_or(DataType::Unknown)),
                     })
                     .collect(),
-                crate::StructFields::Named(f) => f
+                crate::datatype::StructFields::Named(f) => f
                     .fields
                     .into_iter()
                     .map(|(name, f)| specta1::ObjectField {
@@ -104,14 +107,14 @@ pub fn specta_v2_to_v1(datatype: DataType) -> specta1::DataType {
                 .collect::<Vec<_>>();
 
             specta1::DataType::Enum(match e.repr {
-                crate::EnumRepr::Untagged => specta1::EnumType::Untagged {
+                crate::datatype::EnumRepr::Untagged => specta1::EnumType::Untagged {
                     generics: generics.clone(),
                     variants: e
                         .variants
                         .into_iter()
                         .map(|(name, v)| match v.inner() {
-                            crate::EnumVariants::Unit => specta1::EnumVariant::Unit,
-                            crate::EnumVariants::Named(f) => {
+                            crate::datatype::EnumVariants::Unit => specta1::EnumVariant::Unit,
+                            crate::datatype::EnumVariants::Named(f) => {
                                 specta1::EnumVariant::Named(specta1::ObjectType {
                                     generics: generics.clone(),
                                     fields: f
@@ -135,7 +138,7 @@ pub fn specta_v2_to_v1(datatype: DataType) -> specta1::DataType {
                                     }),
                                 })
                             }
-                            crate::EnumVariants::Unnamed(f) => {
+                            crate::datatype::EnumVariants::Unnamed(f) => {
                                 specta1::EnumVariant::Unnamed(specta1::TupleType {
                                     generics: generics.clone(),
                                     fields: f
@@ -149,7 +152,7 @@ pub fn specta_v2_to_v1(datatype: DataType) -> specta1::DataType {
                         })
                         .collect::<Vec<_>>(),
                 },
-                crate::EnumRepr::External => specta1::EnumType::Tagged {
+                crate::datatype::EnumRepr::External => specta1::EnumType::Tagged {
                     variants: e
                         .variants
                         .into_iter()
@@ -160,8 +163,10 @@ pub fn specta_v2_to_v1(datatype: DataType) -> specta1::DataType {
                                     Cow::Owned(v) => String::leak(v),
                                 },
                                 match v.inner {
-                                    crate::EnumVariants::Unit => specta1::EnumVariant::Unit,
-                                    crate::EnumVariants::Named(f) => {
+                                    crate::datatype::EnumVariants::Unit => {
+                                        specta1::EnumVariant::Unit
+                                    }
+                                    crate::datatype::EnumVariants::Named(f) => {
                                         specta1::EnumVariant::Named(specta1::ObjectType {
                                             generics: generics.clone(),
                                             fields: f
@@ -185,7 +190,7 @@ pub fn specta_v2_to_v1(datatype: DataType) -> specta1::DataType {
                                             }),
                                         })
                                     }
-                                    crate::EnumVariants::Unnamed(f) => {
+                                    crate::datatype::EnumVariants::Unnamed(f) => {
                                         specta1::EnumVariant::Unnamed(specta1::TupleType {
                                             generics: generics.clone(),
                                             fields: f
@@ -206,7 +211,7 @@ pub fn specta_v2_to_v1(datatype: DataType) -> specta1::DataType {
                     generics,
                     repr: specta1::EnumRepr::External,
                 },
-                crate::EnumRepr::Internal { tag } => specta1::EnumType::Tagged {
+                crate::datatype::EnumRepr::Internal { tag } => specta1::EnumType::Tagged {
                     generics: generics.clone(),
                     variants: e
                         .variants
@@ -218,8 +223,10 @@ pub fn specta_v2_to_v1(datatype: DataType) -> specta1::DataType {
                                     Cow::Owned(v) => String::leak(v),
                                 },
                                 match v.inner {
-                                    crate::EnumVariants::Unit => specta1::EnumVariant::Unit,
-                                    crate::EnumVariants::Named(f) => {
+                                    crate::datatype::EnumVariants::Unit => {
+                                        specta1::EnumVariant::Unit
+                                    }
+                                    crate::datatype::EnumVariants::Named(f) => {
                                         specta1::EnumVariant::Named(specta1::ObjectType {
                                             generics: generics.clone(),
                                             fields: f
@@ -243,7 +250,7 @@ pub fn specta_v2_to_v1(datatype: DataType) -> specta1::DataType {
                                             }),
                                         })
                                     }
-                                    crate::EnumVariants::Unnamed(f) => {
+                                    crate::datatype::EnumVariants::Unnamed(f) => {
                                         specta1::EnumVariant::Unnamed(specta1::TupleType {
                                             generics: generics.clone(),
                                             fields: f
@@ -268,7 +275,7 @@ pub fn specta_v2_to_v1(datatype: DataType) -> specta1::DataType {
                         },
                     },
                 },
-                crate::EnumRepr::Adjacent { tag, content } => specta1::EnumType::Tagged {
+                crate::datatype::EnumRepr::Adjacent { tag, content } => specta1::EnumType::Tagged {
                     generics: generics.clone(),
                     repr: specta1::EnumRepr::Adjacent {
                         tag: match tag {
@@ -291,8 +298,10 @@ pub fn specta_v2_to_v1(datatype: DataType) -> specta1::DataType {
                                     Cow::Owned(v) => String::leak(v),
                                 },
                                 match v.inner {
-                                    crate::EnumVariants::Unit => specta1::EnumVariant::Unit,
-                                    crate::EnumVariants::Named(f) => {
+                                    crate::datatype::EnumVariants::Unit => {
+                                        specta1::EnumVariant::Unit
+                                    }
+                                    crate::datatype::EnumVariants::Named(f) => {
                                         specta1::EnumVariant::Named(specta1::ObjectType {
                                             generics: generics.clone(),
                                             fields: f
@@ -316,7 +325,7 @@ pub fn specta_v2_to_v1(datatype: DataType) -> specta1::DataType {
                                             }),
                                         })
                                     }
-                                    crate::EnumVariants::Unnamed(f) => {
+                                    crate::datatype::EnumVariants::Unnamed(f) => {
                                         specta1::EnumVariant::Unnamed(specta1::TupleType {
                                             generics: generics.clone(),
                                             fields: f

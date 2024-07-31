@@ -1,6 +1,9 @@
 use crate::{
-    reference::{self, Reference},
-    DataType, NamedDataType, SpectaID, TypeMap,
+    datatype::{
+        reference::{self, Reference},
+        DataType, NamedDataType,
+    },
+    SpectaID, TypeMap,
 };
 
 mod impls;

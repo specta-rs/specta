@@ -1,5 +1,5 @@
 use specta::Type;
-use specta_typescript::{ExportConfig, ExportError, ExportPath, NamedLocation};
+use specta_typescript::{ExportError, ExportPath, NamedLocation, Typescript};
 
 mod astruct {
     use super::*;
@@ -38,7 +38,7 @@ mod aenum {
 #[test]
 fn test_ts_reserved_keyworks() {
     assert_eq!(
-        specta_typescript::export::<astruct::r#enum>(&ExportConfig::default()),
+        specta_typescript::export::<astruct::r#enum>(&Typescript::default()),
         Err(ExportError::ForbiddenName(
             NamedLocation::Type,
             #[cfg(not(windows))]
@@ -49,7 +49,7 @@ fn test_ts_reserved_keyworks() {
         ))
     );
     assert_eq!(
-        specta_typescript::export::<atuplestruct::r#enum>(&ExportConfig::default()),
+        specta_typescript::export::<atuplestruct::r#enum>(&Typescript::default()),
         Err(ExportError::ForbiddenName(
             NamedLocation::Type,
             #[cfg(not(windows))]
@@ -60,7 +60,7 @@ fn test_ts_reserved_keyworks() {
         ))
     );
     assert_eq!(
-        specta_typescript::export::<aenum::r#enum>(&ExportConfig::default()),
+        specta_typescript::export::<aenum::r#enum>(&Typescript::default()),
         Err(ExportError::ForbiddenName(
             NamedLocation::Type,
             #[cfg(not(windows))]

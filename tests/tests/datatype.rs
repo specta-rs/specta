@@ -1,4 +1,4 @@
-use specta::{DataType, LiteralType, PrimitiveType, StructType};
+use specta::datatype::{DataType, LiteralType, PrimitiveType, StructType};
 use specta_datatype_from::DataTypeFrom;
 use specta_typescript as ts;
 

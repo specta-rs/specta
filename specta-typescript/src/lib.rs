@@ -21,13 +21,13 @@ pub use error::*;
 use reserved_terms::*;
 pub use typescript::*;
 
-use specta::{
-    internal::{detect_duplicate_type_names, skip_fields, skip_fields_named, NonSkipField},
-    DataType, DeprecatedType, FunctionResultVariant, Generics, NamedDataType, NamedType,
-    PrimitiveType, Type, TypeMap,
+use specta::datatype::{
+    DataType, DeprecatedType, EnumRepr, EnumType, EnumVariant, EnumVariants, FunctionResultVariant,
+    LiteralType, NamedDataType, PrimitiveType, StructFields, StructType, TupleType,
 };
 use specta::{
-    EnumRepr, EnumType, EnumVariant, EnumVariants, LiteralType, StructFields, StructType, TupleType,
+    internal::{detect_duplicate_type_names, skip_fields, skip_fields_named, NonSkipField},
+    Generics, NamedType, Type, TypeMap,
 };
 use specta_serde::is_valid_ty;
 

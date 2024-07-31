@@ -3,7 +3,7 @@ use std::{
     sync::{Mutex, OnceLock, PoisonError},
 };
 
-use specta::{NamedDataType, NamedType, SpectaID, TypeMap};
+use specta::{datatype::NamedDataType, NamedType, SpectaID, TypeMap};
 
 use crate::TypeCollection;
 

@@ -1,6 +1,9 @@
 use std::borrow::Borrow;
 
-use specta::{DeprecatedType, GenericType, TypeMap};
+use specta::{
+    datatype::{DeprecatedType, GenericType},
+    TypeMap,
+};
 use typescript::CommentFormatterArgs;
 
 use super::*;

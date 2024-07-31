@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{DataType, GenericType, NamedDataType, NamedFields, SpectaID, UnnamedFields};
+use super::{DataType, GenericType, NamedDataType, NamedFields, SpectaID, UnnamedFields};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum StructFields {

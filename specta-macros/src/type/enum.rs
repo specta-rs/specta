@@ -205,13 +205,13 @@ pub fn parse_enum(
 
     let (repr, can_flatten) = match repr {
         Tagged::Untagged => (
-            quote!(#crate_ref::EnumRepr::Untagged),
+            quote!(#crate_ref::datatype::EnumRepr::Untagged),
             data.variants
                 .iter()
                 .any(|v| matches!(&v.fields, Fields::Unit | Fields::Named(_))),
         ),
         Tagged::Externally => (
-            quote!(#crate_ref::EnumRepr::External),
+            quote!(#crate_ref::datatype::EnumRepr::External),
             data.variants.iter().any(|v| match &v.fields {
                 Fields::Unnamed(f) if f.unnamed.len() == 1 => true,
                 Fields::Named(_) => true,
@@ -219,11 +219,11 @@ pub fn parse_enum(
             }),
         ),
         Tagged::Adjacently { tag, content } => (
-            quote!(#crate_ref::EnumRepr::Adjacent { tag: #tag.into(), content: #content.into() }),
+            quote!(#crate_ref::datatype::EnumRepr::Adjacent { tag: #tag.into(), content: #content.into() }),
             true,
         ),
         Tagged::Internally { tag } => (
-            quote!(#crate_ref::EnumRepr::Internal { tag: #tag.into() }),
+            quote!(#crate_ref::datatype::EnumRepr::Internal { tag: #tag.into() }),
             data.variants
                 .iter()
                 .any(|v| matches!(&v.fields, Fields::Unit | Fields::Named(_))),
@@ -233,10 +233,10 @@ pub fn parse_enum(
     let skip_bigint_checs = enum_attrs.unstable_skip_bigint_checks;
 
     Ok((
-        quote!(#crate_ref::DataType::Enum(#crate_ref::internal::construct::r#enum(#name.into(), #sid, #repr, #skip_bigint_checs, vec![#(#definition_generics),*], vec![#(#variant_types),*]))),
+        quote!(#crate_ref::datatype::DataType::Enum(#crate_ref::internal::construct::r#enum(#name.into(), #sid, #repr, #skip_bigint_checs, vec![#(#definition_generics),*], vec![#(#variant_types),*]))),
         quote!({
             let generics = vec![#(#reference_generics),*];
-            #crate_ref::reference::reference::<Self>(type_map, #crate_ref::internal::construct::data_type_reference(
+            #crate_ref::datatype::reference::reference::<Self>(type_map, #crate_ref::internal::construct::data_type_reference(
                 #name.into(),
                 #sid,
                 generics

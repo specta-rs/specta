@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use specta::{DataType, Generics, Type, TypeMap};
+use specta::{datatype::DataType, Generics, Type, TypeMap};
 
 /// Easily convert a non-Specta type into a Specta compatible type.
 /// This will be typed as `any` in Typescript.

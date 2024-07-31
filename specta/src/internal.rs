@@ -13,8 +13,8 @@ pub mod interop;
 pub use paste::paste;
 
 use crate::{
-    DataType, EnumVariants, Field, GenericType, Generics, ImplLocation, List, Map, SpectaID,
-    StructFields, Type, TypeMap,
+    datatype::{DataType, EnumVariants, Field, GenericType, List, Map, StructFields},
+    Generics, ImplLocation, SpectaID, Type, TypeMap,
 };
 
 /// Functions used to construct `crate::datatype` types (they have private fields so can't be constructed directly).
@@ -224,7 +224,7 @@ pub fn flatten<T: Type>(sid: SpectaID, type_map: &mut TypeMap, generics: &[DataT
 #[cfg(feature = "function")]
 mod functions {
     use super::*;
-    use crate::{datatype::Function, function::SpectaFn, DeprecatedType};
+    use crate::{datatype::DeprecatedType, datatype::Function, function::SpectaFn};
 
     #[doc(hidden)]
     /// A helper for exporting a command to a [`CommandDataType`].

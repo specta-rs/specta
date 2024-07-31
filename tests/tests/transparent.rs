@@ -1,4 +1,7 @@
-use specta::{DataType, Generics, PrimitiveType, Type};
+use specta::{
+    datatype::{DataType, PrimitiveType},
+    Generics, Type,
+};
 
 use crate::ts::assert_ts;
 

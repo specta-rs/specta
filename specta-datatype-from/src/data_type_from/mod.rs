@@ -67,15 +67,15 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 let struct_name = ident.to_string();
                 quote! {
                     #[automatically_derived]
-                    impl From<#ident> for #crate_ref::StructType {
-                        fn from(t: #ident) -> #crate_ref::StructType {
+                    impl From<#ident> for #crate_ref::datatype::StructType {
+                        fn from(t: #ident) -> #crate_ref::datatype::StructType {
                             #crate_ref::internal::construct::r#struct(#struct_name.into(), None, vec![], #crate_ref::internal::construct::struct_named(vec![#(#fields),*], None))
                         }
                     }
 
                     #[automatically_derived]
-                    impl From<#ident> for #crate_ref::DataType {
-                        fn from(t: #ident) -> #crate_ref::DataType {
+                    impl From<#ident> for #crate_ref::datatype::DataType {
+                        fn from(t: #ident) -> #crate_ref::datatype::DataType {
                            Self::Struct(t.into())
                         }
                     }
@@ -96,7 +96,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     fields[0].clone()
                 } else {
                     quote! {
-                        #crate_ref::DataType::Tuple(#crate_ref::internal::construct::tuple(
+                        #crate_ref::datatype::DataType::Tuple(#crate_ref::internal::construct::tuple(
                             vec![#(#fields),*]
                         ))
                     }
@@ -104,8 +104,8 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
                 quote! {
                     #[automatically_derived]
-                    impl From<#ident> for #crate_ref::DataType {
-                        fn from(t: #ident) -> #crate_ref::DataType {
+                    impl From<#ident> for #crate_ref::datatype::DataType {
+                        fn from(t: #ident) -> #crate_ref::datatype::DataType {
                             #implementation
                         }
                     }

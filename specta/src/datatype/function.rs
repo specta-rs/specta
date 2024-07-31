@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{DataType, DeprecatedType};
+use super::{DataType, DeprecatedType};
 
 /// Contains type information about a function annotated with [`specta`](macro@crate::specta).
 /// Returned by [`fn_datatype`].

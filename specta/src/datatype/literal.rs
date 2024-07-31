@@ -1,4 +1,4 @@
-use crate::DataType;
+use super::DataType;
 
 /// Type of a literal value for things like const generics.
 ///
