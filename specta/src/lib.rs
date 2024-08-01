@@ -30,8 +30,8 @@ pub use language::Language;
 pub use specta_macros::Type;
 
 #[doc(inline)]
-#[cfg(feature = "function")]
-#[cfg_attr(docsrs, doc(cfg(feature = "function")))]
+#[cfg(all(feature = "derive", feature = "function"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "derive", feature = "function"))))]
 pub use specta_macros::specta;
 
 // This existing is really a mistake but it's depended on by the Tauri alpha's so keeping it for now.
