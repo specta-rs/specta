@@ -7,7 +7,7 @@ edition = "2021"
 license = "MIT"
 repository = "https://github.com/oscartbeaumont/specta"
 documentation = "https://docs.rs/specta-jsdoc/latest/specta-jsdoc"
-keywords = ["async", "specta", "jsdoc", "rspc", "typescript", "typesafe"]
+keywords = ["async", "specta", "jsdoc", "typescript", "typesafe"]
 categories = ["web-programming", "asynchronous"]
 
 # /bin/sh RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
