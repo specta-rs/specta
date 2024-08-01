@@ -1,4 +1,4 @@
-use specta::datatype::{DataType, LiteralType, PrimitiveType, StructType};
+use specta::datatype::{DataType, FunctionResultVariant, LiteralType, PrimitiveType, StructType};
 use specta_datatype_from::DataTypeFrom;
 use specta_typescript as ts;
 
@@ -54,7 +54,11 @@ fn test_datatype() {
     ])
     .into();
     assert_eq!(
-        ts::datatype(&Default::default(), &val, &Default::default()),
+        ts::datatype(
+            &Default::default(),
+            &FunctionResultVariant::Value(val.clone()),
+            &Default::default()
+        ),
         Ok("\"A\" | \"B\"".into())
     );
     assert_eq!(
@@ -76,7 +80,7 @@ fn test_datatype() {
     assert_eq!(
         ts::datatype(
             &Default::default(),
-            &val.clone().to_anonymous(),
+            &FunctionResultVariant::Value(val.clone().to_anonymous()),
             &Default::default()
         ),
         Ok("{ queries: \"A\" | \"B\" }".into())
@@ -100,7 +104,7 @@ fn test_datatype() {
     assert_eq!(
         ts::datatype(
             &Default::default(),
-            &val.clone().to_anonymous(),
+            &FunctionResultVariant::Value(val.clone().to_anonymous()),
             &Default::default()
         ),
         Ok("{ queries: \"A\" | \"B\" }".into())
@@ -127,7 +131,7 @@ fn test_datatype() {
     assert_eq!(
         ts::datatype(
             &Default::default(),
-            &val.clone().to_anonymous(),
+            &FunctionResultVariant::Value(val.clone().to_anonymous()),
             &Default::default()
         ),
         Ok("{ queries: { queries: \"A\" | \"B\" } }".into())
@@ -141,13 +145,21 @@ fn test_datatype() {
     }])
     .into();
     assert_eq!(
-        ts::datatype(&Default::default(), &val, &Default::default()),
+        ts::datatype(
+            &Default::default(),
+            &FunctionResultVariant::Value(val),
+            &Default::default()
+        ),
         Ok("{ queries: \"A\" | \"B\" }".into())
     );
 
     let val: DataType = Procedures7().into();
     assert_eq!(
-        ts::datatype(&Default::default(), &val, &Default::default()),
+        ts::datatype(
+            &Default::default(),
+            &FunctionResultVariant::Value(val),
+            &Default::default()
+        ),
         Ok("null".into()) // This is equivalent of `()` Because this is a `TupleType` not an `EnumType`.
     );
 
@@ -155,7 +167,7 @@ fn test_datatype() {
     assert_eq!(
         ts::datatype(
             &Default::default(),
-            &val.clone().to_anonymous(),
+            &FunctionResultVariant::Value(val.clone().to_anonymous()),
             &Default::default()
         ),
         Ok("Record<string, never>".into())
@@ -164,7 +176,11 @@ fn test_datatype() {
     let val: DataType =
         Procedures9(DataType::Any, DataType::Primitive(PrimitiveType::String)).into();
     assert_eq!(
-        ts::datatype(&Default::default(), &val, &Default::default()),
+        ts::datatype(
+            &Default::default(),
+            &FunctionResultVariant::Value(val),
+            &Default::default()
+        ),
         Ok("[any, string]".into())
     );
 
@@ -172,7 +188,7 @@ fn test_datatype() {
     assert_eq!(
         ts::datatype(
             &Default::default(),
-            &val.clone().to_anonymous(),
+            &FunctionResultVariant::Value(val.clone().to_anonymous()),
             &Default::default()
         ),
         Ok("{ b: any }".into())
