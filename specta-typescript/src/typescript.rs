@@ -1,4 +1,8 @@
-use std::{borrow::Cow, io, path::PathBuf};
+use std::{
+    borrow::Cow,
+    io,
+    path::{Path, PathBuf},
+};
 
 use specta::{datatype::DeprecatedType, Language, TypeMap};
 use specta_serde::is_valid_ty;
@@ -16,7 +20,7 @@ pub struct CommentFormatterArgs<'a> {
 pub type CommentFormatterFn = fn(CommentFormatterArgs) -> String; // TODO: Returning `Cow`???
 
 /// The signature for a function responsible for formatter a Typescript file.
-pub type FormatterFn = fn(PathBuf) -> io::Result<()>;
+pub type FormatterFn = fn(&Path) -> io::Result<()>;
 
 /// Allows you to configure how Specta's Typescript exporter will deal with BigInt types ([i64], [i128] etc).
 ///
@@ -58,8 +62,6 @@ pub struct Typescript {
     pub comment_exporter: Option<CommentFormatterFn>,
     /// How the resulting file should be formatted.
     pub formatter: Option<FormatterFn>,
-    /// The path to export the resulting bindings to.
-    pub path: Option<PathBuf>,
 }
 
 impl Default for Typescript {
@@ -70,7 +72,6 @@ impl Default for Typescript {
             bigint: Default::default(),
             comment_exporter: Some(comments::js_doc),
             formatter: None,
-            path: None,
         }
     }
 }
@@ -126,21 +127,6 @@ impl Typescript {
         self.formatter = Some(formatter);
         self
     }
-
-    /// TODO
-    pub fn path(mut self, path: impl Into<PathBuf>) -> Self {
-        self.path = Some(path.into());
-        self
-    }
-
-    // TODO: Should this take a `path` or should it use `self.path`???
-    /// Run the specified formatter on the given path.
-    pub fn run_format(&self, path: PathBuf) -> io::Result<()> {
-        if let Some(formatter) = self.formatter {
-            formatter(path)?;
-        }
-        Ok(())
-    }
 }
 
 impl Language for Typescript {
@@ -164,5 +150,12 @@ impl Language for Typescript {
         }
 
         Ok(out)
+    }
+
+    fn format(&self, path: &Path) -> Result<(), Self::Error> {
+        if let Some(formatter) = self.formatter {
+            formatter(path)?;
+        }
+        Ok(())
     }
 }

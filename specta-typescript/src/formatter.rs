@@ -1,9 +1,9 @@
-use std::{io, path::PathBuf, process::Command};
+use std::{io, path::Path, process::Command};
 
 use crate::typescript::FormatterFn;
 
 /// Format the specified file using [ESLint](https://eslint.org).
-pub fn eslint(file: PathBuf) -> io::Result<()> {
+pub fn eslint(file: &Path) -> io::Result<()> {
     Command::new("eslint")
         .arg("--fix")
         .arg(file)
@@ -16,7 +16,7 @@ pub fn eslint(file: PathBuf) -> io::Result<()> {
 const _: FormatterFn = eslint;
 
 /// Format the specified file using [Prettier](https://prettier.io).
-pub fn prettier(file: PathBuf) -> io::Result<()> {
+pub fn prettier(file: &Path) -> io::Result<()> {
     Command::new("prettier")
         .arg("--write")
         .arg(file)
@@ -29,7 +29,7 @@ pub fn prettier(file: PathBuf) -> io::Result<()> {
 const _: FormatterFn = prettier;
 
 /// Format the specified file using [Biome](https://prettier.io).
-pub fn biome(file: PathBuf) -> io::Result<()> {
+pub fn biome(file: &Path) -> io::Result<()> {
     Command::new("biome")
         .arg("format")
         .arg(file)

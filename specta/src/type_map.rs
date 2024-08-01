@@ -54,6 +54,10 @@ impl TypeMap {
         self.map.remove(&sid).flatten()
     }
 
+    pub fn append(&mut self, type_map: &mut TypeMap) {
+        self.map.append(&mut type_map.map);
+    }
+
     // TODO: It would be nice if this would a proper `Iterator` or `IntoIterator` implementation!
     pub fn iter(&self) -> impl Iterator<Item = (SpectaID, &NamedDataType)> {
         #[allow(clippy::unnecessary_filter_map)]
