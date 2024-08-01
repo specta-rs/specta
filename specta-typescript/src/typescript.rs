@@ -106,9 +106,9 @@ impl Typescript {
     /// Configure a function which is responsible for styling the comments to be exported
     ///
     /// Implementations:
-    ///  - [`js_doc`](crate::lang::ts::js_doc)
+    ///  - [`js_doc`](specta_typescript::js_doc)
     ///
-    /// Not calling this method will default to the [`js_doc`](crate::lang::ts::js_doc) exporter.
+    /// Not calling this method will default to the [`js_doc`](specta_typescript::js_doc) exporter.
     /// `None` will disable comment exporting.
     /// `Some(exporter)` will enable comment exporting using the provided exporter.
     pub fn comment_style(mut self, exporter: CommentFormatterFn) -> Self {
@@ -120,9 +120,9 @@ impl Typescript {
     ///
     ///
     /// Built-in implementations:
-    ///  - [`prettier`](specta_typescript:formatter:::prettier)
-    ///  - [`ESLint`](specta_typescript::formatter::eslint)
-    ///  - [`Biome`](specta_typescript::formatter::biome)e
+    ///  - [`prettier`](crate:formatter:::prettier)
+    ///  - [`ESLint`](crate::formatter::eslint)
+    ///  - [`Biome`](crate::formatter::biome)e
     pub fn formatter(mut self, formatter: FormatterFn) -> Self {
         self.formatter = Some(formatter);
         self

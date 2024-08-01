@@ -36,14 +36,14 @@ pub type Result<T> = std::result::Result<T, ExportError>;
 
 pub(crate) type Output = Result<String>;
 
-/// Convert a type which implements [`Type`](crate::Type) to a TypeScript string with an export.
+/// Convert a type which implements [`Type`] to a TypeScript string with an export.
 ///
 /// Eg. `export type Foo = { demo: string; };`
 pub fn export_ref<T: NamedType>(_: &T, conf: &Typescript) -> Output {
     export::<T>(conf)
 }
 
-/// Convert a type which implements [`Type`](crate::Type) to a TypeScript string with an export.
+/// Convert a type which implements [`Type`] to a TypeScript string with an export.
 ///
 /// Eg. `export type Foo = { demo: string; };`
 pub fn export<T: NamedType>(conf: &Typescript) -> Output {
@@ -59,14 +59,14 @@ pub fn export<T: NamedType>(conf: &Typescript) -> Output {
     result
 }
 
-/// Convert a type which implements [`Type`](crate::Type) to a TypeScript string.
+/// Convert a type which implements [`Type`] to a TypeScript string.
 ///
 /// Eg. `{ demo: string; };`
 pub fn inline_ref<T: Type>(_: &T, conf: &Typescript) -> Output {
     inline::<T>(conf)
 }
 
-/// Convert a type which implements [`Type`](crate::Type) to a TypeScript string.
+/// Convert a type which implements [`Type`] to a TypeScript string.
 ///
 /// Eg. `{ demo: string; };`
 pub fn inline<T: Type>(conf: &Typescript) -> Output {

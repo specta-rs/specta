@@ -52,9 +52,9 @@ impl JSDoc {
     /// Configure a function which is responsible for styling the comments to be exported
     ///
     /// Implementations:
-    ///  - [`js_doc`](crate::lang::ts::js_doc)
+    ///  - [`js_doc`](specta_typescript::lang::ts::js_doc)
     ///
-    /// Not calling this method will default to the [`js_doc`](crate::lang::ts::js_doc) exporter.
+    /// Not calling this method will default to the [`js_doc`](specta_typescript::lang::ts::js_doc) exporter.
     /// `None` will disable comment exporting.
     /// `Some(exporter)` will enable comment exporting using the provided exporter.
     pub fn comment_style(mut self, exporter: CommentFormatterFn) -> Self {
