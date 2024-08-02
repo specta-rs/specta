@@ -34,18 +34,24 @@ pub(crate) use specta_fn::SpectaFn;
 /// }
 /// ```
 ///
+/// # Recursion limit reached while expanding the macro `fn_datatype`
+///
+/// This macro requires recursion internally to correctly function so you may run into the recursion limit. From my testing you can have 31 path segments before you hit the recursion limit. The size of the segment or the amount of generics in the segment should not affect this limit.
+///
+/// If your having issues with this limit you can increase your [`recursion_limit`](https://doc.rust-lang.org/reference/attributes/limits.html#the-recursion_limit-attribute) by adding `#![recursion_limit = "1024"]` to your `main.rs`. If your able to hit this limit in other scenarios please [let us know](https://github.com/oscartbeaumont/tauri-specta/issues/114) and we can apply some potential optimizations.
+///
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _fn_datatype {
     // Hide distracting implementation details from the generated rustdoc.
     ($($json:tt)*) => {
-        $crate::function::_fn_datatype_inner!($($json)*)
+        $crate::function::_fn_datatype_internal!($($json)*)
     };
 }
 
 #[doc(hidden)]
 #[macro_export]
-macro_rules! _fn_datatype_inner {
+macro_rules! _fn_datatype_internal {
     ([$($path:tt)*] [$($full:tt)*] [$last:tt]) => {
         $crate::internal::paste! {
             $($path)* [<__specta__fn__ $last>]!(@export_fn; $($full)*)
@@ -87,41 +93,27 @@ macro_rules! _fn_datatype_inner {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _collect_functions {
-    // Hide distracting implementation details from the generated rustdoc.
-    ($($json:tt)*) => {
-        $crate::function::_collect_functions_inner!($($json)*)
-    };
-}
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! _collect_functions_inner {
-    ($tm:ident [] [$($result:expr)*]) => {{
-        fn export($tm: &mut $crate::TypeMap) -> Vec<$crate::datatype::Function> {
-            vec![$($result),*]
+    () => {{
+        fn export(_: &mut $crate::TypeMap) -> Vec<$crate::datatype::Function> {
+            vec![]
         }
 
         export
     }};
-    ($tm:ident [$($parts:tt)*] [$($result:expr)*]) => {
-        $crate::function::collect_functions!($tm [] [$($result)* $crate::function::fn_datatype!($($parts)*)($tm)])
-    };
-    ($tm:ident [$($parts:tt)*] [$($result:expr)*] , $($rest:tt)*) => {
-        $crate::function::collect_functions!($tm [] [$($result)* $crate::function::fn_datatype!($($parts)*)($tm)] $($rest)*)
-    };
-    ($tm:ident [$($parts:tt)*] [$($result:expr)*] $t:tt $($rest:tt)*) => {
-        $crate::function::collect_functions!($tm [$($parts)* $t] [$($result)*] $($rest)*)
-    };
-    ($($command:tt)*) => {
-        $crate::function::collect_functions!(type_map [] [] $($command)*)
-    };
+    ($($b:tt $(:: $($p:ident)? $(<$g:path>)? )* ),*) => {{
+        fn export(type_map: &mut $crate::TypeMap) -> Vec<$crate::datatype::Function> {
+            vec![
+                $($crate::function::fn_datatype!($b $($(::$p)? $(::<$g>)? )* )(type_map)),*
+            ]
+        }
+
+        export
+    }};
 }
 
 #[doc(inline)]
 pub use _collect_functions as collect_functions;
-#[doc(hidden)]
-pub use _collect_functions_inner;
 #[doc(inline)]
 pub use _fn_datatype as fn_datatype;
 #[doc(hidden)]
-pub use _fn_datatype_inner;
+pub use _fn_datatype_internal;
