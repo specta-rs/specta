@@ -1,7 +1,7 @@
 [package]
 name = "specta-util"
 description = "High-level utilities for working with Specta"
-version = "0.0.5"
+version = "0.0.6"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2021"
 license = "MIT"
@@ -27,7 +27,7 @@ serde = []
 workspace = true
 
 [dependencies]
-specta = { version = "=2.0.0-rc.18", path = "../specta" }
+specta = { version = "=2.0.0-rc.19", path = "../specta" }
 specta-macros = { version = "=2.0.0-rc.17", path = "../specta-macros", default-features = false, optional = true }
 ctor = { version = "0.2.8", default-features = false, optional = true }
 serde = "1.0.204"  # TODO: Can we remove this or at least make it optional behind the `serde` flag
