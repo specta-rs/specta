@@ -57,8 +57,8 @@ macro_rules! _fn_datatype_internal {
             $($path)* [<__specta__fn__ $last>]!(@export_fn; $($full)*)
         }
     };
-    ([$($path:tt)*] [$($full:tt)*] [$($last:tt)?] $t:tt :: <$($g:path)*> $($rest:tt)*) => {
-        $crate::function::fn_datatype!([$($path)* $($last)*] [$($full)* $t::<$($g)*>] [$t] $($rest)*)
+    ([$($path:tt)*] [$($full:tt)*] [$($last:tt)?] $t:tt :: <$($g:path),*> $($rest:tt)*) => {
+        $crate::function::fn_datatype!([$($path)* $($last)*] [$($full)* $t::<$($g),*>] [$t] $($rest)*)
     };
     ([$($path:tt)*] [$($full:tt)*] [$($last:tt)?] $t:tt $($rest:tt)*) => {
         $crate::function::fn_datatype!([$($path)* $($last)*] [$($full)* $t] [$t] $($rest)*)
@@ -100,10 +100,10 @@ macro_rules! _collect_functions {
 
         export
     }};
-    ($($b:tt $(:: $($p:ident)? $(<$g:path>)? )* ),* $(,)?) => {{
+    ($($b:tt $(:: $($p:ident)? $(<$($g:path),*>)? )* ),* $(,)?) => {{
         fn export(type_map: &mut $crate::TypeMap) -> Vec<$crate::datatype::Function> {
             vec![
-                $($crate::function::fn_datatype!($b $($(::$p)? $(::<$g>)? )* )(type_map)),*
+                $($crate::function::fn_datatype!($b $($(::$p)? $(::<$($g),*>)? )* )(type_map)),*
             ]
         }
 
