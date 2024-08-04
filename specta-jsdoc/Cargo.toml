@@ -1,7 +1,7 @@
 [package]
 name = "specta-jsdoc"
 description = "Export your Rust types to JSDoc"
-version = "0.0.6"
+version = "0.0.7"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2021"
 license = "MIT"
@@ -23,6 +23,6 @@ workspace = true
 
 [dependencies]
 specta = { version = "=2.0.0-rc.20", path = "../specta" }
-specta-typescript = { version = "=0.0.6", path = "../specta-typescript" }
+specta-typescript = { version = "=0.0.7", path = "../specta-typescript" }
 # TODO: Don't depend on serde
-specta-serde = { version = "=0.0.6", path = "../specta-serde" }
+specta-serde = { version = "=0.0.7", path = "../specta-serde" }
