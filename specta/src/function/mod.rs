@@ -93,14 +93,14 @@ macro_rules! _fn_datatype_internal {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _collect_functions {
-    () => {{
+    ($(,)?) => {{
         fn export(_: &mut $crate::TypeMap) -> Vec<$crate::datatype::Function> {
             vec![]
         }
 
         export
     }};
-    ($($b:tt $(:: $($p:ident)? $(<$g:path>)? )* ),*) => {{
+    ($($b:tt $(:: $($p:ident)? $(<$g:path>)? )* ),* $(,)?) => {{
         fn export(type_map: &mut $crate::TypeMap) -> Vec<$crate::datatype::Function> {
             vec![
                 $($crate::function::fn_datatype!($b $($(::$p)? $(::<$g>)? )* )(type_map)),*
