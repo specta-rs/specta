@@ -36,7 +36,7 @@ impl<'a, T: Type + 'static> Type for &'a T {
 }
 
 impl<T: Type> Type for [T] {
-    impl_passthrough!(T);
+    impl_passthrough!(Vec<T>);
 }
 
 impl<'a, T: ?Sized + ToOwned + Type + 'static> Type for std::borrow::Cow<'a, T> {
