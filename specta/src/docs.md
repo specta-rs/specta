@@ -50,7 +50,7 @@ Languages
 - `typescript` - Support for [TypeScript](https://www.typescriptlang.org) language exporting
 - `js_doc` - Support for [JSDoc](https://jsdoc.app) exporting helpers. Also requires `typescript` feature to be enabled.
 
-Compatability
+Compatibility
 
 - `serde` - Support for [serde](https://serde.rs)
 - `serde_json` - Support for [serde-json](https://github.com/serde-rs/json)
@@ -92,4 +92,4 @@ Namely it deals with types individually which means it is not possible to export
 [Typeshare](https://github.com/1Password/typeshare) is also great, but its approach is fundamentally different.
 While Specta uses traits and runtime information, Typeshare statically analyzes your Rust
 files.
-This results in a loss of information and lack of compatability with types from other crates.
+This results in a loss of information and lack of compatibility with types from other crates.

@@ -27,7 +27,7 @@ derive = ["dep:specta-macros"]
 ## Support for exporting the types of Rust functions.
 function = ["specta-macros?/DO_NOT_USE_function", "dep:paste"]
 
-#! Compatability
+#! Compatibility
 ## Support for [serde](https://serde.rs)
 serde = ["dep:serde"]
 ## Support for [serde-json](https://github.com/serde-rs/json)
