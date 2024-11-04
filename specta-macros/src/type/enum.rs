@@ -23,11 +23,11 @@ pub fn parse_enum(
     let generic_idents = generics
         .params
         .iter()
-        .enumerate()
-        .filter_map(|(i, p)| match p {
-            GenericParam::Type(t) => Some((i, &t.ident)),
+        .filter_map(|p| match p {
+            GenericParam::Type(t) => Some(&t.ident),
             _ => None,
-        });
+        })
+        .enumerate();
 
     let definition_generics = generic_idents.clone().map(|(_, ident)| {
         let ident = ident.to_string();

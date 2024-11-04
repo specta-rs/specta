@@ -46,11 +46,11 @@ pub fn parse_struct(
     let generic_idents = generics
         .params
         .iter()
-        .enumerate()
-        .filter_map(|(i, p)| match p {
-            GenericParam::Type(t) => Some((i, &t.ident)),
+        .filter_map(|p| match p {
+            GenericParam::Type(t) => Some(&t.ident),
             _ => None,
         })
+        .enumerate()
         .collect::<Vec<_>>();
 
     let reference_generics = generic_idents.iter().map(|(i, ident)| {
