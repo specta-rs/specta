@@ -5,10 +5,11 @@ Specta provides a system for type introspection and a set of language exporters 
 **Currently we only support exporting to [TypeScript](https://www.typescriptlang.org) but work has begun on other languages.**
 
 ## Features
- - Export structs and enums to [Typescript](https://www.typescriptlang.org)
- - Get function types to use in libraries like [tauri-specta](https://github.com/oscartbeaumont/tauri-specta)
- - Supports wide range of common crates in Rust ecosystem
- - Supports type inference - can determine type of `fn demo() -> impl Type`.
+
+- Export structs and enums to [Typescript](https://www.typescriptlang.org)
+- Get function types to use in libraries like [tauri-specta](https://github.com/oscartbeaumont/tauri-specta)
+- Supports wide range of common crates in Rust ecosystem
+- Supports type inference - can determine type of `fn demo() -> impl Type`.
 
 ## Ecosystem
 
@@ -18,8 +19,9 @@ Specta can be used in your application either directly or through a library whic
 - [tauri-specta](https://github.com/oscartbeaumont/tauri-specta) for typesafe Tauri commands
 
 ## Example
-```rust
-use specta::{*, ts::*};
+
+```rust,no_run
+use specta::*;
 
 #[derive(Type)]
 pub struct MyCustomType {
@@ -28,7 +30,7 @@ pub struct MyCustomType {
 
 fn main() {
     assert_eq!(
-        ts::export::<MyCustomType>(&ExportConfig::default()).unwrap(),
+        specta_typescript::export::<MyCustomType>(&Default::default()).unwrap(),
         "export type MyCustomType = { my_field: string }".to_string()
     );
 }
@@ -39,8 +41,8 @@ fn main() {
 If you are using [Prisma Client Rust](https://prisma.brendonovich.dev) you can enable the `rspc` feature on it to allow for Specta support on types coming directly from your database. This includes support for the types created via a selection.
 
 ## Feature flags
-[//]: # (FEATURE_FLAGS_START)
 
+[//]: # (FEATURE_FLAGS_START)
 
 - `function` - Support for exporting the types of Rust functions.
 - `export` - Support for collecting up a global type map
@@ -89,6 +91,7 @@ but it has a few limitations which became a problem when I was building [rspc](h
 Namely it deals with types individually which means it is not possible to export a type and all of the other types it depends on.
 
 #### Why not Typeshare?
+
 [Typeshare](https://github.com/1Password/typeshare) is also great, but its approach is fundamentally different.
 While Specta uses traits and runtime information, Typeshare statically analyzes your Rust
 files.

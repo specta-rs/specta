@@ -18,7 +18,7 @@ pub(crate) use specta_fn::SpectaFn;
 /// # Examples
 ///
 /// ```rust
-/// use specta::*;
+/// use specta::{*, datatype::*, function::fn_datatype};
 ///
 /// #[specta]
 /// fn some_function(name: String, age: i32) -> bool {
@@ -26,11 +26,11 @@ pub(crate) use specta_fn::SpectaFn;
 /// }
 ///
 /// fn main() {
-///     let typ = fn_datatype!(some_function)(&mut TypeMap::default())
+///     let typ = fn_datatype!(some_function)(&mut TypeMap::default());
 ///
-///     assert_eq!(typ.name, "some_function");
-///     assert_eq!(typ.args.len(), 2);
-///     assert_eq!(typ.result, Some(DataType::Primitive(PrimitiveType::bool)));
+///     assert_eq!(typ.name(), "some_function");
+///     assert_eq!(typ.args().len(), 2);
+///     assert_eq!(typ.result(), Some(DataType::Primitive(PrimitiveType::bool)));
 /// }
 /// ```
 ///
