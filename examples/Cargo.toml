@@ -1,0 +1,13 @@
+[package]
+name = "specta-examples"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+specta = { path = "../specta", features = ["derive"] }
+specta-typescript = { path = "../specta-typescript" }
+specta-util = { path = "../specta-util", features = ["export"] }
+
+[lints]
+workspace = true

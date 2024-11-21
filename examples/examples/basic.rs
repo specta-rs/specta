@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
-use specta::{
-    ts::{self, ExportConfig},
-    Type,
-};
+use specta::Type;
+use specta_typescript::Typescript;
 
 #[derive(Type)]
 pub struct TypeOne {
@@ -34,7 +32,7 @@ pub struct Something {
 }
 
 fn main() {
-    let ts_str = ts::export::<TypeOne>(&ExportConfig::default()).unwrap();
+    let ts_str = specta_typescript::export::<TypeOne>(&Typescript::default()).unwrap();
     println!("{ts_str}");
     assert_eq!(
         ts_str,
@@ -42,21 +40,21 @@ fn main() {
             .to_string()
     );
 
-    let ts_str = ts::export::<GenericType<()>>(&ExportConfig::default()).unwrap();
+    let ts_str = specta_typescript::export::<GenericType<()>>(&Typescript::default()).unwrap();
     println!("{ts_str}");
     assert_eq!(
         ts_str,
         "export type GenericType<A> = { my_field: string; generic: A }".to_string()
     );
 
-    let ts_str = ts::export::<MyEnum>(&ExportConfig::default()).unwrap();
+    let ts_str = specta_typescript::export::<MyEnum>(&Typescript::default()).unwrap();
     println!("{ts_str}");
     assert_eq!(
         ts_str,
         r#"export type MyEnum = "A" | "B" | "C""#.to_string()
     );
 
-    let ts_str = ts::export::<Something>(&ExportConfig::default()).unwrap();
+    let ts_str = specta_typescript::export::<Something>(&Typescript::default()).unwrap();
     println!("{ts_str}");
     assert_eq!(
         ts_str,

@@ -1,4 +1,6 @@
-use specta::{ts::ExportConfig, Type, TypeCollection};
+use specta::Type;
+use specta_typescript::Typescript;
+use specta_util::TypeCollection;
 
 #[derive(Type)]
 pub struct Hello {
@@ -13,7 +15,7 @@ fn main() {
     let code = TypeCollection::default()
         .register::<Hello>()
         .register::<Test>()
-        .export_ts(&ExportConfig::default())
+        .export(&Typescript::default())
         .unwrap();
 
     assert_eq!(

@@ -1,5 +1,5 @@
 [workspace]
-members = ["specta", "specta-*", "tests"]
+members = ["specta", "specta-*", "tests", "examples"]
 resolver = "2"
 
 [workspace.lints.rust]
