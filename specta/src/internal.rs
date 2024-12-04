@@ -333,8 +333,8 @@ pub fn detect_duplicate_type_names(
 ) -> Vec<(Cow<'static, str>, ImplLocation, ImplLocation)> {
     let mut errors = Vec::new();
 
-    let mut map = HashMap::with_capacity(type_map.len());
-    for (sid, dt) in type_map.iter() {
+    let mut map = HashMap::with_capacity(type_map.into_iter().len());
+    for (sid, dt) in type_map.into_iter() {
         if let Some(ext) = &dt.ext {
             if let Some((existing_sid, existing_impl_location)) =
                 map.insert(dt.name.clone(), (sid, ext.impl_location))

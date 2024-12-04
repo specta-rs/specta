@@ -79,7 +79,7 @@ impl Language for JSDoc {
     type Error = specta_typescript::ExportError; // TODO: Custom error type
 
     // TODO: Make this properly export JSDoc
-    fn export(&self, type_map: TypeMap) -> Result<String, Self::Error> {
+    fn export(&self, _type_map: &TypeMap) -> Result<String, Self::Error> {
         todo!("Coming soon...");
         // let mut out = self.0.header.to_string();
         // if !self.0.remove_default_header {
