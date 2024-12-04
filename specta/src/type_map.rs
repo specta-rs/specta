@@ -110,6 +110,6 @@ impl<'a> Iterator for TypeMapInterator<'a> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, Some(self.0.len()))
+        (0, Some(self.0.clone().filter(|(_, t)| t.is_none()).count()))
     }
 }
