@@ -1,10 +1,10 @@
 macro_rules! _impl_passthrough {
     ($t:ty) => {
-        fn inline(type_map: &mut TypeMap, generics: Generics) -> DataType {
+        fn inline(type_map: &mut TypeCollection, generics: Generics) -> DataType {
             <$t>::inline(type_map, generics)
         }
 
-        fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
+        fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
             <$t>::reference(type_map, generics)
         }
     };
@@ -13,7 +13,7 @@ macro_rules! _impl_passthrough {
 macro_rules! _impl_primitives {
     ($($i:ident)+) => {$(
         impl Type for $i {
-            fn inline(_: &mut TypeMap, _: Generics) -> DataType {
+            fn inline(_: &mut TypeCollection, _: Generics) -> DataType {
                 DataType::Primitive(datatype::PrimitiveType::$i)
             }
         }
@@ -25,7 +25,7 @@ macro_rules! _impl_tuple {
         #[allow(non_snake_case)]
         impl<$($i: Type),*> Type for ($($i,)*) {
             #[allow(unused)]
-            fn inline(type_map: &mut TypeMap, generics: Generics) -> DataType {
+            fn inline(type_map: &mut TypeCollection, generics: Generics) -> DataType {
                 let generics = match generics {
                     Generics::Definition => &[],
                     Generics::Provided(generics) => generics,
@@ -54,7 +54,7 @@ macro_rules! _impl_tuple {
 macro_rules! _impl_containers {
     ($($container:ident)+) => {$(
         impl<T: Type> Type for $container<T> {
-            fn inline(type_map: &mut TypeMap, generics: Generics) -> DataType {
+            fn inline(type_map: &mut TypeCollection, generics: Generics) -> DataType {
                 let _generics = match generics {
                     Generics::Definition => &[],
                     Generics::Provided(generics) => generics,
@@ -67,7 +67,7 @@ macro_rules! _impl_containers {
                 )
             }
 
-            fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
+            fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
                 Reference {
                     inner: generics.get(0).cloned().unwrap_or_else(
                         || T::reference(type_map, generics).inner,
@@ -81,11 +81,11 @@ macro_rules! _impl_containers {
                 T::sid()
             }
 
-            fn named_data_type(type_map: &mut TypeMap, generics: &[DataType]) -> NamedDataType {
+            fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
                 T::named_data_type(type_map, generics)
             }
 
-            fn definition_named_data_type(type_map: &mut TypeMap) -> NamedDataType {
+            fn definition_named_data_type(type_map: &mut TypeCollection) -> NamedDataType {
                 T::definition_named_data_type(type_map)
             }
         }
@@ -97,11 +97,11 @@ macro_rules! _impl_containers {
 macro_rules! _impl_as {
     ($($ty:path as $tty:ident)+) => {$(
         impl Type for $ty {
-            fn inline(type_map: &mut TypeMap, generics: Generics) -> DataType {
+            fn inline(type_map: &mut TypeCollection, generics: Generics) -> DataType {
                 <$tty as Type>::inline(type_map, generics)
             }
 
-            fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
+            fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
                 <$tty as Type>::reference(type_map, generics)
             }
         }
@@ -111,7 +111,7 @@ macro_rules! _impl_as {
 macro_rules! _impl_for_list {
     ($($unique:expr; $ty:path as $name:expr)+) => {$(
         impl<T: Type> Type for $ty {
-            fn inline(type_map: &mut TypeMap, generics: Generics) -> DataType {
+            fn inline(type_map: &mut TypeCollection, generics: Generics) -> DataType {
                 let _generics = match generics {
                     Generics::Definition => &[],
                     Generics::Provided(generics) => generics,
@@ -127,7 +127,7 @@ macro_rules! _impl_for_list {
                 })
             }
 
-            fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
+            fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
                 Reference {
                     inner: DataType::List(List {
                         ty: Box::new(generics.get(0).cloned().unwrap_or_else(
@@ -145,7 +145,7 @@ macro_rules! _impl_for_list {
 macro_rules! _impl_for_map {
     ($ty:path as $name:expr) => {
         impl<K: Type, V: Type> Type for $ty {
-            fn inline(type_map: &mut TypeMap, generics: Generics) -> DataType {
+            fn inline(type_map: &mut TypeCollection, generics: Generics) -> DataType {
                 let _generics = match generics {
                     Generics::Definition => &[],
                     Generics::Provided(generics) => generics,
@@ -167,7 +167,7 @@ macro_rules! _impl_for_map {
                 })
             }
 
-            fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
+            fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
                 Reference {
                     inner: DataType::Map(crate::datatype::Map {
                         key_ty: Box::new(

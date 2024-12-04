@@ -6,6 +6,10 @@
 )]
 
 pub mod datatype;
+#[cfg(feature = "export")]
+#[cfg_attr(docsrs, doc(cfg(feature = "export")))]
+#[doc(hidden)]
+pub mod export;
 #[cfg(feature = "function")]
 #[cfg_attr(docsrs, doc(cfg(feature = "function")))]
 pub mod function;
@@ -14,15 +18,20 @@ pub mod internal;
 mod language;
 mod specta_id;
 mod r#type;
-mod type_map;
+mod type_collection;
 
 // TODO: Can we just move the trait here or `#[doc(inline)]`
 pub use r#type::{Flatten, Generics, NamedType, Type};
 // #[doc(inline)]
 pub use specta_id::{ImplLocation, SpectaID};
-pub use type_map::TypeMap;
+pub use type_collection::TypeCollection;
 
 pub use language::Language;
+
+#[doc(inline)]
+#[cfg(feature = "export")]
+#[cfg_attr(docsrs, doc(cfg(feature = "export")))]
+pub use export::export;
 
 #[doc(inline)]
 #[cfg(feature = "derive")]

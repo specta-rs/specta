@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{datatype::DeprecatedType, datatype::Function, TypeMap};
+use crate::{datatype::DeprecatedType, datatype::Function, TypeCollection};
 
 use super::{FunctionArg, FunctionResult};
 
@@ -12,7 +12,7 @@ pub trait SpectaFn<TMarker> {
     fn to_datatype(
         asyncness: bool,
         name: Cow<'static, str>,
-        type_map: &mut TypeMap,
+        type_map: &mut TypeCollection,
         fields: &[Cow<'static, str>],
         docs: Cow<'static, str>,
         deprecated: Option<DeprecatedType>,
@@ -26,7 +26,7 @@ impl<TResultMarker, TResult: FunctionResult<TResultMarker>> SpectaFn<TResultMark
     fn to_datatype(
         asyncness: bool,
         name: Cow<'static, str>,
-        type_map: &mut TypeMap,
+        type_map: &mut TypeCollection,
         _fields: &[Cow<'static, str>],
         docs: Cow<'static, str>,
         deprecated: Option<DeprecatedType>,
@@ -54,7 +54,7 @@ macro_rules! impl_typed_command {
                 fn to_datatype(
                     asyncness: bool,
                     name: Cow<'static, str>,
-                    type_map: &mut TypeMap,
+                    type_map: &mut TypeCollection,
                     fields: &[Cow<'static, str>],
                     docs: Cow<'static, str>,
                     deprecated: Option<DeprecatedType>,

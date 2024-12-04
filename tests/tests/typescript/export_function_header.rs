@@ -1,6 +1,6 @@
 // #![allow(deprecated)]
 
-// use specta::{datatype::Function, function::fn_datatype, specta, TypeMap};
+// use specta::{datatype::Function, function::fn_datatype, specta, TypeCollection};
 
 // #[specta]
 // fn a() {}
@@ -23,31 +23,31 @@
 // #[test]
 // fn test_export_function_header() {
 //     assert(
-//         fn_datatype!(a)(&mut TypeMap::default()),
+//         fn_datatype!(a)(&mut TypeCollection::default()),
 //         Ok("export function a();"),
 //     );
 //     assert(
-//         fn_datatype!(b)(&mut TypeMap::default()),
+//         fn_datatype!(b)(&mut TypeCollection::default()),
 //         Ok("export function b(): null;"),
 //     );
 //     assert(
-//         fn_datatype!(c)(&mut TypeMap::default()),
+//         fn_datatype!(c)(&mut TypeCollection::default()),
 //         Ok("export async function c();"),
 //     );
 //     assert(
-//         fn_datatype!(d)(&mut TypeMap::default()),
+//         fn_datatype!(d)(&mut TypeCollection::default()),
 //         Ok("export function d(): string;"),
 //     );
 //     assert(
-//         fn_datatype!(e)(&mut TypeMap::default()),
+//         fn_datatype!(e)(&mut TypeCollection::default()),
 //         Ok("export function e(a: string);"),
 //     );
 //     assert(
-//         fn_datatype!(f)(&mut TypeMap::default()),
+//         fn_datatype!(f)(&mut TypeCollection::default()),
 //         Ok("export function f(a: string, b: number);"),
 //     );
 //     assert(
-//         fn_datatype!(g)(&mut TypeMap::default()),
+//         fn_datatype!(g)(&mut TypeCollection::default()),
 //         Ok("/**\n * @deprecated\n */\nexport function g();"),
 //     );
 // }

@@ -14,7 +14,7 @@ pub use paste::paste;
 
 use crate::{
     datatype::{DataType, EnumVariants, Field, GenericType, List, Map, StructFields},
-    Generics, ImplLocation, SpectaID, Type, TypeMap,
+    Generics, ImplLocation, SpectaID, Type, TypeCollection,
 };
 
 /// Functions used to construct `crate::datatype` types (they have private fields so can't be constructed directly).
@@ -205,7 +205,11 @@ pub fn skip_fields_named<'a>(
 }
 
 #[track_caller]
-pub fn flatten<T: Type>(sid: SpectaID, type_map: &mut TypeMap, generics: &[DataType]) -> DataType {
+pub fn flatten<T: Type>(
+    sid: SpectaID,
+    type_map: &mut TypeCollection,
+    generics: &[DataType],
+) -> DataType {
     type_map.flatten_stack.push(sid);
 
     #[allow(clippy::panic)]
@@ -233,7 +237,7 @@ mod functions {
         _: T,
         asyncness: bool,
         name: Cow<'static, str>,
-        type_map: &mut TypeMap,
+        type_map: &mut TypeCollection,
         fields: &[Cow<'static, str>],
         docs: Cow<'static, str>,
         deprecated: Option<DeprecatedType>,
@@ -329,12 +333,12 @@ pub fn resolve_generics(mut dt: DataType, generics: &Vec<(GenericType, DataType)
 // TODO: This should go
 /// post process the type map to detect duplicate type names
 pub fn detect_duplicate_type_names(
-    type_map: &TypeMap,
+    type_map: &TypeCollection,
 ) -> Vec<(Cow<'static, str>, ImplLocation, ImplLocation)> {
     let mut errors = Vec::new();
 
-    let mut map = HashMap::with_capacity(type_map.len());
-    for (sid, dt) in type_map.iter() {
+    let mut map = HashMap::with_capacity(type_map.into_iter().len());
+    for (sid, dt) in type_map.into_iter() {
         if let Some(ext) = &dt.ext {
             if let Some((existing_sid, existing_impl_location)) =
                 map.insert(dt.name.clone(), (sid, ext.impl_location))

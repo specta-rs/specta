@@ -3,22 +3,26 @@ use std::{
     sync::{Mutex, OnceLock, PoisonError},
 };
 
-use specta::{datatype::NamedDataType, NamedType, SpectaID, TypeMap};
-
-use crate::TypeCollection;
+use crate::{datatype::NamedDataType, NamedType, SpectaID, TypeCollection};
 
 // Global type store for collecting custom types to export.
-static TYPES: OnceLock<Mutex<HashMap<SpectaID, fn(&mut TypeMap) -> NamedDataType>>> =
+static TYPES: OnceLock<Mutex<HashMap<SpectaID, fn(&mut TypeCollection) -> NamedDataType>>> =
     OnceLock::new();
 
 /// Get the global type store containing all registered types.
 pub fn export() -> TypeCollection {
-    let type_map = TYPES
+    // TODO: Make `TYPES` should just hold a `TypeCollection` directly???
+    let types = TYPES
         .get_or_init(Default::default)
         .lock()
         .unwrap_or_else(PoisonError::into_inner);
 
-    TypeCollection::from_raw(type_map.clone())
+    let mut map = TypeCollection::default();
+    for (id, export) in types.iter() {
+        let dt = export(&mut map);
+        map.insert(*id, dt);
+    }
+    map
 }
 
 #[doc(hidden)]

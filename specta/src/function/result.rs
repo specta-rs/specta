@@ -1,18 +1,18 @@
 use std::future::Future;
 
-use crate::{datatype::FunctionResultVariant, Type, TypeMap};
+use crate::{datatype::FunctionResultVariant, Type, TypeCollection};
 
 /// Implemented by types that can be returned from a function annotated with
 /// [`specta`](crate::specta).
 pub trait FunctionResult<TMarker> {
     /// Gets the type of the result as a [`DataType`].
-    fn to_datatype(type_map: &mut TypeMap) -> FunctionResultVariant;
+    fn to_datatype(type_map: &mut TypeCollection) -> FunctionResultVariant;
 }
 
 #[doc(hidden)]
 pub enum FunctionValueMarker {}
 impl<T: Type> FunctionResult<FunctionValueMarker> for T {
-    fn to_datatype(type_map: &mut TypeMap) -> FunctionResultVariant {
+    fn to_datatype(type_map: &mut TypeCollection) -> FunctionResultVariant {
         FunctionResultVariant::Value(T::reference(type_map, &[]).inner)
     }
 }
@@ -20,7 +20,7 @@ impl<T: Type> FunctionResult<FunctionValueMarker> for T {
 #[doc(hidden)]
 pub enum FunctionResultMarker {}
 impl<T: Type, E: Type> FunctionResult<FunctionResultMarker> for Result<T, E> {
-    fn to_datatype(type_map: &mut TypeMap) -> FunctionResultVariant {
+    fn to_datatype(type_map: &mut TypeCollection) -> FunctionResultVariant {
         FunctionResultVariant::Result(
             T::reference(type_map, &[]).inner,
             E::reference(type_map, &[]).inner,
@@ -35,7 +35,7 @@ where
     F: Future,
     F::Output: Type,
 {
-    fn to_datatype(type_map: &mut TypeMap) -> FunctionResultVariant {
+    fn to_datatype(type_map: &mut TypeCollection) -> FunctionResultVariant {
         FunctionResultVariant::Value(F::Output::reference(type_map, &[]).inner)
     }
 }
@@ -48,7 +48,7 @@ where
     T: Type,
     E: Type,
 {
-    fn to_datatype(type_map: &mut TypeMap) -> FunctionResultVariant {
+    fn to_datatype(type_map: &mut TypeCollection) -> FunctionResultVariant {
         FunctionResultVariant::Result(
             T::reference(type_map, &[]).inner,
             E::reference(type_map, &[]).inner,

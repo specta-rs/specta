@@ -26,7 +26,7 @@ pub(crate) use specta_fn::SpectaFn;
 /// }
 ///
 /// fn main() {
-///     let typ = fn_datatype!(some_function)(&mut TypeMap::default());
+///     let typ = fn_datatype!(some_function)(&mut TypeCollection::default());
 ///
 ///     assert_eq!(typ.name(), "some_function");
 ///     assert_eq!(typ.args().len(), 2);
@@ -72,9 +72,9 @@ macro_rules! _fn_datatype_internal {
 }
 
 /// Collects function types into a [`Vec`],
-/// and all downstream types into a [`TypeMap`](crate::TypeMap) instance.
+/// and all downstream types into a [`TypeCollection`](crate::TypeCollection) instance.
 ///
-/// Specifying a `type_map` argument allows a custom [`TypeMap`] to be used.
+/// Specifying a `type_map` argument allows a custom [`TypeCollection`] to be used.
 ///
 /// # Examples
 ///
@@ -87,21 +87,21 @@ macro_rules! _fn_datatype_internal {
 /// }
 ///
 /// fn main() {
-///     let functions = function::collect_functions![some_function](&mut TypeMap::default());
+///     let functions = function::collect_functions![some_function](&mut TypeCollection::default());
 /// }
 /// ````
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _collect_functions {
     ($(,)?) => {{
-        fn export(_: &mut $crate::TypeMap) -> Vec<$crate::datatype::Function> {
+        fn export(_: &mut $crate::TypeCollection) -> Vec<$crate::datatype::Function> {
             vec![]
         }
 
         export
     }};
     ($($b:tt $(:: $($p:ident)? $(<$($g:path),*>)? )* ),* $(,)?) => {{
-        fn export(type_map: &mut $crate::TypeMap) -> Vec<$crate::datatype::Function> {
+        fn export(type_map: &mut $crate::TypeCollection) -> Vec<$crate::datatype::Function> {
             vec![
                 $($crate::function::fn_datatype!($b $($(::$p)? $(::<$($g),*>)? )* )(type_map)),*
             ]

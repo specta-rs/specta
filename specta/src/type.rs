@@ -3,7 +3,7 @@ use crate::{
         reference::{self, Reference},
         DataType, NamedDataType,
     },
-    SpectaID, TypeMap,
+    SpectaID, TypeCollection,
 };
 
 mod impls;
@@ -45,13 +45,13 @@ pub trait Type {
     /// Returns the definition of a type using the provided generics.
     ///
     /// This should be only implemented via the [`Type`](derive@crate::Type) macro.
-    fn inline(type_map: &mut TypeMap, generics: Generics) -> DataType;
+    fn inline(type_map: &mut TypeCollection, generics: Generics) -> DataType;
 
     /// Generates a datatype corresponding to a reference to this type,
     /// as determined by its category. Getting a reference to a type implies that
     /// it should belong in the type map (since it has to be referenced from somewhere),
     /// so the output of [`definition`](crate::Type::definition) will be put into the type map.
-    fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
+    fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
         reference::inline::<Self>(type_map, generics)
     }
 }
@@ -64,11 +64,11 @@ pub trait NamedType: Type {
 
     // TODO: Should take `Generics` instead of `&[DataType]` but I plan to remove this trait so not fixing it for now.
     /// this is equivalent to [Type::inline] but returns a [NamedDataType] instead.
-    fn named_data_type(type_map: &mut TypeMap, generics: &[DataType]) -> NamedDataType;
+    fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType;
 
     // TODO: Just remove this method given we removed `Type::definition`
     /// this is equivalent to [Type::definition] but returns a [NamedDataType] instead.
-    fn definition_named_data_type(type_map: &mut TypeMap) -> NamedDataType;
+    fn definition_named_data_type(type_map: &mut TypeCollection) -> NamedDataType;
 }
 
 /// A marker trait for compile-time validation of which types can be flattened.
