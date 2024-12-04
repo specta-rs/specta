@@ -63,7 +63,10 @@ impl TypeMap {
         language: L,
         path: impl AsRef<Path>,
     ) -> Result<(), L::Error> {
-        std::fs::write(path, self.export(language)?).map_err(Into::into)
+        let path = path.as_ref();
+        std::fs::write(&path, language.export(self)?)?;
+        language.format(path)?;
+        Ok(())
     }
 
     #[track_caller]
