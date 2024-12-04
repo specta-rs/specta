@@ -42,7 +42,7 @@ pub fn export_ref<T: NamedType>(_: &T, conf: &ExportConfig) -> Output {
 ///
 /// Eg. `export const Foo = z.object({ demo: string; });`
 pub fn export<T: NamedType>(conf: &ExportConfig) -> Output {
-    let mut type_map = TypeMap::default();
+    let mut type_map = TypeCollection::default();
     let named_data_type = T::definition_named_data_type(&mut type_map);
     // is_valid_ty(&named_data_type.inner, &type_map)?;
     let result = export_named_datatype(conf, &named_data_type, &type_map);
@@ -65,7 +65,7 @@ pub fn inline_ref<T: Type>(_: &T, conf: &ExportConfig) -> Output {
 ///
 /// Eg. `z.object({ demo: z.string() });`
 pub fn inline<T: Type>(conf: &ExportConfig) -> Output {
-    let mut type_map = TypeMap::default();
+    let mut type_map = TypeCollection::default();
     let ty = T::inline(&mut type_map, specta::Generics::Definition);
     // is_valid_ty(&ty, &type_map)?;
     let result = datatype(conf, &ty, &type_map);
@@ -83,7 +83,7 @@ pub fn inline<T: Type>(conf: &ExportConfig) -> Output {
 pub fn export_named_datatype(
     conf: &ExportConfig,
     typ: &NamedDataType,
-    type_map: &TypeMap,
+    type_map: &TypeCollection,
 ) -> Output {
     // TODO: Duplicate type name detection?
 
@@ -126,7 +126,11 @@ fn inner_comments(
     format!("{prefix}{comments}{other}")
 }
 
-fn export_datatype_inner(ctx: ExportContext, typ: &NamedDataType, type_map: &TypeMap) -> Output {
+fn export_datatype_inner(
+    ctx: ExportContext,
+    typ: &NamedDataType,
+    type_map: &TypeCollection,
+) -> Output {
     let ctx = ctx.with(
         typ.ext()
             .map(|v| PathItem::TypeExtended(typ.name().clone(), *v.impl_location()))
@@ -156,7 +160,7 @@ fn export_datatype_inner(ctx: ExportContext, typ: &NamedDataType, type_map: &Typ
 /// Convert a DataType to a Zod validator
 ///
 /// Eg. `z.object({ demo: z.string(); })`
-pub fn datatype(conf: &ExportConfig, typ: &DataType, type_map: &TypeMap) -> Output {
+pub fn datatype(conf: &ExportConfig, typ: &DataType, type_map: &TypeCollection) -> Output {
     // TODO: Duplicate type name detection?
 
     datatype_inner(
@@ -170,7 +174,11 @@ pub fn datatype(conf: &ExportConfig, typ: &DataType, type_map: &TypeMap) -> Outp
     )
 }
 
-pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &TypeMap) -> Output {
+pub(crate) fn datatype_inner(
+    ctx: ExportContext,
+    typ: &DataType,
+    type_map: &TypeCollection,
+) -> Output {
     Ok(match &typ {
         DataType::Any => ANY.into(),
         DataType::Unknown => UNKNOWN.into(),
@@ -278,7 +286,7 @@ pub(crate) fn datatype_inner(ctx: ExportContext, typ: &DataType, type_map: &Type
 fn unnamed_fields_datatype(
     ctx: ExportContext,
     fields: &[NonSkipField],
-    type_map: &TypeMap,
+    type_map: &TypeCollection,
 ) -> Output {
     match fields {
         [(field, ty)] => Ok(inner_comments(
@@ -305,7 +313,7 @@ fn unnamed_fields_datatype(
     }
 }
 
-fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, type_map: &TypeMap) -> Output {
+fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, type_map: &TypeCollection) -> Output {
     match &tuple.elements()[..] {
         [] => Ok(NULL.into()),
         tys => Ok(format!(
@@ -318,7 +326,12 @@ fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, type_map: &TypeMap) -> 
     }
 }
 
-fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &TypeMap) -> Output {
+fn struct_datatype(
+    ctx: ExportContext,
+    key: &str,
+    s: &StructType,
+    type_map: &TypeCollection,
+) -> Output {
     match &s.fields() {
         StructFields::Unit => Ok(NULL.into()),
         StructFields::Unnamed(s) => {
@@ -406,7 +419,7 @@ fn struct_datatype(ctx: ExportContext, key: &str, s: &StructType, type_map: &Typ
 
 fn enum_variant_datatype(
     ctx: ExportContext,
-    type_map: &TypeMap,
+    type_map: &TypeCollection,
     name: Cow<'static, str>,
     variant: &EnumVariant,
 ) -> Result<Option<String>> {
@@ -471,7 +484,7 @@ fn enum_variant_datatype(
     }
 }
 
-fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeMap) -> Output {
+fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeCollection) -> Output {
     if e.variants().is_empty() {
         return Ok(NEVER.to_string());
     }
@@ -651,7 +664,7 @@ fn object_field_to_ts(
     ctx: ExportContext,
     key: Cow<'static, str>,
     (field, ty): NonSkipField,
-    type_map: &TypeMap,
+    type_map: &TypeCollection,
 ) -> Output {
     let field_name_safe = sanitise_key(key, false);
 
@@ -714,7 +727,7 @@ pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: 
 fn validate_type_for_tagged_intersection(
     ctx: ExportContext,
     ty: DataType,
-    type_map: &TypeMap,
+    type_map: &TypeCollection,
 ) -> Result<bool> {
     match ty {
         DataType::Any
@@ -772,7 +785,7 @@ fn validate_type_for_tagged_intersection(
             ctx,
             type_map
                 .get(r.sid())
-                .expect("TypeMap should have been populated by now")
+                .expect("TypeCollection should have been populated by now")
                 .inner
                 .clone(),
             type_map,

@@ -10,22 +10,22 @@ use crate::{datatype::NamedDataType, Language, NamedType, SpectaID};
 /// Define a set of types which can be exported together.
 ///
 /// While exporting a type will add all of the types it depends on to the collection.
-/// You can construct your own collection to easily export a set of types together.
+/// You can also construct your own collection to easily export a set of types together.
 #[derive(Default, Clone, PartialEq)]
-pub struct TypeMap {
+pub struct TypeCollection {
     // `None` indicates that the entry is a placeholder. It was reference and we are currently working out it's definition.
     pub(crate) map: BTreeMap<SpectaID, Option<NamedDataType>>,
     // A stack of types that are currently being flattened. This is used to detect cycles.
     pub(crate) flatten_stack: Vec<SpectaID>,
 }
 
-impl fmt::Debug for TypeMap {
+impl fmt::Debug for TypeCollection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("TypeMap").field(&self.map).finish()
+        f.debug_tuple("TypeCollection").field(&self.map).finish()
     }
 }
 
-impl TypeMap {
+impl TypeCollection {
     /// Register a type with the collection.
     pub fn register<T: NamedType>(&mut self) -> &mut Self {
         let def = T::definition_named_data_type(self);
@@ -34,11 +34,11 @@ impl TypeMap {
     }
 
     /// Insert a type into the collection.
-    /// You should prefer to use `TypeMap::register` as it ensures all invariants are met.
+    /// You should prefer to use `TypeCollection::register` as it ensures all invariants are met.
     ///
     /// When using this method it's the responsibility of the caller to:
     ///  - Ensure the `SpectaID` and `NamedDataType` are correctly matched.
-    ///  - Ensure the same `TypeMap` was used when calling `NamedType::definition_named_data_type`.
+    ///  - Ensure the same `TypeCollection` was used when calling `NamedType::definition_named_data_type`.
     /// Not honoring these rules will result in a broken collection.
     pub fn insert(&mut self, sid: SpectaID, def: NamedDataType) -> &mut Self {
         self.map.insert(sid, Some(def));
@@ -78,7 +78,7 @@ impl TypeMap {
             // but all references are managed within `specta` so we can bypass this method and use `map` directly because we have `pub(crate)` access.
             None => {
                 #[cfg(debug_assertions)]
-                unreachable!("specta: `TypeMap::get` found a type placeholder!");
+                unreachable!("specta: `TypeCollection::get` found a type placeholder!");
                 #[cfg(not(debug_assertions))]
                 None
             }
@@ -86,21 +86,21 @@ impl TypeMap {
     }
 }
 
-impl<'a> IntoIterator for &'a TypeMap {
+impl<'a> IntoIterator for &'a TypeCollection {
     type Item = (SpectaID, &'a NamedDataType);
-    type IntoIter = TypeMapInterator<'a>;
+    type IntoIter = TypeCollectionInterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        TypeMapInterator(self.map.iter())
+        TypeCollectionInterator(self.map.iter())
     }
 }
 
 // Sealed
-pub struct TypeMapInterator<'a>(btree_map::Iter<'a, SpectaID, Option<NamedDataType>>);
+pub struct TypeCollectionInterator<'a>(btree_map::Iter<'a, SpectaID, Option<NamedDataType>>);
 
-impl<'a> ExactSizeIterator for TypeMapInterator<'a> {}
+impl<'a> ExactSizeIterator for TypeCollectionInterator<'a> {}
 
-impl<'a> Iterator for TypeMapInterator<'a> {
+impl<'a> Iterator for TypeCollectionInterator<'a> {
     type Item = (SpectaID, &'a NamedDataType);
 
     fn next(&mut self) -> Option<Self::Item> {

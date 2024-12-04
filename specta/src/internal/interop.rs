@@ -6,7 +6,7 @@ use specta1::NamedDataType;
 
 use crate::{
     datatype::{DataType, DeprecatedType, LiteralType, PrimitiveType},
-    TypeMap,
+    TypeCollection,
 };
 
 /// Allow for conversion between Specta v2 and v1 data types.
@@ -369,8 +369,8 @@ pub fn specta_v2_to_v1(datatype: DataType) -> specta1::DataType {
     }
 }
 
-pub fn specta_v2_type_map_to_v1_type_defs(defs: TypeMap, type_map: &mut specta1::TypeDefs) {
-    for (sid, dt) in defs.iter() {
+pub fn specta_v2_type_map_to_v1_type_defs(defs: TypeCollection, type_map: &mut specta1::TypeDefs) {
+    for (sid, dt) in defs.into_iter() {
         let dtv1 = specta_v2_to_v1(dt.inner.clone());
         let sid = specta1::r#type::internal_sid_hash("specta1", "", sid.type_name);
         type_map.insert(

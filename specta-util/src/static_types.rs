@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use specta::{datatype::DataType, Generics, Type, TypeMap};
+use specta::{datatype::DataType, Generics, Type, TypeCollection};
 
 /// Easily convert a non-Specta type into a Specta compatible type.
 /// This will be typed as `any` in Typescript.
@@ -34,7 +34,7 @@ use specta::{datatype::DataType, Generics, Type, TypeMap};
 pub struct Any<T = ()>(T);
 
 impl<T> Type for Any<T> {
-    fn inline(_: &mut TypeMap, _: Generics) -> DataType {
+    fn inline(_: &mut TypeCollection, _: Generics) -> DataType {
         DataType::Any
     }
 }
@@ -97,7 +97,7 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
 pub struct Unknown<T = ()>(T);
 
 impl<T> Type for Unknown<T> {
-    fn inline(_: &mut TypeMap, _: Generics) -> DataType {
+    fn inline(_: &mut TypeCollection, _: Generics) -> DataType {
         DataType::Unknown
     }
 }

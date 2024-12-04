@@ -115,7 +115,7 @@ impl<'a, T: Type> Type for &'a [T] {
 }
 
 impl<const N: usize, T: Type> Type for [T; N] {
-    fn inline(type_map: &mut TypeMap, generics: Generics) -> DataType {
+    fn inline(type_map: &mut TypeCollection, generics: Generics) -> DataType {
         DataType::List(List {
             ty: Box::new(
                 // TODO: This is cursed. Fix it properly!!!
@@ -129,7 +129,7 @@ impl<const N: usize, T: Type> Type for [T; N] {
         })
     }
 
-    fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
+    fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
         Reference {
             inner: DataType::List(List {
                 ty: Box::new(
@@ -147,7 +147,7 @@ impl<const N: usize, T: Type> Type for [T; N] {
 }
 
 impl<T: Type> Type for Option<T> {
-    fn inline(type_map: &mut TypeMap, generics: Generics) -> DataType {
+    fn inline(type_map: &mut TypeCollection, generics: Generics) -> DataType {
         let mut ty = None;
         if let Generics::Provided(generics) = &generics {
             ty = generics.get(0).cloned()
@@ -159,7 +159,7 @@ impl<T: Type> Type for Option<T> {
         }))
     }
 
-    fn reference(type_map: &mut TypeMap, generics: &[DataType]) -> Reference {
+    fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
         Reference {
             inner: DataType::Nullable(Box::new(
                 generics
@@ -172,7 +172,7 @@ impl<T: Type> Type for Option<T> {
 }
 
 impl<T> Type for std::marker::PhantomData<T> {
-    fn inline(_: &mut TypeMap, _: Generics) -> DataType {
+    fn inline(_: &mut TypeCollection, _: Generics) -> DataType {
         DataType::Literal(LiteralType::None)
     }
 }
@@ -183,7 +183,7 @@ const _: () = {
         internal::construct::impl_location("specta/src/type/impls.rs:234:10");
 
     impl Type for std::convert::Infallible {
-        fn inline(_: &mut TypeMap, _: Generics) -> DataType {
+        fn inline(_: &mut TypeCollection, _: Generics) -> DataType {
             DataType::Enum(internal::construct::r#enum(
                 "Infallible".into(),
                 internal::construct::sid("Infallible", "::todo:4:10"),
@@ -193,7 +193,7 @@ const _: () = {
                 vec![],
             ))
         }
-        fn reference(type_map: &mut TypeMap, _: &[DataType]) -> reference::Reference {
+        fn reference(type_map: &mut TypeCollection, _: &[DataType]) -> reference::Reference {
             let generics = vec![];
             reference::reference::<Self>(
                 type_map,
@@ -211,7 +211,7 @@ const _: () = {
             internal::construct::sid("Infallible", "::todo:234:10")
         }
 
-        fn named_data_type(type_map: &mut TypeMap, generics: &[DataType]) -> NamedDataType {
+        fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
             internal::construct::named_data_type(
                 "Infallible".into(),
                 "".into(),
@@ -221,7 +221,7 @@ const _: () = {
                 <Self as Type>::inline(type_map, Generics::Provided(generics)),
             )
         }
-        fn definition_named_data_type(type_map: &mut TypeMap) -> NamedDataType {
+        fn definition_named_data_type(type_map: &mut TypeCollection) -> NamedDataType {
             internal::construct::named_data_type(
                 "Infallible".into(),
                 "".into(),
@@ -235,7 +235,7 @@ const _: () = {
 };
 
 impl<T: Type> Type for std::ops::Range<T> {
-    fn inline(type_map: &mut TypeMap, _generics: Generics) -> DataType {
+    fn inline(type_map: &mut TypeCollection, _generics: Generics) -> DataType {
         let ty = Some(T::inline(type_map, Generics::Definition));
         DataType::Struct(StructType {
             name: "Range".into(),
@@ -289,7 +289,7 @@ const _: () = {
         internal::construct::impl_location("specta/src/type/impls.rs:302:10");
 
     impl Type for std::time::SystemTime {
-        fn inline(type_map: &mut TypeMap, _: Generics) -> DataType {
+        fn inline(type_map: &mut TypeCollection, _: Generics) -> DataType {
             DataType::Struct(internal::construct::r#struct(
                 "SystemTime".into(),
                 Some(internal::construct::sid("SystemTime", "::todo:3:10")),
@@ -328,7 +328,7 @@ const _: () = {
             ))
         }
 
-        fn reference(type_map: &mut TypeMap, _: &[DataType]) -> reference::Reference {
+        fn reference(type_map: &mut TypeCollection, _: &[DataType]) -> reference::Reference {
             reference::reference::<Self>(
                 type_map,
                 internal::construct::data_type_reference("SystemTime".into(), SID, vec![]),
@@ -340,7 +340,7 @@ const _: () = {
         fn sid() -> SpectaID {
             SID
         }
-        fn named_data_type(type_map: &mut TypeMap, generics: &[DataType]) -> NamedDataType {
+        fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
             internal::construct::named_data_type(
                 "SystemTime".into(),
                 "".into(),
@@ -350,7 +350,7 @@ const _: () = {
                 <Self as Type>::inline(type_map, Generics::Provided(generics)),
             )
         }
-        fn definition_named_data_type(type_map: &mut TypeMap) -> NamedDataType {
+        fn definition_named_data_type(type_map: &mut TypeCollection) -> NamedDataType {
             internal::construct::named_data_type(
                 "SystemTime".into(),
                 "".into(),
@@ -371,7 +371,7 @@ const _: () = {
         internal::construct::impl_location("specta/src/type/impls.rs:401:10");
 
     impl Type for std::time::Duration {
-        fn inline(type_map: &mut TypeMap, _: Generics) -> DataType {
+        fn inline(type_map: &mut TypeCollection, _: Generics) -> DataType {
             DataType::Struct(internal::construct::r#struct(
                 "Duration".into(),
                 Some(SID),
@@ -409,7 +409,7 @@ const _: () = {
                 ),
             ))
         }
-        fn reference(type_map: &mut TypeMap, _: &[DataType]) -> reference::Reference {
+        fn reference(type_map: &mut TypeCollection, _: &[DataType]) -> reference::Reference {
             reference::reference::<Self>(
                 type_map,
                 internal::construct::data_type_reference("Duration".into(), Self::sid(), vec![]),
@@ -421,7 +421,7 @@ const _: () = {
         fn sid() -> SpectaID {
             SID
         }
-        fn named_data_type(type_map: &mut TypeMap, generics: &[DataType]) -> NamedDataType {
+        fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
             internal::construct::named_data_type(
                 "Duration".into(),
                 "".into(),
@@ -431,7 +431,7 @@ const _: () = {
                 <Self as Type>::inline(type_map, Generics::Provided(generics)),
             )
         }
-        fn definition_named_data_type(type_map: &mut TypeMap) -> NamedDataType {
+        fn definition_named_data_type(type_map: &mut TypeCollection) -> NamedDataType {
             internal::construct::named_data_type(
                 "Duration".into(),
                 "".into(),

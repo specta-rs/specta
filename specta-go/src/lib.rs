@@ -5,11 +5,14 @@
     html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
 )]
 
-use specta::{datatype::DataType, Generics, Type, TypeMap};
+use specta::{datatype::DataType, Generics, Type, TypeCollection};
 
 /// TODO
 pub fn export<T: Type>() -> Result<String, String> {
-    datatype(&T::inline(&mut TypeMap::default(), Generics::Definition))
+    datatype(&T::inline(
+        &mut TypeCollection::default(),
+        Generics::Definition,
+    ))
 }
 
 fn datatype(t: &DataType) -> Result<String, String> {

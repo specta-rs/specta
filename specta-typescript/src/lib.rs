@@ -27,7 +27,7 @@ use specta::datatype::{
 };
 use specta::{
     internal::{detect_duplicate_type_names, skip_fields, skip_fields_named, NonSkipField},
-    Generics, NamedType, Type, TypeMap,
+    Generics, NamedType, Type, TypeCollection,
 };
 use specta_serde::is_valid_ty;
 
@@ -47,7 +47,7 @@ pub fn export_ref<T: NamedType>(_: &T, conf: &Typescript) -> Output {
 ///
 /// Eg. `export type Foo = { demo: string; };`
 pub fn export<T: NamedType>(conf: &Typescript) -> Output {
-    let mut type_map = TypeMap::default();
+    let mut type_map = TypeCollection::default();
     let named_data_type = T::definition_named_data_type(&mut type_map);
     is_valid_ty(&named_data_type.inner, &type_map)?;
     let result = export_named_datatype(conf, &named_data_type, &type_map);
@@ -70,7 +70,7 @@ pub fn inline_ref<T: Type>(_: &T, conf: &Typescript) -> Output {
 ///
 /// Eg. `{ demo: string; };`
 pub fn inline<T: Type>(conf: &Typescript) -> Output {
-    let mut type_map = TypeMap::default();
+    let mut type_map = TypeCollection::default();
     let ty = T::inline(&mut type_map, Generics::NONE);
     is_valid_ty(&ty, &type_map)?;
     let result = datatype(conf, &FunctionResultVariant::Value(ty.clone()), &type_map);
@@ -85,7 +85,11 @@ pub fn inline<T: Type>(conf: &Typescript) -> Output {
 /// Convert a DataType to a TypeScript string
 ///
 /// Eg. `export Name = { demo: string; }`
-pub fn export_named_datatype(conf: &Typescript, typ: &NamedDataType, type_map: &TypeMap) -> Output {
+pub fn export_named_datatype(
+    conf: &Typescript,
+    typ: &NamedDataType,
+    type_map: &TypeCollection,
+) -> Output {
     // TODO: Duplicate type name detection?
 
     is_valid_ty(&typ.inner, type_map)?;
@@ -126,7 +130,11 @@ fn inner_comments(
     format!("{prefix}{comments}{other}")
 }
 
-fn export_datatype_inner(ctx: ExportContext, typ: &NamedDataType, type_map: &TypeMap) -> Output {
+fn export_datatype_inner(
+    ctx: ExportContext,
+    typ: &NamedDataType,
+    type_map: &TypeCollection,
+) -> Output {
     let name = typ.name();
     let docs = typ.docs();
     let ext = typ.ext();
@@ -166,7 +174,11 @@ fn export_datatype_inner(ctx: ExportContext, typ: &NamedDataType, type_map: &Typ
 /// Convert a DataType to a TypeScript string
 ///
 /// Eg. `{ demo: string; }`
-pub fn datatype(conf: &Typescript, typ: &FunctionResultVariant, type_map: &TypeMap) -> Output {
+pub fn datatype(
+    conf: &Typescript,
+    typ: &FunctionResultVariant,
+    type_map: &TypeCollection,
+) -> Output {
     // TODO: Duplicate type name detection?
 
     let mut s = String::new();
@@ -192,7 +204,7 @@ macro_rules! primitive_def {
 pub(crate) fn datatype_inner(
     ctx: ExportContext,
     typ: &FunctionResultVariant,
-    type_map: &TypeMap,
+    type_map: &TypeCollection,
     s: &mut String,
 ) -> Result<()> {
     let typ = match typ {
@@ -390,7 +402,7 @@ pub(crate) fn datatype_inner(
 fn unnamed_fields_datatype(
     ctx: ExportContext,
     fields: &[NonSkipField],
-    type_map: &TypeMap,
+    type_map: &TypeCollection,
     s: &mut String,
 ) -> Result<()> {
     Ok(match fields {
@@ -439,7 +451,7 @@ fn unnamed_fields_datatype(
     })
 }
 
-fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, type_map: &TypeMap) -> Output {
+fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, type_map: &TypeCollection) -> Output {
     match &tuple.elements()[..] {
         [] => Ok(NULL.to_string()),
         tys => Ok(format!(
@@ -465,7 +477,7 @@ fn struct_datatype(
     ctx: ExportContext,
     key: &str,
     strct: &StructType,
-    type_map: &TypeMap,
+    type_map: &TypeCollection,
     s: &mut String,
 ) -> Result<()> {
     Ok(match &strct.fields() {
@@ -550,7 +562,7 @@ fn struct_datatype(
 
 fn enum_variant_datatype(
     ctx: ExportContext,
-    type_map: &TypeMap,
+    type_map: &TypeCollection,
     name: Cow<'static, str>,
     variant: &EnumVariant,
 ) -> Result<Option<String>> {
@@ -630,7 +642,7 @@ fn enum_variant_datatype(
 fn enum_datatype(
     ctx: ExportContext,
     e: &EnumType,
-    type_map: &TypeMap,
+    type_map: &TypeCollection,
     s: &mut String,
 ) -> Result<()> {
     if e.variants().is_empty() {
@@ -804,7 +816,7 @@ fn object_field_to_ts(
     ctx: ExportContext,
     key: Cow<'static, str>,
     (field, ty): NonSkipField,
-    type_map: &TypeMap,
+    type_map: &TypeCollection,
     s: &mut String,
 ) -> Result<()> {
     let field_name_safe = sanitise_key(key, false);
@@ -876,7 +888,7 @@ pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: 
 fn validate_type_for_tagged_intersection(
     ctx: ExportContext,
     ty: DataType,
-    type_map: &TypeMap,
+    type_map: &TypeCollection,
 ) -> Result<bool> {
     match ty {
         DataType::Any
@@ -934,7 +946,7 @@ fn validate_type_for_tagged_intersection(
             ctx,
             type_map
                 .get(r.sid())
-                .expect("TypeMap should have been populated by now")
+                .expect("TypeCollection should have been populated by now")
                 .inner
                 .clone(),
             type_map,

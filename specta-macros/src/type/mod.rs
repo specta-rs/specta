@@ -138,7 +138,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
             #[automatically_derived]
             #type_impl_heading {
-                fn inline(type_map: &mut #crate_ref::TypeMap, generics: #crate_ref::Generics) -> #crate_ref::datatype::DataType {
+                fn inline(type_map: &mut #crate_ref::TypeCollection, generics: #crate_ref::Generics) -> #crate_ref::datatype::DataType {
                     let generics = match generics {
                         #crate_ref::Generics::Definition => DEFINITION_GENERICS,
                         #crate_ref::Generics::Provided(generics) => generics,
@@ -147,7 +147,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     #inlines
                 }
 
-                fn reference(type_map: &mut #crate_ref::TypeMap, generics: &[#crate_ref::datatype::DataType]) -> #crate_ref::datatype::reference::Reference {
+                fn reference(type_map: &mut #crate_ref::TypeCollection, generics: &[#crate_ref::datatype::DataType]) -> #crate_ref::datatype::reference::Reference {
                     #reference
                 }
             }
@@ -158,7 +158,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     #sid
                 }
 
-                fn named_data_type(type_map: &mut #crate_ref::TypeMap, generics: &[#crate_ref::datatype::DataType]) -> #crate_ref::datatype::NamedDataType {
+                fn named_data_type(type_map: &mut #crate_ref::TypeCollection, generics: &[#crate_ref::datatype::DataType]) -> #crate_ref::datatype::NamedDataType {
                     #crate_ref::internal::construct::named_data_type(
                         #name.into(),
                         #comments.into(),
@@ -169,7 +169,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     )
                 }
 
-                fn definition_named_data_type(type_map: &mut #crate_ref::TypeMap) -> #crate_ref::datatype::NamedDataType {
+                fn definition_named_data_type(type_map: &mut #crate_ref::TypeCollection) -> #crate_ref::datatype::NamedDataType {
                     #crate_ref::internal::construct::named_data_type(
                         #name.into(),
                         #comments.into(),

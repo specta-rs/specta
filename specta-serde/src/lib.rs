@@ -14,7 +14,7 @@ use specta::{
         DataType, EnumRepr, EnumType, EnumVariants, LiteralType, PrimitiveType, StructFields,
     },
     internal::{resolve_generics, skip_fields, skip_fields_named},
-    SpectaID, TypeMap,
+    SpectaID, TypeCollection,
 };
 
 // TODO: The error should show a path to the type causing the issue like the BigInt error reporting.
@@ -32,13 +32,13 @@ pub enum SerdeError {
 /// Check that a [DataType] is a valid for Serde.
 ///
 /// This can be used by exporters which wanna do export-time checks that all types are compatible with Serde formats.
-pub fn is_valid_ty(dt: &DataType, type_map: &TypeMap) -> Result<(), SerdeError> {
+pub fn is_valid_ty(dt: &DataType, type_map: &TypeCollection) -> Result<(), SerdeError> {
     is_valid_ty_internal(dt, type_map, &mut Default::default())
 }
 
 fn is_valid_ty_internal(
     dt: &DataType,
-    type_map: &TypeMap,
+    type_map: &TypeCollection,
     checked_references: &mut HashSet<SpectaID>,
 ) -> Result<(), SerdeError> {
     match dt {
@@ -106,7 +106,7 @@ fn is_valid_ty_internal(
 }
 
 // Typescript: Must be assignable to `string | number | symbol` says Typescript.
-fn is_valid_map_key(key_ty: &DataType, type_map: &TypeMap) -> Result<(), SerdeError> {
+fn is_valid_map_key(key_ty: &DataType, type_map: &TypeCollection) -> Result<(), SerdeError> {
     match key_ty {
         DataType::Any => Ok(()),
         DataType::Primitive(ty) => match ty {
@@ -171,7 +171,7 @@ fn is_valid_map_key(key_ty: &DataType, type_map: &TypeMap) -> Result<(), SerdeEr
 }
 
 // Serde does not allow serializing a variant of certain types of enum's.
-fn validate_enum(e: &EnumType, type_map: &TypeMap) -> Result<(), SerdeError> {
+fn validate_enum(e: &EnumType, type_map: &TypeCollection) -> Result<(), SerdeError> {
     // You can't `#[serde(skip)]` your way to an empty enum.
     let valid_variants = e.variants().iter().filter(|(_, v)| !v.skip()).count();
     if valid_variants == 0 && !e.variants().is_empty() {
@@ -187,7 +187,7 @@ fn validate_enum(e: &EnumType, type_map: &TypeMap) -> Result<(), SerdeError> {
 }
 
 // Checks for specially internally tagged enums.
-fn validate_internally_tag_enum(e: &EnumType, type_map: &TypeMap) -> Result<(), SerdeError> {
+fn validate_internally_tag_enum(e: &EnumType, type_map: &TypeCollection) -> Result<(), SerdeError> {
     for (_variant_name, variant) in e.variants() {
         match &variant.inner() {
             EnumVariants::Unit => {}
@@ -215,7 +215,7 @@ fn validate_internally_tag_enum(e: &EnumType, type_map: &TypeMap) -> Result<(), 
 // Which makes sense when you can't represent `{ "type": "A" } & string` in a single JSON value.
 fn validate_internally_tag_enum_datatype(
     ty: &DataType,
-    type_map: &TypeMap,
+    type_map: &TypeCollection,
 ) -> Result<(), SerdeError> {
     match ty {
         // `serde_json::Any` can be *technically* be either valid or invalid based on the actual data but we are being strict and reject it.

@@ -7,12 +7,15 @@
 
 use specta::{
     datatype::{DataType, PrimitiveType},
-    Generics, Type, TypeMap,
+    Generics, Type, TypeCollection,
 };
 
 /// TODO
 pub fn export<T: Type>() -> Result<String, String> {
-    datatype(&T::inline(&mut TypeMap::default(), Generics::Definition))
+    datatype(&T::inline(
+        &mut TypeCollection::default(),
+        Generics::Definition,
+    ))
 }
 
 fn datatype(t: &DataType) -> Result<String, String> {

@@ -1,4 +1,4 @@
-use specta::{Type, TypeMap};
+use specta::{Type, TypeCollection};
 use specta_util::TypeCollection;
 
 #[derive(Type)]
@@ -19,7 +19,7 @@ struct D(String);
 
 #[test]
 fn type_collection_export() {
-    let mut type_map = TypeMap::default();
+    let mut type_map = TypeCollection::default();
     TypeCollection::default()
         .register::<A>()
         .collect(&mut type_map);
@@ -33,7 +33,7 @@ fn type_collection_merge() {
     let mut b = TypeCollection::default();
     b.register::<C>();
 
-    let mut type_map = TypeMap::default();
+    let mut type_map = TypeCollection::default();
     TypeCollection::default()
         .register::<D>()
         .extend(a)
@@ -50,7 +50,7 @@ fn type_collection_merge() {
 
 #[test]
 fn type_collection_duplicate_register_ty() {
-    let mut type_map = TypeMap::default();
+    let mut type_map = TypeCollection::default();
     TypeCollection::default()
         .register::<C>()
         .register::<C>()

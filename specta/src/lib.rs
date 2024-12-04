@@ -14,13 +14,13 @@ pub mod internal;
 mod language;
 mod specta_id;
 mod r#type;
-mod type_map;
+mod type_collection;
 
 // TODO: Can we just move the trait here or `#[doc(inline)]`
 pub use r#type::{Flatten, Generics, NamedType, Type};
 // #[doc(inline)]
 pub use specta_id::{ImplLocation, SpectaID};
-pub use type_map::TypeMap;
+pub use type_collection::TypeCollection;
 
 pub use language::Language;
 

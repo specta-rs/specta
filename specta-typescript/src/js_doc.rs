@@ -2,13 +2,17 @@ use std::borrow::Borrow;
 
 use specta::{
     datatype::{DeprecatedType, GenericType},
-    TypeMap,
+    TypeCollection,
 };
 use typescript::CommentFormatterArgs;
 
 use super::*;
 
-pub fn typedef_named_datatype(cfg: &Typescript, typ: &NamedDataType, type_map: &TypeMap) -> Output {
+pub fn typedef_named_datatype(
+    cfg: &Typescript,
+    typ: &NamedDataType,
+    type_map: &TypeCollection,
+) -> Output {
     typedef_named_datatype_inner(
         &ExportContext {
             cfg,
@@ -24,7 +28,7 @@ pub fn typedef_named_datatype(cfg: &Typescript, typ: &NamedDataType, type_map: &
 fn typedef_named_datatype_inner(
     ctx: &ExportContext,
     typ: &NamedDataType,
-    type_map: &TypeMap,
+    type_map: &TypeCollection,
 ) -> Output {
     let name = typ.name();
     let docs = typ.docs();
