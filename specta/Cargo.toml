@@ -23,6 +23,9 @@ default = []
 ## Derive macros
 derive = ["dep:specta-macros"]
 
+## Support for collecting up a global type map
+export = ["dep:ctor", "specta-macros/DO_NOT_USE_export"]
+
 #! Features
 ## Support for exporting the types of Rust functions.
 function = ["specta-macros?/DO_NOT_USE_function", "dep:paste"]
@@ -87,6 +90,8 @@ workspace = true
 specta-macros = { version = "=2.0.0-rc.17", optional = true, path = "../specta-macros" }
 paste = { version = "1", optional = true }
 thiserror = "1.0.61"
+
+ctor = { version = "0.2.8", default-features = false, optional = true }
 
 # TODO: To be deprecated
 specta1 = { package = "specta", version = "1", optional = true, default-features = false }

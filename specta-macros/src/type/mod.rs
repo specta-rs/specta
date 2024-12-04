@@ -39,7 +39,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         .unwrap_or_else(|| ident.to_token_stream());
 
     let crate_ref: TokenStream = container_attrs.crate_name.clone().unwrap_or(quote!(specta));
-    let internal_crate_ref: TokenStream = quote!(specta_util); // TODO: This should be overridable by attribute but it's not. // TODO: container_attrs.crate_name.clone().unwrap_or(
 
     let name = container_attrs.rename.clone().unwrap_or_else(|| {
         unraw_raw_ident(&format_ident!("{}", raw_ident.to_string())).to_token_stream()
@@ -119,9 +118,9 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
             quote! {
                 #[allow(non_snake_case)]
-                #[#internal_crate_ref::export::internal::ctor]
+                #[#crate_ref::export::internal::ctor]
                 fn #export_fn_name() {
-                    #internal_crate_ref::export::internal::register::<#ident<#(#generic_params),*>>();
+                    #crate_ref::export::internal::register::<#ident<#(#generic_params),*>>();
                 }
             }
         });

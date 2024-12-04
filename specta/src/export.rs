@@ -3,7 +3,7 @@ use std::{
     sync::{Mutex, OnceLock, PoisonError},
 };
 
-use specta::{datatype::NamedDataType, NamedType, SpectaID, TypeCollection};
+use crate::{datatype::NamedDataType, NamedType, SpectaID, TypeCollection};
 
 // Global type store for collecting custom types to export.
 static TYPES: OnceLock<Mutex<HashMap<SpectaID, fn(&mut TypeCollection) -> NamedDataType>>> =

@@ -5,9 +5,8 @@ edition = "2021"
 publish = false
 
 [dependencies]
-specta = { path = "../specta", features = ["derive"] }
+specta = { path = "../specta", features = ["derive", "export"] }
 specta-typescript = { path = "../specta-typescript" }
-specta-util = { path = "../specta-util", features = ["export"] }
 
 [lints]
 workspace = true

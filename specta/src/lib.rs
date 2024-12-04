@@ -6,6 +6,10 @@
 )]
 
 pub mod datatype;
+#[cfg(feature = "export")]
+#[cfg_attr(docsrs, doc(cfg(feature = "export")))]
+#[doc(hidden)]
+pub mod export;
 #[cfg(feature = "function")]
 #[cfg_attr(docsrs, doc(cfg(feature = "function")))]
 pub mod function;
@@ -23,6 +27,11 @@ pub use specta_id::{ImplLocation, SpectaID};
 pub use type_collection::TypeCollection;
 
 pub use language::Language;
+
+#[doc(inline)]
+#[cfg(feature = "export")]
+#[cfg_attr(docsrs, doc(cfg(feature = "export")))]
+pub use export::export;
 
 #[doc(inline)]
 #[cfg(feature = "derive")]
