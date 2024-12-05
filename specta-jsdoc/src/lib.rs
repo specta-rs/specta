@@ -36,13 +36,6 @@ impl JSDoc {
         self
     }
 
-    // TODO: Only keep this is TS stays responsible for exporting which it probs won't.
-    /// Removes the default Specta header from the output.
-    pub fn remove_default_header(mut self) -> Self {
-        self.0.remove_default_header = true;
-        self
-    }
-
     /// Configure the BigInt handling behaviour
     pub fn bigint(mut self, bigint: BigIntExportBehavior) -> Self {
         self.0.bigint = bigint;

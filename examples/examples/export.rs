@@ -14,21 +14,18 @@ pub struct TypeTwo {
 
 fn main() {
     // Export as string
-    let string = specta::export().export(Typescript::default()).unwrap();
+    let string = Typescript::default().export(&specta::export()).unwrap();
     println!("{string}");
 
     // Export to file
-    specta::export()
-        .export_to(Typescript::default(), "./bindings.ts")
+    Typescript::default()
+        .export_to("./bindings.ts", &specta::export())
         .unwrap();
 
     // Override the export configuration.
-    specta::export()
-        .export_to(
-            Typescript::default()
-                // Be aware this won't be typesafe unless your using a ser/deserializer that converts BigInt types to a number.
-                .bigint(BigIntExportBehavior::Number),
-            "./bindings.ts",
-        )
+    Typescript::default()
+        // Be aware this won't be typesafe unless your using a ser/deserializer that converts BigInt types to a number.
+        .bigint(BigIntExportBehavior::Number)
+        .export_to("./bindings.ts", &specta::export())
         .unwrap();
 }
