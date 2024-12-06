@@ -5,7 +5,10 @@
     html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
 )]
 
-use specta::{datatype::DataType, Generics, Type, TypeCollection};
+use specta::{
+    datatype::{DataType, NamedDataType, StructFields},
+    Generics, Type, TypeCollection,
+};
 
 /// TODO
 pub fn export<T: Type>() -> Result<String, String> {
@@ -15,7 +18,19 @@ pub fn export<T: Type>() -> Result<String, String> {
     ))
 }
 
-fn datatype(t: &DataType) -> Result<String, String> {
+pub fn export_named_datatype(
+    // conf: &Typescript,
+    typ: &NamedDataType,
+    // type_map: &TypeCollection,
+) -> Result<String, String> {
+    Ok(format!(
+        "pub type {} = {}",
+        typ.name(),
+        datatype(&typ.inner)?
+    ))
+}
+
+pub fn datatype(t: &DataType) -> Result<String, String> {
     // TODO: This system does lossy type conversions. That is something I want to fix in the future but for now this works. Eg. `HashSet<T>` will be exported as `Vec<T>`
     // TODO: Serde serialize + deserialize on types
 
@@ -42,36 +57,34 @@ fn datatype(t: &DataType) -> Result<String, String> {
                     .join(", ")
             ),
         },
-        DataType::Struct(s) => {
-            // match &s.fields()[..] {
-            //     [] => "struct {name}".to_string(),
-            //     fields => {
-            //         let generics = (!s.generics().is_empty())
-            //             .then(|| format!("<{}>", s.generics().join(", ")))
-            //             .unwrap_or_default();
+        DataType::Struct(s) => match &s.fields() {
+            StructFields::Unit => "struct {name}".to_string(),
+            StructFields::Named(_) => todo!(),
+            StructFields::Unnamed(_) => todo!(),
+            // fields => {
+            //     let generics = (!s.generics().is_empty())
+            //         .then(|| format!("<{}>", s.generics().join(", ")))
+            //         .unwrap_or_default();
 
-            //         let fields = fields
-            //             .iter()
-            //             .map(|f| {
-            //                 let name = &f.name;
-            //                 let typ = datatype(&f.ty)?;
-            //                 Ok(format!("\t{name}: {typ}"))
-            //             })
-            //             .collect::<Result<Vec<_>, String>>()?
-            //             .join(", ");
+            //     let fields = fields
+            //         .iter()
+            //         .map(|f| {
+            //             let name = &f.name;
+            //             let typ = datatype(&f.ty)?;
+            //             Ok(format!("\t{name}: {typ}"))
+            //         })
+            //         .collect::<Result<Vec<_>, String>>()?
+            //         .join(", ");
 
-            //         let tag = s
-            //             .tag()
-            //             .clone()
-            //             .map(|t| format!("{t}: String"))
-            //             .unwrap_or_default();
+            //     let tag = s
+            //         .tag()
+            //         .clone()
+            //         .map(|t| format!("{t}: String"))
+            //         .unwrap_or_default();
 
-            //         format!("struct {}{generics} {{ {fields}{tag} }}\n", s.name())
-            //     }
+            //     format!("struct {}{generics} {{ {fields}{tag} }}\n", s.name())
             // }
-
-            todo!();
-        }
+        },
         DataType::Enum(_) => todo!(),
         DataType::Reference(reference) => match &reference.generics()[..] {
             [] => reference.name().to_string(),
