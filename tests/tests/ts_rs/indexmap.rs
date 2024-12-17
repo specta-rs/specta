@@ -17,6 +17,6 @@ fn indexmap() {
 
     assert_ts!(
         Indexes,
-        "{ map: { [key in string]: string }; indexset: string[] }"
+        "{ map: Partial<{ [key in string]: string }>; indexset: string[] }"
     );
 }

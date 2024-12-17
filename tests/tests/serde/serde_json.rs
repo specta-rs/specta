@@ -5,8 +5,8 @@ fn serde_json() {
 
     assert_ts!(
         serde_json::Value,
-        "null | boolean | number | string | JsonValue[] | { [key in string]: JsonValue }"
+        "null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>"
     );
-    assert_ts!(serde_json::Map<String, ()>, "{ [key in string]: null }");
+    assert_ts!(serde_json::Map<String, ()>, "Partial<{ [key in string]: null }>");
     assert_ts!(serde_json::Number, "number");
 }

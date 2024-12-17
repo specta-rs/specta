@@ -291,8 +291,9 @@ pub(crate) fn datatype_inner(
             }
         }
         DataType::Map(def) => {
-            // We use this instead of `Record<K, V>` to avoid issues with circular references.
-            s.push_str("{ [key in ");
+            // We use `{ [key in K]: V }` instead of `Record<K, V>` to avoid issues with circular references.
+            // Wrapped in Partial<> because otherwise TypeScript would enforce exhaustiveness.
+            s.push_str("Partial<{ [key in ");
             datatype_inner(
                 ctx.clone(),
                 &FunctionResultVariant::Value(def.key_ty().clone()),
@@ -306,7 +307,7 @@ pub(crate) fn datatype_inner(
                 type_map,
                 s,
             )?;
-            s.push_str(" }");
+            s.push_str(" }>");
         }
         // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
         DataType::List(def) => {

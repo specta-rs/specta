@@ -5,12 +5,12 @@ fn serde_yaml() {
 
     assert_ts!(
         serde_yaml::Value,
-        "null | boolean | number | string | YamlValue[] | unknown | { [key in string]: unknown }"
+        "null | boolean | number | string | YamlValue[] | unknown | Partial<{ [key in string]: unknown }>"
     );
     assert_ts!(serde_yaml::Mapping, "unknown");
     assert_ts!(
         serde_yaml::value::TaggedValue,
-        "{ [key in string]: unknown }"
+        "Partial<{ [key in string]: unknown }>"
     );
     assert_ts!(serde_yaml::Number, "number");
 }

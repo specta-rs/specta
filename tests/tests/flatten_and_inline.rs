@@ -118,7 +118,7 @@ pub enum K {
 fn serde() {
     assert_ts!(
         B,
-        "({ a: string }) & ({ [key in string]: string }) & ({ a: string })"
+        "({ a: string }) & (Partial<{ [key in string]: string }>) & ({ a: string })"
     );
     assert_ts!(C, "({ a: string }) & { b: { a: string } }");
     assert_ts!(D, "({ a: string }) & { b: { a: string }; type: \"D\" }");

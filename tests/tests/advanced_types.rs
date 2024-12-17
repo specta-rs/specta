@@ -38,11 +38,11 @@ fn test_type_aliases() {
     assert_ts!(FullGeneric<u8, bool>, "{ a: number; b: boolean }");
     assert_ts!(Another<bool>, "{ a: number; b: boolean }");
 
-    assert_ts!(MapA<u32>, "{ [key in string]: number }");
-    assert_ts!(MapB<u32>, "{ [key in number]: string }");
+    assert_ts!(MapA<u32>, "Partial<{ [key in string]: number }>");
+    assert_ts!(MapB<u32>, "Partial<{ [key in number]: string }>");
     assert_ts!(
         MapC<u32>,
-        "{ [key in string]: { field: Demo<number, boolean> } }"
+        "Partial<{ [key in string]: { field: Demo<number, boolean> } }>"
     );
 
     assert_ts!(Struct<u32>, "{ field: Demo<number, boolean> }");

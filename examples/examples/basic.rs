@@ -58,6 +58,6 @@ fn main() {
     println!("{ts_str}");
     assert_eq!(
         ts_str,
-        r#"export type Something = { a: { [key in MyEnum]: number } }"#.to_string()
+        r#"export type Something = { a: Partial<{ [key in MyEnum]: number }>"#.to_string()
     );
 }
