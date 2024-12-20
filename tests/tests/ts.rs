@@ -145,7 +145,7 @@ fn typescript_types() {
     );
 
     assert_ts!(OverridenStruct, "{ overriden_field: string }");
-    assert_ts!(HasGenericAlias, r#"{ [key in number]: string }"#);
+    assert_ts!(HasGenericAlias, r#"Partial<{ [key in number]: string }>"#);
 
     assert_ts!(SkipVariant, "{ A: string }");
     assert_ts!(SkipVariant2, r#"{ tag: "A"; data: string }"#);
@@ -191,7 +191,7 @@ fn typescript_types() {
     );
 
     // https://github.com/oscartbeaumont/specta/issues/65
-    assert_ts!(HashMap<BasicEnum, ()>, r#"{ [key in "A" | "B"]: null }"#);
+    assert_ts!(HashMap<BasicEnum, ()>, r#"Partial<{ [key in "A" | "B"]: null }>"#);
 
     // https://github.com/oscartbeaumont/specta/issues/60
     assert_ts!(Option<Option<Option<Option<i32>>>>, r#"number | null"#);
@@ -226,10 +226,10 @@ fn typescript_types() {
         Ok(r#"{ secs: string; nanos: number }"#.into())
     );
 
-    assert_ts!(HashMap<BasicEnum, i32>, r#"{ [key in "A" | "B"]: number }"#);
+    assert_ts!(HashMap<BasicEnum, i32>, r#"Partial<{ [key in "A" | "B"]: number }>"#);
     assert_ts_export!(
         EnumReferenceRecordKey,
-        "export type EnumReferenceRecordKey = { a: { [key in BasicEnum]: number } }"
+        "export type EnumReferenceRecordKey = { a: Partial<{ [key in BasicEnum]: number }> }"
     );
 
     assert_ts!(
