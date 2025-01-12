@@ -51,6 +51,11 @@ impl TypeCollection {
         self
     }
 
+    /// Remove a type from the collection.
+    pub fn remove(&mut self, sid: SpectaID) -> Option<NamedDataType> {
+        self.map.remove(&sid).flatten()
+    }
+
     #[track_caller]
     pub fn get(&self, sid: SpectaID) -> Option<&NamedDataType> {
         #[allow(clippy::bind_instead_of_map)]
