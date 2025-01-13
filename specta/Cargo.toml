@@ -49,6 +49,8 @@ ulid = ["dep:ulid"]
 chrono = ["dep:chrono"]
 ## [time](https://docs.rs/time) crate
 time = ["dep:time"]
+# [jiff](https://docs.rs/jiff) crate
+jiff = ["dep:jiff"]
 ## [bigdecimal](https://docs.rs/bigdecimal) crate
 bigdecimal = ["dep:bigdecimal"]
 ## [rust_decimal](https://docs.rs/rust_decimal) crate
@@ -118,6 +120,7 @@ url = { version = "2.5.2", optional = true, default-features = false }
 either = { version = "1.13.0", optional = true, default-features = false }
 bevy_ecs = { version = "0.14.0", optional = true, default-features = false }
 bevy_input = { version = "0.14.0", optional = true, default-features = false }
+jiff = { version = "0.1", optional = true, default-features = false }
 
 [dev-dependencies]
 serde = { version = "1.0.204", features = ["derive"] } # TODO: Can we remove this?

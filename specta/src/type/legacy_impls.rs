@@ -260,6 +260,17 @@ impl_as!(
     time::Weekday as String
 );
 
+#[cfg(feature = "jiff")]
+impl_as!(
+    jiff::Timestamp as String
+    jiff::Zoned as String
+    jiff::Span as String
+    jiff::civil::Date as String
+    jiff::civil::Time as String
+    jiff::civil::DateTime as String
+    jiff::tz::TimeZone as String
+);
+
 #[cfg(feature = "bigdecimal")]
 impl_as!(bigdecimal::BigDecimal as String);
 

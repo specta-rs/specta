@@ -66,6 +66,7 @@ External types
 - `uuid` - [uuid](https://docs.rs/uuid) crate
 - `chrono` - [chrono](https://docs.rs/chrono) crate
 - `time` - [time](https://docs.rs/time) crate
+- `jiff` - [jiff](https://docs.rs/jiff) crate
 - `bigdecimal` - [bigdecimal](https://docs.rs/bigdecimal) crate
 - `rust_decimal` - [rust_decimal](https://docs.rs/rust_decimal) crate
 - `indexmap` - [indexmap](https://docs.rs/indexmap) crate
