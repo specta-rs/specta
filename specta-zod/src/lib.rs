@@ -333,11 +333,11 @@ fn struct_datatype(
     type_map: &TypeCollection,
 ) -> Output {
     match &s.fields() {
-        StructFields::Unit => Ok(NULL.into()),
-        StructFields::Unnamed(s) => {
+        Fields::Unit => Ok(NULL.into()),
+        Fields::Unnamed(s) => {
             unnamed_fields_datatype(ctx, &skip_fields(s.fields()).collect::<Vec<_>>(), type_map)
         }
-        StructFields::Named(s) => {
+        Fields::Named(s) => {
             let fields = skip_fields_named(s.fields()).collect::<Vec<_>>();
 
             if fields.is_empty() {
@@ -423,10 +423,10 @@ fn enum_variant_datatype(
     name: Cow<'static, str>,
     variant: &EnumVariant,
 ) -> Result<Option<String>> {
-    match &variant.inner() {
+    match &variant.fields() {
         // TODO: Remove unreachable in type system
-        EnumVariants::Unit => unreachable!("Unit enum variants have no type!"),
-        EnumVariants::Named(obj) => {
+        Fields::Unit => unreachable!("Unit enum variants have no type!"),
+        Fields::Named(obj) => {
             let mut fields = if let Some(tag) = &obj.tag() {
                 let sanitised_name = sanitise_key(name, true);
                 let tag = sanitise_key(tag.clone(), false);
@@ -461,7 +461,7 @@ fn enum_variant_datatype(
                 fields => format!("z.object({{ {} }})", fields.join(", ")),
             }))
         }
-        EnumVariants::Unnamed(obj) => {
+        Fields::Unnamed(obj) => {
             let fields = skip_fields(obj.fields())
                 .map(|(_, ty)| datatype_inner(ctx.clone(), ty, type_map))
                 .collect::<Result<Vec<_>>>()?;
@@ -496,8 +496,8 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeCollection) ->
                 .iter()
                 .filter(|(_, variant)| !variant.skip())
                 .map(|(name, variant)| {
-                    Ok(match variant.inner() {
-                        EnumVariants::Unit => NULL.into(),
+                    Ok(match variant.fields() {
+                        Fields::Unit => NULL.into(),
                         _ => inner_comments(
                             ctx.clone(),
                             variant.deprecated(),
@@ -533,13 +533,13 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeCollection) ->
                         ctx.clone(),
                         variant.deprecated(),
                         variant.docs(),
-                        match (repr, &variant.inner()) {
+                        match (repr, &variant.fields()) {
                             (EnumRepr::Untagged, _) => unreachable!(),
-                            (EnumRepr::Internal { tag }, EnumVariants::Unit) => {
+                            (EnumRepr::Internal { tag }, Fields::Unit) => {
                             	let tag = sanitise_key(tag.clone(), false);
                                 format!(r#"z.object({{ {tag}: {sanitised_name} }})"#)
                             }
-                            (EnumRepr::Internal { tag }, EnumVariants::Unnamed(tuple)) => {
+                            (EnumRepr::Internal { tag }, Fields::Unnamed(tuple)) => {
                            	 	let tag = sanitise_key(tag.clone(), false);
                                 let fields = skip_fields(tuple.fields()).collect::<Vec<_>>();
 
@@ -566,7 +566,7 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeCollection) ->
                                     )
                                 }
                             }
-                            (EnumRepr::Internal { tag }, EnumVariants::Named(obj)) => {
+                            (EnumRepr::Internal { tag }, Fields::Named(obj)) => {
                          	 	let tag = sanitise_key(tag.clone(), false);
                                 let mut fields = vec![format!("{tag}: {sanitised_name}")];
 
@@ -585,7 +585,7 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeCollection) ->
 
                                 format!("z.object({{ {} }})", fields.join(", "))
                             }
-                            (EnumRepr::External, EnumVariants::Unit) => format!("z.literal({})", sanitised_name),
+                            (EnumRepr::External, Fields::Unit) => format!("z.literal({})", sanitised_name),
                             (EnumRepr::External, _) => {
                                 let ts_values = enum_variant_datatype(
                                     ctx.with(PathItem::Variant(variant_name.clone())),
@@ -602,7 +602,7 @@ fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeCollection) ->
                                     None => format!(r#"z.literal({sanitised_name})"#),
                                 }
                             }
-                            (EnumRepr::Adjacent { tag, .. }, EnumVariants::Unit) => {
+                            (EnumRepr::Adjacent { tag, .. }, Fields::Unit) => {
                          	 	let tag = sanitise_key(tag.clone(), false);
                                 format!(r#"z.object({{ {tag}: z.literal({sanitised_name}) }})"#)
                             }
@@ -743,13 +743,13 @@ fn validate_type_for_tagged_intersection(
             _ => Ok(false),
         },
         DataType::Struct(v) => match v.fields() {
-            StructFields::Unit => Ok(true),
-            StructFields::Unnamed(_) => {
+            Fields::Unit => Ok(true),
+            Fields::Unnamed(_) => {
                 Err(ExportError::InvalidTaggedVariantContainingTupleStruct(
                    ctx.export_path()
                 ))
             }
-            StructFields::Named(fields) => {
+            Fields::Named(fields) => {
                 // Prevent `{ tag: "{tag}" } & Record<string | never>`
                 if fields.tag().is_none() && fields.fields().is_empty() {
                     return Ok(true);
@@ -761,12 +761,12 @@ fn validate_type_for_tagged_intersection(
         DataType::Enum(v) => {
             match v.repr() {
                 EnumRepr::Untagged => {
-                    Ok(v.variants().iter().any(|(_, v)| match &v.inner() {
+                    Ok(v.variants().iter().any(|(_, v)| match &v.fields() {
                         // `{ .. } & null` is `never`
-                        EnumVariants::Unit => true,
+                        Fields::Unit => true,
                          // `{ ... } & Record<string, never>` is not useful
-                        EnumVariants::Named(v) => v.tag().is_none() && v.fields().is_empty(),
-                        EnumVariants::Unnamed(_) => false,
+                        Fields::Named(v) => v.tag().is_none() && v.fields().is_empty(),
+                        Fields::Unnamed(_) => false,
                     }))
                 },
                 // All of these repr's are always objects.

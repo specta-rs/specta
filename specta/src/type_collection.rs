@@ -4,7 +4,7 @@ use std::{
     fmt,
 };
 
-use crate::{datatype::NamedDataType, NamedType, SpectaID};
+use crate::{datatype::NamedDataType, DataType, NamedType, SpectaID};
 
 /// Define a set of types which can be exported together.
 ///
@@ -29,6 +29,20 @@ impl TypeCollection {
     pub fn register<T: NamedType>(&mut self) -> &mut Self {
         let def = T::definition_named_data_type(self);
         self.map.insert(T::sid(), Some(def));
+        self
+    }
+
+    /// Register a type with the collection.
+    #[doc(hidden)] // TODO: Make public
+    pub fn todo(&mut self, sid: SpectaID, inner: DataType) -> &mut Self {
+        self.map.insert(sid, Some(NamedDataType {
+            name: sid.type_name.into(),
+            // TODO: How to configure this stuff?
+            docs: "".into(),
+            deprecated: None,
+            ext: None, // TODO: Some(crate::datatype::NamedDataTypeExt { sid: (), impl_location: () })
+            inner
+        }));
         self
     }
 

@@ -11,7 +11,7 @@ use thiserror::Error;
 
 use specta::{
     datatype::{
-        DataType, EnumRepr, EnumType, EnumVariants, LiteralType, PrimitiveType, StructFields,
+        DataType, EnumRepr, EnumType, LiteralType, PrimitiveType, Fields,
     },
     internal::{resolve_generics, skip_fields, skip_fields_named},
     SpectaID, TypeCollection,
@@ -48,13 +48,13 @@ fn is_valid_ty_internal(
             is_valid_ty_internal(ty.value_ty(), type_map, checked_references)?;
         }
         DataType::Struct(ty) => match ty.fields() {
-            StructFields::Unit => {}
-            StructFields::Unnamed(ty) => {
+            Fields::Unit => {}
+            Fields::Unnamed(ty) => {
                 for (_, ty) in skip_fields(ty.fields()) {
                     is_valid_ty_internal(ty, type_map, checked_references)?;
                 }
             }
-            StructFields::Named(ty) => {
+            Fields::Named(ty) => {
                 for (_, (_, ty)) in skip_fields_named(ty.fields()) {
                     is_valid_ty_internal(ty, type_map, checked_references)?;
                 }
@@ -64,14 +64,14 @@ fn is_valid_ty_internal(
             validate_enum(ty, type_map)?;
 
             for (_variant_name, variant) in ty.variants().iter() {
-                match &variant.inner() {
-                    EnumVariants::Unit => {}
-                    EnumVariants::Named(variant) => {
+                match &variant.fields() {
+                    Fields::Unit => {}
+                    Fields::Named(variant) => {
                         for (_, (_, ty)) in skip_fields_named(variant.fields()) {
                             is_valid_ty_internal(ty, type_map, checked_references)?;
                         }
                     }
-                    EnumVariants::Unnamed(variant) => {
+                    Fields::Unnamed(variant) => {
                         for (_, ty) in skip_fields(variant.fields()) {
                             is_valid_ty_internal(ty, type_map, checked_references)?;
                         }
@@ -144,9 +144,9 @@ fn is_valid_map_key(key_ty: &DataType, type_map: &TypeCollection) -> Result<(), 
         // Enum of other valid types are also valid Eg. `"A" | "B"` or `"A" | 5` are valid
         DataType::Enum(ty) => {
             for (_variant_name, variant) in ty.variants() {
-                match &variant.inner() {
-                    EnumVariants::Unit => {}
-                    EnumVariants::Unnamed(item) => {
+                match &variant.fields() {
+                    Fields::Unit => {}
+                    Fields::Unnamed(item) => {
                         if item.fields().len() > 1 {
                             return Err(SerdeError::InvalidMapKey);
                         }
@@ -189,10 +189,10 @@ fn validate_enum(e: &EnumType, type_map: &TypeCollection) -> Result<(), SerdeErr
 // Checks for specially internally tagged enums.
 fn validate_internally_tag_enum(e: &EnumType, type_map: &TypeCollection) -> Result<(), SerdeError> {
     for (_variant_name, variant) in e.variants() {
-        match &variant.inner() {
-            EnumVariants::Unit => {}
-            EnumVariants::Named(_) => {}
-            EnumVariants::Unnamed(item) => {
+        match &variant.fields() {
+            Fields::Unit => {}
+            Fields::Named(_) => {}
+            Fields::Unnamed(item) => {
                 let mut fields = skip_fields(item.fields());
 
                 let Some(first_field) = fields.next() else {

@@ -5,6 +5,22 @@ use std::borrow::Cow;
 use super::{DataType, DeprecatedType};
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum Fields {
+    /// A unit struct.
+    ///
+    /// Represented in Rust as `pub struct Unit;` and in TypeScript as `null`.
+    Unit,
+    /// A struct with unnamed fields.
+    ///
+    /// Represented in Rust as `pub struct Unit();` and in TypeScript as `[]`.
+    Unnamed(UnnamedFields),
+    /// A struct with named fields.
+    ///
+    /// Represented in Rust as `pub struct Unit {}` and in TypeScript as `{}`.
+    Named(NamedFields),
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Field {
     /// Did the user apply a `#[specta(optional)]` attribute.
     pub(crate) optional: bool,

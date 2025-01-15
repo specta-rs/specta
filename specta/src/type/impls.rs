@@ -186,7 +186,7 @@ const _: () = {
         fn inline(_: &mut TypeCollection, _: Generics) -> DataType {
             DataType::Enum(internal::construct::r#enum(
                 "Infallible".into(),
-                internal::construct::sid("Infallible", "::todo:4:10"),
+                internal::construct::sid("Infallible".into(), "::todo:4:10"),
                 EnumRepr::External,
                 false,
                 vec![],
@@ -199,7 +199,7 @@ const _: () = {
                 type_map,
                 internal::construct::data_type_reference(
                     "Infallible".into(),
-                    internal::construct::sid("Infallible", "::todo:4:10"),
+                    internal::construct::sid("Infallible".into(), "::todo:4:10"),
                     generics,
                 ),
             )
@@ -208,7 +208,7 @@ const _: () = {
 
     impl NamedType for std::convert::Infallible {
         fn sid() -> SpectaID {
-            internal::construct::sid("Infallible", "::todo:234:10")
+            internal::construct::sid("Infallible".into(), "::todo:234:10")
         }
 
         fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
@@ -241,7 +241,7 @@ impl<T: Type> Type for std::ops::Range<T> {
             name: "Range".into(),
             sid: None,
             generics: vec![],
-            fields: StructFields::Named(NamedFields {
+            fields: Fields::Named(NamedFields {
                 fields: vec![
                     (
                         "start".into(),
@@ -292,9 +292,9 @@ const _: () = {
         fn inline(type_map: &mut TypeCollection, _: Generics) -> DataType {
             DataType::Struct(internal::construct::r#struct(
                 "SystemTime".into(),
-                Some(internal::construct::sid("SystemTime", "::todo:3:10")),
+                Some(internal::construct::sid("SystemTime".into(), "::todo:3:10")),
                 vec![],
-                internal::construct::struct_named(
+                internal::construct::fields_named(
                     vec![
                         (
                             "duration_since_epoch".into(),
@@ -376,7 +376,7 @@ const _: () = {
                 "Duration".into(),
                 Some(SID),
                 vec![],
-                internal::construct::struct_named(
+                internal::construct::fields_named(
                     vec![
                         (
                             "secs".into(),

@@ -22,8 +22,8 @@ use reserved_terms::*;
 pub use typescript::*;
 
 use specta::datatype::{
-    DataType, DeprecatedType, EnumRepr, EnumType, EnumVariant, EnumVariants, FunctionResultVariant,
-    LiteralType, NamedDataType, PrimitiveType, StructFields, StructType, TupleType,
+    DataType, DeprecatedType, EnumRepr, EnumType, EnumVariant, FunctionResultVariant,
+    LiteralType, NamedDataType, PrimitiveType, Fields, StructType, TupleType,
 };
 use specta::{
     internal::{detect_duplicate_type_names, skip_fields, skip_fields_named, NonSkipField},
@@ -482,14 +482,14 @@ fn struct_datatype(
     s: &mut String,
 ) -> Result<()> {
     Ok(match &strct.fields() {
-        StructFields::Unit => s.push_str(NULL),
-        StructFields::Unnamed(unnamed) => unnamed_fields_datatype(
+        Fields::Unit => s.push_str(NULL),
+        Fields::Unnamed(unnamed) => unnamed_fields_datatype(
             ctx,
             &skip_fields(unnamed.fields()).collect::<Vec<_>>(),
             type_map,
             s,
         )?,
-        StructFields::Named(named) => {
+        Fields::Named(named) => {
             let fields = skip_fields_named(named.fields()).collect::<Vec<_>>();
 
             if fields.is_empty() {
@@ -567,10 +567,10 @@ fn enum_variant_datatype(
     name: Cow<'static, str>,
     variant: &EnumVariant,
 ) -> Result<Option<String>> {
-    match &variant.inner() {
+    match &variant.fields() {
         // TODO: Remove unreachable in type system
-        EnumVariants::Unit => unreachable!("Unit enum variants have no type!"),
-        EnumVariants::Named(obj) => {
+        Fields::Unit => unreachable!("Unit enum variants have no type!"),
+        Fields::Named(obj) => {
             let mut fields = if let Some(tag) = &obj.tag() {
                 let sanitised_name = sanitise_key(name, true);
                 vec![format!("{tag}: {sanitised_name}")]
@@ -608,7 +608,7 @@ fn enum_variant_datatype(
                 fields => format!("{{ {} }}", fields.join("; ")),
             }))
         }
-        EnumVariants::Unnamed(obj) => {
+        Fields::Unnamed(obj) => {
             let fields = skip_fields(obj.fields())
                 .map(|(_, ty)| {
                     let mut s = String::new();
@@ -657,8 +657,8 @@ fn enum_datatype(
                 .iter()
                 .filter(|(_, variant)| !variant.skip())
                 .map(|(name, variant)| {
-                    Ok(match variant.inner() {
-                        EnumVariants::Unit => NULL.to_string(),
+                    Ok(match variant.fields() {
+                        Fields::Unit => NULL.to_string(),
                         _ => inner_comments(
                             ctx.clone(),
                             variant.deprecated(),
@@ -690,12 +690,12 @@ fn enum_datatype(
                         ctx.clone(),
                         variant.deprecated(),
                         variant.docs(),
-                        match (repr, &variant.inner()) {
+                        match (repr, &variant.fields()) {
                             (EnumRepr::Untagged, _) => unreachable!(),
-                            (EnumRepr::Internal { tag }, EnumVariants::Unit) => {
+                            (EnumRepr::Internal { tag }, Fields::Unit) => {
                                 format!("{{ {tag}: {sanitised_name} }}")
                             }
-                            (EnumRepr::Internal { tag }, EnumVariants::Unnamed(tuple)) => {
+                            (EnumRepr::Internal { tag }, Fields::Unnamed(tuple)) => {
                                 let fields = skip_fields(tuple.fields()).collect::<Vec<_>>();
 
                                 // This field is only required for `{ty}` not `[...]` so we only need to check when there one field
@@ -724,7 +724,7 @@ fn enum_datatype(
                                     format!("({{ {tag}: {sanitised_name} }} & {typ})")
                                 }
                             }
-                            (EnumRepr::Internal { tag }, EnumVariants::Named(obj)) => {
+                            (EnumRepr::Internal { tag }, Fields::Named(obj)) => {
                                 let mut fields = vec![format!("{tag}: {sanitised_name}")];
 
                                 for (name, field) in skip_fields_named(obj.fields()) {
@@ -741,7 +741,7 @@ fn enum_datatype(
 
                                 format!("{{ {} }}", fields.join("; "))
                             }
-                            (EnumRepr::External, EnumVariants::Unit) => sanitised_name.to_string(),
+                            (EnumRepr::External, Fields::Unit) => sanitised_name.to_string(),
                             (EnumRepr::External, _) => {
                                 let ts_values = enum_variant_datatype(
                                     ctx.with(PathItem::Variant(variant_name.clone())),
@@ -758,7 +758,7 @@ fn enum_datatype(
                                     None => format!(r#""{sanitised_name}""#),
                                 }
                             }
-                            (EnumRepr::Adjacent { tag, .. }, EnumVariants::Unit) => {
+                            (EnumRepr::Adjacent { tag, .. }, Fields::Unit) => {
                                 format!("{{ {tag}: {sanitised_name} }}")
                             }
                             (EnumRepr::Adjacent { tag, content }, _) => {
@@ -905,13 +905,13 @@ fn validate_type_for_tagged_intersection(
             _ => Ok(false),
         },
         DataType::Struct(v) => match v.fields() {
-            StructFields::Unit => Ok(true),
-            StructFields::Unnamed(_) => {
+            Fields::Unit => Ok(true),
+            Fields::Unnamed(_) => {
                 Err(ExportError::InvalidTaggedVariantContainingTupleStruct(
                    ctx.export_path()
                 ))
             }
-            StructFields::Named(fields) => {
+            Fields::Named(fields) => {
                 // Prevent `{ tag: "{tag}" } & Record<string | never>`
                 if fields.tag().is_none() && fields.fields().is_empty() {
                     return Ok(true);
@@ -923,12 +923,12 @@ fn validate_type_for_tagged_intersection(
         DataType::Enum(v) => {
             match v.repr() {
                 EnumRepr::Untagged => {
-                    Ok(v.variants().iter().any(|(_, v)| match &v.inner() {
+                    Ok(v.variants().iter().any(|(_, v)| match &v.fields() {
                         // `{ .. } & null` is `never`
-                        EnumVariants::Unit => true,
+                        Fields::Unit => true,
                          // `{ ... } & Record<string, never>` is not useful
-                        EnumVariants::Named(v) => v.tag().is_none() && v.fields().is_empty(),
-                        EnumVariants::Unnamed(_) => false,
+                        Fields::Named(v) => v.tag().is_none() && v.fields().is_empty(),
+                        Fields::Unnamed(_) => false,
                     }))
                 },
                 // All of these repr's are always objects.

@@ -1,22 +1,6 @@
 use std::borrow::Cow;
 
-use super::{DataType, GenericType, NamedDataType, NamedFields, SpectaID, UnnamedFields};
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum StructFields {
-    /// A unit struct.
-    ///
-    /// Represented in Rust as `pub struct Unit;` and in TypeScript as `null`.
-    Unit,
-    /// A struct with unnamed fields.
-    ///
-    /// Represented in Rust as `pub struct Unit();` and in TypeScript as `[]`.
-    Unnamed(UnnamedFields),
-    /// A struct with named fields.
-    ///
-    /// Represented in Rust as `pub struct Unit {}` and in TypeScript as `{}`.
-    Named(NamedFields),
-}
+use super::{DataType, Fields, GenericType, NamedDataType, SpectaID};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StructType {
@@ -24,7 +8,7 @@ pub struct StructType {
     // Associating a SpectaID will allow exporter to lookup more detailed information about the type to provide better errors.
     pub(crate) sid: Option<SpectaID>,
     pub(crate) generics: Vec<GenericType>,
-    pub(crate) fields: StructFields,
+    pub(crate) fields: Fields,
 }
 
 impl StructType {
@@ -58,15 +42,15 @@ impl StructType {
         &self.generics
     }
 
-    pub fn fields(&self) -> &StructFields {
+    pub fn fields(&self) -> &Fields {
         &self.fields
     }
 
     pub fn tag(&self) -> Option<&Cow<'static, str>> {
         match &self.fields {
-            StructFields::Unit => None,
-            StructFields::Unnamed(_) => None,
-            StructFields::Named(named) => named.tag.as_ref(),
+            Fields::Unit => None,
+            Fields::Unnamed(_) => None,
+            Fields::Named(named) => named.tag.as_ref(),
         }
     }
 }

@@ -1,13 +1,13 @@
 [package]
-name = "specta-rust"
-description = "Export your Rust types to Rust"
+name = "specta-jsonschema"
+description = "Export your Rust types to a JSON Schema"
 version = "0.0.1"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/oscartbeaumont/specta"
-documentation = "https://docs.rs/specta-zod/latest/specta-zod"
-keywords = ["async", "specta", "rspc", "rust", "typesafe"]
+documentation = "https://docs.rs/specta-jsonschema/latest/specta-jsonschema"
+keywords = ["async", "specta", "rspc", "jsonschema", "typesafe"]
 categories = ["web-programming", "asynchronous"]
 
 # /bin/sh RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
@@ -19,5 +19,6 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
-Inflector = "0.11.4"
 specta = { path = "../specta" }
+schemars = { version = "0.8", default-features = false, features = [] }
+Inflector = "0.11.4"

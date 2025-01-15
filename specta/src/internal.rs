@@ -13,7 +13,7 @@ pub mod interop;
 pub use paste::paste;
 
 use crate::{
-    datatype::{DataType, EnumVariants, Field, GenericType, List, Map, StructFields},
+    datatype::{DataType, Field, GenericType, List, Map, Fields},
     Generics, ImplLocation, SpectaID, Type, TypeCollection,
 };
 
@@ -45,7 +45,7 @@ pub mod construct {
         name: Cow<'static, str>,
         sid: Option<SpectaID>,
         generics: Vec<GenericType>,
-        fields: StructFields,
+        fields: Fields,
     ) -> StructType {
         StructType {
             name,
@@ -55,19 +55,19 @@ pub mod construct {
         }
     }
 
-    pub const fn struct_unit() -> StructFields {
-        StructFields::Unit
+    pub const fn fields_unit() -> Fields {
+        Fields::Unit
     }
 
-    pub const fn struct_unnamed(fields: Vec<Field>) -> StructFields {
-        StructFields::Unnamed(UnnamedFields { fields })
+    pub const fn fields_unnamed(fields: Vec<Field>) -> Fields {
+        Fields::Unnamed(UnnamedFields { fields })
     }
 
-    pub const fn struct_named(
+    pub const fn fields_named(
         fields: Vec<(Cow<'static, str>, Field)>,
         tag: Option<Cow<'static, str>>,
-    ) -> StructFields {
-        StructFields::Named(NamedFields { fields, tag })
+    ) -> Fields {
+        Fields::Named(NamedFields { fields, tag })
     }
 
     pub const fn r#enum(
@@ -92,29 +92,14 @@ pub mod construct {
         skip: bool,
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
-        inner: EnumVariants,
+        fields: Fields,
     ) -> EnumVariant {
         EnumVariant {
             skip,
             docs,
             deprecated,
-            inner,
+            fields,
         }
-    }
-
-    pub const fn enum_variant_unit() -> EnumVariants {
-        EnumVariants::Unit
-    }
-
-    pub const fn enum_variant_unnamed(fields: Vec<Field>) -> EnumVariants {
-        EnumVariants::Unnamed(UnnamedFields { fields })
-    }
-
-    pub const fn enum_variant_named(
-        fields: Vec<(Cow<'static, str>, Field)>,
-        tag: Option<Cow<'static, str>>,
-    ) -> EnumVariants {
-        EnumVariants::Named(NamedFields { fields, tag })
     }
 
     pub const fn named_data_type(
@@ -273,15 +258,15 @@ pub fn resolve_generics(mut dt: DataType, generics: &Vec<(GenericType, DataType)
             value_ty: Box::new(resolve_generics(*v.value_ty, generics)),
         }),
         DataType::Struct(ref mut v) => match &mut v.fields {
-            StructFields::Unit => dt,
-            StructFields::Unnamed(f) => {
+            Fields::Unit => dt,
+            Fields::Unnamed(f) => {
                 for field in f.fields.iter_mut() {
                     field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
                 }
 
                 dt
             }
-            StructFields::Named(f) => {
+            Fields::Named(f) => {
                 for (_, field) in f.fields.iter_mut() {
                     field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
                 }
@@ -291,14 +276,14 @@ pub fn resolve_generics(mut dt: DataType, generics: &Vec<(GenericType, DataType)
         },
         DataType::Enum(ref mut v) => {
             for (_, v) in v.variants.iter_mut() {
-                match &mut v.inner {
-                    EnumVariants::Unit => {}
-                    EnumVariants::Named(f) => {
+                match &mut v.fields {
+                    Fields::Unit => {}
+                    Fields::Named(f) => {
                         for (_, field) in f.fields.iter_mut() {
                             field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
                         }
                     }
-                    EnumVariants::Unnamed(f) => {
+                    Fields::Unnamed(f) => {
                         for field in f.fields.iter_mut() {
                             field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
                         }

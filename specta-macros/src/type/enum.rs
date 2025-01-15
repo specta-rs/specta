@@ -94,7 +94,7 @@ pub fn parse_enum(
                 let generic_idents = generic_idents.clone().collect::<Vec<_>>();
 
                 let inner = match &variant.fields {
-                    Fields::Unit => quote!(#crate_ref::internal::construct::enum_variant_unit()),
+                    Fields::Unit => quote!(#crate_ref::internal::construct::fields_unit()),
                     Fields::Unnamed(fields) => {
                         let fields = fields
                             .unnamed
@@ -134,7 +134,7 @@ pub fn parse_enum(
                             })
                             .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                        quote!(#crate_ref::internal::construct::enum_variant_unnamed(
+                        quote!(#crate_ref::internal::construct::fields_unnamed(
                             vec![#(#fields),*],
                         ))
                     }
@@ -192,7 +192,7 @@ pub fn parse_enum(
                         })
                         .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                        quote!(#crate_ref::internal::construct::enum_variant_named(vec![#(#fields),*], None))
+                        quote!(#crate_ref::internal::construct::fields_named(vec![#(#fields),*], None))
                     }
                 };
 

@@ -225,7 +225,7 @@ pub fn parse_struct(
                     .map(|t| quote!(Some(#t.into())))
                     .unwrap_or(quote!(None));
 
-                quote!(#crate_ref::internal::construct::struct_named(vec![#(#fields),*], #tag))
+                quote!(#crate_ref::internal::construct::fields_named(vec![#(#fields),*], #tag))
             }
             Fields::Unnamed(_) => {
                 let fields = data
@@ -261,9 +261,9 @@ pub fn parse_struct(
                     })
                     .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                quote!(#crate_ref::internal::construct::struct_unnamed(vec![#(#fields),*]))
+                quote!(#crate_ref::internal::construct::fields_unnamed(vec![#(#fields),*]))
             }
-            Fields::Unit => quote!(#crate_ref::internal::construct::struct_unit()),
+            Fields::Unit => quote!(#crate_ref::internal::construct::fields_unit()),
         };
 
         quote!(#crate_ref::datatype::DataType::Struct(#crate_ref::internal::construct::r#struct(#name.into(), Some(#sid), vec![#(#definition_generics),*], #fields)))

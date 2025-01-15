@@ -42,7 +42,7 @@ const _: () = {
                             skip: false,
                             docs: Cow::Borrowed(""),
                             deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
+                            fields: Fields::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     optional: false,
                                     flatten: false,
@@ -59,7 +59,7 @@ const _: () = {
                             skip: false,
                             docs: Cow::Borrowed(""),
                             deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
+                            fields: Fields::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     optional: false,
                                     flatten: false,
@@ -76,7 +76,7 @@ const _: () = {
                             skip: false,
                             docs: Cow::Borrowed(""),
                             deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
+                            fields: Fields::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     optional: false,
                                     flatten: false,
@@ -140,7 +140,7 @@ const _: () = {
                             skip: false,
                             docs: Cow::Borrowed(""),
                             deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
+                            fields: Fields::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     optional: false,
                                     flatten: false,
@@ -157,7 +157,7 @@ const _: () = {
                             skip: false,
                             docs: Cow::Borrowed(""),
                             deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
+                            fields: Fields::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     optional: false,
                                     flatten: false,
@@ -174,7 +174,7 @@ const _: () = {
                             skip: false,
                             docs: Cow::Borrowed(""),
                             deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
+                            fields: Fields::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     optional: false,
                                     flatten: false,
@@ -425,7 +425,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                         skip: false,
                         docs: Cow::Borrowed(""),
                         deprecated: None,
-                        inner: EnumVariants::Unnamed(UnnamedFields {
+                        fields: Fields::Unnamed(UnnamedFields {
                             fields: vec![Field {
                                 optional: false,
                                 flatten: false,
@@ -442,7 +442,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                         skip: false,
                         docs: Cow::Borrowed(""),
                         deprecated: None,
-                        inner: EnumVariants::Unnamed(UnnamedFields {
+                        fields: Fields::Unnamed(UnnamedFields {
                             fields: vec![Field {
                                 optional: false,
                                 flatten: false,
@@ -472,7 +472,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                             skip: false,
                             docs: Cow::Borrowed(""),
                             deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
+                            fields: Fields::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     optional: false,
                                     flatten: false,
@@ -489,7 +489,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                             skip: false,
                             docs: Cow::Borrowed(""),
                             deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
+                            fields: Fields::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     optional: false,
                                     flatten: false,

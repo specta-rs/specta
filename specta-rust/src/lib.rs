@@ -5,13 +5,30 @@
     html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
 )]
 
+use std::path::Path;
+
+use inflector::Inflector;
 use specta::{
-    datatype::{DataType, NamedDataType, StructFields},
+    datatype::{DataType, NamedDataType, Fields},
     Generics, Type, TypeCollection,
 };
 
+type Error = String; // TODO: Proper error type
+
+pub struct Rust;
+
+impl Rust {
+    pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
+        todo!();
+    }
+
+    pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
+        todo!();
+    }
+}
+
 /// TODO
-pub fn export<T: Type>() -> Result<String, String> {
+pub fn export<T: Type>() -> Result<String, Error> {
     datatype(&T::inline(
         &mut TypeCollection::default(),
         Generics::Definition,
@@ -22,7 +39,7 @@ pub fn export_named_datatype(
     // conf: &Typescript,
     typ: &NamedDataType,
     // type_map: &TypeCollection,
-) -> Result<String, String> {
+) -> Result<String, Error> {
     Ok(format!(
         "pub type {} = {}",
         typ.name(),
@@ -30,7 +47,7 @@ pub fn export_named_datatype(
     ))
 }
 
-pub fn datatype(t: &DataType) -> Result<String, String> {
+pub fn datatype(t: &DataType) -> Result<String, Error> {
     // TODO: This system does lossy type conversions. That is something I want to fix in the future but for now this works. Eg. `HashSet<T>` will be exported as `Vec<T>`
     // TODO: Serde serialize + deserialize on types
 
@@ -58,34 +75,50 @@ pub fn datatype(t: &DataType) -> Result<String, String> {
             ),
         },
         DataType::Struct(s) => match &s.fields() {
-            StructFields::Unit => "struct {name}".to_string(),
-            StructFields::Named(_) => todo!(),
-            StructFields::Unnamed(_) => todo!(),
-            // fields => {
-            //     let generics = (!s.generics().is_empty())
-            //         .then(|| format!("<{}>", s.generics().join(", ")))
-            //         .unwrap_or_default();
+            Fields::Unit => {
+                if s.generics().len() != 0 {
+                    return Err("generics can't be used on a unit struct".into());
+                }
 
-            //     let fields = fields
-            //         .iter()
-            //         .map(|f| {
-            //             let name = &f.name;
-            //             let typ = datatype(&f.ty)?;
-            //             Ok(format!("\t{name}: {typ}"))
-            //         })
-            //         .collect::<Result<Vec<_>, String>>()?
-            //         .join(", ");
+                format!("pub struct {};", s.name())
+            }
+            Fields::Named(fields) => {
+                assert!(s.generics().len() == 0, "missing support for generics"); // TODO
+                // assert!(s.tag().is_some(), "missing support for tagging"); // TODO
 
-            //     let tag = s
-            //         .tag()
-            //         .clone()
-            //         .map(|t| format!("{t}: String"))
-            //         .unwrap_or_default();
+                // TODO: Error if any of the generics are not used or add `PhantomData` field?
 
-            //     format!("struct {}{generics} {{ {fields}{tag} }}\n", s.name())
-            // }
+                let mut s = format!("pub struct {} {{", s.name());
+
+                for (k, field) in fields.fields() {
+                    // TODO: Documentation, deprecated, etc.
+
+                    let key = k.to_camel_case();
+                    if &*key != k {
+                    s.push_str(&format!("\n    #[serde(rename = \"{key}\")]"));
+                    }
+                    // TODO: Don't `unwrap` here
+                    s.push_str(&format!("\n    pub {}: {},", key.to_camel_case(), datatype(field.ty().unwrap())?));
+                }
+
+                s.push_str("\n}");
+                s
+            }
+            Fields::Unnamed(_) => todo!(),
         },
-        DataType::Enum(_) => todo!(),
+        DataType::Enum(e) => {
+            let mut s = format!("pub enum {} {{ \n", e.name());
+            for (name, variant) in e.variants().iter() {
+                let variant = match variant.fields() {
+                    Fields::Unit => format!("\t{},", name.to_class_case()),
+                    Fields::Named(fields) => format!("\t{},", name.to_class_case()),
+                    Fields::Unnamed(fields) => format!("\t{},", name.to_class_case()),
+                };
+                s.push_str(&variant);
+            }
+            s.push_str("}");
+            s
+        }
         DataType::Reference(reference) => match &reference.generics()[..] {
             [] => reference.name().to_string(),
             generics => {

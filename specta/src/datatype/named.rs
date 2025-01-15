@@ -34,6 +34,7 @@ pub struct NamedDataType {
     pub(crate) deprecated: Option<DeprecatedType>,
     /// Extra information that comes from a real Rust type (using the `Type` macro).
     /// This will be `None` when constructing [NamedDataType] using `StructType::to_named` or `TupleType::to_named` since those types do not correspond to actual Rust types.
+    // TODO: Should this be nullable???
     pub(crate) ext: Option<NamedDataTypeExt>,
     /// the actual type definition.
     // This field is public because we match on it in flattening code. // TODO: Review if this can be made private when reviewing the flattening logic/error handling
