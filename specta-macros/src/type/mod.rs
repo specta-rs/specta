@@ -147,6 +147,13 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 }
 
                 fn reference(type_map: &mut #crate_ref::TypeCollection, generics: &[#crate_ref::datatype::DataType]) -> Option<#crate_ref::datatype::reference::Reference> {
+                    // if self.map.get(&sid).is_none() {
+                    //     self.map.entry(sid).or_insert(None);
+                    //     let dt = T::definition_named_data_type(self);
+                    //     self.map.insert(sid, Some(dt));
+                    // }
+
+
                     Some(#reference)
                 }
             }

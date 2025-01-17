@@ -2,68 +2,62 @@
 
 use crate::{Generics, NamedType, SpectaID, Type, TypeCollection};
 
-use super::{DataType, DataTypeReference};
+use super::{DataType, DataTypeReference, GenericType};
 
 /// A reference datatype.
 ///
-// This type exists to force the user to use [reference::inline] or [reference::reference] which provides some extra safety.
+/// TODO: Explain how to construct this.
 #[non_exhaustive]
 pub struct Reference {
-    // TODO: Seal these fields
-    pub sid: SpectaID,
-    pub inner: DataType,
+    pub(crate) sid: SpectaID,
 }
 
-// TODO: I think inline in userspace is not gonna work well but we can try it.
-// pub fn inlined<T: Type + ?Sized>(
-//     type_map: &mut TypeCollection,
-//     generics: &[DataType],
-// ) -> DataType {
-//     match T::reference(type_map, generics) {
-//         Some(reference) => {
-//             // TODO: This acts as an inlined value but will cause problems with generics.
-//             let ty = type_map.get(reference.sid).unwrap(); // TODO: Error handling. This should be impossible.
-//             ty.inner.clone()
-//         },
-//         None => T::inline(type_map, Generics::Provided(generics)),
-//     }
-// }
+impl Reference {
+    /// TODO: Explain invariant.
+    pub fn construct(sid: SpectaID) -> Self {
+        Self { sid }
+    }
+
+    // pub fn new(sid: SpectaID) -> Self {
+    //     //     if type_map.map.get(&sid).is_none() {
+    //     //         type_map.map.entry(sid).or_insert(None);
+    //     //         let dt = T::definition_named_data_type(type_map);
+    //     //         type_map.map.insert(sid, Some(dt));
+    //     //     }
+
+    //     Self {
+    //         sid,
+    //     }
+    // }
+
+    pub fn sid(&self) -> SpectaID {
+        self.sid
+    }
+
+    pub fn to_datatype(&self, generics: impl Into<Vec<(GenericType, DataType)>>) -> DataType {
+        DataType::Reference(DataTypeReference {
+            sid: self.sid,
+            generics: generics.into(),
+        })
+    }
+}
 
 pub fn reference_or_inline<T: Type + ?Sized>(
-    type_map: &mut TypeCollection,
+    types: &mut TypeCollection,
     generics: &[DataType],
 ) -> DataType {
-    match T::reference(type_map, generics) {
+    match T::reference(types, generics) {
         Some(reference) => {
-            // TODO: Get from type map instead
-
-            // we wanna be able to go from a reference back into a `DataType::Reference`
-            // let todo = DataType::Reference(DataTypeReference {
-            //     name: todo!(),
-            //     sid: todo!(),
-            //     generics: Default::default(), // TODO: Fix this
-            // });
-
-            // TODO: This results in it being inlined which is not what we want.
-            // let ty = type_map.get(reference.sid).unwrap(); // TODO: Error handling. This should be impossible.
-            // ty.inner.clone()
-
-            reference.inner
+            // TODO: Fix generics
+            reference.to_datatype(vec![])
         },
-        None => T::inline(type_map, Generics::Provided(generics)),
+        None => T::inline(types, Generics::Provided(generics)),
     }
 }
 
-pub fn inline<T: Type + ?Sized>(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
-    Reference {
-        sid: todo!("sid a"),
-        inner: T::inline(type_map, Generics::Provided(generics)),
-    }
-}
-
+// TODO: Remove this?
 pub fn reference<T: NamedType>(
     type_map: &mut TypeCollection,
-    // reference: DataTypeReference,
 ) -> Reference {
     let sid = T::sid();
 
@@ -75,18 +69,10 @@ pub fn reference<T: NamedType>(
 
     Reference {
         sid: T::sid(),
-        inner: DataType::Reference(DataTypeReference {
-            // TODO: Make this stuff work
-            // name: "".into(),
-            sid,
-            generics: Default::default()
-        }),
+        // inner: DataType::Reference(DataTypeReference {
+        //     sid,
+        //     // TODO: Make this work
+        //     generics: Default::default()
+        // }),
     }
-}
-
-/// Construct a reference from a custom [DataType].
-///
-/// This function is advanced and should only be used if you know what you're doing.
-pub fn custom(inner: DataType) -> Reference {
-    Reference { sid: todo!("sid c"), inner }
 }

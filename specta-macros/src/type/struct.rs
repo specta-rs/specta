@@ -272,7 +272,8 @@ pub fn parse_struct(
     let category = if container_attrs.inline {
         quote!({
             #reference_generics
-            #crate_ref::datatype::reference::inline::<Self>(type_map, generics)
+            todo!()
+            // #crate_ref::datatype::reference::inline::<Self>(type_map, generics)
         })
     } else {
         quote!({

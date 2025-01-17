@@ -4,7 +4,7 @@ use std::{
     fmt,
 };
 
-use crate::{datatype::NamedDataType, DataType, NamedType, SpectaID};
+use crate::{datatype::{reference::Reference, NamedDataType}, DataType, NamedType, SpectaID};
 
 /// Define a set of types which can be exported together.
 ///
@@ -39,19 +39,31 @@ impl TypeCollection {
         self
     }
 
-    /// Register a type with the collection.
-    #[doc(hidden)] // TODO: Make public
-    pub fn todo(&mut self, sid: SpectaID, inner: DataType) -> &mut Self {
-        self.map.insert(sid, Some(NamedDataType {
-            name: sid.type_name.into(),
-            // TODO: How to configure this stuff?
-            docs: "".into(),
-            deprecated: None,
-            ext: None, // TODO: Some(crate::datatype::NamedDataTypeExt { sid: (), impl_location: () })
-            inner
-        }));
-        self
-    }
+    // /// TODO
+    // pub fn reference(&mut self, sid: SpectaID) -> Reference {
+    //     // if self.map.get(&sid).is_none() {
+    //     //     self.map.entry(sid).or_insert(None);
+    //     //     let dt = T::definition_named_data_type(self);
+    //     //     self.map.insert(sid, Some(dt));
+    //     // }
+
+    //     Reference { sid }
+
+    // }
+
+    // /// Register a type with the collection.
+    // #[doc(hidden)] // TODO: Make public
+    // pub fn todo(&mut self, sid: SpectaID, inner: DataType) -> &mut Self {
+    //     self.map.insert(sid, Some(NamedDataType {
+    //         name: sid.type_name.into(),
+    //         // TODO: How to configure this stuff?
+    //         docs: "".into(),
+    //         deprecated: None,
+    //         ext: None, // TODO: Some(crate::datatype::NamedDataTypeExt { sid: (), impl_location: () })
+    //         inner
+    //     }));
+    //     self
+    // }
 
     /// Insert a type into the collection.
     /// You should prefer to use `TypeCollection::register` as it ensures all invariants are met.
