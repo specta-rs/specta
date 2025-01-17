@@ -34,12 +34,13 @@ pub mod internal {
     // Called within ctor functions to register a type.
     #[doc(hidden)]
     pub fn register<T: NamedType>() {
-        let mut type_map = TYPES
-            .get_or_init(Default::default)
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
+        // let mut type_map = TYPES
+        //     .get_or_init(Default::default)
+        //     .lock()
+        //     .unwrap_or_else(PoisonError::into_inner);
 
-        type_map.insert(T::sid(), |type_map| T::definition_named_data_type(type_map));
+        // type_map.insert(T::sid(), |type_map| T::definition_named_data_type(type_map));
+        println!("Fix `specta::export`");
     }
 
     // We expose this for the macros

@@ -4,9 +4,10 @@ macro_rules! _impl_passthrough {
             <$t>::inline(type_map, generics)
         }
 
-        fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Option<Reference> {
-            <$t>::reference(type_map, generics)
-        }
+        // TODO: Passthrough `NamedType` impls
+        // fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Option<Reference> {
+        //     <$t>::reference(type_map, generics)
+        // }
     };
 }
 
@@ -67,14 +68,18 @@ macro_rules! _impl_containers {
                 )
             }
 
-            fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Option<Reference> {
-                None
-            }
+            // fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Option<Reference> {
+            //     None
+            // }
         }
 
         impl<T: NamedType> NamedType for $container<T> {
             fn sid() -> SpectaID {
                 T::sid()
+            }
+
+            fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
+                T::reference(type_map, generics)
             }
 
             // fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
@@ -97,9 +102,10 @@ macro_rules! _impl_as {
                 <$tty as Type>::inline(type_map, generics)
             }
 
-            fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Option<Reference> {
-                <$tty as Type>::reference(type_map, generics)
-            }
+            // TODO: Passthrough `NamedType` impls
+            // fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Option<Reference> {
+            //     <$tty as Type>::reference(type_map, generics)
+            // }
         }
     )+};
 }
@@ -121,10 +127,6 @@ macro_rules! _impl_for_list {
                     length: None,
                     unique: $unique,
                 })
-            }
-
-            fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Option<Reference> {
-                None
             }
         }
     )+};
@@ -153,10 +155,6 @@ macro_rules! _impl_for_map {
                             .unwrap_or_else(|| V::inline(type_map, generics)),
                     ),
                 })
-            }
-
-            fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Option<Reference> {
-                None
             }
         }
     };

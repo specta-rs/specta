@@ -46,13 +46,14 @@ pub fn reference_or_inline<T: Type + ?Sized>(
     types: &mut TypeCollection,
     generics: &[DataType],
 ) -> DataType {
-    match T::reference(types, generics) {
-        Some(reference) => {
-            // TODO: Fix generics
-            reference.to_datatype(vec![])
-        },
-        None => T::inline(types, Generics::Provided(generics)),
-    }
+    // match T::reference(types, generics) {
+    //     Some(reference) => {
+    //         // TODO: Fix generics
+    //         reference.to_datatype(vec![])
+    //     },
+    //     None => T::inline(types, Generics::Provided(generics)),
+    // }
+    todo!();
 }
 
 // TODO: Remove this?
@@ -76,3 +77,20 @@ pub fn reference<T: NamedType>(
         // }),
     }
 }
+
+// // TODO: Remove this?
+// pub fn reference(
+//     type_map: &mut TypeCollection,
+//     sid: SpectaID,
+//     definition_named_data_type: fn(&mut TypeCollection) -> NamedDataType,
+// ) -> Reference {
+//     if type_map.map.get(&sid).is_none() {
+//         type_map.map.entry(sid).or_insert(None);
+//         let dt = definition_named_data_type(type_map);
+//         type_map.map.insert(sid, Some(dt));
+//     }
+
+//     Reference {
+//         sid,
+//     }
+// }

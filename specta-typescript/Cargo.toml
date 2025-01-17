@@ -31,4 +31,4 @@ specta-serde = { version = "=0.0.9", path = "../specta-serde" }
 thiserror = "1.0.61"
 
 [dev-dependencies]
-specta = { version = "=2.0.0-rc.22", path = "../specta", features = ["export"] }
+specta = { version = "=2.0.0-rc.22", path = "../specta", features = ["derive", "export"] }

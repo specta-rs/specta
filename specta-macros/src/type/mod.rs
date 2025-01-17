@@ -145,8 +145,16 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
                     #inlines
                 }
+            }
 
-                fn reference(type_map: &mut #crate_ref::TypeCollection, generics: &[#crate_ref::datatype::DataType]) -> Option<#crate_ref::datatype::reference::Reference> {
+            #[automatically_derived]
+            impl #bounds #crate_ref::NamedType for #ident #type_args #where_bound {
+                fn sid() -> #crate_ref::SpectaID {
+                    #sid
+                }
+
+
+                fn reference(type_map: &mut #crate_ref::TypeCollection, generics: &[#crate_ref::datatype::DataType]) -> #crate_ref::datatype::reference::Reference {
                     // if self.map.get(&sid).is_none() {
                     //     self.map.entry(sid).or_insert(None);
                     //     let dt = T::definition_named_data_type(self);
@@ -154,14 +162,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     // }
 
 
-                    Some(#reference)
-                }
-            }
-
-            #[automatically_derived]
-            impl #bounds #crate_ref::NamedType for #ident #type_args #where_bound {
-                fn sid() -> #crate_ref::SpectaID {
-                    #sid
+                    #reference
                 }
 
                 // fn named_data_type(type_map: &mut #crate_ref::TypeCollection, generics: &[#crate_ref::datatype::DataType]) -> #crate_ref::datatype::NamedDataType {
