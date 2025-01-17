@@ -92,156 +92,168 @@ pub fn construct_datatype(
     crate_ref: &TokenStream,
     inline: bool,
 ) -> syn::Result<TokenStream> {
-    let (method, transform, generics) = match inline {
-        true => (
-            quote!(inline),
-            quote!(),
-            dt_generic_fn(|crate_ref, tokens| quote!(#crate_ref::Generics::Provided(#tokens))),
-        ),
-        false => (
-            quote!(reference),
-            quote!(.inner),
-            dt_generic_fn(|_, tokens| tokens),
-        ),
+    let inner: fn(_, _, _) -> _ = match inline {
+        true => |crate_ref: &TokenStream, ty: &Type, generics: TokenStream| quote!(<#ty as #crate_ref::Type>::inline(type_map, Generics::Provided(#generics))),
+        false => |crate_ref: &TokenStream, ty: &Type, generics: TokenStream| quote!(#crate_ref::datatype::reference::reference_or_inline::<#ty>(type_map, #generics)),
     };
 
-    let path = match ty {
-        Type::Tuple(t) => {
-            let elems = t
-                .elems
-                .iter()
-                .enumerate()
-                .map(|(i, el)| {
-                    construct_datatype(
-                        format_ident!("{}_{}", var_ident, i),
-                        el,
-                        generic_idents,
-                        crate_ref,
-                        inline,
-                    )
-                })
-                .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-            let generic_var_idents = t
-                .elems
-                .iter()
-                .enumerate()
-                .map(|(i, _)| format_ident!("{}_{}", &var_ident, i));
+    // let (method, transform, generics) = match inline {
+    //     true => (
+    //         quote!(inline),
+    //         quote!(),
+    //         dt_generic_fn(|crate_ref, tokens| quote!(#crate_ref::Generics::Provided(#tokens))),
+    //     ),
+    //     false => (
+    //         quote!(reference),
+    //         quote!(.inner),
+    //         dt_generic_fn(|_, tokens| tokens),
+    //     ),
+    // };
 
-            let generics = generics(&crate_ref, quote!(&[#(#generic_var_idents),*]));
-            return Ok(quote! {
-                #(#elems)*
+    // let path = match ty {
+    //     // Type::Tuple(t) => {
+    //     //     let elems = t
+    //     //         .elems
+    //     //         .iter()
+    //     //         .enumerate()
+    //     //         .map(|(i, el)| {
+    //     //             construct_datatype(
+    //     //                 format_ident!("{}_{}", var_ident, i),
+    //     //                 el,
+    //     //                 generic_idents,
+    //     //                 crate_ref,
+    //     //                 inline,
+    //     //             )
+    //     //         })
+    //     //         .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                let #var_ident = <#ty as #crate_ref::Type>::#method(type_map, #generics)#transform;
-            });
-        }
-        Type::Paren(p) => {
-            return construct_datatype(var_ident, &p.elem, generic_idents, crate_ref, inline)
-        }
-        Type::Array(TypeArray { elem, .. }) | Type::Slice(TypeSlice { elem, .. }) => {
-            let elem_var_ident = format_ident!("{}_el", &var_ident);
-            let elem = construct_datatype(
-                elem_var_ident.clone(),
-                elem,
-                generic_idents,
-                crate_ref,
-                inline,
-            )?;
+    //     //     let generic_var_idents = t
+    //     //         .elems
+    //     //         .iter()
+    //     //         .enumerate()
+    //     //         .map(|(i, _)| format_ident!("{}_{}", &var_ident, i));
 
-            let generics = generics(&crate_ref, quote!(&[#elem_var_ident]));
-            return Ok(quote! {
-                #elem
+    //     //     let generics = generics(&crate_ref, quote!(&[#(#generic_var_idents),*]));
+    //     //     return Ok(quote! {
+    //     //         #(#elems)*
 
-                let #var_ident = <#ty as #crate_ref::Type>::#method(type_map, #generics)#transform;
-            });
-        }
-        Type::Ptr(TypePtr { elem, .. }) | Type::Reference(TypeReference { elem, .. }) => {
-            return construct_datatype(var_ident, elem, generic_idents, crate_ref, inline)
-        }
-        Type::Path(p) => &p.path,
-        Type::TraitObject(_) => {
-            return Err(syn::Error::new(
-                ty.span(),
-                "specta: trait objects are not currently supported.",
-            ));
-        }
-        Type::Macro(m) => {
-            let generics = generics(&crate_ref, quote!(&[]));
-            return Ok(quote! {
-                let #var_ident = <#m as #crate_ref::Type>::#method(type_map, #generics)#transform;
-            });
-        }
-        ty => {
-            return Err(syn::Error::new(
-                ty.span(),
-                format!(
-                    "specta: Cannot get path from type `{}`",
-                    ty.to_token_stream()
-                ),
-            ));
-        }
-    };
+    //     //         let #var_ident = <#ty as #crate_ref::Type>::#method(type_map, #generics)#transform;
+    //     //     });
+    //     // }
+    //     Type::Paren(p) => {
+    //         return construct_datatype(var_ident, &p.elem, generic_idents, crate_ref, inline)
+    //     }
+    //     // Type::Array(TypeArray { elem, .. }) | Type::Slice(TypeSlice { elem, .. }) => {
+    //     //     let elem_var_ident = format_ident!("{}_el", &var_ident);
+    //     //     let elem = construct_datatype(
+    //     //         elem_var_ident.clone(),
+    //     //         elem,
+    //     //         generic_idents,
+    //     //         crate_ref,
+    //     //         inline,
+    //     //     )?;
 
-    if let Some(type_ident) = path.get_ident() {
-        if let Some((i, generic_ident)) = generic_idents
-            .iter()
-            .find(|(_, ident)| ident == &type_ident)
-        {
-            let type_ident = type_ident.to_string();
-            let generics = generics(
-                &crate_ref,
-                quote!(&[#crate_ref::datatype::DataType::Generic(std::borrow::Cow::Borrowed(#type_ident).into())]),
-            );
-            return Ok(quote! {
-                let #var_ident = generics.get(#i).cloned().unwrap_or_else(
-                    || {
-                        <#generic_ident as #crate_ref::Type>::#method(type_map, #generics)#transform
-                    },
-                );
-            });
-        }
-    }
+    //     //     let generics = generics(&crate_ref, quote!(&[#elem_var_ident]));
+    //     //     return Ok(quote! {
+    //     //         #elem
 
-    let generic_args = match &path.segments.last().unwrap().arguments {
-        PathArguments::AngleBracketed(args) => args
-            .args
-            .iter()
-            .enumerate()
-            .filter_map(|(i, input)| match input {
-                GenericArgument::Type(ty) => Some((i, ty)),
-                _ => None,
-            })
-            .collect(),
-        PathArguments::None => vec![],
-        _ => {
-            return Err(Error::new(
-                Span::call_site(),
-                "Only angle bracketed generics are supported!",
-            ))
-        }
-    };
+    //     //         let #var_ident = <#ty as #crate_ref::Type>::#method(type_map, #generics)#transform;
+    //     //     });
+    //     // }
+    //     Type::Ptr(TypePtr { elem, .. }) | Type::Reference(TypeReference { elem, .. }) => {
+    //         return construct_datatype(var_ident, elem, generic_idents, crate_ref, inline)
+    //     }
+    //     Type::Path(p) => &p.path,
+    //     // Type::TraitObject(_) => {
+    //     //     return Err(syn::Error::new(
+    //     //         ty.span(),
+    //     //         "specta: trait objects are not currently supported.",
+    //     //     ));
+    //     // }
+    //     // Type::Macro(m) => {
+    //     //     let generics = generics(&crate_ref, quote!(&[]));
+    //     //     return Ok(quote! {
+    //     //         let #var_ident = <#m as #crate_ref::Type>::#method(type_map, #generics)#transform;
+    //     //     });
+    //     // }
+    //     ty => {
+    //         return Err(syn::Error::new(
+    //             ty.span(),
+    //             format!(
+    //                 "specta: Cannot get path from type `{}`",
+    //                 ty.to_token_stream()
+    //             ),
+    //         ));
+    //     }
+    // };
 
-    let generic_vars = generic_args
-        .iter()
-        .map(|(i, path)| {
-            construct_datatype(
-                format_ident!("{}_{}", &var_ident, i),
-                path,
-                generic_idents,
-                crate_ref,
-                false,
-            )
-        })
-        .collect::<syn::Result<Vec<TokenStream>>>()?;
+    // // if let Some(type_ident) = path.get_ident() {
+    // //     if let Some((i, generic_ident)) = generic_idents
+    // //         .iter()
+    // //         .find(|(_, ident)| ident == &type_ident)
+    // //     {
+    // //         let type_ident = type_ident.to_string();
+    // //         let generics = generics(
+    // //             &crate_ref,
+    // //             quote!(&[#crate_ref::datatype::DataType::Generic(std::borrow::Cow::Borrowed(#type_ident).into())]),
+    // //         );
+    // //         return Ok(quote! {
+    // //             let #var_ident = generics.get(#i).cloned().unwrap_or_else(
+    // //                 || {
+    // //                     <#generic_ident as #crate_ref::Type>::#method(type_map, #generics)#transform
+    // //                 },
+    // //             );
+    // //         });
+    // //     }
+    // // }
 
-    let generic_var_idents = generic_args
-        .iter()
-        .map(|(i, _)| format_ident!("{}_{}", &var_ident, i));
+    // let generic_args = match &path.segments.last().unwrap().arguments {
+    //     PathArguments::AngleBracketed(args) => args
+    //         .args
+    //         .iter()
+    //         .enumerate()
+    //         .filter_map(|(i, input)| match input {
+    //             GenericArgument::Type(ty) => Some((i, ty)),
+    //             _ => None,
+    //         })
+    //         .collect(),
+    //     PathArguments::None => vec![],
+    //     _ => {
+    //         return Err(Error::new(
+    //             Span::call_site(),
+    //             "Only angle bracketed generics are supported!",
+    //         ))
+    //     }
+    // };
 
-    let generics = generics(&crate_ref, quote!(&[#(#generic_var_idents),*]));
+    // let generic_vars = generic_args
+    //     .iter()
+    //     .map(|(i, path)| {
+    //         construct_datatype(
+    //             format_ident!("{}_{}", &var_ident, i),
+    //             path,
+    //             generic_idents,
+    //             crate_ref,
+    //             false,
+    //         )
+    //     })
+    //     .collect::<syn::Result<Vec<TokenStream>>>()?;
+
+    // let generic_var_idents = generic_args
+    //     .iter()
+    //     .map(|(i, _)| format_ident!("{}_{}", &var_ident, i));
+
+    // let generics = generics(&crate_ref, quote!(&[#(#generic_var_idents),*]));
+
+
+
+    // TODO: Fix generics
+    let tokens = inner(crate_ref, ty, quote!(&[]));
+
     Ok(quote! {
-        #(#generic_vars)*
+        // #(#generic_vars)*
 
-        let #var_ident = <#ty as #crate_ref::Type>::#method(type_map, #generics)#transform;
+        let #var_ident = #tokens;
     })
 }

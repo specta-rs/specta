@@ -13,7 +13,8 @@ pub trait FunctionResult<TMarker> {
 pub enum FunctionValueMarker {}
 impl<T: Type> FunctionResult<FunctionValueMarker> for T {
     fn to_datatype(type_map: &mut TypeCollection) -> FunctionResultVariant {
-        FunctionResultVariant::Value(T::reference(type_map, &[]).inner)
+        // FunctionResultVariant::Value(T::reference(type_map, &[]).inner)
+        todo!();
     }
 }
 
@@ -21,10 +22,11 @@ impl<T: Type> FunctionResult<FunctionValueMarker> for T {
 pub enum FunctionResultMarker {}
 impl<T: Type, E: Type> FunctionResult<FunctionResultMarker> for Result<T, E> {
     fn to_datatype(type_map: &mut TypeCollection) -> FunctionResultVariant {
-        FunctionResultVariant::Result(
-            T::reference(type_map, &[]).inner,
-            E::reference(type_map, &[]).inner,
-        )
+        // FunctionResultVariant::Result(
+        //     T::reference(type_map, &[]).inner,
+        //     E::reference(type_map, &[]).inner,
+        // )
+        todo!();
     }
 }
 
@@ -36,7 +38,8 @@ where
     F::Output: Type,
 {
     fn to_datatype(type_map: &mut TypeCollection) -> FunctionResultVariant {
-        FunctionResultVariant::Value(F::Output::reference(type_map, &[]).inner)
+        // FunctionResultVariant::Value(F::Output::reference(type_map, &[]).inner)
+        todo!();
     }
 }
 
@@ -49,9 +52,10 @@ where
     E: Type,
 {
     fn to_datatype(type_map: &mut TypeCollection) -> FunctionResultVariant {
-        FunctionResultVariant::Result(
-            T::reference(type_map, &[]).inner,
-            E::reference(type_map, &[]).inner,
-        )
+        // FunctionResultVariant::Result(
+        //     T::reference(type_map, &[]).inner,
+        //     E::reference(type_map, &[]).inner,
+        // )
+        todo!();
     }
 }

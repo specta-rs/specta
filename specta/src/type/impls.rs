@@ -129,20 +129,8 @@ impl<const N: usize, T: Type> Type for [T; N] {
         })
     }
 
-    fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
-        Reference {
-            inner: DataType::List(List {
-                ty: Box::new(
-                    // TODO: This is cursed. Fix it properly!!!
-                    match Vec::<T>::reference(type_map, generics).inner {
-                        DataType::List(List { ty, .. }) => *ty,
-                        _ => unreachable!(),
-                    },
-                ),
-                length: Some(N),
-                unique: false,
-            }),
-        }
+    fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Option<Reference> {
+        None
     }
 }
 
@@ -159,15 +147,8 @@ impl<T: Type> Type for Option<T> {
         }))
     }
 
-    fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
-        Reference {
-            inner: DataType::Nullable(Box::new(
-                generics
-                    .get(0)
-                    .cloned()
-                    .unwrap_or_else(|| T::reference(type_map, generics).inner),
-            )),
-        }
+    fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Option<Reference> {
+        None
     }
 }
 
@@ -193,16 +174,8 @@ const _: () = {
                 vec![],
             ))
         }
-        fn reference(type_map: &mut TypeCollection, _: &[DataType]) -> reference::Reference {
-            let generics = vec![];
-            reference::reference::<Self>(
-                type_map,
-                internal::construct::data_type_reference(
-                    "Infallible".into(),
-                    internal::construct::sid("Infallible".into(), "::todo:4:10"),
-                    generics,
-                ),
-            )
+        fn reference(type_map: &mut TypeCollection, _: &[DataType]) -> Option<reference::Reference> {
+            None
         }
     }
 
@@ -304,7 +277,7 @@ const _: () = {
                                 None,
                                 "".into(),
                                 Some({
-                                    let ty = <i64 as Type>::reference(type_map, &[]).inner;
+                                    let ty = <i64 as Type>::inline(type_map, Generics::Provided(&[]));
                                     ty
                                 }),
                             ),
@@ -317,7 +290,7 @@ const _: () = {
                                 None,
                                 "".into(),
                                 Some({
-                                    let ty = <u32 as Type>::reference(type_map, &[]).inner;
+                                    let ty = <u32 as Type>::inline(type_map, Generics::Provided(&[]));
                                     ty
                                 }),
                             ),
@@ -328,10 +301,12 @@ const _: () = {
             ))
         }
 
-        fn reference(type_map: &mut TypeCollection, _: &[DataType]) -> reference::Reference {
-            reference::reference::<Self>(
-                type_map,
-                internal::construct::data_type_reference("SystemTime".into(), SID, vec![]),
+        fn reference(type_map: &mut TypeCollection, _: &[DataType]) -> Option<reference::Reference> {
+            Some(
+                reference::reference::<Self>(
+                    type_map,
+                    internal::construct::data_type_reference("SystemTime".into(), SID, vec![]),
+                )
             )
         }
     }
@@ -386,7 +361,7 @@ const _: () = {
                                 None,
                                 "".into(),
                                 Some({
-                                    let ty = <u64 as Type>::reference(type_map, &[]).inner;
+                                    let ty = <u64 as Type>::inline(type_map, Generics::Definition);
                                     ty
                                 }),
                             ),
@@ -399,7 +374,7 @@ const _: () = {
                                 None,
                                 "".into(),
                                 Some({
-                                    let ty = <u32 as Type>::reference(type_map, &[]).inner;
+                                    let ty = <u32 as Type>::inline(type_map, Generics::Definition);
                                     ty
                                 }),
                             ),
@@ -409,10 +384,12 @@ const _: () = {
                 ),
             ))
         }
-        fn reference(type_map: &mut TypeCollection, _: &[DataType]) -> reference::Reference {
-            reference::reference::<Self>(
-                type_map,
-                internal::construct::data_type_reference("Duration".into(), Self::sid(), vec![]),
+        fn reference(type_map: &mut TypeCollection, _: &[DataType]) -> Option<reference::Reference> {
+            Some(
+                reference::reference::<Self>(
+                    type_map,
+                    internal::construct::data_type_reference("Duration".into(), Self::sid(), vec![]),
+                )
             )
         }
     }

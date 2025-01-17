@@ -146,8 +146,8 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     #inlines
                 }
 
-                fn reference(type_map: &mut #crate_ref::TypeCollection, generics: &[#crate_ref::datatype::DataType]) -> #crate_ref::datatype::reference::Reference {
-                    #reference
+                fn reference(type_map: &mut #crate_ref::TypeCollection, generics: &[#crate_ref::datatype::DataType]) -> Option<#crate_ref::datatype::reference::Reference> {
+                    Some(#reference)
                 }
             }
 

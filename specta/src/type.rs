@@ -51,8 +51,8 @@ pub trait Type {
     /// as determined by its category. Getting a reference to a type implies that
     /// it should belong in the type map (since it has to be referenced from somewhere),
     /// so the output of [`definition`](crate::Type::definition) will be put into the type map.
-    fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
-        reference::inline::<Self>(type_map, generics)
+    fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Option<Reference> {
+        None // TODO: Remove this default implementation
     }
 }
 

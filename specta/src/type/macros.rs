@@ -4,7 +4,7 @@ macro_rules! _impl_passthrough {
             <$t>::inline(type_map, generics)
         }
 
-        fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
+        fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Option<Reference> {
             <$t>::reference(type_map, generics)
         }
     };
@@ -34,7 +34,7 @@ macro_rules! _impl_tuple {
                 let mut _generics = generics.iter();
                 $(let $i = _generics.next().map(Clone::clone).unwrap_or_else(
                     || {
-                        $i::reference(type_map, generics).inner
+                        crate::datatype::reference::reference_or_inline::<$i>(type_map, generics)
                     },
                 );)*
 
@@ -67,12 +67,8 @@ macro_rules! _impl_containers {
                 )
             }
 
-            fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
-                Reference {
-                    inner: generics.get(0).cloned().unwrap_or_else(
-                        || T::reference(type_map, generics).inner,
-                    ),
-                }
+            fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Option<Reference> {
+                None
             }
         }
 
@@ -101,7 +97,7 @@ macro_rules! _impl_as {
                 <$tty as Type>::inline(type_map, generics)
             }
 
-            fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
+            fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Option<Reference> {
                 <$tty as Type>::reference(type_map, generics)
             }
         }
@@ -127,16 +123,8 @@ macro_rules! _impl_for_list {
                 })
             }
 
-            fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
-                Reference {
-                    inner: DataType::List(List {
-                        ty: Box::new(generics.get(0).cloned().unwrap_or_else(
-                            || T::reference(type_map, generics).inner,
-                        )),
-                        length: None,
-                        unique: $unique,
-                    }),
-                }
+            fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Option<Reference> {
+                None
             }
         }
     )+};
@@ -167,23 +155,8 @@ macro_rules! _impl_for_map {
                 })
             }
 
-            fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
-                Reference {
-                    inner: DataType::Map(crate::datatype::Map {
-                        key_ty: Box::new(
-                            generics
-                                .get(0)
-                                .cloned()
-                                .unwrap_or_else(|| K::reference(type_map, generics).inner),
-                        ),
-                        value_ty: Box::new(
-                            generics
-                                .get(1)
-                                .cloned()
-                                .unwrap_or_else(|| V::reference(type_map, generics).inner),
-                        ),
-                    }),
-                }
+            fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Option<Reference> {
+                None
             }
         }
     };

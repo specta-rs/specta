@@ -26,7 +26,14 @@ impl fmt::Debug for TypeCollection {
 
 impl TypeCollection {
     /// Register a type with the collection.
-    pub fn register<T: NamedType>(&mut self) -> &mut Self {
+    pub fn register<T: NamedType>(mut self) -> Self {
+        let def = T::definition_named_data_type(&mut self);
+        self.map.insert(T::sid(), Some(def));
+        self
+    }
+
+    /// Register a type with the collection.
+    pub fn register_mut<T: NamedType>(&mut self) -> &mut Self {
         let def = T::definition_named_data_type(self);
         self.map.insert(T::sid(), Some(def));
         self
