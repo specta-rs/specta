@@ -1,7 +1,7 @@
 use super::{attr::*, r#struct::decode_field_attrs};
 use crate::utils::*;
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens};
+use quote::{quote, ToTokens};
 use syn::{spanned::Spanned, DataEnum, Fields, GenericParam, Generics};
 
 pub fn parse_enum(

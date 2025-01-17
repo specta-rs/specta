@@ -49,7 +49,7 @@ pub enum DataType {
     Enum(EnumType),
     Tuple(TupleType),
     // A reference type that has already been defined
-    Reference(DataTypeReference),
+    Reference(reference::Reference),
     Generic(GenericType),
 }
 
@@ -92,30 +92,30 @@ pub enum DeprecatedType {
     },
 }
 
-/// A reference to a [`DataType`] that can be used before a type is resolved in order to
-/// support recursive types without causing an infinite loop.
-///
-/// This works since a child type that references a parent type does not care about the
-/// parent's fields, only really its name. Once all of the parent's fields have been
-/// resolved will the parent's definition be placed in the type map.
-///
-// This doesn't account for flattening and inlining recursive types, however, which will
-// require a more complex solution since it will require multiple processing stages.
-#[derive(Debug, Clone, PartialEq)]
-pub struct DataTypeReference {
-    pub(crate) sid: SpectaID,
-    pub(crate) generics: Vec<(GenericType, DataType)>,
-}
+// /// A reference to a [`DataType`] that can be used before a type is resolved in order to
+// /// support recursive types without causing an infinite loop.
+// ///
+// /// This works since a child type that references a parent type does not care about the
+// /// parent's fields, only really its name. Once all of the parent's fields have been
+// /// resolved will the parent's definition be placed in the type map.
+// ///
+// // This doesn't account for flattening and inlining recursive types, however, which will
+// // require a more complex solution since it will require multiple processing stages.
+// #[derive(Debug, Clone, PartialEq)]
+// pub struct DataTypeReference {
+//     pub(crate) sid: SpectaID,
+//     pub(crate) generics: Vec<(GenericType, DataType)>,
+// }
 
-impl DataTypeReference {
-    pub fn sid(&self) -> SpectaID {
-        self.sid
-    }
+// impl DataTypeReference {
+//     pub fn sid(&self) -> SpectaID {
+//         self.sid
+//     }
 
-    pub fn generics(&self) -> &Vec<(GenericType, DataType)> {
-        &self.generics
-    }
-}
+//     pub fn generics(&self) -> &Vec<(GenericType, DataType)> {
+//         &self.generics
+//     }
+// }
 
 /// A generic ("placeholder") argument to a Specta-enabled type.
 ///

@@ -20,6 +20,8 @@ use crate::{
 pub mod construct {
     use std::borrow::Cow;
 
+    use reference::Reference;
+
     use crate::{datatype::*, ImplLocation, SpectaID};
 
     pub const fn field(
@@ -119,8 +121,8 @@ pub mod construct {
     pub const fn data_type_reference(
         sid: SpectaID,
         generics: Vec<(GenericType, DataType)>,
-    ) -> DataTypeReference {
-        DataTypeReference {
+    ) -> Reference {
+        Reference {
             sid,
             generics,
         }
@@ -239,7 +241,7 @@ pub use functions::*;
 
 // TODO: Maybe make this a public utility?
 // TODO: Should this be in the core or in `specta-serde`?
-pub fn resolve_generics(mut dt: DataType, generics: &Vec<(GenericType, DataType)>) -> DataType {
+pub fn resolve_generics(mut dt: DataType, generics: &[(GenericType, DataType)]) -> DataType {
     match dt {
         DataType::Primitive(_) | DataType::Literal(_) | DataType::Any | DataType::Unknown => dt,
         DataType::List(v) => DataType::List(List {

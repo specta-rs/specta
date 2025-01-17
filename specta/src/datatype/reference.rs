@@ -2,43 +2,36 @@
 
 use crate::{datatype::{Field, Fields, NamedFields, StructType, UnnamedFields}, SpectaID, Type, TypeCollection};
 
-use super::{DataType, DataTypeReference, GenericType};
+use super::{DataType,  GenericType};
 
 /// A reference datatype.
 ///
 /// TODO: Explain how to construct this.
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Reference {
     pub(crate) sid: SpectaID,
+    pub(crate) generics: Vec<(GenericType, DataType)>,
 }
 
 impl Reference {
     /// TODO: Explain invariant.
-    pub fn construct(sid: SpectaID) -> Self {
-        Self { sid }
+    pub fn construct(sid: SpectaID, generics: impl Into<Vec<(GenericType, DataType)>>) -> Self {
+        Self { sid, generics: generics.into() }
     }
-
-    // pub fn new(sid: SpectaID) -> Self {
-    //     //     if type_map.map.get(&sid).is_none() {
-    //     //         type_map.map.entry(sid).or_insert(None);
-    //     //         let dt = T::definition_named_data_type(type_map);
-    //     //         type_map.map.insert(sid, Some(dt));
-    //     //     }
-
-    //     Self {
-    //         sid,
-    //     }
-    // }
 
     pub fn sid(&self) -> SpectaID {
         self.sid
     }
 
-    pub fn to_datatype(&self, generics: impl Into<Vec<(GenericType, DataType)>>) -> DataType {
-        DataType::Reference(DataTypeReference {
-            sid: self.sid,
-            generics: generics.into(),
-        })
+    pub fn generics(&self) -> &[(GenericType, DataType)] {
+        &self.generics
+    }
+}
+
+impl From<Reference> for DataType {
+    fn from(r: Reference) -> Self {
+        Self::Reference(r)
     }
 }
 

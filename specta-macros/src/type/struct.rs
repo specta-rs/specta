@@ -1,6 +1,6 @@
 use crate::utils::{parse_attrs, unraw_raw_ident, AttributeValue};
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens};
+use quote::{quote, ToTokens};
 use syn::{spanned::Spanned, DataStruct, Field, Fields, GenericParam, Generics};
 
 use super::attr::*;
@@ -58,19 +58,6 @@ pub fn parse_struct(
                 .get(#i)
                 .cloned()
                 .unwrap_or_else(|| <#ident as #crate_ref::Type>::reference(type_map, &[]).inner)
-        }
-    });
-    let reference_generics =
-        quote!(let generics: &[#crate_ref::datatype::DataType] = &[#(#reference_generics),*];);
-
-    let reference_generics2 = generic_idents.iter().map(|(i, ident)| {
-        let ident_str = ident.to_string();
-
-        quote! {
-            (
-                std::borrow::Cow::Borrowed(#ident_str).into(),
-                generics[#i].clone()
-            )
         }
     });
 
@@ -242,26 +229,6 @@ pub fn parse_struct(
         };
 
         quote!(#crate_ref::datatype::DataType::Struct(#crate_ref::internal::construct::r#struct(#name.into(), Some(SID), vec![#(#definition_generics),*], #fields)))
-    };
-
-    let reference = if container_attrs.inline {
-        quote!({
-            // #reference_generics
-            todo!()
-            // #crate_ref::datatype::reference::inline::<Self>(type_map, generics)
-        })
-    } else {
-        quote!({
-                // #reference_generics
-
-                #crate_ref::datatype::reference::Reference::construct(SID) // .to_datatype(vec![]) // TODO: pass in generics
-
-                // , #crate_ref::internal::construct::data_type_reference(
-                //     // #name.into(),
-                //     #sid,
-                //     vec![#(#reference_generics2),*]
-                // )
-        })
     };
 
     Ok((definition, true))

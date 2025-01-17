@@ -157,9 +157,8 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         type_map.insert(SID, def);
                     }
 
-                    // TODO: Merge the constructors?
                     // TODO: Fill in the generics
-                    specta::datatype::reference::Reference::construct(SID).to_datatype(vec![])
+                    specta::datatype::reference::Reference::construct(SID, vec![]).into()
                 }
             }
 
@@ -168,7 +167,8 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 fn reference(type_map: &mut #crate_ref::TypeCollection) -> #crate_ref::datatype::reference::Reference {
                     <Self as #crate_ref::Type>::definition(type_map);
 
-                    #crate_ref::datatype::reference::Reference::construct(SID)
+                    // TODO: Fill in the generics
+                    #crate_ref::datatype::reference::Reference::construct(SID, vec![])
                 }
             }
 
