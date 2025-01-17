@@ -3,7 +3,7 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use syn::{spanned::Spanned, DataStruct, Field, Fields, GenericParam, Generics};
 
-use super::{attr::*, generics::construct_datatype};
+use super::attr::*;
 
 pub fn decode_field_attrs(field: &Field) -> syn::Result<FieldAttr> {
     // We pass all the attributes at the start and when decoding them pop them off the list.
@@ -136,19 +136,19 @@ pub fn parse_struct(
 
         let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field_ty);
 
-        let ty = construct_datatype(
-            format_ident!("ty"),
-            field_ty,
-            &generic_idents,
-            crate_ref,
-            field_attrs.inline,
-        )?;
+        // let ty = construct_datatype(
+        //     format_ident!("ty"),
+        //     field_ty,
+        //     &generic_idents,
+        //     crate_ref,
+        //     field_attrs.inline,
+        // )?;
 
-        quote!({
-            #ty
+        if field_attrs.inline {
+            todo!();
+        }
 
-            ty
-        })
+        quote!(Some(<#field_ty as #crate_ref::Type>::definition(type_map)))
     } else {
         let fields = match &data.fields {
             Fields::Named(_) => {
@@ -175,36 +175,24 @@ pub fn parse_struct(
                             let flatten = field_attrs.flatten;
                             let doc = field_attrs.common.doc;
 
-                            let ty = field_attrs.skip.then(|| Ok(quote!(None))).unwrap_or_else(
+                            let ty = field_attrs.skip.then(|| quote!(None)).unwrap_or_else(
                                 || {
-                                    construct_datatype(
-                                        format_ident!("ty"),
-                                        field_ty,
-                                        &generic_idents,
-                                        crate_ref,
-                                        field_attrs.inline,
-                                    )
-                                    .map(|ty| {
-                                        let ty = if field_attrs.flatten {
-                                            quote! {
-                                                fn validate_flatten<T: #crate_ref::Flatten>() {}
-                                                validate_flatten::<#field_ty>();
-                                                #crate_ref::internal::flatten::<#field_ty>(SID, type_map, &generics)
-                                            }
-                                        } else {
-                                            quote! {
-                                                #ty
+                                    if field_attrs.skip {
+                                        todo!();
+                                    }
 
-                                                ty
-                                            }
-                                        };
+                                    if field_attrs.flatten {
+                                        todo!();
+                                        // quote! {
+                                        //     fn validate_flatten<T: #crate_ref::Flatten>() {}
+                                        //     validate_flatten::<#field_ty>();
+                                        //     #crate_ref::internal::flatten::<#field_ty>(SID, type_map, &generics)
+                                        // }
+                                    }
 
-                                        quote! {Some({
-                                            #ty
-                                        })}
-                                    })
+                                    quote!(Some(<#field_ty as #crate_ref::Type>::definition(type_map)))
                                 },
-                            )?;
+                            );
 
                             Ok(
                                 quote!((#field_name.into(), #crate_ref::internal::construct::field(
@@ -239,22 +227,10 @@ pub fn parse_struct(
                         let flatten = field_attrs.flatten;
                         let doc = field_attrs.common.doc;
 
-                        let ty = field_attrs.skip.then(|| Ok(quote!(None)))
+                        let ty = field_attrs.skip.then(|| quote!(None))
                             .unwrap_or_else(|| {
-                                construct_datatype(
-                                    format_ident!("gen"),
-                                    field_ty,
-                                    &generic_idents,
-                                    crate_ref,
-                                    field_attrs.inline,
-                                ).map(|generic_vars| {
-                                    quote! {{
-		                               	#generic_vars
-
-		                               	Some(gen)
-		                            }}
-                                })
-                            })?;
+                                quote!(Some(<#field_ty as #crate_ref::Type>::definition(type_map)))
+                            });
 
                         Ok(quote!(#crate_ref::internal::construct::field(#optional, #flatten, #deprecated, #doc.into(), #ty)))
                     })

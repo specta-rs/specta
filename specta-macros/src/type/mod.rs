@@ -5,8 +5,6 @@ use r#enum::parse_enum;
 use r#struct::parse_struct;
 use syn::{parse, Data, DeriveInput};
 
-use generics::impl_heading;
-
 use crate::utils::{parse_attrs, unraw_raw_ident, AttributeValue};
 
 use self::generics::{
@@ -102,8 +100,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         }
     });
 
-    let type_impl_heading = impl_heading(quote!(#crate_ref::Type), &ident, generics);
-
     let export = (cfg!(feature = "DO_NOT_USE_export") && container_attrs.export.unwrap_or(true))
         .then(|| {
             let export_fn_name = format_ident!("__push_specta_type_{}", raw_ident);
@@ -139,7 +135,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             }
 
             #[automatically_derived]
-            #type_impl_heading {
+             impl #bounds #crate_ref::Type for #ident #type_args #where_bound {
                 fn definition(type_map: &mut #crate_ref::TypeCollection) -> #crate_ref::datatype::DataType {
                     {
                         let def = #crate_ref::internal::construct::named_data_type(

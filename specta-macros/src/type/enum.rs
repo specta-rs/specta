@@ -1,4 +1,4 @@
-use super::{attr::*, generics::construct_datatype, r#struct::decode_field_attrs};
+use super::{attr::*, r#struct::decode_field_attrs};
 use crate::utils::*;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
@@ -75,7 +75,7 @@ pub fn parse_enum(
                     (_, _) => variant_ident_str.to_token_stream(),
                 };
 
-                let generic_idents = generic_idents.clone().collect::<Vec<_>>();
+                // let generic_idents = generic_idents.clone().collect::<Vec<_>>();
 
                 let inner = match &variant.fields {
                     Fields::Unit => quote!(#crate_ref::internal::construct::fields_unit()),
@@ -91,22 +91,14 @@ pub fn parse_enum(
                                 let flatten = field_attrs.flatten;
                                 let doc = field_attrs.common.doc;
 
-                                let ty = (attrs.skip || field_attrs.skip).then(|| Ok(quote!(None)))
+                                let ty = (attrs.skip || field_attrs.skip).then(|| quote!(None))
                                     .unwrap_or_else(|| {
-	                                    construct_datatype(
-	                                        format_ident!("gen"),
-	                                        field_ty,
-	                                        &generic_idents,
-	                                        crate_ref,
-	                                        attrs.inline,
-	                                    ).map(|generic_vars| {
-											quote! {{
-			                                    #generic_vars
+                                        if attrs.inline {
+                                            todo!();
+                                        }
 
-			                                    Some(gen)
-			                                }}
-										})
-                                    })?;
+                                        quote!(Some(<#field_ty as #crate_ref::Type>::definition(type_map)))
+                                    });
 
                                 Ok(quote!(#crate_ref::internal::construct::field(
                                     #optional,
@@ -147,24 +139,14 @@ pub fn parse_enum(
                             let flatten = field_attrs.flatten;
                             let doc = field_attrs.common.doc;
 
-                            let ty = (attrs.skip || field_attrs.skip).then(|| Ok(quote!(None)))
+                            let ty = (attrs.skip || field_attrs.skip).then(|| quote!(None))
                                 .unwrap_or_else(|| {
-	                                 construct_datatype(
-			                            format_ident!("gen"),
-			                            field_ty,
-			                            &generic_idents,
-			                            crate_ref,
-			                            attrs.inline,
-			                        ).map(|generic_vars|{
-										quote! {
-											Some({
-												#generic_vars
+                                    if attrs.inline {
+                                        todo!();
+                                    }
 
-												gen
-											})
-										}
-									})
-                                })?;
+                                    quote!(Some(<#field_ty as #crate_ref::Type>::definition(type_map)))
+                                });
 
                             Ok(quote!((#field_name.into(), #crate_ref::internal::construct::field(
                                 #optional,
