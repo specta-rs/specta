@@ -51,6 +51,7 @@ pub trait Type {
 /// represents a type that can be converted into [NamedDataType].
 /// This will be implemented for all types with the [Type] derive macro.
 pub trait NamedType: Type {
+    // TODO: Remove this cause it's implicitly on the `Reference` impl
     // TODO: I hate this being a method
     fn sid() -> SpectaID;
 
@@ -60,13 +61,8 @@ pub trait NamedType: Type {
     /// so the output of [`definition`](crate::Type::definition) will be put into the type map.
     fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference;
 
-    // // TODO: Should take `Generics` instead of `&[DataType]` but I plan to remove this trait so not fixing it for now.
-    // /// this is equivalent to [Type::inline] but returns a [NamedDataType] instead.
-    // fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType;
-
-    // TODO: Just remove this method given we removed `Type::definition`
-    /// this is equivalent to [Type::definition] but returns a [NamedDataType] instead.
-    fn definition_named_data_type(type_map: &mut TypeCollection) -> NamedDataType;
+    /// TODO
+    fn definition(type_map: &mut TypeCollection);
 }
 
 /// A marker trait for compile-time validation of which types can be flattened.

@@ -133,17 +133,21 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     Ok(quote! {
         const _: () = {
 	        const IMPL_LOCATION: #crate_ref::ImplLocation = #impl_location;
-            const DEFINITION_GENERICS: &[#crate_ref::datatype::DataType] = &[#(#definition_generics),*];
+			const DEFINITION_GENERICS: &[#crate_ref::datatype::DataType] = &[#(#definition_generics),*];
+
+            fn internal_inline(type_map: &mut #crate_ref::TypeCollection, generics: &[#crate_ref::datatype::DataType]) -> #crate_ref::datatype::DataType {
+                #inlines
+            }
 
             #[automatically_derived]
             #type_impl_heading {
                 fn inline(type_map: &mut #crate_ref::TypeCollection, generics: #crate_ref::Generics) -> #crate_ref::datatype::DataType {
-                    let generics = match generics {
+                    <Self as #crate_ref::NamedType>::definition(type_map);
+
+                    internal_inline(type_map, match generics {
                         #crate_ref::Generics::Definition => DEFINITION_GENERICS,
                         #crate_ref::Generics::Provided(generics) => generics,
-                    };
-
-                    #inlines
+                    })
                 }
             }
 
@@ -155,37 +159,30 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
 
                 fn reference(type_map: &mut #crate_ref::TypeCollection, generics: &[#crate_ref::datatype::DataType]) -> #crate_ref::datatype::reference::Reference {
+                    Self::definition(type_map);
+
+                    #reference
+                }
+
+                fn definition(type_map: &mut TypeCollection) {
+                    let def = #crate_ref::internal::construct::named_data_type(
+                        #name.into(),
+                        #comments.into(),
+                        #deprecated,
+                        <Self as #crate_ref::NamedType>::sid(),
+                        IMPL_LOCATION,
+                        internal_inline(type_map, DEFINITION_GENERICS)
+                    );
+
+                    // TODO: We probs need to handle this for recursive types.
                     // if self.map.get(&sid).is_none() {
                     //     self.map.entry(sid).or_insert(None);
                     //     let dt = T::definition_named_data_type(self);
                     //     self.map.insert(sid, Some(dt));
                     // }
 
-
-                    #reference
-                }
-
-                // fn named_data_type(type_map: &mut #crate_ref::TypeCollection, generics: &[#crate_ref::datatype::DataType]) -> #crate_ref::datatype::NamedDataType {
-                //     #crate_ref::internal::construct::named_data_type(
-                //         #name.into(),
-                //         #comments.into(),
-                //         #deprecated,
-                //         Self::sid(),
-                //         IMPL_LOCATION,
-                //         <Self as #crate_ref::Type>::inline(type_map, #crate_ref::Generics::Provided(generics))
-                //     )
-                // }
-
-                fn definition_named_data_type(type_map: &mut #crate_ref::TypeCollection) -> #crate_ref::datatype::NamedDataType {
-                    #crate_ref::internal::construct::named_data_type(
-                        #name.into(),
-                        #comments.into(),
-                        #deprecated,
-                        Self::sid(),
-                        IMPL_LOCATION,
-                        <Self as #crate_ref::Type>::inline(type_map, #crate_ref::Generics::Definition)
-                    )
-                }
+                    type_map.insert(<Self as #crate_ref::NamedType>::sid(), def);
+                 }
             }
 
             #flatten_impl

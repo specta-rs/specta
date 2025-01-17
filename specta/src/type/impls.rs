@@ -264,39 +264,39 @@ const _: () = {
         }
     }
 
-    impl NamedType for std::time::SystemTime {
-        fn sid() -> SpectaID {
-            SID
-        }
+    // impl NamedType for std::time::SystemTime {
+    //     fn sid() -> SpectaID {
+    //         SID
+    //     }
 
-        fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
-            reference::reference::<Self>(
-                type_map,
-                // internal::construct::data_type_reference("SystemTime".into(), SID, vec![]),
-            )
-        }
+    //     fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
+    //         reference::reference::<Self>(
+    //             type_map,
+    //             // internal::construct::data_type_reference("SystemTime".into(), SID, vec![]),
+    //         )
+    //     }
 
-        // fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
-        //     internal::construct::named_data_type(
-        //         "SystemTime".into(),
-        //         "".into(),
-        //         None,
-        //         Self::sid(),
-        //         IMPL_LOCATION,
-        //         <Self as Type>::inline(type_map, Generics::Provided(generics)),
-        //     )
-        // }
-        fn definition_named_data_type(type_map: &mut TypeCollection) -> NamedDataType {
-            internal::construct::named_data_type(
-                "SystemTime".into(),
-                "".into(),
-                None,
-                Self::sid(),
-                IMPL_LOCATION,
-                <Self as Type>::inline(type_map, Generics::Definition),
-            )
-        }
-    }
+    //     // fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
+    //     //     internal::construct::named_data_type(
+    //     //         "SystemTime".into(),
+    //     //         "".into(),
+    //     //         None,
+    //     //         Self::sid(),
+    //     //         IMPL_LOCATION,
+    //     //         <Self as Type>::inline(type_map, Generics::Provided(generics)),
+    //     //     )
+    //     // }
+    //     fn definition_named_data_type(type_map: &mut TypeCollection) -> NamedDataType {
+    //         internal::construct::named_data_type(
+    //             "SystemTime".into(),
+    //             "".into(),
+    //             None,
+    //             Self::sid(),
+    //             IMPL_LOCATION,
+    //             <Self as Type>::inline(type_map, Generics::Definition),
+    //         )
+    //     }
+    // }
     #[automatically_derived]
     impl Flatten for std::time::SystemTime {}
 };
@@ -347,37 +347,37 @@ const _: () = {
         }
     }
 
-    impl NamedType for std::time::Duration {
-        fn sid() -> SpectaID {
-            SID
-        }
-        fn reference(type_map: &mut TypeCollection, _: &[DataType]) -> reference::Reference {
-            reference::reference::<Self>(
-                type_map,
-                // internal::construct::data_type_reference("Duration".into(), Self::sid(), vec![]),
-            )
-        }
-        // fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
-        //     internal::construct::named_data_type(
-        //         "Duration".into(),
-        //         "".into(),
-        //         None,
-        //         Self::sid(),
-        //         IMPL_LOCATION,
-        //         <Self as Type>::inline(type_map, Generics::Provided(generics)),
-        //     )
-        // }
-        fn definition_named_data_type(type_map: &mut TypeCollection) -> NamedDataType {
-            internal::construct::named_data_type(
-                "Duration".into(),
-                "".into(),
-                None,
-                Self::sid(),
-                IMPL_LOCATION,
-                <Self as Type>::inline(type_map, Generics::Definition),
-            )
-        }
-    }
+    // impl NamedType for std::time::Duration {
+    //     fn sid() -> SpectaID {
+    //         SID
+    //     }
+    //     // fn reference(type_map: &mut TypeCollection, _: &[DataType]) -> reference::Reference {
+    //     //     reference::reference::<Self>(
+    //     //         type_map,
+    //     //         // internal::construct::data_type_reference("Duration".into(), Self::sid(), vec![]),
+    //     //     )
+    //     // }
+    //     // fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
+    //     //     internal::construct::named_data_type(
+    //     //         "Duration".into(),
+    //     //         "".into(),
+    //     //         None,
+    //     //         Self::sid(),
+    //     //         IMPL_LOCATION,
+    //     //         <Self as Type>::inline(type_map, Generics::Provided(generics)),
+    //     //     )
+    //     // }
+    //     fn definition_named_data_type(type_map: &mut TypeCollection) -> NamedDataType {
+    //         internal::construct::named_data_type(
+    //             "Duration".into(),
+    //             "".into(),
+    //             None,
+    //             Self::sid(),
+    //             IMPL_LOCATION,
+    //             <Self as Type>::inline(type_map, Generics::Definition),
+    //         )
+    //     }
+    // }
 
     impl Flatten for std::time::Duration {}
 };

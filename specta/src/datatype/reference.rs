@@ -60,14 +60,7 @@ pub fn reference_or_inline<T: Type + ?Sized>(
 pub fn reference<T: NamedType>(
     type_map: &mut TypeCollection,
 ) -> Reference {
-    let sid = T::sid();
-
-    if type_map.map.get(&sid).is_none() {
-        type_map.map.entry(sid).or_insert(None);
-        let dt = T::definition_named_data_type(type_map);
-        type_map.map.insert(sid, Some(dt));
-    }
-
+    T::definition(type_map);
     Reference {
         sid: T::sid(),
         // inner: DataType::Reference(DataTypeReference {

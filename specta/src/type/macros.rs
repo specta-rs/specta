@@ -67,10 +67,6 @@ macro_rules! _impl_containers {
                     },
                 )
             }
-
-            // fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Option<Reference> {
-            //     None
-            // }
         }
 
         impl<T: NamedType> NamedType for $container<T> {
@@ -82,12 +78,8 @@ macro_rules! _impl_containers {
                 T::reference(type_map, generics)
             }
 
-            // fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
-            //     T::named_data_type(type_map, generics)
-            // }
-
-            fn definition_named_data_type(type_map: &mut TypeCollection) -> NamedDataType {
-                T::definition_named_data_type(type_map)
+            fn definition(type_map: &mut TypeCollection) {
+                T::definition(type_map)
             }
         }
 
@@ -101,11 +93,6 @@ macro_rules! _impl_as {
             fn inline(type_map: &mut TypeCollection, generics: Generics) -> DataType {
                 <$tty as Type>::inline(type_map, generics)
             }
-
-            // TODO: Passthrough `NamedType` impls
-            // fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Option<Reference> {
-            //     <$tty as Type>::reference(type_map, generics)
-            // }
         }
     )+};
 }

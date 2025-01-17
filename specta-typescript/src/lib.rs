@@ -47,16 +47,17 @@ pub fn export_ref<T: NamedType>(_: &T, conf: &Typescript) -> Output {
 ///
 /// Eg. `export type Foo = { demo: string; };`
 pub fn export<T: NamedType>(conf: &Typescript) -> Output {
-    let mut type_map = TypeCollection::default();
-    let named_data_type = T::definition_named_data_type(&mut type_map);
-    is_valid_ty(&named_data_type.inner, &type_map)?;
-    let result = export_named_datatype(conf, &named_data_type, &type_map);
+    // let mut type_map = TypeCollection::default();
+    // let named_data_type = T::definition_named_data_type(&mut type_map);
+    // is_valid_ty(&named_data_type.inner, &type_map)?;
+    // let result = export_named_datatype(conf, &named_data_type, &type_map);
 
-    if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_map).into_iter().next() {
-        return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
-    }
+    // if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_map).into_iter().next() {
+    //     return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
+    // }
 
-    result
+    // result
+    todo!();
 }
 
 /// Convert a type which implements [`Type`] to a TypeScript string.
