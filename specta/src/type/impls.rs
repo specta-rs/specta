@@ -184,16 +184,16 @@ const _: () = {
             internal::construct::sid("Infallible".into(), "::todo:234:10")
         }
 
-        fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
-            internal::construct::named_data_type(
-                "Infallible".into(),
-                "".into(),
-                None,
-                Self::sid(),
-                IMPL_LOCATION,
-                <Self as Type>::inline(type_map, Generics::Provided(generics)),
-            )
-        }
+        // fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
+        //     internal::construct::named_data_type(
+        //         "Infallible".into(),
+        //         "".into(),
+        //         None,
+        //         Self::sid(),
+        //         IMPL_LOCATION,
+        //         <Self as Type>::inline(type_map, Generics::Provided(generics)),
+        //     )
+        // }
         fn definition_named_data_type(type_map: &mut TypeCollection) -> NamedDataType {
             internal::construct::named_data_type(
                 "Infallible".into(),
@@ -315,16 +315,16 @@ const _: () = {
         fn sid() -> SpectaID {
             SID
         }
-        fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
-            internal::construct::named_data_type(
-                "SystemTime".into(),
-                "".into(),
-                None,
-                Self::sid(),
-                IMPL_LOCATION,
-                <Self as Type>::inline(type_map, Generics::Provided(generics)),
-            )
-        }
+        // fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
+        //     internal::construct::named_data_type(
+        //         "SystemTime".into(),
+        //         "".into(),
+        //         None,
+        //         Self::sid(),
+        //         IMPL_LOCATION,
+        //         <Self as Type>::inline(type_map, Generics::Provided(generics)),
+        //     )
+        // }
         fn definition_named_data_type(type_map: &mut TypeCollection) -> NamedDataType {
             internal::construct::named_data_type(
                 "SystemTime".into(),
@@ -398,16 +398,16 @@ const _: () = {
         fn sid() -> SpectaID {
             SID
         }
-        fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
-            internal::construct::named_data_type(
-                "Duration".into(),
-                "".into(),
-                None,
-                Self::sid(),
-                IMPL_LOCATION,
-                <Self as Type>::inline(type_map, Generics::Provided(generics)),
-            )
-        }
+        // fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
+        //     internal::construct::named_data_type(
+        //         "Duration".into(),
+        //         "".into(),
+        //         None,
+        //         Self::sid(),
+        //         IMPL_LOCATION,
+        //         <Self as Type>::inline(type_map, Generics::Provided(generics)),
+        //     )
+        // }
         fn definition_named_data_type(type_map: &mut TypeCollection) -> NamedDataType {
             internal::construct::named_data_type(
                 "Duration".into(),

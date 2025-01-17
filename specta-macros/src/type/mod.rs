@@ -157,16 +157,16 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     #sid
                 }
 
-                fn named_data_type(type_map: &mut #crate_ref::TypeCollection, generics: &[#crate_ref::datatype::DataType]) -> #crate_ref::datatype::NamedDataType {
-                    #crate_ref::internal::construct::named_data_type(
-                        #name.into(),
-                        #comments.into(),
-                        #deprecated,
-                        Self::sid(),
-                        IMPL_LOCATION,
-                        <Self as #crate_ref::Type>::inline(type_map, #crate_ref::Generics::Provided(generics))
-                    )
-                }
+                // fn named_data_type(type_map: &mut #crate_ref::TypeCollection, generics: &[#crate_ref::datatype::DataType]) -> #crate_ref::datatype::NamedDataType {
+                //     #crate_ref::internal::construct::named_data_type(
+                //         #name.into(),
+                //         #comments.into(),
+                //         #deprecated,
+                //         Self::sid(),
+                //         IMPL_LOCATION,
+                //         <Self as #crate_ref::Type>::inline(type_map, #crate_ref::Generics::Provided(generics))
+                //     )
+                // }
 
                 fn definition_named_data_type(type_map: &mut #crate_ref::TypeCollection) -> #crate_ref::datatype::NamedDataType {
                     #crate_ref::internal::construct::named_data_type(

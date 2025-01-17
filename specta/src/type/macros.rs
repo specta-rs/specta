@@ -77,9 +77,9 @@ macro_rules! _impl_containers {
                 T::sid()
             }
 
-            fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
-                T::named_data_type(type_map, generics)
-            }
+            // fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
+            //     T::named_data_type(type_map, generics)
+            // }
 
             fn definition_named_data_type(type_map: &mut TypeCollection) -> NamedDataType {
                 T::definition_named_data_type(type_map)

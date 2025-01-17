@@ -62,9 +62,9 @@ pub trait NamedType: Type {
     // TODO: I hate this being a method
     fn sid() -> SpectaID;
 
-    // TODO: Should take `Generics` instead of `&[DataType]` but I plan to remove this trait so not fixing it for now.
-    /// this is equivalent to [Type::inline] but returns a [NamedDataType] instead.
-    fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType;
+    // // TODO: Should take `Generics` instead of `&[DataType]` but I plan to remove this trait so not fixing it for now.
+    // /// this is equivalent to [Type::inline] but returns a [NamedDataType] instead.
+    // fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType;
 
     // TODO: Just remove this method given we removed `Type::definition`
     /// this is equivalent to [Type::definition] but returns a [NamedDataType] instead.
