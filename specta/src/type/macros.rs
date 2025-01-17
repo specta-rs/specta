@@ -42,11 +42,13 @@ macro_rules! _impl_containers {
             }
         }
 
-        impl<T: NamedType> NamedType for $container<T> {
-            fn reference(types: &mut TypeCollection) -> Reference {
-                T::reference(types)
-            }
-        }
+        // TODO: Bring this back?
+        // impl<T: NamedType> NamedType for $container<T> {
+        //     static SID: SpectaID = T::SID;
+        //     // fn reference(types: &mut TypeCollection) -> Reference {
+        //     //     T::reference(types)
+        //     // }
+        // }
 
         impl<T: Flatten> Flatten for $container<T> {}
     )+}

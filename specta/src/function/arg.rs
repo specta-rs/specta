@@ -12,7 +12,6 @@ pub trait FunctionArg {
 
 impl<T: Type> FunctionArg for T {
     fn to_datatype(type_map: &mut TypeCollection) -> Option<DataType> {
-        // Some(T::reference(type_map, &[]).inner)
-        todo!();
+        Some(T::definition(type_map))
     }
 }

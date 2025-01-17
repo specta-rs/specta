@@ -3,10 +3,10 @@ use std::{
     sync::{Mutex, OnceLock, PoisonError},
 };
 
-use crate::{datatype::NamedDataType, NamedType, SpectaID, TypeCollection};
+use crate::{NamedType, SpectaID, TypeCollection};
 
 // Global type store for collecting custom types to export.
-static TYPES: OnceLock<Mutex<HashMap<SpectaID, fn(&mut TypeCollection) -> NamedDataType>>> =
+static TYPES: OnceLock<Mutex<HashMap<SpectaID, fn(&mut TypeCollection)>>> =
     OnceLock::new();
 
 /// Get the global type store containing all registered types.
@@ -18,9 +18,8 @@ pub fn export() -> TypeCollection {
         .unwrap_or_else(PoisonError::into_inner);
 
     let mut map = TypeCollection::default();
-    for (id, export) in types.iter() {
-        let dt = export(&mut map);
-        map.insert(*id, dt);
+    for (_, export) in types.iter() {
+        export(&mut map);
     }
     map
 }
@@ -34,13 +33,15 @@ pub mod internal {
     // Called within ctor functions to register a type.
     #[doc(hidden)]
     pub fn register<T: NamedType>() {
-        // let mut type_map = TYPES
-        //     .get_or_init(Default::default)
-        //     .lock()
-        //     .unwrap_or_else(PoisonError::into_inner);
+        let mut types = TYPES
+            .get_or_init(Default::default)
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
 
-        // type_map.insert(T::sid(), |type_map| T::definition_named_data_type(type_map));
-        println!("Fix `specta::export`");
+        types.insert(T::ID, |types| {
+            // The side-effect of this is registering the type.
+            T::definition(types);
+        });
     }
 
     // We expose this for the macros

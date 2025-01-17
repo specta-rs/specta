@@ -164,12 +164,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
             #[automatically_derived]
             impl #bounds #crate_ref::NamedType for #ident #type_args #where_bound {
-                fn reference(type_map: &mut #crate_ref::TypeCollection) -> #crate_ref::datatype::reference::Reference {
-                    <Self as #crate_ref::Type>::definition(type_map);
-
-                    // TODO: Fill in the generics
-                    #crate_ref::datatype::reference::Reference::construct(SID, vec![])
-                }
+                const ID: #crate_ref::SpectaID = SID;
             }
 
             #flatten_impl

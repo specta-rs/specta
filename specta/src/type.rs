@@ -2,8 +2,7 @@ use crate::{
     datatype::{
         reference::Reference,
         DataType
-    },
-    TypeCollection,
+    }, SpectaID, TypeCollection
 };
 
 mod impls;
@@ -26,8 +25,7 @@ pub trait Type {
 ///
 /// This should be only implemented via the [`Type`](derive@crate::Type) macro.
 pub trait NamedType: Type {
-    /// TODO
-    fn reference(type_map: &mut TypeCollection) -> Reference;
+    const ID: SpectaID;
 }
 
 /// A marker trait for compile-time validation of which types can be flattened.
