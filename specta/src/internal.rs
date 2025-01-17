@@ -10,22 +10,44 @@ use std::{borrow::Cow, collections::HashMap};
 pub use paste::paste;
 
 use crate::{
-    datatype::{DataType, Field, NamedDataType}, ImplLocation, SpectaID, Type, TypeCollection
+    datatype::{DataType, DeprecatedType, Field, NamedDataType, NamedDataTypeExt}, ImplLocation, SpectaID, Type, TypeCollection
 };
+
+// // TODO: make `const` again
+// pub fn named_data_type(
+//     name: Cow<'static, str>,
+//     docs: Cow<'static, str>,
+//     deprecated: Option<DeprecatedType>,
+//     sid: SpectaID,
+//     impl_location: ImplLocation,
+//     inner: DataType,
+// ) -> NamedDataType {
+
+// }
 
 /// Registers a type in the `TypeCollection` if it hasn't been registered already.
 /// This accounts for recursive types.
 pub fn register(
     types: &mut TypeCollection,
+    name: Cow<'static, str>,
+    docs: Cow<'static, str>,
+    deprecated: Option<DeprecatedType>,
     sid: SpectaID,
-    build: impl FnOnce(&mut TypeCollection) -> NamedDataType,
+    impl_location: ImplLocation,
+    build: impl FnOnce(&mut TypeCollection) -> DataType,
 ) -> NamedDataType {
     match types.map.get(&sid) {
         Some(Some(dt)) => dt.clone(),
         Some(None) => todo!("recursive inline or something"), // TODO: Recursive inline I think
         None => {
             types.map.entry(sid).or_insert(None);
-            let dt = build(types);
+            let dt = NamedDataType {
+                name,
+                docs,
+                deprecated,
+                ext: Some(NamedDataTypeExt { sid, impl_location }),
+                inner: build(types)
+            };
             types.map.insert(sid, Some(dt.clone()));
             dt
         }
@@ -189,23 +211,6 @@ pub mod construct {
             docs,
             deprecated,
             fields,
-        }
-    }
-
-    pub const fn named_data_type(
-        name: Cow<'static, str>,
-        docs: Cow<'static, str>,
-        deprecated: Option<DeprecatedType>,
-        sid: SpectaID,
-        impl_location: ImplLocation,
-        inner: DataType,
-    ) -> NamedDataType {
-        NamedDataType {
-            name,
-            docs,
-            deprecated,
-            ext: Some(NamedDataTypeExt { sid, impl_location }),
-            inner,
         }
     }
 

@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, fmt, sync::Arc};
 
 use crate::ImplLocation;
 
@@ -37,8 +37,6 @@ pub struct NamedDataType {
     // TODO: Should this be nullable???
     pub(crate) ext: Option<NamedDataTypeExt>,
     /// the actual type definition.
-    // This field is public because we match on it in flattening code. // TODO: Review if this can be made private when reviewing the flattening logic/error handling
-    // TODO: This field is also used by rspc to construct the `Procedures` type.
     pub inner: DataType,
 }
 

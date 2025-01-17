@@ -137,16 +137,15 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             #[automatically_derived]
              impl #bounds #crate_ref::Type for #ident #type_args #where_bound {
                 fn definition(type_map: &mut #crate_ref::TypeCollection) -> #crate_ref::datatype::DataType {
-                    let dt = #crate_ref::internal::register(type_map, SID, |type_map| {
-                        #crate_ref::internal::construct::named_data_type(
-                            #name.into(),
-                            #comments.into(),
-                            #deprecated,
-                            SID,
-                            #impl_location,
-                            #inlines
-                        )
-                    });
+                    let dt = #crate_ref::internal::register(
+                        type_map,
+                        #name.into(),
+                        #comments.into(),
+                        #deprecated,
+                        SID,
+                        #impl_location,
+                        |type_map| #inlines,
+                    );
 
                     #definition
                 }

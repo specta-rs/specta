@@ -40,10 +40,10 @@ pub struct Something {
     a: HashMap<MyEnum, i32>,
 }
 
-#[derive(Type)]
-pub struct Recursive {
-    a: Box<Recursive>,
-}
+// #[derive(Type)]
+// pub struct Recursive {
+//     a: Box<Recursive>,
+// }
 
 #[derive(Type)]
 #[specta(export = false)]
@@ -78,23 +78,21 @@ fn todo<T: Type>(_: &T) {
 }
 
 fn main() {
-    let s = Selection {
-        name: "Monty Beaumont".into(),
-        age: 7,
-        password: "password123".into(),
-    };
-    let s1 = specta_util::selection!(s, { name, age });
-    todo(&s1);
-    return;
-
-
+    // let s = Selection {
+    //     name: "Monty Beaumont".into(),
+    //     age: 7,
+    //     password: "password123".into(),
+    // };
+    // let s1 = specta_util::selection!(s, { name, age });
+    // todo(&s1);
+    // return;
 
     // println!("{:#?}", <[String; 5] as Type>::definition(&mut TypeCollection::default()));
     // println!("{:#?}", datatype::inline::<[String; 5]>(&mut TypeCollection::default()));
     // println!("{:?}", specta_typescript::inline::<[String; 5]>(&Default::default()));
 
-    println!("{:?}", specta_typescript::inline::<A>(&Default::default()));
-    println!("{:?}", specta_typescript::export::<A>(&Default::default()));
+    // println!("{:?}", specta_typescript::inline::<A>(&Default::default()));
+    // println!("{:?}", specta_typescript::export::<A>(&Default::default()));
 
     let mut types = TypeCollection::default()
         .register::<TypeOne>()
@@ -103,17 +101,17 @@ fn main() {
         .register::<GenericType::<String>>()
         .register::<MyEnum>()
         .register::<Something>()
-        .register::<Recursive>()
+        // .register::<Recursive>()
         .register::<A>();
 
     // TODO: Remove this stuff
-    {
-        let dt = specta::datatype::inline::<TypeOne>(&mut types);
-        println!("{:?}", specta_typescript::datatype(&Typescript::default(), &FunctionResultVariant::Value(dt), &types));
+    // {
+    //     let dt = specta::datatype::inline::<TypeOne>(&mut types);
+    //     println!("{:?}", specta_typescript::datatype(&Typescript::default(), &FunctionResultVariant::Value(dt), &types));
 
-        // let dt = specta::datatype::reference::inline::<TypeOne>(&mut types, &[]);
-        println!("{:?}\n\n", specta_typescript::inline::<TypeOne>(&Default::default()));
-    }
+    //     // let dt = specta::datatype::reference::inline::<TypeOne>(&mut types, &[]);
+    //     println!("{:?}\n\n", specta_typescript::inline::<TypeOne>(&Default::default()));
+    // }
 
     Typescript::default()
         .export_to("./bindings.ts", &types)
