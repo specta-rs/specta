@@ -72,7 +72,7 @@ pub fn inline_ref<T: Type>(_: &T, conf: &Typescript) -> Output {
 /// Eg. `{ demo: string; };`
 pub fn inline<T: Type>(conf: &Typescript) -> Output {
     let mut type_map = TypeCollection::default();
-    let ty = T::inline(&mut type_map, Generics::NONE);
+    let ty = T::definition(&mut type_map);
     is_valid_ty(&ty, &type_map)?;
     let result = datatype(conf, &FunctionResultVariant::Value(ty.clone()), &type_map);
 

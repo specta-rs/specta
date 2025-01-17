@@ -278,7 +278,7 @@ pub fn parse_struct(
         quote!({
                 #reference_generics
 
-                <Self as #crate_ref::NamedType>::definition(type_map);
+                <Self as #crate_ref::Type>::definition(type_map);
 
                 #crate_ref::datatype::reference::Reference::construct(SID) // .to_datatype(vec![]) // TODO: pass in generics
 

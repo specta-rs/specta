@@ -12,7 +12,7 @@ use specta::{
 
 /// TODO
 pub fn export<T: Type>() -> Result<String, String> {
-    datatype(&T::inline(
+    datatype(&T::definition(
         &mut TypeCollection::default(),
         Generics::Definition,
     ))

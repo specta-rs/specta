@@ -93,7 +93,8 @@ pub fn construct_datatype(
     inline: bool,
 ) -> syn::Result<TokenStream> {
     let inner: fn(_, _, _) -> _ = match inline {
-        _ => |crate_ref: &TokenStream, ty: &Type, generics: TokenStream| quote!(<#ty as #crate_ref::Type>::inline(type_map, #crate_ref::Generics::Provided(#generics))),
+        _ => |crate_ref: &TokenStream, ty: &Type, generics: TokenStream| quote!(<#ty as #crate_ref::Type>::definition(type_map)),
+            // , #crate_ref::Generics::Provided(#generics))
         // false => |crate_ref: &TokenStream, ty: &Type, generics: TokenStream| todo!(), // TODO: Use the userspace inline stuff
         // TODO: #crate_ref::datatype::reference::reference_or_inline::<#ty>(type_map, #generics)
         // quote!({

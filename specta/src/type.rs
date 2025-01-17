@@ -40,29 +40,23 @@ impl<'a> Generics<'a> {
 
 /// Provides runtime type information that can be fed into a language exporter to generate a type definition in another language.
 /// Avoid implementing this trait yourself where possible and use the [`Type`](derive@crate::Type) macro instead.
+///
+/// This should be only implemented via the [`Type`](derive@crate::Type) macro.
 pub trait Type {
-    // TODO: Maybe rename this???
-    /// Returns the definition of a type using the provided generics.
-    ///
-    /// This should be only implemented via the [`Type`](derive@crate::Type) macro.
-    fn inline(type_map: &mut TypeCollection, generics: Generics) -> DataType;
+    /// TODO
+    fn definition(type_map: &mut TypeCollection) -> DataType;
 }
 
 /// represents a type that can be converted into [NamedDataType].
 /// This will be implemented for all types with the [Type] derive macro.
+///
+/// This should be only implemented via the [`Type`](derive@crate::Type) macro.
 pub trait NamedType: Type {
-    // // TODO: Remove this cause it's implicitly on the `Reference` impl
-    // // TODO: I hate this being a method
-    // fn sid() -> SpectaID;
-
     /// Generates a datatype corresponding to a reference to this type,
     /// as determined by its category. Getting a reference to a type implies that
     /// it should belong in the type map (since it has to be referenced from somewhere),
     /// so the output of [`definition`](crate::Type::definition) will be put into the type map.
     fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference;
-
-    /// TODO
-    fn definition(type_map: &mut TypeCollection);
 }
 
 /// A marker trait for compile-time validation of which types can be flattened.

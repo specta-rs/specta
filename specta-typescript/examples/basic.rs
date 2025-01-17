@@ -41,7 +41,7 @@ fn main() {
 
     // TODO: Remove this stuff
     {
-        let dt = specta::datatype::reference::inline::<TypeOne>(&mut types, &[]);
+        let dt = specta::datatype::reference::inline::<TypeOne>(&mut types);
         println!("{:?}", specta_typescript::datatype(&Typescript::default(), &FunctionResultVariant::Value(dt), &types));
 
         // let dt = specta::datatype::reference::inline::<TypeOne>(&mut types, &[]);

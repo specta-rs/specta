@@ -28,19 +28,19 @@ pub struct BracedStruct {
 fn transparent() {
     // We check the datatype layer can TS can look correct but be wrong!
     assert_eq!(
-        TupleStruct::inline(&mut Default::default(), Generics::NONE),
+        TupleStruct::definition(&mut Default::default(), Generics::NONE),
         DataType::Primitive(PrimitiveType::String)
     );
     assert_eq!(
-        TupleStructWithRep::inline(&mut Default::default(), Generics::NONE),
+        TupleStructWithRep::definition(&mut Default::default(), Generics::NONE),
         DataType::Primitive(PrimitiveType::String)
     );
     assert_eq!(
-        GenericTupleStruct::<String>::inline(&mut Default::default(), Generics::NONE),
+        GenericTupleStruct::<String>::definition(&mut Default::default(), Generics::NONE),
         DataType::Primitive(PrimitiveType::String)
     );
     assert_eq!(
-        BracedStruct::inline(&mut Default::default(), Generics::NONE),
+        BracedStruct::definition(&mut Default::default(), Generics::NONE),
         DataType::Primitive(PrimitiveType::String)
     );
 

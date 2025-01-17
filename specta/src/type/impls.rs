@@ -115,11 +115,11 @@ impl<'a, T: Type> Type for &'a [T] {
 }
 
 impl<const N: usize, T: Type> Type for [T; N] {
-    fn inline(type_map: &mut TypeCollection, generics: Generics) -> DataType {
+    fn definition(type_map: &mut TypeCollection) -> DataType {
         DataType::List(List {
             ty: Box::new(
                 // TODO: This is cursed. Fix it properly!!!
-                match Vec::<T>::inline(type_map, generics) {
+                match Vec::<T>::definition(type_map) {
                     DataType::List(List { ty, .. }) => *ty,
                     _ => unreachable!(),
                 },
@@ -131,21 +131,14 @@ impl<const N: usize, T: Type> Type for [T; N] {
 }
 
 impl<T: Type> Type for Option<T> {
-    fn inline(type_map: &mut TypeCollection, generics: Generics) -> DataType {
-        let mut ty = None;
-        if let Generics::Provided(generics) = &generics {
-            ty = generics.get(0).cloned()
-        }
+    fn definition(type_map: &mut TypeCollection) -> DataType {
 
-        DataType::Nullable(Box::new(match ty {
-            Some(ty) => ty,
-            None => T::inline(type_map, generics),
-        }))
+        DataType::Nullable(Box::new(T::definition(type_map)))
     }
 }
 
 impl<T> Type for std::marker::PhantomData<T> {
-    fn inline(_: &mut TypeCollection, _: Generics) -> DataType {
+    fn definition(_: &mut TypeCollection) -> DataType {
         DataType::Literal(LiteralType::None)
     }
 }
@@ -156,7 +149,7 @@ const _: () = {
         internal::construct::impl_location("specta/src/type/impls.rs:234:10");
 
     impl Type for std::convert::Infallible {
-        fn inline(_: &mut TypeCollection, _: Generics) -> DataType {
+        fn definition(_: &mut TypeCollection) -> DataType {
             DataType::Enum(internal::construct::r#enum(
                 "Infallible".into(),
                 internal::construct::sid("Infallible".into(), "::todo:4:10"),
@@ -170,8 +163,8 @@ const _: () = {
 };
 
 impl<T: Type> Type for std::ops::Range<T> {
-    fn inline(type_map: &mut TypeCollection, _generics: Generics) -> DataType {
-        let ty = Some(T::inline(type_map, Generics::Definition));
+    fn definition(type_map: &mut TypeCollection) -> DataType {
+        let ty = Some(T::definition(type_map));
         DataType::Struct(StructType {
             name: "Range".into(),
             sid: None,
@@ -224,7 +217,7 @@ const _: () = {
         internal::construct::impl_location("specta/src/type/impls.rs:302:10");
 
     impl Type for std::time::SystemTime {
-        fn inline(type_map: &mut TypeCollection, _: Generics) -> DataType {
+        fn definition(type_map: &mut TypeCollection) -> DataType {
             DataType::Struct(internal::construct::r#struct(
                 "SystemTime".into(),
                 Some(internal::construct::sid("SystemTime".into(), "::todo:3:10")),
@@ -239,7 +232,7 @@ const _: () = {
                                 None,
                                 "".into(),
                                 Some({
-                                    let ty = <i64 as Type>::inline(type_map, Generics::Provided(&[]));
+                                    let ty = <i64 as Type>::definition(type_map);
                                     ty
                                 }),
                             ),
@@ -252,7 +245,7 @@ const _: () = {
                                 None,
                                 "".into(),
                                 Some({
-                                    let ty = <u32 as Type>::inline(type_map, Generics::Provided(&[]));
+                                    let ty = <u32 as Type>::definition(type_map);
                                     ty
                                 }),
                             ),
@@ -307,7 +300,7 @@ const _: () = {
         internal::construct::impl_location("specta/src/type/impls.rs:401:10");
 
     impl Type for std::time::Duration {
-        fn inline(type_map: &mut TypeCollection, _: Generics) -> DataType {
+        fn definition(type_map: &mut TypeCollection) -> DataType {
             DataType::Struct(internal::construct::r#struct(
                 "Duration".into(),
                 Some(SID),
@@ -322,7 +315,7 @@ const _: () = {
                                 None,
                                 "".into(),
                                 Some({
-                                    let ty = <u64 as Type>::inline(type_map, Generics::Definition);
+                                    let ty = <u64 as Type>::definition(type_map);
                                     ty
                                 }),
                             ),
@@ -335,7 +328,7 @@ const _: () = {
                                 None,
                                 "".into(),
                                 Some({
-                                    let ty = <u32 as Type>::inline(type_map, Generics::Definition);
+                                    let ty = <u32 as Type>::definition(type_map);
                                     ty
                                 }),
                             ),

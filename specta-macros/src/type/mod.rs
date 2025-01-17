@@ -140,47 +140,40 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
             #[automatically_derived]
             #type_impl_heading {
-                fn inline(type_map: &mut #crate_ref::TypeCollection, generics: #crate_ref::Generics) -> #crate_ref::datatype::DataType {
-                    <Self as #crate_ref::NamedType>::definition(type_map);
+                fn definition(type_map: &mut #crate_ref::TypeCollection) -> #crate_ref::datatype::DataType {
+                    {
+                        let def = #crate_ref::internal::construct::named_data_type(
+                            #name.into(),
+                            #comments.into(),
+                            #deprecated,
+                            SID,
+                            IMPL_LOCATION,
+                            internal_inline(type_map, DEFINITION_GENERICS)
+                        );
 
-                    // TODO: Merge the constructors
+                        // TODO: We probs need to handle this for recursive types.
+                        // if self.map.get(&sid).is_none() {
+                        //     self.map.entry(sid).or_insert(None);
+                        //     let dt = T::definition_named_data_type(self);
+                        //     self.map.insert(sid, Some(dt));
+                        // }
+
+                        type_map.insert(SID, def);
+                    }
+
+                    // TODO: Merge the constructors?
                     // TODO: Fill in the generics
                     #crate_ref::datatype::reference::Reference::construct(SID).to_datatype(vec![])
-
-                    // internal_inline(type_map, match generics {
-                    //     #crate_ref::Generics::Definition => DEFINITION_GENERICS,
-                    //     #crate_ref::Generics::Provided(generics) => generics,
-                    // })
                 }
             }
 
             #[automatically_derived]
             impl #bounds #crate_ref::NamedType for #ident #type_args #where_bound {
                 fn reference(type_map: &mut #crate_ref::TypeCollection, generics: &[#crate_ref::datatype::DataType]) -> #crate_ref::datatype::reference::Reference {
-                    Self::definition(type_map);
+                    <Self as #crate_ref::Type>::definition(type_map);
 
                     #reference
                 }
-
-                fn definition(type_map: &mut TypeCollection) {
-                    let def = #crate_ref::internal::construct::named_data_type(
-                        #name.into(),
-                        #comments.into(),
-                        #deprecated,
-                        SID,
-                        IMPL_LOCATION,
-                        internal_inline(type_map, DEFINITION_GENERICS)
-                    );
-
-                    // TODO: We probs need to handle this for recursive types.
-                    // if self.map.get(&sid).is_none() {
-                    //     self.map.entry(sid).or_insert(None);
-                    //     let dt = T::definition_named_data_type(self);
-                    //     self.map.insert(sid, Some(dt));
-                    // }
-
-                    type_map.insert(SID, def);
-                 }
             }
 
             #flatten_impl

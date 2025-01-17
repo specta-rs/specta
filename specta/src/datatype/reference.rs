@@ -44,7 +44,7 @@ impl Reference {
 
 /// TODO: Finish and document this
 /// TODO: Move somewhere else
-pub fn inline<T: Type>(types: &mut TypeCollection, generics: &[DataType]) -> DataType {
+pub fn inline<T: Type>(types: &mut TypeCollection) -> DataType {
     fn inner(types: &mut TypeCollection, dt: DataType) -> DataType {
         match dt {
             DataType::Any | DataType::Unknown |  DataType::Primitive(..) | DataType::Literal(..) => dt,
@@ -90,7 +90,7 @@ pub fn inline<T: Type>(types: &mut TypeCollection, generics: &[DataType]) -> Dat
         }
     }
 
-    let dt = T::inline(types, Generics::Provided(generics));
+    let dt = T::definition(types);
     inner(types, dt)
 }
 

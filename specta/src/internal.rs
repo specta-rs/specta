@@ -188,7 +188,7 @@ pub fn skip_fields_named<'a>(
 pub fn flatten<T: Type>(
     sid: SpectaID,
     type_map: &mut TypeCollection,
-    generics: &[DataType],
+    generics: &[DataType], // TODO: Remove
 ) -> DataType {
     type_map.flatten_stack.push(sid);
 
@@ -198,7 +198,7 @@ pub fn flatten<T: Type>(
         panic!("Type recursion limit exceeded!");
     }
 
-    let ty = T::inline(type_map, Generics::Provided(generics));
+    let ty = T::definition(type_map);
 
     type_map.flatten_stack.pop();
 

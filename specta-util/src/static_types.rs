@@ -34,7 +34,7 @@ use specta::{datatype::DataType, Generics, Type, TypeCollection};
 pub struct Any<T = ()>(T);
 
 impl<T> Type for Any<T> {
-    fn inline(_: &mut TypeCollection, _: Generics) -> DataType {
+    fn definition(_: &mut TypeCollection, _: Generics) -> DataType {
         DataType::Any
     }
 }
@@ -97,7 +97,7 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
 pub struct Unknown<T = ()>(T);
 
 impl<T> Type for Unknown<T> {
-    fn inline(_: &mut TypeCollection, _: Generics) -> DataType {
+    fn definition(_: &mut TypeCollection, _: Generics) -> DataType {
         DataType::Unknown
     }
 }

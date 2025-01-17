@@ -16,7 +16,7 @@ pub struct ActualType {
 #[test]
 fn test_generic_type_in_type_map() {
     let mut type_map = TypeCollection::default();
-    ActualType::inline(&mut type_map, Generics::NONE);
+    ActualType::definition(&mut type_map, Generics::NONE);
 
     assert_eq!(type_map.len(), 1);
     let first = type_map.iter().next().unwrap().1;
