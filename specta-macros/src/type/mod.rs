@@ -44,7 +44,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         unraw_raw_ident(&format_ident!("{}", raw_ident.to_string())).to_token_stream()
     });
 
-    let (inlines, reference, can_flatten) = match data {
+    let (inlines, can_flatten) = match data {
         Data::Struct(data) => {
             parse_struct(&name, &container_attrs, generics, &crate_ref, data)
         }
@@ -163,16 +163,16 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
                     // TODO: Merge the constructors?
                     // TODO: Fill in the generics
-                    #crate_ref::datatype::reference::Reference::construct(SID).to_datatype(vec![])
+                    specta::datatype::reference::Reference::construct(SID).to_datatype(vec![])
                 }
             }
 
             #[automatically_derived]
             impl #bounds #crate_ref::NamedType for #ident #type_args #where_bound {
-                fn reference(type_map: &mut #crate_ref::TypeCollection, generics: &[#crate_ref::datatype::DataType]) -> #crate_ref::datatype::reference::Reference {
+                fn reference(type_map: &mut #crate_ref::TypeCollection) -> #crate_ref::datatype::reference::Reference {
                     <Self as #crate_ref::Type>::definition(type_map);
 
-                    #reference
+                    #crate_ref::datatype::reference::Reference::construct(SID)
                 }
             }
 

@@ -41,7 +41,7 @@ pub fn parse_struct(
     generics: &Generics,
     crate_ref: &TokenStream,
     data: &DataStruct,
-) -> syn::Result<(TokenStream, TokenStream, bool)> {
+) -> syn::Result<(TokenStream, bool)> {
     let generic_idents = generics
         .params
         .iter()
@@ -268,17 +268,15 @@ pub fn parse_struct(
         quote!(#crate_ref::datatype::DataType::Struct(#crate_ref::internal::construct::r#struct(#name.into(), Some(SID), vec![#(#definition_generics),*], #fields)))
     };
 
-    let category = if container_attrs.inline {
+    let reference = if container_attrs.inline {
         quote!({
-            #reference_generics
+            // #reference_generics
             todo!()
             // #crate_ref::datatype::reference::inline::<Self>(type_map, generics)
         })
     } else {
         quote!({
-                #reference_generics
-
-                <Self as #crate_ref::Type>::definition(type_map);
+                // #reference_generics
 
                 #crate_ref::datatype::reference::Reference::construct(SID) // .to_datatype(vec![]) // TODO: pass in generics
 
@@ -290,5 +288,5 @@ pub fn parse_struct(
         })
     };
 
-    Ok((definition, category, true))
+    Ok((definition, true))
 }

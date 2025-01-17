@@ -27,7 +27,7 @@ use specta::datatype::{
 };
 use specta::{
     internal::{detect_duplicate_type_names, skip_fields, skip_fields_named, NonSkipField},
-    Generics, NamedType, Type, TypeCollection,
+    NamedType, Type, TypeCollection,
 };
 use specta_serde::is_valid_ty;
 

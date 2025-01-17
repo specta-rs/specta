@@ -52,11 +52,8 @@ pub trait Type {
 ///
 /// This should be only implemented via the [`Type`](derive@crate::Type) macro.
 pub trait NamedType: Type {
-    /// Generates a datatype corresponding to a reference to this type,
-    /// as determined by its category. Getting a reference to a type implies that
-    /// it should belong in the type map (since it has to be referenced from somewhere),
-    /// so the output of [`definition`](crate::Type::definition) will be put into the type map.
-    fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference;
+    /// TODO
+    fn reference(type_map: &mut TypeCollection) -> Reference;
 }
 
 /// A marker trait for compile-time validation of which types can be flattened.

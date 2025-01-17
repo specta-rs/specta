@@ -1,7 +1,7 @@
 macro_rules! _impl_passthrough {
     ($t:ty) => {
-        fn definition(type_map: &mut TypeCollection) -> DataType {
-            <$t>::definition(type_map)
+        fn definition(types: &mut TypeCollection) -> DataType {
+            <$t>::definition(types)
         }
     };
 }
@@ -43,8 +43,8 @@ macro_rules! _impl_containers {
         }
 
         impl<T: NamedType> NamedType for $container<T> {
-            fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
-                T::reference(type_map, generics)
+            fn reference(types: &mut TypeCollection) -> Reference {
+                T::reference(types)
             }
         }
 
@@ -55,8 +55,8 @@ macro_rules! _impl_containers {
 macro_rules! _impl_as {
     ($($ty:path as $tty:ident)+) => {$(
         impl Type for $ty {
-            fn definition(type_map: &mut TypeCollection) -> DataType {
-                <$tty as Type>::definition(type_map)
+            fn definition(types: &mut TypeCollection) -> DataType {
+                <$tty as Type>::definition(types)
             }
         }
     )+};
@@ -79,10 +79,10 @@ macro_rules! _impl_for_list {
 macro_rules! _impl_for_map {
     ($ty:path as $name:expr) => {
         impl<K: Type, V: Type> Type for $ty {
-            fn definition(type_map: &mut TypeCollection) -> DataType {
+            fn definition(types: &mut TypeCollection) -> DataType {
                 DataType::Map(crate::datatype::Map {
-                    key_ty: Box::new(K::definition(type_map)),
-                    value_ty: Box::new(V::definition(type_map)),
+                    key_ty: Box::new(K::definition(types)),
+                    value_ty: Box::new(V::definition(types)),
                 })
             }
         }
