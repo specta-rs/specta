@@ -1,6 +1,6 @@
 use specta::{
     datatype::{DataType, PrimitiveType},
-    Generics, Type,
+    Type,
 };
 
 use crate::ts::assert_ts;
@@ -28,19 +28,19 @@ pub struct BracedStruct {
 fn transparent() {
     // We check the datatype layer can TS can look correct but be wrong!
     assert_eq!(
-        TupleStruct::definition(&mut Default::default(), Generics::NONE),
+        TupleStruct::definition(&mut Default::default()),
         DataType::Primitive(PrimitiveType::String)
     );
     assert_eq!(
-        TupleStructWithRep::definition(&mut Default::default(), Generics::NONE),
+        TupleStructWithRep::definition(&mut Default::default()),
         DataType::Primitive(PrimitiveType::String)
     );
     assert_eq!(
-        GenericTupleStruct::<String>::definition(&mut Default::default(), Generics::NONE),
+        GenericTupleStruct::<String>::definition(&mut Default::default()),
         DataType::Primitive(PrimitiveType::String)
     );
     assert_eq!(
-        BracedStruct::definition(&mut Default::default(), Generics::NONE),
+        BracedStruct::definition(&mut Default::default()),
         DataType::Primitive(PrimitiveType::String)
     );
 

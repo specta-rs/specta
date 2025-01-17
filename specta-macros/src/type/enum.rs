@@ -1,5 +1,5 @@
 use super::{attr::*, r#struct::decode_field_attrs};
-use crate::utils::*;
+use crate::{r#type::field::construct_field, utils::*};
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{spanned::Spanned, DataEnum, Fields, GenericParam, Generics};
@@ -75,8 +75,6 @@ pub fn parse_enum(
                     (_, _) => variant_ident_str.to_token_stream(),
                 };
 
-                // let generic_idents = generic_idents.clone().collect::<Vec<_>>();
-
                 let inner = match &variant.fields {
                     Fields::Unit => quote!(#crate_ref::internal::construct::fields_unit()),
                     Fields::Unnamed(fields) => {
@@ -85,28 +83,15 @@ pub fn parse_enum(
                             .iter()
                             .map(|field| {
                                 let field_attrs = decode_field_attrs(field)?;
-                                let deprecated = field_attrs.common.deprecated_as_tokens(crate_ref);
-                                let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
-                                let optional = field_attrs.optional;
-                                let flatten = field_attrs.flatten;
-                                let doc = field_attrs.common.doc;
-
-                                let ty = (attrs.skip || field_attrs.skip).then(|| quote!(None))
-                                    .unwrap_or_else(|| {
-                                        if attrs.inline {
-                                            todo!();
-                                        }
-
-                                        quote!(Some(<#field_ty as #crate_ref::Type>::definition(type_map)))
-                                    });
-
-                                Ok(quote!(#crate_ref::internal::construct::field(
-                                    #optional,
-                                    #flatten,
-                                    #deprecated,
-                                    #doc.into(),
-                                    #ty
-                                )))
+                                Ok(construct_field(crate_ref, FieldAttr {
+                                    rename: field_attrs.rename,
+                                    r#type: field_attrs.r#type,
+                                    inline: field_attrs.inline || attrs.inline,
+                                    skip: field_attrs.skip || attrs.skip,
+                                    optional: field_attrs.optional,
+                                    flatten: field_attrs.flatten,
+                                    common: field_attrs.common,
+                                }, &field.ty))
                             })
                             .collect::<syn::Result<Vec<TokenStream>>>()?;
 
@@ -126,7 +111,7 @@ pub fn parse_enum(
                             let field_ident_str =
                                 unraw_raw_ident(field.ident.as_ref().unwrap());
 
-                            let field_name = match (field_attrs.rename, attrs.rename_all) {
+                            let field_name = match (field_attrs.rename.clone(), attrs.rename_all) {
                                 (Some(name), _) => name,
                                 (_, Some(inflection)) => {
                                     let name = inflection.apply(&field_ident_str);
@@ -134,27 +119,17 @@ pub fn parse_enum(
                                 }
                                 (_, _) => quote::quote!(#field_ident_str),
                             };
-                            let deprecated = field_attrs.common.deprecated_as_tokens(crate_ref);
-                            let optional = field_attrs.optional;
-                            let flatten = field_attrs.flatten;
-                            let doc = field_attrs.common.doc;
 
-                            let ty = (attrs.skip || field_attrs.skip).then(|| quote!(None))
-                                .unwrap_or_else(|| {
-                                    if attrs.inline {
-                                        todo!();
-                                    }
-
-                                    quote!(Some(<#field_ty as #crate_ref::Type>::definition(type_map)))
-                                });
-
-                            Ok(quote!((#field_name.into(), #crate_ref::internal::construct::field(
-                                #optional,
-                                #flatten,
-                                #deprecated,
-                                #doc.into(),
-                                #ty
-                            ))))
+                            let inner = construct_field(crate_ref, FieldAttr {
+                                rename: field_attrs.rename,
+                                r#type: field_attrs.r#type,
+                                inline: field_attrs.inline || attrs.inline,
+                                skip: field_attrs.skip || attrs.skip,
+                                optional: field_attrs.optional,
+                                flatten: field_attrs.flatten,
+                                common: field_attrs.common,
+                            }, &field.ty);
+                            Ok(quote!((#field_name.into(), #inner)))
                         })
                         .collect::<syn::Result<Vec<TokenStream>>>()?;
 

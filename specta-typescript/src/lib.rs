@@ -47,17 +47,17 @@ pub fn export_ref<T: NamedType>(_: &T, conf: &Typescript) -> Output {
 ///
 /// Eg. `export type Foo = { demo: string; };`
 pub fn export<T: NamedType>(conf: &Typescript) -> Output {
-    // let mut type_map = TypeCollection::default();
-    // let named_data_type = T::definition_named_data_type(&mut type_map);
-    // is_valid_ty(&named_data_type.inner, &type_map)?;
-    // let result = export_named_datatype(conf, &named_data_type, &type_map);
+    let mut types = TypeCollection::default();
+    T::definition(&mut types);
+    let ty = types.get(T::ID).unwrap();
+    is_valid_ty(&ty.inner, &types)?;
+    let result = export_named_datatype(conf, &ty, &types);
 
-    // if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_map).into_iter().next() {
-    //     return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
-    // }
+    if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
+        return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
+    }
 
-    // result
-    todo!();
+    result
 }
 
 /// Convert a type which implements [`Type`] to a TypeScript string.
@@ -71,12 +71,13 @@ pub fn inline_ref<T: Type>(_: &T, conf: &Typescript) -> Output {
 ///
 /// Eg. `{ demo: string; };`
 pub fn inline<T: Type>(conf: &Typescript) -> Output {
-    let mut type_map = TypeCollection::default();
-    let ty = T::definition(&mut type_map);
-    is_valid_ty(&ty, &type_map)?;
-    let result = datatype(conf, &FunctionResultVariant::Value(ty.clone()), &type_map);
+    let mut types = TypeCollection::default();
+    let ty = specta::datatype::inline::<T>(&mut types);
+    // println!("{:?}", ty); // TODO
+    is_valid_ty(&ty, &types)?;
+    let result = datatype(conf, &FunctionResultVariant::Value(ty.clone()), &types);
 
-    if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_map).into_iter().next() {
+    if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
         return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
     }
 
@@ -383,7 +384,7 @@ pub(crate) fn datatype_inner(
                     s.push_str(&definition.name());
                     s.push('<');
 
-                    for (i, (_, v)) in generics.iter().enumerate() {
+                    for (i, v) in generics.iter().enumerate() {
                         if i != 0 {
                             s.push_str(", ");
                         }

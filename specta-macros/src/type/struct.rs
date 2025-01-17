@@ -1,4 +1,4 @@
-use crate::utils::{parse_attrs, unraw_raw_ident, AttributeValue};
+use crate::{r#type::field::construct_field, utils::{parse_attrs, unraw_raw_ident, AttributeValue}};
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{spanned::Spanned, DataStruct, Field, Fields, GenericParam, Generics};
@@ -52,15 +52,6 @@ pub fn parse_struct(
         .enumerate()
         .collect::<Vec<_>>();
 
-    let reference_generics = generic_idents.iter().map(|(i, ident)| {
-        quote! {
-            generics
-                .get(#i)
-                .cloned()
-                .unwrap_or_else(|| <#ident as #crate_ref::Type>::reference(type_map, &[]).inner)
-        }
-    });
-
     let definition_generics = generic_idents.iter().map(|(_, ident)| {
         let ident = ident.to_string();
         quote!(std::borrow::Cow::Borrowed(#ident).into())
@@ -74,68 +65,30 @@ pub fn parse_struct(
             ));
         }
 
-        let (field_ty, field_attrs) = match data.fields {
-            Fields::Named(_) => {
-                let fields = data
-                    .fields
-                    .iter()
-                    .map(|field| decode_field_attrs(field).map(|v| (field.ty.clone(), v)))
-                    .collect::<Result<Vec<_>, _>>()?
-                    .into_iter()
-                    .filter(|(_, attrs)| !attrs.skip)
-                    .collect::<Vec<_>>();
+        let fields = data
+            .fields
+            .iter()
+            .map(|field| decode_field_attrs(field).map(|v| (field.ty.clone(), v)))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .filter(|(_, attrs)| !attrs.skip)
+            .collect::<Vec<_>>();
 
-                if fields.len() != 1 {
-                    return Err(syn::Error::new(
-                        data.fields.span(),
-                        "specta: transparent structs must have exactly one field",
-                    ));
-                }
-
-                fields.into_iter().next().expect("fields.len() != 1")
-            }
-            Fields::Unnamed(_) => {
-                let fields = data
-                    .fields
-                    .iter()
-                    .map(|field| decode_field_attrs(field).map(|v| (field.ty.clone(), v)))
-                    .collect::<Result<Vec<_>, _>>()?
-                    .into_iter()
-                    .filter(|(_, attrs)| !attrs.skip)
-                    .collect::<Vec<_>>();
-
-                if fields.len() != 1 {
-                    return Err(syn::Error::new(
-                        data.fields.span(),
-                        "specta: transparent structs must have exactly one field",
-                    ));
-                }
-
-                fields.into_iter().next().expect("fields.len() != 1")
-            }
-            Fields::Unit => {
-                return Err(syn::Error::new(
-                    data.fields.span(),
-                    "specta: transparent structs must have exactly one field",
-                ));
-            }
-        };
-
-        let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field_ty);
-
-        // let ty = construct_datatype(
-        //     format_ident!("ty"),
-        //     field_ty,
-        //     &generic_idents,
-        //     crate_ref,
-        //     field_attrs.inline,
-        // )?;
-
-        if field_attrs.inline {
-            todo!();
+        if fields.len() != 1 {
+            return Err(syn::Error::new(
+                data.fields.span(),
+                "specta: transparent structs must have exactly one field",
+            ));
         }
 
-        quote!(Some(<#field_ty as #crate_ref::Type>::definition(type_map)))
+        let (field_ty, field_attrs) = fields.into_iter().next().expect("fields.len() != 1");
+        let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field_ty);
+
+        if field_attrs.inline {
+            quote!(#crate_ref::datatype::inline::<#field_ty>(type_map))
+        } else {
+            quote!(<#field_ty as #crate_ref::Type>::definition(type_map))
+        }
     } else {
         let fields = match &data.fields {
             Fields::Named(_) => {
@@ -144,10 +97,8 @@ pub fn parse_struct(
                         .iter()
                         .map(|field| {
                             let field_attrs = decode_field_attrs(field)?;
-                            let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
 
                             let field_ident_str = unraw_raw_ident(field.ident.as_ref().unwrap());
-
                             let field_name =
                                 match (field_attrs.rename.clone(), container_attrs.rename_all) {
                                     (Some(name), _) => name,
@@ -157,39 +108,8 @@ pub fn parse_struct(
                                     (_, _) => field_ident_str.to_token_stream(),
                                 };
 
-                            let deprecated = field_attrs.common.deprecated_as_tokens(crate_ref);
-                            let optional = field_attrs.optional;
-                            let flatten = field_attrs.flatten;
-                            let doc = field_attrs.common.doc;
-
-                            let ty = field_attrs.skip.then(|| quote!(None)).unwrap_or_else(
-                                || {
-                                    if field_attrs.skip {
-                                        todo!();
-                                    }
-
-                                    if field_attrs.flatten {
-                                        todo!();
-                                        // quote! {
-                                        //     fn validate_flatten<T: #crate_ref::Flatten>() {}
-                                        //     validate_flatten::<#field_ty>();
-                                        //     #crate_ref::internal::flatten::<#field_ty>(SID, type_map, &generics)
-                                        // }
-                                    }
-
-                                    quote!(Some(<#field_ty as #crate_ref::Type>::definition(type_map)))
-                                },
-                            );
-
-                            Ok(
-                                quote!((#field_name.into(), #crate_ref::internal::construct::field(
-                                    #optional,
-                                    #flatten,
-                                    #deprecated,
-                                    #doc.into(),
-                                    #ty
-                                ))),
-                            )
+                            let inner = construct_field(crate_ref, field_attrs, &field.ty);
+                            Ok(quote!((#field_name.into(), #inner)))
                         })
                         .collect::<syn::Result<Vec<TokenStream>>>()?;
 
@@ -207,19 +127,7 @@ pub fn parse_struct(
                     .iter()
                     .map(|field| {
                         let field_attrs = decode_field_attrs(field)?;
-                        let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
-
-                        let deprecated = field_attrs.common.deprecated_as_tokens(crate_ref);
-                        let optional = field_attrs.optional;
-                        let flatten = field_attrs.flatten;
-                        let doc = field_attrs.common.doc;
-
-                        let ty = field_attrs.skip.then(|| quote!(None))
-                            .unwrap_or_else(|| {
-                                quote!(Some(<#field_ty as #crate_ref::Type>::definition(type_map)))
-                            });
-
-                        Ok(quote!(#crate_ref::internal::construct::field(#optional, #flatten, #deprecated, #doc.into(), #ty)))
+                        Ok(construct_field(crate_ref, field_attrs, &field.ty))
                     })
                     .collect::<syn::Result<Vec<TokenStream>>>()?;
 

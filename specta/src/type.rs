@@ -1,8 +1,5 @@
 use crate::{
-    datatype::{
-        reference::Reference,
-        DataType
-    }, SpectaID, TypeCollection
+    datatype::DataType, SpectaID, TypeCollection
 };
 
 mod impls;

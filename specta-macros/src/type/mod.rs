@@ -3,7 +3,7 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use r#enum::parse_enum;
 use r#struct::parse_struct;
-use syn::{parse, Data, DeriveInput};
+use syn::{parse, Data, DeriveInput, GenericParam};
 
 use crate::utils::{parse_attrs, unraw_raw_ident, AttributeValue};
 
@@ -11,6 +11,7 @@ use self::generics::{
     add_type_to_where_clause, generics_with_ident_and_bounds_only, generics_with_ident_only,
 };
 
+mod field;
 pub(crate) mod attr;
 mod r#enum;
 mod generics;
@@ -41,6 +42,14 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let name = container_attrs.rename.clone().unwrap_or_else(|| {
         unraw_raw_ident(&format_ident!("{}", raw_ident.to_string())).to_token_stream()
     });
+
+    let reference_generics = generics.params.iter().filter_map(|param| match param {
+        GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
+        GenericParam::Type(t) => {
+            let i = &t.ident;
+            Some(quote!(<#i as #crate_ref::Type>::definition(type_map)))
+        },
+    }).collect::<Vec<_>>();
 
     let (inlines, can_flatten) = match data {
         Data::Struct(data) => {
@@ -84,11 +93,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         }
     }
 
-    let definition_generics = generics.type_params().map(|param| {
-        let ident = param.ident.to_string();
-        quote!(#crate_ref::internal::construct::generic_data_type(#ident))
-    });
-
     let bounds = generics_with_ident_and_bounds_only(generics);
     let type_args = generics_with_ident_only(generics);
     let where_bound = add_type_to_where_clause(&quote!(#crate_ref::Type), generics);
@@ -124,41 +128,27 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let impl_location = quote!(#crate_ref::internal::construct::impl_location(concat!(file!(), ":", line!(), ":", column!())));
 
+    let definition = (container_attrs.inline || container_attrs.transparent).then(|| quote!(dt.inner)).unwrap_or_else(|| quote!(specta::datatype::reference::Reference::construct(SID, vec![#(#reference_generics),*]).into()));
+
     Ok(quote! {
         const _: () = {
-	        const IMPL_LOCATION: #crate_ref::ImplLocation = #impl_location;
-			const DEFINITION_GENERICS: &[#crate_ref::datatype::DataType] = &[#(#definition_generics),*];
 			const SID: #crate_ref::SpectaID = #crate_ref::internal::construct::sid(#name, concat!("::", module_path!(), ":", line!(), ":", column!()));
-
-            fn internal_inline(type_map: &mut #crate_ref::TypeCollection, generics: &[#crate_ref::datatype::DataType]) -> #crate_ref::datatype::DataType {
-                #inlines
-            }
 
             #[automatically_derived]
              impl #bounds #crate_ref::Type for #ident #type_args #where_bound {
                 fn definition(type_map: &mut #crate_ref::TypeCollection) -> #crate_ref::datatype::DataType {
-                    {
-                        let def = #crate_ref::internal::construct::named_data_type(
+                    let dt = #crate_ref::internal::register(type_map, SID, |type_map| {
+                        #crate_ref::internal::construct::named_data_type(
                             #name.into(),
                             #comments.into(),
                             #deprecated,
                             SID,
-                            IMPL_LOCATION,
-                            internal_inline(type_map, DEFINITION_GENERICS)
-                        );
+                            #impl_location,
+                            #inlines
+                        )
+                    });
 
-                        // TODO: We probs need to handle this for recursive types.
-                        // if self.map.get(&sid).is_none() {
-                        //     self.map.entry(sid).or_insert(None);
-                        //     let dt = T::definition_named_data_type(self);
-                        //     self.map.insert(sid, Some(dt));
-                        // }
-
-                        type_map.insert(SID, def);
-                    }
-
-                    // TODO: Fill in the generics
-                    specta::datatype::reference::Reference::construct(SID, vec![]).into()
+                    #definition
                 }
             }
 

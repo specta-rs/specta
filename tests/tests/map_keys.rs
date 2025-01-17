@@ -93,17 +93,17 @@ fn map_keys() {
     assert_ts!(
         ValidMaybeValidKeyNested,
         "Partial<{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }>"
-    );
+    ); // TODO: Stack overflow
     assert_ts_export!(
         ValidMaybeValidKeyNested,
         "export type ValidMaybeValidKeyNested = Partial<{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }>"
-    );
+    ); // TODO: Stack overflow
 
     assert_ts!(error; HashMap<() /* `null` */, ()>, SerdeError::InvalidMapKey);
     assert_ts!(error; HashMap<RegularStruct, ()>, SerdeError::InvalidMapKey);
     assert_ts!(error; HashMap<Variants, ()>, SerdeError::InvalidMapKey);
     assert_ts!(error; InvalidMaybeValidKey, SerdeError::InvalidMapKey);
     assert_ts_export!(error; InvalidMaybeValidKey, SerdeError::InvalidMapKey);
-    assert_ts!(error; InvalidMaybeValidKeyNested, SerdeError::InvalidMapKey);
-    assert_ts_export!(error; InvalidMaybeValidKeyNested, SerdeError::InvalidMapKey);
+    assert_ts!(error; InvalidMaybeValidKeyNested, SerdeError::InvalidMapKey); // TODO: Stack overflow
+    assert_ts_export!(error; InvalidMaybeValidKeyNested, SerdeError::InvalidMapKey); // TODO: Stack overflow
 }

@@ -1,4 +1,4 @@
-use crate::{datatype::reference::Reference, datatype::*, r#type::macros::*, *};
+use crate::{datatype::*, r#type::macros::*, *};
 
 use std::borrow::Cow;
 
@@ -117,13 +117,7 @@ impl<'a, T: Type> Type for &'a [T] {
 impl<const N: usize, T: Type> Type for [T; N] {
     fn definition(type_map: &mut TypeCollection) -> DataType {
         DataType::List(List {
-            ty: Box::new(
-                // TODO: This is cursed. Fix it properly!!!
-                match Vec::<T>::definition(type_map) {
-                    DataType::List(List { ty, .. }) => *ty,
-                    _ => unreachable!(),
-                },
-            ),
+            ty: Box::new(T::definition(type_map)),
             length: Some(N),
             unique: false,
         })
@@ -218,42 +212,43 @@ const _: () = {
 
     impl Type for std::time::SystemTime {
         fn definition(type_map: &mut TypeCollection) -> DataType {
-            DataType::Struct(internal::construct::r#struct(
-                "SystemTime".into(),
-                Some(internal::construct::sid("SystemTime".into(), "::todo:3:10")),
-                vec![],
-                internal::construct::fields_named(
-                    vec![
-                        (
-                            "duration_since_epoch".into(),
-                            internal::construct::field(
-                                false,
-                                false,
-                                None,
-                                "".into(),
-                                Some({
-                                    let ty = <i64 as Type>::definition(type_map);
-                                    ty
-                                }),
-                            ),
-                        ),
-                        (
-                            "duration_since_unix_epoch".into(),
-                            internal::construct::field(
-                                false,
-                                false,
-                                None,
-                                "".into(),
-                                Some({
-                                    let ty = <u32 as Type>::definition(type_map);
-                                    ty
-                                }),
-                            ),
-                        ),
-                    ],
-                    None,
-                ),
-            ))
+            todo!();
+            // DataType::Struct(internal::construct::r#struct(
+            //     "SystemTime".into(),
+            //     Some(internal::construct::sid("SystemTime".into(), "::todo:3:10")),
+            //     vec![],
+            //     internal::construct::fields_named(
+            //         vec![
+            //             (
+            //                 "duration_since_epoch".into(),
+            //                 internal::construct::field(
+            //                     false,
+            //                     false,
+            //                     None,
+            //                     "".into(),
+            //                     Some({
+            //                         let ty = <i64 as Type>::definition(type_map);
+            //                         ty
+            //                     }),
+            //                 ),
+            //             ),
+            //             (
+            //                 "duration_since_unix_epoch".into(),
+            //                 internal::construct::field(
+            //                     false,
+            //                     false,
+            //                     None,
+            //                     "".into(),
+            //                     Some({
+            //                         let ty = <u32 as Type>::definition(type_map);
+            //                         ty
+            //                     }),
+            //                 ),
+            //             ),
+            //         ],
+            //         None,
+            //     ),
+            // ))
         }
     }
 
@@ -301,42 +296,43 @@ const _: () = {
 
     impl Type for std::time::Duration {
         fn definition(type_map: &mut TypeCollection) -> DataType {
-            DataType::Struct(internal::construct::r#struct(
-                "Duration".into(),
-                Some(SID),
-                vec![],
-                internal::construct::fields_named(
-                    vec![
-                        (
-                            "secs".into(),
-                            internal::construct::field(
-                                false,
-                                false,
-                                None,
-                                "".into(),
-                                Some({
-                                    let ty = <u64 as Type>::definition(type_map);
-                                    ty
-                                }),
-                            ),
-                        ),
-                        (
-                            "nanos".into(),
-                            internal::construct::field(
-                                false,
-                                false,
-                                None,
-                                "".into(),
-                                Some({
-                                    let ty = <u32 as Type>::definition(type_map);
-                                    ty
-                                }),
-                            ),
-                        ),
-                    ],
-                    None,
-                ),
-            ))
+            todo!();
+            // DataType::Struct(internal::construct::r#struct(
+            //     "Duration".into(),
+            //     Some(SID),
+            //     vec![],
+            //     internal::construct::fields_named(
+            //         vec![
+            //             (
+            //                 "secs".into(),
+            //                 internal::construct::field::<u64>(
+            //                     false,
+            //                     false,
+            //                     None,
+            //                     "".into(),
+            //                     Some({
+            //                         let ty = <u64 as Type>::definition(type_map);
+            //                         ty
+            //                     }),
+            //                 ),
+            //             ),
+            //             (
+            //                 "nanos".into(),
+            //                 internal::construct::field(
+            //                     false,
+            //                     false,
+            //                     None,
+            //                     "".into(),
+            //                     Some({
+            //                         let ty = <u32 as Type>::definition(type_map);
+            //                         ty
+            //                     }),
+            //                 ),
+            //             ),
+            //         ],
+            //         None,
+            //     ),
+            // ))
         }
     }
 

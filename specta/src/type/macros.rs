@@ -42,13 +42,9 @@ macro_rules! _impl_containers {
             }
         }
 
-        // TODO: Bring this back?
-        // impl<T: NamedType> NamedType for $container<T> {
-        //     static SID: SpectaID = T::SID;
-        //     // fn reference(types: &mut TypeCollection) -> Reference {
-        //     //     T::reference(types)
-        //     // }
-        // }
+        impl<T: NamedType> NamedType for $container<T> {
+            const ID: SpectaID = T::ID;
+        }
 
         impl<T: Flatten> Flatten for $container<T> {}
     )+}
@@ -61,6 +57,11 @@ macro_rules! _impl_as {
                 <$tty as Type>::definition(types)
             }
         }
+
+        // TODO: ????
+        // impl NamedType for $ty {
+        //     const ID: SpectaID = <$tty as NamedType>::ID;
+        // }
     )+};
 }
 

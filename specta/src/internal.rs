@@ -10,9 +10,46 @@ use std::{borrow::Cow, collections::HashMap};
 pub use paste::paste;
 
 use crate::{
-    datatype::{DataType, Field, Fields, GenericType, List, Map},
-    ImplLocation, SpectaID, Type, TypeCollection,
+    datatype::{DataType, Field, NamedDataType}, ImplLocation, SpectaID, Type, TypeCollection
 };
+
+/// Registers a type in the `TypeCollection` if it hasn't been registered already.
+/// This accounts for recursive types.
+pub fn register(
+    types: &mut TypeCollection,
+    sid: SpectaID,
+    build: impl FnOnce(&mut TypeCollection) -> NamedDataType,
+) -> NamedDataType {
+    match types.map.get(&sid) {
+        Some(Some(dt)) => dt.clone(),
+        Some(None) => todo!("recursive inline or something"), // TODO: Recursive inline I think
+        None => {
+            types.map.entry(sid).or_insert(None);
+            let dt = build(types);
+            types.map.insert(sid, Some(dt.clone()));
+            dt
+        }
+    }
+}
+
+// TODO: Make private
+#[track_caller]
+pub fn flatten<T: Type>(
+    sid: SpectaID,
+    types: &mut TypeCollection,
+) -> DataType {
+    types.flatten_stack.push(sid);
+
+    #[allow(clippy::panic)]
+    if types.flatten_stack.len() > 25 {
+        // TODO: Handle this error without panicking
+        panic!("Type recursion limit exceeded!");
+    }
+
+    let ty = T::definition(types);
+    types.flatten_stack.pop();
+    ty
+}
 
 /// Functions used to construct `crate::datatype` types (they have private fields so can't be constructed directly).
 /// We intentionally keep their fields private so we can modify them without a major version bump.
@@ -20,23 +57,77 @@ use crate::{
 pub mod construct {
     use std::borrow::Cow;
 
-    use reference::Reference;
+    use crate::{datatype::{self, *}, Flatten, ImplLocation, SpectaID, Type, TypeCollection};
 
-    use crate::{datatype::*, ImplLocation, SpectaID};
-
-    pub const fn field(
+    pub fn skipped_field(
         optional: bool,
-        flatten: bool,
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
-        ty: Option<DataType>,
     ) -> Field {
         Field {
             optional,
-            flatten,
+            flatten: false,
             deprecated,
             docs,
-            ty,
+            ty: None,
+        }
+    }
+
+    pub fn field_flattened<T: Type + Flatten>(
+        optional: bool,
+        deprecated: Option<DeprecatedType>,
+        docs: Cow<'static, str>,
+        inline: bool,
+        types: &mut TypeCollection
+    ) -> Field {
+        // TODO: Could this stack overflow? Is `TypeCollection::flatten_stack` still used or should we use it?
+        let ty = datatype::inline::<T>(types);
+
+        // match inline {
+        //     DataType::Struct(s) => s.fields(),
+        //     _ => todo!(),
+        // }
+
+        // println!("{:?}", inline);
+
+        // todo!();
+        // types.flatten_stack.push(T::ID);
+
+        // #[allow(clippy::panic)]
+        // if types.flatten_stack.len() > 25 {
+        //     // TODO: Handle this error without panicking
+        //     panic!("Type recursion limit exceeded!");
+        // }
+
+        // let ty = T::definition(types);
+        // types.flatten_stack.pop();
+
+        Field {
+            optional,
+            flatten: true,
+            deprecated,
+            docs,
+            ty: Some(ty),
+        }
+    }
+
+    pub fn field<T: Type>(
+        optional: bool,
+        deprecated: Option<DeprecatedType>,
+        docs: Cow<'static, str>,
+        inline: bool,
+        types: &mut TypeCollection
+    ) -> Field {
+        Field {
+            optional,
+            flatten: false,
+            deprecated,
+            docs,
+            ty: Some(if inline {
+                datatype::inline::<T>(types)
+            } else {
+                T::definition(types)
+            })
         }
     }
 
@@ -118,16 +209,6 @@ pub mod construct {
         }
     }
 
-    pub const fn data_type_reference(
-        sid: SpectaID,
-        generics: Vec<(GenericType, DataType)>,
-    ) -> Reference {
-        Reference {
-            sid,
-            generics,
-        }
-    }
-
     pub const fn tuple(fields: Vec<DataType>) -> TupleType {
         TupleType { elements: fields }
     }
@@ -186,27 +267,6 @@ pub fn skip_fields_named<'a>(
         .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
 }
 
-#[track_caller]
-pub fn flatten<T: Type>(
-    sid: SpectaID,
-    type_map: &mut TypeCollection,
-    generics: &[DataType], // TODO: Remove
-) -> DataType {
-    type_map.flatten_stack.push(sid);
-
-    #[allow(clippy::panic)]
-    if type_map.flatten_stack.len() > 25 {
-        // TODO: Handle this error without panicking
-        panic!("Type recursion limit exceeded!");
-    }
-
-    let ty = T::definition(type_map);
-
-    type_map.flatten_stack.pop();
-
-    ty
-}
-
 #[cfg(feature = "function")]
 mod functions {
     use super::*;
@@ -241,76 +301,76 @@ pub use functions::*;
 
 // TODO: Maybe make this a public utility?
 // TODO: Should this be in the core or in `specta-serde`?
-pub fn resolve_generics(mut dt: DataType, generics: &[(GenericType, DataType)]) -> DataType {
-    match dt {
-        DataType::Primitive(_) | DataType::Literal(_) | DataType::Any | DataType::Unknown => dt,
-        DataType::List(v) => DataType::List(List {
-            ty: Box::new(resolve_generics(*v.ty, generics)),
-            length: v.length,
-            unique: v.unique,
-        }),
-        DataType::Nullable(v) => DataType::Nullable(Box::new(resolve_generics(*v, generics))),
-        DataType::Map(v) => DataType::Map(Map {
-            key_ty: Box::new(resolve_generics(*v.key_ty, generics)),
-            value_ty: Box::new(resolve_generics(*v.value_ty, generics)),
-        }),
-        DataType::Struct(ref mut v) => match &mut v.fields {
-            Fields::Unit => dt,
-            Fields::Unnamed(f) => {
-                for field in f.fields.iter_mut() {
-                    field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
-                }
+// pub fn resolve_generics(mut dt: DataType, generics: &[DataType)]) -> DataType {
+//     match dt {
+//         DataType::Primitive(_) | DataType::Literal(_) | DataType::Any | DataType::Unknown => dt,
+//         DataType::List(v) => DataType::List(List {
+//             ty: Box::new(resolve_generics(*v.ty, generics)),
+//             length: v.length,
+//             unique: v.unique,
+//         }),
+//         DataType::Nullable(v) => DataType::Nullable(Box::new(resolve_generics(*v, generics))),
+//         DataType::Map(v) => DataType::Map(Map {
+//             key_ty: Box::new(resolve_generics(*v.key_ty, generics)),
+//             value_ty: Box::new(resolve_generics(*v.value_ty, generics)),
+//         }),
+//         DataType::Struct(ref mut v) => match &mut v.fields {
+//             Fields::Unit => dt,
+//             Fields::Unnamed(f) => {
+//                 for field in f.fields.iter_mut() {
+//                     field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
+//                 }
 
-                dt
-            }
-            Fields::Named(f) => {
-                for (_, field) in f.fields.iter_mut() {
-                    field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
-                }
+//                 dt
+//             }
+//             Fields::Named(f) => {
+//                 for (_, field) in f.fields.iter_mut() {
+//                     field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
+//                 }
 
-                dt
-            }
-        },
-        DataType::Enum(ref mut v) => {
-            for (_, v) in v.variants.iter_mut() {
-                match &mut v.fields {
-                    Fields::Unit => {}
-                    Fields::Named(f) => {
-                        for (_, field) in f.fields.iter_mut() {
-                            field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
-                        }
-                    }
-                    Fields::Unnamed(f) => {
-                        for field in f.fields.iter_mut() {
-                            field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
-                        }
-                    }
-                }
-            }
+//                 dt
+//             }
+//         },
+//         DataType::Enum(ref mut v) => {
+//             for (_, v) in v.variants.iter_mut() {
+//                 match &mut v.fields {
+//                     Fields::Unit => {}
+//                     Fields::Named(f) => {
+//                         for (_, field) in f.fields.iter_mut() {
+//                             field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
+//                         }
+//                     }
+//                     Fields::Unnamed(f) => {
+//                         for field in f.fields.iter_mut() {
+//                             field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
+//                         }
+//                     }
+//                 }
+//             }
 
-            dt
-        }
-        DataType::Tuple(ref mut v) => {
-            for ty in v.elements.iter_mut() {
-                *ty = resolve_generics(ty.clone(), generics);
-            }
+//             dt
+//         }
+//         DataType::Tuple(ref mut v) => {
+//             for ty in v.elements.iter_mut() {
+//                 *ty = resolve_generics(ty.clone(), generics);
+//             }
 
-            dt
-        }
-        DataType::Reference(ref mut r) => {
-            for (_, generic) in r.generics.iter_mut() {
-                *generic = resolve_generics(generic.clone(), generics);
-            }
+//             dt
+//         }
+//         DataType::Reference(ref mut r) => {
+//             for generic in r.generics.iter_mut() {
+//                 *generic = resolve_generics(generic.clone(), generics);
+//             }
 
-            dt
-        }
-        DataType::Generic(g) => generics
-            .iter()
-            .find(|(name, _)| name == &g)
-            .map(|(_, ty)| ty.clone())
-            .unwrap_or_else(|| format!("Generic type `{g}` was referenced but not found").into()), // TODO: Error properly
-    }
-}
+//             dt
+//         }
+//         DataType::Generic(g) => generics
+//             .iter()
+//             .find(|(name, _)| name == &g)
+//             .map(|(_, ty)| ty.clone())
+//             .unwrap_or_else(|| format!("Generic type `{g}` was referenced but not found").into()), // TODO: Error properly
+//     }
+// }
 
 // TODO: This should go
 /// post process the type map to detect duplicate type names

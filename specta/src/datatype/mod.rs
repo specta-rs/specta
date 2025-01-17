@@ -5,6 +5,7 @@ use std::{
     fmt::Display,
 };
 
+mod inline;
 mod r#enum;
 mod fields;
 mod function;
@@ -17,6 +18,7 @@ pub mod reference;
 mod r#struct;
 mod tuple;
 
+pub use inline::*;
 pub use fields::*;
 pub use function::*;
 pub use list::*;

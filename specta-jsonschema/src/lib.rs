@@ -12,7 +12,7 @@ use std::path::Path;
 
 use inflector::Inflector;
 use schemars::schema::{InstanceType, Schema, SingleOrVec};
-use specta::{builder::{EnumBuilder, FieldBuilder, StructBuilder}, datatype::{DataType, DataTypeReference, List, LiteralType, PrimitiveType}, TypeCollection};
+use specta::{builder::{EnumBuilder, FieldBuilder, StructBuilder}, datatype::{DataType, List, LiteralType, PrimitiveType}, TypeCollection};
 
 #[derive(Debug, Clone)]
 pub struct JsonSchema;

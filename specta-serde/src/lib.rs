@@ -13,7 +13,7 @@ use specta::{
     datatype::{
         DataType, EnumRepr, EnumType, LiteralType, PrimitiveType, Fields,
     },
-    internal::{resolve_generics, skip_fields, skip_fields_named},
+    internal::{skip_fields, skip_fields_named},
     SpectaID, TypeCollection,
 };
 
@@ -85,7 +85,7 @@ fn is_valid_ty_internal(
             }
         }
         DataType::Reference(ty) => {
-            for (_, generic) in ty.generics() {
+            for generic in ty.generics() {
                 is_valid_ty_internal(generic, type_map, checked_references)?;
             }
 
@@ -164,7 +164,9 @@ fn is_valid_map_key(key_ty: &DataType, type_map: &TypeCollection) -> Result<(), 
         DataType::Reference(r) => {
             let ty = type_map.get(r.sid()).expect("Type was never populated"); // TODO: Error properly
 
-            is_valid_map_key(&resolve_generics(ty.inner.clone(), r.generics()), type_map)
+            // TODO: Bring back this
+            // resolve_generics(ty.inner.clone(), r.generics())
+            is_valid_map_key(&ty.inner, type_map)
         }
         _ => Err(SerdeError::InvalidMapKey),
     }
