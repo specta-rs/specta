@@ -57,19 +57,19 @@ pub fn reference_or_inline<T: Type + ?Sized>(
 }
 
 // TODO: Remove this?
-pub fn reference<T: NamedType>(
-    type_map: &mut TypeCollection,
-) -> Reference {
-    T::definition(type_map);
-    Reference {
-        sid: T::sid(),
-        // inner: DataType::Reference(DataTypeReference {
-        //     sid,
-        //     // TODO: Make this work
-        //     generics: Default::default()
-        // }),
-    }
-}
+// pub fn reference<T: NamedType>(
+//     type_map: &mut TypeCollection,
+// ) -> Reference {
+//     T::definition(type_map);
+//     Reference {
+//         sid: T::sid(),
+//         // inner: DataType::Reference(DataTypeReference {
+//         //     sid,
+//         //     // TODO: Make this work
+//         //     generics: Default::default()
+//         // }),
+//     }
+// }
 
 // // TODO: Remove this?
 // pub fn reference(

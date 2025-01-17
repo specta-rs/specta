@@ -70,10 +70,6 @@ macro_rules! _impl_containers {
         }
 
         impl<T: NamedType> NamedType for $container<T> {
-            fn sid() -> SpectaID {
-                T::sid()
-            }
-
             fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
                 T::reference(type_map, generics)
             }

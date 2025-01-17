@@ -80,10 +80,10 @@ pub fn add_type_to_where_clause(ty: &TokenStream, generics: &Generics) -> Option
     }
 }
 
-type DtGenericFn = fn(&TokenStream, TokenStream) -> TokenStream;
-fn dt_generic_fn(f: DtGenericFn) -> DtGenericFn {
-    f
-}
+// type DtGenericFn = fn(&TokenStream, TokenStream) -> TokenStream;
+// fn dt_generic_fn(f: DtGenericFn) -> DtGenericFn {
+//     f
+// }
 
 pub fn construct_datatype(
     var_ident: Ident,
@@ -94,8 +94,16 @@ pub fn construct_datatype(
 ) -> syn::Result<TokenStream> {
     let inner: fn(_, _, _) -> _ = match inline {
         true => |crate_ref: &TokenStream, ty: &Type, generics: TokenStream| quote!(<#ty as #crate_ref::Type>::inline(type_map, Generics::Provided(#generics))),
-        false => |crate_ref: &TokenStream, ty: &Type, generics: TokenStream| quote!(#crate_ref::datatype::reference::reference_or_inline::<#ty>(type_map, #generics)),
+        false => |crate_ref: &TokenStream, ty: &Type, generics: TokenStream|
+        // TODO: #crate_ref::datatype::reference::reference_or_inline::<#ty>(type_map, #generics)
+        quote!({
+            <#ty as #crate_ref::NamedType>::definition(type_map);
+
+            #crate_ref::datatype::reference::Reference::construct(SID) // .to_datatype(vec![]) // TODO: pass in generics
+        }),
     };
+
+
 
 
     // let (method, transform, generics) = match inline {

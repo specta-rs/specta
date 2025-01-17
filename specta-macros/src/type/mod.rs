@@ -44,10 +44,9 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         unraw_raw_ident(&format_ident!("{}", raw_ident.to_string())).to_token_stream()
     });
 
-    let sid = quote!(#crate_ref::internal::construct::sid(#name, concat!("::", module_path!(), ":", line!(), ":", column!())));
     let (inlines, reference, can_flatten) = match data {
         Data::Struct(data) => {
-            parse_struct(&name, &container_attrs, generics, &crate_ref, &sid, data)
+            parse_struct(&name, &container_attrs, generics, &crate_ref, data)
         }
         Data::Enum(data) => parse_enum(
             &name,
@@ -55,7 +54,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             &container_attrs,
             generics,
             &crate_ref,
-            &sid,
             data,
         ),
         Data::Union(data) => Err(syn::Error::new_spanned(
@@ -134,6 +132,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         const _: () = {
 	        const IMPL_LOCATION: #crate_ref::ImplLocation = #impl_location;
 			const DEFINITION_GENERICS: &[#crate_ref::datatype::DataType] = &[#(#definition_generics),*];
+			const SID: #crate_ref::SpectaID = #crate_ref::internal::construct::sid(#name, concat!("::", module_path!(), ":", line!(), ":", column!()));
 
             fn internal_inline(type_map: &mut #crate_ref::TypeCollection, generics: &[#crate_ref::datatype::DataType]) -> #crate_ref::datatype::DataType {
                 #inlines
@@ -153,11 +152,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
             #[automatically_derived]
             impl #bounds #crate_ref::NamedType for #ident #type_args #where_bound {
-                fn sid() -> #crate_ref::SpectaID {
-                    #sid
-                }
-
-
                 fn reference(type_map: &mut #crate_ref::TypeCollection, generics: &[#crate_ref::datatype::DataType]) -> #crate_ref::datatype::reference::Reference {
                     Self::definition(type_map);
 
@@ -169,7 +163,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         #name.into(),
                         #comments.into(),
                         #deprecated,
-                        <Self as #crate_ref::NamedType>::sid(),
+                        SID,
                         IMPL_LOCATION,
                         internal_inline(type_map, DEFINITION_GENERICS)
                     );
@@ -181,7 +175,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     //     self.map.insert(sid, Some(dt));
                     // }
 
-                    type_map.insert(<Self as #crate_ref::NamedType>::sid(), def);
+                    type_map.insert(SID, def);
                  }
             }
 

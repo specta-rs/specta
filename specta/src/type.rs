@@ -51,9 +51,9 @@ pub trait Type {
 /// represents a type that can be converted into [NamedDataType].
 /// This will be implemented for all types with the [Type] derive macro.
 pub trait NamedType: Type {
-    // TODO: Remove this cause it's implicitly on the `Reference` impl
-    // TODO: I hate this being a method
-    fn sid() -> SpectaID;
+    // // TODO: Remove this cause it's implicitly on the `Reference` impl
+    // // TODO: I hate this being a method
+    // fn sid() -> SpectaID;
 
     /// Generates a datatype corresponding to a reference to this type,
     /// as determined by its category. Getting a reference to a type implies that
