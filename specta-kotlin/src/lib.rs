@@ -48,21 +48,22 @@ fn datatype(t: &DataType) -> Result<String, String> {
         ),
         DataType::Generic(t) => t.to_string(),
         DataType::Reference(reference) => {
-            let name = reference.name();
+            // let name = reference.name();
             let generics = reference.generics();
 
-            match &generics[..] {
-                [] => name.to_string(),
-                generics => {
-                    let generics = generics
-                        .iter()
-                        .map(|(_, t)| datatype(t))
-                        .collect::<Result<Vec<_>, _>>()?
-                        .join(", ");
+            // match &generics[..] {
+            //     [] => name.to_string(),
+            //     generics => {
+            //         let generics = generics
+            //             .iter()
+            //             .map(|(_, t)| datatype(t))
+            //             .collect::<Result<Vec<_>, _>>()?
+            //             .join(", ");
 
-                    format!("{name}<{generics}>")
-                }
-            }
+            //         format!("{name}<{generics}>")
+            //     }
+            // }
+            todo!();
         }
         DataType::Nullable(t) => format!("{}?", datatype(&t)?),
         DataType::Struct(s) => {

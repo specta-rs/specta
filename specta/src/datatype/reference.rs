@@ -9,6 +9,7 @@ use super::{DataType, DataTypeReference};
 // This type exists to force the user to use [reference::inline] or [reference::reference] which provides some extra safety.
 #[non_exhaustive]
 pub struct Reference {
+    // TODO: Seal these fields
     pub sid: SpectaID,
     pub inner: DataType,
 }
@@ -62,7 +63,7 @@ pub fn inline<T: Type + ?Sized>(type_map: &mut TypeCollection, generics: &[DataT
 
 pub fn reference<T: NamedType>(
     type_map: &mut TypeCollection,
-    reference: DataTypeReference,
+    // reference: DataTypeReference,
 ) -> Reference {
     let sid = T::sid();
 
@@ -74,7 +75,12 @@ pub fn reference<T: NamedType>(
 
     Reference {
         sid: T::sid(),
-        inner: DataType::Reference(reference),
+        inner: DataType::Reference(DataTypeReference {
+            // TODO: Make this stuff work
+            // name: "".into(),
+            sid,
+            generics: Default::default()
+        }),
     }
 }
 

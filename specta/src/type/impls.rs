@@ -305,7 +305,7 @@ const _: () = {
             Some(
                 reference::reference::<Self>(
                     type_map,
-                    internal::construct::data_type_reference("SystemTime".into(), SID, vec![]),
+                    // internal::construct::data_type_reference("SystemTime".into(), SID, vec![]),
                 )
             )
         }
@@ -388,7 +388,7 @@ const _: () = {
             Some(
                 reference::reference::<Self>(
                     type_map,
-                    internal::construct::data_type_reference("Duration".into(), Self::sid(), vec![]),
+                    // internal::construct::data_type_reference("Duration".into(), Self::sid(), vec![]),
                 )
             )
         }

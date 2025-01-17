@@ -373,26 +373,30 @@ pub(crate) fn datatype_inner(
             )?
         }
         DataType::Tuple(tuple) => s.push_str(&tuple_datatype(ctx, tuple, type_map)?),
-        DataType::Reference(reference) => match &reference.generics()[..] {
-            [] => s.push_str(&reference.name()),
-            generics => {
-                s.push_str(&reference.name());
-                s.push('<');
+        DataType::Reference(reference) => {
+            let definition = type_map.get(reference.sid()).unwrap(); // TODO: Error handling
 
-                for (i, (_, v)) in generics.iter().enumerate() {
-                    if i != 0 {
-                        s.push_str(", ");
+            match &reference.generics()[..] {
+                [] => s.push_str(&definition.name()),
+                generics => {
+                    s.push_str(&definition.name());
+                    s.push('<');
+
+                    for (i, (_, v)) in generics.iter().enumerate() {
+                        if i != 0 {
+                            s.push_str(", ");
+                        }
+
+                        datatype_inner(
+                            ctx.with(PathItem::Type(definition.name().clone())),
+                            &FunctionResultVariant::Value(v.clone()),
+                            type_map,
+                            s,
+                        )?;
                     }
 
-                    datatype_inner(
-                        ctx.with(PathItem::Type(reference.name().clone())),
-                        &FunctionResultVariant::Value(v.clone()),
-                        type_map,
-                        s,
-                    )?;
+                    s.push('>');
                 }
-
-                s.push('>');
             }
         },
         DataType::Generic(ident) => s.push_str(&ident.to_string()),

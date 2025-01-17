@@ -245,14 +245,17 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
             todo!();
         }
         DataType::Reference(reference) => match &reference.generics()[..] {
-            [] => ReferenceOr::Item(Schema {
-                schema_data,
-                schema_kind: SchemaKind::OneOf {
-                    one_of: vec![ReferenceOr::Reference {
-                        reference: format!("#/components/schemas/{}", reference.name()),
-                    }],
-                },
-            }),
+            [] => {
+                todo!();
+                // ReferenceOr::Item(Schema {
+                //     schema_data,
+                //     schema_kind: SchemaKind::OneOf {
+                //         one_of: vec![ReferenceOr::Reference {
+                //             reference: format!("#/components/schemas/{}", reference.name()),
+                //         }],
+                //     },
+                // })
+            },
             generics => {
                 // let generics = generics
                 //     .iter()

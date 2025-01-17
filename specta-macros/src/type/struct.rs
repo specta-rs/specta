@@ -277,11 +277,12 @@ pub fn parse_struct(
     } else {
         quote!({
                 #reference_generics
-                #crate_ref::datatype::reference::reference::<Self>(type_map, #crate_ref::internal::construct::data_type_reference(
-                    #name.into(),
-                    #sid,
-                    vec![#(#reference_generics2),*]
-                ))
+                #crate_ref::datatype::reference::reference::<Self>(type_map)
+                // , #crate_ref::internal::construct::data_type_reference(
+                //     // #name.into(),
+                //     #sid,
+                //     vec![#(#reference_generics2),*]
+                // )
         })
     };
 

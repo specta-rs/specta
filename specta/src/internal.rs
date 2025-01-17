@@ -6,9 +6,6 @@
 
 use std::{borrow::Cow, collections::HashMap};
 
-#[cfg(feature = "interop")]
-pub mod interop;
-
 #[cfg(feature = "function")]
 pub use paste::paste;
 
@@ -120,12 +117,10 @@ pub mod construct {
     }
 
     pub const fn data_type_reference(
-        name: Cow<'static, str>,
         sid: SpectaID,
         generics: Vec<(GenericType, DataType)>,
     ) -> DataTypeReference {
         DataTypeReference {
-            name,
             sid,
             generics,
         }

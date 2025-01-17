@@ -103,16 +103,11 @@ pub enum DeprecatedType {
 // require a more complex solution since it will require multiple processing stages.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DataTypeReference {
-    pub(crate) name: Cow<'static, str>,
     pub(crate) sid: SpectaID,
     pub(crate) generics: Vec<(GenericType, DataType)>,
 }
 
 impl DataTypeReference {
-    pub fn name(&self) -> &Cow<'static, str> {
-        &self.name
-    }
-
     pub fn sid(&self) -> SpectaID {
         self.sid
     }
