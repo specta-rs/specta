@@ -4,7 +4,7 @@ use std::{
     fmt,
 };
 
-use crate::{datatype::{reference::Reference, NamedDataType}, DataType, Generics, NamedType, SpectaID};
+use crate::{datatype::NamedDataType, NamedType, SpectaID};
 
 /// Define a set of types which can be exported together.
 ///

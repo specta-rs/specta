@@ -1,6 +1,6 @@
 //! Helpers for generating [Type::reference] implementations.
 
-use crate::{datatype::{Field, Fields, NamedFields, StructType, UnnamedFields}, Generics, NamedType, SpectaID, Type, TypeCollection};
+use crate::{datatype::{Field, Fields, NamedFields, StructType, UnnamedFields}, SpectaID, Type, TypeCollection};
 
 use super::{DataType, DataTypeReference, GenericType};
 

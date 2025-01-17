@@ -10,8 +10,8 @@ use std::{borrow::Cow, collections::HashMap};
 pub use paste::paste;
 
 use crate::{
-    datatype::{DataType, Field, GenericType, List, Map, Fields},
-    Generics, ImplLocation, SpectaID, Type, TypeCollection,
+    datatype::{DataType, Field, Fields, GenericType, List, Map},
+    ImplLocation, SpectaID, Type, TypeCollection,
 };
 
 /// Functions used to construct `crate::datatype` types (they have private fields so can't be constructed directly).
