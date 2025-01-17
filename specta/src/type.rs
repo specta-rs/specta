@@ -41,7 +41,7 @@ impl<'a> Generics<'a> {
 /// Provides runtime type information that can be fed into a language exporter to generate a type definition in another language.
 /// Avoid implementing this trait yourself where possible and use the [`Type`](derive@crate::Type) macro instead.
 pub trait Type {
-    // TODO: Maybe rename this
+    // TODO: Maybe rename this???
     /// Returns the definition of a type using the provided generics.
     ///
     /// This should be only implemented via the [`Type`](derive@crate::Type) macro.

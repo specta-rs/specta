@@ -1,6 +1,6 @@
 //! Helpers for generating [Type::reference] implementations.
 
-use crate::{Generics, NamedType, SpectaID, Type, TypeCollection};
+use crate::{datatype::{Field, Fields, NamedFields, StructType, UnnamedFields}, Generics, NamedType, SpectaID, Type, TypeCollection};
 
 use super::{DataType, DataTypeReference, GenericType};
 
@@ -40,6 +40,58 @@ impl Reference {
             generics: generics.into(),
         })
     }
+}
+
+/// TODO: Finish and document this
+/// TODO: Move somewhere else
+pub fn inline<T: Type>(types: &mut TypeCollection, generics: &[DataType]) -> DataType {
+    fn inner(types: &mut TypeCollection, dt: DataType) -> DataType {
+        match dt {
+            DataType::Any | DataType::Unknown |  DataType::Primitive(..) | DataType::Literal(..) => dt,
+            DataType::List(list) => inner(types, (*list.ty).clone()),
+            DataType::Map(map) => todo!(),
+            DataType::Nullable(data_type) => todo!(),
+            DataType::Struct(s) => DataType::Struct(StructType {
+                name: s.name,
+                sid: s.sid,
+                generics: s.generics,
+                fields: match s.fields {
+                    Fields::Unit => Fields::Unit,
+                    Fields::Unnamed(unnamed_fields) => Fields::Unnamed(UnnamedFields {
+                        fields: unnamed_fields.fields.into_iter().map(|f| Field {
+                            optional: f.optional,
+                            flatten: f.flatten,
+                            deprecated: f.deprecated,
+                            docs: f.docs,
+                            ty: f.ty.map(|ty| inner(types, ty))
+                        }).collect(),
+                    }),
+                    Fields::Named(named_fields) => Fields::Named(NamedFields {
+                        tag: named_fields.tag,
+                        fields: named_fields.fields.into_iter().map(|(k, f)| (k, Field {
+                            optional: f.optional,
+                            flatten: f.flatten,
+                            deprecated: f.deprecated,
+                            docs: f.docs,
+                            ty: f.ty.map(|ty| inner(types, ty))
+                        })).collect(),
+                    })
+                }
+            }),
+            DataType::Enum(enum_type) => todo!(),
+            DataType::Tuple(tuple_type) => todo!(),
+            DataType::Reference(r) => {
+                assert_eq!(r.generics.len(), 0, "Generics not supported, yet"); // TODO
+
+                let ty = types.get(r.sid).unwrap(); // TODO: Error handling
+                inner(types, ty.inner.clone())
+            }
+            DataType::Generic(generic_type) => todo!(),
+        }
+    }
+
+    let dt = T::inline(types, Generics::Provided(generics));
+    inner(types, dt)
 }
 
 pub fn reference_or_inline<T: Type + ?Sized>(

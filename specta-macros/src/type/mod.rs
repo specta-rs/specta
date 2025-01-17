@@ -143,10 +143,14 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 fn inline(type_map: &mut #crate_ref::TypeCollection, generics: #crate_ref::Generics) -> #crate_ref::datatype::DataType {
                     <Self as #crate_ref::NamedType>::definition(type_map);
 
-                    internal_inline(type_map, match generics {
-                        #crate_ref::Generics::Definition => DEFINITION_GENERICS,
-                        #crate_ref::Generics::Provided(generics) => generics,
-                    })
+                    // TODO: Merge the constructors
+                    // TODO: Fill in the generics
+                    #crate_ref::datatype::reference::Reference::construct(SID).to_datatype(vec![])
+
+                    // internal_inline(type_map, match generics {
+                    //     #crate_ref::Generics::Definition => DEFINITION_GENERICS,
+                    //     #crate_ref::Generics::Provided(generics) => generics,
+                    // })
                 }
             }
 

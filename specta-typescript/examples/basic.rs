@@ -1,5 +1,5 @@
-use specta::{Type, TypeCollection};
-use specta_typescript::Typescript;
+use specta::{datatype::{self, FunctionResultVariant}, Type, TypeCollection};
+use specta_typescript::{inline, Typescript};
 
 #[derive(Type)]
 pub struct TypeOne {
@@ -34,10 +34,19 @@ pub struct TypeTwo {
 // }
 
 fn main() {
-    let types = TypeCollection::default()
+    let mut types = TypeCollection::default()
         .register::<TypeOne>();
          // notice how we don't list `TypeTwo`. It's a dependency of `TypeOne` and will be exported automatically.
     // TODO: Rest of them
+
+    // TODO: Remove this stuff
+    {
+        let dt = specta::datatype::reference::inline::<TypeOne>(&mut types, &[]);
+        println!("{:?}", specta_typescript::datatype(&Typescript::default(), &FunctionResultVariant::Value(dt), &types));
+
+        // let dt = specta::datatype::reference::inline::<TypeOne>(&mut types, &[]);
+        println!("{:?}\n\n", specta_typescript::inline::<TypeOne>(&Default::default()));
+    }
 
     Typescript::default()
         .export_to("./bindings.ts", &types)
