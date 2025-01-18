@@ -11,7 +11,7 @@ pub trait Language {
     type Error: std::error::Error + From<std::io::Error>;
 
     /// TODO
-    fn export(&self, type_map: &TypeCollection) -> Result<String, Self::Error>;
+    fn export(&self, types: &TypeCollection) -> Result<String, Self::Error>;
 
     /// TODO
     // TODO: Not sure I love this here but it's for Tauri Specta.
@@ -22,8 +22,8 @@ pub trait Language {
 impl<T: Language> Language for &T {
     type Error = T::Error;
 
-    fn export(&self, type_map: &TypeCollection) -> Result<String, Self::Error> {
-        (*self).export(type_map)
+    fn export(&self, types: &TypeCollection) -> Result<String, Self::Error> {
+        (*self).export(types)
     }
 
     fn format(&self, path: &Path) -> Result<(), Self::Error> {

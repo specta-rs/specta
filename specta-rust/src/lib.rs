@@ -38,7 +38,7 @@
 // pub fn export_named_datatype(
 //     // conf: &Typescript,
 //     typ: &NamedDataType,
-//     // type_map: &TypeCollection,
+//     // types: &TypeCollection,
 // ) -> Result<String, Error> {
 //     Ok(format!(
 //         "pub type {} = {}",

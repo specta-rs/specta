@@ -412,7 +412,7 @@
 
 // #[cfg(feature = "either")]
 // impl<L: Type, R: Type> Type for either::Either<L, R> {
-//     fn inline(type_map: &mut TypeCollection, generics: Generics) -> DataType {
+//     fn inline(types: &mut TypeCollection, generics: Generics) -> DataType {
 //         DataType::Enum(EnumType {
 //             name: "Either".into(),
 //             sid: None,
@@ -431,7 +431,7 @@
 //                                 flatten: false,
 //                                 deprecated: None,
 //                                 docs: Cow::Borrowed(""),
-//                                 ty: Some(L::inline(type_map, generics)),
+//                                 ty: Some(L::inline(types, generics)),
 //                             }],
 //                         }),
 //                     },
@@ -448,7 +448,7 @@
 //                                 flatten: false,
 //                                 deprecated: None,
 //                                 docs: Cow::Borrowed(""),
-//                                 ty: Some(R::inline(type_map, generics)),
+//                                 ty: Some(R::inline(types, generics)),
 //                             }],
 //                         }),
 //                     },
@@ -458,7 +458,7 @@
 //         })
 //     }
 
-//     fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Option<Reference> {
+//     fn reference(types: &mut TypeCollection, generics: &[DataType]) -> Option<Reference> {
 //         // Reference {
 //         //     inner: DataType::Enum(EnumType {
 //         //         name: "Either".into(),
@@ -478,7 +478,7 @@
 //         //                             flatten: false,
 //         //                             deprecated: None,
 //         //                             docs: Cow::Borrowed(""),
-//         //                             ty: Some(L::reference(type_map, generics).inner),
+//         //                             ty: Some(L::reference(types, generics).inner),
 //         //                         }],
 //         //                     }),
 //         //                 },
@@ -495,7 +495,7 @@
 //         //                             flatten: false,
 //         //                             deprecated: None,
 //         //                             docs: Cow::Borrowed(""),
-//         //                             ty: Some(R::reference(type_map, generics).inner),
+//         //                             ty: Some(R::reference(types, generics).inner),
 //         //                         }],
 //         //                     }),
 //         //                 },

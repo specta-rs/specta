@@ -1,10 +1,5 @@
 //! Types related to working with [`DataType`]. Exposed for advanced users.
 
-use std::{
-    borrow::{Borrow, Cow},
-    fmt::Display,
-};
-
 mod inline;
 mod r#enum;
 mod fields;
@@ -17,7 +12,9 @@ mod primitive;
 pub mod reference;
 mod r#struct;
 mod tuple;
+mod generic;
 
+pub use generic::*;
 pub use inline::*;
 pub use fields::*;
 pub use function::*;
@@ -30,6 +27,7 @@ pub use r#enum::*;
 pub use r#struct::*;
 pub use tuple::*;
 
+use std::borrow::Cow;
 use crate::SpectaID;
 
 /// Runtime type-erased representation of a Rust type.
@@ -92,63 +90,6 @@ pub enum DeprecatedType {
         since: Option<Cow<'static, str>>,
         note: Cow<'static, str>,
     },
-}
-
-// /// A reference to a [`DataType`] that can be used before a type is resolved in order to
-// /// support recursive types without causing an infinite loop.
-// ///
-// /// This works since a child type that references a parent type does not care about the
-// /// parent's fields, only really its name. Once all of the parent's fields have been
-// /// resolved will the parent's definition be placed in the type map.
-// ///
-// // This doesn't account for flattening and inlining recursive types, however, which will
-// // require a more complex solution since it will require multiple processing stages.
-// #[derive(Debug, Clone, PartialEq)]
-// pub struct DataTypeReference {
-//     pub(crate) sid: SpectaID,
-//     pub(crate) generics: Vec<(GenericType, DataType)>,
-// }
-
-// impl DataTypeReference {
-//     pub fn sid(&self) -> SpectaID {
-//         self.sid
-//     }
-
-//     pub fn generics(&self) -> &Vec<(GenericType, DataType)> {
-//         &self.generics
-//     }
-// }
-
-/// A generic ("placeholder") argument to a Specta-enabled type.
-///
-/// A generic does not hold a specific type instead it acts as a slot where a type can be provided when referencing this type.
-///
-/// A `GenericType` holds the identifier of the generic. Eg. Given a generic type `struct A<T>(T);` the generics will be represented as `vec![GenericType("A".into())]`
-#[derive(Debug, Clone, PartialEq)]
-pub struct GenericType(pub(crate) Cow<'static, str>);
-
-impl Display for GenericType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl Borrow<str> for GenericType {
-    fn borrow(&self) -> &str {
-        &self.0
-    }
-}
-
-impl From<Cow<'static, str>> for GenericType {
-    fn from(value: Cow<'static, str>) -> Self {
-        Self(value)
-    }
-}
-
-impl From<GenericType> for DataType {
-    fn from(t: GenericType) -> Self {
-        Self::Generic(t)
-    }
 }
 
 impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {

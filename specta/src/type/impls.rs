@@ -115,9 +115,9 @@ impl<'a, T: Type> Type for &'a [T] {
 }
 
 impl<const N: usize, T: Type> Type for [T; N] {
-    fn definition(type_map: &mut TypeCollection) -> DataType {
+    fn definition(types: &mut TypeCollection) -> DataType {
         DataType::List(List {
-            ty: Box::new(T::definition(type_map)),
+            ty: Box::new(T::definition(types)),
             length: Some(N),
             unique: false,
         })
@@ -125,9 +125,8 @@ impl<const N: usize, T: Type> Type for [T; N] {
 }
 
 impl<T: Type> Type for Option<T> {
-    fn definition(type_map: &mut TypeCollection) -> DataType {
-
-        DataType::Nullable(Box::new(T::definition(type_map)))
+    fn definition(types: &mut TypeCollection) -> DataType {
+        DataType::Nullable(Box::new(T::definition(types)))
     }
 }
 
@@ -157,8 +156,8 @@ const _: () = {
 };
 
 impl<T: Type> Type for std::ops::Range<T> {
-    fn definition(type_map: &mut TypeCollection) -> DataType {
-        let ty = Some(T::definition(type_map));
+    fn definition(types: &mut TypeCollection) -> DataType {
+        let ty = Some(T::definition(types));
         DataType::Struct(StructType {
             name: "Range".into(),
             sid: None,
@@ -211,7 +210,7 @@ const _: () = {
         internal::construct::impl_location("specta/src/type/impls.rs:302:10");
 
     impl Type for std::time::SystemTime {
-        fn definition(type_map: &mut TypeCollection) -> DataType {
+        fn definition(types: &mut TypeCollection) -> DataType {
             todo!();
             // DataType::Struct(internal::construct::r#struct(
             //     "SystemTime".into(),
@@ -227,7 +226,7 @@ const _: () = {
             //                     None,
             //                     "".into(),
             //                     Some({
-            //                         let ty = <i64 as Type>::definition(type_map);
+            //                         let ty = <i64 as Type>::definition(types);
             //                         ty
             //                     }),
             //                 ),
@@ -240,7 +239,7 @@ const _: () = {
             //                     None,
             //                     "".into(),
             //                     Some({
-            //                         let ty = <u32 as Type>::definition(type_map);
+            //                         let ty = <u32 as Type>::definition(types);
             //                         ty
             //                     }),
             //                 ),
@@ -257,31 +256,31 @@ const _: () = {
     //         SID
     //     }
 
-    //     fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
+    //     fn reference(types: &mut TypeCollection, generics: &[DataType]) -> Reference {
     //         reference::reference::<Self>(
-    //             type_map,
+    //             types,
     //             // internal::construct::data_type_reference("SystemTime".into(), SID, vec![]),
     //         )
     //     }
 
-    //     // fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
+    //     // fn named_data_type(types: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
     //     //     internal::construct::named_data_type(
     //     //         "SystemTime".into(),
     //     //         "".into(),
     //     //         None,
     //     //         Self::sid(),
     //     //         IMPL_LOCATION,
-    //     //         <Self as Type>::inline(type_map, Generics::Provided(generics)),
+    //     //         <Self as Type>::inline(types, Generics::Provided(generics)),
     //     //     )
     //     // }
-    //     fn definition_named_data_type(type_map: &mut TypeCollection) -> NamedDataType {
+    //     fn definition_named_data_type(types: &mut TypeCollection) -> NamedDataType {
     //         internal::construct::named_data_type(
     //             "SystemTime".into(),
     //             "".into(),
     //             None,
     //             Self::sid(),
     //             IMPL_LOCATION,
-    //             <Self as Type>::inline(type_map, Generics::Definition),
+    //             <Self as Type>::inline(types, Generics::Definition),
     //         )
     //     }
     // }
@@ -295,7 +294,7 @@ const _: () = {
         internal::construct::impl_location("specta/src/type/impls.rs:401:10");
 
     impl Type for std::time::Duration {
-        fn definition(type_map: &mut TypeCollection) -> DataType {
+        fn definition(types: &mut TypeCollection) -> DataType {
             todo!();
             // DataType::Struct(internal::construct::r#struct(
             //     "Duration".into(),
@@ -311,7 +310,7 @@ const _: () = {
             //                     None,
             //                     "".into(),
             //                     Some({
-            //                         let ty = <u64 as Type>::definition(type_map);
+            //                         let ty = <u64 as Type>::definition(types);
             //                         ty
             //                     }),
             //                 ),
@@ -324,7 +323,7 @@ const _: () = {
             //                     None,
             //                     "".into(),
             //                     Some({
-            //                         let ty = <u32 as Type>::definition(type_map);
+            //                         let ty = <u32 as Type>::definition(types);
             //                         ty
             //                     }),
             //                 ),
@@ -340,30 +339,30 @@ const _: () = {
     //     fn sid() -> SpectaID {
     //         SID
     //     }
-    //     // fn reference(type_map: &mut TypeCollection, _: &[DataType]) -> reference::Reference {
+    //     // fn reference(types: &mut TypeCollection, _: &[DataType]) -> reference::Reference {
     //     //     reference::reference::<Self>(
-    //     //         type_map,
+    //     //         types,
     //     //         // internal::construct::data_type_reference("Duration".into(), Self::sid(), vec![]),
     //     //     )
     //     // }
-    //     // fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
+    //     // fn named_data_type(types: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
     //     //     internal::construct::named_data_type(
     //     //         "Duration".into(),
     //     //         "".into(),
     //     //         None,
     //     //         Self::sid(),
     //     //         IMPL_LOCATION,
-    //     //         <Self as Type>::inline(type_map, Generics::Provided(generics)),
+    //     //         <Self as Type>::inline(types, Generics::Provided(generics)),
     //     //     )
     //     // }
-    //     fn definition_named_data_type(type_map: &mut TypeCollection) -> NamedDataType {
+    //     fn definition_named_data_type(types: &mut TypeCollection) -> NamedDataType {
     //         internal::construct::named_data_type(
     //             "Duration".into(),
     //             "".into(),
     //             None,
     //             Self::sid(),
     //             IMPL_LOCATION,
-    //             <Self as Type>::inline(type_map, Generics::Definition),
+    //             <Self as Type>::inline(types, Generics::Definition),
     //         )
     //     }
     // }

@@ -42,12 +42,12 @@
 // ///
 // /// Eg. `export const Foo = z.object({ demo: string; });`
 // pub fn export<T: NamedType>(conf: &ExportConfig) -> Output {
-//     let mut type_map = TypeCollection::default();
-//     let named_data_type = T::definition_named_data_type(&mut type_map);
-//     // is_valid_ty(&named_data_type.inner, &type_map)?;
-//     let result = export_named_datatype(conf, &named_data_type, &type_map);
+//     let mut types = TypeCollection::default();
+//     let named_data_type = T::definition_named_data_type(&mut types);
+//     // is_valid_ty(&named_data_type.inner, &types)?;
+//     let result = export_named_datatype(conf, &named_data_type, &types);
 
-//     if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_map).into_iter().next() {
+//     if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
 //         return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
 //     }
 
@@ -65,12 +65,12 @@
 // ///
 // /// Eg. `z.object({ demo: z.string() });`
 // pub fn inline<T: Type>(conf: &ExportConfig) -> Output {
-//     let mut type_map = TypeCollection::default();
-//     let ty = T::inline(&mut type_map, specta::Generics::Definition);
-//     // is_valid_ty(&ty, &type_map)?;
-//     let result = datatype(conf, &ty, &type_map);
+//     let mut types = TypeCollection::default();
+//     let ty = T::inline(&mut types, specta::Generics::Definition);
+//     // is_valid_ty(&ty, &types)?;
+//     let result = datatype(conf, &ty, &types);
 
-//     if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_map).into_iter().next() {
+//     if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
 //         return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
 //     }
 
@@ -83,11 +83,11 @@
 // pub fn export_named_datatype(
 //     conf: &ExportConfig,
 //     typ: &NamedDataType,
-//     type_map: &TypeCollection,
+//     types: &TypeCollection,
 // ) -> Output {
 //     // TODO: Duplicate type name detection?
 
-//     // is_valid_ty(&typ.inner, type_map)?;
+//     // is_valid_ty(&typ.inner, types)?;
 //     export_datatype_inner(
 //         ExportContext {
 //             cfg: conf,
@@ -95,7 +95,7 @@
 //             is_export: true,
 //         },
 //         typ,
-//         type_map,
+//         types,
 //     )
 // }
 
@@ -129,7 +129,7 @@
 // fn export_datatype_inner(
 //     ctx: ExportContext,
 //     typ: &NamedDataType,
-//     type_map: &TypeCollection,
+//     types: &TypeCollection,
 // ) -> Output {
 //     let ctx = ctx.with(
 //         typ.ext()
@@ -145,7 +145,7 @@
 //         .map(|generics| format!("<{}>", generics.join(", ")))
 //         .unwrap_or_default();
 
-//     let inline_zod = datatype_inner(ctx.clone(), &typ.inner, type_map)?;
+//     let inline_zod = datatype_inner(ctx.clone(), &typ.inner, types)?;
 
 //     // {generics}
 //     Ok(inner_comments(
@@ -160,7 +160,7 @@
 // /// Convert a DataType to a Zod validator
 // ///
 // /// Eg. `z.object({ demo: z.string(); })`
-// pub fn datatype(conf: &ExportConfig, typ: &DataType, type_map: &TypeCollection) -> Output {
+// pub fn datatype(conf: &ExportConfig, typ: &DataType, types: &TypeCollection) -> Output {
 //     // TODO: Duplicate type name detection?
 
 //     datatype_inner(
@@ -170,14 +170,14 @@
 //             is_export: false,
 //         },
 //         typ,
-//         type_map,
+//         types,
 //     )
 // }
 
 // pub(crate) fn datatype_inner(
 //     ctx: ExportContext,
 //     typ: &DataType,
-//     type_map: &TypeCollection,
+//     types: &TypeCollection,
 // ) -> Output {
 //     Ok(match &typ {
 //         DataType::Any => ANY.into(),
@@ -203,7 +203,7 @@
 //         }
 //         DataType::Literal(literal) => literal.to_zod(),
 //         DataType::Nullable(def) => {
-//             let dt = datatype_inner(ctx, def, type_map)?;
+//             let dt = datatype_inner(ctx, def, types)?;
 
 //             if dt.ends_with(NULLABLE) {
 //                 dt
@@ -215,13 +215,13 @@
 //             format!(
 //                 // We use this isn't of `Record<K, V>` to avoid issues with circular references.
 //                 "z.record({}, {})",
-//                 datatype_inner(ctx.clone(), def.key_ty(), type_map)?,
-//                 datatype_inner(ctx, def.value_ty(), type_map)?
+//                 datatype_inner(ctx.clone(), def.key_ty(), types)?,
+//                 datatype_inner(ctx, def.value_ty(), types)?
 //             )
 //         }
 //         // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
 //         DataType::List(def) => {
-//             let dt = datatype_inner(ctx, def.ty(), type_map)?;
+//             let dt = datatype_inner(ctx, def.ty(), types)?;
 
 //             if let Some(length) = def.length() {
 //                 format!(
@@ -239,14 +239,14 @@
 //             ctx,
 //             // ctx.with(
 //             //     item.sid
-//             //         .and_then(|sid| type_map.get(sid))
+//             //         .and_then(|sid| types.get(sid))
 //             //         .and_then(|v| v.ext())
 //             //         .map(|v| PathItem::TypeExtended(item.name().clone(), v.impl_location()))
 //             //         .unwrap_or_else(|| PathItem::Type(item.name().clone())),
 //             // ),
 //             item.name(),
 //             item,
-//             type_map,
+//             types,
 //         )?,
 //         DataType::Enum(item) => {
 //             let ctx = ctx.clone();
@@ -258,10 +258,10 @@
 //             enum_datatype(
 //                 ctx.with(PathItem::Variant(item.name().clone())),
 //                 item,
-//                 type_map,
+//                 types,
 //             )?
 //         }
-//         DataType::Tuple(tuple) => tuple_datatype(ctx, tuple, type_map)?,
+//         DataType::Tuple(tuple) => tuple_datatype(ctx, tuple, types)?,
 //         DataType::Reference(reference) => match &reference.generics()[..] {
 //             [] => reference.name().to_string(),
 //             _generics => {
@@ -270,7 +270,7 @@
 //                     .generics()
 //                     .iter()
 //                     .map(|(_, v)| {
-//                         datatype_inner(ctx.with(PathItem::Type(name.clone())), v, type_map)
+//                         datatype_inner(ctx.with(PathItem::Type(name.clone())), v, types)
 //                     })
 //                     .collect::<Result<Vec<_>>>()?
 //                     .join(", ");
@@ -286,14 +286,14 @@
 // fn unnamed_fields_datatype(
 //     ctx: ExportContext,
 //     fields: &[NonSkipField],
-//     type_map: &TypeCollection,
+//     types: &TypeCollection,
 // ) -> Output {
 //     match fields {
 //         [(field, ty)] => Ok(inner_comments(
 //             ctx.clone(),
 //             field.deprecated(),
 //             field.docs(),
-//             datatype_inner(ctx, ty, type_map)?,
+//             datatype_inner(ctx, ty, types)?,
 //             true,
 //         )),
 //         fields => Ok(format!(
@@ -304,7 +304,7 @@
 //                     ctx.clone(),
 //                     field.deprecated(),
 //                     field.docs(),
-//                     datatype_inner(ctx.clone(), ty, type_map)?,
+//                     datatype_inner(ctx.clone(), ty, types)?,
 //                     true
 //                 )))
 //                 .collect::<Result<Vec<_>>>()?
@@ -313,13 +313,13 @@
 //     }
 // }
 
-// fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, type_map: &TypeCollection) -> Output {
+// fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, types: &TypeCollection) -> Output {
 //     match &tuple.elements()[..] {
 //         [] => Ok(NULL.into()),
 //         tys => Ok(format!(
 //             "z.tuple([{}])",
 //             tys.iter()
-//                 .map(|v| datatype_inner(ctx.clone(), v, type_map))
+//                 .map(|v| datatype_inner(ctx.clone(), v, types))
 //                 .collect::<Result<Vec<_>>>()?
 //                 .join(", ")
 //         )),
@@ -330,12 +330,12 @@
 //     ctx: ExportContext,
 //     key: &str,
 //     s: &StructType,
-//     type_map: &TypeCollection,
+//     types: &TypeCollection,
 // ) -> Output {
 //     match &s.fields() {
 //         Fields::Unit => Ok(NULL.into()),
 //         Fields::Unnamed(s) => {
-//             unnamed_fields_datatype(ctx, &skip_fields(s.fields()).collect::<Vec<_>>(), type_map)
+//             unnamed_fields_datatype(ctx, &skip_fields(s.fields()).collect::<Vec<_>>(), types)
 //         }
 //         Fields::Named(s) => {
 //             let fields = skip_fields_named(s.fields()).collect::<Vec<_>>();
@@ -357,7 +357,7 @@
 //             let mut field_sections = flattened
 //                 .into_iter()
 //                 .map(|(key, (field, ty))| {
-//                     datatype_inner(ctx.with(PathItem::Field(key.clone())), ty, type_map).map(
+//                     datatype_inner(ctx.with(PathItem::Field(key.clone())), ty, types).map(
 //                         |type_str| {
 //                             inner_comments(
 //                                 ctx.clone(),
@@ -384,7 +384,7 @@
 //                             ctx.with(PathItem::Field(key.clone())),
 //                             key.clone(),
 //                             field_ref,
-//                             type_map,
+//                             types,
 //                         )?,
 //                         true,
 //                     ))
@@ -419,7 +419,7 @@
 
 // fn enum_variant_datatype(
 //     ctx: ExportContext,
-//     type_map: &TypeCollection,
+//     types: &TypeCollection,
 //     name: Cow<'static, str>,
 //     variant: &EnumVariant,
 // ) -> Result<Option<String>> {
@@ -448,7 +448,7 @@
 //                                 ctx.with(PathItem::Field(name.clone())),
 //                                 name.clone(),
 //                                 field_ref,
-//                                 type_map,
+//                                 types,
 //                             )?,
 //                             true,
 //                         ))
@@ -463,7 +463,7 @@
 //         }
 //         Fields::Unnamed(obj) => {
 //             let fields = skip_fields(obj.fields())
-//                 .map(|(_, ty)| datatype_inner(ctx.clone(), ty, type_map))
+//                 .map(|(_, ty)| datatype_inner(ctx.clone(), ty, types))
 //                 .collect::<Result<Vec<_>>>()?;
 
 //             Ok(match &fields[..] {
@@ -484,7 +484,7 @@
 //     }
 // }
 
-// fn enum_datatype(ctx: ExportContext, e: &EnumType, type_map: &TypeCollection) -> Output {
+// fn enum_datatype(ctx: ExportContext, e: &EnumType, types: &TypeCollection) -> Output {
 //     if e.variants().is_empty() {
 //         return Ok(NEVER.to_string());
 //     }
@@ -504,7 +504,7 @@
 //                             variant.docs(),
 //                             enum_variant_datatype(
 //                                 ctx.with(PathItem::Variant(name.clone())),
-//                                 type_map,
+//                                 types,
 //                                 name.clone(),
 //                                 variant,
 //                             )?
@@ -549,14 +549,14 @@
 //                                     validate_type_for_tagged_intersection(
 //                                         ctx.clone(),
 //                                         (**ty).clone(),
-//                                         type_map,
+//                                         types,
 //                                     )?
 //                                 } else {
 //                                     false
 //                                 };
 
 //                                 let typ =
-//                                     unnamed_fields_datatype(ctx.clone(), &fields, type_map)?;
+//                                     unnamed_fields_datatype(ctx.clone(), &fields, types)?;
 
 //                                 if dont_join_ty {
 //                                     format!(r#"z.object({{ {tag}: {sanitised_name} }})"#)
@@ -577,7 +577,7 @@
 //                                                 ctx.with(PathItem::Field(name.clone())),
 //                                                 name.clone(),
 //                                                 field,
-//                                                 type_map,
+//                                                 types,
 //                                             )
 //                                         })
 //                                         .collect::<Result<Vec<_>>>()?,
@@ -589,7 +589,7 @@
 //                             (EnumRepr::External, _) => {
 //                                 let ts_values = enum_variant_datatype(
 //                                     ctx.with(PathItem::Variant(variant_name.clone())),
-//                                     type_map,
+//                                     types,
 //                                     variant_name.clone(),
 //                                     variant,
 //                                 )?;
@@ -610,7 +610,7 @@
 //                          	 	let tag = sanitise_key(tag.clone(), false);
 //                                 let content_values = enum_variant_datatype(
 //                                     ctx.with(PathItem::Variant(variant_name.clone())),
-//                                     type_map,
+//                                     types,
 //                                     variant_name.clone(),
 //                                     variant,
 //                                 )?
@@ -664,7 +664,7 @@
 //     ctx: ExportContext,
 //     key: Cow<'static, str>,
 //     (field, ty): NonSkipField,
-//     type_map: &TypeCollection,
+//     types: &TypeCollection,
 // ) -> Output {
 //     let field_name_safe = sanitise_key(key, false);
 
@@ -674,7 +674,7 @@
 //         false => (field_name_safe, ty),
 //     };
 
-//     Ok(format!("{key}: {}", datatype_inner(ctx, ty, type_map)?))
+//     Ok(format!("{key}: {}", datatype_inner(ctx, ty, types)?))
 // }
 
 // /// sanitise a string to be a valid Typescript key
@@ -727,7 +727,7 @@
 // fn validate_type_for_tagged_intersection(
 //     ctx: ExportContext,
 //     ty: DataType,
-//     type_map: &TypeCollection,
+//     types: &TypeCollection,
 // ) -> Result<bool> {
 //     match ty {
 //         DataType::Any
@@ -783,12 +783,12 @@
 //         }
 //         DataType::Reference(r) => validate_type_for_tagged_intersection(
 //             ctx,
-//             type_map
+//             types
 //                 .get(r.sid())
 //                 .expect("TypeCollection should have been populated by now")
 //                 .inner
 //                 .clone(),
-//             type_map,
+//             types,
 //         ),
 //     }
 // }

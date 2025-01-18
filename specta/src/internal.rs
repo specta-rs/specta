@@ -13,18 +13,6 @@ use crate::{
     datatype::{DataType, DeprecatedType, Field, NamedDataType, NamedDataTypeExt}, ImplLocation, SpectaID, Type, TypeCollection
 };
 
-// // TODO: make `const` again
-// pub fn named_data_type(
-//     name: Cow<'static, str>,
-//     docs: Cow<'static, str>,
-//     deprecated: Option<DeprecatedType>,
-//     sid: SpectaID,
-//     impl_location: ImplLocation,
-//     inner: DataType,
-// ) -> NamedDataType {
-
-// }
-
 /// Registers a type in the `TypeCollection` if it hasn't been registered already.
 /// This accounts for recursive types.
 pub fn register(
@@ -100,10 +88,11 @@ pub mod construct {
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
         inline: bool,
+        generics: &[(GenericType, DataType)],
         types: &mut TypeCollection
     ) -> Field {
         // TODO: Could this stack overflow? Is `TypeCollection::flatten_stack` still used or should we use it?
-        let ty = datatype::inline::<T>(types);
+        let ty = datatype::inline::<T>(types, generics);
 
         // match inline {
         //     DataType::Struct(s) => s.fields(),
@@ -138,6 +127,7 @@ pub mod construct {
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
         inline: bool,
+        generics: &[(GenericType, DataType)],
         types: &mut TypeCollection
     ) -> Field {
         Field {
@@ -146,7 +136,7 @@ pub mod construct {
             deprecated,
             docs,
             ty: Some(if inline {
-                datatype::inline::<T>(types)
+                datatype::inline::<T>(types, generics)
             } else {
                 T::definition(types)
             })
@@ -284,7 +274,7 @@ mod functions {
         _: T,
         asyncness: bool,
         name: Cow<'static, str>,
-        type_map: &mut TypeCollection,
+        types: &mut TypeCollection,
         fields: &[Cow<'static, str>],
         docs: Cow<'static, str>,
         deprecated: Option<DeprecatedType>,
@@ -293,7 +283,7 @@ mod functions {
         T::to_datatype(
             asyncness,
             name,
-            type_map,
+            types,
             fields,
             docs,
             deprecated,
@@ -380,12 +370,12 @@ pub use functions::*;
 // TODO: This should go
 /// post process the type map to detect duplicate type names
 pub fn detect_duplicate_type_names(
-    type_map: &TypeCollection,
+    types: &TypeCollection,
 ) -> Vec<(Cow<'static, str>, ImplLocation, ImplLocation)> {
     let mut errors = Vec::new();
 
-    let mut map = HashMap::with_capacity(type_map.into_iter().len());
-    for (sid, dt) in type_map.into_iter() {
+    let mut map = HashMap::with_capacity(types.into_iter().len());
+    for (sid, dt) in types.into_iter() {
         if let Some(ext) = &dt.ext {
             if let Some((existing_sid, existing_impl_location)) =
                 map.insert(dt.name.clone(), (sid, ext.impl_location))

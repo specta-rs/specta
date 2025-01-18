@@ -1,5 +1,5 @@
 use crate::{
-    datatype::DataType, SpectaID, TypeCollection
+    datatype::{DataType, GenericType}, SpectaID, TypeCollection
 };
 
 mod impls;
@@ -11,14 +11,16 @@ mod legacy_impls;
 /// Provides runtime type information that can be fed into a language exporter to generate a type definition in another language.
 /// Avoid implementing this trait yourself where possible and use the [`Type`](derive@crate::Type) macro instead.
 ///
-/// This should be only implemented via the [`Type`](derive@crate::Type) macro.
+/// This should be only implemented via the [`Type`](derive@crate::Type) macro. - TODO: Discuss how to avoid custom impls.
 pub trait Type {
     /// TODO
-    fn definition(type_map: &mut TypeCollection) -> DataType;
+    fn definition(types: &mut TypeCollection) -> DataType;
 }
 
 /// represents a type that can be converted into [NamedDataType].
 /// This will be implemented for all types with the [Type] derive macro.
+///
+/// TODO: Discuss which types this should be implemented for.
 ///
 /// This should be only implemented via the [`Type`](derive@crate::Type) macro.
 pub trait NamedType: Type {

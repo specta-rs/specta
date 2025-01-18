@@ -19,19 +19,16 @@ pub fn parse_enum(
         ));
     }
 
-    let generic_idents = generics
+    let definition_generics = generics
         .params
         .iter()
         .filter_map(|p| match p {
-            GenericParam::Type(t) => Some(&t.ident),
+            GenericParam::Type(t) => {
+                let ident = t.ident.to_string();
+                Some(quote!(std::borrow::Cow::Borrowed(#ident).into()))
+            },
             _ => None,
-        })
-        .enumerate();
-
-    let definition_generics = generic_idents.clone().map(|(_, ident)| {
-        let ident = ident.to_string();
-        quote!(std::borrow::Cow::Borrowed(#ident).into())
-    });
+        });
 
     let repr = enum_attrs.tagged()?;
     let variant_types =
@@ -83,7 +80,7 @@ pub fn parse_enum(
                             .iter()
                             .map(|field| {
                                 let field_attrs = decode_field_attrs(field)?;
-                                Ok(construct_field(crate_ref, FieldAttr {
+                                Ok(construct_field(crate_ref, generics, FieldAttr {
                                     rename: field_attrs.rename,
                                     r#type: field_attrs.r#type,
                                     inline: field_attrs.inline || attrs.inline,
@@ -106,8 +103,6 @@ pub fn parse_enum(
                         .map(|field| {
                             let field_attrs = decode_field_attrs(field)?;
 
-                            let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
-
                             let field_ident_str =
                                 unraw_raw_ident(field.ident.as_ref().unwrap());
 
@@ -120,7 +115,7 @@ pub fn parse_enum(
                                 (_, _) => quote::quote!(#field_ident_str),
                             };
 
-                            let inner = construct_field(crate_ref, FieldAttr {
+                            let inner = construct_field(crate_ref, generics, FieldAttr {
                                 rename: field_attrs.rename,
                                 r#type: field_attrs.r#type,
                                 inline: field_attrs.inline || attrs.inline,

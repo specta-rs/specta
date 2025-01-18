@@ -11,7 +11,7 @@ use super::*;
 pub fn typedef_named_datatype(
     cfg: &Typescript,
     typ: &NamedDataType,
-    type_map: &TypeCollection,
+    types: &TypeCollection,
 ) -> Output {
     typedef_named_datatype_inner(
         &ExportContext {
@@ -21,14 +21,14 @@ pub fn typedef_named_datatype(
             is_export: false,
         },
         typ,
-        type_map,
+        types,
     )
 }
 
 fn typedef_named_datatype_inner(
     ctx: &ExportContext,
     typ: &NamedDataType,
-    type_map: &TypeCollection,
+    types: &TypeCollection,
 ) -> Output {
     let name = typ.name();
     let docs = typ.docs();
@@ -43,7 +43,7 @@ fn typedef_named_datatype_inner(
     datatype_inner(
         ctx.clone(),
         &FunctionResultVariant::Value(typ.inner.clone()),
-        type_map,
+        types,
         &mut inline_ts,
     )?;
 

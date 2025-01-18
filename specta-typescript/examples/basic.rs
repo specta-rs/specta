@@ -73,8 +73,10 @@ pub struct Selection {
     pub password: String,
 }
 
-fn todo<T: Type>(_: &T) {
-    println!("{:#?}", <T as Type>::definition(&mut TypeCollection::default()));
+pub type Alias<T> = Option<T>;
+
+pub struct Lol<A> {
+    pub a: Alias<A> // TODO: The best the macro can do is to infer this as `A`. It can't see `Option<A>`.
 }
 
 fn main() {

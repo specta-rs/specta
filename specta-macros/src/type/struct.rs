@@ -42,20 +42,16 @@ pub fn parse_struct(
     crate_ref: &TokenStream,
     data: &DataStruct,
 ) -> syn::Result<(TokenStream, bool)> {
-    let generic_idents = generics
+    let definition_generics = generics
         .params
         .iter()
         .filter_map(|p| match p {
-            GenericParam::Type(t) => Some(&t.ident),
+            GenericParam::Type(t) => {
+                let ident = t.ident.to_string();
+                Some(quote!(std::borrow::Cow::Borrowed(#ident).into()))
+            },
             _ => None,
-        })
-        .enumerate()
-        .collect::<Vec<_>>();
-
-    let definition_generics = generic_idents.iter().map(|(_, ident)| {
-        let ident = ident.to_string();
-        quote!(std::borrow::Cow::Borrowed(#ident).into())
-    });
+        });
 
     let definition = if container_attrs.transparent {
         if let Fields::Unit = data.fields {
@@ -85,9 +81,9 @@ pub fn parse_struct(
         let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field_ty);
 
         if field_attrs.inline {
-            quote!(#crate_ref::datatype::inline::<#field_ty>(type_map))
+            quote!(#crate_ref::datatype::inline::<#field_ty>(types))
         } else {
-            quote!(<#field_ty as #crate_ref::Type>::definition(type_map))
+            quote!(<#field_ty as #crate_ref::Type>::definition(types))
         }
     } else {
         let fields = match &data.fields {
@@ -108,7 +104,7 @@ pub fn parse_struct(
                                     (_, _) => field_ident_str.to_token_stream(),
                                 };
 
-                            let inner = construct_field(crate_ref, field_attrs, &field.ty);
+                            let inner = construct_field(crate_ref, generics, field_attrs, &field.ty);
                             Ok(quote!((#field_name.into(), #inner)))
                         })
                         .collect::<syn::Result<Vec<TokenStream>>>()?;
@@ -127,7 +123,7 @@ pub fn parse_struct(
                     .iter()
                     .map(|field| {
                         let field_attrs = decode_field_attrs(field)?;
-                        Ok(construct_field(crate_ref, field_attrs, &field.ty))
+                        Ok(construct_field(crate_ref, generics, field_attrs, &field.ty))
                     })
                     .collect::<syn::Result<Vec<TokenStream>>>()?;
 

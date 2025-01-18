@@ -74,7 +74,7 @@ macro_rules! _fn_datatype_internal {
 /// Collects function types into a [`Vec`],
 /// and all downstream types into a [`TypeCollection`](crate::TypeCollection) instance.
 ///
-/// Specifying a `type_map` argument allows a custom [`TypeCollection`] to be used.
+/// Specifying a `types` argument allows a custom [`TypeCollection`] to be used.
 ///
 /// # Examples
 ///
@@ -101,9 +101,9 @@ macro_rules! _collect_functions {
         export
     }};
     ($($b:tt $(:: $($p:ident)? $(<$($g:path),*>)? )* ),* $(,)?) => {{
-        fn export(type_map: &mut $crate::TypeCollection) -> Vec<$crate::datatype::Function> {
+        fn export(types: &mut $crate::TypeCollection) -> Vec<$crate::datatype::Function> {
             vec![
-                $($crate::function::fn_datatype!($b $($(::$p)? $(::<$($g),*>)? )* )(type_map)),*
+                $($crate::function::fn_datatype!($b $($(::$p)? $(::<$($g),*>)? )* )(types)),*
             ]
         }
 

@@ -32,48 +32,48 @@ pub enum SerdeError {
 /// Check that a [DataType] is a valid for Serde.
 ///
 /// This can be used by exporters which wanna do export-time checks that all types are compatible with Serde formats.
-pub fn is_valid_ty(dt: &DataType, type_map: &TypeCollection) -> Result<(), SerdeError> {
-    is_valid_ty_internal(dt, type_map, &mut Default::default())
+pub fn is_valid_ty(dt: &DataType, types: &TypeCollection) -> Result<(), SerdeError> {
+    is_valid_ty_internal(dt, types, &mut Default::default())
 }
 
 fn is_valid_ty_internal(
     dt: &DataType,
-    type_map: &TypeCollection,
+    types: &TypeCollection,
     checked_references: &mut HashSet<SpectaID>,
 ) -> Result<(), SerdeError> {
     match dt {
-        DataType::Nullable(ty) => is_valid_ty(ty, type_map)?,
+        DataType::Nullable(ty) => is_valid_ty(ty, types)?,
         DataType::Map(ty) => {
-            is_valid_map_key(ty.key_ty(), type_map)?;
-            is_valid_ty_internal(ty.value_ty(), type_map, checked_references)?;
+            is_valid_map_key(ty.key_ty(), types)?;
+            is_valid_ty_internal(ty.value_ty(), types, checked_references)?;
         }
         DataType::Struct(ty) => match ty.fields() {
             Fields::Unit => {}
             Fields::Unnamed(ty) => {
                 for (_, ty) in skip_fields(ty.fields()) {
-                    is_valid_ty_internal(ty, type_map, checked_references)?;
+                    is_valid_ty_internal(ty, types, checked_references)?;
                 }
             }
             Fields::Named(ty) => {
                 for (_, (_, ty)) in skip_fields_named(ty.fields()) {
-                    is_valid_ty_internal(ty, type_map, checked_references)?;
+                    is_valid_ty_internal(ty, types, checked_references)?;
                 }
             }
         },
         DataType::Enum(ty) => {
-            validate_enum(ty, type_map)?;
+            validate_enum(ty, types)?;
 
             for (_variant_name, variant) in ty.variants().iter() {
                 match &variant.fields() {
                     Fields::Unit => {}
                     Fields::Named(variant) => {
                         for (_, (_, ty)) in skip_fields_named(variant.fields()) {
-                            is_valid_ty_internal(ty, type_map, checked_references)?;
+                            is_valid_ty_internal(ty, types, checked_references)?;
                         }
                     }
                     Fields::Unnamed(variant) => {
                         for (_, ty) in skip_fields(variant.fields()) {
-                            is_valid_ty_internal(ty, type_map, checked_references)?;
+                            is_valid_ty_internal(ty, types, checked_references)?;
                         }
                     }
                 }
@@ -81,22 +81,22 @@ fn is_valid_ty_internal(
         }
         DataType::Tuple(ty) => {
             for ty in ty.elements() {
-                is_valid_ty_internal(ty, type_map, checked_references)?;
+                is_valid_ty_internal(ty, types, checked_references)?;
             }
         }
         DataType::Reference(ty) => {
             for generic in ty.generics() {
-                is_valid_ty_internal(generic, type_map, checked_references)?;
+                is_valid_ty_internal(generic, types, checked_references)?;
             }
 
             #[allow(clippy::panic)]
             if !checked_references.contains(&ty.sid()) {
                 checked_references.insert(ty.sid());
-                let ty = type_map.get(ty.sid()).unwrap_or_else(|| {
+                let ty = types.get(ty.sid()).unwrap_or_else(|| {
                     panic!("Type '{}' was never populated.", ty.sid().type_name())
                 }); // TODO: Error properly
 
-                is_valid_ty_internal(&ty.inner, type_map, checked_references)?;
+                is_valid_ty_internal(&ty.inner, types, checked_references)?;
             }
         }
         _ => {}
@@ -106,7 +106,7 @@ fn is_valid_ty_internal(
 }
 
 // Typescript: Must be assignable to `string | number | symbol` says Typescript.
-fn is_valid_map_key(key_ty: &DataType, type_map: &TypeCollection) -> Result<(), SerdeError> {
+fn is_valid_map_key(key_ty: &DataType, types: &TypeCollection) -> Result<(), SerdeError> {
     match key_ty {
         DataType::Any => Ok(()),
         DataType::Primitive(ty) => match ty {
@@ -162,18 +162,18 @@ fn is_valid_map_key(key_ty: &DataType, type_map: &TypeCollection) -> Result<(), 
             Ok(())
         }
         DataType::Reference(r) => {
-            let ty = type_map.get(r.sid()).expect("Type was never populated"); // TODO: Error properly
+            let ty = types.get(r.sid()).expect("Type was never populated"); // TODO: Error properly
 
             // TODO: Bring back this
             // resolve_generics(ty.inner.clone(), r.generics())
-            is_valid_map_key(&ty.inner, type_map)
+            is_valid_map_key(&ty.inner, types)
         }
         _ => Err(SerdeError::InvalidMapKey),
     }
 }
 
 // Serde does not allow serializing a variant of certain types of enum's.
-fn validate_enum(e: &EnumType, type_map: &TypeCollection) -> Result<(), SerdeError> {
+fn validate_enum(e: &EnumType, types: &TypeCollection) -> Result<(), SerdeError> {
     // You can't `#[serde(skip)]` your way to an empty enum.
     let valid_variants = e.variants().iter().filter(|(_, v)| !v.skip()).count();
     if valid_variants == 0 && !e.variants().is_empty() {
@@ -182,14 +182,14 @@ fn validate_enum(e: &EnumType, type_map: &TypeCollection) -> Result<(), SerdeErr
 
     // Only internally tagged enums can be invalid.
     if let EnumRepr::Internal { .. } = e.repr() {
-        validate_internally_tag_enum(e, type_map)?;
+        validate_internally_tag_enum(e, types)?;
     }
 
     Ok(())
 }
 
 // Checks for specially internally tagged enums.
-fn validate_internally_tag_enum(e: &EnumType, type_map: &TypeCollection) -> Result<(), SerdeError> {
+fn validate_internally_tag_enum(e: &EnumType, types: &TypeCollection) -> Result<(), SerdeError> {
     for (_variant_name, variant) in e.variants() {
         match &variant.fields() {
             Fields::Unit => {}
@@ -205,7 +205,7 @@ fn validate_internally_tag_enum(e: &EnumType, type_map: &TypeCollection) -> Resu
                     return Err(SerdeError::InvalidInternallyTaggedEnum);
                 }
 
-                validate_internally_tag_enum_datatype(first_field.1, type_map)?;
+                validate_internally_tag_enum_datatype(first_field.1, types)?;
             }
         }
     }
@@ -217,7 +217,7 @@ fn validate_internally_tag_enum(e: &EnumType, type_map: &TypeCollection) -> Resu
 // Which makes sense when you can't represent `{ "type": "A" } & string` in a single JSON value.
 fn validate_internally_tag_enum_datatype(
     ty: &DataType,
-    type_map: &TypeCollection,
+    types: &TypeCollection,
 ) -> Result<(), SerdeError> {
     match ty {
         // `serde_json::Any` can be *technically* be either valid or invalid based on the actual data but we are being strict and reject it.
@@ -227,7 +227,7 @@ fn validate_internally_tag_enum_datatype(
         DataType::Struct(_) => {}
         DataType::Enum(ty) => match ty.repr() {
             // Is only valid if the enum itself is also valid.
-            EnumRepr::Untagged => validate_internally_tag_enum(ty, type_map)?,
+            EnumRepr::Untagged => validate_internally_tag_enum(ty, types)?,
             // Eg. `{ "Variant": "value" }` is a map-type so valid.
             EnumRepr::External => {}
             // Eg. `{ "type": "variant", "field": "value" }` is a map-type so valid.
@@ -239,9 +239,9 @@ fn validate_internally_tag_enum_datatype(
         DataType::Tuple(ty) if ty.elements().is_empty() => {}
         // References need to be checked against the same rules.
         DataType::Reference(ty) => {
-            let ty = type_map.get(ty.sid()).expect("Type was never populated"); // TODO: Error properly
+            let ty = types.get(ty.sid()).expect("Type was never populated"); // TODO: Error properly
 
-            validate_internally_tag_enum_datatype(&ty.inner, type_map)?;
+            validate_internally_tag_enum_datatype(&ty.inner, types)?;
         }
         _ => return Err(SerdeError::InvalidInternallyTaggedEnum),
     }
