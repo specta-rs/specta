@@ -116,7 +116,7 @@ pub fn parse_struct(
                                     (_, _) => field_ident_str.to_token_stream(),
                                 };
 
-                            let inner = construct_field(crate_ref, generics, container_attrs, field_attrs, &field.ty);
+                            let inner = construct_field(crate_ref, container_attrs, field_attrs, &field.ty);
                             Ok(quote!((#field_name.into(), #inner)))
                         })
                         .collect::<syn::Result<Vec<TokenStream>>>()?;
@@ -135,7 +135,7 @@ pub fn parse_struct(
                     .iter()
                     .map(|field| {
                         let field_attrs = decode_field_attrs(field)?;
-                        Ok(construct_field(crate_ref, generics, container_attrs, field_attrs, &field.ty))
+                        Ok(construct_field(crate_ref, container_attrs, field_attrs, &field.ty))
                     })
                     .collect::<syn::Result<Vec<TokenStream>>>()?;
 

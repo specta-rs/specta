@@ -87,7 +87,6 @@ pub mod construct {
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
         inline: bool,
-        generics: &[(GenericType, DataType)], // TODO: Remove this
         types: &mut TypeCollection
     ) -> Field {
         // TODO: Could this stack overflow? Is `TypeCollection::flatten_stack` still used or should we use it?
@@ -126,7 +125,6 @@ pub mod construct {
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
         inline: bool,
-        generics: &[(GenericType, DataType)], // TODO
         types: &mut TypeCollection
     ) -> Field {
         Field {
