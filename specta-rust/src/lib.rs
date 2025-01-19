@@ -5,27 +5,28 @@
     html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
 )]
 
-// use std::path::Path;
+use std::path::Path;
 
-// use inflector::Inflector;
-// use specta::{
-//     datatype::{DataType, NamedDataType, Fields},
-//     Generics, Type, TypeCollection,
-// };
+use inflector::Inflector;
+use specta::{
+    datatype::{DataType, NamedDataType, Fields},
+    Type, TypeCollection,
+};
 
-// type Error = String; // TODO: Proper error type
+type Error = String; // TODO: Proper error type
 
-// pub struct Rust;
+#[derive(Debug, Default, Clone)]
+pub struct Rust;
 
-// impl Rust {
-//     pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
-//         todo!();
-//     }
+impl Rust {
+    pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
+        todo!();
+    }
 
-//     pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
-//         todo!();
-//     }
-// }
+    pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
+        todo!();
+    }
+}
 
 // /// TODO
 // pub fn export<T: Type>() -> Result<String, Error> {

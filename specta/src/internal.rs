@@ -87,11 +87,11 @@ pub mod construct {
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
         inline: bool,
-        generics: &[(GenericType, DataType)],
+        generics: &[(GenericType, DataType)], // TODO: Remove this
         types: &mut TypeCollection
     ) -> Field {
         // TODO: Could this stack overflow? Is `TypeCollection::flatten_stack` still used or should we use it?
-        let ty = datatype::inline::<T>(types, generics);
+        let ty = datatype::inline::<T>(types);
 
         // match inline {
         //     DataType::Struct(s) => s.fields(),
@@ -126,7 +126,7 @@ pub mod construct {
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
         inline: bool,
-        generics: &[(GenericType, DataType)],
+        generics: &[(GenericType, DataType)], // TODO
         types: &mut TypeCollection
     ) -> Field {
         Field {
@@ -135,7 +135,7 @@ pub mod construct {
             deprecated,
             docs,
             ty: Some(if inline {
-                datatype::inline::<T>(types, generics)
+                datatype::inline::<T>(types)
             } else {
                 T::definition(types)
             })

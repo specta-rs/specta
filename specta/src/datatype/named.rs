@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt, sync::Arc};
+use std::borrow::Cow;
 
 use crate::ImplLocation;
 
@@ -26,14 +26,9 @@ impl NamedDataTypeExt {
 /// A named type represents a non-primitive type capable of being exported as it's own named entity.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NamedDataType {
-    /// The name of the type
     pub(crate) name: Cow<'static, str>,
-    /// Rust documentation comments on the type
     pub(crate) docs: Cow<'static, str>,
-    /// The Rust deprecated comment if the type is deprecated.
     pub(crate) deprecated: Option<DeprecatedType>,
-    /// Extra information that comes from a real Rust type (using the `Type` macro).
-    /// This will be `None` when constructing [NamedDataType] using `StructType::to_named` or `TupleType::to_named` since those types do not correspond to actual Rust types.
     // TODO: Should this be nullable???
     pub(crate) ext: Option<NamedDataTypeExt>,
     /// the actual type definition.
@@ -41,18 +36,23 @@ pub struct NamedDataType {
 }
 
 impl NamedDataType {
+    /// The name of the type
     pub fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 
+    /// Rust documentation comments on the type
     pub fn docs(&self) -> &Cow<'static, str> {
         &self.docs
     }
 
+    /// The Rust deprecated comment if the type is deprecated.
     pub fn deprecated(&self) -> Option<&DeprecatedType> {
         self.deprecated.as_ref()
     }
 
+    /// Extra information that comes from a real Rust type (using the `Type` macro).
+    /// This will be `None` when constructing [NamedDataType] using `StructType::to_named` or `TupleType::to_named` since those types do not correspond to actual Rust types.
     pub fn ext(&self) -> Option<&NamedDataTypeExt> {
         self.ext.as_ref()
     }

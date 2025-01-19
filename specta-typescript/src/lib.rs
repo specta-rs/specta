@@ -71,13 +71,6 @@ pub fn inline_ref<T: Type>(_: &T, conf: &Typescript) -> Output {
 /// Eg. `{ demo: string; };`
 pub fn inline<T: Type>(conf: &Typescript) -> Output {
     let mut types = TypeCollection::default();
-
-    // let ty = match T::definition(&mut types) {
-    //     DataType::Reference(r) => types.get(r.sid()).unwrap().inner.clone(),
-    //     t => t,
-    // };
-    // let ty = specta::datatype::inline::<T>(&mut types, &[]); // TODO: Where to get these generics?
-
     let ty = inline_reference::<T>(&mut types);
 
     is_valid_ty(&ty, &types)?;

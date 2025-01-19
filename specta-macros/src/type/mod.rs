@@ -3,7 +3,7 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use r#enum::parse_enum;
 use r#struct::parse_struct;
-use syn::{parse, parse_quote, punctuated::Punctuated, Data, DeriveInput, GenericParam, PathSegment, TypeParamBound};
+use syn::{parse, Data, DeriveInput, GenericParam};
 
 use crate::utils::{parse_attrs, unraw_raw_ident, AttributeValue};
 
@@ -96,49 +96,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         }
     });
 
-    let comments = &container_attrs.common.doc;
-    let deprecated = container_attrs.common.deprecated_as_tokens(&crate_ref);
-    let impl_location = quote!(#crate_ref::internal::construct::impl_location(concat!(file!(), ":", line!(), ":", column!())));
-    let definition = (container_attrs.inline || container_attrs.transparent).then(|| quote!(
-        dt
-        // TODO: Better error message
-        .expect("detected a recursive inline")
-        .inner)).unwrap_or_else(|| {
-        let reference_generics = generics.params.iter().filter_map(|param| match param {
-            GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
-            GenericParam::Type(t) => {
-                let i = &t.ident;
-                Some(quote!(<#i as #crate_ref::Type>::definition(types)))
-            },
-        });
-
-        quote!(specta::datatype::reference::Reference::construct(SID, vec![#(#reference_generics),*]).into())
-    });
-
-    // // TODO: We should have a helper in `generics.rs` for doing this
-    // let generics_params = generics.params.iter().cloned().map(|v| match v {
-    //     GenericParam::Type(mut ty) => {
-    //         // We add `T: Type` to each generic parameter.
-    //         ty.bounds.push(TypeParamBound::Trait(syn::TraitBound {
-    //             paren_token: Some(syn::token::Paren::default()),
-    //             modifier: syn::TraitBoundModifier::None,
-    //             lifetimes: None,
-    //             path: syn::Path {
-    //                 leading_colon: None,
-    //                 segments: Punctuated::from_iter(vec![
-    //                     PathSegment {
-    //                         ident: parse_quote!(Type),
-    //                         arguments: syn::PathArguments::None,
-    //                     },
-    //                 ]),
-    //             }
-    //         }));
-    //         GenericParam::Type(ty)
-    //     }
-    //     v => v
-    // });
-    // let generics_where = &generics.where_clause;
-
     let inline_generics_def = if container_attrs.inline || container_attrs.transparent {
         let generics = &generics.params;
         quote!(#generics)
@@ -207,6 +164,28 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             #export
         )
     }).unwrap_or_default();
+
+    let comments = &container_attrs.common.doc;
+    let deprecated = container_attrs.common.deprecated_as_tokens(&crate_ref);
+    let impl_location = quote!(#crate_ref::internal::construct::impl_location(concat!(file!(), ":", line!(), ":", column!())));
+    let definition = (container_attrs.inline || container_attrs.transparent).then(|| quote!(
+        dt
+        // TODO: Better error message
+        .expect("detected a recursive inline")
+        .inner)).unwrap_or_else(|| {
+        let reference_generics = generics.params.iter().filter_map(|param| match param {
+            GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
+            GenericParam::Type(t) => {
+                let i = &t.ident;
+                Some(quote!(<#i as #crate_ref::Type>::definition(types)))
+            },
+        });
+
+        quote!(
+            let dt = Self::___specta_definition___(types);
+            specta::datatype::reference::Reference::construct(SID, vec![#(#reference_generics),*], dt).into()
+        )
+    });
 
     Ok(quote! {
         #[allow(non_camel_case_types)]

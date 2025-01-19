@@ -1,10 +1,10 @@
 use std::{
-    borrow::Borrow,
+    borrow::{Borrow, Cow},
     collections::{btree_map, BTreeMap},
-    fmt,
+    fmt, sync::atomic::AtomicU64,
 };
 
-use crate::{datatype::NamedDataType, NamedType, SpectaID};
+use crate::{datatype::NamedDataType, DataType, NamedType, SpectaID};
 
 /// Define a set of types which can be exported together.
 ///
@@ -16,6 +16,8 @@ pub struct TypeCollection {
     pub(crate) map: BTreeMap<SpectaID, Option<NamedDataType>>,
     // A stack of types that are currently being flattened. This is used to detect cycles.
     pub(crate) flatten_stack: Vec<SpectaID>,
+    // #[cfg(feature = "serde_json")]
+    // pub(crate) constants: BTreeMap<Cow<'static, str>, serde_json::Value>,
 }
 
 impl fmt::Debug for TypeCollection {
@@ -37,6 +39,29 @@ impl TypeCollection {
         self
     }
 
+    /// Declare a custom type with the collection.
+    #[doc(hidden)] // TODO: This isn't stable yet
+    pub fn declare(&mut self, name: impl Into<Cow<'static, str>>, dt: DataType) {
+        let dt = NamedDataType {
+            name: name.into(),
+            // TODO: Make this fields configurable somehow?
+            docs: Default::default(),
+            deprecated: Default::default(),
+            ext: None,
+            inner: dt,
+        };
+
+        // TODO: Proper id's
+        static ID: AtomicU64 = AtomicU64::new(0);
+        let id = SpectaID { type_name: "virtual", hash: ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed) };
+
+        self.map.insert(id, Some(dt));
+
+        // TODO: Return a thing which can generate `Reference`s to the type
+    }
+
+    // TODO: `declare_mut`???
+
     // /// TODO
     // pub fn reference(&mut self, sid: SpectaID) -> Reference {
     //     // if self.map.get(&sid).is_none() {
@@ -49,7 +74,7 @@ impl TypeCollection {
 
     // }
 
-    // /// Register a type with the collection.
+    //
     // #[doc(hidden)] // TODO: Make public
     // pub fn todo(&mut self, sid: SpectaID, inner: DataType) -> &mut Self {
     //     self.map.insert(sid, Some(NamedDataType {
@@ -60,6 +85,19 @@ impl TypeCollection {
     //         ext: None, // TODO: Some(crate::datatype::NamedDataTypeExt { sid: (), impl_location: () })
     //         inner
     //     }));
+    //     self
+    // }
+
+    // TODO: Implement in exporter and uncomment these
+    // #[cfg(feature = "serde_json")]
+    // pub fn constant<T: serde::Serialize>(self, name: impl Into<Cow<'static, str>>, value: T) -> Self {
+    //     self.constants.insert(name.into(), serde_json::to_value(value).unwrap()); // TODO: Error handling
+    //     self
+    // }
+
+    // #[cfg(feature = "serde_json")]
+    // pub fn constant_mut<T: serde::Serialize>(&mut self, name: impl Into<Cow<'static, str>>, value: T) -> &mut Self {
+    //     self.constants.insert(name.into(), serde_json::to_value(value).unwrap()); // TODO: Error handling
     //     self
     // }
 

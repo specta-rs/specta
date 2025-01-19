@@ -93,7 +93,7 @@ pub fn parse_struct(
                 }
             });
 
-            quote!(#crate_ref::datatype::inline::<#field_ty>(types, &[#(#generics),*]))
+            quote!(#crate_ref::datatype::inline::<#field_ty>(types))
         } else {
             quote!(<#field_ty as #crate_ref::Type>::definition(types))
         }

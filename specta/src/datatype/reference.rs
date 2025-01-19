@@ -12,12 +12,15 @@ use super::DataType;
 pub struct Reference {
     pub(crate) sid: SpectaID,
     pub(crate) generics: Vec<DataType>,
+    // When creating a reference we generate a `DataType` replacing all `DataType::Generic` with the current generics.
+    // This allows us to avoid a runtime find-and-replace on it.
+    pub(crate) dt: Box<DataType>,
 }
 
 impl Reference {
     /// TODO: Explain invariant.
-    pub fn construct(sid: SpectaID, generics: impl Into<Vec<DataType>>) -> Self {
-        Self { sid, generics: generics.into() }
+    pub fn construct(sid: SpectaID, generics: impl Into<Vec<DataType>>, dt: DataType) -> Self {
+        Self { sid, generics: generics.into(), dt: Box::new(dt) }
     }
 
     pub fn sid(&self) -> SpectaID {
@@ -26,6 +29,10 @@ impl Reference {
 
     pub fn generics(&self) -> &[DataType] {
         &self.generics
+    }
+
+    pub fn datatype(&self) -> &DataType {
+        &self.dt
     }
 }
 

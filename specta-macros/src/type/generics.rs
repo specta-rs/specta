@@ -5,8 +5,6 @@ use syn::{
      LifetimeParam, TypeParam, WhereClause,
 };
 
-use super::FieldAttr;
-
 pub fn generics_with_ident_and_bounds_only(generics: &Generics) -> Option<TokenStream> {
     (!generics.params.is_empty())
         .then(|| {
