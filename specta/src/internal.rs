@@ -23,10 +23,9 @@ pub fn register(
     sid: SpectaID,
     impl_location: ImplLocation,
     build: impl FnOnce(&mut TypeCollection) -> DataType,
-) -> NamedDataType {
+) -> Option<NamedDataType> {
     match types.map.get(&sid) {
-        Some(Some(dt)) => dt.clone(),
-        Some(None) => todo!("recursive inline or something"), // TODO: Recursive inline I think
+        Some(dt) => dt.clone(),
         None => {
             types.map.entry(sid).or_insert(None);
             let dt = NamedDataType {
@@ -37,7 +36,7 @@ pub fn register(
                 inner: build(types)
             };
             types.map.insert(sid, Some(dt.clone()));
-            dt
+            Some(dt)
         }
     }
 }

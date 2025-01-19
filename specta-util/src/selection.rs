@@ -42,7 +42,6 @@ macro_rules! selection {
             #[derive(serde::Serialize, specta::Type)]
             #[specta(inline)]
             pub struct Selection<$($n,)*> {
-                // TODO: #[specta(inline)]
                 $(pub $n: $n),*
             }
         }

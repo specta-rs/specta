@@ -113,7 +113,6 @@ pub fn inline_reference<T: Type>(types: &mut TypeCollection) -> DataType {
 }
 
 /// TODO: Finish and document this. It only inlines the first level of references.
-/// TODO: Remove `generics` argument.
 pub fn inline<T: Type>(types: &mut TypeCollection, generics: &[(GenericType, DataType)]) -> DataType {
     fn inner(types: &mut TypeCollection, generics: &[(GenericType, DataType)], dt: DataType, i: i8) -> DataType {
         if i == 1 {
@@ -198,22 +197,31 @@ pub fn inline<T: Type>(types: &mut TypeCollection, generics: &[(GenericType, Dat
                 elements: t.elements.into_iter().map(|ty| inner(types, generics, ty, i + 1)).collect(),
             }),
             DataType::Reference(r) => {
-                let ty = types.get(r.sid).unwrap(); // TODO: Error handling
+                // TODO: Error handling
+                let Some(ty) = types.map.get(&r.sid).unwrap() else {
+                    panic!("detected a recursive inline"); // TODO: Better error message
+                };
 
                 let g = ty.inner.generics().unwrap(); // TODO: This should be handled properly
 
                 // TODO: Error if the size of both items doesn't match
                 let todo = std::iter::zip(g.iter().cloned(), r.generics.iter().cloned()).collect::<Vec<_>>();
 
-                println!("TODO {:?}", todo); // TODO
+                println!("R {:?} {:?}", r, todo); // TODO
+
+                // println!("TODO {:?}", todo); // TODO
 
                 // TODO: Join `todo` and `generics`
 
                 inner(types, &todo, ty.inner.clone(), i + 1)
             }
-            DataType::Generic(g) => generics.iter().find(|(generic_type, _)| *generic_type == g)
-                .map(|(_, ty)| ty.clone())
-                .unwrap()
+            DataType::Generic(g) => {
+                println!("G {:?} {:?}", g, generics); // TODO
+
+                generics.iter().find(|(generic_type, _)| *generic_type == g)
+                    .map(|(_, ty)| ty.clone())
+                    .unwrap()
+            }
         }
     }
 

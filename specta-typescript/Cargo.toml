@@ -33,4 +33,4 @@ thiserror = "1.0.61"
 [dev-dependencies]
 serde = { version = "1.0.217", features = ["derive"] }
 specta = { version = "=2.0.0-rc.22", path = "../specta", features = ["derive", "export"] }
-specta-util = { path = "../specta-util" }
+specta-util = { path = "../specta-util", features = ["serde"] }

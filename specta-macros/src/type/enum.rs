@@ -80,10 +80,10 @@ pub fn parse_enum(
                             .iter()
                             .map(|field| {
                                 let field_attrs = decode_field_attrs(field)?;
-                                Ok(construct_field(crate_ref, generics, FieldAttr {
+                                Ok(construct_field(crate_ref, generics, container_attrs, FieldAttr {
                                     rename: field_attrs.rename,
                                     r#type: field_attrs.r#type,
-                                    inline: field_attrs.inline || attrs.inline,
+                                    inline: container_attrs.inline || field_attrs.inline || attrs.inline,
                                     skip: field_attrs.skip || attrs.skip,
                                     optional: field_attrs.optional,
                                     flatten: field_attrs.flatten,
@@ -115,10 +115,10 @@ pub fn parse_enum(
                                 (_, _) => quote::quote!(#field_ident_str),
                             };
 
-                            let inner = construct_field(crate_ref, generics, FieldAttr {
+                            let inner = construct_field(crate_ref,  generics, container_attrs, FieldAttr {
                                 rename: field_attrs.rename,
                                 r#type: field_attrs.r#type,
-                                inline: field_attrs.inline || attrs.inline,
+                                inline: container_attrs.inline || field_attrs.inline || attrs.inline,
                                 skip: field_attrs.skip || attrs.skip,
                                 optional: field_attrs.optional,
                                 flatten: field_attrs.flatten,
