@@ -1,7 +1,6 @@
 use std::{borrow::Cow, io, path::Path};
 
 use specta::{datatype::DeprecatedType, TypeCollection};
-use specta_serde::is_valid_ty;
 
 use crate::{comments, ExportError};
 

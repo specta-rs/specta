@@ -5,8 +5,7 @@
     html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
 )]
 
-pub(crate) mod utils;
-pub(crate) mod constants;
+pub(crate) mod reserved_names;
 pub mod primitives;
 pub mod comments;
 mod context;

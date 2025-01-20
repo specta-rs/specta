@@ -29,13 +29,13 @@ pub struct BagOfTypes {
 #[test]
 fn test_sid() {
     // TODO: This is so hard for an end-user to work with. Add some convenience API's!!!
-    let mut type_map = TypeCollection::default();
+    let mut types = TypeCollection::default();
     // We are calling this for it's side-effects
-    BagOfTypes::definition(&mut type_map);
+    BagOfTypes::definition(&mut types);
 
     // `TypeCollection` is a `BTreeMap` so it's sorted by SID. It should be sorted alphabetically by name
     assert_eq!(
-        type_map
+        types
             .into_iter()
             .map(|(_, t)| t.name().clone())
             .collect::<Vec<_>>(),

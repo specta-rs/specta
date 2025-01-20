@@ -6,7 +6,7 @@ use std::{borrow::Borrow, fmt::Write as _, iter};
 
 use specta::{datatype::{reference::Reference, DataType, EnumType, Field, Fields, FunctionResultVariant, List, LiteralType, Map, NamedDataType, PrimitiveType, StructType, TupleType}, TypeCollection};
 
-use crate::{constants::*, utils::intersperse, BigIntExportBehavior, CommentFormatterArgs, ExportError, Typescript};
+use crate::{reserved_names::*, BigIntExportBehavior, CommentFormatterArgs, ExportError, Typescript};
 
 /// Generate an `export Type = ...` Typescript string for a specific [`DataType`].
 ///
@@ -69,8 +69,8 @@ pub fn export_func(ts: &Typescript, types: &TypeCollection, dt: FunctionResultVa
 
 fn datatype(s: &mut String, ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<(), ExportError> {
     match dt {
-        DataType::Any => s.push_str(ANY),
-        DataType::Unknown => s.push_str(UNKNOWN),
+        DataType::Any => s.push_str("any"),
+        DataType::Unknown => s.push_str("unknown"),
         DataType::Primitive(p) => s.push_str(primitive_dt(&ts.bigint, p)?),
         DataType::Literal(l) => literal_dt(s, l),
         DataType::List(l) => list_dt(s, ts, types, l)?,
@@ -97,16 +97,16 @@ fn primitive_dt(b: &BigIntExportBehavior, p: &PrimitiveType) -> Result<&'static 
     use PrimitiveType::*;
 
     Ok(match p {
-        i8 | i16 | i32 | u8 | u16 | u32 | f32 | f64 => NUMBER,
+        i8 | i16 | i32 | u8 | u16 | u32 | f32 | f64 => "number",
         usize | isize | i64 | u64 | i128 | u128 => match b {
-            BigIntExportBehavior::String => STRING,
-            BigIntExportBehavior::Number => NUMBER,
-            BigIntExportBehavior::BigInt => BIGINT,
+            BigIntExportBehavior::String => "string",
+            BigIntExportBehavior::Number => "number",
+            BigIntExportBehavior::BigInt => "bigint",
             BigIntExportBehavior::Fail => return Err(ExportError::BigIntForbidden(todo!())),
             BigIntExportBehavior::FailWithReason(reason) => return Err(ExportError::Other(todo!(), reason.to_string())),
         }
-        PrimitiveType::bool => BOOLEAN,
-        String | char => STRING,
+        PrimitiveType::bool => "boolean",
+        String | char => "string",
     })
 }
 
@@ -126,7 +126,7 @@ fn literal_dt(s: &mut String, l: &LiteralType) {
         bool(v) => write!(s, "{v}"),
         String(v) => write!(s, "\"{v}\""),
         char(v) => write!(s, "\"{v}\""),
-        None => write!(s, "{NULL}"),
+        None => write!(s, "null"),
         // We panic because this is a bug in Specta.
         v => unreachable!("attempted to export unsupported LiteralType variant {v:?}"),
     }.expect("writing to a string is an infallible operation");
@@ -179,7 +179,7 @@ fn map_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, m: &Map) -> R
 
 fn enum_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, e: &EnumType) -> Result<(), ExportError> {
     if e.variants().is_empty() {
-        s.push_str(NEVER);
+        s.push_str("never");
         return Ok(());
     }
 
@@ -214,7 +214,7 @@ fn enum_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, e: &EnumType
 
 fn fields_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, f: &Fields) -> Result<(), ExportError> {
     match f {
-        Fields::Unit => s.push_str(NULL),
+        Fields::Unit => s.push_str("null"),
         Fields::Unnamed(f) => {
             let mut fields = f.fields().into_iter().filter(|f| f.ty().is_some());
 
@@ -274,7 +274,7 @@ fn field_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, f: &Field) 
 
 fn tuple_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, t: &TupleType) -> Result<(), ExportError> {
     match &t.elements()[..] {
-        [] => s.push_str(NULL),
+        [] => s.push_str("null"),
         elems => {
             s.push_str("[");
             iter_with_sep(s, elems, |s, dt| datatype(s, ts, types, &dt), ", ")?;
@@ -356,4 +356,15 @@ fn iter_with_sep<T>(s: &mut String, i: impl IntoIterator<Item = T>, mut item: im
         (item)(s, e)?;
     }
     Ok(())
+}
+
+// A smaller helper until this is stablised into the Rust standard library.
+pub fn intersperse<T: Clone>(iter: impl Iterator<Item = T>, sep: T) -> impl Iterator<Item = T> {
+    iter.enumerate().flat_map(move |(i, item)| {
+        if i == 0 {
+            vec![item]
+        } else {
+            vec![sep.clone(), item]
+        }
+    })
 }

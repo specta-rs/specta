@@ -109,8 +109,8 @@ mod test {
     #[test]
     fn test_function_exporting() {
         {
-            let mut type_map = &mut specta::TypeCollection::default();
-            let def: datatype::Function = specta::fn_datatype![a](&type_map);
+            let mut types = &mut specta::TypeCollection::default();
+            let def: datatype::Function = specta::fn_datatype![a](&types);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "a");
             assert_eq!(def.args.len(), 0);
@@ -118,13 +118,13 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeCollection::default();
-            let def: datatype::Function = specta::fn_datatype![b](&type_map);
+            let mut types = &mut specta::TypeCollection::default();
+            let def: datatype::Function = specta::fn_datatype![b](&types);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "b");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, type_map)
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, types)
                     .unwrap(),
                 "string"
             );
@@ -132,23 +132,23 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeCollection::default();
-            let def: datatype::Function = specta::fn_datatype![c](&type_map);
+            let mut types = &mut specta::TypeCollection::default();
+            let def: datatype::Function = specta::fn_datatype![c](&types);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "c");
             assert_eq!(def.args.len(), 3);
             assert_eq!(
-                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, type_map)
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, types)
                     .unwrap(),
                 "string"
             );
             assert_eq!(
-                specta_typescript::datatype(&ExportConfig::default(), &def.args[1].1, type_map)
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[1].1, types)
                     .unwrap(),
                 "number"
             );
             assert_eq!(
-                specta_typescript::datatype(&ExportConfig::default(), &def.args[2].1, type_map)
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[2].1, types)
                     .unwrap(),
                 "boolean"
             );
@@ -156,13 +156,13 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeCollection::default();
-            let def: datatype::Function = specta::fn_datatype![d](&type_map);
+            let mut types = &mut specta::TypeCollection::default();
+            let def: datatype::Function = specta::fn_datatype![d](&types);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "d");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, type_map)
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, types)
                     .unwrap(),
                 "string"
             );
@@ -173,7 +173,7 @@ mod test {
                             specta_typescript::datatype(
                                 &ExportConfig::default(),
                                 &result,
-                                type_map,
+                                types,
                             )
                             .unwrap(),
                         )
@@ -184,13 +184,13 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeCollection::default();
-            let def: datatype::Function = specta::fn_datatype![e::<bool>](&type_map);
+            let mut types = &mut specta::TypeCollection::default();
+            let def: datatype::Function = specta::fn_datatype![e::<bool>](&types);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "e");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, type_map)
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, types)
                     .unwrap(),
                 "boolean"
             );
@@ -198,13 +198,13 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeCollection::default();
-            let def: datatype::Function = specta::fn_datatype![f](&type_map);
+            let mut types = &mut specta::TypeCollection::default();
+            let def: datatype::Function = specta::fn_datatype![f](&types);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "f");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, type_map)
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, types)
                     .unwrap(),
                 "string"
             );
@@ -215,7 +215,7 @@ mod test {
                             specta_typescript::datatype(
                                 &ExportConfig::default(),
                                 &result,
-                                type_map,
+                                types,
                             )
                             .unwrap(),
                         )
@@ -226,13 +226,13 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeCollection::default();
-            let def: datatype::Function = specta::fn_datatype![g](&type_map);
+            let mut types = &mut specta::TypeCollection::default();
+            let def: datatype::Function = specta::fn_datatype![g](&types);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "g");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, type_map)
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, types)
                     .unwrap(),
                 "string"
             );
@@ -240,13 +240,13 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeCollection::default();
-            let def: datatype::Function = specta::fn_datatype![h](&type_map);
+            let mut types = &mut specta::TypeCollection::default();
+            let def: datatype::Function = specta::fn_datatype![h](&types);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "h");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, type_map)
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, types)
                     .unwrap(),
                 "string"
             );
@@ -254,8 +254,8 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeCollection::default();
-            let def: datatype::Function = specta::fn_datatype![i](&type_map);
+            let mut types = &mut specta::TypeCollection::default();
+            let def: datatype::Function = specta::fn_datatype![i](&types);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "i");
             assert_eq!(def.args.len(), 0);
@@ -266,7 +266,7 @@ mod test {
                             specta_typescript::datatype(
                                 &ExportConfig::default(),
                                 &result,
-                                type_map,
+                                types,
                             )
                             .unwrap(),
                         )
@@ -277,8 +277,8 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeCollection::default();
-            let def: datatype::Function = specta::fn_datatype![k](&type_map);
+            let mut types = &mut specta::TypeCollection::default();
+            let def: datatype::Function = specta::fn_datatype![k](&types);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "k");
             assert_eq!(def.args.len(), 0);
@@ -289,7 +289,7 @@ mod test {
                             specta_typescript::datatype(
                                 &ExportConfig::default(),
                                 &result,
-                                type_map,
+                                types,
                             )
                             .unwrap(),
                         )
@@ -300,18 +300,18 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeCollection::default();
-            let def: datatype::Function = specta::fn_datatype![l](&type_map);
+            let mut types = &mut specta::TypeCollection::default();
+            let def: datatype::Function = specta::fn_datatype![l](&types);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "l");
             assert_eq!(def.args.len(), 2);
             assert_eq!(
-                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, type_map)
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, types)
                     .unwrap(),
                 "Demo"
             );
             assert_eq!(
-                specta_typescript::datatype(&ExportConfig::default(), &def.args[1].1, type_map)
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[1].1, types)
                     .unwrap(),
                 "[string, number]"
             );
@@ -319,13 +319,13 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeCollection::default();
-            let def: datatype::Function = specta::fn_datatype![m](&type_map);
+            let mut types = &mut specta::TypeCollection::default();
+            let def: datatype::Function = specta::fn_datatype![m](&types);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "m");
             assert_eq!(def.args.len(), 1);
             assert_eq!(
-                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, type_map)
+                specta_typescript::datatype(&ExportConfig::default(), &def.args[0].1, types)
                     .unwrap(),
                 "Demo"
             );
@@ -333,8 +333,8 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeCollection::default();
-            let def: datatype::Function = specta::fn_datatype![async_fn](&type_map);
+            let mut types = &mut specta::TypeCollection::default();
+            let def: datatype::Function = specta::fn_datatype![async_fn](&types);
             assert_eq!(def.asyncness, true);
             assert_eq!(def.name, "async_fn");
             assert_eq!(def.args.len(), 0);
@@ -342,8 +342,8 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeCollection::default();
-            let def: datatype::Function = specta::fn_datatype![with_docs](&type_map);
+            let mut types = &mut specta::TypeCollection::default();
+            let def: datatype::Function = specta::fn_datatype![with_docs](&types);
             assert_eq!(def.asyncness, false);
             assert_eq!(def.name, "with_docs");
             assert_eq!(def.args.len(), 0);
@@ -352,8 +352,8 @@ mod test {
         }
 
         {
-            let mut type_map = &mut specta::TypeCollection::default();
-            let def: datatype::Function = specta::fn_datatype![raw](&type_map);
+            let mut types = &mut specta::TypeCollection::default();
+            let def: datatype::Function = specta::fn_datatype![raw](&types);
             assert_eq!(def.args[0].0, "type");
         }
     }

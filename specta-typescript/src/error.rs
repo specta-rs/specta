@@ -1,7 +1,6 @@
 use core::fmt;
 use std::borrow::Cow;
 
-use specta_serde::SerdeError;
 use thiserror::Error;
 
 use specta::ImplLocation;
@@ -32,8 +31,6 @@ impl fmt::Display for NamedLocation {
 pub enum ExportError {
     #[error("Attempted to export '{0}' but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!")]
     BigIntForbidden(ExportPath),
-    #[error("Serde error: {0}")]
-    Serde(#[from] SerdeError),
     // #[error("Attempted to export '{0}' but was unable to export a tagged type which is unnamed")]
     // UnableToTagUnnamedType(ExportPath),
     #[error("Attempted to export '{1}' but was unable to due to {0} name '{2}' conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`")]
@@ -59,7 +56,6 @@ impl PartialEq for ExportError {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::BigIntForbidden(l0), Self::BigIntForbidden(r0)) => l0 == r0,
-            (Self::Serde(l0), Self::Serde(r0)) => l0 == r0,
             // (Self::UnableToTagUnnamedType(l0), Self::UnableToTagUnnamedType(r0)) => l0 == r0,
             (Self::ForbiddenName(l0, l1, l2), Self::ForbiddenName(r0, r1, r2)) => {
                 l0 == r0 && l1 == r1 && l2 == r2
