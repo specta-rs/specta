@@ -118,54 +118,41 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         quote!(#(#g),*)
     };
 
-    // When inlining we don't implement `NamedType` and we don't register into the type collection.
-    let inner = (!container_attrs.inline).then(|| {
-        let generic_placeholders = generics.params.iter().filter_map(|param| match param {
-            GenericParam::Lifetime(_) |  GenericParam::Const(_) => None,
-            GenericParam::Type(t) => {
-                let ident = format_ident!("PLACEHOLDER_{}", t.ident);
-                let ident_str = t.ident.to_string();
-                Some(quote!(
-                    pub struct #ident;
-                    impl #crate_ref::datatype::GenericPlaceholder for #ident {
-                        const PLACEHOLDER: &'static str = #ident_str;
-                    }
-                ))
-            },
+    let generic_placeholders = generics.params.iter().filter_map(|param| match param {
+        GenericParam::Lifetime(_) |  GenericParam::Const(_) => None,
+        GenericParam::Type(t) => {
+            let ident = format_ident!("PLACEHOLDER_{}", t.ident);
+            let ident_str = t.ident.to_string();
+            Some(quote!(
+                pub struct #ident;
+                impl #crate_ref::datatype::GenericPlaceholder for #ident {
+                    const PLACEHOLDER: &'static str = #ident_str;
+                }
+            ))
+        },
+    });
+
+    let export = (cfg!(feature = "DO_NOT_USE_export") && container_attrs.export.unwrap_or(true))
+        .then(|| {
+            let export_fn_name = format_ident!("__push_specta_type_{}", raw_ident);
+
+            let generic_params = generics
+                .params
+                .iter()
+                .filter(|param| matches!(param, syn::GenericParam::Type(_)))
+                .map(|_| quote! { () });
+
+            quote! {
+                #[allow(non_snake_case)]
+                #[#crate_ref::export::internal::ctor]
+                fn #export_fn_name() {
+                    #crate_ref::export::internal::register::<#ident<#(#generic_params),*>>();
+                }
+            }
         });
 
-        let export = (cfg!(feature = "DO_NOT_USE_export") && container_attrs.export.unwrap_or(true))
-            .then(|| {
-                let export_fn_name = format_ident!("__push_specta_type_{}", raw_ident);
-
-                let generic_params = generics
-                    .params
-                    .iter()
-                    .filter(|param| matches!(param, syn::GenericParam::Type(_)))
-                    .map(|_| quote! { () });
-
-                quote! {
-                    #[allow(non_snake_case)]
-                    #[#crate_ref::export::internal::ctor]
-                    fn #export_fn_name() {
-                        #crate_ref::export::internal::register::<#ident<#(#generic_params),*>>();
-                    }
-                }
-            });
-
-        quote!(
-            #(#generic_placeholders)*
-
-            #[automatically_derived]
-            impl #bounds #crate_ref::NamedType for #ident #type_args #where_bound {
-                const ID: #crate_ref::SpectaID = SID;
-            }
-
-            #export
-        )
-    }).unwrap_or_default();
-
     let comments = &container_attrs.common.doc;
+     let inline = container_attrs.inline;
     let deprecated = container_attrs.common.deprecated_as_tokens(&crate_ref);
     let impl_location = quote!(#crate_ref::internal::construct::impl_location(concat!(file!(), ":", line!(), ":", column!())));
     let definition = (container_attrs.inline || container_attrs.transparent).then(|| quote!(
@@ -183,9 +170,10 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
         quote!(
             let dt = Self::___specta_definition___(types);
-            specta::datatype::reference::Reference::construct(SID, vec![#(#reference_generics),*], dt).into()
+            specta::datatype::reference::Reference::construct(SID, vec![#(#reference_generics),*], dt, #inline).into()
         )
     });
+
 
     Ok(quote! {
         #[allow(non_camel_case_types)]
@@ -194,6 +182,8 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
             // This is equivalent to `<Self as #crate_ref::NamedType>::ID` but it's shorter so we use it instead.
             const SID: #crate_ref::SpectaID = #crate_ref::internal::construct::sid(#name, concat!("::", module_path!(), ":", line!(), ":", column!()));
+
+            #(#generic_placeholders)*
 
             // TODO: We should make this a standalone function but that caused issues resolving lifetimes.
             #[automatically_derived]
@@ -220,9 +210,14 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 }
             }
 
-            #inner
+            #[automatically_derived]
+            impl #bounds #crate_ref::NamedType for #ident #type_args #where_bound {
+                const ID: #crate_ref::SpectaID = SID;
+            }
 
             #flatten_impl
+
+            #export
         };
 
     }.into())

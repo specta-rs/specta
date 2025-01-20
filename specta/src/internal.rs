@@ -78,6 +78,7 @@ pub mod construct {
             flatten: false,
             deprecated,
             docs,
+            inline: false, // TODO: Should this come from macro still?
             ty: None,
         }
     }
@@ -90,7 +91,7 @@ pub mod construct {
         types: &mut TypeCollection
     ) -> Field {
         // TODO: Could this stack overflow? Is `TypeCollection::flatten_stack` still used or should we use it?
-        let ty = datatype::inline::<T>(types);
+        let ty = datatype::inline::<T>(types); // TODO
 
         // match inline {
         //     DataType::Struct(s) => s.fields(),
@@ -116,6 +117,7 @@ pub mod construct {
             flatten: true,
             deprecated,
             docs,
+            inline,
             ty: Some(ty),
         }
     }
@@ -132,11 +134,8 @@ pub mod construct {
             flatten: false,
             deprecated,
             docs,
-            ty: Some(if inline {
-                datatype::inline::<T>(types)
-            } else {
-                T::definition(types)
-            })
+            inline,
+            ty: Some(T::definition(types)),
         }
     }
 

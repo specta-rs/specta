@@ -35,6 +35,8 @@ pub struct Field {
     /// You might think, well why not apply this in the macro and just not emit the variant?
     /// Well in Serde `A(String)` and `A(#[serde(skip)] (), String)` export as different Typescript types so the exporter needs runtime knowledge of this.
     pub(crate) ty: Option<DataType>,
+     // TODO: This is a Typescript-specific thing
+    pub(crate) inline: bool,
 }
 
 impl Field {
@@ -52,6 +54,10 @@ impl Field {
 
     pub fn docs(&self) -> &Cow<'static, str> {
         &self.docs
+    }
+
+    pub fn inline(&self) -> bool {
+        self.inline
     }
 
     pub fn ty(&self) -> Option<&DataType> {

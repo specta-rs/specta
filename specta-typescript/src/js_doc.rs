@@ -8,56 +8,56 @@ use typescript::CommentFormatterArgs;
 
 use super::*;
 
-pub fn typedef_named_datatype(
-    cfg: &Typescript,
-    typ: &NamedDataType,
-    types: &TypeCollection,
-) -> Output {
-    typedef_named_datatype_inner(
-        &ExportContext {
-            cfg,
-            path: vec![],
-            // TODO: Should JS doc support per field or variant comments???
-            is_export: false,
-        },
-        typ,
-        types,
-    )
-}
+// pub fn typedef_named_datatype(
+//     cfg: &Typescript,
+//     typ: &NamedDataType,
+//     types: &TypeCollection,
+// ) -> Output {
+//     typedef_named_datatype_inner(
+//         &ExportContext {
+//             cfg,
+//             path: vec![],
+//             // TODO: Should JS doc support per field or variant comments???
+//             is_export: false,
+//         },
+//         typ,
+//         types,
+//     )
+// }
 
-fn typedef_named_datatype_inner(
-    ctx: &ExportContext,
-    typ: &NamedDataType,
-    types: &TypeCollection,
-) -> Output {
-    let name = typ.name();
-    let docs = typ.docs();
-    let deprecated = typ.deprecated();
-    let item = &typ.inner;
+// fn typedef_named_datatype_inner(
+//     ctx: &ExportContext,
+//     typ: &NamedDataType,
+//     types: &TypeCollection,
+// ) -> Output {
+//     let name = typ.name();
+//     let docs = typ.docs();
+//     let deprecated = typ.deprecated();
+//     let item = &typ.inner;
 
-    let ctx = ctx.with(PathItem::Type(name.clone()));
+//     let ctx = ctx.with(PathItem::Type(name.clone()));
 
-    let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
+//     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
 
-    let mut inline_ts = String::new();
-    datatype_inner(
-        ctx.clone(),
-        &FunctionResultVariant::Value(typ.inner.clone()),
-        types,
-        &mut inline_ts,
-    )?;
+//     let mut inline_ts = String::new();
+//     datatype_inner(
+//         ctx.clone(),
+//         &FunctionResultVariant::Value(typ.inner.clone()),
+//         types,
+//         &mut inline_ts,
+//     )?;
 
-    let mut builder = super::comments::js_doc_builder(CommentFormatterArgs { docs, deprecated });
+//     let mut builder = super::comments::js_doc_builder(CommentFormatterArgs { docs, deprecated });
 
-    item.generics()
-        .into_iter()
-        .flatten()
-        .for_each(|generic| builder.push_generic(generic));
+//     item.generics()
+//         .into_iter()
+//         .flatten()
+//         .for_each(|generic| builder.push_generic(generic));
 
-    builder.push_internal(["@typedef { ", &inline_ts, " } ", &name]);
+//     builder.push_internal(["@typedef { ", &inline_ts, " } ", &name]);
 
-    Ok(builder.build())
-}
+//     Ok(builder.build())
+// }
 
 const START: &str = "/**\n";
 

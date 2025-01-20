@@ -105,6 +105,7 @@ impl FieldBuilder {
             flatten: false,
             deprecated: None,
             docs: "".into(),
+            inline: false,
             ty: Some(ty),
         })
     }
@@ -134,6 +135,15 @@ impl FieldBuilder {
 
     pub fn set_flatten(&mut self, flatten: bool) {
         self.0.flatten = flatten;
+    }
+
+    pub fn inline(mut self) -> Self {
+        self.0.inline = true;
+        self
+    }
+
+    pub fn set_inline(&mut self, inline: bool) {
+        self.0.inline = inline;
     }
 
     pub fn deprecated(mut self, reason: DeprecatedType) -> Self {

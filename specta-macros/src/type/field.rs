@@ -10,6 +10,7 @@ pub fn construct_field(crate_ref: &TokenStream, container_attrs: &ContainerAttr,
     let deprecated = attrs.common.deprecated_as_tokens(crate_ref);
     let optional = attrs.optional;
     let doc = attrs.common.doc;
+    // TODO: Check container inline?
     let inline = container_attrs.inline || attrs.inline;
 
     // Skip must be handled by the macro so that we don't try and constrain the inner type to `Type` or `Flatten` traits.

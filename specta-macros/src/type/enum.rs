@@ -83,6 +83,7 @@ pub fn parse_enum(
                                 Ok(construct_field(crate_ref, container_attrs, FieldAttr {
                                     rename: field_attrs.rename,
                                     r#type: field_attrs.r#type,
+                                    // TOOD: Should we check container too?
                                     inline: container_attrs.inline || field_attrs.inline || attrs.inline,
                                     skip: field_attrs.skip || attrs.skip,
                                     optional: field_attrs.optional,

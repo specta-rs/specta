@@ -1,5 +1,5 @@
 use crate::{
-    datatype::{DataType, GenericType}, SpectaID, TypeCollection
+    datatype::DataType, SpectaID, TypeCollection
 };
 
 mod impls;

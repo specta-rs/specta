@@ -2,7 +2,7 @@
 
 use crate::{datatype::{EnumType, EnumVariant, Field, Fields, List, Map, NamedFields, StructType, TupleType, UnnamedFields}, Type, TypeCollection};
 
-use super::{DataType, GenericType};
+use super::DataType;
 
 // TODO: Can/should we merge these? Deduplicate the code?
 
@@ -47,6 +47,7 @@ pub fn inline<T: Type>(types: &mut TypeCollection) -> DataType {
                             flatten: f.flatten,
                             deprecated: f.deprecated,
                             docs: f.docs,
+                            inline: f.inline,
                             ty: f.ty.map(|ty| inner(types, ty, i + 1))
                         }).collect(),
                     }),
@@ -57,6 +58,7 @@ pub fn inline<T: Type>(types: &mut TypeCollection) -> DataType {
                             flatten: f.flatten,
                             deprecated: f.deprecated,
                             docs: f.docs,
+                            inline: f.inline,
                             ty: f.ty.map(|ty| inner(types, ty, i + 1))
                         })).collect(),
                     })
@@ -80,6 +82,7 @@ pub fn inline<T: Type>(types: &mut TypeCollection) -> DataType {
                                 flatten: f.flatten,
                                 deprecated: f.deprecated,
                                 docs: f.docs,
+                                inline: f.inline,
                                 ty: f.ty.map(|ty| inner(types, ty, i + 1))
                             }).collect(),
                         }),
@@ -90,7 +93,8 @@ pub fn inline<T: Type>(types: &mut TypeCollection) -> DataType {
                                 flatten: f.flatten,
                                 deprecated: f.deprecated,
                                 docs: f.docs,
-                                ty: f.ty.map(|ty| inner(types, ty, i + 1))
+                                inline: f.inline,
+                                ty: f.ty.map(|ty| inner(types, ty, i + 1)),
                             })).collect(),
                         })
                     }

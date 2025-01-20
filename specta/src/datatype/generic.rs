@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{borrow::{Borrow, Cow}, fmt::Display, hash::Hash, marker::PhantomData};
+use std::{borrow::{Borrow, Cow}, fmt::Display, marker::PhantomData};
 
 use crate::Type;
 
@@ -19,6 +19,7 @@ impl Display for GenericType {
     }
 }
 
+// TODO: Deref instead?
 impl Borrow<str> for GenericType {
     fn borrow(&self) -> &str {
         &self.0

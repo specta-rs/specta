@@ -81,22 +81,27 @@ pub fn parse_struct(
         let (field_ty, field_attrs) = fields.into_iter().next().expect("fields.len() != 1");
         let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field_ty);
 
-        if container_attrs.inline || field_attrs.inline {
-            // TODO: Duplicate of code in `field.rs` we should refactor out into helper.
-            let generics = generics.params.iter().filter_map(|p| match p {
-                GenericParam::Const(..) | GenericParam::Lifetime(..) => None,
-                GenericParam::Type(p) => {
-                    let ident = &p.ident;
-                    let ident_str = p.ident.to_string();
+        // TODO: Should we check container too?
+        // if container_attrs.inline || field_attrs.inline {
+        //     // TODO: Duplicate of code in `field.rs` we should refactor out into helper.
+        //     // let generics = generics.params.iter().filter_map(|p| match p {
+        //     //     GenericParam::Const(..) | GenericParam::Lifetime(..) => None,
+        //     //     GenericParam::Type(p) => {
+        //     //         let ident = &p.ident;
+        //     //         let ident_str = p.ident.to_string();
 
-                    quote!((std::borrow::Cow::Borrowed(#ident_str).into(), <#ident as #crate_ref::Type>::definition(types))).into()
-                }
-            });
+        //     //         quote!((std::borrow::Cow::Borrowed(#ident_str).into(), <#ident as #crate_ref::Type>::definition(types))).into()
+        //     //     }
+        //     // });
 
-            quote!(#crate_ref::datatype::inline::<#field_ty>(types))
-        } else {
-            quote!(<#field_ty as #crate_ref::Type>::definition(types))
-        }
+        //     // quote!(#crate_ref::datatype::inline::<#field_ty>(types))
+        //     todo!();
+        // } else {
+        //     quote!(<#field_ty as #crate_ref::Type>::definition(types))
+        // }
+
+        // TODO: How can we passthrough the inline to this reference?
+        quote!(<#field_ty as #crate_ref::Type>::definition(types))
     } else {
         let fields = match &data.fields {
             Fields::Named(_) => {

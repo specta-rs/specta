@@ -120,6 +120,7 @@ impl<T: Into<DataType> + 'static> From<Vec<T>> for DataType {
                                     flatten: false,
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
+                                    inline: false,
                                     ty: Some(ty),
                                 }],
                             }),

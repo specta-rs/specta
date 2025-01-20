@@ -32,6 +32,7 @@ pub struct NamedDataType {
     // TODO: Should this be nullable???
     pub(crate) ext: Option<NamedDataTypeExt>,
     /// the actual type definition.
+    // TODO: Seal this field
     pub inner: DataType,
 }
 
@@ -55,5 +56,10 @@ impl NamedDataType {
     /// This will be `None` when constructing [NamedDataType] using `StructType::to_named` or `TupleType::to_named` since those types do not correspond to actual Rust types.
     pub fn ext(&self) -> Option<&NamedDataTypeExt> {
         self.ext.as_ref()
+    }
+
+    /// Get the inner [`DataType`]
+    pub fn ty(&self) -> &DataType {
+        &self.inner
     }
 }
