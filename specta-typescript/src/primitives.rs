@@ -4,7 +4,7 @@
 
 use std::{borrow::Borrow, fmt::Write as _, iter};
 
-use specta::{datatype::{reference::Reference, DataType, EnumType, Field, Fields, FunctionResultVariant, List, LiteralType, Map, NamedDataType, PrimitiveType, StructType, TupleType}, TypeCollection};
+use specta::{datatype::{reference::Reference, DataType, EnumType, Field, Fields, List, LiteralType, Map, NamedDataType, PrimitiveType, StructType, TupleType}, TypeCollection};
 
 use crate::{reserved_names::*, BigIntExportBehavior, CommentFormatterArgs, ExportError, Typescript};
 
@@ -239,7 +239,7 @@ fn fields_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, f: &Fields
                 s.push_str(key);
                 s.push_str(": ");
                 field_dt(s, ts, types, f)
-            }, ", ")?;
+            }, "; ")?;
             s.push_str(" }");
         }
     }

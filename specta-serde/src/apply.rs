@@ -19,53 +19,58 @@ pub fn apply(types: &mut TypeCollection) -> Result<(), Error> {
 
     for (sid, ndt) in types.iter_mut() {
         if let Some(ndt) = ndt {
-            is_valid_ty(&ndt.inner, &types_ref, &mut Default::default())?;
+            inner(&ndt.inner, &types_ref, &mut Default::default())?;
         }
-
-        // TODO: Apply transformations
     }
 
     Ok(())
 }
 
-fn is_valid_ty(
+fn inner(
     dt: &DataType,
     types: &TypeCollection,
     checked_references: &mut HashSet<SpectaID>,
 ) -> Result<(), Error> {
     match dt {
-        DataType::Nullable(ty) => is_valid_ty(ty, types, checked_references)?,
+        DataType::Nullable(ty) => inner(ty, types, checked_references)?,
         DataType::Map(ty) => {
             is_valid_map_key(ty.key_ty(), types)?;
-            is_valid_ty(ty.value_ty(), types, checked_references)?;
+            inner(ty.value_ty(), types, checked_references)?;
         }
         DataType::Struct(ty) => match ty.fields() {
             Fields::Unit => {}
             Fields::Unnamed(ty) => {
                 for (_, ty) in skip_fields(ty.fields()) {
-                    is_valid_ty(ty, types, checked_references)?;
+                    inner(ty, types, checked_references)?;
                 }
             }
             Fields::Named(ty) => {
                 for (_, (_, ty)) in skip_fields_named(ty.fields()) {
-                    is_valid_ty(ty, types, checked_references)?;
+                    inner(ty, types, checked_references)?;
                 }
             }
         },
         DataType::Enum(ty) => {
             validate_enum(ty, types)?;
 
+            match ty.repr() {
+                EnumRepr::Untagged => todo!(),
+                EnumRepr::External => todo!(),
+                EnumRepr::Internal { tag } => todo!(),
+                EnumRepr::Adjacent { tag, content } => todo!(),
+            }
+
             for (_variant_name, variant) in ty.variants().iter() {
                 match &variant.fields() {
                     Fields::Unit => {}
                     Fields::Named(variant) => {
                         for (_, (_, ty)) in skip_fields_named(variant.fields()) {
-                            is_valid_ty(ty, types, checked_references)?;
+                            inner(ty, types, checked_references)?;
                         }
                     }
                     Fields::Unnamed(variant) => {
                         for (_, ty) in skip_fields(variant.fields()) {
-                            is_valid_ty(ty, types, checked_references)?;
+                            inner(ty, types, checked_references)?;
                         }
                     }
                 }
@@ -73,12 +78,12 @@ fn is_valid_ty(
         }
         DataType::Tuple(ty) => {
             for ty in ty.elements() {
-                is_valid_ty(ty, types, checked_references)?;
+                inner(ty, types, checked_references)?;
             }
         }
         DataType::Reference(ty) => {
             for generic in ty.generics() {
-                is_valid_ty(generic, types, checked_references)?;
+                inner(generic, types, checked_references)?;
             }
 
             #[allow(clippy::panic)]
@@ -88,7 +93,7 @@ fn is_valid_ty(
                     panic!("Type '{}' was never populated.", ty.sid().type_name())
                 }); // TODO: Error properly
 
-                is_valid_ty(&ty.inner, types, checked_references)?;
+                inner(&ty.inner, types, checked_references)?;
             }
         }
         _ => {}
