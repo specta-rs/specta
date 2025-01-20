@@ -7,11 +7,11 @@ pub trait FunctionArg {
     ///
     /// Some argument types should be ignored (eg. when doing dependency injection),
     /// so the value is optional.
-    fn to_datatype(type_map: &mut TypeCollection) -> Option<DataType>;
+    fn to_datatype(types: &mut TypeCollection) -> Option<DataType>;
 }
 
 impl<T: Type> FunctionArg for T {
-    fn to_datatype(type_map: &mut TypeCollection) -> Option<DataType> {
-        Some(T::reference(type_map, &[]).inner)
+    fn to_datatype(types: &mut TypeCollection) -> Option<DataType> {
+        Some(T::definition(types))
     }
 }

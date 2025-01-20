@@ -1,9 +1,8 @@
 use std::{borrow::Cow, io, path::Path};
 
-use specta::{datatype::DeprecatedType, Language, TypeCollection};
-use specta_serde::is_valid_ty;
+use specta::{datatype::DeprecatedType, TypeCollection};
 
-use crate::{comments, detect_duplicate_type_names, export_named_datatype, ExportError};
+use crate::{comments, primitives, ExportError};
 
 #[derive(Debug)]
 #[non_exhaustive]
@@ -136,14 +135,13 @@ impl Typescript {
         out += &self.framework_header;
         out.push_str("\n\n");
 
-        if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
-            return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
-        }
+        // TODO: Bring this back
+        // if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
+        //     return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
+        // }
 
-        for (_, ty) in types.into_iter() {
-            is_valid_ty(&ty.inner, &types)?;
-
-            out += &export_named_datatype(self, ty, &types)?;
+        for (_, ndt) in types.into_iter() {
+            out += &primitives::export(self, &types, ndt)?;
             out += "\n\n";
         }
 

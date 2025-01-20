@@ -1,5 +1,5 @@
 /// Taken from: https://github.com/microsoft/TypeScript/blob/fad889283e710ee947e8412e173d2c050107a3c1/src/compiler/types.ts#L276
-pub(crate) const RESERVED_TYPE_NAMES: &[&str] = &[
+pub const RESERVED_TYPE_NAMES: &[&str] = &[
     "break",
     "case",
     "catch",

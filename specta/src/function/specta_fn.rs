@@ -12,7 +12,7 @@ pub trait SpectaFn<TMarker> {
     fn to_datatype(
         asyncness: bool,
         name: Cow<'static, str>,
-        type_map: &mut TypeCollection,
+        types: &mut TypeCollection,
         fields: &[Cow<'static, str>],
         docs: Cow<'static, str>,
         deprecated: Option<DeprecatedType>,
@@ -26,7 +26,7 @@ impl<TResultMarker, TResult: FunctionResult<TResultMarker>> SpectaFn<TResultMark
     fn to_datatype(
         asyncness: bool,
         name: Cow<'static, str>,
-        type_map: &mut TypeCollection,
+        types: &mut TypeCollection,
         _fields: &[Cow<'static, str>],
         docs: Cow<'static, str>,
         deprecated: Option<DeprecatedType>,
@@ -36,7 +36,7 @@ impl<TResultMarker, TResult: FunctionResult<TResultMarker>> SpectaFn<TResultMark
             asyncness,
             name,
             args: vec![],
-            result: (!no_return_type).then(|| TResult::to_datatype(type_map)),
+            result: (!no_return_type).then(|| TResult::to_datatype(types)),
             docs,
             deprecated,
         }
@@ -54,7 +54,7 @@ macro_rules! impl_typed_command {
                 fn to_datatype(
                     asyncness: bool,
                     name: Cow<'static, str>,
-                    type_map: &mut TypeCollection,
+                    types: &mut TypeCollection,
                     fields: &[Cow<'static, str>],
                     docs: Cow<'static, str>,
                     deprecated: Option<DeprecatedType>,
@@ -72,13 +72,13 @@ macro_rules! impl_typed_command {
                                 .next()
                                 .map_or_else(
                                     || None,
-                                    |field| $i::to_datatype(type_map).map(|ty| (field.clone(), ty))
+                                    |field| $i::to_datatype(types).map(|ty| (field.clone(), ty))
                                 )
                         ),*,]
                             .into_iter()
                             .filter_map(|v| v)
                             .collect::<Vec<_>>(),
-                        result: (!no_return_type).then(|| TResult::to_datatype(type_map)),
+                        result: (!no_return_type).then(|| TResult::to_datatype(types)),
                     }
                 }
             }

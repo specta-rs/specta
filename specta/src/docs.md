@@ -1,8 +1,8 @@
-Easily export your Rust types to other languages
+Easily export your Rust types to other languages.
 
 Specta provides a system for type introspection and a set of language exporters which allow you to export your Rust types to other languages!
 
-**Currently we only support exporting to [TypeScript](https://www.typescriptlang.org) but work has begun on other languages.**
+**Get started** by checking out the language exporter's, start with [Typescript](../specta_typescript/index.html).
 
 ## Features
 
@@ -15,30 +15,26 @@ Specta provides a system for type introspection and a set of language exporters 
 
 Specta can be used in your application either directly or through a library which simplifies the process of using it.
 
-- [rspc](https://github.com/oscartbeaumont/rspc) for easily building end-to-end typesafe APIs
-- [tauri-specta](https://github.com/oscartbeaumont/tauri-specta) for typesafe Tauri commands
+- [rspc](https://github.com/specta-rs/rspc) - A framework for building typesafe web backends in Rust
+- [tauri-specta](https://github.com/specta-rs/tauri-specta) - Completely typesafe Tauri commands
+- [TauRPC](https://github.com/MatsDK/TauRPC) - Typesafe IPC layer for Tauri applications
 
-## Example
+## Languages
 
-```rust,no_run
-use specta::*;
+Specta is designed to be able to export from Rust to any other language.
 
-#[derive(Type)]
-pub struct MyCustomType {
-   pub my_field: String,
-}
-
-fn main() {
-    assert_eq!(
-        specta_typescript::export::<MyCustomType>(&Default::default()).unwrap(),
-        "export type MyCustomType = { my_field: string }".to_string()
-    );
-}
-```
-
-## Supported Libraries
-
-If you are using [Prisma Client Rust](https://prisma.brendonovich.dev) you can enable the `rspc` feature on it to allow for Specta support on types coming directly from your database. This includes support for the types created via a selection.
+| Language                                               | Status        |
+| ------------------------------------------------------ | ------------- |
+| [specta-typescript](https://docs.rs/specta-typescript) | **Supported** |
+| [specta-jsdoc](https://docs.rs/specta-jsdoc)           | wip           |
+| [specta-rust](https://docs.rs/specta-rust)             | wip           |
+| [specta-go](https://docs.rs/specta-go)                 | _coming soon_ |
+| [specta-kotlin](https://docs.rs/specta-kotlin)         | _coming soon_ |
+| [specta-swift](https://docs.rs/specta-swift)           | _coming soon_ |
+| [specta-openapi](https://docs.rs/specta-openapi)       | wip           |
+| [specta-jsonschema](https://docs.rs/specta-jsonschema) | wip           |
+| [specta-zod](https://docs.rs/specta-zod)               | wip           |
+| [specta-valibot](https://docs.rs/specta-valibot)       | _coming soon_ |
 
 ## Feature flags
 

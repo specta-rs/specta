@@ -42,7 +42,7 @@ fn test_type_aliases() {
     assert_ts!(MapB<u32>, "Partial<{ [key in number]: string }>");
     assert_ts!(
         MapC<u32>,
-        "Partial<{ [key in string]: { field: Demo<number, boolean> } }>"
+        "Partial<{ [key in string]: Struct<number> }>"
     );
 
     assert_ts!(Struct<u32>, "{ field: Demo<number, boolean> }");

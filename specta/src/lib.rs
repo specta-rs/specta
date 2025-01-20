@@ -15,18 +15,17 @@ pub mod export;
 pub mod function;
 #[doc(hidden)]
 pub mod internal;
-mod language;
 mod specta_id;
 mod r#type;
 mod type_collection;
+#[doc(hidden)] // This stuff is not stable yet.
+pub mod builder;
 
 // TODO: Can we just move the trait here or `#[doc(inline)]`
-pub use r#type::{Flatten, Generics, NamedType, Type};
+pub use r#type::{Flatten, NamedType, Type};
 // #[doc(inline)]
 pub use specta_id::{ImplLocation, SpectaID};
 pub use type_collection::TypeCollection;
-
-pub use language::Language;
 
 #[doc(inline)]
 #[cfg(feature = "export")]

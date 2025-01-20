@@ -19,4 +19,5 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
+Inflector = "0.11.4"
 specta = { path = "../specta" }

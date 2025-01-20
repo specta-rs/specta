@@ -1,4 +1,4 @@
-use specta::{Generics, Type, TypeCollection};
+use specta::{Type, TypeCollection};
 
 #[derive(Type)]
 #[specta(export = false)]
@@ -29,16 +29,16 @@ pub struct BagOfTypes {
 #[test]
 fn test_sid() {
     // TODO: This is so hard for an end-user to work with. Add some convenience API's!!!
-    let mut type_map = TypeCollection::default();
+    let mut types = TypeCollection::default();
     // We are calling this for it's side-effects
-    BagOfTypes::inline(&mut type_map, Generics::Definition);
+    BagOfTypes::definition(&mut types);
 
     // `TypeCollection` is a `BTreeMap` so it's sorted by SID. It should be sorted alphabetically by name
     assert_eq!(
-        type_map
-            .iter()
+        types
+            .into_iter()
             .map(|(_, t)| t.name().clone())
             .collect::<Vec<_>>(),
-        ["A", "B", "C", "Z"]
+        ["A", "B", "BagOfTypes", "C", "Z"]
     );
 }

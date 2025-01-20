@@ -30,3 +30,27 @@ impl From<LiteralType> for DataType {
         Self::Literal(t)
     }
 }
+
+// macro_rules! impl_literal_conversion {
+//     () => {
+
+//     };
+// }
+
+impl From<i8> for LiteralType {
+    fn from(t: i8) -> Self {
+        Self::i8(t)
+    }
+}
+
+impl From<bool> for LiteralType {
+    fn from(t: bool) -> Self {
+        Self::bool(t)
+    }
+}
+
+impl From<String> for LiteralType {
+    fn from(t: String) -> Self {
+        Self::String(t)
+    }
+}
