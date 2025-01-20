@@ -60,12 +60,12 @@ pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<
     Ok(s)
 }
 
-/// Generate an `export Type = ...` Typescript string for a specific [`DataType`].
-///
-/// Similar to [`export`] but works on a [`FunctionResultVariant`].
-pub fn export_func(ts: &Typescript, types: &TypeCollection, dt: FunctionResultVariant) -> Result<String, ExportError> {
-    todo!();
-}
+// /// Generate an `export Type = ...` Typescript string for a specific [`DataType`].
+// ///
+// /// Similar to [`export`] but works on a [`FunctionResultVariant`].
+// pub fn export_func(ts: &Typescript, types: &TypeCollection, dt: FunctionResultVariant) -> Result<String, ExportError> {
+//     todo!();
+// }
 
 fn datatype(s: &mut String, ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<(), ExportError> {
     match dt {
@@ -102,8 +102,8 @@ fn primitive_dt(b: &BigIntExportBehavior, p: &PrimitiveType) -> Result<&'static 
             BigIntExportBehavior::String => "string",
             BigIntExportBehavior::Number => "number",
             BigIntExportBehavior::BigInt => "bigint",
-            BigIntExportBehavior::Fail => return Err(ExportError::BigIntForbidden(todo!())),
-            BigIntExportBehavior::FailWithReason(reason) => return Err(ExportError::Other(todo!(), reason.to_string())),
+            BigIntExportBehavior::Fail => return Err(todo!()), // TODO: ExportError::BigIntForbidden(todo!())),
+            BigIntExportBehavior::FailWithReason(reason) => return Err(todo!()), // TODO: ExportError::Other(todo!(), reason.to_string())),
         }
         PrimitiveType::bool => "boolean",
         String | char => "string",
@@ -359,7 +359,7 @@ fn iter_with_sep<T>(s: &mut String, i: impl IntoIterator<Item = T>, mut item: im
 }
 
 // A smaller helper until this is stablised into the Rust standard library.
-pub fn intersperse<T: Clone>(iter: impl Iterator<Item = T>, sep: T) -> impl Iterator<Item = T> {
+fn intersperse<T: Clone>(iter: impl Iterator<Item = T>, sep: T) -> impl Iterator<Item = T> {
     iter.enumerate().flat_map(move |(i, item)| {
         if i == 0 {
             vec![item]

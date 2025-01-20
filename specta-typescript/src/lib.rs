@@ -1,4 +1,50 @@
 //! [TypeScript](https://www.typescriptlang.org) language exporter.
+//!
+//! # Usage
+//!
+//! Add `specta` and `specta-typescript` to your project:
+//!
+//! ```bash
+//! cargo add specta@2.0.0-rc.22 --features derive,export
+//! cargo add specta-typescript@0.0.9
+//! cargo add specta-serde@0.0.9
+//! ```
+//!
+//! Next copy the following into your `main.rs` file:
+//!
+//! ```rust
+//! use specta::{Type, TypeCollection};
+//! use specta_typescript::Typescript;
+//!
+//! #[derive(Type)]
+//! pub struct MyType {
+//!     pub field: MyOtherType,
+//! }
+//!
+//!
+//! #[derive(Type)]
+//! pub struct MyOtherType {
+//!     pub other_field: String,
+//! }
+//!
+//! fn main() {
+//!     let mut types = TypeCollection::default()
+//!         // We don't need to specify `MyOtherType` because it's referenced by `MyType`
+//!         .register::<MyType>();
+//!
+//!     // If your using Serde, this will ensure it's attributes are handled correctly
+//!     specta_serde::apply(&mut types).unwrap();
+//!
+//!     Typescript::default()
+//!         .export_to("./bindings.ts", &types)
+//!         .unwrap();
+//! }
+//! ```
+//!
+//! Now your setup with Specta!
+//!
+//! If you get tired of listing all your types, checkout [`specta::export`].
+//!
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
     html_logo_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png",
@@ -8,14 +54,14 @@
 pub(crate) mod reserved_names;
 pub mod primitives;
 pub mod comments;
-mod context;
 mod error;
 pub mod formatter;
+#[doc(hidden)]
 pub mod js_doc; // TODO: Remove in favor of `specta-jsdoc`
 mod typescript;
 mod legacy;
 
+#[doc(hidden)]
 pub use legacy::*;
-pub use context::*;
 pub use error::*;
 pub use typescript::*;

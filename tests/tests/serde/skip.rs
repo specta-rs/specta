@@ -1,7 +1,7 @@
 use std::any::Any;
 
 use specta::Type;
-use specta_serde::SerdeError;
+use specta_serde::Error;
 
 use crate::ts::assert_ts;
 

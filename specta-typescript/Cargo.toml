@@ -18,16 +18,15 @@ rustdoc-args = ["--cfg", "docsrs"]
 [lints]
 workspace = true
 
-
 [features]
 default = []
 
 [dependencies]
 specta = { version = "=2.0.0-rc.22", path = "../specta" }
-thiserror = "1.0.61"
 
 # TODO: Remove these
 [dev-dependencies]
 serde = { version = "1.0.217", features = ["derive"] }
-specta = { version = "=2.0.0-rc.22", path = "../specta", features = ["derive", "export"] }
+specta = { path = "../specta", features = ["derive", "export"] }
+specta-serde = { path = "../specta-serde" }
 specta-util = { path = "../specta-util", features = ["serde"] }

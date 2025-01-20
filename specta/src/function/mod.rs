@@ -74,7 +74,7 @@ macro_rules! _fn_datatype_internal {
 /// Collects function types into a [`Vec`],
 /// and all downstream types into a [`TypeCollection`](crate::TypeCollection) instance.
 ///
-/// Specifying a `types` argument allows a custom [`TypeCollection`] to be used.
+/// Specifying a `types` argument allows a custom [`TypeCollection`](crate::TypeCollection) to be used.
 ///
 /// # Examples
 ///

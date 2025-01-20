@@ -9,7 +9,9 @@ use crate::{NamedType, SpectaID, TypeCollection};
 static TYPES: OnceLock<Mutex<HashMap<SpectaID, fn(&mut TypeCollection)>>> =
     OnceLock::new();
 
-/// Get the global type store containing all registered types.
+/// Get the global type store containing all automatically registered types.
+///
+/// All types with the [`Type`](macro@specta::Type) macro will automatically be registered here unless they have been explicitly disabled with `#[specta(export = false)]`.
 pub fn export() -> TypeCollection {
     // TODO: Make `TYPES` should just hold a `TypeCollection` directly???
     let types = TYPES

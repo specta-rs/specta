@@ -106,6 +106,8 @@ fn main() {
         // .register::<Recursive>()
         .register::<A>();
 
+    // TODO: You should use `specta_serde`
+
     // TODO: Remove this stuff
     // {
     //     let dt = specta::datatype::inline::<TypeOne>(&mut types);

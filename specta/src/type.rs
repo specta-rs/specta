@@ -17,7 +17,7 @@ pub trait Type {
     fn definition(types: &mut TypeCollection) -> DataType;
 }
 
-/// represents a type that can be converted into [NamedDataType].
+/// represents a type that can be converted into [`NamedDataType`](crate::NamedDataType).
 /// This will be implemented for all types with the [Type] derive macro.
 ///
 /// TODO: Discuss which types this should be implemented for.

@@ -25,9 +25,9 @@ pub fn export<T: NamedType>(ts: &Typescript) -> Output {
     T::definition(&mut types);
     let dt = types.get(T::ID).unwrap();
     // is_valid_ty(&dt.inner, &types)?;
-    if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
-        return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
-    }
+    // if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
+    //     return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
+    // }
 
     primitives::export(ts, &types, dt)
 }
@@ -46,9 +46,9 @@ pub fn inline<T: Type>(ts: &Typescript) -> Output {
     let mut types = TypeCollection::default();
     let dt = inline_reference::<T>(&mut types);
     // is_valid_ty(&dt, &types)?;
-    if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
-        return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
-    }
+    // if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
+    //     return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
+    // }
 
     primitives::inline(ts, &types, &dt)
 }
