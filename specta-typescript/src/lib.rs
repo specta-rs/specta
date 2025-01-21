@@ -32,9 +32,6 @@
 //!         // We don't need to specify `MyOtherType` because it's referenced by `MyType`
 //!         .register::<MyType>();
 //!
-//!     // If your using Serde, this will ensure it's attributes are handled correctly
-//!     specta_serde::apply(&mut types).unwrap();
-//!
 //!     Typescript::default()
 //!         .export_to("./bindings.ts", &types)
 //!         .unwrap();
@@ -53,15 +50,12 @@
 
 pub(crate) mod reserved_names;
 pub mod primitives;
-pub mod comments;
 mod error;
-pub mod formatter;
-#[doc(hidden)]
-pub mod js_doc; // TODO: Remove in favor of `specta-jsdoc`
+mod js_doc;
 mod typescript;
 mod legacy;
 
 #[doc(hidden)]
 pub use legacy::*;
-pub use error::*;
-pub use typescript::*;
+pub use error::Error;
+pub use typescript::{BigIntExportBehavior, CommentFormatterArgs, FormatterFn, Typescript};

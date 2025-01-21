@@ -1,11 +1,9 @@
 use std::collections::HashSet;
 
 use specta::{
-    datatype::{
-        DataType, EnumRepr, EnumType, LiteralType, PrimitiveType, Fields,
-    },
-    internal::{skip_fields, skip_fields_named},
-    SpectaID, TypeCollection,
+    builder::FieldBuilder, datatype::{
+        DataType, EnumRepr, EnumType, Fields, LiteralType, PrimitiveType, UnnamedFields
+    }, internal::{skip_fields, skip_fields_named}, SpectaID, TypeCollection
 };
 
 use crate::Error;
@@ -13,14 +11,9 @@ use crate::Error;
 // TODO: The error should show a path to the type causing the issue like the BigInt error reporting.
 
 /// Validate the type and apply the Serde transformations.
-pub fn apply(types: &mut TypeCollection) -> Result<(), Error> {
-    let types_ref = types.clone();
-    let types = types.expose();
-
-    for (sid, ndt) in types.iter_mut() {
-        if let Some(ndt) = ndt {
-            inner(&ndt.inner, &types_ref, &mut Default::default())?;
-        }
+pub fn validate(types: &TypeCollection) -> Result<(), Error> {
+    for (_, ndt) in types.into_iter() {
+        inner(&ndt.inner, &types, &mut Default::default())?;
     }
 
     Ok(())
@@ -52,13 +45,6 @@ fn inner(
         },
         DataType::Enum(ty) => {
             validate_enum(ty, types)?;
-
-            match ty.repr() {
-                EnumRepr::Untagged => todo!(),
-                EnumRepr::External => todo!(),
-                EnumRepr::Internal { tag } => todo!(),
-                EnumRepr::Adjacent { tag, content } => todo!(),
-            }
 
             for (_variant_name, variant) in ty.variants().iter() {
                 match &variant.fields() {

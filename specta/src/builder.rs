@@ -6,6 +6,8 @@ use std::{borrow::Cow, fmt::Debug};
 
 use crate::{datatype::{DeprecatedType, EnumRepr, EnumType, EnumVariant, Field, Fields, List, NamedFields, StructType, UnnamedFields}, DataType};
 
+// TDO: `Debug` and `Clone` on everything
+
 impl List {
     #[doc(hidden)] // TODO: Expose
     pub fn new(ty: DataType) -> Self {
@@ -201,25 +203,78 @@ impl EnumBuilder {
     }
 }
 
-pub struct VariantBuilder(EnumVariant);
+#[derive(Debug, Clone)]
+pub struct VariantBuilder<V = ()>(V);
 
-impl VariantBuilder {
+impl VariantBuilder<()> {
     pub fn unit() -> Self {
-        Self(EnumVariant {
+        Self(())
+    }
+
+    pub fn build(self) -> EnumVariant {
+        EnumVariant {
+            // TODO: Configurable fields
             skip: false,
             docs: "".into(),
             deprecated: None,
             fields: Fields::Unit
+        }
+    }
+}
+
+impl Into<EnumVariant> for VariantBuilder<()> {
+    fn into(self) -> EnumVariant {
+        self.build()
+    }
+}
+
+impl VariantBuilder<NamedFields> {
+    pub fn named(fields: Vec<(Cow<'static, str>, Field)>) -> Self {
+        Self(NamedFields {
+            fields,
+            // TODO: Configurable
+            tag: None,
         })
     }
 
-    pub fn named(name: impl Into<Cow<'static, str>>) -> Self {
-        // Self(EnumVariant {
-        //     skip: false,
-        //     docs: "".into(),
-        //     deprecated: None,
-        //     fields: EnumVariants::Named(NamedFields { fields: (), tag: () })
-        // })
-        todo!();
+    pub fn build(self) -> EnumVariant {
+        EnumVariant {
+            // TODO: Configurable fields
+            skip: false,
+            docs: "".into(),
+            deprecated: None,
+            fields: Fields::Unit
+        }
+    }
+}
+
+impl Into<EnumVariant> for VariantBuilder<NamedFields> {
+    fn into(self) -> EnumVariant {
+        self.build()
+    }
+}
+
+
+impl VariantBuilder<UnnamedFields> {
+    pub fn unnamed(fields: Vec<Field>) -> Self {
+        Self(UnnamedFields {
+            fields,
+        })
+    }
+
+    pub fn build(self) -> EnumVariant {
+        EnumVariant {
+            // TODO: Configurable fields
+            skip: false,
+            docs: "".into(),
+            deprecated: None,
+            fields: Fields::Unit
+        }
+    }
+}
+
+impl Into<EnumVariant> for VariantBuilder<UnnamedFields> {
+    fn into(self) -> EnumVariant {
+        self.build()
     }
 }

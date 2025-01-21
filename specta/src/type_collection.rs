@@ -140,12 +140,6 @@ impl TypeCollection {
             }
         })
     }
-
-    // TODO: Get rid of this. It's used by `specta-serde`.
-    #[doc(hidden)]
-    pub fn expose(&mut self) -> &mut BTreeMap<SpectaID, Option<NamedDataType>> {
-        &mut self.map
-    }
 }
 
 impl<'a> IntoIterator for &'a TypeCollection {

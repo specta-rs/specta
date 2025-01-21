@@ -59,27 +59,37 @@ pub enum Hello {
     }
 }
 
+#[derive(Type)]
+// #[specta(tag = "tag")]
+pub enum Todo {
+    A,
+}
+
 fn main() {
     // println!("{:?}\n\n", specta_typescript::inline::<MeNeedInline>(&Default::default()));
     // println!("{:?}\n\n", specta_typescript::export::<MeNeedInline>(&Default::default()));
 
-    println!("Debug");
+    // println!("Debug");
 
-    let i = std::time::Instant::now();
+    // let i = std::time::Instant::now();
     let mut types = TypeCollection::default();
-    let dt = MeNeedInline::definition(&mut types);
-    println!("A {:?}", i.elapsed());
-    println!("{:?}", specta_typescript::primitives::inline(&Default::default(), &types, &dt));
+    // let dt = MeNeedInline::definition(&mut types);
+    // println!("A {:?}", i.elapsed());
+    // println!("{:?}", specta_typescript::primitives::inline(&Default::default(), &types, &dt));
 
-    let i = std::time::Instant::now();
-    println!("{:?}", specta_typescript::primitives::export(&Default::default(), &types, types.get(MeNeedInline::ID).unwrap()));
-    println!("B {:?}", i.elapsed());
+    // let i = std::time::Instant::now();
+    // println!("{:?}", specta_typescript::primitives::export(&Default::default(), &types, types.get(MeNeedInline::ID).unwrap()));
+    // println!("B {:?}", i.elapsed());
 
-    Generic::<String, i32>::definition(&mut types);
-    println!("{:?}", specta_typescript::primitives::export(&Default::default(), &types, types.get(Generic::<String, i32>::ID).unwrap()));
+    // Generic::<String, i32>::definition(&mut types);
+    // println!("{:?}", specta_typescript::primitives::export(&Default::default(), &types, types.get(Generic::<String, i32>::ID).unwrap()));
 
-    Hello::definition(&mut types);
-    println!("{:?}", specta_typescript::primitives::export(&Default::default(), &types, types.get(Hello::ID).unwrap()));
+    // Hello::definition(&mut types);
+    // println!("{:?}", specta_typescript::primitives::export(&Default::default(), &types, types.get(Hello::ID).unwrap()));
+
+    Todo::definition(&mut types);
+    // specta_serde::validate(&types).unwrap();
+    println!("{:?}", specta_typescript::primitives::export(&Default::default(), &types, types.get(Todo::ID).unwrap()));
 
 
     // println!("{:?}\n\n", specta_typescript::inline::<Todo<String>>(&Default::default()));

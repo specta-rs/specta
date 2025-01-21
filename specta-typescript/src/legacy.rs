@@ -1,12 +1,11 @@
 //! TODO: Remove all of these in future.
 
-use specta::{datatype::inline_reference, internal::detect_duplicate_type_names, NamedType, Type, TypeCollection};
+use specta::{datatype::inline_reference, NamedType, Type, TypeCollection};
 
-use crate::{primitives, ExportError, Typescript};
-
+use crate::{primitives, Error, Typescript};
 
 #[allow(missing_docs)]
-pub type Result<T> = std::result::Result<T, ExportError>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 pub(crate) type Output = Result<String>;
 

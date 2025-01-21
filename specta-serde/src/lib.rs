@@ -5,8 +5,8 @@
 //! # Usage
 //!
 //! ```
-//! let mut types = specta::TypeCollection::default();
-//! specta_serde::apply(&mut types).unwrap();
+//! let types = specta::TypeCollection::default();
+//! specta_serde::validate(&types).unwrap();
 //! // Use your `types` as normal with a language exporter
 //! ```
 #![cfg_attr(docsrs, feature(doc_cfg))]
@@ -19,4 +19,4 @@ mod error;
 mod apply;
 
 pub use error::Error;
-pub use apply::apply;
+pub use apply::validate;

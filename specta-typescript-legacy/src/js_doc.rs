@@ -1,63 +1,67 @@
-//! TODO: Should we remove this?
-
 use std::borrow::Borrow;
 
-use specta::datatype::{DeprecatedType, GenericType};
+use specta::{
+    datatype::{DeprecatedType, GenericType},
+    TypeCollection,
+};
+use typescript::CommentFormatterArgs;
 
-// pub fn typedef_named_datatype(
-//     cfg: &Typescript,
-//     typ: &NamedDataType,
-//     types: &TypeCollection,
-// ) -> Output {
-//     typedef_named_datatype_inner(
-//         &ExportContext {
-//             cfg,
-//             path: vec![],
-//             // TODO: Should JS doc support per field or variant comments???
-//             is_export: false,
-//         },
-//         typ,
-//         types,
-//     )
-// }
+use super::*;
 
-// fn typedef_named_datatype_inner(
-//     ctx: &ExportContext,
-//     typ: &NamedDataType,
-//     types: &TypeCollection,
-// ) -> Output {
-//     let name = typ.name();
-//     let docs = typ.docs();
-//     let deprecated = typ.deprecated();
-//     let item = &typ.inner;
+pub fn typedef_named_datatype(
+    cfg: &Typescript,
+    typ: &NamedDataType,
+    types: &TypeCollection,
+) -> Output {
+    typedef_named_datatype_inner(
+        &ExportContext {
+            cfg,
+            path: vec![],
+            // TODO: Should JS doc support per field or variant comments???
+            is_export: false,
+        },
+        typ,
+        types,
+    )
+}
 
-//     let ctx = ctx.with(PathItem::Type(name.clone()));
+fn typedef_named_datatype_inner(
+    ctx: &ExportContext,
+    typ: &NamedDataType,
+    types: &TypeCollection,
+) -> Output {
+    let name = typ.name();
+    let docs = typ.docs();
+    let deprecated = typ.deprecated();
+    let item = &typ.inner;
 
-//     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
+    let ctx = ctx.with(PathItem::Type(name.clone()));
 
-//     let mut inline_ts = String::new();
-//     datatype_inner(
-//         ctx.clone(),
-//         &FunctionResultVariant::Value(typ.inner.clone()),
-//         types,
-//         &mut inline_ts,
-//     )?;
+    let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
 
-//     let mut builder = super::comments::js_doc_builder(CommentFormatterArgs { docs, deprecated });
+    let mut inline_ts = String::new();
+    datatype_inner(
+        ctx.clone(),
+        &FunctionResultVariant::Value(typ.inner.clone()),
+        types,
+        &mut inline_ts,
+    )?;
 
-//     item.generics()
-//         .into_iter()
-//         .flatten()
-//         .for_each(|generic| builder.push_generic(generic));
+    let mut builder = super::comments::js_doc_builder(CommentFormatterArgs { docs, deprecated });
 
-//     builder.push_internal(["@typedef { ", &inline_ts, " } ", &name]);
+    item.generics()
+        .into_iter()
+        .flatten()
+        .for_each(|generic| builder.push_generic(generic));
 
-//     Ok(builder.build())
-// }
+    builder.push_internal(["@typedef { ", &inline_ts, " } ", &name]);
+
+    Ok(builder.build())
+}
 
 const START: &str = "/**\n";
 
-pub(crate) struct Builder {
+pub struct Builder {
     value: String,
 }
 

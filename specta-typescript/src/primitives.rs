@@ -2,11 +2,11 @@
 //!
 //! These are advanced features and should generally be avoided in end-user applications.
 
-use std::{borrow::Borrow, fmt::Write as _, iter};
+use std::{borrow::{Borrow, Cow}, fmt::Write as _, iter};
 
 use specta::{datatype::{reference::Reference, DataType, EnumType, Field, Fields, List, LiteralType, Map, NamedDataType, PrimitiveType, StructType, TupleType}, TypeCollection};
 
-use crate::{reserved_names::*, BigIntExportBehavior, CommentFormatterArgs, ExportError, Typescript};
+use crate::{reserved_names::*, BigIntExportBehavior, CommentFormatterArgs, Error, Typescript};
 
 /// Generate an `export Type = ...` Typescript string for a specific [`DataType`].
 ///
@@ -15,8 +15,8 @@ use crate::{reserved_names::*, BigIntExportBehavior, CommentFormatterArgs, Expor
 ///  - Handling multiple type with overlapping names
 ///  - Transforming the type for your serialization format (Eg. Serde)
 ///
-pub fn export(ts: &Typescript, types: &TypeCollection, dt: &NamedDataType) -> Result<String, ExportError> {
-    validate_name(dt.name())?;
+pub fn export(ts: &Typescript, types: &TypeCollection, dt: &NamedDataType) -> Result<String, Error> {
+    validate_name(dt.name(), &vec![])?;
 
     let generics = dt.inner.generics()
         .into_iter()
@@ -44,7 +44,7 @@ pub fn export(ts: &Typescript, types: &TypeCollection, dt: &NamedDataType) -> Re
         .unwrap_or_default();
     result.push_str(&s);
 
-    datatype(&mut result, ts, types, &dt.inner)?;
+    datatype(&mut result, ts, types, &dt.inner, vec![dt.name().clone()])?;
     result.push_str(";");
 
     Ok(result)
@@ -54,9 +54,9 @@ pub fn export(ts: &Typescript, types: &TypeCollection, dt: &NamedDataType) -> Re
 ///
 /// This methods leaves all the same things as the [`export`] method up to the user.
 ///
-pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<String, ExportError> {
+pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<String, Error> {
     let mut s = String::new();
-    datatype(&mut s, ts, types, dt)?;
+    datatype(&mut s, ts, types, dt, vec![])?;
     Ok(s)
 }
 
@@ -67,33 +67,35 @@ pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<
 //     todo!();
 // }
 
-fn datatype(s: &mut String, ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<(), ExportError> {
+fn datatype(s: &mut String, ts: &Typescript, types: &TypeCollection, dt: &DataType, mut location: Vec<Cow<'static, str>>) -> Result<(), Error> {
     match dt {
         DataType::Any => s.push_str("any"),
         DataType::Unknown => s.push_str("unknown"),
-        DataType::Primitive(p) => s.push_str(primitive_dt(&ts.bigint, p)?),
+        DataType::Primitive(p) => s.push_str(primitive_dt(&ts.bigint, p, location)?),
         DataType::Literal(l) => literal_dt(s, l),
-        DataType::List(l) => list_dt(s, ts, types, l)?,
-        DataType::Map(m) => map_dt(s, ts, types, m)?,
+        DataType::List(l) => list_dt(s, ts, types, l, location)?,
+        DataType::Map(m) => map_dt(s, ts, types, m, location)?,
         DataType::Nullable(t) => {
-            datatype(s, ts, types, &*t)?;
+            datatype(s, ts, types, &*t, location)?;
             let or_null = " | null";
             if !s.ends_with(or_null) {
                 s.push_str(or_null);
             }
         }
-        DataType::Struct(st) => fields_dt(s, ts, types, &st.fields())?,
-        DataType::Enum(e) => enum_dt(s, ts, types, e)?,
-        DataType::Tuple(t) => tuple_dt(s, ts, types, t)?,
-        DataType::Reference(r) => reference_dt(s, ts, types, r)?,
+        DataType::Struct(st) => {
+            location.push(st.name().clone());
+            fields_dt(s, ts, types, &st.fields(), location)?
+        },
+        DataType::Enum(e) => enum_dt(s, ts, types, e, location)?,
+        DataType::Tuple(t) => tuple_dt(s, ts, types, t, location)?,
+        DataType::Reference(r) => reference_dt(s, ts, types, r, location)?,
         DataType::Generic(g) => s.push_str(g.borrow()),
     };
-
 
     Ok(())
 }
 
-fn primitive_dt(b: &BigIntExportBehavior, p: &PrimitiveType) -> Result<&'static str, ExportError> {
+fn primitive_dt(b: &BigIntExportBehavior, p: &PrimitiveType, location: Vec<Cow<'static, str>>) -> Result<&'static str, Error> {
     use PrimitiveType::*;
 
     Ok(match p {
@@ -102,8 +104,9 @@ fn primitive_dt(b: &BigIntExportBehavior, p: &PrimitiveType) -> Result<&'static 
             BigIntExportBehavior::String => "string",
             BigIntExportBehavior::Number => "number",
             BigIntExportBehavior::BigInt => "bigint",
-            BigIntExportBehavior::Fail => return Err(todo!()), // TODO: ExportError::BigIntForbidden(todo!())),
-            BigIntExportBehavior::FailWithReason(reason) => return Err(todo!()), // TODO: ExportError::Other(todo!(), reason.to_string())),
+            BigIntExportBehavior::Fail => return Err(Error::BigIntForbidden {
+                path: location.join(".")
+            }),
         }
         PrimitiveType::bool => "boolean",
         String | char => "string",
@@ -132,11 +135,11 @@ fn literal_dt(s: &mut String, l: &LiteralType) {
     }.expect("writing to a string is an infallible operation");
 }
 
-fn list_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, l: &List) -> Result<(), ExportError> {
+fn list_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, l: &List, location: Vec<Cow<'static, str>>) -> Result<(), Error> {
     // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
 
     let mut result = String::new();
-    datatype(&mut result, ts, types, &l.ty())?;
+    datatype(&mut result, ts, types, &l.ty(), location)?;
     let result = if (result.contains(' ') && !result.ends_with('}'))
         // This is to do with maintaining order of operations.
         // Eg `{} | {}` must be wrapped in parens like `({} | {})[]` but `{}` doesn't cause `{}[]` is valid
@@ -166,22 +169,24 @@ fn list_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, l: &List) ->
     Ok(())
 }
 
-fn map_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, m: &Map) -> Result<(), ExportError> {
+fn map_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, m: &Map, location: Vec<Cow<'static, str>>) -> Result<(), Error> {
     // We use `{ [key in K]: V }` instead of `Record<K, V>` to avoid issues with circular references.
     // Wrapped in Partial<> because otherwise TypeScript would enforce exhaustiveness.
     s.push_str("Partial<{ [key in ");
-    datatype(s, ts, types, m.key_ty())?;
+    datatype(s, ts, types, m.key_ty(), location.clone())?;
     s.push_str("]: ");
-    datatype(s, ts, types, m.value_ty())?;
+    datatype(s, ts, types, m.value_ty(), location)?;
     s.push_str(" }>");
     Ok(())
 }
 
-fn enum_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, e: &EnumType) -> Result<(), ExportError> {
+fn enum_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, e: &EnumType, mut location: Vec<Cow<'static, str>>) -> Result<(), Error> {
     if e.variants().is_empty() {
         s.push_str("never");
         return Ok(());
     }
+
+    location.push(e.name().clone());
 
     let mut _ts = None;
     if e.skip_bigint_checks() {
@@ -201,29 +206,37 @@ fn enum_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, e: &EnumType
 
     // TODO: variants.dedup();
     iter_with_sep(s, variants, |s, (variant_name, variant)| {
-        validate_key(variant_name)?;
+        let mut location = location.clone();
+        location.push(variant_name.clone());
+
+        // escape_key(variant_name)? // TODO
 
         // TODO
         // variant.deprecated()
         // variant.docs()
 
-        fields_dt(s, ts, types, variant.fields())
+        fields_dt(s, ts, types, variant.fields(), location)
     }, " | ")?;
     Ok(())
 }
 
-fn fields_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, f: &Fields) -> Result<(), ExportError> {
+fn fields_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, f: &Fields, location: Vec<Cow<'static, str>>) -> Result<(), Error> {
     match f {
         Fields::Unit => s.push_str("null"),
         Fields::Unnamed(f) => {
             let mut fields = f.fields().into_iter().filter(|f| f.ty().is_some());
 
             if fields.clone().count() == 1 {
-                return field_dt(s, ts, types, &fields.next().expect("checked above"));
+                return field_dt(s, ts, types, fields.next().expect("checked above"), location);
             }
 
             s.push_str("[");
-            iter_with_sep(s, fields, |s, f| field_dt(s, ts, types, f), ", ")?;
+            iter_with_sep(s, fields.enumerate(), |s, (i, f)| {
+                let mut location = location.clone();
+                location.push(i.to_string().into());
+
+                field_dt(s, ts, types, f, location)
+            }, ", ")?;
             s.push_str("]");
         }
         Fields::Named(f) => {
@@ -235,10 +248,12 @@ fn fields_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, f: &Fields
 
             s.push_str("{ ");
             iter_with_sep(s, fields, |s, (key, f)| {
-                validate_key(key)?;
-                s.push_str(key);
+                let mut location = location.clone();
+                location.push(key.clone());
+
+                s.push_str(&*escape_key(key));
                 s.push_str(": ");
-                field_dt(s, ts, types, f)
+                field_dt(s, ts, types, f, location)
             }, "; ")?;
             s.push_str(" }");
         }
@@ -246,7 +261,7 @@ fn fields_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, f: &Fields
     Ok(())
 }
 
-fn field_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, f: &Field) -> Result<(), ExportError> {
+fn field_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, f: &Field, location: Vec<Cow<'static, str>>) -> Result<(), Error> {
     let Some(ty) = f.ty() else {
         // These should be filtered out before getting here.
         return unreachable!();
@@ -267,24 +282,29 @@ fn field_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, f: &Field) 
     //     false => (field_name_safe, ty),
     // };
 
-    datatype(s, ts, types, &ty)?;
+    datatype(s, ts, types, &ty, location)?;
 
     Ok(())
 }
 
-fn tuple_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, t: &TupleType) -> Result<(), ExportError> {
+fn tuple_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, t: &TupleType, location: Vec<Cow<'static, str>>) -> Result<(), Error> {
     match &t.elements()[..] {
         [] => s.push_str("null"),
         elems => {
             s.push_str("[");
-            iter_with_sep(s, elems, |s, dt| datatype(s, ts, types, &dt), ", ")?;
+            iter_with_sep(s, elems.into_iter().enumerate(), |s, (i, dt)| {
+                let mut location = location.clone();
+                location.push(i.to_string().into());
+
+                datatype(s, ts, types, &dt, location)
+            }, ", ")?;
             s.push_str("]");
         }
     }
     Ok(())
 }
 
-fn reference_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, r: &Reference) -> Result<(), ExportError> {
+fn reference_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, r: &Reference, location: Vec<Cow<'static, str>>) -> Result<(), Error> {
     let ndt = types.get(r.sid())
         // Should be impossible without a bug in Specta.
         .unwrap_or_else(|| panic!("Missing {:?} in `TypeCollection`", r.sid()));
@@ -299,7 +319,8 @@ fn reference_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, r: &Ref
         [] => {},
         generics => {
             s.push('<');
-            iter_with_sep(s, generics, |s, dt| datatype(s, ts, types, &dt), ", ")?;
+            // TODO: Should we push a location for which generic?
+            iter_with_sep(s, generics, |s, dt| datatype(s, ts, types, &dt, location.clone()), ", ")?;
             s.push('>');
         }
     }
@@ -307,15 +328,28 @@ fn reference_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, r: &Ref
     Ok(())
 }
 
-fn validate_name(ident: &str) -> Result<(), ExportError> {
+fn validate_name(ident: &Cow<'static, str>, location: &Vec<Cow<'static, str>>) -> Result<(), Error> {
     // TODO: Use a perfect hash-map for faster lookups?
-    if let Some(_) = RESERVED_TYPE_NAMES.iter().find(|v| **v == ident) {
-        todo!();
+    if let Some(name) = RESERVED_TYPE_NAMES.iter().find(|v| **v == ident) {
+        return Err(Error::ForbiddenName {
+            path: location.join("."),
+            name
+        });
+    }
+
+    if ident.is_empty() {
+        return Err(Error::InvalidName {
+            path: location.join("."),
+            name: ident.clone(),
+        });
     }
 
     if let Some(first_char) = ident.chars().next() {
         if !first_char.is_alphabetic() && first_char != '_' {
-            todo!();
+            return Err(Error::InvalidName {
+                path: location.join("."),
+                name: ident.clone(),
+            });
         }
     }
 
@@ -323,32 +357,34 @@ fn validate_name(ident: &str) -> Result<(), ExportError> {
         .find(|c: char| !c.is_alphanumeric() && c != '_')
         .is_some()
     {
-        todo!();
+        return Err(Error::InvalidName {
+            path: location.join("."),
+            name: ident.clone(),
+        });
     }
 
     Ok(())
 }
 
-fn validate_key(ident: &str) -> Result<(), ExportError> {
-    // let valid = field_name
-    //     .chars()
-    //     .all(|c| c.is_alphanumeric() || c == '_' || c == '$')
-    //     && field_name
-    //         .chars()
-    //         .next()
-    //         .map(|first| !first.is_numeric())
-    //         .unwrap_or(true);
+fn escape_key(name: &Cow<'static, str>) -> Cow<'static, str> {
+    let needs_escaping = name
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '_' || c == '$')
+        && name
+            .chars()
+            .next()
+            .map(|first| !first.is_numeric())
+            .unwrap_or(true);
 
-    // if force_string || !valid {
-    //     format!(r#""{field_name}""#).into()
-    // } else {
-    //     field_name
-    // }
-    Ok(())
+    if !needs_escaping {
+        format!(r#""{name}""#).into()
+    } else {
+        name.clone()
+    }
 }
 
 /// Iterate with separate and error handling
-fn iter_with_sep<T>(s: &mut String, i: impl IntoIterator<Item = T>, mut item: impl FnMut(&mut String, T) -> Result<(), ExportError>, sep: &'static str) -> Result<(), ExportError> {
+fn iter_with_sep<T>(s: &mut String, i: impl IntoIterator<Item = T>, mut item: impl FnMut(&mut String, T) -> Result<(), Error>, sep: &'static str) -> Result<(), Error> {
     for (i, e) in i.into_iter().enumerate() {
         if i != 0 {
             s.push_str(sep);

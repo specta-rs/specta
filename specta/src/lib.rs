@@ -18,7 +18,6 @@ pub mod internal;
 mod specta_id;
 mod r#type;
 mod type_collection;
-#[doc(hidden)] // This stuff is not stable yet.
 pub mod builder;
 
 // TODO: Can we just move the trait here or `#[doc(inline)]`

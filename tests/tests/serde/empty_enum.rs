@@ -1,5 +1,5 @@
 use specta::Type;
-use specta_typescript::ExportError;
+use specta_typescript::Error;
 
 use crate::ts::assert_ts;
 
