@@ -19,6 +19,7 @@ mod typescript;
 pub use context::*;
 pub use error::*;
 use reserved_terms::*;
+use specta_serde::validate;
 pub use typescript::*;
 
 use specta::datatype::{
@@ -79,7 +80,7 @@ pub fn inline<T: Type>(conf: &Typescript) -> Output {
 
     let ty = inline_reference::<T>(&mut types);
 
-    // is_valid_ty(&ty, &types)?;
+    validate(&types).unwrap();
     let result = datatype(conf, &FunctionResultVariant::Value(ty.clone()), &types);
 
     if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {

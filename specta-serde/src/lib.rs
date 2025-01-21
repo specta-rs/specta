@@ -16,7 +16,7 @@
 )]
 
 mod error;
-mod apply;
+mod validate;
 
 pub use error::Error;
-pub use apply::validate;
+pub use validate::validate;

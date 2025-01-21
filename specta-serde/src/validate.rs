@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use specta::{
-    builder::FieldBuilder, datatype::{
-        DataType, EnumRepr, EnumType, Fields, LiteralType, PrimitiveType, UnnamedFields
+    datatype::{
+        DataType, EnumRepr, EnumType, Fields, LiteralType, PrimitiveType,
     }, internal::{skip_fields, skip_fields_named}, SpectaID, TypeCollection
 };
 

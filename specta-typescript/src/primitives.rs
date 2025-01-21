@@ -4,7 +4,7 @@
 
 use std::{borrow::{Borrow, Cow}, fmt::Write as _, iter};
 
-use specta::{datatype::{reference::Reference, DataType, EnumType, Field, Fields, List, LiteralType, Map, NamedDataType, PrimitiveType, StructType, TupleType}, TypeCollection};
+use specta::{datatype::{reference::Reference, DataType, EnumRepr, EnumType, Field, Fields, List, LiteralType, Map, NamedDataType, PrimitiveType, StructType, TupleType}, TypeCollection};
 
 use crate::{reserved_names::*, BigIntExportBehavior, CommentFormatterArgs, Error, Typescript};
 
@@ -84,7 +84,7 @@ fn datatype(s: &mut String, ts: &Typescript, types: &TypeCollection, dt: &DataTy
         }
         DataType::Struct(st) => {
             location.push(st.name().clone());
-            fields_dt(s, ts, types, &st.fields(), location)?
+            fields_dt(s, ts, types, st.name(), &st.fields(), location)?
         },
         DataType::Enum(e) => enum_dt(s, ts, types, e, location)?,
         DataType::Tuple(t) => tuple_dt(s, ts, types, t, location)?,
@@ -153,12 +153,11 @@ fn list_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, l: &List, lo
     match l.length() {
         Some(len) => {
             s.push_str("[");
-            iter_with_sep(s, (0..len), |s, _| {
+            iter_with_sep(s, 0..len, |s, _| {
                 s.push_str(&result);
                 Ok(())
             }, ", ")?;
             s.push_str("]");
-
         },
         None => {
             s.push_str(&result);
@@ -181,11 +180,6 @@ fn map_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, m: &Map, loca
 }
 
 fn enum_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, e: &EnumType, mut location: Vec<Cow<'static, str>>) -> Result<(), Error> {
-    if e.variants().is_empty() {
-        s.push_str("never");
-        return Ok(());
-    }
-
     location.push(e.name().clone());
 
     let mut _ts = None;
@@ -204,25 +198,89 @@ fn enum_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, e: &EnumType
         .iter()
         .filter(|(_, variant)| !variant.skip());
 
-    // TODO: variants.dedup();
+    if variants.clone().next().is_none() /* is_empty */ {
+        s.push_str("never");
+        return Ok(());
+    }
+
     iter_with_sep(s, variants, |s, (variant_name, variant)| {
         let mut location = location.clone();
         location.push(variant_name.clone());
-
-        // escape_key(variant_name)? // TODO
 
         // TODO
         // variant.deprecated()
         // variant.docs()
 
-        fields_dt(s, ts, types, variant.fields(), location)
+        match &e.repr() {
+            EnumRepr::Untagged => {
+                fields_dt(s, ts, types, variant_name, variant.fields(), location)?;
+            },
+            EnumRepr::External => match variant.fields() {
+                Fields::Unit => {
+                    s.push_str("\"");
+                    s.push_str(variant_name);
+                    s.push_str("\"");
+                },
+                _ => {
+                    s.push_str("{ ");
+                    s.push_str(&escape_key(variant_name));
+                    s.push_str(": ");
+                    fields_dt(s, ts, types, variant_name, variant.fields(), location)?;
+                    s.push_str(" }");
+                }
+            }
+            EnumRepr::Internal { tag } => {
+                write!(s, "({{ {}: \"{}\" ", escape_key(tag), variant_name).expect("infallible");
+
+                match variant.fields() {
+                    Fields::Unit => {
+                        s.push_str(" }");
+                    },
+                    Fields::Unnamed(f) => {
+                        let mut fields = f.fields().into_iter().filter(|f| f.ty().is_some());
+
+                        // if fields.len
+
+                        // TODO: Having no fields are skipping is valid
+                        // TODO: Having more than 1 field is invalid
+
+                        // TODO: Check if the field's type is object-like and can be merged.
+
+                        todo!();
+                    }
+                    f => {
+                        s.push_str(" } & ");
+                        fields_dt(s, ts, types, variant_name, f, location)?;
+                    }
+                }
+                s.push_str(")");
+            }
+            EnumRepr::Adjacent { tag, content } => {
+                write!(s, "{{ {}: \"{}\"", escape_key(tag), variant_name).expect("infallible");
+
+                match variant.fields() {
+                    Fields::Unit => {},
+                    f => {
+                        write!(s, "; {}: ", escape_key(content)).expect("infallible");
+                        fields_dt(s, ts, types, variant_name, f, location)?;
+                    }
+                }
+
+                s.push_str(" }");
+            }
+        }
+
+        Ok(())
     }, " | ")?;
+
+    // TODO: variants.dedup();
+
     Ok(())
 }
 
-fn fields_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, f: &Fields, location: Vec<Cow<'static, str>>) -> Result<(), Error> {
+fn fields_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, name: &Cow<'static, str>, f: &Fields, location: Vec<Cow<'static, str>>) -> Result<(), Error> {
     match f {
-        Fields::Unit => s.push_str("null"),
+        Fields::Unit =>  s.push_str("null"),
         Fields::Unnamed(f) => {
             let mut fields = f.fields().into_iter().filter(|f| f.ty().is_some());
 
@@ -241,12 +299,21 @@ fn fields_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, f: &Fields
         }
         Fields::Named(f) => {
             let fields = f.fields().into_iter().filter(|(_, f)| f.ty().is_some());
-            if fields.clone().count() == 0 {
-                s.push_str("Record<string, never>");
+            if fields.clone().next().is_none() /* is_empty */ {
+                if let Some(tag) = f.tag() {
+                    write!(s, "{{ {}: \"{name}\" }}", escape_key(tag)).expect("infallible");
+                } else {
+                    s.push_str("Record<string, never>");
+                }
+
                 return Ok(());
             }
 
             s.push_str("{ ");
+            if let Some(tag) = &f.tag() {
+                write!(s, "{}: \"{name}\"; ", escape_key(tag)).expect("infallible");
+            }
+
             iter_with_sep(s, fields, |s, (key, f)| {
                 let mut location = location.clone();
                 location.push(key.clone());

@@ -1,19 +1,20 @@
 use std::collections::HashMap;
 
-use specta::Type;
+use specta::{Type, TypeCollection};
 
 #[derive(Type)]
-pub enum Hello {
+#[specta(tag = "tag")]
+pub enum Todo {
     A,
-    B(String),
+    // B(String),
     C {
         a: String,
     }
 }
 
 fn main() {
-    println!("{:?}\n\n", specta_typescript_legacy::inline::<Hello>(&Default::default()));
+    println!("{:?}\n\n", specta_typescript_legacy::inline::<Todo>(&Default::default()));
     // println!("{:?}\n\n", specta_typescript::export::<HashMap<UnitVariants, ()>>(&Default::default()));
 
-    // Ok("\"A\" | { B: string } | { C: { a: string } }")
+    // Ok("{ tag: \"A\" } | ({ tag: \"B\" } & string) | { tag: \"C\"; a: string }")
 }

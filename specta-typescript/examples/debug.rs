@@ -60,9 +60,13 @@ pub enum Hello {
 }
 
 #[derive(Type)]
-// #[specta(tag = "tag")]
+#[specta(tag = "tag")]
 pub enum Todo {
     A,
+    // B(String),
+    C {
+        a: String,
+    }
 }
 
 fn main() {
