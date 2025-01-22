@@ -22,6 +22,9 @@ use reserved_terms::*;
 use specta_serde::validate;
 pub use typescript::*;
 
+#[doc(hidden)]
+pub use ExportError as Error;
+
 use specta::datatype::{
     inline_reference, DataType, DeprecatedType, EnumRepr, EnumType, EnumVariant, Fields, FunctionResultVariant, LiteralType, NamedDataType, PrimitiveType, StructType, TupleType
 };

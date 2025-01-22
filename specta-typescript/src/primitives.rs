@@ -203,77 +203,98 @@ fn enum_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, e: &EnumType
         return Ok(());
     }
 
-    iter_with_sep(s, variants, |s, (variant_name, variant)| {
-        let mut location = location.clone();
-        location.push(variant_name.clone());
+    let mut variants = variants
+        .into_iter()
+        .map(|(variant_name, variant)| {
+            let mut s = String::new();
+            let mut location = location.clone();
+            location.push(variant_name.clone());
 
-        // TODO
-        // variant.deprecated()
-        // variant.docs()
+            // TODO
+            // variant.deprecated()
+            // variant.docs()
 
-        match &e.repr() {
-            EnumRepr::Untagged => {
-                fields_dt(s, ts, types, variant_name, variant.fields(), location)?;
-            },
-            EnumRepr::External => match variant.fields() {
-                Fields::Unit => {
-                    s.push_str("\"");
-                    s.push_str(variant_name);
-                    s.push_str("\"");
+            match &e.repr() {
+                EnumRepr::Untagged => {
+                    fields_dt(&mut s, ts, types, variant_name, variant.fields(), location)?;
                 },
-                _ => {
-                    s.push_str("{ ");
-                    s.push_str(&escape_key(variant_name));
-                    s.push_str(": ");
-                    fields_dt(s, ts, types, variant_name, variant.fields(), location)?;
+                EnumRepr::External => match variant.fields() {
+                    Fields::Unit => {
+                        s.push_str("\"");
+                        s.push_str(variant_name);
+                        s.push_str("\"");
+                    },
+                    Fields::Unnamed(n) if n.fields().into_iter().filter(|f| f.ty().is_some()).next().is_none() /* is_empty */ => {
+                        // We detect `#[specta(skip)]` by checking if the unfiltered fields are also empty.
+                        if n.fields().is_empty() {
+                            s.push_str("[]");
+                        } else {
+                            s.push_str("\"");
+                            s.push_str(variant_name);
+                            s.push_str("\"");
+                        }
+                    }
+                    _ => {
+                        s.push_str("{ ");
+                        s.push_str(&escape_key(variant_name));
+                        s.push_str(": ");
+                        fields_dt(&mut s, ts, types, variant_name, variant.fields(), location)?;
+                        s.push_str(" }");
+                    }
+                }
+                EnumRepr::Internal { tag } => {
+                    write!(s, "({{ {}: \"{}\" ", escape_key(tag), variant_name).expect("infallible");
+
+                    match variant.fields() {
+                        Fields::Unit => {
+                            s.push_str(" }");
+                        },
+                        Fields::Unnamed(f) => {
+                            let mut fields = f.fields().into_iter().filter(|f| f.ty().is_some());
+
+                            // if fields.len
+
+                            // TODO: Having no fields are skipping is valid
+                            // TODO: Having more than 1 field is invalid
+
+                            // TODO: Check if the field's type is object-like and can be merged.
+
+                            todo!();
+                        }
+                        f => {
+                            s.push_str(" } & ");
+                            fields_dt(&mut s, ts, types, variant_name, f, location)?;
+                        }
+                    }
+                    s.push_str(")");
+                }
+                EnumRepr::Adjacent { tag, content } => {
+                    write!(s, "{{ {}: \"{}\"", escape_key(tag), variant_name).expect("infallible");
+
+                    match variant.fields() {
+                        Fields::Unit => {},
+                        f => {
+                            write!(s, "; {}: ", escape_key(content)).expect("infallible");
+                            fields_dt(&mut s, ts, types, variant_name, f, location)?;
+                        }
+                    }
+
                     s.push_str(" }");
                 }
             }
-            EnumRepr::Internal { tag } => {
-                write!(s, "({{ {}: \"{}\" ", escape_key(tag), variant_name).expect("infallible");
 
-                match variant.fields() {
-                    Fields::Unit => {
-                        s.push_str(" }");
-                    },
-                    Fields::Unnamed(f) => {
-                        let mut fields = f.fields().into_iter().filter(|f| f.ty().is_some());
+            Ok(s)
+        })
+        .collect::<Result<Vec<String>, Error>>()?;
 
-                        // if fields.len
+    // TODO: Instead of deduplicating on the string, we should do it in the AST.
+    // This would avoid the intermediate `String` allocations and be more reliable.
+    variants.dedup();
 
-                        // TODO: Having no fields are skipping is valid
-                        // TODO: Having more than 1 field is invalid
-
-                        // TODO: Check if the field's type is object-like and can be merged.
-
-                        todo!();
-                    }
-                    f => {
-                        s.push_str(" } & ");
-                        fields_dt(s, ts, types, variant_name, f, location)?;
-                    }
-                }
-                s.push_str(")");
-            }
-            EnumRepr::Adjacent { tag, content } => {
-                write!(s, "{{ {}: \"{}\"", escape_key(tag), variant_name).expect("infallible");
-
-                match variant.fields() {
-                    Fields::Unit => {},
-                    f => {
-                        write!(s, "; {}: ", escape_key(content)).expect("infallible");
-                        fields_dt(s, ts, types, variant_name, f, location)?;
-                    }
-                }
-
-                s.push_str(" }");
-            }
-        }
-
+    iter_with_sep(s, variants, |s, v| {
+        s.push_str(&v);
         Ok(())
     }, " | ")?;
-
-    // TODO: variants.dedup();
 
     Ok(())
 }
@@ -284,8 +305,10 @@ fn fields_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, name: &Cow
         Fields::Unnamed(f) => {
             let mut fields = f.fields().into_iter().filter(|f| f.ty().is_some());
 
-            if fields.clone().count() == 1 {
-                return field_dt(s, ts, types, fields.next().expect("checked above"), location);
+            // A single field usually becomes `T`.
+            // but when `#[serde(skip)]` is used it should be `[T]`.
+            if fields.clone().count() == 1 && f.fields.len() == 1 {
+                return field_dt(s, ts, types, None, fields.next().expect("checked above"), location);
             }
 
             s.push_str("[");
@@ -293,7 +316,7 @@ fn fields_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, name: &Cow
                 let mut location = location.clone();
                 location.push(i.to_string().into());
 
-                field_dt(s, ts, types, f, location)
+                field_dt(s, ts, types, None, f, location)
             }, ", ")?;
             s.push_str("]");
         }
@@ -318,9 +341,11 @@ fn fields_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, name: &Cow
                 let mut location = location.clone();
                 location.push(key.clone());
 
-                s.push_str(&*escape_key(key));
-                s.push_str(": ");
-                field_dt(s, ts, types, f, location)
+                if f.flatten() {
+                    s.push_str("||");
+                }
+
+                field_dt(s, ts, types, Some(key), f, location)
             }, "; ")?;
             s.push_str(" }");
         }
@@ -328,28 +353,40 @@ fn fields_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, name: &Cow
     Ok(())
 }
 
-fn field_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, f: &Field, location: Vec<Cow<'static, str>>) -> Result<(), Error> {
+fn field_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, key: Option<&Cow<'static, str>>, f: &Field, location: Vec<Cow<'static, str>>) -> Result<(), Error> {
     let Some(ty) = f.ty() else {
         // These should be filtered out before getting here.
         return unreachable!();
     };
 
     // TODO
+    // field.deprecated(),
+    // field.docs(),
+
+    // TODO
     // if f.inline() {
     //     todo!("inline field");
     // }
 
-    // TODO
-    // field.deprecated(),
-    //     field.docs(),
-
-    // // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
-    // let (key, ty) = match field.optional() {
-    //     true => (format!("{field_name_safe}?").into(), ty),
-    //     false => (field_name_safe, ty),
-    // };
+    if !f.flatten() {
+        if let Some(key) = key {
+            s.push_str(&*escape_key(key));
+            // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
+            if f.optional() {
+                s.push_str("?");
+            }
+            s.push_str(": ");
+        }
+    } else {
+        // TODO: We need to validate the inner type can be flattened safely???
+    }
 
     datatype(s, ts, types, &ty, location)?;
+
+    // If we can't use `?` (Eg. in a tuple) we manually join it.
+    if key.is_none() && f.optional() {
+        s.push_str(" | undefined");
+    }
 
     Ok(())
 }

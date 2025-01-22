@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use serde::Serialize;
 use specta::{Type, NamedType, TypeCollection};
 
 // #[derive(Type)]
@@ -69,14 +70,32 @@ pub enum Todo {
     }
 }
 
+#[derive(Serialize, Type)]
+pub enum SkipVariant {
+    #[specta(skip)]
+    A(String),
+    B(i32),
+}
+
+// #[derive(Serialize, Type)]
+// pub enum SkipVariant2 {
+//     #[specta(skip)]
+//     A,
+// }
+
 fn main() {
+    println!("{:?}\n", serde_json::to_string(&SkipVariant::A("Hello".to_string())).unwrap());
+    println!("{:?}\n", serde_json::to_string(&SkipVariant::B(32)).unwrap());
+    println!("{:?}\n", specta_typescript::export::<SkipVariant>(&Default::default()));
+
+
     // println!("{:?}\n\n", specta_typescript::inline::<MeNeedInline>(&Default::default()));
     // println!("{:?}\n\n", specta_typescript::export::<MeNeedInline>(&Default::default()));
 
     // println!("Debug");
 
     // let i = std::time::Instant::now();
-    let mut types = TypeCollection::default();
+    // let mut types = TypeCollection::default();
     // let dt = MeNeedInline::definition(&mut types);
     // println!("A {:?}", i.elapsed());
     // println!("{:?}", specta_typescript::primitives::inline(&Default::default(), &types, &dt));
@@ -91,9 +110,9 @@ fn main() {
     // Hello::definition(&mut types);
     // println!("{:?}", specta_typescript::primitives::export(&Default::default(), &types, types.get(Hello::ID).unwrap()));
 
-    Todo::definition(&mut types);
-    // specta_serde::validate(&types).unwrap();
-    println!("{:?}", specta_typescript::primitives::export(&Default::default(), &types, types.get(Todo::ID).unwrap()));
+    // Todo::definition(&mut types);
+    // // specta_serde::validate(&types).unwrap();
+    // println!("{:?}", specta_typescript::primitives::export(&Default::default(), &types, types.get(Todo::ID).unwrap()));
 
 
     // println!("{:?}\n\n", specta_typescript::inline::<Todo<String>>(&Default::default()));

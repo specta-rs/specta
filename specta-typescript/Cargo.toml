@@ -31,3 +31,4 @@ serde = { version = "1.0.217", features = ["derive"] }
 specta = { path = "../specta", features = ["derive", "export"] }
 specta-serde = { path = "../specta-serde" }
 specta-util = { path = "../specta-util", features = ["serde"] }
+serde_json = "1.0.137"
