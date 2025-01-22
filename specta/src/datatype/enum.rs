@@ -42,6 +42,10 @@ impl EnumType {
         }
     }
 
+    pub fn sid(&self) -> Option<SpectaID> {
+        self.sid
+    }
+
     pub fn name(&self) -> &Cow<'static, str> {
         &self.name
     }

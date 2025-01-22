@@ -4,7 +4,7 @@ use std::{
     fmt, sync::atomic::AtomicU64,
 };
 
-use crate::{datatype::NamedDataType, DataType, NamedType, SpectaID};
+use crate::{datatype::{reference::Reference, NamedDataType}, DataType, NamedType, SpectaID};
 
 /// Define a set of types which can be exported together.
 ///
@@ -41,23 +41,38 @@ impl TypeCollection {
 
     /// Declare a custom type with the collection.
     #[doc(hidden)] // TODO: This isn't stable yet
-    pub fn declare(&mut self, name: impl Into<Cow<'static, str>>, dt: DataType) {
-        let dt = NamedDataType {
-            name: name.into(),
-            // TODO: Make this fields configurable somehow?
-            docs: Default::default(),
-            deprecated: Default::default(),
-            ext: None,
-            inner: dt,
-        };
-
+    pub fn declare(&mut self, mut ndt: NamedDataType) -> Reference {
         // TODO: Proper id's
         static ID: AtomicU64 = AtomicU64::new(0);
-        let id = SpectaID { type_name: "virtual", hash: ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed) };
+        let sid = SpectaID { type_name: "virtual", hash: ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed) };
 
-        self.map.insert(id, Some(dt));
+        // TODO: Do this and do it on `NamedDataTypeBuilder`
+        // ndt.ext = Some(...);
 
-        // TODO: Return a thing which can generate `Reference`s to the type
+
+        match &mut ndt.inner {
+            // DataType::Nullable(data_type) => todo!(), // TODO: Recurse down?
+            // DataType::Reference(reference) => todo!(),
+            DataType::Struct(s) => {
+                s.sid = Some(sid);
+            }
+            DataType::Enum(e) => {
+                e.sid = Some(sid);
+            }
+            _ => {},
+        }
+
+        // TODO: If we wanna support generics via this API we will need a `ReferenceFactory`
+        let reference = Reference {
+            sid,
+            generics: Default::default(),
+            dt: Box::new(ndt.inner.clone()),
+            inline: false,
+        };
+
+        self.map.insert(sid, Some(ndt));
+
+        reference
     }
 
     // TODO: `declare_mut`???

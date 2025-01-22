@@ -4,7 +4,7 @@
 
 use std::{borrow::Cow, fmt::Debug};
 
-use crate::{datatype::{DeprecatedType, EnumRepr, EnumType, EnumVariant, Field, Fields, List, NamedFields, StructType, UnnamedFields}, DataType};
+use crate::{datatype::{DeprecatedType, EnumRepr, EnumType, EnumVariant, Field, Fields, List, NamedDataType, NamedFields, StructType, UnnamedFields}, DataType};
 
 // TDO: `Debug` and `Clone` on everything
 
@@ -165,10 +165,15 @@ impl FieldBuilder {
     pub fn set_docs(&mut self, docs: impl Into<Cow<'static, str>>) {
         self.0.docs = docs.into();
     }
+
+    pub fn build(self) -> Field {
+        self.0
+    }
 }
 
 pub struct EnumBuilder {
     name: Cow<'static, str>,
+    repr: EnumRepr,
     variants: Vec<(Cow<'static, str>, EnumVariant)>,
 }
 
@@ -176,27 +181,33 @@ impl EnumBuilder {
     pub fn new(name: impl Into<Cow<'static, str>>) -> Self {
         Self {
             name: name.into(),
+            repr: EnumRepr::External,
             variants: vec![],
         }
     }
 
+    pub fn repr(mut self, repr: EnumRepr) -> Self {
+        self.repr = repr;
+        self
+    }
+
     // TODO: Configurable `repr`
 
-    // pub fn variant(mut self, name: impl Into<Cow<'static, str>>, ty: DataType) -> Self {
-    //     self.variants.push((name.into(), EnumVariant));
-    //     self
-    // }
+    pub fn variant(mut self, name: impl Into<Cow<'static, str>>, v: EnumVariant) -> Self {
+        self.variants.push((name.into(), v));
+        self
+    }
 
-    // pub fn variant_mut(&mut self, name: impl Into<Cow<'static, str>>, ty: DataType) {
-    //     self.variants.push((name.into(), EnumVariant::new(ty)));
-    // }
+    pub fn variant_mut(&mut self, name: impl Into<Cow<'static, str>>, v: EnumVariant) {
+        self.variants.push((name.into(), v));
+    }
 
     pub fn build(self) -> DataType {
         DataType::Enum(EnumType {
             name: self.name,
             sid: None,
             skip_bigint_checks: false,
-            repr: EnumRepr::External,
+            repr: self.repr,
             generics: Default::default(),
             variants: self.variants,
         })
@@ -204,19 +215,43 @@ impl EnumBuilder {
 }
 
 #[derive(Debug, Clone)]
-pub struct VariantBuilder<V = ()>(V);
+pub struct VariantBuilder<V = ()>{
+    skip: bool,
+    docs: Cow<'static, str>,
+    deprecated: Option<DeprecatedType>,
+    fields: V,
+}
 
 impl VariantBuilder<()> {
     pub fn unit() -> Self {
-        Self(())
+        Self {
+            skip: false,
+            docs: "".into(),
+            deprecated: None,
+            fields: (),
+        }
+    }
+
+    pub fn skip(mut self) -> Self {
+        self.skip = true;
+        self
+    }
+
+    pub fn docs(mut self, docs: Cow<'static, str>) -> Self {
+        self.docs = docs;
+        self
+    }
+
+    pub fn deprecated(mut self, reason: DeprecatedType) -> Self {
+        self.deprecated = Some(reason);
+        self
     }
 
     pub fn build(self) -> EnumVariant {
         EnumVariant {
-            // TODO: Configurable fields
-            skip: false,
-            docs: "".into(),
-            deprecated: None,
+            skip: self.skip,
+            docs: self.docs,
+            deprecated: self.deprecated,
             fields: Fields::Unit
         }
     }
@@ -229,21 +264,50 @@ impl Into<EnumVariant> for VariantBuilder<()> {
 }
 
 impl VariantBuilder<NamedFields> {
-    pub fn named(fields: Vec<(Cow<'static, str>, Field)>) -> Self {
-        Self(NamedFields {
-            fields,
-            // TODO: Configurable
-            tag: None,
-        })
-    }
-
-    pub fn build(self) -> EnumVariant {
-        EnumVariant {
-            // TODO: Configurable fields
+    pub fn named() -> Self {
+        Self {
             skip: false,
             docs: "".into(),
             deprecated: None,
-            fields: Fields::Unit
+            fields: NamedFields {
+                fields: Default::default(),
+                // TODO: Configurable
+                tag: None,
+            },
+        }
+    }
+
+    pub fn skip(mut self) -> Self {
+        self.skip = true;
+        self
+    }
+
+    pub fn docs(mut self, docs: Cow<'static, str>) -> Self {
+        self.docs = docs;
+        self
+    }
+
+    pub fn deprecated(mut self, reason: DeprecatedType) -> Self {
+        self.deprecated = Some(reason);
+        self
+    }
+
+    pub fn field(mut self, name: impl Into<Cow<'static, str>>, field: Field) -> Self {
+            self.fields.fields.push((name.into(), field));
+            self
+        }
+
+        pub fn field_mut(mut self, name: impl Into<Cow<'static, str>>, field: Field) -> Self {
+            self.fields.fields.push((name.into(), field));
+            self
+        }
+
+    pub fn build(self) -> EnumVariant {
+        EnumVariant {
+            skip: self.skip,
+            docs: self.docs,
+            deprecated: self.deprecated,
+            fields: Fields::Named(self.fields),
         }
     }
 }
@@ -256,19 +320,48 @@ impl Into<EnumVariant> for VariantBuilder<NamedFields> {
 
 
 impl VariantBuilder<UnnamedFields> {
-    pub fn unnamed(fields: Vec<Field>) -> Self {
-        Self(UnnamedFields {
-            fields,
-        })
+    pub fn unnamed() -> Self {
+        Self {
+            skip: false,
+            docs: "".into(),
+            deprecated: None,
+            fields: UnnamedFields {
+                fields: Default::default(),
+            }
+        }
+    }
+
+    pub fn skip(mut self) -> Self {
+        self.skip = true;
+        self
+    }
+
+    pub fn docs(mut self, docs: Cow<'static, str>) -> Self {
+        self.docs = docs;
+        self
+    }
+
+    pub fn deprecated(mut self, reason: DeprecatedType) -> Self {
+        self.deprecated = Some(reason);
+        self
+    }
+
+    pub fn field(mut self, field: Field) -> Self {
+        self.fields.fields.push(field);
+        self
+    }
+
+    pub fn field_mut(mut self, field: Field) -> Self {
+        self.fields.fields.push(field);
+        self
     }
 
     pub fn build(self) -> EnumVariant {
         EnumVariant {
-            // TODO: Configurable fields
-            skip: false,
-            docs: "".into(),
-            deprecated: None,
-            fields: Fields::Unit
+            skip: self.skip,
+            docs: self.docs,
+            deprecated: self.deprecated,
+            fields: Fields::Unnamed(self.fields),
         }
     }
 }
@@ -276,5 +369,39 @@ impl VariantBuilder<UnnamedFields> {
 impl Into<EnumVariant> for VariantBuilder<UnnamedFields> {
     fn into(self) -> EnumVariant {
         self.build()
+    }
+}
+
+pub struct NamedDataTypeBuilder(NamedDataType);
+
+impl NamedDataTypeBuilder {
+    // TODO: Taking `name` is super wierd with enums/structs which *also* have a name on the `Builder::new` method
+    pub fn new(name: impl Into<Cow<'static, str>>, dt: DataType) -> Self {
+        Self(NamedDataType {
+            name: name.into(),
+            docs: "".into(),
+            deprecated: None,
+            ext: None,
+            inner: dt,
+        })
+    }
+
+    pub fn docs(mut self, docs: impl Into<Cow<'static, str>>) -> Self {
+        self.0.docs = docs.into();
+        self
+    }
+
+    pub fn deprecated(mut self, deprecated: DeprecatedType) -> Self {
+        self.0.deprecated = Some(deprecated);
+        self
+    }
+
+    // pub fn ext(mut self, ext: impl Into<Cow<'static, str>>) -> Self {
+    //     self.0.ext = Some(ext.into());
+    //     self
+    // }
+
+    pub fn build(self) -> NamedDataType {
+        self.0
     }
 }
