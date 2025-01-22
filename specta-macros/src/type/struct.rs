@@ -1,4 +1,7 @@
-use crate::{r#type::field::construct_field, utils::{parse_attrs, unraw_raw_ident, AttributeValue}};
+use crate::{
+    r#type::field::construct_field,
+    utils::{parse_attrs, unraw_raw_ident, AttributeValue},
+};
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{spanned::Spanned, DataStruct, Field, Fields, GenericParam, Generics};
@@ -42,16 +45,13 @@ pub fn parse_struct(
     crate_ref: &TokenStream,
     data: &DataStruct,
 ) -> syn::Result<(TokenStream, bool)> {
-    let definition_generics = generics
-        .params
-        .iter()
-        .filter_map(|p| match p {
-            GenericParam::Type(t) => {
-                let ident = t.ident.to_string();
-                Some(quote!(std::borrow::Cow::Borrowed(#ident).into()))
-            },
-            _ => None,
-        });
+    let definition_generics = generics.params.iter().filter_map(|p| match p {
+        GenericParam::Type(t) => {
+            let ident = t.ident.to_string();
+            Some(quote!(std::borrow::Cow::Borrowed(#ident).into()))
+        }
+        _ => None,
+    });
 
     // todo!("{:?}", container_attrs.transparent);
     let definition = if container_attrs.transparent {
@@ -105,26 +105,27 @@ pub fn parse_struct(
     } else {
         let fields = match &data.fields {
             Fields::Named(_) => {
-                let fields =
-                    data.fields
-                        .iter()
-                        .map(|field| {
-                            let field_attrs = decode_field_attrs(field)?;
+                let fields = data
+                    .fields
+                    .iter()
+                    .map(|field| {
+                        let field_attrs = decode_field_attrs(field)?;
 
-                            let field_ident_str = unraw_raw_ident(field.ident.as_ref().unwrap());
-                            let field_name =
-                                match (field_attrs.rename.clone(), container_attrs.rename_all) {
-                                    (Some(name), _) => name,
-                                    (_, Some(inflection)) => {
-                                        inflection.apply(&field_ident_str).to_token_stream()
-                                    }
-                                    (_, _) => field_ident_str.to_token_stream(),
-                                };
+                        let field_ident_str = unraw_raw_ident(field.ident.as_ref().unwrap());
+                        let field_name =
+                            match (field_attrs.rename.clone(), container_attrs.rename_all) {
+                                (Some(name), _) => name,
+                                (_, Some(inflection)) => {
+                                    inflection.apply(&field_ident_str).to_token_stream()
+                                }
+                                (_, _) => field_ident_str.to_token_stream(),
+                            };
 
-                            let inner = construct_field(crate_ref, container_attrs, field_attrs, &field.ty);
-                            Ok(quote!((#field_name.into(), #inner)))
-                        })
-                        .collect::<syn::Result<Vec<TokenStream>>>()?;
+                        let inner =
+                            construct_field(crate_ref, container_attrs, field_attrs, &field.ty);
+                        Ok(quote!((#field_name.into(), #inner)))
+                    })
+                    .collect::<syn::Result<Vec<TokenStream>>>()?;
 
                 let tag = container_attrs
                     .tag
@@ -140,7 +141,12 @@ pub fn parse_struct(
                     .iter()
                     .map(|field| {
                         let field_attrs = decode_field_attrs(field)?;
-                        Ok(construct_field(crate_ref, container_attrs, field_attrs, &field.ty))
+                        Ok(construct_field(
+                            crate_ref,
+                            container_attrs,
+                            field_attrs,
+                            &field.ty,
+                        ))
                     })
                     .collect::<syn::Result<Vec<TokenStream>>>()?;
 

@@ -4,7 +4,13 @@
 
 use std::{borrow::Cow, fmt::Debug};
 
-use crate::{datatype::{DeprecatedType, EnumRepr, EnumType, EnumVariant, Field, Fields, List, NamedDataType, NamedFields, StructType, UnnamedFields}, DataType};
+use crate::{
+    datatype::{
+        DeprecatedType, EnumRepr, EnumType, EnumVariant, Field, Fields, List, NamedDataType,
+        NamedFields, StructType, UnnamedFields,
+    },
+    DataType,
+};
 
 // TDO: `Debug` and `Clone` on everything
 
@@ -34,20 +40,23 @@ impl StructBuilder<()> {
     }
 
     pub fn build(self) -> DataType {
-            DataType::Struct(StructType {
-                name: self.name,
-                sid: None,
-                generics: vec![],
-                fields: Fields::Unit
-            })
-        }
+        DataType::Struct(StructType {
+            name: self.name,
+            sid: None,
+            generics: vec![],
+            fields: Fields::Unit,
+        })
+    }
 }
 
 impl StructBuilder<NamedFields> {
     pub fn named(name: impl Into<Cow<'static, str>>) -> Self {
         Self {
             name: name.into(),
-            fields: NamedFields { fields: Default::default(), tag: Default::default() }
+            fields: NamedFields {
+                fields: Default::default(),
+                tag: Default::default(),
+            },
         }
     }
 
@@ -61,20 +70,22 @@ impl StructBuilder<NamedFields> {
     }
 
     pub fn build(self) -> DataType {
-            DataType::Struct(StructType {
-                name: self.name,
-                sid: None,
-                generics: vec![],
-                fields: Fields::Named(self.fields),
-            })
-        }
+        DataType::Struct(StructType {
+            name: self.name,
+            sid: None,
+            generics: vec![],
+            fields: Fields::Named(self.fields),
+        })
+    }
 }
 
 impl StructBuilder<UnnamedFields> {
     pub fn unnamed(name: impl Into<Cow<'static, str>>) -> Self {
         Self {
             name: name.into(),
-            fields: UnnamedFields { fields: Default::default() },
+            fields: UnnamedFields {
+                fields: Default::default(),
+            },
         }
     }
 
@@ -83,18 +94,18 @@ impl StructBuilder<UnnamedFields> {
         self
     }
 
-    pub fn field_mut(&mut self,field: FieldBuilder) {
+    pub fn field_mut(&mut self, field: FieldBuilder) {
         self.fields.fields.push(field.0);
     }
 
     pub fn build(self) -> DataType {
-            DataType::Struct(StructType {
-                name: self.name,
-                sid: None,
-                generics: vec![],
-                fields: Fields::Unnamed(self.fields),
-            })
-        }
+        DataType::Struct(StructType {
+            name: self.name,
+            sid: None,
+            generics: vec![],
+            fields: Fields::Unnamed(self.fields),
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -215,7 +226,7 @@ impl EnumBuilder {
 }
 
 #[derive(Debug, Clone)]
-pub struct VariantBuilder<V = ()>{
+pub struct VariantBuilder<V = ()> {
     skip: bool,
     docs: Cow<'static, str>,
     deprecated: Option<DeprecatedType>,
@@ -252,7 +263,7 @@ impl VariantBuilder<()> {
             skip: self.skip,
             docs: self.docs,
             deprecated: self.deprecated,
-            fields: Fields::Unit
+            fields: Fields::Unit,
         }
     }
 }
@@ -293,14 +304,14 @@ impl VariantBuilder<NamedFields> {
     }
 
     pub fn field(mut self, name: impl Into<Cow<'static, str>>, field: Field) -> Self {
-            self.fields.fields.push((name.into(), field));
-            self
-        }
+        self.fields.fields.push((name.into(), field));
+        self
+    }
 
-        pub fn field_mut(mut self, name: impl Into<Cow<'static, str>>, field: Field) -> Self {
-            self.fields.fields.push((name.into(), field));
-            self
-        }
+    pub fn field_mut(mut self, name: impl Into<Cow<'static, str>>, field: Field) -> Self {
+        self.fields.fields.push((name.into(), field));
+        self
+    }
 
     pub fn build(self) -> EnumVariant {
         EnumVariant {
@@ -318,7 +329,6 @@ impl Into<EnumVariant> for VariantBuilder<NamedFields> {
     }
 }
 
-
 impl VariantBuilder<UnnamedFields> {
     pub fn unnamed() -> Self {
         Self {
@@ -327,7 +337,7 @@ impl VariantBuilder<UnnamedFields> {
             deprecated: None,
             fields: UnnamedFields {
                 fields: Default::default(),
-            }
+            },
         }
     }
 

@@ -50,7 +50,10 @@ fn rename() {
     assert_ts!(Struct2, "{ b: string }");
 
     assert_ts!(Enum, "({ t: \"A\" }) | ({ t: \"B\" })");
-    assert_ts_export!(Enum, "export type EnumNew = ({ t: \"A\" }) | ({ t: \"B\" });");
+    assert_ts_export!(
+        Enum,
+        "export type EnumNew = ({ t: \"A\" }) | ({ t: \"B\" });"
+    );
 
     assert_ts!(Enum2, "({ t: \"C\" }) | ({ t: \"B\" })");
     assert_ts!(Enum3, "({ t: \"A\"; b: string })");

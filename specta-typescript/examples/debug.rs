@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use specta::{Type, NamedType, TypeCollection};
+use specta::{NamedType, Type, TypeCollection};
 
 // #[derive(Type)]
 // #[specta(export = false, transparent)]
@@ -16,7 +16,6 @@ use specta::{Type, NamedType, TypeCollection};
 // pub struct Todo<T> {
 //     pub field: T,
 // }
-
 
 // #[derive(Type)]
 // #[specta(export = false)]
@@ -42,22 +41,20 @@ pub struct Demo {
 #[specta(inline)]
 pub struct MeNeedInline {
     #[specta(inline)]
-    pub a: Demo
+    pub a: Demo,
 }
 
 #[derive(Type)]
 pub struct Generic<T, U> {
     pub a: T,
-    pub b: U
+    pub b: U,
 }
 
 #[derive(Type)]
 pub enum Hello {
     A,
     B(String),
-    C {
-        a: String,
-    }
+    C { a: String },
 }
 
 #[derive(Type)]
@@ -65,9 +62,7 @@ pub enum Hello {
 pub enum Todo {
     A,
     // B(String),
-    C {
-        a: String,
-    }
+    C { a: String },
 }
 
 #[derive(Serialize, Type)]
@@ -87,19 +82,29 @@ pub enum SkipVariant {
 struct OptionalOnNamedField(#[specta(optional)] Option<String>); // Should do nothing
 
 fn main() {
-    println!("{:?}\n", serde_json::to_string(&SkipVariant::A("Hello".to_string())).unwrap());
-    println!("{:?}\n", serde_json::to_string(&SkipVariant::B(32)).unwrap());
-    println!("{:?}\n", specta_typescript::export::<SkipVariant>(&Default::default()));
+    println!(
+        "{:?}\n",
+        serde_json::to_string(&SkipVariant::A("Hello".to_string())).unwrap()
+    );
+    println!(
+        "{:?}\n",
+        serde_json::to_string(&SkipVariant::B(32)).unwrap()
+    );
+    println!(
+        "{:?}\n",
+        specta_typescript::export::<SkipVariant>(&Default::default())
+    );
 
-     println!("{:?}\n", serde_json::to_string(&OptionalOnNamedField(Some("Hello".to_string()))).unwrap());
-
+    println!(
+        "{:?}\n",
+        serde_json::to_string(&OptionalOnNamedField(Some("Hello".to_string()))).unwrap()
+    );
 
     let a: OptionalOnNamedField = serde_json::from_str("\"Hello\"").unwrap();
     let b: OptionalOnNamedField = serde_json::from_str(r#"null"#).unwrap();
     let c: OptionalOnNamedField = serde_json::from_str(r#"undefined"#).unwrap();
     // println!("{:?}\n", serde_json::to_string(&SkipVariant::A("Hello".to_string())).unwrap());
     // println!("{:?}\n", serde_json::to_string(&SkipVariant::B(32)).unwrap());
-
 
     // println!("{:?}\n\n", specta_typescript::inline::<MeNeedInline>(&Default::default()));
     // println!("{:?}\n\n", specta_typescript::export::<MeNeedInline>(&Default::default()));
@@ -126,13 +131,12 @@ fn main() {
     // // specta_serde::validate(&types).unwrap();
     // println!("{:?}", specta_typescript::primitives::export(&Default::default(), &types, types.get(Todo::ID).unwrap()));
 
-
     // println!("{:?}\n\n", specta_typescript::inline::<Todo<String>>(&Default::default()));
     // println!("{:?}\n\n", specta_typescript::export::<Todo<String>>(&Default::default()));
 
     // println!("{:?}\n\n", specta_typescript::inline::<Test>(&Default::default()));
     // println!("{:?}\n\n", specta_typescript::export::<Test>(&Default::default()));
 
-     // println!("{:?}\n\n", specta_typescript::inline::<HashMap<MaybeValidKey<String>, ()>>(&Default::default()));
+    // println!("{:?}\n\n", specta_typescript::inline::<HashMap<MaybeValidKey<String>, ()>>(&Default::default()));
     // println!("{:?}\n\n", specta_typescript::inline::<HashMap<MaybeValidKey<MaybeValidKey<String>>, ()>>(&Default::default()));
 }

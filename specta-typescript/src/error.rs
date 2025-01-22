@@ -8,16 +8,11 @@ use specta::ImplLocation;
 #[non_exhaustive]
 pub enum Error {
     /// Attempted to export a bigint type but the configuration forbids it.
-    BigIntForbidden {
-        path: String,
-    },
+    BigIntForbidden { path: String },
     /// Failed to validate a type is Serde compatible.
     Serde(specta_serde::Error),
     /// A type's name conflicts with a reserved keyword in Typescript.
-    ForbiddenName {
-        path: String,
-        name: &'static str,
-    },
+    ForbiddenName { path: String, name: &'static str },
     /// A type's name contains invalid characters or is not valid.
     InvalidName {
         path: String,
@@ -31,7 +26,7 @@ pub enum Error {
     /// An filesystem IO error.
     /// This is possible when using `Typescript::export_to` when writing to a file or formatting the file.
     // We cast `std::io::Error` `String` so we can have `PartialEq`
-    Io(String)
+    Io(String),
 }
 
 impl From<io::Error> for Error {

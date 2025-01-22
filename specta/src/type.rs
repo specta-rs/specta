@@ -1,6 +1,4 @@
-use crate::{
-    datatype::DataType, SpectaID, TypeCollection
-};
+use crate::{datatype::DataType, SpectaID, TypeCollection};
 
 mod impls;
 mod macros;

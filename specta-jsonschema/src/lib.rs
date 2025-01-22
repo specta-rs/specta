@@ -5,14 +5,17 @@
     html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
 )]
 
-
 // use specta::datatype::{DataType, PrimitiveType};
 
 use std::path::Path;
 
 use inflector::Inflector;
 use schemars::schema::{InstanceType, Schema, SingleOrVec};
-use specta::{builder::{EnumBuilder, FieldBuilder, StructBuilder}, datatype::{DataType, List, LiteralType, PrimitiveType}, TypeCollection};
+use specta::{
+    builder::{EnumBuilder, FieldBuilder, StructBuilder},
+    datatype::{DataType, List, LiteralType, PrimitiveType},
+    TypeCollection,
+};
 
 #[derive(Debug, Clone)]
 pub struct JsonSchema;
@@ -90,7 +93,7 @@ pub fn to_ast(schema: &Schema) -> Result<DataType, ()> {
 
             if let Some(reference) = &obj.reference {
                 return Ok(DataType::Any); // TODO: Fix this
-                // return Ok(DataType::Reference(DataTypeReference {
+                                          // return Ok(DataType::Reference(DataTypeReference {
 
                 // }));
             }
@@ -141,10 +144,12 @@ pub fn to_ast(schema: &Schema) -> Result<DataType, ()> {
                 // #[serde(skip_serializing_if = "Option::is_none")]
                 // pub property_names: Option<Box<Schema>>,
 
-
-
-
-                let mut s = StructBuilder::named(obj.metadata.as_ref().and_then(|v| v.title.as_ref().map(|v| v.to_class_case())).unwrap_or_else(|| "Unnamed".to_string())); // TODO: Remove fallback
+                let mut s = StructBuilder::named(
+                    obj.metadata
+                        .as_ref()
+                        .and_then(|v| v.title.as_ref().map(|v| v.to_class_case()))
+                        .unwrap_or_else(|| "Unnamed".to_string()),
+                ); // TODO: Remove fallback
                 for (k, v) in o.properties.iter() {
                     s.field_mut(k.clone(), FieldBuilder::new(to_ast(v)?));
                 }
@@ -166,7 +171,6 @@ pub fn to_ast(schema: &Schema) -> Result<DataType, ()> {
                     }
                 }
 
-
                 match o {
                     SingleOrVec::Single(o) => {
                         return Ok(from_instance_type(&o));
@@ -186,12 +190,11 @@ pub fn to_ast(schema: &Schema) -> Result<DataType, ()> {
 
                                 e.build()
                             }
-                        })
+                        });
 
                         // assert!(o.len() == 1, "expected a single item in the array"); // TODO: Handle stuff
 
                         // match
-
 
                         // for list in o {
                         //     println!("{:?}", list);
@@ -202,14 +205,14 @@ pub fn to_ast(schema: &Schema) -> Result<DataType, ()> {
                 }
             }
 
-        // match true {
-        //     _ if o.o
+            // match true {
+            //     _ if o.o
 
-        //     _ => {},
-        // }
+            //     _ => {},
+            // }
 
             todo!("{:?}", obj);
-        },
+        }
     }
 }
 

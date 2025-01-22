@@ -11,9 +11,9 @@ use self::generics::{
     add_type_to_where_clause, generics_with_ident_and_bounds_only, generics_with_ident_only,
 };
 
-mod field;
 pub(crate) mod attr;
 mod r#enum;
+mod field;
 mod generics;
 mod r#struct;
 
@@ -44,9 +44,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     });
 
     let (inlines, can_flatten) = match data {
-        Data::Struct(data) => {
-            parse_struct(&name, &container_attrs, generics, &crate_ref, data)
-        }
+        Data::Struct(data) => parse_struct(&name, &container_attrs, generics, &crate_ref, data),
         Data::Enum(data) => parse_enum(
             &name,
             &EnumAttr::from_attrs(&container_attrs, &mut attrs)?,
@@ -108,7 +106,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             GenericParam::Type(t) => {
                 let ident = format_ident!("PLACEHOLDER_{}", t.ident);
                 quote!(#crate_ref::datatype::Generic<#ident>)
-            },
+            }
             GenericParam::Const(c) => {
                 let ident = &c.ident;
                 quote!(#ident)
@@ -119,7 +117,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     };
 
     let generic_placeholders = generics.params.iter().filter_map(|param| match param {
-        GenericParam::Lifetime(_) |  GenericParam::Const(_) => None,
+        GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
         GenericParam::Type(t) => {
             let ident = format_ident!("PLACEHOLDER_{}", t.ident);
             let ident_str = t.ident.to_string();
@@ -129,7 +127,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     const PLACEHOLDER: &'static str = #ident_str;
                 }
             ))
-        },
+        }
     });
 
     let export = (cfg!(feature = "DO_NOT_USE_export") && container_attrs.export.unwrap_or(true))
@@ -152,7 +150,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         });
 
     let comments = &container_attrs.common.doc;
-     let inline = container_attrs.inline;
+    let inline = container_attrs.inline;
     let deprecated = container_attrs.common.deprecated_as_tokens(&crate_ref);
     let impl_location = quote!(#crate_ref::internal::construct::impl_location(concat!(file!(), ":", line!(), ":", column!())));
     let definition = (container_attrs.inline || container_attrs.transparent).then(|| quote!(
@@ -173,7 +171,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             specta::datatype::reference::Reference::construct(SID, vec![#(#reference_generics),*], dt, #inline).into()
         )
     });
-
 
     Ok(quote! {
         #[allow(non_camel_case_types)]

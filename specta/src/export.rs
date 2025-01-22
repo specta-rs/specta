@@ -6,8 +6,7 @@ use std::{
 use crate::{NamedType, SpectaID, TypeCollection};
 
 // Global type store for collecting custom types to export.
-static TYPES: OnceLock<Mutex<HashMap<SpectaID, fn(&mut TypeCollection)>>> =
-    OnceLock::new();
+static TYPES: OnceLock<Mutex<HashMap<SpectaID, fn(&mut TypeCollection)>>> = OnceLock::new();
 
 /// Get the global type store containing all automatically registered types.
 ///

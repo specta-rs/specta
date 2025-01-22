@@ -21,10 +21,7 @@ impl<T: Type> FunctionResult<FunctionValueMarker> for T {
 pub enum FunctionResultMarker {}
 impl<T: Type, E: Type> FunctionResult<FunctionResultMarker> for Result<T, E> {
     fn to_datatype(types: &mut TypeCollection) -> FunctionResultVariant {
-        FunctionResultVariant::Result(
-            T::definition(types),
-            E::definition(types)
-        )
+        FunctionResultVariant::Result(T::definition(types), E::definition(types))
     }
 }
 
@@ -49,9 +46,6 @@ where
     E: Type,
 {
     fn to_datatype(types: &mut TypeCollection) -> FunctionResultVariant {
-        FunctionResultVariant::Result(
-            T::definition(types),
-            E::definition(types),
-        )
+        FunctionResultVariant::Result(T::definition(types), E::definition(types))
     }
 }

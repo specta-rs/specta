@@ -73,12 +73,13 @@ impl Rust {
         }
         std::fs::write(
             &path,
-            self.export(types)? // TODO: .map(|s| format!("{}{s}", self.header))?,
-        ).unwrap(); // TODO: Error handling
-        // TODO
-        // if let Some(formatter) = self.formatter {
-        //     formatter(path)?;
-        // }
+            self.export(types)?, // TODO: .map(|s| format!("{}{s}", self.header))?,
+        )
+        .unwrap(); // TODO: Error handling
+                   // TODO
+                   // if let Some(formatter) = self.formatter {
+                   //     formatter(path)?;
+                   // }
         Ok(())
     }
 }
@@ -90,7 +91,11 @@ fn datatype(r: &Rust, t: &DataType, types: &TypeCollection) -> Result<String, Er
     Ok(match t {
         DataType::Unknown => todo!(),
         // TODO: This should definetly be configurable cause they might not be using JSON.
-        DataType::Any => r.any_value.as_ref().map(|v| v.to_string()).unwrap_or_else(|| "serde_json::Value".to_string()),
+        DataType::Any => r
+            .any_value
+            .as_ref()
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "serde_json::Value".to_string()),
         DataType::Primitive(ty) => ty.to_rust_str().to_owned(),
         DataType::Literal(_) => todo!(),
         DataType::Nullable(t) => format!("Option<{}>", datatype(r, t, types)?),
@@ -112,7 +117,11 @@ fn datatype(r: &Rust, t: &DataType, types: &TypeCollection) -> Result<String, Er
             ),
         },
         DataType::Struct(s) => {
-            let mut docs = s.sid().map(|sid| types.get(sid).unwrap().docs().clone()).unwrap_or_default().replace("\n", "\n /// ");
+            let mut docs = s
+                .sid()
+                .map(|sid| types.get(sid).unwrap().docs().clone())
+                .unwrap_or_default()
+                .replace("\n", "\n /// ");
             if !docs.is_empty() {
                 docs = format!("/// {}\n", docs);
             }
@@ -127,7 +136,7 @@ fn datatype(r: &Rust, t: &DataType, types: &TypeCollection) -> Result<String, Er
                 }
                 Fields::Named(fields) => {
                     assert!(s.generics().len() == 0, "missing support for generics"); // TODO
-                    // assert!(s.tag().is_some(), "missing support for tagging"); // TODO
+                                                                                      // assert!(s.tag().is_some(), "missing support for tagging"); // TODO
 
                     // TODO: Error if any of the generics are not used or add `PhantomData` field?
 
@@ -155,7 +164,11 @@ fn datatype(r: &Rust, t: &DataType, types: &TypeCollection) -> Result<String, Er
                         }
 
                         // TODO: Don't `unwrap` here
-                        s.push_str(&format!("\n    pub {}: {},", key, datatype(r, field.ty().unwrap(), types)?));
+                        s.push_str(&format!(
+                            "\n    pub {}: {},",
+                            key,
+                            datatype(r, field.ty().unwrap(), types)?
+                        ));
                     }
 
                     s.push_str("\n}");
@@ -163,9 +176,13 @@ fn datatype(r: &Rust, t: &DataType, types: &TypeCollection) -> Result<String, Er
                 }
                 Fields::Unnamed(_) => todo!(),
             }
-        },
+        }
         DataType::Enum(e) => {
-            let mut docs = e.sid().map(|sid| types.get(sid).unwrap().docs().clone()).unwrap_or_default().replace("\n", "\n/// ");
+            let mut docs = e
+                .sid()
+                .map(|sid| types.get(sid).unwrap().docs().clone())
+                .unwrap_or_default()
+                .replace("\n", "\n/// ");
             if !docs.is_empty() {
                 docs = format!("/// {}\n", docs);
             }
@@ -174,7 +191,9 @@ fn datatype(r: &Rust, t: &DataType, types: &TypeCollection) -> Result<String, Er
                 EnumRepr::Untagged => format!("#[serde(untagged)]\n"),
                 EnumRepr::External => format!(""),
                 EnumRepr::Internal { tag } => format!("#[serde(tag = \"{tag}\")]\n"),
-                EnumRepr::Adjacent { tag, content } => format!("#[serde(tag = \"{tag}\", content = \"{content}\")]\n"),
+                EnumRepr::Adjacent { tag, content } => {
+                    format!("#[serde(tag = \"{tag}\", content = \"{content}\")]\n")
+                }
             };
 
             let mut s = format!("{docs}{STANDARD_DERIVE}\n{repr}pub enum {} {{ \n", e.name());
@@ -187,29 +206,37 @@ fn datatype(r: &Rust, t: &DataType, types: &TypeCollection) -> Result<String, Er
                 let variant = match variant.fields() {
                     Fields::Unit => format!("\t{},\n", name.to_class_case()),
                     Fields::Unnamed(fields) => {
-                        let fields = fields.fields().iter().filter_map(|field| {
-                            let Some(ty) = field.ty() else {
-                                return None;
-                            };
+                        let fields = fields
+                            .fields()
+                            .iter()
+                            .filter_map(|field| {
+                                let Some(ty) = field.ty() else {
+                                    return None;
+                                };
 
-                            Some(datatype(r, ty, types).unwrap()) // TODO: Error handling
-                        }).collect::<Vec<String>>();
+                                Some(datatype(r, ty, types).unwrap()) // TODO: Error handling
+                            })
+                            .collect::<Vec<String>>();
 
                         format!("\t{}({}),\n", name.to_class_case(), fields.join("\n"))
-                    },
+                    }
                     Fields::Named(fields) => {
-                        let fields = fields.fields().iter().filter_map(|(_, field)| {
-                            let Some(ty) = field.ty() else {
-                                return None;
-                            };
+                        let fields = fields
+                            .fields()
+                            .iter()
+                            .filter_map(|(_, field)| {
+                                let Some(ty) = field.ty() else {
+                                    return None;
+                                };
 
-                            Some(datatype(r, ty, types).unwrap()) // TODO: Error handling
-                        }).collect::<Vec<String>>();
+                                Some(datatype(r, ty, types).unwrap()) // TODO: Error handling
+                            })
+                            .collect::<Vec<String>>();
 
                         format!("\t{}({}),\n", name.to_class_case(), fields.join("\n"))
-                    },
+                    }
                 };
-                 s.push_str(&docs2);
+                s.push_str(&docs2);
                 s.push_str(&variant);
             }
             s.push_str("}");
@@ -234,7 +261,7 @@ fn datatype(r: &Rust, t: &DataType, types: &TypeCollection) -> Result<String, Er
                     format!("{}<{generics}>", definition.name())
                 }
             }
-        },
+        }
         DataType::Generic(t) => t.to_string(),
     })
 }

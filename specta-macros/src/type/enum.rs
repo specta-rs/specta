@@ -19,16 +19,13 @@ pub fn parse_enum(
         ));
     }
 
-    let definition_generics = generics
-        .params
-        .iter()
-        .filter_map(|p| match p {
-            GenericParam::Type(t) => {
-                let ident = t.ident.to_string();
-                Some(quote!(std::borrow::Cow::Borrowed(#ident).into()))
-            },
-            _ => None,
-        });
+    let definition_generics = generics.params.iter().filter_map(|p| match p {
+        GenericParam::Type(t) => {
+            let ident = t.ident.to_string();
+            Some(quote!(std::borrow::Cow::Borrowed(#ident).into()))
+        }
+        _ => None,
+    });
 
     let repr = enum_attrs.tagged()?;
     let variant_types =

@@ -26,7 +26,8 @@ pub use typescript::*;
 pub use ExportError as Error;
 
 use specta::datatype::{
-    inline_reference, DataType, DeprecatedType, EnumRepr, EnumType, EnumVariant, Fields, FunctionResultVariant, LiteralType, NamedDataType, PrimitiveType, StructType, TupleType
+    inline_reference, DataType, DeprecatedType, EnumRepr, EnumType, EnumVariant, Fields,
+    FunctionResultVariant, LiteralType, NamedDataType, PrimitiveType, StructType, TupleType,
 };
 use specta::{
     internal::{detect_duplicate_type_names, skip_fields, skip_fields_named, NonSkipField},
@@ -185,11 +186,7 @@ fn export_datatype_inner(
 /// Convert a DataType to a TypeScript string
 ///
 /// Eg. `{ demo: string; }`
-pub fn datatype(
-    conf: &Typescript,
-    typ: &FunctionResultVariant,
-    types: &TypeCollection,
-) -> Output {
+pub fn datatype(conf: &Typescript, typ: &FunctionResultVariant, types: &TypeCollection) -> Output {
     // TODO: Duplicate type name detection?
 
     let mut s = String::new();
@@ -234,12 +231,7 @@ pub(crate) fn datatype_inner(
                 },
                 {
                     let mut v = String::new();
-                    datatype_inner(
-                        ctx,
-                        &FunctionResultVariant::Value(e.clone()),
-                        types,
-                        &mut v,
-                    )?;
+                    datatype_inner(ctx, &FunctionResultVariant::Value(e.clone()), types, &mut v)?;
                     v
                 },
             ];
@@ -409,7 +401,7 @@ pub(crate) fn datatype_inner(
                     s.push('>');
                 }
             }
-        },
+        }
         DataType::Generic(ident) => s.push_str(&ident.to_string()),
     })
 }

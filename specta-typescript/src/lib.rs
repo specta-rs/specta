@@ -48,14 +48,16 @@
     html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
 )]
 
-pub(crate) mod reserved_names;
-pub mod primitives;
 mod error;
 mod js_doc;
-mod typescript;
 mod legacy;
+pub mod primitives;
+pub(crate) mod reserved_names;
+mod typescript;
 
+pub use error::Error;
 #[doc(hidden)]
 pub use legacy::*;
-pub use error::Error;
-pub use typescript::{BigIntExportBehavior, CommentFormatterFn, CommentFormatterArgs, FormatterFn, Typescript};
+pub use typescript::{
+    BigIntExportBehavior, CommentFormatterArgs, CommentFormatterFn, FormatterFn, Typescript,
+};

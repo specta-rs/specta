@@ -1,9 +1,10 @@
 //! Types related to working with [`DataType`]. Exposed for advanced users.
 
-mod inline;
 mod r#enum;
 mod fields;
 mod function;
+mod generic;
+mod inline;
 mod list;
 mod literal;
 mod map;
@@ -12,12 +13,11 @@ mod primitive;
 pub mod reference;
 mod r#struct;
 mod tuple;
-mod generic;
 
-pub use generic::*;
-pub use inline::*;
 pub use fields::*;
 pub use function::*;
+pub use generic::*;
+pub use inline::*;
 pub use list::*;
 pub use literal::*;
 pub use map::*;
@@ -27,8 +27,8 @@ pub use r#enum::*;
 pub use r#struct::*;
 pub use tuple::*;
 
-use std::borrow::Cow;
 use crate::SpectaID;
+use std::borrow::Cow;
 
 /// Runtime type-erased representation of a Rust type.
 ///

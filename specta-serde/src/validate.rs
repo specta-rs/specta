@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 
 use specta::{
-    datatype::{
-        DataType, EnumRepr, EnumType, Fields, LiteralType, PrimitiveType,
-    }, internal::{skip_fields, skip_fields_named}, SpectaID, TypeCollection
+    datatype::{DataType, EnumRepr, EnumType, Fields, LiteralType, PrimitiveType},
+    internal::{skip_fields, skip_fields_named},
+    SpectaID, TypeCollection,
 };
 
 use crate::Error;

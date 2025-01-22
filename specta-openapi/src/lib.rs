@@ -255,7 +255,7 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
                 //         }],
                 //     },
                 // })
-            },
+            }
             generics => {
                 // let generics = generics
                 //     .iter()

@@ -170,12 +170,8 @@ mod test {
                 def.result
                     .and_then(|result| {
                         Some(
-                            specta_typescript::datatype(
-                                &ExportConfig::default(),
-                                &result,
-                                types,
-                            )
-                            .unwrap(),
+                            specta_typescript::datatype(&ExportConfig::default(), &result, types)
+                                .unwrap(),
                         )
                     })
                     .as_deref(),
@@ -212,12 +208,8 @@ mod test {
                 def.result
                     .and_then(|result| {
                         Some(
-                            specta_typescript::datatype(
-                                &ExportConfig::default(),
-                                &result,
-                                types,
-                            )
-                            .unwrap(),
+                            specta_typescript::datatype(&ExportConfig::default(), &result, types)
+                                .unwrap(),
                         )
                     })
                     .as_deref(),
@@ -263,12 +255,8 @@ mod test {
                 def.result
                     .and_then(|result| {
                         Some(
-                            specta_typescript::datatype(
-                                &ExportConfig::default(),
-                                &result,
-                                types,
-                            )
-                            .unwrap(),
+                            specta_typescript::datatype(&ExportConfig::default(), &result, types)
+                                .unwrap(),
                         )
                     })
                     .as_deref(),
@@ -286,12 +274,8 @@ mod test {
                 def.result
                     .and_then(|result| {
                         Some(
-                            specta_typescript::datatype(
-                                &ExportConfig::default(),
-                                &result,
-                                types,
-                            )
-                            .unwrap(),
+                            specta_typescript::datatype(&ExportConfig::default(), &result, types)
+                                .unwrap(),
                         )
                     })
                     .as_deref(),

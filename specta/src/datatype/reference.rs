@@ -21,8 +21,18 @@ pub struct Reference {
 
 impl Reference {
     /// TODO: Explain invariant.
-    pub fn construct(sid: SpectaID, generics: impl Into<Vec<DataType>>, dt: DataType, inline: bool) -> Self {
-        Self { sid, generics: generics.into(), dt: Box::new(dt), inline, }
+    pub fn construct(
+        sid: SpectaID,
+        generics: impl Into<Vec<DataType>>,
+        dt: DataType,
+        inline: bool,
+    ) -> Self {
+        Self {
+            sid,
+            generics: generics.into(),
+            dt: Box::new(dt),
+            inline,
+        }
     }
 
     pub fn sid(&self) -> SpectaID {

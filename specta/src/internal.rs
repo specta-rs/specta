@@ -10,7 +10,8 @@ use std::{borrow::Cow, collections::HashMap};
 pub use paste::paste;
 
 use crate::{
-    datatype::{DataType, DeprecatedType, Field, NamedDataType, NamedDataTypeExt}, ImplLocation, SpectaID, Type, TypeCollection
+    datatype::{DataType, DeprecatedType, Field, NamedDataType, NamedDataTypeExt},
+    ImplLocation, SpectaID, Type, TypeCollection,
 };
 
 /// Registers a type in the `TypeCollection` if it hasn't been registered already.
@@ -33,7 +34,7 @@ pub fn register(
                 docs,
                 deprecated,
                 ext: Some(NamedDataTypeExt { sid, impl_location }),
-                inner: build(types)
+                inner: build(types),
             };
             types.map.insert(sid, Some(dt.clone()));
             Some(dt)
@@ -43,10 +44,7 @@ pub fn register(
 
 // TODO: Make private
 #[track_caller]
-pub fn flatten<T: Type>(
-    sid: SpectaID,
-    types: &mut TypeCollection,
-) -> DataType {
+pub fn flatten<T: Type>(sid: SpectaID, types: &mut TypeCollection) -> DataType {
     types.flatten_stack.push(sid);
 
     #[allow(clippy::panic)]
@@ -66,7 +64,10 @@ pub fn flatten<T: Type>(
 pub mod construct {
     use std::borrow::Cow;
 
-    use crate::{datatype::{self, *}, Flatten, ImplLocation, SpectaID, Type, TypeCollection};
+    use crate::{
+        datatype::{self, *},
+        Flatten, ImplLocation, SpectaID, Type, TypeCollection,
+    };
 
     pub fn skipped_field(
         optional: bool,
@@ -88,7 +89,7 @@ pub mod construct {
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
         inline: bool,
-        types: &mut TypeCollection
+        types: &mut TypeCollection,
     ) -> Field {
         // TODO: Could this stack overflow? Is `TypeCollection::flatten_stack` still used or should we use it?
         let ty = datatype::inline::<T>(types); // TODO
@@ -127,7 +128,7 @@ pub mod construct {
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
         inline: bool,
-        types: &mut TypeCollection
+        types: &mut TypeCollection,
     ) -> Field {
         Field {
             optional,

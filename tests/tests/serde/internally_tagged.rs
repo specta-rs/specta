@@ -125,7 +125,10 @@ fn internally_tagged() {
     // assert_ts!(error; A, specta_serde::Error::InvalidInternallyTaggedEnum);
     // assert_ts!(error; B, specta_serde::Error::InvalidInternallyTaggedEnum);
     // assert_ts!(error; C, specta_serde::Error::InvalidInternallyTaggedEnum);
-    assert_ts!(D, "({ type: \"A\" } & Partial<{ [key in string]: string }>)");
+    assert_ts!(
+        D,
+        "({ type: \"A\" } & Partial<{ [key in string]: string }>)"
+    );
     assert_ts!(E, "({ type: \"A\" })");
     // assert_ts!(F, "({ type: \"A\" } & FInner)");
     // assert_ts!(error; G, specta_serde::Error::InvalidInternallyTaggedEnum);

@@ -1,10 +1,14 @@
 use std::{
     borrow::{Borrow, Cow},
     collections::{btree_map, BTreeMap},
-    fmt, sync::atomic::AtomicU64,
+    fmt,
+    sync::atomic::AtomicU64,
 };
 
-use crate::{datatype::{reference::Reference, NamedDataType}, DataType, NamedType, SpectaID};
+use crate::{
+    datatype::{reference::Reference, NamedDataType},
+    DataType, NamedType, SpectaID,
+};
 
 /// Define a set of types which can be exported together.
 ///
@@ -44,11 +48,13 @@ impl TypeCollection {
     pub fn declare(&mut self, mut ndt: NamedDataType) -> Reference {
         // TODO: Proper id's
         static ID: AtomicU64 = AtomicU64::new(0);
-        let sid = SpectaID { type_name: "virtual", hash: ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed) };
+        let sid = SpectaID {
+            type_name: "virtual",
+            hash: ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+        };
 
         // TODO: Do this and do it on `NamedDataTypeBuilder`
         // ndt.ext = Some(...);
-
 
         match &mut ndt.inner {
             // DataType::Nullable(data_type) => todo!(), // TODO: Recurse down?
@@ -59,7 +65,7 @@ impl TypeCollection {
             DataType::Enum(e) => {
                 e.sid = Some(sid);
             }
-            _ => {},
+            _ => {}
         }
 
         // TODO: If we wanna support generics via this API we will need a `ReferenceFactory`

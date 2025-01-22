@@ -1,5 +1,9 @@
 use core::fmt;
-use std::{borrow::{Borrow, Cow}, fmt::Display, marker::PhantomData};
+use std::{
+    borrow::{Borrow, Cow},
+    fmt::Display,
+    marker::PhantomData,
+};
 
 use crate::Type;
 
@@ -42,7 +46,6 @@ impl From<GenericType> for DataType {
 pub trait GenericPlaceholder {
     const PLACEHOLDER: &'static str;
 }
-
 
 /// A placeholder for a generic type.
 ///
@@ -87,7 +90,6 @@ impl<T: GenericPlaceholder> std::hash::Hash for Generic<T> {
         unreachable!();
     }
 }
-
 
 impl<T: GenericPlaceholder> Type for Generic<T> {
     fn definition(_: &mut crate::TypeCollection) -> DataType {

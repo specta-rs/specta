@@ -1,6 +1,6 @@
 use std::{borrow::Cow, io, path::Path};
 
-use specta::{datatype::DeprecatedType, TypeCollection, internal::detect_duplicate_type_names};
+use specta::{datatype::DeprecatedType, internal::detect_duplicate_type_names, TypeCollection};
 
 use crate::{primitives, Error};
 
@@ -147,7 +147,7 @@ impl Typescript {
         if let Some((name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
             return Err(Error::DuplicateTypeName {
                 types: (l0, l1),
-                name
+                name,
             });
         }
 
@@ -162,11 +162,7 @@ impl Typescript {
     }
 
     /// TODO
-    pub fn export_to(
-        &self,
-        path: impl AsRef<Path>,
-        types: &TypeCollection,
-    ) -> Result<(), Error> {
+    pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
         let path = path.as_ref();
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
