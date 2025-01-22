@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use specta::{Type, NamedType, TypeCollection};
 
 // #[derive(Type)]
@@ -83,10 +83,22 @@ pub enum SkipVariant {
 //     A,
 // }
 
+#[derive(Type, Serialize, Deserialize)]
+struct OptionalOnNamedField(#[specta(optional)] Option<String>); // Should do nothing
+
 fn main() {
     println!("{:?}\n", serde_json::to_string(&SkipVariant::A("Hello".to_string())).unwrap());
     println!("{:?}\n", serde_json::to_string(&SkipVariant::B(32)).unwrap());
     println!("{:?}\n", specta_typescript::export::<SkipVariant>(&Default::default()));
+
+     println!("{:?}\n", serde_json::to_string(&OptionalOnNamedField(Some("Hello".to_string()))).unwrap());
+
+
+    let a: OptionalOnNamedField = serde_json::from_str("\"Hello\"").unwrap();
+    let b: OptionalOnNamedField = serde_json::from_str(r#"null"#).unwrap();
+    let c: OptionalOnNamedField = serde_json::from_str(r#"undefined"#).unwrap();
+    // println!("{:?}\n", serde_json::to_string(&SkipVariant::A("Hello".to_string())).unwrap());
+    // println!("{:?}\n", serde_json::to_string(&SkipVariant::B(32)).unwrap());
 
 
     // println!("{:?}\n\n", specta_typescript::inline::<MeNeedInline>(&Default::default()));

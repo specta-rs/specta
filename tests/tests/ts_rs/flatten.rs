@@ -62,16 +62,16 @@ struct FlattenG {
 #[test]
 fn test_flatten() {
     assert_ts!(FlattenA, "{ a: number; b: number }");
-    assert_ts!(FlattenB, "({ a: number; b: number }) & { c: number }");
-    assert_ts!(FlattenC, "({ a: number; b: number }) & { c: number }");
+    assert_ts!(FlattenB, "{ a: number; b: number; c: number }");
+    assert_ts!(FlattenC, "{ a: number; b: number; c: number }");
     assert_ts!(FlattenD, "{ a: FlattenA; c: number }");
     assert_ts!(
         FlattenE,
-        "{ b: ({ a: number; b: number }) & { c: number }; d: number }"
+        "{ b: { a: number; b: number; c: number }; d: number }"
     );
     assert_ts!(
         FlattenF,
-        "{ b: ({ a: number; b: number }) & { c: number }; d: number }"
+        "{ b: { a: number; b: number; c: number }; d: number }"
     );
     assert_ts!(FlattenG, "{ b: FlattenB; d: number }");
 }

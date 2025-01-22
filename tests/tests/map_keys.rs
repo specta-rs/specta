@@ -76,7 +76,7 @@ pub struct InvalidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<()>>, 
 #[test]
 fn map_keys() {
     assert_ts!(HashMap<String, ()>, "Partial<{ [key in string]: null }>");
-    assert_ts_export!(Regular, "export type Regular = Partial<{ [key in string]: null }>");
+    assert_ts_export!(Regular, "export type Regular = Partial<{ [key in string]: null }>;");
     assert_ts!(HashMap<Infallible, ()>, "Partial<{ [key in never]: null }>");
     assert_ts!(HashMap<Any, ()>, "Partial<{ [key in any]: null }>");
     assert_ts!(HashMap<TransparentStruct, ()>, "Partial<{ [key in string]: null }>");
@@ -88,11 +88,11 @@ fn map_keys() {
     );
     assert_ts_export!(
         ValidMaybeValidKey,
-        "export type ValidMaybeValidKey = Partial<{ [key in string]: null }>"
+        "export type ValidMaybeValidKey = Partial<{ [key in string]: null }>;"
     );
     assert_ts!(
         ValidMaybeValidKeyNested,
-        "Partial<{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }>"
+        "Partial<{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }>;"
     );
     // assert_ts_export!(
     //     ValidMaybeValidKeyNested,

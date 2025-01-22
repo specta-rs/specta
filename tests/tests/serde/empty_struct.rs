@@ -14,5 +14,5 @@ struct B {}
 #[test]
 fn empty_enums() {
     assert_ts!(A, "Record<string, never>");
-    assert_ts!(B, r#"{ "a": "B" }"#);
+    assert_ts!(B, r#"{ a: "B" }"#);
 }

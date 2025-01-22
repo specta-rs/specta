@@ -139,10 +139,10 @@ fn inline() {
         t: Generic<String>,
     }
 
-    assert_ts_export!(Generic::<()>, "export type Generic<T> = { t: T }");
+    assert_ts_export!(Generic::<()>, "export type Generic<T> = { t: T };");
     assert_ts_export!(
         Container,
-        "export type Container = ({ t: string }) & { g: Generic<string>; gi: { t: string } }"
+        "export type Container = { g: Generic<string>; gi: { t: string }; t: string };"
     );
 }
 

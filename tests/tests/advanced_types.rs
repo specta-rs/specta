@@ -142,7 +142,7 @@ struct BoxInline {
 fn test_inlining() {
     assert_ts!(
         A,
-        "({ b: number }) & ({ flattened: number }) & ({ generic_flattened: number }) & { a: B; b: { b: number } }"
+        "{ a: B; b: { b: number }; b: number; flattened: number; generic_flattened: number }"
     );
     assert_ts!(DoubleFlattened, "({ a: string }) & ({ a: string })");
 

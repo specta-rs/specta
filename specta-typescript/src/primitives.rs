@@ -243,27 +243,29 @@ fn enum_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, e: &EnumType
                     }
                 }
                 EnumRepr::Internal { tag } => {
-                    write!(s, "({{ {}: \"{}\" ", escape_key(tag), variant_name).expect("infallible");
+                    // TODO: Unconditionally wrapping in `(` kinda sucks.
+                    write!(s, "({{ {}: \"{}\"", escape_key(tag), variant_name).expect("infallible");
 
                     match variant.fields() {
                         Fields::Unit => {
                             s.push_str(" }");
                         },
-                        Fields::Unnamed(f) => {
-                            let mut fields = f.fields().into_iter().filter(|f| f.ty().is_some());
+                        // Fields::Unnamed(f) => {
+                        //     let mut fields = f.fields().into_iter().filter(|f| f.ty().is_some());
 
-                            // if fields.len
+                        //     // if fields.len
 
-                            // TODO: Having no fields are skipping is valid
-                            // TODO: Having more than 1 field is invalid
+                        //     // TODO: Having no fields are skipping is valid
+                        //     // TODO: Having more than 1 field is invalid
 
-                            // TODO: Check if the field's type is object-like and can be merged.
+                        //     // TODO: Check if the field's type is object-like and can be merged.
 
-                            todo!();
-                        }
+                        //     todo!();
+                        // }
                         f => {
-                            s.push_str(" } & ");
-                            fields_dt(&mut s, ts, types, variant_name, f, location)?;
+                            s.push_str("; ");
+                            flattened_fields_dt(&mut s, ts, types, variant_name, f, location)?;
+                            s.push_str(" }");
                         }
                     }
                     s.push_str(")");
@@ -341,10 +343,6 @@ fn fields_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, name: &Cow
                 let mut location = location.clone();
                 location.push(key.clone());
 
-                if f.flatten() {
-                    s.push_str("||");
-                }
-
                 field_dt(s, ts, types, Some(key), f, location)
             }, "; ")?;
             s.push_str(" }");
@@ -353,20 +351,74 @@ fn fields_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, name: &Cow
     Ok(())
 }
 
+// TODO: Remove this to avoid so much duplicate logic
+fn flattened_fields_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, name: &Cow<'static, str>, f: &Fields, location: Vec<Cow<'static, str>>) -> Result<(), Error> {
+    match f {
+        Fields::Unit =>  todo!(), // s.push_str("null"),
+        Fields::Unnamed(f) => {
+            todo!();
+        //     let mut fields = f.fields().into_iter().filter(|f| f.ty().is_some());
+
+        //     // A single field usually becomes `T`.
+        //     // but when `#[serde(skip)]` is used it should be `[T]`.
+        //     if fields.clone().count() == 1 && f.fields.len() == 1 {
+        //         return field_dt(s, ts, types, None, fields.next().expect("checked above"), location);
+        //     }
+
+        //     s.push_str("[");
+        //     iter_with_sep(s, fields.enumerate(), |s, (i, f)| {
+        //         let mut location = location.clone();
+        //         location.push(i.to_string().into());
+
+        //         field_dt(s, ts, types, None, f, location)
+        //     }, ", ")?;
+        //     s.push_str("]");
+        }
+        Fields::Named(f) => {
+            let fields = f.fields().into_iter().filter(|(_, f)| f.ty().is_some());
+            if fields.clone().next().is_none() /* is_empty */ {
+                if let Some(tag) = f.tag() {
+                    write!(s, "{{ {}: \"{name}\" }}", escape_key(tag)).expect("infallible");
+                } else {
+                    s.push_str("Record<string, never>");
+                }
+
+                return Ok(());
+            }
+
+            // s.push_str("{ ");
+            if let Some(tag) = &f.tag() {
+                write!(s, "{}: \"{name}\"; ", escape_key(tag)).expect("infallible");
+            }
+
+            iter_with_sep(s, fields, |s, (key, f)| {
+                let mut location = location.clone();
+                location.push(key.clone());
+
+                field_dt(s, ts, types, Some(key), f, location)
+            }, "; ")?;
+            // s.push_str(" }");
+        }
+    }
+    Ok(())
+}
+
+
 fn field_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, key: Option<&Cow<'static, str>>, f: &Field, location: Vec<Cow<'static, str>>) -> Result<(), Error> {
     let Some(ty) = f.ty() else {
         // These should be filtered out before getting here.
-        return unreachable!();
+        unreachable!()
     };
 
     // TODO
     // field.deprecated(),
     // field.docs(),
 
-    // TODO
-    // if f.inline() {
-    //     todo!("inline field");
-    // }
+    let ty = if f.inline() {
+        specta::datatype::inline_dt(types, ty.clone())
+    } else {
+        ty.clone()
+    };
 
     if !f.flatten() {
         if let Some(key) = key {
@@ -377,16 +429,39 @@ fn field_dt(s: &mut String, ts: &Typescript, types: &TypeCollection, key: Option
             }
             s.push_str(": ");
         }
+
+        datatype(s, ts, types, &ty, location)?;
     } else {
         // TODO: We need to validate the inner type can be flattened safely???
+
+        match ty {
+            DataType::Any => todo!(),
+            DataType::Unknown => todo!(),
+            DataType::Primitive(primitive_type) => todo!(),
+            DataType::Literal(literal_type) => todo!(),
+            DataType::List(list) => todo!(),
+            DataType::Map(map) => todo!(),
+            DataType::Nullable(data_type) => todo!(),
+            DataType::Struct(st) => {
+                // location.push(st.name().clone()); // TODO
+                flattened_fields_dt(s, ts, types, st.name(), &st.fields(), location)?
+            }
+
+            // flattened_fields_dt(s, ts, types, &ty, location)?,
+            DataType::Enum(enum_type) => todo!(),
+            DataType::Tuple(tuple_type) => todo!(),
+            DataType::Reference(reference) => todo!(),
+            DataType::Generic(generic_type) => todo!(),
+        };
     }
 
-    datatype(s, ts, types, &ty, location)?;
+    // TODO: When in flattened mode this will still yield object brackets which we don't want.
 
+    // TODO: This is not always correct but is it ever correct?
     // If we can't use `?` (Eg. in a tuple) we manually join it.
-    if key.is_none() && f.optional() {
-        s.push_str(" | undefined");
-    }
+    // if key.is_none() && f.optional() {
+    //     s.push_str(" | undefined");
+    // }
 
     Ok(())
 }
