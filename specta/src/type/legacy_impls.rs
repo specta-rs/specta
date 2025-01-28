@@ -587,3 +587,9 @@ const _: () = {
         pub delta: glam::Vec2,
     }
 };
+
+#[cfg(feature = "camino")]
+impl_as!(
+    camino::Utf8Path as String
+    camino::Utf8PathBuf as String
+);
