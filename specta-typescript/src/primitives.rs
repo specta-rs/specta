@@ -11,12 +11,12 @@ use std::{
 use specta::{
     datatype::{
         reference::Reference, DataType, EnumRepr, EnumType, Field, Fields, List, LiteralType, Map,
-        NamedDataType, PrimitiveType, StructType, TupleType,
+        NamedDataType, PrimitiveType, TupleType,
     },
     TypeCollection,
 };
 
-use crate::{reserved_names::*, BigIntExportBehavior, CommentFormatterArgs, Error, Typescript};
+use crate::{reserved_names::*, BigIntExportBehavior, Error, Typescript};
 
 /// Generate an `export Type = ...` Typescript string for a specific [`DataType`].
 ///
@@ -52,15 +52,16 @@ pub fn export(
         .collect::<String>();
 
     // TODO: Collecting directly into `result` insetad of allocating `s`?
-    let mut result = ts
-        .comment_exporter
-        .map(|v| {
-            v(CommentFormatterArgs {
-                docs: dt.docs(),
-                deprecated: dt.deprecated(),
-            })
-        })
-        .unwrap_or_default();
+    let mut result = "".to_string(); // TODO:
+                                     //     ts
+                                     //     .comment_exporter
+                                     //     .map(|v| {
+                                     //         v(CommentFormatterArgs {
+                                     //             docs: dt.docs(),
+                                     //             deprecated: dt.deprecated(),
+                                     //         })
+                                     //     })
+                                     //     .unwrap_or_default();
     result.push_str(&s);
 
     datatype(
@@ -229,6 +230,8 @@ fn map_dt(
     location: Vec<Cow<'static, str>>,
     flattening: bool,
 ) -> Result<(), Error> {
+    // assert!(flattening, "todo: map flattening");
+
     // We use `{ [key in K]: V }` instead of `Record<K, V>` to avoid issues with circular references.
     // Wrapped in Partial<> because otherwise TypeScript would enforce exhaustiveness.
     s.push_str("Partial<{ [key in ");
@@ -345,7 +348,7 @@ fn enum_dt(
                         Fields::Unit => {},
                         f => {
                             write!(s, "; {}: ", escape_key(content)).expect("infallible");
-                            fields_dt(&mut s, ts, types, variant_name, f, location ,flattening)?;
+                            fields_dt(&mut s, ts, types, variant_name, f, location, flattening)?;
                         }
                     }
 
@@ -383,11 +386,13 @@ fn fields_dt(
     location: Vec<Cow<'static, str>>,
     flattening: bool,
 ) -> Result<(), Error> {
-    assert!(!flattening, "todo: support for flattening enums"); // TODO
-
     match f {
-        Fields::Unit => s.push_str("null"),
+        Fields::Unit => {
+            assert!(!flattening, "todo: support for flattening enums"); // TODO
+            s.push_str("null")
+        }
         Fields::Unnamed(f) => {
+            assert!(!flattening, "todo: support for flattening enums"); // TODO
             let mut fields = f.fields().into_iter().filter(|f| f.ty().is_some());
 
             // A single field usually becomes `T`.
@@ -423,7 +428,11 @@ fn fields_dt(
             if fields.clone().next().is_none()
             /* is_empty */
             {
+                assert!(!flattening, "todo: support for flattening enums"); // TODO
+
                 if let Some(tag) = f.tag() {
+                    if !flattening {}
+
                     write!(s, "{{ {}: \"{name}\" }}", escape_key(tag)).expect("infallible");
                 } else {
                     s.push_str("Record<string, never>");
@@ -432,7 +441,9 @@ fn fields_dt(
                 return Ok(());
             }
 
-            s.push_str("{ ");
+            if !flattening {
+                s.push_str("{ ");
+            }
             if let Some(tag) = &f.tag() {
                 write!(s, "{}: \"{name}\"; ", escape_key(tag)).expect("infallible");
             }
@@ -448,7 +459,9 @@ fn fields_dt(
                 },
                 "; ",
             )?;
-            s.push_str(" }");
+            if !flattening {
+                s.push_str(" }");
+            }
         }
     }
     Ok(())

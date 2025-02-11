@@ -58,6 +58,4 @@ mod typescript;
 pub use error::Error;
 #[doc(hidden)]
 pub use legacy::*;
-pub use typescript::{
-    BigIntExportBehavior, CommentFormatterArgs, CommentFormatterFn, FormatterFn, Typescript,
-};
+pub use typescript::{BigIntExportBehavior, Typescript};

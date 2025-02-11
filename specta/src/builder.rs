@@ -23,6 +23,16 @@ impl List {
             unique: false,
         }
     }
+
+    #[doc(hidden)] // TODO: Expose
+                   // TODO: Should `len` be a `Range` with an upper and lower bound?
+    pub fn new_with_len(ty: DataType, len: usize) -> Self {
+        Self {
+            ty: Box::new(ty),
+            length: Some(len),
+            unique: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -65,6 +75,7 @@ impl StructBuilder<NamedFields> {
         self
     }
 
+    // TODO: Should this take `FieldBuilder` or `Field`? cause it's inconstent with the rest of this module.
     pub fn field_mut(&mut self, name: impl Into<Cow<'static, str>>, field: FieldBuilder) {
         self.fields.fields.push((name.into(), field.0));
     }

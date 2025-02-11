@@ -7,7 +7,7 @@
 
 use std::borrow::Cow;
 
-use specta_typescript::{BigIntExportBehavior, CommentFormatterFn, FormatterFn};
+use specta_typescript::BigIntExportBehavior;
 
 // TODO: Ensure this is up to our `Typescript` exporters standards.
 
@@ -41,30 +41,30 @@ impl JSDoc {
         self
     }
 
-    /// Configure a function which is responsible for styling the comments to be exported
-    ///
-    /// Implementations:
-    ///  - [`js_doc`](specta_typescript::lang::ts::js_doc)
-    ///
-    /// Not calling this method will default to the [`js_doc`](specta_typescript::lang::ts::js_doc) exporter.
-    /// `None` will disable comment exporting.
-    /// `Some(exporter)` will enable comment exporting using the provided exporter.
-    pub fn comment_style(mut self, exporter: CommentFormatterFn) -> Self {
-        self.0.comment_exporter = Some(exporter);
-        self
-    }
+    // /// Configure a function which is responsible for styling the comments to be exported
+    // ///
+    // /// Implementations:
+    // ///  - [`js_doc`](specta_typescript::lang::ts::js_doc)
+    // ///
+    // /// Not calling this method will default to the [`js_doc`](specta_typescript::lang::ts::js_doc) exporter.
+    // /// `None` will disable comment exporting.
+    // /// `Some(exporter)` will enable comment exporting using the provided exporter.
+    // pub fn comment_style(mut self, exporter: CommentFormatterFn) -> Self {
+    //     self.0.comment_exporter = Some(exporter);
+    //     self
+    // }
 
-    /// Configure a function which is responsible for formatting the result file or files
-    ///
-    ///
-    /// Built-in implementations:
-    ///  - [`prettier`](specta_typescript:formatter:::prettier)
-    ///  - [`ESLint`](specta_typescript::formatter::eslint)
-    ///  - [`Biome`](specta_typescript::formatter::biome)e
-    pub fn formatter(mut self, formatter: FormatterFn) -> Self {
-        self.0.formatter = Some(formatter);
-        self
-    }
+    // /// Configure a function which is responsible for formatting the result file or files
+    // ///
+    // ///
+    // /// Built-in implementations:
+    // ///  - [`prettier`](specta_typescript:formatter:::prettier)
+    // ///  - [`ESLint`](specta_typescript::formatter::eslint)
+    // ///  - [`Biome`](specta_typescript::formatter::biome)e
+    // pub fn formatter(mut self, formatter: FormatterFn) -> Self {
+    //     self.0.formatter = Some(formatter);
+    //     self
+    // }
 }
 
 // impl Language for JSDoc {

@@ -5,7 +5,7 @@
     html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
 )]
 
-use std::{borrow::Cow, path::Path};
+use std::{borrow::Cow, iter, path::Path};
 
 use inflector::Inflector;
 use specta::{
@@ -21,6 +21,9 @@ type Error = String; // TODO: Proper error type
 pub struct Rust {
     any_value: Option<Cow<'static, str>>,
     extras: String,
+    custom_struct_attributes: Option<Cow<'static, str>>,
+    custom_enum_attributes: Option<Cow<'static, str>>,
+    custom_field_attributes: Option<Cow<'static, str>>,
 }
 
 impl Rust {
@@ -32,6 +35,36 @@ impl Rust {
     // TODO: Can we just avoid this being a thing?
     pub fn with_any(mut self, value: impl Into<Cow<'static, str>>) -> Self {
         self.any_value = Some(value.into());
+        self
+    }
+
+    #[doc(hidden)]
+    // TODO: Remove this in favor of a better system. Should the `DataType` structs hold the raw attribute so we can emit the same ones?
+    pub fn custom_container_attributes(mut self, value: impl Into<Cow<'static, str>>) -> Self {
+        let value = value.into();
+        self.custom_struct_attributes = Some(value.clone());
+        self.custom_enum_attributes = Some(value);
+        self
+    }
+
+    #[doc(hidden)]
+    // TODO: Remove this in favor of a better system. Should the `DataType` structs hold the raw attribute so we can emit the same ones?
+    pub fn custom_struct_attributes(mut self, value: impl Into<Cow<'static, str>>) -> Self {
+        self.custom_struct_attributes = Some(value.into());
+        self
+    }
+
+    #[doc(hidden)]
+    // TODO: Remove this in favor of a better system. Should the `DataType` structs hold the raw attribute so we can emit the same ones?
+    pub fn custom_enum_attributes(mut self, value: impl Into<Cow<'static, str>>) -> Self {
+        self.custom_enum_attributes = Some(value.into());
+        self
+    }
+
+    #[doc(hidden)]
+    // TODO: Remove this in favor of a better system. Should the `DataType` structs hold the raw attribute so we can emit the same ones?
+    pub fn custom_field_attributes(mut self, value: impl Into<Cow<'static, str>>) -> Self {
+        self.custom_field_attributes = Some(value.into());
         self
     }
 
@@ -104,7 +137,19 @@ fn datatype(r: &Rust, t: &DataType, types: &TypeCollection) -> Result<String, Er
             datatype(r, &t.key_ty(), types)?,
             datatype(r, &t.value_ty(), types)?
         ),
-        DataType::List(t) => format!("Vec<{}>", datatype(r, t.ty(), types)?),
+        DataType::List(t) => {
+            if let Some(len) = t.length() {
+                format!(
+                    "({},)",
+                    iter::repeat(datatype(r, t.ty(), types)?)
+                        .take(len)
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
+            } else {
+                format!("Vec<{}>", datatype(r, t.ty(), types)?)
+            }
+        }
         DataType::Tuple(tuple) => match &tuple.elements()[..] {
             [] => "()".to_string(),
             [ty] => datatype(r, ty, types)?,
@@ -132,7 +177,14 @@ fn datatype(r: &Rust, t: &DataType, types: &TypeCollection) -> Result<String, Er
                         return Err("generics can't be used on a unit struct".into());
                     }
 
-                    format!("{docs}{STANDARD_DERIVE}\npub struct {};", s.name())
+                    format!(
+                        "{docs}{STANDARD_DERIVE}{}\npub struct {};",
+                        r.custom_struct_attributes
+                            .clone()
+                            .map(|v| format!("\n{v}"))
+                            .unwrap_or("".into()),
+                        s.name()
+                    )
                 }
                 Fields::Named(fields) => {
                     assert!(s.generics().len() == 0, "missing support for generics"); // TODO
@@ -140,7 +192,14 @@ fn datatype(r: &Rust, t: &DataType, types: &TypeCollection) -> Result<String, Er
 
                     // TODO: Error if any of the generics are not used or add `PhantomData` field?
 
-                    let mut s = format!("{docs}{STANDARD_DERIVE}\npub struct {} {{", s.name());
+                    let mut s = format!(
+                        "{docs}{STANDARD_DERIVE}{}\npub struct {} {{",
+                        r.custom_struct_attributes
+                            .clone()
+                            .map(|v| format!("\n{v}"))
+                            .unwrap_or("".into()),
+                        s.name()
+                    );
 
                     for (k, field) in fields.fields() {
                         // TODO: Documentation, deprecated, etc.
@@ -152,7 +211,7 @@ fn datatype(r: &Rust, t: &DataType, types: &TypeCollection) -> Result<String, Er
 
                         let mut key = k.to_snake_case();
                         // TODO: Handle any reserved keywords
-                        if key == "type" {
+                        if key == "type" || key == "where" {
                             key = format!("r#{key}");
                         }
                         if &*key != k {
@@ -160,7 +219,14 @@ fn datatype(r: &Rust, t: &DataType, types: &TypeCollection) -> Result<String, Er
                         }
 
                         if field.optional() || matches!(field.ty(), Some(DataType::Nullable(_))) {
-                            s.push_str("\n    #[serde(default, skip_serializing_if = \"Option::is_none\")]");
+                            s.push_str(
+                                "\n    #[serde(default, skip_serializing_if = \"Option::is_none\"",
+                            );
+                            if let Some(attr) = &r.custom_field_attributes {
+                                s.push_str(&", ");
+                                s.push_str(&attr);
+                            }
+                            s.push_str(")]");
                         }
 
                         // TODO: Don't `unwrap` here
@@ -196,11 +262,54 @@ fn datatype(r: &Rust, t: &DataType, types: &TypeCollection) -> Result<String, Er
                 }
             };
 
-            let mut s = format!("{docs}{STANDARD_DERIVE}\n{repr}pub enum {} {{ \n", e.name());
+            // TODO
+            // let serde_repr = e.variants().iter().all(|(_, v)| {
+            //     if let Fields::Unnamed(fields) = v.fields() {
+            //         use LiteralType::*;
+            //         return fields.fields.len() == 1
+            //             && matches!(
+            //                 fields.fields[0].ty(),
+            //                 Some(DataType::Literal(
+            //                     i8(..)
+            //                         | i16(..)
+            //                         | i32(..)
+            //                         | u8(..)
+            //                         | u16(..)
+            //                         | u32(..)
+            //                         | f32(..)
+            //                         | f64(..)
+            //                 ))
+            //             );
+            //     };
+
+            //     false
+            // });
+
+            // if serde_repr {
+            //     todo!();
+            // }
+
+            let mut s = format!(
+                "{docs}{STANDARD_DERIVE}{}\n{repr}pub enum {} {{ \n",
+                r.custom_enum_attributes
+                    .clone()
+                    .map(|v| format!("\n{v}"))
+                    .unwrap_or("".into()),
+                e.name()
+            );
             for (name, variant) in e.variants().iter() {
                 let mut docs2 = variant.docs().replace("\n", "\n\t/// ");
                 if !docs2.is_empty() {
                     docs2 = format!("\t/// {}\n", docs2);
+                }
+
+                let mut key = name.to_snake_case();
+                // TODO: Handle any reserved keywords
+                if key == "type" || key == "where" {
+                    key = format!("r#{key}");
+                }
+                if &*key != name {
+                    s.push_str(&format!("    #[serde(rename = \"{name}\")]\n"));
                 }
 
                 let variant = match variant.fields() {

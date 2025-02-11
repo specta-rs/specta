@@ -351,7 +351,7 @@ pub(crate) fn datatype_inner(
         DataType::Struct(item) => struct_datatype(
             ctx.with(
                 item.sid()
-                    .and_then(|sid| types.get(*sid))
+                    .and_then(|sid| types.get(sid))
                     .and_then(|v| v.ext())
                     .map(|v| PathItem::TypeExtended(item.name().clone(), *v.impl_location()))
                     .unwrap_or_else(|| PathItem::Type(item.name().clone())),
