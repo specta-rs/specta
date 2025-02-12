@@ -70,7 +70,7 @@ pub fn export(
         types,
         &dt.inner,
         vec![dt.name().clone()],
-        false,
+        State { flattening: false },
     )?;
     result.push_str(";");
 
@@ -83,7 +83,7 @@ pub fn export(
 ///
 pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<String, Error> {
     let mut s = String::new();
-    datatype(&mut s, ts, types, dt, vec![], false)?;
+    datatype(&mut s, ts, types, dt, vec![], State { flattening: false })?;
     Ok(s)
 }
 
@@ -94,13 +94,28 @@ pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<
 //     todo!();
 // }
 
+#[derive(Clone, Copy)]
+struct State {
+    flattening: bool,
+    //     // TODO: Bring this onto it
+    //     // s: &mut String,
+    //     // ts: &Typescript,
+    //     // types: &TypeCollection,
+    //     // /// TODO
+    //     // location: Vec<Cow<'static, str>>,
+    //     // /// TODO
+    //     // flattening: bool,
+    // /// TODO // TODO: Is this different from flattening?
+    // parent_is_object: bool,
+}
+
 fn datatype(
     s: &mut String,
     ts: &Typescript,
     types: &TypeCollection,
     dt: &DataType,
     mut location: Vec<Cow<'static, str>>,
-    flattening: bool,
+    state: State,
 ) -> Result<(), Error> {
     // TODO: Validating the variant from `dt` can be flattened
 
@@ -109,10 +124,10 @@ fn datatype(
         DataType::Unknown => s.push_str("unknown"),
         DataType::Primitive(p) => s.push_str(primitive_dt(&ts.bigint, p, location)?),
         DataType::Literal(l) => literal_dt(s, l),
-        DataType::List(l) => list_dt(s, ts, types, l, location, flattening)?,
-        DataType::Map(m) => map_dt(s, ts, types, m, location, flattening)?,
+        DataType::List(l) => list_dt(s, ts, types, l, location, state)?,
+        DataType::Map(m) => map_dt(s, ts, types, m, location, state)?,
         DataType::Nullable(t) => {
-            datatype(s, ts, types, &*t, location, flattening)?;
+            datatype(s, ts, types, &*t, location, state)?;
             let or_null = " | null";
             if !s.ends_with(or_null) {
                 s.push_str(or_null);
@@ -120,11 +135,11 @@ fn datatype(
         }
         DataType::Struct(st) => {
             location.push(st.name().clone());
-            fields_dt(s, ts, types, st.name(), &st.fields(), location, flattening)?
+            fields_dt(s, ts, types, st.name(), &st.fields(), location, state)?
         }
-        DataType::Enum(e) => enum_dt(s, ts, types, e, location, flattening)?,
-        DataType::Tuple(t) => tuple_dt(s, ts, types, t, location, flattening)?,
-        DataType::Reference(r) => reference_dt(s, ts, types, r, location, flattening)?,
+        DataType::Enum(e) => enum_dt(s, ts, types, e, location, state)?,
+        DataType::Tuple(t) => tuple_dt(s, ts, types, t, location, state)?,
+        DataType::Reference(r) => reference_dt(s, ts, types, r, location, state)?,
         DataType::Generic(g) => s.push_str(g.borrow()),
     };
 
@@ -183,12 +198,12 @@ fn list_dt(
     types: &TypeCollection,
     l: &List,
     location: Vec<Cow<'static, str>>,
-    flattening: bool,
+    state: State,
 ) -> Result<(), Error> {
     // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
 
     let mut result = String::new();
-    datatype(&mut result, ts, types, &l.ty(), location, flattening)?;
+    datatype(&mut result, ts, types, &l.ty(), location, state)?;
     let result = if (result.contains(' ') && !result.ends_with('}'))
         // This is to do with maintaining order of operations.
         // Eg `{} | {}` must be wrapped in parens like `({} | {})[]` but `{}` doesn't cause `{}[]` is valid
@@ -228,16 +243,16 @@ fn map_dt(
     types: &TypeCollection,
     m: &Map,
     location: Vec<Cow<'static, str>>,
-    flattening: bool,
+    state: State,
 ) -> Result<(), Error> {
     // assert!(flattening, "todo: map flattening");
 
     // We use `{ [key in K]: V }` instead of `Record<K, V>` to avoid issues with circular references.
     // Wrapped in Partial<> because otherwise TypeScript would enforce exhaustiveness.
     s.push_str("Partial<{ [key in ");
-    datatype(s, ts, types, m.key_ty(), location.clone(), flattening)?;
+    datatype(s, ts, types, m.key_ty(), location.clone(), state)?;
     s.push_str("]: ");
-    datatype(s, ts, types, m.value_ty(), location, flattening)?;
+    datatype(s, ts, types, m.value_ty(), location, state)?;
     s.push_str(" }>");
     Ok(())
 }
@@ -248,9 +263,9 @@ fn enum_dt(
     types: &TypeCollection,
     e: &EnumType,
     mut location: Vec<Cow<'static, str>>,
-    flattening: bool,
+    state: State,
 ) -> Result<(), Error> {
-    assert!(!flattening, "todo: support for flattening enums"); // TODO
+    assert!(!state.flattening, "todo: support for flattening enums"); // TODO
 
     location.push(e.name().clone());
 
@@ -287,7 +302,7 @@ fn enum_dt(
 
             match &e.repr() {
                 EnumRepr::Untagged => {
-                    fields_dt(&mut s, ts, types, variant_name, variant.fields(), location, flattening)?;
+                    fields_dt(&mut s, ts, types, variant_name, variant.fields(), location, state)?;
                 },
                 EnumRepr::External => match variant.fields() {
                     Fields::Unit => {
@@ -298,7 +313,9 @@ fn enum_dt(
                     Fields::Unnamed(n) if n.fields().into_iter().filter(|f| f.ty().is_some()).next().is_none() /* is_empty */ => {
                         // We detect `#[specta(skip)]` by checking if the unfiltered fields are also empty.
                         if n.fields().is_empty() {
-                            s.push_str("[]");
+                            s.push_str("{ ");
+                            s.push_str(&escape_key(variant_name));
+                            s.push_str(": [] }");
                         } else {
                             s.push_str("\"");
                             s.push_str(variant_name);
@@ -309,7 +326,7 @@ fn enum_dt(
                         s.push_str("{ ");
                         s.push_str(&escape_key(variant_name));
                         s.push_str(": ");
-                        fields_dt(&mut s, ts, types, variant_name, variant.fields(), location, flattening)?;
+                        fields_dt(&mut s, ts, types, variant_name, variant.fields(), location, state)?;
                         s.push_str(" }");
                     }
                 }
@@ -319,27 +336,62 @@ fn enum_dt(
 
                     match variant.fields() {
                         Fields::Unit => {
-                            s.push_str(" }");
+                             s.push_str(" })");
                         },
-                        // Fields::Unnamed(f) => {
-                        //     let mut fields = f.fields().into_iter().filter(|f| f.ty().is_some());
+                        // Fields::Unnamed(f) if f.fields.iter().filter(|f| f.ty().is_some()).count() == 1 => {
+                        //     // let mut fields = f.fields().into_iter().filter(|f| f.ty().is_some());
 
-                        //     // if fields.len
 
-                        //     // TODO: Having no fields are skipping is valid
-                        //     // TODO: Having more than 1 field is invalid
 
-                        //     // TODO: Check if the field's type is object-like and can be merged.
 
-                        //     todo!();
+                        //      s.push_str("______"); // TODO
+
+                        // //     // if fields.len
+
+                        // //     // TODO: Having no fields are skipping is valid
+                        // //     // TODO: Having more than 1 field is invalid
+
+                        // //     // TODO: Check if the field's type is object-like and can be merged.
+
+                        //     // todo!();
                         // }
                         f => {
-                            s.push_str("; ");
-                            flattened_fields_dt(&mut s, ts, types, variant_name, f, location, flattening)?;
-                            s.push_str(" }");
+                            // TODO: Cleanup and explain this
+                            let mut skip_join = false;
+                            if let Fields::Unnamed(f) = &f {
+                                let mut fields = f.fields.iter().filter(|f| f.ty().is_some());
+                                if let (Some(v), None) = (fields.next(), fields.next()) {
+                                    if let Some(DataType::Tuple(tuple)) = &v.ty() {
+                                        skip_join = tuple.elements().len() == 0;
+                                    }
+                                }
+                            }
+
+                            if skip_join {
+                                s.push_str(" })");
+                            } else {
+                                s.push_str(" } & ");
+
+                                // TODO: Can we be smart enough to omit the `{` and `}` if this is an object
+                                fields_dt(&mut s, ts, types, variant_name, f, location, state)?;
+                                s.push_str(")");
+                            }
+
+
+                            // match f {
+                            //     // Checked above
+                            //     Fields::Unit => unreachable!(),
+                            //     Fields::Unnamed(unnamed_fields) => unnamed_fields,
+                            //     Fields::Named(named_fields) => todo!(),
+                            // }
+
+                            // println!("{:?}", f); // TODO: If object we can join in fields like this, else `} & ...`
+                            // flattened_fields_dt(&mut s, ts, types, variant_name, f, location, false)?; // TODO: Fix `flattening`
+
+
                         }
                     }
-                    s.push_str(")");
+
                 }
                 EnumRepr::Adjacent { tag, content } => {
                     write!(s, "{{ {}: \"{}\"", escape_key(tag), variant_name).expect("infallible");
@@ -348,7 +400,7 @@ fn enum_dt(
                         Fields::Unit => {},
                         f => {
                             write!(s, "; {}: ", escape_key(content)).expect("infallible");
-                            fields_dt(&mut s, ts, types, variant_name, f, location, flattening)?;
+                            fields_dt(&mut s, ts, types, variant_name, f, location, state)?;
                         }
                     }
 
@@ -384,15 +436,15 @@ fn fields_dt(
     name: &Cow<'static, str>,
     f: &Fields,
     location: Vec<Cow<'static, str>>,
-    flattening: bool,
+    state: State,
 ) -> Result<(), Error> {
     match f {
         Fields::Unit => {
-            assert!(!flattening, "todo: support for flattening enums"); // TODO
+            assert!(!state.flattening, "todo: support for flattening enums"); // TODO
             s.push_str("null")
         }
         Fields::Unnamed(f) => {
-            assert!(!flattening, "todo: support for flattening enums"); // TODO
+            assert!(!state.flattening, "todo: support for flattening enums"); // TODO
             let mut fields = f.fields().into_iter().filter(|f| f.ty().is_some());
 
             // A single field usually becomes `T`.
@@ -405,7 +457,7 @@ fn fields_dt(
                     None,
                     fields.next().expect("checked above"),
                     location,
-                    flattening,
+                    state,
                 );
             }
 
@@ -417,7 +469,7 @@ fn fields_dt(
                     let mut location = location.clone();
                     location.push(i.to_string().into());
 
-                    field_dt(s, ts, types, None, f, location, flattening)
+                    field_dt(s, ts, types, None, f, location, state)
                 },
                 ", ",
             )?;
@@ -428,10 +480,10 @@ fn fields_dt(
             if fields.clone().next().is_none()
             /* is_empty */
             {
-                assert!(!flattening, "todo: support for flattening enums"); // TODO
+                assert!(!state.flattening, "todo: support for flattening enums"); // TODO
 
                 if let Some(tag) = f.tag() {
-                    if !flattening {}
+                    if !state.flattening {}
 
                     write!(s, "{{ {}: \"{name}\" }}", escape_key(tag)).expect("infallible");
                 } else {
@@ -441,7 +493,7 @@ fn fields_dt(
                 return Ok(());
             }
 
-            if !flattening {
+            if !state.flattening {
                 s.push_str("{ ");
             }
             if let Some(tag) = &f.tag() {
@@ -455,11 +507,11 @@ fn fields_dt(
                     let mut location = location.clone();
                     location.push(key.clone());
 
-                    field_dt(s, ts, types, Some(key), f, location, flattening)
+                    field_dt(s, ts, types, Some(key), f, location, state)
                 },
                 "; ",
             )?;
-            if !flattening {
+            if !state.flattening {
                 s.push_str(" }");
             }
         }
@@ -475,7 +527,7 @@ fn flattened_fields_dt(
     name: &Cow<'static, str>,
     f: &Fields,
     location: Vec<Cow<'static, str>>,
-    flattening: bool,
+    state: State,
 ) -> Result<(), Error> {
     match f {
         Fields::Unit => todo!(), // s.push_str("null"),
@@ -494,7 +546,7 @@ fn flattened_fields_dt(
                     None,
                     fields.next().expect("checked above"),
                     location,
-                    flattening,
+                    state,
                 );
             }
 
@@ -506,7 +558,7 @@ fn flattened_fields_dt(
                     let mut location = location.clone();
                     location.push(i.to_string().into());
 
-                    field_dt(s, ts, types, None, f, location, flattening)
+                    field_dt(s, ts, types, None, f, location, state)
                 },
                 ", ",
             )?;
@@ -538,7 +590,7 @@ fn flattened_fields_dt(
                     let mut location = location.clone();
                     location.push(key.clone());
 
-                    field_dt(s, ts, types, Some(key), f, location, flattening)
+                    field_dt(s, ts, types, Some(key), f, location, state)
                 },
                 "; ",
             )?;
@@ -555,7 +607,7 @@ fn field_dt(
     key: Option<&Cow<'static, str>>,
     f: &Field,
     location: Vec<Cow<'static, str>>,
-    flattening: bool,
+    state: State,
 ) -> Result<(), Error> {
     let Some(ty) = f.ty() else {
         // These should be filtered out before getting here.
@@ -607,7 +659,18 @@ fn field_dt(
         //     };
     }
 
-    datatype(s, ts, types, &ty, location, flattening || f.flatten())?;
+    // TODO: Only flatten when object is inline?
+
+    datatype(
+        s,
+        ts,
+        types,
+        &ty,
+        location,
+        State {
+            flattening: state.flattening || f.flatten(),
+        },
+    )?;
 
     // TODO: This is not always correct but is it ever correct?
     // If we can't use `?` (Eg. in a tuple) we manually join it.
@@ -624,7 +687,7 @@ fn tuple_dt(
     types: &TypeCollection,
     t: &TupleType,
     location: Vec<Cow<'static, str>>,
-    flattening: bool,
+    state: State,
 ) -> Result<(), Error> {
     match &t.elements()[..] {
         [] => s.push_str("null"),
@@ -637,7 +700,7 @@ fn tuple_dt(
                     let mut location = location.clone();
                     location.push(i.to_string().into());
 
-                    datatype(s, ts, types, &dt, location, flattening)
+                    datatype(s, ts, types, &dt, location, state)
                 },
                 ", ",
             )?;
@@ -653,7 +716,7 @@ fn reference_dt(
     types: &TypeCollection,
     r: &Reference,
     location: Vec<Cow<'static, str>>,
-    flattening: bool,
+    state: State,
 ) -> Result<(), Error> {
     let ndt = types
         .get(r.sid())
@@ -674,7 +737,7 @@ fn reference_dt(
             iter_with_sep(
                 s,
                 generics,
-                |s, dt| datatype(s, ts, types, &dt, location.clone(), flattening),
+                |s, dt| datatype(s, ts, types, &dt, location.clone(), state),
                 ", ",
             )?;
             s.push('>');
@@ -740,6 +803,15 @@ fn escape_key(name: &Cow<'static, str>) -> Cow<'static, str> {
     } else {
         name.clone()
     }
+}
+
+fn comment() {
+    // TODO: Different JSDoc modes
+
+    // TODO: Regular comments
+    // TODO: Deprecated
+
+    // TODO: When enabled: arguments, result types
 }
 
 /// Iterate with separate and error handling
