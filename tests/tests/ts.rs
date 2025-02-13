@@ -9,19 +9,22 @@ use std::{
 
 use serde::Serialize;
 use specta::Type;
-use specta_typescript::{BigIntExportBehavior, Error, ExportPath, NamedLocation, Typescript};
+use specta_typescript::{
+    legacy::{ExportPath, NamedLocation},
+    BigIntExportBehavior, Error, Typescript,
+};
 use specta_util::Any;
 
 macro_rules! assert_ts {
     (error; $t:ty, $e:expr) => {
         assert_eq!(
-            specta_typescript::inline::<$t>(&Default::default()),
+            specta_typescript::legacy::inline::<$t>(&Default::default()),
             Err($e.into())
         )
     };
     ($t:ty, $e:expr) => {
         assert_eq!(
-            specta_typescript::inline::<$t>(&Default::default()),
+            specta_typescript::legacy::inline::<$t>(&Default::default()),
             Ok($e.into())
         )
     };
@@ -30,7 +33,7 @@ macro_rules! assert_ts {
         let _: () = {
             fn assert_ty_eq<T: Type>(_t: T) {
                 assert_eq!(
-                    specta_typescript::inline::<T>(&Default::default()),
+                    specta_typescript::legacy::inline::<T>(&Default::default()),
                     Ok($e.into())
                 );
             }
@@ -43,13 +46,13 @@ pub(crate) use assert_ts;
 macro_rules! assert_ts_export {
     ($t:ty, $e:expr) => {
         assert_eq!(
-            specta_typescript::export::<$t>(&Default::default()),
+            specta_typescript::legacy::export::<$t>(&Default::default()),
             Ok($e.into())
         )
     };
     (error; $t:ty, $e:expr) => {
         assert_eq!(
-            specta_typescript::export::<$t>(&Default::default()),
+            specta_typescript::legacy::export::<$t>(&Default::default()),
             Err($e.into())
         )
     };
@@ -201,26 +204,26 @@ fn typescript_types() {
 
     // https://github.com/oscartbeaumont/specta/issues/77
     assert_eq!(
-        specta_typescript::inline::<std::time::SystemTime>(
+        specta_typescript::legacy::inline::<std::time::SystemTime>(
             &Typescript::new().bigint(BigIntExportBehavior::Number)
         ),
         Ok(r#"{ duration_since_epoch: number; duration_since_unix_epoch: number }"#.into())
     );
     assert_eq!(
-        specta_typescript::inline::<std::time::SystemTime>(
+        specta_typescript::legacy::inline::<std::time::SystemTime>(
             &Typescript::new().bigint(BigIntExportBehavior::String)
         ),
         Ok(r#"{ duration_since_epoch: string; duration_since_unix_epoch: number }"#.into())
     );
 
     assert_eq!(
-        specta_typescript::inline::<std::time::Duration>(
+        specta_typescript::legacy::inline::<std::time::Duration>(
             &Typescript::new().bigint(BigIntExportBehavior::Number)
         ),
         Ok(r#"{ secs: number; nanos: number }"#.into())
     );
     assert_eq!(
-        specta_typescript::inline::<std::time::Duration>(
+        specta_typescript::legacy::inline::<std::time::Duration>(
             &Typescript::new().bigint(BigIntExportBehavior::String)
         ),
         Ok(r#"{ secs: string; nanos: number }"#.into())

@@ -1,4 +1,4 @@
-use specta_typescript::inline_ref;
+use specta_typescript::legacy::inline_ref;
 use specta_util::selection;
 
 #[derive(Clone)]

@@ -1,5 +1,8 @@
 use specta::Type;
-use specta_typescript::{Error, ExportPath, NamedLocation, Typescript};
+use specta_typescript::{
+    legacy::{ExportPath, NamedLocation},
+    Error, Typescript,
+};
 
 mod astruct {
     use super::*;
@@ -38,35 +41,35 @@ mod aenum {
 #[test]
 fn test_ts_reserved_keyworks() {
     assert_eq!(
-        specta_typescript::export::<astruct::r#enum>(&Typescript::default()),
+        specta_typescript::legacy::export::<astruct::r#enum>(&Typescript::default()),
         Err(Error::ForbiddenName(
             NamedLocation::Type,
             #[cfg(not(windows))]
-            ExportPath::new_unsafe("tests/tests/reserved_keywords.rs:8:14"),
+            ExportPath::new_unsafe("tests/tests/reserved_keywords.rs:11:14"),
             #[cfg(windows)]
-            ExportPath::new_unsafe("tests\tests\reserved_keywords.rs:8:14"),
+            ExportPath::new_unsafe("tests\tests\reserved_keywords.rs:11:14"),
             "enum"
         ))
     );
     assert_eq!(
-        specta_typescript::export::<atuplestruct::r#enum>(&Typescript::default()),
+        specta_typescript::legacy::export::<atuplestruct::r#enum>(&Typescript::default()),
         Err(Error::ForbiddenName(
             NamedLocation::Type,
             #[cfg(not(windows))]
-            ExportPath::new_unsafe("tests/tests/reserved_keywords.rs:20:14"),
+            ExportPath::new_unsafe("tests/tests/reserved_keywords.rs:23:14"),
             #[cfg(windows)]
-            ExportPath::new_unsafe("tests\tests\reserved_keywords.rs:20:14"),
+            ExportPath::new_unsafe("tests\tests\reserved_keywords.rs:23:14"),
             "enum"
         ))
     );
     assert_eq!(
-        specta_typescript::export::<aenum::r#enum>(&Typescript::default()),
+        specta_typescript::legacy::export::<aenum::r#enum>(&Typescript::default()),
         Err(Error::ForbiddenName(
             NamedLocation::Type,
             #[cfg(not(windows))]
-            ExportPath::new_unsafe("tests/tests/reserved_keywords.rs:30:14"),
+            ExportPath::new_unsafe("tests/tests/reserved_keywords.rs:33:14"),
             #[cfg(windows)]
-            ExportPath::new_unsafe("tests\tests\reserved_keywords.rs:32:14"),
+            ExportPath::new_unsafe("tests\tests\reserved_keywords.rs:33:14"),
             "enum"
         ))
     );

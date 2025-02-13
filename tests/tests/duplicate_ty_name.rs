@@ -1,5 +1,5 @@
 use specta::Type;
-use specta_typescript::{export, Error};
+use specta_typescript::{legacy::export, Error};
 
 mod one {
     use super::*;

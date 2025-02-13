@@ -50,24 +50,11 @@
 
 mod error;
 mod js_doc;
-mod legacy;
+pub mod legacy;
 pub mod primitives;
 pub(crate) mod reserved_terms;
 mod typescript;
 
-pub use error::*; // TODO
+pub use error::Error;
 pub use js_doc::JSDoc;
-pub use legacy::*;
 pub use typescript::{BigIntExportBehavior, Typescript};
-
-// mod error;
-// mod js_doc;
-// mod legacy;
-// pub mod primitives;
-// pub(crate) mod reserved_names;
-// mod typescript;
-
-// pub use error::Error;
-// #[doc(hidden)]
-// pub use legacy::*;
-// pub use typescript::{BigIntExportBehavior, Typescript};

@@ -94,9 +94,9 @@ fn main() {
 
     // println!("{:#?}", <[String; 5] as Type>::definition(&mut TypeCollection::default()));
     // println!("{:#?}", datatype::inline::<[String; 5]>(&mut TypeCollection::default()));
-    // println!("{:?}", specta_typescript::inline::<[String; 5]>(&Default::default()));
+    // println!("{:?}", specta_typescript::legacy::inline::<[String; 5]>(&Default::default()));
 
-    // println!("{:?}", specta_typescript::inline::<A>(&Default::default()));
+    // println!("{:?}", specta_typescript::legacy::inline::<A>(&Default::default()));
     // println!("{:?}", specta_typescript::export::<A>(&Default::default()));
 
     let mut types = TypeCollection::default()
@@ -117,7 +117,7 @@ fn main() {
     //     println!("{:?}", specta_typescript::datatype(&Typescript::default(), &FunctionResultVariant::Value(dt), &types));
 
     //     // let dt = specta::datatype::reference::inline::<TypeOne>(&mut types, &[]);
-    //     println!("{:?}\n\n", specta_typescript::inline::<TypeOne>(&Default::default()));
+    //     println!("{:?}\n\n", specta_typescript::legacy::inline::<TypeOne>(&Default::default()));
     // }
 
     Typescript::default()

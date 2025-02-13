@@ -5,6 +5,24 @@ use std::{borrow::Cow, fmt};
 use specta::{internal::detect_duplicate_type_names, ImplLocation};
 use specta_serde::validate_dt;
 
+/// Describes where an error occurred.
+#[derive(thiserror::Error, Debug, PartialEq)]
+pub enum NamedLocation {
+    Type,
+    Field,
+    Variant,
+}
+
+impl fmt::Display for NamedLocation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Type => write!(f, "type"),
+            Self::Field => write!(f, "field"),
+            Self::Variant => write!(f, "variant"),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) enum PathItem {
     Type(Cow<'static, str>),
@@ -89,12 +107,10 @@ impl fmt::Display for ExportPath {
     }
 }
 
-use std::path::Path;
-
 use specta::TypeCollection;
 
 use crate::reserved_terms::RESERVED_TYPE_NAMES;
-use crate::{BigIntExportBehavior, Error, NamedLocation, Typescript};
+use crate::{BigIntExportBehavior, Error, Typescript};
 use std::fmt::Write;
 
 use specta::datatype::{

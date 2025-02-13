@@ -5,25 +5,9 @@ use thiserror::Error;
 
 use specta::ImplLocation;
 
-use super::ExportPath;
+use crate::legacy::NamedLocation;
 
-/// Describes where an error occurred.
-#[derive(Error, Debug, PartialEq)]
-pub enum NamedLocation {
-    Type,
-    Field,
-    Variant,
-}
-
-impl fmt::Display for NamedLocation {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Type => write!(f, "type"),
-            Self::Field => write!(f, "field"),
-            Self::Variant => write!(f, "variant"),
-        }
-    }
-}
+use super::legacy::ExportPath;
 
 /// The error type for the TypeScript exporter.
 #[derive(Error, Debug)]
