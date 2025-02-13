@@ -177,6 +177,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             // TODO: We should make this a standalone function but that caused issues resolving lifetimes.
             #[automatically_derived]
             impl #bounds #ident #type_args #where_bound {
+                #[doc(hidden)] // Don't want this showing up in users LSP
                 fn ___specta_definition___(types: &mut #crate_ref::TypeCollection) -> #crate_ref::datatype::DataType {
                     #inlines
                 }
