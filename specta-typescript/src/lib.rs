@@ -6,10 +6,13 @@
 )]
 
 mod error;
-pub mod js_doc;
+pub mod js_doc; // TODO
 mod legacy;
+pub mod primitives;
 pub(crate) mod reserved_terms;
+mod typescript;
 
-pub use error::*;
-pub use js_doc::*;
+pub use error::*; // TODO
+pub use js_doc::*; // TODO
 pub use legacy::*;
+pub use typescript::{BigIntExportBehavior, Typescript};

@@ -9,7 +9,7 @@ use std::{
 
 use serde::Serialize;
 use specta::Type;
-use specta_typescript::{BigIntExportBehavior, ExportError, ExportPath, NamedLocation, Typescript};
+use specta_typescript::{BigIntExportBehavior, Error, ExportPath, NamedLocation, Typescript};
 use specta_util::Any;
 
 macro_rules! assert_ts {

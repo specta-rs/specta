@@ -1,5 +1,5 @@
 use specta::Type;
-use specta_typescript::{export, ExportError};
+use specta_typescript::{export, Error};
 
 mod one {
     use super::*;
@@ -35,13 +35,13 @@ fn test_duplicate_ty_name() {
     use specta::internal::construct::impl_location;
 
     #[cfg(not(target_os = "windows"))]
-    let err = Err(ExportError::DuplicateTypeName(
+    let err = Err(Error::DuplicateTypeName(
         "One".into(),
         impl_location("tests/tests/duplicate_ty_name.rs:7:14"),
         impl_location("tests/tests/duplicate_ty_name.rs:17:14"),
     ));
     #[cfg(target_os = "windows")]
-    let err = Err(ExportError::DuplicateTypeName(
+    let err = Err(Error::DuplicateTypeName(
         "One".into(),
         impl_location(r#"tests\tests\duplicate_ty_name.rs:7:14"#),
         impl_location(r#"tests\tests\duplicate_ty_name.rs:17:14"#),
