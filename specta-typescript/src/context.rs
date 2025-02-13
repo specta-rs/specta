@@ -1,3 +1,5 @@
+// TODO: Drop this stuff
+
 use std::{borrow::Cow, fmt};
 
 use specta::ImplLocation;

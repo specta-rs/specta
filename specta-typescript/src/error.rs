@@ -43,7 +43,8 @@ pub enum ExportError {
     InvalidTagging(ExportPath),
     #[error("Attempted to export '{0}' with internal tagging but the variant is a tuple struct.")]
     InvalidTaggedVariantContainingTupleStruct(ExportPath),
-    #[error("Unable to export type named '{0}' from locations '{:?}' '{:?}'", .1.as_str(), .2.as_str())]
+    #[error("Unable to export type named '{0}' from locations")]
+    // TODO: '{:?}' '{:?}'", .1.as_str(), .2.as_str())
     DuplicateTypeName(Cow<'static, str>, ImplLocation, ImplLocation),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),

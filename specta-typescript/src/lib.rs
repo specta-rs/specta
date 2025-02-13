@@ -8,10 +8,8 @@
 use std::borrow::Cow;
 use std::fmt::Write;
 
-pub mod comments;
 mod context;
 mod error;
-pub mod formatter;
 pub mod js_doc;
 mod reserved_terms;
 mod typescript;
@@ -126,11 +124,7 @@ fn inner_comments(
         return other;
     }
 
-    let comments = ctx
-        .cfg
-        .comment_exporter
-        .map(|v| v(CommentFormatterArgs { docs, deprecated }))
-        .unwrap_or_default();
+    let comments = crate::js_doc::js_doc_builder(docs, deprecated).build();
 
     let prefix = match start_with_newline && !comments.is_empty() {
         true => "\n",
