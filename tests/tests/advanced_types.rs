@@ -40,7 +40,10 @@ fn test_type_aliases() {
 
     assert_ts!(MapA<u32>, "Partial<{ [key in string]: number }>");
     assert_ts!(MapB<u32>, "Partial<{ [key in number]: string }>");
-    assert_ts!(MapC<u32>, "Partial<{ [key in string]: Struct<number> }>");
+    assert_ts!(
+        MapC<u32>,
+        "Partial<{ [key in string]: { field: Demo<number, boolean> } }>"
+    );
 
     assert_ts!(Struct<u32>, "{ field: Demo<number, boolean> }");
 }
@@ -139,7 +142,7 @@ struct BoxInline {
 fn test_inlining() {
     assert_ts!(
         A,
-        "{ a: B; b: { b: number }; b: number; flattened: number; generic_flattened: number }"
+        "({ b: number }) & ({ flattened: number }) & ({ generic_flattened: number }) & { a: B; b: { b: number } }"
     );
     assert_ts!(DoubleFlattened, "({ a: string }) & ({ a: string })");
 

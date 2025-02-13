@@ -19,11 +19,11 @@
 
 // #[test]
 // fn type_collection_export() {
-//     let mut types = TypeCollection::default();
+//     let mut type_map = TypeCollection::default();
 //     TypeCollection::default()
 //         .register::<A>()
-//         .collect(&mut types);
-//     assert_eq!(types.len(), 2);
+//         .collect(&mut type_map);
+//     assert_eq!(type_map.len(), 2);
 // }
 
 // #[test]
@@ -33,13 +33,13 @@
 //     let mut b = TypeCollection::default();
 //     b.register::<C>();
 
-//     let mut types = TypeCollection::default();
+//     let mut type_map = TypeCollection::default();
 //     TypeCollection::default()
 //         .register::<D>()
 //         .extend(a)
 //         .extend(b)
-//         .collect(&mut types);
-//     assert_eq!(types.len(), 4);
+//         .collect(&mut type_map);
+//     assert_eq!(type_map.len(), 4);
 
 //     // Check it compile with any valid arg
 //     TypeCollection::default()
@@ -50,12 +50,12 @@
 
 // #[test]
 // fn type_collection_duplicate_register_ty() {
-//     let mut types = TypeCollection::default();
+//     let mut type_map = TypeCollection::default();
 //     TypeCollection::default()
 //         .register::<C>()
 //         .register::<C>()
-//         .collect(&mut types);
-//     assert_eq!(types.len(), 1);
+//         .collect(&mut type_map);
+//     assert_eq!(type_map.len(), 1);
 // }
 
 // // TODO: Bring this back

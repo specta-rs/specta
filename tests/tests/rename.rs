@@ -41,20 +41,17 @@ pub enum Enum3 {
 
 #[test]
 fn rename() {
-    assert_ts!(Struct, "{ t: \"StructNew\"; a: string }");
+    assert_ts!(Struct, "{ a: string; t: \"StructNew\" }");
     assert_ts_export!(
         Struct,
-        "export type StructNew = { t: \"StructNew\"; a: string };"
+        "export type StructNew = { a: string; t: \"StructNew\" }"
     );
 
     assert_ts!(Struct2, "{ b: string }");
 
-    assert_ts!(Enum, "({ t: \"A\" }) | ({ t: \"B\" })");
-    assert_ts_export!(
-        Enum,
-        "export type EnumNew = ({ t: \"A\" }) | ({ t: \"B\" });"
-    );
+    assert_ts!(Enum, "{ t: \"A\" } | { t: \"B\" }");
+    assert_ts_export!(Enum, "export type EnumNew = { t: \"A\" } | { t: \"B\" }");
 
-    assert_ts!(Enum2, "({ t: \"C\" }) | ({ t: \"B\" })");
-    assert_ts!(Enum3, "({ t: \"A\"; b: string })");
+    assert_ts!(Enum2, "{ t: \"C\" } | { t: \"B\" }");
+    assert_ts!(Enum3, "{ t: \"A\"; b: string }");
 }

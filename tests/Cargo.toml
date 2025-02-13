@@ -13,7 +13,7 @@ harness = true
 [dependencies]
 specta = { path = "../specta", features = ["derive"] }
 specta-serde = { path = "../specta-serde" }
-specta-typescript = { path = "../specta-typescript" }
+specta-typescript = { path = "../specta-typescript", features = ["function"] }
 specta-util = { path = "../specta-util", features = ["serde"] }                # TODO: Remove `serde` feature
 specta-datatype-from = { path = "../specta-datatype-from" }
 

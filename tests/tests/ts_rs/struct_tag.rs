@@ -14,7 +14,7 @@ struct TaggedType {
 fn test_struct_tagging() {
     assert_ts!(
         TaggedType,
-        r#"{ type: "TaggedType"; a: number; b: number }"#
+        r#"{ a: number; b: number; type: "TaggedType" }"#
     );
 
     // TODO: Better unit tests for this including asserting runtime error for invalid cases

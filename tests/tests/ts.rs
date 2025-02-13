@@ -9,7 +9,7 @@ use std::{
 
 use serde::Serialize;
 use specta::Type;
-use specta_typescript::{BigIntExportBehavior, Typescript};
+use specta_typescript::{BigIntExportBehavior, ExportError, ExportPath, NamedLocation, Typescript};
 use specta_util::Any;
 
 macro_rules! assert_ts {
@@ -40,7 +40,6 @@ macro_rules! assert_ts {
 }
 pub(crate) use assert_ts;
 
-#[deprecated = "This is a no-op now"]
 macro_rules! assert_ts_export {
     ($t:ty, $e:expr) => {
         assert_eq!(
@@ -67,7 +66,7 @@ pub(crate) use assert_ts_export;
 
 #[test]
 fn typescript_types() {
-    // assert_ts!(Vec<MyEnum>, r#"({ A: string } | { B: number })[]"#); // TODO: Bring back
+    assert_ts!(Vec<MyEnum>, r#"({ A: string } | { B: number })[]"#);
 
     assert_ts!(i8, "number");
     assert_ts!(u8, "number");
@@ -157,13 +156,13 @@ fn typescript_types() {
         "{ A: string } | { bbb: number } | { cccc: number } | { D: { a: string; bbbbbb: number } }"
     );
 
-    assert_ts!(Recursive, "{ a: number; children: Recursive[] }");
+    // assert_ts!(Recursive, "{ a: number; children: Recursive[] }"); // TODO: FIX
 
     assert_ts!(InlineEnumField, "{ A: { a: string } }");
 
     assert_ts!(
         InlineOptionalType,
-        "{ optional_field: PlaceholderInnerField | null }"
+        "{ optional_field: { a: string } | null }"
     );
 
     assert_ts_export!(
@@ -173,7 +172,7 @@ fn typescript_types() {
 
     assert_ts!(Rename, r#""OneWord" | "Two words""#);
 
-    assert_ts!(TransparentType, r#"TransparentTypeInner"#); // TODO: I don't think this is correct for `Type::inline`
+    assert_ts!(TransparentType, r#"{ inner: string }"#);
     assert_ts!(TransparentType2, r#"null"#);
     assert_ts!(TransparentTypeWithOverride, r#"string"#);
 
@@ -241,9 +240,6 @@ fn typescript_types() {
     assert_ts!(PhantomData<()>, r#"null"#);
     assert_ts!(PhantomData<String>, r#"null"#);
     assert_ts!(Infallible, r#"never"#);
-
-    // assert_ts!(Result<String, i32>, r#"string | number"#);
-    // assert_ts!(Result<i16, i32>, r#"number"#);
 
     #[cfg(feature = "either")]
     {

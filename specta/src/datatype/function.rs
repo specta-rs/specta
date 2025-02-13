@@ -23,7 +23,7 @@ pub struct Function {
 /// The type of a function's return type.
 ///
 /// This gives the flexibility of the result's structure to the downstream implementer.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FunctionResultVariant {
     /// The function returns a `T`.
     Value(DataType),

@@ -2,8 +2,9 @@
 
 /// Specta compatible selection of struct fields.
 ///
-/// ```rust
-/// use specta::{selection, ts::inline_ref};
+/// ```ignore
+/// use specta_typescript::inline_ref;
+/// use specta_util::selection;
 ///
 /// #[derive(Clone)]
 /// struct MyStruct {

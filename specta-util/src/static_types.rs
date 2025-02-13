@@ -12,7 +12,8 @@ use specta::{datatype::DataType, Type, TypeCollection};
 /// This can be used as a type override.
 /// ```rust
 /// use serde::Serialize;
-/// use specta::{Type, Any};
+/// use specta::Type;
+/// use specta_util::Any;
 ///
 /// #[derive(Serialize, Type)]
 /// pub struct Demo {
@@ -24,7 +25,8 @@ use specta::{datatype::DataType, Type, TypeCollection};
 /// Or it can be used as a wrapper type.
 /// ```rust
 /// use serde::Serialize;
-/// use specta::{Type, Any};
+/// use specta::Type;
+/// use specta_util::Any;
 ///
 /// #[derive(Serialize, Type)]
 /// pub struct Demo {
@@ -75,7 +77,8 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
 /// This can be used as a type override.
 /// ```rust
 /// use serde::Serialize;
-/// use specta::{Type, Unknown};
+/// use specta::Type;
+/// use specta_util::Unknown;
 ///
 /// #[derive(Serialize, Type)]
 /// pub struct Demo {
@@ -87,7 +90,8 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
 /// Or it can be used as a wrapper type.
 /// ```rust
 /// use serde::Serialize;
-/// use specta::{Type, Unknown};
+/// use specta::Type;
+/// use specta_util::Unknown;
 ///
 /// #[derive(Serialize, Type)]
 /// pub struct Demo {

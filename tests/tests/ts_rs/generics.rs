@@ -41,22 +41,22 @@ struct Container1 {
 fn test() {
     assert_ts_export!(
         Generic1<()>,
-        "export type Generic1<T> = { value: T; values: T[] };"
+        "export type Generic1<T> = { value: T; values: T[] }"
     );
 
     assert_ts_export!(
         GenericAutoBound<()>,
-        "export type GenericAutoBound<T> = { value: T; values: T[] };"
+        "export type GenericAutoBound<T> = { value: T; values: T[] }"
     );
 
     assert_ts_export!(
         GenericAutoBound2<()>,
-        "export type GenericAutoBound2<T> = { value: T; values: T[] };"
+        "export type GenericAutoBound2<T> = { value: T; values: T[] }"
     );
 
     assert_ts_export!(
         Container1,
-        "export type Container1 = { foo: Generic1<number>; bar: Generic1<number>[]; baz: Partial<{ [key in string]: Generic1<string> }> };"
+        "export type Container1 = { foo: Generic1<number>; bar: Generic1<number>[]; baz: Partial<{ [key in string]: Generic1<string> }> }"
     );
 }
 
@@ -77,7 +77,7 @@ fn generic_enum() {
 
     assert_ts_export!(
         Generic2::<(), (), ()>,
-        r#"export type Generic2<A, B, C> = { A: A } | { B: [B, B, B] } | { C: C[] } | { D: A[][][] } | { E: { a: A; b: B; c: C } } | { X: number[] } | { Y: number } | { Z: number[][] };"#
+        r#"export type Generic2<A, B, C> = { A: A } | { B: [B, B, B] } | { C: C[] } | { D: A[][][] } | { E: { a: A; b: B; c: C } } | { X: number[] } | { Y: number } | { Z: number[][] }"#
     )
 }
 
@@ -87,7 +87,7 @@ fn generic_newtype() {
     #[specta(export = false)]
     struct NewType1<T>(Vec<Vec<T>>);
 
-    assert_ts_export!(NewType1::<()>, r#"export type NewType1<T> = T[][];"#);
+    assert_ts_export!(NewType1::<()>, r#"export type NewType1<T> = T[][]"#);
 }
 
 #[test]
@@ -96,7 +96,7 @@ fn generic_tuple() {
     #[specta(export = false)]
     struct Tuple<T>(T, Vec<T>, Vec<Vec<T>>);
 
-    assert_ts_export!(Tuple::<()>, r#"export type Tuple<T> = [T, T[], T[][]];"#);
+    assert_ts_export!(Tuple::<()>, r#"export type Tuple<T> = [T, T[], T[][]]"#);
 }
 
 #[test]
@@ -116,7 +116,7 @@ fn generic_struct() {
 
     assert_ts_export!(
         GenericStruct2::<()>,
-        "export type GenericStruct2<T> = { a: T; b: [T, T]; c: [T, [T, T]]; d: [T, T, T]; e: [([T, T]), ([T, T]), ([T, T])]; f: T[]; g: T[][]; h: ([([T, T]), ([T, T]), ([T, T])])[] };"
+        "export type GenericStruct2<T> = { a: T; b: [T, T]; c: [T, [T, T]]; d: [T, T, T]; e: [([T, T]), ([T, T]), ([T, T])]; f: T[]; g: T[][]; h: ([([T, T]), ([T, T]), ([T, T])])[] }"
     )
 }
 
@@ -139,10 +139,16 @@ fn inline() {
         t: Generic<String>,
     }
 
-    assert_ts_export!(Generic::<()>, "export type Generic<T> = { t: T };");
+    assert_ts_export!(Generic::<()>, "export type Generic<T> = { t: T }");
+    // todo!("{:#?}", Container::definition(&mut Default::default()));
+    let mut types = specta::TypeCollection::default();
+    // todo!(
+    //     "{:#?}",
+    //     specta::datatype::reference::inline_and_flatten(Container::definition(&mut types), &types)
+    // );
     assert_ts_export!(
         Container,
-        "export type Container = { g: Generic<string>; gi: { t: string }; t: string };"
+        "export type Container = ({ t: string }) & { g: Generic<string>; gi: { t: string } }"
     );
 }
 

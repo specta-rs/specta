@@ -213,79 +213,27 @@ const _: () = {
 
     impl Type for std::time::SystemTime {
         fn definition(types: &mut TypeCollection) -> DataType {
-            todo!();
-            // DataType::Struct(internal::construct::r#struct(
-            //     "SystemTime".into(),
-            //     Some(internal::construct::sid("SystemTime".into(), "::todo:3:10")),
-            //     vec![],
-            //     internal::construct::fields_named(
-            //         vec![
-            //             (
-            //                 "duration_since_epoch".into(),
-            //                 internal::construct::field(
-            //                     false,
-            //                     false,
-            //                     None,
-            //                     "".into(),
-            //                     Some({
-            //                         let ty = <i64 as Type>::definition(types);
-            //                         ty
-            //                     }),
-            //                 ),
-            //             ),
-            //             (
-            //                 "duration_since_unix_epoch".into(),
-            //                 internal::construct::field(
-            //                     false,
-            //                     false,
-            //                     None,
-            //                     "".into(),
-            //                     Some({
-            //                         let ty = <u32 as Type>::definition(types);
-            //                         ty
-            //                     }),
-            //                 ),
-            //             ),
-            //         ],
-            //         None,
-            //     ),
-            // ))
+            DataType::Struct(internal::construct::r#struct(
+                "SystemTime".into(),
+                Some(internal::construct::sid("SystemTime".into(), "::todo:3:10")),
+                vec![],
+                internal::construct::fields_named(
+                    vec![
+                        (
+                            "duration_since_epoch".into(),
+                            internal::construct::field::<i64>(false, None, "".into(), false, types),
+                        ),
+                        (
+                            "duration_since_unix_epoch".into(),
+                            internal::construct::field::<u32>(false, None, "".into(), false, types),
+                        ),
+                    ],
+                    None,
+                ),
+            ))
         }
     }
 
-    // impl NamedType for std::time::SystemTime {
-    //     fn sid() -> SpectaID {
-    //         SID
-    //     }
-
-    //     fn reference(types: &mut TypeCollection, generics: &[DataType]) -> Reference {
-    //         reference::reference::<Self>(
-    //             types,
-    //             // internal::construct::data_type_reference("SystemTime".into(), SID, vec![]),
-    //         )
-    //     }
-
-    //     // fn named_data_type(types: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
-    //     //     internal::construct::named_data_type(
-    //     //         "SystemTime".into(),
-    //     //         "".into(),
-    //     //         None,
-    //     //         Self::sid(),
-    //     //         IMPL_LOCATION,
-    //     //         <Self as Type>::inline(types, Generics::Provided(generics)),
-    //     //     )
-    //     // }
-    //     fn definition_named_data_type(types: &mut TypeCollection) -> NamedDataType {
-    //         internal::construct::named_data_type(
-    //             "SystemTime".into(),
-    //             "".into(),
-    //             None,
-    //             Self::sid(),
-    //             IMPL_LOCATION,
-    //             <Self as Type>::inline(types, Generics::Definition),
-    //         )
-    //     }
-    // }
     #[automatically_derived]
     impl Flatten for std::time::SystemTime {}
 };
@@ -297,77 +245,26 @@ const _: () = {
 
     impl Type for std::time::Duration {
         fn definition(types: &mut TypeCollection) -> DataType {
-            todo!();
-            // DataType::Struct(internal::construct::r#struct(
-            //     "Duration".into(),
-            //     Some(SID),
-            //     vec![],
-            //     internal::construct::fields_named(
-            //         vec![
-            //             (
-            //                 "secs".into(),
-            //                 internal::construct::field::<u64>(
-            //                     false,
-            //                     false,
-            //                     None,
-            //                     "".into(),
-            //                     Some({
-            //                         let ty = <u64 as Type>::definition(types);
-            //                         ty
-            //                     }),
-            //                 ),
-            //             ),
-            //             (
-            //                 "nanos".into(),
-            //                 internal::construct::field(
-            //                     false,
-            //                     false,
-            //                     None,
-            //                     "".into(),
-            //                     Some({
-            //                         let ty = <u32 as Type>::definition(types);
-            //                         ty
-            //                     }),
-            //                 ),
-            //             ),
-            //         ],
-            //         None,
-            //     ),
-            // ))
+            DataType::Struct(internal::construct::r#struct(
+                "Duration".into(),
+                Some(SID),
+                vec![],
+                internal::construct::fields_named(
+                    vec![
+                        (
+                            "secs".into(),
+                            internal::construct::field::<u64>(false, None, "".into(), false, types),
+                        ),
+                        (
+                            "nanos".into(),
+                            internal::construct::field::<u32>(false, None, "".into(), false, types),
+                        ),
+                    ],
+                    None,
+                ),
+            ))
         }
     }
-
-    // impl NamedType for std::time::Duration {
-    //     fn sid() -> SpectaID {
-    //         SID
-    //     }
-    //     // fn reference(types: &mut TypeCollection, _: &[DataType]) -> reference::Reference {
-    //     //     reference::reference::<Self>(
-    //     //         types,
-    //     //         // internal::construct::data_type_reference("Duration".into(), Self::sid(), vec![]),
-    //     //     )
-    //     // }
-    //     // fn named_data_type(types: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
-    //     //     internal::construct::named_data_type(
-    //     //         "Duration".into(),
-    //     //         "".into(),
-    //     //         None,
-    //     //         Self::sid(),
-    //     //         IMPL_LOCATION,
-    //     //         <Self as Type>::inline(types, Generics::Provided(generics)),
-    //     //     )
-    //     // }
-    //     fn definition_named_data_type(types: &mut TypeCollection) -> NamedDataType {
-    //         internal::construct::named_data_type(
-    //             "Duration".into(),
-    //             "".into(),
-    //             None,
-    //             Self::sid(),
-    //             IMPL_LOCATION,
-    //             <Self as Type>::inline(types, Generics::Definition),
-    //         )
-    //     }
-    // }
 
     impl Flatten for std::time::Duration {}
 };

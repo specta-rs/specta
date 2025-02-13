@@ -15,20 +15,22 @@ categories = ["web-programming", "asynchronous"]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
-[lints]
-workspace = true
-
 [features]
 default = []
 
+# TODO: Remove this?
+function = ["specta/function"]
+
+[lints]
+workspace = true
+
 [dependencies]
 specta = { version = "=2.0.0-rc.22", path = "../specta" }
-specta-serde = { version = "0.0.9", path = "../specta-serde" }
+# TODO: Don't depend on serde
+specta-serde = { version = "=0.0.9", path = "../specta-serde" }
+thiserror = "1.0.61"
 
-# TODO: Remove these
 [dev-dependencies]
 serde = { version = "1.0.217", features = ["derive"] }
-specta = { path = "../specta", features = ["derive", "export"] }
-specta-serde = { path = "../specta-serde" }
+specta = { version = "=2.0.0-rc.22", path = "../specta", features = ["derive", "export"] }
 specta-util = { path = "../specta-util", features = ["serde"] }
-serde_json = "1.0.137"

@@ -46,25 +46,178 @@ error: specta: invalid formatted attribute
 103 | #[specta = "todo"]
     |   ^^^^^^
 
-error[E0432]: unresolved import `specta::specta`
- --> tests/macro/compile_error.rs:3:14
-  |
-3 | use specta::{specta, Type};
-  |              ^^^^^^ no `specta` in the root
-  |
-note: found an item that was configured out
- --> $WORKSPACE/specta/src/lib.rs
-  |
-  | pub use specta_macros::specta;
-  |                        ^^^^^^
-note: the item is gated here
- --> $WORKSPACE/specta/src/lib.rs
-  |
-  | #[cfg(all(feature = "derive", feature = "function"))]
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+error: specta: You must apply the #[specta] macro before the #[wasm_bindgen] macro
+   --> tests/macro/compile_error.rs:108:1
+    |
+108 | #[wasm_bindgen]
+    | ^^^^^^^^^^^^^^^
+    |
+    = note: this error originates in the attribute macro `wasm_bindgen` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0255]: the name `__specta__fn__testing` is defined multiple times
+   --> tests/macro/compile_error.rs:110:8
+    |
+109 | #[specta]
+    | --------- previous definition of the macro `__specta__fn__testing` here
+110 | pub fn testing() {}
+    |        ^^^^^^^ `__specta__fn__testing` reimported here
+    |
+    = note: `__specta__fn__testing` must be defined only once in the macro namespace of this module
 
 error[E0601]: `main` function not found in crate `$CRATE`
    --> tests/macro/compile_error.rs:110:20
     |
 110 | pub fn testing() {}
     |                    ^ consider adding a `main` function to `$DIR/tests/macro/compile_error.rs`
+
+error[E0277]: the trait bound `dyn std::error::Error + Send + Sync: Type` is not satisfied
+  --> tests/macro/compile_error.rs:13:23
+   |
+13 |     pub(crate) cause: Option<Box<dyn std::error::Error + Send + Sync>>,
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `Type` is not implemented for `dyn std::error::Error + Send + Sync`
+   |
+   = help: the following other types implement trait `Type`:
+             &'a T
+             &'a [T]
+             &'a str
+             ()
+             (T10, T11, T12, T13)
+             (T11, T12, T13)
+             (T12, T13)
+             (T13,)
+           and $N others
+   = note: required for `Box<dyn std::error::Error + Send + Sync>` to implement `Type`
+   = note: 1 redundant requirement hidden
+   = note: required for `Option<Box<dyn std::error::Error + Send + Sync>>` to implement `Type`
+note: required by a bound in `field`
+  --> $WORKSPACE/specta/src/internal.rs
+   |
+   |     pub fn field<T: Type>(
+   |                     ^^^^ required by this bound in `field`
+
+error[E0277]: the size for values of type `dyn std::error::Error + Send + Sync` cannot be known at compilation time
+  --> tests/macro/compile_error.rs:13:23
+   |
+13 |     pub(crate) cause: Option<Box<dyn std::error::Error + Send + Sync>>,
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ doesn't have a size known at compile-time
+   |
+   = help: the trait `Sized` is not implemented for `dyn std::error::Error + Send + Sync`
+   = help: the trait `Type` is implemented for `Option<T>`
+   = note: required for `Box<dyn std::error::Error + Send + Sync>` to implement `Type`
+   = note: 1 redundant requirement hidden
+   = note: required for `Option<Box<dyn std::error::Error + Send + Sync>>` to implement `Type`
+note: required by a bound in `field`
+  --> $WORKSPACE/specta/src/internal.rs
+   |
+   |     pub fn field<T: Type>(
+   |                     ^^^^ required by this bound in `field`
+
+error[E0277]: the trait bound `UnitExternal: specta::Flatten` is not satisfied
+  --> tests/macro/compile_error.rs:32:11
+   |
+32 |     unit: UnitExternal,
+   |           ^^^^^^^^^^^^ the trait `specta::Flatten` is not implemented for `UnitExternal`
+   |
+   = help: the following other types implement trait `specta::Flatten`:
+             Arc<T>
+             BTreeMap<K, V>
+             Box<T>
+             Cell<T>
+             Duration
+             Error
+             FlattenExternal
+             FlattenInternal
+           and $N others
+note: required by a bound in `field_flattened`
+  --> $WORKSPACE/specta/src/internal.rs
+   |
+   |     pub fn field_flattened<T: Type + Flatten>(
+   |                                      ^^^^^^^ required by this bound in `field_flattened`
+
+error[E0277]: the trait bound `UnnamedMultiExternal: specta::Flatten` is not satisfied
+  --> tests/macro/compile_error.rs:34:20
+   |
+34 |     unnamed_multi: UnnamedMultiExternal,
+   |                    ^^^^^^^^^^^^^^^^^^^^ the trait `specta::Flatten` is not implemented for `UnnamedMultiExternal`
+   |
+   = help: the following other types implement trait `specta::Flatten`:
+             Arc<T>
+             BTreeMap<K, V>
+             Box<T>
+             Cell<T>
+             Duration
+             Error
+             FlattenExternal
+             FlattenInternal
+           and $N others
+note: required by a bound in `field_flattened`
+  --> $WORKSPACE/specta/src/internal.rs
+   |
+   |     pub fn field_flattened<T: Type + Flatten>(
+   |                                      ^^^^^^^ required by this bound in `field_flattened`
+
+error[E0277]: the trait bound `UnnamedUntagged: specta::Flatten` is not satisfied
+  --> tests/macro/compile_error.rs:52:14
+   |
+52 |     unnamed: UnnamedUntagged,
+   |              ^^^^^^^^^^^^^^^ the trait `specta::Flatten` is not implemented for `UnnamedUntagged`
+   |
+   = help: the following other types implement trait `specta::Flatten`:
+             Arc<T>
+             BTreeMap<K, V>
+             Box<T>
+             Cell<T>
+             Duration
+             Error
+             FlattenExternal
+             FlattenInternal
+           and $N others
+note: required by a bound in `field_flattened`
+  --> $WORKSPACE/specta/src/internal.rs
+   |
+   |     pub fn field_flattened<T: Type + Flatten>(
+   |                                      ^^^^^^^ required by this bound in `field_flattened`
+
+error[E0277]: the trait bound `UnnamedMultiUntagged: specta::Flatten` is not satisfied
+  --> tests/macro/compile_error.rs:54:20
+   |
+54 |     unnamed_multi: UnnamedMultiUntagged,
+   |                    ^^^^^^^^^^^^^^^^^^^^ the trait `specta::Flatten` is not implemented for `UnnamedMultiUntagged`
+   |
+   = help: the following other types implement trait `specta::Flatten`:
+             Arc<T>
+             BTreeMap<K, V>
+             Box<T>
+             Cell<T>
+             Duration
+             Error
+             FlattenExternal
+             FlattenInternal
+           and $N others
+note: required by a bound in `field_flattened`
+  --> $WORKSPACE/specta/src/internal.rs
+   |
+   |     pub fn field_flattened<T: Type + Flatten>(
+   |                                      ^^^^^^^ required by this bound in `field_flattened`
+
+error[E0277]: the trait bound `UnnamedInternal: specta::Flatten` is not satisfied
+  --> tests/macro/compile_error.rs:70:14
+   |
+70 |     unnamed: UnnamedInternal,
+   |              ^^^^^^^^^^^^^^^ the trait `specta::Flatten` is not implemented for `UnnamedInternal`
+   |
+   = help: the following other types implement trait `specta::Flatten`:
+             Arc<T>
+             BTreeMap<K, V>
+             Box<T>
+             Cell<T>
+             Duration
+             Error
+             FlattenExternal
+             FlattenInternal
+           and $N others
+note: required by a bound in `field_flattened`
+  --> $WORKSPACE/specta/src/internal.rs
+   |
+   |     pub fn field_flattened<T: Type + Flatten>(
+   |                                      ^^^^^^^ required by this bound in `field_flattened`
