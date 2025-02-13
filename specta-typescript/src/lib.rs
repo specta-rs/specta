@@ -19,7 +19,7 @@ mod typescript;
 pub use context::*;
 pub use error::*;
 use reserved_terms::*;
-use specta::datatype::reference::{inline_and_flatten, inline_and_flatten_ndt};
+use specta::datatype::inline_and_flatten_ndt;
 use specta_serde::validate_dt;
 pub use typescript::*;
 
@@ -27,8 +27,8 @@ pub use typescript::*;
 pub use ExportError as Error;
 
 use specta::datatype::{
-    inline_reference, DataType, DeprecatedType, EnumRepr, EnumType, EnumVariant, Fields,
-    FunctionResultVariant, LiteralType, NamedDataType, PrimitiveType, StructType, TupleType,
+    DataType, DeprecatedType, EnumRepr, EnumType, EnumVariant, Fields, FunctionResultVariant,
+    LiteralType, NamedDataType, PrimitiveType, StructType, TupleType,
 };
 use specta::{
     internal::{detect_duplicate_type_names, skip_fields, skip_fields_named, NonSkipField},
@@ -79,9 +79,8 @@ pub fn inline_ref<T: Type>(_: &T, conf: &Typescript) -> Output {
 pub fn inline<T: Type>(conf: &Typescript) -> Output {
     let mut types = TypeCollection::default();
 
-    let ty = inline_reference::<T>(&mut types);
-    let ty = inline_and_flatten(ty.clone(), &types);
-    let ty = specta::datatype::reference::inline(ty.clone(), &types);
+    let ty = T::definition(&mut types);
+    let ty = specta::datatype::inline(ty.clone(), &types);
 
     validate_dt(&ty, &types)?;
     let result = datatype(conf, &FunctionResultVariant::Value(ty.clone()), &types);
@@ -378,27 +377,26 @@ pub(crate) fn datatype_inner(
         DataType::Reference(reference) => {
             let definition = types.get(reference.sid()).unwrap(); // TODO: Error handling
 
-            match &reference.generics()[..] {
-                [] => s.push_str(&definition.name()),
-                generics => {
-                    s.push_str(&definition.name());
-                    s.push('<');
+            if reference.generics().len() == 0 {
+                s.push_str(&definition.name());
+            } else {
+                s.push_str(&definition.name());
+                s.push('<');
 
-                    for (i, v) in generics.iter().enumerate() {
-                        if i != 0 {
-                            s.push_str(", ");
-                        }
-
-                        datatype_inner(
-                            ctx.with(PathItem::Type(definition.name().clone())),
-                            &FunctionResultVariant::Value(v.clone()),
-                            types,
-                            s,
-                        )?;
+                for (i, (_, v)) in reference.generics().iter().enumerate() {
+                    if i != 0 {
+                        s.push_str(", ");
                     }
 
-                    s.push('>');
+                    datatype_inner(
+                        ctx.with(PathItem::Type(definition.name().clone())),
+                        &FunctionResultVariant::Value(v.clone()),
+                        types,
+                        s,
+                    )?;
                 }
+
+                s.push('>');
             }
         }
         DataType::Generic(ident) => s.push_str(&ident.to_string()),

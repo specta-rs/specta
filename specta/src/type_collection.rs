@@ -18,8 +18,6 @@ use crate::{
 pub struct TypeCollection {
     // `None` indicates that the entry is a placeholder. It was reference and we are currently working out it's definition.
     pub(crate) map: BTreeMap<SpectaID, Option<NamedDataType>>,
-    // A stack of types that are currently being flattened. This is used to detect cycles.
-    pub(crate) flatten_stack: Vec<SpectaID>,
     // #[cfg(feature = "serde_json")]
     // pub(crate) constants: BTreeMap<Cow<'static, str>, serde_json::Value>,
 }
@@ -72,7 +70,6 @@ impl TypeCollection {
         let reference = Reference {
             sid,
             generics: Default::default(),
-            dt: Box::new(ndt.inner.clone()),
             inline: false,
         };
 

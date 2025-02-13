@@ -20,9 +20,9 @@ macro_rules! _impl_tuple {
     ( impl $($i:ident),* ) => {
         #[allow(non_snake_case)]
         impl<$($i: Type),*> Type for ($($i,)*) {
-            fn definition(types: &mut TypeCollection) -> DataType {
+            fn definition(_types: &mut TypeCollection) -> DataType {
                 datatype::TupleType {
-                    elements: vec![$(<$i as Type>::definition(types)),*],
+                    elements: vec![$(<$i as Type>::definition(_types)),*],
                 }.to_anonymous()
             }
         }

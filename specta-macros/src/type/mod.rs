@@ -94,10 +94,11 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         }
     });
 
-    let inline_generics_def = if container_attrs.inline || container_attrs.transparent {
-        let generics = &generics.params;
-        quote!(#generics)
-    } else {
+    //     if container_attrs.inline || container_attrs.transparent {
+    //     let generics = &generics.params;
+    //     quote!(#generics)
+    // } else {
+    let inline_generics_def = {
         let g = generics.params.iter().map(|param| match param {
             GenericParam::Lifetime(lt) => {
                 let lt = &lt.lifetime;
@@ -153,23 +154,14 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let inline = container_attrs.inline;
     let deprecated = container_attrs.common.deprecated_as_tokens(&crate_ref);
     let impl_location = quote!(#crate_ref::internal::construct::impl_location(concat!(file!(), ":", line!(), ":", column!())));
-    let definition = (container_attrs.inline || container_attrs.transparent).then(|| quote!(
-        dt
-        // TODO: Better error message
-        .expect("detected a recursive inline")
-        .inner)).unwrap_or_else(|| {
-        let reference_generics = generics.params.iter().filter_map(|param| match param {
-            GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
-            GenericParam::Type(t) => {
-                let i = &t.ident;
-                Some(quote!(<#i as #crate_ref::Type>::definition(types)))
-            },
-        });
 
-        quote!(
-            let dt = Self::___specta_definition___(types);
-            specta::datatype::reference::Reference::construct(SID, vec![#(#reference_generics),*], dt, #inline).into()
-        )
+    let reference_generics = generics.params.iter().filter_map(|param| match param {
+        GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
+        GenericParam::Type(t) => {
+            let i = &t.ident;
+            let i_str = i.to_string();
+            Some(quote!((#crate_ref::internal::construct::generic_data_type(#i_str), <#i as #crate_ref::Type>::definition(types))))
+        }
     });
 
     Ok(quote! {
@@ -193,7 +185,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             #[automatically_derived]
             impl #bounds #crate_ref::Type for #ident #type_args #where_bound {
                 fn definition(types: &mut #crate_ref::TypeCollection) -> #crate_ref::datatype::DataType {
-                    let dt = #crate_ref::internal::register(
+                    #crate_ref::internal::register(
                         types,
                         #name.into(),
                         #comments.into(),
@@ -203,7 +195,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         |types| #ident::<#inline_generics_def>::___specta_definition___(types),
                     );
 
-                    #definition
+                    #crate_ref::datatype::reference::Reference::construct(SID, [#(#reference_generics),*], #inline).into()
                 }
             }
 

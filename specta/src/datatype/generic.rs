@@ -14,7 +14,7 @@ use super::DataType;
 /// A generic does not hold a specific type instead it acts as a slot where a type can be provided when referencing this type.
 ///
 /// A `GenericType` holds the identifier of the generic. Eg. Given a generic type `struct A<T>(T);` the generics will be represented as `vec![GenericType("A".into())]`
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct GenericType(pub(crate) Cow<'static, str>);
 
 impl Display for GenericType {

@@ -88,27 +88,23 @@ fn map_keys() {
     assert_ts!(ValidMaybeValidKey, "Partial<{ [key in string]: null }>");
     assert_ts_export!(
         ValidMaybeValidKey,
-        "export type ValidMaybeValidKey = Partial<{ [key in string]: null }>"
+        "export type ValidMaybeValidKey = Partial<{ [key in MaybeValidKey<string>]: null }>"
     );
-    // assert_ts!(
-    //     ValidMaybeValidKeyNested,
-    //     "Partial<{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }>"
-    // ); // TODO: "detected a recursive inline"
-    // assert_ts_export!(
-    //     ValidMaybeValidKeyNested,
-    //     "export type ValidMaybeValidKeyNested = Partial<{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }>"
-    // ); // TODO: "detected a recursive inline"
 
-    // todo!(
-    //     "{:#?}",
-    //     HashMap::<() /* `null` */, ()>::definition(&mut Default::default())
-    // );
+    assert_ts!(
+        ValidMaybeValidKeyNested,
+        "Partial<{ [key in string]: null }>"
+    );
+    assert_ts_export!(
+        ValidMaybeValidKeyNested,
+        "export type ValidMaybeValidKeyNested = Partial<{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }>"
+    );
 
     assert_ts!(error; HashMap<() /* `null` */, ()>, Error::InvalidMapKey);
     assert_ts!(error; HashMap<RegularStruct, ()>, Error::InvalidMapKey);
     assert_ts!(error; HashMap<Variants, ()>, Error::InvalidMapKey);
     assert_ts!(error; InvalidMaybeValidKey, Error::InvalidMapKey);
     assert_ts_export!(error; InvalidMaybeValidKey, Error::InvalidMapKey);
-    // assert_ts!(error; InvalidMaybeValidKeyNested, Error::InvalidMapKey); // TODO: detected a recursive inline
-    // assert_ts_export!(error; InvalidMaybeValidKeyNested, Error::InvalidMapKey);  // TODO: detected a recursive inline
+    assert_ts!(error; InvalidMaybeValidKeyNested, Error::InvalidMapKey); // TODO: detected a recursive inline
+    assert_ts_export!(error; InvalidMaybeValidKeyNested, Error::InvalidMapKey); // TODO: detected a recursive inline
 }

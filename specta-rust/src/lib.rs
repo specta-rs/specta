@@ -358,17 +358,17 @@ fn datatype(r: &Rust, t: &DataType, types: &TypeCollection) -> Result<String, Er
                 todo!();
             }
 
-            match &reference.generics()[..] {
-                [] => definition.name().to_string(),
-                generics => {
-                    let generics = generics
-                        .iter()
-                        .map(|t| datatype(r, t, types))
-                        .collect::<Result<Vec<_>, _>>()?
-                        .join(", ");
+            if reference.generics().len() == 0 {
+                definition.name().to_string()
+            } else {
+                let generics = reference
+                    .generics()
+                    .iter()
+                    .map(|(_, t)| datatype(r, t, types))
+                    .collect::<Result<Vec<_>, _>>()?
+                    .join(", ");
 
-                    format!("{}<{generics}>", definition.name())
-                }
+                format!("{}<{generics}>", definition.name())
             }
         }
         DataType::Generic(t) => t.to_string(),

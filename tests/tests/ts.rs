@@ -156,7 +156,7 @@ fn typescript_types() {
         "{ A: string } | { bbb: number } | { cccc: number } | { D: { a: string; bbbbbb: number } }"
     );
 
-    // assert_ts!(Recursive, "{ a: number; children: Recursive[] }"); // TODO: FIX
+    assert_ts!(Recursive, "{ a: number; children: Recursive[] }"); // TODO: FIX
 
     assert_ts!(InlineEnumField, "{ A: { a: string } }");
 

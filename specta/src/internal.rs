@@ -11,7 +11,7 @@ pub use paste::paste;
 
 use crate::{
     datatype::{DataType, DeprecatedType, Field, NamedDataType, NamedDataTypeExt},
-    ImplLocation, SpectaID, Type, TypeCollection,
+    ImplLocation, SpectaID, TypeCollection,
 };
 
 /// Registers a type in the `TypeCollection` if it hasn't been registered already.
@@ -24,9 +24,17 @@ pub fn register(
     sid: SpectaID,
     impl_location: ImplLocation,
     build: impl FnOnce(&mut TypeCollection) -> DataType,
-) -> Option<NamedDataType> {
+) -> NamedDataType {
     match types.map.get(&sid) {
-        Some(dt) => dt.clone(),
+        Some(Some(dt)) => dt.clone(),
+        // TODO: Explain this
+        Some(None) => NamedDataType {
+            name,
+            docs,
+            deprecated,
+            ext: Some(NamedDataTypeExt { sid, impl_location }),
+            inner: DataType::Any,
+        },
         None => {
             types.map.entry(sid).or_insert(None);
             let dt = NamedDataType {
@@ -37,25 +45,9 @@ pub fn register(
                 inner: build(types),
             };
             types.map.insert(sid, Some(dt.clone()));
-            Some(dt)
+            dt
         }
     }
-}
-
-// TODO: Make private
-#[track_caller]
-pub fn flatten<T: Type>(sid: SpectaID, types: &mut TypeCollection) -> DataType {
-    types.flatten_stack.push(sid);
-
-    #[allow(clippy::panic)]
-    if types.flatten_stack.len() > 25 {
-        // TODO: Handle this error without panicking
-        panic!("Type recursion limit exceeded!");
-    }
-
-    let ty = T::definition(types);
-    types.flatten_stack.pop();
-    ty
 }
 
 /// Functions used to construct `crate::datatype` types (they have private fields so can't be constructed directly).
@@ -64,10 +56,7 @@ pub fn flatten<T: Type>(sid: SpectaID, types: &mut TypeCollection) -> DataType {
 pub mod construct {
     use std::borrow::Cow;
 
-    use crate::{
-        datatype::{self, *},
-        Flatten, ImplLocation, SpectaID, Type, TypeCollection,
-    };
+    use crate::{datatype::*, Flatten, ImplLocation, SpectaID, Type, TypeCollection};
 
     pub fn skipped_field(
         optional: bool,
@@ -91,35 +80,13 @@ pub mod construct {
         inline: bool,
         types: &mut TypeCollection,
     ) -> Field {
-        // TODO: Could this stack overflow? Is `TypeCollection::flatten_stack` still used or should we use it?
-        let ty = datatype::inline::<T>(types); // TODO
-
-        // match inline {
-        //     DataType::Struct(s) => s.fields(),
-        //     _ => todo!(),
-        // }
-
-        // println!("{:?}", inline);
-
-        // todo!();
-        // types.flatten_stack.push(T::ID);
-
-        // #[allow(clippy::panic)]
-        // if types.flatten_stack.len() > 25 {
-        //     // TODO: Handle this error without panicking
-        //     panic!("Type recursion limit exceeded!");
-        // }
-
-        // let ty = T::definition(types);
-        // types.flatten_stack.pop();
-
         Field {
             optional,
             flatten: true,
             deprecated,
             docs,
             inline,
-            ty: Some(ty),
+            ty: Some(T::definition(types)),
         }
     }
 
@@ -205,8 +172,8 @@ pub mod construct {
         TupleType { elements: fields }
     }
 
-    pub const fn generic_data_type(name: &'static str) -> DataType {
-        DataType::Generic(GenericType(Cow::Borrowed(name)))
+    pub const fn generic_data_type(name: &'static str) -> GenericType {
+        GenericType(Cow::Borrowed(name))
     }
 
     pub const fn impl_location(loc: &'static str) -> ImplLocation {

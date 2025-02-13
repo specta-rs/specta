@@ -1,7 +1,7 @@
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use specta::{
-    datatype::{DataType, EnumRepr, EnumType, Fields, LiteralType, PrimitiveType},
+    datatype::{DataType, EnumRepr, EnumType, Fields, GenericType, LiteralType, PrimitiveType},
     internal::{skip_fields, skip_fields_named},
     SpectaID, TypeCollection,
 };
@@ -13,7 +13,12 @@ use crate::Error;
 /// Validate the type and apply the Serde transformations.
 pub fn validate(types: &TypeCollection) -> Result<(), Error> {
     for (_, ndt) in types.into_iter() {
-        inner(&ndt.inner, &types, &mut Default::default())?;
+        inner(
+            &ndt.inner,
+            &types,
+            &Default::default(),
+            &mut Default::default(),
+        )?;
     }
 
     Ok(())
@@ -21,10 +26,15 @@ pub fn validate(types: &TypeCollection) -> Result<(), Error> {
 
 // TODO: Remove this once we redo the Typescript exporter.
 pub fn validate_dt(ty: &DataType, types: &TypeCollection) -> Result<(), Error> {
-    inner(ty, &types, &mut Default::default())?;
+    inner(ty, &types, &Default::default(), &mut Default::default())?;
 
     for (_, ndt) in types.into_iter() {
-        inner(&ndt.inner, &types, &mut Default::default())?;
+        inner(
+            &ndt.inner,
+            &types,
+            &Default::default(),
+            &mut Default::default(),
+        )?;
     }
 
     Ok(())
@@ -33,24 +43,25 @@ pub fn validate_dt(ty: &DataType, types: &TypeCollection) -> Result<(), Error> {
 fn inner(
     dt: &DataType,
     types: &TypeCollection,
+    generics: &BTreeMap<GenericType, DataType>,
     checked_references: &mut HashSet<SpectaID>,
 ) -> Result<(), Error> {
     match dt {
-        DataType::Nullable(ty) => inner(ty, types, checked_references)?,
+        DataType::Nullable(ty) => inner(ty, types, generics, checked_references)?,
         DataType::Map(ty) => {
-            is_valid_map_key(ty.key_ty(), types)?;
-            inner(ty.value_ty(), types, checked_references)?;
+            is_valid_map_key(ty.key_ty(), types, generics)?;
+            inner(ty.value_ty(), types, generics, checked_references)?;
         }
         DataType::Struct(ty) => match ty.fields() {
             Fields::Unit => {}
             Fields::Unnamed(ty) => {
                 for (_, ty) in skip_fields(ty.fields()) {
-                    inner(ty, types, checked_references)?;
+                    inner(ty, types, generics, checked_references)?;
                 }
             }
             Fields::Named(ty) => {
                 for (_, (_, ty)) in skip_fields_named(ty.fields()) {
-                    inner(ty, types, checked_references)?;
+                    inner(ty, types, generics, checked_references)?;
                 }
             }
         },
@@ -62,12 +73,12 @@ fn inner(
                     Fields::Unit => {}
                     Fields::Named(variant) => {
                         for (_, (_, ty)) in skip_fields_named(variant.fields()) {
-                            inner(ty, types, checked_references)?;
+                            inner(ty, types, generics, checked_references)?;
                         }
                     }
                     Fields::Unnamed(variant) => {
                         for (_, ty) in skip_fields(variant.fields()) {
-                            inner(ty, types, checked_references)?;
+                            inner(ty, types, generics, checked_references)?;
                         }
                     }
                 }
@@ -75,22 +86,22 @@ fn inner(
         }
         DataType::Tuple(ty) => {
             for ty in ty.elements() {
-                inner(ty, types, checked_references)?;
+                inner(ty, types, generics, checked_references)?;
             }
         }
-        DataType::Reference(ty) => {
-            for generic in ty.generics() {
-                inner(generic, types, checked_references)?;
+        DataType::Reference(r) => {
+            for (_, dt) in r.generics() {
+                inner(dt, types, &Default::default(), checked_references)?;
             }
 
             #[allow(clippy::panic)]
-            if !checked_references.contains(&ty.sid()) {
-                checked_references.insert(ty.sid());
-                let ty = types.get(ty.sid()).unwrap_or_else(|| {
-                    panic!("Type '{}' was never populated.", ty.sid().type_name())
+            if !checked_references.contains(&r.sid()) {
+                checked_references.insert(r.sid());
+                let ty = types.get(r.sid()).unwrap_or_else(|| {
+                    panic!("Type '{}' was never populated.", r.sid().type_name())
                 }); // TODO: Error properly
 
-                inner(&ty.inner, types, checked_references)?;
+                inner(&ty.inner, types, r.generics(), checked_references)?;
             }
         }
         _ => {}
@@ -100,9 +111,11 @@ fn inner(
 }
 
 // Typescript: Must be assignable to `string | number | symbol` says Typescript.
-fn is_valid_map_key(key_ty: &DataType, types: &TypeCollection) -> Result<(), Error> {
-    println!("{:?}", key_ty); // TODO
-
+fn is_valid_map_key(
+    key_ty: &DataType,
+    types: &TypeCollection,
+    generics: &BTreeMap<GenericType, DataType>,
+) -> Result<(), Error> {
     match key_ty {
         DataType::Any => Ok(()),
         DataType::Primitive(ty) => match ty {
@@ -167,9 +180,12 @@ fn is_valid_map_key(key_ty: &DataType, types: &TypeCollection) -> Result<(), Err
         DataType::Reference(r) => {
             let ty = types.get(r.sid()).expect("Type was never populated"); // TODO: Error properly
 
-            // TODO: Bring back this
-            // resolve_generics(ty.inner.clone(), r.generics())
-            is_valid_map_key(&ty.inner, types)
+            is_valid_map_key(&ty.inner, types, r.generics())
+        }
+        DataType::Generic(g) => {
+            let ty = generics.get(g).expect("bruh");
+
+            is_valid_map_key(&ty, types, &Default::default())
         }
         _ => Err(Error::InvalidMapKey),
     }

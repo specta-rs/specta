@@ -1,284 +1,247 @@
 //! Helpers for generating [Type::reference] implementations.
 
-use crate::{
-    datatype::{
-        EnumType, EnumVariant, Field, Fields, List, Map, NamedFields, StructType, TupleType,
-        UnnamedFields,
-    },
-    Type, TypeCollection,
-};
+use std::collections::HashMap;
 
-use super::DataType;
+use crate::TypeCollection;
 
-// TODO: Can/should we merge these? Deduplicate the code?
+use super::{DataType, Field, Fields, GenericType, NamedDataType};
 
-// TODO: Maybe remove this function now that it's simple?
-/// If the top-level type is a `DataType::Reference`, inline it and then resolve all generics.
-pub fn inline_reference<T: Type>(types: &mut TypeCollection) -> DataType {
-    match T::definition(types) {
-        DataType::Reference(r) => r.datatype().clone(),
-        dt => dt,
+#[doc(hidden)] // TODO: Move this into Specta Typescript
+pub fn inline_and_flatten_ndt(dt: NamedDataType, types: &TypeCollection) -> NamedDataType {
+    NamedDataType {
+        inner: inline_and_flatten(dt.inner, types),
+        ..dt
     }
 }
 
-// TODO: Remove this in favor of `inline_dt` primitive???
-/// TODO: Finish and document this. It only inlines the first level of references.
-pub fn inline<T: Type>(types: &mut TypeCollection) -> DataType {
-    let dt = T::definition(types);
-    inline_dt(types, dt)
+#[doc(hidden)] // TODO: Move this into Specta Typescript
+pub fn inline_and_flatten(dt: DataType, types: &TypeCollection) -> DataType {
+    inner(dt, types, false, false, &Default::default(), 0)
 }
 
-// TODO: Taking owned or reference `DataType`?
-pub fn inline_dt(types: &TypeCollection, dt: DataType) -> DataType {
-    fn inner(types: &TypeCollection, dt: DataType, i: i8) -> DataType {
-        if i == 1 {
-            return dt;
-            // return inline_generics(types, generics, dt);
-        }
+#[doc(hidden)] // TODO: Move this into Specta Typescript
+pub fn inline(dt: DataType, types: &TypeCollection) -> DataType {
+    inner(dt, types, false, true, &Default::default(), 0)
+}
 
-        match dt {
-            DataType::Any | DataType::Unknown | DataType::Primitive(..) | DataType::Literal(..) => {
-                dt
-            }
-            DataType::List(list) => DataType::List(List {
-                ty: Box::new(inner(types, (*list.ty).clone(), i + 1)),
-                length: list.length,
-                unique: list.unique,
-            }),
-            DataType::Map(map) => DataType::Map(Map {
-                key_ty: Box::new(inner(types, (*map.key_ty).clone(), i + 1)),
-                value_ty: Box::new(inner(types, (*map.value_ty).clone(), i + 1)),
-            }),
-            DataType::Nullable(data_type) => {
-                DataType::Nullable(Box::new(inner(types, *data_type, i + 1)))
-            }
-            DataType::Struct(s) => DataType::Struct(StructType {
-                name: s.name,
-                sid: s.sid,
-                generics: s.generics,
-                fields: match s.fields {
-                    Fields::Unit => Fields::Unit,
-                    Fields::Unnamed(unnamed_fields) => Fields::Unnamed(UnnamedFields {
-                        fields: unnamed_fields
-                            .fields
-                            .into_iter()
-                            .map(|f| Field {
-                                optional: f.optional,
-                                flatten: f.flatten,
-                                deprecated: f.deprecated,
-                                docs: f.docs,
-                                inline: f.inline,
-                                ty: f.ty.map(|ty| inner(types, ty, i + 1)),
-                            })
-                            .collect(),
-                    }),
-                    Fields::Named(named_fields) => Fields::Named(NamedFields {
-                        tag: named_fields.tag,
-                        fields: named_fields
-                            .fields
-                            .into_iter()
-                            .map(|(k, f)| {
-                                (
-                                    k,
-                                    Field {
-                                        optional: f.optional,
-                                        flatten: f.flatten,
-                                        deprecated: f.deprecated,
-                                        docs: f.docs,
-                                        inline: f.inline,
-                                        ty: f.ty.map(|ty| inner(types, ty, i + 1)),
-                                    },
-                                )
-                            })
-                            .collect(),
-                    }),
-                },
-            }),
-            DataType::Enum(e) => DataType::Enum(EnumType {
-                name: e.name,
-                sid: e.sid,
-                skip_bigint_checks: e.skip_bigint_checks,
-                repr: e.repr,
-                generics: e.generics,
-                variants: e
-                    .variants
-                    .into_iter()
-                    .map(|(k, v)| {
-                        (
-                            k,
-                            EnumVariant {
-                                skip: v.skip,
-                                docs: v.docs,
-                                deprecated: v.deprecated,
-                                fields: match v.fields {
-                                    Fields::Unit => Fields::Unit,
-                                    Fields::Unnamed(f) => Fields::Unnamed(UnnamedFields {
-                                        fields: f
-                                            .fields
-                                            .into_iter()
-                                            .map(|f| Field {
-                                                optional: f.optional,
-                                                flatten: f.flatten,
-                                                deprecated: f.deprecated,
-                                                docs: f.docs,
-                                                inline: f.inline,
-                                                ty: f.ty.map(|ty| inner(types, ty, i + 1)),
-                                            })
-                                            .collect(),
-                                    }),
-                                    Fields::Named(f) => Fields::Named(NamedFields {
-                                        tag: f.tag,
-                                        fields: f
-                                            .fields
-                                            .into_iter()
-                                            .map(|(k, f)| {
-                                                (
-                                                    k,
-                                                    Field {
-                                                        optional: f.optional,
-                                                        flatten: f.flatten,
-                                                        deprecated: f.deprecated,
-                                                        docs: f.docs,
-                                                        inline: f.inline,
-                                                        ty: f.ty.map(|ty| inner(types, ty, i + 1)),
-                                                    },
-                                                )
-                                            })
-                                            .collect(),
-                                    }),
-                                },
-                            },
-                        )
-                    })
-                    .collect::<Vec<_>>(),
-            }),
-            DataType::Tuple(t) => DataType::Tuple(TupleType {
-                elements: t
-                    .elements
-                    .into_iter()
-                    .map(|ty| inner(types, ty, i + 1))
-                    .collect(),
-            }),
-            DataType::Reference(r) => r.datatype().clone(),
-            // TODO: If we do a transparent/inline can this be hit? -> Well we will move them to the runtime so will be fixed in near future.
-            DataType::Generic(_) => unreachable!(),
+fn field(
+    f: Field,
+    types: &TypeCollection,
+    truely_force_inline: bool,
+    generics: &HashMap<GenericType, DataType>,
+    depth: usize,
+) -> Field {
+    // TODO: truely_force_inline
+    if f.flatten() || f.inline() {
+        if let Some(ty) = &f.ty {
+            return Field {
+                ty: Some(inner(
+                    ty.clone(),
+                    types,
+                    true,
+                    truely_force_inline,
+                    generics,
+                    depth + 1,
+                )),
+                ..f
+            };
         }
     }
 
-    inner(types, dt, 0)
+    return Field {
+        ty: f.ty.map(|ty| resolve_generics(ty, &generics)),
+        ..f
+    };
 }
 
-// /// TODO
-// pub fn flatten_dt(types: &TypeCollection, dt: DataType) -> Option<DataType> {
-//     Some(match dt {
-//         // DataType::Any | DataType::Unknown |  DataType::Primitive(..) | DataType::Literal(..) => dt,
-//         // DataType::List(list) => DataType::List(List {
-//         //     ty: Box::new(inner(types, (*list.ty).clone(), i + 1)),
-//         //     length: list.length,
-//         //     unique: list.unique,
-//         // }),
-//         // DataType::Map(map) => DataType::Map(Map {
-//         //     key_ty: Box::new(inner(types, (*map.key_ty).clone(), i + 1)),
-//         //     value_ty: Box::new(inner(types, (*map.value_ty).clone(), i + 1)),
-//         // }),
-//         // DataType::Nullable(data_type) => DataType::Nullable(Box::new(inner(types, *data_type, i + 1))),
-//         DataType::Struct(s) => {
-//             DataType::Struct(StructType {
-//                 name: s.name,
-//                 sid: s.sid,
-//                 generics: s.generics,
-//                 fields: match s.fields {
-//                     Fields::Unit => Fields::Unit,
-//                     Fields::Unnamed(f) => {
-//                         for f in f.fields() {
-//                             let Some(ty) = f.ty() else {
-//                                 continue;
-//                             };
+fn fields(
+    f: Fields,
+    types: &TypeCollection,
+    truely_force_inline: bool,
+    generics: &HashMap<GenericType, DataType>,
+    depth: usize,
+) -> Fields {
+    match f {
+        Fields::Unnamed(f) => Fields::Unnamed(super::UnnamedFields {
+            fields: f
+                .fields
+                .into_iter()
+                .map(|f| field(f, types, truely_force_inline, generics, depth))
+                .collect(),
+        }),
+        Fields::Named(f) => Fields::Named(super::NamedFields {
+            fields: f
+                .fields
+                .into_iter()
+                .map(|(n, f)| (n, field(f, types, truely_force_inline, generics, depth)))
+                .collect(),
+            ..f
+        }),
+        v => v,
+    }
+}
 
-//                             // if let DataType::Struct(s) = ty {
-//                             //     if s.generics.is_empty() {
-//                             //         continue;
-//                             //     }
-//                             // }
+fn inner(
+    dt: DataType,
+    types: &TypeCollection,
+    force_inline: bool,
+    truely_force_inline: bool,
+    generics: &HashMap<GenericType, DataType>,
+    depth: usize,
+) -> DataType {
+    // TODO: Can we be smart enough to determine loops, instead of just trying X times and bailing out????
+    //      -> Would be more efficent but much harder. Would make the error messages much better though.
+    if depth == 25 {
+        // TODO: Return a `Result` instead of panicing
+        // TODO: Detect which types are the cycle and report it
+        panic!("Type recursion limit exceeded!");
+    }
 
-//                             if f.flatten() {
-//                                 todo!();
-//                             }
-//                         }
+    match dt {
+        DataType::List(l) => DataType::List(super::List {
+            ty: Box::new(inner(
+                *l.ty,
+                types,
+                false, // truely_force_inline,
+                truely_force_inline,
+                generics,
+                depth + 1,
+            )),
+            length: l.length,
+            unique: l.unique,
+        }),
+        DataType::Map(map) => DataType::Map(super::Map {
+            key_ty: Box::new(inner(
+                *map.key_ty,
+                types,
+                false, // truely_force_inline,
+                truely_force_inline,
+                generics,
+                depth + 1,
+            )),
+            value_ty: Box::new(inner(
+                *map.value_ty,
+                types,
+                false, // truely_force_inline,
+                truely_force_inline,
+                generics,
+                depth + 1,
+            )),
+        }),
+        DataType::Nullable(d) => DataType::Nullable(Box::new(inner(
+            *d,
+            types,
+            false, // truely_force_inline,
+            truely_force_inline,
+            generics,
+            depth + 1,
+        ))),
+        DataType::Struct(s) => DataType::Struct(super::StructType {
+            fields: fields(s.fields, types, truely_force_inline, &generics, depth),
+            ..s
+        }),
+        DataType::Enum(e) => DataType::Enum(super::EnumType {
+            variants: e
+                .variants
+                .into_iter()
+                .map(|(n, t)| {
+                    (
+                        n,
+                        super::EnumVariant {
+                            fields: fields(t.fields, types, truely_force_inline, &generics, depth),
+                            ..t
+                        },
+                    )
+                })
+                .collect(),
+            ..e
+        }),
+        DataType::Tuple(t) => DataType::Tuple(super::TupleType {
+            elements: t
+                .elements
+                .into_iter()
+                .map(|e| inner(e, types, false, truely_force_inline, generics, depth + 1))
+                .collect(),
+        }),
+        DataType::Generic(g) => {
+            let ty = generics.get(&g).expect("dun goof").clone();
 
-//                         todo!();
+            if truely_force_inline {
+                inner(
+                    ty.clone(),
+                    types,
+                    false,
+                    truely_force_inline,
+                    &Default::default(), // TODO: What should this be?
+                    depth + 1,
+                )
+            } else {
+                ty
+            }
+        }
+        DataType::Reference(r) => {
+            if r.inline() || force_inline || truely_force_inline {
+                let ty = types.get(r.sid()).expect("dun goof");
 
-//                         // Fields::Unnamed(UnnamedFields {
-//                         //     fields: unnamed_fields.fields.into_iter().map(|f| Field {
-//                         //         optional: f.optional,
-//                         //         flatten: f.flatten,
-//                         //         deprecated: f.deprecated,
-//                         //         docs: f.docs,
-//                         //         inline: f.inline,
-//                         //         ty: f.ty.map(|ty| inner(types, ty, i + 1))
-//                         //     }).collect(),
-//                         // }),
-//                     }
-//                     Fields::Named(f) => {
-//                         todo!();
+                inner(
+                    ty.inner.clone(),
+                    types,
+                    false,
+                    truely_force_inline,
+                    &r.generics
+                        .clone()
+                        .into_iter()
+                        .map(|(g, dt)| (g, resolve_generics(dt, generics)))
+                        .collect(),
+                    depth + 1,
+                )
+            } else {
+                DataType::Reference(r)
+            }
+        }
+        v => v,
+    }
+}
 
-//                         // Fields::Named(NamedFields {
-//                         //     tag: named_fields.tag,
-//                         //     fields: named_fields.fields.into_iter().map(|(k, f)| (k, Field {
-//                         //         optional: f.optional,
-//                         //         flatten: f.flatten,
-//                         //         deprecated: f.deprecated,
-//                         //         docs: f.docs,
-//                         //         inline: f.inline,
-//                         //         ty: f.ty.map(|ty| inner(types, ty, i + 1))
-//                         //     })).collect(),
-//                         // })
-//                     }
-//                 }
-//             })
-//         },
-//         // DataType::Enum(e) => DataType::Enum(EnumType {
-//         //     name: e.name,
-//         //     sid: e.sid,
-//         //     skip_bigint_checks: e.skip_bigint_checks,
-//         //     repr: e.repr,
-//         //     generics: e.generics,
-//         //     variants: e.variants.into_iter().map(|(k, v)| (k, EnumVariant {
-//         //         skip: v.skip,
-//         //         docs: v.docs,
-//         //         deprecated: v.deprecated,
-//         //         fields: match v.fields {
-//         //             Fields::Unit => Fields::Unit,
-//         //             Fields::Unnamed(f) => Fields::Unnamed(UnnamedFields {
-//         //                 fields: f.fields.into_iter().map(|f| Field {
-//         //                     optional: f.optional,
-//         //                     flatten: f.flatten,
-//         //                     deprecated: f.deprecated,
-//         //                     docs: f.docs,
-//         //                     inline: f.inline,
-//         //                     ty: f.ty.map(|ty| inner(types, ty, i + 1))
-//         //                 }).collect(),
-//         //             }),
-//         //             Fields::Named(f) => Fields::Named(NamedFields {
-//         //                 tag: f.tag,
-//         //                 fields: f.fields.into_iter().map(|(k, f)| (k, Field {
-//         //                     optional: f.optional,
-//         //                     flatten: f.flatten,
-//         //                     deprecated: f.deprecated,
-//         //                     docs: f.docs,
-//         //                     inline: f.inline,
-//         //                     ty: f.ty.map(|ty| inner(types, ty, i + 1)),
-//         //                 })).collect(),
-//         //             })
-//         //         }
-//         //     })).collect::<Vec<_>>(),
-//         // }),
-//         // DataType::Tuple(t) => DataType::Tuple(TupleType {
-//         //     elements: t.elements.into_iter().map(|ty| inner(types, ty, i + 1)).collect(),
-//         // }),
-//         // DataType::Reference(r) => r.datatype().clone(),
-//         // // TODO: If we do a transparent/inline can this be hit? -> Well we will move them to the runtime so will be fixed in near future.
-//         // DataType::Generic(_) => unreachable!(),
-//         _ => todo!(),
-//     })
-// }
+/// Following all `DataType::Reference`'s filling in any `DataType::Generic`'s with the correct value.
+fn resolve_generics(dt: DataType, generics: &HashMap<GenericType, DataType>) -> DataType {
+    // TODO: This could so only re-alloc if the type has a generics that needs replacing.
+    match dt {
+        DataType::List(l) => DataType::List(super::List {
+            ty: Box::new(resolve_generics(*l.ty, generics)),
+            ..l
+        }),
+        DataType::Map(m) => DataType::Map(super::Map {
+            key_ty: Box::new(resolve_generics(*m.key_ty, generics)),
+            value_ty: Box::new(resolve_generics(*m.value_ty, generics)),
+        }),
+        DataType::Nullable(d) => DataType::Nullable(Box::new(resolve_generics(*d, generics))),
+        // DataType::Struct(s) => DataType::Struct(super::StructType {
+        //     generics: todo!(),
+        //     fields: todo!(),
+        //     ..s,
+        // })
+        // DataType::Enum(e) => todo!(),
+        DataType::Tuple(t) => DataType::Tuple(super::TupleType {
+            elements: t
+                .elements
+                .into_iter()
+                .map(|dt| resolve_generics(dt, generics))
+                .collect(),
+        }),
+        DataType::Reference(r) => DataType::Reference(super::reference::Reference {
+            generics: r
+                .generics
+                .into_iter()
+                .map(|(g, dt)| (g, resolve_generics(dt, generics)))
+                .collect(),
+            ..r
+        }),
+        DataType::Generic(g) => {
+            // This method is run when not inlining so for `export` we do expect `DataType::Generic`.
+            // TODO: Functions main documentation nshould explain this.
+            generics.get(&g).cloned().unwrap_or(DataType::Generic(g))
+        }
+        v => v,
+    }
+}
