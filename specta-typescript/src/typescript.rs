@@ -100,7 +100,7 @@ impl Typescript {
             });
         }
 
-        specta_serde::validate(types)?;
+        // specta_serde::validate(types)?; // TODO: Bring back
 
         for (_, ndt) in types.into_iter() {
             out += &primitives::export(self, &types, ndt)?;

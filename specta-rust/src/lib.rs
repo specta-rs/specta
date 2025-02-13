@@ -122,13 +122,13 @@ fn datatype(r: &Rust, t: &DataType, types: &TypeCollection) -> Result<String, Er
     // TODO: Serde serialize + deserialize on types
 
     Ok(match t {
-        DataType::Unknown => todo!(),
-        // TODO: This should definetly be configurable cause they might not be using JSON.
-        DataType::Any => r
-            .any_value
-            .as_ref()
-            .map(|v| v.to_string())
-            .unwrap_or_else(|| "serde_json::Value".to_string()),
+        // DataType::Unknown => todo!(),
+        // // TODO: This should definetly be configurable cause they might not be using JSON.
+        // DataType::Any => r
+        //     .any_value
+        //     .as_ref()
+        //     .map(|v| v.to_string())
+        //     .unwrap_or_else(|| "serde_json::Value".to_string()),
         DataType::Primitive(ty) => ty.to_rust_str().to_owned(),
         DataType::Literal(_) => todo!(),
         DataType::Nullable(t) => format!("Option<{}>", datatype(r, t, types)?),

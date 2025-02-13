@@ -129,7 +129,7 @@ pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<
 // }
 
 // TODO: Private
-pub fn primitive_dt(
+pub(crate) fn primitive_dt(
     b: &BigIntExportBehavior,
     p: &PrimitiveType,
     location: Vec<Cow<'static, str>>,
@@ -154,7 +154,7 @@ pub fn primitive_dt(
 }
 
 // TODO: Private
-pub fn literal_dt(s: &mut String, l: &LiteralType) {
+pub(crate) fn literal_dt(s: &mut String, l: &LiteralType) {
     use LiteralType::*;
 
     match l {

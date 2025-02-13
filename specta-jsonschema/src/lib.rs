@@ -92,8 +92,9 @@ pub fn to_ast(schema: &Schema) -> Result<DataType, ()> {
             // pub extensions: Map<String, Value>,
 
             if let Some(reference) = &obj.reference {
-                return Ok(DataType::Any); // TODO: Fix this
-                                          // return Ok(DataType::Reference(DataTypeReference {
+                todo!();
+                // return Ok(DataType::Any); // TODO: Fix this
+                // return Ok(DataType::Reference(DataTypeReference {
 
                 // }));
             }

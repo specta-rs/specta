@@ -9,11 +9,11 @@ use std::{
 
 use serde::Serialize;
 use specta::Type;
+use specta_typescript::Any;
 use specta_typescript::{
     legacy::{ExportPath, NamedLocation},
     BigIntExportBehavior, Error, Typescript,
 };
-use specta_util::Any;
 
 macro_rules! assert_ts {
     (error; $t:ty, $e:expr) => {

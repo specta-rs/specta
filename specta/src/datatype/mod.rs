@@ -36,8 +36,6 @@ use std::borrow::Cow;
 #[derive(Debug, Clone, PartialEq)]
 pub enum DataType {
     // Always inlined
-    Any,
-    Unknown,
     Primitive(PrimitiveType),
     Literal(LiteralType),
     /// Either a `Set` or a `Vec`

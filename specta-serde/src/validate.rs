@@ -117,7 +117,6 @@ fn is_valid_map_key(
     generics: &BTreeMap<GenericType, DataType>,
 ) -> Result<(), Error> {
     match key_ty {
-        DataType::Any => Ok(()),
         DataType::Primitive(ty) => match ty {
             PrimitiveType::i8
             | PrimitiveType::i16
@@ -240,7 +239,7 @@ fn validate_internally_tag_enum_datatype(
 ) -> Result<(), Error> {
     match ty {
         // `serde_json::Any` can be *technically* be either valid or invalid based on the actual data but we are being strict and reject it.
-        DataType::Any => return Err(Error::InvalidInternallyTaggedEnum),
+        // DataType::Any => return Err(Error::InvalidInternallyTaggedEnum), // TODO: Do we need to fix this?
         DataType::Map(_) => {}
         // Structs's are always map-types unless they are transparent then it depends on inner type. However, transparent passes through when calling `Type::inline` so we don't need to specially check that case.
         DataType::Struct(_) => {}

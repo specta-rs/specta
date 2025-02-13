@@ -1,9 +1,11 @@
 use std::fmt::Debug;
 
-use specta::{datatype::DataType, Type, TypeCollection};
+use specta::{
+    datatype::{reference::Reference, DataType},
+    NamedType, Type, TypeCollection,
+};
 
-/// Easily convert a non-Specta type into a Specta compatible type.
-/// This will be typed as `any` in Typescript.
+/// Cast a Rust type to a Typescript `any` type.
 ///
 /// WARNING: When used with `Option<Any<T>>`, Typescript will not prompt you about nullability checks as `any | null` is coalesced to `any` in Typescript.
 ///
@@ -13,7 +15,7 @@ use specta::{datatype::DataType, Type, TypeCollection};
 /// ```rust
 /// use serde::Serialize;
 /// use specta::Type;
-/// use specta_util::Any;
+/// use specta_typescript::Any;
 ///
 /// #[derive(Serialize, Type)]
 /// pub struct Demo {
@@ -26,7 +28,7 @@ use specta::{datatype::DataType, Type, TypeCollection};
 /// ```rust
 /// use serde::Serialize;
 /// use specta::Type;
-/// use specta_util::Any;
+/// use specta_typescript::Any;
 ///
 /// #[derive(Serialize, Type)]
 /// pub struct Demo {
@@ -36,9 +38,17 @@ use specta::{datatype::DataType, Type, TypeCollection};
 pub struct Any<T = ()>(T);
 
 impl<T> Type for Any<T> {
-    fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Any
+    fn definition(types: &mut TypeCollection) -> DataType {
+        types.placeholder(Self::ID);
+        DataType::Reference(Reference::construct(Self::ID, [], false))
     }
+}
+
+impl<T> NamedType for Any<T> {
+    const ID: specta::SpectaID = specta::internal::construct::sid(
+        "Any",
+        concat!("::", module_path!(), ":", line!(), ":", column!()),
+    );
 }
 
 impl<T: Debug> Debug for Any<T> {
@@ -60,6 +70,7 @@ impl<T: Default> Default for Any<T> {
 }
 
 #[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 impl<T: serde::Serialize> serde::Serialize for Any<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -69,8 +80,7 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
     }
 }
 
-/// Easily convert a non-Specta type into a Specta compatible type.
-/// This will be typed as `unknown` in Typescript.
+/// Cast a Rust type to a Typescript `unknown` type.
 ///
 /// # Examples
 ///
@@ -78,7 +88,7 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
 /// ```rust
 /// use serde::Serialize;
 /// use specta::Type;
-/// use specta_util::Unknown;
+/// use specta_typescript::Unknown;
 ///
 /// #[derive(Serialize, Type)]
 /// pub struct Demo {
@@ -91,7 +101,7 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
 /// ```rust
 /// use serde::Serialize;
 /// use specta::Type;
-/// use specta_util::Unknown;
+/// use specta_typescript::Unknown;
 ///
 /// #[derive(Serialize, Type)]
 /// pub struct Demo {
@@ -101,9 +111,17 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
 pub struct Unknown<T = ()>(T);
 
 impl<T> Type for Unknown<T> {
-    fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Unknown
+    fn definition(types: &mut TypeCollection) -> DataType {
+        types.placeholder(Self::ID);
+        DataType::Reference(Reference::construct(Self::ID, [], false))
     }
+}
+
+impl<T> NamedType for Unknown<T> {
+    const ID: specta::SpectaID = specta::internal::construct::sid(
+        "Unknown",
+        concat!("::", module_path!(), ":", line!(), ":", column!()),
+    );
 }
 
 impl<T: Debug> Debug for Unknown<T> {
@@ -125,6 +143,7 @@ impl<T: Default> Default for Unknown<T> {
 }
 
 #[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 impl<T: serde::Serialize> serde::Serialize for Unknown<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

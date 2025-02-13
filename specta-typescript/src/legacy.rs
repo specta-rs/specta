@@ -110,7 +110,7 @@ impl fmt::Display for ExportPath {
 use specta::TypeCollection;
 
 use crate::reserved_names::RESERVED_TYPE_NAMES;
-use crate::{BigIntExportBehavior, Error, Typescript};
+use crate::{Any, BigIntExportBehavior, Error, Typescript, Unknown};
 use std::fmt::Write;
 
 use specta::datatype::{
@@ -317,8 +317,6 @@ pub(crate) fn datatype_inner(
     };
 
     Ok(match &typ {
-        DataType::Any => s.push_str(ANY),
-        DataType::Unknown => s.push_str(UNKNOWN),
         DataType::Primitive(p) => {
             s.push_str(crate::primitives::primitive_dt(
                 &ctx.cfg.bigint,
@@ -424,28 +422,34 @@ pub(crate) fn datatype_inner(
         }
         DataType::Tuple(tuple) => s.push_str(&tuple_datatype(ctx, tuple, types)?),
         DataType::Reference(reference) => {
-            let definition = types.get(reference.sid()).unwrap(); // TODO: Error handling
-
-            if reference.generics().len() == 0 {
-                s.push_str(&definition.name());
+            if reference.sid() == Any::<()>::ID {
+                s.push_str(ANY);
+            } else if reference.sid() == Unknown::<()>::ID {
+                s.push_str(UNKNOWN);
             } else {
-                s.push_str(&definition.name());
-                s.push('<');
+                let definition = types.get(reference.sid()).unwrap(); // TODO: Error handling
 
-                for (i, (_, v)) in reference.generics().iter().enumerate() {
-                    if i != 0 {
-                        s.push_str(", ");
+                if reference.generics().len() == 0 {
+                    s.push_str(&definition.name());
+                } else {
+                    s.push_str(&definition.name());
+                    s.push('<');
+
+                    for (i, (_, v)) in reference.generics().iter().enumerate() {
+                        if i != 0 {
+                            s.push_str(", ");
+                        }
+
+                        datatype_inner(
+                            ctx.with(PathItem::Type(definition.name().clone())),
+                            &FunctionResultVariant::Value(v.clone()),
+                            types,
+                            s,
+                        )?;
                     }
 
-                    datatype_inner(
-                        ctx.with(PathItem::Type(definition.name().clone())),
-                        &FunctionResultVariant::Value(v.clone()),
-                        types,
-                        s,
-                    )?;
+                    s.push('>');
                 }
-
-                s.push('>');
             }
         }
         DataType::Generic(ident) => s.push_str(&ident.to_string()),
@@ -945,8 +949,6 @@ fn validate_type_for_tagged_intersection(
     types: &TypeCollection,
 ) -> Result<bool> {
     match ty {
-        DataType::Any
-        | DataType::Unknown
         | DataType::Primitive(_)
         // `T & null` is `never` but `T & (U | null)` (this variant) is `T & U` so it's fine.
         | DataType::Nullable(_)

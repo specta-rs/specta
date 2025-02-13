@@ -131,6 +131,14 @@ impl TypeCollection {
         self
     }
 
+    /// TODO
+    ///
+    #[doc(hidden)] // TODO: Should we stablise this? If we do we need to stop it causing panics
+    pub fn placeholder(&mut self, sid: SpectaID) -> &mut Self {
+        self.map.insert(sid, None);
+        self
+    }
+
     /// Join another type collection into this one.
     pub fn extend(mut self, collection: impl Borrow<Self>) -> Self {
         self.map
@@ -158,9 +166,10 @@ impl TypeCollection {
             // If this method is used during type construction this case could be hit when it's actually valid
             // but all references are managed within `specta` so we can bypass this method and use `map` directly because we have `pub(crate)` access.
             None => {
-                #[cfg(debug_assertions)]
-                unreachable!("specta: `TypeCollection::get` found a type placeholder!");
-                #[cfg(not(debug_assertions))]
+                // TODO: Probs bring this back???
+                // #[cfg(debug_assertions)]
+                // unreachable!("specta: `TypeCollection::get` found a type placeholder!");
+                // #[cfg(not(debug_assertions))]
                 None
             }
         })
@@ -198,6 +207,7 @@ impl<'a> Iterator for TypeCollectionInterator<'a> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, Some(self.0.clone().filter(|(_, t)| t.is_none()).count()))
+        let len = self.0.clone().filter(|(_, t)| t.is_some()).count();
+        (len, Some(len))
     }
 }

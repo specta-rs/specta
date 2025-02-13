@@ -33,7 +33,7 @@ pub fn register(
             docs,
             deprecated,
             ext: Some(NamedDataTypeExt { sid, impl_location }),
-            inner: DataType::Any,
+            inner: DataType::Primitive(crate::datatype::PrimitiveType::i8), // TODO: Fix this
         },
         None => {
             types.map.entry(sid).or_insert(None);
