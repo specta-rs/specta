@@ -35,13 +35,13 @@ fn test_duplicate_ty_name() {
     use specta::internal::construct::impl_location;
 
     #[cfg(not(target_os = "windows"))]
-    let err = Err(Error::DuplicateTypeName(
+    let err = Err(Error::DuplicateTypeNameLegacy(
         "One".into(),
         impl_location("tests/tests/duplicate_ty_name.rs:7:14"),
         impl_location("tests/tests/duplicate_ty_name.rs:17:14"),
     ));
     #[cfg(target_os = "windows")]
-    let err = Err(Error::DuplicateTypeName(
+    let err = Err(Error::DuplicateTypeNameLegacy(
         "One".into(),
         impl_location(r#"tests\tests\duplicate_ty_name.rs:7:14"#),
         impl_location(r#"tests\tests\duplicate_ty_name.rs:17:14"#),

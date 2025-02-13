@@ -42,7 +42,7 @@ mod aenum {
 fn test_ts_reserved_keyworks() {
     assert_eq!(
         specta_typescript::legacy::export::<astruct::r#enum>(&Typescript::default()),
-        Err(Error::ForbiddenName(
+        Err(Error::ForbiddenNameLegacy(
             NamedLocation::Type,
             #[cfg(not(windows))]
             ExportPath::new_unsafe("tests/tests/reserved_keywords.rs:11:14"),
@@ -53,7 +53,7 @@ fn test_ts_reserved_keyworks() {
     );
     assert_eq!(
         specta_typescript::legacy::export::<atuplestruct::r#enum>(&Typescript::default()),
-        Err(Error::ForbiddenName(
+        Err(Error::ForbiddenNameLegacy(
             NamedLocation::Type,
             #[cfg(not(windows))]
             ExportPath::new_unsafe("tests/tests/reserved_keywords.rs:23:14"),
@@ -64,7 +64,7 @@ fn test_ts_reserved_keyworks() {
     );
     assert_eq!(
         specta_typescript::legacy::export::<aenum::r#enum>(&Typescript::default()),
-        Err(Error::ForbiddenName(
+        Err(Error::ForbiddenNameLegacy(
             NamedLocation::Type,
             #[cfg(not(windows))]
             ExportPath::new_unsafe("tests/tests/reserved_keywords.rs:33:14"),

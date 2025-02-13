@@ -52,7 +52,7 @@ mod error;
 mod js_doc;
 pub mod legacy;
 pub mod primitives;
-pub(crate) mod reserved_terms;
+pub(crate) mod reserved_names;
 mod typescript;
 
 pub use error::Error;

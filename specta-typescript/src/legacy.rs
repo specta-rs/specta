@@ -6,7 +6,7 @@ use specta::{internal::detect_duplicate_type_names, ImplLocation};
 use specta_serde::validate_dt;
 
 /// Describes where an error occurred.
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum NamedLocation {
     Type,
     Field,
@@ -109,7 +109,7 @@ impl fmt::Display for ExportPath {
 
 use specta::TypeCollection;
 
-use crate::reserved_terms::RESERVED_TYPE_NAMES;
+use crate::reserved_names::RESERVED_TYPE_NAMES;
 use crate::{BigIntExportBehavior, Error, Typescript};
 use std::fmt::Write;
 
@@ -147,7 +147,7 @@ pub fn export<T: NamedType>(conf: &Typescript) -> Output {
     let result = export_named_datatype(conf, &ty, &types);
 
     if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
-        return Err(Error::DuplicateTypeName(ty_name, l0, l1));
+        return Err(Error::DuplicateTypeNameLegacy(ty_name, l0, l1));
     }
 
     result
@@ -173,7 +173,7 @@ pub fn inline<T: Type>(conf: &Typescript) -> Output {
     let result = datatype(conf, &FunctionResultVariant::Value(ty.clone()), &types);
 
     if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
-        return Err(Error::DuplicateTypeName(ty_name, l0, l1));
+        return Err(Error::DuplicateTypeNameLegacy(ty_name, l0, l1));
     }
 
     result
@@ -284,12 +284,6 @@ pub fn datatype(conf: &Typescript, typ: &FunctionResultVariant, types: &TypeColl
     .map(|_| s)
 }
 
-macro_rules! primitive_def {
-    ($($t:ident)+) => {
-        $(PrimitiveType::$t)|+
-    }
-}
-
 pub(crate) fn datatype_inner(
     ctx: ExportContext,
     typ: &FunctionResultVariant,
@@ -326,38 +320,13 @@ pub(crate) fn datatype_inner(
         DataType::Any => s.push_str(ANY),
         DataType::Unknown => s.push_str(UNKNOWN),
         DataType::Primitive(p) => {
-            let ctx = ctx.with(PathItem::Type(p.to_rust_str().into()));
-            let str = match p {
-                primitive_def!(i8 i16 i32 u8 u16 u32 f32 f64) => NUMBER,
-                primitive_def!(usize isize i64 u64 i128 u128) => match ctx.cfg.bigint {
-                    BigIntExportBehavior::String => STRING,
-                    BigIntExportBehavior::Number => NUMBER,
-                    BigIntExportBehavior::BigInt => BIGINT,
-                    BigIntExportBehavior::Fail => {
-                        return Err(Error::BigIntForbidden(ctx.export_path()));
-                    }
-                },
-                primitive_def!(String char) => STRING,
-                primitive_def!(bool) => BOOLEAN,
-            };
-
-            s.push_str(str);
+            s.push_str(crate::primitives::primitive_dt(
+                &ctx.cfg.bigint,
+                p,
+                Vec::new(), /* TODO: Fix this path */
+            )?);
         }
-        DataType::Literal(literal) => match literal {
-            LiteralType::i8(v) => write!(s, "{v}")?,
-            LiteralType::i16(v) => write!(s, "{v}")?,
-            LiteralType::i32(v) => write!(s, "{v}")?,
-            LiteralType::u8(v) => write!(s, "{v}")?,
-            LiteralType::u16(v) => write!(s, "{v}")?,
-            LiteralType::u32(v) => write!(s, "{v}")?,
-            LiteralType::f32(v) => write!(s, "{v}")?,
-            LiteralType::f64(v) => write!(s, "{v}")?,
-            LiteralType::bool(v) => write!(s, "{v}")?,
-            LiteralType::String(v) => write!(s, r#""{v}""#)?,
-            LiteralType::char(v) => write!(s, r#""{v}""#)?,
-            LiteralType::None => s.write_str(NULL)?,
-            _ => unreachable!(),
-        },
+        DataType::Literal(l) => crate::primitives::literal_dt(s, l),
         DataType::Nullable(def) => {
             datatype_inner(
                 ctx,
@@ -943,12 +912,12 @@ fn sanitise_key<'a>(field_name: Cow<'static, str>, force_string: bool) -> Cow<'a
 
 pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: &str) -> Output {
     if let Some(name) = RESERVED_TYPE_NAMES.iter().find(|v| **v == ident) {
-        return Err(Error::ForbiddenName(loc, ctx.export_path(), name));
+        return Err(Error::ForbiddenNameLegacy(loc, ctx.export_path(), name));
     }
 
     if let Some(first_char) = ident.chars().next() {
         if !first_char.is_alphabetic() && first_char != '_' {
-            return Err(Error::InvalidName(
+            return Err(Error::InvalidNameLegacy(
                 loc,
                 ctx.export_path(),
                 ident.to_string(),
@@ -960,7 +929,7 @@ pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: 
         .find(|c: char| !c.is_alphanumeric() && c != '_')
         .is_some()
     {
-        return Err(Error::InvalidName(
+        return Err(Error::InvalidNameLegacy(
             loc,
             ctx.export_path(),
             ident.to_string(),
@@ -991,7 +960,7 @@ fn validate_type_for_tagged_intersection(
         DataType::Struct(v) => match v.fields() {
             Fields::Unit => Ok(true),
             Fields::Unnamed(_) => {
-                Err(Error::InvalidTaggedVariantContainingTupleStruct(
+                Err(Error::InvalidTaggedVariantContainingTupleStructLegacy(
                    ctx.export_path()
                 ))
             }

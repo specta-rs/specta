@@ -93,23 +93,21 @@ impl Typescript {
         out += &self.framework_header;
         out.push_str("\n\n");
 
-        // if let Some((name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
-        //     return Err(Error::DuplicateTypeName {
-        //         types: (l0, l1),
-        //         name,
-        //     });
-        // }
+        if let Some((name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
+            return Err(Error::DuplicateTypeName {
+                types: (l0, l1),
+                name,
+            });
+        }
 
-        // specta_serde::validate(types)?;
+        specta_serde::validate(types)?;
 
-        // for (_, ndt) in types.into_iter() {
-        //     out += &primitives::export(self, &types, ndt)?;
-        //     out += "\n\n";
-        // }
+        for (_, ndt) in types.into_iter() {
+            out += &primitives::export(self, &types, ndt)?;
+            out += "\n\n";
+        }
 
-        // Ok(out)
-
-        todo!();
+        Ok(out)
     }
 
     /// TODO

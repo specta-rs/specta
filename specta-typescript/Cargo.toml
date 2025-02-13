@@ -22,8 +22,6 @@ workspace = true
 specta = { version = "=2.0.0-rc.22", path = "../specta" }
 specta-serde = { version = "=0.0.9", path = "../specta-serde" }
 
-thiserror = "2" # TODO: Remove
-
 [dev-dependencies]
 serde = { version = "1.0.217", features = ["derive"] }
 specta = { version = "=2.0.0-rc.22", path = "../specta", features = ["derive", "export"] }
