@@ -20,7 +20,7 @@ pub use context::*;
 pub use error::*;
 use reserved_terms::*;
 use specta::datatype::reference::{inline_and_flatten, inline_and_flatten_ndt};
-use specta_serde::validate;
+use specta_serde::validate_dt;
 pub use typescript::*;
 
 #[doc(hidden)]
@@ -56,7 +56,7 @@ pub fn export<T: NamedType>(conf: &Typescript) -> Output {
     let ty = types.get(T::ID).unwrap();
     let ty = inline_and_flatten_ndt(ty.clone(), &types);
 
-    // is_valid_ty(&ty.inner, &types)?;
+    validate_dt(ty.ty(), &types)?;
     let result = export_named_datatype(conf, &ty, &types);
 
     if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
@@ -79,17 +79,11 @@ pub fn inline_ref<T: Type>(_: &T, conf: &Typescript) -> Output {
 pub fn inline<T: Type>(conf: &Typescript) -> Output {
     let mut types = TypeCollection::default();
 
-    // let ty = match T::definition(&mut types) {
-    //     DataType::Reference(r) => types.get(r.sid()).unwrap().inner.clone(),
-    //     t => t,
-    // };
-    // let ty = specta::datatype::inline::<T>(&mut types, &[]); // TODO: Where to get these generics?
-
     let ty = inline_reference::<T>(&mut types);
     let ty = inline_and_flatten(ty.clone(), &types);
     let ty = specta::datatype::reference::inline(ty.clone(), &types);
 
-    validate(&types).unwrap();
+    validate_dt(&ty, &types)?;
     let result = datatype(conf, &FunctionResultVariant::Value(ty.clone()), &types);
 
     if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {

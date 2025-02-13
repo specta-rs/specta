@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-
-use specta::{Type, TypeCollection};
+use specta::Type;
 
 #[derive(Type)]
 #[specta(tag = "tag")]

@@ -100,8 +100,6 @@ fn field(
     truely_force_inline: bool,
     generics: &HashMap<GenericType, DataType>,
 ) -> Field {
-    println!("FIELD {:?} {:?}", generics, f.flatten() || f.inline());
-
     // TODO: truely_force_inline
     if f.flatten() || f.inline() {
         if let Some(ty) = &f.ty {
@@ -128,8 +126,6 @@ fn fields(
     truely_force_inline: bool,
     generics: &HashMap<GenericType, DataType>,
 ) -> Fields {
-    println!("FIELDS {:?}", generics);
-
     match f {
         Fields::Unnamed(f) => Fields::Unnamed(super::UnnamedFields {
             fields: f
@@ -163,7 +159,7 @@ fn inner(
             ty: Box::new(inner(
                 *l.ty,
                 types,
-                false,
+                truely_force_inline,
                 truely_force_inline,
                 generics,
                 &Default::default(),
@@ -175,7 +171,7 @@ fn inner(
             key_ty: Box::new(inner(
                 *map.key_ty,
                 types,
-                false,
+                truely_force_inline,
                 truely_force_inline,
                 generics,
                 &Default::default(),
@@ -183,7 +179,7 @@ fn inner(
             value_ty: Box::new(inner(
                 *map.value_ty,
                 types,
-                false,
+                truely_force_inline,
                 truely_force_inline,
                 generics,
                 &Default::default(),
@@ -192,7 +188,7 @@ fn inner(
         DataType::Nullable(d) => DataType::Nullable(Box::new(inner(
             *d,
             types,
-            false,
+            truely_force_inline,
             truely_force_inline,
             generics,
             &Default::default(),
@@ -204,8 +200,6 @@ fn inner(
                 .cloned()
                 .zip(known_references.iter().cloned())
                 .collect::<HashMap<_, _>>();
-
-            println!("STRUCT {:?}", generics);
 
             DataType::Struct(super::StructType {
                 fields: fields(s.fields, types, truely_force_inline, &generics),
@@ -253,22 +247,11 @@ fn inner(
                 })
                 .collect(),
         }),
-        DataType::Generic(g) => {
-            println!(
-                "G: {:?} {:?}",
-                g,
-                generics.get(&g).expect("dun goof").clone()
-            );
-
-            generics.get(&g).expect("dun goof").clone()
-        }
+        DataType::Generic(g) => generics.get(&g).expect("dun goof").clone(),
         DataType::Reference(r) => {
-            // println!("{:?} {:?} {:?}", r.sid, r.inline(), force_inline);
             if r.inline() || force_inline || truely_force_inline {
-                // println!("{:?}", types.get(r.sid).expect("dun goof").ty());
                 inner(
                     *r.dt.clone(),
-                    // types.get(r.sid).expect("dun goof").ty().clone(),
                     types,
                     truely_force_inline, // TODO:  false,
                     truely_force_inline,

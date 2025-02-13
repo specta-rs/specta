@@ -1,5 +1,5 @@
 use std::{
-    borrow::{Borrow, Cow},
+    borrow::Borrow,
     collections::{btree_map, BTreeMap},
     fmt,
     sync::atomic::AtomicU64,
@@ -135,7 +135,14 @@ impl TypeCollection {
     }
 
     /// Join another type collection into this one.
-    pub fn extend(&mut self, collection: impl Borrow<Self>) -> &mut Self {
+    pub fn extend(mut self, collection: impl Borrow<Self>) -> Self {
+        self.map
+            .extend(collection.borrow().map.iter().map(|(k, v)| (*k, v.clone())));
+        self
+    }
+
+    /// Join another type collection into this one.
+    pub fn extend_mut(&mut self, collection: impl Borrow<Self>) -> &mut Self {
         self.map
             .extend(collection.borrow().map.iter().map(|(k, v)| (*k, v.clone())));
         self
@@ -160,6 +167,10 @@ impl TypeCollection {
                 None
             }
         })
+    }
+
+    pub fn len(&self) -> usize {
+        self.map.len()
     }
 }
 

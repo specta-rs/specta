@@ -140,12 +140,6 @@ fn inline() {
     }
 
     assert_ts_export!(Generic::<()>, "export type Generic<T> = { t: T }");
-    // todo!("{:#?}", Container::definition(&mut Default::default()));
-    let mut types = specta::TypeCollection::default();
-    // todo!(
-    //     "{:#?}",
-    //     specta::datatype::reference::inline_and_flatten(Container::definition(&mut types), &types)
-    // );
     assert_ts_export!(
         Container,
         "export type Container = ({ t: string }) & { g: Generic<string>; gi: { t: string } }"

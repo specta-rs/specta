@@ -19,6 +19,17 @@ pub fn validate(types: &TypeCollection) -> Result<(), Error> {
     Ok(())
 }
 
+// TODO: Remove this once we redo the Typescript exporter.
+pub fn validate_dt(ty: &DataType, types: &TypeCollection) -> Result<(), Error> {
+    inner(ty, &types, &mut Default::default())?;
+
+    for (_, ndt) in types.into_iter() {
+        inner(&ndt.inner, &types, &mut Default::default())?;
+    }
+
+    Ok(())
+}
+
 fn inner(
     dt: &DataType,
     types: &TypeCollection,
@@ -90,6 +101,8 @@ fn inner(
 
 // Typescript: Must be assignable to `string | number | symbol` says Typescript.
 fn is_valid_map_key(key_ty: &DataType, types: &TypeCollection) -> Result<(), Error> {
+    println!("{:?}", key_ty); // TODO
+
     match key_ty {
         DataType::Any => Ok(()),
         DataType::Primitive(ty) => match ty {
@@ -140,6 +153,13 @@ fn is_valid_map_key(key_ty: &DataType, types: &TypeCollection) -> Result<(), Err
                     }
                     _ => return Err(Error::InvalidMapKey),
                 }
+            }
+
+            Ok(())
+        }
+        DataType::Tuple(t) => {
+            if t.elements().len() == 0 {
+                return Err(Error::InvalidMapKey);
             }
 
             Ok(())
