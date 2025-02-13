@@ -73,25 +73,25 @@ fn test_bigint_types() {
     assert_eq!(
         specta_typescript::inline::<StructWithBigInt>(&Typescript::default()),
         Err(ExportError::BigIntForbidden(ExportPath::new_unsafe(
-            "StructWithBigInt.a -> i128"
+            "tests/tests/bigints.rs:16:10.a -> i128" // TODO: Include type name not just path
         )))
     );
     assert_eq!(
         specta_typescript::inline::<StructWithStructWithBigInt>(&Typescript::default()),
         Err(ExportError::BigIntForbidden(ExportPath::new_unsafe(
-            "StructWithStructWithBigInt.abc -> StructWithBigInt.a -> i128"
+            "tests/tests/bigints.rs:22:10.abc -> tests/tests/bigints.rs:16:10.a -> i128"
         )))
     );
     assert_eq!(
         specta_typescript::inline::<StructWithStructWithStructWithBigInt>(&Typescript::default()),
         Err(ExportError::BigIntForbidden(ExportPath::new_unsafe(
-            "StructWithStructWithStructWithBigInt.field1 -> StructWithStructWithBigInt.abc -> StructWithBigInt.a -> i128"
+            "tests/tests/bigints.rs:30:10.field1 -> tests/tests/bigints.rs:22:10.abc -> tests/tests/bigints.rs:16:10.a -> i128"
         )))
     );
     assert_eq!(
         specta_typescript::inline::<EnumWithStructWithStructWithBigInt>(&Typescript::default()),
         Err(ExportError::BigIntForbidden(ExportPath::new_unsafe(
-            "EnumWithStructWithStructWithBigInt::A -> StructWithStructWithBigInt.abc -> StructWithBigInt.a -> i128"
+            "EnumWithStructWithStructWithBigInt::A -> tests/tests/bigints.rs:22:10.abc -> tests/tests/bigints.rs:16:10.a -> i128"
         )))
     );
     // TODO: This required `inline` to work better on `Option<T>`
@@ -104,7 +104,7 @@ fn test_bigint_types() {
     assert_eq!(
         specta_typescript::inline::<EnumWithStructWithStructWithBigInt>(&Typescript::default()),
         Err(ExportError::BigIntForbidden(ExportPath::new_unsafe(
-            "EnumWithStructWithStructWithBigInt::A -> StructWithStructWithBigInt.abc -> StructWithBigInt.a -> i128"
+            "EnumWithStructWithStructWithBigInt::A -> tests/tests/bigints.rs:22:10.abc -> tests/tests/bigints.rs:16:10.a -> i128"
         )))
     );
     assert_eq!(

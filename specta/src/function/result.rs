@@ -6,25 +6,22 @@ use crate::{datatype::FunctionResultVariant, Type, TypeCollection};
 /// [`specta`](crate::specta).
 pub trait FunctionResult<TMarker> {
     /// Gets the type of the result as a [`DataType`].
-    fn to_datatype(type_map: &mut TypeCollection) -> FunctionResultVariant;
+    fn to_datatype(types: &mut TypeCollection) -> FunctionResultVariant;
 }
 
 #[doc(hidden)]
 pub enum FunctionValueMarker {}
 impl<T: Type> FunctionResult<FunctionValueMarker> for T {
-    fn to_datatype(type_map: &mut TypeCollection) -> FunctionResultVariant {
-        FunctionResultVariant::Value(T::reference(type_map, &[]).inner)
+    fn to_datatype(types: &mut TypeCollection) -> FunctionResultVariant {
+        FunctionResultVariant::Value(T::definition(types))
     }
 }
 
 #[doc(hidden)]
 pub enum FunctionResultMarker {}
 impl<T: Type, E: Type> FunctionResult<FunctionResultMarker> for Result<T, E> {
-    fn to_datatype(type_map: &mut TypeCollection) -> FunctionResultVariant {
-        FunctionResultVariant::Result(
-            T::reference(type_map, &[]).inner,
-            E::reference(type_map, &[]).inner,
-        )
+    fn to_datatype(types: &mut TypeCollection) -> FunctionResultVariant {
+        FunctionResultVariant::Result(T::definition(types), E::definition(types))
     }
 }
 
@@ -35,8 +32,8 @@ where
     F: Future,
     F::Output: Type,
 {
-    fn to_datatype(type_map: &mut TypeCollection) -> FunctionResultVariant {
-        FunctionResultVariant::Value(F::Output::reference(type_map, &[]).inner)
+    fn to_datatype(types: &mut TypeCollection) -> FunctionResultVariant {
+        FunctionResultVariant::Value(F::Output::definition(types))
     }
 }
 
@@ -48,10 +45,7 @@ where
     T: Type,
     E: Type,
 {
-    fn to_datatype(type_map: &mut TypeCollection) -> FunctionResultVariant {
-        FunctionResultVariant::Result(
-            T::reference(type_map, &[]).inner,
-            E::reference(type_map, &[]).inner,
-        )
+    fn to_datatype(types: &mut TypeCollection) -> FunctionResultVariant {
+        FunctionResultVariant::Result(T::definition(types), E::definition(types))
     }
 }

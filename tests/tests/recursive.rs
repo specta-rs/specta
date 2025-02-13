@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use specta::Type;
-use specta_serde::SerdeError;
+use specta_serde::Error;
 use specta_typescript::ExportError;
 
 use crate::ts::{assert_ts, assert_ts_export};
@@ -54,11 +54,11 @@ fn test_recursive_types() {
     assert_ts_export!(Recursive, "export type Recursive = { demo: Recursive }");
 
     // Just check it doesn't overflow while doing this check
-    assert_ts!(error; RecursiveMapKey, ExportError::Serde(SerdeError::InvalidMapKey));
+    assert_ts!(error; RecursiveMapKey, ExportError::Serde(Error::InvalidMapKey));
     assert_ts_export!(
         error;
         RecursiveMapKey,
-        ExportError::Serde(SerdeError::InvalidMapKey)
+        ExportError::Serde(Error::InvalidMapKey)
     );
 
     assert_ts!(

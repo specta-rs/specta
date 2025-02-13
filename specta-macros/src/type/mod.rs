@@ -3,9 +3,7 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use r#enum::parse_enum;
 use r#struct::parse_struct;
-use syn::{parse, Data, DeriveInput};
-
-use generics::impl_heading;
+use syn::{parse, Data, DeriveInput, GenericParam};
 
 use crate::utils::{parse_attrs, unraw_raw_ident, AttributeValue};
 
@@ -15,6 +13,7 @@ use self::generics::{
 
 pub(crate) mod attr;
 mod r#enum;
+mod field;
 mod generics;
 mod r#struct;
 
@@ -44,18 +43,14 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         unraw_raw_ident(&format_ident!("{}", raw_ident.to_string())).to_token_stream()
     });
 
-    let sid = quote!(#crate_ref::internal::construct::sid(#name, concat!("::", module_path!(), ":", line!(), ":", column!())));
-    let (inlines, reference, can_flatten) = match data {
-        Data::Struct(data) => {
-            parse_struct(&name, &container_attrs, generics, &crate_ref, &sid, data)
-        }
+    let (inlines, can_flatten) = match data {
+        Data::Struct(data) => parse_struct(&name, &container_attrs, generics, &crate_ref, data),
         Data::Enum(data) => parse_enum(
             &name,
             &EnumAttr::from_attrs(&container_attrs, &mut attrs)?,
             &container_attrs,
             generics,
             &crate_ref,
-            &sid,
             data,
         ),
         Data::Union(data) => Err(syn::Error::new_spanned(
@@ -88,11 +83,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         }
     }
 
-    let definition_generics = generics.type_params().map(|param| {
-        let ident = param.ident.to_string();
-        quote!(#crate_ref::internal::construct::generic_data_type(#ident))
-    });
-
     let bounds = generics_with_ident_and_bounds_only(generics);
     let type_args = generics_with_ident_only(generics);
     let where_bound = add_type_to_where_clause(&quote!(#crate_ref::Type), generics);
@@ -104,7 +94,42 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         }
     });
 
-    let type_impl_heading = impl_heading(quote!(#crate_ref::Type), &ident, generics);
+    //     if container_attrs.inline || container_attrs.transparent {
+    //     let generics = &generics.params;
+    //     quote!(#generics)
+    // } else {
+    let inline_generics_def = {
+        let g = generics.params.iter().map(|param| match param {
+            GenericParam::Lifetime(lt) => {
+                let lt = &lt.lifetime;
+                quote!(#lt)
+            }
+            GenericParam::Type(t) => {
+                let ident = format_ident!("PLACEHOLDER_{}", t.ident);
+                quote!(#crate_ref::datatype::Generic<#ident>)
+            }
+            GenericParam::Const(c) => {
+                let ident = &c.ident;
+                quote!(#ident)
+            }
+        });
+
+        quote!(#(#g),*)
+    };
+
+    let generic_placeholders = generics.params.iter().filter_map(|param| match param {
+        GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
+        GenericParam::Type(t) => {
+            let ident = format_ident!("PLACEHOLDER_{}", t.ident);
+            let ident_str = t.ident.to_string();
+            Some(quote!(
+                pub struct #ident;
+                impl #crate_ref::datatype::GenericPlaceholder for #ident {
+                    const PLACEHOLDER: &'static str = #ident_str;
+                }
+            ))
+        }
+    });
 
     let export = (cfg!(feature = "DO_NOT_USE_export") && container_attrs.export.unwrap_or(true))
         .then(|| {
@@ -126,58 +151,58 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         });
 
     let comments = &container_attrs.common.doc;
+    let inline = container_attrs.inline;
     let deprecated = container_attrs.common.deprecated_as_tokens(&crate_ref);
-
     let impl_location = quote!(#crate_ref::internal::construct::impl_location(concat!(file!(), ":", line!(), ":", column!())));
 
+    let reference_generics = generics.params.iter().filter_map(|param| match param {
+        GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
+        GenericParam::Type(t) => {
+            let i = &t.ident;
+            let i_str = i.to_string();
+            Some(quote!((#crate_ref::internal::construct::generic_data_type(#i_str), <#i as #crate_ref::Type>::definition(types))))
+        }
+    });
+
     Ok(quote! {
+        #[allow(non_camel_case_types)]
         const _: () = {
-	        const IMPL_LOCATION: #crate_ref::ImplLocation = #impl_location;
-            const DEFINITION_GENERICS: &[#crate_ref::datatype::DataType] = &[#(#definition_generics),*];
+            pub use #crate_ref::Type;
 
+            // This is equivalent to `<Self as #crate_ref::NamedType>::ID` but it's shorter so we use it instead.
+            const SID: #crate_ref::SpectaID = #crate_ref::internal::construct::sid(#name, concat!("::", module_path!(), ":", line!(), ":", column!()));
+
+            #(#generic_placeholders)*
+
+            // TODO: We should make this a standalone function but that caused issues resolving lifetimes.
             #[automatically_derived]
-            #type_impl_heading {
-                fn inline(type_map: &mut #crate_ref::TypeCollection, generics: #crate_ref::Generics) -> #crate_ref::datatype::DataType {
-                    let generics = match generics {
-                        #crate_ref::Generics::Definition => DEFINITION_GENERICS,
-                        #crate_ref::Generics::Provided(generics) => generics,
-                    };
-
+            impl #bounds #ident #type_args #where_bound {
+                #[doc(hidden)] // Don't want this showing up in users LSP
+                fn ___specta_definition___(types: &mut #crate_ref::TypeCollection) -> #crate_ref::datatype::DataType {
                     #inlines
                 }
+            }
 
-                fn reference(type_map: &mut #crate_ref::TypeCollection, generics: &[#crate_ref::datatype::DataType]) -> #crate_ref::datatype::reference::Reference {
-                    #reference
+            #[automatically_derived]
+            impl #bounds #crate_ref::Type for #ident #type_args #where_bound {
+                fn definition(types: &mut #crate_ref::TypeCollection) -> #crate_ref::datatype::DataType {
+                    #crate_ref::internal::register(
+                        types,
+                        #name.into(),
+                        #comments.into(),
+                        #deprecated,
+                        SID,
+                        #impl_location,
+                        |types| #ident::<#inline_generics_def>::___specta_definition___(types),
+                    );
+
+                    #crate_ref::datatype::reference::Reference::construct(SID, [#(#reference_generics),*], #inline).into()
                 }
             }
 
             #[automatically_derived]
             impl #bounds #crate_ref::NamedType for #ident #type_args #where_bound {
-                fn sid() -> #crate_ref::SpectaID {
-                    #sid
-                }
-
-                fn named_data_type(type_map: &mut #crate_ref::TypeCollection, generics: &[#crate_ref::datatype::DataType]) -> #crate_ref::datatype::NamedDataType {
-                    #crate_ref::internal::construct::named_data_type(
-                        #name.into(),
-                        #comments.into(),
-                        #deprecated,
-                        Self::sid(),
-                        IMPL_LOCATION,
-                        <Self as #crate_ref::Type>::inline(type_map, #crate_ref::Generics::Provided(generics))
-                    )
-                }
-
-                fn definition_named_data_type(type_map: &mut #crate_ref::TypeCollection) -> #crate_ref::datatype::NamedDataType {
-                    #crate_ref::internal::construct::named_data_type(
-                        #name.into(),
-                        #comments.into(),
-                        #deprecated,
-                        Self::sid(),
-                        IMPL_LOCATION,
-                        <Self as #crate_ref::Type>::inline(type_map, #crate_ref::Generics::Definition)
-                    )
-                }
+                const ID: #crate_ref::SpectaID = SID;
             }
 
             #flatten_impl

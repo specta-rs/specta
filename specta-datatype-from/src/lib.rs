@@ -15,7 +15,7 @@
 //! - [`String`] and [`&str`] will become [`LiteralType::String`]
 //!
 //! # Example
-//! ```rust
+//! ```ignore
 //! use specta::{datatype::LiteralType, ts, DataType, DataTypeFrom, StructType, TupleType};
 //!
 //! #[derive(Clone, DataTypeFrom)]

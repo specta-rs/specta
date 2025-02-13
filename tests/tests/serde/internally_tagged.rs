@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use specta::Type;
-use specta_serde::SerdeError;
+use specta_serde::Error;
 
 use crate::ts::assert_ts;
 
@@ -122,15 +122,18 @@ pub enum MInner {
 
 #[test]
 fn internally_tagged() {
-    assert_ts!(error; A, SerdeError::InvalidInternallyTaggedEnum);
-    assert_ts!(error; B, SerdeError::InvalidInternallyTaggedEnum);
-    assert_ts!(error; C, SerdeError::InvalidInternallyTaggedEnum);
-    assert_ts!(D, "({ type: \"A\" } & Partial<{ [key in string]: string }>)");
+    assert_ts!(error; A, Error::InvalidInternallyTaggedEnum);
+    assert_ts!(error; B, Error::InvalidInternallyTaggedEnum);
+    assert_ts!(error; C, Error::InvalidInternallyTaggedEnum);
+    assert_ts!(
+        D,
+        "({ type: \"A\" } & Partial<{ [key in string]: string }>)"
+    );
     assert_ts!(E, "({ type: \"A\" })");
     assert_ts!(F, "({ type: \"A\" } & FInner)");
-    assert_ts!(error; G, SerdeError::InvalidInternallyTaggedEnum);
+    assert_ts!(error; G, Error::InvalidInternallyTaggedEnum);
     assert_ts!(H, "({ type: \"A\" })");
-    assert_ts!(error; I, SerdeError::InvalidInternallyTaggedEnum);
+    assert_ts!(error; I, Error::InvalidInternallyTaggedEnum);
     assert_ts!(L, "({ type: \"A\" } & ({ type: \"A\" } | { type: \"B\" }))");
     assert_ts!(M, "({ type: \"A\" })");
 }

@@ -19,17 +19,21 @@ mod typescript;
 pub use context::*;
 pub use error::*;
 use reserved_terms::*;
+use specta::datatype::inline_and_flatten_ndt;
+use specta_serde::validate_dt;
 pub use typescript::*;
 
+#[doc(hidden)]
+pub use ExportError as Error;
+
 use specta::datatype::{
-    DataType, DeprecatedType, EnumRepr, EnumType, EnumVariant, EnumVariants, FunctionResultVariant,
-    LiteralType, NamedDataType, PrimitiveType, StructFields, StructType, TupleType,
+    DataType, DeprecatedType, EnumRepr, EnumType, EnumVariant, Fields, FunctionResultVariant,
+    LiteralType, NamedDataType, PrimitiveType, StructType, TupleType,
 };
 use specta::{
     internal::{detect_duplicate_type_names, skip_fields, skip_fields_named, NonSkipField},
-    Generics, NamedType, Type, TypeCollection,
+    NamedType, Type, TypeCollection,
 };
-use specta_serde::is_valid_ty;
 
 #[allow(missing_docs)]
 pub type Result<T> = std::result::Result<T, ExportError>;
@@ -47,12 +51,15 @@ pub fn export_ref<T: NamedType>(_: &T, conf: &Typescript) -> Output {
 ///
 /// Eg. `export type Foo = { demo: string; };`
 pub fn export<T: NamedType>(conf: &Typescript) -> Output {
-    let mut type_map = TypeCollection::default();
-    let named_data_type = T::definition_named_data_type(&mut type_map);
-    is_valid_ty(&named_data_type.inner, &type_map)?;
-    let result = export_named_datatype(conf, &named_data_type, &type_map);
+    let mut types = TypeCollection::default();
+    T::definition(&mut types);
+    let ty = types.get(T::ID).unwrap();
+    let ty = inline_and_flatten_ndt(ty.clone(), &types);
 
-    if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_map).into_iter().next() {
+    validate_dt(ty.ty(), &types)?;
+    let result = export_named_datatype(conf, &ty, &types);
+
+    if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
         return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
     }
 
@@ -70,12 +77,15 @@ pub fn inline_ref<T: Type>(_: &T, conf: &Typescript) -> Output {
 ///
 /// Eg. `{ demo: string; };`
 pub fn inline<T: Type>(conf: &Typescript) -> Output {
-    let mut type_map = TypeCollection::default();
-    let ty = T::inline(&mut type_map, Generics::NONE);
-    is_valid_ty(&ty, &type_map)?;
-    let result = datatype(conf, &FunctionResultVariant::Value(ty.clone()), &type_map);
+    let mut types = TypeCollection::default();
 
-    if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&type_map).into_iter().next() {
+    let ty = T::definition(&mut types);
+    let ty = specta::datatype::inline(ty.clone(), &types);
+
+    validate_dt(&ty, &types)?;
+    let result = datatype(conf, &FunctionResultVariant::Value(ty.clone()), &types);
+
+    if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
         return Err(ExportError::DuplicateTypeName(ty_name, l0, l1));
     }
 
@@ -88,11 +98,11 @@ pub fn inline<T: Type>(conf: &Typescript) -> Output {
 pub fn export_named_datatype(
     conf: &Typescript,
     typ: &NamedDataType,
-    type_map: &TypeCollection,
+    types: &TypeCollection,
 ) -> Output {
     // TODO: Duplicate type name detection?
 
-    is_valid_ty(&typ.inner, type_map)?;
+    // is_valid_ty(&typ.inner, types)?;
     export_datatype_inner(
         ExportContext {
             cfg: conf,
@@ -100,7 +110,7 @@ pub fn export_named_datatype(
             is_export: true,
         },
         typ,
-        type_map,
+        types,
     )
 }
 
@@ -133,7 +143,7 @@ fn inner_comments(
 fn export_datatype_inner(
     ctx: ExportContext,
     typ: &NamedDataType,
-    type_map: &TypeCollection,
+    types: &TypeCollection,
 ) -> Output {
     let name = typ.name();
     let docs = typ.docs();
@@ -158,7 +168,7 @@ fn export_datatype_inner(
     datatype_inner(
         ctx.clone(),
         &FunctionResultVariant::Value((typ.inner).clone()),
-        type_map,
+        types,
         &mut inline_ts,
     )?;
 
@@ -174,11 +184,7 @@ fn export_datatype_inner(
 /// Convert a DataType to a TypeScript string
 ///
 /// Eg. `{ demo: string; }`
-pub fn datatype(
-    conf: &Typescript,
-    typ: &FunctionResultVariant,
-    type_map: &TypeCollection,
-) -> Output {
+pub fn datatype(conf: &Typescript, typ: &FunctionResultVariant, types: &TypeCollection) -> Output {
     // TODO: Duplicate type name detection?
 
     let mut s = String::new();
@@ -189,7 +195,7 @@ pub fn datatype(
             is_export: false,
         },
         typ,
-        type_map,
+        types,
         &mut s,
     )
     .map(|_| s)
@@ -204,7 +210,7 @@ macro_rules! primitive_def {
 pub(crate) fn datatype_inner(
     ctx: ExportContext,
     typ: &FunctionResultVariant,
-    type_map: &TypeCollection,
+    types: &TypeCollection,
     s: &mut String,
 ) -> Result<()> {
     let typ = match typ {
@@ -216,19 +222,14 @@ pub(crate) fn datatype_inner(
                     datatype_inner(
                         ctx.clone(),
                         &FunctionResultVariant::Value(t.clone()),
-                        type_map,
+                        types,
                         &mut v,
                     )?;
                     v
                 },
                 {
                     let mut v = String::new();
-                    datatype_inner(
-                        ctx,
-                        &FunctionResultVariant::Value(e.clone()),
-                        type_map,
-                        &mut v,
-                    )?;
+                    datatype_inner(ctx, &FunctionResultVariant::Value(e.clone()), types, &mut v)?;
                     v
                 },
             ];
@@ -281,7 +282,7 @@ pub(crate) fn datatype_inner(
             datatype_inner(
                 ctx,
                 &FunctionResultVariant::Value((**def).clone()),
-                type_map,
+                types,
                 s,
             )?;
 
@@ -297,14 +298,14 @@ pub(crate) fn datatype_inner(
             datatype_inner(
                 ctx.clone(),
                 &FunctionResultVariant::Value(def.key_ty().clone()),
-                type_map,
+                types,
                 s,
             )?;
             s.push_str("]: ");
             datatype_inner(
                 ctx.clone(),
                 &FunctionResultVariant::Value(def.value_ty().clone()),
-                type_map,
+                types,
                 s,
             )?;
             s.push_str(" }>");
@@ -315,7 +316,7 @@ pub(crate) fn datatype_inner(
             datatype_inner(
                 ctx,
                 &FunctionResultVariant::Value(def.ty().clone()),
-                type_map,
+                types,
                 &mut dt,
             )?;
 
@@ -348,14 +349,14 @@ pub(crate) fn datatype_inner(
         DataType::Struct(item) => struct_datatype(
             ctx.with(
                 item.sid()
-                    .and_then(|sid| type_map.get(*sid))
+                    .and_then(|sid| types.get(sid))
                     .and_then(|v| v.ext())
                     .map(|v| PathItem::TypeExtended(item.name().clone(), *v.impl_location()))
                     .unwrap_or_else(|| PathItem::Type(item.name().clone())),
             ),
             item.name(),
             item,
-            type_map,
+            types,
             s,
         )?,
         DataType::Enum(item) => {
@@ -368,33 +369,36 @@ pub(crate) fn datatype_inner(
             enum_datatype(
                 ctx.with(PathItem::Variant(item.name().clone())),
                 item,
-                type_map,
+                types,
                 s,
             )?
         }
-        DataType::Tuple(tuple) => s.push_str(&tuple_datatype(ctx, tuple, type_map)?),
-        DataType::Reference(reference) => match &reference.generics()[..] {
-            [] => s.push_str(&reference.name()),
-            generics => {
-                s.push_str(&reference.name());
+        DataType::Tuple(tuple) => s.push_str(&tuple_datatype(ctx, tuple, types)?),
+        DataType::Reference(reference) => {
+            let definition = types.get(reference.sid()).unwrap(); // TODO: Error handling
+
+            if reference.generics().len() == 0 {
+                s.push_str(&definition.name());
+            } else {
+                s.push_str(&definition.name());
                 s.push('<');
 
-                for (i, (_, v)) in generics.iter().enumerate() {
+                for (i, (_, v)) in reference.generics().iter().enumerate() {
                     if i != 0 {
                         s.push_str(", ");
                     }
 
                     datatype_inner(
-                        ctx.with(PathItem::Type(reference.name().clone())),
+                        ctx.with(PathItem::Type(definition.name().clone())),
                         &FunctionResultVariant::Value(v.clone()),
-                        type_map,
+                        types,
                         s,
                     )?;
                 }
 
                 s.push('>');
             }
-        },
+        }
         DataType::Generic(ident) => s.push_str(&ident.to_string()),
     })
 }
@@ -403,7 +407,7 @@ pub(crate) fn datatype_inner(
 fn unnamed_fields_datatype(
     ctx: ExportContext,
     fields: &[NonSkipField],
-    type_map: &TypeCollection,
+    types: &TypeCollection,
     s: &mut String,
 ) -> Result<()> {
     Ok(match fields {
@@ -412,7 +416,7 @@ fn unnamed_fields_datatype(
             datatype_inner(
                 ctx.clone(),
                 &FunctionResultVariant::Value((*ty).clone()),
-                type_map,
+                types,
                 &mut v,
             )?;
             s.push_str(&inner_comments(
@@ -435,7 +439,7 @@ fn unnamed_fields_datatype(
                 datatype_inner(
                     ctx.clone(),
                     &FunctionResultVariant::Value((*ty).clone()),
-                    type_map,
+                    types,
                     &mut v,
                 )?;
                 s.push_str(&inner_comments(
@@ -452,7 +456,7 @@ fn unnamed_fields_datatype(
     })
 }
 
-fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, type_map: &TypeCollection) -> Output {
+fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, types: &TypeCollection) -> Output {
     match &tuple.elements()[..] {
         [] => Ok(NULL.to_string()),
         tys => Ok(format!(
@@ -463,7 +467,7 @@ fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, type_map: &TypeCollecti
                     datatype_inner(
                         ctx.clone(),
                         &FunctionResultVariant::Value(v.clone()),
-                        type_map,
+                        types,
                         &mut s,
                     )
                     .map(|_| s)
@@ -478,18 +482,18 @@ fn struct_datatype(
     ctx: ExportContext,
     key: &str,
     strct: &StructType,
-    type_map: &TypeCollection,
+    types: &TypeCollection,
     s: &mut String,
 ) -> Result<()> {
     Ok(match &strct.fields() {
-        StructFields::Unit => s.push_str(NULL),
-        StructFields::Unnamed(unnamed) => unnamed_fields_datatype(
+        Fields::Unit => s.push_str(NULL),
+        Fields::Unnamed(unnamed) => unnamed_fields_datatype(
             ctx,
             &skip_fields(unnamed.fields()).collect::<Vec<_>>(),
-            type_map,
+            types,
             s,
         )?,
-        StructFields::Named(named) => {
+        Fields::Named(named) => {
             let fields = skip_fields_named(named.fields()).collect::<Vec<_>>();
 
             if fields.is_empty() {
@@ -509,7 +513,7 @@ fn struct_datatype(
                     datatype_inner(
                         ctx.with(PathItem::Field(key.clone())),
                         &FunctionResultVariant::Value(ty.clone()),
-                        type_map,
+                        types,
                         &mut s,
                     )
                     .map(|_| {
@@ -534,7 +538,7 @@ fn struct_datatype(
                         ctx.with(PathItem::Field(key.clone())),
                         key.clone(),
                         field_ref,
-                        type_map,
+                        types,
                         &mut other,
                     )?;
 
@@ -563,14 +567,14 @@ fn struct_datatype(
 
 fn enum_variant_datatype(
     ctx: ExportContext,
-    type_map: &TypeCollection,
+    types: &TypeCollection,
     name: Cow<'static, str>,
     variant: &EnumVariant,
 ) -> Result<Option<String>> {
-    match &variant.inner() {
+    match &variant.fields() {
         // TODO: Remove unreachable in type system
-        EnumVariants::Unit => unreachable!("Unit enum variants have no type!"),
-        EnumVariants::Named(obj) => {
+        Fields::Unit => unreachable!("Unit enum variants have no type!"),
+        Fields::Named(obj) => {
             let mut fields = if let Some(tag) = &obj.tag() {
                 let sanitised_name = sanitise_key(name, true);
                 vec![format!("{tag}: {sanitised_name}")]
@@ -588,7 +592,7 @@ fn enum_variant_datatype(
                             ctx.with(PathItem::Field(name.clone())),
                             name.clone(),
                             field_ref,
-                            type_map,
+                            types,
                             &mut other,
                         )?;
 
@@ -608,14 +612,14 @@ fn enum_variant_datatype(
                 fields => format!("{{ {} }}", fields.join("; ")),
             }))
         }
-        EnumVariants::Unnamed(obj) => {
+        Fields::Unnamed(obj) => {
             let fields = skip_fields(obj.fields())
                 .map(|(_, ty)| {
                     let mut s = String::new();
                     datatype_inner(
                         ctx.clone(),
                         &FunctionResultVariant::Value(ty.clone()),
-                        type_map,
+                        types,
                         &mut s,
                     )
                     .map(|_| s)
@@ -643,7 +647,7 @@ fn enum_variant_datatype(
 fn enum_datatype(
     ctx: ExportContext,
     e: &EnumType,
-    type_map: &TypeCollection,
+    types: &TypeCollection,
     s: &mut String,
 ) -> Result<()> {
     if e.variants().is_empty() {
@@ -657,15 +661,15 @@ fn enum_datatype(
                 .iter()
                 .filter(|(_, variant)| !variant.skip())
                 .map(|(name, variant)| {
-                    Ok(match variant.inner() {
-                        EnumVariants::Unit => NULL.to_string(),
+                    Ok(match variant.fields() {
+                        Fields::Unit => NULL.to_string(),
                         _ => inner_comments(
                             ctx.clone(),
                             variant.deprecated(),
                             variant.docs(),
                             enum_variant_datatype(
                                 ctx.with(PathItem::Variant(name.clone())),
-                                type_map,
+                                types,
                                 name.clone(),
                                 variant,
                             )?
@@ -690,12 +694,12 @@ fn enum_datatype(
                         ctx.clone(),
                         variant.deprecated(),
                         variant.docs(),
-                        match (repr, &variant.inner()) {
+                        match (repr, &variant.fields()) {
                             (EnumRepr::Untagged, _) => unreachable!(),
-                            (EnumRepr::Internal { tag }, EnumVariants::Unit) => {
+                            (EnumRepr::Internal { tag }, Fields::Unit) => {
                                 format!("{{ {tag}: {sanitised_name} }}")
                             }
-                            (EnumRepr::Internal { tag }, EnumVariants::Unnamed(tuple)) => {
+                            (EnumRepr::Internal { tag }, Fields::Unnamed(tuple)) => {
                                 let fields = skip_fields(tuple.fields()).collect::<Vec<_>>();
 
                                 // This field is only required for `{ty}` not `[...]` so we only need to check when there one field
@@ -704,7 +708,7 @@ fn enum_datatype(
                                     validate_type_for_tagged_intersection(
                                         ctx.clone(),
                                         (**ty).clone(),
-                                        type_map,
+                                        types,
                                     )?
                                 } else {
                                     false
@@ -712,7 +716,7 @@ fn enum_datatype(
 
                                 let mut typ = String::new();
 
-                                unnamed_fields_datatype(ctx.clone(), &fields, type_map, &mut typ)?;
+                                unnamed_fields_datatype(ctx.clone(), &fields, types, &mut typ)?;
 
                                 if dont_join_ty {
                                     format!("({{ {tag}: {sanitised_name} }})")
@@ -724,7 +728,7 @@ fn enum_datatype(
                                     format!("({{ {tag}: {sanitised_name} }} & {typ})")
                                 }
                             }
-                            (EnumRepr::Internal { tag }, EnumVariants::Named(obj)) => {
+                            (EnumRepr::Internal { tag }, Fields::Named(obj)) => {
                                 let mut fields = vec![format!("{tag}: {sanitised_name}")];
 
                                 for (name, field) in skip_fields_named(obj.fields()) {
@@ -733,7 +737,7 @@ fn enum_datatype(
                                         ctx.with(PathItem::Field(name.clone())),
                                         name.clone(),
                                         field,
-                                        type_map,
+                                        types,
                                         &mut other,
                                     )?;
                                     fields.push(other);
@@ -741,11 +745,11 @@ fn enum_datatype(
 
                                 format!("{{ {} }}", fields.join("; "))
                             }
-                            (EnumRepr::External, EnumVariants::Unit) => sanitised_name.to_string(),
+                            (EnumRepr::External, Fields::Unit) => sanitised_name.to_string(),
                             (EnumRepr::External, _) => {
                                 let ts_values = enum_variant_datatype(
                                     ctx.with(PathItem::Variant(variant_name.clone())),
-                                    type_map,
+                                    types,
                                     variant_name.clone(),
                                     variant,
                                 )?;
@@ -758,13 +762,13 @@ fn enum_datatype(
                                     None => format!(r#""{sanitised_name}""#),
                                 }
                             }
-                            (EnumRepr::Adjacent { tag, .. }, EnumVariants::Unit) => {
+                            (EnumRepr::Adjacent { tag, .. }, Fields::Unit) => {
                                 format!("{{ {tag}: {sanitised_name} }}")
                             }
                             (EnumRepr::Adjacent { tag, content }, _) => {
                                 let ts_value = enum_variant_datatype(
                                     ctx.with(PathItem::Variant(variant_name.clone())),
-                                    type_map,
+                                    types,
                                     variant_name.clone(),
                                     variant,
                                 )?;
@@ -817,7 +821,7 @@ fn object_field_to_ts(
     ctx: ExportContext,
     key: Cow<'static, str>,
     (field, ty): NonSkipField,
-    type_map: &TypeCollection,
+    types: &TypeCollection,
     s: &mut String,
 ) -> Result<()> {
     let field_name_safe = sanitise_key(key, false);
@@ -832,7 +836,7 @@ fn object_field_to_ts(
     datatype_inner(
         ctx,
         &FunctionResultVariant::Value(ty.clone()),
-        type_map,
+        types,
         &mut value,
     )?;
 
@@ -889,7 +893,7 @@ pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: 
 fn validate_type_for_tagged_intersection(
     ctx: ExportContext,
     ty: DataType,
-    type_map: &TypeCollection,
+    types: &TypeCollection,
 ) -> Result<bool> {
     match ty {
         DataType::Any
@@ -905,13 +909,13 @@ fn validate_type_for_tagged_intersection(
             _ => Ok(false),
         },
         DataType::Struct(v) => match v.fields() {
-            StructFields::Unit => Ok(true),
-            StructFields::Unnamed(_) => {
+            Fields::Unit => Ok(true),
+            Fields::Unnamed(_) => {
                 Err(ExportError::InvalidTaggedVariantContainingTupleStruct(
                    ctx.export_path()
                 ))
             }
-            StructFields::Named(fields) => {
+            Fields::Named(fields) => {
                 // Prevent `{ tag: "{tag}" } & Record<string | never>`
                 if fields.tag().is_none() && fields.fields().is_empty() {
                     return Ok(true);
@@ -923,12 +927,12 @@ fn validate_type_for_tagged_intersection(
         DataType::Enum(v) => {
             match v.repr() {
                 EnumRepr::Untagged => {
-                    Ok(v.variants().iter().any(|(_, v)| match &v.inner() {
+                    Ok(v.variants().iter().any(|(_, v)| match &v.fields() {
                         // `{ .. } & null` is `never`
-                        EnumVariants::Unit => true,
+                        Fields::Unit => true,
                          // `{ ... } & Record<string, never>` is not useful
-                        EnumVariants::Named(v) => v.tag().is_none() && v.fields().is_empty(),
-                        EnumVariants::Unnamed(_) => false,
+                        Fields::Named(v) => v.tag().is_none() && v.fields().is_empty(),
+                        Fields::Unnamed(_) => false,
                     }))
                 },
                 // All of these repr's are always objects.
@@ -945,12 +949,12 @@ fn validate_type_for_tagged_intersection(
         }
         DataType::Reference(r) => validate_type_for_tagged_intersection(
             ctx,
-            type_map
+            types
                 .get(r.sid())
                 .expect("TypeCollection should have been populated by now")
                 .inner
                 .clone(),
-            type_map,
+            types,
         ),
     }
 }

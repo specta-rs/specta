@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::SpectaID;
 
-use super::{DataType, DeprecatedType, GenericType, NamedDataType, NamedFields, UnnamedFields};
+use super::{DataType, DeprecatedType, Fields, GenericType, NamedDataType};
 
 /// Enum type which dictates how the enum is represented.
 ///
@@ -40,6 +40,10 @@ impl EnumType {
             ext: None,
             inner: DataType::Enum(self),
         }
+    }
+
+    pub fn sid(&self) -> Option<SpectaID> {
+        self.sid
     }
 
     pub fn name(&self) -> &Cow<'static, str> {
@@ -95,7 +99,7 @@ pub struct EnumVariant {
     /// Deprecated attribute for the field.
     pub(crate) deprecated: Option<DeprecatedType>,
     /// The type of the variant.
-    pub(crate) inner: EnumVariants,
+    pub(crate) fields: Fields,
 }
 
 impl EnumVariant {
@@ -111,21 +115,7 @@ impl EnumVariant {
         self.deprecated.as_ref()
     }
 
-    pub fn inner(&self) -> &EnumVariants {
-        &self.inner
+    pub fn fields(&self) -> &Fields {
+        &self.fields
     }
-}
-
-/// Type of an [`EnumType`] variant.
-#[derive(Debug, Clone, PartialEq)]
-pub enum EnumVariants {
-    /// A unit enum variant
-    /// Eg. `Variant`
-    Unit,
-    /// The enum variant contains named fields.
-    /// Eg. `Variant { a: u32 }`
-    Named(NamedFields),
-    /// The enum variant contains unnamed fields.
-    /// Eg. `Variant(u32, String)`
-    Unnamed(UnnamedFields),
 }

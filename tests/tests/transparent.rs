@@ -1,6 +1,6 @@
 use specta::{
-    datatype::{DataType, PrimitiveType},
-    Generics, Type,
+    datatype::{inline_and_flatten, DataType, PrimitiveType},
+    Type, TypeCollection,
 };
 
 use crate::ts::assert_ts;
@@ -24,23 +24,28 @@ pub struct BracedStruct {
     a: String,
 }
 
+fn inline<T: Type>() -> DataType {
+    let mut types = TypeCollection::default();
+    specta::datatype::inline(T::definition(&mut types), &types)
+}
+
 #[test]
 fn transparent() {
     // We check the datatype layer can TS can look correct but be wrong!
     assert_eq!(
-        TupleStruct::inline(&mut Default::default(), Generics::NONE),
+        inline::<TupleStruct>(),
         DataType::Primitive(PrimitiveType::String)
     );
     assert_eq!(
-        TupleStructWithRep::inline(&mut Default::default(), Generics::NONE),
+        inline::<TupleStructWithRep>(),
         DataType::Primitive(PrimitiveType::String)
     );
     assert_eq!(
-        GenericTupleStruct::<String>::inline(&mut Default::default(), Generics::NONE),
+        inline::<GenericTupleStruct::<String>>(),
         DataType::Primitive(PrimitiveType::String)
     );
     assert_eq!(
-        BracedStruct::inline(&mut Default::default(), Generics::NONE),
+        inline::<BracedStruct>(),
         DataType::Primitive(PrimitiveType::String)
     );
 

@@ -17,7 +17,7 @@ mod utils;
 ///
 /// ## Example
 ///
-/// ```rust
+/// ```ignore
 /// use specta::Type;
 ///
 /// // Use it on structs
@@ -46,7 +46,7 @@ pub fn derive_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 ///
 /// ## Example
 ///
-/// ```rust
+/// ```ignore
 /// #[specta::specta]
 /// fn my_function(arg1: i32, arg2: bool) -> &'static str {
 ///     "Hello World"

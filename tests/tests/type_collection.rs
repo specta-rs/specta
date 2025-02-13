@@ -1,5 +1,4 @@
 use specta::{Type, TypeCollection};
-use specta_util::TypeCollection;
 
 #[derive(Type)]
 struct A2(String);
@@ -19,27 +18,17 @@ struct D(String);
 
 #[test]
 fn type_collection_export() {
-    let mut type_map = TypeCollection::default();
-    TypeCollection::default()
-        .register::<A>()
-        .collect(&mut type_map);
-    assert_eq!(type_map.len(), 2);
+    let types = TypeCollection::default().register::<A>();
+    assert_eq!(types.len(), 2);
 }
 
 #[test]
 fn type_collection_merge() {
-    let mut a = TypeCollection::default();
-    a.register::<A>();
-    let mut b = TypeCollection::default();
-    b.register::<C>();
-
-    let mut type_map = TypeCollection::default();
-    TypeCollection::default()
+    let types = TypeCollection::default()
         .register::<D>()
-        .extend(a)
-        .extend(b)
-        .collect(&mut type_map);
-    assert_eq!(type_map.len(), 4);
+        .extend(TypeCollection::default().register::<A>())
+        .extend(TypeCollection::default().register::<C>());
+    assert_eq!(types.len(), 4);
 
     // Check it compile with any valid arg
     TypeCollection::default()
@@ -50,12 +39,9 @@ fn type_collection_merge() {
 
 #[test]
 fn type_collection_duplicate_register_ty() {
-    let mut type_map = TypeCollection::default();
-    TypeCollection::default()
-        .register::<C>()
-        .register::<C>()
-        .collect(&mut type_map);
-    assert_eq!(type_map.len(), 1);
+    let types = TypeCollection::default().register::<C>().register::<C>();
+
+    assert_eq!(types.len(), 1);
 }
 
 // TODO: Bring this back

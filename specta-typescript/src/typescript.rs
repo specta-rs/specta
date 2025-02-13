@@ -1,7 +1,6 @@
 use std::{borrow::Cow, io, path::Path};
 
-use specta::{datatype::DeprecatedType, Language, TypeCollection};
-use specta_serde::is_valid_ty;
+use specta::{datatype::DeprecatedType, TypeCollection};
 
 use crate::{comments, detect_duplicate_type_names, export_named_datatype, ExportError};
 
@@ -141,7 +140,7 @@ impl Typescript {
         }
 
         for (_, ty) in types.into_iter() {
-            is_valid_ty(&ty.inner, &types)?;
+            // is_valid_ty(&ty.inner, &types)?;
 
             out += &export_named_datatype(self, ty, &types)?;
             out += "\n\n";

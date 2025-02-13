@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use specta::{datatype::DataType, Generics, Type, TypeCollection};
+use specta::{datatype::DataType, Type, TypeCollection};
 
 /// Easily convert a non-Specta type into a Specta compatible type.
 /// This will be typed as `any` in Typescript.
@@ -12,7 +12,8 @@ use specta::{datatype::DataType, Generics, Type, TypeCollection};
 /// This can be used as a type override.
 /// ```rust
 /// use serde::Serialize;
-/// use specta::{Type, Any};
+/// use specta::Type;
+/// use specta_util::Any;
 ///
 /// #[derive(Serialize, Type)]
 /// pub struct Demo {
@@ -24,7 +25,8 @@ use specta::{datatype::DataType, Generics, Type, TypeCollection};
 /// Or it can be used as a wrapper type.
 /// ```rust
 /// use serde::Serialize;
-/// use specta::{Type, Any};
+/// use specta::Type;
+/// use specta_util::Any;
 ///
 /// #[derive(Serialize, Type)]
 /// pub struct Demo {
@@ -34,7 +36,7 @@ use specta::{datatype::DataType, Generics, Type, TypeCollection};
 pub struct Any<T = ()>(T);
 
 impl<T> Type for Any<T> {
-    fn inline(_: &mut TypeCollection, _: Generics) -> DataType {
+    fn definition(_: &mut TypeCollection) -> DataType {
         DataType::Any
     }
 }
@@ -75,7 +77,8 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
 /// This can be used as a type override.
 /// ```rust
 /// use serde::Serialize;
-/// use specta::{Type, Unknown};
+/// use specta::Type;
+/// use specta_util::Unknown;
 ///
 /// #[derive(Serialize, Type)]
 /// pub struct Demo {
@@ -87,7 +90,8 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
 /// Or it can be used as a wrapper type.
 /// ```rust
 /// use serde::Serialize;
-/// use specta::{Type, Unknown};
+/// use specta::Type;
+/// use specta_util::Unknown;
 ///
 /// #[derive(Serialize, Type)]
 /// pub struct Demo {
@@ -97,7 +101,7 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
 pub struct Unknown<T = ()>(T);
 
 impl<T> Type for Unknown<T> {
-    fn inline(_: &mut TypeCollection, _: Generics) -> DataType {
+    fn definition(_: &mut TypeCollection) -> DataType {
         DataType::Unknown
     }
 }

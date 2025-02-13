@@ -1,7 +1,7 @@
-use super::{attr::*, generics::construct_datatype, r#struct::decode_field_attrs};
-use crate::utils::*;
+use super::{attr::*, r#struct::decode_field_attrs};
+use crate::{r#type::field::construct_field, utils::*};
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens};
+use quote::{quote, ToTokens};
 use syn::{spanned::Spanned, DataEnum, Fields, GenericParam, Generics};
 
 pub fn parse_enum(
@@ -10,9 +10,8 @@ pub fn parse_enum(
     container_attrs: &ContainerAttr,
     generics: &Generics,
     crate_ref: &TokenStream,
-    sid: &TokenStream,
     data: &DataEnum,
-) -> syn::Result<(TokenStream, TokenStream, bool)> {
+) -> syn::Result<(TokenStream, bool)> {
     if container_attrs.transparent {
         return Err(syn::Error::new(
             data.enum_token.span(),
@@ -20,33 +19,12 @@ pub fn parse_enum(
         ));
     }
 
-    let generic_idents = generics
-        .params
-        .iter()
-        .filter_map(|p| match p {
-            GenericParam::Type(t) => Some(&t.ident),
-            _ => None,
-        })
-        .enumerate();
-
-    let definition_generics = generic_idents.clone().map(|(_, ident)| {
-        let ident = ident.to_string();
-        quote!(std::borrow::Cow::Borrowed(#ident).into())
-    });
-
-    let reference_generics = generic_idents.clone().map(|(i, ident)| {
-        let ident = &ident.clone();
-        let ident_str = ident.to_string();
-
-        quote! {
-            (
-                std::borrow::Cow::Borrowed(#ident_str).into(),
-                generics
-                    .get(#i)
-                    .cloned()
-                    .unwrap_or_else(|| <#ident as #crate_ref::Type>::reference(type_map, &[]).inner)
-            )
+    let definition_generics = generics.params.iter().filter_map(|p| match p {
+        GenericParam::Type(t) => {
+            let ident = t.ident.to_string();
+            Some(quote!(std::borrow::Cow::Borrowed(#ident).into()))
         }
+        _ => None,
     });
 
     let repr = enum_attrs.tagged()?;
@@ -91,50 +69,28 @@ pub fn parse_enum(
                     (_, _) => variant_ident_str.to_token_stream(),
                 };
 
-                let generic_idents = generic_idents.clone().collect::<Vec<_>>();
-
                 let inner = match &variant.fields {
-                    Fields::Unit => quote!(#crate_ref::internal::construct::enum_variant_unit()),
+                    Fields::Unit => quote!(#crate_ref::internal::construct::fields_unit()),
                     Fields::Unnamed(fields) => {
                         let fields = fields
                             .unnamed
                             .iter()
                             .map(|field| {
                                 let field_attrs = decode_field_attrs(field)?;
-                                let deprecated = field_attrs.common.deprecated_as_tokens(crate_ref);
-                                let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
-                                let optional = field_attrs.optional;
-                                let flatten = field_attrs.flatten;
-                                let doc = field_attrs.common.doc;
-
-                                let ty = (attrs.skip || field_attrs.skip).then(|| Ok(quote!(None)))
-                                    .unwrap_or_else(|| {
-	                                    construct_datatype(
-	                                        format_ident!("gen"),
-	                                        field_ty,
-	                                        &generic_idents,
-	                                        crate_ref,
-	                                        attrs.inline,
-	                                    ).map(|generic_vars| {
-											quote! {{
-			                                    #generic_vars
-
-			                                    Some(gen)
-			                                }}
-										})
-                                    })?;
-
-                                Ok(quote!(#crate_ref::internal::construct::field(
-                                    #optional,
-                                    #flatten,
-                                    #deprecated,
-                                    #doc.into(),
-                                    #ty
-                                )))
+                                Ok(construct_field(crate_ref, container_attrs, FieldAttr {
+                                    rename: field_attrs.rename,
+                                    r#type: field_attrs.r#type,
+                                    // TOOD: Should we check container too?
+                                    inline: container_attrs.inline || field_attrs.inline || attrs.inline,
+                                    skip: field_attrs.skip || attrs.skip,
+                                    optional: field_attrs.optional,
+                                    flatten: field_attrs.flatten,
+                                    common: field_attrs.common,
+                                }, &field.ty))
                             })
                             .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                        quote!(#crate_ref::internal::construct::enum_variant_unnamed(
+                        quote!(#crate_ref::internal::construct::fields_unnamed(
                             vec![#(#fields),*],
                         ))
                     }
@@ -145,12 +101,10 @@ pub fn parse_enum(
                         .map(|field| {
                             let field_attrs = decode_field_attrs(field)?;
 
-                            let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field.ty);
-
                             let field_ident_str =
                                 unraw_raw_ident(field.ident.as_ref().unwrap());
 
-                            let field_name = match (field_attrs.rename, attrs.rename_all) {
+                            let field_name = match (field_attrs.rename.clone(), attrs.rename_all) {
                                 (Some(name), _) => name,
                                 (_, Some(inflection)) => {
                                     let name = inflection.apply(&field_ident_str);
@@ -158,41 +112,21 @@ pub fn parse_enum(
                                 }
                                 (_, _) => quote::quote!(#field_ident_str),
                             };
-                            let deprecated = field_attrs.common.deprecated_as_tokens(crate_ref);
-                            let optional = field_attrs.optional;
-                            let flatten = field_attrs.flatten;
-                            let doc = field_attrs.common.doc;
 
-                            let ty = (attrs.skip || field_attrs.skip).then(|| Ok(quote!(None)))
-                                .unwrap_or_else(|| {
-	                                 construct_datatype(
-			                            format_ident!("gen"),
-			                            field_ty,
-			                            &generic_idents,
-			                            crate_ref,
-			                            attrs.inline,
-			                        ).map(|generic_vars|{
-										quote! {
-											Some({
-												#generic_vars
-
-												gen
-											})
-										}
-									})
-                                })?;
-
-                            Ok(quote!((#field_name.into(), #crate_ref::internal::construct::field(
-                                #optional,
-                                #flatten,
-                                #deprecated,
-                                #doc.into(),
-                                #ty
-                            ))))
+                            let inner = construct_field(crate_ref, container_attrs, FieldAttr {
+                                rename: field_attrs.rename,
+                                r#type: field_attrs.r#type,
+                                inline: container_attrs.inline || field_attrs.inline || attrs.inline,
+                                skip: field_attrs.skip || attrs.skip,
+                                optional: field_attrs.optional,
+                                flatten: field_attrs.flatten,
+                                common: field_attrs.common,
+                            }, &field.ty);
+                            Ok(quote!((#field_name.into(), #inner)))
                         })
                         .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                        quote!(#crate_ref::internal::construct::enum_variant_named(vec![#(#fields),*], None))
+                        quote!(#crate_ref::internal::construct::fields_named(vec![#(#fields),*], None))
                     }
                 };
 
@@ -233,15 +167,7 @@ pub fn parse_enum(
     let skip_bigint_checs = enum_attrs.unstable_skip_bigint_checks;
 
     Ok((
-        quote!(#crate_ref::datatype::DataType::Enum(#crate_ref::internal::construct::r#enum(#name.into(), #sid, #repr, #skip_bigint_checs, vec![#(#definition_generics),*], vec![#(#variant_types),*]))),
-        quote!({
-            let generics = vec![#(#reference_generics),*];
-            #crate_ref::datatype::reference::reference::<Self>(type_map, #crate_ref::internal::construct::data_type_reference(
-                #name.into(),
-                #sid,
-                generics
-            ))
-        }),
+        quote!(#crate_ref::datatype::DataType::Enum(#crate_ref::internal::construct::r#enum(#name.into(), SID, #repr, #skip_bigint_checs, vec![#(#definition_generics),*], vec![#(#variant_types),*]))),
         can_flatten,
     ))
 }
