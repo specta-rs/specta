@@ -1,7 +1,7 @@
 use std::borrow::Borrow;
 
 use specta::{
-    datatype::{DeprecatedType, GenericType},
+    datatype::{DeprecatedType, FunctionResultVariant, GenericType, NamedDataType},
     TypeCollection,
 };
 
