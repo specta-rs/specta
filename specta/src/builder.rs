@@ -6,34 +6,13 @@ use std::{borrow::Cow, fmt::Debug};
 
 use crate::{
     datatype::{
-        DeprecatedType, Enum, EnumRepr, EnumVariant, Field, Fields, List, NamedDataType,
-        NamedFields, Struct, UnnamedFields,
+        DeprecatedType, Enum, EnumRepr, EnumVariant, Field, Fields, NamedDataType, NamedFields,
+        Struct, UnnamedFields,
     },
     DataType, ImplLocation, SpectaID,
 };
 
 // TDO: `Debug` and `Clone` on everything
-
-impl List {
-    #[doc(hidden)] // TODO: Expose
-    pub fn new(ty: DataType) -> Self {
-        Self {
-            ty: Box::new(ty),
-            length: None,
-            unique: false,
-        }
-    }
-
-    #[doc(hidden)] // TODO: Expose
-                   // TODO: Should `len` be a `Range` with an upper and lower bound?
-    pub fn new_with_len(ty: DataType, len: usize) -> Self {
-        Self {
-            ty: Box::new(ty),
-            length: Some(len),
-            unique: false,
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct StructBuilder<F = ()> {

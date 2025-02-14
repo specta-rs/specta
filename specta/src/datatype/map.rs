@@ -1,22 +1,21 @@
 use super::DataType;
 
 #[derive(Debug, Clone, PartialEq)]
-
-pub struct Map {
-    // TODO: Box these fields together as an internal optimization.
-    // The type of the map keys.
-    pub(crate) key_ty: Box<DataType>,
-    // The type of the map values.
-    pub(crate) value_ty: Box<DataType>,
-}
+pub struct Map(Box<(DataType, DataType)>);
 
 impl Map {
-    pub fn key_ty(&self) -> &DataType {
-        &self.key_ty
+    pub fn new(key_ty: DataType, value_ty: DataType) -> Self {
+        Self(Box::new((key_ty, value_ty)))
     }
 
+    /// The type of the map keys.
+    pub fn key_ty(&self) -> &DataType {
+        &self.0 .0
+    }
+
+    /// The type of the map values.
     pub fn value_ty(&self) -> &DataType {
-        &self.value_ty
+        &self.0 .1
     }
 }
 

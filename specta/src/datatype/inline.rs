@@ -98,36 +98,36 @@ fn inner(
     }
 
     match dt {
-        DataType::List(l) => DataType::List(super::List {
-            ty: Box::new(inner(
-                *l.ty,
+        DataType::List(l) => DataType::List(super::List::new(
+            inner(
+                l.ty().clone(),
                 types,
                 false, // truely_force_inline,
                 truely_force_inline,
                 generics,
                 depth + 1,
-            )),
-            length: l.length,
-            unique: l.unique,
-        }),
-        DataType::Map(map) => DataType::Map(super::Map {
-            key_ty: Box::new(inner(
-                *map.key_ty,
+            ),
+            l.length(),
+            l.unique(),
+        )),
+        DataType::Map(map) => DataType::Map(super::Map::new(
+            inner(
+                map.key_ty().clone(),
                 types,
                 false, // truely_force_inline,
                 truely_force_inline,
                 generics,
                 depth + 1,
-            )),
-            value_ty: Box::new(inner(
-                *map.value_ty,
+            ),
+            inner(
+                map.value_ty().clone(),
                 types,
                 false, // truely_force_inline,
                 truely_force_inline,
                 generics,
                 depth + 1,
-            )),
-        }),
+            ),
+        )),
         DataType::Nullable(d) => DataType::Nullable(Box::new(inner(
             *d,
             types,
@@ -207,14 +207,15 @@ fn inner(
 fn resolve_generics(dt: DataType, generics: &HashMap<Generic, DataType>) -> DataType {
     // TODO: This could so only re-alloc if the type has a generics that needs replacing.
     match dt {
-        DataType::List(l) => DataType::List(super::List {
-            ty: Box::new(resolve_generics(*l.ty, generics)),
-            ..l
-        }),
-        DataType::Map(m) => DataType::Map(super::Map {
-            key_ty: Box::new(resolve_generics(*m.key_ty, generics)),
-            value_ty: Box::new(resolve_generics(*m.value_ty, generics)),
-        }),
+        DataType::List(l) => DataType::List(super::List::new(
+            resolve_generics(l.ty().clone(), generics),
+            l.length(),
+            l.unique(),
+        )),
+        DataType::Map(m) => DataType::Map(super::Map::new(
+            resolve_generics(m.key_ty().clone(), generics),
+            resolve_generics(m.value_ty().clone(), generics),
+        )),
         DataType::Nullable(d) => DataType::Nullable(Box::new(resolve_generics(*d, generics))),
         // DataType::Struct(s) => DataType::Struct(super::StructType {
         //     generics: todo!(),

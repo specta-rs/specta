@@ -116,11 +116,7 @@ impl<'a, T: Type> Type for &'a [T] {
 
 impl<const N: usize, T: Type> Type for [T; N] {
     fn definition(types: &mut TypeCollection) -> DataType {
-        DataType::List(List {
-            ty: Box::new(T::definition(types)),
-            length: Some(N),
-            unique: false,
-        })
+        DataType::List(List::new(T::definition(types), Some(N), false))
     }
 }
 

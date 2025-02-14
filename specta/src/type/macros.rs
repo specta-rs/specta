@@ -69,11 +69,11 @@ macro_rules! _impl_for_list {
     ($($unique:expr; $ty:path as $name:expr)+) => {$(
         impl<T: Type> Type for $ty {
             fn definition(types: &mut TypeCollection) -> DataType {
-                DataType::List(List {
-                    ty: Box::new(<T as Type>::definition(types)),
-                    length: None,
-                    unique: $unique,
-                })
+                DataType::List(List::new(
+                    <T as Type>::definition(types),
+                    None,
+                    $unique,
+                ))
             }
         }
     )+};
@@ -83,10 +83,10 @@ macro_rules! _impl_for_map {
     ($ty:path as $name:expr) => {
         impl<K: Type, V: Type> Type for $ty {
             fn definition(types: &mut TypeCollection) -> DataType {
-                DataType::Map(crate::datatype::Map {
-                    key_ty: Box::new(K::definition(types)),
-                    value_ty: Box::new(V::definition(types)),
-                })
+                DataType::Map(crate::datatype::Map::new(
+                    K::definition(types),
+                    V::definition(types),
+                ))
             }
         }
     };
