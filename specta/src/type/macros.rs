@@ -10,7 +10,7 @@ macro_rules! _impl_primitives {
     ($($i:ident)+) => {$(
         impl Type for $i {
             fn definition(_: &mut TypeCollection) -> DataType {
-                DataType::Primitive(datatype::PrimitiveType::$i)
+                DataType::Primitive(datatype::Primitive::$i)
             }
         }
     )+};
@@ -21,9 +21,9 @@ macro_rules! _impl_tuple {
         #[allow(non_snake_case)]
         impl<$($i: Type),*> Type for ($($i,)*) {
             fn definition(_types: &mut TypeCollection) -> DataType {
-                datatype::TupleType {
+                DataType::Tuple(datatype::Tuple {
                     elements: vec![$(<$i as Type>::definition(_types)),*],
-                }.to_anonymous()
+                })
             }
         }
     };
@@ -69,11 +69,11 @@ macro_rules! _impl_for_list {
     ($($unique:expr; $ty:path as $name:expr)+) => {$(
         impl<T: Type> Type for $ty {
             fn definition(types: &mut TypeCollection) -> DataType {
-                DataType::List(List {
-                    ty: Box::new(<T as Type>::definition(types)),
-                    length: None,
-                    unique: $unique,
-                })
+                DataType::List(List::new(
+                    <T as Type>::definition(types),
+                    None,
+                    $unique,
+                ))
             }
         }
     )+};
@@ -83,10 +83,10 @@ macro_rules! _impl_for_map {
     ($ty:path as $name:expr) => {
         impl<K: Type, V: Type> Type for $ty {
             fn definition(types: &mut TypeCollection) -> DataType {
-                DataType::Map(crate::datatype::Map {
-                    key_ty: Box::new(K::definition(types)),
-                    value_ty: Box::new(V::definition(types)),
-                })
+                DataType::Map(crate::datatype::Map::new(
+                    K::definition(types),
+                    V::definition(types),
+                ))
             }
         }
     };

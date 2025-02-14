@@ -1,4 +1,4 @@
-use specta_util::{Any, Unknown};
+use specta_typescript::{Any, Unknown};
 
 use crate::ts::assert_ts;
 

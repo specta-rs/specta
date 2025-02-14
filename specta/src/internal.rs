@@ -10,7 +10,7 @@ use std::{borrow::Cow, collections::HashMap};
 pub use paste::paste;
 
 use crate::{
-    datatype::{DataType, DeprecatedType, Field, NamedDataType, NamedDataTypeExt},
+    datatype::{DataType, DeprecatedType, Field, Generic, NamedDataType},
     ImplLocation, SpectaID, TypeCollection,
 };
 
@@ -23,6 +23,7 @@ pub fn register(
     deprecated: Option<DeprecatedType>,
     sid: SpectaID,
     impl_location: ImplLocation,
+    generics: Vec<Generic>,
     build: impl FnOnce(&mut TypeCollection) -> DataType,
 ) -> NamedDataType {
     match types.map.get(&sid) {
@@ -32,8 +33,10 @@ pub fn register(
             name,
             docs,
             deprecated,
-            ext: Some(NamedDataTypeExt { sid, impl_location }),
-            inner: DataType::Any,
+            sid,
+            impl_location,
+            generics,
+            inner: DataType::Primitive(crate::datatype::Primitive::i8), // TODO: Fix this
         },
         None => {
             types.map.entry(sid).or_insert(None);
@@ -41,7 +44,9 @@ pub fn register(
                 name,
                 docs,
                 deprecated,
-                ext: Some(NamedDataTypeExt { sid, impl_location }),
+                sid,
+                impl_location,
+                generics,
                 inner: build(types),
             };
             types.map.insert(sid, Some(dt.clone()));
@@ -110,15 +115,9 @@ pub mod construct {
     pub const fn r#struct(
         name: Cow<'static, str>,
         sid: Option<SpectaID>,
-        generics: Vec<GenericType>,
         fields: Fields,
-    ) -> StructType {
-        StructType {
-            name,
-            sid,
-            generics,
-            fields,
-        }
+    ) -> Struct {
+        Struct { name, sid, fields }
     }
 
     pub const fn fields_unit() -> Fields {
@@ -141,15 +140,13 @@ pub mod construct {
         sid: SpectaID,
         repr: EnumRepr,
         skip_bigint_checks: bool,
-        generics: Vec<GenericType>,
         variants: Vec<(Cow<'static, str>, EnumVariant)>,
-    ) -> EnumType {
-        EnumType {
+    ) -> Enum {
+        Enum {
             name,
             sid: Some(sid),
             repr,
             skip_bigint_checks,
-            generics,
             variants,
         }
     }
@@ -168,12 +165,12 @@ pub mod construct {
         }
     }
 
-    pub const fn tuple(fields: Vec<DataType>) -> TupleType {
-        TupleType { elements: fields }
+    pub const fn tuple(fields: Vec<DataType>) -> Tuple {
+        Tuple { elements: fields }
     }
 
-    pub const fn generic_data_type(name: &'static str) -> GenericType {
-        GenericType(Cow::Borrowed(name))
+    pub const fn generic_data_type(name: &'static str) -> Generic {
+        Generic(Cow::Borrowed(name))
     }
 
     pub const fn impl_location(loc: &'static str) -> ImplLocation {
@@ -340,13 +337,11 @@ pub fn detect_duplicate_type_names(
 
     let mut map = HashMap::with_capacity(types.into_iter().len());
     for (sid, dt) in types.into_iter() {
-        if let Some(ext) = &dt.ext {
-            if let Some((existing_sid, existing_impl_location)) =
-                map.insert(dt.name.clone(), (sid, ext.impl_location))
-            {
-                if existing_sid != sid {
-                    errors.push((dt.name.clone(), ext.impl_location, existing_impl_location));
-                }
+        if let Some((existing_sid, existing_impl_location)) =
+            map.insert(dt.name.clone(), (sid, dt.impl_location))
+        {
+            if existing_sid != sid {
+                errors.push((dt.name.clone(), dt.impl_location, existing_impl_location));
             }
         }
     }

@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use crate::SpectaID;
 
-use super::{DataType, GenericType};
+use super::{DataType, Generic};
 
 /// A reference datatype.
 ///
@@ -13,7 +13,7 @@ use super::{DataType, GenericType};
 #[non_exhaustive]
 pub struct Reference {
     pub(crate) sid: SpectaID,
-    pub(crate) generics: BTreeMap<GenericType, DataType>,
+    pub(crate) generics: BTreeMap<Generic, DataType>,
     pub(crate) inline: bool,
 }
 
@@ -21,7 +21,7 @@ impl Reference {
     /// TODO: Explain invariant.
     pub fn construct(
         sid: SpectaID,
-        generics: impl Into<BTreeMap<GenericType, DataType>>,
+        generics: impl Into<BTreeMap<Generic, DataType>>,
         inline: bool,
     ) -> Self {
         Self {
@@ -35,7 +35,7 @@ impl Reference {
         self.sid
     }
 
-    pub fn generics(&self) -> &BTreeMap<GenericType, DataType> {
+    pub fn generics(&self) -> &BTreeMap<Generic, DataType> {
         &self.generics
     }
 

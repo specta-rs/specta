@@ -1,5 +1,5 @@
 // //! TODO: These are all planned to be removed from the core and into the ecosystem for the v2 release.
-// use crate::{datatype::reference::Reference, datatype::*, r#type::macros::*, *};
+// use crate::{datatype::Reference, datatype::*, r#type::macros::*, *};
 
 // use std::borrow::Cow;
 

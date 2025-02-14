@@ -4,7 +4,7 @@ use crate::{
 };
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{spanned::Spanned, DataStruct, Field, Fields, GenericParam, Generics};
+use syn::{spanned::Spanned, DataStruct, Field, Fields};
 
 use super::attr::*;
 
@@ -41,19 +41,9 @@ pub fn decode_field_attrs(field: &Field) -> syn::Result<FieldAttr> {
 pub fn parse_struct(
     name: &TokenStream,
     container_attrs: &ContainerAttr,
-    generics: &Generics,
     crate_ref: &TokenStream,
     data: &DataStruct,
 ) -> syn::Result<(TokenStream, bool)> {
-    let definition_generics = generics.params.iter().filter_map(|p| match p {
-        GenericParam::Type(t) => {
-            let ident = t.ident.to_string();
-            Some(quote!(std::borrow::Cow::Borrowed(#ident).into()))
-        }
-        _ => None,
-    });
-
-    // todo!("{:?}", container_attrs.transparent);
     let definition = if container_attrs.transparent {
         if let Fields::Unit = data.fields {
             return Err(syn::Error::new(
@@ -155,7 +145,7 @@ pub fn parse_struct(
             Fields::Unit => quote!(#crate_ref::internal::construct::fields_unit()),
         };
 
-        quote!(#crate_ref::datatype::DataType::Struct(#crate_ref::internal::construct::r#struct(#name.into(), Some(SID), vec![#(#definition_generics),*], #fields)))
+        quote!(#crate_ref::datatype::DataType::Struct(#crate_ref::internal::construct::r#struct(#name.into(), Some(SID), #fields)))
     };
 
     Ok((definition, true))

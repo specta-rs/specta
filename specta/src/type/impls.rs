@@ -116,11 +116,7 @@ impl<'a, T: Type> Type for &'a [T] {
 
 impl<const N: usize, T: Type> Type for [T; N] {
     fn definition(types: &mut TypeCollection) -> DataType {
-        DataType::List(List {
-            ty: Box::new(T::definition(types)),
-            length: Some(N),
-            unique: false,
-        })
+        DataType::List(List::new(T::definition(types), Some(N), false))
     }
 }
 
@@ -132,7 +128,7 @@ impl<T: Type> Type for Option<T> {
 
 impl<T> Type for std::marker::PhantomData<T> {
     fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Literal(LiteralType::None)
+        DataType::Literal(Literal::None)
     }
 }
 
@@ -149,7 +145,6 @@ const _: () = {
                 EnumRepr::External,
                 false,
                 vec![],
-                vec![],
             ))
         }
     }
@@ -158,10 +153,9 @@ const _: () = {
 impl<T: Type> Type for std::ops::Range<T> {
     fn definition(types: &mut TypeCollection) -> DataType {
         let ty = Some(T::definition(types));
-        DataType::Struct(StructType {
+        DataType::Struct(Struct {
             name: "Range".into(),
             sid: None,
-            generics: vec![],
             fields: Fields::Named(NamedFields {
                 fields: vec![
                     (
@@ -216,7 +210,6 @@ const _: () = {
             DataType::Struct(internal::construct::r#struct(
                 "SystemTime".into(),
                 Some(internal::construct::sid("SystemTime".into(), "::todo:3:10")),
-                vec![],
                 internal::construct::fields_named(
                     vec![
                         (
@@ -248,7 +241,6 @@ const _: () = {
             DataType::Struct(internal::construct::r#struct(
                 "Duration".into(),
                 Some(SID),
-                vec![],
                 internal::construct::fields_named(
                     vec![
                         (
