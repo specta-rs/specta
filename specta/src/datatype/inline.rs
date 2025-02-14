@@ -229,7 +229,7 @@ fn resolve_generics(dt: DataType, generics: &HashMap<Generic, DataType>) -> Data
                 .map(|dt| resolve_generics(dt, generics))
                 .collect(),
         }),
-        DataType::Reference(r) => DataType::Reference(super::reference::Reference {
+        DataType::Reference(r) => DataType::Reference(super::Reference {
             generics: r
                 .generics
                 .into_iter()

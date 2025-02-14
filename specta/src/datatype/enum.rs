@@ -8,7 +8,7 @@ use super::{DataType, DeprecatedType, Fields, Generic};
 ///
 /// The tagging refers to the [Serde concept](https://serde.rs/enum-representations.html).
 ///
-/// [`Untagged`](EnumType::Untagged) is here rather than in [`EnumRepr`] as it is the only enum representation that does not have tags on its variants.
+/// [`Untagged`](Enum::Untagged) is here rather than in [`EnumRepr`] as it is the only enum representation that does not have tags on its variants.
 /// Separating it allows for better typesafety since `variants` doesn't have to be a [`Vec`] of tuples.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Enum {

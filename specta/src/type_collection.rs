@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    datatype::{reference::Reference, NamedDataType},
+    datatype::{NamedDataType, Reference},
     DataType, NamedType, SpectaID,
 };
 

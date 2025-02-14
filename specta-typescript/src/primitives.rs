@@ -10,8 +10,8 @@ use std::{
 
 use specta::{
     datatype::{
-        reference::Reference, DataType, Enum, EnumRepr, Field, Fields, List, Literal, Map,
-        NamedDataType, Primitive, Tuple,
+        DataType, Enum, EnumRepr, Field, Fields, List, Literal, Map, NamedDataType, Primitive,
+        Reference, Tuple,
     },
     TypeCollection,
 };

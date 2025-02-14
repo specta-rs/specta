@@ -196,7 +196,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         |types| #ident::<#inline_generics_def>::___specta_definition___(types),
                     );
 
-                    #crate_ref::datatype::reference::Reference::construct(SID, [#(#reference_generics),*], #inline).into()
+                    #crate_ref::datatype::Reference::construct(SID, [#(#reference_generics),*], #inline).into()
                 }
             }
 

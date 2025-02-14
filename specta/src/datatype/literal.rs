@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use super::DataType;
 
 /// Type of a literal value for things like const generics.
@@ -19,7 +21,7 @@ pub enum Literal {
     f32(f32),
     f64(f64),
     bool(bool),
-    String(String),
+    String(Cow<'static, str>),
     char(char),
     /// Standalone `null` without a known type
     None,
@@ -52,6 +54,6 @@ impl From<bool> for Literal {
 
 impl From<String> for Literal {
     fn from(t: String) -> Self {
-        Self::String(t)
+        Self::String(Cow::Owned(t))
     }
 }

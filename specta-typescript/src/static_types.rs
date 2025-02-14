@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use specta::{
-    datatype::{reference::Reference, DataType},
+    datatype::{DataType, Reference},
     NamedType, Type, TypeCollection,
 };
 

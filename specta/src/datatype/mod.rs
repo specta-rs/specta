@@ -10,7 +10,7 @@ mod literal;
 mod map;
 mod named;
 mod primitive;
-pub mod reference; // TODO
+mod reference;
 mod r#struct;
 mod tuple;
 
@@ -25,6 +25,7 @@ pub use named::{DeprecatedType, NamedDataType};
 pub use primitive::Primitive;
 pub use r#enum::{Enum, EnumRepr, EnumVariant};
 pub use r#struct::Struct;
+pub use reference::Reference;
 pub use tuple::Tuple;
 
 /// Runtime type-erased representation of a Rust type.

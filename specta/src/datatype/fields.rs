@@ -77,7 +77,7 @@ impl UnnamedFields {
     }
 }
 
-/// The fields for a [StructType] or the anonymous struct declaration in an [EnumVariant].
+/// The fields for a [Struct] or the anonymous struct declaration in an [EnumVariant].
 ///
 /// Eg.
 /// ```rust
