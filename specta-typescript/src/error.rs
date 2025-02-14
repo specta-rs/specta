@@ -33,8 +33,7 @@ pub enum Error {
     },
     /// An filesystem IO error.
     /// This is possible when using `Typescript::export_to` when writing to a file or formatting the file.
-    // We cast `std::io::Error` `String` so we can have `PartialEq`
-    Io(String),
+    Io(io::Error),
     //
     //
     // TODO: Break
@@ -61,7 +60,7 @@ pub enum Error {
 
 impl From<io::Error> for Error {
     fn from(e: io::Error) -> Self {
-        Self::Io(e.to_string())
+        Self::Io(e)
     }
 }
 
