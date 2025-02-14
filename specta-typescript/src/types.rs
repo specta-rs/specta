@@ -152,3 +152,76 @@ impl<T: serde::Serialize> serde::Serialize for Unknown<T> {
         T::serialize(&self.0, serializer)
     }
 }
+
+/// Cast a Rust type to a Typescript `never` type.
+///
+/// # Examples
+///
+/// This can be used as a type override.
+/// ```rust
+/// use serde::Serialize;
+/// use specta::Type;
+/// use specta_typescript::Never;
+///
+/// #[derive(Serialize, Type)]
+/// pub struct Demo {
+///     #[specta(type = Never)]
+///     pub field: String,
+/// }
+/// ```
+///
+/// Or it can be used as a wrapper type.
+/// ```rust
+/// use serde::Serialize;
+/// use specta::Type;
+/// use specta_typescript::Never;
+///
+/// #[derive(Serialize, Type)]
+/// pub struct Demo {
+///     pub field: Never<String>,
+/// }
+/// ```
+pub struct Never<T = ()>(T);
+
+impl<T> Type for Never<T> {
+    fn definition(types: &mut TypeCollection) -> DataType {
+        types.placeholder(Self::ID);
+        DataType::Reference(Reference::construct(Self::ID, [], false))
+    }
+}
+
+impl<T> NamedType for Never<T> {
+    const ID: specta::SpectaID = specta::internal::construct::sid(
+        "Unknown",
+        concat!("::", module_path!(), ":", line!(), ":", column!()),
+    );
+}
+
+impl<T: Debug> Debug for Never<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Any").field(&self.0).finish()
+    }
+}
+
+impl<T: Clone> Clone for Never<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T: Default> Default for Never<T> {
+    fn default() -> Self {
+        Self(T::default())
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<T: serde::Serialize> serde::Serialize for Never<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        T::serialize(&self.0, serializer)
+    }
+}

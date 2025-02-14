@@ -53,10 +53,10 @@ mod js_doc;
 pub mod legacy;
 pub mod primitives;
 pub(crate) mod reserved_names;
-mod static_types;
+mod types;
 mod typescript;
 
 pub use error::Error;
 pub use js_doc::JSDoc;
-pub use static_types::{Any, Unknown};
+pub use types::{Any, Never, Unknown};
 pub use typescript::{BigIntExportBehavior, Typescript};
