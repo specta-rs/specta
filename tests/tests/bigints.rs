@@ -60,38 +60,42 @@ pub enum EnumWithInlineStructWithBigInt {
 
 #[test]
 fn test_bigint_types() {
-    for_bigint_types!(T -> |name| assert_eq!(specta_typescript::legacy::inline::<T>(&Typescript::default()), Err(Error::BigIntForbiddenLegacy(ExportPath::new_unsafe(name)))));
-    for_bigint_types!(T -> |name| assert_eq!(specta_typescript::legacy::inline::<T>(&Typescript::new()), Err(Error::BigIntForbiddenLegacy(ExportPath::new_unsafe(name)))));
-    for_bigint_types!(T -> |name| assert_eq!(specta_typescript::legacy::inline::<T>(&Typescript::new().bigint(BigIntExportBehavior::Fail)), Err(Error::BigIntForbiddenLegacy(ExportPath::new_unsafe(name)))));
+    for_bigint_types!(T -> |name| assert_eq!(specta_typescript::legacy::inline::<T>(&Typescript::default()).map_err(|e| e.to_string()), Err(Error::BigIntForbiddenLegacy(ExportPath::new_unsafe(name)).to_string())));
+    for_bigint_types!(T -> |name| assert_eq!(specta_typescript::legacy::inline::<T>(&Typescript::new()).map_err(|e| e.to_string()), Err(Error::BigIntForbiddenLegacy(ExportPath::new_unsafe(name)).to_string())));
+    for_bigint_types!(T -> |name| assert_eq!(specta_typescript::legacy::inline::<T>(&Typescript::new().bigint(BigIntExportBehavior::Fail)).map_err(|e| e.to_string()), Err(Error::BigIntForbiddenLegacy(ExportPath::new_unsafe(name)).to_string())));
 
-    for_bigint_types!(T -> |name| assert_eq!(specta_typescript::legacy::inline::<T>(&Typescript::new().bigint(BigIntExportBehavior::String)), Ok("string".into())));
-    for_bigint_types!(T -> |name| assert_eq!(specta_typescript::legacy::inline::<T>(&Typescript::new().bigint(BigIntExportBehavior::Number)), Ok("number".into())));
-    for_bigint_types!(T -> |name| assert_eq!(specta_typescript::legacy::inline::<T>(&Typescript::new().bigint(BigIntExportBehavior::BigInt)), Ok("bigint".into())));
+    for_bigint_types!(T -> |name| assert_eq!(specta_typescript::legacy::inline::<T>(&Typescript::new().bigint(BigIntExportBehavior::String)).map_err(|e| e.to_string()), Ok("string".into())));
+    for_bigint_types!(T -> |name| assert_eq!(specta_typescript::legacy::inline::<T>(&Typescript::new().bigint(BigIntExportBehavior::Number)).map_err(|e| e.to_string()), Ok("number".into())));
+    for_bigint_types!(T -> |name| assert_eq!(specta_typescript::legacy::inline::<T>(&Typescript::new().bigint(BigIntExportBehavior::BigInt)).map_err(|e| e.to_string()), Ok("bigint".into())));
 
-    // Check error messages are working correctly -> These tests second for `ExportPath` which is why they are so comprehensive
+    // // Check error messages are working correctly -> These tests second for `ExportPath` which is why they are so comprehensive
     assert_eq!(
-        specta_typescript::legacy::inline::<StructWithBigInt>(&Typescript::default()),
+        specta_typescript::legacy::inline::<StructWithBigInt>(&Typescript::default())
+            .map_err(|e| e.to_string()),
         Err(Error::BigIntForbiddenLegacy(ExportPath::new_unsafe(
             "tests/tests/bigints.rs:16:10.a -> i128" // TODO: Include type name not just path
-        )))
+        ))
+        .to_string())
     );
     assert_eq!(
-        specta_typescript::legacy::inline::<StructWithStructWithBigInt>(&Typescript::default()),
+        specta_typescript::legacy::inline::<StructWithStructWithBigInt>(&Typescript::default())
+            .map_err(|e| e.to_string()),
         Err(Error::BigIntForbiddenLegacy(ExportPath::new_unsafe(
             "tests/tests/bigints.rs:22:10.abc -> tests/tests/bigints.rs:16:10.a -> i128"
-        )))
+        ))
+        .to_string())
     );
     assert_eq!(
-        specta_typescript::legacy::inline::<StructWithStructWithStructWithBigInt>(&Typescript::default()),
+        specta_typescript::legacy::inline::<StructWithStructWithStructWithBigInt>(&Typescript::default()).map_err(|e| e.to_string()),
         Err(Error::BigIntForbiddenLegacy(ExportPath::new_unsafe(
             "tests/tests/bigints.rs:30:10.field1 -> tests/tests/bigints.rs:22:10.abc -> tests/tests/bigints.rs:16:10.a -> i128"
-        )))
+        )).to_string())
     );
     assert_eq!(
-        specta_typescript::legacy::inline::<EnumWithStructWithStructWithBigInt>(&Typescript::default()),
+        specta_typescript::legacy::inline::<EnumWithStructWithStructWithBigInt>(&Typescript::default()).map_err(|e| e.to_string()),
         Err(Error::BigIntForbiddenLegacy(ExportPath::new_unsafe(
             "EnumWithStructWithStructWithBigInt::A -> tests/tests/bigints.rs:22:10.abc -> tests/tests/bigints.rs:16:10.a -> i128"
-        )))
+        )).to_string())
     );
     // TODO: This required `inline` to work better on `Option<T>`
     // assert_eq!(
@@ -101,15 +105,17 @@ fn test_bigint_types() {
     //     )))
     // );
     assert_eq!(
-        specta_typescript::legacy::inline::<EnumWithStructWithStructWithBigInt>(&Typescript::default()),
+        specta_typescript::legacy::inline::<EnumWithStructWithStructWithBigInt>(&Typescript::default()).map_err(|e| e.to_string()),
         Err(Error::BigIntForbiddenLegacy(ExportPath::new_unsafe(
             "EnumWithStructWithStructWithBigInt::A -> tests/tests/bigints.rs:22:10.abc -> tests/tests/bigints.rs:16:10.a -> i128"
-        )))
+        )).to_string())
     );
     assert_eq!(
-        specta_typescript::legacy::inline::<EnumWithInlineStructWithBigInt>(&Typescript::default()),
+        specta_typescript::legacy::inline::<EnumWithInlineStructWithBigInt>(&Typescript::default())
+            .map_err(|e| e.to_string()),
         Err(Error::BigIntForbiddenLegacy(ExportPath::new_unsafe(
             "EnumWithInlineStructWithBigInt::B.a -> i128"
-        )))
+        ))
+        .to_string())
     );
 }

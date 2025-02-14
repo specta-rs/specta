@@ -55,12 +55,8 @@ pub enum Error {
     // #[error("Unable to export type named '{0}' from locations")]
     // TODO: '{:?}' '{:?}'", .1.as_str(), .2.as_str())
     DuplicateTypeNameLegacy(Cow<'static, str>, ImplLocation, ImplLocation),
-    // #[error("IO error: {0}")]
-    // Io(#[from] std::io::Error),
     // #[error("fmt error: {0}")]
     FmtLegacy(std::fmt::Error),
-    // #[error("Failed to export '{0}' due to error: {1}")]
-    // Other(ExportPath, String),
 }
 
 impl From<io::Error> for Error {
@@ -90,16 +86,16 @@ impl fmt::Display for Error {
             Error::InvalidName { path, name } => writeln!(f, "Attempted to export {path:?} but was unable to due to name {name:?} containing an invalid character. Try renaming it or using `#[specta(rename = \"new name\")]`"),
             Error::DuplicateTypeName { types, name } => writeln!(f, "Detected multiple types with the same name: {name:?} in {types:?}"),
             Error::Io(err) => write!(f, "IO error: {err}"),
-            _ => todo!(),
+            // TODO:
+            Error::BigIntForbiddenLegacy(err) => writeln!(f, "Attempted to export {err:?} but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!"),
+            Error::ForbiddenNameLegacy(path, name, _) => writeln!(f, "Attempted to export {path:?} but was unable to due toname {name:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`"),
+            Error::InvalidNameLegacy(path, name, _) => writeln!(f, "Attempted to export {path:?} but was unable to due to name {name:?} containing an invalid character. Try renaming it or using `#[specta(rename = \"new name\")]`"),
+            Error::InvalidTaggingLegacy(path) => writeln!(f, "Attempted to export {path:?} with tagging but the type is not tagged."),
+            Error::InvalidTaggedVariantContainingTupleStructLegacy(path) => writeln!(f, "Attempted to export {path:?} with tagging but the variant is a tuple struct."),
+            Error::DuplicateTypeNameLegacy(a, b, _) => writeln!(f, "Attempted to export {a:?} but was unable to due to name {b:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`"),
+            Error::FmtLegacy(err) => writeln!(f, "formatter: {err:?}"),
         }
     }
 }
 
 impl error::Error for Error {}
-
-// TODO: This `impl` is cringe
-impl PartialEq for Error {
-    fn eq(&self, other: &Self) -> bool {
-        true // TODO: Fix this
-    }
-}
