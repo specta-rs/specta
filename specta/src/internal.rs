@@ -10,7 +10,7 @@ use std::{borrow::Cow, collections::HashMap};
 pub use paste::paste;
 
 use crate::{
-    datatype::{DataType, DeprecatedType, Field, NamedDataType},
+    datatype::{DataType, DeprecatedType, Field, Generic, NamedDataType},
     ImplLocation, SpectaID, TypeCollection,
 };
 
@@ -23,6 +23,7 @@ pub fn register(
     deprecated: Option<DeprecatedType>,
     sid: SpectaID,
     impl_location: ImplLocation,
+    generics: Vec<Generic>,
     build: impl FnOnce(&mut TypeCollection) -> DataType,
 ) -> NamedDataType {
     match types.map.get(&sid) {
@@ -34,6 +35,7 @@ pub fn register(
             deprecated,
             sid,
             impl_location,
+            generics,
             inner: DataType::Primitive(crate::datatype::Primitive::i8), // TODO: Fix this
         },
         None => {
@@ -44,6 +46,7 @@ pub fn register(
                 deprecated,
                 sid,
                 impl_location,
+                generics,
                 inner: build(types),
             };
             types.map.insert(sid, Some(dt.clone()));
@@ -112,15 +115,9 @@ pub mod construct {
     pub const fn r#struct(
         name: Cow<'static, str>,
         sid: Option<SpectaID>,
-        generics: Vec<Generic>,
         fields: Fields,
     ) -> Struct {
-        Struct {
-            name,
-            sid,
-            generics,
-            fields,
-        }
+        Struct { name, sid, fields }
     }
 
     pub const fn fields_unit() -> Fields {
@@ -143,7 +140,6 @@ pub mod construct {
         sid: SpectaID,
         repr: EnumRepr,
         skip_bigint_checks: bool,
-        generics: Vec<Generic>,
         variants: Vec<(Cow<'static, str>, EnumVariant)>,
     ) -> Enum {
         Enum {
@@ -151,7 +147,6 @@ pub mod construct {
             sid: Some(sid),
             repr,
             skip_bigint_checks,
-            generics,
             variants,
         }
     }

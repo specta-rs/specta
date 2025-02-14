@@ -6,8 +6,8 @@ use std::{borrow::Cow, fmt::Debug};
 
 use crate::{
     datatype::{
-        DeprecatedType, Enum, EnumRepr, EnumVariant, Field, Fields, NamedDataType, NamedFields,
-        Struct, UnnamedFields,
+        DeprecatedType, Enum, EnumRepr, EnumVariant, Field, Fields, Generic, NamedDataType,
+        NamedFields, Struct, UnnamedFields,
     },
     DataType, ImplLocation, SpectaID,
 };
@@ -32,7 +32,6 @@ impl StructBuilder<()> {
         DataType::Struct(Struct {
             name: self.name,
             sid: None,
-            generics: vec![],
             fields: Fields::Unit,
         })
     }
@@ -63,7 +62,6 @@ impl StructBuilder<NamedFields> {
         DataType::Struct(Struct {
             name: self.name,
             sid: None,
-            generics: vec![],
             fields: Fields::Named(self.fields),
         })
     }
@@ -92,7 +90,6 @@ impl StructBuilder<UnnamedFields> {
         DataType::Struct(Struct {
             name: self.name,
             sid: None,
-            generics: vec![],
             fields: Fields::Unnamed(self.fields),
         })
     }
@@ -209,7 +206,6 @@ impl EnumBuilder {
             sid: None,
             skip_bigint_checks: false,
             repr: self.repr,
-            generics: Default::default(),
             variants: self.variants,
         })
     }
@@ -380,6 +376,7 @@ impl NamedDataTypeBuilder {
         name: impl Into<Cow<'static, str>>,
         sid: SpectaID,
         impl_location: ImplLocation,
+        generics: Vec<Generic>,
         dt: DataType,
     ) -> Self {
         Self(NamedDataType {
@@ -388,6 +385,7 @@ impl NamedDataTypeBuilder {
             deprecated: None,
             sid,
             impl_location,
+            generics,
             inner: dt,
         })
     }

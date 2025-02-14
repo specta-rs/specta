@@ -2,13 +2,12 @@ use super::{attr::*, r#struct::decode_field_attrs};
 use crate::{r#type::field::construct_field, utils::*};
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{spanned::Spanned, DataEnum, Fields, GenericParam, Generics};
+use syn::{spanned::Spanned, DataEnum, Fields};
 
 pub fn parse_enum(
     name: &TokenStream,
     enum_attrs: &EnumAttr,
     container_attrs: &ContainerAttr,
-    generics: &Generics,
     crate_ref: &TokenStream,
     data: &DataEnum,
 ) -> syn::Result<(TokenStream, bool)> {
@@ -18,14 +17,6 @@ pub fn parse_enum(
             "#[specta(transparent)] is not allowed on an enum",
         ));
     }
-
-    let definition_generics = generics.params.iter().filter_map(|p| match p {
-        GenericParam::Type(t) => {
-            let ident = t.ident.to_string();
-            Some(quote!(std::borrow::Cow::Borrowed(#ident).into()))
-        }
-        _ => None,
-    });
 
     let repr = enum_attrs.tagged()?;
     let variant_types =
@@ -167,7 +158,7 @@ pub fn parse_enum(
     let skip_bigint_checs = enum_attrs.unstable_skip_bigint_checks;
 
     Ok((
-        quote!(#crate_ref::datatype::DataType::Enum(#crate_ref::internal::construct::r#enum(#name.into(), SID, #repr, #skip_bigint_checs, vec![#(#definition_generics),*], vec![#(#variant_types),*]))),
+        quote!(#crate_ref::datatype::DataType::Enum(#crate_ref::internal::construct::r#enum(#name.into(), SID, #repr, #skip_bigint_checs, vec![#(#variant_types),*]))),
         can_flatten,
     ))
 }

@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::{ImplLocation, SpectaID};
 
-use super::DataType;
+use super::{DataType, Generic};
 
 /// A named type represents a non-primitive type capable of being exported as it's own named entity.
 #[derive(Debug, Clone, PartialEq)]
@@ -12,6 +12,7 @@ pub struct NamedDataType {
     pub(crate) deprecated: Option<DeprecatedType>,
     pub(crate) sid: SpectaID,
     pub(crate) impl_location: ImplLocation,
+    pub(crate) generics: Vec<Generic>,
     pub(crate) inner: DataType,
 }
 
@@ -39,6 +40,10 @@ impl NamedDataType {
     /// The code location where this type is implemented. Used for error reporting.
     pub fn impl_location(&self) -> &ImplLocation {
         &self.impl_location
+    }
+
+    pub fn generics(&self) -> &Vec<Generic> {
+        &self.generics
     }
 
     /// Get the inner [`DataType`]

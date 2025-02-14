@@ -145,7 +145,6 @@ const _: () = {
                 EnumRepr::External,
                 false,
                 vec![],
-                vec![],
             ))
         }
     }
@@ -157,7 +156,6 @@ impl<T: Type> Type for std::ops::Range<T> {
         DataType::Struct(Struct {
             name: "Range".into(),
             sid: None,
-            generics: vec![],
             fields: Fields::Named(NamedFields {
                 fields: vec![
                     (
@@ -212,7 +210,6 @@ const _: () = {
             DataType::Struct(internal::construct::r#struct(
                 "SystemTime".into(),
                 Some(internal::construct::sid("SystemTime".into(), "::todo:3:10")),
-                vec![],
                 internal::construct::fields_named(
                     vec![
                         (
@@ -244,7 +241,6 @@ const _: () = {
             DataType::Struct(internal::construct::r#struct(
                 "Duration".into(),
                 Some(SID),
-                vec![],
                 internal::construct::fields_named(
                     vec![
                         (

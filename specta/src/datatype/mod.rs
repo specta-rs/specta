@@ -48,13 +48,3 @@ pub enum DataType {
     Reference(reference::Reference),
     Generic(Generic),
 }
-
-impl DataType {
-    pub fn generics(&self) -> Option<&Vec<Generic>> {
-        match self {
-            Self::Struct(s) => Some(s.generics()),
-            Self::Enum(e) => Some(e.generics()),
-            _ => None,
-        }
-    }
-}

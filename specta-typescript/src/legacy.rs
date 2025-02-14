@@ -115,7 +115,7 @@ use std::fmt::Write;
 
 use specta::datatype::{
     inline_and_flatten_ndt, DataType, DeprecatedType, Enum, EnumRepr, EnumVariant, Fields,
-    FunctionReturnType, Literal, NamedDataType, Primitive, Struct, Tuple,
+    FunctionReturnType, Literal, NamedDataType, Struct, Tuple,
 };
 use specta::{
     internal::{skip_fields, skip_fields_named, NonSkipField},
@@ -231,7 +231,6 @@ fn export_datatype_inner(
     let name = typ.name();
     let docs = typ.docs();
     let deprecated = typ.deprecated();
-    let item = typ.ty();
 
     let ctx = ctx.with(PathItem::TypeExtended(
         name.clone(),
@@ -239,11 +238,11 @@ fn export_datatype_inner(
     ));
     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
 
-    let generics = item
-        .generics()
-        .filter(|generics| !generics.is_empty())
-        .map(|generics| format!("<{}>", generics.join(", ")))
-        .unwrap_or_default();
+    let generics = if typ.generics().len() == 0 {
+        "".into()
+    } else {
+        format!("<{}>", typ.generics().join(", "))
+    };
 
     let mut inline_ts = String::new();
     datatype_inner(
@@ -324,12 +323,7 @@ pub(crate) fn datatype_inner(
         }
         DataType::Literal(l) => crate::primitives::literal_dt(s, l),
         DataType::Nullable(def) => {
-            datatype_inner(
-                ctx,
-                &FunctionReturnType::Value((**def).clone()),
-                types,
-                s,
-            )?;
+            datatype_inner(ctx, &FunctionReturnType::Value((**def).clone()), types, s)?;
 
             let or_null = format!(" | {NULL}");
             if !s.ends_with(&or_null) {
@@ -1009,12 +1003,9 @@ fn validate_type_for_tagged_intersection(
 
 const ANY: &str = "any";
 const UNKNOWN: &str = "unknown";
-const NUMBER: &str = "number";
 const STRING: &str = "string";
-const BOOLEAN: &str = "boolean";
 const NULL: &str = "null";
 const NEVER: &str = "never";
-const BIGINT: &str = "bigint";
 
 use std::borrow::Borrow;
 
@@ -1076,9 +1067,8 @@ fn typedef_named_datatype_inner(
 
     let mut builder = js_doc_builder(docs, deprecated);
 
-    item.generics()
+    typ.generics()
         .into_iter()
-        .flatten()
         .for_each(|generic| builder.push_generic(generic));
 
     builder.push_internal(["@typedef { ", &inline_ts, " } ", &name]);

@@ -173,9 +173,9 @@ fn datatype(r: &Rust, t: &DataType, types: &TypeCollection) -> Result<String, Er
 
             match &s.fields() {
                 Fields::Unit => {
-                    if s.generics().len() != 0 {
-                        return Err("generics can't be used on a unit struct".into());
-                    }
+                    // if s.generics().len() != 0 {
+                    //     return Err("generics can't be used on a unit struct".into());
+                    // }
 
                     format!(
                         "{docs}{STANDARD_DERIVE}{}\npub struct {};",
@@ -187,8 +187,8 @@ fn datatype(r: &Rust, t: &DataType, types: &TypeCollection) -> Result<String, Er
                     )
                 }
                 Fields::Named(fields) => {
-                    assert!(s.generics().len() == 0, "missing support for generics"); // TODO
-                                                                                      // assert!(s.tag().is_some(), "missing support for tagging"); // TODO
+                    // assert!(s.generics().len() == 0, "missing support for generics"); // TODO
+                    // assert!(s.tag().is_some(), "missing support for tagging"); // TODO
 
                     // TODO: Error if any of the generics are not used or add `PhantomData` field?
 

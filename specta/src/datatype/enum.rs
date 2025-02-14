@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::SpectaID;
 
-use super::{DataType, DeprecatedType, Fields, Generic};
+use super::{DataType, DeprecatedType, Fields};
 
 /// Enum type which dictates how the enum is represented.
 ///
@@ -19,7 +19,6 @@ pub struct Enum {
     // I don't know if we should block bigints in these any types. Really I think we should but we need a good DX around overriding it on a per-type basis.
     pub(crate) skip_bigint_checks: bool,
     pub(crate) repr: EnumRepr,
-    pub(crate) generics: Vec<Generic>,
     pub(crate) variants: Vec<(Cow<'static, str>, EnumVariant)>,
 }
 
@@ -38,10 +37,6 @@ impl Enum {
 
     pub fn variants(&self) -> &Vec<(Cow<'static, str>, EnumVariant)> {
         &self.variants
-    }
-
-    pub fn generics(&self) -> &Vec<Generic> {
-        &self.generics
     }
 
     pub fn skip_bigint_checks(&self) -> bool {
