@@ -10,8 +10,8 @@ use std::{
 
 use specta::{
     datatype::{
-        reference::Reference, DataType, EnumRepr, EnumType, Field, Fields, List, LiteralType, Map,
-        NamedDataType, PrimitiveType, TupleType,
+        reference::Reference, DataType, Enum, EnumRepr, Field, Fields, List, Literal, Map,
+        NamedDataType, Primitive, Tuple,
     },
     TypeCollection,
 };
@@ -113,7 +113,7 @@ pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<
         specta_serde::validate_dt(&ty, &types)?;
         let result = crate::legacy::datatype(
             &Default::default(),
-            &specta::datatype::FunctionResultVariant::Value(ty.clone()),
+            &specta::datatype::FunctionReturnType::Value(ty.clone()),
             &types,
         );
 
@@ -131,10 +131,10 @@ pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<
 // TODO: Private
 pub(crate) fn primitive_dt(
     b: &BigIntExportBehavior,
-    p: &PrimitiveType,
+    p: &Primitive,
     location: Vec<Cow<'static, str>>,
 ) -> Result<&'static str, Error> {
-    use PrimitiveType::*;
+    use Primitive::*;
 
     Ok(match p {
         i8 | i16 | i32 | u8 | u16 | u32 | f32 | f64 => "number",
@@ -148,14 +148,14 @@ pub(crate) fn primitive_dt(
                 })
             }
         },
-        PrimitiveType::bool => "boolean",
+        Primitive::bool => "boolean",
         String | char => "string",
     })
 }
 
 // TODO: Private
-pub(crate) fn literal_dt(s: &mut String, l: &LiteralType) {
-    use LiteralType::*;
+pub(crate) fn literal_dt(s: &mut String, l: &Literal) {
+    use Literal::*;
 
     match l {
         i8(v) => write!(s, "{v}"),

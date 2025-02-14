@@ -23,3 +23,9 @@ impl List {
         self.unique
     }
 }
+
+impl From<List> for DataType {
+    fn from(t: List) -> Self {
+        Self::List(t)
+    }
+}

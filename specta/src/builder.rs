@@ -6,10 +6,10 @@ use std::{borrow::Cow, fmt::Debug};
 
 use crate::{
     datatype::{
-        DeprecatedType, EnumRepr, EnumType, EnumVariant, Field, Fields, List, NamedDataType,
-        NamedFields, StructType, UnnamedFields,
+        DeprecatedType, Enum, EnumRepr, EnumVariant, Field, Fields, List, NamedDataType,
+        NamedFields, Struct, UnnamedFields,
     },
-    DataType,
+    DataType, ImplLocation, SpectaID,
 };
 
 // TDO: `Debug` and `Clone` on everything
@@ -50,7 +50,7 @@ impl StructBuilder<()> {
     }
 
     pub fn build(self) -> DataType {
-        DataType::Struct(StructType {
+        DataType::Struct(Struct {
             name: self.name,
             sid: None,
             generics: vec![],
@@ -81,7 +81,7 @@ impl StructBuilder<NamedFields> {
     }
 
     pub fn build(self) -> DataType {
-        DataType::Struct(StructType {
+        DataType::Struct(Struct {
             name: self.name,
             sid: None,
             generics: vec![],
@@ -110,7 +110,7 @@ impl StructBuilder<UnnamedFields> {
     }
 
     pub fn build(self) -> DataType {
-        DataType::Struct(StructType {
+        DataType::Struct(Struct {
             name: self.name,
             sid: None,
             generics: vec![],
@@ -225,7 +225,7 @@ impl EnumBuilder {
     }
 
     pub fn build(self) -> DataType {
-        DataType::Enum(EnumType {
+        DataType::Enum(Enum {
             name: self.name,
             sid: None,
             skip_bigint_checks: false,
@@ -397,12 +397,18 @@ pub struct NamedDataTypeBuilder(NamedDataType);
 
 impl NamedDataTypeBuilder {
     // TODO: Taking `name` is super wierd with enums/structs which *also* have a name on the `Builder::new` method
-    pub fn new(name: impl Into<Cow<'static, str>>, dt: DataType) -> Self {
+    pub fn new(
+        name: impl Into<Cow<'static, str>>,
+        sid: SpectaID,
+        impl_location: ImplLocation,
+        dt: DataType,
+    ) -> Self {
         Self(NamedDataType {
             name: name.into(),
             docs: "".into(),
             deprecated: None,
-            ext: None,
+            sid,
+            impl_location,
             inner: dt,
         })
     }

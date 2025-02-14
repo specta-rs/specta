@@ -10,7 +10,7 @@ macro_rules! _impl_primitives {
     ($($i:ident)+) => {$(
         impl Type for $i {
             fn definition(_: &mut TypeCollection) -> DataType {
-                DataType::Primitive(datatype::PrimitiveType::$i)
+                DataType::Primitive(datatype::Primitive::$i)
             }
         }
     )+};
@@ -21,7 +21,7 @@ macro_rules! _impl_tuple {
         #[allow(non_snake_case)]
         impl<$($i: Type),*> Type for ($($i,)*) {
             fn definition(_types: &mut TypeCollection) -> DataType {
-                datatype::TupleType {
+                datatype::Tuple {
                     elements: vec![$(<$i as Type>::definition(_types)),*],
                 }.to_anonymous()
             }

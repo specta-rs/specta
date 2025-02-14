@@ -106,7 +106,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             }
             GenericParam::Type(t) => {
                 let ident = format_ident!("PLACEHOLDER_{}", t.ident);
-                quote!(#crate_ref::datatype::Generic<#ident>)
+                quote!(#crate_ref::datatype::GenericPlaceholder<#ident>)
             }
             GenericParam::Const(c) => {
                 let ident = &c.ident;
@@ -124,7 +124,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             let ident_str = t.ident.to_string();
             Some(quote!(
                 pub struct #ident;
-                impl #crate_ref::datatype::GenericPlaceholder for #ident {
+                impl #crate_ref::datatype::ConstGenericPlaceholder for #ident {
                     const PLACEHOLDER: &'static str = #ident_str;
                 }
             ))

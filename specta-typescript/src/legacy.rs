@@ -114,8 +114,8 @@ use crate::{Any, BigIntExportBehavior, Error, Typescript, Unknown};
 use std::fmt::Write;
 
 use specta::datatype::{
-    inline_and_flatten_ndt, DataType, DeprecatedType, EnumRepr, EnumType, EnumVariant, Fields,
-    FunctionResultVariant, LiteralType, NamedDataType, PrimitiveType, StructType, TupleType,
+    inline_and_flatten_ndt, DataType, DeprecatedType, Enum, EnumRepr, EnumVariant, Fields,
+    FunctionReturnType, Literal, NamedDataType, Primitive, Struct, Tuple,
 };
 use specta::{
     internal::{skip_fields, skip_fields_named, NonSkipField},
@@ -170,7 +170,7 @@ pub fn inline<T: Type>(conf: &Typescript) -> Output {
     let ty = specta::datatype::inline(ty.clone(), &types);
 
     validate_dt(&ty, &types)?;
-    let result = datatype(conf, &FunctionResultVariant::Value(ty.clone()), &types);
+    let result = datatype(conf, &FunctionReturnType::Value(ty.clone()), &types);
 
     if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
         return Err(Error::DuplicateTypeNameLegacy(ty_name, l0, l1));
@@ -230,15 +230,13 @@ fn export_datatype_inner(
 ) -> Output {
     let name = typ.name();
     let docs = typ.docs();
-    let ext = typ.ext();
     let deprecated = typ.deprecated();
-    let item = &typ.inner;
+    let item = typ.ty();
 
-    let ctx = ctx.with(
-        ext.clone()
-            .map(|v| PathItem::TypeExtended(name.clone(), *v.impl_location()))
-            .unwrap_or_else(|| PathItem::Type(name.clone())),
-    );
+    let ctx = ctx.with(PathItem::TypeExtended(
+        name.clone(),
+        typ.impl_location().clone(),
+    ));
     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
 
     let generics = item
@@ -250,7 +248,7 @@ fn export_datatype_inner(
     let mut inline_ts = String::new();
     datatype_inner(
         ctx.clone(),
-        &FunctionResultVariant::Value((typ.inner).clone()),
+        &FunctionReturnType::Value(typ.ty().clone()),
         types,
         &mut inline_ts,
     )?;
@@ -267,7 +265,7 @@ fn export_datatype_inner(
 /// Convert a DataType to a TypeScript string
 ///
 /// Eg. `{ demo: string; }`
-pub fn datatype(conf: &Typescript, typ: &FunctionResultVariant, types: &TypeCollection) -> Output {
+pub fn datatype(conf: &Typescript, typ: &FunctionReturnType, types: &TypeCollection) -> Output {
     // TODO: Duplicate type name detection?
 
     let mut s = String::new();
@@ -286,19 +284,19 @@ pub fn datatype(conf: &Typescript, typ: &FunctionResultVariant, types: &TypeColl
 
 pub(crate) fn datatype_inner(
     ctx: ExportContext,
-    typ: &FunctionResultVariant,
+    typ: &FunctionReturnType,
     types: &TypeCollection,
     s: &mut String,
 ) -> Result<()> {
     let typ = match typ {
-        FunctionResultVariant::Value(t) => t,
-        FunctionResultVariant::Result(t, e) => {
+        FunctionReturnType::Value(t) => t,
+        FunctionReturnType::Result(t, e) => {
             let mut variants = vec![
                 {
                     let mut v = String::new();
                     datatype_inner(
                         ctx.clone(),
-                        &FunctionResultVariant::Value(t.clone()),
+                        &FunctionReturnType::Value(t.clone()),
                         types,
                         &mut v,
                     )?;
@@ -306,7 +304,7 @@ pub(crate) fn datatype_inner(
                 },
                 {
                     let mut v = String::new();
-                    datatype_inner(ctx, &FunctionResultVariant::Value(e.clone()), types, &mut v)?;
+                    datatype_inner(ctx, &FunctionReturnType::Value(e.clone()), types, &mut v)?;
                     v
                 },
             ];
@@ -328,7 +326,7 @@ pub(crate) fn datatype_inner(
         DataType::Nullable(def) => {
             datatype_inner(
                 ctx,
-                &FunctionResultVariant::Value((**def).clone()),
+                &FunctionReturnType::Value((**def).clone()),
                 types,
                 s,
             )?;
@@ -344,14 +342,14 @@ pub(crate) fn datatype_inner(
             s.push_str("Partial<{ [key in ");
             datatype_inner(
                 ctx.clone(),
-                &FunctionResultVariant::Value(def.key_ty().clone()),
+                &FunctionReturnType::Value(def.key_ty().clone()),
                 types,
                 s,
             )?;
             s.push_str("]: ");
             datatype_inner(
                 ctx.clone(),
-                &FunctionResultVariant::Value(def.value_ty().clone()),
+                &FunctionReturnType::Value(def.value_ty().clone()),
                 types,
                 s,
             )?;
@@ -362,7 +360,7 @@ pub(crate) fn datatype_inner(
             let mut dt = String::new();
             datatype_inner(
                 ctx,
-                &FunctionResultVariant::Value(def.ty().clone()),
+                &FunctionReturnType::Value(def.ty().clone()),
                 types,
                 &mut dt,
             )?;
@@ -397,7 +395,6 @@ pub(crate) fn datatype_inner(
             ctx.with(
                 item.sid()
                     .and_then(|sid| types.get(sid))
-                    .and_then(|v| v.ext())
                     .map(|v| PathItem::TypeExtended(item.name().clone(), *v.impl_location()))
                     .unwrap_or_else(|| PathItem::Type(item.name().clone())),
             ),
@@ -442,7 +439,7 @@ pub(crate) fn datatype_inner(
 
                         datatype_inner(
                             ctx.with(PathItem::Type(definition.name().clone())),
-                            &FunctionResultVariant::Value(v.clone()),
+                            &FunctionReturnType::Value(v.clone()),
                             types,
                             s,
                         )?;
@@ -468,7 +465,7 @@ fn unnamed_fields_datatype(
             let mut v = String::new();
             datatype_inner(
                 ctx.clone(),
-                &FunctionResultVariant::Value((*ty).clone()),
+                &FunctionReturnType::Value((*ty).clone()),
                 types,
                 &mut v,
             )?;
@@ -491,7 +488,7 @@ fn unnamed_fields_datatype(
                 let mut v = String::new();
                 datatype_inner(
                     ctx.clone(),
-                    &FunctionResultVariant::Value((*ty).clone()),
+                    &FunctionReturnType::Value((*ty).clone()),
                     types,
                     &mut v,
                 )?;
@@ -509,7 +506,7 @@ fn unnamed_fields_datatype(
     })
 }
 
-fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, types: &TypeCollection) -> Output {
+fn tuple_datatype(ctx: ExportContext, tuple: &Tuple, types: &TypeCollection) -> Output {
     match &tuple.elements()[..] {
         [] => Ok(NULL.to_string()),
         tys => Ok(format!(
@@ -519,7 +516,7 @@ fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, types: &TypeCollection)
                     let mut s = String::new();
                     datatype_inner(
                         ctx.clone(),
-                        &FunctionResultVariant::Value(v.clone()),
+                        &FunctionReturnType::Value(v.clone()),
                         types,
                         &mut s,
                     )
@@ -534,7 +531,7 @@ fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, types: &TypeCollection)
 fn struct_datatype(
     ctx: ExportContext,
     key: &str,
-    strct: &StructType,
+    strct: &Struct,
     types: &TypeCollection,
     s: &mut String,
 ) -> Result<()> {
@@ -565,7 +562,7 @@ fn struct_datatype(
                     let mut s = String::new();
                     datatype_inner(
                         ctx.with(PathItem::Field(key.clone())),
-                        &FunctionResultVariant::Value(ty.clone()),
+                        &FunctionReturnType::Value(ty.clone()),
                         types,
                         &mut s,
                     )
@@ -671,7 +668,7 @@ fn enum_variant_datatype(
                     let mut s = String::new();
                     datatype_inner(
                         ctx.clone(),
-                        &FunctionResultVariant::Value(ty.clone()),
+                        &FunctionReturnType::Value(ty.clone()),
                         types,
                         &mut s,
                     )
@@ -699,7 +696,7 @@ fn enum_variant_datatype(
 
 fn enum_datatype(
     ctx: ExportContext,
-    e: &EnumType,
+    e: &Enum,
     types: &TypeCollection,
     s: &mut String,
 ) -> Result<()> {
@@ -888,7 +885,7 @@ fn object_field_to_ts(
     let mut value = String::new();
     datatype_inner(
         ctx,
-        &FunctionResultVariant::Value(ty.clone()),
+        &FunctionReturnType::Value(ty.clone()),
         types,
         &mut value,
     )?;
@@ -956,7 +953,7 @@ fn validate_type_for_tagged_intersection(
         | DataType::Map(_)
         | DataType::Generic(_) => Ok(false),
         DataType::Literal(v) => match v {
-            LiteralType::None => Ok(true),
+            Literal::None => Ok(true),
             _ => Ok(false),
         },
         DataType::Struct(v) => match v.fields() {
@@ -1003,7 +1000,7 @@ fn validate_type_for_tagged_intersection(
             types
                 .get(r.sid())
                 .expect("TypeCollection should have been populated by now")
-                .inner
+                .ty()
                 .clone(),
             types,
         ),
@@ -1021,7 +1018,7 @@ const BIGINT: &str = "bigint";
 
 use std::borrow::Borrow;
 
-use specta::datatype::GenericType;
+use specta::datatype::Generic;
 
 // TODO: Merge this into main expoerter
 pub(crate) fn js_doc_builder(docs: &str, deprecated: Option<&DeprecatedType>) -> Builder {
@@ -1063,7 +1060,7 @@ fn typedef_named_datatype_inner(
     let name = typ.name();
     let docs = typ.docs();
     let deprecated = typ.deprecated();
-    let item = &typ.inner;
+    let item = typ.ty();
 
     let ctx = ctx.with(PathItem::Type(name.clone()));
 
@@ -1072,7 +1069,7 @@ fn typedef_named_datatype_inner(
     let mut inline_ts = String::new();
     datatype_inner(
         ctx.clone(),
-        &FunctionResultVariant::Value(typ.inner.clone()),
+        &FunctionReturnType::Value(typ.ty().clone()),
         types,
         &mut inline_ts,
     )?;
@@ -1134,7 +1131,7 @@ impl Builder {
         );
     }
 
-    pub fn push_generic(&mut self, generic: &GenericType) {
+    pub fn push_generic(&mut self, generic: &Generic) {
         self.push_internal(["@template ", generic.borrow()])
     }
 

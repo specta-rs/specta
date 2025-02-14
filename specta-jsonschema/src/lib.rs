@@ -13,7 +13,7 @@ use inflector::Inflector;
 use schemars::schema::{InstanceType, Schema, SingleOrVec};
 use specta::{
     builder::{EnumBuilder, FieldBuilder, StructBuilder},
-    datatype::{DataType, List, LiteralType, PrimitiveType},
+    datatype::{DataType, List, Literal, Primitive},
     TypeCollection,
 };
 
@@ -162,13 +162,13 @@ pub fn to_ast(schema: &Schema) -> Result<DataType, ()> {
 
                 fn from_instance_type(o: &InstanceType) -> DataType {
                     match o {
-                        InstanceType::Null => DataType::Literal(LiteralType::None),
-                        InstanceType::Boolean => DataType::Primitive(PrimitiveType::bool),
+                        InstanceType::Null => DataType::Literal(Literal::None),
+                        InstanceType::Boolean => DataType::Primitive(Primitive::bool),
                         InstanceType::Object => unreachable!(),
                         InstanceType::Array => unreachable!(),
-                        InstanceType::String => DataType::Primitive(PrimitiveType::String),
-                        InstanceType::Number => DataType::Primitive(PrimitiveType::f64),
-                        InstanceType::Integer => DataType::Primitive(PrimitiveType::u64),
+                        InstanceType::String => DataType::Primitive(Primitive::String),
+                        InstanceType::Number => DataType::Primitive(Primitive::f64),
+                        InstanceType::Integer => DataType::Primitive(Primitive::u64),
                     }
                 }
 

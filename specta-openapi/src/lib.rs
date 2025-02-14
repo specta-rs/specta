@@ -9,7 +9,7 @@ use openapiv3::{
     ArrayType, BooleanType, NumberType, ReferenceOr, Schema, SchemaData, SchemaKind, StringType,
     Type,
 };
-use specta::datatype::{DataType, PrimitiveType};
+use specta::datatype::{DataType, Primitive};
 
 // pub fn to_openapi_export(def: &DataType) -> Result<openapiv3::Schema, String> {
 //     Ok(match &def {
@@ -49,7 +49,7 @@ use specta::datatype::{DataType, PrimitiveType};
 
 macro_rules! primitive_def {
     ($($t:ident)+) => {
-        $(DataType::Primitive(PrimitiveType::$t))|+
+        $(DataType::Primitive(Primitive::$t))|+
     }
 }
 

@@ -67,8 +67,7 @@ impl Field {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UnnamedFields {
-    #[doc(hidden)] // TODO: Back to private
-    pub fields: Vec<Field>,
+    pub(crate) fields: Vec<Field>,
 }
 
 impl UnnamedFields {

@@ -19,3 +19,9 @@ impl Map {
         &self.value_ty
     }
 }
+
+impl From<Map> for DataType {
+    fn from(t: Map) -> Self {
+        Self::Map(t)
+    }
+}

@@ -9,7 +9,7 @@ use super::DataType;
 #[derive(Debug, Clone, PartialEq)]
 #[allow(non_camel_case_types)]
 #[non_exhaustive] // TODO: Yes or no???
-pub enum LiteralType {
+pub enum Literal {
     i8(i8),
     i16(i16),
     i32(i32),
@@ -25,31 +25,32 @@ pub enum LiteralType {
     None,
 }
 
-impl From<LiteralType> for DataType {
-    fn from(t: LiteralType) -> Self {
+impl From<Literal> for DataType {
+    fn from(t: Literal) -> Self {
         Self::Literal(t)
     }
 }
 
+// TODO: Do all of this
 // macro_rules! impl_literal_conversion {
 //     () => {
 
 //     };
 // }
 
-impl From<i8> for LiteralType {
+impl From<i8> for Literal {
     fn from(t: i8) -> Self {
         Self::i8(t)
     }
 }
 
-impl From<bool> for LiteralType {
+impl From<bool> for Literal {
     fn from(t: bool) -> Self {
         Self::bool(t)
     }
 }
 
-impl From<String> for LiteralType {
+impl From<String> for Literal {
     fn from(t: String) -> Self {
         Self::String(t)
     }

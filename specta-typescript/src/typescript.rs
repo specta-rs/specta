@@ -84,6 +84,11 @@ impl Typescript {
         self
     }
 
+    /// TODO: Explain
+    pub fn with_serde(mut self) -> Self {
+        todo!();
+    }
+
     /// TODO
     pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
         let mut out = self.header.to_string();

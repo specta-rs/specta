@@ -132,7 +132,7 @@ impl<T: Type> Type for Option<T> {
 
 impl<T> Type for std::marker::PhantomData<T> {
     fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Literal(LiteralType::None)
+        DataType::Literal(Literal::None)
     }
 }
 
@@ -158,7 +158,7 @@ const _: () = {
 impl<T: Type> Type for std::ops::Range<T> {
     fn definition(types: &mut TypeCollection) -> DataType {
         let ty = Some(T::definition(types));
-        DataType::Struct(StructType {
+        DataType::Struct(Struct {
             name: "Range".into(),
             sid: None,
             generics: vec![],

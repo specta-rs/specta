@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::TypeCollection;
 
-use super::{DataType, Field, Fields, GenericType, NamedDataType};
+use super::{DataType, Field, Fields, Generic, NamedDataType};
 
 #[doc(hidden)] // TODO: Move this into Specta Typescript
 pub fn inline_and_flatten_ndt(dt: NamedDataType, types: &TypeCollection) -> NamedDataType {
@@ -28,7 +28,7 @@ fn field(
     f: Field,
     types: &TypeCollection,
     truely_force_inline: bool,
-    generics: &HashMap<GenericType, DataType>,
+    generics: &HashMap<Generic, DataType>,
     depth: usize,
 ) -> Field {
     // TODO: truely_force_inline
@@ -58,7 +58,7 @@ fn fields(
     f: Fields,
     types: &TypeCollection,
     truely_force_inline: bool,
-    generics: &HashMap<GenericType, DataType>,
+    generics: &HashMap<Generic, DataType>,
     depth: usize,
 ) -> Fields {
     match f {
@@ -86,7 +86,7 @@ fn inner(
     types: &TypeCollection,
     force_inline: bool,
     truely_force_inline: bool,
-    generics: &HashMap<GenericType, DataType>,
+    generics: &HashMap<Generic, DataType>,
     depth: usize,
 ) -> DataType {
     // TODO: Can we be smart enough to determine loops, instead of just trying X times and bailing out????
@@ -136,11 +136,11 @@ fn inner(
             generics,
             depth + 1,
         ))),
-        DataType::Struct(s) => DataType::Struct(super::StructType {
+        DataType::Struct(s) => DataType::Struct(super::Struct {
             fields: fields(s.fields, types, truely_force_inline, &generics, depth),
             ..s
         }),
-        DataType::Enum(e) => DataType::Enum(super::EnumType {
+        DataType::Enum(e) => DataType::Enum(super::Enum {
             variants: e
                 .variants
                 .into_iter()
@@ -156,7 +156,7 @@ fn inner(
                 .collect(),
             ..e
         }),
-        DataType::Tuple(t) => DataType::Tuple(super::TupleType {
+        DataType::Tuple(t) => DataType::Tuple(super::Tuple {
             elements: t
                 .elements
                 .into_iter()
@@ -204,7 +204,7 @@ fn inner(
 }
 
 /// Following all `DataType::Reference`'s filling in any `DataType::Generic`'s with the correct value.
-fn resolve_generics(dt: DataType, generics: &HashMap<GenericType, DataType>) -> DataType {
+fn resolve_generics(dt: DataType, generics: &HashMap<Generic, DataType>) -> DataType {
     // TODO: This could so only re-alloc if the type has a generics that needs replacing.
     match dt {
         DataType::List(l) => DataType::List(super::List {
@@ -222,7 +222,7 @@ fn resolve_generics(dt: DataType, generics: &HashMap<GenericType, DataType>) -> 
         //     ..s,
         // })
         // DataType::Enum(e) => todo!(),
-        DataType::Tuple(t) => DataType::Tuple(super::TupleType {
+        DataType::Tuple(t) => DataType::Tuple(super::Tuple {
             elements: t
                 .elements
                 .into_iter()

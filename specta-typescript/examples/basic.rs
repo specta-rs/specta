@@ -1,7 +1,7 @@
 use std::{any::Any, collections::HashMap};
 
 use specta::{
-    datatype::{self, FunctionResultVariant},
+    datatype::{self, FunctionReturnType},
     Type, TypeCollection,
 };
 use specta_typescript::Typescript;

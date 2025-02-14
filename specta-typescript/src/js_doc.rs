@@ -31,23 +31,25 @@ impl JSDoc {
     /// Override the header for the exported file.
     /// You should prefer `Self::header` instead unless your a framework.
     #[doc(hidden)] // Although this is hidden it's still public API.
-    pub fn framework_header(mut self, header: impl Into<Cow<'static, str>>) -> Self {
-        self.0.framework_header = header.into();
-        self
+    pub fn framework_header(self, header: impl Into<Cow<'static, str>>) -> Self {
+        Self(self.0.framework_header(header))
     }
 
     /// Configure a header for the file.
     ///
     /// This is perfect for configuring lint ignore rules or other file-level comments.
-    pub fn header(mut self, header: impl Into<Cow<'static, str>>) -> Self {
-        self.0.header = header.into();
-        self
+    pub fn header(self, header: impl Into<Cow<'static, str>>) -> Self {
+        Self(self.0.header(header))
     }
 
     /// Configure the BigInt handling behaviour
-    pub fn bigint(mut self, bigint: BigIntExportBehavior) -> Self {
-        self.0.bigint = bigint;
-        self
+    pub fn bigint(self, bigint: BigIntExportBehavior) -> Self {
+        Self(self.0.bigint(bigint))
+    }
+
+    /// TODO: Explain
+    pub fn with_serde(self) -> Self {
+        Self(self.0.with_serde())
     }
 
     /// TODO
