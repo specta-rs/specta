@@ -113,8 +113,8 @@ use crate::{Any, BigIntExportBehavior, Error, Typescript, Unknown};
 use std::fmt::Write;
 
 use specta::datatype::{
-    inline_and_flatten_ndt, DataType, DeprecatedType, Enum, EnumRepr, EnumVariant, Fields,
-    FunctionReturnType, Literal, NamedDataType, Struct, Tuple,
+    DataType, DeprecatedType, Enum, EnumRepr, EnumVariant, Fields, FunctionReturnType, Literal,
+    NamedDataType, Struct, Tuple,
 };
 use specta::{
     internal::{skip_fields, skip_fields_named, NonSkipField},
@@ -180,146 +180,7 @@ pub(crate) fn datatype_inner(
         }
     };
 
-    Ok(match &typ {
-        DataType::Primitive(p) => {
-            s.push_str(crate::primitives::primitive_dt(
-                &ctx.cfg.bigint,
-                p,
-                ctx.path
-                    .into_iter()
-                    .map(|v| match v {
-                        PathItem::Type(cow) => cow,
-                        PathItem::TypeExtended(cow, impl_location) => cow,
-                        PathItem::Field(cow) => cow,
-                        PathItem::Variant(cow) => cow,
-                    })
-                    .collect(), // Vec::new(), /* TODO: Fix this path */
-            )?);
-        }
-        DataType::Literal(l) => crate::primitives::literal_dt(s, l),
-        DataType::Nullable(def) => {
-            datatype_inner(ctx, &FunctionReturnType::Value((**def).clone()), types, s)?;
-
-            let or_null = format!(" | {NULL}");
-            if !s.ends_with(&or_null) {
-                s.push_str(&or_null);
-            }
-        }
-        DataType::Map(def) => {
-            // We use `{ [key in K]: V }` instead of `Record<K, V>` to avoid issues with circular references.
-            // Wrapped in Partial<> because otherwise TypeScript would enforce exhaustiveness.
-            s.push_str("Partial<{ [key in ");
-            datatype_inner(
-                ctx.clone(),
-                &FunctionReturnType::Value(def.key_ty().clone()),
-                types,
-                s,
-            )?;
-            s.push_str("]: ");
-            datatype_inner(
-                ctx.clone(),
-                &FunctionReturnType::Value(def.value_ty().clone()),
-                types,
-                s,
-            )?;
-            s.push_str(" }>");
-        }
-        // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
-        DataType::List(def) => {
-            let mut dt = String::new();
-            datatype_inner(
-                ctx,
-                &FunctionReturnType::Value(def.ty().clone()),
-                types,
-                &mut dt,
-            )?;
-
-            let dt = if (dt.contains(' ') && !dt.ends_with('}'))
-                // This is to do with maintaining order of operations.
-                // Eg `{} | {}` must be wrapped in parens like `({} | {})[]` but `{}` doesn't cause `{}[]` is valid
-                || (dt.contains(' ') && (dt.contains('&') || dt.contains('|')))
-            {
-                format!("({dt})")
-            } else {
-                dt
-            };
-
-            if let Some(length) = def.length() {
-                s.push('[');
-
-                for n in 0..length {
-                    if n != 0 {
-                        s.push_str(", ");
-                    }
-
-                    s.push_str(&dt);
-                }
-
-                s.push(']');
-            } else {
-                write!(s, "{dt}[]")?;
-            }
-        }
-        DataType::Struct(item) => struct_datatype(
-            ctx.with(
-                item.sid()
-                    .and_then(|sid| types.get(sid))
-                    .map(|v| PathItem::TypeExtended(item.name().clone(), *v.impl_location()))
-                    .unwrap_or_else(|| PathItem::Type(item.name().clone())),
-            ),
-            item.name(),
-            item,
-            types,
-            s,
-        )?,
-        DataType::Enum(item) => {
-            let mut ctx = ctx.clone();
-            let cfg = ctx.cfg.clone().bigint(BigIntExportBehavior::Number);
-            if item.skip_bigint_checks() {
-                ctx.cfg = &cfg;
-            }
-
-            enum_datatype(
-                ctx.with(PathItem::Variant(item.name().clone())),
-                item,
-                types,
-                s,
-            )?
-        }
-        DataType::Tuple(tuple) => s.push_str(&tuple_datatype(ctx, tuple, types)?),
-        DataType::Reference(reference) => {
-            if reference.sid() == Any::<()>::ID {
-                s.push_str(ANY);
-            } else if reference.sid() == Unknown::<()>::ID {
-                s.push_str(UNKNOWN);
-            } else {
-                let definition = types.get(reference.sid()).unwrap(); // TODO: Error handling
-
-                if reference.generics().len() == 0 {
-                    s.push_str(&definition.name());
-                } else {
-                    s.push_str(&definition.name());
-                    s.push('<');
-
-                    for (i, (_, v)) in reference.generics().iter().enumerate() {
-                        if i != 0 {
-                            s.push_str(", ");
-                        }
-
-                        datatype_inner(
-                            ctx.with(PathItem::Type(definition.name().clone())),
-                            &FunctionReturnType::Value(v.clone()),
-                            types,
-                            s,
-                        )?;
-                    }
-
-                    s.push('>');
-                }
-            }
-        }
-        DataType::Generic(ident) => s.push_str(&ident.to_string()),
-    })
+    crate::primitives::datatype(s, ctx.cfg, types, typ, vec![], ctx.is_export)
 }
 
 // Can be used with `StructUnnamedFields.fields` or `EnumNamedFields.fields`
@@ -375,7 +236,7 @@ fn unnamed_fields_datatype(
     })
 }
 
-fn tuple_datatype(ctx: ExportContext, tuple: &Tuple, types: &TypeCollection) -> Output {
+pub(crate) fn tuple_datatype(ctx: ExportContext, tuple: &Tuple, types: &TypeCollection) -> Output {
     match &tuple.elements()[..] {
         [] => Ok(NULL.to_string()),
         tys => Ok(format!(
@@ -397,7 +258,7 @@ fn tuple_datatype(ctx: ExportContext, tuple: &Tuple, types: &TypeCollection) -> 
     }
 }
 
-fn struct_datatype(
+pub(crate) fn struct_datatype(
     ctx: ExportContext,
     key: &str,
     strct: &Struct,
@@ -563,7 +424,7 @@ fn enum_variant_datatype(
     }
 }
 
-fn enum_datatype(
+pub(crate) fn enum_datatype(
     ctx: ExportContext,
     e: &Enum,
     types: &TypeCollection,

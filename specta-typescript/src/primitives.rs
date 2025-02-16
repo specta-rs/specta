@@ -13,10 +13,13 @@ use specta::{
         DataType, Enum, EnumRepr, Field, Fields, List, Literal, Map, NamedDataType, Primitive,
         Reference, Tuple,
     },
-    TypeCollection,
+    NamedType, TypeCollection,
 };
 
-use crate::{legacy::js_doc_builder, reserved_names::*, BigIntExportBehavior, Error, Typescript};
+use crate::{
+    legacy::js_doc_builder, reserved_names::*, Any, BigIntExportBehavior, Error, Typescript,
+    Unknown,
+};
 
 /// Generate an `export Type = ...` Typescript string for a specific [`DataType`].
 ///
@@ -96,8 +99,74 @@ pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<
 //     todo!();
 // }
 
-// TODO: Private
-pub(crate) fn primitive_dt(
+// TODO: private
+pub(crate) fn datatype(
+    s: &mut String,
+    ts: &Typescript,
+    types: &TypeCollection,
+    dt: &DataType,
+    mut location: Vec<Cow<'static, str>>,
+    // state: State,
+    // TODO: Remove this???
+    is_export: bool,
+) -> Result<(), Error> {
+    // TODO: Validating the variant from `dt` can be flattened
+
+    match dt {
+        DataType::Primitive(p) => s.push_str(primitive_dt(&ts.bigint, p, location)?),
+        DataType::Literal(l) => literal_dt(s, l),
+        DataType::List(l) => list_dt(s, ts, types, l, location, is_export)?,
+        DataType::Map(m) => map_dt(s, ts, types, m, location, is_export)?,
+        DataType::Nullable(def) => {
+            // TODO: Replace legacy stuff
+            crate::legacy::datatype_inner(
+                crate::legacy::ExportContext {
+                    cfg: ts,
+                    path: vec![],
+                    is_export,
+                },
+                &specta::datatype::FunctionReturnType::Value((**def).clone()),
+                types,
+                s,
+            )?;
+
+            let or_null = format!(" | null");
+            if !s.ends_with(&or_null) {
+                s.push_str(&or_null);
+            }
+
+            // datatype(s, ts, types, &*t, location, state)?;
+            // let or_null = " | null";
+            // if !s.ends_with(or_null) {
+            //     s.push_str(or_null);
+            // }
+        }
+        DataType::Struct(st) => {
+            // location.push(st.name().clone());
+            // fields_dt(s, ts, types, st.name(), &st.fields(), location, state)?
+
+            crate::legacy::struct_datatype(
+                crate::legacy::ExportContext {
+                    cfg: ts,
+                    path: vec![],
+                    is_export,
+                },
+                st.name(),
+                st,
+                types,
+                s,
+            )?
+        }
+        DataType::Enum(e) => enum_dt(s, ts, types, e, location, is_export)?,
+        DataType::Tuple(t) => tuple_dt(s, ts, types, t, location, is_export)?,
+        DataType::Reference(r) => reference_dt(s, ts, types, r, location, is_export)?,
+        DataType::Generic(g) => s.push_str(g.borrow()),
+    };
+
+    Ok(())
+}
+
+fn primitive_dt(
     b: &BigIntExportBehavior,
     p: &Primitive,
     location: Vec<Cow<'static, str>>,
@@ -121,184 +190,7 @@ pub(crate) fn primitive_dt(
     })
 }
 
-fn datatype(
-    s: &mut String,
-    ts: &Typescript,
-    types: &TypeCollection,
-    dt: &DataType,
-    mut location: Vec<Cow<'static, str>>,
-    // state: State,
-    // TODO: Remove this???
-    is_export: bool,
-) -> Result<(), Error> {
-    // TODO: Validating the variant from `dt` can be flattened
-
-    match dt {
-        DataType::Primitive(p) => s.push_str(primitive_dt(&ts.bigint, p, location)?),
-        DataType::Literal(l) => literal_dt(s, l),
-        // DataType::List(l) => list_dt(s, ts, types, l, location, state)?,
-        // DataType::Map(m) => map_dt(s, ts, types, m, location, state)?,
-        // DataType::Nullable(t) => {
-        //     datatype(s, ts, types, &*t, location, state)?;
-        //     let or_null = " | null";
-        //     if !s.ends_with(or_null) {
-        //         s.push_str(or_null);
-        //     }
-        // }
-        // DataType::Struct(st) => {
-        //     location.push(st.name().clone());
-        //     fields_dt(s, ts, types, st.name(), &st.fields(), location, state)?
-        // }
-        // DataType::Enum(e) => enum_dt(s, ts, types, e, location, state)?,
-        // DataType::Tuple(t) => tuple_dt(s, ts, types, t, location, state)?,
-        // DataType::Reference(r) => reference_dt(s, ts, types, r, location, state)?,
-        DataType::Generic(g) => s.push_str(g.borrow()),
-        // TODO: Don't fallback to legacy
-        _ => crate::legacy::datatype_inner(
-            crate::legacy::ExportContext {
-                cfg: ts,
-                path: vec![],
-                is_export,
-            },
-            &specta::datatype::FunctionReturnType::Value(dt.clone()),
-            types,
-            s,
-        )?,
-        // TODO: Replace legacy stuff
-        // DataType::Nullable(def) => {
-        //     datatype_inner(
-        //         ctx,
-        //         &specta::datatype::FunctionReturnType::Value((**def).clone()),
-        //         types,
-        //         s,
-        //     )?;
-
-        //     let or_null = format!(" | {NULL}");
-        //     if !s.ends_with(&or_null) {
-        //         s.push_str(&or_null);
-        //     }
-        // }
-        // DataType::Map(def) => {
-        //     // We use `{ [key in K]: V }` instead of `Record<K, V>` to avoid issues with circular references.
-        //     // Wrapped in Partial<> because otherwise TypeScript would enforce exhaustiveness.
-        //     s.push_str("Partial<{ [key in ");
-        //     datatype_inner(
-        //         ctx.clone(),
-        //         &FunctionReturnType::Value(def.key_ty().clone()),
-        //         types,
-        //         s,
-        //     )?;
-        //     s.push_str("]: ");
-        //     datatype_inner(
-        //         ctx.clone(),
-        //         &FunctionReturnType::Value(def.value_ty().clone()),
-        //         types,
-        //         s,
-        //     )?;
-        //     s.push_str(" }>");
-        // }
-        // // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
-        // DataType::List(def) => {
-        //     let mut dt = String::new();
-        //     datatype_inner(
-        //         ctx,
-        //         &FunctionReturnType::Value(def.ty().clone()),
-        //         types,
-        //         &mut dt,
-        //     )?;
-
-        //     let dt = if (dt.contains(' ') && !dt.ends_with('}'))
-        // // This is to do with maintaining order of operations.
-        // // Eg `{} | {}` must be wrapped in parens like `({} | {})[]` but `{}` doesn't cause `{}[]` is valid
-        // || (dt.contains(' ') && (dt.contains('&') || dt.contains('|')))
-        //     {
-        //         format!("({dt})")
-        //     } else {
-        //         dt
-        //     };
-
-        //     if let Some(length) = def.length() {
-        //         s.push('[');
-
-        //         for n in 0..length {
-        //             if n != 0 {
-        //                 s.push_str(", ");
-        //             }
-
-        //             s.push_str(&dt);
-        //         }
-
-        //         s.push(']');
-        //     } else {
-        //         write!(s, "{dt}[]")?;
-        //     }
-        // }
-        // DataType::Struct(item) => struct_datatype(
-        //     ctx.with(
-        //         item.sid()
-        //             .and_then(|sid| types.get(sid))
-        //             .map(|v| PathItem::TypeExtended(item.name().clone(), *v.impl_location()))
-        //             .unwrap_or_else(|| PathItem::Type(item.name().clone())),
-        //     ),
-        //     item.name(),
-        //     item,
-        //     types,
-        //     s,
-        // )?,
-        // DataType::Enum(item) => {
-        //     let mut ctx = ctx.clone();
-        //     let cfg = ctx.cfg.clone().bigint(BigIntExportBehavior::Number);
-        //     if item.skip_bigint_checks() {
-        //         ctx.cfg = &cfg;
-        //     }
-
-        //     enum_datatype(
-        //         ctx.with(PathItem::Variant(item.name().clone())),
-        //         item,
-        //         types,
-        //         s,
-        //     )?
-        // }
-        // DataType::Tuple(tuple) => s.push_str(&tuple_datatype(ctx, tuple, types)?),
-        // DataType::Reference(reference) => {
-        //     if reference.sid() == Any::<()>::ID {
-        //         s.push_str(ANY);
-        //     } else if reference.sid() == Unknown::<()>::ID {
-        //         s.push_str(UNKNOWN);
-        //     } else {
-        //         let definition = types.get(reference.sid()).unwrap(); // TODO: Error handling
-
-        //         if reference.generics().len() == 0 {
-        //             s.push_str(&definition.name());
-        //         } else {
-        //             s.push_str(&definition.name());
-        //             s.push('<');
-
-        //             for (i, (_, v)) in reference.generics().iter().enumerate() {
-        //                 if i != 0 {
-        //                     s.push_str(", ");
-        //                 }
-
-        //                 datatype_inner(
-        //                     ctx.with(PathItem::Type(definition.name().clone())),
-        //                     &FunctionReturnType::Value(v.clone()),
-        //                     types,
-        //                     s,
-        //                 )?;
-        //             }
-
-        //             s.push('>');
-        //         }
-        //     }
-        // }
-        // DataType::Generic(ident) => s.push_str(&ident.to_string()),
-    };
-
-    Ok(())
-}
-
-// TODO: Private
-pub(crate) fn literal_dt(s: &mut String, l: &Literal) {
+fn literal_dt(s: &mut String, l: &Literal) {
     use Literal::*;
 
     match l {
@@ -320,252 +212,327 @@ pub(crate) fn literal_dt(s: &mut String, l: &Literal) {
     .expect("writing to a string is an infallible operation");
 }
 
-// #[derive(Clone, Copy)]
-// struct State {
-//     flattening: bool,
-//     //     // TODO: Bring this onto it
-//     //     // s: &mut String,
-//     //     // ts: &Typescript,
-//     //     // types: &TypeCollection,
-//     //     // /// TODO
-//     //     // location: Vec<Cow<'static, str>>,
-//     //     // /// TODO
-//     //     // flattening: bool,
-//     // /// TODO // TODO: Is this different from flattening?
-//     // parent_is_object: bool,
-// }
+fn list_dt(
+    s: &mut String,
+    ts: &Typescript,
+    types: &TypeCollection,
+    l: &List,
+    location: Vec<Cow<'static, str>>,
+    // TODO: Remove this???
+    is_export: bool,
+) -> Result<(), Error> {
+    // TODO: This is the legacy stuff
+    {
+        let mut dt = String::new();
+        crate::legacy::datatype_inner(
+            crate::legacy::ExportContext {
+                cfg: ts,
+                path: vec![],
+                is_export,
+            },
+            &specta::datatype::FunctionReturnType::Value(l.ty().clone()),
+            types,
+            &mut dt,
+        )?;
 
-// fn list_dt(
-//     s: &mut String,
-//     ts: &Typescript,
-//     types: &TypeCollection,
-//     l: &List,
-//     location: Vec<Cow<'static, str>>,
-//     state: State,
-// ) -> Result<(), Error> {
-//     // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
+        let dt = if (dt.contains(' ') && !dt.ends_with('}'))
+          // This is to do with maintaining order of operations.
+          // Eg `{} | {}` must be wrapped in parens like `({} | {})[]` but `{}` doesn't cause `{}[]` is valid
+          || (dt.contains(' ') && (dt.contains('&') || dt.contains('|')))
+        {
+            format!("({dt})")
+        } else {
+            dt
+        };
 
-//     let mut result = String::new();
-//     datatype(&mut result, ts, types, &l.ty(), location, state)?;
-//     let result = if (result.contains(' ') && !result.ends_with('}'))
-//         // This is to do with maintaining order of operations.
-//         // Eg `{} | {}` must be wrapped in parens like `({} | {})[]` but `{}` doesn't cause `{}[]` is valid
-//         || (result.contains(' ') && (result.contains('&') || result.contains('|')))
-//     {
-//         format!("({result})")
-//     } else {
-//         result
-//     };
+        if let Some(length) = l.length() {
+            s.push('[');
 
-//     match l.length() {
-//         Some(len) => {
-//             s.push_str("[");
-//             iter_with_sep(
-//                 s,
-//                 0..len,
-//                 |s, _| {
-//                     s.push_str(&result);
-//                     Ok(())
-//                 },
-//                 ", ",
-//             )?;
-//             s.push_str("]");
-//         }
-//         None => {
-//             s.push_str(&result);
-//             s.push_str("[]");
-//         }
-//     }
+            for n in 0..length {
+                if n != 0 {
+                    s.push_str(", ");
+                }
 
-//     Ok(())
-// }
+                s.push_str(&dt);
+            }
 
-// fn map_dt(
-//     s: &mut String,
-//     ts: &Typescript,
-//     types: &TypeCollection,
-//     m: &Map,
-//     location: Vec<Cow<'static, str>>,
-//     state: State,
-// ) -> Result<(), Error> {
-//     // assert!(flattening, "todo: map flattening");
+            s.push(']');
+        } else {
+            write!(s, "{dt}[]")?;
+        }
+    }
 
-//     // We use `{ [key in K]: V }` instead of `Record<K, V>` to avoid issues with circular references.
-//     // Wrapped in Partial<> because otherwise TypeScript would enforce exhaustiveness.
-//     s.push_str("Partial<{ [key in ");
-//     datatype(s, ts, types, m.key_ty(), location.clone(), state)?;
-//     s.push_str("]: ");
-//     datatype(s, ts, types, m.value_ty(), location, state)?;
-//     s.push_str(" }>");
-//     Ok(())
-// }
+    //     // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
 
-// fn enum_dt(
-//     s: &mut String,
-//     ts: &Typescript,
-//     types: &TypeCollection,
-//     e: &EnumType,
-//     mut location: Vec<Cow<'static, str>>,
-//     state: State,
-// ) -> Result<(), Error> {
-//     assert!(!state.flattening, "todo: support for flattening enums"); // TODO
+    //     let mut result = String::new();
+    //     datatype(&mut result, ts, types, &l.ty(), location, state)?;
+    //     let result = if (result.contains(' ') && !result.ends_with('}'))
+    //         // This is to do with maintaining order of operations.
+    //         // Eg `{} | {}` must be wrapped in parens like `({} | {})[]` but `{}` doesn't cause `{}[]` is valid
+    //         || (result.contains(' ') && (result.contains('&') || result.contains('|')))
+    //     {
+    //         format!("({result})")
+    //     } else {
+    //         result
+    //     };
 
-//     location.push(e.name().clone());
+    //     match l.length() {
+    //         Some(len) => {
+    //             s.push_str("[");
+    //             iter_with_sep(
+    //                 s,
+    //                 0..len,
+    //                 |s, _| {
+    //                     s.push_str(&result);
+    //                     Ok(())
+    //                 },
+    //                 ", ",
+    //             )?;
+    //             s.push_str("]");
+    //         }
+    //         None => {
+    //             s.push_str(&result);
+    //             s.push_str("[]");
+    //         }
+    //     }
 
-//     let mut _ts = None;
-//     if e.skip_bigint_checks() {
-//         _ts = Some(Typescript {
-//             bigint: BigIntExportBehavior::Number,
-//             ..ts.clone()
-//         });
-//         _ts.as_ref().expect("set above")
-//     } else {
-//         ts
-//     };
+    Ok(())
+}
 
-//     let variants = e.variants().iter().filter(|(_, variant)| !variant.skip());
+fn map_dt(
+    s: &mut String,
+    ts: &Typescript,
+    types: &TypeCollection,
+    m: &Map,
+    location: Vec<Cow<'static, str>>,
+    // TODO: Remove
+    is_export: bool,
+) -> Result<(), Error> {
+    {
+        // We use `{ [key in K]: V }` instead of `Record<K, V>` to avoid issues with circular references.
+        // Wrapped in Partial<> because otherwise TypeScript would enforce exhaustiveness.
+        s.push_str("Partial<{ [key in ");
+        crate::legacy::datatype_inner(
+            crate::legacy::ExportContext {
+                cfg: ts,
+                path: vec![],
+                is_export,
+            },
+            &specta::datatype::FunctionReturnType::Value(m.key_ty().clone()),
+            types,
+            s,
+        )?;
+        s.push_str("]: ");
+        crate::legacy::datatype_inner(
+            crate::legacy::ExportContext {
+                cfg: ts,
+                path: vec![],
+                is_export,
+            },
+            &specta::datatype::FunctionReturnType::Value(m.value_ty().clone()),
+            types,
+            s,
+        )?;
+        s.push_str(" }>");
+    }
+    // assert!(flattening, "todo: map flattening");
 
-//     if variants.clone().next().is_none()
-//     /* is_empty */
-//     {
-//         s.push_str("never");
-//         return Ok(());
-//     }
+    // // We use `{ [key in K]: V }` instead of `Record<K, V>` to avoid issues with circular references.
+    // // Wrapped in Partial<> because otherwise TypeScript would enforce exhaustiveness.
+    // s.push_str("Partial<{ [key in ");
+    // datatype(s, ts, types, m.key_ty(), location.clone(), state)?;
+    // s.push_str("]: ");
+    // datatype(s, ts, types, m.value_ty(), location, state)?;
+    // s.push_str(" }>");
+    Ok(())
+}
 
-//     let mut variants = variants
-//         .into_iter()
-//         .map(|(variant_name, variant)| {
-//             let mut s = String::new();
-//             let mut location = location.clone();
-//             location.push(variant_name.clone());
+fn enum_dt(
+    s: &mut String,
+    ts: &Typescript,
+    types: &TypeCollection,
+    e: &Enum,
+    mut location: Vec<Cow<'static, str>>,
+    // TODO: Remove
+    is_export: bool,
+) -> Result<(), Error> {
+    // TODO: Drop legacy stuff
+    {
+        let mut ts = ts.clone();
+        if e.skip_bigint_checks() {
+            ts = ts.bigint(BigIntExportBehavior::Number);
+        }
 
-//             // TODO
-//             // variant.deprecated()
-//             // variant.docs()
+        crate::legacy::enum_datatype(
+            crate::legacy::ExportContext {
+                cfg: &ts,
+                path: vec![],
+                is_export,
+            },
+            e,
+            types,
+            s,
+        )?
+    }
 
-//             match &e.repr() {
-//                 EnumRepr::Untagged => {
-//                     fields_dt(&mut s, ts, types, variant_name, variant.fields(), location, state)?;
-//                 },
-//                 EnumRepr::External => match variant.fields() {
-//                     Fields::Unit => {
-//                         s.push_str("\"");
-//                         s.push_str(variant_name);
-//                         s.push_str("\"");
-//                     },
-//                     Fields::Unnamed(n) if n.fields().into_iter().filter(|f| f.ty().is_some()).next().is_none() /* is_empty */ => {
-//                         // We detect `#[specta(skip)]` by checking if the unfiltered fields are also empty.
-//                         if n.fields().is_empty() {
-//                             s.push_str("{ ");
-//                             s.push_str(&escape_key(variant_name));
-//                             s.push_str(": [] }");
-//                         } else {
-//                             s.push_str("\"");
-//                             s.push_str(variant_name);
-//                             s.push_str("\"");
-//                         }
-//                     }
-//                     _ => {
-//                         s.push_str("{ ");
-//                         s.push_str(&escape_key(variant_name));
-//                         s.push_str(": ");
-//                         fields_dt(&mut s, ts, types, variant_name, variant.fields(), location, state)?;
-//                         s.push_str(" }");
-//                     }
-//                 }
-//                 EnumRepr::Internal { tag } => {
-//                     // TODO: Unconditionally wrapping in `(` kinda sucks.
-//                     write!(s, "({{ {}: \"{}\"", escape_key(tag), variant_name).expect("infallible");
+    //     assert!(!state.flattening, "todo: support for flattening enums"); // TODO
 
-//                     match variant.fields() {
-//                         Fields::Unit => {
-//                              s.push_str(" })");
-//                         },
-//                         // Fields::Unnamed(f) if f.fields.iter().filter(|f| f.ty().is_some()).count() == 1 => {
-//                         //     // let mut fields = f.fields().into_iter().filter(|f| f.ty().is_some());
+    //     location.push(e.name().clone());
 
-//                         //      s.push_str("______"); // TODO
+    //     let mut _ts = None;
+    //     if e.skip_bigint_checks() {
+    //         _ts = Some(Typescript {
+    //             bigint: BigIntExportBehavior::Number,
+    //             ..ts.clone()
+    //         });
+    //         _ts.as_ref().expect("set above")
+    //     } else {
+    //         ts
+    //     };
 
-//                         // //     // if fields.len
+    //     let variants = e.variants().iter().filter(|(_, variant)| !variant.skip());
 
-//                         // //     // TODO: Having no fields are skipping is valid
-//                         // //     // TODO: Having more than 1 field is invalid
+    //     if variants.clone().next().is_none()
+    //     /* is_empty */
+    //     {
+    //         s.push_str("never");
+    //         return Ok(());
+    //     }
 
-//                         // //     // TODO: Check if the field's type is object-like and can be merged.
+    //     let mut variants = variants
+    //         .into_iter()
+    //         .map(|(variant_name, variant)| {
+    //             let mut s = String::new();
+    //             let mut location = location.clone();
+    //             location.push(variant_name.clone());
 
-//                         //     // todo!();
-//                         // }
-//                         f => {
-//                             // TODO: Cleanup and explain this
-//                             let mut skip_join = false;
-//                             if let Fields::Unnamed(f) = &f {
-//                                 let mut fields = f.fields.iter().filter(|f| f.ty().is_some());
-//                                 if let (Some(v), None) = (fields.next(), fields.next()) {
-//                                     if let Some(DataType::Tuple(tuple)) = &v.ty() {
-//                                         skip_join = tuple.elements().len() == 0;
-//                                     }
-//                                 }
-//                             }
+    //             // TODO
+    //             // variant.deprecated()
+    //             // variant.docs()
 
-//                             if skip_join {
-//                                 s.push_str(" })");
-//                             } else {
-//                                 s.push_str(" } & ");
+    //             match &e.repr() {
+    //                 EnumRepr::Untagged => {
+    //                     fields_dt(&mut s, ts, types, variant_name, variant.fields(), location, state)?;
+    //                 },
+    //                 EnumRepr::External => match variant.fields() {
+    //                     Fields::Unit => {
+    //                         s.push_str("\"");
+    //                         s.push_str(variant_name);
+    //                         s.push_str("\"");
+    //                     },
+    //                     Fields::Unnamed(n) if n.fields().into_iter().filter(|f| f.ty().is_some()).next().is_none() /* is_empty */ => {
+    //                         // We detect `#[specta(skip)]` by checking if the unfiltered fields are also empty.
+    //                         if n.fields().is_empty() {
+    //                             s.push_str("{ ");
+    //                             s.push_str(&escape_key(variant_name));
+    //                             s.push_str(": [] }");
+    //                         } else {
+    //                             s.push_str("\"");
+    //                             s.push_str(variant_name);
+    //                             s.push_str("\"");
+    //                         }
+    //                     }
+    //                     _ => {
+    //                         s.push_str("{ ");
+    //                         s.push_str(&escape_key(variant_name));
+    //                         s.push_str(": ");
+    //                         fields_dt(&mut s, ts, types, variant_name, variant.fields(), location, state)?;
+    //                         s.push_str(" }");
+    //                     }
+    //                 }
+    //                 EnumRepr::Internal { tag } => {
+    //                     // TODO: Unconditionally wrapping in `(` kinda sucks.
+    //                     write!(s, "({{ {}: \"{}\"", escape_key(tag), variant_name).expect("infallible");
 
-//                                 // TODO: Can we be smart enough to omit the `{` and `}` if this is an object
-//                                 fields_dt(&mut s, ts, types, variant_name, f, location, state)?;
-//                                 s.push_str(")");
-//                             }
+    //                     match variant.fields() {
+    //                         Fields::Unit => {
+    //                              s.push_str(" })");
+    //                         },
+    //                         // Fields::Unnamed(f) if f.fields.iter().filter(|f| f.ty().is_some()).count() == 1 => {
+    //                         //     // let mut fields = f.fields().into_iter().filter(|f| f.ty().is_some());
 
-//                             // match f {
-//                             //     // Checked above
-//                             //     Fields::Unit => unreachable!(),
-//                             //     Fields::Unnamed(unnamed_fields) => unnamed_fields,
-//                             //     Fields::Named(named_fields) => todo!(),
-//                             // }
+    //                         //      s.push_str("______"); // TODO
 
-//                             // println!("{:?}", f); // TODO: If object we can join in fields like this, else `} & ...`
-//                             // flattened_fields_dt(&mut s, ts, types, variant_name, f, location, false)?; // TODO: Fix `flattening`
+    //                         // //     // if fields.len
 
-//                         }
-//                     }
+    //                         // //     // TODO: Having no fields are skipping is valid
+    //                         // //     // TODO: Having more than 1 field is invalid
 
-//                 }
-//                 EnumRepr::Adjacent { tag, content } => {
-//                     write!(s, "{{ {}: \"{}\"", escape_key(tag), variant_name).expect("infallible");
+    //                         // //     // TODO: Check if the field's type is object-like and can be merged.
 
-//                     match variant.fields() {
-//                         Fields::Unit => {},
-//                         f => {
-//                             write!(s, "; {}: ", escape_key(content)).expect("infallible");
-//                             fields_dt(&mut s, ts, types, variant_name, f, location, state)?;
-//                         }
-//                     }
+    //                         //     // todo!();
+    //                         // }
+    //                         f => {
+    //                             // TODO: Cleanup and explain this
+    //                             let mut skip_join = false;
+    //                             if let Fields::Unnamed(f) = &f {
+    //                                 let mut fields = f.fields.iter().filter(|f| f.ty().is_some());
+    //                                 if let (Some(v), None) = (fields.next(), fields.next()) {
+    //                                     if let Some(DataType::Tuple(tuple)) = &v.ty() {
+    //                                         skip_join = tuple.elements().len() == 0;
+    //                                     }
+    //                                 }
+    //                             }
 
-//                     s.push_str(" }");
-//                 }
-//             }
+    //                             if skip_join {
+    //                                 s.push_str(" })");
+    //                             } else {
+    //                                 s.push_str(" } & ");
 
-//             Ok(s)
-//         })
-//         .collect::<Result<Vec<String>, Error>>()?;
+    //                                 // TODO: Can we be smart enough to omit the `{` and `}` if this is an object
+    //                                 fields_dt(&mut s, ts, types, variant_name, f, location, state)?;
+    //                                 s.push_str(")");
+    //                             }
 
-//     // TODO: Instead of deduplicating on the string, we should do it in the AST.
-//     // This would avoid the intermediate `String` allocations and be more reliable.
-//     variants.dedup();
+    //                             // match f {
+    //                             //     // Checked above
+    //                             //     Fields::Unit => unreachable!(),
+    //                             //     Fields::Unnamed(unnamed_fields) => unnamed_fields,
+    //                             //     Fields::Named(named_fields) => todo!(),
+    //                             // }
 
-//     iter_with_sep(
-//         s,
-//         variants,
-//         |s, v| {
-//             s.push_str(&v);
-//             Ok(())
-//         },
-//         " | ",
-//     )?;
+    //                             // println!("{:?}", f); // TODO: If object we can join in fields like this, else `} & ...`
+    //                             // flattened_fields_dt(&mut s, ts, types, variant_name, f, location, false)?; // TODO: Fix `flattening`
 
-//     Ok(())
-// }
+    //                         }
+    //                     }
+
+    //                 }
+    //                 EnumRepr::Adjacent { tag, content } => {
+    //                     write!(s, "{{ {}: \"{}\"", escape_key(tag), variant_name).expect("infallible");
+
+    //                     match variant.fields() {
+    //                         Fields::Unit => {},
+    //                         f => {
+    //                             write!(s, "; {}: ", escape_key(content)).expect("infallible");
+    //                             fields_dt(&mut s, ts, types, variant_name, f, location, state)?;
+    //                         }
+    //                     }
+
+    //                     s.push_str(" }");
+    //                 }
+    //             }
+
+    //             Ok(s)
+    //         })
+    //         .collect::<Result<Vec<String>, Error>>()?;
+
+    //     // TODO: Instead of deduplicating on the string, we should do it in the AST.
+    //     // This would avoid the intermediate `String` allocations and be more reliable.
+    //     variants.dedup();
+
+    //     iter_with_sep(
+    //         s,
+    //         variants,
+    //         |s, v| {
+    //             s.push_str(&v);
+    //             Ok(())
+    //         },
+    //         " | ",
+    //     )?;
+
+    Ok(())
+}
 
 // fn fields_dt(
 //     s: &mut String,
@@ -819,71 +786,122 @@ pub(crate) fn literal_dt(s: &mut String, l: &Literal) {
 //     Ok(())
 // }
 
-// fn tuple_dt(
-//     s: &mut String,
-//     ts: &Typescript,
-//     types: &TypeCollection,
-//     t: &TupleType,
-//     location: Vec<Cow<'static, str>>,
-//     state: State,
-// ) -> Result<(), Error> {
-//     match &t.elements()[..] {
-//         [] => s.push_str("null"),
-//         elems => {
-//             s.push_str("[");
-//             iter_with_sep(
-//                 s,
-//                 elems.into_iter().enumerate(),
-//                 |s, (i, dt)| {
-//                     let mut location = location.clone();
-//                     location.push(i.to_string().into());
+fn tuple_dt(
+    s: &mut String,
+    ts: &Typescript,
+    types: &TypeCollection,
+    t: &Tuple,
+    location: Vec<Cow<'static, str>>,
+    // TODO: Remove
+    is_export: bool,
+) -> Result<(), Error> {
+    {
+        s.push_str(&crate::legacy::tuple_datatype(
+            crate::legacy::ExportContext {
+                cfg: ts,
+                path: vec![],
+                is_export,
+            },
+            t,
+            types,
+        )?);
+    }
 
-//                     datatype(s, ts, types, &dt, location, state)
-//                 },
-//                 ", ",
-//             )?;
-//             s.push_str("]");
-//         }
-//     }
-//     Ok(())
-// }
+    // match &t.elements()[..] {
+    //     [] => s.push_str("null"),
+    //     elems => {
+    //         s.push_str("[");
+    //         iter_with_sep(
+    //             s,
+    //             elems.into_iter().enumerate(),
+    //             |s, (i, dt)| {
+    //                 let mut location = location.clone();
+    //                 location.push(i.to_string().into());
 
-// fn reference_dt(
-//     s: &mut String,
-//     ts: &Typescript,
-//     types: &TypeCollection,
-//     r: &Reference,
-//     location: Vec<Cow<'static, str>>,
-//     state: State,
-// ) -> Result<(), Error> {
-//     let ndt = types
-//         .get(r.sid())
-//         // Should be impossible without a bug in Specta.
-//         .unwrap_or_else(|| panic!("Missing {:?} in `TypeCollection`", r.sid()));
+    //                 datatype(s, ts, types, &dt, location, state)
+    //             },
+    //             ", ",
+    //         )?;
+    //         s.push_str("]");
+    //     }
+    // }
+    Ok(())
+}
 
-//     if r.inline() {
-//         todo!("inline reference!");
-//     }
+fn reference_dt(
+    s: &mut String,
+    ts: &Typescript,
+    types: &TypeCollection,
+    r: &Reference,
+    location: Vec<Cow<'static, str>>,
+    // TODO: Remove
+    is_export: bool,
+) -> Result<(), Error> {
+    // TODO: Legacy stuff
+    {
+        if r.sid() == Any::<()>::ID {
+            s.push_str("any");
+        } else if r.sid() == Unknown::<()>::ID {
+            s.push_str("unknown");
+        } else {
+            let definition = types.get(r.sid()).unwrap(); // TODO: Error handling
 
-//     s.push_str(ndt.name());
-//     // TODO: We could possible break this out, the root `export` function also has to emit generics.
-//     match r.generics() {
-//         [] => {}
-//         generics => {
-//             s.push('<');
-//             // TODO: Should we push a location for which generic?
-//             iter_with_sep(
-//                 s,
-//                 generics,
-//                 |s, dt| datatype(s, ts, types, &dt, location.clone(), state),
-//                 ", ",
-//             )?;
-//             s.push('>');
-//         }
-//     }
+            if r.generics().len() == 0 {
+                s.push_str(&definition.name());
+            } else {
+                s.push_str(&definition.name());
+                s.push('<');
 
-//     Ok(())
-// }
+                for (i, (_, v)) in r.generics().iter().enumerate() {
+                    if i != 0 {
+                        s.push_str(", ");
+                    }
+
+                    crate::legacy::datatype_inner(
+                        crate::legacy::ExportContext {
+                            cfg: ts,
+                            path: vec![],
+                            is_export,
+                        },
+                        &specta::datatype::FunctionReturnType::Value(v.clone()),
+                        types,
+                        s,
+                    )?;
+                }
+
+                s.push('>');
+            }
+        }
+    }
+
+    //     let ndt = types
+    //         .get(r.sid())
+    //         // Should be impossible without a bug in Specta.
+    //         .unwrap_or_else(|| panic!("Missing {:?} in `TypeCollection`", r.sid()));
+
+    //     if r.inline() {
+    //         todo!("inline reference!");
+    //     }
+
+    //     s.push_str(ndt.name());
+    //     // TODO: We could possible break this out, the root `export` function also has to emit generics.
+    //     match r.generics() {
+    //         [] => {}
+    //         generics => {
+    //             s.push('<');
+    //             // TODO: Should we push a location for which generic?
+    //             iter_with_sep(
+    //                 s,
+    //                 generics,
+    //                 |s, dt| datatype(s, ts, types, &dt, location.clone(), state),
+    //                 ", ",
+    //             )?;
+    //             s.push('>');
+    //         }
+    //     }
+
+    Ok(())
+}
 
 // fn validate_name(
 //     ident: &Cow<'static, str>,
