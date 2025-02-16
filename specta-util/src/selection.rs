@@ -3,7 +3,7 @@
 /// Specta compatible selection of struct fields.
 ///
 /// ```ignore
-/// use specta_typescript::inline_ref;
+/// use specta_typescript::legacy::inline_ref;
 /// use specta_util::selection;
 ///
 /// #[derive(Clone)]

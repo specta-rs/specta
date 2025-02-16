@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use specta::Type;
-use specta_serde::Error;
-use specta_typescript::ExportError;
+use specta_serde::Error as SerdeError;
+use specta_typescript::Error;
 
 use crate::ts::{assert_ts, assert_ts_export};
 
@@ -51,14 +51,14 @@ pub enum RecursiveInEnum {
 #[test]
 fn test_recursive_types() {
     assert_ts!(Recursive, "{ demo: Recursive }");
-    assert_ts_export!(Recursive, "export type Recursive = { demo: Recursive }");
+    assert_ts_export!(Recursive, "export type Recursive = { demo: Recursive };");
 
     // Just check it doesn't overflow while doing this check
-    assert_ts!(error; RecursiveMapKey, ExportError::Serde(Error::InvalidMapKey));
+    assert_ts!(error; RecursiveMapKey, "Detect invalid Serde type: A map key must be a 'string' or 'number' type\n");
     assert_ts_export!(
         error;
         RecursiveMapKey,
-        ExportError::Serde(Error::InvalidMapKey)
+        Error::Serde(SerdeError::InvalidMapKey)
     );
 
     assert_ts!(
@@ -67,7 +67,7 @@ fn test_recursive_types() {
     );
     assert_ts_export!(
         RecursiveMapValue,
-        "export type RecursiveMapValue = { demo: Partial<{ [key in string]: RecursiveMapValue }> }"
+        "export type RecursiveMapValue = { demo: Partial<{ [key in string]: RecursiveMapValue }> };"
     );
 }
 

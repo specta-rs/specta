@@ -1,7 +1,7 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 
 use specta::{
-    datatype::{DataType, EnumRepr, EnumType, Fields, GenericType, LiteralType, PrimitiveType},
+    datatype::{DataType, Enum, EnumRepr, Fields, Generic, Literal, Primitive},
     internal::{skip_fields, skip_fields_named},
     SpectaID, TypeCollection,
 };
@@ -14,7 +14,7 @@ use crate::Error;
 pub fn validate(types: &TypeCollection) -> Result<(), Error> {
     for (_, ndt) in types.into_iter() {
         inner(
-            &ndt.inner,
+            ndt.ty(),
             &types,
             &Default::default(),
             &mut Default::default(),
@@ -30,7 +30,7 @@ pub fn validate_dt(ty: &DataType, types: &TypeCollection) -> Result<(), Error> {
 
     for (_, ndt) in types.into_iter() {
         inner(
-            &ndt.inner,
+            ndt.ty(),
             &types,
             &Default::default(),
             &mut Default::default(),
@@ -43,7 +43,7 @@ pub fn validate_dt(ty: &DataType, types: &TypeCollection) -> Result<(), Error> {
 fn inner(
     dt: &DataType,
     types: &TypeCollection,
-    generics: &BTreeMap<GenericType, DataType>,
+    generics: &BTreeMap<Generic, DataType>,
     checked_references: &mut HashSet<SpectaID>,
 ) -> Result<(), Error> {
     match dt {
@@ -97,11 +97,10 @@ fn inner(
             #[allow(clippy::panic)]
             if !checked_references.contains(&r.sid()) {
                 checked_references.insert(r.sid());
-                let ty = types.get(r.sid()).unwrap_or_else(|| {
-                    panic!("Type '{}' was never populated.", r.sid().type_name())
-                }); // TODO: Error properly
-
-                inner(&ty.inner, types, r.generics(), checked_references)?;
+                // TODO: We don't error here for `Any`/`Unknown` in the TS exporter
+                if let Some(ty) = types.get(r.sid()) {
+                    inner(ty.ty(), types, r.generics(), checked_references)?;
+                }
             }
         }
         _ => {}
@@ -114,40 +113,39 @@ fn inner(
 fn is_valid_map_key(
     key_ty: &DataType,
     types: &TypeCollection,
-    generics: &BTreeMap<GenericType, DataType>,
+    generics: &BTreeMap<Generic, DataType>,
 ) -> Result<(), Error> {
     match key_ty {
-        DataType::Any => Ok(()),
         DataType::Primitive(ty) => match ty {
-            PrimitiveType::i8
-            | PrimitiveType::i16
-            | PrimitiveType::i32
-            | PrimitiveType::i64
-            | PrimitiveType::i128
-            | PrimitiveType::isize
-            | PrimitiveType::u8
-            | PrimitiveType::u16
-            | PrimitiveType::u32
-            | PrimitiveType::u64
-            | PrimitiveType::u128
-            | PrimitiveType::usize
-            | PrimitiveType::f32
-            | PrimitiveType::f64
-            | PrimitiveType::String
-            | PrimitiveType::char => Ok(()),
+            Primitive::i8
+            | Primitive::i16
+            | Primitive::i32
+            | Primitive::i64
+            | Primitive::i128
+            | Primitive::isize
+            | Primitive::u8
+            | Primitive::u16
+            | Primitive::u32
+            | Primitive::u64
+            | Primitive::u128
+            | Primitive::usize
+            | Primitive::f32
+            | Primitive::f64
+            | Primitive::String
+            | Primitive::char => Ok(()),
             _ => Err(Error::InvalidMapKey),
         },
         DataType::Literal(ty) => match ty {
-            LiteralType::i8(_)
-            | LiteralType::i16(_)
-            | LiteralType::i32(_)
-            | LiteralType::u8(_)
-            | LiteralType::u16(_)
-            | LiteralType::u32(_)
-            | LiteralType::f32(_)
-            | LiteralType::f64(_)
-            | LiteralType::String(_)
-            | LiteralType::char(_) => Ok(()),
+            Literal::i8(_)
+            | Literal::i16(_)
+            | Literal::i32(_)
+            | Literal::u8(_)
+            | Literal::u16(_)
+            | Literal::u32(_)
+            | Literal::f32(_)
+            | Literal::f64(_)
+            | Literal::String(_)
+            | Literal::char(_) => Ok(()),
             _ => Err(Error::InvalidMapKey),
         },
         // Enum of other valid types are also valid Eg. `"A" | "B"` or `"A" | 5` are valid
@@ -180,7 +178,7 @@ fn is_valid_map_key(
         DataType::Reference(r) => {
             let ty = types.get(r.sid()).expect("Type was never populated"); // TODO: Error properly
 
-            is_valid_map_key(&ty.inner, types, r.generics())
+            is_valid_map_key(ty.ty(), types, r.generics())
         }
         DataType::Generic(g) => {
             let ty = generics.get(g).expect("bruh");
@@ -192,7 +190,7 @@ fn is_valid_map_key(
 }
 
 // Serde does not allow serializing a variant of certain types of enum's.
-fn validate_enum(e: &EnumType, types: &TypeCollection) -> Result<(), Error> {
+fn validate_enum(e: &Enum, types: &TypeCollection) -> Result<(), Error> {
     // You can't `#[serde(skip)]` your way to an empty enum.
     let valid_variants = e.variants().iter().filter(|(_, v)| !v.skip()).count();
     if valid_variants == 0 && !e.variants().is_empty() {
@@ -208,7 +206,7 @@ fn validate_enum(e: &EnumType, types: &TypeCollection) -> Result<(), Error> {
 }
 
 // Checks for specially internally tagged enums.
-fn validate_internally_tag_enum(e: &EnumType, types: &TypeCollection) -> Result<(), Error> {
+fn validate_internally_tag_enum(e: &Enum, types: &TypeCollection) -> Result<(), Error> {
     for (_variant_name, variant) in e.variants() {
         match &variant.fields() {
             Fields::Unit => {}
@@ -240,7 +238,7 @@ fn validate_internally_tag_enum_datatype(
 ) -> Result<(), Error> {
     match ty {
         // `serde_json::Any` can be *technically* be either valid or invalid based on the actual data but we are being strict and reject it.
-        DataType::Any => return Err(Error::InvalidInternallyTaggedEnum),
+        // DataType::Any => return Err(Error::InvalidInternallyTaggedEnum), // TODO: Do we need to fix this?
         DataType::Map(_) => {}
         // Structs's are always map-types unless they are transparent then it depends on inner type. However, transparent passes through when calling `Type::inline` so we don't need to specially check that case.
         DataType::Struct(_) => {}
@@ -260,7 +258,7 @@ fn validate_internally_tag_enum_datatype(
         DataType::Reference(ty) => {
             let ty = types.get(ty.sid()).expect("Type was never populated"); // TODO: Error properly
 
-            validate_internally_tag_enum_datatype(&ty.inner, types)?;
+            validate_internally_tag_enum_datatype(ty.ty(), types)?;
         }
         _ => return Err(Error::InvalidInternallyTaggedEnum),
     }

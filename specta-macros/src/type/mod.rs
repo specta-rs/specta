@@ -44,12 +44,11 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     });
 
     let (inlines, can_flatten) = match data {
-        Data::Struct(data) => parse_struct(&name, &container_attrs, generics, &crate_ref, data),
+        Data::Struct(data) => parse_struct(&name, &container_attrs, &crate_ref, data),
         Data::Enum(data) => parse_enum(
             &name,
             &EnumAttr::from_attrs(&container_attrs, &mut attrs)?,
             &container_attrs,
-            generics,
             &crate_ref,
             data,
         ),
@@ -106,7 +105,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             }
             GenericParam::Type(t) => {
                 let ident = format_ident!("PLACEHOLDER_{}", t.ident);
-                quote!(#crate_ref::datatype::Generic<#ident>)
+                quote!(#crate_ref::datatype::GenericPlaceholder<#ident>)
             }
             GenericParam::Const(c) => {
                 let ident = &c.ident;
@@ -124,7 +123,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             let ident_str = t.ident.to_string();
             Some(quote!(
                 pub struct #ident;
-                impl #crate_ref::datatype::GenericPlaceholder for #ident {
+                impl #crate_ref::datatype::ConstGenericPlaceholder for #ident {
                     const PLACEHOLDER: &'static str = #ident_str;
                 }
             ))
@@ -164,6 +163,14 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         }
     });
 
+    let definition_generics = generics.params.iter().filter_map(|p| match p {
+        GenericParam::Type(t) => {
+            let ident = t.ident.to_string();
+            Some(quote!(std::borrow::Cow::Borrowed(#ident).into()))
+        }
+        _ => None,
+    });
+
     Ok(quote! {
         #[allow(non_camel_case_types)]
         const _: () = {
@@ -193,10 +200,11 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         #deprecated,
                         SID,
                         #impl_location,
+                        vec![#(#definition_generics),*],
                         |types| #ident::<#inline_generics_def>::___specta_definition___(types),
                     );
 
-                    #crate_ref::datatype::reference::Reference::construct(SID, [#(#reference_generics),*], #inline).into()
+                    #crate_ref::datatype::Reference::construct(SID, [#(#reference_generics),*], #inline).into()
                 }
             }
 

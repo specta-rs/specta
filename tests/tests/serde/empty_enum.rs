@@ -1,5 +1,5 @@
 use specta::Type;
-use specta_typescript::{ExportError, ExportPath};
+use specta_typescript::{legacy::ExportPath, Error};
 
 use crate::ts::assert_ts;
 
@@ -82,7 +82,7 @@ fn empty_enums() {
 
     assert_ts!(E, "({ a: \"A\" }) | ({ a: \"B\" })");
     assert_ts!(F, "({ a: \"A\" }) | ({ a: \"B\" })");
-    assert_ts!(error; G, ExportError::InvalidTaggedVariantContainingTupleStruct(ExportPath::new_unsafe("G")));
+    assert_ts!(error; G, "Attempted to export  with tagging but the variant is a tuple struct.\n");
     assert_ts!(H, "({ a: \"B\" })");
     assert_ts!(I, "({ a: \"A\" }) | ({ a: \"B\" })");
 }

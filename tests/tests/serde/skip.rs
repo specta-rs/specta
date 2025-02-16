@@ -116,10 +116,10 @@ pub enum LazilySkip {
 fn skip() {
     assert_ts!(SkipOnlyField, "Record<string, never>");
     assert_ts!(SkipField, "{ b: number }");
-    assert_ts!(error; SkipOnlyVariantExternallyTagged, Error::InvalidUsageOfSkip);
-    assert_ts!(error; SkipOnlyVariantInternallyTagged, Error::InvalidUsageOfSkip);
-    assert_ts!(error; SkipOnlyVariantAdjacentlyTagged, Error::InvalidUsageOfSkip);
-    assert_ts!(error; SkipOnlyVariantUntagged, Error::InvalidUsageOfSkip);
+    assert_ts!(error; SkipOnlyVariantExternallyTagged, "Detect invalid Serde type: the usage of #[specta(skip)] means the type can't be serialized\n");
+    assert_ts!(error; SkipOnlyVariantInternallyTagged, "Detect invalid Serde type: the usage of #[specta(skip)] means the type can't be serialized\n");
+    assert_ts!(error; SkipOnlyVariantAdjacentlyTagged, "Detect invalid Serde type: the usage of #[specta(skip)] means the type can't be serialized\n");
+    assert_ts!(error; SkipOnlyVariantUntagged, "Detect invalid Serde type: the usage of #[specta(skip)] means the type can't be serialized\n");
     assert_ts!(SkipVariant, "{ B: number }"); // Serializing `A` will be error but that is expected behavior.
     assert_ts!(SkipUnnamedFieldInVariant, r#""A" | { B: [number] }"#);
     assert_ts!(

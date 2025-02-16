@@ -1,5 +1,5 @@
 use specta::{
-    datatype::{inline_and_flatten, DataType, PrimitiveType},
+    datatype::{inline_and_flatten, DataType, Primitive},
     Type, TypeCollection,
 };
 
@@ -34,19 +34,19 @@ fn transparent() {
     // We check the datatype layer can TS can look correct but be wrong!
     assert_eq!(
         inline::<TupleStruct>(),
-        DataType::Primitive(PrimitiveType::String)
+        DataType::Primitive(Primitive::String)
     );
     assert_eq!(
         inline::<TupleStructWithRep>(),
-        DataType::Primitive(PrimitiveType::String)
+        DataType::Primitive(Primitive::String)
     );
     assert_eq!(
         inline::<GenericTupleStruct::<String>>(),
-        DataType::Primitive(PrimitiveType::String)
+        DataType::Primitive(Primitive::String)
     );
     assert_eq!(
         inline::<BracedStruct>(),
-        DataType::Primitive(PrimitiveType::String)
+        DataType::Primitive(Primitive::String)
     );
 
     assert_ts!(TupleStruct, "string");

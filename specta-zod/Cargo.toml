@@ -23,7 +23,7 @@ specta = { path = "../specta" }
 specta-typescript = { path = "../specta-typescript" }
 # TODO: Don't depend on serde
 specta-serde = { path = "../specta-serde" }
-thiserror = "1.0.61"
+thiserror = "2" # TODO: Remove this
 
 [dev-dependencies]
 specta-util = { path = "../specta-util" }
