@@ -1,5 +1,6 @@
-use specta_typescript::legacy::inline_ref;
 use specta_util::selection;
+
+use crate::ts::inline_ref;
 
 #[derive(Clone)]
 #[allow(dead_code)]

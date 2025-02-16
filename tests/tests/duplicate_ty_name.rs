@@ -1,5 +1,5 @@
-use specta::Type;
-use specta_typescript::{legacy::export, Error};
+use specta::{Type, TypeCollection};
+use specta_typescript::Typescript;
 
 mod one {
     use super::*;
@@ -31,26 +31,17 @@ pub struct Demo {
 
 #[test]
 fn test_duplicate_ty_name() {
-    // DO NOT COPY THIS. This is a hack to construct the impl locations but IS NOT STABLE.
-    use specta::internal::construct::impl_location;
-
     #[cfg(not(target_os = "windows"))]
-    let err = Err(Error::DuplicateTypeNameLegacy(
-        "One".into(),
-        impl_location("tests/tests/duplicate_ty_name.rs:7:14"),
-        impl_location("tests/tests/duplicate_ty_name.rs:17:14"),
-    )
-    .to_string());
+    let err = r#"Detected multiple types with the same name: "One" in (ImplLocation("tests/tests/duplicate_ty_name.rs:7:14"), ImplLocation("tests/tests/duplicate_ty_name.rs:17:14"))
+"#;
     #[cfg(target_os = "windows")]
-    let err = Err(Error::DuplicateTypeNameLegacy(
-        "One".into(),
-        impl_location(r#"tests\tests\duplicate_ty_name.rs:7:14"#),
-        impl_location(r#"tests\tests\duplicate_ty_name.rs:17:14"#),
-    )
-    .to_string());
+    let err = r#"Detected multiple types with the same name: "One" in (ImplLocation("tests\tests\duplicate_ty_name.rs:7:14"), ImplLocation("tests\tests\duplicate_ty_name.rs:17:14"))
+"#;
 
     assert_eq!(
-        export::<Demo>(&Default::default()).map_err(|e| e.to_string()),
-        err
+        Typescript::default()
+            .export(&TypeCollection::default().register::<Demo>())
+            .map_err(|err| err.to_string()),
+        Err(err.into())
     );
 }

@@ -41,8 +41,7 @@ mod aenum {
 #[test]
 fn test_ts_reserved_keyworks() {
     assert_eq!(
-        specta_typescript::legacy::export::<astruct::r#enum>(&Typescript::default())
-            .map_err(|e| e.to_string()),
+        crate::ts::export::<astruct::r#enum>(&Typescript::default()).map_err(|e| e.to_string()),
         Err(Error::ForbiddenNameLegacy(
             NamedLocation::Type,
             #[cfg(not(windows))]
@@ -54,7 +53,7 @@ fn test_ts_reserved_keyworks() {
         .to_string())
     );
     assert_eq!(
-        specta_typescript::legacy::export::<atuplestruct::r#enum>(&Typescript::default())
+        crate::ts::export::<atuplestruct::r#enum>(&Typescript::default())
             .map_err(|e| e.to_string()),
         Err(Error::ForbiddenNameLegacy(
             NamedLocation::Type,
@@ -67,8 +66,7 @@ fn test_ts_reserved_keyworks() {
         .to_string())
     );
     assert_eq!(
-        specta_typescript::legacy::export::<aenum::r#enum>(&Typescript::default())
-            .map_err(|e| e.to_string()),
+        crate::ts::export::<aenum::r#enum>(&Typescript::default()).map_err(|e| e.to_string()),
         Err(Error::ForbiddenNameLegacy(
             NamedLocation::Type,
             #[cfg(not(windows))]

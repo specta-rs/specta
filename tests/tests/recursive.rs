@@ -51,10 +51,10 @@ pub enum RecursiveInEnum {
 #[test]
 fn test_recursive_types() {
     assert_ts!(Recursive, "{ demo: Recursive }");
-    assert_ts_export!(Recursive, "export type Recursive = { demo: Recursive }");
+    assert_ts_export!(Recursive, "export type Recursive = { demo: Recursive };");
 
     // Just check it doesn't overflow while doing this check
-    assert_ts!(error; RecursiveMapKey, Error::Serde(SerdeError::InvalidMapKey));
+    assert_ts!(error; RecursiveMapKey, "Detect invalid Serde type: A map key must be a 'string' or 'number' type\n");
     assert_ts_export!(
         error;
         RecursiveMapKey,
@@ -67,7 +67,7 @@ fn test_recursive_types() {
     );
     assert_ts_export!(
         RecursiveMapValue,
-        "export type RecursiveMapValue = { demo: Partial<{ [key in string]: RecursiveMapValue }> }"
+        "export type RecursiveMapValue = { demo: Partial<{ [key in string]: RecursiveMapValue }> };"
     );
 }
 

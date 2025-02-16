@@ -78,7 +78,7 @@ fn map_keys() {
     assert_ts!(HashMap<String, ()>, "Partial<{ [key in string]: null }>");
     assert_ts_export!(
         Regular,
-        "export type Regular = Partial<{ [key in string]: null }>"
+        "export type Regular = Partial<{ [key in string]: null }>;"
     );
     assert_ts!(HashMap<Infallible, ()>, "Partial<{ [key in never]: null }>");
     assert_ts!(HashMap<Any, ()>, "Partial<{ [key in any]: null }>");
@@ -88,7 +88,7 @@ fn map_keys() {
     assert_ts!(ValidMaybeValidKey, "Partial<{ [key in string]: null }>");
     assert_ts_export!(
         ValidMaybeValidKey,
-        "export type ValidMaybeValidKey = Partial<{ [key in MaybeValidKey<string>]: null }>"
+        "export type ValidMaybeValidKey = Partial<{ [key in MaybeValidKey<string>]: null }>;"
     );
 
     assert_ts!(
@@ -97,7 +97,7 @@ fn map_keys() {
     );
     assert_ts_export!(
         ValidMaybeValidKeyNested,
-        "export type ValidMaybeValidKeyNested = Partial<{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }>"
+        "export type ValidMaybeValidKeyNested = Partial<{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }>;"
     );
 
     assert_ts!(error; HashMap<() /* `null` */, ()>, Error::InvalidMapKey);

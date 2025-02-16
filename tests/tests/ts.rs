@@ -8,32 +8,25 @@ use std::{
 };
 
 use serde::Serialize;
-use specta::Type;
+use specta::{NamedType, Type, TypeCollection};
 use specta_typescript::Any;
 use specta_typescript::{BigIntExportBehavior, Typescript};
 
 macro_rules! assert_ts {
     (error; $t:ty, $e:expr) => {
         assert_eq!(
-            specta_typescript::legacy::inline::<$t>(&Default::default()).map_err(|e| e.to_string()),
+            crate::ts::inline::<$t>(&Default::default()),
             Err($e.to_string())
         )
     };
     ($t:ty, $e:expr) => {
-        assert_eq!(
-            specta_typescript::legacy::inline::<$t>(&Default::default()).map_err(|e| e.to_string()),
-            Ok($e.into())
-        )
+        assert_eq!(crate::ts::inline::<$t>(&Default::default()), Ok($e.into()))
     };
 
     (() => $expr:expr, $e:expr) => {
         let _: () = {
             fn assert_ty_eq<T: Type>(_t: T) {
-                assert_eq!(
-                    specta_typescript::legacy::inline::<T>(&Default::default())
-                        .map_err(|e| e.to_string()),
-                    Ok($e.into())
-                );
+                assert_eq!(crate::ts::inline::<T>(&Default::default()), Ok($e.into()));
             }
             assert_ty_eq($expr);
         };
@@ -44,24 +37,63 @@ pub(crate) use assert_ts;
 macro_rules! assert_ts_export {
     ($t:ty, $e:expr) => {
         assert_eq!(
-            specta_typescript::legacy::export::<$t>(&Default::default()).map_err(|e| e.to_string()),
+            crate::ts::export::<$t>(&Default::default()).map_err(|e| e.to_string()),
             Ok($e.into())
         )
     };
     (error; $t:ty, $e:expr) => {
         assert_eq!(
-            specta_typescript::legacy::export::<$t>(&Default::default()).map_err(|e| e.to_string()),
+            crate::ts::export::<$t>(&Default::default()).map_err(|e| e.to_string()),
             Err($e.to_string())
         )
     };
     ($t:ty, $e:expr; $cfg:expr) => {
-        assert_eq!(specta_typescript::export::<$t>($cfg), Ok($e.into()))
+        assert_eq!(crate::ts::export::<$t>($cfg), Ok($e.into()))
     };
     (error; $t:ty, $e:expr; $cfg:expr) => {
-        assert_eq!(specta_typescript::export::<$t>($cfg), Err($e.into()))
+        assert_eq!(crate::ts::export::<$t>($cfg), Err($e.into()))
     };
 }
 pub(crate) use assert_ts_export;
+
+pub fn inline_ref<T: Type>(t: &T, ts: &Typescript) -> Result<String, String> {
+    inline::<T>(ts)
+}
+
+// TODO: Probally move to snapshot testing w/ high-level API's
+pub fn inline<T: Type>(ts: &Typescript) -> Result<String, String> {
+    let mut types = TypeCollection::default();
+    let dt = T::definition(&mut types);
+
+    // TODO: Could we remove this? It's for backwards compatibility.
+    {
+        specta_serde::validate(&types)
+            .map_err(|err| format!("Detect invalid Serde type: {err:?}"))?;
+
+        if let Some((ty_name, l0, l1)) = specta::internal::detect_duplicate_type_names(&types)
+            .into_iter()
+            .next()
+        {
+            return Err(
+                specta_typescript::Error::DuplicateTypeNameLegacy(ty_name, l0, l1).to_string(),
+            );
+        }
+    }
+
+    specta_typescript::primitives::inline(&Default::default(), &types, &dt)
+        // Allows matching the value. Implementing `PartialEq` on it is really hard.
+        .map_err(|e| e.to_string())
+}
+
+// TODO: Probally move to snapshot testing w/ high-level API's
+pub fn export<T: NamedType>(ts: &Typescript) -> Result<String, String> {
+    let mut types = TypeCollection::default();
+    T::definition(&mut types);
+    let ndt = types.get(T::ID).unwrap();
+    specta_typescript::primitives::export(ts, &types, &ndt)
+        // Allows matching the value. Implementing `PartialEq` on it is really hard.
+        .map_err(|e| e.to_string())
+}
 
 // TODO: Unit test other `specta::Type` methods such as `::reference(...)`
 
@@ -168,7 +200,7 @@ fn typescript_types() {
 
     assert_ts_export!(
         RenameToValue,
-        "export type RenameToValueNewName = { demo_new_name: number }"
+        "export type RenameToValueNewName = { demo_new_name: number };"
     );
 
     assert_ts!(Rename, r#""OneWord" | "Two words""#);
@@ -202,39 +234,31 @@ fn typescript_types() {
 
     // https://github.com/oscartbeaumont/specta/issues/77
     assert_eq!(
-        specta_typescript::legacy::inline::<std::time::SystemTime>(
-            &Typescript::new().bigint(BigIntExportBehavior::Number)
-        )
-        .map_err(|e| e.to_string()),
+        inline::<std::time::SystemTime>(&Typescript::new().bigint(BigIntExportBehavior::Number))
+            .map_err(|e| e.to_string()),
         Ok(r#"{ duration_since_epoch: number; duration_since_unix_epoch: number }"#.into())
     );
     assert_eq!(
-        specta_typescript::legacy::inline::<std::time::SystemTime>(
-            &Typescript::new().bigint(BigIntExportBehavior::String)
-        )
-        .map_err(|e| e.to_string()),
+        inline::<std::time::SystemTime>(&Typescript::new().bigint(BigIntExportBehavior::String))
+            .map_err(|e| e.to_string()),
         Ok(r#"{ duration_since_epoch: string; duration_since_unix_epoch: number }"#.into())
     );
 
     assert_eq!(
-        specta_typescript::legacy::inline::<std::time::Duration>(
-            &Typescript::new().bigint(BigIntExportBehavior::Number)
-        )
-        .map_err(|e| e.to_string()),
+        inline::<std::time::Duration>(&Typescript::new().bigint(BigIntExportBehavior::Number))
+            .map_err(|e| e.to_string()),
         Ok(r#"{ secs: number; nanos: number }"#.into())
     );
     assert_eq!(
-        specta_typescript::legacy::inline::<std::time::Duration>(
-            &Typescript::new().bigint(BigIntExportBehavior::String)
-        )
-        .map_err(|e| e.to_string()),
+        inline::<std::time::Duration>(&Typescript::new().bigint(BigIntExportBehavior::String))
+            .map_err(|e| e.to_string()),
         Ok(r#"{ secs: string; nanos: number }"#.into())
     );
 
     assert_ts!(HashMap<BasicEnum, i32>, r#"Partial<{ [key in "A" | "B"]: number }>"#);
     assert_ts_export!(
         EnumReferenceRecordKey,
-        "export type EnumReferenceRecordKey = { a: Partial<{ [key in BasicEnum]: number }> }"
+        "export type EnumReferenceRecordKey = { a: Partial<{ [key in BasicEnum]: number }> };"
     );
 
     assert_ts!(
@@ -257,7 +281,7 @@ fn typescript_types() {
     assert_ts!(MyEmptyInput, "Record<string, never>");
     assert_ts_export!(
         MyEmptyInput,
-        "export type MyEmptyInput = Record<string, never>"
+        "export type MyEmptyInput = Record<string, never>;"
     );
 
     // https://github.com/oscartbeaumont/specta/issues/142

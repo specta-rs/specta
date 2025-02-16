@@ -127,58 +127,6 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 pub(crate) type Output = Result<String>;
 
-/// Convert a type which implements [`Type`] to a TypeScript string with an export.
-///
-/// Eg. `export type Foo = { demo: string; };`
-pub fn export_ref<T: NamedType>(_: &T, conf: &Typescript) -> Output {
-    export::<T>(conf)
-}
-
-/// Convert a type which implements [`Type`] to a TypeScript string with an export.
-///
-/// Eg. `export type Foo = { demo: string; };`
-pub fn export<T: NamedType>(conf: &Typescript) -> Output {
-    let mut types = TypeCollection::default();
-    T::definition(&mut types);
-    let ty = types.get(T::ID).unwrap();
-    let ty = inline_and_flatten_ndt(ty.clone(), &types);
-
-    validate_dt(ty.ty(), &types)?;
-    let result = export_named_datatype(conf, &ty, &types);
-
-    if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
-        return Err(Error::DuplicateTypeNameLegacy(ty_name, l0, l1));
-    }
-
-    result
-}
-
-/// Convert a type which implements [`Type`] to a TypeScript string.
-///
-/// Eg. `{ demo: string; };`
-pub fn inline_ref<T: Type>(_: &T, conf: &Typescript) -> Output {
-    inline::<T>(conf)
-}
-
-/// Convert a type which implements [`Type`] to a TypeScript string.
-///
-/// Eg. `{ demo: string; };`
-pub fn inline<T: Type>(conf: &Typescript) -> Output {
-    let mut types = TypeCollection::default();
-
-    let ty = T::definition(&mut types);
-    let ty = specta::datatype::inline(ty.clone(), &types);
-
-    validate_dt(&ty, &types)?;
-    let result = datatype(conf, &FunctionReturnType::Value(ty.clone()), &types);
-
-    if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
-        return Err(Error::DuplicateTypeNameLegacy(ty_name, l0, l1));
-    }
-
-    result
-}
-
 /// Convert a DataType to a TypeScript string
 ///
 /// Eg. `export Name = { demo: string; }`
@@ -261,26 +209,6 @@ fn export_datatype_inner(
     ))
 }
 
-/// Convert a DataType to a TypeScript string
-///
-/// Eg. `{ demo: string; }`
-pub fn datatype(conf: &Typescript, typ: &FunctionReturnType, types: &TypeCollection) -> Output {
-    // TODO: Duplicate type name detection?
-
-    let mut s = String::new();
-    datatype_inner(
-        ExportContext {
-            cfg: conf,
-            path: vec![],
-            is_export: false,
-        },
-        typ,
-        types,
-        &mut s,
-    )
-    .map(|_| s)
-}
-
 pub(crate) fn datatype_inner(
     ctx: ExportContext,
     typ: &FunctionReturnType,
@@ -318,7 +246,15 @@ pub(crate) fn datatype_inner(
             s.push_str(crate::primitives::primitive_dt(
                 &ctx.cfg.bigint,
                 p,
-                Vec::new(), /* TODO: Fix this path */
+                ctx.path
+                    .into_iter()
+                    .map(|v| match v {
+                        PathItem::Type(cow) => cow,
+                        PathItem::TypeExtended(cow, impl_location) => cow,
+                        PathItem::Field(cow) => cow,
+                        PathItem::Variant(cow) => cow,
+                    })
+                    .collect(), // Vec::new(), /* TODO: Fix this path */
             )?);
         }
         DataType::Literal(l) => crate::primitives::literal_dt(s, l),
