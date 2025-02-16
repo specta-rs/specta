@@ -15,22 +15,26 @@ pub struct ActualType {
 
 #[test]
 fn test_generic_type_in_type_map() {
-    let mut type_map = TypeCollection::default();
-    ActualType::definition(&mut type_map);
+    let mut types = TypeCollection::default();
+    ActualType::definition(&mut types);
 
-    assert_eq!(type_map.len(), 2);
-    let mut iter = type_map.into_iter();
+    assert_eq!(types.len(), 2);
+    let mut iter = types.into_iter();
 
     let first = iter.next().unwrap().1;
     // https://github.com/oscartbeaumont/specta/issues/171
     assert_eq!(
-        ts::legacy::export_named_datatype(&Default::default(), first, &type_map).unwrap(),
-        "export type ActualType = { a: GenericType<string> }".to_string()
+        specta_typescript::primitives::export(&Default::default(), &types, &first)
+            // Allows matching the value. Implementing `PartialEq` on it is really hard.
+            .map_err(|e| e.to_string()),
+        Ok("export type ActualType = { a: GenericType<string> };".into())
     );
 
     let second = iter.next().unwrap().1;
     assert_eq!(
-        ts::legacy::export_named_datatype(&Default::default(), second, &type_map).unwrap(),
-        "export type GenericType<T> = null | T".to_string()
+        specta_typescript::primitives::export(&Default::default(), &types, &second)
+            // Allows matching the value. Implementing `PartialEq` on it is really hard.
+            .map_err(|e| e.to_string()),
+        Ok("export type GenericType<T> = null | T;".into())
     );
 }

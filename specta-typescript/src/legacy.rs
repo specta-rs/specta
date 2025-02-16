@@ -2,8 +2,7 @@
 
 use std::{borrow::Cow, fmt};
 
-use specta::{internal::detect_duplicate_type_names, ImplLocation};
-use specta_serde::validate_dt;
+use specta::ImplLocation;
 
 /// Describes where an error occurred.
 #[derive(Debug, PartialEq)]
@@ -119,35 +118,13 @@ use specta::datatype::{
 };
 use specta::{
     internal::{skip_fields, skip_fields_named, NonSkipField},
-    NamedType, Type,
+    NamedType,
 };
 
 #[allow(missing_docs)]
-pub type Result<T> = std::result::Result<T, Error>;
+pub(crate) type Result<T> = std::result::Result<T, Error>;
 
 pub(crate) type Output = Result<String>;
-
-/// Convert a DataType to a TypeScript string
-///
-/// Eg. `export Name = { demo: string; }`
-pub fn export_named_datatype(
-    conf: &Typescript,
-    typ: &NamedDataType,
-    types: &TypeCollection,
-) -> Output {
-    // TODO: Duplicate type name detection?
-
-    // is_valid_ty(&typ.inner, types)?;
-    export_datatype_inner(
-        ExportContext {
-            cfg: conf,
-            path: vec![],
-            is_export: true,
-        },
-        typ,
-        types,
-    )
-}
 
 #[allow(clippy::ptr_arg)]
 fn inner_comments(
@@ -169,44 +146,6 @@ fn inner_comments(
     };
 
     format!("{prefix}{comments}{other}")
-}
-
-fn export_datatype_inner(
-    ctx: ExportContext,
-    typ: &NamedDataType,
-    types: &TypeCollection,
-) -> Output {
-    let name = typ.name();
-    let docs = typ.docs();
-    let deprecated = typ.deprecated();
-
-    let ctx = ctx.with(PathItem::TypeExtended(
-        name.clone(),
-        typ.impl_location().clone(),
-    ));
-    let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
-
-    let generics = if typ.generics().len() == 0 {
-        "".into()
-    } else {
-        format!("<{}>", typ.generics().join(", "))
-    };
-
-    let mut inline_ts = String::new();
-    datatype_inner(
-        ctx.clone(),
-        &FunctionReturnType::Value(typ.ty().clone()),
-        types,
-        &mut inline_ts,
-    )?;
-
-    Ok(inner_comments(
-        ctx,
-        deprecated,
-        docs,
-        format!("export type {name}{generics} = {inline_ts}"),
-        false,
-    ))
 }
 
 pub(crate) fn datatype_inner(

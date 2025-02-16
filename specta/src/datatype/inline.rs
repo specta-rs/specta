@@ -181,20 +181,23 @@ fn inner(
         }
         DataType::Reference(r) => {
             if r.inline() || force_inline || truely_force_inline {
-                let ty = types.get(r.sid()).expect("dun goof");
+                // TODO: Should we error here? Might get hit for `specta_typescript::Any`
+                if let Some(ty) = types.get(r.sid()) {
+                    return inner(
+                        ty.inner.clone(),
+                        types,
+                        false,
+                        truely_force_inline,
+                        &r.generics
+                            .clone()
+                            .into_iter()
+                            .map(|(g, dt)| (g, resolve_generics(dt, generics)))
+                            .collect(),
+                        depth + 1,
+                    );
+                }
 
-                inner(
-                    ty.inner.clone(),
-                    types,
-                    false,
-                    truely_force_inline,
-                    &r.generics
-                        .clone()
-                        .into_iter()
-                        .map(|(g, dt)| (g, resolve_generics(dt, generics)))
-                        .collect(),
-                    depth + 1,
-                )
+                DataType::Reference(r)
             } else {
                 DataType::Reference(r)
             }

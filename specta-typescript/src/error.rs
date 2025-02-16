@@ -87,7 +87,7 @@ impl fmt::Display for Error {
             Error::Io(err) => write!(f, "IO error: {err}"),
             // TODO:
             Error::BigIntForbiddenLegacy(path) => writeln!(f, "Attempted to export {path:?} but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!"),
-            Error::ForbiddenNameLegacy(path, name, _) => writeln!(f, "Attempted to export {path:?} but was unable to due toname {name:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`"),
+            Error::ForbiddenNameLegacy(path, name, _) => writeln!(f, "Attempted to export {path:?} but was unable to due to name {name:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`"),
             Error::InvalidNameLegacy(path, name, _) => writeln!(f, "Attempted to export {path:?} but was unable to due to name {name:?} containing an invalid character. Try renaming it or using `#[specta(rename = \"new name\")]`"),
             Error::InvalidTaggingLegacy(path) => writeln!(f, "Attempted to export {path:?} with tagging but the type is not tagged."),
             Error::InvalidTaggedVariantContainingTupleStructLegacy(path) => writeln!(f, "Attempted to export {path:?} with tagging but the variant is a tuple struct."),

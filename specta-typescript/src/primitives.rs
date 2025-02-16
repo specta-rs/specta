@@ -42,8 +42,20 @@ pub fn export(
         .into_iter()
         .flatten();
 
+    // TODO: Modernise this
+    let name = crate::legacy::sanitise_type_name(
+        crate::legacy::ExportContext {
+            cfg: ts,
+            path: vec![],
+            is_export: false,
+        },
+        crate::legacy::NamedLocation::Type,
+        ndt.name(),
+    )?
+    .leak(); // TODO: Leaking bad
+
     let s = iter::empty()
-        .chain(["export type ", ndt.name()])
+        .chain(["export type ", &name])
         .chain(generics)
         .chain([" = "])
         .collect::<String>();
@@ -140,40 +152,146 @@ fn datatype(
         // DataType::Enum(e) => enum_dt(s, ts, types, e, location, state)?,
         // DataType::Tuple(t) => tuple_dt(s, ts, types, t, location, state)?,
         // DataType::Reference(r) => reference_dt(s, ts, types, r, location, state)?,
-        // DataType::Generic(g) => s.push_str(g.borrow()),
+        DataType::Generic(g) => s.push_str(g.borrow()),
         // TODO: Don't fallback to legacy
-        _ => {
-            // let mut s = String::new();
-            // crate::legacy::datatype_inner(
-            //     ExportContext {
-            //         cfg: conf,
-            //         path: vec![],
-            //         is_export: false,
-            //     },
-            //     typ,
-            //     types,
-            //     &mut s,
-            // )
-            // .map(|_| s)
+        _ => crate::legacy::datatype_inner(
+            crate::legacy::ExportContext {
+                cfg: ts,
+                path: vec![],
+                is_export,
+            },
+            &specta::datatype::FunctionReturnType::Value(dt.clone()),
+            types,
+            s,
+        )?,
+        // TODO: Replace legacy stuff
+        // DataType::Nullable(def) => {
+        //     datatype_inner(
+        //         ctx,
+        //         &specta::datatype::FunctionReturnType::Value((**def).clone()),
+        //         types,
+        //         s,
+        //     )?;
 
-            // let mut s = String::new();
-            crate::legacy::datatype_inner(
-                crate::legacy::ExportContext {
-                    cfg: ts,
-                    path: vec![],
-                    is_export,
-                },
-                &specta::datatype::FunctionReturnType::Value(dt.clone()),
-                types,
-                s,
-            )?;
+        //     let or_null = format!(" | {NULL}");
+        //     if !s.ends_with(&or_null) {
+        //         s.push_str(&or_null);
+        //     }
+        // }
+        // DataType::Map(def) => {
+        //     // We use `{ [key in K]: V }` instead of `Record<K, V>` to avoid issues with circular references.
+        //     // Wrapped in Partial<> because otherwise TypeScript would enforce exhaustiveness.
+        //     s.push_str("Partial<{ [key in ");
+        //     datatype_inner(
+        //         ctx.clone(),
+        //         &FunctionReturnType::Value(def.key_ty().clone()),
+        //         types,
+        //         s,
+        //     )?;
+        //     s.push_str("]: ");
+        //     datatype_inner(
+        //         ctx.clone(),
+        //         &FunctionReturnType::Value(def.value_ty().clone()),
+        //         types,
+        //         s,
+        //     )?;
+        //     s.push_str(" }>");
+        // }
+        // // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
+        // DataType::List(def) => {
+        //     let mut dt = String::new();
+        //     datatype_inner(
+        //         ctx,
+        //         &FunctionReturnType::Value(def.ty().clone()),
+        //         types,
+        //         &mut dt,
+        //     )?;
 
-            // s.push_str(&crate::legacy::datatype(
-            //     &Default::default(),
-            //     &specta::datatype::FunctionReturnType::Value(dt.clone()),
-            //     &types,
-            // )?);
-        }
+        //     let dt = if (dt.contains(' ') && !dt.ends_with('}'))
+        // // This is to do with maintaining order of operations.
+        // // Eg `{} | {}` must be wrapped in parens like `({} | {})[]` but `{}` doesn't cause `{}[]` is valid
+        // || (dt.contains(' ') && (dt.contains('&') || dt.contains('|')))
+        //     {
+        //         format!("({dt})")
+        //     } else {
+        //         dt
+        //     };
+
+        //     if let Some(length) = def.length() {
+        //         s.push('[');
+
+        //         for n in 0..length {
+        //             if n != 0 {
+        //                 s.push_str(", ");
+        //             }
+
+        //             s.push_str(&dt);
+        //         }
+
+        //         s.push(']');
+        //     } else {
+        //         write!(s, "{dt}[]")?;
+        //     }
+        // }
+        // DataType::Struct(item) => struct_datatype(
+        //     ctx.with(
+        //         item.sid()
+        //             .and_then(|sid| types.get(sid))
+        //             .map(|v| PathItem::TypeExtended(item.name().clone(), *v.impl_location()))
+        //             .unwrap_or_else(|| PathItem::Type(item.name().clone())),
+        //     ),
+        //     item.name(),
+        //     item,
+        //     types,
+        //     s,
+        // )?,
+        // DataType::Enum(item) => {
+        //     let mut ctx = ctx.clone();
+        //     let cfg = ctx.cfg.clone().bigint(BigIntExportBehavior::Number);
+        //     if item.skip_bigint_checks() {
+        //         ctx.cfg = &cfg;
+        //     }
+
+        //     enum_datatype(
+        //         ctx.with(PathItem::Variant(item.name().clone())),
+        //         item,
+        //         types,
+        //         s,
+        //     )?
+        // }
+        // DataType::Tuple(tuple) => s.push_str(&tuple_datatype(ctx, tuple, types)?),
+        // DataType::Reference(reference) => {
+        //     if reference.sid() == Any::<()>::ID {
+        //         s.push_str(ANY);
+        //     } else if reference.sid() == Unknown::<()>::ID {
+        //         s.push_str(UNKNOWN);
+        //     } else {
+        //         let definition = types.get(reference.sid()).unwrap(); // TODO: Error handling
+
+        //         if reference.generics().len() == 0 {
+        //             s.push_str(&definition.name());
+        //         } else {
+        //             s.push_str(&definition.name());
+        //             s.push('<');
+
+        //             for (i, (_, v)) in reference.generics().iter().enumerate() {
+        //                 if i != 0 {
+        //                     s.push_str(", ");
+        //                 }
+
+        //                 datatype_inner(
+        //                     ctx.with(PathItem::Type(definition.name().clone())),
+        //                     &FunctionReturnType::Value(v.clone()),
+        //                     types,
+        //                     s,
+        //                 )?;
+        //             }
+
+        //             s.push('>');
+        //         }
+        //     }
+        // }
+        // DataType::Generic(ident) => s.push_str(&ident.to_string()),
     };
 
     Ok(())

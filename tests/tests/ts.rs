@@ -8,7 +8,7 @@ use std::{
 };
 
 use serde::Serialize;
-use specta::{NamedType, Type, TypeCollection};
+use specta::{datatype::inline_and_flatten_ndt, NamedType, Type, TypeCollection};
 use specta_typescript::Any;
 use specta_typescript::{BigIntExportBehavior, Typescript};
 
@@ -68,7 +68,7 @@ pub fn inline<T: Type>(ts: &Typescript) -> Result<String, String> {
     // TODO: Could we remove this? It's for backwards compatibility.
     {
         specta_serde::validate(&types)
-            .map_err(|err| format!("Detect invalid Serde type: {err:?}"))?;
+            .map_err(|err| format!("Detect invalid Serde type: {err}"))?;
 
         if let Some((ty_name, l0, l1)) = specta::internal::detect_duplicate_type_names(&types)
             .into_iter()
@@ -80,16 +80,37 @@ pub fn inline<T: Type>(ts: &Typescript) -> Result<String, String> {
         }
     }
 
-    specta_typescript::primitives::inline(&Default::default(), &types, &dt)
+    specta_typescript::primitives::inline(ts, &types, &dt)
         // Allows matching the value. Implementing `PartialEq` on it is really hard.
         .map_err(|e| e.to_string())
+}
+
+pub fn export_ref<T: NamedType>(t: &T, ts: &Typescript) -> Result<String, String> {
+    export::<T>(ts)
 }
 
 // TODO: Probally move to snapshot testing w/ high-level API's
 pub fn export<T: NamedType>(ts: &Typescript) -> Result<String, String> {
     let mut types = TypeCollection::default();
     T::definition(&mut types);
+
+    // TODO: Could we remove this? It's for backwards compatibility.
+    {
+        specta_serde::validate(&types)
+            .map_err(|err| format!("Detect invalid Serde type: {err}"))?;
+
+        if let Some((ty_name, l0, l1)) = specta::internal::detect_duplicate_type_names(&types)
+            .into_iter()
+            .next()
+        {
+            return Err(
+                specta_typescript::Error::DuplicateTypeNameLegacy(ty_name, l0, l1).to_string(),
+            );
+        }
+    }
+
     let ndt = types.get(T::ID).unwrap();
+    let ndt = inline_and_flatten_ndt(ndt.clone(), &types);
     specta_typescript::primitives::export(ts, &types, &ndt)
         // Allows matching the value. Implementing `PartialEq` on it is really hard.
         .map_err(|e| e.to_string())

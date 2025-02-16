@@ -97,11 +97,10 @@ fn inner(
             #[allow(clippy::panic)]
             if !checked_references.contains(&r.sid()) {
                 checked_references.insert(r.sid());
-                let ty = types.get(r.sid()).unwrap_or_else(|| {
-                    panic!("Type '{}' was never populated.", r.sid().type_name())
-                }); // TODO: Error properly
-
-                inner(ty.ty(), types, r.generics(), checked_references)?;
+                // TODO: We don't error here for `Any`/`Unknown` in the TS exporter
+                if let Some(ty) = types.get(r.sid()) {
+                    inner(ty.ty(), types, r.generics(), checked_references)?;
+                }
             }
         }
         _ => {}
