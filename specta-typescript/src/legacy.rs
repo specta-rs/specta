@@ -2,8 +2,6 @@
 
 use std::{borrow::Cow, fmt};
 
-use specta::ImplLocation;
-
 /// Describes where an error occurred.
 #[derive(Debug, PartialEq)]
 pub enum NamedLocation {
@@ -25,7 +23,7 @@ impl fmt::Display for NamedLocation {
 #[derive(Clone, Debug)]
 pub(crate) enum PathItem {
     Type(Cow<'static, str>),
-    TypeExtended(Cow<'static, str>, ImplLocation),
+    TypeExtended(Cow<'static, str>, &'static str),
     Field(Cow<'static, str>),
     Variant(Cow<'static, str>),
 }
@@ -62,7 +60,7 @@ impl ExportPath {
         while let Some(item) = path.next() {
             s.push_str(match item {
                 PathItem::Type(v) => v,
-                PathItem::TypeExtended(_, loc) => loc.as_str(),
+                PathItem::TypeExtended(_, loc) => loc,
                 PathItem::Field(v) => v,
                 PathItem::Variant(v) => v,
             });

@@ -1,6 +1,4 @@
-use std::{borrow::Cow, error, fmt, io};
-
-use specta::ImplLocation;
+use std::{borrow::Cow, error, fmt, io, panic::Location};
 
 use crate::legacy::NamedLocation;
 
@@ -28,7 +26,7 @@ pub enum Error {
     },
     /// Detected multiple types with the same name.
     DuplicateTypeName {
-        types: (ImplLocation, ImplLocation),
+        types: (Location<'static>, Location<'static>),
         name: Cow<'static, str>,
     },
     /// An filesystem IO error.
@@ -53,7 +51,7 @@ pub enum Error {
     InvalidTaggedVariantContainingTupleStructLegacy(ExportPath),
     // #[error("Unable to export type named '{0}' from locations")]
     // TODO: '{:?}' '{:?}'", .1.as_str(), .2.as_str())
-    DuplicateTypeNameLegacy(Cow<'static, str>, ImplLocation, ImplLocation),
+    DuplicateTypeNameLegacy(Cow<'static, str>, Location<'static>, Location<'static>),
     // #[error("fmt error: {0}")]
     FmtLegacy(std::fmt::Error),
 }

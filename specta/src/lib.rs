@@ -23,7 +23,7 @@ mod type_collection;
 // TODO: Can we just move the trait here or `#[doc(inline)]`
 pub use r#type::{Flatten, NamedType, Type};
 // #[doc(inline)]
-pub use specta_id::{ImplLocation, SpectaID};
+pub use specta_id::SpectaID;
 pub use type_collection::TypeCollection;
 
 #[doc(inline)]

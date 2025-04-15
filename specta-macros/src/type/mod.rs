@@ -148,7 +148,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let comments = &container_attrs.common.doc;
     let inline = container_attrs.inline;
     let deprecated = container_attrs.common.deprecated_as_tokens(&crate_ref);
-    let impl_location = quote!(#crate_ref::internal::construct::impl_location(concat!(file!(), ":", line!(), ":", column!())));
 
     let reference_generics = generics.params.iter().filter_map(|param| match param {
         GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
@@ -186,7 +185,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         #comments.into(),
                         #deprecated,
                         SID,
-                        #impl_location,
+                        std::borrow::Cow::Borrowed(module_path!()),
                         vec![#(#definition_generics),*],
                         |types| {
                             #shadow_generics

@@ -134,9 +134,6 @@ impl<T> Type for std::marker::PhantomData<T> {
 
 // Serde does no support `Infallible` as it can't be constructed as a `&self` method is uncallable on it.
 const _: () = {
-    const IMPL_LOCATION: ImplLocation =
-        internal::construct::impl_location("specta/src/type/impls.rs:234:10");
-
     impl Type for std::convert::Infallible {
         fn definition(_: &mut TypeCollection) -> DataType {
             DataType::Enum(internal::construct::r#enum(
@@ -202,8 +199,6 @@ impl<K: Type, V: Type> Flatten for std::collections::BTreeMap<K, V> {}
 
 const _: () = {
     const SID: SpectaID = internal::construct::sid("SystemTime", "::type::impls:305:10");
-    const IMPL_LOCATION: ImplLocation =
-        internal::construct::impl_location("specta/src/type/impls.rs:302:10");
 
     impl Type for std::time::SystemTime {
         fn definition(types: &mut TypeCollection) -> DataType {
@@ -233,8 +228,6 @@ const _: () = {
 
 const _: () = {
     const SID: SpectaID = internal::construct::sid("Duration", "::type::impls:401:10");
-    const IMPL_LOCATION: ImplLocation =
-        internal::construct::impl_location("specta/src/type/impls.rs:401:10");
 
     impl Type for std::time::Duration {
         fn definition(types: &mut TypeCollection) -> DataType {

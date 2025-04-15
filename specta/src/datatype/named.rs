@@ -1,6 +1,6 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, panic::Location};
 
-use crate::{ImplLocation, SpectaID};
+use crate::SpectaID;
 
 use super::{DataType, Generic};
 
@@ -11,7 +11,8 @@ pub struct NamedDataType {
     pub(crate) docs: Cow<'static, str>,
     pub(crate) deprecated: Option<DeprecatedType>,
     pub(crate) sid: SpectaID,
-    pub(crate) impl_location: ImplLocation,
+    pub(crate) module_path: Cow<'static, str>,
+    pub(crate) location: Location<'static>,
     pub(crate) generics: Vec<Generic>,
     pub(crate) inner: DataType,
 }
@@ -37,11 +38,17 @@ impl NamedDataType {
         &self.sid
     }
 
-    /// The code location where this type is implemented. Used for error reporting.
-    pub fn impl_location(&self) -> &ImplLocation {
-        &self.impl_location
+    /// The code location where this type is implemented
+    pub fn location(&self) -> Location {
+        self.location
     }
 
+    /// The Rust path of the module where this type is defined
+    pub fn module_path(&self) -> &str {
+        &self.module_path
+    }
+
+    /// The generics that are defined on this type
     pub fn generics(&self) -> &Vec<Generic> {
         &self.generics
     }

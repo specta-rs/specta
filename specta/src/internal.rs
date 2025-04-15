@@ -4,14 +4,14 @@
 //!
 //! DO NOT USE THEM! You have been warned!
 
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap, panic::Location};
 
 #[cfg(feature = "function")]
 pub use paste::paste;
 
 use crate::{
     datatype::{DataType, DeprecatedType, Field, Generic, NamedDataType},
-    ImplLocation, SpectaID, TypeCollection,
+    SpectaID, TypeCollection,
 };
 
 /// Registers a type in the `TypeCollection` if it hasn't been registered already.
@@ -22,10 +22,11 @@ pub fn register(
     docs: Cow<'static, str>,
     deprecated: Option<DeprecatedType>,
     sid: SpectaID,
-    impl_location: ImplLocation,
+    module_path: Cow<'static, str>,
     generics: Vec<Generic>,
     build: impl FnOnce(&mut TypeCollection) -> DataType,
 ) -> NamedDataType {
+    let location = Location::caller().clone();
     match types.map.get(&sid) {
         Some(Some(dt)) => dt.clone(),
         // TODO: Explain this
@@ -34,7 +35,8 @@ pub fn register(
             docs,
             deprecated,
             sid,
-            impl_location,
+            module_path,
+            location,
             generics,
             inner: DataType::Primitive(crate::datatype::Primitive::i8), // TODO: Fix this
         },
@@ -45,7 +47,8 @@ pub fn register(
                 docs,
                 deprecated,
                 sid,
-                impl_location,
+                module_path,
+                location,
                 generics,
                 inner: build(types),
             };
@@ -61,7 +64,7 @@ pub fn register(
 pub mod construct {
     use std::borrow::Cow;
 
-    use crate::{datatype::*, Flatten, ImplLocation, SpectaID, Type, TypeCollection};
+    use crate::{datatype::*, Flatten, SpectaID, Type, TypeCollection};
 
     pub fn skipped_field(
         optional: bool,
@@ -171,10 +174,6 @@ pub mod construct {
 
     pub const fn generic_data_type(name: &'static str) -> Generic {
         Generic(Cow::Borrowed(name))
-    }
-
-    pub const fn impl_location(loc: &'static str) -> ImplLocation {
-        ImplLocation(loc)
     }
 
     /// Compute an SID hash for a given type.
@@ -332,16 +331,16 @@ pub use functions::*;
 /// post process the type map to detect duplicate type names
 pub fn detect_duplicate_type_names(
     types: &TypeCollection,
-) -> Vec<(Cow<'static, str>, ImplLocation, ImplLocation)> {
+) -> Vec<(Cow<'static, str>, Location<'static>, Location<'static>)> {
     let mut errors = Vec::new();
 
     let mut map = HashMap::with_capacity(types.into_iter().len());
     for (sid, dt) in types.into_iter() {
         if let Some((existing_sid, existing_impl_location)) =
-            map.insert(dt.name.clone(), (sid, dt.impl_location))
+            map.insert(dt.name.clone(), (sid, dt.location))
         {
             if existing_sid != sid {
-                errors.push((dt.name.clone(), dt.impl_location, existing_impl_location));
+                errors.push((dt.name.clone(), dt.location, existing_impl_location));
             }
         }
     }

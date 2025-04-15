@@ -2,14 +2,14 @@
 //!
 //! TODO: Option to build types with generics???
 
-use std::{borrow::Cow, fmt::Debug};
+use std::{borrow::Cow, fmt::Debug, panic::Location};
 
 use crate::{
     datatype::{
         DeprecatedType, Enum, EnumRepr, EnumVariant, Field, Fields, Generic, NamedDataType,
         NamedFields, Struct, UnnamedFields,
     },
-    DataType, ImplLocation, SpectaID,
+    DataType, SpectaID,
 };
 
 // TDO: `Debug` and `Clone` on everything
@@ -375,19 +375,27 @@ impl NamedDataTypeBuilder {
     pub fn new(
         name: impl Into<Cow<'static, str>>,
         sid: SpectaID,
-        impl_location: ImplLocation,
         generics: Vec<Generic>,
         dt: DataType,
     ) -> Self {
         Self(NamedDataType {
             name: name.into(),
-            docs: "".into(),
+            docs: Cow::Borrowed(""),
             deprecated: None,
             sid,
-            impl_location,
+            module_path: Cow::Borrowed("virtual"),
+            location: Location::caller().clone(),
             generics,
             inner: dt,
         })
+    }
+
+    /// Set the module path that this type was defined in.
+    ///
+    /// The value for this is usually determined by [`module_path`](std::module_path). It's important you keep this in the form `edge::edge::edge::node` or `node`.
+    pub fn module_path(mut self, module_path: impl Into<Cow<'static, str>>) -> Self {
+        self.0.module_path = module_path.into();
+        self
     }
 
     pub fn docs(mut self, docs: impl Into<Cow<'static, str>>) -> Self {
