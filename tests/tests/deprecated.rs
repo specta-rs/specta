@@ -60,14 +60,14 @@ pub enum DeprecatedEnumVariants {
 fn test_deprecated_types() {
     assert_ts_export!(
         DeprecatedType,
-        "/**\n * @deprecated\n */\nexport type DeprecatedType = { a: number }"
+        "/**\n * @deprecated\n */\nexport type DeprecatedType = { a: number };"
     );
     assert_ts_export!(
         DeprecatedTypeWithMsg,
-        "/**\n * @deprecated Look at you big man using a deprecation message\n */\nexport type DeprecatedTypeWithMsg = { a: number }"
+        "/**\n * @deprecated Look at you big man using a deprecation message\n */\nexport type DeprecatedTypeWithMsg = { a: number };"
     );
-    assert_ts_export!(DeprecatedTypeWithMsg2, "/**\n * @deprecated Look at you big man using a deprecation message\n */\nexport type DeprecatedTypeWithMsg2 = { a: number }");
-    assert_ts_export!(DeprecatedFields, "export type DeprecatedFields = { a: number; \n/**\n * @deprecated\n */\nb: string; \n/**\n * @deprecated This field is cringe!\n */\nc: string; \n/**\n * @deprecated This field is cringe!\n */\nd: string }");
-    assert_ts_export!(DeprecatedTupleVariant, "export type DeprecatedTupleVariant = [\n/**\n * @deprecated\n */\nstring, \n/**\n * @deprecated Nope\n */\nstring, \n/**\n * @deprecated Nope\n */\nnumber]");
-    assert_ts_export!(DeprecatedEnumVariants, "export type DeprecatedEnumVariants = \n/**\n * @deprecated\n */\n\"A\" | \n/**\n * @deprecated Nope\n */\n\"B\" | \n/**\n * @deprecated Nope\n */\n\"C\"");
+    assert_ts_export!(DeprecatedTypeWithMsg2, "/**\n * @deprecated Look at you big man using a deprecation message\n */\nexport type DeprecatedTypeWithMsg2 = { a: number };");
+    assert_ts_export!(DeprecatedFields, "export type DeprecatedFields = { a: number; \n/**\n * @deprecated\n */\nb: string; \n/**\n * @deprecated This field is cringe!\n */\nc: string; \n/**\n * @deprecated This field is cringe!\n */\nd: string };");
+    assert_ts_export!(DeprecatedTupleVariant, "export type DeprecatedTupleVariant = [\n/**\n * @deprecated\n */\nstring, \n/**\n * @deprecated Nope\n */\nstring, \n/**\n * @deprecated Nope\n */\nnumber];");
+    assert_ts_export!(DeprecatedEnumVariants, "export type DeprecatedEnumVariants = \n/**\n * @deprecated\n */\n\"A\" | \n/**\n * @deprecated Nope\n */\n\"B\" | \n/**\n * @deprecated Nope\n */\n\"C\";");
 }

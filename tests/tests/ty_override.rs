@@ -1,5 +1,5 @@
 use specta::Type;
-use specta_util::Any;
+use specta_typescript::Any;
 
 use crate::ts::assert_ts;
 

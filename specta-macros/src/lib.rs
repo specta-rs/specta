@@ -15,9 +15,17 @@ mod utils;
 
 /// Implements [`Type`] for a given struct or enum.
 ///
+/// # Attributes
+/// Attributes can be applied to modify Specta's behavior. Specta can natively read `#[serde(...)]` attributes so your generally recommend to [just use them](https://serde.rs/attributes.html).
+///
+/// Specta also introduces some of it's own attributes:
+///  - `#[specta(optional)]` - When paired with an `Option<T>` field, this will result in `{ a?: T | null }` instead of `{ a: T | null }`.
+///  - `#[specta(type = ::std::string::String)]` - Will override the type of a item, variant or field to a given type.
+///  - `#[specta(export = false)]` - When using the `export` feature, this will prevent the specific type from being exported.
+///
 /// ## Example
 ///
-/// ```rust
+/// ```ignore
 /// use specta::Type;
 ///
 /// // Use it on structs
@@ -46,7 +54,7 @@ pub fn derive_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 ///
 /// ## Example
 ///
-/// ```rust
+/// ```ignore
 /// #[specta::specta]
 /// fn my_function(arg1: i32, arg2: bool) -> &'static str {
 ///     "Hello World"

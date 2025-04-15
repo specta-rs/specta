@@ -20,4 +20,3 @@ workspace = true
 
 [dependencies]
 specta = { version = "=2.0.0-rc.22", path = "../specta" }
-thiserror = "1.0.61"

@@ -1,5 +1,6 @@
-//! TODO: These are all planned to be removed from the core and into the ecosystem for the v2 release.
-use crate::{datatype::reference::Reference, datatype::*, r#type::macros::*, *};
+//! The plan is to try and move these into the ecosystem for the v2 release.
+use super::macros::*;
+use crate::{datatype::*, Flatten, Type, TypeCollection};
 
 use std::borrow::Cow;
 
@@ -29,8 +30,8 @@ const _: () = {
     }
 
     impl Type for Number {
-        fn inline(_: &mut TypeCollection, _: Generics) -> DataType {
-            DataType::Enum(EnumType {
+        fn definition(_: &mut TypeCollection) -> DataType {
+            DataType::Enum(Enum {
                 name: "Number".into(),
                 sid: None,
                 repr: EnumRepr::Untagged,
@@ -42,13 +43,14 @@ const _: () = {
                             skip: false,
                             docs: Cow::Borrowed(""),
                             deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
+                            fields: Fields::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     optional: false,
                                     flatten: false,
+                                    inline: false,
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(PrimitiveType::f64)),
+                                    ty: Some(DataType::Primitive(Primitive::f64)),
                                 }],
                             }),
                         },
@@ -59,13 +61,14 @@ const _: () = {
                             skip: false,
                             docs: Cow::Borrowed(""),
                             deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
+                            fields: Fields::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     optional: false,
                                     flatten: false,
+                                    inline: false,
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(PrimitiveType::i64)),
+                                    ty: Some(DataType::Primitive(Primitive::i64)),
                                 }],
                             }),
                         },
@@ -76,19 +79,19 @@ const _: () = {
                             skip: false,
                             docs: Cow::Borrowed(""),
                             deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
+                            fields: Fields::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     optional: false,
                                     flatten: false,
+                                    inline: false,
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(PrimitiveType::u64)),
+                                    ty: Some(DataType::Primitive(Primitive::u64)),
                                 }],
                             }),
                         },
                     ),
                 ],
-                generics: vec![],
             })
         }
     }
@@ -111,24 +114,21 @@ const _: () = {
     }
 
     impl Type for serde_yaml::Mapping {
-        fn inline(_: &mut TypeCollection, _: Generics) -> DataType {
-            // We don't type this more accurately because `serde_json` doesn't allow non-string map keys so neither does Specta
-            DataType::Unknown
+        fn definition(types: &mut TypeCollection) -> DataType {
+            // We don't type this more accurately because `serde_json` doesn't allow non-string map keys so neither does Specta // TODO
+            std::collections::HashMap::<serde_yaml::Value, serde_yaml::Value>::definition(types)
         }
     }
 
     impl Type for serde_yaml::value::TaggedValue {
-        fn inline(_: &mut TypeCollection, _: Generics) -> DataType {
-            DataType::Map(Map {
-                key_ty: Box::new(DataType::Primitive(PrimitiveType::String)),
-                value_ty: Box::new(DataType::Unknown),
-            })
+        fn definition(types: &mut TypeCollection) -> DataType {
+            std::collections::HashMap::<String, serde_yaml::Value>::definition(types)
         }
     }
 
     impl Type for serde_yaml::Number {
-        fn inline(_: &mut TypeCollection, _: Generics) -> DataType {
-            DataType::Enum(EnumType {
+        fn definition(_: &mut TypeCollection) -> DataType {
+            DataType::Enum(Enum {
                 name: "Number".into(),
                 sid: None,
                 repr: EnumRepr::Untagged,
@@ -140,13 +140,14 @@ const _: () = {
                             skip: false,
                             docs: Cow::Borrowed(""),
                             deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
+                            fields: Fields::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     optional: false,
                                     flatten: false,
+                                    inline: false,
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(PrimitiveType::f64)),
+                                    ty: Some(DataType::Primitive(Primitive::f64)),
                                 }],
                             }),
                         },
@@ -157,13 +158,14 @@ const _: () = {
                             skip: false,
                             docs: Cow::Borrowed(""),
                             deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
+                            fields: Fields::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     optional: false,
                                     flatten: false,
+                                    inline: false,
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(PrimitiveType::i64)),
+                                    ty: Some(DataType::Primitive(Primitive::i64)),
                                 }],
                             }),
                         },
@@ -174,19 +176,19 @@ const _: () = {
                             skip: false,
                             docs: Cow::Borrowed(""),
                             deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
+                            fields: Fields::Unnamed(UnnamedFields {
                                 fields: vec![Field {
                                     optional: false,
                                     flatten: false,
+                                    inline: false,
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(PrimitiveType::u64)),
+                                    ty: Some(DataType::Primitive(Primitive::u64)),
                                 }],
                             }),
                         },
                     ),
                 ],
-                generics: vec![],
             })
         }
     }
@@ -412,8 +414,8 @@ impl_as!(url::Url as String);
 
 #[cfg(feature = "either")]
 impl<L: Type, R: Type> Type for either::Either<L, R> {
-    fn inline(type_map: &mut TypeCollection, generics: Generics) -> DataType {
-        DataType::Enum(EnumType {
+    fn definition(types: &mut TypeCollection) -> DataType {
+        DataType::Enum(Enum {
             name: "Either".into(),
             sid: None,
             repr: EnumRepr::Untagged,
@@ -425,13 +427,14 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                         skip: false,
                         docs: Cow::Borrowed(""),
                         deprecated: None,
-                        inner: EnumVariants::Unnamed(UnnamedFields {
+                        fields: Fields::Unnamed(UnnamedFields {
                             fields: vec![Field {
                                 optional: false,
                                 flatten: false,
+                                inline: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
-                                ty: Some(L::inline(type_map, generics)),
+                                ty: Some(L::definition(types)),
                             }],
                         }),
                     },
@@ -442,68 +445,20 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                         skip: false,
                         docs: Cow::Borrowed(""),
                         deprecated: None,
-                        inner: EnumVariants::Unnamed(UnnamedFields {
+                        fields: Fields::Unnamed(UnnamedFields {
                             fields: vec![Field {
                                 optional: false,
                                 flatten: false,
+                                inline: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
-                                ty: Some(R::inline(type_map, generics)),
+                                ty: Some(R::definition(types)),
                             }],
                         }),
                     },
                 ),
             ],
-            generics: vec![],
         })
-    }
-
-    fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
-        Reference {
-            inner: DataType::Enum(EnumType {
-                name: "Either".into(),
-                sid: None,
-                repr: EnumRepr::Untagged,
-                skip_bigint_checks: false,
-                variants: vec![
-                    (
-                        "Left".into(),
-                        EnumVariant {
-                            skip: false,
-                            docs: Cow::Borrowed(""),
-                            deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    deprecated: None,
-                                    docs: Cow::Borrowed(""),
-                                    ty: Some(L::reference(type_map, generics).inner),
-                                }],
-                            }),
-                        },
-                    ),
-                    (
-                        "Right".into(),
-                        EnumVariant {
-                            skip: false,
-                            docs: Cow::Borrowed(""),
-                            deprecated: None,
-                            inner: EnumVariants::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    deprecated: None,
-                                    docs: Cow::Borrowed(""),
-                                    ty: Some(R::reference(type_map, generics).inner),
-                                }],
-                            }),
-                        },
-                    ),
-                ],
-                generics: vec![],
-            }),
-        }
     }
 }
 

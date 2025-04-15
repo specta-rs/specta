@@ -1,9 +1,9 @@
 [workspace]
-members = ["specta", "specta-*", "tests", "examples"]
+members = ["specta", "specta-*", "tests"]
 resolver = "2"
 
 [workspace.lints.rust]
-unsafe_code = { level = "forbid", priority = -1 }
+# unsafe_code = { level = "forbid", priority = -1 } # The `export` feature uses unsafe.
 # missing_docs = { level = "warn", priority = -1 } # TODO: Enable this
 
 [workspace.lints.clippy]

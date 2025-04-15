@@ -1,83 +1,100 @@
-use core::fmt;
-use std::borrow::Cow;
-
-use specta_serde::SerdeError;
-use thiserror::Error;
+use std::{borrow::Cow, error, fmt, io};
 
 use specta::ImplLocation;
 
-use super::ExportPath;
+use crate::legacy::NamedLocation;
 
-/// Describes where an error occurred.
-#[derive(Error, Debug, PartialEq)]
-pub enum NamedLocation {
-    Type,
-    Field,
-    Variant,
-}
-
-impl fmt::Display for NamedLocation {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Type => write!(f, "type"),
-            Self::Field => write!(f, "field"),
-            Self::Variant => write!(f, "variant"),
-        }
-    }
-}
+use super::legacy::ExportPath;
 
 /// The error type for the TypeScript exporter.
-#[derive(Error, Debug)]
+#[derive(Debug)]
 #[non_exhaustive]
-pub enum ExportError {
-    #[error("Attempted to export '{0}' but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!")]
-    BigIntForbidden(ExportPath),
-    #[error("Serde error: {0}")]
-    Serde(#[from] SerdeError),
+pub enum Error {
+    /// Attempted to export a bigint type but the configuration forbids it.
+    BigIntForbidden {
+        path: String,
+    },
+    /// Failed to validate a type is Serde compatible.
+    Serde(specta_serde::Error),
+    /// A type's name conflicts with a reserved keyword in Typescript.
+    ForbiddenName {
+        path: String,
+        name: &'static str,
+    },
+    /// A type's name contains invalid characters or is not valid.
+    InvalidName {
+        path: String,
+        name: Cow<'static, str>,
+    },
+    /// Detected multiple types with the same name.
+    DuplicateTypeName {
+        types: (ImplLocation, ImplLocation),
+        name: Cow<'static, str>,
+    },
+    /// An filesystem IO error.
+    /// This is possible when using `Typescript::export_to` when writing to a file or formatting the file.
+    Io(io::Error),
+    //
+    //
+    // TODO: Break
+    //
+    //
+    // #[error("Attempted to export '{0}' but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!")]
+    BigIntForbiddenLegacy(ExportPath),
     // #[error("Attempted to export '{0}' but was unable to export a tagged type which is unnamed")]
     // UnableToTagUnnamedType(ExportPath),
-    #[error("Attempted to export '{1}' but was unable to due to {0} name '{2}' conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`")]
-    ForbiddenName(NamedLocation, ExportPath, &'static str),
-    #[error("Attempted to export '{1}' but was unable to due to {0} name '{2}' containing an invalid character")]
-    InvalidName(NamedLocation, ExportPath, String),
-    #[error("Attempted to export '{0}' with tagging but the type is not tagged.")]
-    InvalidTagging(ExportPath),
-    #[error("Attempted to export '{0}' with internal tagging but the variant is a tuple struct.")]
-    InvalidTaggedVariantContainingTupleStruct(ExportPath),
-    #[error("Unable to export type named '{0}' from locations '{:?}' '{:?}'", .1.as_str(), .2.as_str())]
-    DuplicateTypeName(Cow<'static, str>, ImplLocation, ImplLocation),
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("fmt error: {0}")]
-    Fmt(#[from] std::fmt::Error),
-    #[error("Failed to export '{0}' due to error: {1}")]
-    Other(ExportPath, String),
+    // #[error("Attempted to export '{1}' but was unable to due to {0} name '{2}' conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`")]
+    ForbiddenNameLegacy(NamedLocation, ExportPath, &'static str),
+    // #[error("Attempted to export '{1}' but was unable to due to {0} name '{2}' containing an invalid character")]
+    InvalidNameLegacy(NamedLocation, ExportPath, String),
+    // #[error("Attempted to export '{0}' with tagging but the type is not tagged.")]
+    InvalidTaggingLegacy(ExportPath),
+    // #[error("Attempted to export '{0}' with internal tagging but the variant is a tuple struct.")]
+    InvalidTaggedVariantContainingTupleStructLegacy(ExportPath),
+    // #[error("Unable to export type named '{0}' from locations")]
+    // TODO: '{:?}' '{:?}'", .1.as_str(), .2.as_str())
+    DuplicateTypeNameLegacy(Cow<'static, str>, ImplLocation, ImplLocation),
+    // #[error("fmt error: {0}")]
+    FmtLegacy(std::fmt::Error),
 }
 
-// TODO: This `impl` is cringe
-impl PartialEq for ExportError {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::BigIntForbidden(l0), Self::BigIntForbidden(r0)) => l0 == r0,
-            (Self::Serde(l0), Self::Serde(r0)) => l0 == r0,
-            // (Self::UnableToTagUnnamedType(l0), Self::UnableToTagUnnamedType(r0)) => l0 == r0,
-            (Self::ForbiddenName(l0, l1, l2), Self::ForbiddenName(r0, r1, r2)) => {
-                l0 == r0 && l1 == r1 && l2 == r2
-            }
-            (Self::InvalidName(l0, l1, l2), Self::InvalidName(r0, r1, r2)) => {
-                l0 == r0 && l1 == r1 && l2 == r2
-            }
-            (Self::InvalidTagging(l0), Self::InvalidTagging(r0)) => l0 == r0,
-            (
-                Self::InvalidTaggedVariantContainingTupleStruct(l0),
-                Self::InvalidTaggedVariantContainingTupleStruct(r0),
-            ) => l0 == r0,
-            (Self::DuplicateTypeName(l0, l1, l2), Self::DuplicateTypeName(r0, r1, r2)) => {
-                l0 == r0 && l1 == r1 && l2 == r2
-            }
-            (Self::Io(l0), Self::Io(r0)) => l0.to_string() == r0.to_string(), // This is a bit hacky but it will be fine for usage in unit tests!
-            (Self::Other(l0, l1), Self::Other(r0, r1)) => l0 == r0 && l1 == r1,
-            _ => false,
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Self {
+        Self::Io(e)
+    }
+}
+
+impl From<specta_serde::Error> for Error {
+    fn from(e: specta_serde::Error) -> Self {
+        Self::Serde(e)
+    }
+}
+
+impl From<std::fmt::Error> for Error {
+    fn from(e: std::fmt::Error) -> Self {
+        Self::FmtLegacy(e)
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::BigIntForbidden { path } => writeln!(f, "Attempted to export {path:?} but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!"),
+            Error::Serde(err) => write!(f, "Detect invalid Serde type: {err}"),
+            Error::ForbiddenName { path, name } => writeln!(f, "Attempted to export {path:?} but was unable to due toname {name:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`"),
+            Error::InvalidName { path, name } => writeln!(f, "Attempted to export {path:?} but was unable to due to name {name:?} containing an invalid character. Try renaming it or using `#[specta(rename = \"new name\")]`"),
+            Error::DuplicateTypeName { types, name } => writeln!(f, "Detected multiple types with the same name: {name:?} in {types:?}"),
+            Error::Io(err) => write!(f, "IO error: {err}"),
+            // TODO:
+            Error::BigIntForbiddenLegacy(path) => writeln!(f, "Attempted to export {path:?} but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!"),
+            Error::ForbiddenNameLegacy(path, name, _) => writeln!(f, "Attempted to export {path:?} but was unable to due to name {name:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`"),
+            Error::InvalidNameLegacy(path, name, _) => writeln!(f, "Attempted to export {path:?} but was unable to due to name {name:?} containing an invalid character. Try renaming it or using `#[specta(rename = \"new name\")]`"),
+            Error::InvalidTaggingLegacy(path) => writeln!(f, "Attempted to export {path:?} with tagging but the type is not tagged."),
+            Error::InvalidTaggedVariantContainingTupleStructLegacy(path) => writeln!(f, "Attempted to export {path:?} with tagging but the variant is a tuple struct."),
+            Error::DuplicateTypeNameLegacy(a, b, _) => writeln!(f, "Attempted to export {a:?} but was unable to due to name {b:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`"),
+            Error::FmtLegacy(err) => writeln!(f, "formatter: {err:?}"),
         }
     }
 }
+
+impl error::Error for Error {}

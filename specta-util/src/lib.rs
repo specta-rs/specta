@@ -8,9 +8,8 @@
 #[cfg(feature = "serde")]
 #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 mod selection;
-mod static_types;
 
-#[cfg(feature = "serde")]
-#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+// TODO
+// #[cfg(feature = "serde")]
+// #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 // pub use selection::selection;
-pub use static_types::{Any, Unknown};
