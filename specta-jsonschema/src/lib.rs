@@ -5,7 +5,7 @@
     html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
 )]
 
-// use specta::datatype::{DataType, PrimitiveType};
+// use specta::datatype::{DataType, Primitive};
 
 use std::path::Path;
 
@@ -255,7 +255,7 @@ pub fn to_ast(schema: &Schema) -> Result<DataType, ()> {
 
 // macro_rules! primitive_def {
 //     ($($t:ident)+) => {
-//         $(DataType::Primitive(PrimitiveType::$t))|+
+//         $(DataType::Primitive(Primitive::$t))|+
 //     }
 // }
 

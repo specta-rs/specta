@@ -1,4 +1,4 @@
-use std::{borrow::Cow, path::Path};
+use std::{borrow::Cow, ops::Deref, path::Path};
 
 use specta::TypeCollection;
 
@@ -60,5 +60,13 @@ impl JSDoc {
     /// TODO
     pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
         self.0.export_to(path, types)
+    }
+}
+
+impl Deref for JSDoc {
+    type Target = Typescript;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

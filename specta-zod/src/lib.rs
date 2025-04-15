@@ -23,7 +23,7 @@
 
 // macro_rules! primitive_def {
 //     ($($t:ident)+) => {
-//         $(PrimitiveType::$t)|+
+//         $(Primitive::$t)|+
 //     }
 // }
 

@@ -1,4 +1,4 @@
-// use specta::datatype::{DataType, FunctionResultVariant, LiteralType, PrimitiveType, StructType};
+// use specta::datatype::{DataType, FunctionResultVariant, LiteralType, Primitive, StructType};
 // use specta_datatype_from::DataTypeFrom;
 // use specta_typescript as ts;
 
@@ -174,7 +174,7 @@
 //     );
 
 //     let val: DataType =
-//         Procedures9(DataType::Any, DataType::Primitive(PrimitiveType::String)).into();
+//         Procedures9(DataType::Any, DataType::Primitive(Primitive::String)).into();
 //     assert_eq!(
 //         ts::datatype(
 //             &Default::default(),

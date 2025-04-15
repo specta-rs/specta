@@ -24,7 +24,7 @@ pub enum Primitive {
 }
 
 impl Primitive {
-    /// Converts a [`PrimitiveType`] into a Rust code string.
+    /// Converts a [`Primitive`] into a Rust code string.
     pub fn to_rust_str(&self) -> &'static str {
         match self {
             Self::i8 => "i8",
