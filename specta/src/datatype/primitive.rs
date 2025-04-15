@@ -3,7 +3,7 @@ use super::DataType;
 /// Type of primitives like numbers and strings.
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, PartialEq)]
-pub enum PrimitiveType {
+pub enum Primitive {
     i8,
     i16,
     i32,
@@ -23,8 +23,8 @@ pub enum PrimitiveType {
     String,
 }
 
-impl PrimitiveType {
-    /// Converts a [`PrimitiveType`] into a Rust code string.
+impl Primitive {
+    /// Converts a [`Primitive`] into a Rust code string.
     pub fn to_rust_str(&self) -> &'static str {
         match self {
             Self::i8 => "i8",
@@ -48,8 +48,8 @@ impl PrimitiveType {
     }
 }
 
-impl From<PrimitiveType> for DataType {
-    fn from(t: PrimitiveType) -> Self {
+impl From<Primitive> for DataType {
+    fn from(t: Primitive) -> Self {
         Self::Primitive(t)
     }
 }

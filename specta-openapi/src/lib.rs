@@ -9,7 +9,7 @@ use openapiv3::{
     ArrayType, BooleanType, NumberType, ReferenceOr, Schema, SchemaData, SchemaKind, StringType,
     Type,
 };
-use specta::datatype::{DataType, PrimitiveType};
+use specta::datatype::{DataType, Primitive};
 
 // pub fn to_openapi_export(def: &DataType) -> Result<openapiv3::Schema, String> {
 //     Ok(match &def {
@@ -49,7 +49,7 @@ use specta::datatype::{DataType, PrimitiveType};
 
 macro_rules! primitive_def {
     ($($t:ident)+) => {
-        $(DataType::Primitive(PrimitiveType::$t))|+
+        $(DataType::Primitive(Primitive::$t))|+
     }
 }
 
@@ -65,11 +65,10 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
     };
 
     match &typ {
-        DataType::Any => ReferenceOr::Item(Schema {
-            schema_data,
-            schema_kind: SchemaKind::Type(Type::Object(openapiv3::ObjectType::default())), // TODO: Use official "Any Type"
-        }),
-
+        // DataType::Any => ReferenceOr::Item(Schema {
+        //     schema_data,
+        //     schema_kind: SchemaKind::Type(Type::Object(openapiv3::ObjectType::default())), // TODO: Use official "Any Type"
+        // }),
         primitive_def!(i8 i16 i32 isize u8 u16 u32 usize f32 f64) => ReferenceOr::Item(Schema {
             schema_data,
             schema_kind: SchemaKind::Type(Type::Number(NumberType::default())), // TODO: Configure number type. Ts: `number`

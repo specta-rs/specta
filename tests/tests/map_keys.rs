@@ -1,8 +1,8 @@
 use std::{collections::HashMap, convert::Infallible};
 
-use specta::Type;
+use specta::{Type, TypeCollection};
 use specta_serde::Error;
-use specta_util::Any;
+use specta_typescript::Any;
 
 use crate::ts::{assert_ts, assert_ts_export};
 
@@ -78,7 +78,7 @@ fn map_keys() {
     assert_ts!(HashMap<String, ()>, "Partial<{ [key in string]: null }>");
     assert_ts_export!(
         Regular,
-        "export type Regular = Partial<{ [key in string]: null }>"
+        "export type Regular = Partial<{ [key in string]: null }>;"
     );
     assert_ts!(HashMap<Infallible, ()>, "Partial<{ [key in never]: null }>");
     assert_ts!(HashMap<Any, ()>, "Partial<{ [key in any]: null }>");
@@ -88,7 +88,7 @@ fn map_keys() {
     assert_ts!(ValidMaybeValidKey, "Partial<{ [key in string]: null }>");
     assert_ts_export!(
         ValidMaybeValidKey,
-        "export type ValidMaybeValidKey = Partial<{ [key in MaybeValidKey<string>]: null }>"
+        "export type ValidMaybeValidKey = Partial<{ [key in MaybeValidKey<string>]: null }>;"
     );
 
     assert_ts!(
@@ -97,14 +97,27 @@ fn map_keys() {
     );
     assert_ts_export!(
         ValidMaybeValidKeyNested,
-        "export type ValidMaybeValidKeyNested = Partial<{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }>"
+        "export type ValidMaybeValidKeyNested = Partial<{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }>;"
     );
 
-    assert_ts!(error; HashMap<() /* `null` */, ()>, Error::InvalidMapKey);
-    assert_ts!(error; HashMap<RegularStruct, ()>, Error::InvalidMapKey);
-    assert_ts!(error; HashMap<Variants, ()>, Error::InvalidMapKey);
-    assert_ts!(error; InvalidMaybeValidKey, Error::InvalidMapKey);
-    assert_ts_export!(error; InvalidMaybeValidKey, Error::InvalidMapKey);
-    assert_ts!(error; InvalidMaybeValidKeyNested, Error::InvalidMapKey); // TODO: detected a recursive inline
-    assert_ts_export!(error; InvalidMaybeValidKeyNested, Error::InvalidMapKey); // TODO: detected a recursive inline
+    assert_eq!(
+        check::<HashMap<() /* `null` */, ()>>(),
+        Err(Error::InvalidMapKey)
+    );
+    assert_eq!(
+        check::<HashMap<RegularStruct, ()>>(),
+        Err(Error::InvalidMapKey)
+    );
+    assert_eq!(check::<HashMap<Variants, ()>>(), Err(Error::InvalidMapKey));
+    assert_eq!(check::<InvalidMaybeValidKey>(), Err(Error::InvalidMapKey));
+    assert_eq!(
+        check::<InvalidMaybeValidKeyNested>(),
+        Err(Error::InvalidMapKey)
+    ); // TODO: detected a recursive inline
+}
+
+fn check<T: Type>() -> Result<(), Error> {
+    let mut types = TypeCollection::default();
+    let dt = T::definition(&mut types);
+    specta_serde::validate_dt(&dt, &types)
 }

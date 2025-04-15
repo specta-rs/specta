@@ -6,7 +6,7 @@
 )]
 
 // use specta::{
-//     datatype::{DataType, PrimitiveType},
+//     datatype::{DataType, Primitive},
 //     Generics, Type, TypeCollection,
 // };
 
@@ -21,21 +21,21 @@
 // fn datatype(t: &DataType) -> Result<String, String> {
 //     Ok(match t {
 //         DataType::Primitive(p) => match p {
-//             PrimitiveType::String | PrimitiveType::char => "String",
-//             PrimitiveType::i8 => "Int8",
-//             PrimitiveType::u8 => "UInt8",
-//             PrimitiveType::i16 => "Int16",
-//             PrimitiveType::u16 => "UInt16",
-//             PrimitiveType::usize => "UInt",
-//             PrimitiveType::isize => "Int",
-//             PrimitiveType::i32 => "Int32",
-//             PrimitiveType::u32 => "UInt32",
-//             PrimitiveType::i64 => "Int64",
-//             PrimitiveType::u64 => "UInt64",
-//             PrimitiveType::bool => "Bool",
-//             PrimitiveType::f32 => "Float",
-//             PrimitiveType::f64 => "Double",
-//             PrimitiveType::i128 | PrimitiveType::u128 => {
+//             Primitive::String | Primitive::char => "String",
+//             Primitive::i8 => "Int8",
+//             Primitive::u8 => "UInt8",
+//             Primitive::i16 => "Int16",
+//             Primitive::u16 => "UInt16",
+//             Primitive::usize => "UInt",
+//             Primitive::isize => "Int",
+//             Primitive::i32 => "Int32",
+//             Primitive::u32 => "UInt32",
+//             Primitive::i64 => "Int64",
+//             Primitive::u64 => "UInt64",
+//             Primitive::bool => "Bool",
+//             Primitive::f32 => "Float",
+//             Primitive::f64 => "Double",
+//             Primitive::i128 | Primitive::u128 => {
 //                 return Err("Swift does not support 128 numbers!".to_owned());
 //             }
 //         }

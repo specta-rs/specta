@@ -30,7 +30,7 @@ pub(crate) use specta_fn::SpectaFn;
 ///
 ///     assert_eq!(typ.name(), "some_function");
 ///     assert_eq!(typ.args().count(), 2);
-///     assert_eq!(typ.result(), Some(&FunctionResultVariant::Value(DataType::Primitive(PrimitiveType::bool))));
+///     assert_eq!(typ.result(), Some(&FunctionReturnType::Value(DataType::Primitive(Primitive::bool))));
 /// }
 /// ```
 ///

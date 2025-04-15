@@ -67,8 +67,7 @@ impl Field {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UnnamedFields {
-    #[doc(hidden)] // TODO: Back to private
-    pub fields: Vec<Field>,
+    pub(crate) fields: Vec<Field>,
 }
 
 impl UnnamedFields {
@@ -78,7 +77,7 @@ impl UnnamedFields {
     }
 }
 
-/// The fields for a [StructType] or the anonymous struct declaration in an [EnumVariant].
+/// The fields for a [Struct] or the anonymous struct declaration in an [EnumVariant].
 ///
 /// Eg.
 /// ```rust

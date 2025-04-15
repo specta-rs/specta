@@ -122,18 +122,18 @@ pub enum MInner {
 
 #[test]
 fn internally_tagged() {
-    assert_ts!(error; A, Error::InvalidInternallyTaggedEnum);
-    assert_ts!(error; B, Error::InvalidInternallyTaggedEnum);
-    assert_ts!(error; C, Error::InvalidInternallyTaggedEnum);
+    assert_ts!(error; A, "Detect invalid Serde type: #[specta(tag = \"...\")] cannot be used with tuple variants\n");
+    assert_ts!(error; B, "Detect invalid Serde type: #[specta(tag = \"...\")] cannot be used with tuple variants\n");
+    assert_ts!(error; C, "Detect invalid Serde type: #[specta(tag = \"...\")] cannot be used with tuple variants\n");
     assert_ts!(
         D,
         "({ type: \"A\" } & Partial<{ [key in string]: string }>)"
     );
     assert_ts!(E, "({ type: \"A\" })");
     assert_ts!(F, "({ type: \"A\" } & FInner)");
-    assert_ts!(error; G, Error::InvalidInternallyTaggedEnum);
+    assert_ts!(error; G, "Detect invalid Serde type: #[specta(tag = \"...\")] cannot be used with tuple variants\n");
     assert_ts!(H, "({ type: \"A\" })");
-    assert_ts!(error; I, Error::InvalidInternallyTaggedEnum);
+    assert_ts!(error; I, "Detect invalid Serde type: #[specta(tag = \"...\")] cannot be used with tuple variants\n");
     assert_ts!(L, "({ type: \"A\" } & ({ type: \"A\" } | { type: \"B\" }))");
     assert_ts!(M, "({ type: \"A\" })");
 }

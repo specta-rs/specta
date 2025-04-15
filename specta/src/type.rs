@@ -11,7 +11,8 @@ mod legacy_impls;
 ///
 /// This should be only implemented via the [`Type`](derive@crate::Type) macro. - TODO: Discuss how to avoid custom impls.
 pub trait Type {
-    /// TODO
+    /// returns a [`DataType`](crate::datatype::DataType) that represents the type.
+    /// This will also register any dependent types into the [`TypeCollection`].
     fn definition(types: &mut TypeCollection) -> DataType;
 }
 

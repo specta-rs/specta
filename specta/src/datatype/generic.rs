@@ -15,35 +15,35 @@ use super::DataType;
 ///
 /// A `GenericType` holds the identifier of the generic. Eg. Given a generic type `struct A<T>(T);` the generics will be represented as `vec![GenericType("A".into())]`
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
-pub struct GenericType(pub(crate) Cow<'static, str>);
+pub struct Generic(pub(crate) Cow<'static, str>);
 
-impl Display for GenericType {
+impl Display for Generic {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.0)
     }
 }
 
 // TODO: Deref instead?
-impl Borrow<str> for GenericType {
+impl Borrow<str> for Generic {
     fn borrow(&self) -> &str {
         &self.0
     }
 }
 
-impl From<Cow<'static, str>> for GenericType {
+impl From<Cow<'static, str>> for Generic {
     fn from(value: Cow<'static, str>) -> Self {
         Self(value)
     }
 }
 
-impl From<GenericType> for DataType {
-    fn from(t: GenericType) -> Self {
+impl From<Generic> for DataType {
+    fn from(t: Generic) -> Self {
         Self::Generic(t)
     }
 }
 
 /// A generic placeholder.
-pub trait GenericPlaceholder {
+pub trait ConstGenericPlaceholder {
     const PLACEHOLDER: &'static str;
 }
 
@@ -59,40 +59,40 @@ pub trait GenericPlaceholder {
 /// TODO: Show detailed transformation.
 ///
 // TODO: We should replace the `Generic `trait with `const P: &'static str` if we do a Specta v3.
-pub struct Generic<T: GenericPlaceholder>(PhantomData<T>);
+pub struct GenericPlaceholder<T: ConstGenericPlaceholder>(PhantomData<T>);
 
-impl<T: GenericPlaceholder> fmt::Debug for Generic<T> {
+impl<T: ConstGenericPlaceholder> fmt::Debug for GenericPlaceholder<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(T::PLACEHOLDER)
     }
 }
 
-impl<T: GenericPlaceholder> Default for Generic<T> {
+impl<T: ConstGenericPlaceholder> Default for GenericPlaceholder<T> {
     fn default() -> Self {
         panic!("Can't construct a generic type without a placeholder");
     }
 }
 
-impl<T: GenericPlaceholder> Clone for Generic<T> {
+impl<T: ConstGenericPlaceholder> Clone for GenericPlaceholder<T> {
     fn clone(&self) -> Self {
         unreachable!();
     }
 }
 
-impl<T: GenericPlaceholder> PartialEq for Generic<T> {
+impl<T: ConstGenericPlaceholder> PartialEq for GenericPlaceholder<T> {
     fn eq(&self, _: &Self) -> bool {
         unreachable!();
     }
 }
 
-impl<T: GenericPlaceholder> std::hash::Hash for Generic<T> {
+impl<T: ConstGenericPlaceholder> std::hash::Hash for GenericPlaceholder<T> {
     fn hash<H: std::hash::Hasher>(&self, _: &mut H) {
         unreachable!();
     }
 }
 
-impl<T: GenericPlaceholder> Type for Generic<T> {
+impl<T: ConstGenericPlaceholder> Type for GenericPlaceholder<T> {
     fn definition(_: &mut crate::TypeCollection) -> DataType {
-        DataType::Generic(GenericType(Cow::Borrowed(T::PLACEHOLDER)))
+        DataType::Generic(Generic(Cow::Borrowed(T::PLACEHOLDER)))
     }
 }

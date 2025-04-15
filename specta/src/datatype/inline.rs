@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::TypeCollection;
 
-use super::{DataType, Field, Fields, GenericType, NamedDataType};
+use super::{DataType, Field, Fields, Generic, NamedDataType};
 
 #[doc(hidden)] // TODO: Move this into Specta Typescript
 pub fn inline_and_flatten_ndt(dt: NamedDataType, types: &TypeCollection) -> NamedDataType {
@@ -28,7 +28,7 @@ fn field(
     f: Field,
     types: &TypeCollection,
     truely_force_inline: bool,
-    generics: &HashMap<GenericType, DataType>,
+    generics: &HashMap<Generic, DataType>,
     depth: usize,
 ) -> Field {
     // TODO: truely_force_inline
@@ -58,7 +58,7 @@ fn fields(
     f: Fields,
     types: &TypeCollection,
     truely_force_inline: bool,
-    generics: &HashMap<GenericType, DataType>,
+    generics: &HashMap<Generic, DataType>,
     depth: usize,
 ) -> Fields {
     match f {
@@ -86,7 +86,7 @@ fn inner(
     types: &TypeCollection,
     force_inline: bool,
     truely_force_inline: bool,
-    generics: &HashMap<GenericType, DataType>,
+    generics: &HashMap<Generic, DataType>,
     depth: usize,
 ) -> DataType {
     // TODO: Can we be smart enough to determine loops, instead of just trying X times and bailing out????
@@ -98,36 +98,36 @@ fn inner(
     }
 
     match dt {
-        DataType::List(l) => DataType::List(super::List {
-            ty: Box::new(inner(
-                *l.ty,
+        DataType::List(l) => DataType::List(super::List::new(
+            inner(
+                l.ty().clone(),
                 types,
                 false, // truely_force_inline,
                 truely_force_inline,
                 generics,
                 depth + 1,
-            )),
-            length: l.length,
-            unique: l.unique,
-        }),
-        DataType::Map(map) => DataType::Map(super::Map {
-            key_ty: Box::new(inner(
-                *map.key_ty,
+            ),
+            l.length(),
+            l.unique(),
+        )),
+        DataType::Map(map) => DataType::Map(super::Map::new(
+            inner(
+                map.key_ty().clone(),
                 types,
                 false, // truely_force_inline,
                 truely_force_inline,
                 generics,
                 depth + 1,
-            )),
-            value_ty: Box::new(inner(
-                *map.value_ty,
+            ),
+            inner(
+                map.value_ty().clone(),
                 types,
                 false, // truely_force_inline,
                 truely_force_inline,
                 generics,
                 depth + 1,
-            )),
-        }),
+            ),
+        )),
         DataType::Nullable(d) => DataType::Nullable(Box::new(inner(
             *d,
             types,
@@ -136,11 +136,11 @@ fn inner(
             generics,
             depth + 1,
         ))),
-        DataType::Struct(s) => DataType::Struct(super::StructType {
+        DataType::Struct(s) => DataType::Struct(super::Struct {
             fields: fields(s.fields, types, truely_force_inline, &generics, depth),
             ..s
         }),
-        DataType::Enum(e) => DataType::Enum(super::EnumType {
+        DataType::Enum(e) => DataType::Enum(super::Enum {
             variants: e
                 .variants
                 .into_iter()
@@ -156,7 +156,7 @@ fn inner(
                 .collect(),
             ..e
         }),
-        DataType::Tuple(t) => DataType::Tuple(super::TupleType {
+        DataType::Tuple(t) => DataType::Tuple(super::Tuple {
             elements: t
                 .elements
                 .into_iter()
@@ -181,20 +181,23 @@ fn inner(
         }
         DataType::Reference(r) => {
             if r.inline() || force_inline || truely_force_inline {
-                let ty = types.get(r.sid()).expect("dun goof");
+                // TODO: Should we error here? Might get hit for `specta_typescript::Any`
+                if let Some(ty) = types.get(r.sid()) {
+                    return inner(
+                        ty.inner.clone(),
+                        types,
+                        false,
+                        truely_force_inline,
+                        &r.generics
+                            .clone()
+                            .into_iter()
+                            .map(|(g, dt)| (g, resolve_generics(dt, generics)))
+                            .collect(),
+                        depth + 1,
+                    );
+                }
 
-                inner(
-                    ty.inner.clone(),
-                    types,
-                    false,
-                    truely_force_inline,
-                    &r.generics
-                        .clone()
-                        .into_iter()
-                        .map(|(g, dt)| (g, resolve_generics(dt, generics)))
-                        .collect(),
-                    depth + 1,
-                )
+                DataType::Reference(r)
             } else {
                 DataType::Reference(r)
             }
@@ -204,17 +207,18 @@ fn inner(
 }
 
 /// Following all `DataType::Reference`'s filling in any `DataType::Generic`'s with the correct value.
-fn resolve_generics(dt: DataType, generics: &HashMap<GenericType, DataType>) -> DataType {
+fn resolve_generics(dt: DataType, generics: &HashMap<Generic, DataType>) -> DataType {
     // TODO: This could so only re-alloc if the type has a generics that needs replacing.
     match dt {
-        DataType::List(l) => DataType::List(super::List {
-            ty: Box::new(resolve_generics(*l.ty, generics)),
-            ..l
-        }),
-        DataType::Map(m) => DataType::Map(super::Map {
-            key_ty: Box::new(resolve_generics(*m.key_ty, generics)),
-            value_ty: Box::new(resolve_generics(*m.value_ty, generics)),
-        }),
+        DataType::List(l) => DataType::List(super::List::new(
+            resolve_generics(l.ty().clone(), generics),
+            l.length(),
+            l.unique(),
+        )),
+        DataType::Map(m) => DataType::Map(super::Map::new(
+            resolve_generics(m.key_ty().clone(), generics),
+            resolve_generics(m.value_ty().clone(), generics),
+        )),
         DataType::Nullable(d) => DataType::Nullable(Box::new(resolve_generics(*d, generics))),
         // DataType::Struct(s) => DataType::Struct(super::StructType {
         //     generics: todo!(),
@@ -222,14 +226,14 @@ fn resolve_generics(dt: DataType, generics: &HashMap<GenericType, DataType>) -> 
         //     ..s,
         // })
         // DataType::Enum(e) => todo!(),
-        DataType::Tuple(t) => DataType::Tuple(super::TupleType {
+        DataType::Tuple(t) => DataType::Tuple(super::Tuple {
             elements: t
                 .elements
                 .into_iter()
                 .map(|dt| resolve_generics(dt, generics))
                 .collect(),
         }),
-        DataType::Reference(r) => DataType::Reference(super::reference::Reference {
+        DataType::Reference(r) => DataType::Reference(super::Reference {
             generics: r
                 .generics
                 .into_iter()

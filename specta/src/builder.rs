@@ -6,34 +6,13 @@ use std::{borrow::Cow, fmt::Debug};
 
 use crate::{
     datatype::{
-        DeprecatedType, EnumRepr, EnumType, EnumVariant, Field, Fields, List, NamedDataType,
-        NamedFields, StructType, UnnamedFields,
+        DeprecatedType, Enum, EnumRepr, EnumVariant, Field, Fields, Generic, NamedDataType,
+        NamedFields, Struct, UnnamedFields,
     },
-    DataType,
+    DataType, ImplLocation, SpectaID,
 };
 
 // TDO: `Debug` and `Clone` on everything
-
-impl List {
-    #[doc(hidden)] // TODO: Expose
-    pub fn new(ty: DataType) -> Self {
-        Self {
-            ty: Box::new(ty),
-            length: None,
-            unique: false,
-        }
-    }
-
-    #[doc(hidden)] // TODO: Expose
-                   // TODO: Should `len` be a `Range` with an upper and lower bound?
-    pub fn new_with_len(ty: DataType, len: usize) -> Self {
-        Self {
-            ty: Box::new(ty),
-            length: Some(len),
-            unique: false,
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct StructBuilder<F = ()> {
@@ -50,10 +29,9 @@ impl StructBuilder<()> {
     }
 
     pub fn build(self) -> DataType {
-        DataType::Struct(StructType {
+        DataType::Struct(Struct {
             name: self.name,
             sid: None,
-            generics: vec![],
             fields: Fields::Unit,
         })
     }
@@ -81,10 +59,9 @@ impl StructBuilder<NamedFields> {
     }
 
     pub fn build(self) -> DataType {
-        DataType::Struct(StructType {
+        DataType::Struct(Struct {
             name: self.name,
             sid: None,
-            generics: vec![],
             fields: Fields::Named(self.fields),
         })
     }
@@ -110,10 +87,9 @@ impl StructBuilder<UnnamedFields> {
     }
 
     pub fn build(self) -> DataType {
-        DataType::Struct(StructType {
+        DataType::Struct(Struct {
             name: self.name,
             sid: None,
-            generics: vec![],
             fields: Fields::Unnamed(self.fields),
         })
     }
@@ -225,12 +201,11 @@ impl EnumBuilder {
     }
 
     pub fn build(self) -> DataType {
-        DataType::Enum(EnumType {
+        DataType::Enum(Enum {
             name: self.name,
             sid: None,
             skip_bigint_checks: false,
             repr: self.repr,
-            generics: Default::default(),
             variants: self.variants,
         })
     }
@@ -397,12 +372,20 @@ pub struct NamedDataTypeBuilder(NamedDataType);
 
 impl NamedDataTypeBuilder {
     // TODO: Taking `name` is super wierd with enums/structs which *also* have a name on the `Builder::new` method
-    pub fn new(name: impl Into<Cow<'static, str>>, dt: DataType) -> Self {
+    pub fn new(
+        name: impl Into<Cow<'static, str>>,
+        sid: SpectaID,
+        impl_location: ImplLocation,
+        generics: Vec<Generic>,
+        dt: DataType,
+    ) -> Self {
         Self(NamedDataType {
             name: name.into(),
             docs: "".into(),
             deprecated: None,
-            ext: None,
+            sid,
+            impl_location,
+            generics,
             inner: dt,
         })
     }
