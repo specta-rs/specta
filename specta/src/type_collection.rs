@@ -2,9 +2,13 @@ use std::{
     borrow::Borrow,
     collections::{btree_map, BTreeMap},
     fmt,
+    sync::atomic::AtomicU64,
 };
 
-use crate::{datatype::NamedDataType, NamedType, SpectaID};
+use crate::{
+    datatype::{NamedDataType, Reference},
+    DataType, NamedType, SpectaID,
+};
 
 /// Define a set of types which can be exported together.
 ///
@@ -14,8 +18,8 @@ use crate::{datatype::NamedDataType, NamedType, SpectaID};
 pub struct TypeCollection {
     // `None` indicates that the entry is a placeholder. It was reference and we are currently working out it's definition.
     pub(crate) map: BTreeMap<SpectaID, Option<NamedDataType>>,
-    // A stack of types that are currently being flattened. This is used to detect cycles.
-    pub(crate) flatten_stack: Vec<SpectaID>,
+    // #[cfg(feature = "serde_json")]
+    // pub(crate) constants: BTreeMap<Cow<'static, str>, serde_json::Value>,
 }
 
 impl fmt::Debug for TypeCollection {
@@ -26,11 +30,94 @@ impl fmt::Debug for TypeCollection {
 
 impl TypeCollection {
     /// Register a type with the collection.
-    pub fn register<T: NamedType>(&mut self) -> &mut Self {
-        let def = T::definition_named_data_type(self);
-        self.map.insert(T::sid(), Some(def));
+    pub fn register<T: NamedType>(mut self) -> Self {
+        T::definition(&mut self);
         self
     }
+
+    /// Register a type with the collection.
+    pub fn register_mut<T: NamedType>(&mut self) -> &mut Self {
+        T::definition(self);
+        self
+    }
+
+    /// Declare a custom type with the collection.
+    #[doc(hidden)] // TODO: This isn't stable yet
+    pub fn declare(&mut self, mut ndt: NamedDataType) -> Reference {
+        // TODO: Proper id's
+        static ID: AtomicU64 = AtomicU64::new(0);
+        let sid = SpectaID {
+            type_name: "virtual",
+            hash: ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+        };
+
+        // TODO: Do this and do it on `NamedDataTypeBuilder`
+        // ndt.ext = Some(...);
+
+        match &mut ndt.inner {
+            // DataType::Nullable(data_type) => todo!(), // TODO: Recurse down?
+            // DataType::Reference(reference) => todo!(),
+            DataType::Struct(s) => {
+                s.sid = Some(sid);
+            }
+            DataType::Enum(e) => {
+                e.sid = Some(sid);
+            }
+            _ => {}
+        }
+
+        // TODO: If we wanna support generics via this API we will need a `ReferenceFactory`
+        let reference = Reference {
+            sid,
+            generics: Default::default(),
+            inline: false,
+        };
+
+        self.map.insert(sid, Some(ndt));
+
+        reference
+    }
+
+    // TODO: `declare_mut`???
+
+    // /// TODO
+    // pub fn reference(&mut self, sid: SpectaID) -> Reference {
+    //     // if self.map.get(&sid).is_none() {
+    //     //     self.map.entry(sid).or_insert(None);
+    //     //     let dt = T::definition_named_data_type(self);
+    //     //     self.map.insert(sid, Some(dt));
+    //     // }
+
+    //     Reference { sid }
+
+    // }
+
+    //
+    // #[doc(hidden)] // TODO: Make public
+    // pub fn todo(&mut self, sid: SpectaID, inner: DataType) -> &mut Self {
+    //     self.map.insert(sid, Some(NamedDataType {
+    //         name: sid.type_name.into(),
+    //         // TODO: How to configure this stuff?
+    //         docs: "".into(),
+    //         deprecated: None,
+    //         ext: None, // TODO: Some(crate::datatype::NamedDataTypeExt { sid: (), impl_location: () })
+    //         inner
+    //     }));
+    //     self
+    // }
+
+    // TODO: Implement in exporter and uncomment these
+    // #[cfg(feature = "serde_json")]
+    // pub fn constant<T: serde::Serialize>(self, name: impl Into<Cow<'static, str>>, value: T) -> Self {
+    //     self.constants.insert(name.into(), serde_json::to_value(value).unwrap()); // TODO: Error handling
+    //     self
+    // }
+
+    // #[cfg(feature = "serde_json")]
+    // pub fn constant_mut<T: serde::Serialize>(&mut self, name: impl Into<Cow<'static, str>>, value: T) -> &mut Self {
+    //     self.constants.insert(name.into(), serde_json::to_value(value).unwrap()); // TODO: Error handling
+    //     self
+    // }
 
     /// Insert a type into the collection.
     /// You should prefer to use `TypeCollection::register` as it ensures all invariants are met.
@@ -44,8 +131,23 @@ impl TypeCollection {
         self
     }
 
+    /// TODO
+    ///
+    #[doc(hidden)] // TODO: Should we stablise this? If we do we need to stop it causing panics
+    pub fn placeholder(&mut self, sid: SpectaID) -> &mut Self {
+        self.map.insert(sid, None);
+        self
+    }
+
     /// Join another type collection into this one.
-    pub fn extend(&mut self, collection: impl Borrow<Self>) -> &mut Self {
+    pub fn extend(mut self, collection: impl Borrow<Self>) -> Self {
+        self.map
+            .extend(collection.borrow().map.iter().map(|(k, v)| (*k, v.clone())));
+        self
+    }
+
+    /// Join another type collection into this one.
+    pub fn extend_mut(&mut self, collection: impl Borrow<Self>) -> &mut Self {
         self.map
             .extend(collection.borrow().map.iter().map(|(k, v)| (*k, v.clone())));
         self
@@ -64,12 +166,17 @@ impl TypeCollection {
             // If this method is used during type construction this case could be hit when it's actually valid
             // but all references are managed within `specta` so we can bypass this method and use `map` directly because we have `pub(crate)` access.
             None => {
-                #[cfg(debug_assertions)]
-                unreachable!("specta: `TypeCollection::get` found a type placeholder!");
-                #[cfg(not(debug_assertions))]
+                // TODO: Probs bring this back???
+                // #[cfg(debug_assertions)]
+                // unreachable!("specta: `TypeCollection::get` found a type placeholder!");
+                // #[cfg(not(debug_assertions))]
                 None
             }
         })
+    }
+
+    pub fn len(&self) -> usize {
+        self.map.len()
     }
 }
 
@@ -100,6 +207,7 @@ impl<'a> Iterator for TypeCollectionInterator<'a> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, Some(self.0.clone().filter(|(_, t)| t.is_none()).count()))
+        let len = self.0.clone().filter(|(_, t)| t.is_some()).count();
+        (len, Some(len))
     }
 }

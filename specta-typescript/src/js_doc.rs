@@ -1,135 +1,72 @@
-use std::borrow::Borrow;
+use std::{borrow::Cow, ops::Deref, path::Path};
 
-use specta::{
-    datatype::{DeprecatedType, GenericType},
-    TypeCollection,
-};
-use typescript::CommentFormatterArgs;
+use specta::TypeCollection;
 
-use super::*;
+use crate::{BigIntExportBehavior, Error, Typescript};
 
-pub fn typedef_named_datatype(
-    cfg: &Typescript,
-    typ: &NamedDataType,
-    type_map: &TypeCollection,
-) -> Output {
-    typedef_named_datatype_inner(
-        &ExportContext {
-            cfg,
-            path: vec![],
-            // TODO: Should JS doc support per field or variant comments???
-            is_export: false,
-        },
-        typ,
-        type_map,
-    )
-}
+/// JSDoc language exporter.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct JSDoc(pub Typescript);
 
-fn typedef_named_datatype_inner(
-    ctx: &ExportContext,
-    typ: &NamedDataType,
-    type_map: &TypeCollection,
-) -> Output {
-    let name = typ.name();
-    let docs = typ.docs();
-    let deprecated = typ.deprecated();
-    let item = &typ.inner;
-
-    let ctx = ctx.with(PathItem::Type(name.clone()));
-
-    let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
-
-    let mut inline_ts = String::new();
-    datatype_inner(
-        ctx.clone(),
-        &FunctionResultVariant::Value(typ.inner.clone()),
-        type_map,
-        &mut inline_ts,
-    )?;
-
-    let mut builder = super::comments::js_doc_builder(CommentFormatterArgs { docs, deprecated });
-
-    item.generics()
-        .into_iter()
-        .flatten()
-        .for_each(|generic| builder.push_generic(generic));
-
-    builder.push_internal(["@typedef { ", &inline_ts, " } ", &name]);
-
-    Ok(builder.build())
-}
-
-const START: &str = "/**\n";
-
-pub struct Builder {
-    value: String,
-}
-
-impl Builder {
-    pub fn push(&mut self, line: &str) {
-        self.push_internal([line.trim()]);
-    }
-
-    pub(crate) fn push_internal<'a>(&mut self, parts: impl IntoIterator<Item = &'a str>) {
-        self.value.push_str(" * ");
-
-        for part in parts.into_iter() {
-            self.value.push_str(part);
-        }
-
-        self.value.push('\n');
-    }
-
-    pub fn push_deprecated(&mut self, typ: &DeprecatedType) {
-        self.push_internal(
-            ["@deprecated"].into_iter().chain(
-                match typ {
-                    DeprecatedType::DeprecatedWithSince {
-                        note: message,
-                        since,
-                    } => Some((since.as_ref(), message)),
-                    _ => None,
-                }
-                .map(|(since, message)| {
-                    [" ", message.trim()].into_iter().chain(
-                        since
-                            .map(|since| [" since ", since.trim()])
-                            .into_iter()
-                            .flatten(),
-                    )
-                })
-                .into_iter()
-                .flatten(),
-            ),
-        );
-    }
-
-    pub fn push_generic(&mut self, generic: &GenericType) {
-        self.push_internal(["@template ", generic.borrow()])
-    }
-
-    pub fn build(mut self) -> String {
-        if self.value == START {
-            return String::new();
-        }
-
-        self.value.push_str(" */\n");
-        self.value
-    }
-}
-
-impl Default for Builder {
+impl Default for JSDoc {
     fn default() -> Self {
-        Self {
-            value: START.to_string(),
-        }
+        Typescript::default().into()
     }
 }
 
-impl<T: AsRef<str>> Extend<T> for Builder {
-    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
-        for item in iter {
-            self.push(item.as_ref());
-        }
+impl From<Typescript> for JSDoc {
+    fn from(mut ts: Typescript) -> Self {
+        ts.jsdoc = true;
+        Self(ts)
+    }
+}
+
+impl JSDoc {
+    /// Construct a new JSDoc exporter with the default options configured.
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Override the header for the exported file.
+    /// You should prefer `Self::header` instead unless your a framework.
+    #[doc(hidden)] // Although this is hidden it's still public API.
+    pub fn framework_header(self, header: impl Into<Cow<'static, str>>) -> Self {
+        Self(self.0.framework_header(header))
+    }
+
+    /// Configure a header for the file.
+    ///
+    /// This is perfect for configuring lint ignore rules or other file-level comments.
+    pub fn header(self, header: impl Into<Cow<'static, str>>) -> Self {
+        Self(self.0.header(header))
+    }
+
+    /// Configure the BigInt handling behaviour
+    pub fn bigint(self, bigint: BigIntExportBehavior) -> Self {
+        Self(self.0.bigint(bigint))
+    }
+
+    /// TODO: Explain
+    pub fn with_serde(self) -> Self {
+        Self(self.0.with_serde())
+    }
+
+    /// TODO
+    pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
+        self.0.export(types)
+    }
+
+    /// TODO
+    pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
+        self.0.export_to(path, types)
+    }
+}
+
+impl Deref for JSDoc {
+    type Target = Typescript;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

@@ -1,4 +1,4 @@
-use crate::{datatype::reference::Reference, datatype::*, r#type::macros::*, *};
+use crate::{datatype::*, r#type::macros::*, *};
 
 use std::borrow::Cow;
 
@@ -115,65 +115,20 @@ impl<'a, T: Type> Type for &'a [T] {
 }
 
 impl<const N: usize, T: Type> Type for [T; N] {
-    fn inline(type_map: &mut TypeCollection, generics: Generics) -> DataType {
-        DataType::List(List {
-            ty: Box::new(
-                // TODO: This is cursed. Fix it properly!!!
-                match Vec::<T>::inline(type_map, generics) {
-                    DataType::List(List { ty, .. }) => *ty,
-                    _ => unreachable!(),
-                },
-            ),
-            length: Some(N),
-            unique: false,
-        })
-    }
-
-    fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
-        Reference {
-            inner: DataType::List(List {
-                ty: Box::new(
-                    // TODO: This is cursed. Fix it properly!!!
-                    match Vec::<T>::reference(type_map, generics).inner {
-                        DataType::List(List { ty, .. }) => *ty,
-                        _ => unreachable!(),
-                    },
-                ),
-                length: Some(N),
-                unique: false,
-            }),
-        }
+    fn definition(types: &mut TypeCollection) -> DataType {
+        DataType::List(List::new(T::definition(types), Some(N), false))
     }
 }
 
 impl<T: Type> Type for Option<T> {
-    fn inline(type_map: &mut TypeCollection, generics: Generics) -> DataType {
-        let mut ty = None;
-        if let Generics::Provided(generics) = &generics {
-            ty = generics.get(0).cloned()
-        }
-
-        DataType::Nullable(Box::new(match ty {
-            Some(ty) => ty,
-            None => T::inline(type_map, generics),
-        }))
-    }
-
-    fn reference(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
-        Reference {
-            inner: DataType::Nullable(Box::new(
-                generics
-                    .get(0)
-                    .cloned()
-                    .unwrap_or_else(|| T::reference(type_map, generics).inner),
-            )),
-        }
+    fn definition(types: &mut TypeCollection) -> DataType {
+        DataType::Nullable(Box::new(T::definition(types)))
     }
 }
 
 impl<T> Type for std::marker::PhantomData<T> {
-    fn inline(_: &mut TypeCollection, _: Generics) -> DataType {
-        DataType::Literal(LiteralType::None)
+    fn definition(_: &mut TypeCollection) -> DataType {
+        DataType::Literal(Literal::None)
     }
 }
 
@@ -183,65 +138,25 @@ const _: () = {
         internal::construct::impl_location("specta/src/type/impls.rs:234:10");
 
     impl Type for std::convert::Infallible {
-        fn inline(_: &mut TypeCollection, _: Generics) -> DataType {
+        fn definition(_: &mut TypeCollection) -> DataType {
             DataType::Enum(internal::construct::r#enum(
                 "Infallible".into(),
-                internal::construct::sid("Infallible", "::todo:4:10"),
+                internal::construct::sid("Infallible".into(), "::todo:4:10"),
                 EnumRepr::External,
                 false,
                 vec![],
-                vec![],
             ))
-        }
-        fn reference(type_map: &mut TypeCollection, _: &[DataType]) -> reference::Reference {
-            let generics = vec![];
-            reference::reference::<Self>(
-                type_map,
-                internal::construct::data_type_reference(
-                    "Infallible".into(),
-                    internal::construct::sid("Infallible", "::todo:4:10"),
-                    generics,
-                ),
-            )
-        }
-    }
-
-    impl NamedType for std::convert::Infallible {
-        fn sid() -> SpectaID {
-            internal::construct::sid("Infallible", "::todo:234:10")
-        }
-
-        fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
-            internal::construct::named_data_type(
-                "Infallible".into(),
-                "".into(),
-                None,
-                Self::sid(),
-                IMPL_LOCATION,
-                <Self as Type>::inline(type_map, Generics::Provided(generics)),
-            )
-        }
-        fn definition_named_data_type(type_map: &mut TypeCollection) -> NamedDataType {
-            internal::construct::named_data_type(
-                "Infallible".into(),
-                "".into(),
-                None,
-                Self::sid(),
-                IMPL_LOCATION,
-                <Self as Type>::inline(type_map, Generics::Definition),
-            )
         }
     }
 };
 
 impl<T: Type> Type for std::ops::Range<T> {
-    fn inline(type_map: &mut TypeCollection, _generics: Generics) -> DataType {
-        let ty = Some(T::inline(type_map, Generics::Definition));
-        DataType::Struct(StructType {
+    fn definition(types: &mut TypeCollection) -> DataType {
+        let ty = Some(T::definition(types));
+        DataType::Struct(Struct {
             name: "Range".into(),
             sid: None,
-            generics: vec![],
-            fields: StructFields::Named(NamedFields {
+            fields: Fields::Named(NamedFields {
                 fields: vec![
                     (
                         "start".into(),
@@ -250,6 +165,7 @@ impl<T: Type> Type for std::ops::Range<T> {
                             flatten: false,
                             deprecated: None,
                             docs: Cow::Borrowed(""),
+                            inline: false,
                             ty: ty.clone(),
                         },
                     ),
@@ -260,6 +176,7 @@ impl<T: Type> Type for std::ops::Range<T> {
                             flatten: false,
                             deprecated: None,
                             docs: Cow::Borrowed(""),
+                            inline: false,
                             ty,
                         },
                     ),
@@ -289,78 +206,27 @@ const _: () = {
         internal::construct::impl_location("specta/src/type/impls.rs:302:10");
 
     impl Type for std::time::SystemTime {
-        fn inline(type_map: &mut TypeCollection, _: Generics) -> DataType {
+        fn definition(types: &mut TypeCollection) -> DataType {
             DataType::Struct(internal::construct::r#struct(
                 "SystemTime".into(),
-                Some(internal::construct::sid("SystemTime", "::todo:3:10")),
-                vec![],
-                internal::construct::struct_named(
+                Some(internal::construct::sid("SystemTime".into(), "::todo:3:10")),
+                internal::construct::fields_named(
                     vec![
                         (
                             "duration_since_epoch".into(),
-                            internal::construct::field(
-                                false,
-                                false,
-                                None,
-                                "".into(),
-                                Some({
-                                    let ty = <i64 as Type>::reference(type_map, &[]).inner;
-                                    ty
-                                }),
-                            ),
+                            internal::construct::field::<i64>(false, None, "".into(), false, types),
                         ),
                         (
                             "duration_since_unix_epoch".into(),
-                            internal::construct::field(
-                                false,
-                                false,
-                                None,
-                                "".into(),
-                                Some({
-                                    let ty = <u32 as Type>::reference(type_map, &[]).inner;
-                                    ty
-                                }),
-                            ),
+                            internal::construct::field::<u32>(false, None, "".into(), false, types),
                         ),
                     ],
                     None,
                 ),
             ))
         }
-
-        fn reference(type_map: &mut TypeCollection, _: &[DataType]) -> reference::Reference {
-            reference::reference::<Self>(
-                type_map,
-                internal::construct::data_type_reference("SystemTime".into(), SID, vec![]),
-            )
-        }
     }
 
-    impl NamedType for std::time::SystemTime {
-        fn sid() -> SpectaID {
-            SID
-        }
-        fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
-            internal::construct::named_data_type(
-                "SystemTime".into(),
-                "".into(),
-                None,
-                Self::sid(),
-                IMPL_LOCATION,
-                <Self as Type>::inline(type_map, Generics::Provided(generics)),
-            )
-        }
-        fn definition_named_data_type(type_map: &mut TypeCollection) -> NamedDataType {
-            internal::construct::named_data_type(
-                "SystemTime".into(),
-                "".into(),
-                None,
-                Self::sid(),
-                IMPL_LOCATION,
-                <Self as Type>::inline(type_map, Generics::Definition),
-            )
-        }
-    }
     #[automatically_derived]
     impl Flatten for std::time::SystemTime {}
 };
@@ -371,75 +237,24 @@ const _: () = {
         internal::construct::impl_location("specta/src/type/impls.rs:401:10");
 
     impl Type for std::time::Duration {
-        fn inline(type_map: &mut TypeCollection, _: Generics) -> DataType {
+        fn definition(types: &mut TypeCollection) -> DataType {
             DataType::Struct(internal::construct::r#struct(
                 "Duration".into(),
                 Some(SID),
-                vec![],
-                internal::construct::struct_named(
+                internal::construct::fields_named(
                     vec![
                         (
                             "secs".into(),
-                            internal::construct::field(
-                                false,
-                                false,
-                                None,
-                                "".into(),
-                                Some({
-                                    let ty = <u64 as Type>::reference(type_map, &[]).inner;
-                                    ty
-                                }),
-                            ),
+                            internal::construct::field::<u64>(false, None, "".into(), false, types),
                         ),
                         (
                             "nanos".into(),
-                            internal::construct::field(
-                                false,
-                                false,
-                                None,
-                                "".into(),
-                                Some({
-                                    let ty = <u32 as Type>::reference(type_map, &[]).inner;
-                                    ty
-                                }),
-                            ),
+                            internal::construct::field::<u32>(false, None, "".into(), false, types),
                         ),
                     ],
                     None,
                 ),
             ))
-        }
-        fn reference(type_map: &mut TypeCollection, _: &[DataType]) -> reference::Reference {
-            reference::reference::<Self>(
-                type_map,
-                internal::construct::data_type_reference("Duration".into(), Self::sid(), vec![]),
-            )
-        }
-    }
-
-    impl NamedType for std::time::Duration {
-        fn sid() -> SpectaID {
-            SID
-        }
-        fn named_data_type(type_map: &mut TypeCollection, generics: &[DataType]) -> NamedDataType {
-            internal::construct::named_data_type(
-                "Duration".into(),
-                "".into(),
-                None,
-                Self::sid(),
-                IMPL_LOCATION,
-                <Self as Type>::inline(type_map, Generics::Provided(generics)),
-            )
-        }
-        fn definition_named_data_type(type_map: &mut TypeCollection) -> NamedDataType {
-            internal::construct::named_data_type(
-                "Duration".into(),
-                "".into(),
-                None,
-                Self::sid(),
-                IMPL_LOCATION,
-                <Self as Type>::inline(type_map, Generics::Definition),
-            )
         }
     }
 

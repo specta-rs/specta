@@ -13,10 +13,9 @@ harness = true
 [dependencies]
 specta = { path = "../specta", features = ["derive"] }
 specta-serde = { path = "../specta-serde" }
-specta-typescript = { path = "../specta-typescript", features = ["function"] }
+specta-typescript = { path = "../specta-typescript" }
 specta-util = { path = "../specta-util", features = ["serde"] }                # TODO: Remove `serde` feature
-specta-datatype-from = { path = "../specta-datatype-from" }
 
-serde = { version = "1.0.204", features = ["derive"] }
-trybuild = "1.0.97"
-wasm-bindgen = "0.2.92"
+serde = { version = "1.0.219", features = ["derive"] }
+trybuild = "1.0.104"
+wasm-bindgen = "0.2.100"

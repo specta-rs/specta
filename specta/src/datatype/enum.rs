@@ -2,16 +2,16 @@ use std::borrow::Cow;
 
 use crate::SpectaID;
 
-use super::{DataType, DeprecatedType, GenericType, NamedDataType, NamedFields, UnnamedFields};
+use super::{DataType, DeprecatedType, Fields};
 
 /// Enum type which dictates how the enum is represented.
 ///
 /// The tagging refers to the [Serde concept](https://serde.rs/enum-representations.html).
 ///
-/// [`Untagged`](EnumType::Untagged) is here rather than in [`EnumRepr`] as it is the only enum representation that does not have tags on its variants.
+/// [`Untagged`](Enum::Untagged) is here rather than in [`EnumRepr`] as it is the only enum representation that does not have tags on its variants.
 /// Separating it allows for better typesafety since `variants` doesn't have to be a [`Vec`] of tuples.
 #[derive(Debug, Clone, PartialEq)]
-pub struct EnumType {
+pub struct Enum {
     pub(crate) name: Cow<'static, str>,
     // Associating a SpectaID will allow exporter to lookup more detailed information about the type to provide better errors.
     pub(crate) sid: Option<SpectaID>,
@@ -19,27 +19,12 @@ pub struct EnumType {
     // I don't know if we should block bigints in these any types. Really I think we should but we need a good DX around overriding it on a per-type basis.
     pub(crate) skip_bigint_checks: bool,
     pub(crate) repr: EnumRepr,
-    pub(crate) generics: Vec<GenericType>,
     pub(crate) variants: Vec<(Cow<'static, str>, EnumVariant)>,
 }
 
-impl EnumType {
-    /// Convert a [`EnumType`] to an anonymous [`DataType`].
-    pub fn to_anonymous(self) -> DataType {
-        DataType::Enum(self)
-    }
-
-    /// Convert a [`EnumType`] to a named [`NamedDataType`].
-    ///
-    /// This can easily be converted to a [`DataType`] by putting it inside the [DataType::Named] variant.
-    pub fn to_named(self, name: impl Into<Cow<'static, str>>) -> NamedDataType {
-        NamedDataType {
-            name: name.into(),
-            docs: Cow::Borrowed(""),
-            deprecated: None,
-            ext: None,
-            inner: DataType::Enum(self),
-        }
+impl Enum {
+    pub fn sid(&self) -> Option<SpectaID> {
+        self.sid
     }
 
     pub fn name(&self) -> &Cow<'static, str> {
@@ -54,17 +39,13 @@ impl EnumType {
         &self.variants
     }
 
-    pub fn generics(&self) -> &Vec<GenericType> {
-        &self.generics
-    }
-
     pub fn skip_bigint_checks(&self) -> bool {
         self.skip_bigint_checks
     }
 }
 
-impl From<EnumType> for DataType {
-    fn from(t: EnumType) -> Self {
+impl From<Enum> for DataType {
+    fn from(t: Enum) -> Self {
         Self::Enum(t)
     }
 }
@@ -95,7 +76,7 @@ pub struct EnumVariant {
     /// Deprecated attribute for the field.
     pub(crate) deprecated: Option<DeprecatedType>,
     /// The type of the variant.
-    pub(crate) inner: EnumVariants,
+    pub(crate) fields: Fields,
 }
 
 impl EnumVariant {
@@ -111,21 +92,7 @@ impl EnumVariant {
         self.deprecated.as_ref()
     }
 
-    pub fn inner(&self) -> &EnumVariants {
-        &self.inner
+    pub fn fields(&self) -> &Fields {
+        &self.fields
     }
-}
-
-/// Type of an [`EnumType`] variant.
-#[derive(Debug, Clone, PartialEq)]
-pub enum EnumVariants {
-    /// A unit enum variant
-    /// Eg. `Variant`
-    Unit,
-    /// The enum variant contains named fields.
-    /// Eg. `Variant { a: u32 }`
-    Named(NamedFields),
-    /// The enum variant contains unnamed fields.
-    /// Eg. `Variant(u32, String)`
-    Unnamed(UnnamedFields),
 }

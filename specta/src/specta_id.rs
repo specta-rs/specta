@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cmp::Ordering};
+use std::{borrow::Cow, cmp::Ordering, panic::Location};
 
 /// The unique Specta ID for the type.
 ///
@@ -18,6 +18,49 @@ pub struct SpectaID {
 }
 
 impl SpectaID {
+    /// Construct a new unique identifier for a type.
+    ///
+    /// It's up to you to ensure the type produced is consitent for each identifier.
+    ///
+    #[doc(hidden)] // TODO: Should we stablise this?
+    #[track_caller]
+    pub const fn new(type_name: &'static str) -> Self {
+        let caller = Location::caller();
+        let mut hash = 0xcbf29ce484222325;
+        let prime = 0x00000100000001B3;
+
+        let mut bytes = type_name.as_bytes();
+        let mut i = 0;
+
+        while i < bytes.len() {
+            hash ^= bytes[i] as u64;
+            hash = hash.wrapping_mul(prime);
+            i += 1;
+        }
+
+        bytes = caller.file().as_bytes();
+        i = 0;
+        while i < bytes.len() {
+            hash ^= bytes[i] as u64;
+            hash = hash.wrapping_mul(prime);
+            i += 1;
+        }
+
+        hash ^= ':' as u64;
+        hash = hash.wrapping_mul(prime);
+
+        hash ^= caller.line() as u64;
+        hash = hash.wrapping_mul(prime);
+
+        hash ^= ':' as u64;
+        hash = hash.wrapping_mul(prime);
+
+        hash ^= caller.column() as u64;
+        hash = hash.wrapping_mul(prime);
+
+        SpectaID { type_name, hash }
+    }
+
     pub fn type_name(&self) -> Cow<'static, str> {
         Cow::Borrowed(self.type_name)
     }
@@ -55,6 +98,11 @@ impl PartialEq<Self> for SpectaID {
 pub struct ImplLocation(pub(crate) &'static str);
 
 impl ImplLocation {
+    #[doc(hidden)] // TODO: Remove this. Used by `minee`.
+    pub fn todo() -> Self {
+        Self("todo")
+    }
+
     /// Get the location as a string
     pub const fn as_str(&self) -> &'static str {
         self.0

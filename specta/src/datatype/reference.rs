@@ -1,43 +1,51 @@
 //! Helpers for generating [Type::reference] implementations.
 
-use crate::{Generics, NamedType, Type, TypeCollection};
+use std::collections::BTreeMap;
 
-use super::{DataType, DataTypeReference};
+use crate::SpectaID;
+
+use super::{DataType, Generic};
 
 /// A reference datatype.
 ///
-// This type exists to force the user to use [reference::inline] or [reference::reference] which provides some extra safety.
+/// TODO: Explain how to construct this.
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Reference {
-    pub inner: DataType,
+    pub(crate) sid: SpectaID,
+    pub(crate) generics: BTreeMap<Generic, DataType>,
+    pub(crate) inline: bool,
 }
 
-pub fn inline<T: Type + ?Sized>(type_map: &mut TypeCollection, generics: &[DataType]) -> Reference {
-    Reference {
-        inner: T::inline(type_map, Generics::Provided(generics)),
+impl Reference {
+    /// TODO: Explain invariant.
+    pub fn construct(
+        sid: SpectaID,
+        generics: impl Into<BTreeMap<Generic, DataType>>,
+        inline: bool,
+    ) -> Self {
+        Self {
+            sid,
+            generics: generics.into(),
+            inline,
+        }
+    }
+
+    pub fn sid(&self) -> SpectaID {
+        self.sid
+    }
+
+    pub fn generics(&self) -> &BTreeMap<Generic, DataType> {
+        &self.generics
+    }
+
+    pub fn inline(&self) -> bool {
+        self.inline
     }
 }
 
-pub fn reference<T: NamedType>(
-    type_map: &mut TypeCollection,
-    reference: DataTypeReference,
-) -> Reference {
-    let sid = T::sid();
-
-    if type_map.map.get(&sid).is_none() {
-        type_map.map.entry(sid).or_insert(None);
-        let dt = T::definition_named_data_type(type_map);
-        type_map.map.insert(sid, Some(dt));
+impl From<Reference> for DataType {
+    fn from(r: Reference) -> Self {
+        Self::Reference(r)
     }
-
-    Reference {
-        inner: DataType::Reference(reference),
-    }
-}
-
-/// Construct a reference from a custom [DataType].
-///
-/// This function is advanced and should only be used if you know what you're doing.
-pub fn custom(inner: DataType) -> Reference {
-    Reference { inner }
 }

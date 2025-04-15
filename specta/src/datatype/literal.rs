@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use super::DataType;
 
 /// Type of a literal value for things like const generics.
@@ -9,7 +11,7 @@ use super::DataType;
 #[derive(Debug, Clone, PartialEq)]
 #[allow(non_camel_case_types)]
 #[non_exhaustive] // TODO: Yes or no???
-pub enum LiteralType {
+pub enum Literal {
     i8(i8),
     i16(i16),
     i32(i32),
@@ -19,14 +21,39 @@ pub enum LiteralType {
     f32(f32),
     f64(f64),
     bool(bool),
-    String(String),
+    String(Cow<'static, str>),
     char(char),
     /// Standalone `null` without a known type
     None,
 }
 
-impl From<LiteralType> for DataType {
-    fn from(t: LiteralType) -> Self {
+impl From<Literal> for DataType {
+    fn from(t: Literal) -> Self {
         Self::Literal(t)
+    }
+}
+
+// TODO: Do all of this
+// macro_rules! impl_literal_conversion {
+//     () => {
+
+//     };
+// }
+
+impl From<i8> for Literal {
+    fn from(t: i8) -> Self {
+        Self::i8(t)
+    }
+}
+
+impl From<bool> for Literal {
+    fn from(t: bool) -> Self {
+        Self::bool(t)
+    }
+}
+
+impl From<String> for Literal {
+    fn from(t: String) -> Self {
+        Self::String(Cow::Owned(t))
     }
 }
