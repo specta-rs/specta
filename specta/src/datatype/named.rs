@@ -7,10 +7,10 @@ use super::{DataType, Generic};
 /// A named type represents a non-primitive type capable of being exported as it's own named entity.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NamedDataType {
+    pub(crate) sid: SpectaID,
     pub(crate) name: Cow<'static, str>,
     pub(crate) docs: Cow<'static, str>,
     pub(crate) deprecated: Option<DeprecatedType>,
-    pub(crate) sid: SpectaID,
     pub(crate) module_path: Cow<'static, str>,
     pub(crate) location: Location<'static>,
     pub(crate) generics: Vec<Generic>,
@@ -18,6 +18,11 @@ pub struct NamedDataType {
 }
 
 impl NamedDataType {
+    /// The Specta unique identifier for the type
+    pub fn sid(&self) -> SpectaID {
+        self.sid
+    }
+
     /// The name of the type
     pub fn name(&self) -> &Cow<'static, str> {
         &self.name
@@ -33,13 +38,8 @@ impl NamedDataType {
         self.deprecated.as_ref()
     }
 
-    /// The Specta ID for the type. The value for this should come from the `sid!();` macro.
-    pub fn sid(&self) -> &SpectaID {
-        &self.sid
-    }
-
     /// The code location where this type is implemented
-    pub fn location(&self) -> Location {
+    pub fn location(&self) -> Location<'static> {
         self.location
     }
 

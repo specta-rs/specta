@@ -23,21 +23,6 @@ fn type_collection_export() {
 }
 
 #[test]
-fn type_collection_merge() {
-    let types = TypeCollection::default()
-        .register::<D>()
-        .extend(TypeCollection::default().register::<A>())
-        .extend(TypeCollection::default().register::<C>());
-    assert_eq!(types.len(), 4);
-
-    // Check it compile with any valid arg
-    TypeCollection::default()
-        .extend(&TypeCollection::default())
-        .extend(&mut TypeCollection::default())
-        .extend(TypeCollection::default());
-}
-
-#[test]
 fn type_collection_duplicate_register_ty() {
     let types = TypeCollection::default().register::<C>().register::<C>();
 

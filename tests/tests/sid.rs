@@ -36,8 +36,8 @@ fn test_sid() {
     // `TypeCollection` is a `BTreeMap` so it's sorted by SID. It should be sorted alphabetically by name
     assert_eq!(
         types
-            .into_iter()
-            .map(|(_, t)| t.name().clone())
+            .into_sorted_iter()
+            .map(|t| t.name().clone())
             .collect::<Vec<_>>(),
         ["A", "B", "BagOfTypes", "C", "Z"]
     );

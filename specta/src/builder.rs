@@ -12,7 +12,7 @@ use crate::{
     DataType, SpectaID,
 };
 
-// TDO: `Debug` and `Clone` on everything
+// TODO: `Debug` and `Clone` on everything
 
 #[derive(Debug, Clone)]
 pub struct StructBuilder<F = ()> {
@@ -368,52 +368,45 @@ impl Into<EnumVariant> for VariantBuilder<UnnamedFields> {
     }
 }
 
-pub struct NamedDataTypeBuilder(NamedDataType);
+#[derive(Clone)]
+pub struct NamedDataTypeBuilder {
+    pub(crate) name: Cow<'static, str>,
+    pub(crate) docs: Cow<'static, str>,
+    pub(crate) deprecated: Option<DeprecatedType>,
+    pub(crate) module_path: Cow<'static, str>,
+    pub(crate) location: Location<'static>,
+    pub(crate) generics: Vec<Generic>,
+    pub(crate) inner: DataType,
+}
 
 impl NamedDataTypeBuilder {
-    // TODO: Taking `name` is super wierd with enums/structs which *also* have a name on the `Builder::new` method
-    pub fn new(
-        name: impl Into<Cow<'static, str>>,
-        sid: SpectaID,
-        generics: Vec<Generic>,
-        dt: DataType,
-    ) -> Self {
-        Self(NamedDataType {
+    pub fn new(name: impl Into<Cow<'static, str>>, generics: Vec<Generic>, dt: DataType) -> Self {
+        Self {
             name: name.into(),
             docs: Cow::Borrowed(""),
             deprecated: None,
-            sid,
             module_path: Cow::Borrowed("virtual"),
             location: Location::caller().clone(),
             generics,
             inner: dt,
-        })
+        }
     }
 
     /// Set the module path that this type was defined in.
     ///
     /// The value for this is usually determined by [`module_path`](std::module_path). It's important you keep this in the form `edge::edge::edge::node` or `node`.
     pub fn module_path(mut self, module_path: impl Into<Cow<'static, str>>) -> Self {
-        self.0.module_path = module_path.into();
+        self.module_path = module_path.into();
         self
     }
 
     pub fn docs(mut self, docs: impl Into<Cow<'static, str>>) -> Self {
-        self.0.docs = docs.into();
+        self.docs = docs.into();
         self
     }
 
     pub fn deprecated(mut self, deprecated: DeprecatedType) -> Self {
-        self.0.deprecated = Some(deprecated);
+        self.deprecated = Some(deprecated);
         self
-    }
-
-    // pub fn ext(mut self, ext: impl Into<Cow<'static, str>>) -> Self {
-    //     self.0.ext = Some(ext.into());
-    //     self
-    // }
-
-    pub fn build(self) -> NamedDataType {
-        self.0
     }
 }

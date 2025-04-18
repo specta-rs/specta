@@ -19,9 +19,9 @@ fn test_generic_type_in_type_map() {
     ActualType::definition(&mut types);
 
     assert_eq!(types.len(), 2);
-    let mut iter = types.into_iter();
+    let mut iter = types.into_sorted_iter();
 
-    let first = iter.next().unwrap().1;
+    let first = iter.next().unwrap();
     // https://github.com/oscartbeaumont/specta/issues/171
     assert_eq!(
         specta_typescript::primitives::export(&Default::default(), &types, &first)
@@ -30,7 +30,7 @@ fn test_generic_type_in_type_map() {
         Ok("export type ActualType = { a: GenericType<string> };".into())
     );
 
-    let second = iter.next().unwrap().1;
+    let second = iter.next().unwrap();
     assert_eq!(
         specta_typescript::primitives::export(&Default::default(), &types, &second)
             // Allows matching the value. Implementing `PartialEq` on it is really hard.

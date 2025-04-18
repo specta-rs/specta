@@ -1,9 +1,11 @@
 use std::{
+    borrow::Cow,
     cell::RefCell,
     collections::HashMap,
     convert::Infallible,
     marker::PhantomData,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
+    panic::Location,
     path::PathBuf,
 };
 
@@ -70,10 +72,7 @@ pub fn inline<T: Type>(ts: &Typescript) -> Result<String, String> {
         specta_serde::validate(&types)
             .map_err(|err| format!("Detect invalid Serde type: {err}"))?;
 
-        if let Some((ty_name, l0, l1)) = specta::internal::detect_duplicate_type_names(&types)
-            .into_iter()
-            .next()
-        {
+        if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
             return Err(
                 specta_typescript::Error::DuplicateTypeNameLegacy(ty_name, l0, l1).to_string(),
             );
@@ -99,10 +98,7 @@ pub fn export<T: NamedType>(ts: &Typescript) -> Result<String, String> {
         specta_serde::validate(&types)
             .map_err(|err| format!("Detect invalid Serde type: {err}"))?;
 
-        if let Some((ty_name, l0, l1)) = specta::internal::detect_duplicate_type_names(&types)
-            .into_iter()
-            .next()
-        {
+        if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
             return Err(
                 specta_typescript::Error::DuplicateTypeNameLegacy(ty_name, l0, l1).to_string(),
             );
@@ -114,6 +110,25 @@ pub fn export<T: NamedType>(ts: &Typescript) -> Result<String, String> {
     specta_typescript::primitives::export(ts, &types, &ndt)
         // Allows matching the value. Implementing `PartialEq` on it is really hard.
         .map_err(|e| e.to_string())
+}
+
+fn detect_duplicate_type_names(
+    types: &TypeCollection,
+) -> Vec<(Cow<'static, str>, Location<'static>, Location<'static>)> {
+    let mut errors = Vec::new();
+
+    let mut map = HashMap::with_capacity(types.len());
+    for dt in types.into_unsorted_iter() {
+        if let Some((existing_sid, existing_impl_location)) =
+            map.insert(dt.name().clone(), (dt.sid(), dt.location()))
+        {
+            if existing_sid != dt.sid() {
+                errors.push((dt.name().clone(), dt.location(), existing_impl_location));
+            }
+        }
+    }
+
+    errors
 }
 
 // TODO: Unit test other `specta::Type` methods such as `::reference(...)`

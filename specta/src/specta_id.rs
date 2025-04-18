@@ -1,5 +1,3 @@
-use std::{borrow::Cow, cmp::Ordering, panic::Location};
-
 /// The unique Specta ID for the type.
 ///
 /// Be aware type aliases don't exist as far as Specta is concerned as they are flattened into their inner type by Rust's trait system.
@@ -9,85 +7,63 @@ use std::{borrow::Cow, cmp::Ordering, panic::Location};
 ///  - `Type<T>::SID == Type<S>::SID` (unlike std::any::TypeId)
 ///  - `&'a T::SID == &'b T::SID` (unlike std::any::TypeId which forces a static lifetime)
 ///  - `Box<T> == Arc<T> == Rc<T>` (unlike std::any::TypeId)
+///  - `crate_a@v1::T::SID == crate_a@v2::T::SID` (unlike std::any::TypeId)
 ///
-#[allow(clippy::derived_hash_with_manual_eq)]
-#[derive(Debug, Clone, Copy, Hash)]
-pub struct SpectaID {
-    pub(crate) type_name: &'static str,
-    pub(crate) hash: u64,
+// TODO: Encode the properties above into unit tests.
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub struct SpectaID(pub(crate) SpectaIDInner);
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum SpectaIDInner {
+    /// A statically defined hash
+    /// This will be consistent across `TypeCollection`'s.
+    Static(u64),
+    /// An identifier issued by a specific `TypeCollection` for a runtime-defined type.
+    Virtual(u64),
 }
 
 impl SpectaID {
-    /// Construct a new unique identifier for a type.
-    ///
-    /// It's up to you to ensure the type produced is consistent for each identifier.
-    ///
-    #[doc(hidden)] // TODO: Should we stablise this?
-    #[track_caller]
-    pub const fn new(type_name: &'static str) -> Self {
-        let caller = Location::caller();
-        let mut hash = 0xcbf29ce484222325;
-        let prime = 0x00000100000001B3;
-
-        let mut bytes = type_name.as_bytes();
-        let mut i = 0;
-
-        while i < bytes.len() {
-            hash ^= bytes[i] as u64;
-            hash = hash.wrapping_mul(prime);
-            i += 1;
-        }
-
-        bytes = caller.file().as_bytes();
-        i = 0;
-        while i < bytes.len() {
-            hash ^= bytes[i] as u64;
-            hash = hash.wrapping_mul(prime);
-            i += 1;
-        }
-
-        hash ^= ':' as u64;
-        hash = hash.wrapping_mul(prime);
-
-        hash ^= caller.line() as u64;
-        hash = hash.wrapping_mul(prime);
-
-        hash ^= ':' as u64;
-        hash = hash.wrapping_mul(prime);
-
-        hash ^= caller.column() as u64;
-        hash = hash.wrapping_mul(prime);
-
-        SpectaID { type_name, hash }
+    /// is this identifier valid for any `TypeCollection`.
+    /// This is true for types that were declared with `#[derive(Type)]`.
+    pub fn is_static(&self) -> bool {
+        matches!(self.0, SpectaIDInner::Static(_))
     }
 
-    pub fn type_name(&self) -> Cow<'static, str> {
-        Cow::Borrowed(self.type_name)
+    /// is this identifier tied to the `TypeCollection` it was defined with.
+    /// This is true for types that were defined with `TypeCollection::declare`.
+    pub fn is_virtual(&self) -> bool {
+        matches!(self.0, SpectaIDInner::Virtual(_))
     }
 }
 
-// We do custom impls so the order prefers type_name over hash.
-impl Ord for SpectaID {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.type_name
-            .cmp(other.type_name)
-            .then(self.hash.cmp(&other.hash))
-    }
+pub(crate) fn r#virtual(id: u64) -> SpectaID {
+    SpectaID(SpectaIDInner::Virtual(id))
 }
 
-// We do custom impls so the order prefers type_name over hash.
-impl PartialOrd<Self> for SpectaID {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
+/// Compute an SID hash for a given type.
+/// This will produce a type hash from the arguments.
+/// This hashing function was derived from <https://stackoverflow.com/a/71464396>
+// Exposed as `specta::internal::construct::sid`
+pub const fn sid(type_name: &'static str, type_identifier: &'static str) -> SpectaID {
+    let mut hash = 0xcbf29ce484222325;
+    let prime = 0x00000100000001B3;
 
-// We do custom impls so equals is by SID exclusively.
-impl Eq for SpectaID {}
+    let mut bytes = type_name.as_bytes();
+    let mut i = 0;
 
-// We do custom impls so equals is by SID exclusively.
-impl PartialEq<Self> for SpectaID {
-    fn eq(&self, other: &Self) -> bool {
-        self.hash.eq(&other.hash)
+    while i < bytes.len() {
+        hash ^= bytes[i] as u64;
+        hash = hash.wrapping_mul(prime);
+        i += 1;
     }
+
+    bytes = type_identifier.as_bytes();
+    i = 0;
+    while i < bytes.len() {
+        hash ^= bytes[i] as u64;
+        hash = hash.wrapping_mul(prime);
+        i += 1;
+    }
+
+    SpectaID(crate::specta_id::SpectaIDInner::Static(hash))
 }

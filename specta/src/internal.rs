@@ -176,32 +176,7 @@ pub mod construct {
         Generic(Cow::Borrowed(name))
     }
 
-    /// Compute an SID hash for a given type.
-    /// This will produce a type hash from the arguments.
-    /// This hashing function was derived from <https://stackoverflow.com/a/71464396>
-    pub const fn sid(type_name: &'static str, type_identifier: &'static str) -> SpectaID {
-        let mut hash = 0xcbf29ce484222325;
-        let prime = 0x00000100000001B3;
-
-        let mut bytes = type_name.as_bytes();
-        let mut i = 0;
-
-        while i < bytes.len() {
-            hash ^= bytes[i] as u64;
-            hash = hash.wrapping_mul(prime);
-            i += 1;
-        }
-
-        bytes = type_identifier.as_bytes();
-        i = 0;
-        while i < bytes.len() {
-            hash ^= bytes[i] as u64;
-            hash = hash.wrapping_mul(prime);
-            i += 1;
-        }
-
-        SpectaID { type_name, hash }
-    }
+    pub use crate::specta_id::sid;
 }
 
 pub type NonSkipField<'a> = (&'a Field, &'a DataType);
@@ -326,24 +301,3 @@ pub use functions::*;
 //             .unwrap_or_else(|| format!("Generic type `{g}` was referenced but not found").into()), // TODO: Error properly
 //     }
 // }
-
-// TODO: This should go
-/// post process the type map to detect duplicate type names
-pub fn detect_duplicate_type_names(
-    types: &TypeCollection,
-) -> Vec<(Cow<'static, str>, Location<'static>, Location<'static>)> {
-    let mut errors = Vec::new();
-
-    let mut map = HashMap::with_capacity(types.into_iter().len());
-    for (sid, dt) in types.into_iter() {
-        if let Some((existing_sid, existing_impl_location)) =
-            map.insert(dt.name.clone(), (sid, dt.location))
-        {
-            if existing_sid != sid {
-                errors.push((dt.name.clone(), dt.location, existing_impl_location));
-            }
-        }
-    }
-
-    errors
-}

@@ -12,7 +12,7 @@ use crate::Error;
 
 /// Validate the type and apply the Serde transformations.
 pub fn validate(types: &TypeCollection) -> Result<(), Error> {
-    for (_, ndt) in types.into_iter() {
+    for ndt in types.into_unsorted_iter() {
         inner(
             ndt.ty(),
             &types,
@@ -28,7 +28,7 @@ pub fn validate(types: &TypeCollection) -> Result<(), Error> {
 pub fn validate_dt(ty: &DataType, types: &TypeCollection) -> Result<(), Error> {
     inner(ty, &types, &Default::default(), &mut Default::default())?;
 
-    for (_, ndt) in types.into_iter() {
+    for ndt in types.into_unsorted_iter() {
         inner(
             ndt.ty(),
             &types,

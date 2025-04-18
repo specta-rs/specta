@@ -1,11 +1,11 @@
 use std::{
-    borrow::Borrow,
-    collections::{btree_map, BTreeMap},
+    collections::HashMap,
     fmt,
-    sync::atomic::AtomicU64,
+    sync::atomic::{AtomicU64, Ordering},
 };
 
 use crate::{
+    builder::NamedDataTypeBuilder,
     datatype::{NamedDataType, Reference},
     DataType, NamedType, SpectaID,
 };
@@ -14,12 +14,11 @@ use crate::{
 ///
 /// While exporting a type will add all of the types it depends on to the collection.
 /// You can also construct your own collection to easily export a set of types together.
-#[derive(Default, Clone, PartialEq)]
+#[derive(Default)]
 pub struct TypeCollection {
     // `None` indicates that the entry is a placeholder. It was reference and we are currently working out it's definition.
-    pub(crate) map: BTreeMap<SpectaID, Option<NamedDataType>>,
-    // #[cfg(feature = "serde_json")]
-    // pub(crate) constants: BTreeMap<Cow<'static, str>, serde_json::Value>,
+    pub(crate) map: HashMap<SpectaID, Option<NamedDataType>>,
+    pub(crate) virtual_sid: AtomicU64,
 }
 
 impl fmt::Debug for TypeCollection {
@@ -29,128 +28,55 @@ impl fmt::Debug for TypeCollection {
 }
 
 impl TypeCollection {
-    /// Register a type with the collection.
+    /// Register a [`NamedType`] with the collection.
     pub fn register<T: NamedType>(mut self) -> Self {
         T::definition(&mut self);
         self
     }
 
-    /// Register a type with the collection.
+    /// Register a [`NamedType`] with the collection.
     pub fn register_mut<T: NamedType>(&mut self) -> &mut Self {
         T::definition(self);
         self
     }
 
-    /// Declare a custom type with the collection.
-    #[doc(hidden)] // TODO: This isn't stable yet
-    pub fn declare(&mut self, mut ndt: NamedDataType) -> Reference {
-        // TODO: Proper id's
-        static ID: AtomicU64 = AtomicU64::new(0);
-        let sid = SpectaID {
-            type_name: "virtual",
-            hash: ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+    /// Declare a runtime defined type with the collection.
+    ///
+    /// Each [`Reference`] that is returned from a call to this function will be unique.
+    /// You should only call this once and reuse the [`Reference`] if you intend to point to the same type.
+    ///
+    /// This method will return an error if the type_map is full. This will happen after `u64::MAX` calls to this method.
+    pub fn declare(&mut self, ndt: NamedDataTypeBuilder) -> Result<Reference, ()> {
+        let mut ndt = NamedDataType {
+            name: ndt.name,
+            docs: ndt.docs,
+            deprecated: ndt.deprecated,
+            sid: crate::specta_id::r#virtual(saturating_add(&self.virtual_sid, 1)),
+            module_path: ndt.module_path,
+            location: ndt.location,
+            generics: ndt.generics,
+            inner: ndt.inner,
         };
 
-        // TODO: Do this and do it on `NamedDataTypeBuilder`
-        // ndt.ext = Some(...);
-
+        // TODO: This will be removed by https://github.com/specta-rs/specta/issues/380
         match &mut ndt.inner {
-            // DataType::Nullable(data_type) => todo!(), // TODO: Recurse down?
-            // DataType::Reference(reference) => todo!(),
             DataType::Struct(s) => {
-                s.sid = Some(sid);
+                s.sid = Some(ndt.sid);
             }
             DataType::Enum(e) => {
-                e.sid = Some(sid);
+                e.sid = Some(ndt.sid);
             }
             _ => {}
         }
 
-        // TODO: If we wanna support generics via this API we will need a `ReferenceFactory`
         let reference = Reference {
-            sid,
-            generics: Default::default(),
+            sid: ndt.sid,
+            generics: Default::default(), // TODO: We need this to be configurable.
             inline: false,
         };
+        self.map.insert(ndt.sid, Some(ndt));
 
-        self.map.insert(sid, Some(ndt));
-
-        reference
-    }
-
-    // TODO: `declare_mut`???
-
-    // /// TODO
-    // pub fn reference(&mut self, sid: SpectaID) -> Reference {
-    //     // if self.map.get(&sid).is_none() {
-    //     //     self.map.entry(sid).or_insert(None);
-    //     //     let dt = T::definition_named_data_type(self);
-    //     //     self.map.insert(sid, Some(dt));
-    //     // }
-
-    //     Reference { sid }
-
-    // }
-
-    //
-    // #[doc(hidden)] // TODO: Make public
-    // pub fn todo(&mut self, sid: SpectaID, inner: DataType) -> &mut Self {
-    //     self.map.insert(sid, Some(NamedDataType {
-    //         name: sid.type_name.into(),
-    //         // TODO: How to configure this stuff?
-    //         docs: "".into(),
-    //         deprecated: None,
-    //         ext: None, // TODO: Some(crate::datatype::NamedDataTypeExt { sid: (), impl_location: () })
-    //         inner
-    //     }));
-    //     self
-    // }
-
-    // TODO: Implement in exporter and uncomment these
-    // #[cfg(feature = "serde_json")]
-    // pub fn constant<T: serde::Serialize>(self, name: impl Into<Cow<'static, str>>, value: T) -> Self {
-    //     self.constants.insert(name.into(), serde_json::to_value(value).unwrap()); // TODO: Error handling
-    //     self
-    // }
-
-    // #[cfg(feature = "serde_json")]
-    // pub fn constant_mut<T: serde::Serialize>(&mut self, name: impl Into<Cow<'static, str>>, value: T) -> &mut Self {
-    //     self.constants.insert(name.into(), serde_json::to_value(value).unwrap()); // TODO: Error handling
-    //     self
-    // }
-
-    /// Insert a type into the collection.
-    /// You should prefer to use `TypeCollection::register` as it ensures all invariants are met.
-    ///
-    /// When using this method it's the responsibility of the caller to:
-    ///  - Ensure the `SpectaID` and `NamedDataType` are correctly matched.
-    ///  - Ensure the same `TypeCollection` was used when calling `NamedType::definition_named_data_type`.
-    /// Not honoring these rules will result in a broken collection.
-    pub fn insert(&mut self, sid: SpectaID, def: NamedDataType) -> &mut Self {
-        self.map.insert(sid, Some(def));
-        self
-    }
-
-    /// TODO
-    ///
-    #[doc(hidden)] // TODO: Should we stablise this? If we do we need to stop it causing panics
-    pub fn placeholder(&mut self, sid: SpectaID) -> &mut Self {
-        self.map.insert(sid, None);
-        self
-    }
-
-    /// Join another type collection into this one.
-    pub fn extend(mut self, collection: impl Borrow<Self>) -> Self {
-        self.map
-            .extend(collection.borrow().map.iter().map(|(k, v)| (*k, v.clone())));
-        self
-    }
-
-    /// Join another type collection into this one.
-    pub fn extend_mut(&mut self, collection: impl Borrow<Self>) -> &mut Self {
-        self.map
-            .extend(collection.borrow().map.iter().map(|(k, v)| (*k, v.clone())));
-        self
+        Ok(reference)
     }
 
     /// Remove a type from the collection.
@@ -158,6 +84,7 @@ impl TypeCollection {
         self.map.remove(&sid).flatten()
     }
 
+    /// Get a type from the collection.
     #[track_caller]
     pub fn get(&self, sid: SpectaID) -> Option<&NamedDataType> {
         #[allow(clippy::bind_instead_of_map)]
@@ -175,39 +102,48 @@ impl TypeCollection {
         })
     }
 
+    /// Get the length of the collection.
     pub fn len(&self) -> usize {
-        self.map.len()
+        self.map.iter().filter_map(|(_, ndt)| ndt.as_ref()).count()
+    }
+
+    /// Sort the collection into a consistent order and return an iterator.
+    ///
+    /// The sort order is not necessarily guaranteed to be stable between versions but currently we sort by name.
+    ///
+    /// This method requires reallocating the map to sort the collection. You should prefer [Self::into_unsorted_iter] if you don't care about the order.
+    pub fn into_sorted_iter(&self) -> impl Iterator<Item = NamedDataType> {
+        let mut v = self
+            .map
+            .iter()
+            .filter_map(|(_, ndt)| ndt.clone())
+            .collect::<Vec<_>>();
+        v.sort_by(|x, y| x.name.cmp(&y.name).then(x.sid.0.cmp(&y.sid.0)));
+        v.into_iter()
+    }
+
+    /// Return the unsorted iterator over the collection.
+    pub fn into_unsorted_iter(&self) -> impl Iterator<Item = &NamedDataType> {
+        self.map.iter().filter_map(|(_, ndt)| ndt.as_ref())
+    }
+
+    /// Experimental: should we stabilise this? It's being used by `specta_typescript::Any`
+    /// TODO: If we stablize this, we need to stop it from causing panics.
+    #[doc(hidden)]
+    pub fn placeholder(&mut self, sid: SpectaID) -> &mut Self {
+        self.map.insert(sid, None);
+        self
     }
 }
 
-impl<'a> IntoIterator for &'a TypeCollection {
-    type Item = (SpectaID, &'a NamedDataType);
-    type IntoIter = TypeCollectionInterator<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        TypeCollectionInterator(self.map.iter())
-    }
-}
-
-// Sealed
-pub struct TypeCollectionInterator<'a>(btree_map::Iter<'a, SpectaID, Option<NamedDataType>>);
-
-impl<'a> ExactSizeIterator for TypeCollectionInterator<'a> {}
-
-impl<'a> Iterator for TypeCollectionInterator<'a> {
-    type Item = (SpectaID, &'a NamedDataType);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let (sid, ndt) = self.0.next()?;
-            if let Some(ndt) = ndt {
-                return Some((*sid, ndt));
-            }
+fn saturating_add(atomic: &AtomicU64, value: u64) -> u64 {
+    let mut current = atomic.load(Ordering::Relaxed);
+    loop {
+        let new_value = current.saturating_add(value);
+        match atomic.compare_exchange_weak(current, new_value, Ordering::SeqCst, Ordering::Relaxed)
+        {
+            Ok(_) => break new_value,
+            Err(previous) => current = previous,
         }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.0.clone().filter(|(_, t)| t.is_some()).count();
-        (len, Some(len))
     }
 }

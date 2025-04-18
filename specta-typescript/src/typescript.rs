@@ -1,6 +1,6 @@
-use std::{borrow::Cow, path::Path};
+use std::{borrow::Cow, collections::HashMap, path::Path};
 
-use specta::{internal::detect_duplicate_type_names, TypeCollection};
+use specta::TypeCollection;
 
 use crate::{primitives, Error};
 
@@ -97,19 +97,26 @@ impl Typescript {
         out += &self.framework_header;
         out.push_str("\n\n");
 
-        if let Some((name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
-            return Err(Error::DuplicateTypeName {
-                types: (l0, l1),
-                name,
-            });
+        let mut map = HashMap::with_capacity(types.len());
+        for dt in types.into_unsorted_iter() {
+            if let Some((existing_sid, existing_impl_location)) =
+                map.insert(dt.name().clone(), (dt.sid(), dt.location()))
+            {
+                if existing_sid != dt.sid() {
+                    return Err(Error::DuplicateTypeName {
+                        types: (dt.location(), existing_impl_location),
+                        name: dt.name().clone(),
+                    });
+                }
+            }
         }
 
         if self.serde {
             specta_serde::validate(types)?;
         }
 
-        for (_, ndt) in types.into_iter() {
-            out += &primitives::export(self, &types, ndt)?;
+        for ndt in types.into_sorted_iter() {
+            out += &primitives::export(self, &types, &ndt)?;
             out += "\n\n";
         }
 
