@@ -26,6 +26,9 @@ derive = ["dep:specta-macros"]
 ## Support for collecting up a global type map
 export = ["dep:ctor", "specta-macros/DO_NOT_USE_export"]
 
+## Enable the experimental `specta::json` macro.
+unstable_json_macro = []
+
 #! Features
 ## Support for exporting the types of Rust functions.
 function = ["specta-macros?/DO_NOT_USE_function", "dep:paste"]
