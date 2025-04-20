@@ -32,10 +32,7 @@ const _: () = {
     impl Type for Number {
         fn definition(_: &mut TypeCollection) -> DataType {
             DataType::Enum(Enum {
-                name: "Number".into(),
-                sid: None,
                 repr: EnumRepr::Untagged,
-                skip_bigint_checks: true,
                 variants: vec![
                     (
                         "f64".into(),
@@ -129,10 +126,7 @@ const _: () = {
     impl Type for serde_yaml::Number {
         fn definition(_: &mut TypeCollection) -> DataType {
             DataType::Enum(Enum {
-                name: "Number".into(),
-                sid: None,
                 repr: EnumRepr::Untagged,
-                skip_bigint_checks: true,
                 variants: vec![
                     (
                         "f64".into(),
@@ -202,7 +196,7 @@ const _: () = {
     impl<K: Type, V: Type> Flatten for toml::map::Map<K, V> {}
 
     #[derive(Type)]
-    #[specta(rename = "TomlValue", untagged, remote = Value, crate = crate, export = false, unstable_skip_bigint_checks)]
+    #[specta(rename = "TomlValue", untagged, remote = Value, crate = crate, export = false)]
     pub enum TomlValue {
         String(String),
         Integer(i64),
@@ -416,10 +410,7 @@ impl_as!(url::Url as String);
 impl<L: Type, R: Type> Type for either::Either<L, R> {
     fn definition(types: &mut TypeCollection) -> DataType {
         DataType::Enum(Enum {
-            name: "Either".into(),
-            sid: None,
             repr: EnumRepr::Untagged,
-            skip_bigint_checks: false,
             variants: vec![
                 (
                     "Left".into(),

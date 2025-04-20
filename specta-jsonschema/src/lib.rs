@@ -146,11 +146,11 @@ pub fn to_ast(schema: &Schema) -> Result<DataType, ()> {
                 // pub property_names: Option<Box<Schema>>,
 
                 let mut s = StructBuilder::named(
-                    obj.metadata
-                        .as_ref()
-                        .and_then(|v| v.title.as_ref().map(|v| v.to_class_case()))
-                        .unwrap_or_else(|| "Unnamed".to_string()),
-                ); // TODO: Remove fallback
+                    // obj.metadata
+                    //     .as_ref()
+                    //     .and_then(|v| v.title.as_ref().map(|v| v.to_class_case()))
+                    //     .unwrap_or_else(|| "Unnamed".to_string()),
+                );
                 for (k, v) in o.properties.iter() {
                     s.field_mut(k.clone(), FieldBuilder::new(to_ast(v)?));
                 }
@@ -182,7 +182,7 @@ pub fn to_ast(schema: &Schema) -> Result<DataType, ()> {
                         return Ok(match o.len() {
                             0 => DataType::List(List::new(from_instance_type(&o[0]), None, false)),
                             _ => {
-                                let mut e = EnumBuilder::new("todo");
+                                let mut e = EnumBuilder::new();
 
                                 for list in o {
                                     println!("{:?}", list);

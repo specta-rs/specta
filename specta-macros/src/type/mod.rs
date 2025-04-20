@@ -46,7 +46,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let (inlines, can_flatten) = match data {
         Data::Struct(data) => parse_struct(&name, &container_attrs, &crate_ref, data),
         Data::Enum(data) => parse_enum(
-            &name,
             &EnumAttr::from_attrs(&container_attrs, &mut attrs)?,
             &container_attrs,
             &crate_ref,

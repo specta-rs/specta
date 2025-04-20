@@ -1,9 +1,8 @@
 use std::any::Any;
 
 use specta::Type;
-use specta_serde::Error;
 
-use crate::ts::assert_ts;
+use crate::ts::assert_ts_inline2;
 
 #[derive(Type)]
 #[specta(export = false)]
@@ -114,19 +113,52 @@ pub enum LazilySkip {
 
 #[test]
 fn skip() {
-    assert_ts!(SkipOnlyField, "Record<string, never>");
-    assert_ts!(SkipField, "{ b: number }");
-    assert_ts!(error; SkipOnlyVariantExternallyTagged, "Detect invalid Serde type: the usage of #[specta(skip)] means the type can't be serialized\n");
-    assert_ts!(error; SkipOnlyVariantInternallyTagged, "Detect invalid Serde type: the usage of #[specta(skip)] means the type can't be serialized\n");
-    assert_ts!(error; SkipOnlyVariantAdjacentlyTagged, "Detect invalid Serde type: the usage of #[specta(skip)] means the type can't be serialized\n");
-    assert_ts!(error; SkipOnlyVariantUntagged, "Detect invalid Serde type: the usage of #[specta(skip)] means the type can't be serialized\n");
-    assert_ts!(SkipVariant, "{ B: number }"); // Serializing `A` will be error but that is expected behavior.
-    assert_ts!(SkipUnnamedFieldInVariant, r#""A" | { B: [number] }"#);
-    assert_ts!(
-        SkipNamedFieldInVariant,
-        "{ A: Record<string, never> } | { B: { b: number } }"
+    assert_eq!(
+        assert_ts_inline2::<SkipOnlyField>(),
+        Ok(r#"Record<string, never>"#.into())
     );
-    assert_ts!(TransparentWithSkip, "null");
-    assert_ts!(TransparentWithSkip2, "string");
-    assert_ts!(TransparentWithSkip3, "string");
+    assert_eq!(
+        assert_ts_inline2::<SkipField>(),
+        Ok(r#"{ b: number }"#.into())
+    );
+    assert_eq!(
+        assert_ts_inline2::<SkipOnlyVariantExternallyTagged>(),
+        Err("the usage of #[specta(skip)] means the type can't be serialized\n".into())
+    );
+    assert_eq!(
+        assert_ts_inline2::<SkipOnlyVariantInternallyTagged>(),
+        Err("the usage of #[specta(skip)] means the type can't be serialized\n".into())
+    );
+    assert_eq!(
+        assert_ts_inline2::<SkipOnlyVariantAdjacentlyTagged>(),
+        Err("the usage of #[specta(skip)] means the type can't be serialized\n".into())
+    );
+    assert_eq!(
+        assert_ts_inline2::<SkipOnlyVariantUntagged>(),
+        Err("the usage of #[specta(skip)] means the type can't be serialized\n".into())
+    );
+    assert_eq!(
+        assert_ts_inline2::<SkipVariant>(),
+        Ok(r#"{ B: number }"#.into())
+    ); // Serializing `A` will be error but that is expected behavior.
+    assert_eq!(
+        assert_ts_inline2::<SkipUnnamedFieldInVariant>(),
+        Ok(r#""A" | { B: [number] }"#.into())
+    );
+    assert_eq!(
+        assert_ts_inline2::<SkipNamedFieldInVariant>(),
+        Ok(r#"{ A: Record<string, never> } | { B: { b: number } }"#.into())
+    );
+    assert_eq!(
+        assert_ts_inline2::<TransparentWithSkip>(),
+        Ok(r#"null"#.into())
+    );
+    assert_eq!(
+        assert_ts_inline2::<TransparentWithSkip2>(),
+        Ok(r#"string"#.into())
+    );
+    assert_eq!(
+        assert_ts_inline2::<TransparentWithSkip3>(),
+        Ok(r#"string"#.into())
+    );
 }

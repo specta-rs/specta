@@ -1,27 +1,13 @@
 use std::borrow::Cow;
 
-use crate::{
-    datatype::{DataType, Fields},
-    SpectaID,
-};
+use crate::datatype::{DataType, Fields};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Struct {
-    pub(crate) name: Cow<'static, str>,
-    // Associating a SpectaID will allow exporter to lookup more detailed information about the type to provide better errors.
-    pub(crate) sid: Option<SpectaID>,
     pub(crate) fields: Fields,
 }
 
 impl Struct {
-    pub fn name(&self) -> &Cow<'static, str> {
-        &self.name
-    }
-
-    pub fn sid(&self) -> Option<SpectaID> {
-        self.sid
-    }
-
     pub fn fields(&self) -> &Fields {
         &self.fields
     }

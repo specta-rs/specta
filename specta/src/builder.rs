@@ -6,41 +6,34 @@ use std::{borrow::Cow, fmt::Debug, panic::Location};
 
 use crate::{
     datatype::{
-        DeprecatedType, Enum, EnumRepr, EnumVariant, Field, Fields, Generic, NamedDataType,
-        NamedFields, Struct, UnnamedFields,
+        DeprecatedType, Enum, EnumRepr, EnumVariant, Field, Fields, Generic, NamedFields, Struct,
+        UnnamedFields,
     },
-    DataType, SpectaID,
+    DataType,
 };
 
 // TODO: `Debug` and `Clone` on everything
 
 #[derive(Debug, Clone)]
 pub struct StructBuilder<F = ()> {
-    name: Cow<'static, str>,
     fields: F,
 }
 
 impl StructBuilder<()> {
-    pub fn unit(name: impl Into<Cow<'static, str>>) -> Self {
-        Self {
-            name: name.into(),
-            fields: (),
-        }
+    pub fn unit() -> Self {
+        Self { fields: () }
     }
 
     pub fn build(self) -> DataType {
         DataType::Struct(Struct {
-            name: self.name,
-            sid: None,
             fields: Fields::Unit,
         })
     }
 }
 
 impl StructBuilder<NamedFields> {
-    pub fn named(name: impl Into<Cow<'static, str>>) -> Self {
+    pub fn named() -> Self {
         Self {
-            name: name.into(),
             fields: NamedFields {
                 fields: Default::default(),
                 tag: Default::default(),
@@ -60,17 +53,14 @@ impl StructBuilder<NamedFields> {
 
     pub fn build(self) -> DataType {
         DataType::Struct(Struct {
-            name: self.name,
-            sid: None,
             fields: Fields::Named(self.fields),
         })
     }
 }
 
 impl StructBuilder<UnnamedFields> {
-    pub fn unnamed(name: impl Into<Cow<'static, str>>) -> Self {
+    pub fn unnamed() -> Self {
         Self {
-            name: name.into(),
             fields: UnnamedFields {
                 fields: Default::default(),
             },
@@ -88,8 +78,6 @@ impl StructBuilder<UnnamedFields> {
 
     pub fn build(self) -> DataType {
         DataType::Struct(Struct {
-            name: self.name,
-            sid: None,
             fields: Fields::Unnamed(self.fields),
         })
     }
@@ -170,15 +158,13 @@ impl FieldBuilder {
 }
 
 pub struct EnumBuilder {
-    name: Cow<'static, str>,
     repr: EnumRepr,
     variants: Vec<(Cow<'static, str>, EnumVariant)>,
 }
 
 impl EnumBuilder {
-    pub fn new(name: impl Into<Cow<'static, str>>) -> Self {
+    pub fn new() -> Self {
         Self {
-            name: name.into(),
             repr: EnumRepr::External,
             variants: vec![],
         }
@@ -202,9 +188,6 @@ impl EnumBuilder {
 
     pub fn build(self) -> DataType {
         DataType::Enum(Enum {
-            name: self.name,
-            sid: None,
-            skip_bigint_checks: false,
             repr: self.repr,
             variants: self.variants,
         })

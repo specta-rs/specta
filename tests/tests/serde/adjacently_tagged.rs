@@ -1,6 +1,6 @@
 use specta::Type;
 
-use crate::ts::assert_ts;
+use crate::ts::{assert_ts_export2, assert_ts_inline2};
 
 #[derive(Type)]
 #[specta(export = false, tag = "t", content = "c")]
@@ -14,8 +14,15 @@ enum A {
 fn adjacently_tagged() {
     // There is not way to construct an invalid adjacently tagged type.
 
-    assert_ts!(
-        A,
-        "{ t: \"A\" } | { t: \"B\"; c: { id: string; method: string } } | { t: \"C\"; c: string }"
+    assert_eq!(
+        assert_ts_export2::<A>(),
+        Ok(r#"export type A = { t: "A" } | { t: "B"; c: { id: string; method: string } } | { t: "C"; c: string };"#.into())
+    );
+    assert_eq!(
+        assert_ts_inline2::<A>(),
+        Ok(
+            r#"{ t: "A" } | { t: "B"; c: { id: string; method: string } } | { t: "C"; c: string }"#
+                .into()
+        )
     );
 }

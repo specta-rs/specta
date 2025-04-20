@@ -13,7 +13,7 @@ use specta::{
         DataType, Enum, EnumRepr, Field, Fields, List, Literal, Map, NamedDataType, Primitive,
         Reference, Tuple,
     },
-    NamedType, TypeCollection,
+    NamedType, SpectaID, TypeCollection,
 };
 
 use crate::{
@@ -75,6 +75,7 @@ pub fn export(
         ndt.ty(),
         vec![ndt.name().clone()],
         true,
+        Some(ndt.sid()),
     )?;
     result.push_str(";");
 
@@ -85,10 +86,13 @@ pub fn export(
 ///
 /// This methods leaves all the same things as the [`export`] method up to the user.
 ///
+/// Note that calling this method with a tagged struct or enum may cause the tag to not be exported.
+/// The type should be wrapped in a [`NamedDataType`] to provide a proper name.
+///
 pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<String, Error> {
     let dt = specta::datatype::inline(dt.clone(), &types);
     let mut s = String::new();
-    datatype(&mut s, ts, types, &dt, vec![], false)?;
+    datatype(&mut s, ts, types, &dt, vec![], false, None)?;
     Ok(s)
 }
 
@@ -106,9 +110,10 @@ pub(crate) fn datatype(
     types: &TypeCollection,
     dt: &DataType,
     mut location: Vec<Cow<'static, str>>,
-    // state: State,
-    // TODO: Remove this???
     is_export: bool,
+    // The type that is currently being resolved.
+    // This comes from the `NamedDataType`
+    sid: Option<SpectaID>,
 ) -> Result<(), Error> {
     // TODO: Validating the variant from `dt` can be flattened
 
@@ -151,7 +156,7 @@ pub(crate) fn datatype(
                     path: vec![],
                     is_export,
                 },
-                st.name(),
+                sid,
                 st,
                 types,
                 s,
@@ -358,11 +363,6 @@ fn enum_dt(
 ) -> Result<(), Error> {
     // TODO: Drop legacy stuff
     {
-        let mut ts = ts.clone();
-        if e.skip_bigint_checks() {
-            ts = ts.bigint(BigIntExportBehavior::Number);
-        }
-
         crate::legacy::enum_datatype(
             crate::legacy::ExportContext {
                 cfg: &ts,

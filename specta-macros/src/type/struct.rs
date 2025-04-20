@@ -145,7 +145,7 @@ pub fn parse_struct(
             Fields::Unit => quote!(#crate_ref::internal::construct::fields_unit()),
         };
 
-        quote!(#crate_ref::datatype::DataType::Struct(#crate_ref::internal::construct::r#struct(#name.into(), Some(SID), #fields)))
+        quote!(#crate_ref::datatype::DataType::Struct(#crate_ref::internal::construct::r#struct(#fields)))
     };
 
     Ok((definition, true))

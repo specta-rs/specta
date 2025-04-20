@@ -12,35 +12,17 @@ use super::{DataType, DeprecatedType, Fields};
 /// Separating it allows for better typesafety since `variants` doesn't have to be a [`Vec`] of tuples.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Enum {
-    pub(crate) name: Cow<'static, str>,
-    // Associating a SpectaID will allow exporter to lookup more detailed information about the type to provide better errors.
-    pub(crate) sid: Option<SpectaID>,
-    // This is used to allow `serde_json::Number` and `toml::Value` to contain BigInt numbers without an error.
-    // I don't know if we should block bigints in these any types. Really I think we should but we need a good DX around overriding it on a per-type basis.
-    pub(crate) skip_bigint_checks: bool,
     pub(crate) repr: EnumRepr,
     pub(crate) variants: Vec<(Cow<'static, str>, EnumVariant)>,
 }
 
 impl Enum {
-    pub fn sid(&self) -> Option<SpectaID> {
-        self.sid
-    }
-
-    pub fn name(&self) -> &Cow<'static, str> {
-        &self.name
-    }
-
     pub fn repr(&self) -> &EnumRepr {
         &self.repr
     }
 
     pub fn variants(&self) -> &Vec<(Cow<'static, str>, EnumVariant)> {
         &self.variants
-    }
-
-    pub fn skip_bigint_checks(&self) -> bool {
-        self.skip_bigint_checks
     }
 }
 

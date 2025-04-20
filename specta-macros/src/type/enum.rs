@@ -5,7 +5,6 @@ use quote::{quote, ToTokens};
 use syn::{spanned::Spanned, DataEnum, Fields};
 
 pub fn parse_enum(
-    name: &TokenStream,
     enum_attrs: &EnumAttr,
     container_attrs: &ContainerAttr,
     crate_ref: &TokenStream,
@@ -155,10 +154,8 @@ pub fn parse_enum(
         ),
     };
 
-    let skip_bigint_checs = enum_attrs.unstable_skip_bigint_checks;
-
     Ok((
-        quote!(#crate_ref::datatype::DataType::Enum(#crate_ref::internal::construct::r#enum(#name.into(), SID, #repr, #skip_bigint_checs, vec![#(#variant_types),*]))),
+        quote!(#crate_ref::datatype::DataType::Enum(#crate_ref::internal::construct::r#enum(#repr, vec![#(#variant_types),*]))),
         can_flatten,
     ))
 }

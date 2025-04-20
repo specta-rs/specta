@@ -14,6 +14,22 @@ use specta::{datatype::inline_and_flatten_ndt, NamedType, Type, TypeCollection};
 use specta_typescript::Any;
 use specta_typescript::{BigIntExportBehavior, Typescript};
 
+// We run tests with the low-level APIs
+pub fn assert_ts_export2<T: NamedType>() -> Result<String, String> {
+    let mut types = TypeCollection::default();
+    T::definition(&mut types);
+    specta_serde::validate(&types).map_err(|e| e.to_string())?;
+    specta_typescript::primitives::export(&Default::default(), &types, types.get(T::ID).unwrap())
+        .map_err(|e| e.to_string())
+}
+pub fn assert_ts_inline2<T: Type>() -> Result<String, String> {
+    let mut types = TypeCollection::default();
+    let dt = T::definition(&mut types);
+    specta_serde::validate_dt(&dt, &types).map_err(|e| e.to_string())?;
+    specta_typescript::primitives::inline(&Default::default(), &types, &dt)
+        .map_err(|e| e.to_string())
+}
+
 macro_rules! assert_ts {
     (error; $t:ty, $e:expr) => {
         assert_eq!(

@@ -47,36 +47,26 @@ impl TypeCollection {
     ///
     /// This method will return an error if the type_map is full. This will happen after `u64::MAX` calls to this method.
     pub fn declare(&mut self, ndt: NamedDataTypeBuilder) -> Result<Reference, ()> {
-        let mut ndt = NamedDataType {
-            name: ndt.name,
-            docs: ndt.docs,
-            deprecated: ndt.deprecated,
-            sid: crate::specta_id::r#virtual(saturating_add(&self.virtual_sid, 1)),
-            module_path: ndt.module_path,
-            location: ndt.location,
-            generics: ndt.generics,
-            inner: ndt.inner,
-        };
+        let sid = crate::specta_id::r#virtual(saturating_add(&self.virtual_sid, 1));
+        self.map.insert(
+            sid,
+            Some(NamedDataType {
+                name: ndt.name,
+                docs: ndt.docs,
+                deprecated: ndt.deprecated,
+                sid,
+                module_path: ndt.module_path,
+                location: ndt.location,
+                generics: ndt.generics,
+                inner: ndt.inner,
+            }),
+        );
 
-        // TODO: This will be removed by https://github.com/specta-rs/specta/issues/380
-        match &mut ndt.inner {
-            DataType::Struct(s) => {
-                s.sid = Some(ndt.sid);
-            }
-            DataType::Enum(e) => {
-                e.sid = Some(ndt.sid);
-            }
-            _ => {}
-        }
-
-        let reference = Reference {
-            sid: ndt.sid,
+        Ok(Reference {
+            sid,
             generics: Default::default(), // TODO: We need this to be configurable.
             inline: false,
-        };
-        self.map.insert(ndt.sid, Some(ndt));
-
-        Ok(reference)
+        })
     }
 
     /// Remove a type from the collection.

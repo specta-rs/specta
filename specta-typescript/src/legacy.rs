@@ -104,20 +104,17 @@ impl fmt::Display for ExportPath {
     }
 }
 
-use specta::TypeCollection;
+use specta::{SpectaID, TypeCollection};
 
 use crate::reserved_names::RESERVED_TYPE_NAMES;
-use crate::{Any, BigIntExportBehavior, Error, Typescript, Unknown};
+use crate::{Error, Typescript};
 use std::fmt::Write;
 
 use specta::datatype::{
     DataType, DeprecatedType, Enum, EnumRepr, EnumVariant, Fields, FunctionReturnType, Literal,
     NamedDataType, Struct, Tuple,
 };
-use specta::{
-    internal::{skip_fields, skip_fields_named, NonSkipField},
-    NamedType,
-};
+use specta::internal::{skip_fields, skip_fields_named, NonSkipField};
 
 #[allow(missing_docs)]
 pub(crate) type Result<T> = std::result::Result<T, Error>;
@@ -178,7 +175,7 @@ pub(crate) fn datatype_inner(
         }
     };
 
-    crate::primitives::datatype(s, ctx.cfg, types, typ, vec![], ctx.is_export)
+    crate::primitives::datatype(s, ctx.cfg, types, typ, vec![], ctx.is_export, None)
 }
 
 // Can be used with `StructUnnamedFields.fields` or `EnumNamedFields.fields`
@@ -258,7 +255,7 @@ pub(crate) fn tuple_datatype(ctx: ExportContext, tuple: &Tuple, types: &TypeColl
 
 pub(crate) fn struct_datatype(
     ctx: ExportContext,
-    key: &str,
+    sid: Option<SpectaID>,
     strct: &Struct,
     types: &TypeCollection,
     s: &mut String,
@@ -275,9 +272,12 @@ pub(crate) fn struct_datatype(
             let fields = skip_fields_named(named.fields()).collect::<Vec<_>>();
 
             if fields.is_empty() {
-                return Ok(match named.tag().as_ref() {
-                    Some(tag) => write!(s, r#"{{ "{tag}": "{key}" }}"#)?,
-                    None => write!(s, "Record<{STRING}, {NEVER}>")?,
+                return Ok(match (named.tag().as_ref(), sid) {
+                    (Some(tag), Some(sid)) => {
+                        let key = types.get(sid).unwrap().name();
+                        write!(s, r#"{{ "{tag}": "{key}" }}"#)?
+                    }
+                    (_, _) => write!(s, "Record<{STRING}, {NEVER}>")?,
                 });
             }
 
@@ -330,7 +330,8 @@ pub(crate) fn struct_datatype(
                 })
                 .collect::<Result<Vec<_>>>()?;
 
-            if let Some(tag) = &named.tag() {
+            if let (Some(tag), Some(sid)) = (&named.tag(), sid) {
+                let key = types.get(sid).unwrap().name();
                 unflattened_fields.push(format!("{tag}: \"{key}\""));
             }
 

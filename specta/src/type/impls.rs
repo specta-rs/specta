@@ -136,13 +136,7 @@ impl<T> Type for std::marker::PhantomData<T> {
 const _: () = {
     impl Type for std::convert::Infallible {
         fn definition(_: &mut TypeCollection) -> DataType {
-            DataType::Enum(internal::construct::r#enum(
-                "Infallible".into(),
-                internal::construct::sid("Infallible".into(), "::todo:4:10"),
-                EnumRepr::External,
-                false,
-                vec![],
-            ))
+            DataType::Enum(internal::construct::r#enum(EnumRepr::External, vec![]))
         }
     }
 };
@@ -151,8 +145,6 @@ impl<T: Type> Type for std::ops::Range<T> {
     fn definition(types: &mut TypeCollection) -> DataType {
         let ty = Some(T::definition(types));
         DataType::Struct(Struct {
-            name: "Range".into(),
-            sid: None,
             fields: Fields::Named(NamedFields {
                 fields: vec![
                     (
@@ -203,8 +195,6 @@ const _: () = {
     impl Type for std::time::SystemTime {
         fn definition(types: &mut TypeCollection) -> DataType {
             DataType::Struct(internal::construct::r#struct(
-                "SystemTime".into(),
-                Some(internal::construct::sid("SystemTime".into(), "::todo:3:10")),
                 internal::construct::fields_named(
                     vec![
                         (
@@ -232,8 +222,6 @@ const _: () = {
     impl Type for std::time::Duration {
         fn definition(types: &mut TypeCollection) -> DataType {
             DataType::Struct(internal::construct::r#struct(
-                "Duration".into(),
-                Some(SID),
                 internal::construct::fields_named(
                     vec![
                         (

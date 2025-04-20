@@ -120,7 +120,6 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
         },
         DataType::Struct(s) => {
             let fields = s.fields();
-            let name = s.name();
 
             // match &fields[..] {
             //     [] => todo!(), // "null".to_string(),

@@ -18,8 +18,6 @@ pub struct EnumAttr {
     pub tag: Option<String>,
     pub content: Option<String>,
     pub untagged: bool,
-    // This property is not covered by sem-ver and *should* not be used.
-    pub unstable_skip_bigint_checks: bool,
 }
 
 impl_parse! {
@@ -27,7 +25,6 @@ impl_parse! {
         // "tag" was already passed in the container so we don't need to do anything here
         "content" => out.content = out.content.take().or(Some(attr.parse_string()?)),
         "untagged" => out.untagged = attr.parse_bool().unwrap_or(true),
-        "unstable_skip_bigint_checks" => out.unstable_skip_bigint_checks = attr.parse_bool().unwrap_or(true),
     }
 }
 

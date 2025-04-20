@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 
 use specta::Type;
-use specta_serde::Error;
 
-use crate::ts::assert_ts;
+use crate::ts::assert_ts_inline2;
 
 // This type won't even compile with Serde macros
 #[derive(Type)]
@@ -122,18 +121,40 @@ pub enum MInner {
 
 #[test]
 fn internally_tagged() {
-    assert_ts!(error; A, "Detect invalid Serde type: #[specta(tag = \"...\")] cannot be used with tuple variants\n");
-    assert_ts!(error; B, "Detect invalid Serde type: #[specta(tag = \"...\")] cannot be used with tuple variants\n");
-    assert_ts!(error; C, "Detect invalid Serde type: #[specta(tag = \"...\")] cannot be used with tuple variants\n");
-    assert_ts!(
-        D,
-        "({ type: \"A\" } & Partial<{ [key in string]: string }>)"
+    assert_eq!(
+        assert_ts_inline2::<A>(),
+        Err("#[specta(tag = \"...\")] cannot be used with tuple variants\n".into())
     );
-    assert_ts!(E, "({ type: \"A\" })");
-    assert_ts!(F, "({ type: \"A\" } & FInner)");
-    assert_ts!(error; G, "Detect invalid Serde type: #[specta(tag = \"...\")] cannot be used with tuple variants\n");
-    assert_ts!(H, "({ type: \"A\" })");
-    assert_ts!(error; I, "Detect invalid Serde type: #[specta(tag = \"...\")] cannot be used with tuple variants\n");
-    assert_ts!(L, "({ type: \"A\" } & ({ type: \"A\" } | { type: \"B\" }))");
-    assert_ts!(M, "({ type: \"A\" })");
+    assert_eq!(
+        assert_ts_inline2::<B>(),
+        Err("#[specta(tag = \"...\")] cannot be used with tuple variants\n".into())
+    );
+    assert_eq!(
+        assert_ts_inline2::<C>(),
+        Err("#[specta(tag = \"...\")] cannot be used with tuple variants\n".into())
+    );
+    assert_eq!(
+        assert_ts_inline2::<D>(),
+        Ok(r#"({ type: "A" } & Partial<{ [key in string]: string }>)"#.into())
+    );
+
+    assert_eq!(assert_ts_inline2::<E>(), Ok(r#"({ type: "A" })"#.into()));
+    assert_eq!(
+        assert_ts_inline2::<F>(),
+        Ok(r#"({ type: "A" } & FInner)"#.into())
+    );
+    assert_eq!(
+        assert_ts_inline2::<G>(),
+        Err("#[specta(tag = \"...\")] cannot be used with tuple variants\n".into())
+    );
+    assert_eq!(assert_ts_inline2::<H>(), Ok(r#"({ type: "A" })"#.into()));
+    assert_eq!(
+        assert_ts_inline2::<I>(),
+        Err("#[specta(tag = \"...\")] cannot be used with tuple variants\n".into())
+    );
+    assert_eq!(
+        assert_ts_inline2::<L>(),
+        Ok(r#"({ type: "A" } & ({ type: "A" } | { type: "B" }))"#.into())
+    );
+    assert_eq!(assert_ts_inline2::<M>(), Ok(r#"({ type: "A" })"#.into()));
 }

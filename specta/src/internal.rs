@@ -4,7 +4,7 @@
 //!
 //! DO NOT USE THEM! You have been warned!
 
-use std::{borrow::Cow, collections::HashMap, panic::Location};
+use std::{borrow::Cow, panic::Location};
 
 #[cfg(feature = "function")]
 pub use paste::paste;
@@ -115,12 +115,8 @@ pub mod construct {
         }
     }
 
-    pub const fn r#struct(
-        name: Cow<'static, str>,
-        sid: Option<SpectaID>,
-        fields: Fields,
-    ) -> Struct {
-        Struct { name, sid, fields }
+    pub const fn r#struct(fields: Fields) -> Struct {
+        Struct { fields }
     }
 
     pub const fn fields_unit() -> Fields {
@@ -138,20 +134,8 @@ pub mod construct {
         Fields::Named(NamedFields { fields, tag })
     }
 
-    pub const fn r#enum(
-        name: Cow<'static, str>,
-        sid: SpectaID,
-        repr: EnumRepr,
-        skip_bigint_checks: bool,
-        variants: Vec<(Cow<'static, str>, EnumVariant)>,
-    ) -> Enum {
-        Enum {
-            name,
-            sid: Some(sid),
-            repr,
-            skip_bigint_checks,
-            variants,
-        }
+    pub const fn r#enum(repr: EnumRepr, variants: Vec<(Cow<'static, str>, EnumVariant)>) -> Enum {
+        Enum { repr, variants }
     }
 
     pub const fn enum_variant(

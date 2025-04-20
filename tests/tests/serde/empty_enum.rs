@@ -1,7 +1,6 @@
 use specta::Type;
-use specta_typescript::{legacy::ExportPath, Error};
 
-use crate::ts::assert_ts;
+use crate::ts::assert_ts_inline2;
 
 #[derive(Type)]
 #[specta(export = false)]
@@ -75,14 +74,26 @@ enum I {
 #[test]
 fn empty_enums() {
     // `never & { tag = "a" }` would coalesce to `never` so we don't need to include it.
-    assert_ts!(A, "never");
-    assert_ts!(B, "never");
-    assert_ts!(C, "never");
-    assert_ts!(D, "never");
+    assert_eq!(assert_ts_inline2::<A>(), Ok(r#"never"#.into()));
+    assert_eq!(assert_ts_inline2::<B>(), Ok(r#"never"#.into()));
+    assert_eq!(assert_ts_inline2::<C>(), Ok(r#"never"#.into()));
+    assert_eq!(assert_ts_inline2::<D>(), Ok(r#"never"#.into()));
 
-    assert_ts!(E, "({ a: \"A\" }) | ({ a: \"B\" })");
-    assert_ts!(F, "({ a: \"A\" }) | ({ a: \"B\" })");
-    assert_ts!(error; G, "Attempted to export  with tagging but the variant is a tuple struct.\n");
-    assert_ts!(H, "({ a: \"B\" })");
-    assert_ts!(I, "({ a: \"A\" }) | ({ a: \"B\" })");
+    assert_eq!(
+        assert_ts_inline2::<E>(),
+        Ok(r#"({ a: "A" }) | ({ a: "B" })"#.into())
+    );
+    assert_eq!(
+        assert_ts_inline2::<F>(),
+        Ok(r#"({ a: "A" }) | ({ a: "B" })"#.into())
+    );
+    assert_eq!(
+        assert_ts_inline2::<G>(),
+        Err("Attempted to export  with tagging but the variant is a tuple struct.\n".into())
+    );
+    assert_eq!(assert_ts_inline2::<H>(), Ok(r#"({ a: "B" })"#.into()));
+    assert_eq!(
+        assert_ts_inline2::<I>(),
+        Ok(r#"({ a: "A" }) | ({ a: "B" })"#.into())
+    );
 }
