@@ -1,5 +1,6 @@
 // TODO: Drop this stuff
 
+use std::collections::{BTreeSet, HashSet};
 use std::{borrow::Cow, fmt};
 
 /// Describes where an error occurred.
@@ -339,6 +340,13 @@ pub(crate) fn struct_datatype(
                 field_sections.push(format!("{{ {} }}", unflattened_fields.join("; ")));
             }
 
+            // TODO: Do this more efficiently
+            let field_sections = field_sections
+                .into_iter()
+                // Remove duplicates + sort
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>();
             s.push_str(&field_sections.join(" & "));
         }
     })

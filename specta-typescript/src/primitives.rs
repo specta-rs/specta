@@ -322,14 +322,33 @@ fn map_dt(
     is_export: bool,
 ) -> Result<(), Error> {
     {
+        fn is_exhaustive(dt: &DataType, types: &TypeCollection) -> bool {
+            match dt {
+                DataType::Enum(e) => e.variants().iter().filter(|(_, v)| !v.skip()).count() == 0,
+                DataType::Reference(r) => {
+                    if let Some(ty) = types.get(r.sid()) {
+                        is_exhaustive(ty.ty(), types)
+                    } else {
+                        false
+                    }
+                }
+                _ => true,
+            }
+        }
+
+        let is_exhaustive = is_exhaustive(m.key_ty(), types);
+
         // We use `{ [key in K]: V }` instead of `Record<K, V>` to avoid issues with circular references.
         // Wrapped in Partial<> because otherwise TypeScript would enforce exhaustiveness.
-        s.push_str("Partial<{ [key in ");
+        if !is_exhaustive {
+            s.push_str("Partial<");
+        }
+        s.push_str("{ [key in ");
         crate::legacy::datatype_inner(
             crate::legacy::ExportContext {
                 cfg: ts,
                 path: vec![],
-                is_export,
+                is_export: true,
             },
             &specta::datatype::FunctionReturnType::Value(m.key_ty().clone()),
             types,
@@ -346,7 +365,10 @@ fn map_dt(
             types,
             s,
         )?;
-        s.push_str(" }>");
+        s.push_str(" }");
+        if !is_exhaustive {
+            s.push_str(">");
+        }
     }
     // assert!(flattening, "todo: map flattening");
 

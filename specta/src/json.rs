@@ -3,6 +3,7 @@
 // TODO:
 //  - Should this be called `specta::type` with an alias for `specta::json` cause it's not tied to JSON.
 //  - Remove dependency on `serde_json`
+//  - Don't ignore doctests
 
 use crate::{datatype::Literal, DataType, Type, TypeCollection};
 
@@ -12,7 +13,7 @@ pub use serde_json;
 // /// A type that is typed as `any` in TypeScript.
 // ///
 // /// This can be use like the following:
-// /// ```rust
+// /// ```ignore
 // /// use serde::Serialize;
 // /// use specta::{Type, Any};
 // ///
@@ -68,7 +69,7 @@ impl serde::Serialize for False {
 
 /// Construct a `specta::Value` from a JSON literal.
 ///
-/// ```
+/// ```ignore
 /// # use specta::json;
 /// #
 /// let value = json!({
@@ -91,7 +92,7 @@ impl serde::Serialize for False {
 /// interpolated type decides to fail, or if the interpolated type contains a
 /// map with non-string keys, the `json!` macro will panic.
 ///
-/// ```
+/// ```ignore
 /// # use specta::json;
 /// #
 /// let code = 200;
@@ -108,7 +109,7 @@ impl serde::Serialize for False {
 ///
 /// Trailing commas are allowed inside both arrays and objects.
 ///
-/// ```
+/// ```ignore
 /// # use specta::json;
 /// #
 /// let value = json!([

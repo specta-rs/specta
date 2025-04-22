@@ -56,7 +56,7 @@ fn test() {
 
     assert_ts_export!(
         Container1,
-        "export type Container1 = { foo: Generic1<number>; bar: Generic1<number>[]; baz: Partial<{ [key in string]: Generic1<string> }> };"
+        "export type Container1 = { foo: Generic1<number>; bar: Generic1<number>[]; baz: { [key in string]: Generic1<string> } };"
     );
 }
 
@@ -142,7 +142,7 @@ fn inline() {
     assert_ts_export!(Generic::<()>, "export type Generic<T> = { t: T };");
     assert_ts_export!(
         Container,
-        "export type Container = ({ t: string }) & { g: Generic<string>; gi: { t: string } };"
+        "export type Container = (Generic<string>) & { g: Generic<string>; gi: { t: string } };"
     );
 }
 

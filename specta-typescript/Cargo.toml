@@ -26,6 +26,7 @@ serde = ["dep:serde", "specta/serde"]
 specta = { version = "=2.0.0-rc.22", path = "../specta" }
 specta-serde = { version = "=0.0.9", path = "../specta-serde" }
 serde = { version = "1", default-features = false, optional = true }
+serde_yaml = "0.9.34"
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }

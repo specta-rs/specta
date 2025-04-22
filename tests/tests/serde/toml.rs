@@ -4,11 +4,11 @@ use crate::ts::{assert_ts, assert_ts_inline2};
 fn toml() {
     assert_eq!(
         assert_ts_inline2::<toml::Value>(),
-        Ok(r#""A" | { B: [number] }"#.into())
+        Ok(r#"string | number | boolean | Datetime | TomlValue[] | { [key in string]: TomlValue }"#.into())
     );
     assert_eq!(
         assert_ts_inline2::<toml::map::Map<String, ()>>(),
-        Ok(r#""A" | { B: [number] }"#.into())
+        Ok(r#"{ [key in string]: null }"#.into())
     );
     assert_eq!(
         assert_ts_inline2::<toml::value::Datetime>(),

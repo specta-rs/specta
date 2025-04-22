@@ -68,24 +68,26 @@ pub mod construct {
 
     pub fn skipped_field(
         optional: bool,
+        flatten: bool,
+        inline: bool,
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
     ) -> Field {
         Field {
             optional,
-            flatten: false,
+            flatten,
             deprecated,
             docs,
-            inline: false, // TODO: Should this come from macro still?
+            inline,
             ty: None,
         }
     }
 
     pub fn field_flattened<T: Type + Flatten>(
         optional: bool,
+        inline: bool,
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
-        inline: bool,
         types: &mut TypeCollection,
     ) -> Field {
         Field {
@@ -100,9 +102,9 @@ pub mod construct {
 
     pub fn field<T: Type>(
         optional: bool,
+        inline: bool,
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
-        inline: bool,
         types: &mut TypeCollection,
     ) -> Field {
         Field {

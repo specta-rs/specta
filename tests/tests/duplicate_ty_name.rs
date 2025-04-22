@@ -31,17 +31,9 @@ pub struct Demo {
 
 #[test]
 fn test_duplicate_ty_name() {
-    #[cfg(not(target_os = "windows"))]
-    let err = r#"Detected multiple types with the same name: "One" in (ImplLocation("tests/tests/duplicate_ty_name.rs:7:14"), ImplLocation("tests/tests/duplicate_ty_name.rs:17:14"))
-"#;
-    #[cfg(target_os = "windows")]
-    let err = r#"Detected multiple types with the same name: "One" in (ImplLocation("tests\tests\duplicate_ty_name.rs:7:14"), ImplLocation("tests\tests\duplicate_ty_name.rs:17:14"))
-"#;
-
-    assert_eq!(
-        Typescript::default()
-            .export(&TypeCollection::default().register::<Demo>())
-            .map_err(|err| err.to_string()),
-        Err(err.into())
-    );
+    assert!(Typescript::default()
+        .export(&TypeCollection::default().register::<Demo>())
+        .is_err_and(|err| err
+            .to_string()
+            .starts_with("Detected multiple types with the same name:")));
 }

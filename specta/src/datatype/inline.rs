@@ -32,7 +32,7 @@ fn field(
     depth: usize,
 ) -> Field {
     // TODO: truely_force_inline
-    if f.flatten() || f.inline() {
+    if f.inline() {
         if let Some(ty) = &f.ty {
             return Field {
                 ty: Some(inner(
@@ -243,7 +243,7 @@ fn resolve_generics(dt: DataType, generics: &HashMap<Generic, DataType>) -> Data
         }),
         DataType::Generic(g) => {
             // This method is run when not inlining so for `export` we do expect `DataType::Generic`.
-            // TODO: Functions main documentation nshould explain this.
+            // TODO: Functions main documentation should explain this.
             generics.get(&g).cloned().unwrap_or(DataType::Generic(g))
         }
         v => v,

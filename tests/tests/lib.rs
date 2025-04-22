@@ -39,3 +39,8 @@ fn test_compile_errors() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/macro/compile_error.rs");
 }
+
+#[test]
+fn test_testing() {
+    insta::assert_debug_snapshot!(vec![1, 2, 3]);
+}

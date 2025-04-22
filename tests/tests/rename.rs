@@ -41,7 +41,7 @@ pub enum Enum3 {
 
 #[test]
 fn rename() {
-    assert_ts!(Struct, "{ a: string; t: \"StructNew\" }");
+    assert_ts!(Struct, "{ a: string }");
     assert_ts_export!(
         Struct,
         "export type StructNew = { a: string; t: \"StructNew\" };"

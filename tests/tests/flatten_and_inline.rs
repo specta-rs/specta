@@ -116,15 +116,13 @@ pub enum K {
 
 #[test]
 fn serde() {
-    assert_ts!(
-        B,
-        "({ a: string }) & (Partial<{ [key in string]: string }>) & ({ a: string })"
-    );
-    assert_ts!(C, "({ a: string }) & { b: { a: string } }");
-    assert_ts!(D, "({ a: string }) & { b: { a: string }; type: \"D\" }");
-    assert_ts!(E, "({ a: string }) & { b: { a: string } }");
-    assert_ts!(F, "({ a: string }) & ({ a: string })");
-    assert_ts!(G, "({ a: string }) & ({ a: number })");
+    assert_ts!(B, "(A) & ({ [key in string]: string })");
+    assert_ts!(C, "(A) & { b: { a: string } }");
+    assert_ts!(D, "(A) & { b: { a: string } }");
+    // assert_ts!(D, "(A) & { b: { a: string } }"); // TODO: Assert export
+    assert_ts!(E, "(A) & { b: { a: string } }");
+    assert_ts!(F, "(A)");
+    assert_ts!(G, "(A) & (AA)");
     assert_ts!(H, "{ A: string } | \"B\"");
     assert_ts!(J, "{ t: \"A\"; c: string } | { t: \"B\" } | { t: \"C\"; c: { a: string } } | { t: \"D\"; c: A }");
     assert_ts!(K, "string | null | { a: string } | A");

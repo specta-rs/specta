@@ -1,7 +1,5 @@
 use std::borrow::Cow;
 
-use crate::SpectaID;
-
 use super::{DataType, DeprecatedType, Fields};
 
 /// Enum type which dictates how the enum is represented.

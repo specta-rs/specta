@@ -3,4 +3,3 @@
 export type MyOtherType = { other_field: string };
 
 export type MyType = { field: MyOtherType };
-

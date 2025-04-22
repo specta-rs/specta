@@ -19,15 +19,23 @@ pub fn assert_ts_export2<T: NamedType>() -> Result<String, String> {
     let mut types = TypeCollection::default();
     T::definition(&mut types);
     specta_serde::validate(&types).map_err(|e| e.to_string())?;
-    specta_typescript::primitives::export(&Default::default(), &types, types.get(T::ID).unwrap())
-        .map_err(|e| e.to_string())
+    specta_typescript::primitives::export(
+        &Typescript::default().bigint(BigIntExportBehavior::Number),
+        &types,
+        types.get(T::ID).unwrap(),
+    )
+    .map_err(|e| e.to_string())
 }
 pub fn assert_ts_inline2<T: Type>() -> Result<String, String> {
     let mut types = TypeCollection::default();
     let dt = T::definition(&mut types);
     specta_serde::validate_dt(&dt, &types).map_err(|e| e.to_string())?;
-    specta_typescript::primitives::inline(&Default::default(), &types, &dt)
-        .map_err(|e| e.to_string())
+    specta_typescript::primitives::inline(
+        &Typescript::default().bigint(BigIntExportBehavior::Number),
+        &types,
+        &dt,
+    )
+    .map_err(|e| e.to_string())
 }
 
 macro_rules! assert_ts {
@@ -224,13 +232,10 @@ fn typescript_types() {
     assert_ts!(GenericStruct<i32>, "{ arg: number }");
     assert_ts!(GenericStruct<String>, "{ arg: string }");
 
-    assert_ts!(
-        FlattenEnumStruct,
-        r#"({ tag: "One" } | { tag: "Two" } | { tag: "Three" }) & { outer: string }"#
-    );
+    assert_ts!(FlattenEnumStruct, r#"(FlattenEnum) & { outer: string }"#);
 
     assert_ts!(OverridenStruct, "{ overriden_field: string }");
-    assert_ts!(HasGenericAlias, r#"Partial<{ [key in number]: string }>"#);
+    assert_ts!(HasGenericAlias, r#"{ [key in number]: string }"#);
 
     assert_ts!(SkipVariant, "{ A: string }");
     assert_ts!(SkipVariant2, r#"{ tag: "A"; data: string }"#);
@@ -313,10 +318,7 @@ fn typescript_types() {
         "export type EnumReferenceRecordKey = { a: Partial<{ [key in BasicEnum]: number }> };"
     );
 
-    assert_ts!(
-        FlattenOnNestedEnum,
-        r#"({ type: "a"; value: string } | { type: "b"; value: number }) & { id: string }"#
-    );
+    assert_ts!(FlattenOnNestedEnum, r#"(NestedEnum) & { id: string }"#);
 
     assert_ts!(PhantomData<()>, r#"null"#);
     assert_ts!(PhantomData<String>, r#"null"#);

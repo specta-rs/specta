@@ -135,7 +135,7 @@ fn internally_tagged() {
     );
     assert_eq!(
         assert_ts_inline2::<D>(),
-        Ok(r#"({ type: "A" } & Partial<{ [key in string]: string }>)"#.into())
+        Ok(r#"({ type: "A" } & { [key in string]: string })"#.into())
     );
 
     assert_eq!(assert_ts_inline2::<E>(), Ok(r#"({ type: "A" })"#.into()));

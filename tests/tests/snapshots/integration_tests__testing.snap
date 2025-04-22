@@ -1,0 +1,9 @@
+---
+source: tests/tests/lib.rs
+expression: "vec![1, 2, 3]"
+---
+[
+    1,
+    2,
+    3,
+]

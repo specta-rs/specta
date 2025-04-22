@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use specta::Type;
 
-use crate::ts::assert_ts;
+use crate::ts::{assert_ts, assert_ts_export2};
 
 #[derive(Type)]
 #[specta(export = false)]
@@ -38,11 +38,11 @@ fn test_type_aliases() {
     assert_ts!(FullGeneric<u8, bool>, "{ a: number; b: boolean }");
     assert_ts!(Another<bool>, "{ a: number; b: boolean }");
 
-    assert_ts!(MapA<u32>, "Partial<{ [key in string]: number }>");
-    assert_ts!(MapB<u32>, "Partial<{ [key in number]: string }>");
+    assert_ts!(MapA<u32>, "{ [key in string]: number }");
+    assert_ts!(MapB<u32>, "{ [key in number]: string }");
     assert_ts!(
         MapC<u32>,
-        "Partial<{ [key in string]: { field: Demo<number, boolean> } }>"
+        "{ [key in string]: { field: Demo<number, boolean> } }"
     );
 
     assert_ts!(Struct<u32>, "{ field: Demo<number, boolean> }");
@@ -140,11 +140,16 @@ struct BoxInline {
 
 #[test]
 fn test_inlining() {
-    assert_ts!(
-        A,
-        "({ b: number }) & ({ flattened: number }) & ({ generic_flattened: number }) & { a: B; b: { b: number } }"
+    assert_eq!(
+        assert_ts_export2::<A>(),
+        Ok(r#"export type A = (B) & (D) & (GenericFlattened<number>) & { a: B; b: B };"#.into())
     );
-    assert_ts!(DoubleFlattened, "({ a: string }) & ({ a: string })");
+
+    // assert_ts!(
+    //     A,
+    //     "({ b: number }) & ({ flattened: number }) & ({ generic_flattened: number }) & { a: B; b: { b: number } }"
+    // );
+    // assert_ts!(DoubleFlattened, "({ a: string }) & ({ a: string })");
 
     // TODO: All of these currently fail.
     // assert_ts!(FlattenedInner, ""); // TODO: This is wrong

@@ -63,11 +63,11 @@ fn test_recursive_types() {
 
     assert_ts!(
         RecursiveMapValue,
-        "{ demo: Partial<{ [key in string]: RecursiveMapValue }> }"
+        "{ demo: { [key in string]: RecursiveMapValue } }"
     );
     assert_ts_export!(
         RecursiveMapValue,
-        "export type RecursiveMapValue = { demo: Partial<{ [key in string]: RecursiveMapValue }> };"
+        "export type RecursiveMapValue = { demo: { [key in string]: RecursiveMapValue } };"
     );
 }
 
