@@ -91,7 +91,7 @@ impl Default for ExportConfig {
 pub enum BigIntExportBehavior {
     /// Export BigInt as a Typescript `string`
     ///
-    /// Doing this is serde is [pretty simple](https://github.com/serde-rs/json/issues/329#issuecomment-305608405).
+    /// Doing this in serde is [pretty simple](https://github.com/serde-rs/json/issues/329#issuecomment-305608405).
     String,
     /// Export BigInt as a Typescript `number`.
     ///
