@@ -54,6 +54,7 @@ pub enum Error {
     DuplicateTypeNameLegacy(Cow<'static, str>, Location<'static>, Location<'static>),
     // #[error("fmt error: {0}")]
     FmtLegacy(std::fmt::Error),
+    UnableToExport,
 }
 
 impl From<io::Error> for Error {
@@ -91,6 +92,7 @@ impl fmt::Display for Error {
             Error::InvalidTaggedVariantContainingTupleStructLegacy(path) => writeln!(f, "Attempted to export {path:?} with tagging but the variant is a tuple struct."),
             Error::DuplicateTypeNameLegacy(a, b, _) => writeln!(f, "Attempted to export {a:?} but was unable to due to name {b:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`"),
             Error::FmtLegacy(err) => writeln!(f, "formatter: {err:?}"),
+            Error::UnableToExport => writeln!(f, "Unable to export type"),
         }
     }
 }

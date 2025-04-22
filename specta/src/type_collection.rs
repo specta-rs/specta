@@ -40,13 +40,13 @@ impl TypeCollection {
         self
     }
 
-    /// Declare a runtime defined type with the collection.
+    /// Create a runtime defined type with the collection.
     ///
     /// Each [`Reference`] that is returned from a call to this function will be unique.
     /// You should only call this once and reuse the [`Reference`] if you intend to point to the same type.
     ///
     /// This method will return an error if the type_map is full. This will happen after `u64::MAX` calls to this method.
-    pub fn declare(&mut self, ndt: NamedDataTypeBuilder) -> Result<Reference, ()> {
+    pub fn create(&mut self, ndt: NamedDataTypeBuilder) -> Result<Reference, ()> {
         let sid = crate::specta_id::r#virtual(saturating_add(&self.virtual_sid, 1));
         self.map.insert(
             sid,
@@ -108,7 +108,7 @@ impl TypeCollection {
             .iter()
             .filter_map(|(_, ndt)| ndt.clone())
             .collect::<Vec<_>>();
-        v.sort_by(|x, y| x.name.cmp(&y.name).then(x.sid.0.cmp(&y.sid.0)));
+        v.sort_by(|x, y| x.name.cmp(&y.name).then(x.sid.cmp(&y.sid)));
         v.into_iter()
     }
 

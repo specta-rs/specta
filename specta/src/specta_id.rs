@@ -10,7 +10,7 @@
 ///  - `crate_a@v1::T::SID == crate_a@v2::T::SID` (unlike std::any::TypeId)
 ///
 // TODO: Encode the properties above into unit tests.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SpectaID(pub(crate) SpectaIDInner);
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]

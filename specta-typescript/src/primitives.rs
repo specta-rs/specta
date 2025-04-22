@@ -17,8 +17,8 @@ use specta::{
 };
 
 use crate::{
-    legacy::js_doc_builder, reserved_names::*, Any, BigIntExportBehavior, Error, Typescript,
-    Unknown,
+    legacy::js_doc_builder, reserved_names::*, Any, BigIntExportBehavior, Error, Format,
+    Typescript, Unknown,
 };
 
 /// Generate an `export Type = ...` Typescript string for a specific [`DataType`].
@@ -53,7 +53,15 @@ pub fn export(
             is_export: false,
         },
         crate::legacy::NamedLocation::Type,
-        ndt.name(),
+        &match ts.format {
+            Format::ModulePrefixedName => {
+                let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
+                s.push_str("_");
+                s.push_str(ndt.name());
+                Cow::Owned(s)
+            }
+            _ => ndt.name().clone(),
+        },
     )?
     .leak(); // TODO: Leaking bad
 
@@ -844,12 +852,38 @@ fn reference_dt(
         } else if r.sid() == Unknown::<()>::ID {
             s.push_str("unknown");
         } else {
-            let definition = types.get(r.sid()).unwrap(); // TODO: Error handling
+            let ndt = types.get(r.sid()).unwrap(); // TODO: Error handling
 
-            if r.generics().len() == 0 {
-                s.push_str(&definition.name());
-            } else {
-                s.push_str(&definition.name());
+            let name = match ts.format {
+                Format::ModulePrefixedName => {
+                    let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
+                    s.push_str("_");
+                    s.push_str(ndt.name());
+                    Cow::Owned(s)
+                }
+                Format::Namespaces => {
+                    let mut s = "$$specta_ns$$".to_string();
+                    for (i, root_module) in ndt.module_path().split("::").enumerate() {
+                        if i != 0 {
+                            s.push_str(".");
+                        }
+                        s.push_str(root_module);
+                    }
+                    s.push_str(".");
+                    s.push_str(ndt.name());
+                    Cow::Owned(s)
+                }
+                Format::Files => {
+                    let mut s = ndt.module_path().replace("::", "_");
+                    s.push_str("_");
+                    s.push_str(ndt.name());
+                    Cow::Owned(s)
+                }
+                _ => ndt.name().clone(),
+            };
+
+            s.push_str(&name);
+            if r.generics().len() != 0 {
                 s.push('<');
 
                 for (i, (_, v)) in r.generics().iter().enumerate() {

@@ -59,4 +59,4 @@ mod typescript;
 pub use error::Error;
 pub use js_doc::JSDoc;
 pub use types::{Any, Never, Unknown};
-pub use typescript::{BigIntExportBehavior, Typescript};
+pub use typescript::{BigIntExportBehavior, Format, Typescript};
