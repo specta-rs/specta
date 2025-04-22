@@ -187,7 +187,7 @@ fn primitive_dt(
     use Primitive::*;
 
     Ok(match p {
-        i8 | i16 | i32 | u8 | u16 | u32 | f32 | f64 => "number",
+        i8 | i16 | i32 | u8 | u16 | u32 | f32 | f16 | f64 => "number",
         usize | isize | i64 | u64 | i128 | u128 => match b {
             BigIntExportBehavior::String => "string",
             BigIntExportBehavior::Number => "number",

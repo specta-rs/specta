@@ -10,6 +10,13 @@ impl_primitives!(
     String
 );
 
+#[cfg(feature = "nightly")]
+impl Type for f16 {
+    fn definition(_: &mut TypeCollection) -> DataType {
+        DataType::Primitive(datatype::Primitive::f16)
+    }
+}
+
 impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13); // Technically we only support 12-tuples but the `T13` is required due to how the macro works
 
 const _: () = {

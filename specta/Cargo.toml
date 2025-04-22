@@ -33,6 +33,9 @@ unstable_json_macro = []
 ## Support for exporting the types of Rust functions.
 function = ["specta-macros?/DO_NOT_USE_function", "dep:paste"]
 
+# Enable nightly features
+nightly = []
+
 #! Compatibility
 ## Support for [serde](https://serde.rs)
 serde = ["dep:serde"]
