@@ -3,6 +3,8 @@
 use std::collections::{BTreeSet, HashSet};
 use std::{borrow::Cow, fmt};
 
+pub use crate::inline::inline_and_flatten_ndt;
+
 /// Describes where an error occurred.
 #[derive(Debug, PartialEq)]
 pub enum NamedLocation {

@@ -2,12 +2,12 @@ use std::borrow::Cow;
 
 use super::{DataType, DeprecatedType, Fields};
 
-/// Enum type which dictates how the enum is represented.
+/// represents a Rust [enum](https://doc.rust-lang.org/std/keyword.enum.html).
 ///
-/// The tagging refers to the [Serde concept](https://serde.rs/enum-representations.html).
+/// Enums are configured with a set of variants, each with a name and a type.
+/// The variants can be either unit variants (no fields), tuple variants (fields in a tuple), or struct variants (fields in a struct).
 ///
-/// [`Untagged`](Enum::Untagged) is here rather than in [`EnumRepr`] as it is the only enum representation that does not have tags on its variants.
-/// Separating it allows for better typesafety since `variants` doesn't have to be a [`Vec`] of tuples.
+/// An enum is also assigned a repr which follows [Serde repr semantics](https://serde.rs/enum-representations.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Enum {
     pub(crate) repr: Option<EnumRepr>,
@@ -15,12 +15,29 @@ pub struct Enum {
 }
 
 impl Enum {
+    /// Get an immutable reference to the enum's representation.
     pub fn repr(&self) -> Option<&EnumRepr> {
         self.repr.as_ref()
     }
 
+    /// Get a mutable reference to the enum's representation.
+    pub fn repr_mut(&mut self) -> Option<&mut EnumRepr> {
+        self.repr.as_mut()
+    }
+
+    /// Set the enum's representation.
+    pub fn set_repr(&mut self, repr: EnumRepr) {
+        self.repr = Some(repr);
+    }
+
+    /// Get an immutable reference to the enum's variants.
     pub fn variants(&self) -> &[(Cow<'static, str>, EnumVariant)] {
         &self.variants
+    }
+
+    /// Get a mutable reference to the enum's variants.
+    pub fn variants_mut(&mut self) -> &mut Vec<(Cow<'static, str>, EnumVariant)> {
+        &mut self.variants
     }
 }
 
@@ -31,6 +48,7 @@ impl From<Enum> for DataType {
 }
 
 /// Serde representation of an enum.
+/// Refer to the [Serde documentation](https://serde.rs/enum-representations.html) for more information.
 #[derive(Debug, Clone, PartialEq)]
 pub enum EnumRepr {
     Untagged,
@@ -44,6 +62,7 @@ pub enum EnumRepr {
     },
 }
 
+/// represents a variant of an enum.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnumVariant {
     /// Did the user apply a `#[serde(skip)]` or `#[specta(skip)]` attribute.
@@ -60,19 +79,58 @@ pub struct EnumVariant {
 }
 
 impl EnumVariant {
+    /// Has the Serde or Specta skip attribute been applied to this variant?
     pub fn skip(&self) -> bool {
         self.skip
     }
 
+    /// Set the skip attribute for the variant.
+    pub fn set_skip(&mut self, skip: bool) {
+        self.skip = skip;
+    }
+
+    /// Get an immutable reference to the documentation comments for the field.
     pub fn docs(&self) -> &Cow<'static, str> {
         &self.docs
     }
 
+    /// Get a mutable reference to the documentation comments for the variant.
+    pub fn docs_mut(&mut self) -> &mut Cow<'static, str> {
+        &mut self.docs
+    }
+
+    /// Set the documentation comments for the field.
+    pub fn set_docs(&mut self, docs: Cow<'static, str>) {
+        self.docs = docs;
+    }
+
+    /// Get an immutable reference to the deprecated attribute for the field.
     pub fn deprecated(&self) -> Option<&DeprecatedType> {
         self.deprecated.as_ref()
     }
 
+    /// Get a mutable reference to the deprecated attribute for the field.
+    pub fn deprecated_mut(&mut self) -> Option<&mut DeprecatedType> {
+        self.deprecated.as_mut()
+    }
+
+    /// Set the deprecated attribute for the field.
+    pub fn set_deprecated(&mut self, deprecated: Option<DeprecatedType>) {
+        self.deprecated = deprecated;
+    }
+
+    /// Get an immutable reference to the fields of the variant.
     pub fn fields(&self) -> &Fields {
         &self.fields
+    }
+
+    /// Get a mutable reference to the fields of the variant.
+    pub fn fields_mut(&mut self) -> &mut Fields {
+        &mut self.fields
+    }
+
+    /// Set the fields of the variant.
+    pub fn set_fields(&mut self, fields: Fields) {
+        self.fields = fields;
     }
 }

@@ -1,17 +1,27 @@
 use super::DataType;
 
-/// A regular tuple
+/// Represents a Rust [tuple](https://doc.rust-lang.org/std/primitive.tuple.html) type.
 ///
-/// Represented in Rust as `(...)` and in TypeScript as `[...]`.
-/// Be aware `()` is treated specially as `null` in Typescript.
+/// Be aware `()` is treated specially as `null` when using the Typescript exporter.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Tuple {
     pub(crate) elements: Vec<DataType>,
 }
 
 impl Tuple {
+    /// Create a new tuple with the given elements.
+    pub fn new(elements: Vec<DataType>) -> Self {
+        Self { elements }
+    }
+
+    /// Get the elements of the tuple.
     pub fn elements(&self) -> &[DataType] {
         &self.elements
+    }
+
+    /// Get a mutable reference to the elements of the tuple.
+    pub fn elements_mut(&mut self) -> &mut Vec<DataType> {
+        &mut self.elements
     }
 }
 

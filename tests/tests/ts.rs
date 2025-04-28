@@ -10,7 +10,7 @@ use std::{
 };
 
 use serde::Serialize;
-use specta::{datatype::inline_and_flatten_ndt, NamedType, Type, TypeCollection};
+use specta::{NamedType, Type, TypeCollection};
 use specta_typescript::Any;
 use specta_typescript::{BigIntExportBehavior, Typescript};
 
@@ -129,8 +129,8 @@ pub fn export<T: NamedType>(ts: &Typescript) -> Result<String, String> {
         }
     }
 
-    let ndt = types.get(T::ID).unwrap();
-    let ndt = inline_and_flatten_ndt(ndt.clone(), &types);
+    let mut ndt = types.get(T::ID).unwrap().clone();
+    specta_typescript::legacy::inline_and_flatten_ndt(&mut ndt, &types);
     specta_typescript::primitives::export(ts, &types, &ndt)
         // Allows matching the value. Implementing `PartialEq` on it is really hard.
         .map_err(|e| e.to_string())

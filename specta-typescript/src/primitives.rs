@@ -98,7 +98,8 @@ pub fn export(
 /// The type should be wrapped in a [`NamedDataType`] to provide a proper name.
 ///
 pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<String, Error> {
-    let dt = specta::datatype::inline(dt.clone(), &types);
+    let mut dt = dt.clone();
+    crate::inline::inline(&mut dt, &types);
     let mut s = String::new();
     datatype(&mut s, ts, types, &dt, vec![], false, None)?;
     Ok(s)

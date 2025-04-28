@@ -6,9 +6,7 @@ use crate::SpectaID;
 
 use super::{DataType, Generic};
 
-/// A reference datatype.
-///
-/// TODO: Explain how to construct this.
+/// A reference to a [NamedDataType].
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Reference {
@@ -31,14 +29,22 @@ impl Reference {
         }
     }
 
+    /// Get the [SpectaID] of the [NamedDataType] this [Reference] points to.
     pub fn sid(&self) -> SpectaID {
         self.sid
     }
 
+    /// Get the generic parameters set on this reference which will be filled in by the [NamedDataType].
     pub fn generics(&self) -> &BTreeMap<Generic, DataType> {
         &self.generics
     }
 
+    /// Get the generic parameters set on this reference which will be filled in by the [NamedDataType].
+    pub fn generics_mut(&mut self) -> &mut BTreeMap<Generic, DataType> {
+        &mut self.generics
+    }
+
+    /// Get whether this reference should be inlined
     pub fn inline(&self) -> bool {
         self.inline
     }

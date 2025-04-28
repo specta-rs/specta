@@ -180,7 +180,7 @@ pub fn to_ast(schema: &Schema) -> Result<DataType, ()> {
                         println!("{:?}", obj);
 
                         return Ok(match o.len() {
-                            0 => DataType::List(List::new(from_instance_type(&o[0]), None, false)),
+                            0 => DataType::List(List::new(from_instance_type(&o[0]))),
                             _ => {
                                 let mut e = EnumBuilder::new();
 

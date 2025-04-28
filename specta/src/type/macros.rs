@@ -69,11 +69,11 @@ macro_rules! _impl_for_list {
     ($($unique:expr; $ty:path as $name:expr)+) => {$(
         impl<T: Type> Type for $ty {
             fn definition(types: &mut TypeCollection) -> DataType {
-                DataType::List(List::new(
+                let mut l = List::new(
                     <T as Type>::definition(types),
-                    None,
-                    $unique,
-                ))
+                );
+                l.set_unique($unique);
+                DataType::List(l)
             }
         }
     )+};

@@ -49,6 +49,7 @@
 )]
 
 mod error;
+mod inline;
 mod js_doc;
 pub mod legacy;
 pub mod primitives;
