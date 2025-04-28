@@ -33,24 +33,17 @@ impl From<Literal> for DataType {
     }
 }
 
-// TODO: Do all of this
-// macro_rules! impl_literal_conversion {
-//     () => {
-
-//     };
-// }
-
-impl From<i8> for Literal {
-    fn from(t: i8) -> Self {
-        Self::i8(t)
-    }
+macro_rules! impl_literal_conversion {
+    ($($i:ident)+) => {$(
+        impl From<$i> for Literal {
+            fn from(t: $i) -> Self {
+                Self::$i(t)
+            }
+        }
+    )+};
 }
 
-impl From<bool> for Literal {
-    fn from(t: bool) -> Self {
-        Self::bool(t)
-    }
-}
+impl_literal_conversion!(i8 i16 i32 u8 u16 u32 f32 f64 bool char);
 
 impl From<String> for Literal {
     fn from(t: String) -> Self {
