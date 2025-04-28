@@ -39,7 +39,6 @@ pub struct Any<T = ()>(T);
 
 impl<T> Type for Any<T> {
     fn definition(types: &mut TypeCollection) -> DataType {
-        types.placeholder(Self::ID);
         DataType::Reference(Reference::construct(Self::ID, [], false))
     }
 }
@@ -112,7 +111,6 @@ pub struct Unknown<T = ()>(T);
 
 impl<T> Type for Unknown<T> {
     fn definition(types: &mut TypeCollection) -> DataType {
-        types.placeholder(Self::ID);
         DataType::Reference(Reference::construct(Self::ID, [], false))
     }
 }
@@ -185,7 +183,6 @@ pub struct Never<T = ()>(T);
 
 impl<T> Type for Never<T> {
     fn definition(types: &mut TypeCollection) -> DataType {
-        types.placeholder(Self::ID);
         DataType::Reference(Reference::construct(Self::ID, [], false))
     }
 }

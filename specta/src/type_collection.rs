@@ -116,14 +116,6 @@ impl TypeCollection {
     pub fn into_unsorted_iter(&self) -> impl Iterator<Item = &NamedDataType> {
         self.map.iter().filter_map(|(_, ndt)| ndt.as_ref())
     }
-
-    /// Experimental: should we stabilise this? It's being used by `specta_typescript::Any`
-    /// TODO: If we stablize this, we need to stop it from causing panics.
-    #[doc(hidden)]
-    pub fn placeholder(&mut self, sid: SpectaID) -> &mut Self {
-        self.map.insert(sid, None);
-        self
-    }
 }
 
 fn saturating_add(atomic: &AtomicU64, value: u64) -> u64 {
