@@ -404,6 +404,9 @@ fn typescript_types() {
     //         r#"@odata.context"#.to_string()
     //     )
     // );
+
+    // https://github.com/specta-rs/specta/issues/374
+    assert_ts!(Issue374, "{ foo?: boolean; bar?: boolean }");
 }
 
 #[derive(Type)]
@@ -763,4 +766,13 @@ pub struct KebabCase {
 #[derive(Type)]
 pub struct Issue281<'a> {
     default_unity_arguments: &'a [&'a str],
+}
+
+/// https://github.com/specta-rs/specta/issues/374
+#[derive(specta::Type)]
+struct Issue374 {
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    foo: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
+    bar: bool,
 }
