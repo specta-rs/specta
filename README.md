@@ -19,6 +19,14 @@
  - Supports wide range of common crates in Rust ecosystem
  - Supports type inference - can determine type of `fn demo() -> impl Type`.
 
+## Support
+
+Development of this project is supported by my [GitHub Sponsors](https://github.com/sponsors/oscartbeaumont) and also [CrabNebula](https://crabnebula.dev), a huge thanks to them!
+
+<p align="center">
+  <img alt="CrabNebula Logo" src="https://github.com/user-attachments/assets/9924e76d-07a9-43fb-b276-571e5823920f" />
+</p>
+
 ## Ecosystem
 
 Specta can be used in your application either directly or through a library which simplifies the process of using it.
