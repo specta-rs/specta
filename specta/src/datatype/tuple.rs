@@ -10,7 +10,7 @@ pub struct Tuple {
 }
 
 impl Tuple {
-    pub fn elements(&self) -> &Vec<DataType> {
+    pub fn elements(&self) -> &[DataType] {
         &self.elements
     }
 }

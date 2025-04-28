@@ -19,7 +19,7 @@ impl Enum {
         self.repr.as_ref()
     }
 
-    pub fn variants(&self) -> &Vec<(Cow<'static, str>, EnumVariant)> {
+    pub fn variants(&self) -> &[(Cow<'static, str>, EnumVariant)] {
         &self.variants
     }
 }

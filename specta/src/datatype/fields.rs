@@ -72,7 +72,7 @@ pub struct UnnamedFields {
 
 impl UnnamedFields {
     /// A list of fields for the current type.
-    pub fn fields(&self) -> &Vec<Field> {
+    pub fn fields(&self) -> &[Field] {
         &self.fields
     }
 }
@@ -98,12 +98,12 @@ pub struct NamedFields {
 
 impl NamedFields {
     /// A list of fields in the format (name, [StructField]).
-    pub fn fields(&self) -> &Vec<(Cow<'static, str>, Field)> {
+    pub fn fields(&self) -> &[(Cow<'static, str>, Field)] {
         &self.fields
     }
 
     /// Serde tag for the current field.
-    pub fn tag(&self) -> &Option<Cow<'static, str>> {
-        &self.tag
+    pub fn tag(&self) -> Option<&Cow<'static, str>> {
+        self.tag.as_ref()
     }
 }

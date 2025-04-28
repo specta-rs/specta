@@ -7,7 +7,7 @@ use std::{
 use crate::{
     builder::NamedDataTypeBuilder,
     datatype::{NamedDataType, Reference},
-    DataType, NamedType, SpectaID,
+    NamedType, SpectaID,
 };
 
 /// Define a set of types which can be exported together.

@@ -49,7 +49,7 @@ impl NamedDataType {
     }
 
     /// The generics that are defined on this type
-    pub fn generics(&self) -> &Vec<Generic> {
+    pub fn generics(&self) -> &[Generic] {
         &self.generics
     }
 
