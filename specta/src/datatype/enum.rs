@@ -10,13 +10,13 @@ use super::{DataType, DeprecatedType, Fields};
 /// Separating it allows for better typesafety since `variants` doesn't have to be a [`Vec`] of tuples.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Enum {
-    pub(crate) repr: EnumRepr,
+    pub(crate) repr: Option<EnumRepr>,
     pub(crate) variants: Vec<(Cow<'static, str>, EnumVariant)>,
 }
 
 impl Enum {
-    pub fn repr(&self) -> &EnumRepr {
-        &self.repr
+    pub fn repr(&self) -> Option<&EnumRepr> {
+        self.repr.as_ref()
     }
 
     pub fn variants(&self) -> &Vec<(Cow<'static, str>, EnumVariant)> {

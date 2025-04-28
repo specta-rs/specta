@@ -158,20 +158,20 @@ impl FieldBuilder {
 }
 
 pub struct EnumBuilder {
-    repr: EnumRepr,
+    repr: Option<EnumRepr>,
     variants: Vec<(Cow<'static, str>, EnumVariant)>,
 }
 
 impl EnumBuilder {
     pub fn new() -> Self {
         Self {
-            repr: EnumRepr::External,
+            repr: None,
             variants: vec![],
         }
     }
 
     pub fn repr(mut self, repr: EnumRepr) -> Self {
-        self.repr = repr;
+        self.repr = Some(repr);
         self
     }
 

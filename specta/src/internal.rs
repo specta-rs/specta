@@ -136,7 +136,10 @@ pub mod construct {
         Fields::Named(NamedFields { fields, tag })
     }
 
-    pub const fn r#enum(repr: EnumRepr, variants: Vec<(Cow<'static, str>, EnumVariant)>) -> Enum {
+    pub const fn r#enum(
+        repr: Option<EnumRepr>,
+        variants: Vec<(Cow<'static, str>, EnumVariant)>,
+    ) -> Enum {
         Enum { repr, variants }
     }
 

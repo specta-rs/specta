@@ -441,7 +441,7 @@ pub(crate) fn enum_datatype(
         return Ok(write!(s, "{NEVER}")?);
     }
 
-    Ok(match &e.repr() {
+    Ok(match &e.repr().unwrap_or(&EnumRepr::External) {
         EnumRepr::Untagged => {
             let mut variants = e
                 .variants()
@@ -710,7 +710,7 @@ fn validate_type_for_tagged_intersection(
             }
         },
         DataType::Enum(v) => {
-            match v.repr() {
+            match v.repr().unwrap_or(&EnumRepr::External) {
                 EnumRepr::Untagged => {
                     Ok(v.variants().iter().any(|(_, v)| match &v.fields() {
                         // `{ .. } & null` is `never`

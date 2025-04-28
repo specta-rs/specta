@@ -158,7 +158,7 @@ fn is_valid_map_key(
                             return Err(Error::InvalidMapKey);
                         }
 
-                        if *ty.repr() != EnumRepr::Untagged {
+                        if *ty.repr().unwrap_or(&EnumRepr::External) != EnumRepr::Untagged {
                             return Err(Error::InvalidMapKey);
                         }
                     }
@@ -198,7 +198,7 @@ fn validate_enum(e: &Enum, types: &TypeCollection) -> Result<(), Error> {
     }
 
     // Only internally tagged enums can be invalid.
-    if let EnumRepr::Internal { .. } = e.repr() {
+    if let EnumRepr::Internal { .. } = e.repr().unwrap_or(&EnumRepr::External) {
         validate_internally_tag_enum(e, types)?;
     }
 
@@ -242,7 +242,7 @@ fn validate_internally_tag_enum_datatype(
         DataType::Map(_) => {}
         // Structs's are always map-types unless they are transparent then it depends on inner type. However, transparent passes through when calling `Type::inline` so we don't need to specially check that case.
         DataType::Struct(_) => {}
-        DataType::Enum(ty) => match ty.repr() {
+        DataType::Enum(ty) => match ty.repr().unwrap_or(&EnumRepr::External) {
             // Is only valid if the enum itself is also valid.
             EnumRepr::Untagged => validate_internally_tag_enum(ty, types)?,
             // Eg. `{ "Variant": "value" }` is a map-type so valid.

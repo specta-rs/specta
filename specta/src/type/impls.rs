@@ -143,7 +143,10 @@ impl<T> Type for std::marker::PhantomData<T> {
 const _: () = {
     impl Type for std::convert::Infallible {
         fn definition(_: &mut TypeCollection) -> DataType {
-            DataType::Enum(internal::construct::r#enum(EnumRepr::External, vec![]))
+            DataType::Enum(internal::construct::r#enum(
+                Some(EnumRepr::External),
+                vec![],
+            ))
         }
     }
 };
