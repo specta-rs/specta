@@ -21,7 +21,7 @@ pub enum Fields {
     Named(NamedFields),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct Field {
     /// Did the user apply a `#[specta(optional)]` attribute.
     pub(crate) optional: bool,
@@ -41,6 +41,20 @@ pub struct Field {
 }
 
 impl Field {
+    /// Construct a new field with the given type.
+    ///
+    /// You can skip the requirement on providing a [`DataType`] by using [`Field::default`]
+    pub fn new(ty: DataType) -> Self {
+        Field {
+            optional: false,
+            flatten: false,
+            deprecated: None,
+            docs: "".into(),
+            inline: false,
+            ty: Some(ty),
+        }
+    }
+
     /// Has the Serde or Specta optional attribute been applied to this field?
     pub fn optional(&self) -> bool {
         self.optional

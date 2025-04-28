@@ -1,6 +1,11 @@
 use std::borrow::Cow;
 
-use crate::datatype::{DataType, Fields};
+use crate::{
+    builder::StructBuilder,
+    datatype::{DataType, Fields},
+};
+
+use super::{NamedFields, UnnamedFields};
 
 /// represents a Rust [struct](https://doc.rust-lang.org/std/keyword.struct.html).
 #[derive(Debug, Clone, PartialEq)]
@@ -9,6 +14,32 @@ pub struct Struct {
 }
 
 impl Struct {
+    /// Construct a new unit struct.
+    pub fn unit() -> Self {
+        Self {
+            fields: Fields::Unit,
+        }
+    }
+
+    /// Construct a named struct.
+    pub fn named() -> StructBuilder<NamedFields> {
+        StructBuilder {
+            fields: NamedFields {
+                fields: Default::default(),
+                tag: Default::default(),
+            },
+        }
+    }
+
+    /// Construct an unnamed struct.
+    pub fn unnamed() -> StructBuilder<UnnamedFields> {
+        StructBuilder {
+            fields: UnnamedFields {
+                fields: Default::default(),
+            },
+        }
+    }
+
     /// Get a immutable reference to the fields of the struct.
     pub fn fields(&self) -> &Fields {
         &self.fields

@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 
-use super::{DataType, DeprecatedType, Fields};
+use crate::builder::VariantBuilder;
+
+use super::{DataType, DeprecatedType, Fields, NamedFields, UnnamedFields};
 
 /// represents a Rust [enum](https://doc.rust-lang.org/std/keyword.enum.html).
 ///
@@ -8,13 +10,18 @@ use super::{DataType, DeprecatedType, Fields};
 /// The variants can be either unit variants (no fields), tuple variants (fields in a tuple), or struct variants (fields in a struct).
 ///
 /// An enum is also assigned a repr which follows [Serde repr semantics](https://serde.rs/enum-representations.html).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct Enum {
     pub(crate) repr: Option<EnumRepr>,
     pub(crate) variants: Vec<(Cow<'static, str>, EnumVariant)>,
 }
 
 impl Enum {
+    /// Construct a new empty enum.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Get an immutable reference to the enum's representation.
     pub fn repr(&self) -> Option<&EnumRepr> {
         self.repr.as_ref()
@@ -79,6 +86,37 @@ pub struct EnumVariant {
 }
 
 impl EnumVariant {
+    /// Construct a new unit enum variant.
+    pub fn unit() -> Self {
+        Self {
+            skip: false,
+            docs: "".into(),
+            deprecated: None,
+            fields: Fields::Unit,
+        }
+    }
+
+    /// Construct a new struct enum variant with named fields.
+    pub fn named() -> VariantBuilder<NamedFields> {
+        VariantBuilder {
+            v: Self::unit(),
+            variant: NamedFields {
+                fields: vec![],
+                tag: None,
+            },
+        }
+    }
+
+    /// Construct a new tuple enum variant without unnamed fields.
+    pub fn unnamed() -> VariantBuilder<UnnamedFields> {
+        VariantBuilder {
+            v: Self::unit(),
+            variant: UnnamedFields {
+                fields: Default::default(),
+            },
+        }
+    }
+
     /// Has the Serde or Specta skip attribute been applied to this variant?
     pub fn skip(&self) -> bool {
         self.skip

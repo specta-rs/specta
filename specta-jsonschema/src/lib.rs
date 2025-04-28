@@ -9,11 +9,9 @@
 
 use std::path::Path;
 
-use inflector::Inflector;
 use schemars::schema::{InstanceType, Schema, SingleOrVec};
 use specta::{
-    builder::{EnumBuilder, FieldBuilder, StructBuilder},
-    datatype::{DataType, List, Literal, Primitive},
+    datatype::{DataType, Enum, EnumVariant, Field, List, Literal, Primitive, Struct},
     TypeCollection,
 };
 
@@ -145,14 +143,14 @@ pub fn to_ast(schema: &Schema) -> Result<DataType, ()> {
                 // #[serde(skip_serializing_if = "Option::is_none")]
                 // pub property_names: Option<Box<Schema>>,
 
-                let mut s = StructBuilder::named(
+                let mut s = Struct::named(
                     // obj.metadata
                     //     .as_ref()
                     //     .and_then(|v| v.title.as_ref().map(|v| v.to_class_case()))
                     //     .unwrap_or_else(|| "Unnamed".to_string()),
                 );
                 for (k, v) in o.properties.iter() {
-                    s.field_mut(k.clone(), FieldBuilder::new(to_ast(v)?));
+                    s.field_mut(k.clone(), Field::new(to_ast(v)?));
                 }
                 return Ok(s.build());
             }
@@ -182,14 +180,18 @@ pub fn to_ast(schema: &Schema) -> Result<DataType, ()> {
                         return Ok(match o.len() {
                             0 => DataType::List(List::new(from_instance_type(&o[0]))),
                             _ => {
-                                let mut e = EnumBuilder::new();
+                                todo!();
+                                // let mut e = Enum::new();
 
-                                for list in o {
-                                    println!("{:?}", list);
-                                    // e.variant_mut(list.name.clone(), from_instance_type(&list));
-                                }
+                                // for list in o {
+                                //     println!("{:?}", list);
+                                //     e.variants_mut().push((
+                                //         list.name.clone(),
+                                //         EnumVariant::named(from_instance_type(&list)),
+                                //     ));
+                                // }
 
-                                e.build()
+                                // e
                             }
                         });
 
