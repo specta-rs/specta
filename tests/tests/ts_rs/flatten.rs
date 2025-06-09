@@ -5,14 +5,14 @@ use specta::Type;
 use crate::ts::assert_ts;
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct FlattenA {
     a: i32,
     b: i32,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct FlattenB {
     #[specta(flatten)]
     a: FlattenA,
@@ -20,7 +20,7 @@ struct FlattenB {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct FlattenC {
     #[specta(flatten = true)]
     a: FlattenA,
@@ -28,7 +28,7 @@ struct FlattenC {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct FlattenD {
     #[specta(flatten = false)]
     a: FlattenA,
@@ -36,7 +36,7 @@ struct FlattenD {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct FlattenE {
     #[specta(inline)]
     b: FlattenB,
@@ -44,7 +44,7 @@ struct FlattenE {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct FlattenF {
     #[specta(inline = true)]
     b: FlattenB,
@@ -52,7 +52,7 @@ struct FlattenF {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct FlattenG {
     #[specta(inline = false)]
     b: FlattenB,

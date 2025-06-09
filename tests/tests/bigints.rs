@@ -14,13 +14,13 @@ macro_rules! for_bigint_types {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct StructWithBigInt {
     pub a: i128,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 
 pub struct StructWithStructWithBigInt {
     #[specta(inline)] // Inline required so reference is not used and error is part of parent
@@ -28,7 +28,7 @@ pub struct StructWithStructWithBigInt {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 
 pub struct StructWithStructWithStructWithBigInt {
     #[specta(inline)] // Inline required so reference is not used and error is part of parent
@@ -36,14 +36,14 @@ pub struct StructWithStructWithStructWithBigInt {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct StructWithOptionWithStructWithBigInt {
     #[specta(inline)] // Inline required so reference is not used and error is part of parent
     pub optional_field: Option<StructWithBigInt>,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 
 pub enum EnumWithStructWithStructWithBigInt {
     #[specta(inline)]
@@ -51,7 +51,7 @@ pub enum EnumWithStructWithStructWithBigInt {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 
 pub enum EnumWithInlineStructWithBigInt {
     #[specta(inline)]

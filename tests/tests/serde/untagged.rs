@@ -3,7 +3,7 @@ use specta::Type;
 use crate::ts::assert_ts_inline2;
 
 #[derive(Type)]
-#[specta(export = false, untagged)]
+#[specta(collect = false, untagged)]
 enum A {
     A { id: String },
     C(String),
@@ -11,7 +11,7 @@ enum A {
 }
 
 #[derive(Type)]
-#[serde(export = false, untagged)]
+#[serde(collect = false, untagged)]
 pub enum B {
     A,
     B,

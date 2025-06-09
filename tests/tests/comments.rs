@@ -6,7 +6,7 @@ use crate::ts::assert_ts_export;
 /// Some triple-slash comment
 /// Some more triple-slash comment
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct CommentedStruct {
     // Some double-slash comment which is ignored
     /// Some triple-slash comment
@@ -18,7 +18,7 @@ pub struct CommentedStruct {
 /// Some triple-slash comment
 /// Some more triple-slash comment
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub enum CommentedEnum {
     // Some double-slash comment which is ignored
     /// Some triple-slash comment
@@ -37,7 +37,7 @@ pub enum CommentedEnum {
 
 /// Some single-line comment
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub enum SingleLineComment {
     /// Some single-line comment
     A(i32),

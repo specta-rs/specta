@@ -6,11 +6,11 @@
 )]
 
 pub mod builder;
-pub mod datatype;
-#[cfg(feature = "export")]
-#[cfg_attr(docsrs, doc(cfg(feature = "export")))]
+#[cfg(feature = "collect")]
+#[cfg_attr(docsrs, doc(cfg(feature = "collect")))]
 #[doc(hidden)]
-pub mod export;
+pub mod collect;
+pub mod datatype;
 #[cfg(feature = "function")]
 #[cfg_attr(docsrs, doc(cfg(feature = "function")))]
 pub mod function;
@@ -33,9 +33,9 @@ pub use specta_id::SpectaID;
 pub use type_collection::TypeCollection;
 
 #[doc(inline)]
-#[cfg(feature = "export")]
-#[cfg_attr(docsrs, doc(cfg(feature = "export")))]
-pub use export::export;
+#[cfg(feature = "collect")]
+#[cfg_attr(docsrs, doc(cfg(feature = "collect")))]
+pub use collect::collect;
 
 #[doc(inline)]
 #[cfg(feature = "derive")]

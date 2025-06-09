@@ -5,19 +5,19 @@ use specta::Type;
 use crate::ts::assert_ts;
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct A {
     pub a: String,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct AA {
     pub a: i32,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct B {
     #[specta(flatten)]
     pub a: A,
@@ -28,7 +28,7 @@ pub struct B {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct C {
     #[specta(flatten)]
     pub a: A,
@@ -37,7 +37,7 @@ pub struct C {
 }
 
 #[derive(Type)]
-#[specta(export = false, tag = "type")]
+#[specta(collect = false, tag = "type")]
 pub struct D {
     #[specta(flatten)]
     pub a: A,
@@ -46,7 +46,7 @@ pub struct D {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 #[serde(untagged)]
 pub struct E {
     #[specta(flatten)]
@@ -57,7 +57,7 @@ pub struct E {
 
 // Flattening a struct multiple times
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct F {
     #[specta(flatten)]
     pub a: A,
@@ -67,7 +67,7 @@ pub struct F {
 
 // Two fields with the same name (`a`) but different types
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct G {
     #[specta(flatten)]
     pub a: A,
@@ -77,7 +77,7 @@ pub struct G {
 
 // Serde can't serialize this
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub enum H {
     A(String),
     B,
@@ -85,7 +85,7 @@ pub enum H {
 
 // TODO: Invalid Serde type but unit test this at the datamodel level cause it might be valid in other langs.
 // #[derive(Type)]
-// #[specta(export = false, tag = "type")]
+// #[specta(collect = false, tag = "type")]
 // pub enum I {
 //     A(String),
 //     B,
@@ -95,7 +95,7 @@ pub enum H {
 // }
 
 #[derive(Type)]
-#[specta(export = false, tag = "t", content = "c")]
+#[specta(collect = false, tag = "t", content = "c")]
 pub enum J {
     A(String),
     B,
@@ -105,7 +105,7 @@ pub enum J {
 }
 
 #[derive(Type)]
-#[specta(export = false, untagged)]
+#[specta(collect = false, untagged)]
 pub enum K {
     A(String),
     B,

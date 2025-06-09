@@ -5,14 +5,14 @@ use specta::Type;
 use crate::ts::assert_ts;
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct D {
     x1: Arc<i32>,
     y1: Cell<i32>,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct E {
     a1: Box<D>,
     #[specta(inline)]
@@ -20,7 +20,7 @@ struct E {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct F {
     b1: Rc<E>,
     #[specta(inline)]
