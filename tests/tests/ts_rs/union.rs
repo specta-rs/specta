@@ -3,7 +3,7 @@ use specta::Type;
 use crate::ts::assert_ts;
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 enum SimpleEnum1 {
     #[specta(rename = "asdf")]
     A,
@@ -17,7 +17,7 @@ enum SimpleEnum1 {
 #[test]
 fn test_empty() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     enum Empty {}
 
     assert_ts!(Empty, "never");

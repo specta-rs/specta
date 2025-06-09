@@ -14,7 +14,7 @@ pub struct TypeTwo {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct NotExported {
     pub b: i32,
 }
@@ -27,7 +27,7 @@ pub struct ReferingToUnexportedType {
 }
 
 // TODO: Enable this test on Windows again. It's ordering of types is different for seemingly no reason.
-#[cfg(all(not(target_os = "windows"), all(feature = "export", feature = "ts")))]
+#[cfg(all(not(target_os = "windows"), all(feature = "collect", feature = "ts")))]
 #[test]
 fn test_export_feature() {
     use specta::{

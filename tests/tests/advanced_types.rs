@@ -7,7 +7,7 @@ use specta::Type;
 use crate::ts::{assert_ts, assert_ts_export2};
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Demo<A, B> {
     a: A,
     b: B,
@@ -25,7 +25,7 @@ type MapB<B> = HashMap<B, String>;
 type MapC<B> = HashMap<String, Struct<B>>;
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Struct<T> {
     field: HalfGenericA<T>,
 }
@@ -49,19 +49,19 @@ fn test_type_aliases() {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct D {
     flattened: u32,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct GenericFlattened<T> {
     generic_flattened: T,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct C {
     a: u32,
     #[specta(flatten)]
@@ -69,13 +69,13 @@ struct C {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct B {
     b: u32,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct A {
     a: B,
     #[specta(inline)]
@@ -89,13 +89,13 @@ struct A {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct ToBeFlattened {
     a: String,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct DoubleFlattened {
     #[specta(flatten)]
     a: ToBeFlattened,
@@ -104,7 +104,7 @@ struct DoubleFlattened {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Inner {
     a: i32,
     #[specta(flatten)]
@@ -112,27 +112,27 @@ struct Inner {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct FlattenedInner {
     #[specta(flatten)]
     c: Inner,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct BoxedInner {
     a: i32,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct BoxFlattened {
     #[specta(flatten)]
     b: Box<BoxedInner>,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct BoxInline {
     #[specta(inline)]
     c: Box<BoxedInner>,

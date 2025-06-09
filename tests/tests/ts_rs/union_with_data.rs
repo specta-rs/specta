@@ -4,19 +4,19 @@ use specta::Type;
 use crate::ts::assert_ts;
 
 #[derive(Type, Serialize)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Bar {
     field: i32,
 }
 
 #[derive(Type, Serialize)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Foo {
     bar: Bar,
 }
 
 #[derive(Type, Serialize)]
-#[specta(export = false)]
+#[specta(collect = false)]
 enum SimpleEnum2 {
     A(String),
     B(i32),

@@ -8,21 +8,21 @@ use crate::ts::{assert_ts, assert_ts_export};
 
 // Export needs a `NamedDataType` but uses `Type::reference` instead of `Type::inline` so we test it.
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Regular(HashMap<String, ()>);
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct RegularStruct {
     a: String,
 }
 
 #[derive(Type)]
-#[specta(export = false, transparent)]
+#[specta(collect = false, transparent)]
 struct TransparentStruct(String);
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 enum UnitVariants {
     A,
     B,
@@ -30,7 +30,7 @@ enum UnitVariants {
 }
 
 #[derive(Type)]
-#[specta(export = false, untagged)]
+#[specta(collect = false, untagged)]
 enum UntaggedVariants {
     A(String),
     B(i32),
@@ -38,7 +38,7 @@ enum UntaggedVariants {
 }
 
 #[derive(Type)]
-#[specta(export = false, untagged)]
+#[specta(collect = false, untagged)]
 enum InvalidUntaggedVariants {
     A(String),
     B(i32, String),
@@ -46,7 +46,7 @@ enum InvalidUntaggedVariants {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 enum Variants {
     A(String),
     B(i32),
@@ -54,23 +54,23 @@ enum Variants {
 }
 
 #[derive(Type)]
-#[specta(export = false, transparent)]
+#[specta(collect = false, transparent)]
 pub struct MaybeValidKey<T>(T);
 
 #[derive(Type)]
-#[specta(export = false, transparent)]
+#[specta(collect = false, transparent)]
 pub struct ValidMaybeValidKey(HashMap<MaybeValidKey<String>, ()>);
 
 #[derive(Type)]
-#[specta(export = false, transparent)]
+#[specta(collect = false, transparent)]
 pub struct ValidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<String>>, ()>);
 
 #[derive(Type)]
-#[specta(export = false, transparent)]
+#[specta(collect = false, transparent)]
 pub struct InvalidMaybeValidKey(HashMap<MaybeValidKey<()>, ()>);
 
 #[derive(Type)]
-#[specta(export = false, transparent)]
+#[specta(collect = false, transparent)]
 pub struct InvalidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<()>>, ()>);
 
 #[test]

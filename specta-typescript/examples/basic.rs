@@ -49,20 +49,20 @@ pub struct Something {
 // }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct B {
     b: u32,
     c: C,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct C {
     b: u32,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct A {
     a: B,
     c: C,

@@ -55,7 +55,7 @@ mod test {
     }
 
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     pub struct Demo {
         pub demo: String,
     }

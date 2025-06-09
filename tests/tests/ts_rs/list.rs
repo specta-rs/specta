@@ -5,7 +5,7 @@ use crate::ts::assert_ts;
 #[test]
 fn list() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct List {
         #[allow(dead_code)]
         data: Option<Vec<u32>>,
