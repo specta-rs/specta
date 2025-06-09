@@ -168,8 +168,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     Ok(quote! {
         #[allow(non_camel_case_types)]
         const _: () = {
-            pub use #crate_ref::Type;
-
             // This is equivalent to `<Self as #crate_ref::NamedType>::ID` but it's shorter so we use it instead.
             const SID: #crate_ref::SpectaID = #crate_ref::internal::construct::sid(#name, concat!("::", module_path!(), ":", line!(), ":", column!()));
 
