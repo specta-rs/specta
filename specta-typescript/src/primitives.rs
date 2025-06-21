@@ -90,6 +90,15 @@ pub fn export(
     Ok(result)
 }
 
+/// Generate an Typescript string for a specific [`DataType`].
+///
+/// See [`export`] for the list of things to consider when using this.
+pub fn refer(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<String, Error> {
+    let mut s = String::new();
+    datatype(&mut s, ts, types, &dt, vec![], false, None)?;
+    Ok(s)
+}
+
 /// Generate an inlined Typescript string for a specific [`DataType`].
 ///
 /// This methods leaves all the same things as the [`export`] method up to the user.
