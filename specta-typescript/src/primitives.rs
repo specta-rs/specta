@@ -93,7 +93,7 @@ pub fn export(
 /// Generate an Typescript string for a specific [`DataType`].
 ///
 /// See [`export`] for the list of things to consider when using this.
-pub fn refer(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<String, Error> {
+pub fn reference(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<String, Error> {
     let mut s = String::new();
     datatype(&mut s, ts, types, &dt, vec![], false, None)?;
     Ok(s)
