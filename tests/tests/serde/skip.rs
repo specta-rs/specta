@@ -5,14 +5,14 @@ use specta::Type;
 use crate::ts::assert_ts_inline2;
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct SkipOnlyField {
     #[specta(skip)]
     a: String,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct SkipField {
     #[specta(skip)]
     a: String,
@@ -20,35 +20,35 @@ pub struct SkipField {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub enum SkipOnlyVariantExternallyTagged {
     #[specta(skip)]
     A(String),
 }
 
 #[derive(Type)]
-#[specta(export = false, tag = "t")]
+#[specta(collect = false, tag = "t")]
 pub enum SkipOnlyVariantInternallyTagged {
     #[specta(skip)]
     A(String),
 }
 
 #[derive(Type)]
-#[specta(export = false, tag = "t", content = "c")]
+#[specta(collect = false, tag = "t", content = "c")]
 pub enum SkipOnlyVariantAdjacentlyTagged {
     #[specta(skip)]
     A(String),
 }
 
 #[derive(Type)]
-#[specta(export = false, untagged)]
+#[specta(collect = false, untagged)]
 pub enum SkipOnlyVariantUntagged {
     #[specta(skip)]
     A(String),
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub enum SkipVariant {
     #[specta(skip)]
     A(String),
@@ -56,7 +56,7 @@ pub enum SkipVariant {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub enum SkipUnnamedFieldInVariant {
     // only field
     A(#[specta(skip)] String),
@@ -67,7 +67,7 @@ pub enum SkipUnnamedFieldInVariant {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub enum SkipNamedFieldInVariant {
     // only field
     A {
@@ -84,23 +84,23 @@ pub enum SkipNamedFieldInVariant {
 
 // https://github.com/oscartbeaumont/specta/issues/170
 #[derive(Type)]
-#[specta(transparent, export = false)]
+#[specta(transparent, collect = false)]
 pub struct TransparentWithSkip((), #[specta(skip)] String);
 
 // https://github.com/oscartbeaumont/specta/issues/170
 #[derive(Type)]
-#[specta(transparent, export = false)]
+#[specta(transparent, collect = false)]
 pub struct TransparentWithSkip2(#[specta(skip)] (), String);
 
 // https://github.com/oscartbeaumont/specta/issues/170
 #[derive(Type)]
-#[specta(transparent, export = false)]
+#[specta(transparent, collect = false)]
 pub struct TransparentWithSkip3(#[specta(type = String)] Box<dyn Any>);
 
 /// This is intentionally just a compile or not compile test
 /// https://github.com/oscartbeaumont/specta/issues/167
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub enum LazilySkip {
     #[specta(skip)]
     A(Box<dyn Any>),

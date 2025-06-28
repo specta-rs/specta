@@ -9,7 +9,7 @@ fn free() {
 #[test]
 fn interface() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct Interface {
         #[allow(dead_code)]
         a: [i32; 3],
@@ -21,7 +21,7 @@ fn interface() {
 #[test]
 fn newtype() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct Newtype(#[allow(dead_code)] [i32; 3]);
 
     assert_ts!(Newtype, "[number, number, number]")

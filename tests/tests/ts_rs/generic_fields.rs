@@ -8,7 +8,7 @@ use specta::Type;
 #[test]
 fn newtype() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct Newtype1(Vec<Cow<'static, i32>>);
     assert_ts!(Newtype1, "number[]");
 }
@@ -16,7 +16,7 @@ fn newtype() {
 #[test]
 fn newtype_nested() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct Newtype2(Vec<Vec<i32>>);
     assert_ts!(Newtype2, "number[][]");
 }
@@ -36,7 +36,7 @@ fn alias_nested() {
 #[test]
 fn named() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct Struct1 {
         a: Box<Vec<String>>,
         b: (Vec<String>, Vec<String>),
@@ -51,7 +51,7 @@ fn named() {
 #[test]
 fn named_nested() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct Struct2 {
         a: Vec<Vec<String>>,
         b: (Vec<Vec<String>>, Vec<Vec<String>>),
@@ -66,7 +66,7 @@ fn named_nested() {
 #[test]
 fn tuple() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct Tuple1(Vec<i32>, (Vec<i32>, Vec<i32>), [Vec<i32>; 3]);
     assert_ts!(
         Tuple1,
@@ -77,7 +77,7 @@ fn tuple() {
 #[test]
 fn tuple_nested() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct Tuple2(
         Vec<Vec<i32>>,
         (Vec<Vec<i32>>, Vec<Vec<i32>>),

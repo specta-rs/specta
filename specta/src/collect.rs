@@ -10,11 +10,11 @@ static TYPES: OnceLock<Mutex<HashMap<SpectaID, fn(&mut TypeCollection)>>> = Once
 
 /// Get the global type store containing all automatically registered types.
 ///
-/// All types with the [`Type`](macro@specta::Type) macro will automatically be registered here unless they have been explicitly disabled with `#[specta(export = false)]`.
+/// All types with the [`Type`](macro@specta::Type) macro will automatically be registered here unless they have been explicitly disabled with `#[specta(collect = false)]`.
 ///
-/// Note that when enabling the `export` feature, you will not be able to enable the `unsafe_code` lint as [`ctor`](https://docs.rs/ctor) (which is used internally) is marked unsafe.
+/// Note that when enabling the `collect` feature, you will not be able to enable the `unsafe_code` lint as [`ctor`](https://docs.rs/ctor) (which is used internally) is marked unsafe.
 ///
-pub fn export() -> TypeCollection {
+pub fn collect() -> TypeCollection {
     // TODO: Make `TYPES` should just hold a `TypeCollection` directly???
     let types = TYPES
         .get_or_init(Default::default)
@@ -49,6 +49,6 @@ pub mod internal {
     }
 
     // We expose this for the macros
-    #[cfg(feature = "export")]
+    #[cfg(feature = "collect")]
     pub use ::ctor;
 }

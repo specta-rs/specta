@@ -3,11 +3,11 @@ use specta::Type;
 use crate::ts::{assert_ts_export2, assert_ts_inline2};
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct A {}
 
 #[derive(Type)]
-#[specta(export = false, tag = "a")]
+#[specta(collect = false, tag = "a")]
 struct B {}
 
 // https://github.com/oscartbeaumont/specta/issues/174

@@ -1,23 +1,23 @@
 use specta::{Type, TypeCollection};
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct A {}
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct B {}
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct C {}
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct Z {}
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct BagOfTypes {
     // Fields are outta order intentionally so we don't fluke the test
     a: A,

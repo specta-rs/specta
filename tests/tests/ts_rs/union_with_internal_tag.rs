@@ -3,7 +3,7 @@ use crate::ts::assert_ts;
 use specta::Type;
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 #[serde(tag = "type")]
 enum EnumWithInternalTag {
     A { foo: String },
@@ -11,19 +11,19 @@ enum EnumWithInternalTag {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct InnerA {
     foo: String,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct InnerB {
     bar: i32,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 #[serde(tag = "type")]
 enum EnumWithInternalTag2 {
     A(InnerA),

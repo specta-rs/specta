@@ -7,40 +7,40 @@ use specta_typescript::Error;
 use crate::ts::{assert_ts, assert_ts_export};
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct Recursive {
     demo: Box<Recursive>,
 }
 
 #[derive(Type)]
-#[specta(transparent, export = false)]
+#[specta(transparent, collect = false)]
 pub struct RecursiveMapKeyTrick(RecursiveMapKey);
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct RecursiveMapKey {
     demo: HashMap<RecursiveMapKeyTrick, String>,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct RecursiveMapValue {
     demo: HashMap<String, RecursiveMapValue>,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct RecursiveInline {
     #[specta(flatten)]
     demo: Box<RecursiveInline>,
 }
 
 #[derive(Type)]
-#[specta(transparent, export = false)]
+#[specta(transparent, collect = false)]
 pub struct RecursiveTransparent(Box<RecursiveInline>);
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub enum RecursiveInEnum {
     A {
         #[specta(flatten)]

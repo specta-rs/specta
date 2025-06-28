@@ -19,7 +19,7 @@ const _: () = {
     impl<K: Type, V: Type> Flatten for Map<K, V> {}
 
     #[derive(Type)]
-    #[specta(rename = "JsonValue", untagged, remote = Value, crate = crate, export = false)]
+    #[specta(rename = "JsonValue", untagged, remote = Value, crate = crate, collect = false)]
     pub enum JsonValue {
         Null,
         Bool(bool),
@@ -99,7 +99,7 @@ const _: () = {
     use serde_yaml::{value::TaggedValue, Mapping, Number, Sequence, Value};
 
     #[derive(Type)]
-    #[specta(rename = "YamlValue", untagged, remote = Value, crate = crate, export = false)]
+    #[specta(rename = "YamlValue", untagged, remote = Value, crate = crate, collect = false)]
     pub enum YamlValue {
         Null,
         Bool(bool),
@@ -196,7 +196,7 @@ const _: () = {
     impl<K: Type, V: Type> Flatten for toml::map::Map<K, V> {}
 
     #[derive(Type)]
-    #[specta(rename = "TomlValue", untagged, remote = Value, crate = crate, export = false)]
+    #[specta(rename = "TomlValue", untagged, remote = Value, crate = crate, collect = false)]
     pub enum TomlValue {
         String(String),
         Integer(i64),
@@ -208,7 +208,7 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(rename = "Datetime", remote = Datetime, crate = crate, export = false)]
+    #[specta(rename = "Datetime", remote = Datetime, crate = crate, collect = false)]
     #[allow(dead_code)]
     struct DatetimeDef {
         #[specta(rename = "$__toml_private_datetime")]
@@ -317,7 +317,7 @@ const _: () = {
     );
 
     #[derive(Type)]
-    #[specta(remote = Timestamp, crate = crate, export = false)]
+    #[specta(remote = Timestamp, crate = crate, collect = false)]
     #[allow(dead_code)]
     struct Timestamp {
         time: NTP64,
@@ -328,77 +328,77 @@ const _: () = {
 #[cfg(feature = "glam")]
 const _: () = {
     #[derive(Type)]
-    #[specta(remote = glam::DVec2, crate = crate, export = false)]
+    #[specta(remote = glam::DVec2, crate = crate, collect = false)]
     #[allow(dead_code)]
     struct DVec2([f64; 2]);
 
     #[derive(Type)]
-    #[specta(remote = glam::IVec2, crate = crate, export = false)]
+    #[specta(remote = glam::IVec2, crate = crate, collect = false)]
     #[allow(dead_code)]
     struct IVec2([i32; 2]);
 
     #[derive(Type)]
-    #[specta(remote = glam::DMat2, crate = crate, export = false)]
+    #[specta(remote = glam::DMat2, crate = crate, collect = false)]
     #[allow(dead_code)]
     struct DMat2([f64; 4]);
 
     #[derive(Type)]
-    #[specta(remote = glam::DAffine2, crate = crate, export = false)]
+    #[specta(remote = glam::DAffine2, crate = crate, collect = false)]
     #[allow(dead_code)]
     struct DAffine2([f64; 6]);
 
     #[derive(Type)]
-    #[specta(remote = glam::Vec2, crate = crate, export = false)]
+    #[specta(remote = glam::Vec2, crate = crate, collect = false)]
     #[allow(dead_code)]
     struct Vec2([f32; 2]);
 
     #[derive(Type)]
-    #[specta(remote = glam::Vec3, crate = crate, export = false)]
+    #[specta(remote = glam::Vec3, crate = crate, collect = false)]
     #[allow(dead_code)]
     struct Vec3([f32; 3]);
 
     #[derive(Type)]
-    #[specta(remote = glam::Vec3A, crate = crate, export = false)]
+    #[specta(remote = glam::Vec3A, crate = crate, collect = false)]
     #[allow(dead_code)]
     struct Vec3A([f32; 3]);
 
     #[derive(Type)]
-    #[specta(remote = glam::Vec4, crate = crate, export = false)]
+    #[specta(remote = glam::Vec4, crate = crate, collect = false)]
     #[allow(dead_code)]
     struct Vec4([f32; 4]);
 
     #[derive(Type)]
-    #[specta(remote = glam::Mat2, crate = crate, export = false)]
+    #[specta(remote = glam::Mat2, crate = crate, collect = false)]
     #[allow(dead_code)]
     struct Mat2([f32; 4]);
 
     #[derive(Type)]
-    #[specta(remote = glam::Mat3, crate = crate, export = false)]
+    #[specta(remote = glam::Mat3, crate = crate, collect = false)]
     #[allow(dead_code)]
     struct Mat3([f32; 9]);
 
     #[derive(Type)]
-    #[specta(remote = glam::Mat3A, crate = crate, export = false)]
+    #[specta(remote = glam::Mat3A, crate = crate, collect = false)]
     #[allow(dead_code)]
     struct Mat3A([f32; 9]);
 
     #[derive(Type)]
-    #[specta(remote = glam::Mat4, crate = crate, export = false)]
+    #[specta(remote = glam::Mat4, crate = crate, collect = false)]
     #[allow(dead_code)]
     struct Mat4([f32; 16]);
 
     #[derive(Type)]
-    #[specta(remote = glam::Quat, crate = crate, export = false)]
+    #[specta(remote = glam::Quat, crate = crate, collect = false)]
     #[allow(dead_code)]
     struct Quat([f32; 4]);
 
     #[derive(Type)]
-    #[specta(remote = glam::Affine2, crate = crate, export = false)]
+    #[specta(remote = glam::Affine2, crate = crate, collect = false)]
     #[allow(dead_code)]
     struct Affine2([f32; 6]);
 
     #[derive(Type)]
-    #[specta(remote = glam::Affine3A, crate = crate, export = false)]
+    #[specta(remote = glam::Affine3A, crate = crate, collect = false)]
     #[allow(dead_code)]
     struct Affine3A([f32; 12]);
 };
@@ -456,7 +456,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
 #[cfg(feature = "bevy_ecs")]
 const _: () = {
     #[derive(Type)]
-    #[specta(rename = "Entity", remote = bevy_ecs::entity::Entity, crate = crate, export = false)]
+    #[specta(rename = "Entity", remote = bevy_ecs::entity::Entity, crate = crate, collect = false)]
     #[allow(dead_code)]
     struct EntityDef(u64);
 };
@@ -464,7 +464,7 @@ const _: () = {
 #[cfg(feature = "bevy_input")]
 const _: () = {
     #[derive(Type)]
-    #[specta(remote = bevy_input::ButtonState, crate = crate, export = false)]
+    #[specta(remote = bevy_input::ButtonState, crate = crate, collect = false)]
     #[allow(dead_code)]
     enum ButtonState {
         Pressed,
@@ -472,7 +472,7 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(remote = bevy_input::keyboard::KeyboardInput, crate = crate, export = false)]
+    #[specta(remote = bevy_input::keyboard::KeyboardInput, crate = crate, collect = false)]
     #[allow(dead_code)]
     struct KeyboardInput {
         pub key_code: bevy_input::keyboard::KeyCode,
@@ -488,7 +488,7 @@ const _: () = {
     );
 
     #[derive(Type)]
-    #[specta(remote = bevy_input::mouse::MouseButtonInput, crate = crate, export = false)]
+    #[specta(remote = bevy_input::mouse::MouseButtonInput, crate = crate, collect = false)]
     #[allow(dead_code)]
     pub struct MouseButtonInput {
         pub button: bevy_input::mouse::MouseButton,
@@ -497,7 +497,7 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(remote = bevy_input::mouse::MouseButton, crate = crate, export = false)]
+    #[specta(remote = bevy_input::mouse::MouseButton, crate = crate, collect = false)]
     #[allow(dead_code)]
     pub enum MouseButton {
         Left,
@@ -509,7 +509,7 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(remote = bevy_input::mouse::MouseWheel, crate = crate, export = false)]
+    #[specta(remote = bevy_input::mouse::MouseWheel, crate = crate, collect = false)]
     #[allow(dead_code)]
     pub struct MouseWheel {
         pub unit: bevy_input::mouse::MouseScrollUnit,
@@ -519,7 +519,7 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(remote = bevy_input::mouse::MouseScrollUnit, crate = crate, export = false)]
+    #[specta(remote = bevy_input::mouse::MouseScrollUnit, crate = crate, collect = false)]
     #[allow(dead_code)]
     pub enum MouseScrollUnit {
         Line,
@@ -527,7 +527,7 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(remote = bevy_input::mouse::MouseMotion, crate = crate, export = false)]
+    #[specta(remote = bevy_input::mouse::MouseMotion, crate = crate, collect = false)]
     #[allow(dead_code)]
     pub struct MouseMotion {
         pub delta: glam::Vec2,

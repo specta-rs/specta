@@ -3,27 +3,27 @@ use specta::Type;
 use crate::ts::{assert_ts, assert_ts_export};
 
 #[derive(Type)]
-#[specta(export = false, rename = "StructNew", tag = "t")]
+#[specta(collect = false, rename = "StructNew", tag = "t")]
 pub struct Struct {
     a: String,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct Struct2 {
     #[specta(rename = "b")]
     a: String,
 }
 
 #[derive(Type)]
-#[specta(export = false, rename = "EnumNew", tag = "t")]
+#[specta(collect = false, rename = "EnumNew", tag = "t")]
 pub enum Enum {
     A,
     B,
 }
 
 #[derive(Type)]
-#[specta(export = false, rename = "EnumNew", tag = "t")]
+#[specta(collect = false, rename = "EnumNew", tag = "t")]
 pub enum Enum2 {
     #[specta(rename = "C")]
     A,
@@ -31,7 +31,7 @@ pub enum Enum2 {
 }
 
 #[derive(Type)]
-#[specta(export = false, rename = "EnumNew", tag = "t")]
+#[specta(collect = false, rename = "EnumNew", tag = "t")]
 pub enum Enum3 {
     A {
         #[specta(rename = "b")]

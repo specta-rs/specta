@@ -116,7 +116,7 @@ pub enum MyEnum {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct DontExportMe {
     field: String,
 }

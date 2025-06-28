@@ -3,56 +3,56 @@ use specta::Type;
 use crate::ts::assert_ts_inline2;
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 enum A {}
 
 #[derive(Type)]
-#[specta(export = false, tag = "a")]
+#[specta(collect = false, tag = "a")]
 enum B {}
 
 #[derive(Type)]
-#[specta(export = false, tag = "a", content = "b")]
+#[specta(collect = false, tag = "a", content = "b")]
 enum C {}
 
 #[derive(Type)]
-#[specta(export = false, untagged)]
+#[specta(collect = false, untagged)]
 enum D {}
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct Inner;
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct Inner2 {}
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct Inner3();
 
 #[derive(Type)]
-#[specta(export = false, tag = "a")]
+#[specta(collect = false, tag = "a")]
 enum E {
     A(Inner),
     B(Inner),
 }
 
 #[derive(Type)]
-#[specta(export = false, tag = "a")]
+#[specta(collect = false, tag = "a")]
 enum F {
     A(Inner2),
     B(Inner2),
 }
 
 #[derive(Type)]
-#[specta(export = false, tag = "a")]
+#[specta(collect = false, tag = "a")]
 enum G {
     A(Inner3),
     B(Inner3),
 }
 
 #[derive(Type)]
-#[specta(export = false, tag = "a")]
+#[specta(collect = false, tag = "a")]
 enum H {
     #[specta(skip)]
     A(Inner3),
@@ -60,11 +60,11 @@ enum H {
 }
 
 #[derive(Type)]
-#[specta(export = false, transparent)]
+#[specta(collect = false, transparent)]
 pub struct Demo(());
 
 #[derive(Type)]
-#[specta(export = false, tag = "a")]
+#[specta(collect = false, tag = "a")]
 enum I {
     A(Demo),
     B(Demo),

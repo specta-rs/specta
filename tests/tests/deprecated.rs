@@ -5,28 +5,28 @@ use specta::Type;
 use crate::ts::assert_ts_export;
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 #[deprecated]
 struct DeprecatedType {
     a: i32,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 #[deprecated = "Look at you big man using a deprecation message"]
 struct DeprecatedTypeWithMsg {
     a: i32,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 #[deprecated(note = "Look at you big man using a deprecation message")]
 struct DeprecatedTypeWithMsg2 {
     a: i32,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct DeprecatedFields {
     a: i32,
     #[deprecated]
@@ -38,7 +38,7 @@ struct DeprecatedFields {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct DeprecatedTupleVariant(
     #[deprecated] String,
     #[deprecated = "Nope"] String,
@@ -46,7 +46,7 @@ pub struct DeprecatedTupleVariant(
 );
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub enum DeprecatedEnumVariants {
     #[deprecated]
     A,

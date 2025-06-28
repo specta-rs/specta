@@ -3,13 +3,13 @@ use std::{collections::HashMap, convert::Infallible, sync::Arc};
 use specta::{Type, TypeCollection};
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct A {
     pub a: String,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct B {
     #[specta(flatten)]
     pub a: A,

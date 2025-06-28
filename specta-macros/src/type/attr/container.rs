@@ -43,7 +43,7 @@ impl_parse! {
         },
         "inline" => out.inline = attr.parse_bool().unwrap_or(true),
         "remote" => out.remote = out.remote.take().or(Some(attr.parse_path()?.to_token_stream())),
-        "export" => out.export = out.export.take().or(Some(attr.parse_bool().unwrap_or(true))),
+        "collect" => out.export = out.export.take().or(Some(attr.parse_bool().unwrap_or(true))),
         "transparent" => out.transparent = attr.parse_bool().unwrap_or(true),
     }
 }

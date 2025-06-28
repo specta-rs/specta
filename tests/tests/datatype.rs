@@ -14,7 +14,7 @@
 
 // // Testing using `DataTypeFrom` and `Type` together.
 // #[derive(DataTypeFrom, specta::Type)] // This derive bit gets passed into the macro
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // #[specta(rename = "ProceduresDef")]
 // struct Procedures3 {
 //     #[specta(type = String)] // This is a lie but just for the test
