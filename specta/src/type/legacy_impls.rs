@@ -327,80 +327,104 @@ const _: () = {
 
 #[cfg(feature = "glam")]
 const _: () = {
-    #[derive(Type)]
-    #[specta(remote = glam::DVec2, crate = crate, export = false)]
-    #[allow(dead_code)]
-    struct DVec2([f64; 2]);
+    macro_rules! implement_specta_type_for_glam_type {
+        (
+            $name: ident as $representation: ty
+        ) => {
+            #[derive(Type)]
+            #[specta(remote = glam::$name, crate = crate, export = false)]
+            #[allow(dead_code)]
+            struct $name($representation);
+        };
+    }
 
-    #[derive(Type)]
-    #[specta(remote = glam::IVec2, crate = crate, export = false)]
-    #[allow(dead_code)]
-    struct IVec2([i32; 2]);
+    // Implementations for https://docs.rs/glam/latest/glam/f32/index.html
+    // Affines
+    implement_specta_type_for_glam_type!(Affine2 as [f32; 6]);
+    implement_specta_type_for_glam_type!(Affine3A as [f32; 12]);
 
-    #[derive(Type)]
-    #[specta(remote = glam::DMat2, crate = crate, export = false)]
-    #[allow(dead_code)]
-    struct DMat2([f64; 4]);
+    // Matrices
+    implement_specta_type_for_glam_type!(Mat2 as [f32; 4]);
+    implement_specta_type_for_glam_type!(Mat3 as [f32; 9]);
+    implement_specta_type_for_glam_type!(Mat3A as [f32; 9]);
+    implement_specta_type_for_glam_type!(Mat4 as [f32; 16]);
 
-    #[derive(Type)]
-    #[specta(remote = glam::DAffine2, crate = crate, export = false)]
-    #[allow(dead_code)]
-    struct DAffine2([f64; 6]);
+    // Quaternions
+    implement_specta_type_for_glam_type!(Quat as [f32; 4]);
 
-    #[derive(Type)]
-    #[specta(remote = glam::Vec2, crate = crate, export = false)]
-    #[allow(dead_code)]
-    struct Vec2([f32; 2]);
+    // Vectors
+    implement_specta_type_for_glam_type!(Vec2 as [f32; 2]);
+    implement_specta_type_for_glam_type!(Vec3 as [f32; 3]);
+    implement_specta_type_for_glam_type!(Vec3A as [f32; 3]);
+    implement_specta_type_for_glam_type!(Vec4 as [f32; 4]);
 
-    #[derive(Type)]
-    #[specta(remote = glam::Vec3, crate = crate, export = false)]
-    #[allow(dead_code)]
-    struct Vec3([f32; 3]);
+    // Implementations for https://docs.rs/glam/latest/glam/f64/index.html
+    // Affines
+    implement_specta_type_for_glam_type!(DAffine2 as [f64; 6]);
+    implement_specta_type_for_glam_type!(DAffine3 as [f64; 12]);
 
-    #[derive(Type)]
-    #[specta(remote = glam::Vec3A, crate = crate, export = false)]
-    #[allow(dead_code)]
-    struct Vec3A([f32; 3]);
+    // Matrices
+    implement_specta_type_for_glam_type!(DMat2 as [f64; 4]);
+    implement_specta_type_for_glam_type!(DMat3 as [f64; 9]);
+    implement_specta_type_for_glam_type!(DMat4 as [f64; 16]);
 
-    #[derive(Type)]
-    #[specta(remote = glam::Vec4, crate = crate, export = false)]
-    #[allow(dead_code)]
-    struct Vec4([f32; 4]);
+    // Quaternions
+    implement_specta_type_for_glam_type!(DQuat as [f64; 4]);
 
-    #[derive(Type)]
-    #[specta(remote = glam::Mat2, crate = crate, export = false)]
-    #[allow(dead_code)]
-    struct Mat2([f32; 4]);
+    // Vectors
+    implement_specta_type_for_glam_type!(DVec2 as [f64; 2]);
+    implement_specta_type_for_glam_type!(DVec3 as [f64; 3]);
+    implement_specta_type_for_glam_type!(DVec4 as [f64; 4]);
 
-    #[derive(Type)]
-    #[specta(remote = glam::Mat3, crate = crate, export = false)]
-    #[allow(dead_code)]
-    struct Mat3([f32; 9]);
+    // Implementations for https://docs.rs/glam/latest/glam/i8/index.html
+    implement_specta_type_for_glam_type!(I8Vec2 as [i8; 2]);
+    implement_specta_type_for_glam_type!(I8Vec3 as [i8; 3]);
+    implement_specta_type_for_glam_type!(I8Vec4 as [i8; 4]);
 
-    #[derive(Type)]
-    #[specta(remote = glam::Mat3A, crate = crate, export = false)]
-    #[allow(dead_code)]
-    struct Mat3A([f32; 9]);
+    // Implementations for https://docs.rs/glam/latest/glam/u8/index.html
+    implement_specta_type_for_glam_type!(U8Vec2 as [u8; 2]);
+    implement_specta_type_for_glam_type!(U8Vec3 as [u8; 3]);
+    implement_specta_type_for_glam_type!(U8Vec4 as [u8; 4]);
 
-    #[derive(Type)]
-    #[specta(remote = glam::Mat4, crate = crate, export = false)]
-    #[allow(dead_code)]
-    struct Mat4([f32; 16]);
+    // Implementations for https://docs.rs/glam/latest/glam/i16/index.html
+    implement_specta_type_for_glam_type!(I16Vec2 as [i16; 2]);
+    implement_specta_type_for_glam_type!(I16Vec3 as [i16; 3]);
+    implement_specta_type_for_glam_type!(I16Vec4 as [i16; 4]);
 
-    #[derive(Type)]
-    #[specta(remote = glam::Quat, crate = crate, export = false)]
-    #[allow(dead_code)]
-    struct Quat([f32; 4]);
+    // Implementations for https://docs.rs/glam/latest/glam/u16/index.html
+    implement_specta_type_for_glam_type!(U16Vec2 as [u16; 2]);
+    implement_specta_type_for_glam_type!(U16Vec3 as [u16; 3]);
+    implement_specta_type_for_glam_type!(U16Vec4 as [u16; 4]);
 
-    #[derive(Type)]
-    #[specta(remote = glam::Affine2, crate = crate, export = false)]
-    #[allow(dead_code)]
-    struct Affine2([f32; 6]);
+    // Implementations for https://docs.rs/glam/latest/glam/i32/index.html
+    implement_specta_type_for_glam_type!(IVec2 as [i32; 2]);
+    implement_specta_type_for_glam_type!(IVec3 as [i32; 3]);
+    implement_specta_type_for_glam_type!(IVec4 as [i32; 4]);
 
-    #[derive(Type)]
-    #[specta(remote = glam::Affine3A, crate = crate, export = false)]
-    #[allow(dead_code)]
-    struct Affine3A([f32; 12]);
+    // Implementations for https://docs.rs/glam/latest/glam/u32/index.html
+    implement_specta_type_for_glam_type!(UVec2 as [u32; 2]);
+    implement_specta_type_for_glam_type!(UVec3 as [u32; 3]);
+    implement_specta_type_for_glam_type!(UVec4 as [u32; 4]);
+
+    // Implementation for https://docs.rs/glam/latest/glam/i64/index.html
+    implement_specta_type_for_glam_type!(I64Vec2 as [i64; 2]);
+    implement_specta_type_for_glam_type!(I64Vec3 as [i64; 3]);
+    implement_specta_type_for_glam_type!(I64Vec4 as [i64; 4]);
+
+    // Implementation for https://docs.rs/glam/latest/glam/u64/index.html
+    implement_specta_type_for_glam_type!(U64Vec2 as [u64; 2]);
+    implement_specta_type_for_glam_type!(U64Vec3 as [u64; 3]);
+    implement_specta_type_for_glam_type!(U64Vec4 as [u64; 4]);
+
+    // implementation for https://docs.rs/glam/latest/glam/usize/index.html
+    implement_specta_type_for_glam_type!(USizeVec2 as [usize; 2]);
+    implement_specta_type_for_glam_type!(USizeVec3 as [usize; 3]);
+    implement_specta_type_for_glam_type!(USizeVec4 as [usize; 4]);
+
+    // Implementation for https://docs.rs/glam/latest/glam/bool/index.html
+    implement_specta_type_for_glam_type!(BVec2 as [bool; 2]);
+    implement_specta_type_for_glam_type!(BVec3 as [bool; 3]);
+    implement_specta_type_for_glam_type!(BVec4 as [bool; 4]);
 };
 
 #[cfg(feature = "url")]
