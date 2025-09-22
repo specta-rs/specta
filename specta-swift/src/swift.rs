@@ -200,6 +200,15 @@ impl NamingConvention {
         }
     }
 
+    /// Convert a string to the appropriate naming convention for enum cases.
+    pub fn convert_enum_case(&self, name: &str) -> String {
+        match self {
+            Self::PascalCase => self.to_camel_case(name), // Enum cases should be camelCase
+            Self::CamelCase => self.to_camel_case(name),
+            Self::SnakeCase => self.to_snake_case(name),
+        }
+    }
+
     fn to_camel_case(&self, name: &str) -> String {
         // Convert snake_case to camelCase
         let parts: Vec<&str> = name.split('_').collect();

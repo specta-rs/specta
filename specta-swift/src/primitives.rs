@@ -17,14 +17,14 @@ pub fn export_type(
     ndt: &specta::datatype::NamedDataType,
 ) -> Result<String> {
     let mut result = String::new();
-    
+
     // Add JSDoc-style comments if present
     if !ndt.docs().is_empty() {
         result.push_str("/// ");
         result.push_str(ndt.docs());
         result.push('\n');
     }
-    
+
     // Add deprecated annotation if present
     if let Some(deprecated) = ndt.deprecated() {
         let message = match deprecated {
@@ -32,12 +32,15 @@ pub fn export_type(
             specta::datatype::DeprecatedType::DeprecatedWithSince { note, .. } => note.to_string(),
             _ => "This type is deprecated".to_string(),
         };
-        result.push_str(&format!("@available(*, deprecated, message: \"{}\")\n", message));
+        result.push_str(&format!(
+            "@available(*, deprecated, message: \"{}\")\n",
+            message
+        ));
     }
-    
+
     // Generate the type definition
     let type_def = datatype_to_swift(swift, types, ndt.ty(), vec![], false, Some(ndt.sid()))?;
-    
+
     // Format based on type
     match ndt.ty() {
         DataType::Struct(_) => {
@@ -45,9 +48,16 @@ pub fn export_type(
             let generics = if ndt.generics().is_empty() {
                 String::new()
             } else {
-                format!("<{}>", ndt.generics().iter().map(|g| g.to_string()).collect::<Vec<_>>().join(", "))
+                format!(
+                    "<{}>",
+                    ndt.generics()
+                        .iter()
+                        .map(|g| g.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
             };
-            
+
             result.push_str(&format!("struct {}{}: Codable {{\n", name, generics));
             result.push_str(&type_def);
             result.push_str("}");
@@ -57,9 +67,16 @@ pub fn export_type(
             let generics = if ndt.generics().is_empty() {
                 String::new()
             } else {
-                format!("<{}>", ndt.generics().iter().map(|g| g.to_string()).collect::<Vec<_>>().join(", "))
+                format!(
+                    "<{}>",
+                    ndt.generics()
+                        .iter()
+                        .map(|g| g.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
             };
-            
+
             result.push_str(&format!("enum {}{}: Codable {{\n", name, generics));
             result.push_str(&type_def);
             result.push_str("}");
@@ -69,7 +86,7 @@ pub fn export_type(
             result.push_str(&type_def);
         }
     }
-    
+
     Ok(result)
 }
 
@@ -121,10 +138,14 @@ fn primitive_to_swift(primitive: &Primitive) -> Result<String> {
         Primitive::char => "Character".to_string(),
         Primitive::String => "String".to_string(),
         Primitive::i128 | Primitive::u128 => {
-            return Err(Error::UnsupportedType("Swift does not support 128-bit integers".to_string()));
+            return Err(Error::UnsupportedType(
+                "Swift does not support 128-bit integers".to_string(),
+            ));
         }
         Primitive::f16 => {
-            return Err(Error::UnsupportedType("Swift does not support f16".to_string()));
+            return Err(Error::UnsupportedType(
+                "Swift does not support f16".to_string(),
+            ));
         }
     })
 }
@@ -144,7 +165,11 @@ fn literal_to_swift(literal: &specta::datatype::Literal) -> Result<String> {
         specta::datatype::Literal::String(s) => format!("\"{}\"", s),
         specta::datatype::Literal::char(c) => format!("\"{}\"", c),
         specta::datatype::Literal::None => "nil".to_string(),
-        _ => return Err(Error::UnsupportedType("Unsupported literal type".to_string())),
+        _ => {
+            return Err(Error::UnsupportedType(
+                "Unsupported literal type".to_string(),
+            ))
+        }
     })
 }
 
@@ -184,11 +209,28 @@ fn struct_to_swift(
             if fields.fields().is_empty() {
                 Ok("Void".to_string())
             } else if fields.fields().len() == 1 {
-                datatype_to_swift(swift, types, &fields.fields()[0].ty().unwrap(), location, is_export, sid)
+                datatype_to_swift(
+                    swift,
+                    types,
+                    &fields.fields()[0].ty().unwrap(),
+                    location,
+                    is_export,
+                    sid,
+                )
             } else {
-                let types_str = fields.fields()
+                let types_str = fields
+                    .fields()
                     .iter()
-                    .map(|f| datatype_to_swift(swift, types, f.ty().unwrap(), location.clone(), is_export, sid))
+                    .map(|f| {
+                        datatype_to_swift(
+                            swift,
+                            types,
+                            f.ty().unwrap(),
+                            location.clone(),
+                            is_export,
+                            sid,
+                        )
+                    })
                     .collect::<std::result::Result<Vec<_>, _>>()?
                     .join(", ");
                 Ok(format!("({})", types_str))
@@ -196,20 +238,23 @@ fn struct_to_swift(
         }
         specta::datatype::Fields::Named(fields) => {
             let mut result = String::new();
-            
+
             for (name, field) in fields.fields() {
                 let field_type = if let Some(ty) = field.ty() {
                     datatype_to_swift(swift, types, ty, location.clone(), is_export, sid)?
                 } else {
                     continue;
                 };
-                
+
                 let optional_marker = if field.optional() { "?" } else { "" };
                 let field_name = swift.naming.convert_field(name);
-                
-                result.push_str(&format!("    let {}: {}{}\n", field_name, field_type, optional_marker));
+
+                result.push_str(&format!(
+                    "    let {}: {}{}\n",
+                    field_name, field_type, optional_marker
+                ));
             }
-            
+
             Ok(result)
         }
     }
@@ -225,14 +270,14 @@ fn enum_to_swift(
     sid: Option<SpectaID>,
 ) -> Result<String> {
     let mut result = String::new();
-    
+
     for (variant_name, variant) in e.variants() {
         if variant.skip() {
             continue;
         }
-        
-        let variant_name = swift.naming.convert_field(variant_name);
-        
+
+        let variant_name = swift.naming.convert_enum_case(variant_name);
+
         match variant.fields() {
             specta::datatype::Fields::Unit => {
                 result.push_str(&format!("    case {}\n", variant_name));
@@ -241,9 +286,19 @@ fn enum_to_swift(
                 if fields.fields().is_empty() {
                     result.push_str(&format!("    case {}\n", variant_name));
                 } else {
-                    let types_str = fields.fields()
+                    let types_str = fields
+                        .fields()
                         .iter()
-                        .map(|f| datatype_to_swift(swift, types, f.ty().unwrap(), location.clone(), is_export, sid))
+                        .map(|f| {
+                            datatype_to_swift(
+                                swift,
+                                types,
+                                f.ty().unwrap(),
+                                location.clone(),
+                                is_export,
+                                sid,
+                            )
+                        })
                         .collect::<std::result::Result<Vec<_>, _>>()?
                         .join(", ");
                     result.push_str(&format!("    case {}({})\n", variant_name, types_str));
@@ -262,14 +317,19 @@ fn enum_to_swift(
                         };
                         let optional_marker = if field.optional() { "?" } else { "" };
                         let field_name = swift.naming.convert_field(field_name);
-                        field_strs.push(format!("{}: {}{}", field_name, field_type, optional_marker));
+                        field_strs
+                            .push(format!("{}: {}{}", field_name, field_type, optional_marker));
                     }
-                    result.push_str(&format!("    case {}({})\n", variant_name, field_strs.join(", ")));
+                    result.push_str(&format!(
+                        "    case {}({})\n",
+                        variant_name,
+                        field_strs.join(", ")
+                    ));
                 }
             }
         }
     }
-    
+
     Ok(result)
 }
 
@@ -284,7 +344,8 @@ fn tuple_to_swift(
     } else if t.elements().len() == 1 {
         datatype_to_swift(swift, types, &t.elements()[0], vec![], false, None)
     } else {
-        let types_str = t.elements()
+        let types_str = t
+            .elements()
             .iter()
             .map(|e| datatype_to_swift(swift, types, e, vec![], false, None))
             .collect::<std::result::Result<Vec<_>, _>>()?
@@ -303,13 +364,16 @@ fn reference_to_swift(
     let name = if let Some(ndt) = types.get(r.sid()) {
         swift.naming.convert(ndt.name())
     } else {
-        return Err(Error::InvalidIdentifier("Reference to unknown type".to_string()));
+        return Err(Error::InvalidIdentifier(
+            "Reference to unknown type".to_string(),
+        ));
     };
-    
+
     if r.generics().is_empty() {
         Ok(name)
     } else {
-        let generics = r.generics()
+        let generics = r
+            .generics()
             .iter()
             .map(|(_, t)| datatype_to_swift(swift, types, t, vec![], false, None))
             .collect::<std::result::Result<Vec<_>, _>>()?
@@ -319,9 +383,6 @@ fn reference_to_swift(
 }
 
 /// Convert generic types to Swift.
-fn generic_to_swift(
-    _swift: &Swift,
-    g: &specta::datatype::Generic,
-) -> Result<String> {
+fn generic_to_swift(_swift: &Swift, g: &specta::datatype::Generic) -> Result<String> {
     Ok(g.to_string())
 }
