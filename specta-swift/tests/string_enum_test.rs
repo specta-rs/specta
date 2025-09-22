@@ -30,12 +30,12 @@ fn test_string_enum_generation() {
 
     println!("String enum test output:\n{}", output);
 
-    // JobStatus should be a simple enum (string-based)
-    assert!(output.contains("enum JobStatus: Codable"));
-    assert!(output.contains("case completed"));
-    assert!(output.contains("case running"));
-    assert!(output.contains("case failed"));
-    assert!(output.contains("case pendingApproval"));
+    // JobStatus should be a string enum (with String protocol and raw values)
+    assert!(output.contains("enum JobStatus: String, Codable"));
+    assert!(output.contains("case completed = \"completed\""));
+    assert!(output.contains("case running = \"running\""));
+    assert!(output.contains("case failed = \"failed\""));
+    assert!(output.contains("case pendingApproval = \"pending_approval\""));
 
     // RegularEnum should be a tagged union
     assert!(output.contains("enum RegularEnum: Codable"));

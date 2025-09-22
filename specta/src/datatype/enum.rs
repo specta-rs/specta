@@ -46,6 +46,14 @@ impl Enum {
     pub fn variants_mut(&mut self) -> &mut Vec<(Cow<'static, str>, EnumVariant)> {
         &mut self.variants
     }
+
+    /// Check if this enum should be serialized as a string enum.
+    /// This is true when all variants are unit variants (no fields).
+    pub fn is_string_enum(&self) -> bool {
+        self.variants()
+            .iter()
+            .all(|(_, variant)| matches!(variant.fields(), Fields::Unit))
+    }
 }
 
 impl From<Enum> for DataType {
@@ -67,6 +75,25 @@ pub enum EnumRepr {
         tag: Cow<'static, str>,
         content: Cow<'static, str>,
     },
+    /// String enum representation for unit-only enums with serde rename_all
+    String {
+        rename_all: Option<Cow<'static, str>>,
+    },
+}
+
+impl EnumRepr {
+    /// Check if this is a string enum representation
+    pub fn is_string(&self) -> bool {
+        matches!(self, EnumRepr::String { .. })
+    }
+
+    /// Get the rename_all inflection for string enums
+    pub fn rename_all(&self) -> Option<&str> {
+        match self {
+            EnumRepr::String { rename_all } => rename_all.as_deref(),
+            _ => None,
+        }
+    }
 }
 
 /// represents a variant of an enum.

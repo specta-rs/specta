@@ -210,30 +210,47 @@ impl NamingConvention {
     }
 
     fn to_camel_case(&self, name: &str) -> String {
-        // Convert snake_case to camelCase
-        let parts: Vec<&str> = name.split('_').collect();
-        if parts.is_empty() {
-            return name.to_string();
-        }
+        // Convert snake_case or PascalCase to camelCase
+        if name.contains('_') {
+            // Handle snake_case
+            let parts: Vec<&str> = name.split('_').collect();
+            if parts.is_empty() {
+                return name.to_string();
+            }
 
-        let mut result = String::new();
-        for (i, part) in parts.iter().enumerate() {
-            if i == 0 {
-                result.push_str(&part.to_lowercase());
-            } else {
-                let mut chars = part.chars();
-                match chars.next() {
-                    None => continue,
-                    Some(first) => {
-                        result.push(first.to_uppercase().next().unwrap_or(first));
-                        for c in chars {
-                            result.extend(c.to_lowercase());
+            let mut result = String::new();
+            for (i, part) in parts.iter().enumerate() {
+                if i == 0 {
+                    result.push_str(&part.to_lowercase());
+                } else {
+                    let mut chars = part.chars();
+                    match chars.next() {
+                        None => continue,
+                        Some(first) => {
+                            result.push(first.to_uppercase().next().unwrap_or(first));
+                            for c in chars {
+                                result.extend(c.to_lowercase());
+                            }
                         }
                     }
                 }
             }
+            result
+        } else {
+            // Handle PascalCase - convert to camelCase
+            let mut chars = name.chars();
+            match chars.next() {
+                None => name.to_string(),
+                Some(first) => {
+                    let mut result = String::new();
+                    result.push(first.to_lowercase().next().unwrap_or(first));
+                    for c in chars {
+                        result.push(c); // Keep the rest as-is for PascalCase
+                    }
+                    result
+                }
+            }
         }
-        result
     }
 
     fn to_pascal_case(&self, name: &str) -> String {

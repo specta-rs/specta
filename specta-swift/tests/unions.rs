@@ -124,19 +124,19 @@ fn test_enum_with_nested_structs() {
     assert!(output.contains("case tuple(String, UInt32, Bool)"));
 
     // Test named field variants (should be struct-like)
-    assert!(output.contains("case admin"));
-    assert!(output.contains("case guest"));
-    assert!(output.contains("case success"));
-    assert!(output.contains("case error"));
-    assert!(output.contains("case loading"));
-    assert!(output.contains("case namedfields"));
-    assert!(output.contains("case complex"));
+    assert!(output.contains("case admin(AdminData)"));
+    assert!(output.contains("case guest(GuestData)"));
+    assert!(output.contains("case success(SuccessData)"));
+    assert!(output.contains("case error(ErrorData)"));
+    assert!(output.contains("case loading(LoadingData)"));
+    assert!(output.contains("case namedFields(NamedFieldsData)"));
+    assert!(output.contains("case complex(ComplexData)"));
 
     // Test nested struct variants
     assert!(output.contains("case registered(User)"));
-    assert!(output.contains("case superadmin(Admin)"));
-    assert!(output.contains("case userstruct(User)"));
-    assert!(output.contains("case usertype(UserType)"));
+    assert!(output.contains("case superAdmin(Admin)"));
+    assert!(output.contains("case userStruct(User)"));
+    assert!(output.contains("case userType(UserType)"));
 
     // Test that nested structs are properly defined
     assert!(output.contains("struct User"));
@@ -163,8 +163,8 @@ fn test_swift_union_syntax() {
     assert!(output.contains("case user(String, UInt32)"));
 
     // Named fields should be struct-like
-    assert!(output.contains("case admin"));
+    assert!(output.contains("case admin(AdminData)"));
     assert!(output.contains("case registered(User)"));
-    assert!(output.contains("case superadmin(Admin)"));
-    assert!(output.contains("case guest"));
+    assert!(output.contains("case superAdmin(Admin)"));
+    assert!(output.contains("case guest(GuestData)"));
 }
