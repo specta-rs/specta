@@ -104,6 +104,11 @@ pub fn datatype_to_swift(
     is_export: bool,
     sid: Option<SpectaID>,
 ) -> Result<String> {
+    // Check for special standard library types first
+    if let Some(special_type) = is_special_std_type(types, sid) {
+        return Ok(special_type);
+    }
+
     match dt {
         DataType::Primitive(p) => primitive_to_swift(p),
         DataType::Literal(l) => literal_to_swift(l),
@@ -116,12 +121,53 @@ pub fn datatype_to_swift(
                 crate::swift::OptionalStyle::Optional => format!("Optional<{}>", inner),
             })
         }
-        DataType::Struct(s) => struct_to_swift(swift, types, s, location, is_export, sid),
+        DataType::Struct(s) => {
+            // Check if this is a Duration struct by looking at its fields
+            if is_duration_struct(s) {
+                return Ok("TimeInterval".to_string());
+            }
+            struct_to_swift(swift, types, s, location, is_export, sid)
+        }
         DataType::Enum(e) => enum_to_swift(swift, types, e, location, is_export, sid),
         DataType::Tuple(t) => tuple_to_swift(swift, types, t),
         DataType::Reference(r) => reference_to_swift(swift, types, r),
         DataType::Generic(g) => generic_to_swift(swift, g),
     }
+}
+
+/// Check if a struct is a Duration by examining its fields
+fn is_duration_struct(s: &specta::datatype::Struct) -> bool {
+    match s.fields() {
+        specta::datatype::Fields::Named(fields) => {
+            let field_names: Vec<String> = fields
+                .fields()
+                .iter()
+                .map(|(name, _)| name.to_string())
+                .collect();
+            // Duration has exactly two fields: "secs" (u64) and "nanos" (u32)
+            field_names.len() == 2
+                && field_names.contains(&"secs".to_string())
+                && field_names.contains(&"nanos".to_string())
+        }
+        _ => false,
+    }
+}
+
+/// Check if a type is a special standard library type that needs special handling
+fn is_special_std_type(types: &TypeCollection, sid: Option<SpectaID>) -> Option<String> {
+    if let Some(sid) = sid {
+        if let Some(ndt) = types.get(sid) {
+            // Check for std::time::Duration
+            if ndt.name() == "Duration" {
+                return Some("TimeInterval".to_string());
+            }
+            // Check for std::time::SystemTime
+            if ndt.name() == "SystemTime" {
+                return Some("Date".to_string());
+            }
+        }
+    }
+    None
 }
 
 /// Convert primitive types to Swift.
@@ -214,31 +260,31 @@ fn struct_to_swift(
             if fields.fields().is_empty() {
                 Ok("Void".to_string())
             } else if fields.fields().len() == 1 {
-                datatype_to_swift(
+                // Single field tuple struct - convert to a proper struct with a 'value' field
+                let field_type = datatype_to_swift(
                     swift,
                     types,
                     &fields.fields()[0].ty().unwrap(),
                     location,
                     is_export,
                     sid,
-                )
+                )?;
+                Ok(format!("    let value: {}\n", field_type))
             } else {
-                let types_str = fields
-                    .fields()
-                    .iter()
-                    .map(|f| {
-                        datatype_to_swift(
-                            swift,
-                            types,
-                            f.ty().unwrap(),
-                            location.clone(),
-                            is_export,
-                            sid,
-                        )
-                    })
-                    .collect::<std::result::Result<Vec<_>, _>>()?
-                    .join(", ");
-                Ok(format!("({})", types_str))
+                // Multiple field tuple struct - convert to a proper struct with numbered fields
+                let mut result = String::new();
+                for (i, field) in fields.fields().iter().enumerate() {
+                    let field_type = datatype_to_swift(
+                        swift,
+                        types,
+                        field.ty().unwrap(),
+                        location.clone(),
+                        is_export,
+                        sid,
+                    )?;
+                    result.push_str(&format!("    let field{}: {}\n", i, field_type));
+                }
+                Ok(result)
             }
         }
         specta::datatype::Fields::Named(fields) => {
