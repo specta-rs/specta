@@ -20,9 +20,14 @@ pub fn export_type(
 
     // Add JSDoc-style comments if present
     if !ndt.docs().is_empty() {
-        result.push_str("/// ");
-        result.push_str(ndt.docs());
-        result.push('\n');
+        let docs = ndt.docs();
+        // Handle multi-line comments properly
+        for line in docs.lines() {
+            result.push_str("/// ");
+            // Trim leading whitespace from the line to avoid extra spaces
+            result.push_str(line.trim_start());
+            result.push('\n');
+        }
     }
 
     // Add deprecated annotation if present
