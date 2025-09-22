@@ -162,7 +162,7 @@ pub fn datatype_to_swift(
         DataType::Struct(s) => {
             // Check if this is a Duration struct by looking at its fields
             if is_duration_struct(s) {
-                return Ok("TimeInterval".to_string());
+                return Ok("RustDuration".to_string());
             }
             struct_to_swift(swift, types, s, location, is_export, sid)
         }
@@ -197,7 +197,7 @@ fn is_special_std_type(types: &TypeCollection, sid: Option<SpectaID>) -> Option<
         if let Some(ndt) = types.get(sid) {
             // Check for std::time::Duration
             if ndt.name() == "Duration" {
-                return Some("TimeInterval".to_string());
+                return Some("RustDuration".to_string());
             }
             // Check for std::time::SystemTime
             if ndt.name() == "SystemTime" {
@@ -343,16 +343,21 @@ fn struct_to_swift(
                     "    public let {}: {}{}\n",
                     swift_field_name, field_type, optional_marker
                 ));
-                
+
                 field_mappings.push((swift_field_name, original_field_name.to_string()));
             }
 
             // Generate custom CodingKeys if field names were converted
-            let needs_custom_coding_keys = field_mappings.iter().any(|(swift_name, rust_name)| swift_name != rust_name);
+            let needs_custom_coding_keys = field_mappings
+                .iter()
+                .any(|(swift_name, rust_name)| swift_name != rust_name);
             if needs_custom_coding_keys {
                 result.push_str("\n    private enum CodingKeys: String, CodingKey {\n");
                 for (swift_name, rust_name) in &field_mappings {
-                    result.push_str(&format!("        case {} = \"{}\"\n", swift_name, rust_name));
+                    result.push_str(&format!(
+                        "        case {} = \"{}\"\n",
+                        swift_name, rust_name
+                    ));
                 }
                 result.push_str("    }\n");
             }
@@ -666,6 +671,17 @@ fn generate_enum_codable_impl(
     ));
     result.push_str(&format!("extension {}: Codable {{\n", enum_name));
 
+    // Check if this is an adjacently tagged enum
+    let is_adjacently_tagged = if let Some(repr) = e.repr() {
+        matches!(repr, specta::datatype::EnumRepr::Adjacent { .. })
+    } else {
+        false
+    };
+
+    if is_adjacently_tagged {
+        return generate_adjacently_tagged_codable(swift, e, enum_name);
+    }
+
     // Generate CodingKeys enum
     result.push_str("    private enum CodingKeys: String, CodingKey {\n");
     for (original_variant_name, variant) in e.variants() {
@@ -775,6 +791,137 @@ fn generate_enum_codable_impl(
                     "            try container.encode(data, forKey: .{})\n",
                     swift_case_name
                 ));
+            }
+        }
+    }
+
+    result.push_str("        }\n");
+    result.push_str("    }\n");
+    result.push_str("}\n");
+
+    Ok(result)
+}
+
+/// Generate custom Codable implementation for adjacently tagged enums
+fn generate_adjacently_tagged_codable(
+    swift: &Swift,
+    e: &specta::datatype::Enum,
+    enum_name: &str,
+) -> Result<String> {
+    let mut result = String::new();
+
+    // Get tag and content field names
+    let (tag_field, content_field) =
+        if let Some(specta::datatype::EnumRepr::Adjacent { tag, content }) = e.repr() {
+            (tag.as_ref(), content.as_ref())
+        } else {
+            return Err(Error::UnsupportedType(
+                "Expected adjacently tagged enum".to_string(),
+            ));
+        };
+
+    result.push_str(&format!(
+        "\n// MARK: - {} Adjacently Tagged Codable Implementation\n",
+        enum_name
+    ));
+    result.push_str(&format!("extension {}: Codable {{\n", enum_name));
+
+    // Generate TypeKeys enum for the tag and content fields
+    result.push_str("    private enum TypeKeys: String, CodingKey {\n");
+    result.push_str(&format!("        case tag = \"{}\"\n", tag_field));
+    result.push_str(&format!("        case content = \"{}\"\n", content_field));
+    result.push_str("    }\n\n");
+
+    // Generate VariantType enum for variant names
+    result.push_str("    private enum VariantType: String, Codable {\n");
+    for (original_variant_name, variant) in e.variants() {
+        if variant.skip() {
+            continue;
+        }
+        let swift_case_name = swift.naming.convert_enum_case(original_variant_name);
+        result.push_str(&format!(
+            "        case {} = \"{}\"\n",
+            swift_case_name, original_variant_name
+        ));
+    }
+    result.push_str("    }\n\n");
+
+    // Generate init(from decoder:)
+    result.push_str("    public init(from decoder: Decoder) throws {\n");
+    result.push_str("        let container = try decoder.container(keyedBy: TypeKeys.self)\n");
+    result.push_str(
+        "        let variantType = try container.decode(VariantType.self, forKey: .tag)\n",
+    );
+    result.push_str("        \n");
+    result.push_str("        switch variantType {\n");
+
+    for (original_variant_name, variant) in e.variants() {
+        if variant.skip() {
+            continue;
+        }
+
+        let swift_case_name = swift.naming.convert_enum_case(original_variant_name);
+
+        match variant.fields() {
+            specta::datatype::Fields::Unit => {
+                result.push_str(&format!("        case .{}:\n", swift_case_name));
+                result.push_str(&format!("            self = .{}\n", swift_case_name));
+            }
+            specta::datatype::Fields::Unnamed(_) => {
+                // TODO: Handle tuple variants for adjacently tagged
+                result.push_str(&format!("        case .{}:\n", swift_case_name));
+                result.push_str("            fatalError(\"Adjacently tagged tuple variants not implemented\")\n");
+            }
+            specta::datatype::Fields::Named(_) => {
+                let pascal_variant_name = to_pascal_case(original_variant_name);
+                let struct_name = format!("{}{}Data", enum_name, pascal_variant_name);
+
+                result.push_str(&format!("        case .{}:\n", swift_case_name));
+                result.push_str(&format!(
+                    "            let data = try container.decode({}.self, forKey: .content)\n",
+                    struct_name
+                ));
+                result.push_str(&format!("            self = .{}(data)\n", swift_case_name));
+            }
+        }
+    }
+
+    result.push_str("        }\n");
+    result.push_str("    }\n\n");
+
+    // Generate encode(to encoder:)
+    result.push_str("    public func encode(to encoder: Encoder) throws {\n");
+    result.push_str("        var container = encoder.container(keyedBy: TypeKeys.self)\n");
+    result.push_str("        \n");
+    result.push_str("        switch self {\n");
+
+    for (original_variant_name, variant) in e.variants() {
+        if variant.skip() {
+            continue;
+        }
+
+        let swift_case_name = swift.naming.convert_enum_case(original_variant_name);
+
+        match variant.fields() {
+            specta::datatype::Fields::Unit => {
+                result.push_str(&format!("        case .{}:\n", swift_case_name));
+                result.push_str(&format!(
+                    "            try container.encode(VariantType.{}, forKey: .tag)\n",
+                    swift_case_name
+                ));
+            }
+            specta::datatype::Fields::Unnamed(_) => {
+                // TODO: Handle tuple variants
+                result.push_str(&format!("        case .{}:\n", swift_case_name));
+                result.push_str("            fatalError(\"Adjacently tagged tuple variants not implemented\")\n");
+            }
+            specta::datatype::Fields::Named(_) => {
+                result.push_str(&format!("        case .{}(let data):\n", swift_case_name));
+                result.push_str(&format!(
+                    "            try container.encode(VariantType.{}, forKey: .tag)\n",
+                    swift_case_name
+                ));
+                result.push_str("            try container.encode(data, forKey: .content)\n");
             }
         }
     }
