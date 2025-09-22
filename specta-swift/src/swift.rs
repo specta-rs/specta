@@ -5,7 +5,7 @@ use std::{borrow::Cow, path::Path};
 use specta::TypeCollection;
 
 use crate::error::{Error, Result};
-use crate::primitives::export_type;
+use crate::primitives::{export_type, is_duration_struct};
 
 /// Swift language exporter.
 #[derive(Debug, Clone)]
@@ -159,6 +159,11 @@ impl Swift {
         }
         result.push('\n');
 
+        // Check if we need to inject Duration helper
+        if needs_duration_helper(types) {
+            result.push_str(&generate_duration_helper());
+        }
+
         // Export types
         for ndt in types.into_sorted_iter() {
             result.push_str(&export_type(self, types, &ndt)?);
@@ -280,4 +285,51 @@ impl NamingConvention {
 
         result
     }
+}
+
+/// Check if the type collection contains any Duration types that need the helper
+fn needs_duration_helper(types: &TypeCollection) -> bool {
+    for ndt in types.into_sorted_iter() {
+        if ndt.name() == "Duration" {
+            return true;
+        }
+        // Also check if any struct fields contain Duration
+        if let specta::datatype::DataType::Struct(s) = ndt.ty() {
+            if let specta::datatype::Fields::Named(fields) = s.fields() {
+                for (_, field) in fields.fields() {
+                    if let Some(ty) = field.ty() {
+                        if let specta::datatype::DataType::Reference(r) = ty {
+                            if let Some(referenced_ndt) = types.get(r.sid()) {
+                                if referenced_ndt.name() == "Duration" {
+                                    return true;
+                                }
+                            }
+                        }
+                        // Also check if the field type is a Duration struct directly
+                        if let specta::datatype::DataType::Struct(struct_ty) = ty {
+                            if is_duration_struct(struct_ty) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+/// Generate the Duration helper struct
+fn generate_duration_helper() -> String {
+    "// MARK: - Duration Helper\n".to_string()
+        + "/// Helper struct to decode Rust Duration format {\"secs\": u64, \"nanos\": u32}\n"
+        + "public struct RustDuration: Codable {\n"
+        + "    public let secs: UInt64\n"
+        + "    public let nanos: UInt32\n"
+        + "    \n"
+        + "    public var timeInterval: TimeInterval {\n"
+        + "        return Double(secs) + Double(nanos) / 1_000_000_000.0\n"
+        + "    }\n"
+        + "}\n\n"
+        + "// MARK: - Generated Types\n\n"
 }

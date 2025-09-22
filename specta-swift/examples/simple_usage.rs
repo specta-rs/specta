@@ -34,7 +34,9 @@ fn main() {
 
     // Export to Swift with default settings
     let swift = Swift::default();
-    swift.export_to("./SimpleTypes.swift", &types).unwrap();
+    swift
+        .export_to("./examples/generated/SimpleTypes.swift", &types)
+        .unwrap();
 
     println!("Simple types exported to SimpleTypes.swift");
 
@@ -45,7 +47,7 @@ fn main() {
         .optionals(specta_swift::OptionalStyle::Optional);
 
     custom_swift
-        .export_to("./CustomTypes.swift", &types)
+        .export_to("./examples/generated/CustomTypes.swift", &types)
         .unwrap();
 
     println!("Custom types exported to CustomTypes.swift");

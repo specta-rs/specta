@@ -92,10 +92,8 @@ pub fn export_type(
 
             let protocols = if is_string_enum {
                 "String, Codable"
-            } else if has_struct_variants {
-                "" // No Codable - we'll generate custom implementation
             } else {
-                "Codable"
+                "Codable" // Always include Codable - we'll provide custom implementation if needed
             };
 
             let protocol_part = if protocols.is_empty() {
@@ -174,7 +172,7 @@ pub fn datatype_to_swift(
 }
 
 /// Check if a struct is a Duration by examining its fields
-fn is_duration_struct(s: &specta::datatype::Struct) -> bool {
+pub fn is_duration_struct(s: &specta::datatype::Struct) -> bool {
     match s.fields() {
         specta::datatype::Fields::Named(fields) => {
             let field_names: Vec<String> = fields

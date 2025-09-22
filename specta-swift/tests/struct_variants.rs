@@ -49,34 +49,34 @@ fn test_struct_variants_generation() {
 
     // Event enum should have struct-like cases
     assert!(result.contains("enum Event: Codable"));
-    assert!(result.contains("case jobStarted(JobStartedData)"));
-    assert!(result.contains("case jobCompleted(JobCompletedData)"));
+    assert!(result.contains("case jobStarted(EventJobStartedData)"));
+    assert!(result.contains("case jobCompleted(EventJobCompletedData)"));
     assert!(result.contains("case jobCancelled"));
     assert!(result.contains("case jobFailed(String, UInt32)"));
 
     // Should generate structs for named field variants
-    assert!(result.contains("struct JobStartedData: Codable"));
+    assert!(result.contains("struct EventJobStartedData: Codable"));
     assert!(result.contains("let jobId: String"));
     assert!(result.contains("let jobType: String"));
 
-    assert!(result.contains("struct JobCompletedData: Codable"));
+    assert!(result.contains("struct EventJobCompletedData: Codable"));
     assert!(result.contains("let jobId: String"));
     assert!(result.contains("let result: String"));
     assert!(result.contains("let duration: UInt64"));
 
     // ApiResponse enum should have struct-like cases
     assert!(result.contains("enum ApiResponse: Codable"));
-    assert!(result.contains("case success(SuccessData)"));
-    assert!(result.contains("case error(ErrorData)"));
+    assert!(result.contains("case success(ApiResponseSuccessData)"));
+    assert!(result.contains("case error(ApiResponseErrorData)"));
     assert!(result.contains("case loading"));
     assert!(result.contains("case redirect(String)"));
 
     // Should generate structs for ApiResponse variants
-    assert!(result.contains("struct SuccessData: Codable"));
+    assert!(result.contains("struct ApiResponseSuccessData: Codable"));
     assert!(result.contains("let data: String"));
     assert!(result.contains("let status: UInt16"));
 
-    assert!(result.contains("struct ErrorData: Codable"));
+    assert!(result.contains("struct ApiResponseErrorData: Codable"));
     assert!(result.contains("let message: String"));
     assert!(result.contains("let code: UInt32"));
     assert!(result.contains("let details: String?"));
