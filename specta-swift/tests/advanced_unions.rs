@@ -180,8 +180,12 @@ fn test_union_with_generics() {
     println!("Generic unions Swift code:\n{}", output);
 
     // Test generic enum definitions
-    assert!(output.contains("enum ApiResponse<T>: Codable"));
-    assert!(output.contains("enum DatabaseResult<T, E>: Codable"));
+    assert!(output.contains("enum ApiResponse<T>"));
+    assert!(output.contains("enum DatabaseResult<T, E>"));
+
+    // Test that Codable is added via extension
+    assert!(output.contains("extension ApiResponse: Codable"));
+    assert!(output.contains("extension DatabaseResult: Codable"));
 
     // Test that generic types are used in variants
     assert!(output.contains("data: T"));

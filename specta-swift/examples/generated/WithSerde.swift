@@ -2,7 +2,7 @@
 import Foundation
 import Codable
 
-public enum ApiResponse<T>: Codable {
+public enum ApiResponse<T> {
     case success(ApiResponseSuccessData)
     case error(ApiResponseErrorData)
     case loading(ApiResponseLoadingData)

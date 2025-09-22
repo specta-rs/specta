@@ -356,7 +356,7 @@ public struct TaskMetadata: Codable {
 }
 
 /// Task status enum with mixed variants
-public enum TaskStatus: Codable {
+public enum TaskStatus {
     case todo
     case inProgress(TaskStatusInProgressData)
     case blocked(TaskStatusBlockedData)
@@ -546,7 +546,7 @@ public struct UserProfile: Codable {
 }
 
 /// User role with permissions
-public enum UserRole: Codable {
+public enum UserRole {
     case user
     case moderator(UserRoleModeratorData)
     case admin(UserRoleAdminData)

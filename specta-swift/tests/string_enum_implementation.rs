@@ -187,9 +187,13 @@ fn test_mixed_enum_not_string() {
     println!("Generated Swift for MixedEnum:");
     println!("{}", result);
 
-    // Should NOT be a string enum (has data fields)
-    assert!(result.contains("enum MixedEnum: Codable"));
+    // Should NOT be a string enum (has data fields) - no redundant Codable in declaration
+    assert!(result.contains("enum MixedEnum"));
+    assert!(!result.contains("enum MixedEnum: Codable"));
     assert!(!result.contains("enum MixedEnum: String, Codable"));
+
+    // Should have Codable in extension instead
+    assert!(result.contains("extension MixedEnum: Codable"));
     assert!(result.contains("case unit"));
     assert!(result.contains("case withData(String)"));
     assert!(result.contains("case withFields(MixedEnumWithFieldsData)"));
@@ -243,6 +247,7 @@ fn test_all_string_enums_together() {
     assert!(result.contains("enum DatabaseStatus: String, Codable"));
 
     // Check that non-string enums are generated correctly
-    assert!(result.contains("enum MixedEnum: Codable"));
-    assert!(result.contains("enum RegularEnum: Codable"));
+    assert!(result.contains("enum MixedEnum")); // No redundant Codable in declaration
+    assert!(result.contains("enum RegularEnum: Codable")); // Simple enum can have Codable in declaration
+    assert!(result.contains("extension MixedEnum: Codable")); // Complex enum has Codable in extension
 }

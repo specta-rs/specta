@@ -71,7 +71,7 @@ public struct IndexerMetrics: Codable {
 }
 
 /// Job status with timing
-public enum JobStatus: Codable {
+public enum JobStatus {
     case queued
     case running(JobStatusRunningData)
     case completed(JobStatusCompletedData)

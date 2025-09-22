@@ -6,7 +6,7 @@ import Foundation
 /// This example demonstrates how specta-swift handles complex enum scenarios
 /// including nested types, generic enums, and custom Codable implementations.
 /// Complex enum with mixed variant types
-public enum ApiResult<T, E>: Codable {
+public enum ApiResult<T, E> {
     case ok(ApiResultOkData)
     case err(ApiResultErrData)
     case loading(ApiResultLoadingData)
@@ -104,7 +104,7 @@ public enum Container<T>: Codable {
 }
 
 /// Event system enum
-public enum Event: Codable {
+public enum Event {
     case user(EventUserData)
     case system(EventSystemData)
     case error(EventErrorData)
@@ -208,7 +208,7 @@ public struct LineStyle: Codable {
 }
 
 /// Mixed enum with both string-like and data variants
-public enum MixedEnum: Codable {
+public enum MixedEnum {
     case simple(String)
     case withFields(MixedEnumWithFieldsData)
     case empty
@@ -282,7 +282,7 @@ public struct Rectangle: Codable {
 }
 
 /// Enum demonstrating different field patterns
-public enum Shape: Codable {
+public enum Shape {
     case none
     case point(Double, Double)
     case circle(ShapeCircleData)
@@ -383,7 +383,7 @@ extension Shape: Codable {
 
 
 /// Enum with recursive references
-public enum Tree<T>: Codable {
+public enum Tree<T> {
     case leaf(T)
     case branch(TreeBranchData)
 }

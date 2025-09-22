@@ -48,7 +48,7 @@ fn test_struct_variants_generation() {
     println!("{}", result);
 
     // Event enum should have struct-like cases
-    assert!(result.contains("enum Event: Codable"));
+    assert!(result.contains("enum Event"));
     assert!(result.contains("case jobStarted(EventJobStartedData)"));
     assert!(result.contains("case jobCompleted(EventJobCompletedData)"));
     assert!(result.contains("case jobCancelled"));
@@ -65,7 +65,7 @@ fn test_struct_variants_generation() {
     assert!(result.contains("let duration: UInt64"));
 
     // ApiResponse enum should have struct-like cases
-    assert!(result.contains("enum ApiResponse: Codable"));
+    assert!(result.contains("enum ApiResponse"));
     assert!(result.contains("case success(ApiResponseSuccessData)"));
     assert!(result.contains("case error(ApiResponseErrorData)"));
     assert!(result.contains("case loading"));

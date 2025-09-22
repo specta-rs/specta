@@ -2,7 +2,7 @@
 import Foundation
 
 /// Mixed enum with both string-like and data variants
-public enum ApiResult: Codable {
+public enum ApiResult {
     case success
     case successWithData(ApiResultSuccessWithDataData)
     case error(ApiResultErrorData)
@@ -82,7 +82,7 @@ public enum Environment: Codable {
 }
 
 /// Complex enum with multiple data variants
-public enum EventType: Codable {
+public enum EventType {
     case userCreated
     case userUpdated(EventTypeUserUpdatedData)
     case userDeleted(EventTypeUserDeletedData)
@@ -202,7 +202,7 @@ public enum JobState: Codable {
 }
 
 /// Mixed enum with complex variants
-public enum NotificationType: Codable {
+public enum NotificationType {
     case email
     case push
     case sms
@@ -289,7 +289,7 @@ public enum Result<T, E>: Codable {
 }
 
 /// Complex mixed enum
-public enum UserAction: Codable {
+public enum UserAction {
     case login
     case logout
     case updateProfile(UserActionUpdateProfileData)

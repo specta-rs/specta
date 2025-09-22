@@ -90,10 +90,19 @@ pub fn export_type(
                 matches!(variant.fields(), specta::datatype::Fields::Named(fields) if !fields.fields().is_empty())
             });
 
+            // Determine protocols based on whether we'll generate custom Codable
             let protocols = if is_string_enum {
-                "String, Codable"
+                if has_struct_variants {
+                    "String" // Custom Codable will be generated
+                } else {
+                    "String, Codable"
+                }
             } else {
-                "Codable" // Always include Codable - we'll provide custom implementation if needed
+                if has_struct_variants {
+                    "" // Custom Codable will be generated
+                } else {
+                    "Codable"
+                }
             };
 
             let protocol_part = if protocols.is_empty() {

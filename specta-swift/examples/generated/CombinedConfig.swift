@@ -5,7 +5,7 @@ import Codable
 import Equatable
 import Hashable
 
-public enum apiResponse<T>: Codable {
+public enum apiResponse<T> {
     case success(apiResponseSuccessData)
     case error(apiResponseErrorData)
     case loading(apiResponseLoadingData)

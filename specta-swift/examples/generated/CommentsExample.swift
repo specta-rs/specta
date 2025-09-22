@@ -11,7 +11,7 @@ import Foundation
 /// 
 /// The generated Swift code will have properly formatted doc comments
 /// that are compatible with Swift's documentation system.
-public enum ApiResponse<T>: Codable {
+public enum ApiResponse<T> {
     case success(ApiResponseSuccessData)
     case error(ApiResponseErrorData)
     case loading(ApiResponseLoadingData)

@@ -66,7 +66,7 @@ public struct Primitives: Codable {
 }
 
 /// Enum with different variant types
-public enum Status: Codable {
+public enum Status {
     case active
     case pending(String)
     case error(String, UInt32)
