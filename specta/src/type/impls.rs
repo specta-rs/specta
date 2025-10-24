@@ -39,6 +39,14 @@ impl Type for Box<str> {
     impl_passthrough!(String);
 }
 
+impl Type for std::rc::Rc<str> {
+    impl_passthrough!(String);
+}
+
+impl Type for std::sync::Arc<str> {
+    impl_passthrough!(String);
+}
+
 impl<'a, T: Type + 'static> Type for &'a T {
     impl_passthrough!(T);
 }
