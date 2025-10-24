@@ -407,9 +407,6 @@ fn typescript_types() {
 
     // https://github.com/specta-rs/specta/issues/374
     assert_ts!(Issue374, "{ foo?: boolean; bar?: boolean }");
-
-    // https://github.com/specta-rs/specta/issues/386
-    assert_ts!(Type, "never");
 }
 
 #[derive(Type)]
@@ -780,6 +777,16 @@ struct Issue374 {
     bar: bool,
 }
 
-/// https://github.com/specta-rs/specta/issues/386
-#[derive(specta::Type)]
-enum Type {}
+
+// https://github.com/specta-rs/specta/issues/386
+// We put this test in a separate module because the parent module has `use specta::Type`,
+// so it clashes with our user-defined `Type`.
+mod type_type {
+    #[derive(specta::Type)]
+    enum Type {}
+
+    #[test]
+    fn typescript_types() {
+        assert_ts!(Type, "never");
+    }
+}
