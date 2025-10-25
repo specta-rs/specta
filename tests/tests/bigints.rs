@@ -60,10 +60,9 @@ pub enum EnumWithInlineStructWithBigInt {
 
 #[test]
 fn test_bigint_types() {
-    // TODO: Fix errors
-    for_bigint_types!(T -> |name| assert_eq!(crate::ts::inline::<T>(&Typescript::default()).map_err(|e| e.to_string()), Err("Attempted to export \"\" but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!\n".into())));
-    for_bigint_types!(T -> |name| assert_eq!(crate::ts::inline::<T>(&Typescript::new()).map_err(|e| e.to_string()), Err("Attempted to export \"\" but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!\n".into())));
-    for_bigint_types!(T -> |name| assert_eq!(crate::ts::inline::<T>(&Typescript::new().bigint(BigIntExportBehavior::Fail)).map_err(|e| e.to_string()), Err("Attempted to export \"\" but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!\n".into())));
+    for_bigint_types!(T -> |name| assert_eq!(crate::ts::inline::<T>(&Typescript::default()).map_err(|e| e.to_string()), Err("Attempted to export \"\" but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. If your using a serializer/deserializer that natively has support for BigInt types you can disable this warning by editing your `ExportConfiguration`!\n".into())));
+    for_bigint_types!(T -> |name| assert_eq!(crate::ts::inline::<T>(&Typescript::new()).map_err(|e| e.to_string()), Err("Attempted to export \"\" but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. If your using a serializer/deserializer that natively has support for BigInt types you can disable this warning by editing your `ExportConfiguration`!\n".into())));
+    for_bigint_types!(T -> |name| assert_eq!(crate::ts::inline::<T>(&Typescript::new().bigint(BigIntExportBehavior::Fail)).map_err(|e| e.to_string()), Err("Attempted to export \"\" but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. If your using a serializer/deserializer that natively has support for BigInt types you can disable this warning by editing your `ExportConfiguration`!\n".into())));
 
     for_bigint_types!(T -> |name| assert_eq!(crate::ts::inline::<T>(&Typescript::new().bigint(BigIntExportBehavior::String)).map_err(|e| e.to_string()), Ok("string".into())));
     for_bigint_types!(T -> |name| assert_eq!(crate::ts::inline::<T>(&Typescript::new().bigint(BigIntExportBehavior::Number)).map_err(|e| e.to_string()), Ok("number".into())));
@@ -72,22 +71,22 @@ fn test_bigint_types() {
     // // // Check error messages are working correctly -> These tests second for `ExportPath` which is why they are so comprehensive
     assert_eq!(
         crate::ts::inline::<StructWithBigInt>(&Typescript::default()).map_err(|e| e.to_string()),
-        Err("Attempted to export \"\" but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!\n".into())
+        Err("Attempted to export \"\" but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. If your using a serializer/deserializer that natively has support for BigInt types you can disable this warning by editing your `ExportConfiguration`!\n".into())
     );
     assert_eq!(
         crate::ts::inline::<StructWithStructWithBigInt>(&Typescript::default())
             .map_err(|e| e.to_string()),
-        Err("Attempted to export \"\" but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!\n".into())
+        Err("Attempted to export \"\" but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. If your using a serializer/deserializer that natively has support for BigInt types you can disable this warning by editing your `ExportConfiguration`!\n".into())
     );
     assert_eq!(
         crate::ts::inline::<StructWithStructWithStructWithBigInt>(&Typescript::default())
             .map_err(|e| e.to_string()),
-        Err("Attempted to export \"\" but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!\n".into())
+        Err("Attempted to export \"\" but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. If your using a serializer/deserializer that natively has support for BigInt types you can disable this warning by editing your `ExportConfiguration`!\n".into())
     );
     assert_eq!(
         crate::ts::inline::<EnumWithStructWithStructWithBigInt>(&Typescript::default())
             .map_err(|e| e.to_string()),
-        Err("Attempted to export \"\" but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!\n".into())
+        Err("Attempted to export \"\" but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. If your using a serializer/deserializer that natively has support for BigInt types you can disable this warning by editing your `ExportConfiguration`!\n".into())
     );
     // TODO: This required `inline` to work better on `Option<T>`
     // assert_eq!(
@@ -99,11 +98,11 @@ fn test_bigint_types() {
     assert_eq!(
         crate::ts::inline::<EnumWithStructWithStructWithBigInt>(&Typescript::default())
             .map_err(|e| e.to_string()),
-        Err("Attempted to export \"\" but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!\n".into())
+        Err("Attempted to export \"\" but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. If your using a serializer/deserializer that natively has support for BigInt types you can disable this warning by editing your `ExportConfiguration`!\n".into())
     );
     assert_eq!(
         crate::ts::inline::<EnumWithInlineStructWithBigInt>(&Typescript::default())
             .map_err(|e| e.to_string()),
-        Err("Attempted to export \"\" but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!\n".into())
+        Err("Attempted to export \"\" but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. If your using a serializer/deserializer that natively has support for BigInt types you can disable this warning by editing your `ExportConfiguration`!\n".into())
     );
 }
