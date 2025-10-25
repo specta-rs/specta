@@ -251,6 +251,8 @@ fn validate_internally_tag_enum_datatype(
             EnumRepr::Internal { .. } => {}
             // Eg. `{ "type": "variant", "c": {} }` is a map-type so valid.
             EnumRepr::Adjacent { .. } => {}
+            // String enums serialize as strings, which are valid
+            EnumRepr::String { .. } => {}
         },
         // `()` is `null` and is valid
         DataType::Tuple(ty) if ty.elements().is_empty() => {}

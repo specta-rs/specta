@@ -409,7 +409,7 @@ fn typescript_types() {
     assert_ts!(Issue374, "{ foo?: boolean; bar?: boolean }");
 
     // https://github.com/specta-rs/specta/issues/386
-    assert_ts!(Type, "never");
+    assert_ts!(TypeEnum, "never");
 }
 
 #[derive(Type)]
@@ -782,4 +782,4 @@ struct Issue374 {
 
 /// https://github.com/specta-rs/specta/issues/386
 #[derive(specta::Type)]
-enum Type {}
+enum TypeEnum {}
