@@ -99,7 +99,8 @@ fn inner(
                 checked_references.insert(r.sid());
                 // TODO: We don't error here for `Any`/`Unknown` in the TS exporter
                 if let Some(ty) = types.get(r.sid()) {
-                    inner(ty.ty(), types, r.generics(), checked_references)?;
+                    let generics_map: BTreeMap<_, _> = r.generics().iter().cloned().collect();
+                    inner(ty.ty(), types, &generics_map, checked_references)?;
                 }
             }
         }
@@ -177,8 +178,8 @@ fn is_valid_map_key(
         }
         DataType::Reference(r) => {
             let ty = types.get(r.sid()).expect("Type was never populated"); // TODO: Error properly
-
-            is_valid_map_key(ty.ty(), types, r.generics())
+            let generics_map: BTreeMap<_, _> = r.generics().iter().cloned().collect();
+            is_valid_map_key(ty.ty(), types, &generics_map)
         }
         DataType::Generic(g) => {
             let ty = generics.get(g).expect("bruh");

@@ -1,7 +1,5 @@
 //! Helpers for generating [Type::reference] implementations.
 
-use std::collections::BTreeMap;
-
 use crate::SpectaID;
 
 use super::{DataType, Generic};
@@ -11,7 +9,7 @@ use super::{DataType, Generic};
 #[non_exhaustive]
 pub struct Reference {
     pub(crate) sid: SpectaID,
-    pub(crate) generics: BTreeMap<Generic, DataType>,
+    pub(crate) generics: Vec<(Generic, DataType)>,
     pub(crate) inline: bool,
 }
 
@@ -19,7 +17,7 @@ impl Reference {
     /// TODO: Explain invariant.
     pub fn construct(
         sid: SpectaID,
-        generics: impl Into<BTreeMap<Generic, DataType>>,
+        generics: impl Into<Vec<(Generic, DataType)>>,
         inline: bool,
     ) -> Self {
         Self {
@@ -35,12 +33,12 @@ impl Reference {
     }
 
     /// Get the generic parameters set on this reference which will be filled in by the [NamedDataType].
-    pub fn generics(&self) -> &BTreeMap<Generic, DataType> {
+    pub fn generics(&self) -> &[(Generic, DataType)] {
         &self.generics
     }
 
     /// Get the generic parameters set on this reference which will be filled in by the [NamedDataType].
-    pub fn generics_mut(&mut self) -> &mut BTreeMap<Generic, DataType> {
+    pub fn generics_mut(&mut self) -> &mut Vec<(Generic, DataType)> {
         &mut self.generics
     }
 

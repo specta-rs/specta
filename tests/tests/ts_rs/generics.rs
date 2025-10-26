@@ -219,3 +219,25 @@ fn inline() {
 
 //     assert_ts_export!(D::<&str, 41>, "export type D<T> = { t: Array<T>, }")
 // }
+
+// https://github.com/specta-rs/specta/issues/400
+#[test]
+fn generic_parameter_order_preserved() {
+    #[derive(Type)]
+    #[specta(export = false)]
+    struct Pair<Z, A> {
+        first: Z,
+        second: A,
+    }
+
+    #[derive(Type)]
+    #[specta(export = false)]
+    struct Container {
+        pair: Pair<i32, String>,
+    }
+
+    assert_ts_export!(
+        Container,
+        "export type Container = { pair: Pair<number, string> };"
+    );
+}

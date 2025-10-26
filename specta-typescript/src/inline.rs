@@ -150,8 +150,8 @@ fn inner(
                         false,
                         truely_force_inline,
                         &r.generics()
-                            .clone()
-                            .into_iter()
+                            .iter()
+                            .cloned()
                             .map(|(g, mut dt)| {
                                 resolve_generics(&mut dt, generics);
                                 (g, dt)
