@@ -55,13 +55,11 @@ error[E0432]: unresolved import `specta::specta`
 note: found an item that was configured out
  --> $WORKSPACE/specta/src/lib.rs
   |
+  | #[cfg(all(feature = "derive", feature = "function"))]
+  |                               -------------------- the item is gated behind the `function` feature
+  | #[cfg_attr(docsrs, doc(cfg(all(feature = "derive", feature = "function"))))]
   | pub use specta_macros::specta;
   |                        ^^^^^^
-note: the item is gated here
- --> $WORKSPACE/specta/src/lib.rs
-  |
-  | #[cfg(all(feature = "derive", feature = "function"))]
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error[E0601]: `main` function not found in crate `$CRATE`
    --> tests/macro/compile_error.rs:110:20
