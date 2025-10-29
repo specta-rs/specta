@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 
 use specta::{
     datatype::{DataType, Enum, EnumRepr, Fields, Generic, Literal, Primitive},
@@ -13,12 +13,7 @@ use crate::Error;
 /// Validate the type and apply the Serde transformations.
 pub fn validate(types: &TypeCollection) -> Result<(), Error> {
     for ndt in types.into_unsorted_iter() {
-        inner(
-            ndt.ty(),
-            &types,
-            &Default::default(),
-            &mut Default::default(),
-        )?;
+        inner(ndt.ty(), &types, &[], &mut Default::default())?;
     }
 
     Ok(())
@@ -26,15 +21,10 @@ pub fn validate(types: &TypeCollection) -> Result<(), Error> {
 
 // TODO: Remove this once we redo the Typescript exporter.
 pub fn validate_dt(ty: &DataType, types: &TypeCollection) -> Result<(), Error> {
-    inner(ty, &types, &Default::default(), &mut Default::default())?;
+    inner(ty, &types, &[], &mut Default::default())?;
 
     for ndt in types.into_unsorted_iter() {
-        inner(
-            ndt.ty(),
-            &types,
-            &Default::default(),
-            &mut Default::default(),
-        )?;
+        inner(ndt.ty(), &types, &[], &mut Default::default())?;
     }
 
     Ok(())
@@ -43,7 +33,7 @@ pub fn validate_dt(ty: &DataType, types: &TypeCollection) -> Result<(), Error> {
 fn inner(
     dt: &DataType,
     types: &TypeCollection,
-    generics: &BTreeMap<Generic, DataType>,
+    generics: &[(Generic, DataType)],
     checked_references: &mut HashSet<SpectaID>,
 ) -> Result<(), Error> {
     match dt {
@@ -91,7 +81,7 @@ fn inner(
         }
         DataType::Reference(r) => {
             for (_, dt) in r.generics() {
-                inner(dt, types, &Default::default(), checked_references)?;
+                inner(dt, types, &[], checked_references)?;
             }
 
             #[allow(clippy::panic)]
@@ -99,8 +89,7 @@ fn inner(
                 checked_references.insert(r.sid());
                 // TODO: We don't error here for `Any`/`Unknown` in the TS exporter
                 if let Some(ty) = types.get(r.sid()) {
-                    let generics_map: BTreeMap<_, _> = r.generics().iter().cloned().collect();
-                    inner(ty.ty(), types, &generics_map, checked_references)?;
+                    inner(ty.ty(), types, r.generics(), checked_references)?;
                 }
             }
         }
@@ -114,7 +103,7 @@ fn inner(
 fn is_valid_map_key(
     key_ty: &DataType,
     types: &TypeCollection,
-    generics: &BTreeMap<Generic, DataType>,
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     match key_ty {
         DataType::Primitive(ty) => match ty {
@@ -178,13 +167,16 @@ fn is_valid_map_key(
         }
         DataType::Reference(r) => {
             let ty = types.get(r.sid()).expect("Type was never populated"); // TODO: Error properly
-            let generics_map: BTreeMap<_, _> = r.generics().iter().cloned().collect();
-            is_valid_map_key(ty.ty(), types, &generics_map)
+            is_valid_map_key(ty.ty(), types, r.generics())
         }
         DataType::Generic(g) => {
-            let ty = generics.get(g).expect("bruh");
+            let ty = generics
+                .iter()
+                .find(|(gen, _)| gen == g)
+                .map(|(_, dt)| dt)
+                .expect("bruh");
 
-            is_valid_map_key(&ty, types, &Default::default())
+            is_valid_map_key(ty, types, &[])
         }
         _ => Err(Error::InvalidMapKey),
     }
