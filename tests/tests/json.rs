@@ -21,9 +21,13 @@ fn test_json_macro() {
 
     // TODO: Fix these
     // assert_ts!(() => json!({ "a": "b" }), r#"{ "a": "b" }"#);
+    // assert_ts!(() => json!({ "hello": "world" }), "{ hello: string }");
+    // assert_ts!(() => json!({
+    //     "hello": "world",
+    // }), "{ hello: string }");
     // assert_ts!(() => json!({ "a": 5, "c": true, "d": false, "e": 42u8, "f": 2.7 }), r#""#);
     // assert_ts!(() => json!([]), "[]");
-    // assert_ts!(() => json!(["a", "b", "c"]), "");
+    // assert_ts!(() => json!(["a", "b", "c"]), "string[]");
     // assert_ts!(() => json!([{}, {}, {}]), "");
     // assert_ts!(() => json!([{ "n": "0" }, { "n": "1" }, { "n": "2" }]), "");
 }
