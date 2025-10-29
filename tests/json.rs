@@ -1,7 +1,7 @@
 use crate::ts::assert_ts;
 
-#[test]
 #[cfg(feature = "serde")]
+#[test]
 fn test_json() {
     use specta::{json, True};
 

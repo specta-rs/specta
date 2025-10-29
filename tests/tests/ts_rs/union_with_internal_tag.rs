@@ -31,7 +31,6 @@ enum EnumWithInternalTag2 {
 }
 
 #[test]
-#[cfg(feature = "serde")]
 fn test_enums_with_internal_tags() {
     assert_ts!(
         EnumWithInternalTag,

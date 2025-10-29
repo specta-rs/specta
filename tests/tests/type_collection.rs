@@ -31,7 +31,6 @@ fn type_collection_duplicate_register_ty() {
 
 // TODO: Bring this back
 // #[test]
-// #[cfg(feature = "typescript")]
 // fn type_collection_ts() {
 //     let result = TypeCollection::default()
 //         .register::<A>()
