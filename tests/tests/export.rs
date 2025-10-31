@@ -28,6 +28,7 @@ pub struct ReferingToUnexportedType {
 
 // TODO: Enable this test on Windows again. It's ordering of types is different for seemingly no reason.
 #[cfg(all(not(target_os = "windows"), all(feature = "export", feature = "ts")))]
+// TODO: This feature guard is bogus because this test package doesn't define any features.
 #[test]
 fn test_export_feature() {
     use specta::{

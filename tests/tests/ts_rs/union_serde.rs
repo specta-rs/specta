@@ -30,7 +30,6 @@ enum Untagged {
     None,
 }
 
-#[cfg(feature = "serde")]
 #[test]
 fn test_serde_enum() {
     assert_ts!(SimpleEnumA, r#"{ kind: "A" } | { kind: "B" }"#);

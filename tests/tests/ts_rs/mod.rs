@@ -1,5 +1,4 @@
 mod arrays;
-#[cfg(feature = "chrono")]
 mod chrono;
 mod field_rename;
 mod flatten;

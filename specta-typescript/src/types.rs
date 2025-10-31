@@ -30,10 +30,12 @@ use specta::{
 /// use specta::Type;
 /// use specta_typescript::Any;
 ///
+/// # #[cfg(feature = "serde")] {
 /// #[derive(Serialize, Type)]
 /// pub struct Demo {
 ///     pub field: Any<String>,
 /// }
+/// # }
 /// ```
 pub struct Any<T = ()>(T);
 
@@ -102,10 +104,12 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
 /// use specta::Type;
 /// use specta_typescript::Unknown;
 ///
+/// # #[cfg(feature = "serde")] {
 /// #[derive(Serialize, Type)]
 /// pub struct Demo {
 ///     pub field: Unknown<String>,
 /// }
+/// # }
 /// ```
 pub struct Unknown<T = ()>(T);
 
@@ -174,10 +178,12 @@ impl<T: serde::Serialize> serde::Serialize for Unknown<T> {
 /// use specta::Type;
 /// use specta_typescript::Never;
 ///
+/// # #[cfg(feature = "serde")] {
 /// #[derive(Serialize, Type)]
 /// pub struct Demo {
 ///     pub field: Never<String>,
 /// }
+/// # }
 /// ```
 pub struct Never<T = ()>(T);
 

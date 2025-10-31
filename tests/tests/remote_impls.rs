@@ -1,5 +1,4 @@
 #[test]
-#[cfg(feature = "glam")]
 fn typescript_types_glam() {
     use crate::ts::assert_ts;
 
@@ -34,6 +33,7 @@ fn typescript_types_glam() {
 
 #[test]
 #[cfg(feature = "bevy_ecs")]
+// TODO: This feature guard is bogus because this test package doesn't define any features.
 fn typescript_types_bevy_ecs() {
     use specta_typescript::{self, BigIntExportBehavior, ExportConfig, ExportPath};
 

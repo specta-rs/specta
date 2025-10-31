@@ -1610,6 +1610,9 @@ dependencies = [
 name = "specta-tests"
 version = "0.0.0"
 dependencies = [
+ "chrono",
+ "either",
+ "glam 0.30.9",
  "insta",
  "serde",
  "serde_json",
@@ -1620,6 +1623,7 @@ dependencies = [
  "specta-util",
  "toml 0.8.23",
  "trybuild",
+ "ulid",
  "wasm-bindgen",
 ]
 

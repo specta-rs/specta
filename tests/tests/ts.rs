@@ -324,11 +324,8 @@ fn typescript_types() {
     assert_ts!(PhantomData<String>, r#"null"#);
     assert_ts!(Infallible, r#"never"#);
 
-    #[cfg(feature = "either")]
-    {
-        assert_ts!(either::Either<String, i32>, r#"string | number"#);
-        assert_ts!(either::Either<i16, i32>, r#"number"#);
-    }
+    assert_ts!(either::Either<String, i32>, r#"string | number"#);
+    assert_ts!(either::Either<i16, i32>, r#"number"#);
 
     assert_ts!(Any, r#"any"#);
 
