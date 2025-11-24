@@ -492,7 +492,7 @@ pub(crate) fn enum_datatype(
                                 let fields = skip_fields(tuple.fields()).collect::<Vec<_>>();
 
                                 // This field is only required for `{ty}` not `[...]` so we only need to check when there one field
-                                let dont_join_ty = if tuple.fields().len() == 1 {
+                                let dont_join_ty = if fields.len() == 1 {
                                     let (_, ty) = fields.first().expect("checked length above");
                                     validate_type_for_tagged_intersection(
                                         ctx.clone(),
