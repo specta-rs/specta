@@ -11,7 +11,7 @@ path = "tests/lib.rs"
 harness = true
 
 [dependencies]
-specta = { path = "../specta", features = ["derive", "serde_json", "serde_yaml", "unstable_json_macro", "toml"] }
+specta = { path = "../specta", features = ["derive", "serde_json", "serde_yaml", "unstable_json_macro", "toml", "chrono", "either", "ulid", "glam"] }
 specta-serde = { path = "../specta-serde" }
 specta-typescript = { path = "../specta-typescript" }
 specta-util = { path = "../specta-util", features = ["serde"] }                # TODO: Remove `serde` feature
@@ -23,3 +23,7 @@ serde_json = "1.0.140"
 serde_yaml = "0.9.34"
 toml = "0.8.20"
 insta = "1.42.2"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+either = { version = "1.15", default-features = false }
+ulid = { version = "1.2", default-features = false, features = [] }
+glam = { version = "0.30", default-features = false, features = ["std"] }

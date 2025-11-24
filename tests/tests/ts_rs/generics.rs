@@ -33,8 +33,8 @@ struct GenericAutoBound2<T: PartialEq> {
 #[specta(export = false)]
 struct Container1 {
     foo: Generic1<u32>,
-    bar: Box<HashSet<Generic1<u32>>>,
-    baz: Box<BTreeMap<String, Rc<Generic1<String>>>>,
+    bar: HashSet<Generic1<u32>>,
+    baz: BTreeMap<String, Rc<Generic1<String>>>,
 }
 
 #[test]

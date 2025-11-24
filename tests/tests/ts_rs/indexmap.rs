@@ -1,4 +1,5 @@
 #![cfg(feature = "indexmap")]
+// TODO: This feature guard is bogus because this test package doesn't define any features.
 
 use indexmap::{IndexMap, IndexSet};
 use specta::Type;
