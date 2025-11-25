@@ -20,4 +20,4 @@ workspace = true
 
 [dependencies]
 specta = { path = "../specta" }
-openapiv3 = { version = "2.0.0", default-features = false, features = [] }
+openapiv3 = { version = "2.2.0", default-features = false, features = [] }

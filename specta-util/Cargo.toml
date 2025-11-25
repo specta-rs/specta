@@ -27,4 +27,4 @@ workspace = true
 [dependencies]
 specta = { version = "=2.0.0-rc.22", path = "../specta" }
 specta-macros = { version = "=2.0.0-rc.18", path = "../specta-macros", default-features = false, optional = true }
-serde = "1.0.219"                                                                                                  # TODO: Can we remove this or at least make it optional behind the `serde` flag
+serde = "1.0.228"                                                                                                  # TODO: Can we remove this or at least make it optional behind the `serde` flag
