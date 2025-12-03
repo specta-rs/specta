@@ -3,7 +3,7 @@ name = "specta-openapi"
 description = "Export your Rust types to OpenAPI"
 version = "0.0.1"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
-edition = "2021"
+edition = "2024"
 license = "MIT"
 repository = "https://github.com/oscartbeaumont/specta"
 documentation = "https://docs.rs/specta-zod/latest/specta-zod"
@@ -20,4 +20,4 @@ workspace = true
 
 [dependencies]
 specta = { path = "../specta" }
-openapiv3 = { version = "2.0.0", default-features = false, features = [] }
+openapiv3 = { version = "2.2.0", default-features = false, features = [] }

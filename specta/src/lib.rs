@@ -16,12 +16,6 @@ pub mod export;
 pub mod function;
 #[doc(hidden)]
 pub mod internal;
-#[cfg(all(feature = "unstable_json_macro", feature = "serde_json"))]
-#[cfg_attr(
-    docsrs,
-    doc(cfg(all(feature = "unstable_json_macro", feature = "serde_json")))
-)]
-pub mod json;
 mod specta_id;
 mod r#type;
 mod type_collection;

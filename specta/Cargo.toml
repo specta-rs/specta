@@ -3,7 +3,7 @@ name = "specta"
 description = "Easily export your Rust types to other languages"
 version = "2.0.0-rc.22"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
-edition = "2021"
+edition = "2024"
 license = "MIT"
 include = ["/src", "/examples", "/LICENCE", "/README.md"]
 repository = "https://github.com/oscartbeaumont/specta"
@@ -26,9 +26,6 @@ derive = ["dep:specta-macros"]
 ## Support for collecting up a global type map
 export = ["dep:ctor", "specta-macros/DO_NOT_USE_export"]
 
-## Enable the experimental `specta::json` macro.
-unstable_json_macro = []
-
 #! Features
 ## Support for exporting the types of Rust functions.
 function = ["specta-macros?/DO_NOT_USE_function", "dep:paste"]
@@ -37,10 +34,8 @@ function = ["specta-macros?/DO_NOT_USE_function", "dep:paste"]
 nightly = []
 
 #! Compatibility
-## Support for [serde](https://serde.rs)
-serde = ["dep:serde"]
 ## Support for [serde-json](https://github.com/serde-rs/json)
-serde_json = ["dep:serde_json", "dep:serde"]
+serde_json = ["dep:serde_json"]
 ## Support for [serde_yaml](https://github.com/dtolnay/serde-yaml)
 serde_yaml = ["dep:serde_yaml"]
 ## Support for [toml](https://github.com/toml-rs/toml)
@@ -97,34 +92,33 @@ workspace = true
 specta-macros = { version = "=2.0.0-rc.18", optional = true, path = "../specta-macros" }
 paste = { version = "1", optional = true }
 
-ctor = { version = "0.4.1", default-features = false, optional = true, features = ["proc_macro"] }
+ctor = { version = "0.6.1", default-features = false, optional = true, features = ["proc_macro"] }
 
 # TODO: To be deprecated
-serde = { version = "1.0.219", optional = true, default-features = false, features = ["derive"] }
-serde_json = { version = "1.0.140", optional = true, default-features = false, features = ["std"] }
+serde_json = { version = "1.0.145", optional = true, default-features = false, features = ["std"] }
 serde_yaml = { version = "0.9.34", optional = true, default-features = false, features = [] }
-toml = { version = "0.8.20", optional = true, default-features = false }
+toml = { version = "0.9.8", optional = true, default-features = false }
 ulid = { version = "1.2.1", optional = true, default-features = false, features = [] }
-uuid = { version = "1.12.1", optional = true, default-features = false, features = [] } # TODO: Downgraded for Bevy (argh)
-chrono = { version = "0.4.40", optional = true, default-features = false, features = ["clock"] }
-time = { version = "0.3.41", optional = true, default-features = false, features = [] }
-bigdecimal = { version = "0.4.8", optional = true, default-features = false, features = [] }
-rust_decimal = { version = "1.37.1", optional = true, default-features = false, features = [] }
-indexmap = { version = "2.9.0", optional = true, default-features = false, features = ["std"] }     # TODO: Don't require `std`
+uuid = { version = "1.18.1", optional = true, default-features = false, features = [] } # TODO: Downgraded for Bevy (argh)
+chrono = { version = "0.4.42", optional = true, default-features = false, features = ["clock"] }
+time = { version = "0.3.44", optional = true, default-features = false, features = [] }
+bigdecimal = { version = "0.4.9", optional = true, default-features = false, features = [] }
+rust_decimal = { version = "1.39.0", optional = true, default-features = false, features = [] }
+indexmap = { version = "2.12.1", optional = true, default-features = false, features = ["std"] }     # TODO: Don't require `std`
 ipnetwork = { version = "0.21.1", optional = true, default-features = false, features = [] }
 mac_address = { version = "1.1.8", optional = true, default-features = false, features = [] }
 bit-vec = { version = "0.8.0", optional = true, default-features = false, features = [] }
-bson = { version = "2.14.0", optional = true, default-features = false, features = [] }
-uhlc = { version = "0.8.0", optional = true, default-features = false, features = [] }
-bytesize = { version = "2.0.1", optional = true, default-features = false, features = [] }
+bson = { version = "3.1.0", optional = true, default-features = false, features = ["compat-3-0-0"] }
+uhlc = { version = "0.8.2", optional = true, default-features = false, features = [] }
+bytesize = { version = "2.3.0", optional = true, default-features = false, features = [] }
 glam = { version = "0.30", optional = true, default-features = false, features = ["std"] }
-tokio = { version = "1.44", optional = true, default-features = false, features = ["sync"] }
-url = { version = "2.5.4", optional = true, default-features = false }
+tokio = { version = "1.48", optional = true, default-features = false, features = ["sync"] }
+url = { version = "2.5.7", optional = true, default-features = false }
 either = { version = "1.15.0", optional = true, default-features = false }
-bevy_ecs = { version = "0.15.3", optional = true, default-features = false }
-bevy_input = { version = "0.15.3", optional = true, default-features = false, features = ["bevy_reflect"] }
+bevy_ecs = { version = "0.17.3", optional = true, default-features = false, features = ["std"] }
+bevy_input = { version = "0.17.3", optional = true, default-features = false, features = ["std", "bevy_reflect"] }
 jiff = { version = "0.2", optional = true, default-features = false }
-camino = { version = "1.1.9", optional = true, default-features = false }
+camino = { version = "1.2.1", optional = true, default-features = false }
 
 [dev-dependencies]
-serde = { version = "1.0.219", features = ["derive"] } # TODO: Can we remove this?
+serde = { version = "1.0.228", features = ["derive"] } # TODO: Can we remove this?

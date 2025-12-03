@@ -1,25 +1,23 @@
 //! Helpers for generating [Type::reference] implementations.
 
-use std::collections::HashMap;
-
 use specta::TypeCollection;
 
 use specta::datatype::{DataType, Field, Fields, Generic, NamedDataType};
 
 #[doc(hidden)] // TODO: Make this private
 pub fn inline_and_flatten_ndt(ndt: &mut NamedDataType, types: &TypeCollection) {
-    inner(ndt.ty_mut(), types, false, false, &Default::default(), 0);
+    inner(ndt.ty_mut(), types, false, false, &[], 0);
 }
 
 pub(crate) fn inline(dt: &mut DataType, types: &TypeCollection) {
-    inner(dt, types, false, true, &Default::default(), 0)
+    inner(dt, types, false, true, &[], 0)
 }
 
 fn field(
     f: &mut Field,
     types: &TypeCollection,
     truely_force_inline: bool,
-    generics: &HashMap<Generic, DataType>,
+    generics: &[(Generic, DataType)],
     depth: usize,
 ) {
     // TODO: truely_force_inline
@@ -38,7 +36,7 @@ fn fields(
     f: &mut Fields,
     types: &TypeCollection,
     truely_force_inline: bool,
-    generics: &HashMap<Generic, DataType>,
+    generics: &[(Generic, DataType)],
     depth: usize,
 ) {
     match f {
@@ -61,7 +59,7 @@ fn inner(
     types: &TypeCollection,
     force_inline: bool,
     truely_force_inline: bool,
-    generics: &HashMap<Generic, DataType>,
+    generics: &[(Generic, DataType)],
     depth: usize,
 ) {
     // TODO: Can we be smart enough to determine loops, instead of just trying X times and bailing out????
@@ -125,7 +123,12 @@ fn inner(
             }
         }
         DataType::Generic(g) => {
-            let mut ty = generics.get(g).unwrap().clone(); // TODO: Properly handle this error
+            let mut ty = generics
+                .iter()
+                .find(|(gen, _)| gen == g)
+                .map(|(_, dt)| dt)
+                .unwrap()
+                .clone(); // TODO: Properly handle this error
 
             if truely_force_inline {
                 inner(
@@ -133,7 +136,7 @@ fn inner(
                     types,
                     false,
                     truely_force_inline,
-                    &Default::default(), // TODO: What should this be?
+                    &[], // TODO: What should this be?
                     depth + 1,
                 );
                 *dt = ty;
@@ -150,13 +153,13 @@ fn inner(
                         false,
                         truely_force_inline,
                         &r.generics()
-                            .clone()
-                            .into_iter()
+                            .iter()
+                            .cloned()
                             .map(|(g, mut dt)| {
                                 resolve_generics(&mut dt, generics);
                                 (g, dt)
                             })
-                            .collect(),
+                            .collect::<Vec<_>>(),
                         depth + 1,
                     );
                     *dt = ty;
@@ -168,7 +171,7 @@ fn inner(
 }
 
 /// Following all `DataType::Reference`'s filling in any `DataType::Generic`'s with the correct value.
-fn resolve_generics(dt: &mut DataType, generics: &HashMap<Generic, DataType>) {
+fn resolve_generics(dt: &mut DataType, generics: &[(Generic, DataType)]) {
     // TODO: This could so only re-alloc if the type has a generics that needs replacing.
     match dt {
         DataType::List(l) => {
@@ -201,8 +204,9 @@ fn resolve_generics(dt: &mut DataType, generics: &HashMap<Generic, DataType>) {
             // This method is run when not inlining so for `export` we do expect `DataType::Generic`.
             // TODO: Functions main documentation should explain this.
             *dt = generics
-                .get(g)
-                .cloned()
+                .iter()
+                .find(|(gen, _)| gen == g)
+                .map(|(_, dt)| dt.clone())
                 .unwrap_or(DataType::Generic(g.clone()));
         }
         _ => {}

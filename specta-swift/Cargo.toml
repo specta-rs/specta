@@ -2,8 +2,8 @@
 name = "specta-swift"
 description = "Export your Rust types to Swift"
 version = "0.0.1"
-authors = ["Jamie Pine <hello@jamiepine.com>"]
-edition = "2021"
+authors = ["Jamie Pine <hello@jamiepine.com>", "Oscar Beaumont <oscar@otbeaumont.me>"]
+edition = "2024"
 license = "MIT"
 repository = "https://github.com/oscartbeaumont/specta"
 documentation = "https://docs.rs/specta-zod/latest/specta-zod"

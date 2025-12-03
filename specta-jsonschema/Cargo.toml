@@ -3,7 +3,7 @@ name = "specta-jsonschema"
 description = "Export your Rust types to a JSON Schema"
 version = "0.0.1"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
-edition = "2021"
+edition = "2024"
 license = "MIT"
 repository = "https://github.com/oscartbeaumont/specta"
 documentation = "https://docs.rs/specta-jsonschema/latest/specta-jsonschema"
@@ -20,5 +20,5 @@ workspace = true
 
 [dependencies]
 specta = { path = "../specta" }
-schemars = { version = "0.8", default-features = false, features = [] }
+schemars = { version = "0.8.22", default-features = false, features = [] } # TODO: move to something else or v1
 Inflector = "0.11.4"
