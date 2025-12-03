@@ -1638,14 +1638,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "specta-rust"
-version = "0.0.1"
-dependencies = [
- "Inflector",
- "specta",
-]
-
-[[package]]
 name = "specta-serde"
 version = "0.0.9"
 dependencies = [

@@ -18,8 +18,11 @@ rustdoc-args = ["--cfg", "docsrs"]
 [features]
 default = []
 
-# TODO: Can we remove this?
-serde = []
+## Support for [serde](https://serde.rs)
+serde = ["dep:serde"]
+
+## Enable the experimental `specta::json` macro.
+unstable_json_macro = ["dep:serde_json", "dep:serde"]
 
 [lints]
 workspace = true
@@ -27,4 +30,5 @@ workspace = true
 [dependencies]
 specta = { version = "=2.0.0-rc.22", path = "../specta" }
 specta-macros = { version = "=2.0.0-rc.18", path = "../specta-macros", default-features = false, optional = true }
-serde = "1.0.228"                                                                                                  # TODO: Can we remove this or at least make it optional behind the `serde` flag
+serde = { version = "1.0.228", optional = true, default-features = false }
+serde_json = { version = "1.0.145", optional = true, default-features = false, features = ["std"] }

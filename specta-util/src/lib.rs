@@ -1,4 +1,5 @@
-//! TODO
+//! Extended functionality for Specta.
+
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
     html_logo_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png",
@@ -9,7 +10,6 @@
 #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 mod selection;
 
-// TODO
-// #[cfg(feature = "serde")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
-// pub use selection::selection;
+#[cfg(feature = "unstable_json_macro")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable_json_macro")))]
+pub mod json;
