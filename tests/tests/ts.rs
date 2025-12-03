@@ -406,6 +406,9 @@ fn typescript_types() {
 
     // https://github.com/specta-rs/specta/issues/374
     assert_ts!(Issue374, "{ foo?: boolean; bar?: boolean }");
+
+    // https://github.com/specta-rs/specta/issues/386
+    assert_ts!(type_type::Type, "never");
 }
 
 #[derive(Type)]

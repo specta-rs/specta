@@ -1,0 +1,15 @@
+[package]
+name = "specta-swift-tests"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[[test]]
+name = "basic"
+path = "basic.rs"
+
+[dependencies]
+specta = { path = "../../specta", features = ["derive", "uuid", "chrono"] }
+specta-swift = { path = "../" }
+uuid = "1.12.1"
+chrono = { version = "0.4.40", features = ["clock"] }

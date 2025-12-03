@@ -2,7 +2,7 @@
 name = "specta-swift"
 description = "Export your Rust types to Swift"
 version = "0.0.1"
-authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
+authors = ["Jamie Pine <hello@jamiepine.com>", "Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/oscartbeaumont/specta"
@@ -19,4 +19,37 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
-specta = { path = "../specta" }
+specta = { path = "../specta", features = ["derive", "uuid", "chrono"] }
+specta-serde = { path = "../specta-serde" }
+thiserror = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+
+[dev-dependencies]
+insta = "1.42"
+trybuild = "1.0"
+uuid = "1.12.1"
+chrono = { version = "0.4.40", features = ["clock"] }
+
+[[example]]
+name = "basic_types"
+path = "examples/basic_types.rs"
+
+[[example]]
+name = "advanced_unions"
+path = "examples/advanced_unions.rs"
+
+[[example]]
+name = "configuration_options"
+path = "examples/configuration_options.rs"
+
+[[example]]
+name = "special_types"
+path = "examples/special_types.rs"
+
+[[example]]
+name = "string_enums"
+path = "examples/string_enums.rs"
+
+[[example]]
+name = "comprehensive_demo"
+path = "examples/comprehensive_demo.rs"

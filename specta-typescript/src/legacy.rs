@@ -575,6 +575,43 @@ pub(crate) fn enum_datatype(
 
                                 s
                             }
+                            (EnumRepr::String { rename_all }, Fields::Unit) => {
+                                // Generate string literal for string enums
+                                let string_value = match rename_all.as_deref() {
+                                    Some("snake_case") => variant_name.to_lowercase(),
+                                    Some("UPPERCASE") => variant_name.to_uppercase(),
+                                    Some("camelCase") => {
+                                        let mut chars = variant_name.chars();
+                                        match chars.next() {
+                                            None => String::new(),
+                                            Some(first) => {
+                                                first.to_lowercase().chain(chars).collect()
+                                            }
+                                        }
+                                    }
+                                    Some("PascalCase") => {
+                                        let mut chars = variant_name.chars();
+                                        match chars.next() {
+                                            None => String::new(),
+                                            Some(first) => {
+                                                first.to_uppercase().chain(chars).collect()
+                                            }
+                                        }
+                                    }
+                                    Some("kebab-case") => {
+                                        variant_name.to_lowercase().replace('_', "-")
+                                    }
+                                    _ => variant_name.to_lowercase(),
+                                };
+                                format!(r#""{string_value}""#)
+                            }
+                            (EnumRepr::String { .. }, _) => {
+                                // String enums should only have unit variants
+                                return Err(Error::InvalidName {
+                                    path: format!("enum variant '{}'", variant_name),
+                                    name: "String enum variants cannot have fields".into(),
+                                });
+                            }
                         },
                         true,
                     ))
@@ -724,6 +761,8 @@ fn validate_type_for_tagged_intersection(
                 },
                 // All of these repr's are always objects.
                 EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. } | EnumRepr::External => Ok(false),
+                // String enums are string literals, not objects
+                EnumRepr::String { .. } => Ok(false),
             }
         }
         DataType::Tuple(v) => {
