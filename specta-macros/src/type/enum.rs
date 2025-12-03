@@ -126,58 +126,94 @@ pub fn parse_enum(
             })
             .collect::<syn::Result<Vec<_>>>()?;
 
-    let (can_flatten, repr) = match (enum_attrs.untagged, &enum_attrs.tag, &enum_attrs.content) {
-        (None, None, None) => (
-            // TODO: We treat the default being externally tagged but that is a bad assumption.
-            // Fix this with: https://github.com/specta-rs/specta/issues/384
-            data.variants.iter().any(|v| match &v.fields {
-                Fields::Unnamed(f) if f.unnamed.len() == 1 => true,
-                Fields::Named(_) => true,
-                _ => false,
-            }),
-            quote!(None),
-        ),
-        (Some(false), None, None) => (
-            data.variants.iter().any(|v| match &v.fields {
-                Fields::Unnamed(f) if f.unnamed.len() == 1 => true,
-                Fields::Named(_) => true,
-                _ => false,
-            }),
-            quote!(Some(#crate_ref::datatype::EnumRepr::External)),
-        ),
-        (Some(false) | None, Some(tag), None) => (
-            data.variants
-                .iter()
-                .any(|v| matches!(&v.fields, Fields::Unit | Fields::Named(_))),
-            quote!(Some(#crate_ref::datatype::EnumRepr::Internal { tag: #tag.into() })),
-        ),
-        (Some(false) | None, Some(tag), Some(content)) => (
-            true,
-            quote!(Some(#crate_ref::datatype::EnumRepr::Adjacent { tag: #tag.into(), content: #content.into() })),
-        ),
-        (Some(true), None, None) => (
-            data.variants
-                .iter()
-                .any(|v| matches!(&v.fields, Fields::Unit | Fields::Named(_))),
-            quote!(Some(#crate_ref::datatype::EnumRepr::Untagged)),
-        ),
-        (Some(true), Some(_), None) => {
-            return Err(Error::new(
-                Span::call_site(),
-                "untagged cannot be used with tag",
-            ))
-        }
-        (Some(true), _, Some(_)) => {
-            return Err(Error::new(
-                Span::call_site(),
-                "untagged cannot be used with content",
-            ))
-        }
-        (Some(false) | None, None, Some(_)) => {
-            return Err(Error::new(
-                Span::call_site(),
-                "content cannot be used without tag",
-            ))
+    // Check if this should be a string enum
+    let is_string_enum = data
+        .variants
+        .iter()
+        .all(|v| matches!(&v.fields, Fields::Unit))
+        && container_attrs.rename_all.is_some()
+        && enum_attrs.untagged.is_none()
+        && enum_attrs.tag.is_none()
+        && enum_attrs.content.is_none();
+
+    let (can_flatten, repr) = if is_string_enum {
+        // Generate string enum representation
+        let rename_all = container_attrs
+            .rename_all
+            .as_ref()
+            .map(|inflection| {
+                let inflection_str = match inflection {
+                    crate::utils::Inflection::Lower => "lowercase",
+                    crate::utils::Inflection::Upper => "UPPERCASE",
+                    crate::utils::Inflection::Camel => "camelCase",
+                    crate::utils::Inflection::Snake => "snake_case",
+                    crate::utils::Inflection::Pascal => "PascalCase",
+                    crate::utils::Inflection::ScreamingSnake => "SCREAMING_SNAKE_CASE",
+                    crate::utils::Inflection::Kebab => "kebab-case",
+                    crate::utils::Inflection::ScreamingKebab => "SCREAMING-KEBAB-CASE",
+                };
+                quote!(Some(#inflection_str.into()))
+            })
+            .unwrap_or_else(|| quote!(None));
+
+        (
+            false, // String enums can't be flattened
+            quote!(Some(#crate_ref::datatype::EnumRepr::String { rename_all: #rename_all })),
+        )
+    } else {
+        match (enum_attrs.untagged, &enum_attrs.tag, &enum_attrs.content) {
+            (None, None, None) => (
+                // TODO: We treat the default being externally tagged but that is a bad assumption.
+                // Fix this with: https://github.com/specta-rs/specta/issues/384
+                data.variants.iter().any(|v| match &v.fields {
+                    Fields::Unnamed(f) if f.unnamed.len() == 1 => true,
+                    Fields::Named(_) => true,
+                    _ => false,
+                }),
+                quote!(None),
+            ),
+            (Some(false), None, None) => (
+                data.variants.iter().any(|v| match &v.fields {
+                    Fields::Unnamed(f) if f.unnamed.len() == 1 => true,
+                    Fields::Named(_) => true,
+                    _ => false,
+                }),
+                quote!(Some(#crate_ref::datatype::EnumRepr::External)),
+            ),
+            (Some(false) | None, Some(tag), None) => (
+                data.variants
+                    .iter()
+                    .any(|v| matches!(&v.fields, Fields::Unit | Fields::Named(_))),
+                quote!(Some(#crate_ref::datatype::EnumRepr::Internal { tag: #tag.into() })),
+            ),
+            (Some(false) | None, Some(tag), Some(content)) => (
+                true,
+                quote!(Some(#crate_ref::datatype::EnumRepr::Adjacent { tag: #tag.into(), content: #content.into() })),
+            ),
+            (Some(true), None, None) => (
+                data.variants
+                    .iter()
+                    .any(|v| matches!(&v.fields, Fields::Unit | Fields::Named(_))),
+                quote!(Some(#crate_ref::datatype::EnumRepr::Untagged)),
+            ),
+            (Some(true), Some(_), None) => {
+                return Err(Error::new(
+                    Span::call_site(),
+                    "untagged cannot be used with tag",
+                ))
+            }
+            (Some(true), _, Some(_)) => {
+                return Err(Error::new(
+                    Span::call_site(),
+                    "untagged cannot be used with content",
+                ))
+            }
+            (Some(false) | None, None, Some(_)) => {
+                return Err(Error::new(
+                    Span::call_site(),
+                    "content cannot be used without tag",
+                ))
+            }
         }
     };
 

@@ -176,7 +176,9 @@ fn typescript_types() {
     assert_ts!((String, i32), "[string, number]");
     assert_ts!((String, i32, bool), "[string, number, boolean]");
     assert_ts!(
-        (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool),
+        (
+            bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool
+        ),
         "[boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean]"
     );
 
@@ -404,6 +406,9 @@ fn typescript_types() {
 
     // https://github.com/specta-rs/specta/issues/374
     assert_ts!(Issue374, "{ foo?: boolean; bar?: boolean }");
+
+    // https://github.com/specta-rs/specta/issues/386
+    assert_ts!(type_type::Type, "never");
 }
 
 #[derive(Type)]
@@ -773,7 +778,6 @@ struct Issue374 {
     #[serde(skip_serializing_if = "std::ops::Not::not", default)]
     bar: bool,
 }
-
 
 // https://github.com/specta-rs/specta/issues/386
 // We put this test in a separate module because the parent module has `use specta::Type`,

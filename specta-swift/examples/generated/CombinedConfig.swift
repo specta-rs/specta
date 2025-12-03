@@ -1,0 +1,107 @@
+// My Custom App Types
+// Generated with love ❤️
+import Foundation
+import Codable
+import Equatable
+import Hashable
+
+public enum apiResponse<T> {
+    case success(apiResponseSuccessData)
+    case error(apiResponseErrorData)
+    case loading(apiResponseLoadingData)
+}
+public struct apiResponseSuccessData: Codable {
+    public let data: T
+    public let statusCode: UInt16
+
+    private enum CodingKeys: String, CodingKey {
+        case data = "data"
+        case statusCode = "status_code"
+    }
+}
+
+public struct apiResponseErrorData: Codable {
+    public let message: String
+    public let errorCode: UInt32
+
+    private enum CodingKeys: String, CodingKey {
+        case message = "message"
+        case errorCode = "error_code"
+    }
+}
+
+public struct apiResponseLoadingData: Codable {
+    public let progress: Float
+}
+
+// MARK: - apiResponse Codable Implementation
+extension apiResponse: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case success = "Success"
+        case error = "Error"
+        case loading = "Loading"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        if container.allKeys.count != 1 {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Invalid number of keys found, expected one.")
+            )
+        }
+
+        let key = container.allKeys.first!
+        switch key {
+        case .success:
+            let data = try container.decode(apiResponseSuccessData.self, forKey: .success)
+            self = .success(data)
+        case .error:
+            let data = try container.decode(apiResponseErrorData.self, forKey: .error)
+            self = .error(data)
+        case .loading:
+            let data = try container.decode(apiResponseLoadingData.self, forKey: .loading)
+            self = .loading(data)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        
+        switch self {
+        case .success(let data):
+            try container.encode(data, forKey: .success)
+        case .error(let data):
+            try container.encode(data, forKey: .error)
+        case .loading(let data):
+            try container.encode(data, forKey: .loading)
+        }
+    }
+}
+
+
+public struct genericContainer<T, U>: Codable {
+    public let primary: T
+    public let secondary: U
+    public let metadata: Optional<[(String, String)]>
+}
+
+/// Comprehensive example showcasing ALL configuration options for specta-swift
+/// 
+/// This example demonstrates every configuration option available in the Swift exporter,
+/// showing how different settings affect the generated Swift code.
+/// Sample types for demonstration
+public struct user: Codable {
+    public let userId: UInt32
+    public let fullName: String
+    public let emailAddress: Optional<String>
+    public let isVerified: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case fullName = "full_name"
+        case emailAddress = "email_address"
+        case isVerified = "is_verified"
+    }
+}
+
