@@ -39,12 +39,12 @@ use specta::{
 /// ```
 pub struct Any<T = ()>(T);
 
-const ANY_ID: specta::SpectaID = specta::internal::construct::sid(
+pub(crate) const ANY_ID: specta::SpectaID = specta::internal::construct::sid(
     "Any",
     concat!("::", module_path!(), ":", line!(), ":", column!()),
 );
 impl<T> Type for Any<T> {
-    fn definition(types: &mut TypeCollection) -> DataType {
+    fn definition(_: &mut TypeCollection) -> DataType {
         DataType::Reference(Reference::construct(ANY_ID, [], false))
     }
 }
@@ -110,12 +110,12 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
 /// ```
 pub struct Unknown<T = ()>(T);
 
-const UNKNOWN_ID: specta::SpectaID = specta::internal::construct::sid(
+pub(crate) const UNKNOWN_ID: specta::SpectaID = specta::internal::construct::sid(
     "Unknown",
     concat!("::", module_path!(), ":", line!(), ":", column!()),
 );
 impl<T> Type for Unknown<T> {
-    fn definition(types: &mut TypeCollection) -> DataType {
+    fn definition(_: &mut TypeCollection) -> DataType {
         DataType::Reference(Reference::construct(UNKNOWN_ID, [], false))
     }
 }
@@ -181,12 +181,12 @@ impl<T: serde::Serialize> serde::Serialize for Unknown<T> {
 /// ```
 pub struct Never<T = ()>(T);
 
-const NEVER_ID: specta::SpectaID = specta::internal::construct::sid(
+pub(crate) const NEVER_ID: specta::SpectaID = specta::internal::construct::sid(
     "Any",
     concat!("::", module_path!(), ":", line!(), ":", column!()),
 );
 impl<T> Type for Never<T> {
-    fn definition(types: &mut TypeCollection) -> DataType {
+    fn definition(_: &mut TypeCollection) -> DataType {
         DataType::Reference(Reference::construct(NEVER_ID, [], false))
     }
 }
