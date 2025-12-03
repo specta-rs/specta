@@ -35,7 +35,7 @@ nightly = []
 
 #! Compatibility
 ## Support for [serde-json](https://github.com/serde-rs/json)
-serde_json = ["dep:serde_json", "dep:serde"]
+serde_json = ["dep:serde_json"]
 ## Support for [serde_yaml](https://github.com/dtolnay/serde-yaml)
 serde_yaml = ["dep:serde_yaml"]
 ## Support for [toml](https://github.com/toml-rs/toml)

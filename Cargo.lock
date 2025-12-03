@@ -1687,6 +1687,7 @@ name = "specta-util"
 version = "0.0.9"
 dependencies = [
  "serde",
+ "serde_json",
  "specta",
  "specta-macros",
 ]
