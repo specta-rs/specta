@@ -9,16 +9,16 @@ use std::{
 };
 
 use specta::{
+    SpectaID, TypeCollection,
     datatype::{
         DataType, Enum, EnumRepr, Field, Fields, List, Literal, Map, NamedDataType, Primitive,
         Reference, Tuple,
     },
-    NamedType, SpectaID, TypeCollection,
 };
 
 use crate::{
-    legacy::js_doc_builder, reserved_names::*, Any, BigIntExportBehavior, Error, Format,
-    Typescript, Unknown,
+    Any, BigIntExportBehavior, Error, Format, Typescript, Unknown, legacy::js_doc_builder,
+    reserved_names::*,
 };
 
 /// Generate an `export Type = ...` Typescript string for a specific [`DataType`].
@@ -205,7 +205,7 @@ fn primitive_dt(
             BigIntExportBehavior::Fail => {
                 return Err(Error::BigIntForbidden {
                     path: location.join("."),
-                })
+                });
             }
         },
         Primitive::bool => "boolean",
@@ -879,11 +879,13 @@ fn reference_dt(
 ) -> Result<(), Error> {
     // TODO: Legacy stuff
     {
-        if r.sid() == Any::<()>::ID {
-            s.push_str("any");
-        } else if r.sid() == Unknown::<()>::ID {
-            s.push_str("unknown");
-        } else {
+        todo!();
+        // if r.sid() == Any::<()>::ID {
+        //     s.push_str("any");
+        // } else if r.sid() == Unknown::<()>::ID {
+        //     s.push_str("unknown");
+        // } else
+        {
             let ndt = types.get(r.sid()).unwrap(); // TODO: Error handling
 
             let name = match ts.format {

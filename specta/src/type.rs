@@ -1,4 +1,4 @@
-use crate::{datatype::DataType, SpectaID, TypeCollection};
+use crate::{SpectaID, TypeCollection, datatype::DataType};
 
 mod impls;
 mod macros;
@@ -23,9 +23,9 @@ pub trait Type {
 /// TODO: Discuss which types this should be implemented for.
 ///
 /// This should be only implemented via the [`Type`](derive@crate::Type) macro.
-pub trait NamedType: Type {
-    const ID: SpectaID;
-}
+// pub trait NamedType: Type {
+//     const ID: SpectaID;
+// }
 
 /// A marker trait for compile-time validation of which types can be flattened.
 pub trait Flatten: Type {}

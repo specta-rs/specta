@@ -125,7 +125,7 @@ fn inner(
         DataType::Generic(g) => {
             let mut ty = generics
                 .iter()
-                .find(|(gen, _)| gen == g)
+                .find(|(ge, _)| ge == g)
                 .map(|(_, dt)| dt)
                 .unwrap()
                 .clone(); // TODO: Properly handle this error
@@ -205,7 +205,7 @@ fn resolve_generics(dt: &mut DataType, generics: &[(Generic, DataType)]) {
             // TODO: Functions main documentation should explain this.
             *dt = generics
                 .iter()
-                .find(|(gen, _)| gen == g)
+                .find(|(ge, _)| ge == g)
                 .map(|(_, dt)| dt.clone())
                 .unwrap_or(DataType::Generic(g.clone()));
         }

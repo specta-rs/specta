@@ -10,12 +10,12 @@ use std::{
 };
 
 use serde::Serialize;
-use specta::{NamedType, Type, TypeCollection};
+use specta::{Type, TypeCollection};
 use specta_typescript::Any;
 use specta_typescript::{BigIntExportBehavior, Typescript};
 
 // We run tests with the low-level APIs
-pub fn assert_ts_export2<T: NamedType>() -> Result<String, String> {
+pub fn assert_ts_export2<T: Type>() -> Result<String, String> {
     let mut types = TypeCollection::default();
     T::definition(&mut types);
     specta_serde::validate(&types).map_err(|e| e.to_string())?;
@@ -108,12 +108,12 @@ pub fn inline<T: Type>(ts: &Typescript) -> Result<String, String> {
         .map_err(|e| e.to_string())
 }
 
-pub fn export_ref<T: NamedType>(t: &T, ts: &Typescript) -> Result<String, String> {
+pub fn export_ref<T: Type>(t: &T, ts: &Typescript) -> Result<String, String> {
     export::<T>(ts)
 }
 
 // TODO: Probally move to snapshot testing w/ high-level API's
-pub fn export<T: NamedType>(ts: &Typescript) -> Result<String, String> {
+pub fn export<T: TypeNamedType>(ts: &Typescript) -> Result<String, String> {
     let mut types = TypeCollection::default();
     T::definition(&mut types);
 
@@ -176,7 +176,9 @@ fn typescript_types() {
     assert_ts!((String, i32), "[string, number]");
     assert_ts!((String, i32, bool), "[string, number, boolean]");
     assert_ts!(
-        (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool),
+        (
+            bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool
+        ),
         "[boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean]"
     );
 
@@ -773,7 +775,6 @@ struct Issue374 {
     #[serde(skip_serializing_if = "std::ops::Not::not", default)]
     bar: bool,
 }
-
 
 // https://github.com/specta-rs/specta/issues/386
 // We put this test in a separate module because the parent module has `use specta::Type`,

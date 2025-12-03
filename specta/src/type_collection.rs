@@ -5,9 +5,9 @@ use std::{
 };
 
 use crate::{
+    SpectaID, Type,
     builder::NamedDataTypeBuilder,
     datatype::{NamedDataType, Reference},
-    NamedType, SpectaID,
 };
 
 /// Define a set of types which can be exported together.
@@ -28,14 +28,14 @@ impl fmt::Debug for TypeCollection {
 }
 
 impl TypeCollection {
-    /// Register a [`NamedType`] with the collection.
-    pub fn register<T: NamedType>(mut self) -> Self {
+    /// Register a [`Type`] with the collection.
+    pub fn register<T: Type>(mut self) -> Self {
         T::definition(&mut self);
         self
     }
 
-    /// Register a [`NamedType`] with the collection.
-    pub fn register_mut<T: NamedType>(&mut self) -> &mut Self {
+    /// Register a [`Type`] with the collection.
+    pub fn register_mut<T: Type>(&mut self) -> &mut Self {
         T::definition(self);
         self
     }

@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 
 use specta::{
+    SpectaID, TypeCollection,
     datatype::{DataType, Enum, EnumRepr, Fields, Generic, Literal, Primitive},
     internal::{skip_fields, skip_fields_named},
-    SpectaID, TypeCollection,
 };
 
 use crate::Error;
@@ -172,7 +172,7 @@ fn is_valid_map_key(
         DataType::Generic(g) => {
             let ty = generics
                 .iter()
-                .find(|(gen, _)| gen == g)
+                .find(|(ge, _)| ge == g)
                 .map(|(_, dt)| dt)
                 .expect("bruh");
 
