@@ -1,6 +1,6 @@
 //! Helpers for generating [Type::reference] implementations.
 
-use crate::SpectaID;
+use crate::{SpectaID, TypeCollection, datatype::NamedDataType};
 
 use super::{DataType, Generic};
 
@@ -15,6 +15,7 @@ pub struct Reference {
 
 impl Reference {
     /// TODO: Explain invariant.
+    /// TODO: Can this force that the type is in the typemap at the point of the `Reference` being created to ensure `Self::get` never panics.
     pub fn construct(
         sid: SpectaID,
         generics: impl Into<Vec<(Generic, DataType)>>,
@@ -45,6 +46,14 @@ impl Reference {
     /// Get whether this reference should be inlined
     pub fn inline(&self) -> bool {
         self.inline
+    }
+
+    #[doc(hidden)] // TODO: Stablise
+    pub fn get<'a>(&self, types: &'a TypeCollection) -> &'a NamedDataType {
+        // TODO: Different panic for missing vs placeholder
+        types
+            .get(self.sid)
+            .expect("a type with a reference must be registered to the TypeMap")
     }
 }
 

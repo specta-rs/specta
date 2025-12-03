@@ -1,4 +1,4 @@
-use crate::{TypeCollection, datatype::DataType};
+use crate::{SpectaID, TypeCollection, datatype::DataType};
 
 mod impls;
 mod macros;
@@ -12,6 +12,8 @@ mod legacy_impls;
 /// This should be implemented by the [`Type`](derive@crate::Type) macro.
 /// TODO: Discuss how to avoid custom implementations.
 pub trait Type {
+    const ID: Option<SpectaID>; // TODO: This is problematic
+
     /// returns a [`DataType`](crate::datatype::DataType) that represents the type.
     /// This will also register this and any dependent types into the [`TypeCollection`].
     fn definition(types: &mut TypeCollection) -> DataType;

@@ -20,7 +20,25 @@ pub struct B {
 }
 
 fn main() {
-    let mut types = TypeCollection::default().register::<B>();
+    let types = TypeCollection::default().register::<B>();
+
+    // Using `NamedType`
+    let ndt = types.get(A::SID).unwrap();
+
+    // Naive alternative
+    let ndt = types
+        .get(match A::definition(types) {
+            specta::datatype::DataType::Reference(r) => r.sid(),
+            _ => panic!(),
+        })
+        .unwrap();
+
+    // We could add this to remove one of the panics as it's an invariant of the Type trait?
+    let ndt = match A::definition(types) {
+        specta::datatype::DataType::Reference(r) => r.get(types),
+        _ => panic!(),
+    };
+
     // .register::<Testing>()
     // .register::<serde_yaml::Value>();
     // println!("{:#?}", types.get(Testing::ID).unwrap());
