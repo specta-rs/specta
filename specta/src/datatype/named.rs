@@ -1,4 +1,4 @@
-use std::{borrow::Cow, panic::Location};
+use std::{borrow::Cow, collections::HashSet, panic::Location};
 
 use crate::SpectaID;
 
@@ -14,6 +14,7 @@ pub struct NamedDataType {
     pub(crate) module_path: Cow<'static, str>,
     pub(crate) location: Location<'static>,
     pub(crate) generics: Vec<Generic>,
+    pub(crate) tags: HashSet<TypeTag>,
     pub(crate) inner: DataType,
 }
 
@@ -122,6 +123,21 @@ impl NamedDataType {
     pub fn set_ty(&mut self, ty: DataType) {
         self.inner = ty;
     }
+
+    /// Get the tags associated with this type
+    pub fn tags(&self) -> &HashSet<TypeTag> {
+        &self.tags
+    }
+
+    /// Get a mutable reference to the tags associated with this type
+    pub fn tags_mut(&mut self) -> &mut HashSet<TypeTag> {
+        &mut self.tags
+    }
+
+    /// Set the tags associated with this type
+    pub fn set_tags(&mut self, tags: HashSet<TypeTag>) {
+        self.tags = tags;
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -138,4 +154,11 @@ pub enum DeprecatedType {
         since: Option<Cow<'static, str>>,
         note: Cow<'static, str>,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum TypeTag {
+    Date,
+    Custom(Cow<'static, str>),
 }
