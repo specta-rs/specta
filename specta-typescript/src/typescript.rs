@@ -332,7 +332,7 @@ pub(crate) fn export(ts: &Typescript, types: &TypeCollection) -> Result<String, 
                     out += "\n";
                 }
                 out += &format!("export namespace {} {{\n", root_module);
-                out += &export_module(types, self, &mut module_types, root_module, 1)?;
+                out += &export_module(types, ts, &mut module_types, root_module, 1)?;
                 out += "}";
             }
 
