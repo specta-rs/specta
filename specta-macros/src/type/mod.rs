@@ -1,11 +1,11 @@
 use attr::*;
-use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens};
 use r#enum::parse_enum;
+use proc_macro2::TokenStream;
+use quote::{ToTokens, format_ident, quote};
 use r#struct::parse_struct;
-use syn::{parse, Data, DeriveInput, GenericParam};
+use syn::{Data, DeriveInput, GenericParam, parse};
 
-use crate::utils::{parse_attrs, unraw_raw_ident, AttributeValue};
+use crate::utils::{AttributeValue, parse_attrs, unraw_raw_ident};
 
 use self::generics::{
     add_type_to_where_clause, generics_with_ident_and_bounds_only, generics_with_ident_only,
@@ -76,7 +76,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 return Err(syn::Error::new(
                     attrs.key.span(),
                     "specta: invalid formatted attribute",
-                ))
+                ));
             }
         }
     }
@@ -194,10 +194,10 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 }
             }
 
-            #[automatically_derived]
-            impl #bounds #crate_ref::NamedType for #ident #type_args #where_bound {
-                const ID: #crate_ref::SpectaID = SID;
-            }
+            // #[automatically_derived]
+            // impl #bounds #crate_ref::NamedType for #ident #type_args #where_bound {
+            //     const ID: #crate_ref::SpectaID = SID;
+            // }
 
             #flatten_impl
 
