@@ -7,7 +7,7 @@ use crate::{BigIntExportBehavior, Error, Format, Typescript};
 /// JSDoc language exporter.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub struct JSDoc(pub Typescript);
+pub struct JSDoc(Typescript);
 
 impl Default for JSDoc {
     fn default() -> Self {
