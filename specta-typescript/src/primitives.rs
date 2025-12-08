@@ -80,6 +80,7 @@ pub fn export(
         vec![ndt.name().clone()],
         true,
         Some(ndt.sid()),
+        "",
     )?;
     result.push(';');
 
@@ -143,6 +144,7 @@ pub(crate) fn typedef_internal(
         vec![dt.name().clone()],
         false,
         Some(dt.sid()),
+        "ABC",
     )?;
     s.push_str("} ");
     s.push_str(&type_name);
@@ -157,7 +159,7 @@ pub(crate) fn typedef_internal(
 /// See [`export`] for the list of things to consider when using this.
 pub fn reference(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<String, Error> {
     let mut s = String::new();
-    datatype(&mut s, ts, types, dt, vec![], false, None)?;
+    datatype(&mut s, ts, types, dt, vec![], false, None, "")?;
     Ok(s)
 }
 
@@ -172,7 +174,7 @@ pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<
     let mut dt = dt.clone();
     crate::inline::inline(&mut dt, types);
     let mut s = String::new();
-    datatype(&mut s, ts, types, &dt, vec![], false, None)?;
+    datatype(&mut s, ts, types, &dt, vec![], false, None, "")?;
     Ok(s)
 }
 
@@ -187,6 +189,7 @@ pub(crate) fn datatype(
     // The type that is currently being resolved.
     // This comes from the `NamedDataType`
     sid: Option<SpectaID>,
+    prefix: &str,
 ) -> Result<(), Error> {
     // TODO: Validating the variant from `dt` can be flattened
 
