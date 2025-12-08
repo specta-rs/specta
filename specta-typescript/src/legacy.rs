@@ -135,7 +135,7 @@ fn inner_comments(
         return other;
     }
 
-    let comments = js_doc_builder(docs, deprecated).build();
+    let comments = js_doc(docs, deprecated);
 
     let (prefix_a, prefix_b) = match start_with_newline && !comments.is_empty() {
         true => ("\n", prefix),
@@ -604,7 +604,7 @@ pub(crate) fn enum_datatype(
 
                                 write!(s, "{tag}: {sanitised_name}")?;
                                 if let Some(ts_value) = ts_value {
-                                    write!(s, "; {content}: {ts_value}|")?;
+                                    write!(s, "; {content}: {ts_value}")?;
                                 }
 
                                 s.push_str(" }");
@@ -811,23 +811,21 @@ const STRING: &str = "string";
 const NULL: &str = "null";
 const NEVER: &str = "never";
 
-use std::borrow::Borrow;
-
-use specta::datatype::Generic;
-
 // TODO: Merge this into main expoerter
-pub(crate) fn js_doc_builder(docs: &str, deprecated: Option<&DeprecatedType>) -> Builder {
-    let mut builder = Builder::default();
+pub(crate) fn js_doc(docs: &str, deprecated: Option<&DeprecatedType>) -> String {
+    // let mut builder = Builder::default();
 
-    if !docs.is_empty() {
-        builder.extend(docs.split('\n'));
-    }
+    // if !docs.is_empty() {
+    //     builder.extend(docs.split('\n'));
+    // }
 
-    if let Some(deprecated) = deprecated {
-        builder.push_deprecated(deprecated);
-    }
+    // if let Some(deprecated) = deprecated {
+    //     builder.push_deprecated(deprecated);
+    // }
 
-    builder
+    // builder.build()
+
+    format!("") // TODO: Fix this
 }
 
 // pub fn typedef_named_datatype(
@@ -879,78 +877,3 @@ pub(crate) fn js_doc_builder(docs: &str, deprecated: Option<&DeprecatedType>) ->
 
 //     Ok(builder.build())
 // }
-
-const START: &str = "/**\n";
-
-pub struct Builder {
-    value: String,
-}
-
-impl Builder {
-    pub fn push(&mut self, line: &str) {
-        self.push_internal([line.trim()]);
-    }
-
-    pub(crate) fn push_internal<'a>(&mut self, parts: impl IntoIterator<Item = &'a str>) {
-        self.value.push_str(" * ");
-
-        for part in parts.into_iter() {
-            self.value.push_str(part);
-        }
-
-        self.value.push('\n');
-    }
-
-    pub fn push_deprecated(&mut self, typ: &DeprecatedType) {
-        self.push_internal(
-            ["@deprecated"].into_iter().chain(
-                match typ {
-                    DeprecatedType::DeprecatedWithSince {
-                        note: message,
-                        since,
-                    } => Some((since.as_ref(), message)),
-                    _ => None,
-                }
-                .map(|(since, message)| {
-                    [" ", message.trim()].into_iter().chain(
-                        since
-                            .map(|since| [" since ", since.trim()])
-                            .into_iter()
-                            .flatten(),
-                    )
-                })
-                .into_iter()
-                .flatten(),
-            ),
-        );
-    }
-
-    // pub fn push_generic(&mut self, generic: &Generic) {
-    //     self.push_internal(["@template ", generic.borrow()])
-    // }
-
-    pub fn build(mut self) -> String {
-        if self.value == START {
-            return String::new();
-        }
-
-        self.value.push_str(" */\n");
-        self.value
-    }
-}
-
-impl Default for Builder {
-    fn default() -> Self {
-        Self {
-            value: START.to_string(),
-        }
-    }
-}
-
-impl<T: AsRef<str>> Extend<T> for Builder {
-    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
-        for item in iter {
-            self.push(item.as_ref());
-        }
-    }
-}

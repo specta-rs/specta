@@ -64,6 +64,11 @@ impl JSDoc {
         Self(self.0.with_serde())
     }
 
+    /// Get a reference to the inner [Typescript] instance.
+    pub fn inner_ref(&self) -> &Typescript {
+        &self.0
+    }
+
     /// Export the files into a single string.
     ///
     /// Note: This will return [`Error:UnableToExport`] if the format is `Format::Files`.
