@@ -5,11 +5,11 @@ use std::{
 };
 
 use specta::{
-    datatype::{DataType, Fields, NamedDataType},
     SpectaID, TypeCollection,
+    datatype::{DataType, Fields, NamedDataType},
 };
 
-use crate::{primitives, Error};
+use crate::{Error, primitives};
 
 /// Allows you to configure how Specta's Typescript exporter will deal with BigInt types ([i64], [i128] etc).
 ///
@@ -45,7 +45,7 @@ pub enum Format {
     Files,
     /// Include the full module path in the types name but keep a flat structure.
     ModulePrefixedName,
-    /// Flatten all of the types into a single flat file of types.
+    /// Flatten all of the types into a single file of types.
     /// This mode doesn't support having multiple types with the same name.
     #[default]
     FlatFile,
@@ -122,105 +122,7 @@ impl Typescript {
     ///
     /// Note: This will return [`Error:UnableToExport`] if the format is `Format::Files`.
     pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
-        if self.serde {
-            specta_serde::validate(types)?;
-        }
-
-        match self.format {
-            Format::Namespaces => {
-                let mut out = self.export_internal([].into_iter(), [].into_iter(), types)?;
-                let mut module_types: HashMap<_, Vec<_>> = HashMap::new();
-
-                for ndt in types.into_unsorted_iter() {
-                    module_types
-                        .entry(ndt.module_path().to_string())
-                        .or_default()
-                        .push(ndt.clone());
-                }
-
-                fn export_module(
-                    types: &TypeCollection,
-                    ts: &Typescript,
-                    module_types: &mut HashMap<String, Vec<NamedDataType>>,
-                    current_module: &str,
-                    indent: usize,
-                ) -> Result<String, Error> {
-                    let mut out = String::new();
-                    if let Some(types_in_module) = module_types.get_mut(current_module) {
-                        types_in_module
-                            .sort_by(|a, b| a.name().cmp(b.name()).then(a.sid().cmp(&b.sid())));
-                        for ndt in types_in_module {
-                            out += &"    ".repeat(indent);
-                            out += &primitives::export(ts, types, ndt)?;
-                            out += "\n\n";
-                        }
-                    }
-
-                    let mut child_modules = module_types
-                        .keys()
-                        .filter(|k| {
-                            k.starts_with(&format!("{}::", current_module))
-                                && k[current_module.len() + 2..].split("::").count() == 1
-                        })
-                        .cloned()
-                        .collect::<Vec<_>>();
-                    child_modules.sort();
-
-                    for child in child_modules {
-                        let module_name = child.split("::").last().unwrap();
-                        out += &"    ".repeat(indent);
-                        out += &format!("export namespace {module_name} {{\n");
-                        out += &export_module(types, ts, module_types, &child, indent + 1)?;
-                        out += &"    ".repeat(indent);
-                        out += "}\n";
-                    }
-
-                    Ok(out)
-                }
-
-                let mut root_modules = module_types.keys().cloned().collect::<Vec<_>>();
-                root_modules.sort();
-
-                for root_module in root_modules.iter() {
-                    out += "import $$specta_ns$$";
-                    out += root_module;
-                    out += " = ";
-                    out += root_module;
-                    out += ";\n\n";
-                }
-
-                for (i, root_module) in root_modules.iter().enumerate() {
-                    if i != 0 {
-                        out += "\n";
-                    }
-                    out += &format!("export namespace {} {{\n", root_module);
-                    out += &export_module(types, self, &mut module_types, root_module, 1)?;
-                    out += "}";
-                }
-
-                Ok(out)
-            }
-            Format::Files => return Err(Error::UnableToExport),
-            Format::FlatFile | Format::ModulePrefixedName => {
-                if self.format == Format::FlatFile {
-                    let mut map = HashMap::with_capacity(types.len());
-                    for dt in types.into_unsorted_iter() {
-                        if let Some((existing_sid, existing_impl_location)) =
-                            map.insert(dt.name().clone(), (dt.sid(), dt.location()))
-                        {
-                            if existing_sid != dt.sid() {
-                                return Err(Error::DuplicateTypeName {
-                                    types: (dt.location(), existing_impl_location),
-                                    name: dt.name().clone(),
-                                });
-                            }
-                        }
-                    }
-                }
-
-                self.export_internal(types.into_sorted_iter(), [].into_iter(), types)
-            }
-        }
+        export(self, types)
     }
 
     fn export_internal(
@@ -296,7 +198,7 @@ impl Typescript {
                 files.entry(path).or_default().push(ndt);
             }
 
-            let mut used_paths = files.keys().cloned().collect::<HashSet<_>>();
+            let used_paths = files.keys().cloned().collect::<HashSet<_>>();
 
             for (path, ndts) in files {
                 if let Some(parent) = path.parent() {
@@ -354,6 +256,108 @@ impl Typescript {
         }
 
         Ok(())
+    }
+}
+
+pub(crate) fn export(ts: &Typescript, types: &TypeCollection) -> Result<String, Error> {
+    if ts.serde {
+        specta_serde::validate(types)?;
+    }
+
+    match ts.format {
+        Format::Namespaces => {
+            let mut out = ts.export_internal([].into_iter(), [].into_iter(), types)?;
+            let mut module_types: HashMap<_, Vec<_>> = HashMap::new();
+
+            for ndt in types.into_unsorted_iter() {
+                module_types
+                    .entry(ndt.module_path().to_string())
+                    .or_default()
+                    .push(ndt.clone());
+            }
+
+            fn export_module(
+                types: &TypeCollection,
+                ts: &Typescript,
+                module_types: &mut HashMap<String, Vec<NamedDataType>>,
+                current_module: &str,
+                indent: usize,
+            ) -> Result<String, Error> {
+                let mut out = String::new();
+                if let Some(types_in_module) = module_types.get_mut(current_module) {
+                    types_in_module
+                        .sort_by(|a, b| a.name().cmp(b.name()).then(a.sid().cmp(&b.sid())));
+                    for ndt in types_in_module {
+                        out += &"    ".repeat(indent);
+                        out += &primitives::export(ts, types, ndt)?;
+                        out += "\n\n";
+                    }
+                }
+
+                let mut child_modules = module_types
+                    .keys()
+                    .filter(|k| {
+                        k.starts_with(&format!("{}::", current_module))
+                            && k[current_module.len() + 2..].split("::").count() == 1
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>();
+                child_modules.sort();
+
+                for child in child_modules {
+                    let module_name = child.split("::").last().unwrap();
+                    out += &"    ".repeat(indent);
+                    out += &format!("export namespace {module_name} {{\n");
+                    out += &export_module(types, ts, module_types, &child, indent + 1)?;
+                    out += &"    ".repeat(indent);
+                    out += "}\n";
+                }
+
+                Ok(out)
+            }
+
+            let mut root_modules = module_types.keys().cloned().collect::<Vec<_>>();
+            root_modules.sort();
+
+            for root_module in root_modules.iter() {
+                out += "import $$specta_ns$$";
+                out += root_module;
+                out += " = ";
+                out += root_module;
+                out += ";\n\n";
+            }
+
+            for (i, root_module) in root_modules.iter().enumerate() {
+                if i != 0 {
+                    out += "\n";
+                }
+                out += &format!("export namespace {} {{\n", root_module);
+                out += &export_module(types, self, &mut module_types, root_module, 1)?;
+                out += "}";
+            }
+
+            Ok(out)
+        }
+        Format::Files => Err(Error::UnableToExport),
+        Format::FlatFile | Format::ModulePrefixedName => {
+            if ts.format == Format::FlatFile {
+                let mut map = HashMap::with_capacity(types.len());
+                for dt in types.into_unsorted_iter() {
+                    if let Some((existing_sid, existing_impl_location)) =
+                        map.insert(dt.name().clone(), (dt.sid(), dt.location()))
+                    {
+                        if existing_sid != dt.sid() {
+                            return Err(Error::DuplicateTypeName {
+                                types: (dt.location(), existing_impl_location),
+                                name: dt.name().clone(),
+                            });
+                        }
+                    }
+                }
+            }
+
+            ts.export_internal(types.into_sorted_iter(), [].into_iter(), types)
+        }
     }
 }
 

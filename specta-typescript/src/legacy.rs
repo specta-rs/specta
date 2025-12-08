@@ -1,9 +1,7 @@
 // TODO: Drop this stuff
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::BTreeSet;
 use std::{borrow::Cow, fmt};
-
-pub use crate::inline::inline_and_flatten_ndt;
 
 /// Describes where an error occurred.
 #[derive(Debug, PartialEq)]
@@ -117,7 +115,7 @@ use specta::datatype::{
     DataType, DeprecatedType, Enum, EnumRepr, EnumVariant, Fields, FunctionReturnType, Literal,
     NamedDataType, Struct, Tuple,
 };
-use specta::internal::{skip_fields, skip_fields_named, NonSkipField};
+use specta::internal::{NonSkipField, skip_fields, skip_fields_named};
 
 #[allow(missing_docs)]
 pub(crate) type Result<T> = std::result::Result<T, Error>;
@@ -810,55 +808,55 @@ pub(crate) fn js_doc_builder(docs: &str, deprecated: Option<&DeprecatedType>) ->
     builder
 }
 
-pub fn typedef_named_datatype(
-    cfg: &Typescript,
-    typ: &NamedDataType,
-    types: &TypeCollection,
-) -> Output {
-    typedef_named_datatype_inner(
-        &ExportContext {
-            cfg,
-            path: vec![],
-            // TODO: Should JS doc support per field or variant comments???
-            is_export: false,
-        },
-        typ,
-        types,
-    )
-}
+// pub fn typedef_named_datatype(
+//     cfg: &Typescript,
+//     typ: &NamedDataType,
+//     types: &TypeCollection,
+// ) -> Output {
+//     typedef_named_datatype_inner(
+//         &ExportContext {
+//             cfg,
+//             path: vec![],
+//             // TODO: Should JS doc support per field or variant comments???
+//             is_export: false,
+//         },
+//         typ,
+//         types,
+//     )
+// }
 
-fn typedef_named_datatype_inner(
-    ctx: &ExportContext,
-    typ: &NamedDataType,
-    types: &TypeCollection,
-) -> Output {
-    let name = typ.name();
-    let docs = typ.docs();
-    let deprecated = typ.deprecated();
-    let item = typ.ty();
+// fn typedef_named_datatype_inner(
+//     ctx: &ExportContext,
+//     typ: &NamedDataType,
+//     types: &TypeCollection,
+// ) -> Output {
+//     let name = typ.name();
+//     let docs = typ.docs();
+//     let deprecated = typ.deprecated();
+//     let item = typ.ty();
 
-    let ctx = ctx.with(PathItem::Type(name.clone()));
+//     let ctx = ctx.with(PathItem::Type(name.clone()));
 
-    let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
+//     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
 
-    let mut inline_ts = String::new();
-    datatype_inner(
-        ctx.clone(),
-        &FunctionReturnType::Value(typ.ty().clone()),
-        types,
-        &mut inline_ts,
-    )?;
+//     let mut inline_ts = String::new();
+//     datatype_inner(
+//         ctx.clone(),
+//         &FunctionReturnType::Value(typ.ty().clone()),
+//         types,
+//         &mut inline_ts,
+//     )?;
 
-    let mut builder = js_doc_builder(docs, deprecated);
+//     let mut builder = js_doc_builder(docs, deprecated);
 
-    typ.generics()
-        .into_iter()
-        .for_each(|generic| builder.push_generic(generic));
+//     typ.generics()
+//         .into_iter()
+//         .for_each(|generic| builder.push_generic(generic));
 
-    builder.push_internal(["@typedef { ", &inline_ts, " } ", &name]);
+//     builder.push_internal(["@typedef { ", &inline_ts, " } ", &name]);
 
-    Ok(builder.build())
-}
+//     Ok(builder.build())
+// }
 
 const START: &str = "/**\n";
 

@@ -1,6 +1,6 @@
 //! Primitives provide building blocks for Specta-based libraries.
 //!
-//! These are for advanced usecases, you should generally use [Typescript] in end-user applications.
+//! These are for advanced usecases, you should generally use [Typescript] or [JSDoc] in end-user applications.
 
 use std::{
     borrow::{Borrow, Cow},
@@ -9,16 +9,12 @@ use std::{
 };
 
 use specta::{
-    datatype::{
-        DataType, Enum, EnumRepr, Field, Fields, List, Literal, Map, NamedDataType, Primitive,
-        Reference, Tuple,
-    },
     NamedType, SpectaID, TypeCollection,
+    datatype::{DataType, Enum, List, Literal, Map, NamedDataType, Primitive, Reference, Tuple},
 };
 
 use crate::{
-    legacy::js_doc_builder, reserved_names::*, Any, BigIntExportBehavior, Error, Format,
-    Typescript, Unknown,
+    Any, BigIntExportBehavior, Error, Format, Typescript, Unknown, legacy::js_doc_builder,
 };
 
 /// Generate an `export Type = ...` Typescript string for a specific [`DataType`].
@@ -205,7 +201,7 @@ fn primitive_dt(
             BigIntExportBehavior::Fail => {
                 return Err(Error::BigIntForbidden {
                     path: location.join("."),
-                })
+                });
             }
         },
         Primitive::bool => "boolean",
