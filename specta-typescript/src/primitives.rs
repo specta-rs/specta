@@ -10,7 +10,10 @@ use std::{
 
 use specta::{
     NamedType, SpectaID, TypeCollection,
-    datatype::{DataType, Enum, List, Literal, Map, NamedDataType, Primitive, Reference, Tuple},
+    datatype::{
+        DataType, DeprecatedType, Enum, List, Literal, Map, NamedDataType, Primitive, Reference,
+        Tuple,
+    },
 };
 
 use crate::{
@@ -111,10 +114,30 @@ pub(crate) fn typedef_internal(
         .chain(generics)
         .collect::<String>();
 
-    // Generate the type definition
-    let mut type_def = String::new();
+    let mut s = "/**\n".to_string();
+
+    if !dt.docs().is_empty() {
+        for line in dt.docs().lines() {
+            s.push_str(" * ");
+            s.push_str(line);
+            s.push('\n');
+        }
+        s.push_str(" *\n");
+    }
+
+    if let Some(deprecated) = dt.deprecated() {
+        s.push_str(" * @deprecated");
+        if let DeprecatedType::DeprecatedWithSince { note, .. } = deprecated {
+            s.push(' ');
+            s.push_str(note);
+        }
+        s.push('\n');
+        s.push_str(" *\n");
+    }
+
+    s.push_str(" * @typedef {");
     datatype(
-        &mut type_def,
+        &mut s,
         ts,
         types,
         dt.ty(),
@@ -122,43 +145,12 @@ pub(crate) fn typedef_internal(
         false,
         Some(dt.sid()),
     )?;
+    s.push_str("} ");
+    s.push_str(&type_name);
+    s.push('\n');
+    s.push_str(" */");
 
-    // Build JSDoc @typedef comment
-    let mut result = String::new();
-
-    // Add JSDoc comment block
-    result.push_str("/**\n");
-
-    // Add documentation if present
-    // if let Some(docs) = dt.docs() {
-    //     for line in docs.lines() {
-    //         result.push_str(" * ");
-    //         result.push_str(line);
-    //         result.push('\n');
-    //     }
-    //     result.push_str(" *\n");
-    // }
-
-    // Add deprecated notice if applicable
-    // if let Some(deprecated) = dt.deprecated() {
-    //     result.push_str(" * @deprecated");
-    //     if let Some(note) = deprecated.note() {
-    //         result.push(' ');
-    //         result.push_str(note);
-    //     }
-    //     result.push('\n');
-    //     result.push_str(" *\n");
-    // }
-
-    // Add the @typedef declaration
-    result.push_str(" * @typedef {");
-    result.push_str(&type_def);
-    result.push_str("} ");
-    result.push_str(&type_name);
-    result.push('\n');
-    result.push_str(" */");
-
-    Ok(result)
+    Ok(s)
 }
 
 /// Generate an Typescript string for a specific [`DataType`].

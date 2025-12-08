@@ -64,12 +64,18 @@ impl JSDoc {
         Self(self.0.with_serde())
     }
 
-    /// TODO
+    /// Export the files into a single string.
+    ///
+    /// Note: This will return [`Error:UnableToExport`] if the format is `Format::Files`.
     pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
         self.0.export(types)
     }
 
-    /// TODO
+    /// Export the types to a specific file/folder.
+    ///
+    /// When configured when `format` is `Format::Files`, you must provide a directory path.
+    /// Otherwise, you must provide the path of a single file.
+    ///
     pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
         self.0.export_to(path, types)
     }
