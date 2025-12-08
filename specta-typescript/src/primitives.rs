@@ -119,15 +119,15 @@ pub(crate) fn typedef_internal(
 
     if !dt.docs().is_empty() {
         for line in dt.docs().lines() {
-            s.push_str(" * ");
+            s.push_str("\t* ");
             s.push_str(line);
             s.push('\n');
         }
-        s.push_str(" *\n");
+        s.push_str("\t*\n");
     }
 
     if let Some(deprecated) = dt.deprecated() {
-        s.push_str(" * @deprecated");
+        s.push_str("\t* @deprecated");
         if let DeprecatedType::DeprecatedWithSince { note, .. } = deprecated {
             s.push(' ');
             s.push_str(note);
@@ -135,7 +135,7 @@ pub(crate) fn typedef_internal(
         s.push('\n');
     }
 
-    s.push_str(" * @typedef {");
+    s.push_str("\t* @typedef {");
     datatype(
         &mut s,
         ts,
@@ -144,12 +144,12 @@ pub(crate) fn typedef_internal(
         vec![dt.name().clone()],
         false,
         Some(dt.sid()),
-        "ABC",
+        "\t*",
     )?;
     s.push_str("} ");
     s.push_str(&type_name);
     s.push('\n');
-    s.push_str(" */");
+    s.push_str("\t*/");
 
     Ok(s)
 }

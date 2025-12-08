@@ -176,7 +176,7 @@ pub(crate) fn datatype_inner(
         }
     };
 
-    crate::primitives::datatype(s, ctx.cfg, types, typ, vec![], ctx.is_export, None)
+    crate::primitives::datatype(s, ctx.cfg, types, typ, vec![], ctx.is_export, None, "")
 }
 
 // Can be used with `StructUnnamedFields.fields` or `EnumNamedFields.fields`
@@ -260,6 +260,7 @@ pub(crate) fn struct_datatype(
     strct: &Struct,
     types: &TypeCollection,
     s: &mut String,
+    prefix: &str,
 ) -> Result<()> {
     Ok(match &strct.fields() {
         Fields::Unit => s.push_str(NULL),
