@@ -132,7 +132,6 @@ pub(crate) fn typedef_internal(
             s.push_str(note);
         }
         s.push('\n');
-        s.push_str(" *\n");
     }
 
     s.push_str(" * @typedef {");
