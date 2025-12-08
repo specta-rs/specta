@@ -20,9 +20,9 @@ use crate::{
     Any, BigIntExportBehavior, Error, Format, JSDoc, Typescript, Unknown, legacy::js_doc_builder,
 };
 
-/// Generate an `export Type = ...` Typescript string for a specific [`DataType`].
+/// Generate an `export Type = ...` Typescript string for a specific [`NamedDataType`].
 ///
-/// This method leaves the following up to the implementor:
+/// This method leaves the following up to the implementer:
 ///  - Ensuring all referenced types are exported
 ///  - Handling multiple type with overlapping names
 ///  - Transforming the type for your serialization format (Eg. Serde)
@@ -87,7 +87,12 @@ pub fn export(
     Ok(result)
 }
 
-/// TODO
+/// Generate a JSDoc `@typedef` comment for defining a [NamedDataType].
+///
+/// This method leaves the following up to the implementer:
+///  - Ensuring all referenced types are exported
+///  - Handling multiple type with overlapping names
+///  - Transforming the type for your serialization format (Eg. Serde)
 ///
 pub fn typedef(js: &JSDoc, types: &TypeCollection, dt: &NamedDataType) -> Result<String, Error> {
     typedef_internal(&js.0, types, dt)
