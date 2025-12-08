@@ -5,7 +5,7 @@
 //  - Remove dependency on `serde_json`
 //  - Don't ignore doctests
 
-use crate::{datatype::Literal, DataType, Type, TypeCollection};
+use specta::{DataType, Type, TypeCollection, datatype::Literal};
 
 #[doc(hidden)]
 pub use serde_json;
