@@ -1,13 +1,13 @@
-use std::{borrow::Cow, ops::Deref, path::Path};
+use std::{borrow::Cow, path::Path};
 
 use specta::TypeCollection;
 
-use crate::{BigIntExportBehavior, Error, Typescript};
+use crate::{BigIntExportBehavior, Error, Format, Typescript};
 
 /// JSDoc language exporter.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub struct JSDoc(pub Typescript);
+pub struct JSDoc(Typescript);
 
 impl Default for JSDoc {
     fn default() -> Self {
@@ -19,6 +19,13 @@ impl From<Typescript> for JSDoc {
     fn from(mut ts: Typescript) -> Self {
         ts.jsdoc = true;
         Self(ts)
+    }
+}
+
+impl From<JSDoc> for Typescript {
+    fn from(mut jsdoc: JSDoc) -> Self {
+        jsdoc.0.jsdoc = false;
+        jsdoc.0
     }
 }
 
@@ -47,26 +54,34 @@ impl JSDoc {
         Self(self.0.bigint(bigint))
     }
 
+    /// Configure the format
+    pub fn format(self, format: Format) -> Self {
+        Self(self.0.format(format))
+    }
+
     /// TODO: Explain
     pub fn with_serde(self) -> Self {
         Self(self.0.with_serde())
     }
 
-    /// TODO
+    /// Get a reference to the inner [Typescript] instance.
+    pub fn inner_ref(&self) -> &Typescript {
+        &self.0
+    }
+
+    /// Export the files into a single string.
+    ///
+    /// Note: This will return [`Error:UnableToExport`] if the format is `Format::Files`.
     pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
         self.0.export(types)
     }
 
-    /// TODO
+    /// Export the types to a specific file/folder.
+    ///
+    /// When configured when `format` is `Format::Files`, you must provide a directory path.
+    /// Otherwise, you must provide the path of a single file.
+    ///
     pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
         self.0.export_to(path, types)
-    }
-}
-
-impl Deref for JSDoc {
-    type Target = Typescript;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }

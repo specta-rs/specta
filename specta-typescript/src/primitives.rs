@@ -1,6 +1,6 @@
 //! Primitives provide building blocks for Specta-based libraries.
 //!
-//! These are for advanced usecases, you should generally use [Typescript] in end-user applications.
+//! These are for advanced usecases, you should generally use [Typescript] or [JSDoc] in end-user applications.
 
 use std::{
     borrow::{Borrow, Cow},
@@ -9,21 +9,18 @@ use std::{
 };
 
 use specta::{
-    datatype::{
-        DataType, Enum, EnumRepr, Field, Fields, List, Literal, Map, NamedDataType, Primitive,
-        Reference, Tuple,
-    },
     NamedType, SpectaID, TypeCollection,
+    datatype::{
+        DataType, DeprecatedType, Enum, List, Literal, Map, NamedDataType, Primitive, Reference,
+        Tuple,
+    },
 };
 
-use crate::{
-    legacy::js_doc_builder, reserved_names::*, Any, BigIntExportBehavior, Error, Format,
-    Typescript, Unknown,
-};
+use crate::{Any, BigIntExportBehavior, Error, Format, JSDoc, Typescript, Unknown, legacy::js_doc};
 
-/// Generate an `export Type = ...` Typescript string for a specific [`DataType`].
+/// Generate an `export Type = ...` Typescript string for a specific [`NamedDataType`].
 ///
-/// This method leaves the following up to the implementor:
+/// This method leaves the following up to the implementer:
 ///  - Ensuring all referenced types are exported
 ///  - Handling multiple type with overlapping names
 ///  - Transforming the type for your serialization format (Eg. Serde)
@@ -36,10 +33,7 @@ pub fn export(
     let generics = (!ndt.generics().is_empty())
         .then(|| {
             iter::once("<")
-                .chain(intersperse(
-                    ndt.generics().into_iter().map(|g| g.borrow()),
-                    ", ",
-                ))
+                .chain(intersperse(ndt.generics().iter().map(|g| g.borrow()), ", "))
                 .chain(iter::once(">"))
         })
         .into_iter()
@@ -56,7 +50,7 @@ pub fn export(
         &match ts.format {
             Format::ModulePrefixedName => {
                 let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
-                s.push_str("_");
+                s.push('_');
                 s.push_str(ndt.name());
                 Cow::Owned(s)
             }
@@ -66,14 +60,12 @@ pub fn export(
     .leak(); // TODO: Leaking bad
 
     let s = iter::empty()
-        .chain(["export type ", &name])
+        .chain(["export type ", name])
         .chain(generics)
         .chain([" = "])
-        .collect::<String>();
+        .collect::<String>(); // TODO: Don't collect and instead build into `result`
 
-    // TODO: Upgrade this to new stuff
-    // TODO: Collecting directly into `result` insetad of allocating `s`?
-    let mut result = js_doc_builder(ndt.docs(), ndt.deprecated()).build();
+    let mut result = js_doc(ndt.docs(), ndt.deprecated());
     result.push_str(&s);
 
     datatype(
@@ -84,10 +76,83 @@ pub fn export(
         vec![ndt.name().clone()],
         true,
         Some(ndt.sid()),
+        "\t",
     )?;
-    result.push_str(";");
+    result.push_str(";\n");
 
     Ok(result)
+}
+
+/// Generate a JSDoc `@typedef` comment for defining a [NamedDataType].
+///
+/// This method leaves the following up to the implementer:
+///  - Ensuring all referenced types are exported
+///  - Handling multiple type with overlapping names
+///  - Transforming the type for your serialization format (Eg. Serde)
+///
+pub fn typedef(js: &JSDoc, types: &TypeCollection, dt: &NamedDataType) -> Result<String, Error> {
+    typedef_internal(js.inner_ref(), types, dt)
+}
+
+// This can be used internally to prevent cloning `Typescript` instances.
+// Externally this shouldn't be a concern so we don't expose it.
+pub(crate) fn typedef_internal(
+    ts: &Typescript,
+    types: &TypeCollection,
+    dt: &NamedDataType,
+) -> Result<String, Error> {
+    let generics = (!dt.generics().is_empty())
+        .then(|| {
+            iter::once("<")
+                .chain(intersperse(dt.generics().iter().map(|g| g.borrow()), ", "))
+                .chain(iter::once(">"))
+        })
+        .into_iter()
+        .flatten();
+
+    let name = dt.name();
+    let type_name = iter::empty()
+        .chain([name.as_ref()])
+        .chain(generics)
+        .collect::<String>();
+
+    let mut s = "/**\n".to_string();
+
+    if !dt.docs().is_empty() {
+        for line in dt.docs().lines() {
+            s.push_str("\t* ");
+            s.push_str(line);
+            s.push('\n');
+        }
+        s.push_str("\t*\n");
+    }
+
+    if let Some(deprecated) = dt.deprecated() {
+        s.push_str("\t* @deprecated");
+        if let DeprecatedType::DeprecatedWithSince { note, .. } = deprecated {
+            s.push(' ');
+            s.push_str(note);
+        }
+        s.push('\n');
+    }
+
+    s.push_str("\t* @typedef {");
+    datatype(
+        &mut s,
+        ts,
+        types,
+        dt.ty(),
+        vec![dt.name().clone()],
+        false,
+        Some(dt.sid()),
+        "\t*\t",
+    )?;
+    s.push_str("} ");
+    s.push_str(&type_name);
+    s.push('\n');
+    s.push_str("\t*/");
+
+    Ok(s)
 }
 
 /// Generate an Typescript string for a specific [`DataType`].
@@ -95,7 +160,7 @@ pub fn export(
 /// See [`export`] for the list of things to consider when using this.
 pub fn reference(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<String, Error> {
     let mut s = String::new();
-    datatype(&mut s, ts, types, &dt, vec![], false, None)?;
+    datatype(&mut s, ts, types, dt, vec![], false, None, "")?;
     Ok(s)
 }
 
@@ -108,18 +173,11 @@ pub fn reference(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Resu
 ///
 pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<String, Error> {
     let mut dt = dt.clone();
-    crate::inline::inline(&mut dt, &types);
+    crate::inline::inline(&mut dt, types);
     let mut s = String::new();
-    datatype(&mut s, ts, types, &dt, vec![], false, None)?;
+    datatype(&mut s, ts, types, &dt, vec![], false, None, "")?;
     Ok(s)
 }
-
-// /// Generate an `export Type = ...` Typescript string for a specific [`DataType`].
-// ///
-// /// Similar to [`export`] but works on a [`FunctionResultVariant`].
-// pub fn export_func(ts: &Typescript, types: &TypeCollection, dt: FunctionResultVariant) -> Result<String, ExportError> {
-//     todo!();
-// }
 
 // TODO: private
 pub(crate) fn datatype(
@@ -132,6 +190,7 @@ pub(crate) fn datatype(
     // The type that is currently being resolved.
     // This comes from the `NamedDataType`
     sid: Option<SpectaID>,
+    prefix: &str,
 ) -> Result<(), Error> {
     // TODO: Validating the variant from `dt` can be flattened
 
@@ -153,9 +212,9 @@ pub(crate) fn datatype(
                 s,
             )?;
 
-            let or_null = format!(" | null");
+            let or_null = " | null";
             if !s.ends_with(&or_null) {
-                s.push_str(&or_null);
+                s.push_str(or_null);
             }
 
             // datatype(s, ts, types, &*t, location, state)?;
@@ -178,9 +237,10 @@ pub(crate) fn datatype(
                 st,
                 types,
                 s,
+                prefix,
             )?
         }
-        DataType::Enum(e) => enum_dt(s, ts, types, e, location, is_export)?,
+        DataType::Enum(e) => enum_dt(s, ts, types, e, location, is_export, prefix)?,
         DataType::Tuple(t) => tuple_dt(s, ts, types, t, location, is_export)?,
         DataType::Reference(r) => reference_dt(s, ts, types, r, location, is_export)?,
         DataType::Generic(g) => s.push_str(g.borrow()),
@@ -205,7 +265,7 @@ fn primitive_dt(
             BigIntExportBehavior::Fail => {
                 return Err(Error::BigIntForbidden {
                     path: location.join("."),
-                })
+                });
             }
         },
         Primitive::bool => "boolean",
@@ -400,6 +460,7 @@ fn enum_dt(
     mut location: Vec<Cow<'static, str>>,
     // TODO: Remove
     is_export: bool,
+    prefix: &str,
 ) -> Result<(), Error> {
     // TODO: Drop legacy stuff
     {
@@ -412,6 +473,7 @@ fn enum_dt(
             e,
             types,
             s,
+            prefix,
         )?
     }
 
