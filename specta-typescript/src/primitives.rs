@@ -176,13 +176,6 @@ pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<
     Ok(s)
 }
 
-// /// Generate an `export Type = ...` Typescript string for a specific [`DataType`].
-// ///
-// /// Similar to [`export`] but works on a [`FunctionResultVariant`].
-// pub fn export_func(ts: &Typescript, types: &TypeCollection, dt: FunctionResultVariant) -> Result<String, ExportError> {
-//     todo!();
-// }
-
 // TODO: private
 pub(crate) fn datatype(
     s: &mut String,

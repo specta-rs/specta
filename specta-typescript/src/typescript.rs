@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
@@ -257,14 +257,13 @@ impl Typescript {
             out += "_";
             out += ndt.name();
             out += " } from \"";
-            // TODO: Handle `0` for module path elements
-            for i in 1..ndt.module_path().split("::").count() {
-                if i == 1 {
-                    out += "./";
-                } else {
-                    out += "../";
-                }
+
+            let depth = ndt.module_path().split("::").count();
+            out += "./";
+            for _ in 2..depth {
+                out += "../";
             }
+
             out += &ndt.module_path().replace("::", "/");
             out += "\";";
         }
@@ -323,7 +322,7 @@ impl Typescript {
                     std::fs::create_dir_all(parent)?;
                 }
 
-                let mut references = HashSet::new();
+                let mut references = BTreeSet::new();
                 for ndt in ndts.iter() {
                     crawl_references(ndt.ty(), &mut references);
                 }
@@ -378,7 +377,7 @@ impl Typescript {
     }
 }
 
-fn crawl_references(dt: &DataType, references: &mut HashSet<SpectaID>) {
+fn crawl_references(dt: &DataType, references: &mut BTreeSet<SpectaID>) {
     match dt {
         DataType::Primitive(..) | DataType::Literal(..) => {}
         DataType::List(list) => {
@@ -411,7 +410,7 @@ fn crawl_references(dt: &DataType, references: &mut HashSet<SpectaID>) {
     }
 }
 
-fn crawl_references_fields(fields: &Fields, references: &mut HashSet<SpectaID>) {
+fn crawl_references_fields(fields: &Fields, references: &mut BTreeSet<SpectaID>) {
     match fields {
         Fields::Unit => {}
         Fields::Unnamed(fields) => {
