@@ -23,8 +23,8 @@ impl fmt::Display for NamedLocation {
 
 #[derive(Clone, Debug)]
 pub(crate) enum PathItem {
-    Type(Cow<'static, str>),
-    TypeExtended(Cow<'static, str>, &'static str),
+    // Type(Cow<'static, str>),
+    // TypeExtended(Cow<'static, str>, &'static str),
     Field(Cow<'static, str>),
     Variant(Cow<'static, str>),
 }
@@ -60,16 +60,16 @@ impl ExportPath {
         let mut path = path.iter().peekable();
         while let Some(item) = path.next() {
             s.push_str(match item {
-                PathItem::Type(v) => v,
-                PathItem::TypeExtended(_, loc) => loc,
+                // PathItem::Type(v) => v,
+                // PathItem::TypeExtended(_, loc) => loc,
                 PathItem::Field(v) => v,
                 PathItem::Variant(v) => v,
             });
 
             if let Some(next) = path.peek() {
                 s.push_str(match next {
-                    PathItem::Type(_) => " -> ",
-                    PathItem::TypeExtended(_, _) => " -> ",
+                    // PathItem::Type(_) => " -> ",
+                    // PathItem::TypeExtended(_, _) => " -> ",
                     PathItem::Field(_) => ".",
                     PathItem::Variant(_) => "::",
                 });
@@ -113,7 +113,7 @@ use std::fmt::Write;
 
 use specta::datatype::{
     DataType, DeprecatedType, Enum, EnumRepr, EnumVariant, Fields, FunctionReturnType, Literal,
-    NamedDataType, Struct, Tuple,
+    Struct, Tuple,
 };
 use specta::internal::{NonSkipField, skip_fields, skip_fields_named};
 
@@ -129,6 +129,7 @@ fn inner_comments(
     docs: &Cow<'static, str>,
     other: String,
     start_with_newline: bool,
+    prefix: &str,
 ) -> String {
     if !ctx.is_export {
         return other;
@@ -136,12 +137,12 @@ fn inner_comments(
 
     let comments = js_doc_builder(docs, deprecated).build();
 
-    let prefix = match start_with_newline && !comments.is_empty() {
-        true => "\n",
-        false => "",
+    let (prefix_a, prefix_b) = match start_with_newline && !comments.is_empty() {
+        true => ("\n", prefix),
+        false => ("", ""),
     };
 
-    format!("{prefix}{comments}{other}")
+    format!("{prefix_a}{prefix_b}{comments}{other}")
 }
 
 pub(crate) fn datatype_inner(
@@ -185,8 +186,9 @@ fn unnamed_fields_datatype(
     fields: &[NonSkipField],
     types: &TypeCollection,
     s: &mut String,
+    prefix: &str,
 ) -> Result<()> {
-    Ok(match fields {
+    match fields {
         [(field, ty)] => {
             let mut v = String::new();
             datatype_inner(
@@ -201,6 +203,7 @@ fn unnamed_fields_datatype(
                 field.docs(),
                 v,
                 true,
+                prefix,
             ));
         }
         fields => {
@@ -224,16 +227,19 @@ fn unnamed_fields_datatype(
                     field.docs(),
                     v,
                     true,
+                    prefix,
                 ));
             }
 
             s.push(']');
         }
-    })
+    }
+
+    Ok(())
 }
 
 pub(crate) fn tuple_datatype(ctx: ExportContext, tuple: &Tuple, types: &TypeCollection) -> Output {
-    match &tuple.elements()[..] {
+    match &tuple.elements() {
         [] => Ok(NULL.to_string()),
         tys => Ok(format!(
             "[{}]",
@@ -262,25 +268,28 @@ pub(crate) fn struct_datatype(
     s: &mut String,
     prefix: &str,
 ) -> Result<()> {
-    Ok(match &strct.fields() {
+    match &strct.fields() {
         Fields::Unit => s.push_str(NULL),
         Fields::Unnamed(unnamed) => unnamed_fields_datatype(
             ctx,
             &skip_fields(unnamed.fields()).collect::<Vec<_>>(),
             types,
             s,
+            prefix,
         )?,
         Fields::Named(named) => {
             let fields = skip_fields_named(named.fields()).collect::<Vec<_>>();
 
             if fields.is_empty() {
-                return Ok(match (named.tag().as_ref(), sid) {
+                match (named.tag().as_ref(), sid) {
                     (Some(tag), Some(sid)) => {
                         let key = types.get(sid).unwrap().name();
                         write!(s, r#"{{ "{tag}": "{key}" }}"#)?
                     }
                     (_, _) => write!(s, "Record<{STRING}, {NEVER}>")?,
-                });
+                }
+
+                return Ok(());
             }
 
             let (flattened, non_flattened): (Vec<_>, Vec<_>) =
@@ -303,6 +312,7 @@ pub(crate) fn struct_datatype(
                             field.docs(),
                             format!("({s})"),
                             true,
+                            prefix,
                         )
                     })
                 })
@@ -328,6 +338,7 @@ pub(crate) fn struct_datatype(
                         field.docs(),
                         other,
                         true,
+                        prefix,
                     ))
                 })
                 .collect::<Result<Vec<_>>>()?;
@@ -338,7 +349,18 @@ pub(crate) fn struct_datatype(
             }
 
             if !unflattened_fields.is_empty() {
-                field_sections.push(format!("{{ {} }}", unflattened_fields.join("; ")));
+                let mut s = "{ ".to_string();
+
+                for field in unflattened_fields {
+                    // TODO: Inline or not for newline?
+                    // s.push_str(&format!("{field}; "));
+                    s.push_str(&format!("\n{prefix}\t{field};"));
+                }
+
+                s.push('\n');
+                s.push_str(prefix);
+                s.push('}');
+                field_sections.push(s);
             }
 
             // TODO: Do this more efficiently
@@ -350,7 +372,9 @@ pub(crate) fn struct_datatype(
                 .collect::<Vec<_>>();
             s.push_str(&field_sections.join(" & "));
         }
-    })
+    }
+
+    Ok(())
 }
 
 fn enum_variant_datatype(
@@ -358,6 +382,7 @@ fn enum_variant_datatype(
     types: &TypeCollection,
     name: Cow<'static, str>,
     variant: &EnumVariant,
+    prefix: &str,
 ) -> Result<Option<String>> {
     match &variant.fields() {
         // TODO: Remove unreachable in type system
@@ -390,6 +415,7 @@ fn enum_variant_datatype(
                             field.docs(),
                             other,
                             true,
+                            prefix,
                         ))
                     })
                     .collect::<Result<Vec<_>>>()?,
@@ -437,12 +463,13 @@ pub(crate) fn enum_datatype(
     e: &Enum,
     types: &TypeCollection,
     s: &mut String,
+    prefix: &str,
 ) -> Result<()> {
     if e.variants().is_empty() {
         return Ok(write!(s, "{NEVER}")?);
     }
 
-    Ok(match &e.repr().unwrap_or(&EnumRepr::External) {
+    match &e.repr().unwrap_or(&EnumRepr::External) {
         EnumRepr::Untagged => {
             let mut variants = e
                 .variants()
@@ -460,9 +487,11 @@ pub(crate) fn enum_datatype(
                                 types,
                                 name.clone(),
                                 variant,
+                                prefix,
                             )?
                             .expect("Invalid Serde type"),
                             true,
+                            prefix,
                         ),
                     })
                 })
@@ -504,7 +533,13 @@ pub(crate) fn enum_datatype(
 
                                 let mut typ = String::new();
 
-                                unnamed_fields_datatype(ctx.clone(), &fields, types, &mut typ)?;
+                                unnamed_fields_datatype(
+                                    ctx.clone(),
+                                    &fields,
+                                    types,
+                                    &mut typ,
+                                    prefix,
+                                )?;
 
                                 if dont_join_ty {
                                     format!("({{ {tag}: {sanitised_name} }})")
@@ -540,6 +575,7 @@ pub(crate) fn enum_datatype(
                                     types,
                                     variant_name.clone(),
                                     variant,
+                                    prefix,
                                 )?;
                                 let sanitised_name = sanitise_key(variant_name.clone(), false);
 
@@ -559,6 +595,7 @@ pub(crate) fn enum_datatype(
                                     types,
                                     variant_name.clone(),
                                     variant,
+                                    prefix,
                                 )?;
 
                                 let mut s = String::new();
@@ -567,7 +604,7 @@ pub(crate) fn enum_datatype(
 
                                 write!(s, "{tag}: {sanitised_name}")?;
                                 if let Some(ts_value) = ts_value {
-                                    write!(s, "; {content}: {ts_value}")?;
+                                    write!(s, "; {content}: {ts_value}|")?;
                                 }
 
                                 s.push_str(" }");
@@ -613,33 +650,17 @@ pub(crate) fn enum_datatype(
                             }
                         },
                         true,
+                        prefix,
                     ))
                 })
                 .collect::<Result<Vec<_>>>()?;
             variants.dedup();
             s.push_str(&variants.join(" | "));
         }
-    })
-}
+    }
 
-// impl std::fmt::Display for LiteralType {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         match self {
-//             Self::i8(v) => write!(f, "{v}"),
-//             Self::i16(v) => write!(f, "{v}"),
-//             Self::i32(v) => write!(f, "{v}"),
-//             Self::u8(v) => write!(f, "{v}"),
-//             Self::u16(v) => write!(f, "{v}"),
-//             Self::u32(v) => write!(f, "{v}"),
-//             Self::f32(v) => write!(f, "{v}"),
-//             Self::f64(v) => write!(f, "{v}"),
-//             Self::bool(v) => write!(f, "{v}"),
-//             Self::String(v) => write!(f, r#""{v}""#),
-//             Self::char(v) => write!(f, r#""{v}""#),
-//             Self::None => f.write_str(NULL),
-//         }
-//     }
-// }
+    Ok(())
+}
 
 /// convert an object field into a Typescript string
 fn object_field_to_ts(
@@ -904,9 +925,9 @@ impl Builder {
         );
     }
 
-    pub fn push_generic(&mut self, generic: &Generic) {
-        self.push_internal(["@template ", generic.borrow()])
-    }
+    // pub fn push_generic(&mut self, generic: &Generic) {
+    //     self.push_internal(["@template ", generic.borrow()])
+    // }
 
     pub fn build(mut self) -> String {
         if self.value == START {

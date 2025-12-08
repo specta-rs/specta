@@ -80,7 +80,7 @@ pub fn export(
         vec![ndt.name().clone()],
         true,
         Some(ndt.sid()),
-        "",
+        "\t",
     )?;
     result.push(';');
 
@@ -144,7 +144,7 @@ pub(crate) fn typedef_internal(
         vec![dt.name().clone()],
         false,
         Some(dt.sid()),
-        "\t*",
+        "\t*\t",
     )?;
     s.push_str("} ");
     s.push_str(&type_name);
@@ -236,9 +236,10 @@ pub(crate) fn datatype(
                 st,
                 types,
                 s,
+                prefix,
             )?
         }
-        DataType::Enum(e) => enum_dt(s, ts, types, e, location, is_export)?,
+        DataType::Enum(e) => enum_dt(s, ts, types, e, location, is_export, prefix)?,
         DataType::Tuple(t) => tuple_dt(s, ts, types, t, location, is_export)?,
         DataType::Reference(r) => reference_dt(s, ts, types, r, location, is_export)?,
         DataType::Generic(g) => s.push_str(g.borrow()),
@@ -458,6 +459,7 @@ fn enum_dt(
     mut location: Vec<Cow<'static, str>>,
     // TODO: Remove
     is_export: bool,
+    prefix: &str,
 ) -> Result<(), Error> {
     // TODO: Drop legacy stuff
     {
@@ -470,6 +472,7 @@ fn enum_dt(
             e,
             types,
             s,
+            prefix,
         )?
     }
 
