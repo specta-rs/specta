@@ -1,8 +1,8 @@
-use std::{borrow::Cow, ops::Deref, path::Path};
+use std::{borrow::Cow, path::Path};
 
 use specta::TypeCollection;
 
-use crate::{BigIntExportBehavior, Error, Typescript};
+use crate::{BigIntExportBehavior, Error, Format, Typescript};
 
 /// JSDoc language exporter.
 #[derive(Debug, Clone)]
@@ -19,6 +19,13 @@ impl From<Typescript> for JSDoc {
     fn from(mut ts: Typescript) -> Self {
         ts.jsdoc = true;
         Self(ts)
+    }
+}
+
+impl From<JSDoc> for Typescript {
+    fn from(mut jsdoc: JSDoc) -> Self {
+        jsdoc.0.jsdoc = false;
+        jsdoc.0
     }
 }
 
@@ -47,6 +54,11 @@ impl JSDoc {
         Self(self.0.bigint(bigint))
     }
 
+    /// Configure the format
+    pub fn format(self, format: Format) -> Self {
+        Self(self.0.format(format))
+    }
+
     /// TODO: Explain
     pub fn with_serde(self) -> Self {
         Self(self.0.with_serde())
@@ -60,13 +72,5 @@ impl JSDoc {
     /// TODO
     pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
         self.0.export_to(path, types)
-    }
-}
-
-impl Deref for JSDoc {
-    type Target = Typescript;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }

@@ -14,7 +14,7 @@ use specta::{
 };
 
 use crate::{
-    Any, BigIntExportBehavior, Error, Format, Typescript, Unknown, legacy::js_doc_builder,
+    Any, BigIntExportBehavior, Error, Format, JSDoc, Typescript, Unknown, legacy::js_doc_builder,
 };
 
 /// Generate an `export Type = ...` Typescript string for a specific [`DataType`].
@@ -32,10 +32,7 @@ pub fn export(
     let generics = (!ndt.generics().is_empty())
         .then(|| {
             iter::once("<")
-                .chain(intersperse(
-                    ndt.generics().into_iter().map(|g| g.borrow()),
-                    ", ",
-                ))
+                .chain(intersperse(ndt.generics().iter().map(|g| g.borrow()), ", "))
                 .chain(iter::once(">"))
         })
         .into_iter()
@@ -52,7 +49,7 @@ pub fn export(
         &match ts.format {
             Format::ModulePrefixedName => {
                 let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
-                s.push_str("_");
+                s.push('_');
                 s.push_str(ndt.name());
                 Cow::Owned(s)
             }
@@ -62,7 +59,7 @@ pub fn export(
     .leak(); // TODO: Leaking bad
 
     let s = iter::empty()
-        .chain(["export type ", &name])
+        .chain(["export type ", name])
         .chain(generics)
         .chain([" = "])
         .collect::<String>();
@@ -81,7 +78,85 @@ pub fn export(
         true,
         Some(ndt.sid()),
     )?;
-    result.push_str(";");
+    result.push(';');
+
+    Ok(result)
+}
+
+/// TODO
+///
+pub fn typedef(js: &JSDoc, types: &TypeCollection, dt: &NamedDataType) -> Result<String, Error> {
+    typedef_internal(&js.0, types, dt)
+}
+
+// This can be used internally to prevent cloning `Typescript` instances.
+// Externally this shouldn't be a concern so we don't expose it.
+pub(crate) fn typedef_internal(
+    ts: &Typescript,
+    types: &TypeCollection,
+    dt: &NamedDataType,
+) -> Result<String, Error> {
+    let generics = (!dt.generics().is_empty())
+        .then(|| {
+            iter::once("<")
+                .chain(intersperse(dt.generics().iter().map(|g| g.borrow()), ", "))
+                .chain(iter::once(">"))
+        })
+        .into_iter()
+        .flatten();
+
+    let name = dt.name();
+    let type_name = iter::empty()
+        .chain([name.as_ref()])
+        .chain(generics)
+        .collect::<String>();
+
+    // Generate the type definition
+    let mut type_def = String::new();
+    datatype(
+        &mut type_def,
+        ts,
+        types,
+        dt.ty(),
+        vec![dt.name().clone()],
+        false,
+        Some(dt.sid()),
+    )?;
+
+    // Build JSDoc @typedef comment
+    let mut result = String::new();
+
+    // Add JSDoc comment block
+    result.push_str("/**\n");
+
+    // Add documentation if present
+    // if let Some(docs) = dt.docs() {
+    //     for line in docs.lines() {
+    //         result.push_str(" * ");
+    //         result.push_str(line);
+    //         result.push('\n');
+    //     }
+    //     result.push_str(" *\n");
+    // }
+
+    // Add deprecated notice if applicable
+    // if let Some(deprecated) = dt.deprecated() {
+    //     result.push_str(" * @deprecated");
+    //     if let Some(note) = deprecated.note() {
+    //         result.push(' ');
+    //         result.push_str(note);
+    //     }
+    //     result.push('\n');
+    //     result.push_str(" *\n");
+    // }
+
+    // Add the @typedef declaration
+    result.push_str(" * @typedef {");
+    result.push_str(&type_def);
+    result.push_str("} ");
+    result.push_str(&type_name);
+    result.push('\n');
+    result.push_str(" */");
 
     Ok(result)
 }
@@ -91,7 +166,7 @@ pub fn export(
 /// See [`export`] for the list of things to consider when using this.
 pub fn reference(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<String, Error> {
     let mut s = String::new();
-    datatype(&mut s, ts, types, &dt, vec![], false, None)?;
+    datatype(&mut s, ts, types, dt, vec![], false, None)?;
     Ok(s)
 }
 
@@ -104,7 +179,7 @@ pub fn reference(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Resu
 ///
 pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<String, Error> {
     let mut dt = dt.clone();
-    crate::inline::inline(&mut dt, &types);
+    crate::inline::inline(&mut dt, types);
     let mut s = String::new();
     datatype(&mut s, ts, types, &dt, vec![], false, None)?;
     Ok(s)
@@ -149,9 +224,9 @@ pub(crate) fn datatype(
                 s,
             )?;
 
-            let or_null = format!(" | null");
+            let or_null = " | null";
             if !s.ends_with(&or_null) {
-                s.push_str(&or_null);
+                s.push_str(or_null);
             }
 
             // datatype(s, ts, types, &*t, location, state)?;
