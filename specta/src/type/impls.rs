@@ -7,8 +7,20 @@ impl_primitives!(
     u8 u16 u32 u64 u128 usize
     f32 f64
     bool char
-    String
+    // String
 );
+
+// const TODO: Reference = Reference::
+impl Type for String {
+    fn definition(types: &mut TypeCollection) -> DataType {
+        DataType::Primitive(Primitive::String)
+    }
+
+    // TODO: We can't make it so the reference is in the `TypeMap` without `&mut` which breaks exporters.
+    // fn reference() -> Reference {
+    //     todo!();
+    // }
+}
 
 // TODO: Reenable this at some point. It's being really annoying.
 // #[cfg(feature = "nightly")]
@@ -59,6 +71,7 @@ impl<'a, T: ?Sized + ToOwned + Type + 'static> Type for std::borrow::Cow<'a, T> 
     impl_passthrough!(T);
 }
 
+use std::cell::Ref;
 use std::ffi::*;
 impl_as!(
     str as String

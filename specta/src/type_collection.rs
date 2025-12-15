@@ -5,9 +5,9 @@ use std::{
 };
 
 use crate::{
+    NamedType, SpectaID,
     builder::NamedDataTypeBuilder,
     datatype::{NamedDataType, Reference},
-    NamedType, SpectaID,
 };
 
 /// Define a set of types which can be exported together.
@@ -47,26 +47,28 @@ impl TypeCollection {
     ///
     /// This method will return an error if the type_map is full. This will happen after `u64::MAX` calls to this method.
     pub fn create(&mut self, ndt: NamedDataTypeBuilder) -> Result<Reference, ()> {
-        let sid = crate::specta_id::r#virtual(saturating_add(&self.virtual_sid, 1));
-        self.map.insert(
-            sid,
-            Some(NamedDataType {
-                name: ndt.name,
-                docs: ndt.docs,
-                deprecated: ndt.deprecated,
-                sid,
-                module_path: ndt.module_path,
-                location: ndt.location,
-                generics: ndt.generics,
-                inner: ndt.inner,
-            }),
-        );
+        // let sid = crate::specta_id::r#virtual(saturating_add(&self.virtual_sid, 1));
+        // self.map.insert(
+        //     sid,
+        //     Some(NamedDataType {
+        //         name: ndt.name,
+        //         docs: ndt.docs,
+        //         deprecated: ndt.deprecated,
+        //         sid,
+        //         module_path: ndt.module_path,
+        //         location: ndt.location,
+        //         generics: ndt.generics,
+        //         inner: ndt.inner,
+        //     }),
+        // );
 
-        Ok(Reference {
-            sid,
-            generics: Default::default(), // TODO: We need this to be configurable.
-            inline: false,
-        })
+        // Ok(Reference {
+        //     id,
+        //     sid,
+        //     generics: Default::default(), // TODO: We need this to be configurable.
+        //     inline: false,
+        // })
+        todo!();
     }
 
     /// Remove a type from the collection.

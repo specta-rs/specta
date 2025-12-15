@@ -13,6 +13,7 @@ mod reference;
 mod r#struct;
 mod tuple;
 
+pub use r#enum::{Enum, EnumRepr, EnumVariant};
 pub use fields::{Field, Fields, NamedFields, UnnamedFields};
 pub use function::{Function, FunctionReturnType};
 pub use generic::{ConstGenericPlaceholder, Generic, GenericPlaceholder};
@@ -21,9 +22,8 @@ pub use literal::Literal;
 pub use map::Map;
 pub use named::{DeprecatedType, NamedDataType};
 pub use primitive::Primitive;
-pub use r#enum::{Enum, EnumRepr, EnumVariant};
+pub use reference::{Reference, ReferenceToken};
 pub use r#struct::Struct;
-pub use reference::Reference;
 pub use tuple::Tuple;
 
 /// Runtime type-erased representation of a Rust type.
@@ -39,6 +39,6 @@ pub enum DataType {
     Struct(Struct),
     Enum(Enum),
     Tuple(Tuple),
-    Reference(reference::Reference),
+    Reference(Reference),
     Generic(Generic),
 }

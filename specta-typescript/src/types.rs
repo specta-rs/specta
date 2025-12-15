@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 
 use specta::{
-    datatype::{DataType, Reference},
     NamedType, Type, TypeCollection,
+    datatype::{DataType, Reference, ReferenceToken},
 };
 
 /// Cast a Rust type to a Typescript `any` type.
@@ -39,9 +39,18 @@ use specta::{
 /// ```
 pub struct Any<T = ()>(T);
 
+static ANY: ReferenceToken = ReferenceToken;
+
 impl<T> Type for Any<T> {
-    fn definition(types: &mut TypeCollection) -> DataType {
-        DataType::Reference(Reference::construct(Self::ID, [], false))
+    fn definition(_: &mut TypeCollection) -> DataType {
+        println!("PTR EQ: {:?}", std::ptr::eq(&ANY, &ANY));
+
+        println!(
+            "definition: {:?}",
+            Reference::opaque2(&ANY).ref_eq(&Reference::opaque2(&ANY))
+        );
+
+        DataType::Reference(Reference::opaque2(&ANY))
     }
 }
 
@@ -114,8 +123,8 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
 pub struct Unknown<T = ()>(T);
 
 impl<T> Type for Unknown<T> {
-    fn definition(types: &mut TypeCollection) -> DataType {
-        DataType::Reference(Reference::construct(Self::ID, [], false))
+    fn definition(_: &mut TypeCollection) -> DataType {
+        DataType::Reference(Reference::opaque())
     }
 }
 
@@ -188,8 +197,8 @@ impl<T: serde::Serialize> serde::Serialize for Unknown<T> {
 pub struct Never<T = ()>(T);
 
 impl<T> Type for Never<T> {
-    fn definition(types: &mut TypeCollection) -> DataType {
-        DataType::Reference(Reference::construct(Self::ID, [], false))
+    fn definition(_: &mut TypeCollection) -> DataType {
+        DataType::Reference(Reference::opaque())
     }
 }
 

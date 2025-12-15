@@ -9,7 +9,7 @@ use std::{
 };
 
 use specta::{
-    NamedType, SpectaID, TypeCollection,
+    NamedType, SpectaID, Type, TypeCollection,
     datatype::{
         DataType, DeprecatedType, Enum, List, Literal, Map, NamedDataType, Primitive, Reference,
         Tuple,
@@ -155,7 +155,9 @@ pub(crate) fn typedef_internal(
     Ok(s)
 }
 
-/// Generate an Typescript string for a specific [`DataType`].
+/// Generate an Typescript string to refer to a specific [`DataType`].
+///
+/// For primitives this will include the literal type but for named type it will contain a reference.
 ///
 /// See [`export`] for the list of things to consider when using this.
 pub fn reference(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<String, Error> {
@@ -939,6 +941,20 @@ fn reference_dt(
     // TODO: Remove
     is_export: bool,
 ) -> Result<(), Error> {
+    if let Some((_, typescript)) = ts.references.iter().find(|(re, _)| re.ref_eq(r)) {
+        s.push_str(typescript);
+        return Ok(());
+    } else if match Any::<()>::definition(
+        // TODO: Explain invariants here
+        &mut Default::default(),
+    ) {
+        DataType::Reference(re) => re.ref_eq(r),
+        _ => false,
+    } {
+        s.push_str("any");
+        return Ok(());
+    }
+
     // TODO: Legacy stuff
     {
         if r.sid() == Any::<()>::ID {
