@@ -6,23 +6,13 @@ use crate::{SpectaID, specta_id::SpectaIDInner};
 
 use super::{DataType, Generic};
 
-// TODO: Rename?
-// #[derive(Debug, Clone, PartialEq)]
-// pub struct ReferenceToken;
-
-#[derive(Debug, Clone, PartialEq)]
-enum OpaqueReference {
-    // Static(&'static ReferenceToken),
-    Dynamic(ArcId),
-}
-
 /// A reference to a [NamedDataType].
 #[derive(Debug, Clone, PartialEq)]
 pub struct Reference(ReferenceInner);
 
 #[derive(Debug, Clone, PartialEq)]
 enum ReferenceInner {
-    Opaque(OpaqueReference),
+    Opaque(ArcId),
     // TODO: Replace this
     Legacy {
         sid: SpectaID,
@@ -32,74 +22,24 @@ enum ReferenceInner {
 }
 
 impl Reference {
-    // /// TODO
-    // ///
-    // /// TODO:
-    // ///  - Explain cloning semantics
-    // ///  - Explain comparison semantics
-    // ///
-    // pub fn new() -> Reference {
-    //     Reference {
-    //         id: ArcId::default(),
-    //         sid: SpectaID(SpectaIDInner::Virtual(0)), // TODO: Fix this
-    //         generics: Default::default(),
-    //         inline: Default::default(),
-    //     }
-    // }
-
-    // pub fn from(dt: ()) -> Reference {
-    //     // TODO: We need to handle failure of these better.
-    //     // TODO: If the exporter doesn't handle them it's an error.
-
-    //     Reference {
-    //         id: ArcId::default(),
-    //         sid: SpectaID(SpectaIDInner::Virtual(0)), // TODO: Fix this
-    //         generics: Default::default(),
-    //         inline: Default::default(),
-    //     }
-    // }
-
-    // // TODO: Rename
-    // // TODO: Explain invariance?
-    // // TODO: Should we seal this method???
-    // //
-    // // TODO: This is only valid for `static`'s not `const` types.
-    // pub const fn opaque2(base: &'static ReferenceToken) -> Reference {
-    //     Reference(ReferenceInner::Opaque(OpaqueReference::Static(base)))
-    // }
-
-    /// TODO
+    /// Construct a new reference to an opaque type.
+    ///
+    /// An opaque type is unable to represents using the [DataType] system and requires specific exporter integration to handle it.
+    ///
+    /// An opaque [Reference] is equal when cloned and can be compared using the [Self::ref_eq] or [PartialEq].
+    ///
     pub fn opaque() -> Reference {
-        // TODO: We need to handle failure of these better.
-        // TODO: If the exporter doesn't handle them it's an error.
-
-        // Reference {
-        //     id: ArcId::default(),
-        //     sid: SpectaID(SpectaIDInner::Virtual(0)), // TODO: Fix this
-        //     generics: Default::default(),
-        //     inline: Default::default(),
-        // }
-
-        Reference(ReferenceInner::Opaque(OpaqueReference::Dynamic(
-            ArcId::default(),
-        )))
+        Reference(ReferenceInner::Opaque(ArcId::default()))
     }
 
-    /// TODO
+    /// Compare if two references are pointing to the same type.
+    ///
+    /// Unlike `PartialEq::eq`, this method only compares the types, not the generics and inline attributes.
     pub fn ref_eq(&self, other: &Reference) -> bool {
-        println!("{:?} {:?}", self, other);
         match (&self.0, &other.0) {
-            // (
-            //     ReferenceInner::Opaque(OpaqueReference::Static(id1)),
-            //     ReferenceInner::Opaque(OpaqueReference::Static(id2)),
-            // ) => {
-            //     println!(" - A {:p} {:p}", id1, id2);
-            //     std::ptr::eq(*id1, *id2)
-            // }
-            (
-                ReferenceInner::Opaque(OpaqueReference::Dynamic(id1)),
-                ReferenceInner::Opaque(OpaqueReference::Dynamic(id2)),
-            ) => Arc::ptr_eq(&id1.0, &id2.0),
+            (ReferenceInner::Opaque(id1), ReferenceInner::Opaque(id2)) => {
+                Arc::ptr_eq(&id1.0, &id2.0)
+            }
             _ => false,
         }
     }

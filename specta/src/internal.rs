@@ -10,8 +10,8 @@ use std::{borrow::Cow, panic::Location};
 pub use paste::paste;
 
 use crate::{
-    datatype::{DataType, DeprecatedType, Field, Generic, NamedDataType},
     SpectaID, TypeCollection,
+    datatype::{DataType, DeprecatedType, Field, Generic, NamedDataType},
 };
 
 /// Registers a type in the `TypeCollection` if it hasn't been registered already.
@@ -27,7 +27,7 @@ pub fn register(
     build: impl FnOnce(&mut TypeCollection) -> DataType,
 ) -> NamedDataType {
     let location = Location::caller().clone();
-    match types.map.get(&sid) {
+    match types.0.get(&sid) {
         Some(Some(dt)) => dt.clone(),
         // TODO: Explain this
         Some(None) => NamedDataType {
@@ -41,7 +41,7 @@ pub fn register(
             inner: DataType::Primitive(crate::datatype::Primitive::i8), // TODO: Fix this
         },
         None => {
-            types.map.entry(sid).or_insert(None);
+            types.0.entry(sid).or_insert(None);
             let dt = NamedDataType {
                 name,
                 docs,
@@ -52,7 +52,7 @@ pub fn register(
                 generics,
                 inner: build(types),
             };
-            types.map.insert(sid, Some(dt.clone()));
+            types.0.insert(sid, Some(dt.clone()));
             dt
         }
     }
@@ -64,7 +64,7 @@ pub fn register(
 pub mod construct {
     use std::borrow::Cow;
 
-    use crate::{datatype::*, Flatten, SpectaID, Type, TypeCollection};
+    use crate::{Flatten, SpectaID, Type, TypeCollection, datatype::*};
 
     pub fn skipped_field(
         optional: bool,
