@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    fmt,
-    sync::atomic::{AtomicU64, Ordering},
-};
+use std::{collections::HashMap, fmt};
 
 use crate::{NamedType, SpectaID, datatype::NamedDataType};
 
@@ -12,7 +8,8 @@ use crate::{NamedType, SpectaID, datatype::NamedDataType};
 /// You can also construct your own collection to easily export a set of types together.
 #[derive(Default, Clone)]
 pub struct TypeCollection(
-    // `None` indicates that the entry is a placeholder. It was reference and we are currently working out it's definition.
+    // `None` indicates that the entry is a placeholder.
+    // It is a reference and we are currently resolving it's definition.
     pub(crate) HashMap<SpectaID, Option<NamedDataType>>,
 );
 

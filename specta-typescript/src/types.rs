@@ -1,4 +1,4 @@
-use std::{fmt::Debug, sync::LazyLock};
+use std::fmt::Debug;
 
 use specta::{
     NamedType, Type, TypeCollection,
@@ -39,10 +39,14 @@ use specta::{
 /// ```
 pub struct Any<T = ()>(T);
 
-pub static ANY_REFERENCE: LazyLock<Reference> = LazyLock::new(Reference::opaque);
+pub static ANY_REFERENCE: Reference = Reference::unsafe_from_fixed_static_reference({
+    static SENTIAL: () = ();
+    &SENTIAL
+});
 
 impl<T> Type for Any<T> {
     fn definition(_: &mut TypeCollection) -> DataType {
+        println!("{:?} {:?}", ANY_REFERENCE, Reference::opaque());
         DataType::Reference(ANY_REFERENCE.clone())
     }
 }
