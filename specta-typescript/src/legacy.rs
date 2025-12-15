@@ -795,8 +795,7 @@ fn validate_type_for_tagged_intersection(
         }
         DataType::Reference(r) => validate_type_for_tagged_intersection(
             ctx,
-            types
-                .get(r.sid())
+            r.get(types)
                 .expect("TypeCollection should have been populated by now")
                 .ty()
                 .clone(),

@@ -145,8 +145,8 @@ fn inner(
         DataType::Reference(r) => {
             if r.inline() || force_inline || truely_force_inline {
                 // TODO: Should we error here? Might get hit for `specta_typescript::Any`
-                if let Some(ty) = types.get(r.sid()) {
-                    let mut ty = ty.ty().clone();
+                if let Some(ndt) = r.get(types) {
+                    let mut ty = ndt.ty().clone();
                     inner(
                         &mut ty,
                         types,

@@ -170,8 +170,12 @@ impl Typescript {
                 ) -> Result<String, Error> {
                     let mut out = String::new();
                     if let Some(types_in_module) = module_types.get_mut(current_module) {
-                        types_in_module
-                            .sort_by(|a, b| a.name().cmp(b.name()).then(a.sid().cmp(&b.sid())));
+                        types_in_module.sort_by(|a, b| {
+                            a.name()
+                                .cmp(&b.name())
+                                .then(a.module_path().cmp(&b.module_path()))
+                                .then(a.location().cmp(&b.location()))
+                        });
                         for ndt in types_in_module {
                             out += &"    ".repeat(indent);
                             // out += &primitives::export(ts, types, ndt)?; // TODO
@@ -227,19 +231,20 @@ impl Typescript {
             Layout::Files => Err(Error::UnableToExport),
             Layout::FlatFile | Layout::ModulePrefixedName => {
                 if self.layout == Layout::FlatFile {
-                    let mut map = HashMap::with_capacity(types.len());
-                    for dt in types.into_unsorted_iter() {
-                        if let Some((existing_sid, existing_impl_location)) =
-                            map.insert(dt.name().clone(), (dt.sid(), dt.location()))
-                        {
-                            if existing_sid != dt.sid() {
-                                return Err(Error::DuplicateTypeName {
-                                    types: (dt.location(), existing_impl_location),
-                                    name: dt.name().clone(),
-                                });
-                            }
-                        }
-                    }
+                    // let mut map = HashMap::with_capacity(types.len());
+                    // for dt in types.into_unsorted_iter() {
+                    //     if let Some((existing_sid, existing_impl_location)) =
+                    //         map.insert(dt.name().clone(), (dt.sid(), dt.location()))
+                    //     {
+                    //         if existing_sid != dt.sid() {
+                    //             return Err(Error::DuplicateTypeName {
+                    //                 types: (dt.location(), existing_impl_location),
+                    //                 name: dt.name().clone(),
+                    //             });
+                    //         }
+                    //     }
+                    // }
+                    todo!();
                 }
 
                 self.export_internal(types.into_sorted_iter(), [].into_iter(), types)
@@ -250,7 +255,7 @@ impl Typescript {
     fn export_internal(
         &self,
         ndts: impl Iterator<Item = NamedDataType>,
-        references: impl Iterator<Item = SpectaID>,
+        references: impl Iterator<Item = ()>, // TODO: SpectaID
         types: &TypeCollection,
     ) -> Result<String, Error> {
         let mut out = self.header.to_string();
@@ -264,32 +269,32 @@ impl Typescript {
             out += "\n/**";
         }
 
-        for sid in references {
-            let ndt = types.get(sid).unwrap();
+        // for sid in references {
+        //     let ndt = types.get(sid).unwrap();
 
-            if self.jsdoc {
-                out += "\n\t* @import";
-            } else {
-                out += "\nimport type";
-            }
+        //     if self.jsdoc {
+        //         out += "\n\t* @import";
+        //     } else {
+        //         out += "\nimport type";
+        //     }
 
-            out += " { ";
-            out += ndt.name();
-            out += " as ";
-            out += &ndt.module_path().replace("::", "_");
-            out += "_";
-            out += ndt.name();
-            out += " } from \"";
+        //     out += " { ";
+        //     out += ndt.name();
+        //     out += " as ";
+        //     out += &ndt.module_path().replace("::", "_");
+        //     out += "_";
+        //     out += ndt.name();
+        //     out += " } from \"";
 
-            let depth = ndt.module_path().split("::").count();
-            out += "./";
-            for _ in 2..depth {
-                out += "../";
-            }
+        //     let depth = ndt.module_path().split("::").count();
+        //     out += "./";
+        //     for _ in 2..depth {
+        //         out += "../";
+        //     }
 
-            out += &ndt.module_path().replace("::", "/");
-            out += "\";";
-        }
+        //     out += &ndt.module_path().replace("::", "/");
+        //     out += "\";";
+        // }
 
         if self.jsdoc {
             out += "\n\t*/";
@@ -346,9 +351,10 @@ impl Typescript {
                 }
 
                 let mut references = BTreeSet::new();
-                for ndt in ndts.iter() {
-                    crawl_references(ndt.ty(), &mut references);
-                }
+                // for ndt in ndts.iter() {
+                //     crawl_references(ndt.ty(), &mut references);
+                // }
+                todo!();
 
                 std::fs::write(
                     &path,
@@ -400,55 +406,55 @@ impl Typescript {
     }
 }
 
-fn crawl_references(dt: &DataType, references: &mut BTreeSet<SpectaID>) {
-    match dt {
-        DataType::Primitive(..) | DataType::Literal(..) => {}
-        DataType::List(list) => {
-            crawl_references(list.ty(), references);
-        }
-        DataType::Map(map) => {
-            crawl_references(map.key_ty(), references);
-            crawl_references(map.value_ty(), references);
-        }
-        DataType::Nullable(dt) => {
-            crawl_references(dt, references);
-        }
-        DataType::Struct(s) => {
-            crawl_references_fields(s.fields(), references);
-        }
-        DataType::Enum(e) => {
-            for (_, variant) in e.variants() {
-                crawl_references_fields(variant.fields(), references);
-            }
-        }
-        DataType::Tuple(tuple) => {
-            for field in tuple.elements() {
-                crawl_references(field, references);
-            }
-        }
-        DataType::Reference(reference) => {
-            references.insert(reference.sid());
-        }
-        DataType::Generic(_) => {}
-    }
-}
+// fn crawl_references(dt: &DataType, references: &mut BTreeSet<SpectaID>) {
+//     match dt {
+//         DataType::Primitive(..) | DataType::Literal(..) => {}
+//         DataType::List(list) => {
+//             crawl_references(list.ty(), references);
+//         }
+//         DataType::Map(map) => {
+//             crawl_references(map.key_ty(), references);
+//             crawl_references(map.value_ty(), references);
+//         }
+//         DataType::Nullable(dt) => {
+//             crawl_references(dt, references);
+//         }
+//         DataType::Struct(s) => {
+//             crawl_references_fields(s.fields(), references);
+//         }
+//         DataType::Enum(e) => {
+//             for (_, variant) in e.variants() {
+//                 crawl_references_fields(variant.fields(), references);
+//             }
+//         }
+//         DataType::Tuple(tuple) => {
+//             for field in tuple.elements() {
+//                 crawl_references(field, references);
+//             }
+//         }
+//         DataType::Reference(reference) => {
+//             references.insert(reference.sid());
+//         }
+//         DataType::Generic(_) => {}
+//     }
+// }
 
-fn crawl_references_fields(fields: &Fields, references: &mut BTreeSet<SpectaID>) {
-    match fields {
-        Fields::Unit => {}
-        Fields::Unnamed(fields) => {
-            for field in fields.fields() {
-                if let Some(ty) = field.ty() {
-                    crawl_references(ty, references);
-                }
-            }
-        }
-        Fields::Named(fields) => {
-            for (_, field) in fields.fields() {
-                if let Some(ty) = field.ty() {
-                    crawl_references(ty, references);
-                }
-            }
-        }
-    }
-}
+// fn crawl_references_fields(fields: &Fields, references: &mut BTreeSet<SpectaID>) {
+//     match fields {
+//         Fields::Unit => {}
+//         Fields::Unnamed(fields) => {
+//             for field in fields.fields() {
+//                 if let Some(ty) = field.ty() {
+//                     crawl_references(ty, references);
+//                 }
+//             }
+//         }
+//         Fields::Named(fields) => {
+//             for (_, field) in fields.fields() {
+//                 if let Some(ty) = field.ty() {
+//                     crawl_references(ty, references);
+//                 }
+//             }
+//         }
+//     }
+// }

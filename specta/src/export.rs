@@ -5,6 +5,7 @@ use crate::{Type, TypeCollection};
 // Global type store for collecting custom types to export.
 //
 // We intentionally store functions over a `TypeCollection` directly to ensure any internal panics aren't done in CTOR.
+#[allow(clippy::type_complexity)]
 static TYPES: OnceLock<Mutex<Vec<fn(&mut TypeCollection)>>> = OnceLock::new();
 
 /// Get the global type store containing all automatically registered types.

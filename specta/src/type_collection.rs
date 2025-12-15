@@ -56,11 +56,11 @@ impl TypeCollection {
             .iter()
             .filter_map(|(_, ndt)| ndt.clone())
             .collect::<Vec<_>>();
-        v.sort_by(|x, y| {
-            x.name
-                .cmp(&y.name)
-                .then(x.module_path.cmp(&y.module_path))
-                .then(x.location.cmp(&y.location))
+        v.sort_by(|a, b| {
+            a.name
+                .cmp(&b.name)
+                .then(a.module_path.cmp(&b.module_path))
+                .then(a.location.cmp(&b.location))
         });
         v.into_iter()
     }

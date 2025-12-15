@@ -10,11 +10,20 @@ use super::{DataType, Generic};
 #[derive(Debug, Clone, PartialEq)]
 pub struct Reference {
     pub(crate) id: ArcId,
+    // TODO: Should this be a map-type???
     pub(crate) generics: Vec<(Generic, DataType)>, // TODO: Cow<'static, [(Generic, DataType)]>,
     pub(crate) inline: bool,
 }
 
 impl Reference {
+    #[doc(hidden)] // TODO: I wanna remove this and come up with a better solution for `specta-serde`.
+    pub fn type_identifier(&self) -> String {
+        match &self.id {
+            ArcId::Static(id) => format!("s:{:p}", *id),
+            ArcId::Dynamic(id) => format!("d:{}", Arc::as_ptr(id) as u128),
+        }
+    }
+
     /// Get a reference to a [NamedDataType] from a [TypeCollection].
     pub fn get<'a>(&self, types: &'a TypeCollection) -> Option<&'a NamedDataType> {
         types.0.get(&self.id)?.as_ref()
@@ -31,7 +40,6 @@ impl Reference {
     pub fn opaque() -> Self {
         Self {
             id: ArcId::Dynamic(Default::default()),
-            // TODO: Allow these to be mutable would break invariant.
             generics: Vec::with_capacity(0),
             inline: false,
         }
@@ -47,7 +55,6 @@ impl Reference {
     pub const fn opaque_from_sentinel(sentinel: &'static ()) -> Reference {
         Self {
             id: ArcId::Static(sentinel),
-            // TODO: Allow these to be mutable would break invariant.
             generics: Vec::new(),
             inline: false,
         }

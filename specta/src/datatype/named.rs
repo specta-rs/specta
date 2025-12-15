@@ -26,7 +26,9 @@ impl NamedDataType {
         sentinel: &'static (),
         build_dt: fn(&mut TypeCollection) -> DataType,
     ) -> Self {
-        // types.0
+        let id = ArcId::Static(sentinel);
+        // types.0.insert(id, None);
+        // types.0.insert(id, Some(build_dt(types)));
 
         todo!();
         // Self {
@@ -45,10 +47,12 @@ impl NamedDataType {
     // TODO: Should this take `&mut TypeCollection` to maintain invariants???
     #[track_caller]
     pub fn new(types: &mut TypeCollection, dt: DataType) -> Self {
+        let id = ArcId::Dynamic(Default::default());
+
         // TODO: Ensure this type is registered into the type collection
 
         Self {
-            id: ArcId::Dynamic(Default::default()),
+            id,
             name: Cow::Borrowed(""),
             docs: Cow::Borrowed(""),
             deprecated: None,

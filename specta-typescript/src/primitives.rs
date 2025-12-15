@@ -75,7 +75,7 @@ pub fn export(
         ndt.ty(),
         vec![ndt.name().clone()],
         true,
-        Some(ndt.sid()),
+        todo!(), // TODO: Some(ndt.sid()),
         "\t",
     )?;
     result.push_str(";\n");
@@ -144,7 +144,7 @@ pub(crate) fn typedef_internal(
         dt.ty(),
         vec![dt.name().clone()],
         false,
-        Some(dt.sid()),
+        todo!(), // TODO: Some(dt.sid()),
         "\t*\t",
     )?;
     s.push_str("} ");
@@ -398,8 +398,8 @@ fn map_dt(
             match dt {
                 DataType::Enum(e) => e.variants().iter().filter(|(_, v)| !v.skip()).count() == 0,
                 DataType::Reference(r) => {
-                    if let Some(ty) = types.get(r.sid()) {
-                        is_exhaustive(ty.ty(), types)
+                    if let Some(ndt) = r.get(types) {
+                        is_exhaustive(ndt.ty(), types)
                     } else {
                         false
                     }
@@ -947,7 +947,7 @@ fn reference_dt(
     }
     // TODO: Legacy stuff
     {
-        let ndt = types.get(r.sid()).unwrap(); // TODO: Error handling
+        let ndt = r.get(types).unwrap(); // TODO: Error handling
 
         let name = match ts.layout {
             Layout::ModulePrefixedName => {
