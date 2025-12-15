@@ -19,17 +19,6 @@ pub fn validate(types: &TypeCollection) -> Result<(), Error> {
     Ok(())
 }
 
-// TODO: Remove this once we redo the Typescript exporter.
-pub fn validate_dt(ty: &DataType, types: &TypeCollection) -> Result<(), Error> {
-    inner(ty, &types, &[], &mut Default::default())?;
-
-    for ndt in types.into_unsorted_iter() {
-        inner(ndt.ty(), &types, &[], &mut Default::default())?;
-    }
-
-    Ok(())
-}
-
 fn inner(
     dt: &DataType,
     types: &TypeCollection,

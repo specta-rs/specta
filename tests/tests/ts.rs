@@ -29,7 +29,7 @@ pub fn assert_ts_export2<T: Type>() -> Result<String, String> {
 pub fn assert_ts_inline2<T: Type>() -> Result<String, String> {
     let mut types = TypeCollection::default();
     let dt = T::definition(&mut types);
-    specta_serde::validate_dt(&dt, &types).map_err(|e| e.to_string())?;
+    specta_serde::validate(&types).map_err(|e| e.to_string())?;
     specta_typescript::primitives::inline(
         &Typescript::default().bigint(BigIntExportBehavior::Number),
         &types,

@@ -4,60 +4,12 @@
 //!
 //! DO NOT USE THEM! You have been warned!
 
-use std::{borrow::Cow, panic::Location};
+use std::borrow::Cow;
 
 #[cfg(feature = "function")]
 pub use paste::paste;
 
-use crate::{
-    TypeCollection,
-    datatype::{ArcId, DataType, DeprecatedType, Field, Generic, NamedDataType},
-};
-
-/// Registers a type in the `TypeCollection` if it hasn't been registered already.
-/// This accounts for recursive types.
-pub fn register(
-    types: &mut TypeCollection,
-    name: Cow<'static, str>,
-    docs: Cow<'static, str>,
-    deprecated: Option<DeprecatedType>,
-    sentinel: &'static (),
-    module_path: Cow<'static, str>,
-    generics: Vec<Generic>,
-    build: impl FnOnce(&mut TypeCollection) -> DataType,
-) -> NamedDataType {
-    let location = Location::caller().clone();
-    // match types.0.get(&sid) {
-    //     Some(Some(dt)) => dt.clone(),
-    //     // TODO: Explain this
-    //     Some(None) => NamedDataType {
-    //         id: ArcId::Static(sentinel),
-    //         name,
-    //         docs,
-    //         deprecated,
-    //         module_path,
-    //         location,
-    //         generics,
-    //         inner: DataType::Primitive(crate::datatype::Primitive::i8), // TODO: Fix this
-    //     },
-    //     None => {
-    //         types.0.entry(sid).or_insert(None);
-    //         let dt = NamedDataType {
-    //             name,
-    //             docs,
-    //             deprecated,
-    //             sid,
-    //             module_path,
-    //             location,
-    //             generics,
-    //             inner: build(types),
-    //         };
-    //         types.0.insert(sid, Some(dt.clone()));
-    //         dt
-    //     }
-    // }
-    todo!();
-}
+use crate::datatype::{DataType, Field};
 
 /// Functions used to construct `crate::datatype` types (they have private fields so can't be constructed directly).
 /// We intentionally keep their fields private so we can modify them without a major version bump.
