@@ -1,13 +1,14 @@
 use std::{borrow::Cow, panic::Location};
 
-use crate::SpectaID;
-
-use super::{DataType, Generic};
+use crate::{
+    DataType, TypeCollection,
+    datatype::{Generic, Reference, reference::ArcId},
+};
 
 /// A named type represents a non-primitive type capable of being exported as it's own named entity.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NamedDataType {
-    pub(crate) sid: SpectaID,
+    pub(crate) id: ArcId,
     pub(crate) name: Cow<'static, str>,
     pub(crate) docs: Cow<'static, str>,
     pub(crate) deprecated: Option<DeprecatedType>,
@@ -18,14 +19,55 @@ pub struct NamedDataType {
 }
 
 impl NamedDataType {
-    /// The Specta unique identifier for the type
-    pub fn sid(&self) -> SpectaID {
-        self.sid
+    // TODO: Explain invariants on sentinel
+    #[doc(hidden)] // This should not be used outside of `specta_macros` as it may have breaking changes.
+    pub fn init_with_sentinel(
+        types: &mut TypeCollection,
+        sentinel: &'static (),
+        build_dt: fn(&mut TypeCollection) -> DataType,
+    ) -> Self {
+        // types.0
+
+        todo!();
+        // Self {
+        //     id: ArcId::Static(sentinel),
+        //     name: Cow::Borrowed(""),
+        //     docs: Cow::Borrowed(""),
+        //     deprecated: None,
+        //     module_path: Cow::Borrowed(""),
+        //     location: Location::caller().to_owned(),
+        //     generics: Vec::new(),
+        //     inner: dt,
+        // }
     }
 
-    /// Set the Specta unique identifier for the type
-    pub fn set_sid(&mut self, sid: SpectaID) {
-        self.sid = sid;
+    /// TODO
+    // TODO: Should this take `&mut TypeCollection` to maintain invariants???
+    #[track_caller]
+    pub fn new(types: &mut TypeCollection, dt: DataType) -> Self {
+        // TODO: Ensure this type is registered into the type collection
+
+        Self {
+            id: ArcId::Dynamic(Default::default()),
+            name: Cow::Borrowed(""),
+            docs: Cow::Borrowed(""),
+            deprecated: None,
+            module_path: Cow::Borrowed(""),
+            location: Location::caller().to_owned(),
+            generics: Vec::new(),
+            inner: dt,
+        }
+    }
+
+    /// TODO
+    // TODO: Problematic to seal + allow generics to be `Cow`
+    // TODO: HashMap instead of array for better typesafety??
+    pub fn reference(&self, generics: Vec<(Generic, DataType)>, inline: bool) -> Reference {
+        Reference {
+            id: self.id.clone(),
+            generics,
+            inline,
+        }
     }
 
     /// The name of the type

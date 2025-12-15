@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use specta::{
-    NamedType, Type, TypeCollection,
+    Type, TypeCollection,
     datatype::{DataType, Reference},
 };
 
@@ -39,7 +39,7 @@ use specta::{
 /// ```
 pub struct Any<T = ()>(T);
 
-pub(crate) static ANY_REFERENCE: Reference = Reference::unsafe_from_fixed_static_reference({
+pub(crate) static ANY_REFERENCE: Reference = Reference::opaque_from_sentinel({
     static SENTINEL: () = ();
     &SENTINEL
 });
@@ -48,13 +48,6 @@ impl<T> Type for Any<T> {
     fn definition(_: &mut TypeCollection) -> DataType {
         DataType::Reference(ANY_REFERENCE.clone())
     }
-}
-
-impl<T> NamedType for Any<T> {
-    const ID: specta::SpectaID = specta::internal::construct::sid(
-        "Any",
-        concat!("::", module_path!(), ":", line!(), ":", column!()),
-    );
 }
 
 impl<T: Debug> Debug for Any<T> {
@@ -118,7 +111,7 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
 /// ```
 pub struct Unknown<T = ()>(T);
 
-pub(crate) static UNKNOWN_REFERENCE: Reference = Reference::unsafe_from_fixed_static_reference({
+pub(crate) static UNKNOWN_REFERENCE: Reference = Reference::opaque_from_sentinel({
     static SENTINEL: () = ();
     &SENTINEL
 });
@@ -127,13 +120,6 @@ impl<T> Type for Unknown<T> {
     fn definition(_: &mut TypeCollection) -> DataType {
         DataType::Reference(UNKNOWN_REFERENCE.clone())
     }
-}
-
-impl<T> NamedType for Unknown<T> {
-    const ID: specta::SpectaID = specta::internal::construct::sid(
-        "Unknown",
-        concat!("::", module_path!(), ":", line!(), ":", column!()),
-    );
 }
 
 impl<T: Debug> Debug for Unknown<T> {
@@ -197,7 +183,7 @@ impl<T: serde::Serialize> serde::Serialize for Unknown<T> {
 /// ```
 pub struct Never<T = ()>(T);
 
-pub(crate) static NEVER_REFERENCE: Reference = Reference::unsafe_from_fixed_static_reference({
+pub(crate) static NEVER_REFERENCE: Reference = Reference::opaque_from_sentinel({
     static SENTINEL: () = ();
     &SENTINEL
 });
@@ -206,13 +192,6 @@ impl<T> Type for Never<T> {
     fn definition(_: &mut TypeCollection) -> DataType {
         DataType::Reference(NEVER_REFERENCE.clone())
     }
-}
-
-impl<T> NamedType for Never<T> {
-    const ID: specta::SpectaID = specta::internal::construct::sid(
-        "Unknown",
-        concat!("::", module_path!(), ":", line!(), ":", column!()),
-    );
 }
 
 impl<T: Debug> Debug for Never<T> {

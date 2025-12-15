@@ -1,18 +1,25 @@
 //! Helpers for generating [Type::reference] implementations
 
-use std::{borrow::Cow, fmt, hash, sync::Arc};
+use std::{fmt, hash, sync::Arc};
+
+use crate::{TypeCollection, datatype::NamedDataType};
 
 use super::{DataType, Generic};
 
 /// A reference to a [NamedDataType].
 #[derive(Debug, Clone, PartialEq)]
 pub struct Reference {
-    id: ArcId,
-    generics: Cow<'static, [(Generic, DataType)]>,
-    inline: bool,
+    pub(crate) id: ArcId,
+    pub(crate) generics: Vec<(Generic, DataType)>, // TODO: Cow<'static, [(Generic, DataType)]>,
+    pub(crate) inline: bool,
 }
 
 impl Reference {
+    /// Get a reference to a [NamedDataType] from a [TypeCollection].
+    pub fn get<'a>(&self, types: &'a TypeCollection) -> Option<&'a NamedDataType> {
+        types.0.get(&self.id)?.as_ref()
+    }
+
     /// Construct a new reference to an opaque type.
     ///
     /// An opaque type is unable to represents using the [DataType] system and requires specific exporter integration to handle it.
@@ -21,82 +28,47 @@ impl Reference {
     ///
     /// An opaque [Reference] is equal when cloned and can be compared using the [Self::ref_eq] or [PartialEq].
     ///
-    pub fn opaque() -> Reference {
-        Reference {
+    pub fn opaque() -> Self {
+        Self {
             id: ArcId::Dynamic(Default::default()),
             // TODO: Allow these to be mutable would break invariant.
-            generics: Cow::Borrowed(&[]),
+            generics: Vec::with_capacity(0),
             inline: false,
         }
     }
 
-    // pub const fn todo(generics: &'static [(Generic, DataType)], ) -> Reference {
-    //     todo!();
-    // }
-
+    // TODO: Remove this
     /// Construct a new reference to a type with a fixed reference.
     ///
     /// # Safety
     ///
     /// It's critical that this reference points to a `static ...: () = ();` which is uniquely created for this reference. If it points to a `const` or `Box::leak`d value, the reference will not maintain it's invariants.
     ///
-    pub const fn unsafe_from_fixed_static_reference(s: &'static ()) -> Reference {
-        // Reference(ReferenceInner::Opaque(ArcId::Static(s)))
-        todo!();
+    pub const fn opaque_from_sentinel(sentinel: &'static ()) -> Reference {
+        Self {
+            id: ArcId::Static(sentinel),
+            // TODO: Allow these to be mutable would break invariant.
+            generics: Vec::new(),
+            inline: false,
+        }
     }
 
     /// Compare if two references are pointing to the same type.
     ///
     /// Unlike `PartialEq::eq`, this method only compares the types, not the generics, inline and other reference attributes.
-    pub fn ref_eq(&self, other: &Reference) -> bool {
+    pub fn ref_eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 
-    // // TODO: Remove this method
-    // /// TODO: Explain invariant.
-    // pub fn construct(
-    //     sid: SpectaID,
-    //     generics: impl Into<Vec<(Generic, DataType)>>,
-    //     inline: bool,
-    // ) -> Self {
-    //     Self(ReferenceInner::Legacy {
-    //         sid,
-    //         generics: generics.into(),
-    //         inline,
-    //     })
-    // }
+    /// Get the generic parameters set on this reference which will be filled in by the [NamedDataType].
+    pub fn generics(&self) -> &[(Generic, DataType)] {
+        &self.generics
+    }
 
-    // /// Get the [SpectaID] of the [NamedDataType] this [Reference] points to.
-    // pub fn sid(&self) -> SpectaID {
-    //     match &self.0 {
-    //         ReferenceInner::Opaque { .. } => SpectaID(SpectaIDInner::Virtual(0)), // TODO: Fix this
-    //         ReferenceInner::Legacy { sid, .. } => *sid,
-    //     }
-    // }
-
-    // /// Get the generic parameters set on this reference which will be filled in by the [NamedDataType].
-    // pub fn generics(&self) -> &[(Generic, DataType)] {
-    //     match &self.0 {
-    //         ReferenceInner::Opaque { .. } => &[],
-    //         ReferenceInner::Legacy { generics, .. } => generics,
-    //     }
-    // }
-
-    // /// Get the generic parameters set on this reference which will be filled in by the [NamedDataType].
-    // pub fn generics_mut(&mut self) -> &mut Vec<(Generic, DataType)> {
-    //     match &mut self.0 {
-    //         ReferenceInner::Opaque { .. } => todo!(), // TODO: Fix this
-    //         ReferenceInner::Legacy { generics, .. } => generics,
-    //     }
-    // }
-
-    // /// Get whether this reference should be inlined
-    // pub fn inline(&self) -> bool {
-    //     match &self.0 {
-    //         ReferenceInner::Opaque { .. } => false,
-    //         ReferenceInner::Legacy { inline, .. } => *inline,
-    //     }
-    // }
+    /// Get whether this reference should be inlined
+    pub fn inline(&self) -> bool {
+        self.inline
+    }
 }
 
 impl From<Reference> for DataType {
@@ -105,12 +77,14 @@ impl From<Reference> for DataType {
     }
 }
 
+/// A unique identifier for a type.
+///
 /// `Arc<()>` is a great way of creating a virtual ID which
 /// can be compared to itself but for any types defined with the macro
 /// it requires a program-length allocation which is cringe so we use the pointer
 /// to a static which is much more error-prone.
 #[derive(Clone)]
-enum ArcId {
+pub(crate) enum ArcId {
     // A pointer to a `static ...: ()`.
     // These are all given a unique pointer.
     Static(&'static ()),

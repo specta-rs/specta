@@ -26,6 +26,9 @@ pub use reference::Reference;
 pub use r#struct::Struct;
 pub use tuple::Tuple;
 
+// TODO: Remove this
+pub(crate) use reference::ArcId;
+
 /// Runtime type-erased representation of a Rust type.
 ///
 /// A language exporter takes this general format and converts it into a language specific syntax.

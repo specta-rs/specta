@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use specta::{
-    SpectaID, TypeCollection,
-    datatype::{DataType, Enum, EnumRepr, Fields, Generic, Literal, Primitive},
+    TypeCollection,
+    datatype::{DataType, Enum, EnumRepr, Fields, Generic, Literal, Primitive, Reference},
     internal::{skip_fields, skip_fields_named},
 };
 
@@ -34,7 +34,7 @@ fn inner(
     dt: &DataType,
     types: &TypeCollection,
     generics: &[(Generic, DataType)],
-    checked_references: &mut HashSet<SpectaID>,
+    checked_references: &mut HashSet<Reference>,
 ) -> Result<(), Error> {
     match dt {
         DataType::Nullable(ty) => inner(ty, types, generics, checked_references)?,
@@ -80,6 +80,7 @@ fn inner(
             }
         }
         DataType::Reference(r) => {
+            // TODO
             for (_, dt) in r.generics() {
                 inner(dt, types, &[], checked_references)?;
             }
@@ -166,8 +167,10 @@ fn is_valid_map_key(
             Ok(())
         }
         DataType::Reference(r) => {
-            let ty = types.get(r.sid()).expect("Type was never populated"); // TODO: Error properly
-            is_valid_map_key(ty.ty(), types, r.generics())
+            // TODO
+            // let ty = types.get(r.sid()).expect("Type was never populated"); // TODO: Error properly
+            // is_valid_map_key(ty.ty(), types, r.generics())
+            Ok(())
         }
         DataType::Generic(g) => {
             let ty = generics
@@ -251,9 +254,9 @@ fn validate_internally_tag_enum_datatype(
         DataType::Tuple(ty) if ty.elements().is_empty() => {}
         // References need to be checked against the same rules.
         DataType::Reference(ty) => {
-            let ty = types.get(ty.sid()).expect("Type was never populated"); // TODO: Error properly
+            // let ty = types.get(ty.sid()).expect("Type was never populated"); // TODO: Error properly
 
-            validate_internally_tag_enum_datatype(ty.ty(), types)?;
+            // validate_internally_tag_enum_datatype(ty.ty(), types)?;
         }
         _ => return Err(Error::InvalidInternallyTaggedEnum),
     }

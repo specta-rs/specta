@@ -9,16 +9,14 @@ use std::{
 };
 
 use specta::{
-    NamedType, SpectaID, Type, TypeCollection,
+    Type, TypeCollection,
     datatype::{
         DataType, DeprecatedType, Enum, List, Literal, Map, NamedDataType, Primitive, Reference,
         Tuple,
     },
 };
 
-use crate::{
-    Any, BigIntExportBehavior, Error, JSDoc, Layout, Typescript, Unknown, legacy::js_doc, types,
-};
+use crate::{BigIntExportBehavior, Error, JSDoc, Layout, Typescript, legacy::js_doc};
 
 /// Generate an `export Type = ...` Typescript string for a specific [`NamedDataType`].
 ///

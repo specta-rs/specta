@@ -1,6 +1,9 @@
 use std::{collections::HashMap, fmt};
 
-use crate::{SpectaID, Type, datatype::NamedDataType};
+use crate::{
+    Type,
+    datatype::{ArcId, NamedDataType},
+};
 
 /// Define a set of types which can be exported together.
 ///
@@ -10,7 +13,7 @@ use crate::{SpectaID, Type, datatype::NamedDataType};
 pub struct TypeCollection(
     // `None` indicates that the entry is a placeholder.
     // It is a reference and we are currently resolving it's definition.
-    pub(crate) HashMap<SpectaID, Option<NamedDataType>>,
+    pub(crate) HashMap<ArcId, Option<NamedDataType>>,
 );
 
 impl fmt::Debug for TypeCollection {
@@ -30,30 +33,6 @@ impl TypeCollection {
     pub fn register_mut<T: Type>(&mut self) -> &mut Self {
         T::definition(self);
         self
-    }
-
-    /// Remove a type from the collection.
-    #[doc(hidden)]
-    #[deprecated = "https://github.com/specta-rs/specta/issues/426"]
-    pub fn remove(&mut self, sid: SpectaID) -> Option<NamedDataType> {
-        self.0.remove(&sid).flatten()
-    }
-
-    /// Get a type from the collection.
-    #[track_caller]
-    pub fn get(&self, sid: SpectaID) -> Option<&NamedDataType> {
-        #[allow(clippy::bind_instead_of_map)]
-        self.0.get(&sid).as_ref().and_then(|v| match v {
-            Some(ndt) => Some(ndt),
-            // If this method is used during type construction this case could be hit when it's actually valid
-            // but all references are managed within `specta` so we can bypass this method and use `map` directly because we have `pub(crate)` access.
-            None => {
-                #[cfg(debug_assertions)]
-                unreachable!("specta: `TypeCollection::get` found a type placeholder!");
-                #[cfg(not(debug_assertions))]
-                None
-            }
-        })
     }
 
     /// Get the length of the collection.
@@ -77,7 +56,12 @@ impl TypeCollection {
             .iter()
             .filter_map(|(_, ndt)| ndt.clone())
             .collect::<Vec<_>>();
-        v.sort_by(|x, y| x.name.cmp(&y.name).then(x.sid.cmp(&y.sid)));
+        v.sort_by(|x, y| {
+            x.name
+                .cmp(&y.name)
+                .then(x.module_path.cmp(&y.module_path))
+                .then(x.location.cmp(&y.location))
+        });
         v.into_iter()
     }
 

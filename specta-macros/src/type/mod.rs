@@ -175,26 +175,17 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             #[automatically_derived]
             impl #bounds #crate_ref::Type for #ident #type_args #where_bound {
                 fn definition(types: &mut #crate_ref::TypeCollection) -> datatype::DataType {
-                    internal::register(
-                        types,
-                        #name.into(),
-                        #comments.into(),
-                        #deprecated,
-                        SID,
-                        std::borrow::Cow::Borrowed(module_path!()),
-                        vec![#(#definition_generics),*],
-                        |types| {
-                            #shadow_generics
-                            #inlines
-                        },
-                    );
+                    static SENTINEL: () = ();
+                    let ndt = datatype::NamedDataType::init_with_sentinel(types, &SENTINEL, |types| {
+                        todo!();
+                    });
 
-                    // TODO: Fix this
-                    // datatype::Reference::construct(SID, [#(#reference_generics),*], #inline).into()
-                    datatype::DataType::Reference(datatype::Reference::unsafe_from_fixed_static_reference({
-                        static SENTINEL: () = ();
-                        &SENTINEL
-                    }))
+
+                    // TODO
+
+                    datatype::DataType::Reference(ndt.reference(vec![
+                        // #(#reference_generics),* // TODO: Fix this
+                    ], #inline))
                 }
             }
 

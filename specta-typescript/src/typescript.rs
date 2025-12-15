@@ -5,7 +5,7 @@ use std::{
 };
 
 use specta::{
-    SpectaID, TypeCollection,
+    TypeCollection,
     datatype::{DataType, Fields, NamedDataType, Reference},
 };
 
