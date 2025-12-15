@@ -2,8 +2,6 @@
 
 use std::{borrow::Cow, fmt, hash, sync::Arc};
 
-use crate::{SpectaID, specta_id::SpectaIDInner};
-
 use super::{DataType, Generic};
 
 /// A reference to a [NamedDataType].
@@ -32,7 +30,7 @@ impl Reference {
         }
     }
 
-    // pub const fn todo(generics: &'static [Generic, DataT]) -> Reference {
+    // pub const fn todo(generics: &'static [(Generic, DataType)], ) -> Reference {
     //     todo!();
     // }
 
@@ -49,13 +47,9 @@ impl Reference {
 
     /// Compare if two references are pointing to the same type.
     ///
-    /// Unlike `PartialEq::eq`, this method only compares the types, not the generics and inline attributes.
+    /// Unlike `PartialEq::eq`, this method only compares the types, not the generics, inline and other reference attributes.
     pub fn ref_eq(&self, other: &Reference) -> bool {
-        // match (&self.0, &other.0) {
-        //     (ReferenceInner::Opaque(id1), ReferenceInner::Opaque(id2)) => id1 == id2,
-        //     _ => false,
-        // }
-        todo!();
+        self.id == other.id
     }
 
     // // TODO: Remove this method

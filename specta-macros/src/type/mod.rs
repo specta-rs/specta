@@ -104,7 +104,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             GenericParam::Type(t) => {
                 let ident = &t.ident;
                 let placeholder_ident = format_ident!("PLACEHOLDER_{}", t.ident);
-                quote!(type #ident = #crate_ref::datatype::GenericPlaceholder<#placeholder_ident>;)
+                quote!(type #ident = datatype::GenericPlaceholder<#placeholder_ident>;)
             }
         });
 
@@ -118,7 +118,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             let ident_str = t.ident.to_string();
             Some(quote!(
                 pub struct #ident;
-                impl #crate_ref::datatype::ConstGenericPlaceholder for #ident {
+                impl datatype::ConstGenericPlaceholder for #ident {
                     const PLACEHOLDER: &'static str = #ident_str;
                 }
             ))
@@ -153,7 +153,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         GenericParam::Type(t) => {
             let i = &t.ident;
             let i_str = i.to_string();
-            Some(quote!((#crate_ref::internal::construct::generic_data_type(#i_str), <#i as #crate_ref::Type>::definition(types))))
+            Some(quote!((internal::construct::generic_data_type(#i_str), <#i as #crate_ref::Type>::definition(types))))
         }
     });
 
@@ -168,22 +168,14 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     Ok(quote! {
         #[allow(non_camel_case_types)]
         const _: () = {
-            use #crate_ref::datatype;
-
-            pub static REFERENCE: datatype::Reference = datatype::Reference::unsafe_from_fixed_static_reference({
-                static SENTIAL: () = ();
-                &SENTIAL
-            });
-
-            // This is equivalent to `<Self as #crate_ref::NamedType>::ID` but it's shorter so we use it instead.
-            const SID: #crate_ref::SpectaID = #crate_ref::internal::construct::sid(#name, concat!("::", module_path!(), ":", line!(), ":", column!()));
+            use #crate_ref::{datatype, internal};
 
             #(#generic_placeholders)*
 
             #[automatically_derived]
             impl #bounds #crate_ref::Type for #ident #type_args #where_bound {
-                fn definition(types: &mut #crate_ref::TypeCollection) -> #crate_ref::datatype::DataType {
-                    #crate_ref::internal::register(
+                fn definition(types: &mut #crate_ref::TypeCollection) -> datatype::DataType {
+                    internal::register(
                         types,
                         #name.into(),
                         #comments.into(),
@@ -197,13 +189,13 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         },
                     );
 
-                    #crate_ref::datatype::Reference::construct(SID, [#(#reference_generics),*], #inline).into()
+                    // TODO: Fix this
+                    // datatype::Reference::construct(SID, [#(#reference_generics),*], #inline).into()
+                    datatype::DataType::Reference(datatype::Reference::unsafe_from_fixed_static_reference({
+                        static SENTINEL: () = ();
+                        &SENTINEL
+                    }))
                 }
-            }
-
-            #[automatically_derived]
-            impl #bounds #crate_ref::NamedType for #ident #type_args #where_bound {
-                const ID: #crate_ref::SpectaID = SID;
             }
 
             #flatten_impl
@@ -211,5 +203,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             #export
         };
 
-    }.into())
+    }
+    .into())
 }

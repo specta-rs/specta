@@ -39,14 +39,13 @@ use specta::{
 /// ```
 pub struct Any<T = ()>(T);
 
-pub static ANY_REFERENCE: Reference = Reference::unsafe_from_fixed_static_reference({
-    static SENTIAL: () = ();
-    &SENTIAL
+pub(crate) static ANY_REFERENCE: Reference = Reference::unsafe_from_fixed_static_reference({
+    static SENTINEL: () = ();
+    &SENTINEL
 });
 
 impl<T> Type for Any<T> {
     fn definition(_: &mut TypeCollection) -> DataType {
-        println!("{:?} {:?}", ANY_REFERENCE, Reference::opaque());
         DataType::Reference(ANY_REFERENCE.clone())
     }
 }
@@ -119,9 +118,14 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
 /// ```
 pub struct Unknown<T = ()>(T);
 
+pub(crate) static UNKNOWN_REFERENCE: Reference = Reference::unsafe_from_fixed_static_reference({
+    static SENTINEL: () = ();
+    &SENTINEL
+});
+
 impl<T> Type for Unknown<T> {
     fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Reference(Reference::opaque())
+        DataType::Reference(UNKNOWN_REFERENCE.clone())
     }
 }
 
@@ -193,9 +197,14 @@ impl<T: serde::Serialize> serde::Serialize for Unknown<T> {
 /// ```
 pub struct Never<T = ()>(T);
 
+pub(crate) static NEVER_REFERENCE: Reference = Reference::unsafe_from_fixed_static_reference({
+    static SENTINEL: () = ();
+    &SENTINEL
+});
+
 impl<T> Type for Never<T> {
     fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Reference(Reference::opaque())
+        DataType::Reference(NEVER_REFERENCE.clone())
     }
 }
 

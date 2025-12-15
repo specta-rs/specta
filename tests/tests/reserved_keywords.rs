@@ -1,7 +1,7 @@
 use specta::{NamedType, Type, TypeCollection};
 use specta_typescript::{
-    legacy::{ExportPath, NamedLocation},
     Error, Typescript,
+    legacy::{ExportPath, NamedLocation},
 };
 
 mod astruct {
@@ -57,7 +57,7 @@ fn test_ts_reserved_keyworks() {
     );
 }
 
-fn export<T: NamedType>() -> Result<String, String> {
+fn export<T: Type>() -> Result<String, String> {
     let mut types = TypeCollection::default();
     T::definition(&mut types);
     Typescript::default()

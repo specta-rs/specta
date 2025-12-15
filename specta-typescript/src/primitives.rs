@@ -16,7 +16,9 @@ use specta::{
     },
 };
 
-use crate::{Any, BigIntExportBehavior, Error, JSDoc, Layout, Typescript, Unknown, legacy::js_doc};
+use crate::{
+    Any, BigIntExportBehavior, Error, JSDoc, Layout, Typescript, Unknown, legacy::js_doc, types,
+};
 
 /// Generate an `export Type = ...` Typescript string for a specific [`NamedDataType`].
 ///
@@ -944,77 +946,61 @@ fn reference_dt(
     if let Some((_, typescript)) = ts.references.iter().find(|(re, _)| re.ref_eq(r)) {
         s.push_str(typescript);
         return Ok(());
-    } else if match Any::<()>::definition(
-        // TODO: Explain invariants here
-        &mut Default::default(),
-    ) {
-        DataType::Reference(re) => re.ref_eq(r),
-        _ => false,
-    } {
-        s.push_str("any");
-        return Ok(());
     }
-
     // TODO: Legacy stuff
     {
-        if r.sid() == Any::<()>::ID {
-            s.push_str("any");
-        } else if r.sid() == Unknown::<()>::ID {
-            s.push_str("unknown");
-        } else {
-            let ndt = types.get(r.sid()).unwrap(); // TODO: Error handling
+        let ndt = types.get(r.sid()).unwrap(); // TODO: Error handling
 
-            let name = match ts.layout {
-                Layout::ModulePrefixedName => {
-                    let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
-                    s.push_str("_");
-                    s.push_str(ndt.name());
-                    Cow::Owned(s)
-                }
-                Layout::Namespaces => {
-                    let mut s = "$$specta_ns$$".to_string();
-                    for (i, root_module) in ndt.module_path().split("::").enumerate() {
-                        if i != 0 {
-                            s.push_str(".");
-                        }
-                        s.push_str(root_module);
-                    }
-                    s.push_str(".");
-                    s.push_str(ndt.name());
-                    Cow::Owned(s)
-                }
-                Layout::Files => {
-                    let mut s = ndt.module_path().replace("::", "_");
-                    s.push_str("_");
-                    s.push_str(ndt.name());
-                    Cow::Owned(s)
-                }
-                _ => ndt.name().clone(),
-            };
-
-            s.push_str(&name);
-            if r.generics().len() != 0 {
-                s.push('<');
-
-                for (i, (_, v)) in r.generics().iter().enumerate() {
-                    if i != 0 {
-                        s.push_str(", ");
-                    }
-
-                    crate::legacy::datatype_inner(
-                        crate::legacy::ExportContext {
-                            cfg: ts,
-                            path: vec![],
-                            is_export,
-                        },
-                        &specta::datatype::FunctionReturnType::Value(v.clone()),
-                        types,
-                        s,
-                    )?;
-                }
-
-                s.push('>');
+        let name = match ts.layout {
+            Layout::ModulePrefixedName => {
+                let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
+                s.push_str("_");
+                s.push_str(ndt.name());
+                Cow::Owned(s)
             }
+            Layout::Namespaces => {
+                let mut s = "$$specta_ns$$".to_string();
+                for (i, root_module) in ndt.module_path().split("::").enumerate() {
+                    if i != 0 {
+                        s.push_str(".");
+                    }
+                    s.push_str(root_module);
+                }
+                s.push_str(".");
+                s.push_str(ndt.name());
+                Cow::Owned(s)
+            }
+            Layout::Files => {
+                let mut s = ndt.module_path().replace("::", "_");
+                s.push_str("_");
+                s.push_str(ndt.name());
+                Cow::Owned(s)
+            }
+            _ => ndt.name().clone(),
+        };
+
+        s.push_str(&name);
+        if r.generics().len() != 0 {
+            s.push('<');
+
+            for (i, (_, v)) in r.generics().iter().enumerate() {
+                if i != 0 {
+                    s.push_str(", ");
+                }
+
+                crate::legacy::datatype_inner(
+                    crate::legacy::ExportContext {
+                        cfg: ts,
+                        path: vec![],
+                        is_export,
+                    },
+                    &specta::datatype::FunctionReturnType::Value(v.clone()),
+                    types,
+                    s,
+                )?;
+            }
+
+            s.push('>');
         }
     }
 

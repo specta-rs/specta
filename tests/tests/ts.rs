@@ -15,7 +15,7 @@ use specta_typescript::Any;
 use specta_typescript::{BigIntExportBehavior, Typescript};
 
 // We run tests with the low-level APIs
-pub fn assert_ts_export2<T: NamedType>() -> Result<String, String> {
+pub fn assert_ts_export2<T: Type>() -> Result<String, String> {
     let mut types = TypeCollection::default();
     T::definition(&mut types);
     specta_serde::validate(&types).map_err(|e| e.to_string())?;
@@ -108,12 +108,12 @@ pub fn inline<T: Type>(ts: &Typescript) -> Result<String, String> {
         .map_err(|e| e.to_string())
 }
 
-pub fn export_ref<T: NamedType>(t: &T, ts: &Typescript) -> Result<String, String> {
+pub fn export_ref<T: Type>(t: &T, ts: &Typescript) -> Result<String, String> {
     export::<T>(ts)
 }
 
 // TODO: Probally move to snapshot testing w/ high-level API's
-pub fn export<T: NamedType>(ts: &Typescript) -> Result<String, String> {
+pub fn export<T: Type>(ts: &Typescript) -> Result<String, String> {
     let mut types = TypeCollection::default();
     T::definition(&mut types);
 

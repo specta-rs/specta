@@ -1,4 +1,4 @@
-use crate::{SpectaID, TypeCollection, datatype::DataType};
+use crate::{TypeCollection, datatype::DataType};
 
 mod impls;
 mod macros;
@@ -15,16 +15,6 @@ pub trait Type {
     /// returns a [`DataType`](crate::datatype::DataType) that represents the type.
     /// This will also register any dependent types into the [`TypeCollection`].
     fn definition(types: &mut TypeCollection) -> DataType;
-}
-
-/// represents a type that can be converted into [`NamedDataType`](crate::NamedDataType).
-/// This will be implemented for all types with the [Type] derive macro.
-///
-/// TODO: Discuss which types this should be implemented for.
-///
-/// This should be only implemented via the [`Type`](derive@crate::Type) macro.
-pub trait NamedType: Type {
-    const ID: SpectaID;
 }
 
 /// A marker trait for compile-time validation of which types can be flattened.

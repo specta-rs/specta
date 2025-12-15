@@ -1,8 +1,8 @@
 use super::{attr::*, r#struct::decode_field_attrs};
 use crate::{r#type::field::construct_field, utils::*};
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, ToTokens};
-use syn::{spanned::Spanned, DataEnum, Error, Fields};
+use quote::{ToTokens, quote};
+use syn::{DataEnum, Error, Fields, spanned::Spanned};
 
 pub fn parse_enum(
     enum_attrs: &EnumAttr,
@@ -59,7 +59,7 @@ pub fn parse_enum(
                 };
 
                 let inner = match &variant.fields {
-                    Fields::Unit => quote!(#crate_ref::internal::construct::fields_unit()),
+                    Fields::Unit => quote!(internal::construct::fields_unit()),
                     Fields::Unnamed(fields) => {
                         let fields = fields
                             .unnamed
@@ -79,7 +79,7 @@ pub fn parse_enum(
                             })
                             .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                        quote!(#crate_ref::internal::construct::fields_unnamed(
+                        quote!(internal::construct::fields_unnamed(
                             vec![#(#fields),*],
                         ))
                     }
@@ -115,14 +115,14 @@ pub fn parse_enum(
                         })
                         .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                        quote!(#crate_ref::internal::construct::fields_named(vec![#(#fields),*], None))
+                        quote!(internal::construct::fields_named(vec![#(#fields),*], None))
                     }
                 };
 
                 let deprecated = attrs.common.deprecated_as_tokens(crate_ref);
                 let skip = attrs.skip;
                 let doc = attrs.common.doc;
-                Ok(quote!((#variant_name_str.into(), #crate_ref::internal::construct::enum_variant(#skip, #deprecated, #doc.into(), #inner))))
+                Ok(quote!((#variant_name_str.into(), internal::construct::enum_variant(#skip, #deprecated, #doc.into(), #inner))))
             })
             .collect::<syn::Result<Vec<_>>>()?;
 
@@ -158,7 +158,7 @@ pub fn parse_enum(
 
         (
             false, // String enums can't be flattened
-            quote!(Some(#crate_ref::datatype::EnumRepr::String { rename_all: #rename_all })),
+            quote!(Some(datatype::EnumRepr::String { rename_all: #rename_all })),
         )
     } else {
         match (enum_attrs.untagged, &enum_attrs.tag, &enum_attrs.content) {
@@ -178,47 +178,47 @@ pub fn parse_enum(
                     Fields::Named(_) => true,
                     _ => false,
                 }),
-                quote!(Some(#crate_ref::datatype::EnumRepr::External)),
+                quote!(Some(datatype::EnumRepr::External)),
             ),
             (Some(false) | None, Some(tag), None) => (
                 data.variants
                     .iter()
                     .any(|v| matches!(&v.fields, Fields::Unit | Fields::Named(_))),
-                quote!(Some(#crate_ref::datatype::EnumRepr::Internal { tag: #tag.into() })),
+                quote!(Some(datatype::EnumRepr::Internal { tag: #tag.into() })),
             ),
             (Some(false) | None, Some(tag), Some(content)) => (
                 true,
-                quote!(Some(#crate_ref::datatype::EnumRepr::Adjacent { tag: #tag.into(), content: #content.into() })),
+                quote!(Some(datatype::EnumRepr::Adjacent { tag: #tag.into(), content: #content.into() })),
             ),
             (Some(true), None, None) => (
                 data.variants
                     .iter()
                     .any(|v| matches!(&v.fields, Fields::Unit | Fields::Named(_))),
-                quote!(Some(#crate_ref::datatype::EnumRepr::Untagged)),
+                quote!(Some(datatype::EnumRepr::Untagged)),
             ),
             (Some(true), Some(_), None) => {
                 return Err(Error::new(
                     Span::call_site(),
                     "untagged cannot be used with tag",
-                ))
+                ));
             }
             (Some(true), _, Some(_)) => {
                 return Err(Error::new(
                     Span::call_site(),
                     "untagged cannot be used with content",
-                ))
+                ));
             }
             (Some(false) | None, None, Some(_)) => {
                 return Err(Error::new(
                     Span::call_site(),
                     "content cannot be used without tag",
-                ))
+                ));
             }
         }
     };
 
     Ok((
-        quote!(#crate_ref::datatype::DataType::Enum(#crate_ref::internal::construct::r#enum(#repr, vec![#(#variant_types),*]))),
+        quote!(datatype::DataType::Enum(internal::construct::r#enum(#repr, vec![#(#variant_types),*]))),
         can_flatten,
     ))
 }
