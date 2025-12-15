@@ -2,7 +2,7 @@ use std::{borrow::Cow, path::Path};
 
 use specta::{TypeCollection, datatype::Reference};
 
-use crate::{BigIntExportBehavior, Error, Format, Typescript};
+use crate::{BigIntExportBehavior, Error, Layout, Typescript};
 
 /// JSDoc language exporter.
 #[derive(Debug, Clone)]
@@ -73,9 +73,9 @@ impl JSDoc {
         Self(self.0.bigint(bigint))
     }
 
-    /// Configure the format
-    pub fn format(self, format: Format) -> Self {
-        Self(self.0.format(format))
+    /// Configure the layout of the generated file
+    pub fn layout(self, layout: Layout) -> Self {
+        Self(self.0.layout(layout))
     }
 
     /// TODO: Explain

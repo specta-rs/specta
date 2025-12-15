@@ -16,7 +16,7 @@ use specta::{
     },
 };
 
-use crate::{Any, BigIntExportBehavior, Error, Format, JSDoc, Typescript, Unknown, legacy::js_doc};
+use crate::{Any, BigIntExportBehavior, Error, JSDoc, Layout, Typescript, Unknown, legacy::js_doc};
 
 /// Generate an `export Type = ...` Typescript string for a specific [`NamedDataType`].
 ///
@@ -47,8 +47,8 @@ pub fn export(
             is_export: false,
         },
         crate::legacy::NamedLocation::Type,
-        &match ts.format {
-            Format::ModulePrefixedName => {
+        &match ts.layout {
+            Layout::ModulePrefixedName => {
                 let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
                 s.push('_');
                 s.push_str(ndt.name());
@@ -964,14 +964,14 @@ fn reference_dt(
         } else {
             let ndt = types.get(r.sid()).unwrap(); // TODO: Error handling
 
-            let name = match ts.format {
-                Format::ModulePrefixedName => {
+            let name = match ts.layout {
+                Layout::ModulePrefixedName => {
                     let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
                     s.push_str("_");
                     s.push_str(ndt.name());
                     Cow::Owned(s)
                 }
-                Format::Namespaces => {
+                Layout::Namespaces => {
                     let mut s = "$$specta_ns$$".to_string();
                     for (i, root_module) in ndt.module_path().split("::").enumerate() {
                         if i != 0 {
@@ -983,7 +983,7 @@ fn reference_dt(
                     s.push_str(ndt.name());
                     Cow::Owned(s)
                 }
-                Format::Files => {
+                Layout::Files => {
                     let mut s = ndt.module_path().replace("::", "_");
                     s.push_str("_");
                     s.push_str(ndt.name());

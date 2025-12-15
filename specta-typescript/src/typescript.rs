@@ -38,7 +38,7 @@ pub enum BigIntExportBehavior {
 
 /// Allows configuring the format of the final types file
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum Format {
+pub enum Layout {
     /// Produce a Typescript namespace for each Rust module
     Namespaces,
     /// Produce a dedicated file for each Rust module
@@ -60,7 +60,7 @@ pub struct Typescript {
     framework_prelude: Cow<'static, str>,
     pub(crate) references: Vec<(Reference, Cow<'static, str>)>,
     pub bigint: BigIntExportBehavior,
-    pub format: Format,
+    pub layout: Layout,
     pub serde: bool,
     pub(crate) jsdoc: bool,
 }
@@ -75,7 +75,7 @@ impl Default for Typescript {
             ),
             references: Default::default(),
             bigint: Default::default(),
-            format: Default::default(),
+            layout: Default::default(),
             serde: false,
             jsdoc: false,
         }
@@ -125,9 +125,9 @@ impl Typescript {
         self
     }
 
-    /// Configure the format
-    pub fn format(mut self, format: Format) -> Self {
-        self.format = format;
+    /// Configure the bindings layout
+    pub fn layout(mut self, layout: Layout) -> Self {
+        self.layout = layout;
         self
     }
 
@@ -145,8 +145,8 @@ impl Typescript {
             specta_serde::validate(types)?;
         }
 
-        match self.format {
-            Format::Namespaces => {
+        match self.layout {
+            Layout::Namespaces => {
                 let mut out = self.export_internal([].into_iter(), [].into_iter(), types)?;
                 let mut module_types: HashMap<_, Vec<_>> = HashMap::new();
 
@@ -220,9 +220,9 @@ impl Typescript {
                 Ok(out)
             }
             // You can't `inline` while using `Files`.
-            Format::Files => Err(Error::UnableToExport),
-            Format::FlatFile | Format::ModulePrefixedName => {
-                if self.format == Format::FlatFile {
+            Layout::Files => Err(Error::UnableToExport),
+            Layout::FlatFile | Layout::ModulePrefixedName => {
+                if self.layout == Layout::FlatFile {
                     let mut map = HashMap::with_capacity(types.len());
                     for dt in types.into_unsorted_iter() {
                         if let Some((existing_sid, existing_impl_location)) =
@@ -316,7 +316,7 @@ impl Typescript {
     pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
         let path = path.as_ref();
 
-        if self.format == Format::Files {
+        if self.layout == Layout::Files {
             if self.serde {
                 specta_serde::validate(types)?;
             }

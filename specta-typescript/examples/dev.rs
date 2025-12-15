@@ -1,20 +1,10 @@
-use specta::{Type, TypeCollection, datatype::DataType};
+use specta::{Type, TypeCollection};
 use specta_typescript::{Any, Typescript, primitives};
 
 #[derive(Type)]
 struct Testing {
     field: Any,
 }
-
-// pub struct Any<T = ()>(T);
-
-// static ANY: ReferenceToken = ReferenceToken;
-
-// impl<T> Type for Any<T> {
-//     fn definition(_: &mut TypeCollection) -> DataType {
-//         DataType::Reference(Reference::opaque2(&ANY))
-//     }
-// }
 
 fn main() {
     let mut ts = Typescript::default();
@@ -25,6 +15,8 @@ fn main() {
         "{:?}",
         primitives::inline(&ts, &Default::default(), &r.into())
     );
+
+    // TODO: Properly handle this with opaque types
     // println!("{:?}", primitives::inline(&Default::default(), &Default::default(), &DataType::String));
 
     let s = ts

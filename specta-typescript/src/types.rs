@@ -1,8 +1,8 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::LazyLock};
 
 use specta::{
     NamedType, Type, TypeCollection,
-    datatype::{DataType, Reference, ReferenceToken},
+    datatype::{DataType, Reference},
 };
 
 /// Cast a Rust type to a Typescript `any` type.
@@ -39,18 +39,11 @@ use specta::{
 /// ```
 pub struct Any<T = ()>(T);
 
-static ANY: ReferenceToken = ReferenceToken;
+pub static ANY_REFERENCE: LazyLock<Reference> = LazyLock::new(Reference::opaque);
 
 impl<T> Type for Any<T> {
     fn definition(_: &mut TypeCollection) -> DataType {
-        println!("PTR EQ: {:?}", std::ptr::eq(&ANY, &ANY));
-
-        println!(
-            "definition: {:?}",
-            Reference::opaque2(&ANY).ref_eq(&Reference::opaque2(&ANY))
-        );
-
-        DataType::Reference(Reference::opaque2(&ANY))
+        DataType::Reference(ANY_REFERENCE.clone())
     }
 }
 

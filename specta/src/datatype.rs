@@ -22,7 +22,7 @@ pub use literal::Literal;
 pub use map::Map;
 pub use named::{DeprecatedType, NamedDataType};
 pub use primitive::Primitive;
-pub use reference::{Reference, ReferenceToken};
+pub use reference::Reference;
 pub use r#struct::Struct;
 pub use tuple::Tuple;
 

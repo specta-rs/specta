@@ -7,12 +7,12 @@ use crate::{SpectaID, specta_id::SpectaIDInner};
 use super::{DataType, Generic};
 
 // TODO: Rename?
-#[derive(Debug, Clone, PartialEq)]
-pub struct ReferenceToken;
+// #[derive(Debug, Clone, PartialEq)]
+// pub struct ReferenceToken;
 
 #[derive(Debug, Clone, PartialEq)]
 enum OpaqueReference {
-    Static(&'static ReferenceToken),
+    // Static(&'static ReferenceToken),
     Dynamic(ArcId),
 }
 
@@ -59,12 +59,14 @@ impl Reference {
     //     }
     // }
 
-    // TODO: Rename
-    // TODO: Explain invariance?
-    // TODO: Should we seal this method???
-    pub const fn opaque2(base: &'static ReferenceToken) -> Reference {
-        Reference(ReferenceInner::Opaque(OpaqueReference::Static(base)))
-    }
+    // // TODO: Rename
+    // // TODO: Explain invariance?
+    // // TODO: Should we seal this method???
+    // //
+    // // TODO: This is only valid for `static`'s not `const` types.
+    // pub const fn opaque2(base: &'static ReferenceToken) -> Reference {
+    //     Reference(ReferenceInner::Opaque(OpaqueReference::Static(base)))
+    // }
 
     /// TODO
     pub fn opaque() -> Reference {
@@ -87,13 +89,13 @@ impl Reference {
     pub fn ref_eq(&self, other: &Reference) -> bool {
         println!("{:?} {:?}", self, other);
         match (&self.0, &other.0) {
-            (
-                ReferenceInner::Opaque(OpaqueReference::Static(id1)),
-                ReferenceInner::Opaque(OpaqueReference::Static(id2)),
-            ) => {
-                println!(" - A {:p} {:p}", id1, id2);
-                std::ptr::eq(*id1, *id2)
-            }
+            // (
+            //     ReferenceInner::Opaque(OpaqueReference::Static(id1)),
+            //     ReferenceInner::Opaque(OpaqueReference::Static(id2)),
+            // ) => {
+            //     println!(" - A {:p} {:p}", id1, id2);
+            //     std::ptr::eq(*id1, *id2)
+            // }
             (
                 ReferenceInner::Opaque(OpaqueReference::Dynamic(id1)),
                 ReferenceInner::Opaque(OpaqueReference::Dynamic(id2)),

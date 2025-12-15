@@ -32,13 +32,13 @@ mod another {
 
 fn main() {
     Typescript::default()
-        .format(specta_typescript::Format::Files)
+        .layout(specta_typescript::Format::Files)
         // This requires the `export` feature to be enabled on Specta
         .export_to("./bindings", &specta::export())
         .unwrap();
 
     JSDoc::default()
-        .format(specta_typescript::Format::Files)
+        .layout(specta_typescript::Format::Files)
         // This requires the `export` feature to be enabled on Specta
         .export_to("./bindings2", &specta::export())
         .unwrap();
