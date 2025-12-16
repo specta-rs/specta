@@ -105,7 +105,7 @@ impl fmt::Display for ExportPath {
     }
 }
 
-use specta::{SpectaID, TypeCollection};
+use specta::TypeCollection;
 
 use crate::reserved_names::RESERVED_TYPE_NAMES;
 use crate::{Error, Typescript};

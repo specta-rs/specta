@@ -13,7 +13,7 @@ use crate::Error;
 /// Validate the type and apply the Serde transformations.
 pub fn validate(types: &TypeCollection) -> Result<(), Error> {
     for ndt in types.into_unsorted_iter() {
-        inner(ndt.ty(), &types, &[], &mut Default::default())?;
+        inner(ndt.ty(), types, &[], &mut Default::default())?;
     }
 
     Ok(())

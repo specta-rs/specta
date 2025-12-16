@@ -31,7 +31,7 @@ const _: () = {
     impl_containers!(Mutex RwLock);
 };
 
-impl<'a> Type for &'a str {
+impl Type for &str {
     impl_passthrough!(String);
 }
 
@@ -127,7 +127,7 @@ impl_for_list!(
     true; BTreeSet<T> as "BTreeSet"
 );
 
-impl<'a, T: Type> Type for &'a [T] {
+impl<T: Type> Type for &[T] {
     impl_passthrough!(Vec<T>);
 }
 
