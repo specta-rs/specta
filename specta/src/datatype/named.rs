@@ -19,28 +19,50 @@ pub struct NamedDataType {
 }
 
 impl NamedDataType {
-    // TODO: Explain invariants on sentinel
+    // ## Sentinel
+    //
+    // MUST point to a `static ...: () = ();`. This is used as a unique identifier for the type and `const` or `Box::leak` SHOULD NOT be used.
+    //
+    // If this invariant is violated you will see unexpected behavior.
+    //
+    // ## Why return a reference?
+    //
+    // If a recursive type is being resolved it's possible the `init_with_sentinel` function will be called recursively.
+    // To avoid this we avoid resolving a type that's already marked as being resolved but this means the [NamedDataType]'s [DataType] is unknown at this stage so we can't return it. Instead we always return [Reference]'s as they are always valid.
     #[doc(hidden)] // This should not be used outside of `specta_macros` as it may have breaking changes.
+    #[track_caller]
     pub fn init_with_sentinel(
         types: &mut TypeCollection,
         sentinel: &'static (),
-        build_dt: fn(&mut TypeCollection) -> DataType,
-    ) -> Self {
+        generics: Vec<(Generic, DataType)>,
+        inline: bool,
+        build_ndt: fn(&mut TypeCollection, &mut NamedDataType),
+    ) -> Reference {
         let id = ArcId::Static(sentinel);
-        // types.0.insert(id, None);
-        // types.0.insert(id, Some(build_dt(types)));
+        let location = Location::caller().to_owned();
 
-        todo!();
-        // Self {
-        //     id: ArcId::Static(sentinel),
-        //     name: Cow::Borrowed(""),
-        //     docs: Cow::Borrowed(""),
-        //     deprecated: None,
-        //     module_path: Cow::Borrowed(""),
-        //     location: Location::caller().to_owned(),
-        //     generics: Vec::new(),
-        //     inner: dt,
-        // }
+        // We have never encountered this type. Start resolving it!
+        if !types.0.contains_key(&id) {
+            types.0.insert(id.clone(), None);
+            let mut ndt = NamedDataType {
+                id: id.clone(),
+                name: Cow::Borrowed(""),
+                docs: Cow::Borrowed(""),
+                deprecated: None,
+                module_path: Cow::Borrowed(""),
+                location,
+                generics: vec![],
+                inner: DataType::Primitive(super::Primitive::i8),
+            };
+            build_ndt(types, &mut ndt);
+            types.0.insert(id.clone(), Some(ndt));
+        }
+
+        Reference {
+            id,
+            generics,
+            inline,
+        }
     }
 
     /// TODO
@@ -50,6 +72,7 @@ impl NamedDataType {
         let id = ArcId::Dynamic(Default::default());
 
         // TODO: Ensure this type is registered into the type collection
+        todo!();
 
         Self {
             id,

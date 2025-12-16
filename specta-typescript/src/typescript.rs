@@ -1,12 +1,12 @@
 use std::{
     borrow::Cow,
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
 use specta::{
     TypeCollection,
-    datatype::{NamedDataType, Reference},
+    datatype::{DataType, Fields, NamedDataType, Reference},
 };
 
 use crate::{Error, primitives, types};
@@ -151,7 +151,7 @@ impl Typescript {
 
         match self.layout {
             Layout::Namespaces => {
-                let mut out = self.export_internal([].into_iter(), [].into_iter(), types)?;
+                let mut out = self.export_internal([].into_iter(), None, types)?;
                 let mut module_types: HashMap<_, Vec<_>> = HashMap::new();
 
                 for ndt in types.into_unsorted_iter() {
@@ -172,8 +172,8 @@ impl Typescript {
                     if let Some(types_in_module) = module_types.get_mut(current_module) {
                         types_in_module.sort_by(|a, b| {
                             a.name()
-                                .cmp(&b.name())
-                                .then(a.module_path().cmp(&b.module_path()))
+                                .cmp(b.name())
+                                .then(a.module_path().cmp(b.module_path()))
                                 .then(a.location().cmp(&b.location()))
                         });
                         for ndt in types_in_module {
@@ -231,23 +231,20 @@ impl Typescript {
             Layout::Files => Err(Error::UnableToExport),
             Layout::FlatFile | Layout::ModulePrefixedName => {
                 if self.layout == Layout::FlatFile {
-                    // let mut map = HashMap::with_capacity(types.len());
-                    // for dt in types.into_unsorted_iter() {
-                    //     if let Some((existing_sid, existing_impl_location)) =
-                    //         map.insert(dt.name().clone(), (dt.sid(), dt.location()))
-                    //     {
-                    //         if existing_sid != dt.sid() {
-                    //             return Err(Error::DuplicateTypeName {
-                    //                 types: (dt.location(), existing_impl_location),
-                    //                 name: dt.name().clone(),
-                    //             });
-                    //         }
-                    //     }
-                    // }
-                    todo!();
+                    let mut map = HashMap::with_capacity(types.len());
+                    for dt in types.into_unsorted_iter() {
+                        if let Some(existing_dt) = map.insert(dt.name().clone(), dt)
+                            && existing_dt != dt
+                        {
+                            return Err(Error::DuplicateTypeName {
+                                types: (dt.location(), existing_dt.location()),
+                                name: dt.name().clone(),
+                            });
+                        }
+                    }
                 }
 
-                self.export_internal(types.into_sorted_iter(), [].into_iter(), types)
+                self.export_internal(types.into_sorted_iter(), None, types)
             }
         }
     }
@@ -255,7 +252,7 @@ impl Typescript {
     fn export_internal(
         &self,
         ndts: impl Iterator<Item = NamedDataType>,
-        references: impl Iterator<Item = ()>, // TODO: SpectaID
+        references: Option<ImportMap>,
         types: &TypeCollection,
     ) -> Result<String, Error> {
         let mut out = self.header.to_string();
@@ -269,33 +266,29 @@ impl Typescript {
             out += "\n/**";
         }
 
-        todo!();
-        // for sid in references {
-        //     let ndt = types.get(sid).unwrap();
+        for (src, items) in references.iter().flatten() {
+            if self.jsdoc {
+                out += "\n\t* @import";
+            } else {
+                out += "\nimport type";
+            }
 
-        //     if self.jsdoc {
-        //         out += "\n\t* @import";
-        //     } else {
-        //         out += "\nimport type";
-        //     }
+            out += " { ";
+            for (i, (src, alias)) in items.iter().enumerate() {
+                if i != 0 {
+                    out += ", ";
+                }
+                out += src;
+                if alias != src {
+                    out += " as ";
+                    out += alias;
+                }
+            }
 
-        //     out += " { ";
-        //     out += ndt.name();
-        //     out += " as ";
-        //     out += &ndt.module_path().replace("::", "_");
-        //     out += "_";
-        //     out += ndt.name();
-        //     out += " } from \"";
-
-        //     let depth = ndt.module_path().split("::").count();
-        //     out += "./";
-        //     for _ in 2..depth {
-        //         out += "../";
-        //     }
-
-        //     out += &ndt.module_path().replace("::", "/");
-        //     out += "\";";
-        // }
+            out += " } from \"";
+            out += src;
+            out += "\";";
+        }
 
         if self.jsdoc {
             out += "\n\t*/";
@@ -351,15 +344,14 @@ impl Typescript {
                     std::fs::create_dir_all(parent)?;
                 }
 
-                let mut references = BTreeSet::new();
-                // for ndt in ndts.iter() {
-                //     crawl_references(ndt.ty(), &mut references);
-                // }
-                todo!();
+                let mut references = ImportMap::default();
+                for ndt in ndts.iter() {
+                    crawl_for_imports(ndt.ty(), types, &mut references);
+                }
 
                 std::fs::write(
                     &path,
-                    self.export_internal(ndts.into_iter(), references.into_iter(), types)?,
+                    self.export_internal(ndts.into_iter(), Some(references), types)?,
                 )?;
             }
 
@@ -407,55 +399,70 @@ impl Typescript {
     }
 }
 
-// fn crawl_references(dt: &DataType, references: &mut BTreeSet<SpectaID>) {
-//     match dt {
-//         DataType::Primitive(..) | DataType::Literal(..) => {}
-//         DataType::List(list) => {
-//             crawl_references(list.ty(), references);
-//         }
-//         DataType::Map(map) => {
-//             crawl_references(map.key_ty(), references);
-//             crawl_references(map.value_ty(), references);
-//         }
-//         DataType::Nullable(dt) => {
-//             crawl_references(dt, references);
-//         }
-//         DataType::Struct(s) => {
-//             crawl_references_fields(s.fields(), references);
-//         }
-//         DataType::Enum(e) => {
-//             for (_, variant) in e.variants() {
-//                 crawl_references_fields(variant.fields(), references);
-//             }
-//         }
-//         DataType::Tuple(tuple) => {
-//             for field in tuple.elements() {
-//                 crawl_references(field, references);
-//             }
-//         }
-//         DataType::Reference(reference) => {
-//             references.insert(reference.sid());
-//         }
-//         DataType::Generic(_) => {}
-//     }
-// }
+type ImportMap = BTreeMap<String, BTreeSet<(Cow<'static, str>, String)>>;
 
-// fn crawl_references_fields(fields: &Fields, references: &mut BTreeSet<SpectaID>) {
-//     match fields {
-//         Fields::Unit => {}
-//         Fields::Unnamed(fields) => {
-//             for field in fields.fields() {
-//                 if let Some(ty) = field.ty() {
-//                     crawl_references(ty, references);
-//                 }
-//             }
-//         }
-//         Fields::Named(fields) => {
-//             for (_, field) in fields.fields() {
-//                 if let Some(ty) = field.ty() {
-//                     crawl_references(ty, references);
-//                 }
-//             }
-//         }
-//     }
-// }
+/// Scan for references in a `DataType` chain and collate the required cross-file imports.
+fn crawl_for_imports(dt: &DataType, types: &TypeCollection, imports: &mut ImportMap) {
+    fn crawl_references_fields(fields: &Fields, types: &TypeCollection, imports: &mut ImportMap) {
+        match fields {
+            Fields::Unit => {}
+            Fields::Unnamed(fields) => {
+                for field in fields.fields() {
+                    if let Some(ty) = field.ty() {
+                        crawl_for_imports(ty, types, imports);
+                    }
+                }
+            }
+            Fields::Named(fields) => {
+                for (_, field) in fields.fields() {
+                    if let Some(ty) = field.ty() {
+                        crawl_for_imports(ty, types, imports);
+                    }
+                }
+            }
+        }
+    }
+
+    match dt {
+        DataType::Primitive(..) => {}
+        DataType::List(list) => {
+            crawl_for_imports(list.ty(), types, imports);
+        }
+        DataType::Map(map) => {
+            crawl_for_imports(map.key_ty(), types, imports);
+            crawl_for_imports(map.value_ty(), types, imports);
+        }
+        DataType::Nullable(dt) => {
+            crawl_for_imports(dt, types, imports);
+        }
+        DataType::Struct(s) => {
+            crawl_references_fields(s.fields(), types, imports);
+        }
+        DataType::Enum(e) => {
+            for (_, variant) in e.variants() {
+                crawl_references_fields(variant.fields(), types, imports);
+            }
+        }
+        DataType::Tuple(tuple) => {
+            for field in tuple.elements() {
+                crawl_for_imports(field, types, imports);
+            }
+        }
+        DataType::Reference(r) => {
+            if let Some(ndt) = r.get(types) {
+                let mut path = "./".to_string();
+
+                let depth = ndt.module_path().split("::").count();
+                for _ in 2..depth {
+                    path.push_str("../");
+                }
+
+                imports
+                    .entry(path)
+                    .or_default()
+                    .insert((ndt.name().clone(), ndt.module_path().replace("::", "_")));
+            }
+        }
+        DataType::Generic(_) => {}
+    }
+}

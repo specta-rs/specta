@@ -92,10 +92,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         }
     });
 
-    //     if container_attrs.inline || container_attrs.transparent {
-    //     let generics = &generics.params;
-    //     quote!(#generics)
-    // } else {
     let shadow_generics = {
         let g = generics.params.iter().map(|param| match param {
             // Pulled from outside
@@ -168,6 +164,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     Ok(quote! {
         #[allow(non_camel_case_types)]
         const _: () = {
+            use std::borrow::Cow;
             use #crate_ref::{datatype, internal};
 
             #(#generic_placeholders)*
@@ -176,16 +173,25 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             impl #bounds #crate_ref::Type for #ident #type_args #where_bound {
                 fn definition(types: &mut #crate_ref::TypeCollection) -> datatype::DataType {
                     static SENTINEL: () = ();
-                    let ndt = datatype::NamedDataType::init_with_sentinel(types, &SENTINEL, |types| {
-                        todo!();
-                    });
-
-
-                    // TODO
-
-                    datatype::DataType::Reference(ndt.reference(vec![
-                        // #(#reference_generics),* // TODO: Fix this
-                    ], #inline))
+                    datatype::DataType::Reference(
+                        datatype::NamedDataType::init_with_sentinel(
+                            types,
+                            &SENTINEL,
+                            vec![#(#reference_generics),*],
+                            #inline,
+                            |types, ndt| {
+                                ndt.set_name(Cow::Borrowed(#name));
+                                ndt.set_docs(Cow::Borrowed(#comments));
+                                ndt.set_deprecated(#deprecated);
+                                ndt.set_module_path(Cow::Borrowed(module_path!()));
+                                *ndt.generics_mut() = vec![#(#definition_generics),*];
+                                ndt.set_ty({
+                                    #shadow_generics
+                                    #inlines
+                                });
+                            }
+                        )
+                    )
                 }
             }
 
