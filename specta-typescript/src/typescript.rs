@@ -100,18 +100,17 @@ impl Typescript {
         self.references.push((reference.clone(), typescript.into()));
         reference
     }
+    /// Provide a prelude which is added to the start of all exported files.
+    #[doc(hidden)]
+    pub fn framework_prelude(mut self, prelude: impl Into<Cow<'static, str>>) -> Self {
+        self.framework_prelude = prelude.into();
+        self
+    }
 
     /// Inject some code which is exported into the bindings file (or a root `index.ts` file).
     #[doc(hidden)]
     pub fn framework_runtime(mut self, runtime: impl Into<Cow<'static, str>>) -> Self {
         self.framework_runtime = runtime.into();
-        self
-    }
-
-    /// Provide a prelude which is added to the start of all exported files.
-    #[doc(hidden)]
-    pub fn framework_prelude(mut self, prelude: impl Into<Cow<'static, str>>) -> Self {
-        self.framework_prelude = prelude.into();
         self
     }
 
@@ -151,7 +150,7 @@ impl Typescript {
 
         match self.layout {
             Layout::Namespaces => {
-                let mut out = self.export_internal([].into_iter(), None, types)?;
+                let mut out = self.export_internal([].into_iter(), None, types, true)?;
                 let mut module_types: HashMap<_, Vec<_>> = HashMap::new();
 
                 for ndt in types.into_unsorted_iter() {
@@ -244,7 +243,7 @@ impl Typescript {
                     }
                 }
 
-                self.export_internal(types.into_sorted_iter(), None, types)
+                self.export_internal(types.into_sorted_iter(), None, types, true)
             }
         }
     }
@@ -254,6 +253,7 @@ impl Typescript {
         ndts: impl Iterator<Item = NamedDataType>,
         references: Option<ImportMap>,
         types: &TypeCollection,
+        include_runtime: bool,
     ) -> Result<String, Error> {
         let mut out = self.header.to_string();
         if !out.is_empty() {
@@ -261,6 +261,10 @@ impl Typescript {
         }
         out += &self.framework_prelude;
         out.push('\n');
+        if include_runtime {
+            out.push_str(&self.framework_runtime);
+            out.push('\n');
+        }
 
         if self.jsdoc {
             out += "\n/**";
@@ -337,7 +341,7 @@ impl Typescript {
                 files.entry(path).or_default().push(ndt);
             }
 
-            let used_paths = files.keys().cloned().collect::<HashSet<_>>();
+            let mut used_paths = files.keys().cloned().collect::<HashSet<_>>();
 
             for (path, ndts) in files {
                 if let Some(parent) = path.parent() {
@@ -351,8 +355,21 @@ impl Typescript {
 
                 std::fs::write(
                     &path,
-                    self.export_internal(ndts.into_iter(), Some(references), types)?,
+                    self.export_internal(ndts.into_iter(), Some(references), types, false)?,
                 )?;
+            }
+
+            if !self.framework_runtime.is_empty() {
+                // TODO: Does this risk conflicting with an `index.rs` module???
+                let p = path.join("index.ts");
+                let mut content = self.framework_prelude.to_string();
+                content.push('\n');
+                content.push_str(&self.framework_runtime);
+                content.push('\n');
+                std::fs::write(&p, content)?;
+
+                // This is to ensure `remove_unused_ts_files` doesn't remove it
+                used_paths.insert(p);
             }
 
             if path.exists() && path.is_dir() {

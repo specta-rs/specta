@@ -350,7 +350,7 @@ pub(crate) fn struct_datatype(
                 for field in unflattened_fields {
                     // TODO: Inline or not for newline?
                     // s.push_str(&format!("{field}; "));
-                    s.push_str(&format!("\n{prefix}\t{field};"));
+                    s.push_str(&format!("\n{prefix}\t{field},"));
                 }
 
                 s.push('\n');

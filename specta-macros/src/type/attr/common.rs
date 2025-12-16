@@ -99,10 +99,7 @@ impl CommonAttr {
         Ok(CommonAttr { doc, deprecated })
     }
 
-    pub fn deprecated_as_tokens(
-        &self,
-        crate_ref: &proc_macro2::TokenStream,
-    ) -> proc_macro2::TokenStream {
+    pub fn deprecated_as_tokens(&self) -> proc_macro2::TokenStream {
         match &self.deprecated {
             Some(DeprecatedType::Deprecated) => {
                 quote!(Some(datatype::DeprecatedType::Deprecated))

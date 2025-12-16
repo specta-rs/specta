@@ -12,7 +12,7 @@ pub fn construct_field(
     field_ty: &Type,
 ) -> TokenStream {
     let field_ty = attrs.r#type.as_ref().unwrap_or(&field_ty);
-    let deprecated = attrs.common.deprecated_as_tokens(crate_ref);
+    let deprecated = attrs.common.deprecated_as_tokens();
     let optional = attrs.optional;
     let doc = attrs.common.doc;
     let flatten = attrs.flatten;

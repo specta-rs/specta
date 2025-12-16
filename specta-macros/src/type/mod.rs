@@ -142,7 +142,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let comments = &container_attrs.common.doc;
     let inline = container_attrs.inline;
-    let deprecated = container_attrs.common.deprecated_as_tokens(&crate_ref);
+    let deprecated = container_attrs.common.deprecated_as_tokens();
 
     let reference_generics = generics.params.iter().filter_map(|param| match param {
         GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
@@ -167,18 +167,18 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             use std::borrow::Cow;
             use #crate_ref::{datatype, internal};
 
-            #(#generic_placeholders)*
-
             #[automatically_derived]
             impl #bounds #crate_ref::Type for #ident #type_args #where_bound {
                 fn definition(types: &mut #crate_ref::TypeCollection) -> datatype::DataType {
+                    #(#generic_placeholders)*
+
                     static SENTINEL: () = ();
                     datatype::DataType::Reference(
                         datatype::NamedDataType::init_with_sentinel(
-                            types,
-                            &SENTINEL,
                             vec![#(#reference_generics),*],
                             #inline,
+                            types,
+                            &SENTINEL,
                             |types, ndt| {
                                 ndt.set_name(Cow::Borrowed(#name));
                                 ndt.set_docs(Cow::Borrowed(#comments));

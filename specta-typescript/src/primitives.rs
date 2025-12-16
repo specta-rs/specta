@@ -143,7 +143,7 @@ pub(crate) fn typedef_internal(
         dt.ty(),
         vec![dt.name().clone()],
         false,
-        todo!(), // TODO: Some(dt.sid()),
+        Some(dt.name()),
         "\t*\t",
     )?;
     s.push_str("} ");

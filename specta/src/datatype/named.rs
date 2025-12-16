@@ -32,10 +32,10 @@ impl NamedDataType {
     #[doc(hidden)] // This should not be used outside of `specta_macros` as it may have breaking changes.
     #[track_caller]
     pub fn init_with_sentinel(
-        types: &mut TypeCollection,
-        sentinel: &'static (),
         generics: Vec<(Generic, DataType)>,
         inline: bool,
+        types: &mut TypeCollection,
+        sentinel: &'static (),
         build_ndt: fn(&mut TypeCollection, &mut NamedDataType),
     ) -> Reference {
         let id = ArcId::Static(sentinel);

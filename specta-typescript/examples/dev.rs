@@ -6,6 +6,18 @@ struct Testing {
     field: Any,
 }
 
+/// An IPC channel.
+pub struct Channel<TSend> {
+    phantom: std::marker::PhantomData<TSend>,
+}
+
+const _: () = {
+    #[derive(specta::Type)]
+    #[specta(remote = Channel, rename = "TAURI_CHANNEL")]
+    #[allow(dead_code)]
+    struct Channel2<TSend>(std::marker::PhantomData<TSend>);
+};
+
 fn main() {
     let mut ts = Typescript::default();
 

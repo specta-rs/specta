@@ -119,7 +119,7 @@ pub fn parse_enum(
                     }
                 };
 
-                let deprecated = attrs.common.deprecated_as_tokens(crate_ref);
+                let deprecated = attrs.common.deprecated_as_tokens();
                 let skip = attrs.skip;
                 let doc = attrs.common.doc;
                 Ok(quote!((#variant_name_str.into(), internal::construct::enum_variant(#skip, #deprecated, #doc.into(), #inner))))

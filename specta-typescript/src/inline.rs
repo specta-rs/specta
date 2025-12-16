@@ -199,7 +199,7 @@ fn resolve_generics(dt: &mut DataType, generics: &[(Generic, DataType)]) {
             // for (_, dt) in r.generics_mut() {
             //     resolve_generics(dt, generics);
             // }
-            todo!();
+            // todo!(); // TODO
         }
         DataType::Generic(g) => {
             // This method is run when not inlining so for `export` we do expect `DataType::Generic`.
