@@ -177,7 +177,7 @@ impl Typescript {
                         });
                         for ndt in types_in_module {
                             out += &"    ".repeat(indent);
-                            // out += &primitives::export(ts, types, ndt)?; // TODO
+                            out += &primitives::export(ts, types, ndt)?;
                             out += "\n\n";
                         }
                     }
@@ -192,14 +192,14 @@ impl Typescript {
                         .collect::<Vec<_>>();
                     child_modules.sort();
 
-                    //     for child in child_modules {
-                    //         let module_name = child.split("::").last().unwrap();
-                    //         out += &"    ".repeat(indent);
-                    //         out += &format!("export namespace {module_name} {{\n");
-                    //         out += &export_module(types, ts, module_types, &child, indent + 1)?;
-                    //         out += &"    ".repeat(indent);
-                    //         out += "}\n";
-                    //     }
+                    for child in child_modules {
+                        let module_name = child.split("::").last().unwrap();
+                        out += &"    ".repeat(indent);
+                        out += &format!("export namespace {module_name} {{\n");
+                        out += &export_module(types, ts, module_types, &child, indent + 1)?;
+                        out += &"    ".repeat(indent);
+                        out += "}\n";
+                    }
 
                     Ok(out)
                 }
@@ -207,22 +207,22 @@ impl Typescript {
                 let mut root_modules = module_types.keys().cloned().collect::<Vec<_>>();
                 root_modules.sort();
 
-                // for root_module in root_modules.iter() {
-                //     out += "import $$specta_ns$$";
-                //     out += root_module;
-                //     out += " = ";
-                //     out += root_module;
-                //     out += ";\n\n";
-                // }
+                for root_module in root_modules.iter() {
+                    out += "import $$specta_ns$$";
+                    out += root_module;
+                    out += " = ";
+                    out += root_module;
+                    out += ";\n\n";
+                }
 
-                // for (i, root_module) in root_modules.iter().enumerate() {
-                //     if i != 0 {
-                //         out += "\n";
-                //     }
-                //     out += &format!("export namespace {} {{\n", root_module);
-                //     out += &export_module(types, self, &mut module_types, root_module, 1)?;
-                //     out += "}";
-                // }
+                for (i, root_module) in root_modules.iter().enumerate() {
+                    if i != 0 {
+                        out += "\n";
+                    }
+                    out += &format!("export namespace {} {{\n", root_module);
+                    out += &export_module(types, self, &mut module_types, root_module, 1)?;
+                    out += "}";
+                }
 
                 Ok(out)
             }
