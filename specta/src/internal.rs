@@ -140,7 +140,7 @@ pub fn skip_fields_named<'a>(
 #[cfg(feature = "function")]
 mod functions {
     use super::*;
-    use crate::{datatype::DeprecatedType, datatype::Function, function::SpectaFn};
+    use crate::{TypeCollection, datatype::DeprecatedType, datatype::Function, function::SpectaFn};
 
     #[doc(hidden)]
     /// A helper for exporting a command to a [`CommandDataType`].

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use specta::{
     TypeCollection,
-    datatype::{DataType, Enum, EnumRepr, Fields, Generic, Literal, Primitive},
+    datatype::{DataType, Enum, EnumRepr, Fields, Generic, Primitive, Reference},
     internal::{skip_fields, skip_fields_named},
 };
 
@@ -23,7 +23,7 @@ fn inner(
     dt: &DataType,
     types: &TypeCollection,
     generics: &[(Generic, DataType)],
-    checked_references: &mut HashSet<String>,
+    checked_references: &mut HashSet<Reference>,
 ) -> Result<(), Error> {
     match dt {
         DataType::Nullable(ty) => inner(ty, types, generics, checked_references)?,
@@ -73,8 +73,8 @@ fn inner(
                 inner(dt, types, &[], checked_references)?;
             }
 
-            if !checked_references.contains(&r.type_identifier()) {
-                checked_references.insert(r.type_identifier());
+            if !checked_references.contains(r) {
+                checked_references.insert(r.clone());
                 if let Some(ndt) = r.get(types) {
                     inner(ndt.ty(), types, r.generics(), checked_references)?;
                 }
@@ -112,19 +112,19 @@ fn is_valid_map_key(
             | Primitive::char,
         ) => Ok(()),
         DataType::Primitive(_) => Err(Error::InvalidMapKey),
-        DataType::Literal(
-            Literal::i8(_)
-            | Literal::i16(_)
-            | Literal::i32(_)
-            | Literal::u8(_)
-            | Literal::u16(_)
-            | Literal::u32(_)
-            | Literal::f32(_)
-            | Literal::f64(_)
-            | Literal::String(_)
-            | Literal::char(_),
-        ) => Ok(()),
-        DataType::Literal(_) => Err(Error::InvalidMapKey),
+        // DataType::Literal(
+        //     Literal::i8(_)
+        //     | Literal::i16(_)
+        //     | Literal::i32(_)
+        //     | Literal::u8(_)
+        //     | Literal::u16(_)
+        //     | Literal::u32(_)
+        //     | Literal::f32(_)
+        //     | Literal::f64(_)
+        //     | Literal::String(_)
+        //     | Literal::char(_),
+        // ) => Ok(()),
+        // DataType::Literal(_) => Err(Error::InvalidMapKey),
         // Enum of other valid types are also valid Eg. `"A" | "B"` or `"A" | 5` are valid
         DataType::Enum(ty) => {
             for (_variant_name, variant) in ty.variants() {

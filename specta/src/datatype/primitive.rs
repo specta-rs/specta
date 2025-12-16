@@ -2,7 +2,7 @@ use super::DataType;
 
 /// Type of primitives like numbers and strings.
 #[allow(non_camel_case_types)]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Primitive {
     i8,
     i16,

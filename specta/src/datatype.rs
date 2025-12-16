@@ -5,7 +5,6 @@ mod fields;
 mod function;
 mod generic;
 mod list;
-mod literal;
 mod map;
 mod named;
 mod primitive;
@@ -18,7 +17,6 @@ pub use fields::{Field, Fields, NamedFields, UnnamedFields};
 pub use function::{Function, FunctionReturnType};
 pub use generic::{ConstGenericPlaceholder, Generic, GenericPlaceholder};
 pub use list::List;
-pub use literal::Literal;
 pub use map::Map;
 pub use named::{DeprecatedType, NamedDataType};
 pub use primitive::Primitive;
@@ -32,10 +30,9 @@ pub(crate) use reference::ArcId;
 /// Runtime type-erased representation of a Rust type.
 ///
 /// A language exporter takes this general format and converts it into a language specific syntax.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DataType {
     Primitive(Primitive),
-    Literal(Literal),
     List(List),
     Map(Map),
     Nullable(Box<DataType>),

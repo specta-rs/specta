@@ -9,10 +9,9 @@ use std::{
 };
 
 use specta::{
-    Type, TypeCollection,
+    TypeCollection,
     datatype::{
-        DataType, DeprecatedType, Enum, List, Literal, Map, NamedDataType, Primitive, Reference,
-        Tuple,
+        DataType, DeprecatedType, Enum, List, Map, NamedDataType, Primitive, Reference, Tuple,
     },
 };
 
@@ -75,7 +74,7 @@ pub fn export(
         ndt.ty(),
         vec![ndt.name().clone()],
         true,
-        todo!(), // TODO: Some(ndt.sid()),
+        Some(ndt.name()),
         "\t",
     )?;
     result.push_str(";\n");
@@ -189,16 +188,13 @@ pub(crate) fn datatype(
     dt: &DataType,
     mut location: Vec<Cow<'static, str>>,
     is_export: bool,
-    // The type that is currently being resolved.
-    // This comes from the `NamedDataType`
-    sid: Option<SpectaID>,
+    parent_name: Option<&str>,
     prefix: &str,
 ) -> Result<(), Error> {
     // TODO: Validating the variant from `dt` can be flattened
 
     match dt {
         DataType::Primitive(p) => s.push_str(primitive_dt(&ts.bigint, p, location)?),
-        DataType::Literal(l) => literal_dt(s, l),
         DataType::List(l) => list_dt(s, ts, types, l, location, is_export)?,
         DataType::Map(m) => map_dt(s, ts, types, m, location, is_export)?,
         DataType::Nullable(def) => {
@@ -235,7 +231,7 @@ pub(crate) fn datatype(
                     path: vec![],
                     is_export,
                 },
-                sid,
+                parent_name,
                 st,
                 types,
                 s,
@@ -273,28 +269,6 @@ fn primitive_dt(
         Primitive::bool => "boolean",
         String | char => "string",
     })
-}
-
-fn literal_dt(s: &mut String, l: &Literal) {
-    use Literal::*;
-
-    match l {
-        i8(v) => write!(s, "{v}"),
-        i16(v) => write!(s, "{v}"),
-        i32(v) => write!(s, "{v}"),
-        u8(v) => write!(s, "{v}"),
-        u16(v) => write!(s, "{v}"),
-        u32(v) => write!(s, "{v}"),
-        f32(v) => write!(s, "{v}"),
-        f64(v) => write!(s, "{v}"),
-        bool(v) => write!(s, "{v}"),
-        String(v) => write!(s, "\"{v}\""),
-        char(v) => write!(s, "\"{v}\""),
-        None => write!(s, "null"),
-        // We panic because this is a bug in Specta.
-        v => unreachable!("attempted to export unsupported LiteralType variant {v:?}"),
-    }
-    .expect("writing to a string is an infallible operation");
 }
 
 fn list_dt(

@@ -10,7 +10,7 @@ use super::{DataType, DeprecatedType, Fields, NamedFields, UnnamedFields};
 /// The variants can be either unit variants (no fields), tuple variants (fields in a tuple), or struct variants (fields in a struct).
 ///
 /// An enum is also assigned a repr which follows [Serde repr semantics](https://serde.rs/enum-representations.html).
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Enum {
     pub(crate) repr: Option<EnumRepr>,
     pub(crate) variants: Vec<(Cow<'static, str>, EnumVariant)>,
@@ -64,7 +64,7 @@ impl From<Enum> for DataType {
 
 /// Serde representation of an enum.
 /// Refer to the [Serde documentation](https://serde.rs/enum-representations.html) for more information.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum EnumRepr {
     Untagged,
     External,
@@ -97,7 +97,7 @@ impl EnumRepr {
 }
 
 /// represents a variant of an enum.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct EnumVariant {
     /// Did the user apply a `#[serde(skip)]` or `#[specta(skip)]` attribute.
     ///

@@ -7,7 +7,7 @@ use crate::{TypeCollection, datatype::NamedDataType};
 use super::{DataType, Generic};
 
 /// A reference to a [NamedDataType].
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Reference {
     pub(crate) id: ArcId,
     // TODO: Should this be a map-type???
@@ -16,14 +16,6 @@ pub struct Reference {
 }
 
 impl Reference {
-    #[doc(hidden)] // TODO: I wanna remove this and come up with a better solution for `specta-serde`.
-    pub fn type_identifier(&self) -> String {
-        match &self.id {
-            ArcId::Static(id) => format!("s:{:p}", *id),
-            ArcId::Dynamic(id) => format!("d:{}", Arc::as_ptr(id) as u128),
-        }
-    }
-
     /// Get a reference to a [NamedDataType] from a [TypeCollection].
     pub fn get<'a>(&self, types: &'a TypeCollection) -> Option<&'a NamedDataType> {
         types.0.get(&self.id)?.as_ref()

@@ -8,7 +8,7 @@ use crate::{
 use super::{NamedFields, UnnamedFields};
 
 /// represents a Rust [struct](https://doc.rust-lang.org/std/keyword.struct.html).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Struct {
     pub(crate) fields: Fields,
 }

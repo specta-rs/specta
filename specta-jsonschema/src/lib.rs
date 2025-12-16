@@ -11,8 +11,8 @@ use std::path::Path;
 
 use schemars::schema::{InstanceType, Schema, SingleOrVec};
 use specta::{
-    datatype::{DataType, Enum, EnumVariant, Field, List, Literal, Primitive, Struct},
     TypeCollection,
+    datatype::{DataType, Field, List, Literal, Primitive, Struct},
 };
 
 #[derive(Debug, Clone)]

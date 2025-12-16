@@ -112,7 +112,7 @@ use crate::{Error, Typescript};
 use std::fmt::Write;
 
 use specta::datatype::{
-    DataType, DeprecatedType, Enum, EnumRepr, EnumVariant, Fields, FunctionReturnType, Literal,
+    DataType, DeprecatedType, Enum, EnumRepr, EnumVariant, Fields, FunctionReturnType, Reference,
     Struct, Tuple,
 };
 use specta::internal::{NonSkipField, skip_fields, skip_fields_named};
@@ -262,7 +262,7 @@ pub(crate) fn tuple_datatype(ctx: ExportContext, tuple: &Tuple, types: &TypeColl
 
 pub(crate) fn struct_datatype(
     ctx: ExportContext,
-    sid: Option<SpectaID>,
+    parent_name: Option<&str>,
     strct: &Struct,
     types: &TypeCollection,
     s: &mut String,
@@ -281,11 +281,8 @@ pub(crate) fn struct_datatype(
             let fields = skip_fields_named(named.fields()).collect::<Vec<_>>();
 
             if fields.is_empty() {
-                match (named.tag().as_ref(), sid) {
-                    (Some(tag), Some(sid)) => {
-                        let key = types.get(sid).unwrap().name();
-                        write!(s, r#"{{ "{tag}": "{key}" }}"#)?
-                    }
+                match (named.tag().as_ref(), parent_name) {
+                    (Some(tag), Some(key)) => write!(s, r#"{{ "{tag}": "{key}" }}"#)?,
                     (_, _) => write!(s, "Record<{STRING}, {NEVER}>")?,
                 }
 
@@ -343,8 +340,7 @@ pub(crate) fn struct_datatype(
                 })
                 .collect::<Result<Vec<_>>>()?;
 
-            if let (Some(tag), Some(sid)) = (&named.tag(), sid) {
-                let key = types.get(sid).unwrap().name();
+            if let (Some(tag), Some(key)) = (&named.tag(), parent_name) {
                 unflattened_fields.push(format!("{tag}: \"{key}\""));
             }
 
@@ -748,10 +744,10 @@ fn validate_type_for_tagged_intersection(
         | DataType::List(_)
         | DataType::Map(_)
         | DataType::Generic(_) => Ok(false),
-        DataType::Literal(v) => match v {
-            Literal::None => Ok(true),
-            _ => Ok(false),
-        },
+        // DataType::Literal(v) => match v {
+        //     Literal::None => Ok(true),
+        //     _ => Ok(false),
+        // },
         DataType::Struct(v) => match v.fields() {
             Fields::Unit => Ok(true),
             Fields::Unnamed(_) => {

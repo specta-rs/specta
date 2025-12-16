@@ -5,7 +5,7 @@ use std::borrow::Cow;
 use super::{DataType, DeprecatedType};
 
 /// Data stored within an enum variant or struct.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Fields {
     /// A unit struct.
     ///
@@ -21,7 +21,7 @@ pub enum Fields {
     Named(NamedFields),
 }
 
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Field {
     /// Did the user apply a `#[specta(optional)]` attribute.
     pub(crate) optional: bool,
@@ -132,7 +132,7 @@ impl Field {
 }
 
 /// The fields of an unnamed enum variant.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UnnamedFields {
     pub(crate) fields: Vec<Field>,
 }
@@ -150,7 +150,7 @@ impl UnnamedFields {
 }
 
 /// The fields of an named enum variant or a struct.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NamedFields {
     pub(crate) fields: Vec<(Cow<'static, str>, Field)>,
     pub(crate) tag: Option<Cow<'static, str>>,

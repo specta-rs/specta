@@ -147,7 +147,8 @@ impl<T: Type> Type for Option<T> {
 
 impl<T> Type for std::marker::PhantomData<T> {
     fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Literal(Literal::None)
+        // In practice this is always going to be `null` but this is a better default
+        todo!(); // TODO: Empty tuple???
     }
 }
 

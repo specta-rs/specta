@@ -6,7 +6,7 @@ use std::{
 
 use specta::{
     TypeCollection,
-    datatype::{DataType, Fields, NamedDataType, Reference},
+    datatype::{NamedDataType, Reference},
 };
 
 use crate::{Error, primitives, types};
