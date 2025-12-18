@@ -15,7 +15,15 @@ use specta::{
     },
 };
 
-use crate::{BigIntExportBehavior, Error, JSDoc, Layout, Typescript, legacy::js_doc};
+use crate::{
+    legacy::js_doc,
+    typescript::root_alias_ident,
+    BigIntExportBehavior,
+    Error,
+    JSDoc,
+    Layout,
+    Typescript,
+};
 
 /// Generate an `export Type = ...` Typescript string for a specific [`NamedDataType`].
 ///
@@ -1046,25 +1054,32 @@ fn reference_dt(
         let name = match ts.layout {
             Layout::ModulePrefixedName => {
                 let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
-                s.push_str("_");
+                s.push('_');
                 s.push_str(ndt.name());
                 Cow::Owned(s)
             }
             Layout::Namespaces => {
-                let mut s = "$$specta_ns$$".to_string();
-                for (i, root_module) in ndt.module_path().split("::").enumerate() {
-                    if i != 0 {
-                        s.push_str(".");
+                if ndt.module_path().is_empty() {
+                    ndt.name().clone()
+                } else {
+                    let parts: Vec<&str> = ndt.module_path().split("::").collect();
+                    if let Some((root, rest)) = parts.split_first() {
+                        let mut s = root_alias_ident(root);
+                        if !rest.is_empty() {
+                            s.push('.');
+                            s.push_str(&rest.join("."));
+                        }
+                        s.push('.');
+                        s.push_str(ndt.name());
+                        Cow::Owned(s)
+                    } else {
+                        ndt.name().clone()
                     }
-                    s.push_str(root_module);
                 }
-                s.push_str(".");
-                s.push_str(ndt.name());
-                Cow::Owned(s)
             }
             Layout::Files => {
                 let mut s = ndt.module_path().replace("::", "_");
-                s.push_str("_");
+                s.push('_');
                 s.push_str(ndt.name());
                 Cow::Owned(s)
             }
@@ -1072,7 +1087,7 @@ fn reference_dt(
         };
 
         s.push_str(&name);
-        if r.generics().len() != 0 {
+        if !r.generics().is_empty() {
             s.push('<');
 
             for (i, (_, v)) in r.generics().iter().enumerate() {

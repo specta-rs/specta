@@ -160,68 +160,136 @@ impl Typescript {
                         .push(ndt.clone());
                 }
 
-                fn export_module(
-                    types: &TypeCollection,
-                    ts: &Typescript,
-                    module_types: &mut HashMap<String, Vec<NamedDataType>>,
-                    current_module: &str,
-                    indent: usize,
-                ) -> Result<String, Error> {
-                    let mut out = String::new();
-                    if let Some(types_in_module) = module_types.get_mut(current_module) {
-                        types_in_module.sort_by(|a, b| {
-                            a.name()
-                                .cmp(b.name())
-                                .then(a.module_path().cmp(b.module_path()))
-                                .then(a.location().cmp(&b.location()))
-                        });
-                        for ndt in types_in_module {
-                            out += &"    ".repeat(indent);
-                            out += &primitives::export(ts, types, ndt)?;
-                            out += "\n";
-                        }
+                // Group all modules by their root namespace (first segment)
+                let mut root_namespaces: HashMap<String, Vec<String>> = HashMap::new();
+
+                for module_path in module_types.keys() {
+                    if let Some(root) = module_path.split("::").next() {
+                        root_namespaces
+                            .entry(root.to_string())
+                            .or_default()
+                            .push(module_path.clone());
                     }
-
-                    let mut child_modules = module_types
-                        .keys()
-                        .filter(|k| {
-                            k.starts_with(&format!("{}::", current_module))
-                                && k[current_module.len() + 2..].split("::").count() == 1
-                        })
-                        .cloned()
-                        .collect::<Vec<_>>();
-                    child_modules.sort();
-
-                    for child in child_modules {
-                        let module_name = child.split("::").last().unwrap();
-                        out += &"    ".repeat(indent);
-                        out += &format!("export namespace {module_name} {{\n");
-                        out += &export_module(types, ts, module_types, &child, indent + 1)?;
-                        out += &"    ".repeat(indent);
-                        out += "}\n";
-                    }
-
-                    Ok(out)
                 }
 
-                let mut root_modules = module_types.keys().cloned().collect::<Vec<_>>();
-                root_modules.sort();
+                // Sort root namespaces for consistent output
+                let mut sorted_roots: Vec<_> = root_namespaces.keys().collect();
+                sorted_roots.sort();
 
-                // for root_module in root_modules.iter() {
-                //     out += "import $$specta_ns$$";
-                //     out += root_module;
-                //     out += " = ";
-                //     out += &root_module.replace("::", "_");
-                //     out += ";\n\n";
-                // }
+                let mut root_aliases = Vec::with_capacity(sorted_roots.len());
 
-                for (i, root_module) in root_modules.iter().enumerate() {
+                for (i, root_name) in sorted_roots.iter().enumerate() {
                     if i != 0 {
                         out += "\n";
                     }
-                    out += &format!("export namespace {} {{\n", root_module.replace("::", "_"));
-                    out += &export_module(types, self, &mut module_types, root_module, 1)?;
-                    out += "}";
+
+                    let modules_in_root = root_namespaces.get(*root_name).unwrap();
+
+                    // Sort modules to process them in order
+                    let mut sorted_modules = modules_in_root.clone();
+                    sorted_modules.sort();
+
+                    // Build a tree structure: map from parent path to its direct children  
+                    // This will help us generate namespaces hierarchically
+                    let mut path_children: HashMap<String, BTreeSet<String>> = HashMap::new();
+                    
+                    for module_path in &sorted_modules {
+                        let parts: Vec<&str> = module_path.split("::").collect();
+                        
+                        // For each level, track direct parent-child relationships only
+                        for depth in 0..parts.len() {
+                            let parent = if depth == 0 {
+                                String::new()
+                            } else {
+                                parts[0..depth].join("::")
+                            };
+                            let child_name = parts[depth].to_string();
+                            
+                            path_children
+                                .entry(parent)
+                                .or_default()
+                                .insert(child_name);
+                        }
+                    }
+
+                    // Recursive function to generate nested namespaces
+                    fn write_namespace(
+                        out: &mut String,
+                        current_path: &str,
+                        depth: usize,
+                        path_children: &HashMap<String, BTreeSet<String>>,
+                        module_types: &mut HashMap<String, Vec<NamedDataType>>,
+                        ts: &Typescript,
+                        types: &TypeCollection,
+                    ) -> Result<(), Error> {
+                        let indent = "    ".repeat(depth);
+                        
+                        // Get types for this exact path
+                        let has_types = if let Some(types_in_module) = module_types.get_mut(current_path) {
+                            types_in_module.sort_by(|a, b| {
+                                a.name()
+                                    .cmp(b.name())
+                                    .then(a.module_path().cmp(b.module_path()))
+                                    .then(a.location().cmp(&b.location()))
+                            });
+
+                            for ndt in types_in_module {
+                                *out += &indent;
+                                *out += &primitives::export(ts, types, ndt)?;
+                                *out += "\n";
+                            }
+                            true
+                        } else {
+                            false
+                        };
+
+                        // Get child namespace names
+                        if let Some(child_names) = path_children.get(current_path) {
+                            for (i, child_name) in child_names.iter().enumerate() {
+                                // Add blank line between siblings or after types
+                                if i > 0 || has_types {
+                                    *out += "\n";
+                                }
+                                
+                                *out += &indent;
+                                *out += &format!("export namespace {child_name} {{\n");
+                                
+                                // Build the full path for the child
+                                let child_path = if current_path.is_empty() {
+                                    child_name.clone()
+                                } else {
+                                    format!("{}::{}", current_path, child_name)
+                                };
+                                
+                                write_namespace(out, &child_path, depth + 1, path_children, module_types, ts, types)?;
+                                
+                                *out += &indent;
+                                *out += "}\n";
+                            }
+                        }
+
+                        Ok(())
+                    }
+
+                    // Start with the root namespace
+                    out += &format!("export namespace {root_name} {{\n");
+                    write_namespace(&mut out, root_name, 1, &path_children, &mut module_types, self, types)?;
+                    out += "}\n";
+
+                    if !root_name.is_empty() {
+                        root_aliases.push(format!(
+                            "export import {} = {};\n",
+                            root_alias_ident(root_name),
+                            root_name
+                        ));
+                    }
+                }
+
+                if !root_aliases.is_empty() {
+                    out += "\n";
+                    for alias in root_aliases {
+                        out += &alias;
+                    }
                 }
 
                 Ok(out)
@@ -478,5 +546,113 @@ fn crawl_for_imports(dt: &DataType, types: &TypeCollection, imports: &mut Import
             }
         }
         DataType::Generic(_) => {}
+    }
+}
+
+pub(crate) fn root_alias_ident(root: &str) -> String {
+    let mut alias = String::from("$specta$root$");
+    for ch in root.chars() {
+        if ch == '_' || ch.is_ascii_alphanumeric() {
+            alias.push(ch);
+        } else {
+            alias.push('_');
+        }
+    }
+    alias.push('$');
+    alias
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use specta::{Type, TypeCollection};
+
+    #[derive(Type)]
+    pub struct RootType {
+        data: String,
+    }
+
+    #[derive(Type)]
+    pub struct MainType {
+        nested: dev::another::NestedType,
+        root: RootType,
+    }
+
+    mod dev {
+        use super::*;
+
+        pub mod another {
+            use super::*;
+
+            #[derive(Type)]
+            pub struct NestedType {
+                value: String,
+            }
+
+            pub mod deeply {
+                use super::*;
+
+                #[derive(Type)]
+                pub struct DeeplyNestedType {
+                    inner: NestedType,
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_nested_namespaces_generation() {
+        let types = TypeCollection::default()
+            .register::<RootType>()
+            .register::<MainType>()
+            .register::<dev::another::NestedType>()
+            .register::<dev::another::deeply::DeeplyNestedType>();
+
+        let output = Typescript::new()
+            .layout(Layout::Namespaces)
+            .export(&types)
+            .expect("Should export successfully");
+
+        // The test types are nested under the test module path, so check for the proper nesting
+        // Check that we generate nested namespaces instead of flattened ones
+        assert!(
+            output.contains("export namespace dev {"),
+            "Should contain 'export namespace dev {{'"
+        );
+        assert!(
+            output.contains("export namespace another {"),
+            "Should contain 'export namespace another {{'"
+        );
+
+        // Check that we don't generate flattened namespaces with underscores in root declarations
+        assert!(
+            !output.contains("export namespace dev_another"),
+            "Should not contain flattened namespace names with underscores"
+        );
+
+        // Check that type references use proper dot notation
+        assert!(
+            output.contains("$specta$root$specta_typescript$.typescript.tests.dev.another.NestedType"),
+            "Type references should use alias-based dot notation for namespace access"
+        );
+    }
+
+    #[test]
+    fn test_module_prefixed_name_still_uses_underscores() {
+        let types = TypeCollection::default()
+            .register::<RootType>()
+            .register::<MainType>()
+            .register::<dev::another::NestedType>();
+
+        let output = Typescript::new()
+            .layout(Layout::ModulePrefixedName)
+            .export(&types)
+            .expect("Should export successfully");
+
+        // ModulePrefixedName should still use underscores as before
+        assert!(
+            output.contains("dev_another_NestedType"),
+            "ModulePrefixedName should still use underscores"
+        );
     }
 }

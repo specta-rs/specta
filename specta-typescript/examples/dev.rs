@@ -18,6 +18,21 @@ mod another {
     #[derive(specta::Type)]
     pub struct Bruh {
         field: u32,
+        field2: bruh::Testing,
+    }
+
+    mod bruh {
+        #[derive(specta::Type)]
+        pub struct Testing {
+            field: dev::Testing,
+        }
+
+        mod dev {
+            #[derive(specta::Type)]
+            pub struct Testing {
+                field: u32,
+            }
+        }
     }
 }
 
@@ -34,7 +49,7 @@ mod another {
 // };
 
 fn main() {
-    let mut ts = Typescript::default();
+    let ts = Typescript::default();
 
     // let r = ts.define("string & { _brand: 'a' }");
     // println!(
@@ -45,11 +60,12 @@ fn main() {
     // TODO: Properly handle this with opaque types
     // println!("{:?}", primitives::inline(&Default::default(), &Default::default(), &DataType::String));
 
-    let s = ts
-        .layout(Layout::Namespaces)
-        .export(&TypeCollection::default().register::<nested::Another>())
+    ts.layout(Layout::Namespaces)
+        .export_to(
+            "demo.ts",
+            &TypeCollection::default().register::<nested::Another>(),
+        )
         .unwrap();
-    println!("{s}");
 
     // println!("PTR EQ: {:?}", std::ptr::eq(&ANY, &ANY));
 
