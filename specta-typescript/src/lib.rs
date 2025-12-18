@@ -49,7 +49,6 @@
 )]
 
 mod error;
-mod inline;
 mod js_doc;
 mod legacy; // TODO: Remove this
 pub mod primitives;

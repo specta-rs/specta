@@ -66,27 +66,6 @@ impl NamedDataType {
     }
 
     /// TODO
-    // TODO: Should this take `&mut TypeCollection` to maintain invariants???
-    #[track_caller]
-    pub fn new(types: &mut TypeCollection, dt: DataType) -> Self {
-        let id = ArcId::Dynamic(Default::default());
-
-        // TODO: Ensure this type is registered into the type collection
-        todo!();
-
-        Self {
-            id,
-            name: Cow::Borrowed(""),
-            docs: Cow::Borrowed(""),
-            deprecated: None,
-            module_path: Cow::Borrowed(""),
-            location: Location::caller().to_owned(),
-            generics: Vec::new(),
-            inner: dt,
-        }
-    }
-
-    /// TODO
     // TODO: Problematic to seal + allow generics to be `Cow`
     // TODO: HashMap instead of array for better typesafety??
     pub fn reference(&self, generics: Vec<(Generic, DataType)>, inline: bool) -> Reference {

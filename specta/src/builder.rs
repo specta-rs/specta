@@ -5,10 +5,11 @@
 use std::{borrow::Cow, fmt::Debug, panic::Location};
 
 use crate::{
+    DataType, TypeCollection,
     datatype::{
-        DeprecatedType, EnumVariant, Field, Fields, Generic, NamedFields, Struct, UnnamedFields,
+        ArcId, DeprecatedType, EnumVariant, Field, Fields, Generic, NamedDataType, NamedFields,
+        Struct, UnnamedFields,
     },
-    DataType,
 };
 
 #[derive(Debug, Clone)]
@@ -137,7 +138,6 @@ pub struct NamedDataTypeBuilder {
     pub(crate) docs: Cow<'static, str>,
     pub(crate) deprecated: Option<DeprecatedType>,
     pub(crate) module_path: Cow<'static, str>,
-    pub(crate) location: Location<'static>,
     pub(crate) generics: Vec<Generic>,
     pub(crate) inner: DataType,
 }
@@ -149,7 +149,6 @@ impl NamedDataTypeBuilder {
             docs: Cow::Borrowed(""),
             deprecated: None,
             module_path: Cow::Borrowed("virtual"),
-            location: Location::caller().clone(),
             generics,
             inner: dt,
         }
@@ -171,5 +170,22 @@ impl NamedDataTypeBuilder {
     pub fn deprecated(mut self, deprecated: DeprecatedType) -> Self {
         self.deprecated = Some(deprecated);
         self
+    }
+
+    #[track_caller]
+    pub fn build(self, types: &mut TypeCollection) -> NamedDataType {
+        let ndt = NamedDataType {
+            id: ArcId::Dynamic(Default::default()),
+            name: self.name,
+            docs: self.docs,
+            deprecated: self.deprecated,
+            module_path: self.module_path,
+            location: Location::caller().to_owned(),
+            generics: self.generics,
+            inner: self.inner,
+        };
+
+        types.0.insert(ndt.id.clone(), Some(ndt.clone()));
+        ndt
     }
 }

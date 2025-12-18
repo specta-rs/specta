@@ -173,11 +173,105 @@ pub fn reference(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Resu
 /// The type should be wrapped in a [`NamedDataType`] to provide a proper name.
 ///
 pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<String, Error> {
-    let mut dt = dt.clone();
-    crate::inline::inline(&mut dt, types);
     let mut s = String::new();
-    datatype(&mut s, ts, types, &dt, vec![], false, None, "")?;
+    inline_datatype(&mut s, ts, types, dt, vec![], false, None, "", 0)?;
     Ok(s)
+}
+
+// Internal function to handle inlining without cloning DataType nodes
+fn inline_datatype(
+    s: &mut String,
+    ts: &Typescript,
+    types: &TypeCollection,
+    dt: &DataType,
+    mut location: Vec<Cow<'static, str>>,
+    is_export: bool,
+    parent_name: Option<&str>,
+    prefix: &str,
+    depth: usize,
+) -> Result<(), Error> {
+    // Prevent infinite recursion
+    if depth == 25 {
+        return Err(Error::InvalidName {
+            path: location.join("."),
+            name: "Type recursion limit exceeded during inline expansion".into(),
+        });
+    }
+
+    match dt {
+        DataType::Primitive(p) => s.push_str(primitive_dt(&ts.bigint, p, location)?),
+        DataType::List(l) => {
+            // Inline the list element type
+            let mut dt_str = String::new();
+            crate::legacy::datatype_inner(
+                crate::legacy::ExportContext {
+                    cfg: ts,
+                    path: vec![],
+                    is_export,
+                },
+                &specta::datatype::FunctionReturnType::Value(l.ty().clone()),
+                types,
+                &mut dt_str,
+            )?;
+
+            let dt_str = if (dt_str.contains(' ') && !dt_str.ends_with('}'))
+                || (dt_str.contains(' ') && (dt_str.contains('&') || dt_str.contains('|')))
+            {
+                format!("({dt_str})")
+            } else {
+                dt_str
+            };
+
+            if let Some(length) = l.length() {
+                s.push('[');
+                for n in 0..length {
+                    if n != 0 {
+                        s.push_str(", ");
+                    }
+                    s.push_str(&dt_str);
+                }
+                s.push(']');
+            } else {
+                write!(s, "{dt_str}[]")?;
+            }
+        }
+        DataType::Map(m) => map_dt(s, ts, types, m, location, is_export)?,
+        DataType::Nullable(def) => {
+            inline_datatype(s, ts, types, def, location, is_export, parent_name, prefix, depth + 1)?;
+            let or_null = " | null";
+            if !s.ends_with(&or_null) {
+                s.push_str(or_null);
+            }
+        }
+        DataType::Struct(st) => {
+            crate::legacy::struct_datatype(
+                crate::legacy::ExportContext {
+                    cfg: ts,
+                    path: vec![],
+                    is_export,
+                },
+                parent_name,
+                st,
+                types,
+                s,
+                prefix,
+            )?
+        }
+        DataType::Enum(e) => enum_dt(s, ts, types, e, location, is_export, prefix)?,
+        DataType::Tuple(t) => tuple_dt(s, ts, types, t, location, is_export)?,
+        DataType::Reference(r) => {
+            // Always inline references when in inline mode
+            if let Some(ndt) = r.get(types) {
+                inline_datatype(s, ts, types, ndt.ty(), location, is_export, parent_name, prefix, depth + 1)?;
+            } else {
+                // Fallback to regular reference if type not found
+                reference_dt(s, ts, types, r, location, is_export)?;
+            }
+        }
+        DataType::Generic(g) => s.push_str(g.borrow()),
+    }
+
+    Ok(())
 }
 
 // TODO: private
@@ -915,6 +1009,14 @@ fn reference_dt(
     // TODO: Remove
     is_export: bool,
 ) -> Result<(), Error> {
+    // Check if this reference should be inlined
+    if r.inline() {
+        if let Some(ndt) = r.get(types) {
+            // Inline the referenced type directly without cloning the entire DataType
+            return datatype(s, ts, types, ndt.ty(), location, is_export, None, "");
+        }
+    }
+
     if let Some((_, typescript)) = ts.references.iter().find(|(re, _)| re.ref_eq(r)) {
         s.push_str(typescript);
         return Ok(());

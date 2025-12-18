@@ -10,19 +10,24 @@ use std::{
 };
 
 use serde::Serialize;
-use specta::{NamedType, Type, TypeCollection};
+use specta::{Type, TypeCollection, datatype::DataType};
 use specta_typescript::Any;
 use specta_typescript::{BigIntExportBehavior, Typescript};
 
 // We run tests with the low-level APIs
+#[track_caller]
 pub fn assert_ts_export2<T: Type>() -> Result<String, String> {
     let mut types = TypeCollection::default();
-    T::definition(&mut types);
+    let ndt = match T::definition(&mut types) {
+        DataType::Reference(r) => r.get(&types).expect("Can't find type in `TypeCollection`"),
+        _ => panic!("This type can't be exported!"),
+    };
+
     specta_serde::validate(&types).map_err(|e| e.to_string())?;
     specta_typescript::primitives::export(
         &Typescript::default().bigint(BigIntExportBehavior::Number),
         &types,
-        types.get(T::ID).unwrap(),
+        ndt,
     )
     .map_err(|e| e.to_string())
 }
@@ -129,11 +134,12 @@ pub fn export<T: Type>(ts: &Typescript) -> Result<String, String> {
         }
     }
 
-    let mut ndt = types.get(T::ID).unwrap().clone();
-    specta_typescript::legacy::inline_and_flatten_ndt(&mut ndt, &types);
-    specta_typescript::primitives::export(ts, &types, &ndt)
-        // Allows matching the value. Implementing `PartialEq` on it is really hard.
-        .map_err(|e| e.to_string())
+    // let mut ndt = types.get(T::ID).unwrap().clone();
+    // specta_typescript::legacy::inline_and_flatten_ndt(&mut ndt, &types);
+    // specta_typescript::primitives::export(ts, &types, &ndt)
+    // Allows matching the value. Implementing `PartialEq` on it is really hard.
+    // .map_err(|e| e.to_string())
+    todo!();
 }
 
 fn detect_duplicate_type_names(
@@ -141,16 +147,17 @@ fn detect_duplicate_type_names(
 ) -> Vec<(Cow<'static, str>, Location<'static>, Location<'static>)> {
     let mut errors = Vec::new();
 
-    let mut map = HashMap::with_capacity(types.len());
-    for dt in types.into_unsorted_iter() {
-        if let Some((existing_sid, existing_impl_location)) =
-            map.insert(dt.name().clone(), (dt.sid(), dt.location()))
-        {
-            if existing_sid != dt.sid() {
-                errors.push((dt.name().clone(), dt.location(), existing_impl_location));
-            }
-        }
-    }
+    // let mut map = HashMap::with_capacity(types.len());
+    // for dt in types.into_unsorted_iter() {
+    //     if let Some((existing_sid, existing_impl_location)) =
+    //         map.insert(dt.name().clone(), (dt.sid(), dt.location()))
+    //     {
+    //         if existing_sid != dt.sid() {
+    //             errors.push((dt.name().clone(), dt.location(), existing_impl_location));
+    //         }
+    //     }
+    // }
+    todo!();
 
     errors
 }
@@ -784,7 +791,7 @@ struct Issue374 {
 // so it clashes with our user-defined `Type`.
 mod type_type {
     #[derive(specta::Type)]
-    enum Type {}
+    pub enum Type {}
 
     #[test]
     fn typescript_types() {

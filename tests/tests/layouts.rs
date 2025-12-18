@@ -3,7 +3,7 @@ use std::fs::read_to_string;
 use specta::{
     Type, TypeCollection,
     builder::NamedDataTypeBuilder,
-    datatype::{DataType, Primitive},
+    datatype::{DataType, NamedDataType, Primitive},
 };
 use specta_typescript::Layout;
 
@@ -168,13 +168,17 @@ fn test_formats_without_duplicate_typename() {
 #[test]
 fn test_empty_module_path() {
     let mut types = TypeCollection::default();
-    types
-        .create(NamedDataTypeBuilder::new(
-            "testing",
-            Default::default(),
-            DataType::Primitive(Primitive::i8),
-        ))
-        .unwrap();
+
+    let ndt = NamedDataTypeBuilder::new(
+        "testing",
+        Default::default(),
+        DataType::Primitive(Primitive::i8),
+    )
+    .build(&mut types);
+
+    // types
+    //     .create()
+    //     .unwrap();
 
     // types
     //     .create(

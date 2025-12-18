@@ -4,7 +4,7 @@ use std::{borrow::Cow, path::Path};
 
 use specta::TypeCollection;
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::primitives::{export_type, is_duration_struct};
 
 /// Swift language exporter.
@@ -299,7 +299,7 @@ fn needs_duration_helper(types: &TypeCollection) -> bool {
                 for (_, field) in fields.fields() {
                     if let Some(ty) = field.ty() {
                         if let specta::datatype::DataType::Reference(r) = ty {
-                            if let Some(referenced_ndt) = types.get(r.sid()) {
+                            if let Some(referenced_ndt) = r.get(types) {
                                 if referenced_ndt.name() == "Duration" {
                                     return true;
                                 }
