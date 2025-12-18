@@ -19,4 +19,4 @@ mod error;
 mod validate;
 
 pub use error::Error;
-pub use validate::{validate, validate_dt};
+pub use validate::validate;

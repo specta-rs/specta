@@ -1,11 +1,11 @@
 use attr::*;
-use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens};
 use r#enum::parse_enum;
+use proc_macro2::TokenStream;
+use quote::{ToTokens, format_ident, quote};
 use r#struct::parse_struct;
-use syn::{parse, Data, DeriveInput, GenericParam};
+use syn::{Data, DeriveInput, GenericParam, parse};
 
-use crate::utils::{parse_attrs, unraw_raw_ident, AttributeValue};
+use crate::utils::{AttributeValue, parse_attrs, unraw_raw_ident};
 
 use self::generics::{
     add_type_to_where_clause, generics_with_ident_and_bounds_only, generics_with_ident_only,
@@ -76,7 +76,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 return Err(syn::Error::new(
                     attrs.key.span(),
                     "specta: invalid formatted attribute",
-                ))
+                ));
             }
         }
     }
@@ -92,10 +92,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         }
     });
 
-    //     if container_attrs.inline || container_attrs.transparent {
-    //     let generics = &generics.params;
-    //     quote!(#generics)
-    // } else {
     let shadow_generics = {
         let g = generics.params.iter().map(|param| match param {
             // Pulled from outside
@@ -104,7 +100,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             GenericParam::Type(t) => {
                 let ident = &t.ident;
                 let placeholder_ident = format_ident!("PLACEHOLDER_{}", t.ident);
-                quote!(type #ident = #crate_ref::datatype::GenericPlaceholder<#placeholder_ident>;)
+                quote!(type #ident = datatype::GenericPlaceholder<#placeholder_ident>;)
             }
         });
 
@@ -118,7 +114,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             let ident_str = t.ident.to_string();
             Some(quote!(
                 pub struct #ident;
-                impl #crate_ref::datatype::ConstGenericPlaceholder for #ident {
+                impl datatype::ConstGenericPlaceholder for #ident {
                     const PLACEHOLDER: &'static str = #ident_str;
                 }
             ))
@@ -146,14 +142,14 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let comments = &container_attrs.common.doc;
     let inline = container_attrs.inline;
-    let deprecated = container_attrs.common.deprecated_as_tokens(&crate_ref);
+    let deprecated = container_attrs.common.deprecated_as_tokens();
 
     let reference_generics = generics.params.iter().filter_map(|param| match param {
         GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
         GenericParam::Type(t) => {
             let i = &t.ident;
             let i_str = i.to_string();
-            Some(quote!((#crate_ref::internal::construct::generic_data_type(#i_str), <#i as #crate_ref::Type>::definition(types))))
+            Some(quote!((internal::construct::generic_data_type(#i_str), <#i as #crate_ref::Type>::definition(types))))
         }
     });
 
@@ -168,35 +164,35 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     Ok(quote! {
         #[allow(non_camel_case_types)]
         const _: () = {
-            // This is equivalent to `<Self as #crate_ref::NamedType>::ID` but it's shorter so we use it instead.
-            const SID: #crate_ref::SpectaID = #crate_ref::internal::construct::sid(#name, concat!("::", module_path!(), ":", line!(), ":", column!()));
-
-            #(#generic_placeholders)*
+            use std::borrow::Cow;
+            use #crate_ref::{datatype, internal};
 
             #[automatically_derived]
             impl #bounds #crate_ref::Type for #ident #type_args #where_bound {
-                fn definition(types: &mut #crate_ref::TypeCollection) -> #crate_ref::datatype::DataType {
-                    #crate_ref::internal::register(
-                        types,
-                        #name.into(),
-                        #comments.into(),
-                        #deprecated,
-                        SID,
-                        std::borrow::Cow::Borrowed(module_path!()),
-                        vec![#(#definition_generics),*],
-                        |types| {
-                            #shadow_generics
-                            #inlines
-                        },
-                    );
+                fn definition(types: &mut #crate_ref::TypeCollection) -> datatype::DataType {
+                    #(#generic_placeholders)*
 
-                    #crate_ref::datatype::Reference::construct(SID, [#(#reference_generics),*], #inline).into()
+                    static SENTINEL: () = ();
+                    datatype::DataType::Reference(
+                        datatype::NamedDataType::init_with_sentinel(
+                            vec![#(#reference_generics),*],
+                            #inline,
+                            types,
+                            &SENTINEL,
+                            |types, ndt| {
+                                ndt.set_name(Cow::Borrowed(#name));
+                                ndt.set_docs(Cow::Borrowed(#comments));
+                                ndt.set_deprecated(#deprecated);
+                                ndt.set_module_path(Cow::Borrowed(module_path!()));
+                                *ndt.generics_mut() = vec![#(#definition_generics),*];
+                                ndt.set_ty({
+                                    #shadow_generics
+                                    #inlines
+                                });
+                            }
+                        )
+                    )
                 }
-            }
-
-            #[automatically_derived]
-            impl #bounds #crate_ref::NamedType for #ident #type_args #where_bound {
-                const ID: #crate_ref::SpectaID = SID;
             }
 
             #flatten_impl
@@ -204,5 +200,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             #export
         };
 
-    }.into())
+    }
+    .into())
 }

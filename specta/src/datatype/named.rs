@@ -1,13 +1,14 @@
 use std::{borrow::Cow, panic::Location};
 
-use crate::SpectaID;
-
-use super::{DataType, Generic};
+use crate::{
+    DataType, TypeCollection,
+    datatype::{Generic, Reference, reference::ArcId},
+};
 
 /// A named type represents a non-primitive type capable of being exported as it's own named entity.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NamedDataType {
-    pub(crate) sid: SpectaID,
+    pub(crate) id: ArcId,
     pub(crate) name: Cow<'static, str>,
     pub(crate) docs: Cow<'static, str>,
     pub(crate) deprecated: Option<DeprecatedType>,
@@ -18,14 +19,61 @@ pub struct NamedDataType {
 }
 
 impl NamedDataType {
-    /// The Specta unique identifier for the type
-    pub fn sid(&self) -> SpectaID {
-        self.sid
+    // ## Sentinel
+    //
+    // MUST point to a `static ...: () = ();`. This is used as a unique identifier for the type and `const` or `Box::leak` SHOULD NOT be used.
+    //
+    // If this invariant is violated you will see unexpected behavior.
+    //
+    // ## Why return a reference?
+    //
+    // If a recursive type is being resolved it's possible the `init_with_sentinel` function will be called recursively.
+    // To avoid this we avoid resolving a type that's already marked as being resolved but this means the [NamedDataType]'s [DataType] is unknown at this stage so we can't return it. Instead we always return [Reference]'s as they are always valid.
+    #[doc(hidden)] // This should not be used outside of `specta_macros` as it may have breaking changes.
+    #[track_caller]
+    pub fn init_with_sentinel(
+        generics: Vec<(Generic, DataType)>,
+        inline: bool,
+        types: &mut TypeCollection,
+        sentinel: &'static (),
+        build_ndt: fn(&mut TypeCollection, &mut NamedDataType),
+    ) -> Reference {
+        let id = ArcId::Static(sentinel);
+        let location = Location::caller().to_owned();
+
+        // We have never encountered this type. Start resolving it!
+        if !types.0.contains_key(&id) {
+            types.0.insert(id.clone(), None);
+            let mut ndt = NamedDataType {
+                id: id.clone(),
+                name: Cow::Borrowed(""),
+                docs: Cow::Borrowed(""),
+                deprecated: None,
+                module_path: Cow::Borrowed(""),
+                location,
+                generics: vec![],
+                inner: DataType::Primitive(super::Primitive::i8),
+            };
+            build_ndt(types, &mut ndt);
+            types.0.insert(id.clone(), Some(ndt));
+        }
+
+        Reference {
+            id,
+            generics,
+            inline,
+        }
     }
 
-    /// Set the Specta unique identifier for the type
-    pub fn set_sid(&mut self, sid: SpectaID) {
-        self.sid = sid;
+    /// TODO
+    // TODO: Problematic to seal + allow generics to be `Cow`
+    // TODO: HashMap instead of array for better typesafety??
+    pub fn reference(&self, generics: Vec<(Generic, DataType)>, inline: bool) -> Reference {
+        Reference {
+            id: self.id.clone(),
+            generics,
+            inline,
+        }
     }
 
     /// The name of the type

@@ -1,12 +1,12 @@
-use std::{
-    collections::HashMap,
-    sync::{Mutex, OnceLock, PoisonError},
-};
+use std::sync::{Mutex, OnceLock, PoisonError};
 
-use crate::{NamedType, SpectaID, TypeCollection};
+use crate::{Type, TypeCollection};
 
 // Global type store for collecting custom types to export.
-static TYPES: OnceLock<Mutex<HashMap<SpectaID, fn(&mut TypeCollection)>>> = OnceLock::new();
+//
+// We intentionally store functions over a `TypeCollection` directly to ensure any internal panics aren't done in CTOR.
+#[allow(clippy::type_complexity)]
+static TYPES: OnceLock<Mutex<Vec<fn(&mut TypeCollection)>>> = OnceLock::new();
 
 /// Get the global type store containing all automatically registered types.
 ///
@@ -15,14 +15,13 @@ static TYPES: OnceLock<Mutex<HashMap<SpectaID, fn(&mut TypeCollection)>>> = Once
 /// Note that when enabling the `export` feature, you will not be able to enable the `unsafe_code` lint as [`ctor`](https://docs.rs/ctor) (which is used internally) is marked unsafe.
 ///
 pub fn export() -> TypeCollection {
-    // TODO: Make `TYPES` should just hold a `TypeCollection` directly???
     let types = TYPES
         .get_or_init(Default::default)
         .lock()
         .unwrap_or_else(PoisonError::into_inner);
 
     let mut map = TypeCollection::default();
-    for (_, export) in types.iter() {
+    for export in types.iter() {
         export(&mut map);
     }
     map
@@ -30,22 +29,19 @@ pub fn export() -> TypeCollection {
 
 #[doc(hidden)]
 pub mod internal {
-    use std::sync::PoisonError;
-
     use super::*;
 
     // Called within ctor functions to register a type.
     #[doc(hidden)]
-    pub fn register<T: NamedType>() {
-        let mut types = TYPES
+    pub fn register<T: Type>() {
+        TYPES
             .get_or_init(Default::default)
             .lock()
-            .unwrap_or_else(PoisonError::into_inner);
-
-        types.insert(T::ID, |types| {
-            // The side-effect of this is registering the type.
-            T::definition(types);
-        });
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(|types| {
+                // The side-effect of this is registering the type.
+                T::definition(types);
+            });
     }
 
     // We expose this for the macros

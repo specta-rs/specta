@@ -5,7 +5,7 @@
 //  - Remove dependency on `serde_json`
 //  - Don't ignore doctests
 
-use specta::{DataType, Type, TypeCollection, datatype::Literal};
+use specta::{DataType, Type, TypeCollection};
 
 #[doc(hidden)]
 pub use serde_json;
@@ -33,11 +33,11 @@ pub use serde_json;
 
 pub struct True;
 
-impl Type for True {
-    fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Literal(Literal::bool(true))
-    }
-}
+// impl Type for True {
+//     fn definition(_: &mut TypeCollection) -> DataType {
+//         DataType::Literal(Literal::bool(true))
+//     }
+// }
 
 #[cfg(feature = "serde")]
 impl serde::Serialize for True {
@@ -51,11 +51,11 @@ impl serde::Serialize for True {
 
 pub struct False;
 
-impl Type for False {
-    fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Literal(Literal::bool(false))
-    }
-}
+// impl Type for False {
+//     fn definition(_: &mut TypeCollection) -> DataType {
+//         DataType::Literal(Literal::bool(false))
+//     }
+// }
 
 #[cfg(feature = "serde")]
 impl serde::Serialize for False {

@@ -16,14 +16,11 @@ pub mod export;
 pub mod function;
 #[doc(hidden)]
 pub mod internal;
-mod specta_id;
 mod r#type;
 mod type_collection;
 
 // TODO: Can we just move the trait here or `#[doc(inline)]`
-pub use r#type::{Flatten, NamedType, Type};
-// #[doc(inline)]
-pub use specta_id::SpectaID;
+pub use r#type::{Flatten, Type};
 pub use type_collection::TypeCollection;
 
 #[doc(inline)]
@@ -41,10 +38,12 @@ pub use specta_macros::Type;
 #[cfg_attr(docsrs, doc(cfg(all(feature = "derive", feature = "function"))))]
 pub use specta_macros::specta;
 
+// TODO: Remove this for major
 // This existing is really a mistake but it's depended on by the Tauri alpha's so keeping it for now.
 #[doc(hidden)]
 pub use datatype::DataType;
 
+// TODO: Remove this for major
 // To ensure Tauri doesn't have a breaking change.
 #[doc(hidden)]
 pub type TypeMap = TypeCollection;

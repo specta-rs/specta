@@ -3,8 +3,8 @@
 use std::borrow::Cow;
 
 use specta::{
+    TypeCollection,
     datatype::{DataType, Primitive},
-    SpectaID, TypeCollection,
 };
 
 use crate::error::{Error, Result};
@@ -44,7 +44,7 @@ pub fn export_type(
     }
 
     // Generate the type definition
-    let type_def = datatype_to_swift(swift, types, ndt.ty(), vec![], false, Some(ndt.sid()))?;
+    let type_def = datatype_to_swift(swift, types, ndt.ty(), vec![], false, None)?;
 
     // Format based on type
     match ndt.ty() {
@@ -116,13 +116,13 @@ pub fn export_type(
                 name, generics, protocol_part
             ));
             let enum_body =
-                enum_to_swift(swift, types, e, vec![], false, Some(ndt.sid()), Some(&name))?;
+                enum_to_swift(swift, types, e, vec![], false, None, Some(&name))?;
             result.push_str(&enum_body);
             result.push_str("}");
 
             // Generate struct definitions for named field variants
             let struct_definitions =
-                generate_enum_structs(swift, types, e, vec![], false, Some(ndt.sid()), &name)?;
+                generate_enum_structs(swift, types, e, vec![], false, None, &name)?;
             result.push_str(&struct_definitions);
 
             // Generate custom Codable implementation for enums with struct variants
@@ -147,20 +147,20 @@ pub fn datatype_to_swift(
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
     is_export: bool,
-    sid: Option<SpectaID>,
+    reference: Option<&specta::datatype::Reference>,
 ) -> Result<String> {
     // Check for special standard library types first
-    if let Some(special_type) = is_special_std_type(types, sid) {
+    if let Some(special_type) = is_special_std_type(types, reference) {
         return Ok(special_type);
     }
 
     match dt {
         DataType::Primitive(p) => primitive_to_swift(p),
-        DataType::Literal(l) => literal_to_swift(l),
+        // DataType::Literal(l) => literal_to_swift(l),
         DataType::List(l) => list_to_swift(swift, types, l),
         DataType::Map(m) => map_to_swift(swift, types, m),
         DataType::Nullable(def) => {
-            let inner = datatype_to_swift(swift, types, def, location, is_export, sid)?;
+            let inner = datatype_to_swift(swift, types, def, location, is_export, None)?;
             Ok(match swift.optionals {
                 crate::swift::OptionalStyle::QuestionMark => format!("{}?", inner),
                 crate::swift::OptionalStyle::Optional => format!("Optional<{}>", inner),
@@ -171,9 +171,9 @@ pub fn datatype_to_swift(
             if is_duration_struct(s) {
                 return Ok("RustDuration".to_string());
             }
-            struct_to_swift(swift, types, s, location, is_export, sid)
+            struct_to_swift(swift, types, s, location, is_export, None)
         }
-        DataType::Enum(e) => enum_to_swift(swift, types, e, location, is_export, sid, None),
+        DataType::Enum(e) => enum_to_swift(swift, types, e, location, is_export, None, None),
         DataType::Tuple(t) => tuple_to_swift(swift, types, t),
         DataType::Reference(r) => reference_to_swift(swift, types, r),
         DataType::Generic(g) => generic_to_swift(swift, g),
@@ -199,9 +199,9 @@ pub fn is_duration_struct(s: &specta::datatype::Struct) -> bool {
 }
 
 /// Check if a type is a special standard library type that needs special handling
-fn is_special_std_type(types: &TypeCollection, sid: Option<SpectaID>) -> Option<String> {
-    if let Some(sid) = sid {
-        if let Some(ndt) = types.get(sid) {
+fn is_special_std_type(types: &TypeCollection, reference: Option<&specta::datatype::Reference>) -> Option<String> {
+    if let Some(r) = reference {
+        if let Some(ndt) = r.get(types) {
             // Check for std::time::Duration
             if ndt.name() == "Duration" {
                 return Some("RustDuration".to_string());
@@ -246,28 +246,28 @@ fn primitive_to_swift(primitive: &Primitive) -> Result<String> {
     })
 }
 
-/// Convert literal types to Swift.
-fn literal_to_swift(literal: &specta::datatype::Literal) -> Result<String> {
-    Ok(match literal {
-        specta::datatype::Literal::i8(v) => v.to_string(),
-        specta::datatype::Literal::i16(v) => v.to_string(),
-        specta::datatype::Literal::i32(v) => v.to_string(),
-        specta::datatype::Literal::u8(v) => v.to_string(),
-        specta::datatype::Literal::u16(v) => v.to_string(),
-        specta::datatype::Literal::u32(v) => v.to_string(),
-        specta::datatype::Literal::f32(v) => v.to_string(),
-        specta::datatype::Literal::f64(v) => v.to_string(),
-        specta::datatype::Literal::bool(v) => v.to_string(),
-        specta::datatype::Literal::String(s) => format!("\"{}\"", s),
-        specta::datatype::Literal::char(c) => format!("\"{}\"", c),
-        specta::datatype::Literal::None => "nil".to_string(),
-        _ => {
-            return Err(Error::UnsupportedType(
-                "Unsupported literal type".to_string(),
-            ))
-        }
-    })
-}
+// /// Convert literal types to Swift.
+// fn literal_to_swift(literal: &specta::datatype::Literal) -> Result<String> {
+//     Ok(match literal {
+//         specta::datatype::Literal::i8(v) => v.to_string(),
+//         specta::datatype::Literal::i16(v) => v.to_string(),
+//         specta::datatype::Literal::i32(v) => v.to_string(),
+//         specta::datatype::Literal::u8(v) => v.to_string(),
+//         specta::datatype::Literal::u16(v) => v.to_string(),
+//         specta::datatype::Literal::u32(v) => v.to_string(),
+//         specta::datatype::Literal::f32(v) => v.to_string(),
+//         specta::datatype::Literal::f64(v) => v.to_string(),
+//         specta::datatype::Literal::bool(v) => v.to_string(),
+//         specta::datatype::Literal::String(s) => format!("\"{}\"", s),
+//         specta::datatype::Literal::char(c) => format!("\"{}\"", c),
+//         specta::datatype::Literal::None => "nil".to_string(),
+//         _ => {
+//             return Err(Error::UnsupportedType(
+//                 "Unsupported literal type".to_string(),
+//             ));
+//         }
+//     })
+// }
 
 /// Convert list types to Swift arrays.
 fn list_to_swift(
@@ -297,7 +297,7 @@ fn struct_to_swift(
     s: &specta::datatype::Struct,
     location: Vec<Cow<'static, str>>,
     is_export: bool,
-    sid: Option<SpectaID>,
+    _reference: Option<&specta::datatype::Reference>,
 ) -> Result<String> {
     match s.fields() {
         specta::datatype::Fields::Unit => Ok("Void".to_string()),
@@ -312,7 +312,7 @@ fn struct_to_swift(
                     &fields.fields()[0].ty().unwrap(),
                     location,
                     is_export,
-                    sid,
+                    None,
                 )?;
                 Ok(format!("    let value: {}\n", field_type))
             } else {
@@ -325,7 +325,7 @@ fn struct_to_swift(
                         field.ty().unwrap(),
                         location.clone(),
                         is_export,
-                        sid,
+                        None,
                     )?;
                     result.push_str(&format!("    public let field{}: {}\n", i, field_type));
                 }
@@ -338,7 +338,7 @@ fn struct_to_swift(
 
             for (original_field_name, field) in fields.fields() {
                 let field_type = if let Some(ty) = field.ty() {
-                    datatype_to_swift(swift, types, ty, location.clone(), is_export, sid)?
+                    datatype_to_swift(swift, types, ty, location.clone(), is_export, None)?
                 } else {
                     continue;
                 };
@@ -448,7 +448,7 @@ fn enum_to_swift(
     e: &specta::datatype::Enum,
     location: Vec<Cow<'static, str>>,
     is_export: bool,
-    sid: Option<SpectaID>,
+    _reference: Option<&specta::datatype::Reference>,
     enum_name: Option<&str>,
 ) -> Result<String> {
     let mut result = String::new();
@@ -490,7 +490,7 @@ fn enum_to_swift(
                                 f.ty().unwrap(),
                                 location.clone(),
                                 is_export,
-                                sid,
+                                None,
                             )
                         })
                         .collect::<std::result::Result<Vec<_>, _>>()?
@@ -528,7 +528,7 @@ fn generate_enum_structs(
     e: &specta::datatype::Enum,
     location: Vec<Cow<'static, str>>,
     is_export: bool,
-    sid: Option<SpectaID>,
+    _reference: Option<&specta::datatype::Reference>,
     enum_name: &str,
 ) -> Result<String> {
     let mut result = String::new();
@@ -551,7 +551,7 @@ fn generate_enum_structs(
                 for (original_field_name, field) in fields.fields() {
                     if let Some(ty) = field.ty() {
                         let field_type =
-                            datatype_to_swift(swift, types, ty, location.clone(), is_export, sid)?;
+                            datatype_to_swift(swift, types, ty, location.clone(), is_export, None)?;
                         let optional_marker = if field.optional() { "?" } else { "" };
                         let swift_field_name = swift.naming.convert_field(original_field_name);
                         result.push_str(&format!(
@@ -638,7 +638,7 @@ fn reference_to_swift(
     r: &specta::datatype::Reference,
 ) -> Result<String> {
     // Get the name from the TypeCollection using the SID
-    let name = if let Some(ndt) = types.get(r.sid()) {
+    let name = if let Some(ndt) = r.get(types) {
         swift.naming.convert(ndt.name())
     } else {
         return Err(Error::InvalidIdentifier(

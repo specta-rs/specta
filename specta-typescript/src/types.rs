@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 
 use specta::{
+    Type, TypeCollection,
     datatype::{DataType, Reference},
-    NamedType, Type, TypeCollection,
 };
 
 /// Cast a Rust type to a Typescript `any` type.
@@ -39,17 +39,15 @@ use specta::{
 /// ```
 pub struct Any<T = ()>(T);
 
-impl<T> Type for Any<T> {
-    fn definition(types: &mut TypeCollection) -> DataType {
-        DataType::Reference(Reference::construct(Self::ID, [], false))
-    }
-}
+pub(crate) static ANY_REFERENCE: Reference = Reference::opaque_from_sentinel({
+    static SENTINEL: () = ();
+    &SENTINEL
+});
 
-impl<T> NamedType for Any<T> {
-    const ID: specta::SpectaID = specta::internal::construct::sid(
-        "Any",
-        concat!("::", module_path!(), ":", line!(), ":", column!()),
-    );
+impl<T> Type for Any<T> {
+    fn definition(_: &mut TypeCollection) -> DataType {
+        DataType::Reference(ANY_REFERENCE.clone())
+    }
 }
 
 impl<T: Debug> Debug for Any<T> {
@@ -113,17 +111,15 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
 /// ```
 pub struct Unknown<T = ()>(T);
 
-impl<T> Type for Unknown<T> {
-    fn definition(types: &mut TypeCollection) -> DataType {
-        DataType::Reference(Reference::construct(Self::ID, [], false))
-    }
-}
+pub(crate) static UNKNOWN_REFERENCE: Reference = Reference::opaque_from_sentinel({
+    static SENTINEL: () = ();
+    &SENTINEL
+});
 
-impl<T> NamedType for Unknown<T> {
-    const ID: specta::SpectaID = specta::internal::construct::sid(
-        "Unknown",
-        concat!("::", module_path!(), ":", line!(), ":", column!()),
-    );
+impl<T> Type for Unknown<T> {
+    fn definition(_: &mut TypeCollection) -> DataType {
+        DataType::Reference(UNKNOWN_REFERENCE.clone())
+    }
 }
 
 impl<T: Debug> Debug for Unknown<T> {
@@ -187,17 +183,15 @@ impl<T: serde::Serialize> serde::Serialize for Unknown<T> {
 /// ```
 pub struct Never<T = ()>(T);
 
-impl<T> Type for Never<T> {
-    fn definition(types: &mut TypeCollection) -> DataType {
-        DataType::Reference(Reference::construct(Self::ID, [], false))
-    }
-}
+pub(crate) static NEVER_REFERENCE: Reference = Reference::opaque_from_sentinel({
+    static SENTINEL: () = ();
+    &SENTINEL
+});
 
-impl<T> NamedType for Never<T> {
-    const ID: specta::SpectaID = specta::internal::construct::sid(
-        "Unknown",
-        concat!("::", module_path!(), ":", line!(), ":", column!()),
-    );
+impl<T> Type for Never<T> {
+    fn definition(_: &mut TypeCollection) -> DataType {
+        DataType::Reference(NEVER_REFERENCE.clone())
+    }
 }
 
 impl<T: Debug> Debug for Never<T> {

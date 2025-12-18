@@ -1,6 +1,6 @@
 //! The plan is to try and move these into the ecosystem for the v2 release.
 use super::macros::*;
-use crate::{datatype::*, Flatten, Type, TypeCollection};
+use crate::{Flatten, Type, TypeCollection, datatype::*};
 
 use std::borrow::Cow;
 
@@ -96,7 +96,7 @@ const _: () = {
 
 #[cfg(feature = "serde_yaml")]
 const _: () = {
-    use serde_yaml::{value::TaggedValue, Mapping, Number, Sequence, Value};
+    use serde_yaml::{Mapping, Number, Sequence, Value, value::TaggedValue};
 
     #[derive(Type)]
     #[specta(rename = "YamlValue", untagged, remote = Value, crate = crate, export = false)]
@@ -190,7 +190,7 @@ const _: () = {
 
 #[cfg(feature = "toml")]
 const _: () = {
-    use toml::{value::Array, value::Datetime, value::Table, Value};
+    use toml::{Value, value::Array, value::Datetime, value::Table};
 
     impl_for_map!(toml::map::Map<K, V> as "Map");
     impl<K: Type, V: Type> Flatten for toml::map::Map<K, V> {}

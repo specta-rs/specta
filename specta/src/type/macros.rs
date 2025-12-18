@@ -42,10 +42,6 @@ macro_rules! _impl_containers {
             }
         }
 
-        impl<T: NamedType> NamedType for $container<T> {
-            const ID: SpectaID = T::ID;
-        }
-
         impl<T: Flatten> Flatten for $container<T> {}
     )+}
 }

@@ -34,14 +34,14 @@
 // /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string with an export.
 // ///
 // /// Eg. `export const Foo = z.object({ demo: z.string() });`
-// pub fn export_ref<T: NamedType>(_: &T, conf: &ExportConfig) -> Output {
+// pub fn export_ref<T: Type>(_: &T, conf: &ExportConfig) -> Output {
 //     export::<T>(conf)
 // }
 
 // /// Convert a type which implements [`Type`](crate::Type) to a TypeScript string with an export.
 // ///
 // /// Eg. `export const Foo = z.object({ demo: string; });`
-// pub fn export<T: NamedType>(conf: &ExportConfig) -> Output {
+// pub fn export<T: Type>(conf: &ExportConfig) -> Output {
 //     let mut types = TypeCollection::default();
 //     let named_data_type = T::definition_named_data_type(&mut types);
 //     // is_valid_ty(&named_data_type.inner, &types)?;

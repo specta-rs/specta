@@ -1,10 +1,10 @@
 use crate::{
     r#type::field::construct_field,
-    utils::{parse_attrs, unraw_raw_ident, AttributeValue},
+    utils::{AttributeValue, parse_attrs, unraw_raw_ident},
 };
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
-use syn::{spanned::Spanned, DataStruct, Field, Fields};
+use quote::{ToTokens, quote};
+use syn::{DataStruct, Field, Fields, spanned::Spanned};
 
 use super::attr::*;
 
@@ -30,7 +30,7 @@ pub fn decode_field_attrs(field: &Field) -> syn::Result<FieldAttr> {
                 return Err(syn::Error::new(
                     attrs.key.span(),
                     "specta: invalid formatted attribute",
-                ))
+                ));
             }
         }
     }
@@ -84,7 +84,7 @@ pub fn parse_struct(
         //     //     }
         //     // });
 
-        //     // quote!(#crate_ref::datatype::inline::<#field_ty>(types))
+        //     // quote!(datatype::inline::<#field_ty>(types))
         //     todo!();
         // } else {
         //     quote!(<#field_ty as #crate_ref::Type>::definition(types))
@@ -123,7 +123,7 @@ pub fn parse_struct(
                     .map(|t| quote!(Some(#t.into())))
                     .unwrap_or(quote!(None));
 
-                quote!(#crate_ref::internal::construct::fields_named(vec![#(#fields),*], #tag))
+                quote!(internal::construct::fields_named(vec![#(#fields),*], #tag))
             }
             Fields::Unnamed(_) => {
                 let fields = data
@@ -140,12 +140,12 @@ pub fn parse_struct(
                     })
                     .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                quote!(#crate_ref::internal::construct::fields_unnamed(vec![#(#fields),*]))
+                quote!(internal::construct::fields_unnamed(vec![#(#fields),*]))
             }
-            Fields::Unit => quote!(#crate_ref::internal::construct::fields_unit()),
+            Fields::Unit => quote!(internal::construct::fields_unit()),
         };
 
-        quote!(#crate_ref::datatype::DataType::Struct(#crate_ref::internal::construct::r#struct(#fields)))
+        quote!(datatype::DataType::Struct(internal::construct::r#struct(#fields)))
     };
 
     Ok((definition, true))
