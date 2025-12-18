@@ -9,7 +9,3 @@
 #[cfg(feature = "serde")]
 #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 mod selection;
-
-#[cfg(feature = "unstable_json_macro")]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable_json_macro")))]
-pub mod json;

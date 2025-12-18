@@ -21,9 +21,6 @@ default = []
 ## Support for [serde](https://serde.rs)
 serde = ["dep:serde"]
 
-## Enable the experimental `specta::json` macro.
-unstable_json_macro = ["dep:serde_json", "dep:serde"]
-
 [lints]
 workspace = true
 
