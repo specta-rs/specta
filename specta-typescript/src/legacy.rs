@@ -1,9 +1,8 @@
 // TODO: Drop this stuff
 
-use std::collections::{BTreeSet, HashSet};
+use std::borrow::Borrow;
+use std::collections::BTreeSet;
 use std::{borrow::Cow, fmt};
-
-pub use crate::inline::inline_and_flatten_ndt;
 
 /// Describes where an error occurred.
 #[derive(Debug, PartialEq)]
@@ -25,8 +24,8 @@ impl fmt::Display for NamedLocation {
 
 #[derive(Clone, Debug)]
 pub(crate) enum PathItem {
-    Type(Cow<'static, str>),
-    TypeExtended(Cow<'static, str>, &'static str),
+    // Type(Cow<'static, str>),
+    // TypeExtended(Cow<'static, str>, &'static str),
     Field(Cow<'static, str>),
     Variant(Cow<'static, str>),
 }
@@ -62,16 +61,16 @@ impl ExportPath {
         let mut path = path.iter().peekable();
         while let Some(item) = path.next() {
             s.push_str(match item {
-                PathItem::Type(v) => v,
-                PathItem::TypeExtended(_, loc) => loc,
+                // PathItem::Type(v) => v,
+                // PathItem::TypeExtended(_, loc) => loc,
                 PathItem::Field(v) => v,
                 PathItem::Variant(v) => v,
             });
 
             if let Some(next) = path.peek() {
                 s.push_str(match next {
-                    PathItem::Type(_) => " -> ",
-                    PathItem::TypeExtended(_, _) => " -> ",
+                    // PathItem::Type(_) => " -> ",
+                    // PathItem::TypeExtended(_, _) => " -> ",
                     PathItem::Field(_) => ".",
                     PathItem::Variant(_) => "::",
                 });
@@ -107,17 +106,17 @@ impl fmt::Display for ExportPath {
     }
 }
 
-use specta::{SpectaID, TypeCollection};
+use specta::TypeCollection;
 
 use crate::reserved_names::RESERVED_TYPE_NAMES;
 use crate::{Error, Typescript};
 use std::fmt::Write;
 
 use specta::datatype::{
-    DataType, DeprecatedType, Enum, EnumRepr, EnumVariant, Fields, FunctionReturnType, Literal,
-    NamedDataType, Struct, Tuple,
+    DataType, DeprecatedType, Enum, EnumRepr, EnumVariant, Fields, FunctionReturnType, Generic,
+    Reference, Struct, Tuple,
 };
-use specta::internal::{skip_fields, skip_fields_named, NonSkipField};
+use specta::internal::{NonSkipField, skip_fields, skip_fields_named};
 
 #[allow(missing_docs)]
 pub(crate) type Result<T> = std::result::Result<T, Error>;
@@ -131,19 +130,20 @@ fn inner_comments(
     docs: &Cow<'static, str>,
     other: String,
     start_with_newline: bool,
+    prefix: &str,
 ) -> String {
     if !ctx.is_export {
         return other;
     }
 
-    let comments = js_doc_builder(docs, deprecated).build();
+    let comments = js_doc(docs, deprecated);
 
-    let prefix = match start_with_newline && !comments.is_empty() {
-        true => "\n",
-        false => "",
+    let (prefix_a, prefix_b) = match start_with_newline && !comments.is_empty() {
+        true => ("\n", prefix),
+        false => ("", ""),
     };
 
-    format!("{prefix}{comments}{other}")
+    format!("{prefix_a}{prefix_b}{comments}{other}")
 }
 
 pub(crate) fn datatype_inner(
@@ -178,7 +178,7 @@ pub(crate) fn datatype_inner(
         }
     };
 
-    crate::primitives::datatype(s, ctx.cfg, types, typ, vec![], ctx.is_export, None)
+    crate::primitives::datatype(s, ctx.cfg, types, typ, vec![], ctx.is_export, None, "")
 }
 
 // Can be used with `StructUnnamedFields.fields` or `EnumNamedFields.fields`
@@ -187,8 +187,9 @@ fn unnamed_fields_datatype(
     fields: &[NonSkipField],
     types: &TypeCollection,
     s: &mut String,
+    prefix: &str,
 ) -> Result<()> {
-    Ok(match fields {
+    match fields {
         [(field, ty)] => {
             let mut v = String::new();
             datatype_inner(
@@ -203,6 +204,7 @@ fn unnamed_fields_datatype(
                 field.docs(),
                 v,
                 true,
+                prefix,
             ));
         }
         fields => {
@@ -226,16 +228,19 @@ fn unnamed_fields_datatype(
                     field.docs(),
                     v,
                     true,
+                    prefix,
                 ));
             }
 
             s.push(']');
         }
-    })
+    }
+
+    Ok(())
 }
 
 pub(crate) fn tuple_datatype(ctx: ExportContext, tuple: &Tuple, types: &TypeCollection) -> Output {
-    match &tuple.elements()[..] {
+    match &tuple.elements() {
         [] => Ok(NULL.to_string()),
         tys => Ok(format!(
             "[{}]",
@@ -258,30 +263,31 @@ pub(crate) fn tuple_datatype(ctx: ExportContext, tuple: &Tuple, types: &TypeColl
 
 pub(crate) fn struct_datatype(
     ctx: ExportContext,
-    sid: Option<SpectaID>,
+    parent_name: Option<&str>,
     strct: &Struct,
     types: &TypeCollection,
     s: &mut String,
+    prefix: &str,
 ) -> Result<()> {
-    Ok(match &strct.fields() {
+    match &strct.fields() {
         Fields::Unit => s.push_str(NULL),
         Fields::Unnamed(unnamed) => unnamed_fields_datatype(
             ctx,
             &skip_fields(unnamed.fields()).collect::<Vec<_>>(),
             types,
             s,
+            prefix,
         )?,
         Fields::Named(named) => {
             let fields = skip_fields_named(named.fields()).collect::<Vec<_>>();
 
             if fields.is_empty() {
-                return Ok(match (named.tag().as_ref(), sid) {
-                    (Some(tag), Some(sid)) => {
-                        let key = types.get(sid).unwrap().name();
-                        write!(s, r#"{{ "{tag}": "{key}" }}"#)?
-                    }
+                match (named.tag().as_ref(), parent_name) {
+                    (Some(tag), Some(key)) => write!(s, r#"{{ "{tag}": "{key}" }}"#)?,
                     (_, _) => write!(s, "Record<{STRING}, {NEVER}>")?,
-                });
+                }
+
+                return Ok(());
             }
 
             let (flattened, non_flattened): (Vec<_>, Vec<_>) =
@@ -304,6 +310,7 @@ pub(crate) fn struct_datatype(
                             field.docs(),
                             format!("({s})"),
                             true,
+                            prefix,
                         )
                     })
                 })
@@ -329,17 +336,28 @@ pub(crate) fn struct_datatype(
                         field.docs(),
                         other,
                         true,
+                        prefix,
                     ))
                 })
                 .collect::<Result<Vec<_>>>()?;
 
-            if let (Some(tag), Some(sid)) = (&named.tag(), sid) {
-                let key = types.get(sid).unwrap().name();
+            if let (Some(tag), Some(key)) = (&named.tag(), parent_name) {
                 unflattened_fields.push(format!("{tag}: \"{key}\""));
             }
 
             if !unflattened_fields.is_empty() {
-                field_sections.push(format!("{{ {} }}", unflattened_fields.join("; ")));
+                let mut s = "{ ".to_string();
+
+                for field in unflattened_fields {
+                    // TODO: Inline or not for newline?
+                    // s.push_str(&format!("{field}; "));
+                    s.push_str(&format!("\n{prefix}\t{field},"));
+                }
+
+                s.push('\n');
+                s.push_str(prefix);
+                s.push('}');
+                field_sections.push(s);
             }
 
             // TODO: Do this more efficiently
@@ -351,7 +369,9 @@ pub(crate) fn struct_datatype(
                 .collect::<Vec<_>>();
             s.push_str(&field_sections.join(" & "));
         }
-    })
+    }
+
+    Ok(())
 }
 
 fn enum_variant_datatype(
@@ -359,6 +379,7 @@ fn enum_variant_datatype(
     types: &TypeCollection,
     name: Cow<'static, str>,
     variant: &EnumVariant,
+    prefix: &str,
 ) -> Result<Option<String>> {
     match &variant.fields() {
         // TODO: Remove unreachable in type system
@@ -391,6 +412,7 @@ fn enum_variant_datatype(
                             field.docs(),
                             other,
                             true,
+                            prefix,
                         ))
                     })
                     .collect::<Result<Vec<_>>>()?,
@@ -438,12 +460,13 @@ pub(crate) fn enum_datatype(
     e: &Enum,
     types: &TypeCollection,
     s: &mut String,
+    prefix: &str,
 ) -> Result<()> {
     if e.variants().is_empty() {
         return Ok(write!(s, "{NEVER}")?);
     }
 
-    Ok(match &e.repr().unwrap_or(&EnumRepr::External) {
+    match &e.repr().unwrap_or(&EnumRepr::External) {
         EnumRepr::Untagged => {
             let mut variants = e
                 .variants()
@@ -461,9 +484,11 @@ pub(crate) fn enum_datatype(
                                 types,
                                 name.clone(),
                                 variant,
+                                prefix,
                             )?
                             .expect("Invalid Serde type"),
                             true,
+                            prefix,
                         ),
                     })
                 })
@@ -505,7 +530,13 @@ pub(crate) fn enum_datatype(
 
                                 let mut typ = String::new();
 
-                                unnamed_fields_datatype(ctx.clone(), &fields, types, &mut typ)?;
+                                unnamed_fields_datatype(
+                                    ctx.clone(),
+                                    &fields,
+                                    types,
+                                    &mut typ,
+                                    prefix,
+                                )?;
 
                                 if dont_join_ty {
                                     format!("({{ {tag}: {sanitised_name} }})")
@@ -541,6 +572,7 @@ pub(crate) fn enum_datatype(
                                     types,
                                     variant_name.clone(),
                                     variant,
+                                    prefix,
                                 )?;
                                 let sanitised_name = sanitise_key(variant_name.clone(), false);
 
@@ -560,6 +592,7 @@ pub(crate) fn enum_datatype(
                                     types,
                                     variant_name.clone(),
                                     variant,
+                                    prefix,
                                 )?;
 
                                 let mut s = String::new();
@@ -614,33 +647,17 @@ pub(crate) fn enum_datatype(
                             }
                         },
                         true,
+                        prefix,
                     ))
                 })
                 .collect::<Result<Vec<_>>>()?;
             variants.dedup();
             s.push_str(&variants.join(" | "));
         }
-    })
-}
+    }
 
-// impl std::fmt::Display for LiteralType {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         match self {
-//             Self::i8(v) => write!(f, "{v}"),
-//             Self::i16(v) => write!(f, "{v}"),
-//             Self::i32(v) => write!(f, "{v}"),
-//             Self::u8(v) => write!(f, "{v}"),
-//             Self::u16(v) => write!(f, "{v}"),
-//             Self::u32(v) => write!(f, "{v}"),
-//             Self::f32(v) => write!(f, "{v}"),
-//             Self::f64(v) => write!(f, "{v}"),
-//             Self::bool(v) => write!(f, "{v}"),
-//             Self::String(v) => write!(f, r#""{v}""#),
-//             Self::char(v) => write!(f, r#""{v}""#),
-//             Self::None => f.write_str(NULL),
-//         }
-//     }
-// }
+    Ok(())
+}
 
 /// convert an object field into a Typescript string
 fn object_field_to_ts(
@@ -728,10 +745,10 @@ fn validate_type_for_tagged_intersection(
         | DataType::List(_)
         | DataType::Map(_)
         | DataType::Generic(_) => Ok(false),
-        DataType::Literal(v) => match v {
-            Literal::None => Ok(true),
-            _ => Ok(false),
-        },
+        // DataType::Literal(v) => match v {
+        //     Literal::None => Ok(true),
+        //     _ => Ok(false),
+        // },
         DataType::Struct(v) => match v.fields() {
             Fields::Unit => Ok(true),
             Fields::Unnamed(_) => {
@@ -775,8 +792,7 @@ fn validate_type_for_tagged_intersection(
         }
         DataType::Reference(r) => validate_type_for_tagged_intersection(
             ctx,
-            types
-                .get(r.sid())
+            r.get(types)
                 .expect("TypeCollection should have been populated by now")
                 .ty()
                 .clone(),
@@ -791,12 +807,83 @@ const STRING: &str = "string";
 const NULL: &str = "null";
 const NEVER: &str = "never";
 
-use std::borrow::Borrow;
-
-use specta::datatype::Generic;
-
 // TODO: Merge this into main expoerter
-pub(crate) fn js_doc_builder(docs: &str, deprecated: Option<&DeprecatedType>) -> Builder {
+pub(crate) fn js_doc(docs: &str, deprecated: Option<&DeprecatedType>) -> String {
+    const START: &str = "/**\n";
+
+    pub struct Builder {
+        value: String,
+    }
+
+    impl Builder {
+        pub fn push(&mut self, line: &str) {
+            self.push_internal([line.trim()]);
+        }
+
+        pub(crate) fn push_internal<'a>(&mut self, parts: impl IntoIterator<Item = &'a str>) {
+            self.value.push_str(" * ");
+
+            for part in parts.into_iter() {
+                self.value.push_str(part);
+            }
+
+            self.value.push('\n');
+        }
+
+        pub fn push_deprecated(&mut self, typ: &DeprecatedType) {
+            self.push_internal(
+                ["@deprecated"].into_iter().chain(
+                    match typ {
+                        DeprecatedType::DeprecatedWithSince {
+                            note: message,
+                            since,
+                        } => Some((since.as_ref(), message)),
+                        _ => None,
+                    }
+                    .map(|(since, message)| {
+                        [" ", message.trim()].into_iter().chain(
+                            since
+                                .map(|since| [" since ", since.trim()])
+                                .into_iter()
+                                .flatten(),
+                        )
+                    })
+                    .into_iter()
+                    .flatten(),
+                ),
+            );
+        }
+
+        pub fn push_generic(&mut self, generic: &Generic) {
+            self.push_internal(["@template ", generic.borrow()])
+        }
+
+        pub fn build(mut self) -> String {
+            if self.value == START {
+                return String::new();
+            }
+
+            self.value.push_str(" */\n");
+            self.value
+        }
+    }
+
+    impl Default for Builder {
+        fn default() -> Self {
+            Self {
+                value: START.to_string(),
+            }
+        }
+    }
+
+    impl<T: AsRef<str>> Extend<T> for Builder {
+        fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+            for item in iter {
+                self.push(item.as_ref());
+            }
+        }
+    }
+
     let mut builder = Builder::default();
 
     if !docs.is_empty() {
@@ -807,130 +894,55 @@ pub(crate) fn js_doc_builder(docs: &str, deprecated: Option<&DeprecatedType>) ->
         builder.push_deprecated(deprecated);
     }
 
-    builder
+    builder.build()
 }
 
-pub fn typedef_named_datatype(
-    cfg: &Typescript,
-    typ: &NamedDataType,
-    types: &TypeCollection,
-) -> Output {
-    typedef_named_datatype_inner(
-        &ExportContext {
-            cfg,
-            path: vec![],
-            // TODO: Should JS doc support per field or variant comments???
-            is_export: false,
-        },
-        typ,
-        types,
-    )
-}
+// pub fn typedef_named_datatype(
+//     cfg: &Typescript,
+//     typ: &NamedDataType,
+//     types: &TypeCollection,
+// ) -> Output {
+//     typedef_named_datatype_inner(
+//         &ExportContext {
+//             cfg,
+//             path: vec![],
+//             // TODO: Should JS doc support per field or variant comments???
+//             is_export: false,
+//         },
+//         typ,
+//         types,
+//     )
+// }
 
-fn typedef_named_datatype_inner(
-    ctx: &ExportContext,
-    typ: &NamedDataType,
-    types: &TypeCollection,
-) -> Output {
-    let name = typ.name();
-    let docs = typ.docs();
-    let deprecated = typ.deprecated();
-    let item = typ.ty();
+// fn typedef_named_datatype_inner(
+//     ctx: &ExportContext,
+//     typ: &NamedDataType,
+//     types: &TypeCollection,
+// ) -> Output {
+//     let name = typ.name();
+//     let docs = typ.docs();
+//     let deprecated = typ.deprecated();
+//     let item = typ.ty();
 
-    let ctx = ctx.with(PathItem::Type(name.clone()));
+//     let ctx = ctx.with(PathItem::Type(name.clone()));
 
-    let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
+//     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
 
-    let mut inline_ts = String::new();
-    datatype_inner(
-        ctx.clone(),
-        &FunctionReturnType::Value(typ.ty().clone()),
-        types,
-        &mut inline_ts,
-    )?;
+//     let mut inline_ts = String::new();
+//     datatype_inner(
+//         ctx.clone(),
+//         &FunctionReturnType::Value(typ.ty().clone()),
+//         types,
+//         &mut inline_ts,
+//     )?;
 
-    let mut builder = js_doc_builder(docs, deprecated);
+//     let mut builder = js_doc_builder(docs, deprecated);
 
-    typ.generics()
-        .into_iter()
-        .for_each(|generic| builder.push_generic(generic));
+//     typ.generics()
+//         .into_iter()
+//         .for_each(|generic| builder.push_generic(generic));
 
-    builder.push_internal(["@typedef { ", &inline_ts, " } ", &name]);
+//     builder.push_internal(["@typedef { ", &inline_ts, " } ", &name]);
 
-    Ok(builder.build())
-}
-
-const START: &str = "/**\n";
-
-pub struct Builder {
-    value: String,
-}
-
-impl Builder {
-    pub fn push(&mut self, line: &str) {
-        self.push_internal([line.trim()]);
-    }
-
-    pub(crate) fn push_internal<'a>(&mut self, parts: impl IntoIterator<Item = &'a str>) {
-        self.value.push_str(" * ");
-
-        for part in parts.into_iter() {
-            self.value.push_str(part);
-        }
-
-        self.value.push('\n');
-    }
-
-    pub fn push_deprecated(&mut self, typ: &DeprecatedType) {
-        self.push_internal(
-            ["@deprecated"].into_iter().chain(
-                match typ {
-                    DeprecatedType::DeprecatedWithSince {
-                        note: message,
-                        since,
-                    } => Some((since.as_ref(), message)),
-                    _ => None,
-                }
-                .map(|(since, message)| {
-                    [" ", message.trim()].into_iter().chain(
-                        since
-                            .map(|since| [" since ", since.trim()])
-                            .into_iter()
-                            .flatten(),
-                    )
-                })
-                .into_iter()
-                .flatten(),
-            ),
-        );
-    }
-
-    pub fn push_generic(&mut self, generic: &Generic) {
-        self.push_internal(["@template ", generic.borrow()])
-    }
-
-    pub fn build(mut self) -> String {
-        if self.value == START {
-            return String::new();
-        }
-
-        self.value.push_str(" */\n");
-        self.value
-    }
-}
-
-impl Default for Builder {
-    fn default() -> Self {
-        Self {
-            value: START.to_string(),
-        }
-    }
-}
-
-impl<T: AsRef<str>> Extend<T> for Builder {
-    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
-        for item in iter {
-            self.push(item.as_ref());
-        }
-    }
-}
+//     Ok(builder.build())
+// }

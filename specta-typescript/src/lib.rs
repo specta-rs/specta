@@ -40,7 +40,7 @@
 //!
 //! Now your setup with Specta!
 //!
-//! If you get tired of listing all your types, checkout [`specta::export`].
+//! If you get tired of listing all your types manually? Checkout [`specta::export`]!
 //!
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
@@ -49,9 +49,8 @@
 )]
 
 mod error;
-mod inline;
 mod js_doc;
-pub mod legacy;
+mod legacy; // TODO: Remove this
 pub mod primitives;
 pub(crate) mod reserved_names;
 mod types;
@@ -60,4 +59,4 @@ mod typescript;
 pub use error::Error;
 pub use js_doc::JSDoc;
 pub use types::{Any, Never, Unknown};
-pub use typescript::{BigIntExportBehavior, Format, Typescript};
+pub use typescript::{BigIntExportBehavior, Layout, Typescript};

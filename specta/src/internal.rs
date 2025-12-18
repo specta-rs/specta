@@ -4,59 +4,12 @@
 //!
 //! DO NOT USE THEM! You have been warned!
 
-use std::{borrow::Cow, panic::Location};
+use std::borrow::Cow;
 
 #[cfg(feature = "function")]
 pub use paste::paste;
 
-use crate::{
-    datatype::{DataType, DeprecatedType, Field, Generic, NamedDataType},
-    SpectaID, TypeCollection,
-};
-
-/// Registers a type in the `TypeCollection` if it hasn't been registered already.
-/// This accounts for recursive types.
-pub fn register(
-    types: &mut TypeCollection,
-    name: Cow<'static, str>,
-    docs: Cow<'static, str>,
-    deprecated: Option<DeprecatedType>,
-    sid: SpectaID,
-    module_path: Cow<'static, str>,
-    generics: Vec<Generic>,
-    build: impl FnOnce(&mut TypeCollection) -> DataType,
-) -> NamedDataType {
-    let location = Location::caller().clone();
-    match types.map.get(&sid) {
-        Some(Some(dt)) => dt.clone(),
-        // TODO: Explain this
-        Some(None) => NamedDataType {
-            name,
-            docs,
-            deprecated,
-            sid,
-            module_path,
-            location,
-            generics,
-            inner: DataType::Primitive(crate::datatype::Primitive::i8), // TODO: Fix this
-        },
-        None => {
-            types.map.entry(sid).or_insert(None);
-            let dt = NamedDataType {
-                name,
-                docs,
-                deprecated,
-                sid,
-                module_path,
-                location,
-                generics,
-                inner: build(types),
-            };
-            types.map.insert(sid, Some(dt.clone()));
-            dt
-        }
-    }
-}
+use crate::datatype::{DataType, Field};
 
 /// Functions used to construct `crate::datatype` types (they have private fields so can't be constructed directly).
 /// We intentionally keep their fields private so we can modify them without a major version bump.
@@ -64,7 +17,7 @@ pub fn register(
 pub mod construct {
     use std::borrow::Cow;
 
-    use crate::{datatype::*, Flatten, SpectaID, Type, TypeCollection};
+    use crate::{Flatten, Type, TypeCollection, datatype::*};
 
     pub fn skipped_field(
         optional: bool,
@@ -164,8 +117,6 @@ pub mod construct {
     pub const fn generic_data_type(name: &'static str) -> Generic {
         Generic(Cow::Borrowed(name))
     }
-
-    pub use crate::specta_id::sid;
 }
 
 pub type NonSkipField<'a> = (&'a Field, &'a DataType);
@@ -189,7 +140,7 @@ pub fn skip_fields_named<'a>(
 #[cfg(feature = "function")]
 mod functions {
     use super::*;
-    use crate::{datatype::DeprecatedType, datatype::Function, function::SpectaFn};
+    use crate::{TypeCollection, datatype::DeprecatedType, datatype::Function, function::SpectaFn};
 
     #[doc(hidden)]
     /// A helper for exporting a command to a [`CommandDataType`].

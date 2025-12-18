@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 
 use specta::{
-    datatype::{DataType, Enum, EnumRepr, Fields, Generic, Literal, Primitive},
+    TypeCollection,
+    datatype::{DataType, Enum, EnumRepr, Fields, Generic, Primitive, Reference},
     internal::{skip_fields, skip_fields_named},
-    SpectaID, TypeCollection,
 };
 
 use crate::Error;
@@ -13,18 +13,7 @@ use crate::Error;
 /// Validate the type and apply the Serde transformations.
 pub fn validate(types: &TypeCollection) -> Result<(), Error> {
     for ndt in types.into_unsorted_iter() {
-        inner(ndt.ty(), &types, &[], &mut Default::default())?;
-    }
-
-    Ok(())
-}
-
-// TODO: Remove this once we redo the Typescript exporter.
-pub fn validate_dt(ty: &DataType, types: &TypeCollection) -> Result<(), Error> {
-    inner(ty, &types, &[], &mut Default::default())?;
-
-    for ndt in types.into_unsorted_iter() {
-        inner(ndt.ty(), &types, &[], &mut Default::default())?;
+        inner(ndt.ty(), types, &[], &mut Default::default())?;
     }
 
     Ok(())
@@ -34,7 +23,7 @@ fn inner(
     dt: &DataType,
     types: &TypeCollection,
     generics: &[(Generic, DataType)],
-    checked_references: &mut HashSet<SpectaID>,
+    checked_references: &mut HashSet<Reference>,
 ) -> Result<(), Error> {
     match dt {
         DataType::Nullable(ty) => inner(ty, types, generics, checked_references)?,
@@ -84,12 +73,10 @@ fn inner(
                 inner(dt, types, &[], checked_references)?;
             }
 
-            #[allow(clippy::panic)]
-            if !checked_references.contains(&r.sid()) {
-                checked_references.insert(r.sid());
-                // TODO: We don't error here for `Any`/`Unknown` in the TS exporter
-                if let Some(ty) = types.get(r.sid()) {
-                    inner(ty.ty(), types, r.generics(), checked_references)?;
+            if !checked_references.contains(r) {
+                checked_references.insert(r.clone());
+                if let Some(ndt) = r.get(types) {
+                    inner(ndt.ty(), types, r.generics(), checked_references)?;
                 }
             }
         }
@@ -106,7 +93,7 @@ fn is_valid_map_key(
     generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     match key_ty {
-        DataType::Primitive(ty) => match ty {
+        DataType::Primitive(
             Primitive::i8
             | Primitive::i16
             | Primitive::i32
@@ -122,22 +109,22 @@ fn is_valid_map_key(
             | Primitive::f32
             | Primitive::f64
             | Primitive::String
-            | Primitive::char => Ok(()),
-            _ => Err(Error::InvalidMapKey),
-        },
-        DataType::Literal(ty) => match ty {
-            Literal::i8(_)
-            | Literal::i16(_)
-            | Literal::i32(_)
-            | Literal::u8(_)
-            | Literal::u16(_)
-            | Literal::u32(_)
-            | Literal::f32(_)
-            | Literal::f64(_)
-            | Literal::String(_)
-            | Literal::char(_) => Ok(()),
-            _ => Err(Error::InvalidMapKey),
-        },
+            | Primitive::char,
+        ) => Ok(()),
+        DataType::Primitive(_) => Err(Error::InvalidMapKey),
+        // DataType::Literal(
+        //     Literal::i8(_)
+        //     | Literal::i16(_)
+        //     | Literal::i32(_)
+        //     | Literal::u8(_)
+        //     | Literal::u16(_)
+        //     | Literal::u32(_)
+        //     | Literal::f32(_)
+        //     | Literal::f64(_)
+        //     | Literal::String(_)
+        //     | Literal::char(_),
+        // ) => Ok(()),
+        // DataType::Literal(_) => Err(Error::InvalidMapKey),
         // Enum of other valid types are also valid Eg. `"A" | "B"` or `"A" | 5` are valid
         DataType::Enum(ty) => {
             for (_variant_name, variant) in ty.variants() {
@@ -159,22 +146,24 @@ fn is_valid_map_key(
             Ok(())
         }
         DataType::Tuple(t) => {
-            if t.elements().len() == 0 {
+            if t.elements().is_empty() {
                 return Err(Error::InvalidMapKey);
             }
 
             Ok(())
         }
         DataType::Reference(r) => {
-            let ty = types.get(r.sid()).expect("Type was never populated"); // TODO: Error properly
-            is_valid_map_key(ty.ty(), types, r.generics())
+            if let Some(ndt) = r.get(types) {
+                is_valid_map_key(ndt.ty(), types, r.generics())?;
+            }
+            Ok(())
         }
         DataType::Generic(g) => {
             let ty = generics
                 .iter()
-                .find(|(gen, _)| gen == g)
+                .find(|(ge, _)| ge == g)
                 .map(|(_, dt)| dt)
-                .expect("bruh");
+                .expect("unable to find expected generic type"); // TODO: Proper error instead of panicking
 
             is_valid_map_key(ty, types, &[])
         }
@@ -250,10 +239,11 @@ fn validate_internally_tag_enum_datatype(
         // `()` is `null` and is valid
         DataType::Tuple(ty) if ty.elements().is_empty() => {}
         // References need to be checked against the same rules.
-        DataType::Reference(ty) => {
-            let ty = types.get(ty.sid()).expect("Type was never populated"); // TODO: Error properly
-
-            validate_internally_tag_enum_datatype(ty.ty(), types)?;
+        DataType::Reference(r) => {
+            // TODO: Should this error on missing?
+            if let Some(ndt) = r.get(types) {
+                validate_internally_tag_enum_datatype(ndt.ty(), types)?;
+            }
         }
         _ => return Err(Error::InvalidInternallyTaggedEnum),
     }

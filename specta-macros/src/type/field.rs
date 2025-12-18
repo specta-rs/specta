@@ -12,7 +12,7 @@ pub fn construct_field(
     field_ty: &Type,
 ) -> TokenStream {
     let field_ty = attrs.r#type.as_ref().unwrap_or(&field_ty);
-    let deprecated = attrs.common.deprecated_as_tokens(crate_ref);
+    let deprecated = attrs.common.deprecated_as_tokens();
     let optional = attrs.optional;
     let doc = attrs.common.doc;
     let flatten = attrs.flatten;
@@ -20,7 +20,7 @@ pub fn construct_field(
 
     // Skip must be handled by the macro so that we don't try and constrain the inner type to `Type` or `Flatten` traits.
     if attrs.skip {
-        return quote!(#crate_ref::internal::construct::skipped_field(
+        return quote!(internal::construct::skipped_field(
             #optional,
             #flatten,
             #inline,
@@ -33,7 +33,7 @@ pub fn construct_field(
         .flatten
         .then(|| quote!(field_flattened))
         .unwrap_or_else(|| quote!(field));
-    let ty = quote!(#crate_ref::internal::construct::#method::<#field_ty>(
+    let ty = quote!(internal::construct::#method::<#field_ty>(
         #optional,
         #inline,
         #deprecated,

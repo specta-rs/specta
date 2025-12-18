@@ -11,8 +11,8 @@ use std::path::Path;
 
 use schemars::schema::{InstanceType, Schema, SingleOrVec};
 use specta::{
-    datatype::{DataType, Enum, EnumVariant, Field, List, Literal, Primitive, Struct},
     TypeCollection,
+    datatype::{DataType, Field, List, Primitive, Struct},
 };
 
 #[derive(Debug, Clone)]
@@ -34,7 +34,7 @@ pub fn to_ast(schema: &Schema) -> Result<DataType, ()> {
     let mut types = TypeCollection::default();
 
     match schema {
-        Schema::Bool(b) => Ok(DataType::Literal((*b).into())),
+        Schema::Bool(b) => todo!(), // Ok(DataType::Literal((*b).into())),
         Schema::Object(obj) => {
             // TODO: Implement it all
             // /// Properties which annotate the [`SchemaObject`] which typically have no effect when an object is being validated against the schema.
@@ -160,7 +160,7 @@ pub fn to_ast(schema: &Schema) -> Result<DataType, ()> {
 
                 fn from_instance_type(o: &InstanceType) -> DataType {
                     match o {
-                        InstanceType::Null => DataType::Literal(Literal::None),
+                        InstanceType::Null => todo!(), // DataType::Literal(Literal::None),
                         InstanceType::Boolean => DataType::Primitive(Primitive::bool),
                         InstanceType::Object => unreachable!(),
                         InstanceType::Array => unreachable!(),

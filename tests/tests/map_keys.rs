@@ -113,5 +113,5 @@ fn map_keys() {
 fn check<T: Type>() -> Result<(), Error> {
     let mut types = TypeCollection::default();
     let dt = T::definition(&mut types);
-    specta_serde::validate_dt(&dt, &types)
+    specta_serde::validate(&types)
 }

@@ -3,7 +3,7 @@ use super::DataType;
 /// Represents a Rust [tuple](https://doc.rust-lang.org/std/primitive.tuple.html) type.
 ///
 /// Be aware `()` is treated specially as `null` when using the Typescript exporter.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Tuple {
     pub(crate) elements: Vec<DataType>,
 }

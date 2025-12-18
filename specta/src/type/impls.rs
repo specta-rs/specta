@@ -31,7 +31,7 @@ const _: () = {
     impl_containers!(Mutex RwLock);
 };
 
-impl<'a> Type for &'a str {
+impl Type for &str {
     impl_passthrough!(String);
 }
 
@@ -59,6 +59,7 @@ impl<'a, T: ?Sized + ToOwned + Type + 'static> Type for std::borrow::Cow<'a, T> 
     impl_passthrough!(T);
 }
 
+use std::cell::Ref;
 use std::ffi::*;
 impl_as!(
     str as String
@@ -126,7 +127,7 @@ impl_for_list!(
     true; BTreeSet<T> as "BTreeSet"
 );
 
-impl<'a, T: Type> Type for &'a [T] {
+impl<T: Type> Type for &[T] {
     impl_passthrough!(Vec<T>);
 }
 
@@ -145,8 +146,9 @@ impl<T: Type> Type for Option<T> {
 }
 
 impl<T> Type for std::marker::PhantomData<T> {
-    fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Literal(Literal::None)
+    fn definition(types: &mut TypeCollection) -> DataType {
+        // TODO: Does this hold up for non-Typescript languages -> This should probs be a named type so the exporter can modify it.
+        <() as Type>::definition(types)
     }
 }
 
@@ -211,8 +213,6 @@ impl<K: Type, V: Type> Flatten for std::collections::HashMap<K, V> {}
 impl<K: Type, V: Type> Flatten for std::collections::BTreeMap<K, V> {}
 
 const _: () = {
-    const SID: SpectaID = internal::construct::sid("SystemTime", "::type::impls:305:10");
-
     impl Type for std::time::SystemTime {
         fn definition(types: &mut TypeCollection) -> DataType {
             DataType::Struct(internal::construct::r#struct(
@@ -238,8 +238,6 @@ const _: () = {
 };
 
 const _: () = {
-    const SID: SpectaID = internal::construct::sid("Duration", "::type::impls:401:10");
-
     impl Type for std::time::Duration {
         fn definition(types: &mut TypeCollection) -> DataType {
             DataType::Struct(internal::construct::r#struct(
