@@ -25,7 +25,7 @@ impl Reference {
     ///
     /// An opaque type is unable to represents using the [DataType] system and requires specific exporter integration to handle it.
     ///
-    /// This should NOT be used in a [Type::definition] method as that likely means unnecessary memory.
+    /// This should NOT be used in a [Type::definition] declaration as that will either result in equality issues or a persistent memory allocation.
     ///
     /// An opaque [Reference] is equal when cloned and can be compared using the [Self::ref_eq] or [PartialEq].
     ///
@@ -37,8 +37,11 @@ impl Reference {
         }
     }
 
-    // TODO: Remove this
-    /// Construct a new reference to a type with a fixed reference.
+    /// Construct a new opaque reference to a type with a fixed reference.
+    ///
+    /// An opaque type is unable to represents using the [DataType] system and requires specific exporter integration to handle it.
+    ///
+    /// This should NOT be used in a [Type::definition] declaration as that will either result in equality issues or a persistent memory allocation.
     ///
     /// # Safety
     ///
