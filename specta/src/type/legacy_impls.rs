@@ -1,6 +1,6 @@
 //! The plan is to try and move these into the ecosystem for the v2 release.
 use super::macros::*;
-use crate::{Flatten, Type, TypeCollection, datatype::*};
+use crate::{Type, TypeCollection, datatype::*};
 
 use std::borrow::Cow;
 
@@ -8,7 +8,6 @@ use std::borrow::Cow;
 const _: () = {
     impl_for_list!(true; indexmap::IndexSet<T> as "IndexSet");
     impl_for_map!(indexmap::IndexMap<K, V> as "IndexMap");
-    impl<K: Type, V: Type> Flatten for indexmap::IndexMap<K, V> {}
 };
 
 #[cfg(feature = "serde_json")]
@@ -16,7 +15,6 @@ const _: () = {
     use serde_json::{Map, Number, Value};
 
     impl_for_map!(Map<K, V> as "Map");
-    impl<K: Type, V: Type> Flatten for Map<K, V> {}
 
     #[derive(Type)]
     #[specta(rename = "JsonValue", untagged, remote = Value, crate = crate, export = false)]
@@ -193,7 +191,6 @@ const _: () = {
     use toml::{Value, value::Array, value::Datetime, value::Table};
 
     impl_for_map!(toml::map::Map<K, V> as "Map");
-    impl<K: Type, V: Type> Flatten for toml::map::Map<K, V> {}
 
     #[derive(Type)]
     #[specta(rename = "TomlValue", untagged, remote = Value, crate = crate, export = false)]

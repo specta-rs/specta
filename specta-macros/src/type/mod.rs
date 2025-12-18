@@ -85,13 +85,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let type_args = generics_with_ident_only(generics);
     let where_bound = add_type_to_where_clause(&quote!(#crate_ref::Type), generics);
 
-    let flatten_impl = can_flatten.then(|| {
-        quote! {
-            #[automatically_derived]
-            impl #bounds #crate_ref::Flatten for #ident #type_args #where_bound {}
-        }
-    });
-
     let shadow_generics = {
         let g = generics.params.iter().map(|param| match param {
             // Pulled from outside
@@ -194,8 +187,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     )
                 }
             }
-
-            #flatten_impl
 
             #export
         };

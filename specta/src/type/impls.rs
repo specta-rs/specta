@@ -199,18 +199,12 @@ impl<T: Type> Type for std::ops::Range<T> {
     }
 }
 
-impl<T: Type> Flatten for std::ops::Range<T> {}
-
 impl<T: Type> Type for std::ops::RangeInclusive<T> {
     impl_passthrough!(std::ops::Range<T>); // Yeah Serde are cringe
 }
 
-impl<T: Type> Flatten for std::ops::RangeInclusive<T> {}
-
 impl_for_map!(HashMap<K, V> as "HashMap");
 impl_for_map!(BTreeMap<K, V> as "BTreeMap");
-impl<K: Type, V: Type> Flatten for std::collections::HashMap<K, V> {}
-impl<K: Type, V: Type> Flatten for std::collections::BTreeMap<K, V> {}
 
 const _: () = {
     impl Type for std::time::SystemTime {
@@ -232,9 +226,6 @@ const _: () = {
             ))
         }
     }
-
-    #[automatically_derived]
-    impl Flatten for std::time::SystemTime {}
 };
 
 const _: () = {
@@ -257,6 +248,4 @@ const _: () = {
             ))
         }
     }
-
-    impl Flatten for std::time::Duration {}
 };
