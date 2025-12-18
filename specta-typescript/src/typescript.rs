@@ -406,10 +406,7 @@ impl Typescript {
                 std::fs::create_dir_all(parent)?;
             }
 
-            std::fs::write(
-                path,
-                self.export(types).map(|s| format!("{}{s}", self.header))?,
-            )?;
+            std::fs::write(path, self.export(types)?)?;
         }
 
         Ok(())
