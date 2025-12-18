@@ -41,8 +41,6 @@ macro_rules! _impl_containers {
                 <T as Type>::definition(types)
             }
         }
-
-        impl<T: Flatten> Flatten for $container<T> {}
     )+}
 }
 
