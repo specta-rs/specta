@@ -1,40 +1,55 @@
 use specta::{Type, TypeCollection};
-use specta_typescript::{Any, Typescript, primitives};
+use specta_typescript::{Any, Layout, Typescript, primitives};
 
 #[derive(Type)]
-struct Testing {
+pub struct Testing {
     field: Any,
 }
 
-/// An IPC channel.
-pub struct Channel<TSend> {
-    phantom: std::marker::PhantomData<TSend>,
+mod nested {
+    #[derive(specta::Type)]
+    pub struct Another {
+        field: super::Testing,
+        field2: super::another::Bruh,
+    }
 }
 
-const _: () = {
+mod another {
     #[derive(specta::Type)]
-    #[specta(remote = Channel, rename = "TAURI_CHANNEL")]
-    #[allow(dead_code)]
-    struct Channel2<TSend>(std::marker::PhantomData<TSend>);
-};
+    pub struct Bruh {
+        field: u32,
+    }
+}
+
+// /// An IPC channel.
+// pub struct Channel<TSend> {
+//     phantom: std::marker::PhantomData<TSend>,
+// }
+
+// const _: () = {
+//     #[derive(specta::Type)]
+//     #[specta(remote = Channel, rename = "TAURI_CHANNEL")]
+//     #[allow(dead_code)]
+//     struct Channel2<TSend>(std::marker::PhantomData<TSend>);
+// };
 
 fn main() {
     let mut ts = Typescript::default();
 
-    let r = ts.define("string & { _brand: 'a' }");
-
-    println!(
-        "{:?}",
-        primitives::inline(&ts, &Default::default(), &r.into())
-    );
+    // let r = ts.define("string & { _brand: 'a' }");
+    // println!(
+    //     "{:?}",
+    //     primitives::inline(&ts, &Default::default(), &r.into())
+    // );
 
     // TODO: Properly handle this with opaque types
     // println!("{:?}", primitives::inline(&Default::default(), &Default::default(), &DataType::String));
 
     let s = ts
-        .export(&TypeCollection::default().register::<Testing>())
+        .layout(Layout::Namespaces)
+        .export(&TypeCollection::default().register::<nested::Another>())
         .unwrap();
-    println!("{s:?}");
+    println!("{s}");
 
     // println!("PTR EQ: {:?}", std::ptr::eq(&ANY, &ANY));
 

@@ -207,19 +207,19 @@ impl Typescript {
                 let mut root_modules = module_types.keys().cloned().collect::<Vec<_>>();
                 root_modules.sort();
 
-                for root_module in root_modules.iter() {
-                    out += "import $$specta_ns$$";
-                    out += root_module;
-                    out += " = ";
-                    out += root_module;
-                    out += ";\n\n";
-                }
+                // for root_module in root_modules.iter() {
+                //     out += "import $$specta_ns$$";
+                //     out += root_module;
+                //     out += " = ";
+                //     out += &root_module.replace("::", "_");
+                //     out += ";\n\n";
+                // }
 
                 for (i, root_module) in root_modules.iter().enumerate() {
                     if i != 0 {
                         out += "\n";
                     }
-                    out += &format!("export namespace {} {{\n", root_module);
+                    out += &format!("export namespace {} {{\n", root_module.replace("::", "_"));
                     out += &export_module(types, self, &mut module_types, root_module, 1)?;
                     out += "}";
                 }

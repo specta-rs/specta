@@ -237,32 +237,50 @@ fn inline_datatype(
         }
         DataType::Map(m) => map_dt(s, ts, types, m, location, is_export)?,
         DataType::Nullable(def) => {
-            inline_datatype(s, ts, types, def, location, is_export, parent_name, prefix, depth + 1)?;
+            inline_datatype(
+                s,
+                ts,
+                types,
+                def,
+                location,
+                is_export,
+                parent_name,
+                prefix,
+                depth + 1,
+            )?;
             let or_null = " | null";
             if !s.ends_with(&or_null) {
                 s.push_str(or_null);
             }
         }
-        DataType::Struct(st) => {
-            crate::legacy::struct_datatype(
-                crate::legacy::ExportContext {
-                    cfg: ts,
-                    path: vec![],
-                    is_export,
-                },
-                parent_name,
-                st,
-                types,
-                s,
-                prefix,
-            )?
-        }
+        DataType::Struct(st) => crate::legacy::struct_datatype(
+            crate::legacy::ExportContext {
+                cfg: ts,
+                path: vec![],
+                is_export,
+            },
+            parent_name,
+            st,
+            types,
+            s,
+            prefix,
+        )?,
         DataType::Enum(e) => enum_dt(s, ts, types, e, location, is_export, prefix)?,
         DataType::Tuple(t) => tuple_dt(s, ts, types, t, location, is_export)?,
         DataType::Reference(r) => {
             // Always inline references when in inline mode
             if let Some(ndt) = r.get(types) {
-                inline_datatype(s, ts, types, ndt.ty(), location, is_export, parent_name, prefix, depth + 1)?;
+                inline_datatype(
+                    s,
+                    ts,
+                    types,
+                    ndt.ty(),
+                    location,
+                    is_export,
+                    parent_name,
+                    prefix,
+                    depth + 1,
+                )?;
             } else {
                 // Fallback to regular reference if type not found
                 reference_dt(s, ts, types, r, location, is_export)?;
@@ -536,7 +554,7 @@ fn enum_dt(
     {
         crate::legacy::enum_datatype(
             crate::legacy::ExportContext {
-                cfg: &ts,
+                cfg: ts,
                 path: vec![],
                 is_export,
             },
