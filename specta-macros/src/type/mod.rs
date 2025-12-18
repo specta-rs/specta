@@ -133,9 +133,9 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
             quote! {
                 #[allow(non_snake_case)]
-                #[#crate_ref::export::internal::ctor::ctor(anonymous, crate_path = #crate_ref::export::internal::ctor)]
+                #[#crate_ref::collect::internal::ctor::ctor(anonymous, crate_path = #crate_ref::collect::internal::ctor)]
                 unsafe fn #export_fn_name() {
-                    #crate_ref::export::internal::register::<#ident<#(#generic_params),*>>();
+                    #crate_ref::collect::internal::register::<#ident<#(#generic_params),*>>();
                 }
             }
         });
