@@ -146,9 +146,9 @@ impl<T: Type> Type for Option<T> {
 }
 
 impl<T> Type for std::marker::PhantomData<T> {
-    fn definition(_: &mut TypeCollection) -> DataType {
-        // In practice this is always going to be `null` but this is a better default
-        todo!(); // TODO: Empty tuple???
+    fn definition(types: &mut TypeCollection) -> DataType {
+        // TODO: Does this hold up for non-Typescript languages -> This should probs be a named type so the exporter can modify it.
+        <() as Type>::definition(types)
     }
 }
 
