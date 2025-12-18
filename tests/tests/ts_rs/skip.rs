@@ -3,7 +3,7 @@ use specta::Type;
 use crate::ts::assert_ts;
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Skip {
     a: i32,
     b: i32,

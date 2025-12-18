@@ -12,7 +12,7 @@ struct Unsupported2;
 #[test]
 fn simple() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct Override {
         a: i32,
         #[specta(type = String)]
@@ -32,10 +32,10 @@ fn simple() {
 #[test]
 fn newtype() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct New1(#[specta(type = String)] Unsupported2);
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct New2(#[specta(type = Option<String>)] Unsupported<Unsupported2>);
 
     assert_ts!(New1, r#"string"#);

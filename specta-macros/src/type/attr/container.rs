@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::Result;
 
-use crate::utils::{impl_parse, Attribute, Inflection};
+use crate::utils::{Attribute, Inflection, impl_parse};
 
 use super::CommonAttr;
 
@@ -14,7 +14,7 @@ pub struct ContainerAttr {
     pub crate_name: Option<TokenStream>,
     pub inline: bool,
     pub remote: Option<TokenStream>,
-    pub export: Option<bool>,
+    pub collect: Option<bool>,
     pub common: CommonAttr,
 
     // Struct ony (we pass it anyway so enums get nice errors)
@@ -43,7 +43,7 @@ impl_parse! {
         },
         "inline" => out.inline = attr.parse_bool().unwrap_or(true),
         "remote" => out.remote = out.remote.take().or(Some(attr.parse_path()?.to_token_stream())),
-        "export" => out.export = out.export.take().or(Some(attr.parse_bool().unwrap_or(true))),
+        "collect" => out.collect = out.collect.take().or(Some(attr.parse_bool().unwrap_or(true))),
         "transparent" => out.transparent = attr.parse_bool().unwrap_or(true),
     }
 }

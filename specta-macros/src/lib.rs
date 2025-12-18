@@ -21,7 +21,7 @@ mod utils;
 /// Specta also introduces some of it's own attributes:
 ///  - `#[specta(optional)]` - When paired with an `Option<T>` field, this will result in `{ a?: T | null }` instead of `{ a: T | null }`.
 ///  - `#[specta(type = ::std::string::String)]` - Will override the type of a item, variant or field to a given type.
-///  - `#[specta(export = false)]` - When using the `export` feature, this will prevent the specific type from being exported.
+///  - `#[specta(collect = false)]` - When using the `collect` feature, this will prevent the specific type from being exported.
 ///
 /// ## Example
 ///

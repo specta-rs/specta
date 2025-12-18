@@ -4,7 +4,7 @@ use crate::ts::assert_ts;
 use specta::Type;
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Rename1 {
     a: i32,
     #[specta(rename = "bb")]

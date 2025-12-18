@@ -2,7 +2,7 @@
 mod test {
     use std::{borrow::Cow, fmt};
 
-    use specta::{datatype::Function, function, specta, ts::ExportConfig, Type};
+    use specta::{Type, datatype::Function, function, specta, ts::ExportConfig};
 
     /// Multiline
     /// Docs
@@ -55,7 +55,7 @@ mod test {
     }
 
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     pub struct Demo {
         pub demo: String,
     }

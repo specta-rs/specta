@@ -9,28 +9,28 @@ use crate::ts::assert_ts_export;
 use specta::Type;
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Generic1<T: Type> {
     value: T,
     values: Vec<T>,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct GenericAutoBound<T> {
     value: T,
     values: Vec<T>,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct GenericAutoBound2<T: PartialEq> {
     value: T,
     values: Vec<T>,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Container1 {
     foo: Generic1<u32>,
     bar: HashSet<Generic1<u32>>,
@@ -63,7 +63,7 @@ fn test() {
 #[test]
 fn generic_enum() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     enum Generic2<A, B, C> {
         A(A),
         B(B, B, B),
@@ -84,7 +84,7 @@ fn generic_enum() {
 #[test]
 fn generic_newtype() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct NewType1<T>(Vec<Vec<T>>);
 
     assert_ts_export!(NewType1::<()>, r#"export type NewType1<T> = T[][];"#);
@@ -93,7 +93,7 @@ fn generic_newtype() {
 #[test]
 fn generic_tuple() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct Tuple<T>(T, Vec<T>, Vec<Vec<T>>);
 
     assert_ts_export!(Tuple::<()>, r#"export type Tuple<T> = [T, T[], T[][]];"#);
@@ -102,7 +102,7 @@ fn generic_tuple() {
 #[test]
 fn generic_struct() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct GenericStruct2<T> {
         a: T,
         b: (T, T),
@@ -124,13 +124,13 @@ fn generic_struct() {
 #[test]
 fn inline() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct Generic<T> {
         t: T,
     }
 
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct Container {
         g: Generic<String>,
         #[specta(inline)]
@@ -149,7 +149,7 @@ fn inline() {
 // #[test]
 // fn default() {
 //     #[derive(Type)]
-//     #[specta(export = false)]
+//     #[specta(collect = false)]
 //     struct A<T = String> {
 //         t: T,
 //     }
@@ -159,7 +159,7 @@ fn inline() {
 //     );
 
 //     #[derive(Type)]
-//     #[specta(export = false)]
+//     #[specta(collect = false)]
 //     struct B<U = Option<A<i32>>> {
 //         u: U,
 //     }
@@ -169,7 +169,7 @@ fn inline() {
 //     );
 
 //     #[derive(Type)]
-//     #[specta(export = false)]
+//     #[specta(collect = false)]
 //     struct Y {
 //         a1: A,
 //         a2: A<i32>,
@@ -224,14 +224,14 @@ fn inline() {
 #[test]
 fn generic_parameter_order_preserved() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct Pair<Z, A> {
         first: Z,
         second: A,
     }
 
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct Container {
         pair: Pair<i32, String>,
     }

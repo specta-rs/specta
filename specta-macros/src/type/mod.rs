@@ -121,7 +121,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         }
     });
 
-    let export = (cfg!(feature = "DO_NOT_USE_export") && container_attrs.export.unwrap_or(true))
+    let collect = (cfg!(feature = "DO_NOT_USE_collect") && container_attrs.collect.unwrap_or(true))
         .then(|| {
             let export_fn_name = format_ident!("__push_specta_type_{}", raw_ident);
 
@@ -197,7 +197,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
             #flatten_impl
 
-            #export
+            #collect
         };
 
     }

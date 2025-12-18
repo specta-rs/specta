@@ -24,7 +24,7 @@ default = []
 derive = ["dep:specta-macros"]
 
 ## Support for collecting up a global type map
-export = ["dep:ctor", "specta-macros/DO_NOT_USE_export"]
+collect = ["dep:ctor", "specta-macros/DO_NOT_USE_collect"]
 
 #! Features
 ## Support for exporting the types of Rust functions.

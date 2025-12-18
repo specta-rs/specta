@@ -1,25 +1,25 @@
 use specta::{
-    datatype::{DataType, Primitive},
     Type, TypeCollection,
+    datatype::{DataType, Primitive},
 };
 
 use crate::ts::assert_ts;
 
 #[derive(Type)]
-#[specta(export = false, transparent)]
+#[specta(collect = false, transparent)]
 struct TupleStruct(String);
 
 #[repr(transparent)]
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct TupleStructWithRep(String);
 
 #[derive(Type)]
-#[specta(export = false, transparent)]
+#[specta(collect = false, transparent)]
 struct GenericTupleStruct<T>(T);
 
 #[derive(Type)]
-#[specta(export = false, transparent)]
+#[specta(collect = false, transparent)]
 pub struct BracedStruct {
     a: String,
 }

@@ -419,41 +419,41 @@ fn typescript_types() {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Unit1;
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Unit2 {}
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Unit3();
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Unit4(());
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 enum Unit5 {
     A,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 enum Unit6 {
     A(),
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 enum Unit7 {
     A {},
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct SimpleStruct {
     a: i32,
     b: String,
@@ -463,20 +463,20 @@ struct SimpleStruct {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct TupleStruct1(i32);
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct TupleStruct3(i32, bool, String);
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 #[specta(rename = "HasBeenRenamed")]
 struct RenamedStruct;
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 enum TestEnum {
     Unit,
     Single(i32),
@@ -485,18 +485,18 @@ enum TestEnum {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct RefStruct(TestEnum);
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct InlineStruct {
     ref_struct: SimpleStruct,
     val: i32,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct InlinerStruct {
     #[specta(inline)]
     inline_this: InlineStruct,
@@ -504,13 +504,13 @@ struct InlinerStruct {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct GenericStruct<T> {
     arg: T,
 }
 
 #[derive(Serialize, Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct FlattenEnumStruct {
     outer: String,
     #[serde(flatten)]
@@ -518,7 +518,7 @@ struct FlattenEnumStruct {
 }
 
 #[derive(Serialize, Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 #[serde(tag = "tag", content = "test")]
 enum FlattenEnum {
     One,
@@ -527,20 +527,20 @@ enum FlattenEnum {
 }
 
 #[derive(Serialize, Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct OverridenStruct {
     #[specta(type = String)]
     overriden_field: i32,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct HasGenericAlias(GenericAlias<i32>);
 
 type GenericAlias<T> = std::collections::HashMap<T, String>;
 
 #[derive(Serialize, Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 enum SkipVariant {
     A(String),
     #[serde(skip)]
@@ -550,7 +550,7 @@ enum SkipVariant {
 }
 
 #[derive(Serialize, Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 #[serde(tag = "tag", content = "data")]
 enum SkipVariant2 {
     A(String),
@@ -561,7 +561,7 @@ enum SkipVariant2 {
 }
 
 #[derive(Serialize, Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 enum SkipVariant3 {
     A {
         a: String,
@@ -577,7 +577,7 @@ enum SkipVariant3 {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub enum EnumMacroAttributes {
     A(#[specta(type = String)] i32),
     #[specta(rename = "bbb")]
@@ -593,20 +593,20 @@ pub enum EnumMacroAttributes {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct PlaceholderInnerField {
     a: String,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct Recursive {
     a: i32,
     children: Vec<Recursive>,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 
 pub enum InlineEnumField {
     #[specta(inline)]
@@ -614,7 +614,7 @@ pub enum InlineEnumField {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct InlineOptionalType {
     #[specta(inline)]
     pub optional_field: Option<PlaceholderInnerField>,
@@ -626,7 +626,7 @@ const FIELD_NAME: &str = "demo_new_name";
 // This is very much an advanced API. It is not recommended to use this unless you know what your doing.
 // For personal reference: Is used in PCR to apply an inflection to the dynamic name of the include/select macro.
 #[derive(Type)]
-#[specta(export = false, rename_from_path = CONTAINER_NAME)]
+#[specta(collect = false, rename_from_path = CONTAINER_NAME)]
 pub struct RenameToValue {
     #[specta(rename_from_path = FIELD_NAME)]
     pub demo: i32,
@@ -634,7 +634,7 @@ pub struct RenameToValue {
 
 // Regression test for https://github.com/oscartbeaumont/specta/issues/56
 #[derive(Type, serde::Serialize)]
-#[specta(export = false)]
+#[specta(collect = false)]
 enum Rename {
     OneWord,
     #[serde(rename = "Two words")]
@@ -642,18 +642,18 @@ enum Rename {
 }
 
 #[derive(Type, serde::Serialize)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct TransparentTypeInner {
     inner: String,
 }
 
 #[derive(Type, serde::Serialize)]
-#[specta(export = false)]
+#[specta(collect = false)]
 #[serde(transparent)]
 pub struct TransparentType(pub(crate) TransparentTypeInner);
 
 #[derive(Type, serde::Serialize)]
-#[specta(export = false)]
+#[specta(collect = false)]
 #[serde(transparent)]
 pub struct TransparentType2(pub(crate) ());
 
@@ -661,12 +661,12 @@ pub struct TransparentType2(pub(crate) ());
 pub struct NonTypeType;
 
 #[derive(Type, serde::Serialize)]
-#[specta(export = false)]
+#[specta(collect = false)]
 #[serde(transparent)]
 pub struct TransparentTypeWithOverride(#[specta(type = String)] NonTypeType);
 
 #[derive(Type, serde::Serialize)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub enum BasicEnum {
     A,
     B,
@@ -674,7 +674,7 @@ pub enum BasicEnum {
 
 #[derive(Type)]
 #[serde(
-    export = false,
+    collect = false,
     tag = "type",
     content = "value",
     rename_all = "camelCase"
@@ -685,7 +685,7 @@ pub enum NestedEnum {
 }
 
 #[derive(Type)]
-#[serde(export = false, rename_all = "camelCase")]
+#[serde(collect = false, rename_all = "camelCase")]
 pub struct FlattenOnNestedEnum {
     id: String,
     #[serde(flatten)]
@@ -693,31 +693,31 @@ pub struct FlattenOnNestedEnum {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct EnumReferenceRecordKey {
     a: HashMap<BasicEnum, i32>,
 }
 
 // https://github.com/oscartbeaumont/specta/issues/88
 #[derive(Type)]
-#[serde(export = false, rename_all = "camelCase")]
+#[serde(collect = false, rename_all = "camelCase")]
 #[serde(default)]
 pub(super) struct MyEmptyInput {}
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 #[allow(unused_parens)]
 pub enum ExtraBracketsInTupleVariant {
     A((String)),
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 #[allow(unused_parens)]
 pub struct ExtraBracketsInUnnamedStruct((String));
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 #[allow(unused_parens)]
 pub struct RenameWithWeirdCharsField {
     #[specta(rename = "@odata.context")]
@@ -725,7 +725,7 @@ pub struct RenameWithWeirdCharsField {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 #[allow(unused_parens)]
 pub enum RenameWithWeirdCharsVariant {
     #[specta(rename = "@odata.context")]
@@ -733,11 +733,11 @@ pub enum RenameWithWeirdCharsVariant {
 }
 
 #[derive(Type)]
-#[specta(export = false, rename = "@odata.context")]
+#[specta(collect = false, rename = "@odata.context")]
 pub struct RenameWithWeirdCharsStruct(String);
 
 #[derive(Type)]
-#[specta(export = false, rename = "@odata.context")]
+#[specta(collect = false, rename = "@odata.context")]
 pub enum RenameWithWeirdCharsEnum {}
 
 #[derive(Type)]

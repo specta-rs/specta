@@ -5,28 +5,28 @@ use specta::Type;
 use crate::ts::assert_ts_export;
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 #[deprecated]
 struct DeprecatedType {
     a: i32,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 #[deprecated = "Look at you big man using a deprecation message"]
 struct DeprecatedTypeWithMsg {
     a: i32,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 #[deprecated(note = "Look at you big man using a deprecation message")]
 struct DeprecatedTypeWithMsg2 {
     a: i32,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct DeprecatedFields {
     a: i32,
     #[deprecated]
@@ -38,7 +38,7 @@ struct DeprecatedFields {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct DeprecatedTupleVariant(
     #[deprecated] String,
     #[deprecated = "Nope"] String,
@@ -46,7 +46,7 @@ pub struct DeprecatedTupleVariant(
 );
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub enum DeprecatedEnumVariants {
     #[deprecated]
     A,
@@ -66,8 +66,20 @@ fn test_deprecated_types() {
         DeprecatedTypeWithMsg,
         "/**\n * @deprecated Look at you big man using a deprecation message\n */\nexport type DeprecatedTypeWithMsg = { a: number };"
     );
-    assert_ts_export!(DeprecatedTypeWithMsg2, "/**\n * @deprecated Look at you big man using a deprecation message\n */\nexport type DeprecatedTypeWithMsg2 = { a: number };");
-    assert_ts_export!(DeprecatedFields, "export type DeprecatedFields = { a: number; \n/**\n * @deprecated\n */\nb: string; \n/**\n * @deprecated This field is cringe!\n */\nc: string; \n/**\n * @deprecated This field is cringe!\n */\nd: string };");
-    assert_ts_export!(DeprecatedTupleVariant, "export type DeprecatedTupleVariant = [\n/**\n * @deprecated\n */\nstring, \n/**\n * @deprecated Nope\n */\nstring, \n/**\n * @deprecated Nope\n */\nnumber];");
-    assert_ts_export!(DeprecatedEnumVariants, "export type DeprecatedEnumVariants = \n/**\n * @deprecated\n */\n\"A\" | \n/**\n * @deprecated Nope\n */\n\"B\" | \n/**\n * @deprecated Nope\n */\n\"C\";");
+    assert_ts_export!(
+        DeprecatedTypeWithMsg2,
+        "/**\n * @deprecated Look at you big man using a deprecation message\n */\nexport type DeprecatedTypeWithMsg2 = { a: number };"
+    );
+    assert_ts_export!(
+        DeprecatedFields,
+        "export type DeprecatedFields = { a: number; \n/**\n * @deprecated\n */\nb: string; \n/**\n * @deprecated This field is cringe!\n */\nc: string; \n/**\n * @deprecated This field is cringe!\n */\nd: string };"
+    );
+    assert_ts_export!(
+        DeprecatedTupleVariant,
+        "export type DeprecatedTupleVariant = [\n/**\n * @deprecated\n */\nstring, \n/**\n * @deprecated Nope\n */\nstring, \n/**\n * @deprecated Nope\n */\nnumber];"
+    );
+    assert_ts_export!(
+        DeprecatedEnumVariants,
+        "export type DeprecatedEnumVariants = \n/**\n * @deprecated\n */\n\"A\" | \n/**\n * @deprecated Nope\n */\n\"B\" | \n/**\n * @deprecated Nope\n */\n\"C\";"
+    );
 }

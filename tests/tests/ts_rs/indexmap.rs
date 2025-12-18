@@ -9,7 +9,7 @@ use crate::ts::assert_ts;
 #[test]
 fn indexmap() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     #[allow(dead_code)]
     struct Indexes {
         map: IndexMap<String, String>,

@@ -6,7 +6,7 @@ mod astruct {
 
     // Typescript reserved type name
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     #[allow(non_camel_case_types)]
     pub struct r#enum {
         a: String,
@@ -18,7 +18,7 @@ mod atuplestruct {
 
     // Typescript reserved type name
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     #[allow(non_camel_case_types)]
     pub struct r#enum(String);
 }
@@ -28,7 +28,7 @@ mod aenum {
 
     // Typescript reserved type name
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     #[allow(non_camel_case_types)]
     pub enum r#enum {
         A(String),
