@@ -178,7 +178,7 @@ impl Typescript {
                         for ndt in types_in_module {
                             out += &"    ".repeat(indent);
                             out += &primitives::export(ts, types, ndt)?;
-                            out += "\n\n";
+                            out += "\n";
                         }
                     }
 
@@ -302,7 +302,7 @@ impl Typescript {
 
         for (i, ndt) in ndts.enumerate() {
             if i != 0 {
-                out += "\n\n";
+                out += "\n";
             }
 
             if self.jsdoc {
