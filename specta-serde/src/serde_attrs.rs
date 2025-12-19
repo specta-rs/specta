@@ -27,12 +27,14 @@ pub enum SerdeMode {
 }
 
 /// Contains parsed serde attributes for a type
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct SerdeAttributes {
     /// Direct rename specified by #[serde(rename = "name")]
     pub rename: Option<String>,
     /// Rename all fields/variants according to #[serde(rename_all = "case")]
     pub rename_all: Option<RenameRule>,
+    /// Rename all fields in enum variants according to #[serde(rename_all_fields = "case")]
+    pub rename_all_fields: Option<RenameRule>,
     /// Skip serialization with #[serde(skip_serializing)]
     pub skip_serializing: bool,
     /// Skip deserialization with #[serde(skip_deserializing)]
@@ -43,8 +45,12 @@ pub struct SerdeAttributes {
     pub flatten: bool,
     /// Default value with #[serde(default)]
     pub default: bool,
+    /// Default value with custom function #[serde(default = "path")]
+    pub default_with: Option<String>,
     /// Transparent container with #[serde(transparent)]
     pub transparent: bool,
+    /// Deny unknown fields #[serde(deny_unknown_fields)]
+    pub deny_unknown_fields: bool,
     /// Enum representation
     pub repr: Option<EnumRepr>,
     /// Tag for internally tagged enums
@@ -53,17 +59,91 @@ pub struct SerdeAttributes {
     pub content: Option<String>,
     /// Untagged enum
     pub untagged: bool,
+    /// Custom trait bounds #[serde(bound = "...")]
+    pub bound: Option<String>,
+    /// Remote type definition #[serde(remote = "...")]
+    pub remote: Option<String>,
+    /// Convert from another type #[serde(from = "...")]
+    pub from: Option<String>,
+    /// Try convert from another type #[serde(try_from = "...")]
+    pub try_from: Option<String>,
+    /// Convert into another type #[serde(into = "...")]
+    pub into: Option<String>,
+    /// Custom crate path #[serde(crate = "...")]
+    pub crate_path: Option<String>,
+    /// Custom expectation message #[serde(expecting = "...")]
+    pub expecting: Option<String>,
+    /// Variant identifier for enum deserialization
+    pub variant_identifier: bool,
+    /// Field identifier for struct deserialization
+    pub field_identifier: bool,
 }
 
 /// Contains parsed serde attributes for a field
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct SerdeFieldAttributes {
     /// Field-specific attributes
     pub base: SerdeAttributes,
-    /// Serialize with a different name
+    /// Field alias for deserialization #[serde(alias = "name")]
+    pub alias: Vec<String>,
+    /// Serialize with custom function #[serde(serialize_with = "path")]
     pub serialize_with: Option<String>,
-    /// Deserialize with a different name
+    /// Deserialize with custom function #[serde(deserialize_with = "path")]
     pub deserialize_with: Option<String>,
+    /// Combined serialize/deserialize with module #[serde(with = "module")]
+    pub with: Option<String>,
+    /// Skip serializing if condition is true #[serde(skip_serializing_if = "path")]
+    pub skip_serializing_if: Option<String>,
+    /// Borrow data during deserialization #[serde(borrow)]
+    pub borrow: Option<String>,
+    /// Getter function for private fields #[serde(getter = "...")]
+    pub getter: Option<String>,
+}
+
+impl Default for SerdeAttributes {
+    fn default() -> Self {
+        Self {
+            rename: None,
+            rename_all: None,
+            rename_all_fields: None,
+            skip_serializing: false,
+            skip_deserializing: false,
+            skip: false,
+            flatten: false,
+            default: false,
+            default_with: None,
+            transparent: false,
+            deny_unknown_fields: false,
+            repr: None,
+            tag: None,
+            content: None,
+            untagged: false,
+            bound: None,
+            remote: None,
+            from: None,
+            try_from: None,
+            into: None,
+            crate_path: None,
+            expecting: None,
+            variant_identifier: false,
+            field_identifier: false,
+        }
+    }
+}
+
+impl Default for SerdeFieldAttributes {
+    fn default() -> Self {
+        Self {
+            base: SerdeAttributes::default(),
+            alias: Vec::new(),
+            serialize_with: None,
+            deserialize_with: None,
+            with: None,
+            skip_serializing_if: None,
+            borrow: None,
+            getter: None,
+        }
+    }
 }
 
 /// Apply serde transformations to a DataType for the specified mode
@@ -375,6 +455,7 @@ fn parse_serde_attribute_content(
         RuntimeMeta::Path => {
             // Just #[serde] with no content - could be skip, untagged, etc.
             // We need the actual path string to determine what this is
+            // For now, we can't handle path-only attributes due to RuntimeMeta limitations
         }
         RuntimeMeta::NameValue { key, value } => {
             match key.as_str() {
@@ -389,6 +470,14 @@ fn parse_serde_attribute_content(
                             RenameRule::from_str(rule_str)
                                 .map_err(|_| Error::InvalidUsageOfSkip)?,
                         ); // TODO: Better error
+                    }
+                }
+                "rename_all_fields" => {
+                    if let RuntimeLiteral::Str(rule_str) = value {
+                        attrs.rename_all_fields = Some(
+                            RenameRule::from_str(rule_str)
+                                .map_err(|_| Error::InvalidUsageOfSkip)?,
+                        );
                     }
                 }
                 "tag" => {
@@ -407,9 +496,46 @@ fn parse_serde_attribute_content(
                         attrs.content = Some(content_name.clone());
                     }
                 }
-                "default" => {
-                    if let RuntimeLiteral::Bool(true) = value {
-                        attrs.default = true;
+                "default" => match value {
+                    RuntimeLiteral::Bool(true) => attrs.default = true,
+                    RuntimeLiteral::Str(func_path) => {
+                        attrs.default_with = Some(func_path.clone());
+                    }
+                    _ => {}
+                },
+                "bound" => {
+                    if let RuntimeLiteral::Str(bound_str) = value {
+                        attrs.bound = Some(bound_str.clone());
+                    }
+                }
+                "remote" => {
+                    if let RuntimeLiteral::Str(remote_type) = value {
+                        attrs.remote = Some(remote_type.clone());
+                    }
+                }
+                "from" => {
+                    if let RuntimeLiteral::Str(from_type) = value {
+                        attrs.from = Some(from_type.clone());
+                    }
+                }
+                "try_from" => {
+                    if let RuntimeLiteral::Str(try_from_type) = value {
+                        attrs.try_from = Some(try_from_type.clone());
+                    }
+                }
+                "into" => {
+                    if let RuntimeLiteral::Str(into_type) = value {
+                        attrs.into = Some(into_type.clone());
+                    }
+                }
+                "crate" => {
+                    if let RuntimeLiteral::Str(crate_path) = value {
+                        attrs.crate_path = Some(crate_path.clone());
+                    }
+                }
+                "expecting" => {
+                    if let RuntimeLiteral::Str(expecting_msg) = value {
+                        attrs.expecting = Some(expecting_msg.clone());
                     }
                 }
                 _ => {}
@@ -421,8 +547,12 @@ fn parse_serde_attribute_content(
                     RuntimeNestedMeta::Meta(nested_meta) => {
                         parse_serde_attribute_content(nested_meta, attrs)?;
                     }
+                    RuntimeNestedMeta::Literal(RuntimeLiteral::Str(s)) => {
+                        // Handle string literals that might be path attributes
+                        parse_serde_path_attribute(attrs, s);
+                    }
                     RuntimeNestedMeta::Literal(_) => {
-                        // Handle literal values in lists if needed
+                        // Handle other literal values in lists if needed
                     }
                 }
             }
@@ -455,56 +585,25 @@ fn parse_serde_path_attribute(attrs: &mut SerdeAttributes, attribute_name: &str)
         "default" => attrs.default = true,
         "transparent" => attrs.transparent = true,
         "untagged" => attrs.untagged = true,
+        "deny_unknown_fields" => attrs.deny_unknown_fields = true,
+        "variant_identifier" => attrs.variant_identifier = true,
+        "field_identifier" => attrs.field_identifier = true,
         _ => {}
     }
 }
 
-/// Enhanced parsing for common serde attribute patterns
-fn parse_enhanced_serde_attributes(
-    attributes: &[RuntimeAttribute],
-) -> Result<SerdeAttributes, Error> {
-    let mut attrs = SerdeAttributes::default();
-
-    for attr in attributes {
-        if attr.path == "serde" {
-            match &attr.kind {
-                RuntimeMeta::List(list) => {
-                    for nested in list {
-                        match nested {
-                            RuntimeNestedMeta::Meta(RuntimeMeta::Path) => {
-                                // We would need the actual path string here
-                                // This is a limitation of the current RuntimeAttribute structure
-                            }
-                            RuntimeNestedMeta::Meta(meta) => {
-                                parse_serde_attribute_content(meta, &mut attrs)?;
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                _ => {
-                    parse_serde_attribute_content(&attr.kind, &mut attrs)?;
-                }
-            }
-        }
-    }
-
-    Ok(attrs)
-}
-
 /// Parse serde field attributes from a vector of RuntimeAttribute
-fn parse_serde_field_attributes(
-    attributes: &[RuntimeAttribute],
-) -> Result<SerdeFieldAttributes, Error> {
-    let mut attrs = SerdeFieldAttributes::default();
+fn parse_serde_field_attributes(attrs: &[RuntimeAttribute]) -> Result<SerdeFieldAttributes, Error> {
+    let mut result = SerdeFieldAttributes::default();
+    result.base = parse_serde_attributes(attrs)?;
 
-    for attr in attributes {
+    for attr in attrs {
         if attr.path == "serde" {
-            parse_serde_field_attribute_content(&attr.kind, &mut attrs)?;
+            parse_serde_field_attribute_content(&attr.kind, &mut result)?;
         }
     }
 
-    Ok(attrs)
+    Ok(result)
 }
 
 /// Parse the content of a serde field attribute
@@ -512,12 +611,16 @@ fn parse_serde_field_attribute_content(
     meta: &RuntimeMeta,
     attrs: &mut SerdeFieldAttributes,
 ) -> Result<(), Error> {
+    // First parse as base attributes
+    parse_serde_attribute_content(meta, &mut attrs.base)?;
+
+    // Then parse field-specific attributes
     match meta {
         RuntimeMeta::Path => {}
         RuntimeMeta::NameValue { key, value } => match key.as_str() {
-            "rename" => {
-                if let RuntimeLiteral::Str(name) = value {
-                    attrs.base.rename = Some(name.clone());
+            "alias" => {
+                if let RuntimeLiteral::Str(alias_name) = value {
+                    attrs.alias.push(alias_name.clone());
                 }
             }
             "serialize_with" => {
@@ -528,6 +631,28 @@ fn parse_serde_field_attribute_content(
             "deserialize_with" => {
                 if let RuntimeLiteral::Str(func_name) = value {
                     attrs.deserialize_with = Some(func_name.clone());
+                }
+            }
+            "with" => {
+                if let RuntimeLiteral::Str(module_path) = value {
+                    attrs.with = Some(module_path.clone());
+                }
+            }
+            "skip_serializing_if" => {
+                if let RuntimeLiteral::Str(func_name) = value {
+                    attrs.skip_serializing_if = Some(func_name.clone());
+                }
+            }
+            "borrow" => {
+                if let RuntimeLiteral::Str(borrow_spec) = value {
+                    attrs.borrow = Some(borrow_spec.clone());
+                } else if let RuntimeLiteral::Bool(true) = value {
+                    attrs.borrow = Some(String::new()); // Empty string indicates simple borrow
+                }
+            }
+            "getter" => {
+                if let RuntimeLiteral::Str(getter_func) = value {
+                    attrs.getter = Some(getter_func.clone());
                 }
             }
             _ => {}
@@ -776,38 +901,36 @@ mod tests {
     fn test_transparent_struct_handling() {
         let mut transformer = SerdeTransformer::new(SerdeMode::Serialize);
 
-        // Create a transparent struct with one unnamed field
-        let field = specta::datatype::Field::new(DataType::Primitive(Primitive::String));
-        let unnamed_fields = internal::construct::fields_unnamed(vec![field]);
-        let transparent_struct = internal::construct::r#struct(
-            unnamed_fields,
-            vec![RuntimeAttribute {
-                path: "serde".to_string(),
-                kind: RuntimeMeta::NameValue {
-                    key: "transparent".to_string(),
-                    value: RuntimeLiteral::Bool(true),
-                },
-            }],
-        );
+        // Create a transparent struct with single field using List format
+        let transparent_attr = RuntimeAttribute {
+            path: "serde".to_string(),
+            kind: RuntimeMeta::List(vec![RuntimeNestedMeta::Literal(RuntimeLiteral::Str(
+                "transparent".to_string(),
+            ))]),
+        };
 
-        let result = transformer.handle_transparent_struct(&transparent_struct);
-        // Should resolve to the inner type for transparent structs
-        assert!(result.is_ok());
+        let field = specta::datatype::Field::new(DataType::Primitive(Primitive::String));
+        let fields = specta::internal::construct::fields_unnamed(vec![field]);
+        let struct_dt = specta::internal::construct::r#struct(fields, vec![transparent_attr]);
+
+        let datatype = DataType::Struct(struct_dt);
+        let result = transformer.transform_datatype(&datatype).unwrap();
+
+        // Should resolve to the inner type
+        assert_eq!(result, DataType::Primitive(Primitive::String));
     }
 
     #[test]
     fn test_field_attributes_parsing() {
-        let mut field_attrs = SerdeFieldAttributes::default();
-        let meta = RuntimeMeta::NameValue {
-            key: "serialize_with".to_string(),
-            value: RuntimeLiteral::Str("custom_serializer".to_string()),
+        let serialize_with_attr = RuntimeAttribute {
+            path: "serde".to_string(),
+            kind: RuntimeMeta::NameValue {
+                key: "serialize_with".to_string(),
+                value: RuntimeLiteral::Str("custom_serialize".to_string()),
+            },
         };
 
-        parse_serde_field_attribute_content(&meta, &mut field_attrs)
-            .expect("Failed to parse field attribute");
-        assert_eq!(
-            field_attrs.serialize_with,
-            Some("custom_serializer".to_string())
-        );
+        let attrs = parse_serde_field_attributes(&[serialize_with_attr]).unwrap();
+        assert_eq!(attrs.serialize_with, Some("custom_serialize".to_string()));
     }
 }
