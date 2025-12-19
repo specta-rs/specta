@@ -1,8 +1,7 @@
 //! Field types are used by both enums and structs.
 
+use super::{DataType, DeprecatedType, RuntimeAttribute};
 use std::borrow::Cow;
-
-use super::{DataType, DeprecatedType};
 
 /// Data stored within an enum variant or struct.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -38,6 +37,8 @@ pub struct Field {
     pub(crate) ty: Option<DataType>,
     // TODO: This is a Typescript-specific thing
     pub(crate) inline: bool,
+    /// Runtime attributes for this field (e.g., serde attributes)
+    pub(crate) attributes: Vec<RuntimeAttribute>,
 }
 
 impl Field {
@@ -52,6 +53,7 @@ impl Field {
             docs: "".into(),
             inline: false,
             ty: Some(ty),
+            attributes: Vec::new(),
         }
     }
 
@@ -128,6 +130,21 @@ impl Field {
     /// Set the type of this field.
     pub fn set_ty(&mut self, ty: DataType) {
         self.ty = Some(ty);
+    }
+
+    /// Get an immutable reference to the runtime attributes for this field.
+    pub fn attributes(&self) -> &Vec<RuntimeAttribute> {
+        &self.attributes
+    }
+
+    /// Mutable reference to the runtime attributes for this field.
+    pub fn attributes_mut(&mut self) -> &mut Vec<RuntimeAttribute> {
+        &mut self.attributes
+    }
+
+    /// Set the runtime attributes for this field.
+    pub fn set_attributes(&mut self, attrs: Vec<RuntimeAttribute>) {
+        self.attributes = attrs;
     }
 }
 

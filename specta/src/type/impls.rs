@@ -180,6 +180,7 @@ impl<T: Type> Type for std::ops::Range<T> {
                             docs: Cow::Borrowed(""),
                             inline: false,
                             ty: ty.clone(),
+                            attributes: Vec::new(),
                         },
                     ),
                     (
@@ -191,6 +192,7 @@ impl<T: Type> Type for std::ops::Range<T> {
                             docs: Cow::Borrowed(""),
                             inline: false,
                             ty,
+                            attributes: Vec::new(),
                         },
                     ),
                 ],
@@ -222,11 +224,25 @@ const _: () = {
                     vec![
                         (
                             "duration_since_epoch".into(),
-                            internal::construct::field::<i64>(false, false, None, "".into(), types),
+                            internal::construct::field::<i64>(
+                                false,
+                                false,
+                                None,
+                                "".into(),
+                                types,
+                                Vec::new(),
+                            ),
                         ),
                         (
                             "duration_since_unix_epoch".into(),
-                            internal::construct::field::<u32>(false, false, None, "".into(), types),
+                            internal::construct::field::<u32>(
+                                false,
+                                false,
+                                None,
+                                "".into(),
+                                types,
+                                Vec::new(),
+                            ),
                         ),
                     ],
                     None,
@@ -248,11 +264,25 @@ const _: () = {
                     vec![
                         (
                             "secs".into(),
-                            internal::construct::field::<u64>(false, false, None, "".into(), types),
+                            internal::construct::field::<u64>(
+                                false,
+                                false,
+                                None,
+                                "".into(),
+                                types,
+                                Vec::new(),
+                            ),
                         ),
                         (
                             "nanos".into(),
-                            internal::construct::field::<u32>(false, false, None, "".into(), types),
+                            internal::construct::field::<u32>(
+                                false,
+                                false,
+                                None,
+                                "".into(),
+                                types,
+                                Vec::new(),
+                            ),
                         ),
                     ],
                     None,

@@ -66,7 +66,7 @@ pub fn parse_enum(
                             .unnamed
                             .iter()
                             .map(|field| {
-                                let field_attrs = decode_field_attrs(field)?;
+                                let (field_attrs, raw_attrs) = decode_field_attrs(field)?;
                                 Ok(construct_field(crate_ref, container_attrs, FieldAttr {
                                     rename: field_attrs.rename,
                                     r#type: field_attrs.r#type,
@@ -76,7 +76,7 @@ pub fn parse_enum(
                                     optional: field_attrs.optional,
                                     flatten: field_attrs.flatten,
                                     common: field_attrs.common,
-                                }, &field.ty))
+                                }, &field.ty, &raw_attrs))
                             })
                             .collect::<syn::Result<Vec<TokenStream>>>()?;
 
@@ -89,7 +89,7 @@ pub fn parse_enum(
                         .named
                         .iter()
                         .map(|field| {
-                            let field_attrs = decode_field_attrs(field)?;
+                            let (field_attrs, raw_attrs) = decode_field_attrs(field)?;
 
                             let field_ident_str =
                                 unraw_raw_ident(field.ident.as_ref().unwrap());
@@ -100,18 +100,22 @@ pub fn parse_enum(
                                     let name = inflection.apply(&field_ident_str);
                                     quote::quote!(#name)
                                 }
-                                (_, _) => quote::quote!(#field_ident_str),
+                                (_, _) => {
+                                    let name = field_ident_str;
+                                    quote::quote!(#name)
+                                }
                             };
 
                             let inner = construct_field(crate_ref, container_attrs, FieldAttr {
                                 rename: field_attrs.rename,
                                 r#type: field_attrs.r#type,
+                                // TOOD: Should we check container too?
                                 inline: container_attrs.inline || field_attrs.inline || attrs.inline,
                                 skip: field_attrs.skip || attrs.skip,
                                 optional: field_attrs.optional,
                                 flatten: field_attrs.flatten,
                                 common: field_attrs.common,
-                            }, &field.ty);
+                            }, &field.ty, &raw_attrs);
                             Ok(quote!((#field_name.into(), #inner)))
                         })
                         .collect::<syn::Result<Vec<TokenStream>>>()?;
@@ -123,7 +127,7 @@ pub fn parse_enum(
                 let deprecated = attrs.common.deprecated_as_tokens();
                 let skip = attrs.skip;
                 let doc = attrs.common.doc;
-                Ok(quote!((#variant_name_str.into(), internal::construct::enum_variant(#skip, #deprecated, #doc.into(), #inner))))
+                Ok(quote!((#variant_name_str.into(), internal::construct::enum_variant(#skip, #deprecated, #doc.into(), #inner, Vec::new()))))
             })
             .collect::<syn::Result<Vec<_>>>()?;
 

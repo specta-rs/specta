@@ -213,3 +213,154 @@ fn test_nullable_type_transformation() {
     let transformed = ser_result.unwrap();
     assert!(matches!(transformed, DataType::Nullable(_)));
 }
+
+#[test]
+fn test_field_level_skip_attributes() {
+    // Create fields with different skip attributes
+    let mut field_skip = Field::new(DataType::Primitive(Primitive::String));
+    field_skip.set_attributes(vec![RuntimeAttribute {
+        path: "serde".to_string(),
+        kind: RuntimeMeta::NameValue {
+            key: "skip".to_string(),
+            value: RuntimeLiteral::Bool(true),
+        },
+    }]);
+
+    let mut field_skip_ser = Field::new(DataType::Primitive(Primitive::u32));
+    field_skip_ser.set_attributes(vec![RuntimeAttribute {
+        path: "serde".to_string(),
+        kind: RuntimeMeta::NameValue {
+            key: "skip_serializing".to_string(),
+            value: RuntimeLiteral::Bool(true),
+        },
+    }]);
+
+    let mut field_skip_de = Field::new(DataType::Primitive(Primitive::i32));
+    field_skip_de.set_attributes(vec![RuntimeAttribute {
+        path: "serde".to_string(),
+        kind: RuntimeMeta::NameValue {
+            key: "skip_deserializing".to_string(),
+            value: RuntimeLiteral::Bool(true),
+        },
+    }]);
+
+    let normal_field = Field::new(DataType::Primitive(Primitive::bool));
+
+    let fields = internal::construct::fields_named(
+        vec![
+            ("skip_both".into(), field_skip),
+            ("skip_ser_only".into(), field_skip_ser),
+            ("skip_de_only".into(), field_skip_de),
+            ("normal".into(), normal_field),
+        ],
+        None,
+    );
+
+    let struct_dt = DataType::Struct(internal::construct::r#struct(fields, vec![]));
+
+    // Transform for serialization - should skip 'skip_both' and 'skip_ser_only' fields
+    let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
+    assert!(ser_result.is_ok());
+
+    // Transform for deserialization - should skip 'skip_both' and 'skip_de_only' fields
+    let de_result = apply_serde_transformations(&struct_dt, SerdeMode::Deserialize);
+    assert!(de_result.is_ok());
+}
+
+#[test]
+fn test_field_level_rename_attributes() {
+    // Create a field with rename attribute
+    let mut field_renamed = Field::new(DataType::Primitive(Primitive::String));
+    field_renamed.set_attributes(vec![RuntimeAttribute {
+        path: "serde".to_string(),
+        kind: RuntimeMeta::NameValue {
+            key: "rename".to_string(),
+            value: RuntimeLiteral::Str("customName".to_string()),
+        },
+    }]);
+
+    let normal_field = Field::new(DataType::Primitive(Primitive::u32));
+
+    let fields = internal::construct::fields_named(
+        vec![
+            ("original_name".into(), field_renamed),
+            ("id".into(), normal_field),
+        ],
+        None,
+    );
+
+    let struct_dt = DataType::Struct(internal::construct::r#struct(fields, vec![]));
+
+    // Transform for serialization
+    let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
+    assert!(ser_result.is_ok());
+
+    // The transformation should preserve the rename information
+    let transformed = ser_result.unwrap();
+    assert!(matches!(transformed, DataType::Struct(_)));
+}
+
+#[cfg(test)]
+mod derive_tests {
+    use super::*;
+    use specta::Type;
+    use specta_macros::Type as TypeDerive;
+
+    #[derive(TypeDerive, serde::Serialize, serde::Deserialize)]
+    struct TestStruct {
+        normal_field: String,
+        #[serde(skip)]
+        skip_field: u32,
+        #[serde(skip_serializing)]
+        skip_ser_field: i32,
+        #[serde(skip_deserializing)]
+        skip_de_field: bool,
+        #[serde(rename = "customName")]
+        renamed_field: f64,
+    }
+
+    #[derive(TypeDerive, serde::Serialize, serde::Deserialize)]
+    enum TestEnum {
+        UnitVariant,
+        #[serde(skip)]
+        SkippedVariant,
+        #[serde(rename = "CustomVariant")]
+        RenamedVariant,
+        TupleVariant(String, u32),
+        StructVariant {
+            field1: String,
+            #[serde(skip)]
+            field2: u32,
+        },
+    }
+
+    #[test]
+    fn test_derive_macro_with_field_attributes() {
+        let types = specta::TypeCollection::default().register::<TestStruct>();
+
+        // Process for serialization
+        let ser_types = process_for_serialization(&types).unwrap();
+
+        // Process for deserialization
+        let de_types = process_for_deserialization(&types).unwrap();
+
+        // Both should succeed
+        assert_eq!(ser_types.len(), 1);
+        assert_eq!(de_types.len(), 1);
+    }
+
+    #[test]
+    fn test_derive_macro_with_enum_attributes() {
+        let types = specta::TypeCollection::default().register::<TestEnum>();
+
+        // Process for serialization
+        let ser_types = process_for_serialization(&types).unwrap();
+
+        // Process for deserialization
+        let de_types = process_for_deserialization(&types).unwrap();
+
+        // Both should succeed
+        assert_eq!(ser_types.len(), 1);
+        assert_eq!(de_types.len(), 1);
+    }
+}

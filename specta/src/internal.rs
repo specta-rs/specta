@@ -25,6 +25,7 @@ pub mod construct {
         inline: bool,
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
+        attributes: Vec<RuntimeAttribute>,
     ) -> Field {
         Field {
             optional,
@@ -33,6 +34,7 @@ pub mod construct {
             docs,
             inline,
             ty: None,
+            attributes,
         }
     }
 
@@ -42,6 +44,7 @@ pub mod construct {
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
         types: &mut TypeCollection,
+        attributes: Vec<RuntimeAttribute>,
     ) -> Field {
         Field {
             optional,
@@ -50,6 +53,7 @@ pub mod construct {
             docs,
             inline,
             ty: Some(T::definition(types)),
+            attributes,
         }
     }
 
@@ -59,6 +63,7 @@ pub mod construct {
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
         types: &mut TypeCollection,
+        attributes: Vec<RuntimeAttribute>,
     ) -> Field {
         Field {
             optional,
@@ -67,6 +72,7 @@ pub mod construct {
             docs,
             inline,
             ty: Some(T::definition(types)),
+            attributes,
         }
     }
 
@@ -100,12 +106,14 @@ pub mod construct {
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
         fields: Fields,
+        attributes: Vec<RuntimeAttribute>,
     ) -> EnumVariant {
         EnumVariant {
             skip,
             docs,
             deprecated,
             fields,
+            attributes,
         }
     }
 

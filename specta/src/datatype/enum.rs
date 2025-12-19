@@ -66,6 +66,8 @@ pub struct EnumVariant {
     pub(crate) deprecated: Option<DeprecatedType>,
     /// The type of the variant.
     pub(crate) fields: Fields,
+    /// Runtime attributes for this variant (e.g., serde attributes)
+    pub(crate) attributes: Vec<RuntimeAttribute>,
 }
 
 impl EnumVariant {
@@ -76,6 +78,7 @@ impl EnumVariant {
             docs: "".into(),
             deprecated: None,
             fields: Fields::Unit,
+            attributes: Vec::new(),
         }
     }
 
@@ -150,8 +153,23 @@ impl EnumVariant {
         &mut self.fields
     }
 
-    /// Set the fields of the variant.
+    /// Set the fields of this enum variant.
     pub fn set_fields(&mut self, fields: Fields) {
         self.fields = fields;
+    }
+
+    /// Get an immutable reference to the runtime attributes for this variant.
+    pub fn attributes(&self) -> &Vec<RuntimeAttribute> {
+        &self.attributes
+    }
+
+    /// Mutable reference to the runtime attributes for this variant.
+    pub fn attributes_mut(&mut self) -> &mut Vec<RuntimeAttribute> {
+        &mut self.attributes
+    }
+
+    /// Set the runtime attributes for this variant.
+    pub fn set_attributes(&mut self, attrs: Vec<RuntimeAttribute>) {
+        self.attributes = attrs;
     }
 }
