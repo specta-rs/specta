@@ -153,7 +153,7 @@ impl UnnamedFields {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NamedFields {
     pub(crate) fields: Vec<(Cow<'static, str>, Field)>,
-    pub(crate) tag: Option<Cow<'static, str>>,
+    pub(crate) tag: Option<Cow<'static, str>>, // TODO: Drop this too???
 }
 
 impl NamedFields {

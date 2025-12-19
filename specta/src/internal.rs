@@ -70,12 +70,8 @@ pub mod construct {
         }
     }
 
-    pub const fn r#struct(fields: Fields) -> Struct {
-        Struct { fields }
-    }
-
-    pub const fn fields_unit() -> Fields {
-        Fields::Unit
+    pub const fn r#struct(fields: Fields, attributes: Vec<RuntimeAttribute>) -> Struct {
+        Struct { fields, attributes }
     }
 
     pub const fn fields_unnamed(fields: Vec<Field>) -> Fields {
@@ -90,10 +86,13 @@ pub mod construct {
     }
 
     pub const fn r#enum(
-        repr: Option<EnumRepr>,
         variants: Vec<(Cow<'static, str>, EnumVariant)>,
+        attributes: Vec<RuntimeAttribute>,
     ) -> Enum {
-        Enum { repr, variants }
+        Enum {
+            variants,
+            attributes,
+        }
     }
 
     pub const fn enum_variant(

@@ -39,10 +39,10 @@ pub fn decode_field_attrs(field: &Field) -> syn::Result<FieldAttr> {
 }
 
 pub fn parse_struct(
-    name: &TokenStream,
     container_attrs: &ContainerAttr,
     crate_ref: &TokenStream,
     data: &DataStruct,
+    lowered_attrs: &Vec<TokenStream>, // TODO: Make more typesafe
 ) -> syn::Result<(TokenStream, bool)> {
     let definition = if container_attrs.transparent {
         if let Fields::Unit = data.fields {
@@ -142,10 +142,10 @@ pub fn parse_struct(
 
                 quote!(internal::construct::fields_unnamed(vec![#(#fields),*]))
             }
-            Fields::Unit => quote!(internal::construct::fields_unit()),
+            Fields::Unit => quote!(datatype::Fields::Unit),
         };
 
-        quote!(datatype::DataType::Struct(internal::construct::r#struct(#fields)))
+        quote!(datatype::DataType::Struct(internal::construct::r#struct(#fields, vec![#(#lowered_attrs),*])))
     };
 
     Ok((definition, true))

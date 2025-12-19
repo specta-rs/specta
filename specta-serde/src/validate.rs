@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use specta::{
     TypeCollection,
-    datatype::{DataType, Enum, EnumRepr, Fields, Generic, Primitive, Reference},
+    datatype::{DataType, Enum, Fields, Generic, Primitive, Reference},
     internal::{skip_fields, skip_fields_named},
 };
 
@@ -135,9 +135,10 @@ fn is_valid_map_key(
                             return Err(Error::InvalidMapKey);
                         }
 
-                        if *ty.repr().unwrap_or(&EnumRepr::External) != EnumRepr::Untagged {
-                            return Err(Error::InvalidMapKey);
-                        }
+                        // if *ty.repr().unwrap_or(&EnumRepr::External) != EnumRepr::Untagged {
+                        //     return Err(Error::InvalidMapKey);
+                        // }
+                        todo!();
                     }
                     _ => return Err(Error::InvalidMapKey),
                 }
@@ -180,9 +181,10 @@ fn validate_enum(e: &Enum, types: &TypeCollection) -> Result<(), Error> {
     }
 
     // Only internally tagged enums can be invalid.
-    if let EnumRepr::Internal { .. } = e.repr().unwrap_or(&EnumRepr::External) {
-        validate_internally_tag_enum(e, types)?;
-    }
+    // if let EnumRepr::Internal { .. } = e.repr().unwrap_or(&EnumRepr::External) {
+    //     validate_internally_tag_enum(e, types)?;
+    // }
+    todo!();
 
     Ok(())
 }
@@ -224,18 +226,19 @@ fn validate_internally_tag_enum_datatype(
         DataType::Map(_) => {}
         // Structs's are always map-types unless they are transparent then it depends on inner type. However, transparent passes through when calling `Type::inline` so we don't need to specially check that case.
         DataType::Struct(_) => {}
-        DataType::Enum(ty) => match ty.repr().unwrap_or(&EnumRepr::External) {
-            // Is only valid if the enum itself is also valid.
-            EnumRepr::Untagged => validate_internally_tag_enum(ty, types)?,
-            // Eg. `{ "Variant": "value" }` is a map-type so valid.
-            EnumRepr::External => {}
-            // Eg. `{ "type": "variant", "field": "value" }` is a map-type so valid.
-            EnumRepr::Internal { .. } => {}
-            // Eg. `{ "type": "variant", "c": {} }` is a map-type so valid.
-            EnumRepr::Adjacent { .. } => {}
-            // String enums serialize as strings, which are valid
-            EnumRepr::String { .. } => {}
-        },
+        DataType::Enum(ty) => todo!(),
+        // match ty.repr().unwrap_or(&EnumRepr::External) {
+        //     // Is only valid if the enum itself is also valid.
+        //     EnumRepr::Untagged => validate_internally_tag_enum(ty, types)?,
+        //     // Eg. `{ "Variant": "value" }` is a map-type so valid.
+        //     EnumRepr::External => {}
+        //     // Eg. `{ "type": "variant", "field": "value" }` is a map-type so valid.
+        //     EnumRepr::Internal { .. } => {}
+        //     // Eg. `{ "type": "variant", "c": {} }` is a map-type so valid.
+        //     EnumRepr::Adjacent { .. } => {}
+        //     // String enums serialize as strings, which are valid
+        //     EnumRepr::String { .. } => {}
+        // },
         // `()` is `null` and is valid
         DataType::Tuple(ty) if ty.elements().is_empty() => {}
         // References need to be checked against the same rules.

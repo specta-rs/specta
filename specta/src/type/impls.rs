@@ -157,7 +157,8 @@ const _: () = {
     impl Type for std::convert::Infallible {
         fn definition(_: &mut TypeCollection) -> DataType {
             DataType::Enum(internal::construct::r#enum(
-                Some(EnumRepr::External),
+                // Some(EnumRepr::External),
+                vec![],
                 vec![],
             ))
         }
@@ -195,6 +196,7 @@ impl<T: Type> Type for std::ops::Range<T> {
                 ],
                 tag: None,
             }),
+            attributes: vec![],
         })
     }
 }
@@ -229,6 +231,7 @@ const _: () = {
                     ],
                     None,
                 ),
+                vec![],
             ))
         }
     }
@@ -254,6 +257,7 @@ const _: () = {
                     ],
                     None,
                 ),
+                vec![],
             ))
         }
     }

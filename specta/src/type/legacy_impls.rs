@@ -32,7 +32,7 @@ const _: () = {
     impl Type for Number {
         fn definition(_: &mut TypeCollection) -> DataType {
             DataType::Enum(Enum {
-                repr: Some(EnumRepr::Untagged),
+                // repr: Some(EnumRepr::Untagged),
                 variants: vec![
                     (
                         "f64".into(),
@@ -89,6 +89,7 @@ const _: () = {
                         },
                     ),
                 ],
+                attributes: vec![],
             })
         }
     }
@@ -126,7 +127,7 @@ const _: () = {
     impl Type for serde_yaml::Number {
         fn definition(_: &mut TypeCollection) -> DataType {
             DataType::Enum(Enum {
-                repr: Some(EnumRepr::Untagged),
+                // repr: Some(EnumRepr::Untagged),
                 variants: vec![
                     (
                         "f64".into(),
@@ -183,6 +184,7 @@ const _: () = {
                         },
                     ),
                 ],
+                attributes: vec![],
             })
         }
     }
@@ -434,7 +436,7 @@ impl_as!(url::Url as String);
 impl<L: Type, R: Type> Type for either::Either<L, R> {
     fn definition(types: &mut TypeCollection) -> DataType {
         DataType::Enum(Enum {
-            repr: Some(EnumRepr::Untagged),
+            // repr: Some(EnumRepr::Untagged),
             variants: vec![
                 (
                     "Left".into(),
@@ -473,6 +475,7 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                     },
                 ),
             ],
+            attributes: vec![],
         })
     }
 }

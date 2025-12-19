@@ -9,6 +9,7 @@ pub fn parse_enum(
     container_attrs: &ContainerAttr,
     crate_ref: &TokenStream,
     data: &DataEnum,
+    lowered_attrs: &Vec<TokenStream>,
 ) -> syn::Result<(TokenStream, bool)> {
     if container_attrs.transparent {
         return Err(syn::Error::new(
@@ -59,7 +60,7 @@ pub fn parse_enum(
                 };
 
                 let inner = match &variant.fields {
-                    Fields::Unit => quote!(internal::construct::fields_unit()),
+                    Fields::Unit => quote!(datatype::Fields::Unit),
                     Fields::Unnamed(fields) => {
                         let fields = fields
                             .unnamed
@@ -218,7 +219,11 @@ pub fn parse_enum(
     };
 
     Ok((
-        quote!(datatype::DataType::Enum(internal::construct::r#enum(#repr, vec![#(#variant_types),*]))),
+        // TODO: #repr,
+        quote!(datatype::DataType::Enum(internal::construct::r#enum(
+            vec![#(#variant_types),*],
+            vec![#(#lowered_attrs),*]
+        ))),
         can_flatten,
     ))
 }

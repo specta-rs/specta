@@ -1,5 +1,6 @@
 //! Types related to working with [`DataType`]. Exposed for advanced users.
 
+mod attrs;
 mod r#enum;
 mod fields;
 mod function;
@@ -12,7 +13,8 @@ mod reference;
 mod r#struct;
 mod tuple;
 
-pub use r#enum::{Enum, EnumRepr, EnumVariant};
+pub use attrs::*;
+pub use r#enum::{Enum, EnumVariant};
 pub use fields::{Field, Fields, NamedFields, UnnamedFields};
 pub use function::{Function, FunctionReturnType};
 pub use generic::{ConstGenericPlaceholder, Generic, GenericPlaceholder};
@@ -22,7 +24,7 @@ pub use named::{DeprecatedType, NamedDataType};
 pub use primitive::Primitive;
 pub use reference::Reference;
 pub use r#struct::Struct;
-pub use tuple::Tuple;
+pub use tuple::Tuple; // TODO: Hardcodd exports
 
 // TODO: Remove this
 pub(crate) use reference::ArcId;

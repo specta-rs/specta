@@ -30,6 +30,7 @@ impl StructBuilder<NamedFields> {
     pub fn build(self) -> DataType {
         DataType::Struct(Struct {
             fields: Fields::Named(self.fields),
+            attributes: Default::default(),
         })
     }
 }
@@ -44,9 +45,12 @@ impl StructBuilder<UnnamedFields> {
         self.fields.fields.push(field);
     }
 
+    // TODO: Allow configuring attributes???
+
     pub fn build(self) -> DataType {
         DataType::Struct(Struct {
             fields: Fields::Unnamed(self.fields),
+            attributes: Default::default(),
         })
     }
 }

@@ -17,7 +17,7 @@ pub struct ContainerAttr {
     pub collect: Option<bool>,
     pub common: CommonAttr,
 
-    // Struct ony (we pass it anyway so enums get nice errors)
+    // Struct only (we pass it anyway so enums get nice errors)
     pub transparent: bool,
 }
 

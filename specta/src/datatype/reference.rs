@@ -117,7 +117,11 @@ impl fmt::Debug for ArcId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{:?}",
+            "{}_{:?}",
+            match self {
+                ArcId::Static(..) => "s",
+                ArcId::Dynamic(..) => "d",
+            },
             match self {
                 ArcId::Static(ptr) => *ptr as *const (),
                 ArcId::Dynamic(arc) => Arc::as_ptr(arc),
