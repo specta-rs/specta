@@ -31,10 +31,19 @@ pub enum SerdeMode {
 pub struct SerdeAttributes {
     /// Direct rename specified by #[serde(rename = "name")]
     pub rename: Option<String>,
+    /// Separate names for serialization and deserialization
+    pub rename_serialize: Option<String>,
+    pub rename_deserialize: Option<String>,
     /// Rename all fields/variants according to #[serde(rename_all = "case")]
     pub rename_all: Option<RenameRule>,
+    /// Separate rename_all for serialization and deserialization
+    pub rename_all_serialize: Option<RenameRule>,
+    pub rename_all_deserialize: Option<RenameRule>,
     /// Rename all fields in enum variants according to #[serde(rename_all_fields = "case")]
     pub rename_all_fields: Option<RenameRule>,
+    /// Separate rename_all_fields for serialization and deserialization
+    pub rename_all_fields_serialize: Option<RenameRule>,
+    pub rename_all_fields_deserialize: Option<RenameRule>,
     /// Skip serialization with #[serde(skip_serializing)]
     pub skip_serializing: bool,
     /// Skip deserialization with #[serde(skip_deserializing)]
@@ -61,6 +70,9 @@ pub struct SerdeAttributes {
     pub untagged: bool,
     /// Custom trait bounds #[serde(bound = "...")]
     pub bound: Option<String>,
+    /// Separate bounds for serialization and deserialization
+    pub bound_serialize: Option<String>,
+    pub bound_deserialize: Option<String>,
     /// Remote type definition #[serde(remote = "...")]
     pub remote: Option<String>,
     /// Convert from another type #[serde(from = "...")]
@@ -77,6 +89,18 @@ pub struct SerdeAttributes {
     pub variant_identifier: bool,
     /// Field identifier for struct deserialization
     pub field_identifier: bool,
+    /// Deserialize unknown variants to this variant #[serde(other)]
+    pub other: bool,
+    /// Aliases for deserialization #[serde(alias = "name")]
+    pub alias: Vec<String>,
+    /// Serialize with custom function #[serde(serialize_with = "path")]
+    pub serialize_with: Option<String>,
+    /// Deserialize with custom function #[serde(deserialize_with = "path")]
+    pub deserialize_with: Option<String>,
+    /// Combined serialize/deserialize with module #[serde(with = "module")]
+    pub with: Option<String>,
+    /// Borrow data during deserialization #[serde(borrow)]
+    pub borrow: Option<String>,
 }
 
 /// Contains parsed serde attributes for a field
@@ -104,8 +128,14 @@ impl Default for SerdeAttributes {
     fn default() -> Self {
         Self {
             rename: None,
+            rename_serialize: None,
+            rename_deserialize: None,
             rename_all: None,
+            rename_all_serialize: None,
+            rename_all_deserialize: None,
             rename_all_fields: None,
+            rename_all_fields_serialize: None,
+            rename_all_fields_deserialize: None,
             skip_serializing: false,
             skip_deserializing: false,
             skip: false,
@@ -119,6 +149,8 @@ impl Default for SerdeAttributes {
             content: None,
             untagged: false,
             bound: None,
+            bound_serialize: None,
+            bound_deserialize: None,
             remote: None,
             from: None,
             try_from: None,
@@ -127,6 +159,12 @@ impl Default for SerdeAttributes {
             expecting: None,
             variant_identifier: false,
             field_identifier: false,
+            other: false,
+            alias: Vec::new(),
+            serialize_with: None,
+            deserialize_with: None,
+            with: None,
+            borrow: None,
         }
     }
 }
@@ -238,7 +276,7 @@ impl SerdeTransformer {
         let mut transformed_variants = Vec::new();
 
         for (variant_name, variant) in enum_type.variants() {
-            let variant_attrs = SerdeAttributes::default(); // Parse variant-specific attributes if needed
+            let variant_attrs = parse_serde_attributes(variant.attributes())?;
 
             if self.should_skip_type(&variant_attrs) {
                 continue;
@@ -248,6 +286,7 @@ impl SerdeTransformer {
                 variant_name,
                 attrs.rename_all,
                 &variant_attrs.rename,
+                &variant_attrs,
                 true, // is_variant
             )?;
 
@@ -278,7 +317,7 @@ impl SerdeTransformer {
                 return Err(Error::InvalidUsageOfSkip); // Not a string enum
             }
 
-            let variant_attrs = SerdeAttributes::default();
+            let variant_attrs = parse_serde_attributes(variant.attributes())?;
             if self.should_skip_type(&variant_attrs) {
                 continue;
             }
@@ -287,6 +326,7 @@ impl SerdeTransformer {
                 variant_name,
                 attrs.rename_all,
                 &variant_attrs.rename,
+                &variant_attrs,
                 true,
             )?;
 
@@ -351,6 +391,7 @@ impl SerdeTransformer {
                         field_name,
                         parent_attrs.rename_all,
                         &field_attrs.base.rename,
+                        &field_attrs.base,
                         false, // is_variant
                     )?;
 
@@ -411,6 +452,7 @@ impl SerdeTransformer {
         original_name: &str,
         rename_all_rule: Option<RenameRule>,
         direct_rename: &Option<String>,
+        attrs: &SerdeAttributes,
         is_variant: bool,
     ) -> Result<Cow<'static, str>, Error> {
         // Direct rename takes precedence
@@ -418,8 +460,34 @@ impl SerdeTransformer {
             return Ok(Cow::Owned(renamed.clone()));
         }
 
+        // Check for mode-specific renames
+        match self.mode {
+            SerdeMode::Serialize => {
+                if let Some(renamed) = &attrs.rename_serialize {
+                    return Ok(Cow::Owned(renamed.clone()));
+                }
+            }
+            SerdeMode::Deserialize => {
+                if let Some(renamed) = &attrs.rename_deserialize {
+                    return Ok(Cow::Owned(renamed.clone()));
+                }
+            }
+        }
+
+        // Apply mode-specific rename_all rule
+        let rule = match self.mode {
+            SerdeMode::Serialize => attrs
+                .rename_all_serialize
+                .or(attrs.rename_all_fields_serialize)
+                .or(rename_all_rule),
+            SerdeMode::Deserialize => attrs
+                .rename_all_deserialize
+                .or(attrs.rename_all_fields_deserialize)
+                .or(rename_all_rule),
+        };
+
         // Apply rename_all rule
-        if let Some(rule) = rename_all_rule {
+        if let Some(rule) = rule {
             let transformed = if is_variant {
                 rule.apply_to_variant(original_name)
             } else {
@@ -538,21 +606,67 @@ fn parse_serde_attribute_content(
                         attrs.expecting = Some(expecting_msg.clone());
                     }
                 }
+                "alias" => {
+                    if let RuntimeLiteral::Str(alias_name) = value {
+                        attrs.alias.push(alias_name.clone());
+                    }
+                }
+                "serialize_with" => {
+                    if let RuntimeLiteral::Str(serialize_fn) = value {
+                        attrs.serialize_with = Some(serialize_fn.clone());
+                    }
+                }
+                "deserialize_with" => {
+                    if let RuntimeLiteral::Str(deserialize_fn) = value {
+                        attrs.deserialize_with = Some(deserialize_fn.clone());
+                    }
+                }
+                "with" => {
+                    if let RuntimeLiteral::Str(with_module) = value {
+                        attrs.with = Some(with_module.clone());
+                    }
+                }
+                "borrow" => {
+                    if let RuntimeLiteral::Str(borrow_str) = value {
+                        attrs.borrow = Some(borrow_str.clone());
+                    }
+                }
                 _ => {}
             }
         }
         RuntimeMeta::List(list) => {
+            // Check if this is a complex attribute with serialize/deserialize modifiers
+            let mut has_serialize_deserialize = false;
             for nested in list {
-                match nested {
-                    RuntimeNestedMeta::Meta(nested_meta) => {
-                        parse_serde_attribute_content(nested_meta, attrs)?;
+                if let RuntimeNestedMeta::Meta(RuntimeMeta::NameValue { key, .. }) = nested {
+                    if key == "serialize" || key == "deserialize" {
+                        has_serialize_deserialize = true;
+                        break;
                     }
-                    RuntimeNestedMeta::Literal(RuntimeLiteral::Str(s)) => {
-                        // Handle string literals that might be path attributes
-                        parse_serde_path_attribute(attrs, s);
+                }
+            }
+
+            if has_serialize_deserialize {
+                // This is a complex attribute like rename(serialize="...", deserialize="...")
+                for nested in list {
+                    if let RuntimeNestedMeta::Meta(nested_meta) = nested {
+                        parse_complex_serde_attribute(nested_meta, attrs, "rename")?;
                     }
-                    RuntimeNestedMeta::Literal(_) => {
-                        // Handle other literal values in lists if needed
+                }
+            } else {
+                // Regular list processing
+                for nested in list {
+                    match nested {
+                        RuntimeNestedMeta::Meta(nested_meta) => {
+                            parse_serde_attribute_content(nested_meta, attrs)?;
+                        }
+                        RuntimeNestedMeta::Literal(RuntimeLiteral::Str(s)) => {
+                            // Handle string literals that might be path attributes
+                            parse_serde_path_attribute(attrs, s);
+                        }
+                        RuntimeNestedMeta::Literal(_) => {
+                            // Handle other literal values in lists if needed
+                        }
                     }
                 }
             }
@@ -574,6 +688,66 @@ fn parse_serde_attribute_content(
     Ok(())
 }
 
+fn parse_complex_serde_attribute(
+    meta: &RuntimeMeta,
+    attrs: &mut SerdeAttributes,
+    parent_key: &str,
+) -> Result<(), Error> {
+    match meta {
+        RuntimeMeta::NameValue { key, value } => match key.as_str() {
+            "serialize" => {
+                if let RuntimeLiteral::Str(name) = value {
+                    match parent_key {
+                        "rename" => attrs.rename_serialize = Some(name.clone()),
+                        "rename_all" => {
+                            if let Ok(rule) = RenameRule::from_str(name) {
+                                attrs.rename_all_serialize = Some(rule);
+                            }
+                        }
+                        "rename_all_fields" => {
+                            if let Ok(rule) = RenameRule::from_str(name) {
+                                attrs.rename_all_fields_serialize = Some(rule);
+                            }
+                        }
+                        "bound" => attrs.bound_serialize = Some(name.clone()),
+                        _ => {}
+                    }
+                }
+            }
+            "deserialize" => {
+                if let RuntimeLiteral::Str(name) = value {
+                    match parent_key {
+                        "rename" => attrs.rename_deserialize = Some(name.clone()),
+                        "rename_all" => {
+                            if let Ok(rule) = RenameRule::from_str(name) {
+                                attrs.rename_all_deserialize = Some(rule);
+                            }
+                        }
+                        "rename_all_fields" => {
+                            if let Ok(rule) = RenameRule::from_str(name) {
+                                attrs.rename_all_fields_deserialize = Some(rule);
+                            }
+                        }
+                        "bound" => attrs.bound_deserialize = Some(name.clone()),
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        },
+        RuntimeMeta::List(list) => {
+            // Handle nested complex attributes
+            for nested in list {
+                if let RuntimeNestedMeta::Meta(nested_meta) = nested {
+                    parse_complex_serde_attribute(nested_meta, attrs, parent_key)?;
+                }
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
 /// Parse string attributes that are commonly used with serde
 /// This is a helper for parsing path-only attributes like #[serde(skip)]
 fn parse_serde_path_attribute(attrs: &mut SerdeAttributes, attribute_name: &str) {
@@ -588,6 +762,8 @@ fn parse_serde_path_attribute(attrs: &mut SerdeAttributes, attribute_name: &str)
         "deny_unknown_fields" => attrs.deny_unknown_fields = true,
         "variant_identifier" => attrs.variant_identifier = true,
         "field_identifier" => attrs.field_identifier = true,
+        "other" => attrs.other = true,
+        "borrow" => attrs.borrow = Some(String::new()),
         _ => {}
     }
 }
@@ -877,13 +1053,25 @@ mod tests {
 
         // Test field renaming
         let result = transformer
-            .apply_rename_rule("test_field", Some(RenameRule::CamelCase), &None, false)
+            .apply_rename_rule(
+                "test_field",
+                Some(RenameRule::CamelCase),
+                &None,
+                &SerdeAttributes::default(),
+                false,
+            )
             .unwrap();
         assert_eq!(result, "testField");
 
         // Test variant renaming
         let result = transformer
-            .apply_rename_rule("TestVariant", Some(RenameRule::SnakeCase), &None, true)
+            .apply_rename_rule(
+                "TestVariant",
+                Some(RenameRule::SnakeCase),
+                &None,
+                &SerdeAttributes::default(),
+                true,
+            )
             .unwrap();
         assert_eq!(result, "test_variant");
 
@@ -893,6 +1081,7 @@ mod tests {
                 "test_field",
                 Some(RenameRule::CamelCase),
                 &Some("customName".to_string()),
+                &SerdeAttributes::default(),
                 false,
             )
             .unwrap();
@@ -1057,5 +1246,176 @@ mod tests {
 
         let attrs = parse_serde_field_attributes(&[serialize_with_attr]).unwrap();
         assert_eq!(attrs.serialize_with, Some("custom_serialize".to_string()));
+    }
+
+    #[test]
+    fn test_other_attribute() {
+        let mut attrs = SerdeAttributes::default();
+        parse_serde_path_attribute(&mut attrs, "other");
+        assert!(attrs.other);
+    }
+
+    #[test]
+    fn test_alias_attribute() {
+        let mut attrs = SerdeAttributes::default();
+        let meta = RuntimeMeta::NameValue {
+            key: "alias".to_string(),
+            value: RuntimeLiteral::Str("alternative_name".to_string()),
+        };
+
+        parse_serde_attribute_content(&meta, &mut attrs).expect("Failed to parse serde attribute");
+        assert_eq!(attrs.alias, vec!["alternative_name".to_string()]);
+    }
+
+    #[test]
+    fn test_serialize_with_attribute() {
+        let mut attrs = SerdeAttributes::default();
+        let meta = RuntimeMeta::NameValue {
+            key: "serialize_with".to_string(),
+            value: RuntimeLiteral::Str("custom_serialize".to_string()),
+        };
+
+        parse_serde_attribute_content(&meta, &mut attrs).expect("Failed to parse serde attribute");
+        assert_eq!(attrs.serialize_with, Some("custom_serialize".to_string()));
+    }
+
+    #[test]
+    fn test_with_attribute() {
+        let mut attrs = SerdeAttributes::default();
+        let meta = RuntimeMeta::NameValue {
+            key: "with".to_string(),
+            value: RuntimeLiteral::Str("custom_module".to_string()),
+        };
+
+        parse_serde_attribute_content(&meta, &mut attrs).expect("Failed to parse serde attribute");
+        assert_eq!(attrs.with, Some("custom_module".to_string()));
+    }
+
+    #[test]
+    fn test_complex_rename_attribute() {
+        let mut attrs = SerdeAttributes::default();
+
+        // Simulate parsing rename(serialize = "ser_name", deserialize = "de_name")
+        let serialize_meta = RuntimeMeta::NameValue {
+            key: "serialize".to_string(),
+            value: RuntimeLiteral::Str("ser_name".to_string()),
+        };
+        let deserialize_meta = RuntimeMeta::NameValue {
+            key: "deserialize".to_string(),
+            value: RuntimeLiteral::Str("de_name".to_string()),
+        };
+
+        parse_complex_serde_attribute(&serialize_meta, &mut attrs, "rename")
+            .expect("Failed to parse serialize");
+        parse_complex_serde_attribute(&deserialize_meta, &mut attrs, "rename")
+            .expect("Failed to parse deserialize");
+
+        assert_eq!(attrs.rename_serialize, Some("ser_name".to_string()));
+        assert_eq!(attrs.rename_deserialize, Some("de_name".to_string()));
+    }
+
+    #[test]
+    fn test_complex_rename_all_attribute() {
+        let mut attrs = SerdeAttributes::default();
+
+        // Simulate parsing rename_all(serialize = "camelCase", deserialize = "snake_case")
+        let serialize_meta = RuntimeMeta::NameValue {
+            key: "serialize".to_string(),
+            value: RuntimeLiteral::Str("camelCase".to_string()),
+        };
+        let deserialize_meta = RuntimeMeta::NameValue {
+            key: "deserialize".to_string(),
+            value: RuntimeLiteral::Str("snake_case".to_string()),
+        };
+
+        parse_complex_serde_attribute(&serialize_meta, &mut attrs, "rename_all")
+            .expect("Failed to parse serialize");
+        parse_complex_serde_attribute(&deserialize_meta, &mut attrs, "rename_all")
+            .expect("Failed to parse deserialize");
+
+        assert_eq!(attrs.rename_all_serialize, Some(RenameRule::CamelCase));
+        assert_eq!(attrs.rename_all_deserialize, Some(RenameRule::SnakeCase));
+    }
+
+    #[test]
+    fn test_mode_specific_rename_behavior() {
+        let mut attrs = SerdeAttributes::default();
+        attrs.rename_serialize = Some("ser_name".to_string());
+        attrs.rename_deserialize = Some("de_name".to_string());
+
+        let ser_transformer = SerdeTransformer::new(SerdeMode::Serialize);
+        let de_transformer = SerdeTransformer::new(SerdeMode::Deserialize);
+
+        let ser_result = ser_transformer
+            .apply_rename_rule("original", None, &None, &attrs, false)
+            .unwrap();
+        assert_eq!(ser_result, "ser_name");
+
+        let de_result = de_transformer
+            .apply_rename_rule("original", None, &None, &attrs, false)
+            .unwrap();
+        assert_eq!(de_result, "de_name");
+    }
+
+    #[test]
+    fn test_mode_specific_rename_all_behavior() {
+        let mut attrs = SerdeAttributes::default();
+        attrs.rename_all_serialize = Some(RenameRule::CamelCase);
+        attrs.rename_all_deserialize = Some(RenameRule::SnakeCase);
+
+        let ser_transformer = SerdeTransformer::new(SerdeMode::Serialize);
+        let de_transformer = SerdeTransformer::new(SerdeMode::Deserialize);
+
+        // Test field renaming (fields start as snake_case in Rust)
+        let ser_result = ser_transformer
+            .apply_rename_rule("test_field", None, &None, &attrs, false)
+            .unwrap();
+        assert_eq!(ser_result, "testField");
+
+        let de_result = de_transformer
+            .apply_rename_rule("test_field", None, &None, &attrs, false)
+            .unwrap();
+        assert_eq!(de_result, "test_field"); // snake_case rule returns input unchanged for fields
+
+        // Test variant renaming (variants start as PascalCase in Rust)
+        let ser_result = ser_transformer
+            .apply_rename_rule("TestVariant", None, &None, &attrs, true)
+            .unwrap();
+        assert_eq!(ser_result, "testVariant"); // camelCase
+
+        let de_result = de_transformer
+            .apply_rename_rule("TestVariant", None, &None, &attrs, true)
+            .unwrap();
+        assert_eq!(de_result, "test_variant"); // snake_case
+    }
+
+    #[test]
+    fn test_borrow_attribute_parsing() {
+        let mut attrs = SerdeAttributes::default();
+        parse_serde_path_attribute(&mut attrs, "borrow");
+        assert_eq!(attrs.borrow, Some(String::new()));
+
+        let mut attrs2 = SerdeAttributes::default();
+        let meta = RuntimeMeta::NameValue {
+            key: "borrow".to_string(),
+            value: RuntimeLiteral::Str("'a + 'b".to_string()),
+        };
+        parse_serde_attribute_content(&meta, &mut attrs2).expect("Failed to parse borrow");
+        assert_eq!(attrs2.borrow, Some("'a + 'b".to_string()));
+    }
+
+    #[test]
+    fn test_variant_attribute_parsing() {
+        // Test that variant attributes are parsed when transforming enums
+        let variant_attr = RuntimeAttribute {
+            path: "serde".to_string(),
+            kind: RuntimeMeta::NameValue {
+                key: "rename".to_string(),
+                value: RuntimeLiteral::Str("custom_variant".to_string()),
+            },
+        };
+
+        let attrs = parse_serde_attributes(&[variant_attr]).unwrap();
+        assert_eq!(attrs.rename, Some("custom_variant".to_string()));
     }
 }
