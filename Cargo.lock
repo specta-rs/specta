@@ -1643,7 +1643,9 @@ dependencies = [
 name = "specta-serde"
 version = "0.0.9"
 dependencies = [
+ "serde",
  "specta",
+ "specta-macros",
 ]
 
 [[package]]

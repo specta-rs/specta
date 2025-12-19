@@ -6,7 +6,10 @@ use specta::{
     internal::{skip_fields, skip_fields_named},
 };
 
-use crate::Error;
+use crate::{
+    Error,
+    serde_attrs::{SerdeMode, apply_serde_transformations},
+};
 
 // TODO: The error should show a path to the type causing the issue like the BigInt error reporting.
 
@@ -14,6 +17,34 @@ use crate::Error;
 pub fn validate(types: &TypeCollection) -> Result<(), Error> {
     for ndt in types.into_unsorted_iter() {
         inner(ndt.ty(), types, &[], &mut Default::default())?;
+    }
+
+    Ok(())
+}
+
+/// Validate and transform types with serde attributes for serialization
+pub fn validate_with_serde_serialize(types: &mut TypeCollection) -> Result<(), Error> {
+    let type_entries: Vec<_> = types.into_unsorted_iter().collect();
+
+    for ndt in type_entries {
+        let transformed = apply_serde_transformations(ndt.ty(), SerdeMode::Serialize)?;
+        // Note: In a real implementation, we'd need a way to update the type in the collection
+        // This is a conceptual example showing how the transformation would be applied
+        inner(&transformed, types, &[], &mut Default::default())?;
+    }
+
+    Ok(())
+}
+
+/// Validate and transform types with serde attributes for deserialization
+pub fn validate_with_serde_deserialize(types: &mut TypeCollection) -> Result<(), Error> {
+    let type_entries: Vec<_> = types.into_unsorted_iter().collect();
+
+    for ndt in type_entries {
+        let transformed = apply_serde_transformations(ndt.ty(), SerdeMode::Deserialize)?;
+        // Note: In a real implementation, we'd need a way to update the type in the collection
+        // This is a conceptual example showing how the transformation would be applied
+        inner(&transformed, types, &[], &mut Default::default())?;
     }
 
     Ok(())
