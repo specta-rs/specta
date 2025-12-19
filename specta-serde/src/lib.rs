@@ -17,6 +17,7 @@
 
 mod error;
 mod inflection;
+mod repr;
 mod validate;
 
 pub use error::Error;

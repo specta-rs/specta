@@ -12,7 +12,6 @@ use super::{DataType, DeprecatedType, Fields, NamedFields, RuntimeAttribute, Unn
 /// An enum is also assigned a repr which follows [Serde repr semantics](https://serde.rs/enum-representations.html).
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Enum {
-    // pub(crate) repr: Option<EnumRepr>,
     pub(crate) variants: Vec<(Cow<'static, str>, EnumVariant)>,
     pub(crate) attributes: Vec<RuntimeAttribute>,
 }
@@ -22,21 +21,6 @@ impl Enum {
     pub fn new() -> Self {
         Self::default()
     }
-
-    // /// Get an immutable reference to the enum's representation.
-    // pub fn repr(&self) -> Option<&EnumRepr> {
-    //     self.repr.as_ref()
-    // }
-
-    // /// Get a mutable reference to the enum's representation.
-    // pub fn repr_mut(&mut self) -> Option<&mut EnumRepr> {
-    //     self.repr.as_mut()
-    // }
-
-    // /// Set the enum's representation.
-    // pub fn set_repr(&mut self, repr: EnumRepr) {
-    //     self.repr = Some(repr);
-    // }
 
     /// Get an immutable reference to the enum's variants.
     pub fn variants(&self) -> &[(Cow<'static, str>, EnumVariant)] {
@@ -67,40 +51,6 @@ impl From<Enum> for DataType {
         Self::Enum(t)
     }
 }
-
-// /// Serde representation of an enum.
-// /// Refer to the [Serde documentation](https://serde.rs/enum-representations.html) for more information.
-// #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-// pub enum EnumRepr {
-//     Untagged,
-//     External,
-//     Internal {
-//         tag: Cow<'static, str>,
-//     },
-//     Adjacent {
-//         tag: Cow<'static, str>,
-//         content: Cow<'static, str>,
-//     },
-//     /// String enum representation for unit-only enums with serde rename_all
-//     String {
-//         rename_all: Option<Cow<'static, str>>,
-//     },
-// }
-
-// impl EnumRepr {
-//     /// Check if this is a string enum representation
-//     pub fn is_string(&self) -> bool {
-//         matches!(self, EnumRepr::String { .. })
-//     }
-
-//     /// Get the rename_all inflection for string enums
-//     pub fn rename_all(&self) -> Option<&str> {
-//         match self {
-//             EnumRepr::String { rename_all } => rename_all.as_deref(),
-//             _ => None,
-//         }
-//     }
-// }
 
 /// represents a variant of an enum.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
