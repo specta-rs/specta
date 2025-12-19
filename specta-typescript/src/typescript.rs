@@ -8,6 +8,7 @@ use specta::{
     TypeCollection,
     datatype::{DataType, Fields, NamedDataType, Reference},
 };
+use specta_serde::SerdeMode;
 
 use crate::{Error, primitives, types};
 
@@ -61,7 +62,7 @@ pub struct Typescript {
     pub(crate) references: Vec<(Reference, Cow<'static, str>)>,
     pub bigint: BigIntExportBehavior,
     pub layout: Layout,
-    pub serde: bool,
+    pub serde: Option<SerdeMode>,
     pub(crate) jsdoc: bool,
 }
 
@@ -80,7 +81,7 @@ impl Default for Typescript {
             ],
             bigint: Default::default(),
             layout: Default::default(),
-            serde: false,
+            serde: None,
             jsdoc: false,
         }
     }
@@ -134,19 +135,36 @@ impl Typescript {
         self
     }
 
-    /// TODO: Explain
-    pub fn with_serde(mut self) -> Self {
-        self.serde = true;
+    /// Configure the exporter to use specta-serde with the specified mode
+    pub fn with_serde(mut self, mode: SerdeMode) -> Self {
+        self.serde = Some(mode);
         self
+    }
+
+    /// Configure the exporter to use specta-serde for serialization
+    pub fn with_serde_serialize(self) -> Self {
+        self.with_serde(SerdeMode::Serialize)
+    }
+
+    /// Configure the exporter to use specta-serde for deserialization
+    pub fn with_serde_deserialize(self) -> Self {
+        self.with_serde(SerdeMode::Deserialize)
     }
 
     /// Export the files into a single string.
     ///
     /// Note: This will return [`Error:UnableToExport`] if the format is `Format::Files`.
     pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
-        if self.serde {
-            specta_serde::validate(types)?;
-        }
+        let processed_types = if let Some(mode) = &self.serde {
+            match mode {
+                SerdeMode::Serialize => specta_serde::process_for_serialization(types)?,
+                SerdeMode::Deserialize => specta_serde::process_for_deserialization(types)?,
+            }
+        } else {
+            types.clone()
+        };
+
+        let types = &processed_types;
 
         match self.layout {
             Layout::Namespaces => {
@@ -406,9 +424,15 @@ impl Typescript {
         let path = path.as_ref();
 
         if self.layout == Layout::Files {
-            if self.serde {
-                specta_serde::validate(types)?;
-            }
+            let processed_types = if let Some(mode) = &self.serde {
+                match mode {
+                    SerdeMode::Serialize => specta_serde::process_for_serialization(types)?,
+                    SerdeMode::Deserialize => specta_serde::process_for_deserialization(types)?,
+                }
+            } else {
+                types.clone()
+            };
+            let types = &processed_types;
 
             std::fs::create_dir_all(path)?;
 

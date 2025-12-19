@@ -29,7 +29,6 @@ pub use serde_attrs::{
 };
 
 use specta::TypeCollection;
-use specta::builder::NamedDataTypeBuilder;
 use specta::datatype::{DataType, Enum, Fields, Generic, Primitive, Reference};
 use specta::internal::{skip_fields, skip_fields_named};
 use std::collections::HashSet;
@@ -44,36 +43,29 @@ use std::collections::HashSet;
 /// - Internally tagged enums are properly structured
 /// - Skip attributes don't result in empty enums
 pub fn process_for_serialization(types: &TypeCollection) -> Result<TypeCollection, Error> {
-    let mut new_types = TypeCollection::default();
-
+    // First validate all types
     for ndt in types.into_unsorted_iter() {
-        // First validate the original type
         validate_type(ndt.ty(), types, &[], &mut Default::default())?;
-
-        // Then apply transformations
-        let transformed_dt =
-            serde_attrs::apply_serde_transformations(ndt.ty(), SerdeMode::Serialize)?;
-
-        // Validate the transformed type as well
-        validate_type(&transformed_dt, types, &[], &mut Default::default())?;
-
-        // Create a new NamedDataType with the transformed DataType using the builder
-        let builder =
-            NamedDataTypeBuilder::new(ndt.name().clone(), ndt.generics().to_vec(), transformed_dt)
-                .docs(ndt.docs().clone())
-                .module_path(ndt.module_path().clone());
-
-        // Set deprecated if present
-        let builder = if let Some(deprecated) = ndt.deprecated() {
-            builder.deprecated(deprecated.clone())
-        } else {
-            builder
-        };
-
-        builder.build(&mut new_types);
     }
 
-    Ok(new_types)
+    // Use map to transform types while preserving ArcId
+    let transformed_types = types.clone().map(|mut ndt| {
+        // Apply serde transformations to the DataType
+        let transformed_dt =
+            serde_attrs::apply_serde_transformations(ndt.ty(), SerdeMode::Serialize)
+                .expect("Serde transformation failed");
+
+        // Update the inner DataType while keeping all other properties
+        ndt.set_ty(transformed_dt);
+        ndt
+    });
+
+    // Validate transformed types
+    for ndt in transformed_types.into_unsorted_iter() {
+        validate_type(ndt.ty(), &transformed_types, &[], &mut Default::default())?;
+    }
+
+    Ok(transformed_types)
 }
 
 /// Process a TypeCollection and return transformed types for deserialization
@@ -86,36 +78,29 @@ pub fn process_for_serialization(types: &TypeCollection) -> Result<TypeCollectio
 /// - Internally tagged enums are properly structured
 /// - Skip attributes don't result in empty enums
 pub fn process_for_deserialization(types: &TypeCollection) -> Result<TypeCollection, Error> {
-    let mut new_types = TypeCollection::default();
-
+    // First validate all types
     for ndt in types.into_unsorted_iter() {
-        // First validate the original type
         validate_type(ndt.ty(), types, &[], &mut Default::default())?;
-
-        // Then apply transformations
-        let transformed_dt =
-            serde_attrs::apply_serde_transformations(ndt.ty(), SerdeMode::Deserialize)?;
-
-        // Validate the transformed type as well
-        validate_type(&transformed_dt, types, &[], &mut Default::default())?;
-
-        // Create a new NamedDataType with the transformed DataType using the builder
-        let builder =
-            NamedDataTypeBuilder::new(ndt.name().clone(), ndt.generics().to_vec(), transformed_dt)
-                .docs(ndt.docs().clone())
-                .module_path(ndt.module_path().clone());
-
-        // Set deprecated if present
-        let builder = if let Some(deprecated) = ndt.deprecated() {
-            builder.deprecated(deprecated.clone())
-        } else {
-            builder
-        };
-
-        builder.build(&mut new_types);
     }
 
-    Ok(new_types)
+    // Use map to transform types while preserving ArcId
+    let transformed_types = types.clone().map(|mut ndt| {
+        // Apply serde transformations to the DataType
+        let transformed_dt =
+            serde_attrs::apply_serde_transformations(ndt.ty(), SerdeMode::Deserialize)
+                .expect("Serde transformation failed");
+
+        // Update the inner DataType while keeping all other properties
+        ndt.set_ty(transformed_dt);
+        ndt
+    });
+
+    // Validate transformed types
+    for ndt in transformed_types.into_unsorted_iter() {
+        validate_type(ndt.ty(), &transformed_types, &[], &mut Default::default())?;
+    }
+
+    Ok(transformed_types)
 }
 
 /// Convenience function to process types for both serialization and deserialization
