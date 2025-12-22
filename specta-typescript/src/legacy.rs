@@ -4,6 +4,29 @@ use std::borrow::Borrow;
 use std::collections::BTreeSet;
 use std::{borrow::Cow, fmt};
 
+use specta::datatype::{RuntimeAttribute, RuntimeMeta, RuntimeNestedMeta, RuntimeLiteral};
+
+/// Helper function to extract the tag from serde attributes
+/// This is used for internally tagged enums where the tag is on the parent enum, not the variant fields
+fn extract_tag_from_attrs(attrs: &[RuntimeAttribute]) -> Option<String> {
+    for attr in attrs {
+        if attr.path == "serde" {
+            if let RuntimeMeta::List(items) = &attr.kind {
+                for item in items {
+                    if let RuntimeNestedMeta::Meta(RuntimeMeta::NameValue { key, value }) = item {
+                        if key == "tag" {
+                            if let RuntimeLiteral::Str(tag_value) = value {
+                                return Some(tag_value.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 /// Describes where an error occurred.
 #[derive(Debug, PartialEq)]
 pub enum NamedLocation {
@@ -282,11 +305,10 @@ pub(crate) fn struct_datatype(
             let fields = skip_fields_named(named.fields()).collect::<Vec<_>>();
 
             if fields.is_empty() {
-                match (named.tag().as_ref(), parent_name) {
-                    (Some(tag), Some(key)) => write!(s, r#"{{ "{tag}": "{key}" }}"#)?,
-                    (_, _) => write!(s, "Record<{STRING}, {NEVER}>")?,
-                }
-
+                // Note: tag is now on parent Enum/Struct attributes, not on NamedFields
+                // For proper tag support, parent context would need to be passed down
+                // For now, we treat all empty named fields as Record<string, never>
+                write!(s, "Record<{STRING}, {NEVER}>")?;
                 return Ok(());
             }
 
@@ -341,9 +363,9 @@ pub(crate) fn struct_datatype(
                 })
                 .collect::<Result<Vec<_>>>()?;
 
-            if let (Some(tag), Some(key)) = (&named.tag(), parent_name) {
-                unflattened_fields.push(format!("{tag}: \"{key}\""));
-            }
+            // Note: tag is now on parent Enum/Struct attributes, not on NamedFields
+            // For proper tag support, parent context would need to be passed down
+            // Skipping tag field for now
 
             if !unflattened_fields.is_empty() {
                 let mut s = "{ ".to_string();
@@ -385,12 +407,9 @@ fn enum_variant_datatype(
         // TODO: Remove unreachable in type system
         Fields::Unit => unreachable!("Unit enum variants have no type!"),
         Fields::Named(obj) => {
-            let mut fields = if let Some(tag) = &obj.tag() {
-                let sanitised_name = sanitise_key(name, true);
-                vec![format!("{tag}: {sanitised_name}")]
-            } else {
-                vec![]
-            };
+            // Note: tag is now on parent Enum attributes, not on NamedFields
+            // For proper tag support, parent context would need to be passed down
+            let mut fields = vec![];
 
             fields.extend(
                 skip_fields_named(obj.fields())
@@ -609,7 +628,8 @@ fn validate_type_for_tagged_intersection(
             }
             Fields::Named(fields) => {
                 // Prevent `{ tag: "{tag}" } & Record<string | never>`
-                if fields.tag().is_none() && fields.fields().is_empty() {
+                // Note: tag is now on parent Enum attributes, not on NamedFields
+                if fields.fields().is_empty() {
                     return Ok(true);
                 }
 

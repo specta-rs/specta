@@ -1,4 +1,4 @@
-use super::{attr::*, r#struct::decode_field_attrs};
+use super::{attr::*, r#struct::decode_field_attrs, lower_attribute};
 use crate::{r#type::field::construct_field, utils::*};
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
@@ -46,11 +46,21 @@ pub fn parse_enum(
                     }
                 }
 
-                Ok((v, variant_attrs))
+                // Lower the variant attributes to RuntimeAttribute tokens
+                let lowered_variant_attrs = v.attrs
+                    .iter()
+                    .filter(|attr| {
+                        let path = attr.path().to_token_stream().to_string();
+                        path == "serde" || path == "specta"
+                    })
+                    .map(|attr| lower_attribute(attr).map(|attr| attr.to_tokens()))
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                Ok((v, variant_attrs, lowered_variant_attrs))
             })
             .collect::<syn::Result<Vec<_>>>()?
             .into_iter()
-            .map(|(variant, attrs)| {
+            .map(|(variant, attrs, lowered_variant_attrs)| {
                 let variant_ident_str = unraw_raw_ident(&variant.ident);
 
                 let variant_name_str = match (attrs.rename, container_attrs.rename_all) {
@@ -128,7 +138,7 @@ pub fn parse_enum(
                 let deprecated = attrs.common.deprecated_as_tokens();
                 let skip = attrs.skip;
                 let doc = attrs.common.doc;
-                Ok(quote!((#variant_name_str.into(), internal::construct::enum_variant(#skip, #deprecated, #doc.into(), #inner, Vec::new()))))
+                Ok(quote!((#variant_name_str.into(), internal::construct::enum_variant(#skip, #deprecated, #doc.into(), #inner, vec![#(#lowered_variant_attrs),*]))))
             })
             .collect::<syn::Result<Vec<_>>>()?;
 

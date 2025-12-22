@@ -214,25 +214,4 @@ impl NamedFields {
     pub fn set_attributes(&mut self, attrs: Vec<RuntimeAttribute>) {
         self.attributes = attrs;
     }
-
-    /// Get the tag from attributes if present (for internally tagged enums).
-    /// This checks for serde(tag = "...") in the attributes.
-    pub fn tag(&self) -> Option<Cow<'static, str>> {
-        for attr in &self.attributes {
-            if attr.path == "serde" {
-                if let RuntimeMeta::List(items) = &attr.kind {
-                    for item in items {
-                        if let RuntimeNestedMeta::Meta(RuntimeMeta::NameValue { key, value }) = item {
-                            if key == "tag" {
-                                if let RuntimeLiteral::Str(tag_value) = value {
-                                    return Some(Cow::Owned(tag_value.clone()));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        None
-    }
 }

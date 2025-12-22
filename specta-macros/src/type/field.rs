@@ -19,7 +19,6 @@ pub fn construct_field(
     let flatten = attrs.flatten;
     let inline = container_attrs.inline || attrs.inline;
 
-    // Convert raw attributes to runtime attributes
     let runtime_attrs = convert_attrs_to_runtime_attrs(raw_attrs);
 
     // Skip must be handled by the macro so that we don't try and constrain the inner type to `Type` or `Flatten` traits.

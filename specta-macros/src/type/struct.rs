@@ -121,24 +121,7 @@ pub fn parse_struct(
                     })
                     .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                // For named fields, we want to pass the container attributes that apply to the fields themselves
-                // This includes serde(tag = "...") for internally tagged enums
-                let mut fields_attrs = vec![];
-                if let Some(tag) = &container_attrs.tag {
-                    fields_attrs.push(quote! {
-                        datatype::RuntimeAttribute {
-                            path: String::from("serde"),
-                            kind: datatype::RuntimeMeta::List(vec![
-                                datatype::RuntimeNestedMeta::Meta(datatype::RuntimeMeta::NameValue {
-                                    key: String::from("tag"),
-                                    value: datatype::RuntimeLiteral::Str(#tag.to_string()),
-                                }),
-                            ]),
-                        }
-                    });
-                }
-
-                quote!(internal::construct::fields_named(vec![#(#fields),*], vec![#(#fields_attrs),*]))
+                quote!(internal::construct::fields_named(vec![#(#fields),*], vec![]))
             }
             Fields::Unnamed(_) => {
                 let fields = data
