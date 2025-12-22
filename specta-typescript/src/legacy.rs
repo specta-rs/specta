@@ -4,29 +4,6 @@ use std::borrow::Borrow;
 use std::collections::BTreeSet;
 use std::{borrow::Cow, fmt};
 
-use specta::datatype::{RuntimeAttribute, RuntimeMeta, RuntimeNestedMeta, RuntimeLiteral};
-
-/// Helper function to extract the tag from serde attributes
-/// This is used for internally tagged enums where the tag is on the parent enum, not the variant fields
-fn extract_tag_from_attrs(attrs: &[RuntimeAttribute]) -> Option<String> {
-    for attr in attrs {
-        if attr.path == "serde" {
-            if let RuntimeMeta::List(items) = &attr.kind {
-                for item in items {
-                    if let RuntimeNestedMeta::Meta(RuntimeMeta::NameValue { key, value }) = item {
-                        if key == "tag" {
-                            if let RuntimeLiteral::Str(tag_value) = value {
-                                return Some(tag_value.clone());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    None
-}
-
 /// Describes where an error occurred.
 #[derive(Debug, PartialEq)]
 pub enum NamedLocation {
