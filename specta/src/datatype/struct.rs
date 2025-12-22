@@ -1,8 +1,6 @@
-use std::borrow::Cow;
-
 use crate::{
     builder::StructBuilder,
-    datatype::{DataType, Fields},
+    datatype::{DataType, Fields, RuntimeAttribute},
 };
 
 use super::{NamedFields, UnnamedFields};
@@ -11,6 +9,7 @@ use super::{NamedFields, UnnamedFields};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Struct {
     pub(crate) fields: Fields,
+    pub(crate) attributes: Vec<RuntimeAttribute>,
 }
 
 impl Struct {
@@ -18,6 +17,7 @@ impl Struct {
     pub fn unit() -> Self {
         Self {
             fields: Fields::Unit,
+            attributes: Default::default(),
         }
     }
 
@@ -26,7 +26,7 @@ impl Struct {
         StructBuilder {
             fields: NamedFields {
                 fields: Default::default(),
-                tag: Default::default(),
+                attributes: Default::default(),
             },
         }
     }
@@ -36,6 +36,7 @@ impl Struct {
         StructBuilder {
             fields: UnnamedFields {
                 fields: Default::default(),
+                attributes: Default::default(),
             },
         }
     }
@@ -55,22 +56,19 @@ impl Struct {
         self.fields = fields;
     }
 
-    /// Get a immutable reference to the tag of the struct.
-    pub fn tag(&self) -> Option<&Cow<'static, str>> {
-        match &self.fields {
-            Fields::Unit => None,
-            Fields::Unnamed(_) => None,
-            Fields::Named(named) => named.tag.as_ref(),
-        }
+    /// Get a immutable reference to the attributes of the struct.
+    pub fn attributes(&self) -> &Vec<RuntimeAttribute> {
+        &self.attributes
     }
 
-    /// Set the tag of the struct.
-    pub fn set_tag(&mut self, tag: Option<Cow<'static, str>>) {
-        match &mut self.fields {
-            Fields::Unit => {}
-            Fields::Unnamed(_) => {}
-            Fields::Named(named) => named.tag = tag,
-        }
+    /// Get a mutable reference to the attributes of the struct.
+    pub fn attributes_mut(&mut self) -> &mut Vec<RuntimeAttribute> {
+        &mut self.attributes
+    }
+
+    /// Set the attributes of the struct.
+    pub fn set_attributes(&mut self, attributes: Vec<RuntimeAttribute>) {
+        self.attributes = attributes;
     }
 }
 

@@ -156,10 +156,7 @@ impl<T> Type for std::marker::PhantomData<T> {
 const _: () = {
     impl Type for std::convert::Infallible {
         fn definition(_: &mut TypeCollection) -> DataType {
-            DataType::Enum(internal::construct::r#enum(
-                Some(EnumRepr::External),
-                vec![],
-            ))
+            DataType::Enum(Enum::default())
         }
     }
 };
@@ -179,6 +176,7 @@ impl<T: Type> Type for std::ops::Range<T> {
                             docs: Cow::Borrowed(""),
                             inline: false,
                             ty: ty.clone(),
+                            attributes: Vec::new(),
                         },
                     ),
                     (
@@ -190,11 +188,13 @@ impl<T: Type> Type for std::ops::Range<T> {
                             docs: Cow::Borrowed(""),
                             inline: false,
                             ty,
+                            attributes: Vec::new(),
                         },
                     ),
                 ],
-                tag: None,
+                attributes: Vec::new(),
             }),
+            attributes: vec![],
         })
     }
 }
@@ -220,15 +220,30 @@ const _: () = {
                     vec![
                         (
                             "duration_since_epoch".into(),
-                            internal::construct::field::<i64>(false, false, None, "".into(), types),
+                            internal::construct::field::<i64>(
+                                false,
+                                false,
+                                None,
+                                "".into(),
+                                types,
+                                Vec::new(),
+                            ),
                         ),
                         (
                             "duration_since_unix_epoch".into(),
-                            internal::construct::field::<u32>(false, false, None, "".into(), types),
+                            internal::construct::field::<u32>(
+                                false,
+                                false,
+                                None,
+                                "".into(),
+                                types,
+                                Vec::new(),
+                            ),
                         ),
                     ],
-                    None,
+                    vec![],
                 ),
+                vec![],
             ))
         }
     }
@@ -245,15 +260,30 @@ const _: () = {
                     vec![
                         (
                             "secs".into(),
-                            internal::construct::field::<u64>(false, false, None, "".into(), types),
+                            internal::construct::field::<u64>(
+                                false,
+                                false,
+                                None,
+                                "".into(),
+                                types,
+                                Vec::new(),
+                            ),
                         ),
                         (
                             "nanos".into(),
-                            internal::construct::field::<u32>(false, false, None, "".into(), types),
+                            internal::construct::field::<u32>(
+                                false,
+                                false,
+                                None,
+                                "".into(),
+                                types,
+                                Vec::new(),
+                            ),
                         ),
                     ],
-                    None,
+                    vec![],
                 ),
+                vec![],
             ))
         }
     }

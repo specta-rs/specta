@@ -80,7 +80,7 @@ impl JSDoc {
 
     /// TODO: Explain
     pub fn with_serde(self) -> Self {
-        Self(self.0.with_serde())
+        Self(self.0.with_serde_serialize())
     }
 
     /// Get a reference to the inner [Typescript] instance.

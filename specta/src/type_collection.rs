@@ -69,4 +69,18 @@ impl TypeCollection {
     pub fn into_unsorted_iter(&self) -> impl Iterator<Item = &NamedDataType> {
         self.0.iter().filter_map(|(_, ndt)| ndt.as_ref())
     }
+
+    /// Map over the collection, transforming each `NamedDataType` with the given closure.
+    /// This preserves the `ArcId` keys, ensuring that `Reference`s remain valid.
+    pub fn map<F>(mut self, mut f: F) -> Self
+    where
+        F: FnMut(NamedDataType) -> NamedDataType,
+    {
+        for (_, ndt) in self.0.iter_mut() {
+            if let Some(named_data_type) = ndt.take() {
+                *ndt = Some(f(named_data_type));
+            }
+        }
+        self
+    }
 }

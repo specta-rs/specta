@@ -32,7 +32,7 @@ const _: () = {
     impl Type for Number {
         fn definition(_: &mut TypeCollection) -> DataType {
             DataType::Enum(Enum {
-                repr: Some(EnumRepr::Untagged),
+                // repr: Some(EnumRepr::Untagged),
                 variants: vec![
                     (
                         "f64".into(),
@@ -48,8 +48,11 @@ const _: () = {
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
                                     ty: Some(DataType::Primitive(Primitive::f64)),
+                                    attributes: Vec::new(),
                                 }],
+                                attributes: Vec::new(),
                             }),
+                            attributes: Vec::new(),
                         },
                     ),
                     (
@@ -66,8 +69,11 @@ const _: () = {
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
                                     ty: Some(DataType::Primitive(Primitive::i64)),
+                                    attributes: Vec::new(),
                                 }],
+                                attributes: Vec::new(),
                             }),
+                            attributes: Vec::new(),
                         },
                     ),
                     (
@@ -84,11 +90,15 @@ const _: () = {
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
                                     ty: Some(DataType::Primitive(Primitive::u64)),
+                                    attributes: Vec::new(),
                                 }],
+                                attributes: Vec::new(),
                             }),
+                            attributes: Vec::new(),
                         },
                     ),
                 ],
+                attributes: vec![],
             })
         }
     }
@@ -126,7 +136,7 @@ const _: () = {
     impl Type for serde_yaml::Number {
         fn definition(_: &mut TypeCollection) -> DataType {
             DataType::Enum(Enum {
-                repr: Some(EnumRepr::Untagged),
+                // repr: Some(EnumRepr::Untagged),
                 variants: vec![
                     (
                         "f64".into(),
@@ -142,8 +152,11 @@ const _: () = {
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
                                     ty: Some(DataType::Primitive(Primitive::f64)),
+                                    attributes: Vec::new(),
                                 }],
+                                attributes: Vec::new(),
                             }),
+                            attributes: Vec::new(),
                         },
                     ),
                     (
@@ -160,8 +173,11 @@ const _: () = {
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
                                     ty: Some(DataType::Primitive(Primitive::i64)),
+                                    attributes: Vec::new(),
                                 }],
+                                attributes: Vec::new(),
                             }),
+                            attributes: Vec::new(),
                         },
                     ),
                     (
@@ -178,11 +194,15 @@ const _: () = {
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
                                     ty: Some(DataType::Primitive(Primitive::u64)),
+                                    attributes: Vec::new(),
                                 }],
+                                attributes: Vec::new(),
                             }),
+                            attributes: Vec::new(),
                         },
                     ),
                 ],
+                attributes: vec![],
             })
         }
     }
@@ -434,7 +454,7 @@ impl_as!(url::Url as String);
 impl<L: Type, R: Type> Type for either::Either<L, R> {
     fn definition(types: &mut TypeCollection) -> DataType {
         DataType::Enum(Enum {
-            repr: Some(EnumRepr::Untagged),
+            // repr: Some(EnumRepr::Untagged),
             variants: vec![
                 (
                     "Left".into(),
@@ -442,16 +462,19 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                         skip: false,
                         docs: Cow::Borrowed(""),
                         deprecated: None,
-                        fields: Fields::Unnamed(UnnamedFields {
-                            fields: vec![Field {
-                                optional: false,
-                                flatten: false,
-                                inline: false,
-                                deprecated: None,
-                                docs: Cow::Borrowed(""),
-                                ty: Some(L::definition(types)),
-                            }],
-                        }),
+                            fields: Fields::Unnamed(UnnamedFields {
+                                fields: vec![Field {
+                                    optional: false,
+                                    flatten: false,
+                                    inline: false,
+                                    deprecated: None,
+                                    docs: Cow::Borrowed(""),
+                                    ty: Some(DataType::Primitive(Primitive::f64)),
+                                    attributes: Vec::new(),
+                                }],
+                                attributes: Vec::new(),
+                            }),
+                        attributes: Vec::new(),
                     },
                 ),
                 (
@@ -460,19 +483,23 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
                         skip: false,
                         docs: Cow::Borrowed(""),
                         deprecated: None,
-                        fields: Fields::Unnamed(UnnamedFields {
-                            fields: vec![Field {
-                                optional: false,
-                                flatten: false,
-                                inline: false,
-                                deprecated: None,
-                                docs: Cow::Borrowed(""),
-                                ty: Some(R::definition(types)),
-                            }],
-                        }),
+                            fields: Fields::Unnamed(UnnamedFields {
+                                fields: vec![Field {
+                                    optional: false,
+                                    flatten: false,
+                                    inline: false,
+                                    deprecated: None,
+                                    docs: Cow::Borrowed(""),
+                                    ty: Some(DataType::Primitive(Primitive::i64)),
+                                    attributes: Vec::new(),
+                                }],
+                                attributes: Vec::new(),
+                            }),
+                        attributes: Vec::new(),
                     },
                 ),
             ],
+            attributes: vec![],
         })
     }
 }

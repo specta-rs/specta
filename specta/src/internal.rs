@@ -25,6 +25,7 @@ pub mod construct {
         inline: bool,
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
+        attributes: Vec<RuntimeAttribute>,
     ) -> Field {
         Field {
             optional,
@@ -33,6 +34,7 @@ pub mod construct {
             docs,
             inline,
             ty: None,
+            attributes,
         }
     }
 
@@ -42,6 +44,7 @@ pub mod construct {
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
         types: &mut TypeCollection,
+        attributes: Vec<RuntimeAttribute>,
     ) -> Field {
         Field {
             optional,
@@ -50,6 +53,7 @@ pub mod construct {
             docs,
             inline,
             ty: Some(T::definition(types)),
+            attributes,
         }
     }
 
@@ -59,6 +63,7 @@ pub mod construct {
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
         types: &mut TypeCollection,
+        attributes: Vec<RuntimeAttribute>,
     ) -> Field {
         Field {
             optional,
@@ -67,33 +72,23 @@ pub mod construct {
             docs,
             inline,
             ty: Some(T::definition(types)),
+            attributes,
         }
     }
 
-    pub const fn r#struct(fields: Fields) -> Struct {
-        Struct { fields }
+    pub const fn r#struct(fields: Fields, attributes: Vec<RuntimeAttribute>) -> Struct {
+        Struct { fields, attributes }
     }
 
-    pub const fn fields_unit() -> Fields {
-        Fields::Unit
-    }
-
-    pub const fn fields_unnamed(fields: Vec<Field>) -> Fields {
-        Fields::Unnamed(UnnamedFields { fields })
+    pub const fn fields_unnamed(fields: Vec<Field>, attributes: Vec<RuntimeAttribute>) -> Fields {
+        Fields::Unnamed(UnnamedFields { fields, attributes })
     }
 
     pub const fn fields_named(
         fields: Vec<(Cow<'static, str>, Field)>,
-        tag: Option<Cow<'static, str>>,
+        attributes: Vec<RuntimeAttribute>,
     ) -> Fields {
-        Fields::Named(NamedFields { fields, tag })
-    }
-
-    pub const fn r#enum(
-        repr: Option<EnumRepr>,
-        variants: Vec<(Cow<'static, str>, EnumVariant)>,
-    ) -> Enum {
-        Enum { repr, variants }
+        Fields::Named(NamedFields { fields, attributes })
     }
 
     pub const fn enum_variant(
@@ -101,12 +96,24 @@ pub mod construct {
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
         fields: Fields,
+        attributes: Vec<RuntimeAttribute>,
     ) -> EnumVariant {
         EnumVariant {
             skip,
             docs,
             deprecated,
             fields,
+            attributes,
+        }
+    }
+
+    pub const fn r#enum(
+        variants: Vec<(Cow<'static, str>, EnumVariant)>,
+        attributes: Vec<RuntimeAttribute>,
+    ) -> Enum {
+        Enum {
+            variants,
+            attributes,
         }
     }
 

@@ -1,11 +1,11 @@
 use proc_macro2::Span;
 use quote::ToTokens;
 use syn::{
+    Ident, Lit, Meta, Path, Result, Token,
     ext::IdentExt,
     parse::{Parse, ParseStream},
     spanned::Spanned,
     token::Paren,
-    Ident, Lit, Meta, Path, Result, Token,
 };
 
 #[derive(Clone)]
@@ -101,7 +101,7 @@ impl Attribute {
                     return Err(syn::Error::new_spanned(
                         lit,
                         "specta: found string literal containing an unsupported inflection",
-                    ))
+                    ));
                 }
             }),
             _ => Err(syn::Error::new(
@@ -165,7 +165,7 @@ pub fn parse_attrs(attrs: &[syn::Attribute]) -> syn::Result<Vec<Attribute>> {
 
         // TODO: We should somehow build this up from the macro output automatically -> if not our attribute parser is applied to stuff like `allow` and that's bad.
         if !(ident == "specta"
-            || ident == "serde"
+            // || ident == "serde"
             || ident == "doc"
             || ident == "repr"
             || ident == "deprecated")

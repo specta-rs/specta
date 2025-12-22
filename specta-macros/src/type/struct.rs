@@ -4,14 +4,15 @@ use crate::{
 };
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use syn::{DataStruct, Field, Fields, spanned::Spanned};
+use syn::{DataStruct, Field, Fields, Type, spanned::Spanned};
 
 use super::attr::*;
 
-pub fn decode_field_attrs(field: &Field) -> syn::Result<FieldAttr> {
+pub fn decode_field_attrs(field: &Field) -> syn::Result<(FieldAttr, Vec<crate::utils::Attribute>)> {
     // We pass all the attributes at the start and when decoding them pop them off the list.
     // This means at the end we can check for any that weren't consumed and throw an error.
-    let mut attrs = parse_attrs(&field.attrs)?;
+    let raw_attrs = parse_attrs(&field.attrs)?;
+    let mut attrs = raw_attrs.clone();
     let field_attrs = FieldAttr::from_attrs(&mut attrs)?;
 
     // The expectation is that when an attribute is processed it will be removed so if any are left over we know they are invalid
@@ -35,14 +36,14 @@ pub fn decode_field_attrs(field: &Field) -> syn::Result<FieldAttr> {
         }
     }
 
-    Ok(field_attrs)
+    Ok((field_attrs, raw_attrs))
 }
 
 pub fn parse_struct(
-    name: &TokenStream,
     container_attrs: &ContainerAttr,
     crate_ref: &TokenStream,
     data: &DataStruct,
+    lowered_attrs: &Vec<TokenStream>, // TODO: Make more typesafe
 ) -> syn::Result<(TokenStream, bool)> {
     let definition = if container_attrs.transparent {
         if let Fields::Unit = data.fields {
@@ -55,10 +56,12 @@ pub fn parse_struct(
         let fields = data
             .fields
             .iter()
-            .map(|field| decode_field_attrs(field).map(|v| (field.ty.clone(), v)))
-            .collect::<Result<Vec<_>, _>>()?
+            .map(|field| {
+                decode_field_attrs(field).map(|(attrs, raw)| (field.ty.clone(), attrs, raw))
+            })
+            .collect::<syn::Result<Vec<(Type, FieldAttr, Vec<crate::utils::Attribute>)>>>()?
             .into_iter()
-            .filter(|(_, attrs)| !attrs.skip)
+            .filter(|(_, attrs, _)| !attrs.skip)
             .collect::<Vec<_>>();
 
         if fields.len() != 1 {
@@ -68,7 +71,8 @@ pub fn parse_struct(
             ));
         }
 
-        let (field_ty, field_attrs) = fields.into_iter().next().expect("fields.len() != 1");
+        let (field_ty, field_attrs, _raw_attrs) =
+            fields.into_iter().next().expect("fields.len() != 1");
         let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field_ty);
 
         // TODO: Should we check container too?
@@ -99,7 +103,7 @@ pub fn parse_struct(
                     .fields
                     .iter()
                     .map(|field| {
-                        let field_attrs = decode_field_attrs(field)?;
+                        let (field_attrs, raw_attrs) = decode_field_attrs(field)?;
 
                         let field_ident_str = unraw_raw_ident(field.ident.as_ref().unwrap());
                         let field_name =
@@ -112,40 +116,34 @@ pub fn parse_struct(
                             };
 
                         let inner =
-                            construct_field(crate_ref, container_attrs, field_attrs, &field.ty);
+                            construct_field(container_attrs, field_attrs, &field.ty, &raw_attrs);
                         Ok(quote!((#field_name.into(), #inner)))
                     })
                     .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                let tag = container_attrs
-                    .tag
-                    .as_ref()
-                    .map(|t| quote!(Some(#t.into())))
-                    .unwrap_or(quote!(None));
-
-                quote!(internal::construct::fields_named(vec![#(#fields),*], #tag))
+                quote!(internal::construct::fields_named(vec![#(#fields),*], vec![]))
             }
             Fields::Unnamed(_) => {
                 let fields = data
                     .fields
                     .iter()
                     .map(|field| {
-                        let field_attrs = decode_field_attrs(field)?;
+                        let (field_attrs, raw_attrs) = decode_field_attrs(field)?;
                         Ok(construct_field(
-                            crate_ref,
                             container_attrs,
                             field_attrs,
                             &field.ty,
+                            &raw_attrs,
                         ))
                     })
                     .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                quote!(internal::construct::fields_unnamed(vec![#(#fields),*]))
+                quote!(internal::construct::fields_unnamed(vec![#(#fields),*], vec![]))
             }
-            Fields::Unit => quote!(internal::construct::fields_unit()),
+            Fields::Unit => quote!(datatype::Fields::Unit),
         };
 
-        quote!(datatype::DataType::Struct(internal::construct::r#struct(#fields)))
+        quote!(datatype::DataType::Struct(internal::construct::r#struct(#fields, vec![#(#lowered_attrs),*])))
     };
 
     Ok((definition, true))

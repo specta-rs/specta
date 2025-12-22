@@ -1,4 +1,4 @@
-use super::{attr::*, r#struct::decode_field_attrs};
+use super::{attr::*, r#struct::decode_field_attrs, lower_attribute};
 use crate::{r#type::field::construct_field, utils::*};
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
@@ -9,6 +9,7 @@ pub fn parse_enum(
     container_attrs: &ContainerAttr,
     crate_ref: &TokenStream,
     data: &DataEnum,
+    lowered_attrs: &Vec<TokenStream>,
 ) -> syn::Result<(TokenStream, bool)> {
     if container_attrs.transparent {
         return Err(syn::Error::new(
@@ -45,11 +46,21 @@ pub fn parse_enum(
                     }
                 }
 
-                Ok((v, variant_attrs))
+                // Lower the variant attributes to RuntimeAttribute tokens
+                let lowered_variant_attrs = v.attrs
+                    .iter()
+                    .filter(|attr| {
+                        let path = attr.path().to_token_stream().to_string();
+                        path == "serde" || path == "specta"
+                    })
+                    .map(|attr| lower_attribute(attr).map(|attr| attr.to_tokens()))
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                Ok((v, variant_attrs, lowered_variant_attrs))
             })
             .collect::<syn::Result<Vec<_>>>()?
             .into_iter()
-            .map(|(variant, attrs)| {
+            .map(|(variant, attrs, lowered_variant_attrs)| {
                 let variant_ident_str = unraw_raw_ident(&variant.ident);
 
                 let variant_name_str = match (attrs.rename, container_attrs.rename_all) {
@@ -59,14 +70,14 @@ pub fn parse_enum(
                 };
 
                 let inner = match &variant.fields {
-                    Fields::Unit => quote!(internal::construct::fields_unit()),
+                    Fields::Unit => quote!(datatype::Fields::Unit),
                     Fields::Unnamed(fields) => {
                         let fields = fields
                             .unnamed
                             .iter()
                             .map(|field| {
-                                let field_attrs = decode_field_attrs(field)?;
-                                Ok(construct_field(crate_ref, container_attrs, FieldAttr {
+                                let (field_attrs, raw_attrs) = decode_field_attrs(field)?;
+                                Ok(construct_field( container_attrs, FieldAttr {
                                     rename: field_attrs.rename,
                                     r#type: field_attrs.r#type,
                                     // TOOD: Should we check container too?
@@ -75,12 +86,13 @@ pub fn parse_enum(
                                     optional: field_attrs.optional,
                                     flatten: field_attrs.flatten,
                                     common: field_attrs.common,
-                                }, &field.ty))
+                                }, &field.ty, &raw_attrs))
                             })
                             .collect::<syn::Result<Vec<TokenStream>>>()?;
 
                         quote!(internal::construct::fields_unnamed(
                             vec![#(#fields),*],
+                            vec![],
                         ))
                     }
                     Fields::Named(fields) => {
@@ -88,7 +100,7 @@ pub fn parse_enum(
                         .named
                         .iter()
                         .map(|field| {
-                            let field_attrs = decode_field_attrs(field)?;
+                            let (field_attrs, raw_attrs) = decode_field_attrs(field)?;
 
                             let field_ident_str =
                                 unraw_raw_ident(field.ident.as_ref().unwrap());
@@ -99,30 +111,34 @@ pub fn parse_enum(
                                     let name = inflection.apply(&field_ident_str);
                                     quote::quote!(#name)
                                 }
-                                (_, _) => quote::quote!(#field_ident_str),
+                                (_, _) => {
+                                    let name = field_ident_str;
+                                    quote::quote!(#name)
+                                }
                             };
 
-                            let inner = construct_field(crate_ref, container_attrs, FieldAttr {
+                            let inner = construct_field( container_attrs, FieldAttr {
                                 rename: field_attrs.rename,
                                 r#type: field_attrs.r#type,
+                                // TOOD: Should we check container too?
                                 inline: container_attrs.inline || field_attrs.inline || attrs.inline,
                                 skip: field_attrs.skip || attrs.skip,
                                 optional: field_attrs.optional,
                                 flatten: field_attrs.flatten,
                                 common: field_attrs.common,
-                            }, &field.ty);
+                            }, &field.ty, &raw_attrs);
                             Ok(quote!((#field_name.into(), #inner)))
                         })
                         .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                        quote!(internal::construct::fields_named(vec![#(#fields),*], None))
+                        quote!(internal::construct::fields_named(vec![#(#fields),*], vec![]))
                     }
                 };
 
                 let deprecated = attrs.common.deprecated_as_tokens();
                 let skip = attrs.skip;
                 let doc = attrs.common.doc;
-                Ok(quote!((#variant_name_str.into(), internal::construct::enum_variant(#skip, #deprecated, #doc.into(), #inner))))
+                Ok(quote!((#variant_name_str.into(), internal::construct::enum_variant(#skip, #deprecated, #doc.into(), #inner, vec![#(#lowered_variant_attrs),*]))))
             })
             .collect::<syn::Result<Vec<_>>>()?;
 
@@ -218,7 +234,12 @@ pub fn parse_enum(
     };
 
     Ok((
-        quote!(datatype::DataType::Enum(internal::construct::r#enum(#repr, vec![#(#variant_types),*]))),
+        quote!(datatype::DataType::Enum({
+            let mut e = datatype::Enum::new();
+            *e.variants_mut() = vec![#(#variant_types),*];
+            *e.attributes_mut() = vec![#(#lowered_attrs),*];
+            e
+        })),
         can_flatten,
     ))
 }

@@ -1,5 +1,6 @@
 //! Types related to working with [`DataType`]. Exposed for advanced users.
 
+mod attrs;
 mod r#enum;
 mod fields;
 mod function;
@@ -12,7 +13,8 @@ mod reference;
 mod r#struct;
 mod tuple;
 
-pub use r#enum::{Enum, EnumRepr, EnumVariant};
+pub use attrs::{RuntimeAttribute, RuntimeMeta, RuntimeNestedMeta, RuntimeLiteral};
+pub use r#enum::{Enum, EnumVariant};
 pub use fields::{Field, Fields, NamedFields, UnnamedFields};
 pub use function::{Function, FunctionReturnType};
 pub use generic::{ConstGenericPlaceholder, Generic, GenericPlaceholder};
