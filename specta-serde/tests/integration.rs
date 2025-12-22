@@ -17,7 +17,7 @@ use specta_serde::{
 fn test_basic_transformation() {
     // Create a simple struct DataType
     let field = Field::new(DataType::Primitive(Primitive::String));
-    let fields = internal::construct::fields_named(vec![("user_name".into(), field)], None);
+    let fields = internal::construct::fields_named(vec![("user_name".into(), field)], vec![]);
     let struct_dt = DataType::Struct(internal::construct::r#struct(fields, vec![]));
 
     // Transform for serialization
@@ -45,7 +45,7 @@ fn test_rename_all_transformation() {
 
     let fields = internal::construct::fields_named(
         vec![("first_name".into(), field1), ("user_id".into(), field2)],
-        None,
+        vec![],
     );
 
     let struct_dt = DataType::Struct(internal::construct::r#struct(fields, vec![serde_attr]));
@@ -70,7 +70,7 @@ fn test_skip_serializing() {
             ("secret".into(), field_with_skip),
             ("public_id".into(), normal_field),
         ],
-        None,
+        vec![],
     );
 
     let struct_dt = DataType::Struct(internal::construct::r#struct(fields, vec![]));
@@ -143,7 +143,7 @@ fn test_transparent_struct() {
     };
 
     let inner_field = Field::new(DataType::Primitive(Primitive::u64));
-    let fields = internal::construct::fields_unnamed(vec![inner_field]);
+    let fields = internal::construct::fields_unnamed(vec![inner_field], vec![]);
 
     let struct_dt = DataType::Struct(internal::construct::r#struct(
         fields,
@@ -188,7 +188,7 @@ fn test_type_collection_processing() {
 fn test_nested_type_transformation() {
     // Create nested types - List of structs
     let field = Field::new(DataType::Primitive(Primitive::String));
-    let fields = internal::construct::fields_named(vec![("name".into(), field)], None);
+    let fields = internal::construct::fields_named(vec![("name".into(), field)], vec![]);
     let inner_struct = DataType::Struct(internal::construct::r#struct(fields, vec![]));
     let list_type = DataType::List(specta::datatype::List::new(inner_struct));
 
@@ -253,7 +253,7 @@ fn test_field_level_skip_attributes() {
             ("skip_de_only".into(), field_skip_de),
             ("normal".into(), normal_field),
         ],
-        None,
+        vec![],
     );
 
     let struct_dt = DataType::Struct(internal::construct::r#struct(fields, vec![]));
@@ -286,7 +286,7 @@ fn test_field_level_rename_attributes() {
             ("original_name".into(), field_renamed),
             ("id".into(), normal_field),
         ],
-        None,
+        vec![],
     );
 
     let struct_dt = DataType::Struct(internal::construct::r#struct(fields, vec![]));

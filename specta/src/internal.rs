@@ -80,25 +80,15 @@ pub mod construct {
         Struct { fields, attributes }
     }
 
-    pub const fn fields_unnamed(fields: Vec<Field>) -> Fields {
-        Fields::Unnamed(UnnamedFields { fields })
+    pub const fn fields_unnamed(fields: Vec<Field>, attributes: Vec<RuntimeAttribute>) -> Fields {
+        Fields::Unnamed(UnnamedFields { fields, attributes })
     }
 
     pub const fn fields_named(
         fields: Vec<(Cow<'static, str>, Field)>,
-        tag: Option<Cow<'static, str>>,
-    ) -> Fields {
-        Fields::Named(NamedFields { fields, tag })
-    }
-
-    pub const fn r#enum(
-        variants: Vec<(Cow<'static, str>, EnumVariant)>,
         attributes: Vec<RuntimeAttribute>,
-    ) -> Enum {
-        Enum {
-            variants,
-            attributes,
-        }
+    ) -> Fields {
+        Fields::Named(NamedFields { fields, attributes })
     }
 
     pub const fn enum_variant(
@@ -113,6 +103,16 @@ pub mod construct {
             docs,
             deprecated,
             fields,
+            attributes,
+        }
+    }
+
+    pub const fn r#enum(
+        variants: Vec<(Cow<'static, str>, EnumVariant)>,
+        attributes: Vec<RuntimeAttribute>,
+    ) -> Enum {
+        Enum {
+            variants,
             attributes,
         }
     }

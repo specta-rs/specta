@@ -7,13 +7,12 @@ use crate::utils::Attribute;
 
 // Construct a field.
 pub fn construct_field(
-    crate_ref: &TokenStream,
     container_attrs: &ContainerAttr,
     attrs: FieldAttr,
     field_ty: &Type,
     raw_attrs: &[Attribute],
 ) -> TokenStream {
-    let field_ty = attrs.r#type.as_ref().unwrap_or(&field_ty);
+    let field_ty = attrs.r#type.as_ref().unwrap_or(field_ty);
     let deprecated = attrs.common.deprecated_as_tokens();
     let optional = attrs.optional;
     let doc = attrs.common.doc;

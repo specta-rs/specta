@@ -67,7 +67,7 @@ pub fn parse_enum(
                             .iter()
                             .map(|field| {
                                 let (field_attrs, raw_attrs) = decode_field_attrs(field)?;
-                                Ok(construct_field(crate_ref, container_attrs, FieldAttr {
+                                Ok(construct_field( container_attrs, FieldAttr {
                                     rename: field_attrs.rename,
                                     r#type: field_attrs.r#type,
                                     // TOOD: Should we check container too?
@@ -82,6 +82,7 @@ pub fn parse_enum(
 
                         quote!(internal::construct::fields_unnamed(
                             vec![#(#fields),*],
+                            vec![],
                         ))
                     }
                     Fields::Named(fields) => {
@@ -106,7 +107,7 @@ pub fn parse_enum(
                                 }
                             };
 
-                            let inner = construct_field(crate_ref, container_attrs, FieldAttr {
+                            let inner = construct_field( container_attrs, FieldAttr {
                                 rename: field_attrs.rename,
                                 r#type: field_attrs.r#type,
                                 // TOOD: Should we check container too?
@@ -120,7 +121,7 @@ pub fn parse_enum(
                         })
                         .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                        quote!(internal::construct::fields_named(vec![#(#fields),*], None))
+                        quote!(internal::construct::fields_named(vec![#(#fields),*], vec![]))
                     }
                 };
 
@@ -223,11 +224,12 @@ pub fn parse_enum(
     };
 
     Ok((
-        // TODO: #repr,
-        quote!(datatype::DataType::Enum(internal::construct::r#enum(
-            vec![#(#variant_types),*],
-            vec![#(#lowered_attrs),*]
-        ))),
+        quote!(datatype::DataType::Enum({
+            let mut e = datatype::Enum::new();
+            *e.variants_mut() = vec![#(#variant_types),*];
+            *e.attributes_mut() = vec![#(#lowered_attrs),*];
+            e
+        })),
         can_flatten,
     ))
 }

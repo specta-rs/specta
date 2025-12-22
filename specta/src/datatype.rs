@@ -13,7 +13,7 @@ mod reference;
 mod r#struct;
 mod tuple;
 
-pub use attrs::*;
+pub use attrs::{RuntimeAttribute, RuntimeMeta, RuntimeNestedMeta, RuntimeLiteral};
 pub use r#enum::{Enum, EnumVariant};
 pub use fields::{Field, Fields, NamedFields, UnnamedFields};
 pub use function::{Function, FunctionReturnType};
@@ -24,7 +24,7 @@ pub use named::{DeprecatedType, NamedDataType};
 pub use primitive::Primitive;
 pub use reference::Reference;
 pub use r#struct::Struct;
-pub use tuple::Tuple; // TODO: Hardcodd exports
+pub use tuple::Tuple;
 
 // TODO: Remove this
 pub(crate) use reference::ArcId;

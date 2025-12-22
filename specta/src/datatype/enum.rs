@@ -32,9 +32,14 @@ impl Enum {
         &mut self.variants
     }
 
-    /// TODO
+    /// Get an immutable reference to the enum's attributes.
     pub fn attributes(&self) -> &Vec<RuntimeAttribute> {
         &self.attributes
+    }
+
+    /// Get a mutable reference to the enum's attributes.
+    pub fn attributes_mut(&mut self) -> &mut Vec<RuntimeAttribute> {
+        &mut self.attributes
     }
 
     /// Check if this enum should be serialized as a string enum.
@@ -66,7 +71,7 @@ pub struct EnumVariant {
     pub(crate) deprecated: Option<DeprecatedType>,
     /// The type of the variant.
     pub(crate) fields: Fields,
-    /// Runtime attributes for this variant (e.g., serde attributes)
+    /// Runtime attributes for this variant
     pub(crate) attributes: Vec<RuntimeAttribute>,
 }
 
@@ -88,7 +93,7 @@ impl EnumVariant {
             v: Self::unit(),
             variant: NamedFields {
                 fields: vec![],
-                tag: None,
+                attributes: vec![],
             },
         }
     }
@@ -99,6 +104,7 @@ impl EnumVariant {
             v: Self::unit(),
             variant: UnnamedFields {
                 fields: Default::default(),
+                attributes: Default::default(),
             },
         }
     }

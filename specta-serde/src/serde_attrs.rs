@@ -374,6 +374,7 @@ impl SerdeTransformer {
 
                 Ok(internal::construct::fields_unnamed(
                     transformed_fields.into_iter().map(|(_, f)| f).collect(),
+                    vec![],
                 ))
             }
             Fields::Named(named) => {
@@ -403,7 +404,7 @@ impl SerdeTransformer {
                     }
                 }
 
-                Ok(internal::construct::fields_named(transformed_fields, None))
+                Ok(internal::construct::fields_named(transformed_fields, vec![]))
             }
         }
     }
@@ -1224,7 +1225,7 @@ mod tests {
         };
 
         let field = specta::datatype::Field::new(DataType::Primitive(Primitive::String));
-        let fields = specta::internal::construct::fields_unnamed(vec![field]);
+        let fields = specta::internal::construct::fields_unnamed(vec![field], vec![]);
         let struct_dt = specta::internal::construct::r#struct(fields, vec![transparent_attr]);
 
         let datatype = DataType::Struct(struct_dt);

@@ -115,24 +115,30 @@ pub fn parse_struct(
                                 (_, _) => field_ident_str.to_token_stream(),
                             };
 
-                        let inner = construct_field(
-                            crate_ref,
-                            container_attrs,
-                            field_attrs,
-                            &field.ty,
-                            &raw_attrs,
-                        );
+                        let inner =
+                            construct_field(container_attrs, field_attrs, &field.ty, &raw_attrs);
                         Ok(quote!((#field_name.into(), #inner)))
                     })
                     .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                let tag = container_attrs
-                    .tag
-                    .as_ref()
-                    .map(|t| quote!(Some(#t.into())))
-                    .unwrap_or(quote!(None));
+                // For named fields, we want to pass the container attributes that apply to the fields themselves
+                // This includes serde(tag = "...") for internally tagged enums
+                let mut fields_attrs = vec![];
+                if let Some(tag) = &container_attrs.tag {
+                    fields_attrs.push(quote! {
+                        datatype::RuntimeAttribute {
+                            path: String::from("serde"),
+                            kind: datatype::RuntimeMeta::List(vec![
+                                datatype::RuntimeNestedMeta::Meta(datatype::RuntimeMeta::NameValue {
+                                    key: String::from("tag"),
+                                    value: datatype::RuntimeLiteral::Str(#tag.to_string()),
+                                }),
+                            ]),
+                        }
+                    });
+                }
 
-                quote!(internal::construct::fields_named(vec![#(#fields),*], #tag))
+                quote!(internal::construct::fields_named(vec![#(#fields),*], vec![#(#fields_attrs),*]))
             }
             Fields::Unnamed(_) => {
                 let fields = data
@@ -141,7 +147,6 @@ pub fn parse_struct(
                     .map(|field| {
                         let (field_attrs, raw_attrs) = decode_field_attrs(field)?;
                         Ok(construct_field(
-                            crate_ref,
                             container_attrs,
                             field_attrs,
                             &field.ty,
@@ -150,7 +155,7 @@ pub fn parse_struct(
                     })
                     .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                quote!(internal::construct::fields_unnamed(vec![#(#fields),*]))
+                quote!(internal::construct::fields_unnamed(vec![#(#fields),*], vec![]))
             }
             Fields::Unit => quote!(datatype::Fields::Unit),
         };

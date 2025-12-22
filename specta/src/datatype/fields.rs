@@ -1,6 +1,6 @@
 //! Field types are used by both enums and structs.
 
-use super::{DataType, DeprecatedType, RuntimeAttribute};
+use super::{DataType, DeprecatedType, RuntimeAttribute, RuntimeMeta, RuntimeNestedMeta, RuntimeLiteral};
 use std::borrow::Cow;
 
 /// Data stored within an enum variant or struct.
@@ -152,6 +152,7 @@ impl Field {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UnnamedFields {
     pub(crate) fields: Vec<Field>,
+    pub(crate) attributes: Vec<RuntimeAttribute>,
 }
 
 impl UnnamedFields {
@@ -164,13 +165,28 @@ impl UnnamedFields {
     pub fn fields_mut(&mut self) -> &mut Vec<Field> {
         &mut self.fields
     }
+
+    /// Get an immutable reference to the runtime attributes for this unnamed fields.
+    pub fn attributes(&self) -> &Vec<RuntimeAttribute> {
+        &self.attributes
+    }
+
+    /// Mutable reference to the runtime attributes for this unnamed fields.
+    pub fn attributes_mut(&mut self) -> &mut Vec<RuntimeAttribute> {
+        &mut self.attributes
+    }
+
+    /// Set the runtime attributes for this unnamed fields.
+    pub fn set_attributes(&mut self, attrs: Vec<RuntimeAttribute>) {
+        self.attributes = attrs;
+    }
 }
 
 /// The fields of an named enum variant or a struct.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NamedFields {
     pub(crate) fields: Vec<(Cow<'static, str>, Field)>,
-    pub(crate) tag: Option<Cow<'static, str>>, // TODO: Drop this too???
+    pub(crate) attributes: Vec<RuntimeAttribute>,
 }
 
 impl NamedFields {
@@ -184,18 +200,39 @@ impl NamedFields {
         &mut self.fields
     }
 
-    /// Get an immutable reference to the tag.
-    pub fn tag(&self) -> Option<&Cow<'static, str>> {
-        self.tag.as_ref()
+    /// Get an immutable reference to the runtime attributes for this named fields.
+    pub fn attributes(&self) -> &Vec<RuntimeAttribute> {
+        &self.attributes
     }
 
-    /// Get a mutable reference to the tag.
-    pub fn tag_mut(&mut self) -> Option<&mut Cow<'static, str>> {
-        self.tag.as_mut()
+    /// Mutable reference to the runtime attributes for this named fields.
+    pub fn attributes_mut(&mut self) -> &mut Vec<RuntimeAttribute> {
+        &mut self.attributes
     }
 
-    /// Set the tag of this named enum variant or struct.
-    pub fn set_tag(&mut self, tag: Cow<'static, str>) {
-        self.tag = Some(tag);
+    /// Set the runtime attributes for this named fields.
+    pub fn set_attributes(&mut self, attrs: Vec<RuntimeAttribute>) {
+        self.attributes = attrs;
+    }
+
+    /// Get the tag from attributes if present (for internally tagged enums).
+    /// This checks for serde(tag = "...") in the attributes.
+    pub fn tag(&self) -> Option<Cow<'static, str>> {
+        for attr in &self.attributes {
+            if attr.path == "serde" {
+                if let RuntimeMeta::List(items) = &attr.kind {
+                    for item in items {
+                        if let RuntimeNestedMeta::Meta(RuntimeMeta::NameValue { key, value }) = item {
+                            if key == "tag" {
+                                if let RuntimeLiteral::Str(tag_value) = value {
+                                    return Some(Cow::Owned(tag_value.clone()));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        None
     }
 }

@@ -156,11 +156,7 @@ impl<T> Type for std::marker::PhantomData<T> {
 const _: () = {
     impl Type for std::convert::Infallible {
         fn definition(_: &mut TypeCollection) -> DataType {
-            DataType::Enum(internal::construct::r#enum(
-                // Some(EnumRepr::External),
-                vec![],
-                vec![],
-            ))
+            DataType::Enum(Enum::default())
         }
     }
 };
@@ -196,7 +192,7 @@ impl<T: Type> Type for std::ops::Range<T> {
                         },
                     ),
                 ],
-                tag: None,
+                attributes: Vec::new(),
             }),
             attributes: vec![],
         })
@@ -245,7 +241,7 @@ const _: () = {
                             ),
                         ),
                     ],
-                    None,
+                    vec![],
                 ),
                 vec![],
             ))
@@ -285,7 +281,7 @@ const _: () = {
                             ),
                         ),
                     ],
-                    None,
+                    vec![],
                 ),
                 vec![],
             ))
