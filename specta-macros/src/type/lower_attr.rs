@@ -1,12 +1,15 @@
 // Runtime attribute representation for syn 2.0 compatibility
 // These types mirror the runtime attribute types in specta/src/datatype/struct.rs
 // but use owned String data instead of static str references for macro parsing
-struct RuntimeAttributeIR {
+
+use quote::ToTokens;
+
+pub struct RuntimeAttributeIR {
     path: String,
     kind: RuntimeMetaIR,
 }
 
-enum RuntimeMetaIR {
+pub enum RuntimeMetaIR {
     Path,
     NameValue {
         key: String,
@@ -15,12 +18,12 @@ enum RuntimeMetaIR {
     List(Vec<RuntimeNestedMetaIR>),
 }
 
-enum RuntimeNestedMetaIR {
+pub enum RuntimeNestedMetaIR {
     Meta(RuntimeMetaIR),
     Literal(RuntimeLiteralIR),
 }
 
-enum RuntimeLiteralIR {
+pub enum RuntimeLiteralIR {
     Str(String),
     Int(i64),
     Bool(bool),
@@ -170,7 +173,7 @@ fn lower_meta(meta: &syn::Meta) -> syn::Result<RuntimeMetaIR> {
 
 /// Convert a syn::Attribute to RuntimeAttributeIR.
 /// Updated for syn 2.0 - uses attr.meta instead of attr.parse_meta().
-fn lower_attribute(attr: &syn::Attribute) -> syn::Result<RuntimeAttributeIR> {
+pub fn lower_attribute(attr: &syn::Attribute) -> syn::Result<RuntimeAttributeIR> {
     Ok(RuntimeAttributeIR {
         path: attr.path().to_token_stream().to_string(),
         kind: lower_meta(&attr.meta)?,
@@ -178,7 +181,7 @@ fn lower_attribute(attr: &syn::Attribute) -> syn::Result<RuntimeAttributeIR> {
 }
 
 impl RuntimeLiteralIR {
-    fn to_tokens(&self) -> proc_macro2::TokenStream {
+    pub fn to_tokens(&self) -> proc_macro2::TokenStream {
         match self {
             RuntimeLiteralIR::Str(s) => {
                 quote::quote!(datatype::RuntimeLiteral::Str(String::from(#s)))
@@ -191,7 +194,7 @@ impl RuntimeLiteralIR {
 }
 
 impl RuntimeNestedMetaIR {
-    fn to_tokens(&self) -> proc_macro2::TokenStream {
+    pub fn to_tokens(&self) -> proc_macro2::TokenStream {
         match self {
             RuntimeNestedMetaIR::Meta(m) => {
                 let m = m.to_tokens();
@@ -206,7 +209,7 @@ impl RuntimeNestedMetaIR {
 }
 
 impl RuntimeMetaIR {
-    fn to_tokens(&self) -> proc_macro2::TokenStream {
+    pub fn to_tokens(&self) -> proc_macro2::TokenStream {
         match self {
             RuntimeMetaIR::Path => quote::quote!(datatype::RuntimeMeta::Path),
 
@@ -231,7 +234,7 @@ impl RuntimeMetaIR {
 }
 
 impl RuntimeAttributeIR {
-    fn to_tokens(&self) -> proc_macro2::TokenStream {
+    pub fn to_tokens(&self) -> proc_macro2::TokenStream {
         let path = &self.path;
         let kind = self.kind.to_tokens();
 

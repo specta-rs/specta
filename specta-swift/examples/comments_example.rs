@@ -116,6 +116,8 @@ fn main() {
     );
 
     // Also write to file for inspection
-    swift.export_to("./examples/generated/CommentsExample.swift", &types).unwrap();
+    swift
+        .export_to("./examples/generated/CommentsExample.swift", &types)
+        .unwrap();
     println!("\nComments example written to CommentsExample.swift");
 }

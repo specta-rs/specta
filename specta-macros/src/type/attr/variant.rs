@@ -1,15 +1,11 @@
-use proc_macro2::TokenStream;
-use quote::ToTokens;
 use syn::Result;
 
-use crate::utils::{Attribute, Inflection, impl_parse};
+use crate::utils::{Attribute, impl_parse};
 
 use super::RustCAttr;
 
 #[derive(Default)]
 pub struct VariantAttr {
-    pub rename_all: Option<Inflection>,
-    pub rename: Option<TokenStream>,
     pub skip: bool,
     pub inline: bool,
     pub common: RustCAttr,
@@ -17,11 +13,7 @@ pub struct VariantAttr {
 
 impl_parse! {
     VariantAttr(attr, out) {
-        "rename_all" => out.rename_all = out.rename_all.take().or(Some(attr.parse_inflection()?)),
-        "rename" => out.rename = out.rename.take().or(Some(attr.parse_string()?.to_token_stream())),
         "skip" => out.skip = attr.parse_bool().unwrap_or(true),
-        "skip_serializing" => out.skip = true,
-        "skip_deserializing" => out.skip = true,
         "inline" => out.inline = attr.parse_bool().unwrap_or(true),
     }
 }

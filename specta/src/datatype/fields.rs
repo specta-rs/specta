@@ -1,6 +1,8 @@
 //! Field types are used by both enums and structs.
 
-use super::{DataType, DeprecatedType, RuntimeAttribute, RuntimeMeta, RuntimeNestedMeta, RuntimeLiteral};
+use super::{
+    DataType, DeprecatedType, RuntimeAttribute, RuntimeLiteral, RuntimeMeta, RuntimeNestedMeta,
+};
 use std::borrow::Cow;
 
 /// Data stored within an enum variant or struct.

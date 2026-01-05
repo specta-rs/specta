@@ -404,7 +404,10 @@ impl SerdeTransformer {
                     }
                 }
 
-                Ok(internal::construct::fields_named(transformed_fields, vec![]))
+                Ok(internal::construct::fields_named(
+                    transformed_fields,
+                    vec![],
+                ))
             }
         }
     }

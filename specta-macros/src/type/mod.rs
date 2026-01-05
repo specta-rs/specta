@@ -40,17 +40,42 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         .clone()
         .unwrap_or_else(|| raw_ident.to_token_stream());
 
-    let name = container_attrs.rename.clone().unwrap_or_else(|| {
-        unraw_raw_ident(&format_ident!("{}", raw_ident.to_string())).to_token_stream()
-    });
+    let name = unraw_raw_ident(&format_ident!("{}", raw_ident.to_string())).to_token_stream();
+
+    // Check for enum-specific attributes and parse them
+    let enum_attrs_opt = match data {
+        Data::Enum(_) => Some(EnumAttr::from_attrs(&container_attrs, &mut attrs)?),
+        _ => None,
+    };
+
+    // Check for unknown specta attributes after all parsing is done
+    if let Some(attr) = attrs.iter().find(|attr| attr.key == "specta") {
+        match &attr.value {
+            Some(crate::utils::AttributeValue::Attribute {
+                attr: inner_attrs, ..
+            }) => {
+                if let Some(inner_attr) = inner_attrs.first() {
+                    return Err(syn::Error::new(
+                        inner_attr.key.span(),
+                        format!(
+                            "specta: Found unsupported container attribute '{}'",
+                            inner_attr.key
+                        ),
+                    ));
+                }
+            }
+            _ => {
+                return Err(syn::Error::new(
+                    attr.key.span(),
+                    "specta: invalid formatted attribute",
+                ));
+            }
+        }
+    }
 
     let (dt_type, dt_impl) = match data {
         Data::Struct(data) => parse_struct(&container_attrs, &crate_ref, data),
-        Data::Enum(data) => parse_enum(
-            &EnumAttr::from_attrs(&container_attrs, &mut attrs)?,
-            &container_attrs,
-            data,
-        ),
+        Data::Enum(data) => parse_enum(enum_attrs_opt.as_ref().unwrap(), &container_attrs, data),
         Data::Union(data) => Err(syn::Error::new_spanned(
             data.union_token,
             "specta: Union types are not supported by Specta yet!",

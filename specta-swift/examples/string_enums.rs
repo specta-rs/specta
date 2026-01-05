@@ -185,7 +185,9 @@ fn main() {
     println!("{}", output);
 
     // Write to file for inspection
-    swift.export_to("./examples/generated/StringEnums.swift", &types).unwrap();
+    swift
+        .export_to("./examples/generated/StringEnums.swift", &types)
+        .unwrap();
     println!("✅ String enums exported to StringEnums.swift");
 
     println!("\n🔍 Key Features Demonstrated:");

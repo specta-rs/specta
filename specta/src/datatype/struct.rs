@@ -13,12 +13,17 @@ pub struct Struct {
 }
 
 impl Struct {
-    /// Construct a new unit struct.
-    pub fn unit() -> Self {
+    /// Construct a new struct with no fields. Fields can be set later with `set_fields` or `fields_mut`.
+    pub fn new() -> Self {
         Self {
             fields: Fields::Unit,
             attributes: Default::default(),
         }
+    }
+
+    /// Construct a new unit struct.
+    pub fn unit() -> Self {
+        Self::new()
     }
 
     /// Construct a named struct.
