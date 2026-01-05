@@ -10,7 +10,6 @@ mod duplicate_ty_name;
 mod export;
 mod flatten_and_inline;
 mod functions;
-mod json;
 mod layouts;
 mod macro_decls;
 mod map_keys;
