@@ -83,6 +83,46 @@ pub enum H {
     B,
 }
 
+// Test for issue #393 - flatten in enum variant with internal tag
+#[derive(Type)]
+#[specta(collect = false, tag = "type")]
+pub enum MyEnum {
+    Variant {
+        #[specta(flatten)]
+        inner: A,
+    },
+}
+
+// Test for issue #393 - flatten in enum variant with external tag
+#[derive(Type)]
+#[specta(collect = false)]
+pub enum MyEnumExternal {
+    Variant {
+        #[specta(flatten)]
+        inner: A,
+    },
+}
+
+// Test for issue #393 - flatten in enum variant with adjacent tag
+#[derive(Type)]
+#[specta(collect = false, tag = "t", content = "c")]
+pub enum MyEnumAdjacent {
+    Variant {
+        #[specta(flatten)]
+        inner: A,
+    },
+}
+
+// Test for issue #393 - flatten in enum variant with untagged
+#[derive(Type)]
+#[specta(collect = false, untagged)]
+pub enum MyEnumUntagged {
+    Variant {
+        #[specta(flatten)]
+        inner: A,
+    },
+}
+
 // TODO: Invalid Serde type but unit test this at the datamodel level cause it might be valid in other langs.
 // #[derive(Type)]
 // #[specta(collect = false, tag = "type")]
@@ -129,4 +169,10 @@ fn serde() {
         "{ t: \"A\"; c: string } | { t: \"B\" } | { t: \"C\"; c: { a: string } } | { t: \"D\"; c: A }"
     );
     assert_ts!(K, "string | null | { a: string } | A");
+
+    // Test for issue #393 - flatten in enum variants
+    assert_ts!(MyEnum, "(A) & { type: \"Variant\" }");
+    assert_ts!(MyEnumExternal, "{ Variant: (A) }");
+    assert_ts!(MyEnumAdjacent, "{ t: \"Variant\"; c: (A) }");
+    assert_ts!(MyEnumUntagged, "(A)");
 }

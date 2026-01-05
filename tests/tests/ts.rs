@@ -143,9 +143,9 @@ pub fn export<T: Type>(ts: &Typescript) -> Result<String, String> {
 }
 
 fn detect_duplicate_type_names(
-    types: &TypeCollection,
+    _types: &TypeCollection,
 ) -> Vec<(Cow<'static, str>, Location<'static>, Location<'static>)> {
-    let mut errors = Vec::new();
+    let errors = Vec::new();
 
     // let mut map = HashMap::with_capacity(types.len());
     // for dt in types.into_unsorted_iter() {
@@ -157,7 +157,7 @@ fn detect_duplicate_type_names(
     //         }
     //     }
     // }
-    todo!();
+    // TODO: Implement duplicate type name detection
 
     errors
 }

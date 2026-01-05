@@ -22,13 +22,19 @@ fn typescript_types_glam() {
         glam::Mat3A,
         "[number, number, number, number, number, number, number, number, number]"
     );
-    assert_ts!(glam::Mat4, "[number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number]");
+    assert_ts!(
+        glam::Mat4,
+        "[number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number]"
+    );
     assert_ts!(glam::Quat, "[number, number, number, number]");
     assert_ts!(
         glam::Affine2,
         "[number, number, number, number, number, number]"
     );
-    assert_ts!(glam::Affine3A, "[number, number, number, number, number, number, number, number, number, number, number, number]");
+    assert_ts!(
+        glam::Affine3A,
+        "[number, number, number, number, number, number, number, number, number, number, number, number]"
+    );
 }
 
 #[test]

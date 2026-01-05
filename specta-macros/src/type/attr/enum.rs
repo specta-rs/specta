@@ -2,7 +2,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::{Error, Result};
 
-use crate::utils::{impl_parse, Attribute};
+use crate::utils::{Attribute, impl_parse};
 
 use super::ContainerAttr;
 

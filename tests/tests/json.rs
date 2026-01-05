@@ -1,5 +1,5 @@
 use serde::Serialize;
-use specta_util::json;
+// use specta_util::json; // TODO: This module doesn't exist yet
 
 use crate::ts::assert_ts;
 

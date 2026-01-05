@@ -385,15 +385,44 @@ fn enum_variant_datatype(
         // TODO: Remove unreachable in type system
         Fields::Unit => unreachable!("Unit enum variants have no type!"),
         Fields::Named(obj) => {
-            let mut fields = if let Some(tag) = &obj.tag() {
+            let all_fields = skip_fields_named(obj.fields()).collect::<Vec<_>>();
+
+            let (flattened, non_flattened): (Vec<_>, Vec<_>) =
+                all_fields.iter().partition(|(_, (f, _))| f.flatten());
+
+            let mut field_sections = flattened
+                .into_iter()
+                .map(|(key, (field, ty))| {
+                    let mut s = String::new();
+                    datatype_inner(
+                        ctx.with(PathItem::Field(key.clone())),
+                        &FunctionReturnType::Value(ty.clone()),
+                        types,
+                        &mut s,
+                    )
+                    .map(|_| {
+                        inner_comments(
+                            ctx.clone(),
+                            field.deprecated(),
+                            field.docs(),
+                            format!("({s})"),
+                            true,
+                            prefix,
+                        )
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?;
+
+            let mut regular_fields = if let Some(tag) = &obj.tag() {
                 let sanitised_name = sanitise_key(name, true);
                 vec![format!("{tag}: {sanitised_name}")]
             } else {
                 vec![]
             };
 
-            fields.extend(
-                skip_fields_named(obj.fields())
+            regular_fields.extend(
+                non_flattened
+                    .into_iter()
                     .map(|(name, field_ref)| {
                         let (field, _) = field_ref;
 
@@ -418,9 +447,14 @@ fn enum_variant_datatype(
                     .collect::<Result<Vec<_>>>()?,
             );
 
-            Ok(Some(match &fields[..] {
-                [] => format!("Record<{STRING}, {NEVER}>").to_string(),
-                fields => format!("{{ {} }}", fields.join("; ")),
+            Ok(Some(match (&field_sections[..], &regular_fields[..]) {
+                ([], []) => format!("Record<{STRING}, {NEVER}>").to_string(),
+                ([], fields) => format!("{{ {} }}", fields.join("; ")),
+                (_, []) => field_sections.join(" & "),
+                (_, _) => {
+                    field_sections.push(format!("{{ {} }}", regular_fields.join("; ")));
+                    field_sections.join(" & ")
+                }
             }))
         }
         Fields::Unnamed(obj) => {
@@ -549,9 +583,36 @@ pub(crate) fn enum_datatype(
                                 }
                             }
                             (EnumRepr::Internal { tag }, Fields::Named(obj)) => {
-                                let mut fields = vec![format!("{tag}: {sanitised_name}")];
+                                let fields = skip_fields_named(obj.fields()).collect::<Vec<_>>();
 
-                                for (name, field) in skip_fields_named(obj.fields()) {
+                                let (flattened, non_flattened): (Vec<_>, Vec<_>) =
+                                    fields.iter().partition(|(_, (f, _))| f.flatten());
+
+                                let mut field_sections = flattened
+                                    .into_iter()
+                                    .map(|(key, (field, ty))| {
+                                        let mut s = String::new();
+                                        datatype_inner(
+                                            ctx.with(PathItem::Field(key.clone())),
+                                            &FunctionReturnType::Value(ty.clone()),
+                                            types,
+                                            &mut s,
+                                        )
+                                        .map(|_| {
+                                            inner_comments(
+                                                ctx.clone(),
+                                                field.deprecated(),
+                                                field.docs(),
+                                                format!("({s})"),
+                                                true,
+                                                prefix,
+                                            )
+                                        })
+                                    })
+                                    .collect::<Result<Vec<_>>>()?;
+
+                                let mut regular_fields = vec![format!("{tag}: {sanitised_name}")];
+                                for (name, field) in non_flattened {
                                     let mut other = String::new();
                                     object_field_to_ts(
                                         ctx.with(PathItem::Field(name.clone())),
@@ -560,10 +621,16 @@ pub(crate) fn enum_datatype(
                                         types,
                                         &mut other,
                                     )?;
-                                    fields.push(other);
+                                    regular_fields.push(other);
                                 }
 
-                                format!("{{ {} }}", fields.join("; "))
+                                if field_sections.is_empty() {
+                                    format!("{{ {} }}", regular_fields.join("; "))
+                                } else {
+                                    field_sections
+                                        .push(format!("{{ {} }}", regular_fields.join("; ")));
+                                    field_sections.join(" & ")
+                                }
                             }
                             (EnumRepr::External, Fields::Unit) => sanitised_name.to_string(),
                             (EnumRepr::External, _) => {
