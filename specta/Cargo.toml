@@ -27,9 +27,6 @@ derive = ["dep:specta-macros"]
 collect = ["dep:ctor", "specta-macros/DO_NOT_USE_collect"]
 
 #! Features
-## Support for exporting the types of Rust functions.
-function = ["specta-macros?/DO_NOT_USE_function", "dep:paste"]
-
 # Enable nightly features
 nightly = []
 
@@ -90,7 +87,6 @@ workspace = true
 
 [dependencies]
 specta-macros = { version = "=2.0.0-rc.18", optional = true, path = "../specta-macros" }
-paste = { version = "1", optional = true }
 
 ctor = { version = "0.6.1", default-features = false, optional = true, features = ["proc_macro"] }
 

@@ -113,8 +113,7 @@ use crate::{Error, Typescript};
 use std::fmt::Write;
 
 use specta::datatype::{
-    DataType, DeprecatedType, Enum, EnumRepr, EnumVariant, Fields, FunctionReturnType, Generic,
-    Reference, Struct, Tuple,
+    DataType, DeprecatedType, Enum, EnumRepr, EnumVariant, Fields, Generic, Struct, Tuple,
 };
 use specta::internal::{NonSkipField, skip_fields, skip_fields_named};
 
@@ -148,36 +147,10 @@ fn inner_comments(
 
 pub(crate) fn datatype_inner(
     ctx: ExportContext,
-    typ: &FunctionReturnType,
+    typ: &DataType,
     types: &TypeCollection,
     s: &mut String,
 ) -> Result<()> {
-    let typ = match typ {
-        FunctionReturnType::Value(t) => t,
-        FunctionReturnType::Result(t, e) => {
-            let mut variants = vec![
-                {
-                    let mut v = String::new();
-                    datatype_inner(
-                        ctx.clone(),
-                        &FunctionReturnType::Value(t.clone()),
-                        types,
-                        &mut v,
-                    )?;
-                    v
-                },
-                {
-                    let mut v = String::new();
-                    datatype_inner(ctx, &FunctionReturnType::Value(e.clone()), types, &mut v)?;
-                    v
-                },
-            ];
-            variants.dedup();
-            s.push_str(&variants.join(" | "));
-            return Ok(());
-        }
-    };
-
     crate::primitives::datatype(s, ctx.cfg, types, typ, vec![], ctx.is_export, None, "")
 }
 
@@ -192,12 +165,7 @@ fn unnamed_fields_datatype(
     match fields {
         [(field, ty)] => {
             let mut v = String::new();
-            datatype_inner(
-                ctx.clone(),
-                &FunctionReturnType::Value((*ty).clone()),
-                types,
-                &mut v,
-            )?;
+            datatype_inner(ctx.clone(), ty, types, &mut v)?;
             s.push_str(&inner_comments(
                 ctx,
                 field.deprecated(),
@@ -216,12 +184,7 @@ fn unnamed_fields_datatype(
                 }
 
                 let mut v = String::new();
-                datatype_inner(
-                    ctx.clone(),
-                    &FunctionReturnType::Value((*ty).clone()),
-                    types,
-                    &mut v,
-                )?;
+                datatype_inner(ctx.clone(), ty, types, &mut v)?;
                 s.push_str(&inner_comments(
                     ctx.clone(),
                     field.deprecated(),
@@ -247,13 +210,7 @@ pub(crate) fn tuple_datatype(ctx: ExportContext, tuple: &Tuple, types: &TypeColl
             tys.iter()
                 .map(|v| {
                     let mut s = String::new();
-                    datatype_inner(
-                        ctx.clone(),
-                        &FunctionReturnType::Value(v.clone()),
-                        types,
-                        &mut s,
-                    )
-                    .map(|_| s)
+                    datatype_inner(ctx.clone(), v, types, &mut s).map(|_| s)
                 })
                 .collect::<Result<Vec<_>>>()?
                 .join(", ")
@@ -297,22 +254,18 @@ pub(crate) fn struct_datatype(
                 .into_iter()
                 .map(|(key, (field, ty))| {
                     let mut s = String::new();
-                    datatype_inner(
-                        ctx.with(PathItem::Field(key.clone())),
-                        &FunctionReturnType::Value(ty.clone()),
-                        types,
-                        &mut s,
+                    datatype_inner(ctx.with(PathItem::Field(key.clone())), ty, types, &mut s).map(
+                        |_| {
+                            inner_comments(
+                                ctx.clone(),
+                                field.deprecated(),
+                                field.docs(),
+                                format!("({s})"),
+                                true,
+                                prefix,
+                            )
+                        },
                     )
-                    .map(|_| {
-                        inner_comments(
-                            ctx.clone(),
-                            field.deprecated(),
-                            field.docs(),
-                            format!("({s})"),
-                            true,
-                            prefix,
-                        )
-                    })
                 })
                 .collect::<Result<Vec<_>>>()?;
 
@@ -427,13 +380,7 @@ fn enum_variant_datatype(
             let fields = skip_fields(obj.fields())
                 .map(|(_, ty)| {
                     let mut s = String::new();
-                    datatype_inner(
-                        ctx.clone(),
-                        &FunctionReturnType::Value(ty.clone()),
-                        types,
-                        &mut s,
-                    )
-                    .map(|_| s)
+                    datatype_inner(ctx.clone(), ty, types, &mut s).map(|_| s)
                 })
                 .collect::<Result<Vec<_>>>()?;
 
@@ -676,12 +623,7 @@ fn object_field_to_ts(
     };
 
     let mut value = String::new();
-    datatype_inner(
-        ctx,
-        &FunctionReturnType::Value(ty.clone()),
-        types,
-        &mut value,
-    )?;
+    datatype_inner(ctx, ty, types, &mut value)?;
 
     Ok(write!(s, "{key}: {value}",)?)
 }
