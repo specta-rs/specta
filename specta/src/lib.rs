@@ -11,9 +11,6 @@ pub mod builder;
 #[doc(hidden)]
 pub mod collect;
 pub mod datatype;
-#[cfg(feature = "function")]
-#[cfg_attr(docsrs, doc(cfg(feature = "function")))]
-pub mod function;
 #[doc(hidden)]
 pub mod internal;
 mod r#type;
