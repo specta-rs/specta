@@ -1,7 +1,5 @@
 use specta::Type;
 
-use crate::ts::assert_ts;
-
 #[derive(Type)]
 #[specta(collect = false)]
 #[serde(tag = "kind", content = "d")]
@@ -32,10 +30,7 @@ enum Untagged {
 
 #[test]
 fn test_serde_enum() {
-    assert_ts!(SimpleEnumA, r#"{ kind: "A" } | { kind: "B" }"#);
-    assert_ts!(
-        ComplexEnum,
-        r#"{ kind: "A" } | { kind: "B"; data: { foo: string; bar: number } } | { kind: "W"; data: SimpleEnumA } | { kind: "F"; data: { nested: SimpleEnumA } } | { kind: "T"; data: [number, SimpleEnumA] }"#
-    );
-    assert_ts!(Untagged, r#"string | number | null"#);
+    insta::assert_snapshot!(crate::ts::inline::<SimpleEnumA>(&Default::default()).unwrap(), @r#"{ kind: "A" } | { kind: "B" }"#);
+    insta::assert_snapshot!(crate::ts::inline::<ComplexEnum>(&Default::default()).unwrap(), @r#"{ kind: "A" } | { kind: "B"; data: { foo: string; bar: number } } | { kind: "W"; data: SimpleEnumA } | { kind: "F"; data: { nested: SimpleEnumA } } | { kind: "T"; data: [number, SimpleEnumA] }"#);
+    insta::assert_snapshot!(crate::ts::inline::<Untagged>(&Default::default()).unwrap(), @r#"string | number | null"#);
 }

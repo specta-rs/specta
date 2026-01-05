@@ -2,8 +2,6 @@
 
 use specta::Type;
 
-use crate::ts::assert_ts;
-
 #[derive(Type)]
 #[specta(collect = false)]
 struct FlattenA {
@@ -61,11 +59,11 @@ struct FlattenG {
 
 #[test]
 fn test_flatten() {
-    assert_ts!(FlattenA, "{ a: number; b: number }");
-    assert_ts!(FlattenB, "(FlattenA) & { c: number }");
-    assert_ts!(FlattenC, "(FlattenA) & { c: number }");
-    assert_ts!(FlattenD, "{ a: FlattenA; c: number }");
-    assert_ts!(FlattenE, "{ b: (FlattenA) & { c: number }; d: number }");
-    assert_ts!(FlattenF, "{ b: (FlattenA) & { c: number }; d: number }");
-    assert_ts!(FlattenG, "{ b: FlattenB; d: number }");
+    insta::assert_snapshot!(crate::ts::inline::<FlattenA>(&Default::default()).unwrap(), @"{ a: number; b: number }");
+    insta::assert_snapshot!(crate::ts::inline::<FlattenB>(&Default::default()).unwrap(), @"(FlattenA) & { c: number }");
+    insta::assert_snapshot!(crate::ts::inline::<FlattenC>(&Default::default()).unwrap(), @"(FlattenA) & { c: number }");
+    insta::assert_snapshot!(crate::ts::inline::<FlattenD>(&Default::default()).unwrap(), @"{ a: FlattenA; c: number }");
+    insta::assert_snapshot!(crate::ts::inline::<FlattenE>(&Default::default()).unwrap(), @"{ b: (FlattenA) & { c: number }; d: number }");
+    insta::assert_snapshot!(crate::ts::inline::<FlattenF>(&Default::default()).unwrap(), @"{ b: (FlattenA) & { c: number }; d: number }");
+    insta::assert_snapshot!(crate::ts::inline::<FlattenG>(&Default::default()).unwrap(), @"{ b: FlattenB; d: number }");
 }

@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use crate::ts::assert_ts;
 use specta::Type;
 
 #[derive(Type)]
@@ -13,5 +12,5 @@ struct Rename1 {
 
 #[test]
 fn test() {
-    assert_ts!(Rename1, "{ a: number; bb: number }")
+    insta::assert_snapshot!(crate::ts::inline::<Rename1>(&Default::default()).unwrap(), @"{ a: number; bb: number }");
 }

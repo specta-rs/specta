@@ -1,7 +1,5 @@
 use specta::Type;
 
-use crate::ts::assert_ts;
-
 #[derive(Type)]
 #[specta(collect = false)]
 #[specta(rename_all = "lowercase")]
@@ -15,5 +13,5 @@ enum RenamedEnum {
 
 #[test]
 fn test_simple_enum() {
-    assert_ts!(RenamedEnum, r#""ASDF" | "b" | "c""#)
+    insta::assert_snapshot!(crate::ts::inline::<RenamedEnum>(&Default::default()).unwrap(), @r#""ASDF" | "b" | "c""#);
 }

@@ -20,9 +20,9 @@ fn test_uuid_support() {
     let types = TypeCollection::default().register::<WithUuid>();
     let swift = Swift::default();
     let output = swift.export(&types).unwrap();
-    
+
     println!("UUID support test:\n{}", output);
-    
+
     // UUID should be converted to String in Swift
     assert!(output.contains("let id: String"));
     assert!(output.contains("let name: String"));
@@ -33,9 +33,9 @@ fn test_chrono_support() {
     let types = TypeCollection::default().register::<WithChrono>();
     let swift = Swift::default();
     let output = swift.export(&types).unwrap();
-    
+
     println!("Chrono support test:\n{}", output);
-    
+
     // Chrono types should be converted to String in Swift
     assert!(output.contains("let createdAt: String"));
     assert!(output.contains("let updatedAt: String"));

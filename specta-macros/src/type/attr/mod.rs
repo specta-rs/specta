@@ -1,7 +1,7 @@
 pub use common::*;
 pub use container::*;
-pub use field::*;
 pub use r#enum::*;
+pub use field::*;
 pub use variant::*;
 
 mod common;

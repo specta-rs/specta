@@ -1,7 +1,5 @@
 use specta::Type;
 
-use crate::ts::{assert_ts, assert_ts_export};
-
 #[derive(Type)]
 #[specta(collect = false, rename = "StructNew", tag = "t")]
 pub struct Struct {
@@ -41,17 +39,14 @@ pub enum Enum3 {
 
 #[test]
 fn rename() {
-    assert_ts!(Struct, "{ a: string }");
-    assert_ts_export!(
-        Struct,
-        "export type StructNew = { a: string; t: \"StructNew\" };"
-    );
+    insta::assert_snapshot!(crate::ts::inline::<Struct>(&Default::default()).unwrap(), @"{ a: string }");
+    insta::assert_snapshot!(crate::ts::export::<Struct>(&Default::default()).unwrap(), @"export type StructNew = { a: string; t: \"StructNew\" };");
 
-    assert_ts!(Struct2, "{ b: string }");
+    insta::assert_snapshot!(crate::ts::inline::<Struct2>(&Default::default()).unwrap(), @"{ b: string }");
 
-    assert_ts!(Enum, "{ t: \"A\" } | { t: \"B\" }");
-    assert_ts_export!(Enum, "export type EnumNew = { t: \"A\" } | { t: \"B\" };");
+    insta::assert_snapshot!(crate::ts::inline::<Enum>(&Default::default()).unwrap(), @"{ t: \"A\" } | { t: \"B\" }");
+    insta::assert_snapshot!(crate::ts::export::<Enum>(&Default::default()).unwrap(), @"export type EnumNew = { t: \"A\" } | { t: \"B\" };");
 
-    assert_ts!(Enum2, "{ t: \"C\" } | { t: \"B\" }");
-    assert_ts!(Enum3, "{ t: \"A\"; b: string }");
+    insta::assert_snapshot!(crate::ts::inline::<Enum2>(&Default::default()).unwrap(), @"{ t: \"C\" } | { t: \"B\" }");
+    insta::assert_snapshot!(crate::ts::inline::<Enum3>(&Default::default()).unwrap(), @"{ t: \"A\"; b: string }");
 }

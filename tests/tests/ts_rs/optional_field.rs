@@ -1,7 +1,5 @@
 use specta::Type;
 
-use crate::ts::assert_ts;
-
 #[derive(Type)]
 #[specta(collect = false)]
 struct Optional {
@@ -16,8 +14,5 @@ struct Optional {
 
 #[test]
 fn test() {
-    assert_ts!(
-        Optional,
-        "{ a: number | null; b?: number | null; c?: string | null; d?: boolean }"
-    );
+    insta::assert_snapshot!(crate::ts::inline::<Optional>(&Default::default()).unwrap(), @"{ a: number | null; b?: number | null; c?: string | null; d?: boolean }");
 }

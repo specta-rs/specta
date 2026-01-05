@@ -1,7 +1,5 @@
 use specta::Type;
 
-use crate::ts::assert_ts;
-
 #[derive(Type)]
 #[specta(collect = false)]
 struct NonOptional(Option<String>);
@@ -39,11 +37,8 @@ enum OptionalInEnum {
 
 #[test]
 fn optional() {
-    assert_ts!(NonOptional, "string | null");
-    assert_ts!(OptionalOnNamedField, "string | null");
+    insta::assert_snapshot!(crate::ts::inline::<NonOptional>(&Default::default()).unwrap(), @"string | null");
+    insta::assert_snapshot!(crate::ts::inline::<OptionalOnNamedField>(&Default::default()).unwrap(), @"string | null");
     // assert_ts!(OptionalOnTransparentNamedField, "{ b?: string | null }"); // TODO: Fix this
-    assert_ts!(
-        OptionalInEnum,
-        "{ A: string | null } | { B: { a: string | null } } | { C: { a?: string | null } }"
-    );
+    insta::assert_snapshot!(crate::ts::inline::<OptionalInEnum>(&Default::default()).unwrap(), @"{ A: string | null } | { B: { a: string | null } } | { C: { a?: string | null } }");
 }

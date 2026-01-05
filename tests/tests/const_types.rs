@@ -1,8 +1,6 @@
-use crate::ts::assert_ts;
-
 #[test]
 fn const_types() {
-    assert_ts!((String, String), "[string, string]");
-    assert_ts!([String; 5], "[string, string, string, string, string]");
-    assert_ts!([String; 0], "[]");
+    insta::assert_snapshot!(crate::ts::inline::<(String, String)>(&Default::default()).unwrap(), @"[string, string]");
+    insta::assert_snapshot!(crate::ts::inline::<[String; 5]>(&Default::default()).unwrap(), @"[string, string, string, string, string]");
+    insta::assert_snapshot!(crate::ts::inline::<[String; 0]>(&Default::default()).unwrap(), @"[]");
 }

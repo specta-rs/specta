@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::Result;
 
-use crate::utils::{impl_parse, Attribute, Inflection};
+use crate::utils::{Attribute, Inflection, impl_parse};
 
 use super::CommonAttr;
 
