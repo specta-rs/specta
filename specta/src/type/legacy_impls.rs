@@ -1,6 +1,6 @@
 //! The plan is to try and move these into the ecosystem for the v2 release.
 use super::macros::*;
-use crate::{Flatten, Type, TypeCollection, datatype::*};
+use crate::{Type, TypeCollection, datatype::*};
 
 use std::borrow::Cow;
 
@@ -8,7 +8,6 @@ use std::borrow::Cow;
 const _: () = {
     impl_for_list!(true; indexmap::IndexSet<T> as "IndexSet");
     impl_for_map!(indexmap::IndexMap<K, V> as "IndexMap");
-    impl<K: Type, V: Type> Flatten for indexmap::IndexMap<K, V> {}
 };
 
 #[cfg(feature = "serde_json")]
@@ -16,10 +15,9 @@ const _: () = {
     use serde_json::{Map, Number, Value};
 
     impl_for_map!(Map<K, V> as "Map");
-    impl<K: Type, V: Type> Flatten for Map<K, V> {}
 
     #[derive(Type)]
-    #[specta(rename = "JsonValue", untagged, remote = Value, crate = crate, collect = false)]
+    #[specta(remote = Value, crate = crate, collect = false)]
     pub enum JsonValue {
         Null,
         Bool(bool),
@@ -32,73 +30,32 @@ const _: () = {
     impl Type for Number {
         fn definition(_: &mut TypeCollection) -> DataType {
             DataType::Enum(Enum {
-                // repr: Some(EnumRepr::Untagged),
                 variants: vec![
                     (
                         "f64".into(),
-                        EnumVariant {
-                            skip: false,
-                            docs: Cow::Borrowed(""),
-                            deprecated: None,
-                            fields: Fields::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    inline: false,
-                                    deprecated: None,
-                                    docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(Primitive::f64)),
-                                    attributes: Vec::new(),
-                                }],
-                                attributes: Vec::new(),
-                            }),
-                            attributes: Vec::new(),
-                        },
+                        EnumVariant::unnamed()
+                            .field(Field::new(DataType::Primitive(Primitive::f64)))
+                            .build(),
                     ),
                     (
                         "i64".into(),
-                        EnumVariant {
-                            skip: false,
-                            docs: Cow::Borrowed(""),
-                            deprecated: None,
-                            fields: Fields::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    inline: false,
-                                    deprecated: None,
-                                    docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(Primitive::i64)),
-                                    attributes: Vec::new(),
-                                }],
-                                attributes: Vec::new(),
-                            }),
-                            attributes: Vec::new(),
-                        },
+                        EnumVariant::unnamed()
+                            .field(Field::new(DataType::Primitive(Primitive::i64)))
+                            .build(),
                     ),
                     (
                         "u64".into(),
-                        EnumVariant {
-                            skip: false,
-                            docs: Cow::Borrowed(""),
-                            deprecated: None,
-                            fields: Fields::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    inline: false,
-                                    deprecated: None,
-                                    docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(Primitive::u64)),
-                                    attributes: Vec::new(),
-                                }],
-                                attributes: Vec::new(),
-                            }),
-                            attributes: Vec::new(),
-                        },
+                        EnumVariant::unnamed()
+                            .field(Field::new(DataType::Primitive(Primitive::u64)))
+                            .build(),
                     ),
                 ],
-                attributes: vec![],
+                attributes: vec![RuntimeAttribute {
+                    path: String::from("serde"),
+                    kind: RuntimeMeta::List(vec![RuntimeNestedMeta::Meta(RuntimeMeta::Path(
+                        String::from("untagged"),
+                    ))]),
+                }],
             })
         }
     }
@@ -109,7 +66,7 @@ const _: () = {
     use serde_yaml::{Mapping, Number, Sequence, Value, value::TaggedValue};
 
     #[derive(Type)]
-    #[specta(rename = "YamlValue", untagged, remote = Value, crate = crate, collect = false)]
+    #[specta(remote = Value, crate = crate, collect = false)]
     pub enum YamlValue {
         Null,
         Bool(bool),
@@ -118,13 +75,6 @@ const _: () = {
         Sequence(Sequence),
         Mapping(Mapping),
         Tagged(Box<TaggedValue>),
-    }
-
-    impl Type for serde_yaml::Mapping {
-        fn definition(types: &mut TypeCollection) -> DataType {
-            // We don't type this more accurately because `serde_json` doesn't allow non-string map keys so neither does Specta // TODO
-            std::collections::HashMap::<serde_yaml::Value, serde_yaml::Value>::definition(types)
-        }
     }
 
     impl Type for serde_yaml::value::TaggedValue {
@@ -210,28 +160,26 @@ const _: () = {
 
 #[cfg(feature = "toml")]
 const _: () = {
-    use toml::{Value, value::Array, value::Datetime, value::Table};
+    use toml::{Value, value, value::Array, value::Table};
 
     impl_for_map!(toml::map::Map<K, V> as "Map");
-    impl<K: Type, V: Type> Flatten for toml::map::Map<K, V> {}
 
     #[derive(Type)]
-    #[specta(rename = "TomlValue", untagged, remote = Value, crate = crate, collect = false)]
+    #[specta(remote = Value, crate = crate, collect = false)]
     pub enum TomlValue {
         String(String),
         Integer(i64),
         Float(f64),
         Boolean(bool),
-        Datetime(Datetime),
+        Datetime(value::Datetime),
         Array(Array),
         Table(Table),
     }
 
     #[derive(Type)]
-    #[specta(rename = "Datetime", remote = Datetime, crate = crate, collect = false)]
+    #[specta(remote = value::Datetime, crate = crate, collect = false)]
     #[allow(dead_code)]
-    struct DatetimeDef {
-        #[specta(rename = "$__toml_private_datetime")]
+    struct Datetime {
         pub v: String,
     }
 };
@@ -507,9 +455,9 @@ impl<L: Type, R: Type> Type for either::Either<L, R> {
 #[cfg(feature = "bevy_ecs")]
 const _: () = {
     #[derive(Type)]
-    #[specta(rename = "Entity", remote = bevy_ecs::entity::Entity, crate = crate, collect = false)]
+    #[specta(remote = bevy_ecs::entity::Entity, crate = crate, collect = false)]
     #[allow(dead_code)]
-    struct EntityDef(u64);
+    struct Entity(u64);
 };
 
 #[cfg(feature = "bevy_input")]

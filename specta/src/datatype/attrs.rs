@@ -10,7 +10,7 @@ pub struct RuntimeAttribute {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RuntimeMeta {
-    Path,
+    Path(String),
     NameValue { key: String, value: RuntimeLiteral },
     List(Vec<RuntimeNestedMeta>),
 }

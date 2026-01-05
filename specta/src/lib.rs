@@ -20,7 +20,7 @@ mod r#type;
 mod type_collection;
 
 // TODO: Can we just move the trait here or `#[doc(inline)]`
-pub use r#type::{Flatten, Type};
+pub use r#type::Type;
 pub use type_collection::TypeCollection;
 
 #[doc(inline)]

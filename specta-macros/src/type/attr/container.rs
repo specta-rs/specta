@@ -6,7 +6,7 @@ use crate::utils::{Attribute, impl_parse};
 
 use super::RustCAttr;
 
-#[derive(Default, Clone)]
+#[derive(Default)]
 pub struct ContainerAttr {
     pub crate_name: Option<TokenStream>,
     pub inline: bool,

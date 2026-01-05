@@ -524,10 +524,9 @@ fn parse_serde_attribute_content(
     attrs: &mut SerdeAttributes,
 ) -> Result<(), Error> {
     match meta {
-        RuntimeMeta::Path => {
-            // Just #[serde] with no content - could be skip, untagged, etc.
-            // We need the actual path string to determine what this is
-            // For now, we can't handle path-only attributes due to RuntimeMeta limitations
+        RuntimeMeta::Path(path) => {
+            // Handle path-only attributes (e.g., #[serde(untagged)], #[serde(skip)])
+            parse_serde_path_attribute(attrs, path);
         }
         RuntimeMeta::NameValue { key, value } => {
             match key.as_str() {
@@ -796,7 +795,9 @@ fn parse_serde_field_attribute_content(
 
     // Then parse field-specific attributes
     match meta {
-        RuntimeMeta::Path => {}
+        RuntimeMeta::Path(_path) => {
+            // Path-only attributes are already handled by parse_serde_attribute_content above
+        }
         RuntimeMeta::NameValue { key, value } => match key.as_str() {
             "alias" => {
                 if let RuntimeLiteral::Str(alias_name) = value {
@@ -857,8 +858,9 @@ fn parse_field_serde_attributes(
     for attr in attributes {
         if attr.path == "serde" {
             match &attr.kind {
-                specta::datatype::RuntimeMeta::Path => {
-                    // Handle simple #[serde] attributes
+                specta::datatype::RuntimeMeta::Path(path) => {
+                    // Handle simple #[serde(path)] attributes (e.g., #[serde(skip)])
+                    parse_serde_path_attribute(&mut field_attrs.base, path);
                 }
                 specta::datatype::RuntimeMeta::List(nested) => {
                     // Parse nested serde attributes

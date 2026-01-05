@@ -1,14 +1,12 @@
 use super::{attr::*, lower_attr::lower_attribute, r#struct::decode_field_attrs};
 use crate::{r#type::field::construct_field, utils::*};
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use syn::{DataEnum, Error, Fields, spanned::Spanned};
+use syn::{DataEnum, Fields, spanned::Spanned};
 
 pub fn parse_enum(
-    enum_attrs: &EnumAttr,
     container_attrs: &ContainerAttr,
     data: &DataEnum,
-    // lowered_attrs: &Vec<TokenStream>,
 ) -> syn::Result<(TokenStream, TokenStream)> {
     if container_attrs.transparent {
         return Err(syn::Error::new(
@@ -111,63 +109,6 @@ pub fn parse_enum(
                 Ok(quote!((#variant_name_str.into(), internal::construct::enum_variant(#skip, #deprecated, #doc.into(), #inner, vec![#(#lowered_variant_attrs),*]))))
             })
             .collect::<syn::Result<Vec<_>>>()?;
-
-    let (can_flatten, repr) = {
-        match (enum_attrs.untagged, &enum_attrs.tag, &enum_attrs.content) {
-            (None, None, None) => (
-                // TODO: We treat the default being externally tagged but that is a bad assumption.
-                // Fix this with: https://github.com/specta-rs/specta/issues/384
-                data.variants.iter().any(|v| match &v.fields {
-                    Fields::Unnamed(f) if f.unnamed.len() == 1 => true,
-                    Fields::Named(_) => true,
-                    _ => false,
-                }),
-                quote!(None),
-            ),
-            (Some(false), None, None) => (
-                data.variants.iter().any(|v| match &v.fields {
-                    Fields::Unnamed(f) if f.unnamed.len() == 1 => true,
-                    Fields::Named(_) => true,
-                    _ => false,
-                }),
-                quote!(Some(datatype::EnumRepr::External)),
-            ),
-            (Some(false) | None, Some(tag), None) => (
-                data.variants
-                    .iter()
-                    .any(|v| matches!(&v.fields, Fields::Unit | Fields::Named(_))),
-                quote!(Some(datatype::EnumRepr::Internal { tag: #tag.into() })),
-            ),
-            (Some(false) | None, Some(tag), Some(content)) => (
-                true,
-                quote!(Some(datatype::EnumRepr::Adjacent { tag: #tag.into(), content: #content.into() })),
-            ),
-            (Some(true), None, None) => (
-                data.variants
-                    .iter()
-                    .any(|v| matches!(&v.fields, Fields::Unit | Fields::Named(_))),
-                quote!(Some(datatype::EnumRepr::Untagged)),
-            ),
-            (Some(true), Some(_), None) => {
-                return Err(Error::new(
-                    Span::call_site(),
-                    "untagged cannot be used with tag",
-                ));
-            }
-            (Some(true), _, Some(_)) => {
-                return Err(Error::new(
-                    Span::call_site(),
-                    "untagged cannot be used with content",
-                ));
-            }
-            (Some(false) | None, None, Some(_)) => {
-                return Err(Error::new(
-                    Span::call_site(),
-                    "content cannot be used without tag",
-                ));
-            }
-        }
-    };
 
     Ok((
         quote!(Enum),

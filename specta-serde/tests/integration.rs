@@ -364,3 +364,108 @@ mod derive_tests {
         assert_eq!(de_types.len(), 1);
     }
 }
+
+#[test]
+fn test_untagged_enum_path_attribute() {
+    use specta::datatype::RuntimeNestedMeta;
+
+    // Test that #[serde(untagged)] is properly captured with path name
+    // This test verifies the fix for RuntimeMeta::Path now including the path string
+    let untagged_attr = RuntimeAttribute {
+        path: "serde".to_string(),
+        kind: RuntimeMeta::List(vec![RuntimeNestedMeta::Meta(RuntimeMeta::Path(
+            "untagged".to_string(),
+        ))]),
+    };
+
+    // Use unit variants for simplicity
+    let variant1 = specta::datatype::EnumVariant::unit();
+    let variant2 = specta::datatype::EnumVariant::unit();
+
+    let enum_dt = DataType::Enum(internal::construct::r#enum(
+        vec![
+            ("StringVariant".into(), variant1),
+            ("NumberVariant".into(), variant2),
+        ],
+        vec![untagged_attr],
+    ));
+
+    // Transform for serialization - should recognize untagged attribute
+    let ser_result = apply_serde_transformations(&enum_dt, SerdeMode::Serialize);
+    assert!(
+        ser_result.is_ok(),
+        "Failed to transform untagged enum for serialization"
+    );
+
+    // Transform for deserialization
+    let de_result = apply_serde_transformations(&enum_dt, SerdeMode::Deserialize);
+    assert!(
+        de_result.is_ok(),
+        "Failed to transform untagged enum for deserialization"
+    );
+}
+
+#[test]
+fn test_skip_path_attribute() {
+    use specta::datatype::RuntimeNestedMeta;
+
+    // Test that #[serde(skip)] path attribute is properly handled
+    let skip_attr = RuntimeAttribute {
+        path: "serde".to_string(),
+        kind: RuntimeMeta::List(vec![RuntimeNestedMeta::Meta(RuntimeMeta::Path(
+            "skip".to_string(),
+        ))]),
+    };
+
+    let field1 = Field::new(DataType::Primitive(Primitive::String));
+    let mut field2 = Field::new(DataType::Primitive(Primitive::u32));
+    field2.set_attributes(vec![skip_attr]);
+
+    let fields = internal::construct::fields_named(
+        vec![
+            ("visible_field".into(), field1),
+            ("skipped_field".into(), field2),
+        ],
+        vec![],
+    );
+
+    let struct_dt = DataType::Struct(internal::construct::r#struct(fields, vec![]));
+
+    // Transform for serialization - skipped field should be excluded
+    let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
+    assert!(
+        ser_result.is_ok(),
+        "Failed to transform struct with skip attribute"
+    );
+}
+
+#[test]
+fn test_flatten_path_attribute() {
+    use specta::datatype::RuntimeNestedMeta;
+
+    // Test that #[serde(flatten)] path attribute is properly handled
+    let flatten_attr = RuntimeAttribute {
+        path: "serde".to_string(),
+        kind: RuntimeMeta::List(vec![RuntimeNestedMeta::Meta(RuntimeMeta::Path(
+            "flatten".to_string(),
+        ))]),
+    };
+
+    let field1 = Field::new(DataType::Primitive(Primitive::String));
+    let mut field2 = Field::new(DataType::Primitive(Primitive::u32));
+    field2.set_attributes(vec![flatten_attr]);
+
+    let fields = internal::construct::fields_named(
+        vec![("name".into(), field1), ("metadata".into(), field2)],
+        vec![],
+    );
+
+    let struct_dt = DataType::Struct(internal::construct::r#struct(fields, vec![]));
+
+    // Transform for serialization - should recognize flatten attribute
+    let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
+    assert!(
+        ser_result.is_ok(),
+        "Failed to transform struct with flatten attribute"
+    );
+}

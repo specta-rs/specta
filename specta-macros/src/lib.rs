@@ -45,7 +45,7 @@ mod utils;
 ///     VariantThree { name: String, age: i32 },
 /// }
 /// ```
-#[proc_macro_derive(Type, attributes(specta, todo))] // TODO
+#[proc_macro_derive(Type, attributes(specta))]
 pub fn derive_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     r#type::derive(input).unwrap_or_else(|err| err.into_compile_error().into())
 }

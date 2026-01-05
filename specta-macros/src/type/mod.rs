@@ -42,12 +42,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let name = unraw_raw_ident(&format_ident!("{}", raw_ident.to_string())).to_token_stream();
 
-    // Check for enum-specific attributes and parse them
-    let enum_attrs_opt = match data {
-        Data::Enum(_) => Some(EnumAttr::from_attrs(&container_attrs, &mut attrs)?),
-        _ => None,
-    };
-
     // Check for unknown specta attributes after all parsing is done
     if let Some(attr) = attrs.iter().find(|attr| attr.key == "specta") {
         match &attr.value {
@@ -75,7 +69,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let (dt_type, dt_impl) = match data {
         Data::Struct(data) => parse_struct(&container_attrs, &crate_ref, data),
-        Data::Enum(data) => parse_enum(enum_attrs_opt.as_ref().unwrap(), &container_attrs, data),
+        Data::Enum(data) => parse_enum(&container_attrs, data),
         Data::Union(data) => Err(syn::Error::new_spanned(
             data.union_token,
             "specta: Union types are not supported by Specta yet!",
@@ -123,13 +117,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let bounds = generics_with_ident_and_bounds_only(generics);
     let type_args = generics_with_ident_only(generics);
     let where_bound = add_type_to_where_clause(&quote!(#crate_ref::Type), generics);
-
-    // let flatten_impl = can_flatten.then(|| {
-    //     quote! {
-    //         #[automatically_derived]
-    //         impl #bounds #crate_ref::Flatten for #ident #type_args #where_bound {}
-    //     }
-    // });
 
     let shadow_generics = {
         let g = generics.params.iter().map(|param| match param {

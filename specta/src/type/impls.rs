@@ -59,7 +59,6 @@ impl<'a, T: ?Sized + ToOwned + Type + 'static> Type for std::borrow::Cow<'a, T> 
     impl_passthrough!(T);
 }
 
-use std::cell::Ref;
 use std::ffi::*;
 impl_as!(
     str as String
@@ -199,94 +198,79 @@ impl<T: Type> Type for std::ops::Range<T> {
     }
 }
 
-impl<T: Type> Flatten for std::ops::Range<T> {}
-
 impl<T: Type> Type for std::ops::RangeInclusive<T> {
     impl_passthrough!(std::ops::Range<T>); // Yeah Serde are cringe
 }
 
-impl<T: Type> Flatten for std::ops::RangeInclusive<T> {}
-
 impl_for_map!(HashMap<K, V> as "HashMap");
 impl_for_map!(BTreeMap<K, V> as "BTreeMap");
-impl<K: Type, V: Type> Flatten for std::collections::HashMap<K, V> {}
-impl<K: Type, V: Type> Flatten for std::collections::BTreeMap<K, V> {}
 
-const _: () = {
-    impl Type for std::time::SystemTime {
-        fn definition(types: &mut TypeCollection) -> DataType {
-            DataType::Struct(internal::construct::r#struct(
-                internal::construct::fields_named(
-                    vec![
-                        (
-                            "duration_since_epoch".into(),
-                            internal::construct::field::<i64>(
-                                false,
-                                false,
-                                None,
-                                "".into(),
-                                types,
-                                Vec::new(),
-                            ),
+impl Type for std::time::SystemTime {
+    fn definition(types: &mut TypeCollection) -> DataType {
+        DataType::Struct(internal::construct::r#struct(
+            internal::construct::fields_named(
+                vec![
+                    (
+                        "duration_since_epoch".into(),
+                        internal::construct::field::<i64>(
+                            false,
+                            false,
+                            None,
+                            "".into(),
+                            types,
+                            Vec::new(),
                         ),
-                        (
-                            "duration_since_unix_epoch".into(),
-                            internal::construct::field::<u32>(
-                                false,
-                                false,
-                                None,
-                                "".into(),
-                                types,
-                                Vec::new(),
-                            ),
+                    ),
+                    (
+                        "duration_since_unix_epoch".into(),
+                        internal::construct::field::<u32>(
+                            false,
+                            false,
+                            None,
+                            "".into(),
+                            types,
+                            Vec::new(),
                         ),
-                    ],
-                    vec![],
-                ),
+                    ),
+                ],
                 vec![],
-            ))
-        }
+            ),
+            vec![],
+        ))
     }
+}
 
-    #[automatically_derived]
-    impl Flatten for std::time::SystemTime {}
-};
-
-const _: () = {
-    impl Type for std::time::Duration {
-        fn definition(types: &mut TypeCollection) -> DataType {
-            DataType::Struct(internal::construct::r#struct(
-                internal::construct::fields_named(
-                    vec![
-                        (
-                            "secs".into(),
-                            internal::construct::field::<u64>(
-                                false,
-                                false,
-                                None,
-                                "".into(),
-                                types,
-                                Vec::new(),
-                            ),
+impl Type for std::time::Duration {
+    fn definition(types: &mut TypeCollection) -> DataType {
+        DataType::Struct(internal::construct::r#struct(
+            internal::construct::fields_named(
+                vec![
+                    (
+                        "secs".into(),
+                        internal::construct::field::<u64>(
+                            false,
+                            false,
+                            None,
+                            "".into(),
+                            types,
+                            Vec::new(),
                         ),
-                        (
-                            "nanos".into(),
-                            internal::construct::field::<u32>(
-                                false,
-                                false,
-                                None,
-                                "".into(),
-                                types,
-                                Vec::new(),
-                            ),
+                    ),
+                    (
+                        "nanos".into(),
+                        internal::construct::field::<u32>(
+                            false,
+                            false,
+                            None,
+                            "".into(),
+                            types,
+                            Vec::new(),
                         ),
-                    ],
-                    vec![],
-                ),
+                    ),
+                ],
                 vec![],
-            ))
-        }
+            ),
+            vec![],
+        ))
     }
-
-    impl Flatten for std::time::Duration {}
-};
+}

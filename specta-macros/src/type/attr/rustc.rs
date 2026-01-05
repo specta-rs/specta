@@ -1,11 +1,10 @@
 use std::borrow::Cow;
 
 use quote::quote;
-use syn::{Lit, Result};
+use syn::Result;
 
-use crate::utils::{Attribute, AttributeValue};
+use crate::utils::Attribute;
 
-#[derive(Clone)]
 pub enum DeprecatedType {
     Deprecated,
     DeprecatedWithSince {
@@ -14,7 +13,7 @@ pub enum DeprecatedType {
     },
 }
 
-#[derive(Default, Clone)]
+#[derive(Default)]
 pub struct RustCAttr {
     pub doc: String,
     pub deprecated: Option<DeprecatedType>,

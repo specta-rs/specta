@@ -10,7 +10,7 @@ pub struct RuntimeAttributeIR {
 }
 
 pub enum RuntimeMetaIR {
-    Path,
+    Path(String),
     NameValue {
         key: String,
         value: RuntimeLiteralIR,
@@ -91,7 +91,8 @@ fn parse_nested_meta_items(list: &syn::MetaList) -> syn::Result<Vec<RuntimeNeste
 
         // Check if it's a path-only meta (like `untagged`)
         if meta.input.is_empty() {
-            items.push(RuntimeNestedMetaIR::Meta(RuntimeMetaIR::Path));
+            let path_str = meta.path.to_token_stream().to_string();
+            items.push(RuntimeNestedMetaIR::Meta(RuntimeMetaIR::Path(path_str)));
             return Ok(());
         }
 
@@ -109,8 +110,9 @@ fn parse_nested_meta_items(list: &syn::MetaList) -> syn::Result<Vec<RuntimeNeste
                     _ => return Err(syn::Error::new_spanned(lit, "unsupported literal")),
                 };
 
+                let path_str = meta.path.to_token_stream().to_string();
                 items.push(RuntimeNestedMetaIR::Meta(RuntimeMetaIR::NameValue {
-                    key: meta.path.to_token_stream().to_string(),
+                    key: path_str,
                     value: runtime_lit,
                 }));
             } else {
@@ -118,9 +120,10 @@ fn parse_nested_meta_items(list: &syn::MetaList) -> syn::Result<Vec<RuntimeNeste
                 // This handles complex expressions like `remote = Value` or `crate = crate`
                 let tokens: proc_macro2::TokenStream = value_stream.parse()?;
                 let value_str = tokens.to_string();
+                let path_str = meta.path.to_token_stream().to_string();
 
                 items.push(RuntimeNestedMetaIR::Meta(RuntimeMetaIR::NameValue {
-                    key: meta.path.to_token_stream().to_string(),
+                    key: path_str,
                     value: RuntimeLiteralIR::Str(value_str),
                 }));
             }
@@ -146,7 +149,8 @@ fn parse_nested_meta_items(list: &syn::MetaList) -> syn::Result<Vec<RuntimeNeste
         }
 
         // Default case: treat as path
-        items.push(RuntimeNestedMetaIR::Meta(RuntimeMetaIR::Path));
+        let path_str = meta.path.to_token_stream().to_string();
+        items.push(RuntimeNestedMetaIR::Meta(RuntimeMetaIR::Path(path_str)));
         Ok(())
     })?;
 
@@ -157,7 +161,10 @@ fn parse_nested_meta_items(list: &syn::MetaList) -> syn::Result<Vec<RuntimeNeste
 /// Updated for syn 2.0 - Meta structure is the same but NestedMeta parsing changed.
 fn lower_meta(meta: &syn::Meta) -> syn::Result<RuntimeMetaIR> {
     Ok(match meta {
-        syn::Meta::Path(_) => RuntimeMetaIR::Path,
+        syn::Meta::Path(path) => {
+            let path_str = path.to_token_stream().to_string();
+            RuntimeMetaIR::Path(path_str)
+        }
 
         syn::Meta::NameValue(nv) => RuntimeMetaIR::NameValue {
             key: nv.path.to_token_stream().to_string(),
@@ -211,7 +218,9 @@ impl RuntimeNestedMetaIR {
 impl RuntimeMetaIR {
     pub fn to_tokens(&self) -> proc_macro2::TokenStream {
         match self {
-            RuntimeMetaIR::Path => quote::quote!(datatype::RuntimeMeta::Path),
+            RuntimeMetaIR::Path(path) => {
+                quote::quote!(datatype::RuntimeMeta::Path(String::from(#path)))
+            }
 
             RuntimeMetaIR::NameValue { key, value } => {
                 let value = value.to_tokens();

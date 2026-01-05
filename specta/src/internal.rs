@@ -17,7 +17,7 @@ use crate::datatype::{DataType, Field};
 pub mod construct {
     use std::borrow::Cow;
 
-    use crate::{Flatten, Type, TypeCollection, datatype::*};
+    use crate::{Type, TypeCollection, datatype::*};
 
     pub fn skipped_field(
         optional: bool,
@@ -38,7 +38,7 @@ pub mod construct {
         }
     }
 
-    pub fn field_flattened<T: Type + Flatten>(
+    pub fn field_flattened<T: Type>(
         optional: bool,
         inline: bool,
         deprecated: Option<DeprecatedType>,

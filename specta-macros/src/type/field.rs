@@ -77,7 +77,11 @@ fn convert_attrs_to_runtime_attrs(raw_attrs: &[Attribute]) -> TokenStream {
                     }
                 }
                 None => {
-                    quote! { datatype::RuntimeMeta::Path }
+                    // Note: This is a simplified representation.
+                    // For proper attribute handling, use the syn-based lower_attr.rs implementation.
+                    // This case represents a path-only attribute like #[serde] with no arguments.
+                    let path_name = path.clone();
+                    quote! { datatype::RuntimeMeta::Path(#path_name.to_string()) }
                 }
             };
 
