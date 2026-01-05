@@ -88,7 +88,7 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
     let arg_signatures = function.sig.inputs.iter().map(|_| quote!(_));
 
     let mut attrs = parse_attrs(&function.attrs)?;
-    let common = crate::r#type::attr::CommonAttr::from_attrs(&mut attrs)?;
+    let common = crate::r#type::attr::RustCAttr::from_attrs(&mut attrs)?;
 
     let deprecated = common.deprecated_as_tokens();
     let docs = common.doc;

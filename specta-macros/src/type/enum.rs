@@ -1,4 +1,4 @@
-use super::{attr::*, r#struct::decode_field_attrs, lower_attribute};
+use super::{attr::*, r#struct::decode_field_attrs};
 use crate::{r#type::field::construct_field, utils::*};
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
@@ -7,10 +7,9 @@ use syn::{DataEnum, Error, Fields, spanned::Spanned};
 pub fn parse_enum(
     enum_attrs: &EnumAttr,
     container_attrs: &ContainerAttr,
-    crate_ref: &TokenStream,
     data: &DataEnum,
-    lowered_attrs: &Vec<TokenStream>,
-) -> syn::Result<(TokenStream, bool)> {
+    // lowered_attrs: &Vec<TokenStream>,
+) -> syn::Result<(TokenStream, TokenStream)> {
     if container_attrs.transparent {
         return Err(syn::Error::new(
             data.enum_token.span(),
@@ -29,22 +28,23 @@ pub fn parse_enum(
 
                 // The expectation is that when an attribute is processed it will be removed so if any are left over we know they are invalid
                 // but we only throw errors for Specta-specific attributes so we don't continually break other attributes.
-                if let Some(attrs) = attrs.iter().find(|attr| attr.key == "specta") {
-                    match &attrs.value {
-                        Some(AttributeValue::Attribute { attr, .. }) => {
-                            if let Some(attr) = attr.first() {
-                                return Err(syn::Error::new(
-                                    attr.key.span(),
-                                    format!(
-                                        "specta: Found unsupported enum attribute '{}'",
-                                        attr.key
-                                    ),
-                                ));
-                            }
-                        }
-                        _ => todo!(),
-                    }
-                }
+                // TODO: Fix this?
+                // if let Some(attrs) = attrs.iter().find(|attr| attr.key == "specta") {
+                //     match &attrs.value {
+                //         Some(AttributeValue::Attribute { attr, .. }) => {
+                //             if let Some(attr) = attr.first() {
+                //                 return Err(syn::Error::new(
+                //                     attr.key.span(),
+                //                     format!(
+                //                         "specta: Found unsupported enum attribute '{}'",
+                //                         attr.key
+                //                     ),
+                //                 ));
+                //             }
+                //         }
+                //         _ => todo!(),
+                //     }
+                // }
 
                 // Lower the variant attributes to RuntimeAttribute tokens
                 let lowered_variant_attrs = v.attrs
@@ -234,12 +234,7 @@ pub fn parse_enum(
     };
 
     Ok((
-        quote!(datatype::DataType::Enum({
-            let mut e = datatype::Enum::new();
-            *e.variants_mut() = vec![#(#variant_types),*];
-            *e.attributes_mut() = vec![#(#lowered_attrs),*];
-            e
-        })),
-        can_flatten,
+        quote!(Enum),
+        quote!(*e.variants_mut() = vec![#(#variant_types),*];),
     ))
 }

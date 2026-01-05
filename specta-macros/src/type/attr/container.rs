@@ -4,18 +4,18 @@ use syn::Result;
 
 use crate::utils::{Attribute, Inflection, impl_parse};
 
-use super::CommonAttr;
+use super::RustCAttr;
 
 #[derive(Default, Clone)]
 pub struct ContainerAttr {
-    pub rename_all: Option<Inflection>,
-    pub rename: Option<TokenStream>,
-    pub tag: Option<String>,
+    // pub rename_all: Option<Inflection>,
+    // pub rename: Option<TokenStream>,
+    // pub tag: Option<String>,
     pub crate_name: Option<TokenStream>,
     pub inline: bool,
     pub remote: Option<TokenStream>,
     pub collect: Option<bool>,
-    pub common: CommonAttr,
+    pub common: RustCAttr,
 
     // Struct only (we pass it anyway so enums get nice errors)
     pub transparent: bool,
@@ -51,7 +51,7 @@ impl_parse! {
 impl ContainerAttr {
     pub fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
         let mut result = Self::default();
-        result.common = CommonAttr::from_attrs(attrs)?;
+        result.common = RustCAttr::from_attrs(attrs)?;
         Self::try_from_attrs("specta", attrs, &mut result)?;
         Self::try_from_attrs("serde", attrs, &mut result)?;
         Self::try_from_attrs("repr", attrs, &mut result)?; // To handle `#[repr(transparent)]`

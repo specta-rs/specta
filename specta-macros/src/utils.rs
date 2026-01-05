@@ -163,15 +163,15 @@ pub fn parse_attrs(attrs: &[syn::Attribute]) -> syn::Result<Vec<Attribute>> {
             .clone()
             .ident;
 
-        // TODO: We should somehow build this up from the macro output automatically -> if not our attribute parser is applied to stuff like `allow` and that's bad.
-        if !(ident == "specta"
-            // || ident == "serde"
-            || ident == "doc"
-            || ident == "repr"
-            || ident == "deprecated")
-        {
-            continue;
-        }
+        // // TODO: We should somehow build this up from the macro output automatically -> if not our attribute parser is applied to stuff like `allow` and that's bad.
+        // if !(ident == "specta"
+        //     // || ident == "serde"
+        //     || ident == "doc"
+        //     || ident == "repr"
+        //     || ident == "deprecated")
+        // {
+        //     continue;
+        // }
 
         result.append(&mut match &attr.meta {
             Meta::Path(_) => vec![Attribute {
@@ -253,35 +253,6 @@ pub fn unraw_raw_ident(ident: &Ident) -> String {
         ident.trim_start_matches("r#").to_owned()
     } else {
         ident
-    }
-}
-
-#[derive(Copy, Clone)]
-pub enum Inflection {
-    Lower,
-    Upper,
-    Camel,
-    Snake,
-    Pascal,
-    ScreamingSnake,
-    Kebab,
-    ScreamingKebab,
-}
-
-impl Inflection {
-    pub fn apply(self, string: &str) -> String {
-        use inflector::Inflector;
-
-        match self {
-            Inflection::Lower => string.to_lowercase(),
-            Inflection::Upper => string.to_uppercase(),
-            Inflection::Camel => string.to_camel_case(),
-            Inflection::Snake => string.to_snake_case(),
-            Inflection::Pascal => string.to_pascal_case(),
-            Inflection::ScreamingSnake => string.to_screaming_snake_case(),
-            Inflection::Kebab => string.to_kebab_case(),
-            Inflection::ScreamingKebab => string.to_kebab_case().to_uppercase(),
-        }
     }
 }
 

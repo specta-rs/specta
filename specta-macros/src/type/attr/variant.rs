@@ -2,9 +2,9 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::Result;
 
-use crate::utils::{impl_parse, Attribute, Inflection};
+use crate::utils::{Attribute, Inflection, impl_parse};
 
-use super::CommonAttr;
+use super::RustCAttr;
 
 #[derive(Default)]
 pub struct VariantAttr {
@@ -12,7 +12,7 @@ pub struct VariantAttr {
     pub rename: Option<TokenStream>,
     pub skip: bool,
     pub inline: bool,
-    pub common: CommonAttr,
+    pub common: RustCAttr,
 }
 
 impl_parse! {
@@ -29,7 +29,7 @@ impl_parse! {
 impl VariantAttr {
     pub fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
         let mut result = Self::default();
-        result.common = CommonAttr::from_attrs(attrs)?;
+        result.common = RustCAttr::from_attrs(attrs)?;
         Self::try_from_attrs("specta", attrs, &mut result)?;
         Self::try_from_attrs("serde", attrs, &mut result)?;
         Ok(result)
