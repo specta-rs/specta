@@ -16,13 +16,8 @@ use specta::{
 };
 
 use crate::{
-    legacy::js_doc,
+    BigIntExportBehavior, Error, JSDoc, Layout, Typescript, legacy::js_doc,
     typescript::root_alias_ident,
-    BigIntExportBehavior,
-    Error,
-    JSDoc,
-    Layout,
-    Typescript,
 };
 
 /// Generate an `export Type = ...` Typescript string for a specific [`NamedDataType`].
@@ -217,7 +212,7 @@ fn inline_datatype(
                     path: vec![],
                     is_export,
                 },
-                &specta::datatype::FunctionReturnType::Value(l.ty().clone()),
+                l.ty(),
                 types,
                 &mut dt_str,
             )?;
@@ -325,7 +320,7 @@ pub(crate) fn datatype(
                     path: vec![],
                     is_export,
                 },
-                &specta::datatype::FunctionReturnType::Value((**def).clone()),
+                def,
                 types,
                 s,
             )?;
@@ -409,7 +404,7 @@ fn list_dt(
                 path: vec![],
                 is_export,
             },
-            &specta::datatype::FunctionReturnType::Value(l.ty().clone()),
+            l.ty(),
             types,
             &mut dt,
         )?;
@@ -516,7 +511,7 @@ fn map_dt(
                 path: vec![],
                 is_export: true,
             },
-            &specta::datatype::FunctionReturnType::Value(m.key_ty().clone()),
+            m.key_ty(),
             types,
             s,
         )?;
@@ -527,7 +522,7 @@ fn map_dt(
                 path: vec![],
                 is_export,
             },
-            &specta::datatype::FunctionReturnType::Value(m.value_ty().clone()),
+            m.value_ty(),
             types,
             s,
         )?;
@@ -1101,7 +1096,7 @@ fn reference_dt(
                         path: vec![],
                         is_export,
                     },
-                    &specta::datatype::FunctionReturnType::Value(v.clone()),
+                    &v,
                     types,
                     s,
                 )?;

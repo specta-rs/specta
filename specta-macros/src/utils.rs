@@ -1,11 +1,11 @@
 use proc_macro2::Span;
 use quote::ToTokens;
 use syn::{
+    Ident, Lit, Meta, Path, Result, Token,
     ext::IdentExt,
     parse::{Parse, ParseStream},
     spanned::Spanned,
     token::Paren,
-    Ident, Lit, Meta, Path, Result, Token,
 };
 
 #[derive(Clone)]
@@ -101,7 +101,7 @@ impl Attribute {
                     return Err(syn::Error::new_spanned(
                         lit,
                         "specta: found string literal containing an unsupported inflection",
-                    ))
+                    ));
                 }
             }),
             _ => Err(syn::Error::new(
@@ -283,9 +283,4 @@ impl Inflection {
             Inflection::ScreamingKebab => string.to_kebab_case().to_uppercase(),
         }
     }
-}
-
-#[cfg(feature = "DO_NOT_USE_function")]
-pub fn format_fn_wrapper(function: &Ident) -> Ident {
-    quote::format_ident!("__specta__fn__{}", function)
 }

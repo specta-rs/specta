@@ -6,9 +6,6 @@
 
 use std::borrow::Cow;
 
-#[cfg(feature = "function")]
-pub use paste::paste;
-
 use crate::datatype::{DataType, Field};
 
 /// Functions used to construct `crate::datatype` types (they have private fields so can't be constructed directly).
@@ -136,38 +133,6 @@ pub fn skip_fields_named<'a>(
         .into_iter()
         .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
 }
-
-#[cfg(feature = "function")]
-mod functions {
-    use super::*;
-    use crate::{TypeCollection, datatype::DeprecatedType, datatype::Function, function::SpectaFn};
-
-    #[doc(hidden)]
-    /// A helper for exporting a command to a [`CommandDataType`].
-    /// You shouldn't use this directly and instead should use [`fn_datatype!`](crate::fn_datatype).
-    pub fn get_fn_datatype<TMarker, T: SpectaFn<TMarker>>(
-        _: T,
-        asyncness: bool,
-        name: Cow<'static, str>,
-        types: &mut TypeCollection,
-        fields: &[Cow<'static, str>],
-        docs: Cow<'static, str>,
-        deprecated: Option<DeprecatedType>,
-        no_return_type: bool,
-    ) -> Function {
-        T::to_datatype(
-            asyncness,
-            name,
-            types,
-            fields,
-            docs,
-            deprecated,
-            no_return_type,
-        )
-    }
-}
-#[cfg(feature = "function")]
-pub use functions::*;
 
 // TODO: Maybe make this a public utility?
 // TODO: Should this be in the core or in `specta-serde`?

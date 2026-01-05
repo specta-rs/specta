@@ -2,7 +2,6 @@
 
 mod r#enum;
 mod fields;
-mod function;
 mod generic;
 mod list;
 mod map;
@@ -14,7 +13,6 @@ mod tuple;
 
 pub use r#enum::{Enum, EnumRepr, EnumVariant};
 pub use fields::{Field, Fields, NamedFields, UnnamedFields};
-pub use function::{Function, FunctionReturnType};
 pub use generic::{ConstGenericPlaceholder, Generic, GenericPlaceholder};
 pub use list::List;
 pub use map::Map;
