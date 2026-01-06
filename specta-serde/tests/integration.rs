@@ -4,10 +4,9 @@
 //! works correctly with real DataType structures.
 
 use specta::datatype::{RuntimeAttribute, RuntimeLiteral, RuntimeMeta};
-use specta::internal;
 use specta::{
     DataType, TypeCollection,
-    datatype::{Field, Primitive},
+    datatype::{Field, Primitive, Struct},
 };
 use specta_serde::{
     SerdeMode, apply_serde_transformations, process_for_deserialization, process_for_serialization,
@@ -17,10 +16,7 @@ use specta_serde::{
 fn test_basic_transformation() {
     // Create a simple struct DataType
     let field = Field::new(DataType::Primitive(Primitive::String));
-    let fields = internal::construct::fields_named(vec![("user_name".into(), field)], vec![]);
-    let mut s = specta::datatype::Struct::new();
-    s.set_fields(fields);
-    let struct_dt = DataType::Struct(s);
+    let struct_dt = Struct::named().field("user_name", field).build();
 
     // Transform for serialization
     let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
@@ -45,13 +41,14 @@ fn test_rename_all_transformation() {
     let field1 = Field::new(DataType::Primitive(Primitive::String));
     let field2 = Field::new(DataType::Primitive(Primitive::u32));
 
-    let fields = internal::construct::fields_named(
-        vec![("first_name".into(), field1), ("user_id".into(), field2)],
-        vec![],
-    );
-
-    let mut s = specta::datatype::Struct::new();
-    s.set_fields(fields);
+    let mut s = match Struct::named()
+        .field("first_name", field1)
+        .field("user_id", field2)
+        .build()
+    {
+        DataType::Struct(s) => s,
+        _ => unreachable!(),
+    };
     s.set_attributes(vec![serde_attr]);
     let struct_dt = DataType::Struct(s);
 
@@ -70,17 +67,10 @@ fn test_skip_serializing() {
     let field_with_skip = Field::new(DataType::Primitive(Primitive::String));
     let normal_field = Field::new(DataType::Primitive(Primitive::u32));
 
-    let fields = internal::construct::fields_named(
-        vec![
-            ("secret".into(), field_with_skip),
-            ("public_id".into(), normal_field),
-        ],
-        vec![],
-    );
-
-    let mut s = specta::datatype::Struct::new();
-    s.set_fields(fields);
-    let struct_dt = DataType::Struct(s);
+    let struct_dt = Struct::named()
+        .field("secret", field_with_skip)
+        .field("public_id", normal_field)
+        .build();
 
     // Test serialization mode
     let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
@@ -149,10 +139,11 @@ fn test_transparent_struct() {
     };
 
     let inner_field = Field::new(DataType::Primitive(Primitive::u64));
-    let fields = internal::construct::fields_unnamed(vec![inner_field], vec![]);
 
-    let mut s = specta::datatype::Struct::new();
-    s.set_fields(fields);
+    let mut s = match Struct::unnamed().field(inner_field).build() {
+        DataType::Struct(s) => s,
+        _ => unreachable!(),
+    };
     s.set_attributes(vec![transparent_attr]);
     let struct_dt = DataType::Struct(s);
 
@@ -194,10 +185,7 @@ fn test_type_collection_processing() {
 fn test_nested_type_transformation() {
     // Create nested types - List of structs
     let field = Field::new(DataType::Primitive(Primitive::String));
-    let fields = internal::construct::fields_named(vec![("name".into(), field)], vec![]);
-    let mut s = specta::datatype::Struct::new();
-    s.set_fields(fields);
-    let inner_struct = DataType::Struct(s);
+    let inner_struct = Struct::named().field("name", field).build();
     let list_type = DataType::List(specta::datatype::List::new(inner_struct));
 
     // Transform the nested type
@@ -254,19 +242,12 @@ fn test_field_level_skip_attributes() {
 
     let normal_field = Field::new(DataType::Primitive(Primitive::bool));
 
-    let fields = internal::construct::fields_named(
-        vec![
-            ("skip_both".into(), field_skip),
-            ("skip_ser_only".into(), field_skip_ser),
-            ("skip_de_only".into(), field_skip_de),
-            ("normal".into(), normal_field),
-        ],
-        vec![],
-    );
-
-    let mut s = specta::datatype::Struct::new();
-    s.set_fields(fields);
-    let struct_dt = DataType::Struct(s);
+    let struct_dt = Struct::named()
+        .field("skip_both", field_skip)
+        .field("skip_ser_only", field_skip_ser)
+        .field("skip_de_only", field_skip_de)
+        .field("normal", normal_field)
+        .build();
 
     // Transform for serialization - should skip 'skip_both' and 'skip_ser_only' fields
     let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
@@ -291,17 +272,10 @@ fn test_field_level_rename_attributes() {
 
     let normal_field = Field::new(DataType::Primitive(Primitive::u32));
 
-    let fields = internal::construct::fields_named(
-        vec![
-            ("original_name".into(), field_renamed),
-            ("id".into(), normal_field),
-        ],
-        vec![],
-    );
-
-    let mut s = specta::datatype::Struct::new();
-    s.set_fields(fields);
-    let struct_dt = DataType::Struct(s);
+    let struct_dt = Struct::named()
+        .field("original_name", field_renamed)
+        .field("id", normal_field)
+        .build();
 
     // Transform for serialization
     let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
@@ -433,17 +407,10 @@ fn test_skip_path_attribute() {
     let mut field2 = Field::new(DataType::Primitive(Primitive::u32));
     field2.set_attributes(vec![skip_attr]);
 
-    let fields = internal::construct::fields_named(
-        vec![
-            ("visible_field".into(), field1),
-            ("skipped_field".into(), field2),
-        ],
-        vec![],
-    );
-
-    let mut s = specta::datatype::Struct::new();
-    s.set_fields(fields);
-    let struct_dt = DataType::Struct(s);
+    let struct_dt = Struct::named()
+        .field("visible_field", field1)
+        .field("skipped_field", field2)
+        .build();
 
     // Transform for serialization - skipped field should be excluded
     let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
@@ -469,14 +436,10 @@ fn test_flatten_path_attribute() {
     let mut field2 = Field::new(DataType::Primitive(Primitive::u32));
     field2.set_attributes(vec![flatten_attr]);
 
-    let fields = internal::construct::fields_named(
-        vec![("name".into(), field1), ("metadata".into(), field2)],
-        vec![],
-    );
-
-    let mut s = specta::datatype::Struct::new();
-    s.set_fields(fields);
-    let struct_dt = DataType::Struct(s);
+    let struct_dt = Struct::named()
+        .field("name", field1)
+        .field("metadata", field2)
+        .build();
 
     // Transform for serialization - should recognize flatten attribute
     let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
@@ -500,13 +463,14 @@ fn test_both_mode_with_common_attributes() {
     let field1 = Field::new(DataType::Primitive(Primitive::String));
     let field2 = Field::new(DataType::Primitive(Primitive::u32));
 
-    let fields = internal::construct::fields_named(
-        vec![("first_name".into(), field1), ("user_id".into(), field2)],
-        vec![],
-    );
-
-    let mut s = specta::datatype::Struct::new();
-    s.set_fields(fields);
+    let mut s = match Struct::named()
+        .field("first_name", field1)
+        .field("user_id", field2)
+        .build()
+    {
+        DataType::Struct(s) => s,
+        _ => unreachable!(),
+    };
     s.set_attributes(vec![serde_attr]);
     let struct_dt = DataType::Struct(s);
 
@@ -552,14 +516,10 @@ fn test_both_mode_skip_behavior() {
 
     let field2 = Field::new(DataType::Primitive(Primitive::u32));
 
-    let fields = internal::construct::fields_named(
-        vec![("name".into(), field1), ("id".into(), field2)],
-        vec![],
-    );
-
-    let mut s = specta::datatype::Struct::new();
-    s.set_fields(fields);
-    let struct_dt = DataType::Struct(s);
+    let struct_dt = Struct::named()
+        .field("name", field1)
+        .field("id", field2)
+        .build();
 
     // Transform with Serialize mode - should skip the field
     let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
@@ -607,14 +567,10 @@ fn test_both_mode_with_universal_skip() {
 
     let field2 = Field::new(DataType::Primitive(Primitive::u32));
 
-    let fields = internal::construct::fields_named(
-        vec![("name".into(), field1), ("id".into(), field2)],
-        vec![],
-    );
-
-    let mut s = specta::datatype::Struct::new();
-    s.set_fields(fields);
-    let struct_dt = DataType::Struct(s);
+    let struct_dt = Struct::named()
+        .field("name", field1)
+        .field("id", field2)
+        .build();
 
     // Transform with Both mode - should skip the field (universal skip)
     let both_result = apply_serde_transformations(&struct_dt, SerdeMode::Both);

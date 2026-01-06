@@ -1266,9 +1266,10 @@ mod tests {
         };
 
         let field = specta::datatype::Field::new(DataType::Primitive(Primitive::String));
-        let fields = specta::internal::construct::fields_unnamed(vec![field], vec![]);
-        let mut struct_dt = Struct::new();
-        struct_dt.set_fields(fields);
+        let mut struct_dt = match Struct::unnamed().field(field).build() {
+            DataType::Struct(s) => s,
+            _ => unreachable!(),
+        };
         struct_dt.set_attributes(vec![transparent_attr]);
 
         let datatype = DataType::Struct(struct_dt);
