@@ -26,8 +26,14 @@ pub fn parse_enum(
 
             // The expectation is that when an attribute is processed it will be removed so if any are left over we know they are invalid
             // but we only throw errors for Specta-specific attributes so we don't continually break other attributes.
-            if let Some(attr) = attrs.iter().find(|attr| attr.key == "specta") {
+            if let Some(attr) = attrs.iter().find(|attr| attr.source == "specta") {
                 match &attr.value {
+                    None | Some(AttributeValue::Lit(_)) | Some(AttributeValue::Path(_)) => {
+                        return Err(syn::Error::new(
+                            attr.key.span(),
+                            "specta: invalid formatted attribute",
+                        ));
+                    }
                     Some(AttributeValue::Attribute {
                         attr: inner_attrs, ..
                     }) => {
@@ -40,8 +46,6 @@ pub fn parse_enum(
                                 ),
                             ));
                         }
-                    }
-                    _ => {
                         return Err(syn::Error::new(
                             attr.key.span(),
                             "specta: invalid formatted attribute",

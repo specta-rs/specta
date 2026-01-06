@@ -41,11 +41,22 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let name = unraw_raw_ident(&format_ident!("{}", raw_ident.to_string())).to_token_stream();
 
     // Check for unknown specta attributes after all parsing is done
-    if let Some(attr) = attrs.iter().find(|attr| attr.key == "specta") {
+    // Since extract() removes consumed attributes, any remaining ones are unknown
+    if let Some(attr) = attrs.iter().find(|attr| attr.source == "specta") {
+        // Check if it's an invalid formatted attribute (like #[specta] or #[specta = "..."])
         match &attr.value {
+            None
+            | Some(crate::utils::AttributeValue::Lit(_))
+            | Some(crate::utils::AttributeValue::Path(_)) => {
+                return Err(syn::Error::new(
+                    attr.key.span(),
+                    "specta: invalid formatted attribute",
+                ));
+            }
             Some(crate::utils::AttributeValue::Attribute {
                 attr: inner_attrs, ..
             }) => {
+                // If there are nested attributes remaining, report the first one
                 if let Some(inner_attr) = inner_attrs.first() {
                     return Err(syn::Error::new(
                         inner_attr.key.span(),
@@ -55,8 +66,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         ),
                     ));
                 }
-            }
-            _ => {
+                // If the nested list is empty, it's an invalid format
                 return Err(syn::Error::new(
                     attr.key.span(),
                     "specta: invalid formatted attribute",

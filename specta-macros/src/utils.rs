@@ -90,20 +90,93 @@ impl Attribute {
 }
 
 pub trait AttrExtract {
-    fn extract(&self, source: &str, key: &str) -> Option<&Attribute>;
-    fn extract_all(&self, source: &str, key: &str) -> Vec<&Attribute>;
+    fn extract(&mut self, source: &str, key: &str) -> Option<Attribute>;
+    fn extract_all(&mut self, source: &str, key: &str) -> Vec<Attribute>;
 }
 
 impl AttrExtract for Vec<Attribute> {
-    fn extract(&self, source: &str, key: &str) -> Option<&Attribute> {
-        self.iter()
-            .find(|attr| attr.source == source && attr.key == key)
+    fn extract(&mut self, source: &str, key: &str) -> Option<Attribute> {
+        // 1. Check for top-level match (e.g., #[deprecated])
+        if let Some(pos) = self
+            .iter()
+            .position(|attr| attr.source == source && attr.key.to_string() == key)
+        {
+            return Some(self.swap_remove(pos));
+        }
+
+        // 2. Check nested attributes within parent matching source
+        //    e.g., extract("specta", "inline") from #[specta(inline)]
+        //    Structure: Attribute { source: "specta", key: "specta", value: Attribute { key: "inline" } }
+        for i in 0..self.len() {
+            if self[i].source == source && self[i].key.to_string() == source {
+                if let Some(AttributeValue::Attribute {
+                    attr: nested_attrs, ..
+                }) = &mut self[i].value
+                {
+                    if let Some(nested_pos) =
+                        nested_attrs.iter().position(|a| a.key.to_string() == key)
+                    {
+                        let result = nested_attrs.swap_remove(nested_pos);
+
+                        // If parent attribute is now empty, remove it too
+                        if nested_attrs.is_empty() {
+                            self.swap_remove(i);
+                        }
+
+                        return Some(result);
+                    }
+                }
+            }
+        }
+
+        None
     }
 
-    fn extract_all(&self, source: &str, key: &str) -> Vec<&Attribute> {
-        self.iter()
-            .filter(|attr| attr.source == source && attr.key == key)
-            .collect()
+    fn extract_all(&mut self, source: &str, key: &str) -> Vec<Attribute> {
+        let mut result = Vec::new();
+
+        // 1. Extract all top-level matches
+        let mut i = 0;
+        while i < self.len() {
+            if self[i].source == source && self[i].key.to_string() == key {
+                result.push(self.swap_remove(i));
+                // Don't increment i, as swap_remove moved a new element to position i
+            } else {
+                i += 1;
+            }
+        }
+
+        // 2. Extract all nested matches
+        let mut i = 0;
+        while i < self.len() {
+            let mut should_remove_parent = false;
+
+            if self[i].source == source && self[i].key.to_string() == source {
+                if let Some(AttributeValue::Attribute {
+                    attr: nested_attrs, ..
+                }) = &mut self[i].value
+                {
+                    let mut j = 0;
+                    while j < nested_attrs.len() {
+                        if nested_attrs[j].key.to_string() == key {
+                            result.push(nested_attrs.swap_remove(j));
+                        } else {
+                            j += 1;
+                        }
+                    }
+
+                    should_remove_parent = nested_attrs.is_empty();
+                }
+            }
+
+            if should_remove_parent {
+                self.swap_remove(i);
+            } else {
+                i += 1;
+            }
+        }
+
+        result
     }
 }
 

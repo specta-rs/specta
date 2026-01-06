@@ -34,7 +34,10 @@ impl RustCAttr {
         )?;
 
         let mut deprecated = None;
-        if let Some(attr_value) = attrs.iter().filter(|attr| attr.key == "deprecated").next() {
+        // Find and remove the deprecated attribute
+        if let Some(pos) = attrs.iter().position(|attr| attr.key == "deprecated") {
+            let attr_value = attrs[pos].clone();
+
             match &attr_value.value {
                 Some(AttributeValue::Lit(lit)) => {
                     deprecated = Some(DeprecatedType::DeprecatedWithSince {
@@ -85,6 +88,9 @@ impl RustCAttr {
                 }
                 None => deprecated = Some(DeprecatedType::Deprecated),
             }
+
+            // Remove the attribute after processing
+            attrs.swap_remove(pos);
         };
 
         Ok(RustCAttr { doc, deprecated })
