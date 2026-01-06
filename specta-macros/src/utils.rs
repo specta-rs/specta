@@ -275,14 +275,3 @@ pub fn unraw_raw_ident(ident: &Ident) -> String {
 pub fn format_fn_wrapper(function: &Ident) -> Ident {
     quote::format_ident!("__specta__fn__{}", function)
 }
-
-pub enum Inflection {
-    Lower,
-    Upper,
-    Pascal,
-    Camel,
-    Snake,
-    ScreamingSnake,
-    Kebab,
-    ScreamingKebab,
-}

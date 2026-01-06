@@ -34,58 +34,58 @@ impl RustCAttr {
         )?;
 
         let mut deprecated = None;
-        // if let Some(attr_value) = attrs.iter().filter(|attr| attr.key == "deprecated").next() {
-        //     match &attr_value.value {
-        //         Some(AttributeValue::Lit(lit)) => {
-        //             deprecated = Some(DeprecatedType::DeprecatedWithSince {
-        //                 since: None,
-        //                 note: match lit {
-        //                     Lit::Str(s) => s.value().into(),
-        //                     _ => return Err(syn::Error::new_spanned(lit, "expected string")),
-        //                 },
-        //             });
-        //         }
-        //         Some(AttributeValue::Path(_)) => {
-        //             unreachable!("deprecated attribute can't be a path!")
-        //         }
-        //         Some(AttributeValue::Attribute { attr, .. }) => {
-        //             let since = attr
-        //                 .iter()
-        //                 .filter(|attr| attr.key == "since")
-        //                 .next()
-        //                 .and_then(|v| v.value.as_ref())
-        //                 .and_then(|v| match v {
-        //                     AttributeValue::Lit(lit) => Some(lit),
-        //                     _ => None, // TODO: This should probs be an error
-        //                 })
-        //                 .and_then(|lit| match lit {
-        //                     syn::Lit::Str(s) => Some(s.value()),
-        //                     _ => None, // TODO: This should probs be an error
-        //                 });
+        if let Some(attr_value) = attrs.iter().filter(|attr| attr.key == "deprecated").next() {
+            match &attr_value.value {
+                Some(AttributeValue::Lit(lit)) => {
+                    deprecated = Some(DeprecatedType::DeprecatedWithSince {
+                        since: None,
+                        note: match lit {
+                            Lit::Str(s) => s.value().into(),
+                            _ => return Err(syn::Error::new_spanned(lit, "expected string")),
+                        },
+                    });
+                }
+                Some(AttributeValue::Path(_)) => {
+                    unreachable!("deprecated attribute can't be a path!")
+                }
+                Some(AttributeValue::Attribute { attr, .. }) => {
+                    let since = attr
+                        .iter()
+                        .filter(|attr| attr.key == "since")
+                        .next()
+                        .and_then(|v| v.value.as_ref())
+                        .and_then(|v| match v {
+                            AttributeValue::Lit(lit) => Some(lit),
+                            _ => None, // TODO: This should probs be an error
+                        })
+                        .and_then(|lit| match lit {
+                            syn::Lit::Str(s) => Some(s.value()),
+                            _ => None, // TODO: This should probs be an error
+                        });
 
-        //             let note = attr
-        //                 .iter()
-        //                 .filter(|attr| attr.key == "note")
-        //                 .next()
-        //                 .and_then(|v| match v.value.as_ref() {
-        //                     Some(AttributeValue::Lit(lit)) => Some(lit),
-        //                     _ => None, // TODO: This should probs be an error
-        //                 })
-        //                 .and_then(|lit| match lit {
-        //                     syn::Lit::Str(s) => Some(s.value()),
-        //                     _ => None, // TODO: This should probs be an error
-        //                 })
-        //                 .unwrap_or_default();
+                    let note = attr
+                        .iter()
+                        .filter(|attr| attr.key == "note")
+                        .next()
+                        .and_then(|v| match v.value.as_ref() {
+                            Some(AttributeValue::Lit(lit)) => Some(lit),
+                            _ => None, // TODO: This should probs be an error
+                        })
+                        .and_then(|lit| match lit {
+                            syn::Lit::Str(s) => Some(s.value()),
+                            _ => None, // TODO: This should probs be an error
+                        })
+                        .unwrap_or_default();
 
-        //             deprecated = Some(DeprecatedType::DeprecatedWithSince {
-        //                 // TODO: Use Cow's earlier rather than later
-        //                 since: since.map(Into::into),
-        //                 note: note.into(),
-        //             });
-        //         }
-        //         None => deprecated = Some(DeprecatedType::Deprecated),
-        //     }
-        // };
+                    deprecated = Some(DeprecatedType::DeprecatedWithSince {
+                        // TODO: Use Cow's earlier rather than later
+                        since: since.map(Into::into),
+                        note: note.into(),
+                    });
+                }
+                None => deprecated = Some(DeprecatedType::Deprecated),
+            }
+        };
 
         Ok(RustCAttr { doc, deprecated })
     }

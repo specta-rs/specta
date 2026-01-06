@@ -12,13 +12,11 @@ pub struct ContainerAttr {
     pub inline: bool,
     pub remote: Option<TokenStream>,
     pub collect: Option<bool>,
+    pub skip_attrs: Vec<String>,
     pub common: RustCAttr,
 
     // Struct only (we pass it anyway so enums get nice errors)
     pub transparent: bool,
-
-    // List of attribute names to skip during parsing and lowering
-    pub skip_attrs: Vec<String>,
 }
 
 impl_parse! {
@@ -29,8 +27,8 @@ impl_parse! {
         "inline" => out.inline = attr.parse_bool().unwrap_or(true),
         "remote" => out.remote = out.remote.take().or(Some(attr.parse_path()?.to_token_stream())),
         "collect" => out.collect = out.collect.take().or(Some(attr.parse_bool().unwrap_or(true))),
-        "transparent" => out.transparent = attr.parse_bool().unwrap_or(true),
         "skip_attr" => out.skip_attrs.push(attr.parse_string()?),
+        "transparent" => out.transparent = attr.parse_bool().unwrap_or(true),
     }
 }
 
@@ -39,7 +37,7 @@ impl ContainerAttr {
         let mut result = Self::default();
         result.common = RustCAttr::from_attrs(attrs)?;
         Self::try_from_attrs("specta", attrs, &mut result)?;
-        Self::try_from_attrs("serde", attrs, &mut result)?;
+        // Self::try_from_attrs("serde", attrs, &mut result)?;
         Self::try_from_attrs("repr", attrs, &mut result)?; // To handle `#[repr(transparent)]`
         Ok(result)
     }
