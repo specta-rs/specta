@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(rename_all = "lowercase")]
 #[serde(rename = "SimpleEnum")]

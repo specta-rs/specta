@@ -1,13 +1,14 @@
 // Test the skip_attr functionality
 // The skip_attr feature allows skipping attributes that may have non-standard syntax
 // that Specta's attribute parser might not understand.
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
 // Test basic functionality - skip_attr should prevent specta from trying to parse
 // the specified attribute, allowing compilation to succeed
 #[test]
 fn skip_attr_basic() {
-    #[derive(Type)]
+    #[derive(Type, Serialize, Deserialize)]
     #[specta(skip_attr = "doc")] // Skip doc comments as a test
     struct TestStruct {
         #[doc = "This is a field"]
@@ -43,7 +44,7 @@ fn skip_attr_preserves_other_attrs() {
 // Test skip_attr on enums
 #[test]
 fn skip_attr_on_enum() {
-    #[derive(Type)]
+    #[derive(Type, Serialize, Deserialize)]
     #[specta(skip_attr = "doc")]
     enum TestEnum {
         #[doc = "Variant 1"]
@@ -64,7 +65,7 @@ fn skip_attr_on_enum() {
 // Test multiple skip_attr declarations
 #[test]
 fn skip_multiple_attrs() {
-    #[derive(Type)]
+    #[derive(Type, Serialize, Deserialize)]
     #[specta(skip_attr = "doc")]
     #[specta(skip_attr = "allow")]
     struct MultiSkip {

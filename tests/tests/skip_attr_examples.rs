@@ -1,10 +1,11 @@
 // Example demonstrating the skip_attr feature
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
 // Example 1: Skip doc attributes
 #[test]
 fn example_skip_doc() {
-    #[derive(Type)]
+    #[derive(Type, Serialize, Deserialize)]
     #[specta(skip_attr = "doc")]
     struct SkipDocExample {
         #[doc = "This doc comment will be skipped"]
@@ -19,7 +20,7 @@ fn example_skip_doc() {
 // Example 2: Skip multiple attribute types
 #[test]
 fn example_skip_multiple() {
-    #[derive(Type)]
+    #[derive(Type, Serialize, Deserialize)]
     #[specta(skip_attr = "doc")]
     #[specta(skip_attr = "allow")]
     struct SkipMultipleExample {
@@ -35,7 +36,7 @@ fn example_skip_multiple() {
 // Example 3: Works with enums too
 #[test]
 fn example_skip_on_enum() {
-    #[derive(Type)]
+    #[derive(Type, Serialize, Deserialize)]
     #[specta(skip_attr = "doc")]
     enum SkipEnumExample {
         #[doc = "Variant A"]

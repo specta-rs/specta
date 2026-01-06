@@ -1,8 +1,9 @@
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
 #[test]
 fn rename_all() {
-    #[derive(Type)]
+    #[derive(Type, Serialize, Deserialize)]
     #[specta(collect = false)]
     #[serde(rename_all = "UPPERCASE")]
     struct Rename {

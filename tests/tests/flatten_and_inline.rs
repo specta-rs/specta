@@ -1,14 +1,15 @@
 use std::{collections::HashMap, sync::Arc};
 
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub struct A {
     pub a: String,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub struct AA {
     pub a: i32,
@@ -17,65 +18,56 @@ pub struct AA {
 #[derive(Type)]
 #[specta(collect = false)]
 pub struct B {
-    #[specta(flatten)]
+    #[serde(flatten)]
     pub a: A,
-    #[specta(flatten)]
     pub b: HashMap<String, String>,
-    #[specta(flatten)]
     pub c: Arc<A>,
 }
 
 #[derive(Type)]
 #[specta(collect = false)]
 pub struct C {
-    #[specta(flatten)]
     pub a: A,
     #[specta(inline)]
     pub b: A,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
 pub struct D {
-    #[specta(flatten)]
     pub a: A,
     #[specta(inline)]
     pub b: A,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(untagged)]
 pub struct E {
-    #[specta(flatten)]
     pub a: A,
     #[specta(inline)]
     pub b: A,
 }
 
 // Flattening a struct multiple times
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub struct F {
-    #[specta(flatten)]
     pub a: A,
-    #[specta(flatten)]
     pub b: A,
 }
 
 // Two fields with the same name (`a`) but different types
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub struct G {
-    #[specta(flatten)]
     pub a: A,
-    #[specta(flatten)]
     pub b: AA,
 }
 
 // Serde can't serialize this
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub enum H {
     A(String),
@@ -83,7 +75,7 @@ pub enum H {
 }
 
 // TODO: Invalid Serde type but unit test this at the datamodel level cause it might be valid in other langs.
-// #[derive(Type)]
+// #[derive(Type, Serialize, Deserialize)]
 // #[specta(collect = false)]
 #[serde(tag = "type")]
 // pub enum I {
@@ -91,9 +83,9 @@ pub enum H {
 //     B,
 //     #[specta(inline)]
 //     C(A),
-//     D(#[specta(flatten)] A),
+//     D(#[serde(flatten)] A),
 // }
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "t", content = "c")]
 pub enum J {
@@ -104,7 +96,7 @@ pub enum J {
     D(A),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(untagged)]
 pub enum K {

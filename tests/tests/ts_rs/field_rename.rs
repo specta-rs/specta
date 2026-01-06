@@ -1,8 +1,9 @@
 #![allow(dead_code)]
 
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct Rename1 {
     a: i32,

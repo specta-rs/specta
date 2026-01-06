@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use crate::ts::assert_ts_inline2;
 
 // This type won't even compile with Serde macros
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
 pub enum A {
@@ -13,7 +14,7 @@ pub enum A {
     A(String, u32),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
 pub enum B {
@@ -21,7 +22,7 @@ pub enum B {
     A(String),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
 pub enum C {
@@ -29,7 +30,7 @@ pub enum C {
     A(Vec<String>),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
 pub enum D {
@@ -37,7 +38,7 @@ pub enum D {
     A(HashMap<String, String>),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
 pub enum E {
@@ -45,7 +46,7 @@ pub enum E {
     A(()),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
 pub enum F {
@@ -53,14 +54,14 @@ pub enum F {
     A(FInner),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(untagged)]
 pub enum FInner {
     A(()),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
 pub enum G {
@@ -68,14 +69,14 @@ pub enum G {
     A(GInner),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(untagged)]
 pub enum GInner {
     A(String),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
 pub enum H {
@@ -83,12 +84,12 @@ pub enum H {
     A(HInner),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(transparent)]
 pub struct HInner(());
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
 pub enum I {
@@ -96,12 +97,12 @@ pub enum I {
     A(IInner),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(transparent)]
 pub struct IInner(String);
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
 pub enum L {
@@ -110,7 +111,7 @@ pub enum L {
     A(LInner),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
 pub enum LInner {
@@ -118,7 +119,7 @@ pub enum LInner {
     B,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
 pub enum M {
@@ -128,7 +129,7 @@ pub enum M {
     A(MInner),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(untagged)]
 pub enum MInner {

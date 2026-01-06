@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 #![allow(dead_code)]
 
 use std::{
@@ -107,13 +109,13 @@ fn inline() {
         t: T,
     }
 
-    #[derive(Type)]
+    #[derive(Type, Serialize, Deserialize)]
     #[specta(collect = false)]
     struct Container {
         g: Generic<String>,
         #[specta(inline)]
         gi: Generic<String>,
-        #[specta(flatten)]
+        #[serde(flatten)]
         t: Generic<String>,
     }
 

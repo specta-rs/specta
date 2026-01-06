@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 enum SimpleEnum1 {
     #[serde(rename = "asdf")]

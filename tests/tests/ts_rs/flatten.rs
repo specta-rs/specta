@@ -1,39 +1,40 @@
+use serde::{Deserialize, Serialize};
+
 #![allow(dead_code)]
 
 use specta::Type;
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct FlattenA {
     a: i32,
     b: i32,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct FlattenB {
-    #[specta(flatten)]
+    #[serde(flatten)]
     a: FlattenA,
     c: i32,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct FlattenC {
-    #[specta(flatten = true)]
+    #[serde(flatten)]
     a: FlattenA,
     c: i32,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct FlattenD {
-    #[specta(flatten = false)]
     a: FlattenA,
     c: i32,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct FlattenE {
     #[specta(inline)]
@@ -41,7 +42,7 @@ struct FlattenE {
     d: i32,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct FlattenF {
     #[specta(inline = true)]
@@ -49,7 +50,7 @@ struct FlattenF {
     d: i32,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct FlattenG {
     #[specta(inline = false)]

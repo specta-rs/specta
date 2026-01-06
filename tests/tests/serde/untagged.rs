@@ -1,8 +1,9 @@
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use crate::ts::assert_ts_inline2;
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(untagged)]
 enum A {
@@ -11,8 +12,9 @@ enum A {
     D(String, String),
 }
 
-#[derive(Type)]
-#[serde(collect = false, untagged)]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
 pub enum B {
     A,
     B,

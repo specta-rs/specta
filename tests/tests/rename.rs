@@ -1,20 +1,21 @@
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(rename = "StructNew", tag = "t")]
 pub struct Struct {
     a: String,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub struct Struct2 {
     #[serde(rename = "b")]
     a: String,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(rename = "EnumNew", tag = "t")]
 pub enum Enum {
@@ -22,7 +23,7 @@ pub enum Enum {
     B,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(rename = "EnumNew", tag = "t")]
 pub enum Enum2 {
@@ -31,7 +32,7 @@ pub enum Enum2 {
     B,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(rename = "EnumNew", tag = "t")]
 pub enum Enum3 {

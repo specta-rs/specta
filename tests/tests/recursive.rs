@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use std::collections::HashMap;
 
 use specta::Type;
@@ -26,22 +28,22 @@ pub struct RecursiveMapValue {
     demo: HashMap<String, RecursiveMapValue>,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub struct RecursiveInline {
-    #[specta(flatten)]
+    #[serde(flatten)]
     demo: Box<RecursiveInline>,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(transparent, collect = false)]
 pub struct RecursiveTransparent(Box<RecursiveInline>);
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub enum RecursiveInEnum {
     A {
-        #[specta(flatten)]
+        #[serde(flatten)]
         demo: Box<RecursiveInEnum>,
     },
 }

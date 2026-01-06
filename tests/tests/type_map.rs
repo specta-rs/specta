@@ -1,14 +1,15 @@
+use serde::{Deserialize, Serialize};
 use specta::{Type, TypeCollection};
 use specta_typescript as ts;
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum GenericType<T> {
     Undefined,
     Value(T),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 pub struct ActualType {
     a: GenericType<String>,
 }

@@ -1,8 +1,9 @@
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use crate::ts::{assert_ts_export2, assert_ts_inline2};
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "t", content = "c")]
 enum A {

@@ -1,39 +1,40 @@
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use crate::ts::assert_ts_inline2;
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 enum A {}
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "a")]
 enum B {}
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "a", content = "b")]
 enum C {}
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(untagged)]
 enum D {}
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub struct Inner;
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub struct Inner2 {}
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub struct Inner3();
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "a")]
 enum E {
@@ -41,7 +42,7 @@ enum E {
     B(Inner),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "a")]
 enum F {
@@ -49,7 +50,7 @@ enum F {
     B(Inner2),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "a")]
 enum G {
@@ -57,7 +58,7 @@ enum G {
     B(Inner3),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "a")]
 enum H {
@@ -66,11 +67,11 @@ enum H {
     B(Inner2),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false, transparent)]
 pub struct Demo(());
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "a")]
 enum I {
