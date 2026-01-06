@@ -18,7 +18,9 @@ fn test_basic_transformation() {
     // Create a simple struct DataType
     let field = Field::new(DataType::Primitive(Primitive::String));
     let fields = internal::construct::fields_named(vec![("user_name".into(), field)], vec![]);
-    let struct_dt = DataType::Struct(internal::construct::r#struct(fields, vec![]));
+    let mut s = specta::datatype::Struct::new();
+    s.set_fields(fields);
+    let struct_dt = DataType::Struct(s);
 
     // Transform for serialization
     let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
@@ -48,7 +50,10 @@ fn test_rename_all_transformation() {
         vec![],
     );
 
-    let struct_dt = DataType::Struct(internal::construct::r#struct(fields, vec![serde_attr]));
+    let mut s = specta::datatype::Struct::new();
+    s.set_fields(fields);
+    s.set_attributes(vec![serde_attr]);
+    let struct_dt = DataType::Struct(s);
 
     // Transform for serialization
     let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
@@ -73,7 +78,9 @@ fn test_skip_serializing() {
         vec![],
     );
 
-    let struct_dt = DataType::Struct(internal::construct::r#struct(fields, vec![]));
+    let mut s = specta::datatype::Struct::new();
+    s.set_fields(fields);
+    let struct_dt = DataType::Struct(s);
 
     // Test serialization mode
     let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
@@ -90,10 +97,9 @@ fn test_enum_transformation() {
     let variant1 = specta::datatype::EnumVariant::unit();
     let variant2 = specta::datatype::EnumVariant::unit();
 
-    let enum_dt = DataType::Enum(internal::construct::r#enum(
-        vec![("Active".into(), variant1), ("Inactive".into(), variant2)],
-        vec![],
-    ));
+    let mut e = specta::datatype::Enum::new();
+    *e.variants_mut() = vec![("Active".into(), variant1), ("Inactive".into(), variant2)];
+    let enum_dt = DataType::Enum(e);
 
     // Transform for serialization
     let ser_result = apply_serde_transformations(&enum_dt, SerdeMode::Serialize);
@@ -118,13 +124,13 @@ fn test_string_enum_with_rename_all() {
     let variant1 = specta::datatype::EnumVariant::unit();
     let variant2 = specta::datatype::EnumVariant::unit();
 
-    let enum_dt = DataType::Enum(internal::construct::r#enum(
-        vec![
-            ("UserActive".into(), variant1),
-            ("UserInactive".into(), variant2),
-        ],
-        vec![serde_attr],
-    ));
+    let mut e = specta::datatype::Enum::new();
+    *e.variants_mut() = vec![
+        ("UserActive".into(), variant1),
+        ("UserInactive".into(), variant2),
+    ];
+    *e.attributes_mut() = vec![serde_attr];
+    let enum_dt = DataType::Enum(e);
 
     // Transform for serialization - should handle string enum transformation
     let ser_result = apply_serde_transformations(&enum_dt, SerdeMode::Serialize);
@@ -145,10 +151,10 @@ fn test_transparent_struct() {
     let inner_field = Field::new(DataType::Primitive(Primitive::u64));
     let fields = internal::construct::fields_unnamed(vec![inner_field], vec![]);
 
-    let struct_dt = DataType::Struct(internal::construct::r#struct(
-        fields,
-        vec![transparent_attr],
-    ));
+    let mut s = specta::datatype::Struct::new();
+    s.set_fields(fields);
+    s.set_attributes(vec![transparent_attr]);
+    let struct_dt = DataType::Struct(s);
 
     // Transform for serialization - should resolve to inner type
     let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
@@ -189,7 +195,9 @@ fn test_nested_type_transformation() {
     // Create nested types - List of structs
     let field = Field::new(DataType::Primitive(Primitive::String));
     let fields = internal::construct::fields_named(vec![("name".into(), field)], vec![]);
-    let inner_struct = DataType::Struct(internal::construct::r#struct(fields, vec![]));
+    let mut s = specta::datatype::Struct::new();
+    s.set_fields(fields);
+    let inner_struct = DataType::Struct(s);
     let list_type = DataType::List(specta::datatype::List::new(inner_struct));
 
     // Transform the nested type
@@ -256,7 +264,9 @@ fn test_field_level_skip_attributes() {
         vec![],
     );
 
-    let struct_dt = DataType::Struct(internal::construct::r#struct(fields, vec![]));
+    let mut s = specta::datatype::Struct::new();
+    s.set_fields(fields);
+    let struct_dt = DataType::Struct(s);
 
     // Transform for serialization - should skip 'skip_both' and 'skip_ser_only' fields
     let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
@@ -289,7 +299,9 @@ fn test_field_level_rename_attributes() {
         vec![],
     );
 
-    let struct_dt = DataType::Struct(internal::construct::r#struct(fields, vec![]));
+    let mut s = specta::datatype::Struct::new();
+    s.set_fields(fields);
+    let struct_dt = DataType::Struct(s);
 
     // Transform for serialization
     let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
@@ -382,13 +394,13 @@ fn test_untagged_enum_path_attribute() {
     let variant1 = specta::datatype::EnumVariant::unit();
     let variant2 = specta::datatype::EnumVariant::unit();
 
-    let enum_dt = DataType::Enum(internal::construct::r#enum(
-        vec![
-            ("StringVariant".into(), variant1),
-            ("NumberVariant".into(), variant2),
-        ],
-        vec![untagged_attr],
-    ));
+    let mut e = specta::datatype::Enum::new();
+    *e.variants_mut() = vec![
+        ("StringVariant".into(), variant1),
+        ("NumberVariant".into(), variant2),
+    ];
+    *e.attributes_mut() = vec![untagged_attr];
+    let enum_dt = DataType::Enum(e);
 
     // Transform for serialization - should recognize untagged attribute
     let ser_result = apply_serde_transformations(&enum_dt, SerdeMode::Serialize);
@@ -429,7 +441,9 @@ fn test_skip_path_attribute() {
         vec![],
     );
 
-    let struct_dt = DataType::Struct(internal::construct::r#struct(fields, vec![]));
+    let mut s = specta::datatype::Struct::new();
+    s.set_fields(fields);
+    let struct_dt = DataType::Struct(s);
 
     // Transform for serialization - skipped field should be excluded
     let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
@@ -460,7 +474,9 @@ fn test_flatten_path_attribute() {
         vec![],
     );
 
-    let struct_dt = DataType::Struct(internal::construct::r#struct(fields, vec![]));
+    let mut s = specta::datatype::Struct::new();
+    s.set_fields(fields);
+    let struct_dt = DataType::Struct(s);
 
     // Transform for serialization - should recognize flatten attribute
     let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);

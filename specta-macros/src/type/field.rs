@@ -28,7 +28,7 @@ pub fn construct_field(
     let ty = if attrs.skip {
         quote!(None)
     } else {
-        quote!(<#field_ty as specta::Type>::definition(types))
+        quote!(Some(<#field_ty as specta::Type>::definition(types)))
     };
 
     Ok(quote!(internal::construct::field(

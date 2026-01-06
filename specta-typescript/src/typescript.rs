@@ -81,7 +81,7 @@ impl Default for Typescript {
             ],
             bigint: Default::default(),
             layout: Default::default(),
-            serde: None,
+            serde: Some(SerdeMode::Both),
             jsdoc: false,
         }
     }
@@ -141,12 +141,12 @@ impl Typescript {
         self
     }
 
-    /// Configure the exporter to use specta-serde for serialization
+    /// Configure the exporter to export the types for `#[derive(serde::Serialize)]`
     pub fn with_serde_serialize(self) -> Self {
         self.with_serde(SerdeMode::Serialize)
     }
 
-    /// Configure the exporter to use specta-serde for deserialization
+    /// Configure the exporter to export the types for `#[derive(serde::Deserialize)]`
     pub fn with_serde_deserialize(self) -> Self {
         self.with_serde(SerdeMode::Deserialize)
     }

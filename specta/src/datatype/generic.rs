@@ -17,6 +17,12 @@ use super::DataType;
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct Generic(pub(crate) Cow<'static, str>);
 
+impl Generic {
+    pub fn new(name: impl Into<Cow<'static, str>>) -> Self {
+        Self(Into::into(name))
+    }
+}
+
 impl Display for Generic {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.0)

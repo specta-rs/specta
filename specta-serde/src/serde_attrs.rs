@@ -18,12 +18,15 @@ use specta::{
 use crate::{Error, inflection::RenameRule, repr::EnumRepr};
 
 /// Specifies whether to apply serde transformations for serialization or deserialization
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SerdeMode {
     /// Apply transformations for serialization (Rust -> JSON/etc)
     Serialize,
     /// Apply transformations for deserialization (JSON/etc -> Rust)
     Deserialize,
+    /// Apply transformations for both serialization and deserialization
+    #[default]
+    Both,
 }
 
 /// Contains parsed serde attributes for a type
@@ -250,8 +253,9 @@ impl SerdeTransformer {
 
         let transformed_fields = self.transform_fields(struct_type.fields(), &attrs)?;
 
-        let new_struct =
-            internal::construct::r#struct(transformed_fields, struct_type.attributes().clone());
+        let mut new_struct = Struct::new();
+        new_struct.set_fields(transformed_fields);
+        new_struct.set_attributes(struct_type.attributes().clone());
 
         Ok(DataType::Struct(new_struct))
     }
@@ -298,8 +302,9 @@ impl SerdeTransformer {
             transformed_variants.push((transformed_name, new_variant));
         }
 
-        let new_enum =
-            internal::construct::r#enum(transformed_variants, enum_type.attributes().clone());
+        let mut new_enum = Enum::new();
+        *new_enum.variants_mut() = transformed_variants;
+        *new_enum.attributes_mut() = enum_type.attributes().clone();
 
         Ok(DataType::Enum(new_enum))
     }
@@ -334,8 +339,9 @@ impl SerdeTransformer {
         }
 
         // Create enum with String representation
-        let new_enum =
-            internal::construct::r#enum(transformed_variants, enum_type.attributes().clone());
+        let mut new_enum = Enum::new();
+        *new_enum.variants_mut() = transformed_variants;
+        *new_enum.attributes_mut() = enum_type.attributes().clone();
 
         Ok(DataType::Enum(new_enum))
     }
@@ -1231,7 +1237,9 @@ mod tests {
 
         let field = specta::datatype::Field::new(DataType::Primitive(Primitive::String));
         let fields = specta::internal::construct::fields_unnamed(vec![field], vec![]);
-        let struct_dt = specta::internal::construct::r#struct(fields, vec![transparent_attr]);
+        let mut struct_dt = Struct::new();
+        struct_dt.set_fields(fields);
+        struct_dt.set_attributes(vec![transparent_attr]);
 
         let datatype = DataType::Struct(struct_dt);
         let result = transformer.transform_datatype(&datatype).unwrap();

@@ -24,12 +24,26 @@ mod repr;
 mod serde_attrs;
 
 pub use error::Error;
-pub use serde_attrs::SerdeMode;
+pub use serde_attrs::{SerdeMode, apply_serde_transformations};
 
 use specta::TypeCollection;
 use specta::datatype::{DataType, Enum, Fields, Generic, Primitive, Reference};
 use specta::internal::{skip_fields, skip_fields_named};
 use std::collections::HashSet;
+
+/// Apply Serde attributes to a [TypeCollection].
+pub fn apply(types: &mut TypeCollection, mode: SerdeMode) -> Result<(), Error> {
+    for ndt in types.into_unsorted_iter() {
+        todo!();
+    }
+
+    Ok(())
+}
+
+/// Apply Serde attributes to a single [DataType].
+pub fn apply_to_dt(mut dt: DataType, mode: SerdeMode) -> Result<DataType, Error> {
+    serde_attrs::apply_serde_transformations(&mut dt, mode)
+}
 
 // TODO: We need something better for Tauri Specta cause it needs to handle multiple phases in one export run and handle the referencing of them.
 // pub fn process() -> Result<TypeCollection, Error>  {}
@@ -43,7 +57,7 @@ use std::collections::HashSet;
 /// - Map keys are valid types (string/number types)
 /// - Internally tagged enums are properly structured
 /// - Skip attributes don't result in empty enums
-pub fn process_for_serialization(types: &TypeCollection) -> Result<TypeCollection, Error> {
+fn process_for_serialization(types: &TypeCollection) -> Result<TypeCollection, Error> {
     // First validate all types
     for ndt in types.into_unsorted_iter() {
         validate_type(ndt.ty(), types, &[], &mut Default::default())?;
@@ -78,7 +92,7 @@ pub fn process_for_serialization(types: &TypeCollection) -> Result<TypeCollectio
 /// - Map keys are valid types (string/number types)
 /// - Internally tagged enums are properly structured
 /// - Skip attributes don't result in empty enums
-pub fn process_for_deserialization(types: &TypeCollection) -> Result<TypeCollection, Error> {
+fn process_for_deserialization(types: &TypeCollection) -> Result<TypeCollection, Error> {
     // First validate all types
     for ndt in types.into_unsorted_iter() {
         validate_type(ndt.ty(), types, &[], &mut Default::default())?;
@@ -107,7 +121,7 @@ pub fn process_for_deserialization(types: &TypeCollection) -> Result<TypeCollect
 /// Convenience function to process types for both serialization and deserialization
 ///
 /// Returns a tuple of (serialization_types, deserialization_types)
-pub fn process_for_both(types: &TypeCollection) -> Result<(TypeCollection, TypeCollection), Error> {
+fn process_for_both(types: &TypeCollection) -> Result<(TypeCollection, TypeCollection), Error> {
     let ser_types = process_for_serialization(types)?;
     let de_types = process_for_deserialization(types)?;
     Ok((ser_types, de_types))

@@ -17,10 +17,24 @@ use crate::datatype::{DataType, Field};
 pub mod construct {
     use std::borrow::Cow;
 
-    use crate::{Type, TypeCollection, datatype::*};
+    use crate::datatype::*;
 
-    pub const fn r#struct(fields: Fields, attributes: Vec<RuntimeAttribute>) -> Struct {
-        Struct { fields, attributes }
+    pub const fn field(
+        optional: bool,
+        deprecated: Option<DeprecatedType>,
+        docs: Cow<'static, str>,
+        inline: bool,
+        attributes: Vec<RuntimeAttribute>,
+        ty: Option<DataType>,
+    ) -> Field {
+        Field {
+            optional,
+            deprecated,
+            docs,
+            inline,
+            attributes,
+            ty,
+        }
     }
 
     pub const fn fields_unnamed(fields: Vec<Field>, attributes: Vec<RuntimeAttribute>) -> Fields {
@@ -32,54 +46,6 @@ pub mod construct {
         attributes: Vec<RuntimeAttribute>,
     ) -> Fields {
         Fields::Named(NamedFields { fields, attributes })
-    }
-
-    pub const fn enum_variant(
-        skip: bool,
-        deprecated: Option<DeprecatedType>,
-        docs: Cow<'static, str>,
-        fields: Fields,
-        attributes: Vec<RuntimeAttribute>,
-    ) -> EnumVariant {
-        EnumVariant {
-            skip,
-            docs,
-            deprecated,
-            fields,
-            attributes,
-        }
-    }
-
-    pub const fn r#enum(
-        variants: Vec<(Cow<'static, str>, EnumVariant)>,
-        attributes: Vec<RuntimeAttribute>,
-    ) -> Enum {
-        Enum {
-            variants,
-            attributes,
-        }
-    }
-
-    pub const fn tuple(fields: Vec<DataType>) -> Tuple {
-        Tuple { elements: fields }
-    }
-
-    pub const fn generic_data_type(name: &'static str) -> Generic {
-        Generic(Cow::Borrowed(name))
-    }
-
-    pub fn transparent_field<T: Type>(types: &mut TypeCollection) -> Fields {
-        Fields::Unnamed(UnnamedFields {
-            fields: vec![Field {
-                optional: false,
-                deprecated: None,
-                docs: Cow::Borrowed(""),
-                inline: true,
-                ty: Some(T::definition(types)),
-                attributes: vec![],
-            }],
-            attributes: vec![],
-        })
     }
 }
 
@@ -132,76 +98,3 @@ mod functions {
 }
 #[cfg(feature = "function")]
 pub use functions::*;
-
-// TODO: Maybe make this a public utility?
-// TODO: Should this be in the core or in `specta-serde`?
-// pub fn resolve_generics(mut dt: DataType, generics: &[DataType)]) -> DataType {
-//     match dt {
-//         DataType::Primitive(_) | DataType::Literal(_) | DataType::Any | DataType::Unknown => dt,
-//         DataType::List(v) => DataType::List(List {
-//             ty: Box::new(resolve_generics(*v.ty, generics)),
-//             length: v.length,
-//             unique: v.unique,
-//         }),
-//         DataType::Nullable(v) => DataType::Nullable(Box::new(resolve_generics(*v, generics))),
-//         DataType::Map(v) => DataType::Map(Map {
-//             key_ty: Box::new(resolve_generics(*v.key_ty, generics)),
-//             value_ty: Box::new(resolve_generics(*v.value_ty, generics)),
-//         }),
-//         DataType::Struct(ref mut v) => match &mut v.fields {
-//             Fields::Unit => dt,
-//             Fields::Unnamed(f) => {
-//                 for field in f.fields.iter_mut() {
-//                     field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
-//                 }
-
-//                 dt
-//             }
-//             Fields::Named(f) => {
-//                 for (_, field) in f.fields.iter_mut() {
-//                     field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
-//                 }
-
-//                 dt
-//             }
-//         },
-//         DataType::Enum(ref mut v) => {
-//             for (_, v) in v.variants.iter_mut() {
-//                 match &mut v.fields {
-//                     Fields::Unit => {}
-//                     Fields::Named(f) => {
-//                         for (_, field) in f.fields.iter_mut() {
-//                             field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
-//                         }
-//                     }
-//                     Fields::Unnamed(f) => {
-//                         for field in f.fields.iter_mut() {
-//                             field.ty = field.ty.take().map(|v| resolve_generics(v, generics));
-//                         }
-//                     }
-//                 }
-//             }
-
-//             dt
-//         }
-//         DataType::Tuple(ref mut v) => {
-//             for ty in v.elements.iter_mut() {
-//                 *ty = resolve_generics(ty.clone(), generics);
-//             }
-
-//             dt
-//         }
-//         DataType::Reference(ref mut r) => {
-//             for generic in r.generics.iter_mut() {
-//                 *generic = resolve_generics(generic.clone(), generics);
-//             }
-
-//             dt
-//         }
-//         DataType::Generic(g) => generics
-//             .iter()
-//             .find(|(name, _)| name == &g)
-//             .map(|(_, ty)| ty.clone())
-//             .unwrap_or_else(|| format!("Generic type `{g}` was referenced but not found").into()), // TODO: Error properly
-//     }
-// }

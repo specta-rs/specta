@@ -539,7 +539,6 @@ const _: () = {
                 fields: Fields::Unnamed(UnnamedFields {
                     fields: vec![Field {
                         optional: false,
-                        flatten: false,
                         inline: false,
                         deprecated: None,
                         docs: Cow::Borrowed(""),

@@ -135,7 +135,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         GenericParam::Type(t) => {
             let i = &t.ident;
             let i_str = i.to_string();
-            Some(quote!((internal::construct::generic_data_type(#i_str), <#i as #crate_ref::Type>::definition(types))))
+            Some(quote!((#crate_ref::datatype::Generic::new(#i_str), <#i as #crate_ref::Type>::definition(types))))
         }
     });
 

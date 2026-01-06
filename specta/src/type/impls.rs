@@ -207,42 +207,42 @@ impl_for_map!(BTreeMap<K, V> as "BTreeMap");
 
 impl Type for std::time::SystemTime {
     fn definition(types: &mut TypeCollection) -> DataType {
-        DataType::Struct(internal::construct::r#struct(
-            internal::construct::fields_named(
-                vec![
-                    (
-                        "duration_since_epoch".into(),
-                        Field::new(<i64 as crate::Type>::definition(types)),
-                    ),
-                    (
-                        "duration_since_unix_epoch".into(),
-                        Field::new(<u32 as crate::Type>::definition(types)),
-                    ),
-                ],
-                vec![],
-            ),
+        let fields = internal::construct::fields_named(
+            vec![
+                (
+                    "duration_since_epoch".into(),
+                    Field::new(<i64 as crate::Type>::definition(types)),
+                ),
+                (
+                    "duration_since_unix_epoch".into(),
+                    Field::new(<u32 as crate::Type>::definition(types)),
+                ),
+            ],
             vec![],
-        ))
+        );
+        let mut s = crate::datatype::Struct::new();
+        s.set_fields(fields);
+        DataType::Struct(s)
     }
 }
 
 impl Type for std::time::Duration {
     fn definition(types: &mut TypeCollection) -> DataType {
-        DataType::Struct(internal::construct::r#struct(
-            internal::construct::fields_named(
-                vec![
-                    (
-                        "secs".into(),
-                        Field::new(<u64 as crate::Type>::definition(types)),
-                    ),
-                    (
-                        "nanos".into(),
-                        Field::new(<u32 as crate::Type>::definition(types)),
-                    ),
-                ],
-                vec![],
-            ),
+        let fields = internal::construct::fields_named(
+            vec![
+                (
+                    "secs".into(),
+                    Field::new(<u64 as crate::Type>::definition(types)),
+                ),
+                (
+                    "nanos".into(),
+                    Field::new(<u32 as crate::Type>::definition(types)),
+                ),
+            ],
             vec![],
-        ))
+        );
+        let mut s = crate::datatype::Struct::new();
+        s.set_fields(fields);
+        DataType::Struct(s)
     }
 }

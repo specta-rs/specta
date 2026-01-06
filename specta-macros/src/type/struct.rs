@@ -74,13 +74,14 @@ pub fn parse_struct(
             ));
         }
 
-        let (field_ty, field_attrs, _raw_attrs) =
+        let (field_ty, field_attrs, raw_attrs) =
             fields.into_iter().next().expect("fields.len() != 1");
-        let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field_ty);
+
+        let field = construct_field(container_attrs, field_attrs, &field_ty, raw_attrs)?;
 
         return Ok((
             quote!(Struct),
-            quote!(*e.fields_mut() = internal::construct::transparent_field::<#field_ty>(types);),
+            quote!(*e.fields_mut() = internal::construct::fields_unnamed(vec![#field], vec![]);),
         ));
     }
 
