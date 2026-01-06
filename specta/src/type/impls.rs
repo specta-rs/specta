@@ -21,8 +21,14 @@ impl_primitives!(
 impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13); // Technically we only support 12-tuples but the `T13` is required due to how the macro works
 
 const _: () = {
-    use std::{cell::*, rc::Rc, sync::*};
-    impl_containers!(Box Rc Arc Cell RefCell Mutex RwLock);
+    use std::{cell::*, rc::Rc, sync::Arc};
+    impl_containers!(Box Rc Arc Cell RefCell);
+};
+
+#[cfg(feature = "std")]
+const _: () = {
+    use std::sync::{Mutex, RwLock};
+    impl_containers!(Mutex RwLock);
 };
 
 #[cfg(feature = "tokio")]
@@ -59,23 +65,27 @@ impl<'a, T: ?Sized + ToOwned + Type + 'static> Type for std::borrow::Cow<'a, T> 
     impl_passthrough!(T);
 }
 
-use std::cell::Ref;
+#[cfg(feature = "std")]
 use std::ffi::*;
+#[cfg(feature = "std")]
 impl_as!(
-    str as String
     CString as String
     CStr as String
     OsString as String
     OsStr as String
 );
 
+#[cfg(feature = "std")]
 use std::path::*;
+#[cfg(feature = "std")]
 impl_as!(
     Path as String
     PathBuf as String
 );
 
+#[cfg(feature = "std")]
 use std::net::*;
+#[cfg(feature = "std")]
 impl_as!(
     IpAddr as String
     Ipv4Addr as String
@@ -86,7 +96,9 @@ impl_as!(
     SocketAddrV6 as String
 );
 
+#[cfg(feature = "std")]
 use std::sync::atomic::*;
+#[cfg(feature = "std")]
 impl_as!(
     AtomicBool as bool
     AtomicI8 as i8
@@ -123,8 +135,12 @@ impl_for_list!(
     false; VecDeque<T> as "VecDeque"
     false; BinaryHeap<T> as "BinaryHeap"
     false; LinkedList<T> as "LinkedList"
-    true; HashSet<T> as "HashSet"
     true; BTreeSet<T> as "BTreeSet"
+);
+
+#[cfg(feature = "std")]
+impl_for_list!(
+    true; HashSet<T> as "HashSet"
 );
 
 impl<T: Type> Type for &[T] {
@@ -207,11 +223,16 @@ impl<T: Type> Type for std::ops::RangeInclusive<T> {
 
 impl<T: Type> Flatten for std::ops::RangeInclusive<T> {}
 
-impl_for_map!(HashMap<K, V> as "HashMap");
 impl_for_map!(BTreeMap<K, V> as "BTreeMap");
+
+#[cfg(feature = "std")]
+impl_for_map!(HashMap<K, V> as "HashMap");
+
+#[cfg(feature = "std")]
 impl<K: Type, V: Type> Flatten for std::collections::HashMap<K, V> {}
 impl<K: Type, V: Type> Flatten for std::collections::BTreeMap<K, V> {}
 
+#[cfg(feature = "std")]
 const _: () = {
     impl Type for std::time::SystemTime {
         fn definition(types: &mut TypeCollection) -> DataType {
