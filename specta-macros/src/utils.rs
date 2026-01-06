@@ -127,6 +127,15 @@ fn parse_attribute(content: ParseStream) -> Result<Vec<Attribute>> {
 /// pass all of the attributes into a single structure.
 /// We can then remove them from the struct while passing an any left over must be invalid and an error can be thrown.
 pub fn parse_attrs(attrs: &[syn::Attribute]) -> syn::Result<Vec<Attribute>> {
+    parse_attrs_with_filter(attrs, &[])
+}
+
+/// Same as `parse_attrs` but allows skipping attributes by name.
+/// This is useful for skipping attributes that may have non-standard syntax that we can't parse.
+pub fn parse_attrs_with_filter(
+    attrs: &[syn::Attribute],
+    skip_attrs: &[String],
+) -> syn::Result<Vec<Attribute>> {
     let mut result = Vec::new();
 
     for attr in attrs {
@@ -137,6 +146,12 @@ pub fn parse_attrs(attrs: &[syn::Attribute]) -> syn::Result<Vec<Attribute>> {
             .expect("Attribute path must have at least one segment")
             .clone()
             .ident;
+
+        // Skip attributes that are in the skip list
+        let attr_name = ident.to_string();
+        if skip_attrs.iter().any(|skip| *skip == attr_name) {
+            continue;
+        }
 
         // // TODO: We should somehow build this up from the macro output automatically -> if not our attribute parser is applied to stuff like `allow` and that's bad.
         // if !(ident == "specta"

@@ -21,7 +21,7 @@ pub fn parse_enum(
             .map(|v| {
                 // We pass all the attributes at the start and when decoding them pop them off the list.
                 // This means at the end we can check for any that weren't consumed and throw an error.
-                let mut attrs = parse_attrs(&v.attrs)?;
+                let mut attrs = parse_attrs_with_filter(&v.attrs, &container_attrs.skip_attrs)?;
                 let variant_attrs = VariantAttr::from_attrs(&mut attrs)?;
 
                 // The expectation is that when an attribute is processed it will be removed so if any are left over we know they are invalid
@@ -53,6 +53,10 @@ pub fn parse_enum(
                     .iter()
                     .filter(|attr| {
                         let path = attr.path().to_token_stream().to_string();
+                        // Skip attributes that are in the skip_attrs list
+                        if container_attrs.skip_attrs.iter().any(|skip| path == *skip) {
+                            return false;
+                        }
                         path == "serde" || path == "specta"
                     })
                     .map(|attr| lower_attribute(attr).map(|attr| attr.to_tokens()))
@@ -73,7 +77,7 @@ pub fn parse_enum(
                             .unnamed
                             .iter()
                             .map(|field| {
-                                let (field_attrs, raw_attrs) = decode_field_attrs(field)?;
+                                let (field_attrs, raw_attrs) = decode_field_attrs(field, &container_attrs.skip_attrs)?;
                                 construct_field( container_attrs, field_attrs, &field.ty, raw_attrs)
                             })
                             .collect::<syn::Result<Vec<TokenStream>>>()?;
@@ -88,7 +92,7 @@ pub fn parse_enum(
                         .named
                         .iter()
                         .map(|field| {
-                            let (field_attrs, raw_attrs) = decode_field_attrs(field)?;
+                            let (field_attrs, raw_attrs) = decode_field_attrs(field, &container_attrs.skip_attrs)?;
 
                             let field_ident_str =
                                 unraw_raw_ident(field.ident.as_ref().unwrap());

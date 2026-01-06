@@ -95,7 +95,6 @@ pub enum H {
 //     C(A),
 //     D(#[specta(flatten)] A),
 // }
-
 #[derive(Type)]
 #[specta(collect = false)]
 #[serde(tag = "t", content = "c")]

@@ -1,6 +1,6 @@
 use crate::{
     r#type::field::construct_field,
-    utils::{AttributeValue, parse_attrs, unraw_raw_ident},
+    utils::{AttributeValue, parse_attrs_with_filter, unraw_raw_ident},
 };
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
@@ -8,10 +8,13 @@ use syn::{DataStruct, Field, Fields, Type, spanned::Spanned};
 
 use super::attr::*;
 
-pub fn decode_field_attrs(field: &Field) -> syn::Result<(FieldAttr, &[syn::Attribute])> {
+pub fn decode_field_attrs<'a>(
+    field: &'a Field,
+    skip_attrs: &[String],
+) -> syn::Result<(FieldAttr, &'a [syn::Attribute])> {
     // We pass all the attributes at the start and when decoding them pop them off the list.
     // This means at the end we can check for any that weren't consumed and throw an error.
-    let raw_attrs = parse_attrs(&field.attrs)?;
+    let raw_attrs = parse_attrs_with_filter(&field.attrs, skip_attrs)?;
     let mut attrs = raw_attrs.clone();
     let field_attrs = FieldAttr::from_attrs(&mut attrs)?;
 
@@ -56,7 +59,8 @@ pub fn parse_struct(
             .fields
             .iter()
             .map(|field| {
-                decode_field_attrs(field).map(|(attrs, raw)| (field.ty.clone(), attrs, raw))
+                decode_field_attrs(field, &container_attrs.skip_attrs)
+                    .map(|(attrs, raw)| (field.ty.clone(), attrs, raw))
             })
             .collect::<syn::Result<Vec<(Type, FieldAttr, &[syn::Attribute])>>>()?
             .into_iter()
@@ -86,7 +90,8 @@ pub fn parse_struct(
                 .fields
                 .iter()
                 .map(|field| {
-                    let (field_attrs, raw_attrs) = decode_field_attrs(field)?;
+                    let (field_attrs, raw_attrs) =
+                        decode_field_attrs(field, &container_attrs.skip_attrs)?;
 
                     let field_ident_str = unraw_raw_ident(field.ident.as_ref().unwrap());
                     let field_name = field_ident_str.to_token_stream();
@@ -107,7 +112,8 @@ pub fn parse_struct(
                 .fields
                 .iter()
                 .map(|field| {
-                    let (field_attrs, raw_attrs) = decode_field_attrs(field)?;
+                    let (field_attrs, raw_attrs) =
+                        decode_field_attrs(field, &container_attrs.skip_attrs)?;
                     construct_field(container_attrs, field_attrs, &field.ty, raw_attrs)
                 })
                 .collect::<syn::Result<Vec<TokenStream>>>()?;

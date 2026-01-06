@@ -23,6 +23,10 @@ pub fn construct_field(
         .iter()
         .filter(|attr| {
             let path = attr.path().to_token_stream().to_string();
+            // Skip attributes that are in the skip_attrs list
+            if container_attrs.skip_attrs.iter().any(|skip| path == *skip) {
+                return false;
+            }
             path == "serde" || path == "specta"
         })
         .map(|attr| lower_attribute(attr).map(|attr| attr.to_tokens()))

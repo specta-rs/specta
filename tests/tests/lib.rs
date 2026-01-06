@@ -21,6 +21,7 @@ mod reserved_keywords;
 mod selection;
 mod serde;
 mod sid;
+mod skip_attr;
 mod static_types;
 mod transparent;
 pub mod ts;

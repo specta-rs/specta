@@ -16,6 +16,9 @@ pub struct ContainerAttr {
 
     // Struct only (we pass it anyway so enums get nice errors)
     pub transparent: bool,
+
+    // List of attribute names to skip during parsing and lowering
+    pub skip_attrs: Vec<String>,
 }
 
 impl_parse! {
@@ -27,6 +30,7 @@ impl_parse! {
         "remote" => out.remote = out.remote.take().or(Some(attr.parse_path()?.to_token_stream())),
         "collect" => out.collect = out.collect.take().or(Some(attr.parse_bool().unwrap_or(true))),
         "transparent" => out.transparent = attr.parse_bool().unwrap_or(true),
+        "skip_attr" => out.skip_attrs.push(attr.parse_string()?),
     }
 }
 
