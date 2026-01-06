@@ -94,7 +94,13 @@ pub fn parse_struct(
                     let (field_attrs, raw_attrs) =
                         decode_field_attrs(field, &container_attrs.skip_attrs)?;
 
-                    let field_ident_str = unraw_raw_ident(field.ident.as_ref().unwrap());
+                    let field_ident_str =
+                        unraw_raw_ident(field.ident.as_ref().ok_or_else(|| {
+                            syn::Error::new(
+                                field.span(),
+                                "specta: named field must have an identifier",
+                            )
+                        })?);
                     let field_name = field_ident_str.to_token_stream();
 
                     let inner =

@@ -5,7 +5,6 @@
     html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
 )]
 
-pub mod builder;
 #[cfg(feature = "collect")]
 #[cfg_attr(docsrs, doc(cfg(feature = "collect")))]
 #[doc(hidden)]

@@ -155,11 +155,10 @@ impl Typescript {
     ///
     /// Note: This will return [`Error:UnableToExport`] if the format is `Format::Files`.
     pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
-        let processed_types = if let Some(mode) = &self.serde {
-            match mode {
-                SerdeMode::Serialize => specta_serde::process_for_serialization(types)?,
-                SerdeMode::Deserialize => specta_serde::process_for_deserialization(types)?,
-            }
+        let processed_types = if let Some(mode) = self.serde {
+            let mut types_clone = types.clone();
+            specta_serde::apply(&mut types_clone, mode)?;
+            types_clone
         } else {
             types.clone()
         };
@@ -424,11 +423,10 @@ impl Typescript {
         let path = path.as_ref();
 
         if self.layout == Layout::Files {
-            let processed_types = if let Some(mode) = &self.serde {
-                match mode {
-                    SerdeMode::Serialize => specta_serde::process_for_serialization(types)?,
-                    SerdeMode::Deserialize => specta_serde::process_for_deserialization(types)?,
-                }
+            let processed_types = if let Some(mode) = self.serde {
+                let mut types_clone = types.clone();
+                specta_serde::apply(&mut types_clone, mode)?;
+                types_clone
             } else {
                 types.clone()
             };

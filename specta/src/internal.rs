@@ -9,7 +9,7 @@ use std::borrow::Cow;
 #[cfg(feature = "function")]
 pub use paste::paste;
 
-use crate::datatype::{DataType, Field};
+use crate::datatype::{DataType, Field, NonSkipField, skip_fields, skip_fields_named};
 
 /// Functions used to construct `crate::datatype` types (they have private fields so can't be constructed directly).
 /// We intentionally keep their fields private so we can modify them without a major version bump.
@@ -47,24 +47,6 @@ pub mod construct {
     ) -> Fields {
         Fields::Named(NamedFields { fields, attributes })
     }
-}
-
-pub type NonSkipField<'a> = (&'a Field, &'a DataType);
-
-pub fn skip_fields<'a>(
-    fields: impl IntoIterator<Item = &'a Field>,
-) -> impl Iterator<Item = NonSkipField<'a>> {
-    fields
-        .into_iter()
-        .filter_map(|field| field.ty().map(|ty| (field, ty)))
-}
-
-pub fn skip_fields_named<'a>(
-    fields: impl IntoIterator<Item = &'a (Cow<'static, str>, Field)>,
-) -> impl Iterator<Item = (&'a Cow<'static, str>, NonSkipField<'a>)> {
-    fields
-        .into_iter()
-        .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
 }
 
 #[cfg(feature = "function")]

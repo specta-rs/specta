@@ -116,7 +116,7 @@ use specta::datatype::{
     DataType, DeprecatedType, Enum, EnumVariant, Field, Fields, FunctionReturnType, Generic,
     Reference, RuntimeMeta, Struct, Tuple,
 };
-use specta::internal::{NonSkipField, skip_fields, skip_fields_named};
+use specta::datatype::{NonSkipField, skip_fields, skip_fields_named};
 
 #[allow(missing_docs)]
 pub(crate) type Result<T> = std::result::Result<T, Error>;

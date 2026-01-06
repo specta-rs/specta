@@ -92,7 +92,6 @@ impl Attribute {
 pub trait AttrExtract {
     fn extract(&self, source: &str, key: &str) -> Option<&Attribute>;
     fn extract_all(&self, source: &str, key: &str) -> Vec<&Attribute>;
-    fn extract_all_by_source(&self, source: &str) -> Vec<&Attribute>;
 }
 
 impl AttrExtract for Vec<Attribute> {
@@ -105,10 +104,6 @@ impl AttrExtract for Vec<Attribute> {
         self.iter()
             .filter(|attr| attr.source == source && attr.key == key)
             .collect()
-    }
-
-    fn extract_all_by_source(&self, source: &str) -> Vec<&Attribute> {
-        self.iter().filter(|attr| attr.source == source).collect()
     }
 }
 
@@ -172,7 +167,7 @@ pub fn parse_attrs_with_filter(
 
         // Skip attributes that are in the skip list
         let attr_name = ident.to_string();
-        if skip_attrs.iter().any(|skip| *skip == attr_name) {
+        if skip_attrs.contains(&attr_name) {
             continue;
         }
 

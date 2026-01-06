@@ -485,3 +485,150 @@ fn test_flatten_path_attribute() {
         "Failed to transform struct with flatten attribute"
     );
 }
+
+#[test]
+fn test_both_mode_with_common_attributes() {
+    // Create a struct with rename_all that applies to both modes
+    let serde_attr = RuntimeAttribute {
+        path: "serde".to_string(),
+        kind: RuntimeMeta::NameValue {
+            key: "rename_all".to_string(),
+            value: RuntimeLiteral::Str("camelCase".to_string()),
+        },
+    };
+
+    let field1 = Field::new(DataType::Primitive(Primitive::String));
+    let field2 = Field::new(DataType::Primitive(Primitive::u32));
+
+    let fields = internal::construct::fields_named(
+        vec![("first_name".into(), field1), ("user_id".into(), field2)],
+        vec![],
+    );
+
+    let mut s = specta::datatype::Struct::new();
+    s.set_fields(fields);
+    s.set_attributes(vec![serde_attr]);
+    let struct_dt = DataType::Struct(s);
+
+    // Transform with Both mode - should apply camelCase to both
+    let both_result = apply_serde_transformations(&struct_dt, SerdeMode::Both);
+    assert!(both_result.is_ok(), "Both mode transformation failed");
+
+    // Verify the transformation applied
+    if let Ok(DataType::Struct(transformed)) = both_result {
+        match transformed.fields() {
+            specta::datatype::Fields::Named(named) => {
+                let field_names: Vec<_> = named
+                    .fields()
+                    .iter()
+                    .map(|(name, _)| name.as_ref())
+                    .collect();
+                assert!(
+                    field_names.contains(&"firstName"),
+                    "Expected firstName but got {:?}",
+                    field_names
+                );
+                assert!(
+                    field_names.contains(&"userId"),
+                    "Expected userId but got {:?}",
+                    field_names
+                );
+            }
+            _ => panic!("Expected named fields"),
+        }
+    }
+}
+
+#[test]
+fn test_both_mode_skip_behavior() {
+    // Create a struct with a field that has skip_serializing
+    let field1_attr = RuntimeAttribute {
+        path: "serde".to_string(),
+        kind: RuntimeMeta::Path("skip_serializing".to_string()),
+    };
+
+    let mut field1 = Field::new(DataType::Primitive(Primitive::String));
+    field1.set_attributes(vec![field1_attr]);
+
+    let field2 = Field::new(DataType::Primitive(Primitive::u32));
+
+    let fields = internal::construct::fields_named(
+        vec![("name".into(), field1), ("id".into(), field2)],
+        vec![],
+    );
+
+    let mut s = specta::datatype::Struct::new();
+    s.set_fields(fields);
+    let struct_dt = DataType::Struct(s);
+
+    // Transform with Serialize mode - should skip the field
+    let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
+    assert!(ser_result.is_ok());
+    if let Ok(DataType::Struct(transformed)) = ser_result {
+        match transformed.fields() {
+            specta::datatype::Fields::Named(named) => {
+                assert_eq!(
+                    named.fields().len(),
+                    1,
+                    "Serialize mode should skip the field"
+                );
+            }
+            _ => panic!("Expected named fields"),
+        }
+    }
+
+    // Transform with Both mode - should NOT skip the field (only skips if both modes skip)
+    let both_result = apply_serde_transformations(&struct_dt, SerdeMode::Both);
+    assert!(both_result.is_ok());
+    if let Ok(DataType::Struct(transformed)) = both_result {
+        match transformed.fields() {
+            specta::datatype::Fields::Named(named) => {
+                assert_eq!(
+                    named.fields().len(),
+                    2,
+                    "Both mode should keep the field (not skipped in deserialize)"
+                );
+            }
+            _ => panic!("Expected named fields"),
+        }
+    }
+}
+
+#[test]
+fn test_both_mode_with_universal_skip() {
+    // Create a struct with a field that has universal skip
+    let field1_attr = RuntimeAttribute {
+        path: "serde".to_string(),
+        kind: RuntimeMeta::Path("skip".to_string()),
+    };
+
+    let mut field1 = Field::new(DataType::Primitive(Primitive::String));
+    field1.set_attributes(vec![field1_attr]);
+
+    let field2 = Field::new(DataType::Primitive(Primitive::u32));
+
+    let fields = internal::construct::fields_named(
+        vec![("name".into(), field1), ("id".into(), field2)],
+        vec![],
+    );
+
+    let mut s = specta::datatype::Struct::new();
+    s.set_fields(fields);
+    let struct_dt = DataType::Struct(s);
+
+    // Transform with Both mode - should skip the field (universal skip)
+    let both_result = apply_serde_transformations(&struct_dt, SerdeMode::Both);
+    assert!(both_result.is_ok());
+    if let Ok(DataType::Struct(transformed)) = both_result {
+        match transformed.fields() {
+            specta::datatype::Fields::Named(named) => {
+                assert_eq!(
+                    named.fields().len(),
+                    1,
+                    "Both mode should skip universally skipped field"
+                );
+            }
+            _ => panic!("Expected named fields"),
+        }
+    }
+}

@@ -1,17 +1,54 @@
 //! [Serde](https://serde.rs) support for Specta
 //!
-//! This crate is what parses the `#[serde(...)]` attributes and applies the needed transformations to your types.
-//! This is possible as the Specta macros crate stores the discovered macro attributes into the [specta::DataType] definition of your type.
+//! This crate parses `#[serde(...)]` attributes and applies the necessary transformations to your types.
+//! This is possible because the Specta macro crate stores discovered macro attributes in the [specta::DataType] definition of your type.
 //!
-//! For the specific attributes refer to Serde's [official documentation](https://serde.rs/attributes.html).
+//! For specific attributes, refer to Serde's [official documentation](https://serde.rs/attributes.html).
 //!
 //! # Usage
 //!
+//! ## Transform a TypeCollection in-place
+//!
+//! ```ignore
+//! use specta::TypeCollection;
+//! use specta_serde::{apply, SerdeMode};
+//!
+//! let mut types = TypeCollection::default();
+//! // Add your types...
+//!
+//! // For serialization only
+//! apply(&mut types, SerdeMode::Serialize)?;
+//!
+//! // For deserialization only
+//! apply(&mut types, SerdeMode::Deserialize)?;
+//!
+//! // For both (uses common attributes, skips mode-specific ones)
+//! apply(&mut types, SerdeMode::Both)?;
 //! ```
-//! let types = specta::TypeCollection::default();
-//! let (ser_types, de_types) = specta_serde::process_for_both(&types).unwrap();
-//! // Use your transformed `types` as normal with a language exporter
+//!
+//! ## Transform a single DataType
+//!
+//! ```ignore
+//! use specta::DataType;
+//! use specta_serde::{apply_to_dt, SerdeMode};
+//!
+//! let dt = DataType::Primitive(specta::datatype::Primitive::String);
+//! let transformed = apply_to_dt(dt, SerdeMode::Serialize)?;
 //! ```
+//!
+//! ## Understanding SerdeMode
+//!
+//! - `SerdeMode::Serialize`: Apply transformations for serialization (Rust → JSON/etc).
+//!   Respects `skip_serializing`, `rename_serialize`, etc.
+//!
+//! - `SerdeMode::Deserialize`: Apply transformations for deserialization (JSON/etc → Rust).
+//!   Respects `skip_deserializing`, `rename_deserialize`, etc.
+//!
+//! - `SerdeMode::Both`: Apply transformations that work for both directions.
+//!   - Uses common attributes like `rename`, `rename_all`, `skip`
+//!   - Only skips fields/types that are skipped in BOTH modes
+//!   - Ignores mode-specific attributes unless they match in both modes
+//!   - Useful when you want a single type definition for bidirectional APIs
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
     html_logo_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png",
@@ -27,101 +64,132 @@ pub use error::Error;
 pub use serde_attrs::{SerdeMode, apply_serde_transformations};
 
 use specta::TypeCollection;
-use specta::datatype::{DataType, Enum, Fields, Generic, Primitive, Reference};
-use specta::internal::{skip_fields, skip_fields_named};
+use specta::datatype::{
+    DataType, Enum, Fields, Generic, Primitive, Reference, skip_fields, skip_fields_named,
+};
 use std::collections::HashSet;
 
-/// Apply Serde attributes to a [TypeCollection].
+/// Apply Serde attributes to a [TypeCollection] in-place.
+///
+/// This function validates all types in the collection, then applies serde transformations
+/// according to the specified mode.
+///
+/// # Modes
+///
+/// - [`SerdeMode::Serialize`]: Apply transformations for serialization (Rust → JSON/etc)
+/// - [`SerdeMode::Deserialize`]: Apply transformations for deserialization (JSON/etc → Rust)
+/// - [`SerdeMode::Both`]: Apply common transformations (useful for bidirectional APIs)
+///
+/// The validation ensures:
+/// - Map keys are valid types (string/number types)
+/// - Internally tagged enums are properly structured
+/// - Skip attributes don't result in empty enums
+///
+/// # Example
+/// ```ignore
+/// use specta_serde::{apply, SerdeMode};
+///
+/// let mut types = specta::TypeCollection::default();
+/// // For serialization only
+/// apply(&mut types, SerdeMode::Serialize)?;
+///
+/// // For both serialization and deserialization
+/// apply(&mut types, SerdeMode::Both)?;
+/// ```
 pub fn apply(types: &mut TypeCollection, mode: SerdeMode) -> Result<(), Error> {
+    // First validate all types before transformation
     for ndt in types.into_unsorted_iter() {
-        todo!();
+        validate_type(ndt.ty(), types, &[], &mut Default::default())?;
     }
+
+    // Apply transformations to each type in the collection
+    let transformed = types.clone().map(|mut ndt| {
+        // Apply serde transformations - we validated above so this should succeed
+        match serde_attrs::apply_serde_transformations(ndt.ty(), mode) {
+            Ok(transformed_dt) => {
+                ndt.set_ty(transformed_dt);
+                ndt
+            }
+            Err(_) => {
+                // This shouldn't happen since we validated, but return unchanged if it does
+                ndt
+            }
+        }
+    });
+
+    // Validate transformed types
+    for ndt in transformed.into_unsorted_iter() {
+        validate_type(ndt.ty(), &transformed, &[], &mut Default::default())?;
+    }
+
+    // Replace the original collection with the transformed one
+    *types = transformed;
 
     Ok(())
 }
 
 /// Apply Serde attributes to a single [DataType].
-pub fn apply_to_dt(mut dt: DataType, mode: SerdeMode) -> Result<DataType, Error> {
-    serde_attrs::apply_serde_transformations(&mut dt, mode)
+///
+/// This function takes a DataType, applies serde transformations according to the
+/// specified mode, and returns the transformed DataType.
+///
+/// # Example
+/// ```ignore
+/// let dt = DataType::Primitive(Primitive::String);
+/// let transformed = specta_serde::apply_to_dt(dt, SerdeMode::Serialize)?;
+/// ```
+pub fn apply_to_dt(dt: DataType, mode: SerdeMode) -> Result<DataType, Error> {
+    serde_attrs::apply_serde_transformations(&dt, mode)
 }
-
-// TODO: We need something better for Tauri Specta cause it needs to handle multiple phases in one export run and handle the referencing of them.
-// pub fn process() -> Result<TypeCollection, Error>  {}
 
 /// Process a TypeCollection and return transformed types for serialization
 ///
-/// This function takes a TypeCollection, validates each type, applies serde transformations
-/// for serialization, and returns a new TypeCollection with the transformed types.
+/// This is a convenience function that creates a new TypeCollection with serde transformations
+/// applied for serialization. For in-place transformation, use [`apply`] instead.
 ///
-/// The validation ensures:
-/// - Map keys are valid types (string/number types)
-/// - Internally tagged enums are properly structured
-/// - Skip attributes don't result in empty enums
-fn process_for_serialization(types: &TypeCollection) -> Result<TypeCollection, Error> {
-    // First validate all types
-    for ndt in types.into_unsorted_iter() {
-        validate_type(ndt.ty(), types, &[], &mut Default::default())?;
-    }
-
-    // Use map to transform types while preserving ArcId
-    let transformed_types = types.clone().map(|mut ndt| {
-        // Apply serde transformations to the DataType
-        let transformed_dt =
-            serde_attrs::apply_serde_transformations(ndt.ty(), SerdeMode::Serialize)
-                .expect("Serde transformation failed");
-
-        // Update the inner DataType while keeping all other properties
-        ndt.set_ty(transformed_dt);
-        ndt
-    });
-
-    // Validate transformed types
-    for ndt in transformed_types.into_unsorted_iter() {
-        validate_type(ndt.ty(), &transformed_types, &[], &mut Default::default())?;
-    }
-
-    Ok(transformed_types)
+/// # Example
+/// ```ignore
+/// let types = specta::TypeCollection::default();
+/// let ser_types = specta_serde::process_for_serialization(&types)?;
+/// ```
+#[doc(hidden)]
+pub fn process_for_serialization(types: &TypeCollection) -> Result<TypeCollection, Error> {
+    let mut cloned = types.clone();
+    apply(&mut cloned, SerdeMode::Serialize)?;
+    Ok(cloned)
 }
 
 /// Process a TypeCollection and return transformed types for deserialization
 ///
-/// This function takes a TypeCollection, validates each type, applies serde transformations
-/// for deserialization, and returns a new TypeCollection with the transformed types.
+/// This is a convenience function that creates a new TypeCollection with serde transformations
+/// applied for deserialization. For in-place transformation, use [`apply`] instead.
 ///
-/// The validation ensures:
-/// - Map keys are valid types (string/number types)
-/// - Internally tagged enums are properly structured
-/// - Skip attributes don't result in empty enums
-fn process_for_deserialization(types: &TypeCollection) -> Result<TypeCollection, Error> {
-    // First validate all types
-    for ndt in types.into_unsorted_iter() {
-        validate_type(ndt.ty(), types, &[], &mut Default::default())?;
-    }
-
-    // Use map to transform types while preserving ArcId
-    let transformed_types = types.clone().map(|mut ndt| {
-        // Apply serde transformations to the DataType
-        let transformed_dt =
-            serde_attrs::apply_serde_transformations(ndt.ty(), SerdeMode::Deserialize)
-                .expect("Serde transformation failed");
-
-        // Update the inner DataType while keeping all other properties
-        ndt.set_ty(transformed_dt);
-        ndt
-    });
-
-    // Validate transformed types
-    for ndt in transformed_types.into_unsorted_iter() {
-        validate_type(ndt.ty(), &transformed_types, &[], &mut Default::default())?;
-    }
-
-    Ok(transformed_types)
+/// # Example
+/// ```ignore
+/// let types = specta::TypeCollection::default();
+/// let de_types = specta_serde::process_for_deserialization(&types)?;
+/// ```
+#[doc(hidden)]
+pub fn process_for_deserialization(types: &TypeCollection) -> Result<TypeCollection, Error> {
+    let mut cloned = types.clone();
+    apply(&mut cloned, SerdeMode::Deserialize)?;
+    Ok(cloned)
 }
 
-/// Convenience function to process types for both serialization and deserialization
+/// Process types for both serialization and deserialization
+///
+/// This is a convenience function that returns separate TypeCollections for serialization
+/// and deserialization. For in-place transformation, use [`apply`] instead.
 ///
 /// Returns a tuple of (serialization_types, deserialization_types)
-fn process_for_both(types: &TypeCollection) -> Result<(TypeCollection, TypeCollection), Error> {
+///
+/// # Example
+/// ```ignore
+/// let types = specta::TypeCollection::default();
+/// let (ser_types, de_types) = specta_serde::process_for_both(&types)?;
+/// ```
+#[doc(hidden)]
+pub fn process_for_both(types: &TypeCollection) -> Result<(TypeCollection, TypeCollection), Error> {
     let ser_types = process_for_serialization(types)?;
     let de_types = process_for_deserialization(types)?;
     Ok((ser_types, de_types))

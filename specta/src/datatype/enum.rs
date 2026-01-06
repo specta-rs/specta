@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::builder::VariantBuilder;
+use super::VariantBuilder;
 
 use super::{DataType, DeprecatedType, Fields, NamedFields, RuntimeAttribute, UnnamedFields};
 

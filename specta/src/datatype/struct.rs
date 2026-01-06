@@ -1,7 +1,6 @@
-use crate::{
-    builder::StructBuilder,
-    datatype::{DataType, Fields, RuntimeAttribute},
-};
+use crate::datatype::{DataType, Fields, RuntimeAttribute};
+
+use super::StructBuilder;
 
 use super::{NamedFields, UnnamedFields};
 

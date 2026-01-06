@@ -25,6 +25,10 @@ pub enum SerdeMode {
     /// Apply transformations for deserialization (JSON/etc -> Rust)
     Deserialize,
     /// Apply transformations for both serialization and deserialization
+    ///
+    /// This mode uses common transformations (like `rename`, `rename_all`, `skip`)
+    /// but skips mode-specific attributes (like `rename_serialize`, `skip_serializing`).
+    /// A field/type is only skipped if it's skipped in both modes.
     #[default]
     Both,
 }
@@ -448,6 +452,8 @@ impl SerdeTransformer {
         match self.mode {
             SerdeMode::Serialize => attrs.skip_serializing,
             SerdeMode::Deserialize => attrs.skip_deserializing,
+            // For Both mode, only skip if skipped in both directions
+            SerdeMode::Both => attrs.skip_serializing && attrs.skip_deserializing,
         }
     }
 
@@ -482,6 +488,16 @@ impl SerdeTransformer {
                     return Ok(Cow::Owned(renamed.clone()));
                 }
             }
+            SerdeMode::Both => {
+                // For Both mode, don't use mode-specific renames
+                // Only use if serialize and deserialize renames match
+                if let (Some(ser), Some(de)) = (&attrs.rename_serialize, &attrs.rename_deserialize)
+                {
+                    if ser == de {
+                        return Ok(Cow::Owned(ser.clone()));
+                    }
+                }
+            }
         }
 
         // Apply mode-specific rename_all rule
@@ -494,6 +510,20 @@ impl SerdeTransformer {
                 .rename_all_deserialize
                 .or(attrs.rename_all_fields_deserialize)
                 .or(rename_all_rule),
+            SerdeMode::Both => {
+                // For Both mode, use common rename_all or only if both modes match
+                if let (Some(ser), Some(de)) =
+                    (attrs.rename_all_serialize, attrs.rename_all_deserialize)
+                {
+                    if ser == de {
+                        Some(ser)
+                    } else {
+                        rename_all_rule // Fall back to common rule
+                    }
+                } else {
+                    rename_all_rule
+                }
+            }
         };
 
         // Apply rename_all rule
@@ -1401,6 +1431,102 @@ mod tests {
             .apply_rename_rule("TestVariant", None, &None, &attrs, true)
             .unwrap();
         assert_eq!(de_result, "test_variant"); // snake_case
+    }
+
+    #[test]
+    fn test_both_mode_skip_behavior() {
+        let mut attrs = SerdeAttributes::default();
+        let both_transformer = SerdeTransformer::new(SerdeMode::Both);
+
+        // Test that Both mode only skips if both modes skip
+        attrs.skip_serializing = true;
+        attrs.skip_deserializing = false;
+        assert!(!both_transformer.should_skip_type(&attrs));
+
+        attrs.skip_serializing = false;
+        attrs.skip_deserializing = true;
+        assert!(!both_transformer.should_skip_type(&attrs));
+
+        // Should skip only when both are true
+        attrs.skip_serializing = true;
+        attrs.skip_deserializing = true;
+        assert!(both_transformer.should_skip_type(&attrs));
+
+        // Universal skip should still work
+        attrs.skip_serializing = false;
+        attrs.skip_deserializing = false;
+        attrs.skip = true;
+        assert!(both_transformer.should_skip_type(&attrs));
+    }
+
+    #[test]
+    fn test_both_mode_rename_behavior() {
+        let both_transformer = SerdeTransformer::new(SerdeMode::Both);
+        let mut attrs = SerdeAttributes::default();
+
+        // Test that Both mode uses common rename
+        attrs.rename = Some("commonName".to_string());
+        let result = both_transformer
+            .apply_rename_rule("original", None, &attrs.rename, &attrs, false)
+            .unwrap();
+        assert_eq!(result, "commonName");
+
+        // Test that Both mode uses matching mode-specific renames
+        attrs.rename = None;
+        attrs.rename_serialize = Some("sameName".to_string());
+        attrs.rename_deserialize = Some("sameName".to_string());
+        let result = both_transformer
+            .apply_rename_rule("original", None, &None, &attrs, false)
+            .unwrap();
+        assert_eq!(result, "sameName");
+
+        // Test that Both mode ignores non-matching mode-specific renames
+        attrs.rename_serialize = Some("serName".to_string());
+        attrs.rename_deserialize = Some("deName".to_string());
+        let result = both_transformer
+            .apply_rename_rule("original", None, &None, &attrs, false)
+            .unwrap();
+        assert_eq!(result, "original"); // Falls back to original name
+    }
+
+    #[test]
+    fn test_both_mode_rename_all_behavior() {
+        let both_transformer = SerdeTransformer::new(SerdeMode::Both);
+        let mut attrs = SerdeAttributes::default();
+
+        // Test that Both mode uses common rename_all
+        let result = both_transformer
+            .apply_rename_rule(
+                "test_field",
+                Some(RenameRule::CamelCase),
+                &None,
+                &attrs,
+                false,
+            )
+            .unwrap();
+        assert_eq!(result, "testField");
+
+        // Test that Both mode uses matching mode-specific rename_all
+        attrs.rename_all_serialize = Some(RenameRule::PascalCase);
+        attrs.rename_all_deserialize = Some(RenameRule::PascalCase);
+        let result = both_transformer
+            .apply_rename_rule("test_field", None, &None, &attrs, false)
+            .unwrap();
+        assert_eq!(result, "TestField");
+
+        // Test that Both mode falls back to common rule when modes differ
+        attrs.rename_all_serialize = Some(RenameRule::CamelCase);
+        attrs.rename_all_deserialize = Some(RenameRule::SnakeCase);
+        let result = both_transformer
+            .apply_rename_rule(
+                "test_field",
+                Some(RenameRule::PascalCase),
+                &None,
+                &attrs,
+                false,
+            )
+            .unwrap();
+        assert_eq!(result, "TestField"); // Uses common rule
     }
 
     #[test]
