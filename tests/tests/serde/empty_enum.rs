@@ -7,15 +7,18 @@ use crate::ts::assert_ts_inline2;
 enum A {}
 
 #[derive(Type)]
-#[specta(collect = false, tag = "a")]
+#[specta(collect = false)]
+#[serde(tag = "a")]
 enum B {}
 
 #[derive(Type)]
-#[specta(collect = false, tag = "a", content = "b")]
+#[specta(collect = false)]
+#[serde(tag = "a", content = "b")]
 enum C {}
 
 #[derive(Type)]
-#[specta(collect = false, untagged)]
+#[specta(collect = false)]
+#[serde(untagged)]
 enum D {}
 
 #[derive(Type)]
@@ -31,28 +34,32 @@ pub struct Inner2 {}
 pub struct Inner3();
 
 #[derive(Type)]
-#[specta(collect = false, tag = "a")]
+#[specta(collect = false)]
+#[serde(tag = "a")]
 enum E {
     A(Inner),
     B(Inner),
 }
 
 #[derive(Type)]
-#[specta(collect = false, tag = "a")]
+#[specta(collect = false)]
+#[serde(tag = "a")]
 enum F {
     A(Inner2),
     B(Inner2),
 }
 
 #[derive(Type)]
-#[specta(collect = false, tag = "a")]
+#[specta(collect = false)]
+#[serde(tag = "a")]
 enum G {
     A(Inner3),
     B(Inner3),
 }
 
 #[derive(Type)]
-#[specta(collect = false, tag = "a")]
+#[specta(collect = false)]
+#[serde(tag = "a")]
 enum H {
     #[specta(skip)]
     A(Inner3),
@@ -64,7 +71,8 @@ enum H {
 pub struct Demo(());
 
 #[derive(Type)]
-#[specta(collect = false, tag = "a")]
+#[specta(collect = false)]
+#[serde(tag = "a")]
 enum I {
     A(Demo),
     B(Demo),

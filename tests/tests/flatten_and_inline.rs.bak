@@ -37,8 +37,7 @@ pub struct C {
 }
 
 #[derive(Type)]
-#[specta(collect = false)]
-#[serde(tag = "type")]
+#[specta(collect = false, tag = "type")]
 pub struct D {
     #[specta(flatten)]
     pub a: A,
@@ -86,8 +85,7 @@ pub enum H {
 
 // TODO: Invalid Serde type but unit test this at the datamodel level cause it might be valid in other langs.
 // #[derive(Type)]
-// #[specta(collect = false)]
-#[serde(tag = "type")]
+// #[specta(collect = false, tag = "type")]
 // pub enum I {
 //     A(String),
 //     B,
@@ -97,8 +95,7 @@ pub enum H {
 // }
 
 #[derive(Type)]
-#[specta(collect = false)]
-#[serde(tag = "t", content = "c")]
+#[specta(collect = false, tag = "t", content = "c")]
 pub enum J {
     A(String),
     B,
@@ -108,8 +105,7 @@ pub enum J {
 }
 
 #[derive(Type)]
-#[specta(collect = false)]
-#[serde(untagged)]
+#[specta(collect = false, untagged)]
 pub enum K {
     A(String),
     B,

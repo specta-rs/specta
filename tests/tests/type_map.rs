@@ -2,7 +2,7 @@ use specta::{Type, TypeCollection};
 use specta_typescript as ts;
 
 #[derive(Type)]
-#[specta(untagged)]
+#[serde(untagged)]
 pub enum GenericType<T> {
     Undefined,
     Value(T),

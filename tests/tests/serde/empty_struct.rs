@@ -7,7 +7,8 @@ use crate::ts::{assert_ts_export2, assert_ts_inline2};
 struct A {}
 
 #[derive(Type)]
-#[specta(collect = false, tag = "a")]
+#[specta(collect = false)]
+#[serde(tag = "a")]
 struct B {}
 
 // https://github.com/oscartbeaumont/specta/issues/174

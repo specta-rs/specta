@@ -7,7 +7,7 @@ use specta::Type;
 #[specta(collect = false)]
 struct Rename1 {
     a: i32,
-    #[specta(rename = "bb")]
+    #[serde(rename = "bb")]
     b: i32,
 }
 

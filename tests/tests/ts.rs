@@ -472,7 +472,7 @@ struct TupleStruct3(i32, bool, String);
 
 #[derive(Type)]
 #[specta(collect = false)]
-#[specta(rename = "HasBeenRenamed")]
+#[serde(rename = "HasBeenRenamed")]
 struct RenamedStruct;
 
 #[derive(Type)]
@@ -580,14 +580,14 @@ enum SkipVariant3 {
 #[specta(collect = false)]
 pub enum EnumMacroAttributes {
     A(#[specta(type = String)] i32),
-    #[specta(rename = "bbb")]
+    #[serde(rename = "bbb")]
     B(i32),
-    #[specta(rename = "cccc")]
+    #[serde(rename = "cccc")]
     C(#[specta(type = i32)] String),
     D {
         #[specta(type = String)]
         a: i32,
-        #[specta(rename = "bbbbbb")]
+        #[serde(rename = "bbbbbb")]
         b: i32,
     },
 }
@@ -720,7 +720,7 @@ pub struct ExtraBracketsInUnnamedStruct((String));
 #[specta(collect = false)]
 #[allow(unused_parens)]
 pub struct RenameWithWeirdCharsField {
-    #[specta(rename = "@odata.context")]
+    #[serde(rename = "@odata.context")]
     odata_context: String,
 }
 
@@ -728,16 +728,18 @@ pub struct RenameWithWeirdCharsField {
 #[specta(collect = false)]
 #[allow(unused_parens)]
 pub enum RenameWithWeirdCharsVariant {
-    #[specta(rename = "@odata.context")]
+    #[serde(rename = "@odata.context")]
     A(String),
 }
 
 #[derive(Type)]
-#[specta(collect = false, rename = "@odata.context")]
+#[specta(collect = false)]
+#[serde(rename = "@odata.context")]
 pub struct RenameWithWeirdCharsStruct(String);
 
 #[derive(Type)]
-#[specta(collect = false, rename = "@odata.context")]
+#[specta(collect = false)]
+#[serde(rename = "@odata.context")]
 pub enum RenameWithWeirdCharsEnum {}
 
 #[derive(Type)]

@@ -74,7 +74,7 @@ pub fn parse_enum(
                             .iter()
                             .map(|field| {
                                 let (field_attrs, raw_attrs) = decode_field_attrs(field)?;
-                                Ok(construct_field( container_attrs, field_attrs, &field.ty, &raw_attrs))
+                                construct_field( container_attrs, field_attrs, &field.ty, raw_attrs)
                             })
                             .collect::<syn::Result<Vec<TokenStream>>>()?;
 
@@ -94,7 +94,7 @@ pub fn parse_enum(
                                 unraw_raw_ident(field.ident.as_ref().unwrap());
                             let field_name = field_ident_str;
 
-                            let inner = construct_field(container_attrs, field_attrs, &field.ty, &raw_attrs);
+                            let inner = construct_field(container_attrs, field_attrs, &field.ty, raw_attrs)?;
                             Ok(quote!((#field_name.into(), #inner)))
                         })
                         .collect::<syn::Result<Vec<TokenStream>>>()?;

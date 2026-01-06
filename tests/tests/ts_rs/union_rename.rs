@@ -4,10 +4,10 @@ use crate::ts::assert_ts;
 
 #[derive(Type)]
 #[specta(collect = false)]
-#[specta(rename_all = "lowercase")]
-#[specta(rename = "SimpleEnum")]
+#[serde(rename_all = "lowercase")]
+#[serde(rename = "SimpleEnum")]
 enum RenamedEnum {
-    #[specta(rename = "ASDF")]
+    #[serde(rename = "ASDF")]
     A,
     B,
     C,

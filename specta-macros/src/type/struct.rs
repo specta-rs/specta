@@ -8,7 +8,7 @@ use syn::{DataStruct, Field, Fields, Type, spanned::Spanned};
 
 use super::attr::*;
 
-pub fn decode_field_attrs(field: &Field) -> syn::Result<(FieldAttr, Vec<crate::utils::Attribute>)> {
+pub fn decode_field_attrs(field: &Field) -> syn::Result<(FieldAttr, &[syn::Attribute])> {
     // We pass all the attributes at the start and when decoding them pop them off the list.
     // This means at the end we can check for any that weren't consumed and throw an error.
     let raw_attrs = parse_attrs(&field.attrs)?;
@@ -36,7 +36,7 @@ pub fn decode_field_attrs(field: &Field) -> syn::Result<(FieldAttr, Vec<crate::u
         }
     }
 
-    Ok((field_attrs, raw_attrs))
+    Ok((field_attrs, &field.attrs))
 }
 
 pub fn parse_struct(
@@ -58,7 +58,7 @@ pub fn parse_struct(
             .map(|field| {
                 decode_field_attrs(field).map(|(attrs, raw)| (field.ty.clone(), attrs, raw))
             })
-            .collect::<syn::Result<Vec<(Type, FieldAttr, Vec<crate::utils::Attribute>)>>>()?
+            .collect::<syn::Result<Vec<(Type, FieldAttr, &[syn::Attribute])>>>()?
             .into_iter()
             .filter(|(_, attrs, _)| !attrs.skip)
             .collect::<Vec<_>>();
@@ -92,7 +92,7 @@ pub fn parse_struct(
                     let field_name = field_ident_str.to_token_stream();
 
                     let inner =
-                        construct_field(container_attrs, field_attrs, &field.ty, &raw_attrs);
+                        construct_field(container_attrs, field_attrs, &field.ty, raw_attrs)?;
                     Ok(quote!((#field_name.into(), #inner)))
                 })
                 .collect::<syn::Result<Vec<TokenStream>>>()?;
@@ -108,12 +108,7 @@ pub fn parse_struct(
                 .iter()
                 .map(|field| {
                     let (field_attrs, raw_attrs) = decode_field_attrs(field)?;
-                    Ok(construct_field(
-                        container_attrs,
-                        field_attrs,
-                        &field.ty,
-                        &raw_attrs,
-                    ))
+                    construct_field(container_attrs, field_attrs, &field.ty, raw_attrs)
                 })
                 .collect::<syn::Result<Vec<TokenStream>>>()?;
 

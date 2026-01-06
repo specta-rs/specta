@@ -3,7 +3,8 @@ use specta::Type;
 use crate::ts::{assert_ts_export2, assert_ts_inline2};
 
 #[derive(Type)]
-#[specta(collect = false, tag = "t", content = "c")]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
 enum A {
     A,
     B { id: String, method: String },

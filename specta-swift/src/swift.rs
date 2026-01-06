@@ -137,9 +137,8 @@ impl Swift {
 
     /// Export types to a Swift string.
     pub fn export(&self, types: &TypeCollection) -> Result<String> {
-        if self.serde {
-            specta_serde::validate(types)?;
-        }
+        // Note: Serde validation is now handled by the exporter when processing types
+        // If you need to validate types, use specta_serde::process_for_serialization(types)
 
         let mut result = String::new();
 

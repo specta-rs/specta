@@ -10,6 +10,101 @@ use specta::{
 use crate::error::{Error, Result};
 use crate::swift::Swift;
 
+/// Check if an enum is a string enum (has String repr)
+fn is_string_enum(e: &specta::datatype::Enum) -> bool {
+    // If all variants are unit variants, it's a string enum
+    e.is_string_enum()
+}
+
+/// Helper function to get rename_all from serde attributes  
+fn get_rename_all_from_attributes(
+    attributes: &[specta::datatype::RuntimeAttribute],
+) -> Option<String> {
+    use specta::datatype::RuntimeMeta;
+
+    for attr in attributes {
+        if attr.path == "serde" {
+            if let RuntimeMeta::List(list) = &attr.kind {
+                for nested in list {
+                    if let specta::datatype::RuntimeNestedMeta::Meta(meta) = nested {
+                        if let RuntimeMeta::NameValue { key, value } = meta {
+                            if key == "rename_all" {
+                                if let specta::datatype::RuntimeLiteral::Str(s) = value {
+                                    return Some(s.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Check if an enum is adjacently tagged
+fn is_adjacently_tagged_enum(e: &specta::datatype::Enum) -> bool {
+    use specta::datatype::RuntimeMeta;
+
+    let mut has_tag = false;
+    let mut has_content = false;
+
+    for attr in e.attributes() {
+        if attr.path == "serde" {
+            if let RuntimeMeta::List(list) = &attr.kind {
+                for nested in list {
+                    if let specta::datatype::RuntimeNestedMeta::Meta(meta) = nested {
+                        if let RuntimeMeta::NameValue { key, .. } = meta {
+                            if key == "tag" {
+                                has_tag = true;
+                            } else if key == "content" {
+                                has_content = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    has_tag && has_content
+}
+
+/// Get the tag and content field names for an adjacently tagged enum
+fn get_adjacent_tag_content(e: &specta::datatype::Enum) -> Option<(String, String)> {
+    use specta::datatype::RuntimeMeta;
+
+    let mut tag = None;
+    let mut content = None;
+
+    for attr in e.attributes() {
+        if attr.path == "serde" {
+            if let RuntimeMeta::List(list) = &attr.kind {
+                for nested in list {
+                    if let specta::datatype::RuntimeNestedMeta::Meta(meta) = nested {
+                        if let RuntimeMeta::NameValue { key, value } = meta {
+                            if key == "tag" {
+                                if let specta::datatype::RuntimeLiteral::Str(s) = value {
+                                    tag = Some(s.clone());
+                                }
+                            } else if key == "content" {
+                                if let specta::datatype::RuntimeLiteral::Str(s) = value {
+                                    content = Some(s.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    match (tag, content) {
+        (Some(t), Some(c)) => Some((t, c)),
+        _ => None,
+    }
+}
+
 /// Export a single type to Swift.
 pub fn export_type(
     swift: &Swift,
@@ -83,7 +178,7 @@ pub fn export_type(
             };
 
             // Check if this is a string enum
-            let is_string_enum = e.repr().map(|repr| repr.is_string()).unwrap_or(false);
+            let is_string_enum_val = is_string_enum(e);
 
             // Check if this enum has struct-like variants (needs custom Codable)
             let has_struct_variants = e.variants().iter().any(|(_, variant)| {
@@ -91,7 +186,7 @@ pub fn export_type(
             });
 
             // Determine protocols based on whether we'll generate custom Codable
-            let protocols = if is_string_enum {
+            let protocols = if is_string_enum_val {
                 if has_struct_variants {
                     "String" // Custom Codable will be generated
                 } else {
@@ -456,7 +551,7 @@ fn enum_to_swift(
     let mut result = String::new();
 
     // Check if this is a string enum
-    let is_string_enum = e.repr().map(|repr| repr.is_string()).unwrap_or(false);
+    let is_string_enum = is_string_enum(e);
 
     for (original_variant_name, variant) in e.variants() {
         if variant.skip() {
@@ -471,7 +566,7 @@ fn enum_to_swift(
                     // For string enums, generate raw value assignments
                     let raw_value = generate_raw_value(
                         original_variant_name,
-                        e.repr().and_then(|r| r.rename_all()),
+                        get_rename_all_from_attributes(e.attributes()).as_deref(),
                     );
                     result.push_str(&format!("    case {} = \"{}\"\n", variant_name, raw_value));
                 } else {
@@ -681,11 +776,7 @@ fn generate_enum_codable_impl(
     result.push_str(&format!("extension {}: Codable {{\n", enum_name));
 
     // Check if this is an adjacently tagged enum
-    let is_adjacently_tagged = if let Some(repr) = e.repr() {
-        matches!(repr, specta::datatype::EnumRepr::Adjacent { .. })
-    } else {
-        false
-    };
+    let is_adjacently_tagged = is_adjacently_tagged_enum(e);
 
     if is_adjacently_tagged {
         return generate_adjacently_tagged_codable(swift, e, enum_name);
@@ -820,14 +911,8 @@ fn generate_adjacently_tagged_codable(
     let mut result = String::new();
 
     // Get tag and content field names
-    let (tag_field, content_field) =
-        if let Some(specta::datatype::EnumRepr::Adjacent { tag, content }) = e.repr() {
-            (tag.as_ref(), content.as_ref())
-        } else {
-            return Err(Error::UnsupportedType(
-                "Expected adjacently tagged enum".to_string(),
-            ));
-        };
+    let (tag_field, content_field) = get_adjacent_tag_content(e)
+        .ok_or_else(|| Error::UnsupportedType("Expected adjacently tagged enum".to_string()))?;
 
     result.push_str(&format!(
         "\n// MARK: - {} Adjacently Tagged Codable Implementation\n",

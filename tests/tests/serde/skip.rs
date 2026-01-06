@@ -27,21 +27,24 @@ pub enum SkipOnlyVariantExternallyTagged {
 }
 
 #[derive(Type)]
-#[specta(collect = false, tag = "t")]
+#[specta(collect = false)]
+#[serde(tag = "t")]
 pub enum SkipOnlyVariantInternallyTagged {
     #[specta(skip)]
     A(String),
 }
 
 #[derive(Type)]
-#[specta(collect = false, tag = "t", content = "c")]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
 pub enum SkipOnlyVariantAdjacentlyTagged {
     #[specta(skip)]
     A(String),
 }
 
 #[derive(Type)]
-#[specta(collect = false, untagged)]
+#[specta(collect = false)]
+#[serde(untagged)]
 pub enum SkipOnlyVariantUntagged {
     #[specta(skip)]
     A(String),

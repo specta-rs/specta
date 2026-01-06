@@ -124,6 +124,21 @@ pub mod construct {
     pub const fn generic_data_type(name: &'static str) -> Generic {
         Generic(Cow::Borrowed(name))
     }
+
+    pub fn transparent_field<T: Type>(types: &mut TypeCollection) -> Fields {
+        Fields::Unnamed(UnnamedFields {
+            fields: vec![Field {
+                optional: false,
+                flatten: false,
+                deprecated: None,
+                docs: Cow::Borrowed(""),
+                inline: true,
+                ty: Some(T::definition(types)),
+                attributes: vec![],
+            }],
+            attributes: vec![],
+        })
+    }
 }
 
 pub type NonSkipField<'a> = (&'a Field, &'a DataType);

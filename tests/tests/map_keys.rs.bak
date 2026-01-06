@@ -18,8 +18,7 @@ struct RegularStruct {
 }
 
 #[derive(Type)]
-#[specta(collect = false)]
-#[serde(transparent)]
+#[specta(collect = false, transparent)]
 struct TransparentStruct(String);
 
 #[derive(Type)]
@@ -31,8 +30,7 @@ enum UnitVariants {
 }
 
 #[derive(Type)]
-#[specta(collect = false)]
-#[serde(untagged)]
+#[specta(collect = false, untagged)]
 enum UntaggedVariants {
     A(String),
     B(i32),
@@ -40,8 +38,7 @@ enum UntaggedVariants {
 }
 
 #[derive(Type)]
-#[specta(collect = false)]
-#[serde(untagged)]
+#[specta(collect = false, untagged)]
 enum InvalidUntaggedVariants {
     A(String),
     B(i32, String),
@@ -57,28 +54,23 @@ enum Variants {
 }
 
 #[derive(Type)]
-#[specta(collect = false)]
-#[serde(transparent)]
+#[specta(collect = false, transparent)]
 pub struct MaybeValidKey<T>(T);
 
 #[derive(Type)]
-#[specta(collect = false)]
-#[serde(transparent)]
+#[specta(collect = false, transparent)]
 pub struct ValidMaybeValidKey(HashMap<MaybeValidKey<String>, ()>);
 
 #[derive(Type)]
-#[specta(collect = false)]
-#[serde(transparent)]
+#[specta(collect = false, transparent)]
 pub struct ValidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<String>>, ()>);
 
 #[derive(Type)]
-#[specta(collect = false)]
-#[serde(transparent)]
+#[specta(collect = false, transparent)]
 pub struct InvalidMaybeValidKey(HashMap<MaybeValidKey<()>, ()>);
 
 #[derive(Type)]
-#[specta(collect = false)]
-#[serde(transparent)]
+#[specta(collect = false, transparent)]
 pub struct InvalidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<()>>, ()>);
 
 #[test]

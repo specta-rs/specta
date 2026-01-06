@@ -5,10 +5,10 @@ use crate::ts::assert_ts;
 #[derive(Type)]
 #[specta(collect = false)]
 enum SimpleEnum1 {
-    #[specta(rename = "asdf")]
+    #[serde(rename = "asdf")]
     A,
     B,
-    #[specta(rename_all = "camelCase")]
+    #[serde(rename_all = "camelCase")]
     C {
         enum_field: (),
     },
