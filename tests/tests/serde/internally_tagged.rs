@@ -121,40 +121,40 @@ pub enum MInner {
 
 #[test]
 fn internally_tagged() {
-    assert_eq!(
-        assert_ts_inline2::<A>(),
-        Err("#[specta(tag = \"...\")] cannot be used with tuple variants\n".into())
+    insta::assert_snapshot!(
+        assert_ts_inline2::<A>().unwrap_err(),
+        @"#[specta(tag = \"...\")] cannot be used with tuple variants\n"
     );
-    assert_eq!(
-        assert_ts_inline2::<B>(),
-        Err("#[specta(tag = \"...\")] cannot be used with tuple variants\n".into())
+    insta::assert_snapshot!(
+        assert_ts_inline2::<B>().unwrap_err(),
+        @"#[specta(tag = \"...\")] cannot be used with tuple variants\n"
     );
-    assert_eq!(
-        assert_ts_inline2::<C>(),
-        Err("#[specta(tag = \"...\")] cannot be used with tuple variants\n".into())
+    insta::assert_snapshot!(
+        assert_ts_inline2::<C>().unwrap_err(),
+        @"#[specta(tag = \"...\")] cannot be used with tuple variants\n"
     );
-    assert_eq!(
-        assert_ts_inline2::<D>(),
-        Ok(r#"({ type: "A" } & { [key in string]: string })"#.into())
+    insta::assert_snapshot!(
+        assert_ts_inline2::<D>().unwrap(),
+        @r#"({ type: "A" } & { [key in string]: string })"#
     );
 
-    assert_eq!(assert_ts_inline2::<E>(), Ok(r#"({ type: "A" })"#.into()));
-    assert_eq!(
-        assert_ts_inline2::<F>(),
-        Ok(r#"({ type: "A" } & FInner)"#.into())
+    insta::assert_snapshot!(assert_ts_inline2::<E>().unwrap(), @r#"({ type: "A" })"#);
+    insta::assert_snapshot!(
+        assert_ts_inline2::<F>().unwrap(),
+        @r#"({ type: "A" } & FInner)"#
     );
-    assert_eq!(
-        assert_ts_inline2::<G>(),
-        Err("#[specta(tag = \"...\")] cannot be used with tuple variants\n".into())
+    insta::assert_snapshot!(
+        assert_ts_inline2::<G>().unwrap_err(),
+        @"#[specta(tag = \"...\")] cannot be used with tuple variants\n"
     );
-    assert_eq!(assert_ts_inline2::<H>(), Ok(r#"({ type: "A" })"#.into()));
-    assert_eq!(
-        assert_ts_inline2::<I>(),
-        Err("#[specta(tag = \"...\")] cannot be used with tuple variants\n".into())
+    insta::assert_snapshot!(assert_ts_inline2::<H>().unwrap(), @r#"({ type: "A" })"#);
+    insta::assert_snapshot!(
+        assert_ts_inline2::<I>().unwrap_err(),
+        @"#[specta(tag = \"...\")] cannot be used with tuple variants\n"
     );
-    assert_eq!(
-        assert_ts_inline2::<L>(),
-        Ok(r#"({ type: "A" } & ({ type: "A" } | { type: "B" }))"#.into())
+    insta::assert_snapshot!(
+        assert_ts_inline2::<L>().unwrap(),
+        @r#"({ type: "A" } & ({ type: "A" } | { type: "B" }))"#
     );
-    assert_eq!(assert_ts_inline2::<M>(), Ok(r#"({ type: "A" })"#.into()));
+    insta::assert_snapshot!(assert_ts_inline2::<M>().unwrap(), @r#"({ type: "A" })"#);
 }

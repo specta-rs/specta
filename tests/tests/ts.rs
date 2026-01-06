@@ -166,256 +166,240 @@ fn detect_duplicate_type_names(
 
 #[test]
 fn typescript_types() {
-    assert_ts!(Vec<MyEnum>, r#"({ A: string } | { B: number })[]"#);
+    insta::assert_snapshot!(inline::<Vec<MyEnum>>(&Default::default()).unwrap(), @r#"({ A: string } | { B: number })[]"#);
 
-    assert_ts!(i8, "number");
-    assert_ts!(u8, "number");
-    assert_ts!(i16, "number");
-    assert_ts!(u16, "number");
-    assert_ts!(i32, "number");
-    assert_ts!(u32, "number");
-    assert_ts!(f32, "number");
-    assert_ts!(f64, "number");
+    insta::assert_snapshot!(inline::<i8>(&Default::default()).unwrap(), @"number");
+    insta::assert_snapshot!(inline::<u8>(&Default::default()).unwrap(), @"number");
+    insta::assert_snapshot!(inline::<i16>(&Default::default()).unwrap(), @"number");
+    insta::assert_snapshot!(inline::<u16>(&Default::default()).unwrap(), @"number");
+    insta::assert_snapshot!(inline::<i32>(&Default::default()).unwrap(), @"number");
+    insta::assert_snapshot!(inline::<u32>(&Default::default()).unwrap(), @"number");
+    insta::assert_snapshot!(inline::<f32>(&Default::default()).unwrap(), @"number");
+    insta::assert_snapshot!(inline::<f64>(&Default::default()).unwrap(), @"number");
 
-    assert_ts!(bool, "boolean");
+    insta::assert_snapshot!(inline::<bool>(&Default::default()).unwrap(), @"boolean");
 
-    assert_ts!((), "null");
-    assert_ts!((String, i32), "[string, number]");
-    assert_ts!((String, i32, bool), "[string, number, boolean]");
-    assert_ts!(
-        (
+    insta::assert_snapshot!(inline::<()>(&Default::default()).unwrap(), @"null");
+    insta::assert_snapshot!(inline::<(String, i32)>(&Default::default()).unwrap(), @"[string, number]");
+    insta::assert_snapshot!(inline::<(String, i32, bool)>(&Default::default()).unwrap(), @"[string, number, boolean]");
+    insta::assert_snapshot!(
+        inline::<(
             bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool
-        ),
-        "[boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean]"
+        )>(&Default::default()).unwrap(),
+        @"[boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean]"
     );
 
-    assert_ts!(String, "string");
+    insta::assert_snapshot!(inline::<String>(&Default::default()).unwrap(), @"string");
     // impossible since Path as a generic is unsized lol
-    // assert_ts!(Path, "string");
-    assert_ts!(PathBuf, "string");
-    assert_ts!(IpAddr, "string");
-    assert_ts!(Ipv4Addr, "string");
-    assert_ts!(Ipv6Addr, "string");
-    assert_ts!(SocketAddr, "string");
-    assert_ts!(SocketAddrV4, "string");
-    assert_ts!(SocketAddrV6, "string");
-    assert_ts!(char, "string");
-    assert_ts!(&'static str, "string");
+    // insta::assert_snapshot!(inline::<Path>(&Default::default()).unwrap(), @"string");
+    insta::assert_snapshot!(inline::<PathBuf>(&Default::default()).unwrap(), @"string");
+    insta::assert_snapshot!(inline::<IpAddr>(&Default::default()).unwrap(), @"string");
+    insta::assert_snapshot!(inline::<Ipv4Addr>(&Default::default()).unwrap(), @"string");
+    insta::assert_snapshot!(inline::<Ipv6Addr>(&Default::default()).unwrap(), @"string");
+    insta::assert_snapshot!(inline::<SocketAddr>(&Default::default()).unwrap(), @"string");
+    insta::assert_snapshot!(inline::<SocketAddrV4>(&Default::default()).unwrap(), @"string");
+    insta::assert_snapshot!(inline::<SocketAddrV6>(&Default::default()).unwrap(), @"string");
+    insta::assert_snapshot!(inline::<char>(&Default::default()).unwrap(), @"string");
+    insta::assert_snapshot!(inline::<&'static str>(&Default::default()).unwrap(), @"string");
 
-    assert_ts!(&'static bool, "boolean");
-    assert_ts!(&'static i32, "number");
+    insta::assert_snapshot!(inline::<&'static bool>(&Default::default()).unwrap(), @"boolean");
+    insta::assert_snapshot!(inline::<&'static i32>(&Default::default()).unwrap(), @"number");
 
-    assert_ts!(Vec<i32>, "number[]");
-    assert_ts!(&[i32], "number[]");
-    assert_ts!(&[i32; 3], "[number, number, number]");
+    insta::assert_snapshot!(inline::<Vec<i32>>(&Default::default()).unwrap(), @"number[]");
+    insta::assert_snapshot!(inline::<&[i32]>(&Default::default()).unwrap(), @"number[]");
+    insta::assert_snapshot!(inline::<&[i32; 3]>(&Default::default()).unwrap(), @"[number, number, number]");
 
-    assert_ts!(Option<i32>, "number | null");
+    insta::assert_snapshot!(inline::<Option<i32>>(&Default::default()).unwrap(), @"number | null");
 
     // https://github.com/oscartbeaumont/specta/issues/88
-    assert_ts!(Unit1, "null");
-    assert_ts!(Unit2, "Record<string, never>");
-    assert_ts!(Unit3, "[]");
-    assert_ts!(Unit4, "null");
-    assert_ts!(Unit5, r#""A""#);
-    assert_ts!(Unit6, "{ A: [] }");
-    assert_ts!(Unit7, "{ A: Record<string, never> }");
+    insta::assert_snapshot!(inline::<Unit1>(&Default::default()).unwrap(), @"null");
+    insta::assert_snapshot!(inline::<Unit2>(&Default::default()).unwrap(), @"Record<string, never>");
+    insta::assert_snapshot!(inline::<Unit3>(&Default::default()).unwrap(), @"[]");
+    insta::assert_snapshot!(inline::<Unit4>(&Default::default()).unwrap(), @"null");
+    insta::assert_snapshot!(inline::<Unit5>(&Default::default()).unwrap(), @r#""A""#);
+    insta::assert_snapshot!(inline::<Unit6>(&Default::default()).unwrap(), @"{ A: [] }");
+    insta::assert_snapshot!(inline::<Unit7>(&Default::default()).unwrap(), @"{ A: Record<string, never> }");
 
-    assert_ts!(
-        SimpleStruct,
-        "{ a: number; b: string; c: [number, string, number]; d: string[]; e: string | null }"
+    insta::assert_snapshot!(
+        inline::<SimpleStruct>(&Default::default()).unwrap(),
+        @"{ a: number; b: string; c: [number, string, number]; d: string[]; e: string | null }"
     );
-    assert_ts!(TupleStruct1, "number");
-    assert_ts!(TupleStruct3, "[number, boolean, string]");
+    insta::assert_snapshot!(inline::<TupleStruct1>(&Default::default()).unwrap(), @"number");
+    insta::assert_snapshot!(inline::<TupleStruct3>(&Default::default()).unwrap(), @"[number, boolean, string]");
 
-    assert_ts!(
-        TestEnum,
-        r#""Unit" | { Single: number } | { Multiple: [number, number] } | { Struct: { a: number } }"#
+    insta::assert_snapshot!(
+        inline::<TestEnum>(&Default::default()).unwrap(),
+        @r#""Unit" | { Single: number } | { Multiple: [number, number] } | { Struct: { a: number } }"#
     );
-    assert_ts!(RefStruct, "TestEnum");
+    insta::assert_snapshot!(inline::<RefStruct>(&Default::default()).unwrap(), @"TestEnum");
 
-    assert_ts!(
-        InlinerStruct,
-        "{ inline_this: { ref_struct: SimpleStruct; val: number }; dont_inline_this: RefStruct }"
-    );
-
-    assert_ts!(GenericStruct<i32>, "{ arg: number }");
-    assert_ts!(GenericStruct<String>, "{ arg: string }");
-
-    assert_ts!(FlattenEnumStruct, r#"(FlattenEnum) & { outer: string }"#);
-
-    assert_ts!(OverridenStruct, "{ overriden_field: string }");
-    assert_ts!(HasGenericAlias, r#"{ [key in number]: string }"#);
-
-    assert_ts!(SkipVariant, "{ A: string }");
-    assert_ts!(SkipVariant2, r#"{ tag: "A"; data: string }"#);
-    assert_ts!(SkipVariant3, "{ A: { a: string } }");
-
-    assert_ts!(
-        EnumMacroAttributes,
-        "{ A: string } | { bbb: number } | { cccc: number } | { D: { a: string; bbbbbb: number } }"
+    insta::assert_snapshot!(
+        inline::<InlinerStruct>(&Default::default()).unwrap(),
+        @"{ inline_this: { ref_struct: SimpleStruct; val: number }; dont_inline_this: RefStruct }"
     );
 
-    assert_ts!(Recursive, "{ a: number; children: Recursive[] }"); // TODO: FIX
+    insta::assert_snapshot!(inline::<GenericStruct<i32>>(&Default::default()).unwrap(), @"{ arg: number }");
+    insta::assert_snapshot!(inline::<GenericStruct<String>>(&Default::default()).unwrap(), @"{ arg: string }");
 
-    assert_ts!(InlineEnumField, "{ A: { a: string } }");
+    insta::assert_snapshot!(inline::<FlattenEnumStruct>(&Default::default()).unwrap(), @r#"(FlattenEnum) & { outer: string }"#);
 
-    assert_ts!(
-        InlineOptionalType,
-        "{ optional_field: { a: string } | null }"
+    insta::assert_snapshot!(inline::<OverridenStruct>(&Default::default()).unwrap(), @"{ overriden_field: string }");
+    insta::assert_snapshot!(inline::<HasGenericAlias>(&Default::default()).unwrap(), @r#"{ [key in number]: string }"#);
+
+    insta::assert_snapshot!(inline::<SkipVariant>(&Default::default()).unwrap(), @"{ A: string }");
+    insta::assert_snapshot!(inline::<SkipVariant2>(&Default::default()).unwrap(), @r#"{ tag: "A"; data: string }"#);
+    insta::assert_snapshot!(inline::<SkipVariant3>(&Default::default()).unwrap(), @"{ A: { a: string } }");
+
+    insta::assert_snapshot!(
+        inline::<EnumMacroAttributes>(&Default::default()).unwrap(),
+        @"{ A: string } | { bbb: number } | { cccc: number } | { D: { a: string; bbbbbb: number } }"
     );
 
-    assert_ts_export!(
-        RenameToValue,
-        "export type RenameToValueNewName = { demo_new_name: number };"
+    insta::assert_snapshot!(inline::<Recursive>(&Default::default()).unwrap(), @"{ a: number; children: Recursive[] }"); // TODO: FIX
+
+    insta::assert_snapshot!(inline::<InlineEnumField>(&Default::default()).unwrap(), @"{ A: { a: string } }");
+
+    insta::assert_snapshot!(
+        inline::<InlineOptionalType>(&Default::default()).unwrap(),
+        @"{ optional_field: { a: string } | null }"
     );
 
-    assert_ts!(Rename, r#""OneWord" | "Two words""#);
+    insta::assert_snapshot!(
+        export::<RenameToValue>(&Default::default()).unwrap(),
+        @"export type RenameToValueNewName = { demo_new_name: number };"
+    );
 
-    assert_ts!(TransparentType, r#"{ inner: string }"#);
-    assert_ts!(TransparentType2, r#"null"#);
-    assert_ts!(TransparentTypeWithOverride, r#"string"#);
+    insta::assert_snapshot!(inline::<Rename>(&Default::default()).unwrap(), @r#""OneWord" | "Two words""#);
+
+    insta::assert_snapshot!(inline::<TransparentType>(&Default::default()).unwrap(), @r#"{ inner: string }"#);
+    insta::assert_snapshot!(inline::<TransparentType2>(&Default::default()).unwrap(), @r#"null"#);
+    insta::assert_snapshot!(inline::<TransparentTypeWithOverride>(&Default::default()).unwrap(), @r#"string"#);
 
     // I love serde but this is so mega cringe. Lack of support and the fact that `0..5` == `0..=5` is so dumb.
-    assert_ts!(() => 0..5, r#"{ start: number; end: number }"#);
-    // assert_ts!(() => 0.., r#"{ start: 0 }"#);
-    // assert_ts!(() => .., r#""#);
-    assert_ts!(() => 0..=5, r#"{ start: number; end: number }"#);
-    // assert_ts!(() => ..5, r#"{ end: 5 }"#);
-    // assert_ts!(() => ..=5, r#"{ end: 5 }"#);
+    insta::assert_snapshot!(inline_ref(&(0..5), &Default::default()).unwrap(), @r#"{ start: number; end: number }"#);
+    // insta::assert_snapshot!(inline_ref(&(0..), &Default::default()).unwrap(), @r#"{ start: 0 }"#);
+    // insta::assert_snapshot!(inline_ref(&(..), &Default::default()).unwrap(), @r#""#);
+    insta::assert_snapshot!(inline_ref(&(0..=5), &Default::default()).unwrap(), @r#"{ start: number; end: number }"#);
+    // insta::assert_snapshot!(inline_ref(&(..5), &Default::default()).unwrap(), @r#"{ end: 5 }"#);
+    // insta::assert_snapshot!(inline_ref(&(..=5), &Default::default()).unwrap(), @r#"{ end: 5 }"#);
 
     // https://github.com/oscartbeaumont/specta/issues/66
-    assert_ts!(
-        [Option<u8>; 3],
-        r#"[(number | null), (number | null), (number | null)]"#
+    insta::assert_snapshot!(
+        inline::<[Option<u8>; 3]>(&Default::default()).unwrap(),
+        @r#"[(number | null), (number | null), (number | null)]"#
     );
 
     // https://github.com/oscartbeaumont/specta/issues/65
-    assert_ts!(HashMap<BasicEnum, ()>, r#"Partial<{ [key in "A" | "B"]: null }>"#);
+    insta::assert_snapshot!(inline::<HashMap<BasicEnum, ()>>(&Default::default()).unwrap(), @r#"Partial<{ [key in "A" | "B"]: null }>"#);
 
     // https://github.com/oscartbeaumont/specta/issues/60
-    assert_ts!(Option<Option<Option<Option<i32>>>>, r#"number | null"#);
+    insta::assert_snapshot!(inline::<Option<Option<Option<Option<i32>>>>>(&Default::default()).unwrap(), @r#"number | null"#);
 
     // https://github.com/oscartbeaumont/specta/issues/71
-    assert_ts!(Vec<PlaceholderInnerField>, r#"{ a: string }[]"#);
+    insta::assert_snapshot!(inline::<Vec<PlaceholderInnerField>>(&Default::default()).unwrap(), @r#"{ a: string }[]"#);
 
     // https://github.com/oscartbeaumont/specta/issues/77
-    assert_eq!(
+    insta::assert_snapshot!(
         inline::<std::time::SystemTime>(&Typescript::new().bigint(BigIntExportBehavior::Number))
-            .map_err(|e| e.to_string()),
-        Ok(r#"{ duration_since_epoch: number; duration_since_unix_epoch: number }"#.into())
+            .unwrap(),
+        @r#"{ duration_since_epoch: number; duration_since_unix_epoch: number }"#
     );
-    assert_eq!(
+    insta::assert_snapshot!(
         inline::<std::time::SystemTime>(&Typescript::new().bigint(BigIntExportBehavior::String))
-            .map_err(|e| e.to_string()),
-        Ok(r#"{ duration_since_epoch: string; duration_since_unix_epoch: number }"#.into())
+            .unwrap(),
+        @r#"{ duration_since_epoch: string; duration_since_unix_epoch: number }"#
     );
 
-    assert_eq!(
+    insta::assert_snapshot!(
         inline::<std::time::Duration>(&Typescript::new().bigint(BigIntExportBehavior::Number))
-            .map_err(|e| e.to_string()),
-        Ok(r#"{ secs: number; nanos: number }"#.into())
+            .unwrap(),
+        @r#"{ secs: number; nanos: number }"#
     );
-    assert_eq!(
+    insta::assert_snapshot!(
         inline::<std::time::Duration>(&Typescript::new().bigint(BigIntExportBehavior::String))
-            .map_err(|e| e.to_string()),
-        Ok(r#"{ secs: string; nanos: number }"#.into())
+            .unwrap(),
+        @r#"{ secs: string; nanos: number }"#
     );
 
-    assert_ts!(HashMap<BasicEnum, i32>, r#"Partial<{ [key in "A" | "B"]: number }>"#);
-    assert_ts_export!(
-        EnumReferenceRecordKey,
-        "export type EnumReferenceRecordKey = { a: Partial<{ [key in BasicEnum]: number }> };"
+    insta::assert_snapshot!(inline::<HashMap<BasicEnum, i32>>(&Default::default()).unwrap(), @r#"Partial<{ [key in "A" | "B"]: number }>"#);
+    insta::assert_snapshot!(
+        export::<EnumReferenceRecordKey>(&Default::default()).unwrap(),
+        @"export type EnumReferenceRecordKey = { a: Partial<{ [key in BasicEnum]: number }> };"
     );
 
-    assert_ts!(FlattenOnNestedEnum, r#"(NestedEnum) & { id: string }"#);
+    insta::assert_snapshot!(inline::<FlattenOnNestedEnum>(&Default::default()).unwrap(), @r#"(NestedEnum) & { id: string }"#);
 
-    assert_ts!(PhantomData<()>, r#"null"#);
-    assert_ts!(PhantomData<String>, r#"null"#);
-    assert_ts!(Infallible, r#"never"#);
+    insta::assert_snapshot!(inline::<PhantomData<()>>(&Default::default()).unwrap(), @r#"null"#);
+    insta::assert_snapshot!(inline::<PhantomData<String>>(&Default::default()).unwrap(), @r#"null"#);
+    insta::assert_snapshot!(inline::<Infallible>(&Default::default()).unwrap(), @r#"never"#);
 
-    assert_ts!(either::Either<String, i32>, r#"string | number"#);
-    assert_ts!(either::Either<i16, i32>, r#"number"#);
+    insta::assert_snapshot!(inline::<either::Either<String, i32>>(&Default::default()).unwrap(), @r#"string | number"#);
+    insta::assert_snapshot!(inline::<either::Either<i16, i32>>(&Default::default()).unwrap(), @r#"number"#);
 
-    assert_ts!(Any, r#"any"#);
+    insta::assert_snapshot!(inline::<Any>(&Default::default()).unwrap(), @r#"any"#);
 
-    assert_ts!(MyEmptyInput, "Record<string, never>");
-    assert_ts_export!(
-        MyEmptyInput,
-        "export type MyEmptyInput = Record<string, never>;"
+    insta::assert_snapshot!(inline::<MyEmptyInput>(&Default::default()).unwrap(), @"Record<string, never>");
+    insta::assert_snapshot!(
+        export::<MyEmptyInput>(&Default::default()).unwrap(),
+        @"export type MyEmptyInput = Record<string, never>;"
     );
 
     // https://github.com/oscartbeaumont/specta/issues/142
     #[allow(unused_parens)]
     {
-        assert_ts!((String), r#"string"#);
-        assert_ts!((String,), r#"[string]"#);
+        insta::assert_snapshot!(inline::<(String)>(&Default::default()).unwrap(), @r#"string"#);
+        insta::assert_snapshot!(inline::<(String,)>(&Default::default()).unwrap(), @r#"[string]"#);
     }
 
     // https://github.com/oscartbeaumont/specta/issues/148
-    assert_ts!(ExtraBracketsInTupleVariant, "{ A: string }");
-    assert_ts!(ExtraBracketsInUnnamedStruct, "string");
+    insta::assert_snapshot!(inline::<ExtraBracketsInTupleVariant>(&Default::default()).unwrap(), @"{ A: string }");
+    insta::assert_snapshot!(inline::<ExtraBracketsInUnnamedStruct>(&Default::default()).unwrap(), @"string");
 
     // https://github.com/oscartbeaumont/specta/issues/156
-    assert_ts!(Vec<MyEnum>, r#"({ A: string } | { B: number })[]"#);
+    insta::assert_snapshot!(inline::<Vec<MyEnum>>(&Default::default()).unwrap(), @r#"({ A: string } | { B: number })[]"#);
 
-    assert_ts!(InlineTuple, r#"{ demo: [string, boolean] }"#);
-    assert_ts!(
-        InlineTuple2,
-        r#"{ demo: [{ demo: [string, boolean] }, boolean] }"#
+    insta::assert_snapshot!(inline::<InlineTuple>(&Default::default()).unwrap(), @r#"{ demo: [string, boolean] }"#);
+    insta::assert_snapshot!(
+        inline::<InlineTuple2>(&Default::default()).unwrap(),
+        @r#"{ demo: [{ demo: [string, boolean] }, boolean] }"#
     );
 
     // https://github.com/oscartbeaumont/specta/issues/220
-    assert_ts!(Box<str>, r#"string"#);
+    insta::assert_snapshot!(inline::<Box<str>>(&Default::default()).unwrap(), @r#"string"#);
 
-    assert_ts!(
-        SkippedFieldWithinVariant,
-        r#"{ type: "A" } | { type: "B"; data: string }"#
+    insta::assert_snapshot!(
+        inline::<SkippedFieldWithinVariant>(&Default::default()).unwrap(),
+        @r#"{ type: "A" } | { type: "B"; data: string }"#
     );
 
     // https://github.com/oscartbeaumont/specta/issues/239
-    assert_ts!(KebabCase, r#"{ "test-ing": string }"#);
+    insta::assert_snapshot!(inline::<KebabCase>(&Default::default()).unwrap(), @r#"{ "test-ing": string }"#);
 
     // https://github.com/specta-rs/specta/issues/281
-    assert_ts!(&[&str], "string[]");
-    assert_ts!(Issue281<'_>, "{ default_unity_arguments: string[] }");
+    insta::assert_snapshot!(inline::<&[&str]>(&Default::default()).unwrap(), @"string[]");
+    insta::assert_snapshot!(inline::<Issue281<'_>>(&Default::default()).unwrap(), @"{ default_unity_arguments: string[] }");
 
     // https://github.com/oscartbeaumont/specta/issues/90
-    assert_ts!(RenameWithWeirdCharsField, r#"{ "@odata.context": string }"#);
-    assert_ts!(
-        RenameWithWeirdCharsVariant,
-        r#"{ "@odata.context": string }"#
+    insta::assert_snapshot!(inline::<RenameWithWeirdCharsField>(&Default::default()).unwrap(), @r#"{ "@odata.context": string }"#);
+    insta::assert_snapshot!(
+        inline::<RenameWithWeirdCharsVariant>(&Default::default()).unwrap(),
+        @r#"{ "@odata.context": string }"#
     );
     // TODO: Reenable these tests when they are no so flaky
-    // assert_ts_export!(
-    //     error;
-    //     RenameWithWeirdCharsStruct,
-    //     ExportError::InvalidName(
-    //         NamedLocation::Type,
-    //         #[cfg(not(windows))]
-    //         ExportPath::new_unsafe("tests/tests/ts.rs:640:10"),
-    //         #[cfg(windows)]
-    //         ExportPath::new_unsafe("tests\tests\ts.rs:640:10"),
-    //         r#"@odata.context"#.to_string()
-    //     )
+    // insta::assert_snapshot!(
+    //     export::<RenameWithWeirdCharsStruct>(&Default::default()).unwrap_err(),
+    //     @"ExportError::InvalidName(...)"
     // );
-    // assert_ts_export!(
-    //     error;
-    //     RenameWithWeirdCharsEnum,
-    //     ExportError::InvalidName(
-    //         NamedLocation::Type,
-    //         #[cfg(not(windows))]
-    //         ExportPath::new_unsafe("tests/tests/ts.rs:644:10"),
-    //         #[cfg(windows)]
-    //         ExportPath::new_unsafe("tests\tests\ts.rs:644:10"),
-    //         r#"@odata.context"#.to_string()
-    //     )
+    // insta::assert_snapshot!(
+    //     export::<RenameWithWeirdCharsEnum>(&Default::default()).unwrap_err(),
+    //     @"ExportError::InvalidName(...)"
     // );
 
     // https://github.com/specta-rs/specta/issues/374
-    assert_ts!(Issue374, "{ foo?: boolean; bar?: boolean }");
+    insta::assert_snapshot!(inline::<Issue374>(&Default::default()).unwrap(), @"{ foo?: boolean; bar?: boolean }");
 
     // https://github.com/specta-rs/specta/issues/386
-    assert_ts!(type_type::Type, "never");
+    insta::assert_snapshot!(inline::<type_type::Type>(&Default::default()).unwrap(), @"never");
 }
 
 #[derive(Type)]

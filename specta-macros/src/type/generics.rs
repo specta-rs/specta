@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse_quote, ConstParam, GenericParam, Generics, LifetimeParam, TypeParam, WhereClause};
+use syn::{ConstParam, GenericParam, Generics, LifetimeParam, TypeParam, WhereClause, parse_quote};
 
 pub fn generics_with_ident_and_bounds_only(generics: &Generics) -> Option<TokenStream> {
     (!generics.params.is_empty())

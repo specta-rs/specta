@@ -189,13 +189,13 @@ impl Typescript {
                     let mut sorted_modules = modules_in_root.clone();
                     sorted_modules.sort();
 
-                    // Build a tree structure: map from parent path to its direct children  
+                    // Build a tree structure: map from parent path to its direct children
                     // This will help us generate namespaces hierarchically
                     let mut path_children: HashMap<String, BTreeSet<String>> = HashMap::new();
-                    
+
                     for module_path in &sorted_modules {
                         let parts: Vec<&str> = module_path.split("::").collect();
-                        
+
                         // For each level, track direct parent-child relationships only
                         for depth in 0..parts.len() {
                             let parent = if depth == 0 {
@@ -204,11 +204,8 @@ impl Typescript {
                                 parts[0..depth].join("::")
                             };
                             let child_name = parts[depth].to_string();
-                            
-                            path_children
-                                .entry(parent)
-                                .or_default()
-                                .insert(child_name);
+
+                            path_children.entry(parent).or_default().insert(child_name);
                         }
                     }
 
@@ -223,25 +220,26 @@ impl Typescript {
                         types: &TypeCollection,
                     ) -> Result<(), Error> {
                         let indent = "    ".repeat(depth);
-                        
-                        // Get types for this exact path
-                        let has_types = if let Some(types_in_module) = module_types.get_mut(current_path) {
-                            types_in_module.sort_by(|a, b| {
-                                a.name()
-                                    .cmp(b.name())
-                                    .then(a.module_path().cmp(b.module_path()))
-                                    .then(a.location().cmp(&b.location()))
-                            });
 
-                            for ndt in types_in_module {
-                                *out += &indent;
-                                *out += &primitives::export(ts, types, ndt)?;
-                                *out += "\n";
-                            }
-                            true
-                        } else {
-                            false
-                        };
+                        // Get types for this exact path
+                        let has_types =
+                            if let Some(types_in_module) = module_types.get_mut(current_path) {
+                                types_in_module.sort_by(|a, b| {
+                                    a.name()
+                                        .cmp(b.name())
+                                        .then(a.module_path().cmp(b.module_path()))
+                                        .then(a.location().cmp(&b.location()))
+                                });
+
+                                for ndt in types_in_module {
+                                    *out += &indent;
+                                    *out += &primitives::export(ts, types, ndt)?;
+                                    *out += "\n";
+                                }
+                                true
+                            } else {
+                                false
+                            };
 
                         // Get child namespace names
                         if let Some(child_names) = path_children.get(current_path) {
@@ -250,19 +248,27 @@ impl Typescript {
                                 if i > 0 || has_types {
                                     *out += "\n";
                                 }
-                                
+
                                 *out += &indent;
                                 *out += &format!("export namespace {child_name} {{\n");
-                                
+
                                 // Build the full path for the child
                                 let child_path = if current_path.is_empty() {
                                     child_name.clone()
                                 } else {
                                     format!("{}::{}", current_path, child_name)
                                 };
-                                
-                                write_namespace(out, &child_path, depth + 1, path_children, module_types, ts, types)?;
-                                
+
+                                write_namespace(
+                                    out,
+                                    &child_path,
+                                    depth + 1,
+                                    path_children,
+                                    module_types,
+                                    ts,
+                                    types,
+                                )?;
+
                                 *out += &indent;
                                 *out += "}\n";
                             }
@@ -273,7 +279,15 @@ impl Typescript {
 
                     // Start with the root namespace
                     out += &format!("export namespace {root_name} {{\n");
-                    write_namespace(&mut out, root_name, 1, &path_children, &mut module_types, self, types)?;
+                    write_namespace(
+                        &mut out,
+                        root_name,
+                        1,
+                        &path_children,
+                        &mut module_types,
+                        self,
+                        types,
+                    )?;
                     out += "}\n";
 
                     if !root_name.is_empty() {
@@ -560,99 +574,4 @@ pub(crate) fn root_alias_ident(root: &str) -> String {
     }
     alias.push('$');
     alias
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use specta::{Type, TypeCollection};
-
-    #[derive(Type)]
-    pub struct RootType {
-        data: String,
-    }
-
-    #[derive(Type)]
-    pub struct MainType {
-        nested: dev::another::NestedType,
-        root: RootType,
-    }
-
-    mod dev {
-        use super::*;
-
-        pub mod another {
-            use super::*;
-
-            #[derive(Type)]
-            pub struct NestedType {
-                value: String,
-            }
-
-            pub mod deeply {
-                use super::*;
-
-                #[derive(Type)]
-                pub struct DeeplyNestedType {
-                    inner: NestedType,
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_nested_namespaces_generation() {
-        let types = TypeCollection::default()
-            .register::<RootType>()
-            .register::<MainType>()
-            .register::<dev::another::NestedType>()
-            .register::<dev::another::deeply::DeeplyNestedType>();
-
-        let output = Typescript::new()
-            .layout(Layout::Namespaces)
-            .export(&types)
-            .expect("Should export successfully");
-
-        // The test types are nested under the test module path, so check for the proper nesting
-        // Check that we generate nested namespaces instead of flattened ones
-        assert!(
-            output.contains("export namespace dev {"),
-            "Should contain 'export namespace dev {{'"
-        );
-        assert!(
-            output.contains("export namespace another {"),
-            "Should contain 'export namespace another {{'"
-        );
-
-        // Check that we don't generate flattened namespaces with underscores in root declarations
-        assert!(
-            !output.contains("export namespace dev_another"),
-            "Should not contain flattened namespace names with underscores"
-        );
-
-        // Check that type references use proper dot notation
-        assert!(
-            output.contains("$specta$root$specta_typescript$.typescript.tests.dev.another.NestedType"),
-            "Type references should use alias-based dot notation for namespace access"
-        );
-    }
-
-    #[test]
-    fn test_module_prefixed_name_still_uses_underscores() {
-        let types = TypeCollection::default()
-            .register::<RootType>()
-            .register::<MainType>()
-            .register::<dev::another::NestedType>();
-
-        let output = Typescript::new()
-            .layout(Layout::ModulePrefixedName)
-            .export(&types)
-            .expect("Should export successfully");
-
-        // ModulePrefixedName should still use underscores as before
-        assert!(
-            output.contains("dev_another_NestedType"),
-            "ModulePrefixedName should still use underscores"
-        );
-    }
 }

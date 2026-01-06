@@ -115,8 +115,7 @@ pub fn export_type(
                 "public enum {}{}{} {{\n",
                 name, generics, protocol_part
             ));
-            let enum_body =
-                enum_to_swift(swift, types, e, vec![], false, None, Some(&name))?;
+            let enum_body = enum_to_swift(swift, types, e, vec![], false, None, Some(&name))?;
             result.push_str(&enum_body);
             result.push_str("}");
 
@@ -199,7 +198,10 @@ pub fn is_duration_struct(s: &specta::datatype::Struct) -> bool {
 }
 
 /// Check if a type is a special standard library type that needs special handling
-fn is_special_std_type(types: &TypeCollection, reference: Option<&specta::datatype::Reference>) -> Option<String> {
+fn is_special_std_type(
+    types: &TypeCollection,
+    reference: Option<&specta::datatype::Reference>,
+) -> Option<String> {
     if let Some(r) = reference {
         if let Some(ndt) = r.get(types) {
             // Check for std::time::Duration

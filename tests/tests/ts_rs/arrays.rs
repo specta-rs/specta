@@ -1,9 +1,8 @@
-use crate::ts::assert_ts;
 use specta::Type;
 
 #[test]
 fn free() {
-    assert_ts!([String; 3], "[string, string, string]")
+    insta::assert_snapshot!(crate::ts::inline::<[String; 3]>(&Default::default()).unwrap(), @"[string, string, string]");
 }
 
 #[test]
@@ -15,7 +14,7 @@ fn interface() {
         a: [i32; 3],
     }
 
-    assert_ts!(Interface, "{ a: [number, number, number] }")
+    insta::assert_snapshot!(crate::ts::inline::<Interface>(&Default::default()).unwrap(), @"{ a: [number, number, number] }");
 }
 
 #[test]
@@ -24,5 +23,5 @@ fn newtype() {
     #[specta(collect = false)]
     struct Newtype(#[allow(dead_code)] [i32; 3]);
 
-    assert_ts!(Newtype, "[number, number, number]")
+    insta::assert_snapshot!(crate::ts::inline::<Newtype>(&Default::default()).unwrap(), @"[number, number, number]");
 }

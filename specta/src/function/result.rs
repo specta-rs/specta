@@ -1,6 +1,6 @@
 use std::future::Future;
 
-use crate::{datatype::FunctionReturnType, Type, TypeCollection};
+use crate::{Type, TypeCollection, datatype::FunctionReturnType};
 
 /// Implemented by types that can be returned from a function annotated with
 /// [`specta`](crate::specta).

@@ -12,15 +12,9 @@ struct TaggedType {
 
 #[test]
 fn test_struct_tagging() {
-    assert_eq!(
-        assert_ts_export2::<TaggedType>(),
-        Ok(r#"export type TaggedType = { a: number; b: number; type: "TaggedType" };"#.into())
-    );
-    assert_eq!(
-        assert_ts_inline2::<TaggedType>(),
-        //. This might be unexpected but we are inling without NamedDataType so it's correct.
-        Ok(r#"{ a: number; b: number }"#.into())
-    );
+    insta::assert_snapshot!(assert_ts_export2::<TaggedType>().unwrap(), @r#"export type TaggedType = { a: number; b: number; type: "TaggedType" };"#);
+    //. This might be unexpected but we are inling without NamedDataType so it's correct.
+    insta::assert_snapshot!(assert_ts_inline2::<TaggedType>().unwrap(), @r#"{ a: number; b: number }"#);
 
     // TODO: Better unit tests for this including asserting runtime error for invalid cases
 }

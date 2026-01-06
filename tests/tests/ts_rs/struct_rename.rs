@@ -1,5 +1,3 @@
-use crate::ts::assert_ts;
-
 use specta::Type;
 
 #[test]
@@ -12,7 +10,7 @@ fn rename_all() {
         b: i32,
     }
 
-    assert_ts!(Rename, "{ A: number; B: number }");
+    insta::assert_snapshot!(crate::ts::inline::<Rename>(&Default::default()).unwrap(), @"{ A: number; B: number }");
 }
 
 // #[test]
