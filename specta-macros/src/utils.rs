@@ -85,6 +85,31 @@ impl Attribute {
             )),
         }
     }
+
+    pub fn parse_inflection(&self) -> Result<Inflection> {
+        match &self.value {
+            Some(AttributeValue::Lit(Lit::Str(lit))) => Ok(match lit.value().as_str() {
+                "lowercase" => Inflection::Lower,
+                "UPPERCASE" => Inflection::Upper,
+                "PascalCase" => Inflection::Pascal,
+                "camelCase" => Inflection::Camel,
+                "snake_case" => Inflection::Snake,
+                "SCREAMING_SNAKE_CASE" => Inflection::ScreamingSnake,
+                "kebab-case" => Inflection::Kebab,
+                "SCREAMING-KEBAB-CASE" => Inflection::ScreamingKebab,
+                _ => {
+                    return Err(syn::Error::new_spanned(
+                        lit,
+                        "specta: found string literal containing an unsupported inflection",
+                    ));
+                }
+            }),
+            _ => Err(syn::Error::new(
+                self.value_span(),
+                "specta: expected string literal containing an inflection",
+            )),
+        }
+    }
 }
 
 fn parse_attribute(content: ParseStream) -> Result<Vec<Attribute>> {
@@ -249,4 +274,15 @@ pub fn unraw_raw_ident(ident: &Ident) -> String {
 #[cfg(feature = "DO_NOT_USE_function")]
 pub fn format_fn_wrapper(function: &Ident) -> Ident {
     quote::format_ident!("__specta__fn__{}", function)
+}
+
+pub enum Inflection {
+    Lower,
+    Upper,
+    Pascal,
+    Camel,
+    Snake,
+    ScreamingSnake,
+    Kebab,
+    ScreamingKebab,
 }

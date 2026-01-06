@@ -1,0 +1,89 @@
+Reserve all the language crate names
+
+
+Overhaul `specta-serde` public API
+Convert Specta Serde README to Rustdocs
+
+
+
+Drain items using `&mut Vec<Attribute>` and then all remaining items should be lower into the AST layer
+
+Cleanup Specta attributes support (remove most of them)
+
+
+
+
+
+
+
+
+
+
+Make builders public in Rustdoc???
+
+`Fields::*` is missing handling for attributes. Especially `Unit`.
+
+Remove all `*` imports
+
+
+
+Maybe merge `specta::builder` into `specta::internal`???
+
+
+
+
+
+
+
+TODO:
+ - Cleanup default formatting for JS & TS output
+ - JSDoc: Field comments
+ - JSDoc: Generics
+
+Fix JSDoc & deprecated exporting on struct fields
+
+Should `primitives::typedef` be removed in favor of smarting references/inline needed for Tauri Specta???
+
+Better errors when exporting unknown `Opaque` reference
+
+Legacy module in core
+ - Function stuff
+ - `TypeCollection::remove`
+Remove `legacy` module from `specta-typescript` by finishing rewrite
+
+Make `SystemTime`, etc built-in impls a reference instead of inlining it's definition
+
+Future:
+ - Drop `specta::Flatten`???
+ - Overhaul errors in Typescript exporter
+ - Clean internals of Typescript exporter (drop legacy stuff)
+ - Drop as much of `specta::internal` as possible and use public builder methods
+
+The `collect` feature should have it's own namespacing
+
+
+BigInt:
+- Convert `BigIntExportBehavior` to be an attribute on the container
+- Remove the global `BigIntExportBehavior` config
+
+
+Can Tauri implement `Type` for the built-in's instead of `FunctionResult`/`FunctionArg`
+
+`MaybeUndefined` - https://github.com/specta-rs/specta/issues/157
+
+
+
+I wonder if I could replace the FunctionArg impls in Tauri with a Type impl for State, AppHandle, etc but define it as Reference::opaque() which is effectively a type which doesn't know how to be exported than Tauri Specta will need to tell Specta Typescript how to handle it. The only downside is that you could use State, etc in a return type but I suppose Tauri will stop you doing that anyway.
+If we did that but kept the old FunctionArg trait hidden we would probs be fine.
+To maintain semver Tauri is requiring Specta to keep so many random reexports so maybe for the final release before stabilisation I just remove all them (and FunctionArg) and hope people have upgraded or locked the Specta version like recommended.
+cause in Tauri we could bump the min required Specta version which would be required for Reference::opaque to even exist.
+
+
+
+
+Cleanup testing harness in `ts.rs`.
+Add unit tests for namespace/etc exporting
+Unit test FS files are created with `export_to`
+
+
+Migrate `specta-swift` to insta + Maybe break TS tests out of `specta-tests` and into `specta-typescript`???

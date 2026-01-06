@@ -2,8 +2,6 @@ use std::{cell::Cell, rc::Rc, sync::Arc};
 
 use specta::Type;
 
-use crate::ts::assert_ts;
-
 #[derive(Type)]
 #[specta(collect = false)]
 struct D {
@@ -29,8 +27,5 @@ struct F {
 
 #[test]
 fn test_nested() {
-    assert_ts!(
-        F,
-        "{ b1: E; b2: { a1: D; a2: { x1: number; y1: number } } }"
-    );
+    insta::assert_snapshot!(crate::ts::inline::<F>(&Default::default()).unwrap(), @"{ b1: E; b2: { a1: D; a2: { x1: number; y1: number } } }");
 }

@@ -1,6 +1,6 @@
 use syn::Result;
 
-use crate::utils::{Attribute, impl_parse};
+use crate::utils::{Attribute, Inflection, impl_parse};
 
 use super::RustCAttr;
 

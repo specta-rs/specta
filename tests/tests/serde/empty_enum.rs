@@ -82,26 +82,14 @@ enum I {
 #[test]
 fn empty_enums() {
     // `never & { tag = "a" }` would coalesce to `never` so we don't need to include it.
-    assert_eq!(assert_ts_inline2::<A>(), Ok(r#"never"#.into()));
-    assert_eq!(assert_ts_inline2::<B>(), Ok(r#"never"#.into()));
-    assert_eq!(assert_ts_inline2::<C>(), Ok(r#"never"#.into()));
-    assert_eq!(assert_ts_inline2::<D>(), Ok(r#"never"#.into()));
+    insta::assert_snapshot!(assert_ts_inline2::<A>().unwrap(), @r#"never"#);
+    insta::assert_snapshot!(assert_ts_inline2::<B>().unwrap(), @r#"never"#);
+    insta::assert_snapshot!(assert_ts_inline2::<C>().unwrap(), @r#"never"#);
+    insta::assert_snapshot!(assert_ts_inline2::<D>().unwrap(), @r#"never"#);
 
-    assert_eq!(
-        assert_ts_inline2::<E>(),
-        Ok(r#"({ a: "A" }) | ({ a: "B" })"#.into())
-    );
-    assert_eq!(
-        assert_ts_inline2::<F>(),
-        Ok(r#"({ a: "A" }) | ({ a: "B" })"#.into())
-    );
-    assert_eq!(
-        assert_ts_inline2::<G>(),
-        Err("Attempted to export  with tagging but the variant is a tuple struct.\n".into())
-    );
-    assert_eq!(assert_ts_inline2::<H>(), Ok(r#"({ a: "B" })"#.into()));
-    assert_eq!(
-        assert_ts_inline2::<I>(),
-        Ok(r#"({ a: "A" }) | ({ a: "B" })"#.into())
-    );
+    insta::assert_snapshot!(assert_ts_inline2::<E>().unwrap(), @r#"({ a: "A" }) | ({ a: "B" })"#);
+    insta::assert_snapshot!(assert_ts_inline2::<F>().unwrap(), @r#"({ a: "A" }) | ({ a: "B" })"#);
+    insta::assert_snapshot!(assert_ts_inline2::<G>().unwrap_err(), @"Attempted to export  with tagging but the variant is a tuple struct.\n");
+    insta::assert_snapshot!(assert_ts_inline2::<H>().unwrap(), @r#"({ a: "B" })"#);
+    insta::assert_snapshot!(assert_ts_inline2::<I>().unwrap(), @r#"({ a: "A" }) | ({ a: "B" })"#);
 }

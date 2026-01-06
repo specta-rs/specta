@@ -2,8 +2,6 @@ use std::{collections::HashMap, sync::Arc};
 
 use specta::Type;
 
-use crate::ts::assert_ts;
-
 #[derive(Type)]
 #[specta(collect = false)]
 pub struct A {
@@ -119,17 +117,14 @@ pub enum K {
 
 #[test]
 fn serde() {
-    assert_ts!(B, "(A) & ({ [key in string]: string })");
-    assert_ts!(C, "(A) & { b: { a: string } }");
-    assert_ts!(D, "(A) & { b: { a: string } }");
+    insta::assert_snapshot!(crate::ts::inline::<B>(&Default::default()).unwrap(), @"(A) & ({ [key in string]: string })");
+    insta::assert_snapshot!(crate::ts::inline::<C>(&Default::default()).unwrap(), @"(A) & { b: { a: string } }");
+    insta::assert_snapshot!(crate::ts::inline::<D>(&Default::default()).unwrap(), @"(A) & { b: { a: string } }");
     // assert_ts!(D, "(A) & { b: { a: string } }"); // TODO: Assert export
-    assert_ts!(E, "(A) & { b: { a: string } }");
-    assert_ts!(F, "(A)");
-    assert_ts!(G, "(A) & (AA)");
-    assert_ts!(H, "{ A: string } | \"B\"");
-    assert_ts!(
-        J,
-        "{ t: \"A\"; c: string } | { t: \"B\" } | { t: \"C\"; c: { a: string } } | { t: \"D\"; c: A }"
-    );
-    assert_ts!(K, "string | null | { a: string } | A");
+    insta::assert_snapshot!(crate::ts::inline::<E>(&Default::default()).unwrap(), @"(A) & { b: { a: string } }");
+    insta::assert_snapshot!(crate::ts::inline::<F>(&Default::default()).unwrap(), @"(A)");
+    insta::assert_snapshot!(crate::ts::inline::<G>(&Default::default()).unwrap(), @"(A) & (AA)");
+    insta::assert_snapshot!(crate::ts::inline::<H>(&Default::default()).unwrap(), @"{ A: string } | \"B\"");
+    insta::assert_snapshot!(crate::ts::inline::<J>(&Default::default()).unwrap(), @"{ t: \"A\"; c: string } | { t: \"B\" } | { t: \"C\"; c: { a: string } } | { t: \"D\"; c: A }");
+    insta::assert_snapshot!(crate::ts::inline::<K>(&Default::default()).unwrap(), @"string | null | { a: string } | A");
 }

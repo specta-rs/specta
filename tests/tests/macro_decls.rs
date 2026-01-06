@@ -1,7 +1,5 @@
 use specta::Type;
 
-use crate::ts::assert_ts;
-
 macro_rules! field_ty_macro {
     () => {
         String
@@ -27,7 +25,7 @@ pub enum MacroEnum {
 
 #[test]
 fn test_macro_in_decls() {
-    assert_ts!(MacroStruct, "string");
-    assert_ts!(MacroStruct2, "{ demo: string }");
-    assert_ts!(MacroEnum, "{ Demo: string } | { Demo2: { demo2: string } }");
+    insta::assert_snapshot!(crate::ts::inline::<MacroStruct>(&Default::default()).unwrap(), @"string");
+    insta::assert_snapshot!(crate::ts::inline::<MacroStruct2>(&Default::default()).unwrap(), @"{ demo: string }");
+    insta::assert_snapshot!(crate::ts::inline::<MacroEnum>(&Default::default()).unwrap(), @"{ Demo: string } | { Demo2: { demo2: string } }");
 }
