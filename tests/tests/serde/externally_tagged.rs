@@ -14,8 +14,8 @@ enum A {
 fn externally_tagged() {
     // There is not way to construct an invalid externally tagged type.
 
-    assert_eq!(
-        assert_ts_inline2::<A>(),
-        Ok(r#""A" | { B: { id: string; method: string } } | { C: string }"#.into())
+    insta::assert_snapshot!(
+        assert_ts_inline2::<A>().unwrap(),
+        @r#""A" | { B: { id: string; method: string } } | { C: string }"#
     );
 }

@@ -1,5 +1,3 @@
-use crate::ts::assert_ts;
-
 use specta::Type;
 
 #[derive(Type)]
@@ -32,13 +30,7 @@ enum EnumWithInternalTag2 {
 
 #[test]
 fn test_enums_with_internal_tags() {
-    assert_ts!(
-        EnumWithInternalTag,
-        r#"{ type: "A"; foo: string } | { type: "B"; bar: number }"#
-    );
+    insta::assert_snapshot!(crate::ts::inline::<EnumWithInternalTag>(&Default::default()).unwrap(), @r#"{ type: "A"; foo: string } | { type: "B"; bar: number }"#);
 
-    assert_ts!(
-        EnumWithInternalTag2,
-        r#"({ type: "A" } & InnerA) | ({ type: "B" } & InnerB)"#
-    );
+    insta::assert_snapshot!(crate::ts::inline::<EnumWithInternalTag2>(&Default::default()).unwrap(), @r#"({ type: "A" } & InnerA) | ({ type: "B" } & InnerB)"#);
 }

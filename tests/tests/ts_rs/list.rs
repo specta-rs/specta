@@ -1,7 +1,5 @@
 use specta::Type;
 
-use crate::ts::assert_ts;
-
 #[test]
 fn list() {
     #[derive(Type)]
@@ -11,5 +9,5 @@ fn list() {
         data: Option<Vec<u32>>,
     }
 
-    assert_ts!(List, "{ data: number[] | null }");
+    insta::assert_snapshot!(crate::ts::inline::<List>(&Default::default()).unwrap(), @"{ data: number[] | null }");
 }
