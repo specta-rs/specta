@@ -40,6 +40,8 @@ impl Parse for AttributeValue {
 
 #[derive(Clone)]
 pub struct Attribute {
+    /// Source of the attribute. Eg. `specta`, `serde`, `repr`, `deprecated`, etc.
+    pub source: String,
     /// Key of the current item. Eg. `specta` or `type`in `#[specta(type = String)]`
     pub key: Ident,
     /// Value of the item. Eg. `String` in `#[specta(type = String)]`
@@ -85,68 +87,64 @@ impl Attribute {
             )),
         }
     }
+}
 
-    pub fn parse_inflection(&self) -> Result<Inflection> {
-        match &self.value {
-            Some(AttributeValue::Lit(Lit::Str(lit))) => Ok(match lit.value().as_str() {
-                "lowercase" => Inflection::Lower,
-                "UPPERCASE" => Inflection::Upper,
-                "PascalCase" => Inflection::Pascal,
-                "camelCase" => Inflection::Camel,
-                "snake_case" => Inflection::Snake,
-                "SCREAMING_SNAKE_CASE" => Inflection::ScreamingSnake,
-                "kebab-case" => Inflection::Kebab,
-                "SCREAMING-KEBAB-CASE" => Inflection::ScreamingKebab,
-                _ => {
-                    return Err(syn::Error::new_spanned(
-                        lit,
-                        "specta: found string literal containing an unsupported inflection",
-                    ));
-                }
-            }),
-            _ => Err(syn::Error::new(
-                self.value_span(),
-                "specta: expected string literal containing an inflection",
-            )),
-        }
+pub trait AttrExtract {
+    fn extract(&self, source: &str, key: &str) -> Option<&Attribute>;
+    fn extract_all(&self, source: &str, key: &str) -> Vec<&Attribute>;
+    fn extract_all_by_source(&self, source: &str) -> Vec<&Attribute>;
+}
+
+impl AttrExtract for Vec<Attribute> {
+    fn extract(&self, source: &str, key: &str) -> Option<&Attribute> {
+        self.iter()
+            .find(|attr| attr.source == source && attr.key == key)
+    }
+
+    fn extract_all(&self, source: &str, key: &str) -> Vec<&Attribute> {
+        self.iter()
+            .filter(|attr| attr.source == source && attr.key == key)
+            .collect()
+    }
+
+    fn extract_all_by_source(&self, source: &str) -> Vec<&Attribute> {
+        self.iter().filter(|attr| attr.source == source).collect()
     }
 }
 
-fn parse_attribute(content: ParseStream) -> Result<Vec<Attribute>> {
-    let mut result = Vec::new();
+struct NestedAttributeList {
+    attrs: Vec<Attribute>,
+}
 
-    while !content.is_empty() {
-        // (demo = "hello")
-        //  ^^^^
-        let key = content.call(Ident::parse_any)?;
-        let key_span = key.span();
+impl Parse for NestedAttributeList {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let mut attrs = Vec::new();
+        while !input.is_empty() {
+            let key = input.call(Ident::parse_any)?;
+            let key_span = key.span();
 
-        result.push(Attribute {
-            key,
-            value: match false {
-                // `(demo(...))`
-                //       ^^^^^
-                _ if content.peek(Paren) => Some(AttributeValue::Attribute {
-                    span: key_span,
-                    attr: parse_attribute(content)?,
-                }),
-                // `(demo = "hello")`
-                //        ^^^^^^^^^
-                _ if content.peek(Token![=]) => {
-                    content.parse::<Token![=]>()?;
-                    Some(AttributeValue::parse(content)?)
-                }
-                // `(demo)`
-                _ => None,
-            },
-        });
+            attrs.push(Attribute {
+                source: String::new(), // Will be updated by caller
+                key,
+                value: match false {
+                    _ if input.peek(Paren) => Some(AttributeValue::Attribute {
+                        span: key_span,
+                        attr: input.parse::<NestedAttributeList>()?.attrs,
+                    }),
+                    _ if input.peek(Token![=]) => {
+                        input.parse::<Token![=]>()?;
+                        Some(input.parse()?)
+                    }
+                    _ => None,
+                },
+            });
 
-        if content.peek(Token![,]) {
-            content.parse::<Token![,]>()?;
+            if input.peek(Token![,]) {
+                input.parse::<Token![,]>()?;
+            }
         }
+        Ok(NestedAttributeList { attrs })
     }
-
-    Ok(result)
 }
 
 /// pass all of the attributes into a single structure.
@@ -178,89 +176,42 @@ pub fn parse_attrs_with_filter(
             continue;
         }
 
-        // // TODO: We should somehow build this up from the macro output automatically -> if not our attribute parser is applied to stuff like `allow` and that's bad.
-        // if !(ident == "specta"
-        //     // || ident == "serde"
-        //     || ident == "doc"
-        //     || ident == "repr"
-        //     || ident == "deprecated")
-        // {
-        //     continue;
-        // }
-
         result.append(&mut match &attr.meta {
             Meta::Path(_) => vec![Attribute {
+                source: attr_name.clone(),
                 key: ident.clone(),
                 value: None,
             }],
-            Meta::List(meta) => vec![Attribute {
-                key: ident.clone(),
-                value: Some(AttributeValue::Attribute {
-                    span: ident.span(),
-                    attr: syn::parse::Parser::parse2(parse_attribute, meta.tokens.clone())?,
-                }),
-            }],
+            Meta::List(meta) => {
+                let source = attr_name.clone();
+                let mut parsed: Vec<Attribute> =
+                    syn::parse2::<NestedAttributeList>(meta.tokens.clone())?.attrs;
+                for a in &mut parsed {
+                    a.source = source.clone();
+                }
+                vec![Attribute {
+                    source,
+                    key: ident.clone(),
+                    value: Some(AttributeValue::Attribute {
+                        span: ident.span(),
+                        attr: parsed,
+                    }),
+                }]
+            }
             Meta::NameValue(meta) => {
-                syn::parse::Parser::parse2(parse_attribute, meta.to_token_stream().clone())?
+                let source = attr_name.clone();
+                let mut parsed: Vec<Attribute> =
+                    syn::parse2::<NestedAttributeList>(meta.to_token_stream().clone())?.attrs;
+                for a in &mut parsed {
+                    a.source = source.clone();
+                }
+                parsed
             }
         });
     }
 
     Ok(result)
 }
-
-macro_rules! impl_parse {
-    ($i:ident ($attr_parser:ident, $out:ident) { $($k:pat => $e:expr),* $(,)? }) => {
-        impl $i {
-            fn try_from_attrs(
-                ident: &'static str,
-                attrs: &mut Vec<crate::utils::Attribute>,
-                $out: &mut Self,
-            ) -> syn::Result<()> {
-                // Technically we can have multiple root-level attributes
-                // Eg. `#[specta(...)]` can exist multiple times on a single type
-                for attr in attrs.iter_mut().filter(|attr| attr.key == ident) {
-                    match &mut attr.value {
-                        Some($crate::utils::AttributeValue::Attribute { attr, .. }) => {
-                            *attr = std::mem::take(attr)
-                                .into_iter()
-                                .map(|$attr_parser| {
-                                    let mut was_passed_by_user = true;
-
-                                    match $attr_parser.key.to_string().as_str() {
-                                        $($k => $e,)*
-                                        #[allow(unreachable_patterns)]
-                                        _ => {
-                                            was_passed_by_user = false;
-                                        }
-                                    }
-
-                                    Ok(($attr_parser, was_passed_by_user))
-                                })
-                                .collect::<syn::Result<Vec<(Attribute, bool)>>>()?
-                                .into_iter()
-                                .filter_map(
-                                    |(attr, was_passed_by_user)| {
-                                        if was_passed_by_user {
-                                            None
-                                        } else {
-                                            Some(attr)
-                                        }
-                                    },
-                                )
-                                .collect();
-                        }
-                        _ => {}
-                    }
-                }
-
-                Ok(())
-            }
-        }
-    };
-}
-
-pub(crate) use impl_parse;
 
 pub fn unraw_raw_ident(ident: &Ident) -> String {
     let ident = ident.to_string();

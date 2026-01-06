@@ -21,7 +21,6 @@ pub mod construct {
 
     pub fn skipped_field(
         optional: bool,
-        flatten: bool,
         inline: bool,
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
@@ -29,30 +28,10 @@ pub mod construct {
     ) -> Field {
         Field {
             optional,
-            flatten,
             deprecated,
             docs,
             inline,
             ty: None,
-            attributes,
-        }
-    }
-
-    pub fn field_flattened<T: Type>(
-        optional: bool,
-        inline: bool,
-        deprecated: Option<DeprecatedType>,
-        docs: Cow<'static, str>,
-        types: &mut TypeCollection,
-        attributes: Vec<RuntimeAttribute>,
-    ) -> Field {
-        Field {
-            optional,
-            flatten: true,
-            deprecated,
-            docs,
-            inline,
-            ty: Some(T::definition(types)),
             attributes,
         }
     }
@@ -67,7 +46,6 @@ pub mod construct {
     ) -> Field {
         Field {
             optional,
-            flatten: false,
             deprecated,
             docs,
             inline,
@@ -129,7 +107,6 @@ pub mod construct {
         Fields::Unnamed(UnnamedFields {
             fields: vec![Field {
                 optional: false,
-                flatten: false,
                 deprecated: None,
                 docs: Cow::Borrowed(""),
                 inline: true,

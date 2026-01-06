@@ -194,7 +194,7 @@ const _: () = {
                         "v".into(),
                         Field {
                             optional: false,
-                            flatten: false,
+
                             inline: false,
                             deprecated: None,
                             docs: Cow::Borrowed(""),
@@ -373,7 +373,7 @@ const _: () = {
                             "time".into(),
                             Field {
                                 optional: false,
-                                flatten: false,
+
                                 inline: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
@@ -385,7 +385,7 @@ const _: () = {
                             "id".into(),
                             Field {
                                 optional: false,
-                                flatten: false,
+
                                 inline: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
@@ -577,7 +577,7 @@ const _: () = {
                             "key_code".into(),
                             Field {
                                 optional: false,
-                                flatten: false,
+
                                 inline: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
@@ -589,7 +589,7 @@ const _: () = {
                             "logical_key".into(),
                             Field {
                                 optional: false,
-                                flatten: false,
+
                                 inline: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
@@ -601,7 +601,7 @@ const _: () = {
                             "state".into(),
                             Field {
                                 optional: false,
-                                flatten: false,
+
                                 inline: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
@@ -613,7 +613,7 @@ const _: () = {
                             "window".into(),
                             Field {
                                 optional: false,
-                                flatten: false,
+
                                 inline: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
@@ -644,7 +644,7 @@ const _: () = {
                             "button".into(),
                             Field {
                                 optional: false,
-                                flatten: false,
+
                                 inline: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
@@ -656,7 +656,7 @@ const _: () = {
                             "state".into(),
                             Field {
                                 optional: false,
-                                flatten: false,
+
                                 inline: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
@@ -668,7 +668,7 @@ const _: () = {
                             "window".into(),
                             Field {
                                 optional: false,
-                                flatten: false,
+
                                 inline: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
@@ -714,7 +714,7 @@ const _: () = {
                             "unit".into(),
                             Field {
                                 optional: false,
-                                flatten: false,
+
                                 inline: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
@@ -726,7 +726,7 @@ const _: () = {
                             "x".into(),
                             Field {
                                 optional: false,
-                                flatten: false,
+
                                 inline: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
@@ -738,7 +738,7 @@ const _: () = {
                             "y".into(),
                             Field {
                                 optional: false,
-                                flatten: false,
+
                                 inline: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
@@ -750,7 +750,7 @@ const _: () = {
                             "window".into(),
                             Field {
                                 optional: false,
-                                flatten: false,
+
                                 inline: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
@@ -786,7 +786,7 @@ const _: () = {
                         "delta".into(),
                         Field {
                             optional: false,
-                            flatten: false,
+
                             inline: false,
                             deprecated: None,
                             docs: Cow::Borrowed(""),

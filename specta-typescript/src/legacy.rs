@@ -113,8 +113,8 @@ use crate::{Error, Typescript};
 use std::fmt::Write;
 
 use specta::datatype::{
-    DataType, DeprecatedType, Enum, EnumVariant, Fields, FunctionReturnType, Generic, Reference,
-    Struct, Tuple,
+    DataType, DeprecatedType, Enum, EnumVariant, Field, Fields, FunctionReturnType, Generic,
+    Reference, RuntimeMeta, Struct, Tuple,
 };
 use specta::internal::{NonSkipField, skip_fields, skip_fields_named};
 
@@ -122,6 +122,23 @@ use specta::internal::{NonSkipField, skip_fields, skip_fields_named};
 pub(crate) type Result<T> = std::result::Result<T, Error>;
 
 pub(crate) type Output = Result<String>;
+
+/// Check if a field has the `#[serde(flatten)]` or `#[specta(flatten)]` attribute
+fn is_field_flattened(field: &Field) -> bool {
+    field.attributes().iter().any(|attr| {
+        if attr.path == "serde" || attr.path == "specta" {
+            match &attr.kind {
+                RuntimeMeta::Path(path) => path == "flatten",
+                RuntimeMeta::List(items) => items.iter().any(|item| {
+                    matches!(item, specta::datatype::RuntimeNestedMeta::Meta(RuntimeMeta::Path(path)) if path == "flatten")
+                }),
+                _ => false,
+            }
+        } else {
+            false
+        }
+    })
+}
 
 #[allow(clippy::ptr_arg)]
 fn inner_comments(
@@ -290,7 +307,7 @@ pub(crate) fn struct_datatype(
             }
 
             let (flattened, non_flattened): (Vec<_>, Vec<_>) =
-                fields.iter().partition(|(_, (f, _))| f.flatten());
+                fields.iter().partition(|(_, (f, _))| is_field_flattened(f));
 
             let mut field_sections = flattened
                 .into_iter()

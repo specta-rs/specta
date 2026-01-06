@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::Result;
 
-use crate::utils::{Attribute, impl_parse};
+use crate::utils::{AttrExtract, Attribute};
 
 use super::RustCAttr;
 
@@ -19,26 +19,49 @@ pub struct ContainerAttr {
     pub transparent: bool,
 }
 
-impl_parse! {
-    ContainerAttr(attr, out) {
-        "crate" => {
-            out.crate_name = out.crate_name.take().or(Some(attr.parse_path()?.to_token_stream()));
-        },
-        "inline" => out.inline = attr.parse_bool().unwrap_or(true),
-        "remote" => out.remote = out.remote.take().or(Some(attr.parse_path()?.to_token_stream())),
-        "collect" => out.collect = out.collect.take().or(Some(attr.parse_bool().unwrap_or(true))),
-        "skip_attr" => out.skip_attrs.push(attr.parse_string()?),
-        "transparent" => out.transparent = attr.parse_bool().unwrap_or(true),
-    }
-}
-
 impl ContainerAttr {
     pub fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
         let mut result = Self::default();
         result.common = RustCAttr::from_attrs(attrs)?;
-        Self::try_from_attrs("specta", attrs, &mut result)?;
-        // Self::try_from_attrs("serde", attrs, &mut result)?;
-        Self::try_from_attrs("repr", attrs, &mut result)?; // To handle `#[repr(transparent)]`
+
+        if let Some(attr) = attrs.extract("specta", "crate") {
+            result.crate_name = result
+                .crate_name
+                .take()
+                .or(Some(attr.parse_path()?.to_token_stream()));
+        }
+
+        if let Some(attr) = attrs.extract("specta", "inline") {
+            result.inline = attr.parse_bool().unwrap_or(true);
+        }
+
+        if let Some(attr) = attrs.extract("specta", "remote") {
+            result.remote = result
+                .remote
+                .take()
+                .or(Some(attr.parse_path()?.to_token_stream()));
+        }
+
+        if let Some(attr) = attrs.extract("specta", "collect") {
+            result.collect = result
+                .collect
+                .take()
+                .or(Some(attr.parse_bool().unwrap_or(true)));
+        }
+
+        for attr in attrs.extract_all("specta", "skip_attr") {
+            result.skip_attrs.push(attr.parse_string()?);
+        }
+
+        if let Some(attr) = attrs.extract("specta", "transparent") {
+            result.transparent = attr.parse_bool().unwrap_or(true);
+        }
+
+        // Handle `#[repr(transparent)]`
+        if let Some(attr) = attrs.extract("repr", "transparent") {
+            result.transparent = attr.parse_bool().unwrap_or(true);
+        }
+
         Ok(result)
     }
 }

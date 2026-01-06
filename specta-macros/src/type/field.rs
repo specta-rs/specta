@@ -15,7 +15,6 @@ pub fn construct_field(
     let deprecated = attrs.common.deprecated_as_tokens();
     let optional = attrs.optional;
     let doc = attrs.common.doc;
-    let flatten = attrs.flatten;
     let inline = container_attrs.inline || attrs.inline;
 
     // Lower the field attributes to RuntimeAttribute tokens (same as enum variants)
@@ -38,7 +37,6 @@ pub fn construct_field(
     if attrs.skip {
         return Ok(quote!(internal::construct::skipped_field(
             #optional,
-            #flatten,
             #inline,
             #deprecated,
             #doc.into(),
@@ -46,11 +44,7 @@ pub fn construct_field(
         )));
     }
 
-    let method = attrs
-        .flatten
-        .then(|| quote!(field_flattened))
-        .unwrap_or_else(|| quote!(field));
-    let ty = quote!(internal::construct::#method::<#field_ty>(
+    let ty = quote!(internal::construct::field::<#field_ty>(
         #optional,
         #inline,
         #deprecated,

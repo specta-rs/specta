@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 
 use quote::quote;
-use syn::Result;
+use syn::{Lit, Result};
 
-use crate::utils::Attribute;
+use crate::utils::{Attribute, AttributeValue};
 
 pub enum DeprecatedType {
     Deprecated,

@@ -24,8 +24,6 @@ pub enum Fields {
 pub struct Field {
     /// Did the user apply a `#[specta(optional)]` attribute.
     pub(crate) optional: bool,
-    /// Did the user apply a `#[serde(flatten)]` or `#[specta(flatten)]` attribute.
-    pub(crate) flatten: bool,
     /// Deprecated attribute for the field.
     pub(crate) deprecated: Option<DeprecatedType>,
     /// Documentation comments for the field.
@@ -48,7 +46,6 @@ impl Field {
     pub fn new(ty: DataType) -> Self {
         Field {
             optional: false,
-            flatten: false,
             deprecated: None,
             docs: "".into(),
             inline: false,
@@ -65,16 +62,6 @@ impl Field {
     /// Set the optional attribute for this field.
     pub fn set_optional(&mut self, optional: bool) {
         self.optional = optional;
-    }
-
-    /// Has the Serde or Specta flatten attribute been applied to this field?
-    pub fn flatten(&self) -> bool {
-        self.flatten
-    }
-
-    /// Set the flatten attribute for this field.
-    pub fn set_flatten(&mut self, flatten: bool) {
-        self.flatten = flatten;
     }
 
     /// Has the Serde inline attribute been applied to this field?
