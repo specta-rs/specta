@@ -1,7 +1,9 @@
 //! [Serde](https://serde.rs) support for Specta
 //!
-//! This crate takes the types with their attribute metadata returned from the macros,
-//! validates that the type is a valid Serde type, and applies any transformations needed.
+//! This crate is what parses the `#[serde(...)]` attributes and applies the needed transformations to your types.
+//! This is possible as the Specta macros crate stores the discovered macro attributes into the [specta::DataType] definition of your type.
+//!
+//! For the specific attributes refer to Serde's [official documentation](https://serde.rs/attributes.html).
 //!
 //! # Usage
 //!
@@ -19,19 +21,18 @@
 mod error;
 mod inflection;
 mod repr;
-pub mod serde_attrs;
+mod serde_attrs;
 
 pub use error::Error;
-pub use inflection::RenameRule;
-pub use repr::EnumRepr;
-pub use serde_attrs::{
-    SerdeAttributes, SerdeFieldAttributes, SerdeMode, apply_serde_transformations,
-};
+pub use serde_attrs::SerdeMode;
 
 use specta::TypeCollection;
 use specta::datatype::{DataType, Enum, Fields, Generic, Primitive, Reference};
 use specta::internal::{skip_fields, skip_fields_named};
 use std::collections::HashSet;
+
+// TODO: We need something better for Tauri Specta cause it needs to handle multiple phases in one export run and handle the referencing of them.
+// pub fn process() -> Result<TypeCollection, Error>  {}
 
 /// Process a TypeCollection and return transformed types for serialization
 ///
