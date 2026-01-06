@@ -30,20 +30,6 @@ pub enum RuntimeLiteralIR {
     Float(f64),
 }
 
-// impl RuntimeAttributeIR {
-//     fn to_tokens(&self) -> proc_macro2::TokenStream {
-//         let path = &self.path;
-//         let kind = self.kind.to_tokens();
-
-//         quote::quote! {
-//             RuntimeAttribute {
-//                 path: #path,
-//                 kind: #kind,
-//             }
-//         }
-//     }
-// }
-
 fn lower_lit(expr: &syn::Expr) -> syn::Result<RuntimeLiteralIR> {
     match expr {
         syn::Expr::Lit(syn::ExprLit { lit, .. }) => match lit {

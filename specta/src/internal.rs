@@ -19,41 +19,6 @@ pub mod construct {
 
     use crate::{Type, TypeCollection, datatype::*};
 
-    pub fn skipped_field(
-        optional: bool,
-        inline: bool,
-        deprecated: Option<DeprecatedType>,
-        docs: Cow<'static, str>,
-        attributes: Vec<RuntimeAttribute>,
-    ) -> Field {
-        Field {
-            optional,
-            deprecated,
-            docs,
-            inline,
-            ty: None,
-            attributes,
-        }
-    }
-
-    pub fn field<T: Type>(
-        optional: bool,
-        inline: bool,
-        deprecated: Option<DeprecatedType>,
-        docs: Cow<'static, str>,
-        types: &mut TypeCollection,
-        attributes: Vec<RuntimeAttribute>,
-    ) -> Field {
-        Field {
-            optional,
-            deprecated,
-            docs,
-            inline,
-            ty: Some(T::definition(types)),
-            attributes,
-        }
-    }
-
     pub const fn r#struct(fields: Fields, attributes: Vec<RuntimeAttribute>) -> Struct {
         Struct { fields, attributes }
     }

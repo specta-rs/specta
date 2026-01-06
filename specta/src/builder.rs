@@ -101,9 +101,9 @@ impl VariantBuilder<NamedFields> {
     }
 }
 
-impl Into<EnumVariant> for VariantBuilder<NamedFields> {
-    fn into(self) -> EnumVariant {
-        self.build()
+impl From<VariantBuilder<NamedFields>> for EnumVariant {
+    fn from(val: VariantBuilder<NamedFields>) -> Self {
+        val.build()
     }
 }
 
@@ -130,9 +130,9 @@ impl VariantBuilder<UnnamedFields> {
     }
 }
 
-impl Into<EnumVariant> for VariantBuilder<UnnamedFields> {
-    fn into(self) -> EnumVariant {
-        self.build()
+impl From<VariantBuilder<UnnamedFields>> for EnumVariant {
+    fn from(val: VariantBuilder<UnnamedFields>) -> Self {
+        val.build()
     }
 }
 

@@ -54,7 +54,7 @@ pub fn parse_enum(
                     .filter(|attr| {
                         let path = attr.path().to_token_stream().to_string();
                         // Skip attributes that are in the skip_attrs list
-                        if container_attrs.skip_attrs.iter().any(|skip| path == *skip) {
+                        if container_attrs.skip_attrs.contains(&path) {
                             return false;
                         }
                         path == "serde" || path == "specta"

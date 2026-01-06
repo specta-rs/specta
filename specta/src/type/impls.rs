@@ -212,25 +212,11 @@ impl Type for std::time::SystemTime {
                 vec![
                     (
                         "duration_since_epoch".into(),
-                        internal::construct::field::<i64>(
-                            false,
-                            false,
-                            None,
-                            "".into(),
-                            types,
-                            Vec::new(),
-                        ),
+                        Field::new(<i64 as crate::Type>::definition(types)),
                     ),
                     (
                         "duration_since_unix_epoch".into(),
-                        internal::construct::field::<u32>(
-                            false,
-                            false,
-                            None,
-                            "".into(),
-                            types,
-                            Vec::new(),
-                        ),
+                        Field::new(<u32 as crate::Type>::definition(types)),
                     ),
                 ],
                 vec![],
@@ -247,25 +233,11 @@ impl Type for std::time::Duration {
                 vec![
                     (
                         "secs".into(),
-                        internal::construct::field::<u64>(
-                            false,
-                            false,
-                            None,
-                            "".into(),
-                            types,
-                            Vec::new(),
-                        ),
+                        Field::new(<u64 as crate::Type>::definition(types)),
                     ),
                     (
                         "nanos".into(),
-                        internal::construct::field::<u32>(
-                            false,
-                            false,
-                            None,
-                            "".into(),
-                            types,
-                            Vec::new(),
-                        ),
+                        Field::new(<u32 as crate::Type>::definition(types)),
                     ),
                 ],
                 vec![],

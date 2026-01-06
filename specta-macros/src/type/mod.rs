@@ -30,8 +30,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     // This means at the end we can check for any that weren't consumed and throw an error.
     let mut attrs = parse_attrs(attrs)?;
 
-    // TODO: We wanna drain from `ContainerAttrs` + do on per-field
-
     let container_attrs = ContainerAttr::from_attrs(&mut attrs)?;
     let crate_ref = container_attrs.crate_name.clone().unwrap_or(quote!(specta));
 
@@ -75,44 +73,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             "specta: Union types are not supported by Specta yet!",
         )),
     }?;
-
-    // let container_attrs = attrs
-    //     .iter()
-    //     .map(|attr| lower_attribute(attr).map(|attr| attr.to_tokens()))
-    //     .collect::<Result<Vec<_>, _>>()?;
-    // let inlines = match data {
-    //     Data::Struct(_) => quote!(datatype::Struct({
-    //         #inlines
-    //         // *e.attributes_mut() = vec![];
-    //         e
-    //     })),
-    //     Data::Enum(_) => quote!(datatype::Enum(#inlines)),
-    //     Data::Union(_) => unreachable!(),
-    // };
-
-    // // The expectation is that when an attribute is processed it will be removed so if any are left over we know they are invalid
-    // // but we only throw errors for Specta-specific attributes so we don't continually break other attributes.
-    // if let Some(attrs) = attrs.iter().find(|attr| attr.key == "specta") {
-    //     match &attrs.value {
-    //         Some(AttributeValue::Attribute { attr, .. }) => {
-    //             if let Some(attr) = attr.first() {
-    //                 return Err(syn::Error::new(
-    //                     attr.key.span(),
-    //                     format!(
-    //                         "specta: Found unsupported container attribute '{}'",
-    //                         attr.key
-    //                     ),
-    //                 ));
-    //             }
-    //         }
-    //         _ => {
-    //             return Err(syn::Error::new(
-    //                 attrs.key.span(),
-    //                 "specta: invalid formatted attribute",
-    //             ));
-    //         }
-    //     }
-    // }
 
     let bounds = generics_with_ident_and_bounds_only(generics);
     let type_args = generics_with_ident_only(generics);

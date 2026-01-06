@@ -28,15 +28,15 @@ pub struct Field {
     pub(crate) deprecated: Option<DeprecatedType>,
     /// Documentation comments for the field.
     pub(crate) docs: Cow<'static, str>,
+    /// Should we inline the definition of this type.
+    pub(crate) inline: bool,
+    /// Runtime attributes for this field (e.g., serde attributes)
+    pub(crate) attributes: Vec<RuntimeAttribute>,
     /// Type for the field. Is optional if `#[serde(skip)]` or `#[specta(skip)]` was applied.
     ///
     /// You might think, well why not apply this in the macro and just not emit the variant?
     /// Well in Serde `A(String)` and `A(#[serde(skip)] (), String)` export as different Typescript types so the exporter needs runtime knowledge of this.
     pub(crate) ty: Option<DataType>,
-    // TODO: This is a Typescript-specific thing
-    pub(crate) inline: bool,
-    /// Runtime attributes for this field (e.g., serde attributes)
-    pub(crate) attributes: Vec<RuntimeAttribute>,
 }
 
 impl Field {
