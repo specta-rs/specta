@@ -23,20 +23,10 @@ fn typescript_types_glam() {
 fn typescript_types_bevy_ecs() {
     use specta_typescript::{self, BigIntExportBehavior, ExportConfig, ExportPath};
 
-    assert_eq!(
-        ts::inline::<bevy_ecs::entity::Entity>(
-            &ExportConfig::default().bigint(BigIntExportBehavior::Number)
-        ),
-        Ok("number".into())
-    );
+    insta::assert_snapshot!(crate::ts::inline::<bevy_ecs::entity::Entity>(&ExportConfig::default().bigint(BigIntExportBehavior::Number)).unwrap(), @"number");
     // TODO: As we inline `Entity` never ends up in the type map so it falls back to "Entity" in the error instead of the path to the type. Is this what we want or not?
     insta::assert_snapshot!(format!("{:?}", crate::ts::inline::<bevy_ecs::entity::Entity>(&Default::default()).unwrap_err()), @"BigIntForbidden(ExportPath { path: \"Entity -> u64\" })");
 
     // https://github.com/oscartbeaumont/specta/issues/161#issuecomment-1822735951
-    assert_eq!(
-        ts::export::<bevy_ecs::entity::Entity>(
-            &ExportConfig::default().bigint(BigIntExportBehavior::Number)
-        ),
-        Ok("export type Entity = number".into())
-    );
+    insta::assert_snapshot!(crate::ts::export::<bevy_ecs::entity::Entity>(&ExportConfig::default().bigint(BigIntExportBehavior::Number)).unwrap(), @"export type Entity = number");
 }

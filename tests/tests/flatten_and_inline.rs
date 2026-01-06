@@ -155,27 +155,15 @@ pub enum K {
 #[test]
 fn serde() {
     insta::assert_snapshot!(crate::ts::inline::<B>(&Default::default()).unwrap(), @"(A) & ({ [key in string]: string })");
-    insta::assert_snapshot!(crate::ts::inline::<C>(&Default::default()).unwrap(), @r"
-    (A) & { 
-    	b: A,
-    }
-    ");
-    insta::assert_snapshot!(crate::ts::inline::<D>(&Default::default()).unwrap(), @r"
-    (A) & { 
-    	b: A,
-    }
-    ");
-    // TODO: Assert export
-    insta::assert_snapshot!(crate::ts::inline::<E>(&Default::default()).unwrap(), @r"
-    (A) & { 
-    	b: A,
-    }
-    ");
+    insta::assert_snapshot!(crate::ts::inline::<C>(&Default::default()).unwrap(), @"(A) & { b: { a: string } }");
+    insta::assert_snapshot!(crate::ts::inline::<D>(&Default::default()).unwrap(), @"(A) & { b: { a: string } }");
+    // assert_ts!(D, "(A) & { b: { a: string } }"); // TODO: Assert export
+    insta::assert_snapshot!(crate::ts::inline::<E>(&Default::default()).unwrap(), @"(A) & { b: { a: string } }");
     insta::assert_snapshot!(crate::ts::inline::<F>(&Default::default()).unwrap(), @"(A)");
     insta::assert_snapshot!(crate::ts::inline::<G>(&Default::default()).unwrap(), @"(A) & (AA)");
     insta::assert_snapshot!(crate::ts::inline::<H>(&Default::default()).unwrap(), @"{ A: string } | \"B\"");
-    insta::assert_snapshot!(crate::ts::inline::<J>(&Default::default()).unwrap(), @r#"{ t: "A"; c: string } | { t: "B" } | { t: "C"; c: A } | { t: "D"; c: A }"#);
-    insta::assert_snapshot!(crate::ts::inline::<K>(&Default::default()).unwrap(), @"string | null | A");
+    insta::assert_snapshot!(crate::ts::inline::<J>(&Default::default()).unwrap(), @"{ t: \"A\"; c: string } | { t: \"B\" } | { t: \"C\"; c: { a: string } } | { t: \"D\"; c: A }");
+    insta::assert_snapshot!(crate::ts::inline::<K>(&Default::default()).unwrap(), @"string | null | { a: string } | A");
 
     // Test for issue #393 - flatten in enum variants
     insta::assert_snapshot!(crate::ts::inline::<MyEnum>(&Default::default()).unwrap(), @"(A) & { type: \"Variant\" }");

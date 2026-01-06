@@ -12,13 +12,7 @@ struct TaggedType {
 
 #[test]
 fn test_struct_tagging() {
-    insta::assert_snapshot!(assert_ts_export2::<TaggedType>().unwrap(), @r#"
-    export type TaggedType = { 
-    		a: number,
-    		b: number,
-    		type: "TaggedType",
-    	};
-    "#);
+    insta::assert_snapshot!(assert_ts_export2::<TaggedType>().unwrap(), @r#"export type TaggedType = { a: number; b: number; type: "TaggedType" };"#);
     //. This might be unexpected but we are inling without NamedDataType so it's correct.
     insta::assert_snapshot!(assert_ts_inline2::<TaggedType>().unwrap(), @r#"{ a: number; b: number }"#);
 

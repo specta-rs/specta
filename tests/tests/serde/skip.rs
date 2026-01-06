@@ -114,11 +114,7 @@ pub enum LazilySkip {
 #[test]
 fn skip() {
     insta::assert_snapshot!(assert_ts_inline2::<SkipOnlyField>().unwrap(), @r#"Record<string, never>"#);
-    insta::assert_snapshot!(assert_ts_inline2::<SkipField>().unwrap(), @r"
-    { 
-    	b: number,
-    }
-    ");
+    insta::assert_snapshot!(assert_ts_inline2::<SkipField>().unwrap(), @r#"{ b: number }"#);
     insta::assert_snapshot!(assert_ts_inline2::<SkipOnlyVariantExternallyTagged>().unwrap_err(), @"the usage of #[specta(skip)] means the type can't be serialized\n");
     insta::assert_snapshot!(assert_ts_inline2::<SkipOnlyVariantInternallyTagged>().unwrap_err(), @"the usage of #[specta(skip)] means the type can't be serialized\n");
     insta::assert_snapshot!(assert_ts_inline2::<SkipOnlyVariantAdjacentlyTagged>().unwrap_err(), @"the usage of #[specta(skip)] means the type can't be serialized\n");
