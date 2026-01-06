@@ -154,7 +154,7 @@ fn internally_tagged() {
     );
     insta::assert_snapshot!(
         assert_ts_inline2::<L>().unwrap(),
-        @r#"({ type: "A" } & ({ type: "A" } | { type: "B" }))"#
+        @r#"({ type: "A" } & LInner)"#
     );
     insta::assert_snapshot!(assert_ts_inline2::<M>().unwrap(), @r#"({ type: "A" })"#);
 }
