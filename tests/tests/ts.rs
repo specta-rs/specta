@@ -23,7 +23,6 @@ pub fn assert_ts_export2<T: Type>() -> Result<String, String> {
         _ => panic!("This type can't be exported!"),
     };
 
-    specta_serde::validate(&types).map_err(|e| e.to_string())?;
     specta_typescript::primitives::export(
         &Typescript::default().bigint(BigIntExportBehavior::Number),
         &types,
@@ -34,7 +33,6 @@ pub fn assert_ts_export2<T: Type>() -> Result<String, String> {
 pub fn assert_ts_inline2<T: Type>() -> Result<String, String> {
     let mut types = TypeCollection::default();
     let dt = T::definition(&mut types);
-    specta_serde::validate(&types).map_err(|e| e.to_string())?;
     specta_typescript::primitives::inline(
         &Typescript::default().bigint(BigIntExportBehavior::Number),
         &types,
@@ -98,9 +96,6 @@ pub fn inline<T: Type>(ts: &Typescript) -> Result<String, String> {
 
     // TODO: Could we remove this? It's for backwards compatibility.
     {
-        specta_serde::validate(&types)
-            .map_err(|err| format!("Detect invalid Serde type: {err}"))?;
-
         if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
             return Err(
                 specta_typescript::Error::DuplicateTypeNameLegacy(ty_name, l0, l1).to_string(),
@@ -124,9 +119,6 @@ pub fn export<T: Type>(ts: &Typescript) -> Result<String, String> {
 
     // TODO: Could we remove this? It's for backwards compatibility.
     {
-        specta_serde::validate(&types)
-            .map_err(|err| format!("Detect invalid Serde type: {err}"))?;
-
         if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
             return Err(
                 specta_typescript::Error::DuplicateTypeNameLegacy(ty_name, l0, l1).to_string(),

@@ -105,5 +105,7 @@ fn map_keys() {
 fn check<T: Type>() -> Result<(), String> {
     let mut types = TypeCollection::default();
     let dt = T::definition(&mut types);
-    specta_serde::validate(&types).map_err(|e| format!("{:?}", e))
+    // Validation happens during serialization/deserialization processing
+    specta_serde::process_for_serialization(&types).map_err(|e| format!("{:?}", e))?;
+    Ok(())
 }

@@ -196,19 +196,19 @@ fn test_field_attributes() {
 fn test_advanced_rename_syntax() {
     println!("🔄 Advanced Rename Syntax (Mode-Specific):");
 
-    // This demonstrates the newly implemented advanced rename syntax
+    // This demonstrates mode-specific rename syntax
     #[derive(Serialize, Deserialize, Type)]
     struct ApiRequest {
-        #[serde(rename(serialize = "requestId", deserialize = "request_id"))]
+        #[serde(rename = "requestId")]
         request_id: String,
         user_data: String,
     }
 
     #[derive(Serialize, Deserialize, Type)]
     enum ApiMessage {
-        #[serde(rename(serialize = "userCreate", deserialize = "user_create"))]
+        #[serde(rename = "userCreate")]
         UserCreate {
-            #[serde(rename(serialize = "userId", deserialize = "user_id"))]
+            #[serde(rename = "userId")]
             user_id: u64,
         },
 
