@@ -28,6 +28,10 @@ pub enum RuntimeLiteralIR {
     Int(i64),
     Bool(bool),
     Float(f64),
+    Byte(u8),
+    Char(char),
+    ByteStr(Vec<u8>),
+    CStr(Vec<u8>),
 }
 
 fn lower_lit(expr: &syn::Expr) -> syn::Result<RuntimeLiteralIR> {
@@ -37,6 +41,10 @@ fn lower_lit(expr: &syn::Expr) -> syn::Result<RuntimeLiteralIR> {
             syn::Lit::Int(i) => Ok(RuntimeLiteralIR::Int(i.base10_parse()?)),
             syn::Lit::Bool(b) => Ok(RuntimeLiteralIR::Bool(b.value)),
             syn::Lit::Float(f) => Ok(RuntimeLiteralIR::Float(f.base10_parse()?)),
+            syn::Lit::Byte(b) => Ok(RuntimeLiteralIR::Byte(b.value())),
+            syn::Lit::Char(c) => Ok(RuntimeLiteralIR::Char(c.value())),
+            syn::Lit::ByteStr(bs) => Ok(RuntimeLiteralIR::ByteStr(bs.value())),
+            syn::Lit::CStr(cs) => Ok(RuntimeLiteralIR::CStr(cs.value().to_bytes().to_vec())),
             _ => Err(syn::Error::new_spanned(lit, "unsupported literal")),
         },
         _ => Err(syn::Error::new_spanned(expr, "expected literal")),
@@ -64,6 +72,10 @@ fn parse_nested_meta_items(list: &syn::MetaList) -> syn::Result<Vec<RuntimeNeste
             syn::Lit::Int(i) => RuntimeLiteralIR::Int(i.base10_parse()?),
             syn::Lit::Bool(b) => RuntimeLiteralIR::Bool(b.value),
             syn::Lit::Float(f) => RuntimeLiteralIR::Float(f.base10_parse()?),
+            syn::Lit::Byte(b) => RuntimeLiteralIR::Byte(b.value()),
+            syn::Lit::Char(c) => RuntimeLiteralIR::Char(c.value()),
+            syn::Lit::ByteStr(bs) => RuntimeLiteralIR::ByteStr(bs.value()),
+            syn::Lit::CStr(cs) => RuntimeLiteralIR::CStr(cs.value().to_bytes().to_vec()),
             _ => return Err(syn::Error::new_spanned(lit, "unsupported literal")),
         };
         return Ok(vec![RuntimeNestedMetaIR::Literal(runtime_lit)]);
@@ -93,6 +105,10 @@ fn parse_nested_meta_items(list: &syn::MetaList) -> syn::Result<Vec<RuntimeNeste
                     syn::Lit::Int(i) => RuntimeLiteralIR::Int(i.base10_parse()?),
                     syn::Lit::Bool(b) => RuntimeLiteralIR::Bool(b.value),
                     syn::Lit::Float(f) => RuntimeLiteralIR::Float(f.base10_parse()?),
+                    syn::Lit::Byte(b) => RuntimeLiteralIR::Byte(b.value()),
+                    syn::Lit::Char(c) => RuntimeLiteralIR::Char(c.value()),
+                    syn::Lit::ByteStr(bs) => RuntimeLiteralIR::ByteStr(bs.value()),
+                    syn::Lit::CStr(cs) => RuntimeLiteralIR::CStr(cs.value().to_bytes().to_vec()),
                     _ => return Err(syn::Error::new_spanned(lit, "unsupported literal")),
                 };
 
@@ -190,6 +206,14 @@ impl RuntimeLiteralIR {
             RuntimeLiteralIR::Int(i) => quote::quote!(datatype::RuntimeLiteral::Int(#i)),
             RuntimeLiteralIR::Bool(b) => quote::quote!(datatype::RuntimeLiteral::Bool(#b)),
             RuntimeLiteralIR::Float(f) => quote::quote!(datatype::RuntimeLiteral::Float(#f)),
+            RuntimeLiteralIR::Byte(b) => quote::quote!(datatype::RuntimeLiteral::Byte(#b)),
+            RuntimeLiteralIR::Char(c) => quote::quote!(datatype::RuntimeLiteral::Char(#c)),
+            RuntimeLiteralIR::ByteStr(bs) => {
+                quote::quote!(datatype::RuntimeLiteral::ByteStr(vec![#(#bs),*]))
+            }
+            RuntimeLiteralIR::CStr(cs) => {
+                quote::quote!(datatype::RuntimeLiteral::CStr(vec![#(#cs),*]))
+            }
         }
     }
 }

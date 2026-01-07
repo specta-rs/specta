@@ -172,6 +172,18 @@ pub enum RuntimeNestedMeta {
 ///
 /// // Parsed from: #[custom(ratio = 3.14)]
 /// RuntimeLiteral::Float(3.14)
+///
+/// // Parsed from: #[custom(byte_val = b'x')]
+/// RuntimeLiteral::Byte(b'x')
+///
+/// // Parsed from: #[custom(char_val = 'a')]
+/// RuntimeLiteral::Char('a')
+///
+/// // Parsed from: #[custom(bytes = b"hello")]
+/// RuntimeLiteral::ByteStr(b"hello".to_vec())
+///
+/// // Parsed from: #[custom(cstr = c"hello")]
+/// RuntimeLiteral::CStr(b"hello\0".to_vec())
 /// ```
 ///
 /// # Why It Exists
@@ -189,6 +201,17 @@ pub enum RuntimeLiteral {
     Bool(bool),
     /// A floating-point literal (e.g., `3.14` in `ratio = 3.14`).
     Float(f64),
+    /// A byte literal (e.g., `b'x'` in `byte_val = b'x'`).
+    Byte(u8),
+    /// A character literal (e.g., `'a'` in `char_val = 'a'`).
+    Char(char),
+    /// A byte string literal (e.g., `b"hello"` in `bytes = b"hello"`).
+    ByteStr(Vec<u8>),
+    /// A C-string literal (e.g., `c"hello"` in `cstr = c"hello"`).
+    ///
+    /// Note: C-string literals require Rust 1.77+. The variant is always available,
+    /// but using the `c"..."` syntax requires a recent compiler.
+    CStr(Vec<u8>),
 }
 
 // Manual implementation of PartialEq for RuntimeLiteral to handle f64
@@ -199,6 +222,10 @@ impl PartialEq for RuntimeLiteral {
             (RuntimeLiteral::Int(a), RuntimeLiteral::Int(b)) => a == b,
             (RuntimeLiteral::Bool(a), RuntimeLiteral::Bool(b)) => a == b,
             (RuntimeLiteral::Float(a), RuntimeLiteral::Float(b)) => a.to_bits() == b.to_bits(),
+            (RuntimeLiteral::Byte(a), RuntimeLiteral::Byte(b)) => a == b,
+            (RuntimeLiteral::Char(a), RuntimeLiteral::Char(b)) => a == b,
+            (RuntimeLiteral::ByteStr(a), RuntimeLiteral::ByteStr(b)) => a == b,
+            (RuntimeLiteral::CStr(a), RuntimeLiteral::CStr(b)) => a == b,
             _ => false,
         }
     }
@@ -226,6 +253,22 @@ impl Hash for RuntimeLiteral {
             RuntimeLiteral::Float(f) => {
                 3u8.hash(state);
                 f.to_bits().hash(state);
+            }
+            RuntimeLiteral::Byte(b) => {
+                4u8.hash(state);
+                b.hash(state);
+            }
+            RuntimeLiteral::Char(c) => {
+                5u8.hash(state);
+                c.hash(state);
+            }
+            RuntimeLiteral::ByteStr(bs) => {
+                6u8.hash(state);
+                bs.hash(state);
+            }
+            RuntimeLiteral::CStr(cs) => {
+                7u8.hash(state);
+                cs.hash(state);
             }
         }
     }

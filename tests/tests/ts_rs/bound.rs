@@ -17,7 +17,7 @@ struct MultiBound<T, U> {
     u: U,
 }
 
-// Test 3: Complex trait bounds  
+// Test 3: Complex trait bounds
 #[derive(Type)]
 #[specta(bound = "T: Clone + std::fmt::Debug + Type", collect = false)]
 struct ComplexBound<T> {
@@ -62,7 +62,7 @@ fn test_custom_bound() {
     #[derive(Clone, Type)]
     #[specta(collect = false)]
     struct CloneAndType;
-    
+
     let _: CustomBound<CloneAndType> = CustomBound {
         value: CloneAndType,
     };
@@ -73,7 +73,7 @@ fn test_multi_bound() {
     #[derive(Clone, Debug, Type)]
     #[specta(collect = false)]
     struct AllTraits;
-    
+
     let _: MultiBound<AllTraits, AllTraits> = MultiBound {
         t: AllTraits,
         u: AllTraits,
@@ -85,10 +85,8 @@ fn test_complex_bound() {
     #[derive(Clone, Debug, Type)]
     #[specta(collect = false)]
     struct AllTraits;
-    
-    let _: ComplexBound<AllTraits> = ComplexBound {
-        value: AllTraits,
-    };
+
+    let _: ComplexBound<AllTraits> = ComplexBound { value: AllTraits };
 }
 
 #[test]
@@ -96,10 +94,8 @@ fn test_existing_where() {
     #[derive(Clone, Type)]
     #[specta(collect = false)]
     struct BothTraits;
-    
-    let _: ExistingWhere<BothTraits> = ExistingWhere {
-        value: BothTraits,
-    };
+
+    let _: ExistingWhere<BothTraits> = ExistingWhere { value: BothTraits };
 }
 
 #[test]
@@ -107,6 +103,6 @@ fn test_enum_bound() {
     #[derive(Clone, Type)]
     #[specta(collect = false)]
     struct CloneAndType;
-    
+
     let _: EnumWithBound<CloneAndType> = EnumWithBound::Other;
 }

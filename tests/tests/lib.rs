@@ -1,6 +1,7 @@
 #![allow(unused_variables, dead_code)]
 
 mod advanced_types;
+mod attribute_literals;
 mod bigints;
 mod comments;
 mod const_types;

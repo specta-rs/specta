@@ -78,4 +78,50 @@ fn test_runtime_attributes_with_various_types() {
             "literal_value".to_string(),
         ))]),
     };
+
+    // 9. NameValue with Byte literal
+    let _name_value_byte = RuntimeAttribute {
+        path: "test".to_string(),
+        kind: RuntimeMeta::NameValue {
+            key: "byte_val".to_string(),
+            value: RuntimeLiteral::Byte(b'x'),
+        },
+    };
+
+    // 10. NameValue with Char literal
+    let _name_value_char = RuntimeAttribute {
+        path: "test".to_string(),
+        kind: RuntimeMeta::NameValue {
+            key: "char_val".to_string(),
+            value: RuntimeLiteral::Char('a'),
+        },
+    };
+
+    // 11. NameValue with ByteStr literal
+    let _name_value_bytestr = RuntimeAttribute {
+        path: "test".to_string(),
+        kind: RuntimeMeta::NameValue {
+            key: "bytes".to_string(),
+            value: RuntimeLiteral::ByteStr(b"hello".to_vec()),
+        },
+    };
+
+    // 12. NameValue with CStr literal
+    let _name_value_cstr = RuntimeAttribute {
+        path: "test".to_string(),
+        kind: RuntimeMeta::NameValue {
+            key: "cstr".to_string(),
+            value: RuntimeLiteral::CStr(b"hello\0".to_vec()),
+        },
+    };
+
+    // 13. List with various literal types
+    let _list_with_various_literals = RuntimeAttribute {
+        path: "test".to_string(),
+        kind: RuntimeMeta::List(vec![
+            RuntimeNestedMeta::Literal(RuntimeLiteral::Byte(b'x')),
+            RuntimeNestedMeta::Literal(RuntimeLiteral::Char('c')),
+            RuntimeNestedMeta::Literal(RuntimeLiteral::ByteStr(b"test".to_vec())),
+        ]),
+    };
 }
