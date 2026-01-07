@@ -22,7 +22,8 @@ pub fn construct_field(
             let path = attr.path().to_token_stream().to_string();
             !container_attrs.skip_attrs.contains(&path) && (path == "serde" || path == "specta")
         })
-        .map(|attr| lower_attribute(attr).map(|attr| attr.to_tokens()))
+        .filter_map(|attr| lower_attribute(attr).transpose())
+        .map(|result| result.map(|attr| attr.to_tokens()))
         .collect::<Result<Vec<_>, _>>()?;
 
     let ty = if attrs.skip {

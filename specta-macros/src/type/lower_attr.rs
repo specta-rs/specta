@@ -166,11 +166,19 @@ fn lower_meta(meta: &syn::Meta) -> syn::Result<RuntimeMetaIR> {
 
 /// Convert a syn::Attribute to RuntimeAttributeIR.
 /// Updated for syn 2.0 - uses attr.meta instead of attr.parse_meta().
-pub fn lower_attribute(attr: &syn::Attribute) -> syn::Result<RuntimeAttributeIR> {
-    Ok(RuntimeAttributeIR {
-        path: attr.path().to_token_stream().to_string(),
+/// Returns None for #[specta(...)] attributes as they are handled by the macro.
+pub fn lower_attribute(attr: &syn::Attribute) -> syn::Result<Option<RuntimeAttributeIR>> {
+    let path = attr.path().to_token_stream().to_string();
+
+    // Skip #[specta(...)] attributes as they are handled by the macro
+    if path == "specta" {
+        return Ok(None);
+    }
+
+    Ok(Some(RuntimeAttributeIR {
+        path,
         kind: lower_meta(&attr.meta)?,
-    })
+    }))
 }
 
 impl RuntimeLiteralIR {

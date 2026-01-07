@@ -66,7 +66,8 @@ pub fn parse_enum(
                     }
                     path == "serde" || path == "specta"
                 })
-                .map(|attr| lower_attribute(attr).map(|attr| attr.to_tokens()))
+                .filter_map(|attr| lower_attribute(attr).transpose())
+                .map(|result| result.map(|attr| attr.to_tokens()))
                 .collect::<Result<Vec<_>, _>>()?;
 
             Ok((v, variant_attrs, lowered_variant_attrs))
