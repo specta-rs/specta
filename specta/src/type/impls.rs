@@ -118,12 +118,12 @@ impl_as!(
 
 use std::collections::*;
 impl_for_list!(
-    false; Vec<T> as "Vec"
-    false; VecDeque<T> as "VecDeque"
-    false; BinaryHeap<T> as "BinaryHeap"
-    false; LinkedList<T> as "LinkedList"
-    true; HashSet<T> as "HashSet"
-    true; BTreeSet<T> as "BTreeSet"
+    false; Vec<T>
+    false; VecDeque<T>
+    false; BinaryHeap<T>
+    false; LinkedList<T>
+    true; HashSet<T>
+    true; BTreeSet<T>
 );
 
 impl<T: Type> Type for &[T] {
@@ -202,8 +202,8 @@ impl<T: Type> Type for std::ops::RangeInclusive<T> {
     impl_passthrough!(std::ops::Range<T>); // Yeah Serde are cringe
 }
 
-impl_for_map!(HashMap<K, V> as "HashMap");
-impl_for_map!(BTreeMap<K, V> as "BTreeMap");
+impl_for_map!(HashMap<K, V>);
+impl_for_map!(BTreeMap<K, V>);
 
 impl Type for std::time::SystemTime {
     fn definition(types: &mut TypeCollection) -> DataType {

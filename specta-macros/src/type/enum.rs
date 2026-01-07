@@ -1,5 +1,5 @@
 use super::{attr::*, lower_attr::lower_attribute, r#struct::decode_field_attrs};
-use crate::{r#type::field::construct_field, utils::*};
+use crate::{r#type::field::construct_field_with_variant_skip, utils::*};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{DataEnum, Fields, spanned::Spanned};
@@ -77,6 +77,7 @@ pub fn parse_enum(
         .map(|(variant, attrs, lowered_variant_attrs)| {
             let variant_ident_str = unraw_raw_ident(&variant.ident);
             let variant_name_str = variant_ident_str.to_token_stream();
+            let variant_skip = attrs.skip;
 
             let inner = match &variant.fields {
                 Fields::Unit => quote!(datatype::Fields::Unit),
@@ -87,7 +88,13 @@ pub fn parse_enum(
                         .map(|field| {
                             let (field_attrs, raw_attrs) =
                                 decode_field_attrs(field, &container_attrs.skip_attrs)?;
-                            construct_field(container_attrs, field_attrs, &field.ty, raw_attrs)
+                            construct_field_with_variant_skip(
+                                container_attrs,
+                                field_attrs,
+                                &field.ty,
+                                raw_attrs,
+                                variant_skip,
+                            )
                         })
                         .collect::<syn::Result<Vec<TokenStream>>>()?;
 
@@ -114,11 +121,12 @@ pub fn parse_enum(
 
                             let field_name = field_ident_str;
 
-                            let inner = construct_field(
+                            let inner = construct_field_with_variant_skip(
                                 container_attrs,
                                 field_attrs,
                                 &field.ty,
                                 raw_attrs,
+                                variant_skip,
                             )?;
                             Ok(quote!((#field_name.into(), #inner)))
                         })
@@ -132,7 +140,7 @@ pub fn parse_enum(
             };
 
             let deprecated = attrs.common.deprecated_as_tokens();
-            let skip = attrs.skip;
+            let skip = variant_skip;
             let doc = attrs.common.doc;
             Ok(quote!((#variant_name_str.into(), {
                 let mut v = datatype::EnumVariant::unit();

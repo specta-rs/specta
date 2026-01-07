@@ -6,15 +6,15 @@ use std::borrow::Cow;
 
 #[cfg(feature = "indexmap")]
 const _: () = {
-    impl_for_list!(true; indexmap::IndexSet<T> as "IndexSet");
-    impl_for_map!(indexmap::IndexMap<K, V> as "IndexMap");
+    impl_for_list!(true; indexmap::IndexSet<T>);
+    impl_for_map!(indexmap::IndexMap<K, V>);
 };
 
 #[cfg(feature = "serde_json")]
 const _: () = {
     use serde_json::{Map, Number, Value};
 
-    impl_for_map!(Map<K, V> as "Map");
+    impl_for_map!(Map<K, V>);
 
     impl Type for Value {
         fn definition(types: &mut TypeCollection) -> DataType {
@@ -94,6 +94,15 @@ const _: () = {
 #[cfg(feature = "serde_yaml")]
 const _: () = {
     use serde_yaml::{Number, Value, value::TaggedValue};
+
+    impl Type for serde_yaml::Mapping {
+        fn definition(types: &mut TypeCollection) -> DataType {
+            DataType::Map(crate::datatype::Map::new(
+                serde_yaml::Value::definition(types),
+                serde_yaml::Value::definition(types),
+            ))
+        }
+    }
 
     impl Type for serde_yaml::value::TaggedValue {
         fn definition(types: &mut TypeCollection) -> DataType {
@@ -184,7 +193,7 @@ const _: () = {
 const _: () = {
     use toml::{Value, value};
 
-    impl_for_map!(toml::map::Map<K, V> as "Map");
+    impl_for_map!(toml::map::Map<K, V>);
 
     impl Type for value::Datetime {
         fn definition(types: &mut TypeCollection) -> DataType {

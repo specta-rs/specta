@@ -51,16 +51,11 @@ macro_rules! _impl_as {
                 <$tty as Type>::definition(types)
             }
         }
-
-        // TODO: ????
-        // impl NamedType for $ty {
-        //     const ID: SpectaID = <$tty as NamedType>::ID;
-        // }
     )+};
 }
 
 macro_rules! _impl_for_list {
-    ($($unique:expr; $ty:path as $name:expr)+) => {$(
+    ($($unique:expr; $ty:path)+) => {$(
         impl<T: Type> Type for $ty {
             fn definition(types: &mut TypeCollection) -> DataType {
                 let mut l = List::new(
@@ -74,7 +69,7 @@ macro_rules! _impl_for_list {
 }
 
 macro_rules! _impl_for_map {
-    ($ty:path as $name:expr) => {
+    ($ty:path) => {
         impl<K: Type, V: Type> Type for $ty {
             fn definition(types: &mut TypeCollection) -> DataType {
                 DataType::Map(crate::datatype::Map::new(

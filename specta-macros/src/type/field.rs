@@ -10,6 +10,16 @@ pub fn construct_field(
     field_ty: &Type,
     raw_attrs: &[syn::Attribute],
 ) -> syn::Result<TokenStream> {
+    construct_field_with_variant_skip(container_attrs, attrs, field_ty, raw_attrs, false)
+}
+
+pub fn construct_field_with_variant_skip(
+    container_attrs: &ContainerAttr,
+    attrs: FieldAttr,
+    field_ty: &Type,
+    raw_attrs: &[syn::Attribute],
+    variant_skip: bool,
+) -> syn::Result<TokenStream> {
     let field_ty = attrs.r#type.as_ref().unwrap_or(field_ty);
     let deprecated = attrs.common.deprecated_as_tokens();
     let optional = attrs.optional;
@@ -26,7 +36,7 @@ pub fn construct_field(
         .map(|result| result.map(|attr| attr.to_tokens()))
         .collect::<Result<Vec<_>, _>>()?;
 
-    let ty = if attrs.skip {
+    let ty = if attrs.skip || variant_skip {
         quote!(None)
     } else {
         quote!(Some(<#field_ty as specta::Type>::definition(types)))

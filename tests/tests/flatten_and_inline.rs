@@ -21,7 +21,7 @@ pub struct B {
     #[serde(flatten)]
     pub a: A,
     pub b: HashMap<String, String>,
-    pub c: Arc<A>,
+    pub c: Box<A>,
 }
 
 #[derive(Type)]
