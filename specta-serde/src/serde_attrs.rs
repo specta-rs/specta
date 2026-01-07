@@ -241,7 +241,38 @@ impl SerdeTransformer {
                 true, // is_variant
             )?;
 
-            let transformed_fields = self.transform_fields(variant.fields(), &attrs)?;
+            // For enum variant fields, use rename_all_fields instead of rename_all
+            let mut variant_field_attrs = attrs.clone();
+            // Apply rename_all_fields to variant fields based on mode
+            match self.mode {
+                SerdeMode::Serialize => {
+                    if let Some(rule) = attrs
+                        .rename_all_fields_serialize
+                        .or(attrs.rename_all_fields)
+                    {
+                        variant_field_attrs.rename_all = Some(rule);
+                        variant_field_attrs.rename_all_serialize = Some(rule);
+                    }
+                }
+                SerdeMode::Deserialize => {
+                    if let Some(rule) = attrs
+                        .rename_all_fields_deserialize
+                        .or(attrs.rename_all_fields)
+                    {
+                        variant_field_attrs.rename_all = Some(rule);
+                        variant_field_attrs.rename_all_deserialize = Some(rule);
+                    }
+                }
+                SerdeMode::Both => {
+                    // For Both mode, use rename_all_fields if available
+                    if let Some(rule) = attrs.rename_all_fields {
+                        variant_field_attrs.rename_all = Some(rule);
+                    }
+                }
+            }
+
+            let transformed_fields =
+                self.transform_fields(variant.fields(), &variant_field_attrs)?;
 
             let mut new_variant = variant.clone();
             new_variant.set_fields(transformed_fields);

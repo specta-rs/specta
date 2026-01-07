@@ -108,13 +108,12 @@ impl fmt::Display for ExportPath {
 
 use specta::TypeCollection;
 
-use crate::reserved_names::RESERVED_TYPE_NAMES;
+use crate::reserved_names::{RESERVED_IDENTS, RESERVED_TYPE_NAMES};
 use crate::{Error, Typescript};
 use std::fmt::Write;
 
 use specta::datatype::{
-    DataType, DeprecatedType, Enum, EnumVariant, Field, Fields, FunctionReturnType, Generic,
-    RuntimeMeta, Struct, Tuple,
+    DataType, DeprecatedType, Enum, EnumVariant, Fields, FunctionReturnType, Generic, Struct, Tuple,
 };
 use specta::datatype::{NonSkipField, skip_fields, skip_fields_named};
 
@@ -122,23 +121,6 @@ use specta::datatype::{NonSkipField, skip_fields, skip_fields_named};
 pub(crate) type Result<T> = std::result::Result<T, Error>;
 
 pub(crate) type Output = Result<String>;
-
-/// Check if a field has the `#[serde(flatten)]` or `#[specta(flatten)]` attribute
-fn is_field_flattened(field: &Field) -> bool {
-    field.attributes().iter().any(|attr| {
-        if attr.path == "serde" || attr.path == "specta" {
-            match &attr.kind {
-                RuntimeMeta::Path(path) => path == "flatten",
-                RuntimeMeta::List(items) => items.iter().any(|item| {
-                    matches!(item, specta::datatype::RuntimeNestedMeta::Meta(RuntimeMeta::Path(path)) if path == "flatten")
-                }),
-                _ => false,
-            }
-        } else {
-            false
-        }
-    })
-}
 
 #[allow(clippy::ptr_arg)]
 fn inner_comments(
@@ -306,8 +288,9 @@ pub(crate) fn struct_datatype(
                 return Ok(());
             }
 
-            let (flattened, non_flattened): (Vec<_>, Vec<_>) =
-                fields.iter().partition(|(_, (f, _))| is_field_flattened(f));
+            let (flattened, non_flattened): (Vec<_>, Vec<_>) = fields
+                .iter()
+                .partition(|(_, (f, _))| specta_serde::is_field_flattened(f));
 
             let mut field_sections = flattened
                 .into_iter()
@@ -405,7 +388,7 @@ fn enum_variant_datatype(
 
             let (flattened, non_flattened): (Vec<_>, Vec<_>) = all_fields
                 .iter()
-                .partition(|(_, (f, _))| is_field_flattened(f));
+                .partition(|(_, (f, _))| specta_serde::is_field_flattened(f));
 
             let mut field_sections = flattened
                 .into_iter()
@@ -512,37 +495,129 @@ pub(crate) fn enum_datatype(
         return Ok(write!(s, "{NEVER}")?);
     }
 
-    // Simplified: use External representation only
+    // Get enum representation from serde attributes
+    let repr = specta_serde::get_enum_repr(e.attributes());
+
     let mut variants = e
         .variants()
         .iter()
         .filter(|(_, variant)| !variant.skip())
         .map(|(variant_name, variant)| {
-            let sanitised_name = sanitise_key(variant_name.clone(), true);
-
             Ok(inner_comments(
                 ctx.clone(),
                 variant.deprecated(),
                 variant.docs(),
-                // Always use External representation
-                match &variant.fields() {
-                    Fields::Unit => sanitised_name.to_string(),
-                    _ => {
-                        let ts_values = enum_variant_datatype(
-                            ctx.with(PathItem::Variant(variant_name.clone())),
-                            types,
-                            variant_name.clone(),
-                            variant,
-                            prefix,
-                        )?;
-                        let sanitised_name = sanitise_key(variant_name.clone(), false);
-
-                        match ts_values {
-                            Some(ts_values) => {
-                                format!("{{ {sanitised_name}: {ts_values} }}")
+                match &repr {
+                    specta_serde::EnumRepr::External => {
+                        // External representation
+                        match &variant.fields() {
+                            Fields::Unit => {
+                                let sanitised_name = sanitise_key(variant_name.clone(), true);
+                                sanitised_name.to_string()
                             }
-                            None => format!(r#""{sanitised_name}""#),
+                            _ => {
+                                let ts_values = enum_variant_datatype(
+                                    ctx.with(PathItem::Variant(variant_name.clone())),
+                                    types,
+                                    variant_name.clone(),
+                                    variant,
+                                    prefix,
+                                )?;
+                                let sanitised_name = sanitise_key(variant_name.clone(), false);
+
+                                match ts_values {
+                                    Some(ts_values) => {
+                                        format!("{{ {sanitised_name}: {ts_values} }}")
+                                    }
+                                    None => format!(r#""{sanitised_name}""#),
+                                }
+                            }
                         }
+                    }
+                    specta_serde::EnumRepr::Internal { tag } => {
+                        // Internal representation: { tag: "VariantName", ...fields }
+                        let tag_key = sanitise_key(Cow::Owned(tag.to_string()), false);
+                        let variant_value = sanitise_key(variant_name.clone(), true);
+                        
+                        match &variant.fields() {
+                            Fields::Unit => {
+                                format!("{{ {tag_key}: {variant_value} }}")
+                            }
+                            Fields::Named(_) => {
+                                let ts_values = enum_variant_datatype(
+                                    ctx.with(PathItem::Variant(variant_name.clone())),
+                                    types,
+                                    variant_name.clone(),
+                                    variant,
+                                    prefix,
+                                )?;
+                                
+                                if let Some(ts_values) = ts_values {
+                                    // Remove outer braces from ts_values if present
+                                    let inner = ts_values.trim_start_matches("{ ").trim_end_matches(" }");
+                                    format!("{{ {tag_key}: {variant_value}; {inner} }}")
+                                } else {
+                                    format!("{{ {tag_key}: {variant_value} }}")
+                                }
+                            }
+                            _ => {
+                                // Tuple variants not supported in internally tagged enums
+                                format!("{{ {tag_key}: {variant_value} }}")
+                            }
+                        }
+                    }
+                    specta_serde::EnumRepr::Adjacent { tag, content } => {
+                        // Adjacent representation: { tag: "VariantName", content: data }
+                        let tag_key = sanitise_key(Cow::Owned(tag.to_string()), false);
+                        let content_key = sanitise_key(Cow::Owned(content.to_string()), false);
+                        let variant_value = sanitise_key(variant_name.clone(), true);
+                        
+                        match &variant.fields() {
+                            Fields::Unit => {
+                                format!("{{ {tag_key}: {variant_value} }}")
+                            }
+                            _ => {
+                                let ts_values = enum_variant_datatype(
+                                    ctx.with(PathItem::Variant(variant_name.clone())),
+                                    types,
+                                    variant_name.clone(),
+                                    variant,
+                                    prefix,
+                                )?;
+                                
+                                match ts_values {
+                                    Some(ts_values) => {
+                                        format!("{{ {tag_key}: {variant_value}; {content_key}: {ts_values} }}")
+                                    }
+                                    None => format!("{{ {tag_key}: {variant_value} }}"),
+                                }
+                            }
+                        }
+                    }
+                    specta_serde::EnumRepr::Untagged => {
+                        // Untagged representation: just the variant data
+                        match &variant.fields() {
+                            Fields::Unit => {
+                                let sanitised_name = sanitise_key(variant_name.clone(), true);
+                                sanitised_name.to_string()
+                            }
+                            _ => {
+                                let ts_values = enum_variant_datatype(
+                                    ctx.with(PathItem::Variant(variant_name.clone())),
+                                    types,
+                                    variant_name.clone(),
+                                    variant,
+                                    prefix,
+                                )?;
+                                
+                                ts_values.unwrap_or_else(|| "never".to_string())
+                            }
+                        }
+                    }
+                    specta_serde::EnumRepr::String { .. } => {
+                        // String enum representation - treat as External with string literals
+                        let sanitised_name = sanitise_key(variant_name.clone(), true);
+                        sanitised_name.to_string()
                     }
                 },
                 true,
@@ -585,6 +660,9 @@ fn object_field_to_ts(
 
 /// sanitise a string to be a valid Typescript key
 fn sanitise_key<'a>(field_name: Cow<'static, str>, force_string: bool) -> Cow<'a, str> {
+    // Check if it's a reserved identifier (JavaScript keyword)
+    let is_reserved = RESERVED_IDENTS.iter().any(|v| *v == field_name.as_ref());
+
     let valid = field_name
         .chars()
         .all(|c| c.is_alphanumeric() || c == '_' || c == '$')
@@ -592,7 +670,8 @@ fn sanitise_key<'a>(field_name: Cow<'static, str>, force_string: bool) -> Cow<'a
             .chars()
             .next()
             .map(|first| !first.is_numeric())
-            .unwrap_or(true);
+            .unwrap_or(true)
+        && !is_reserved;
 
     if force_string || !valid {
         format!(r#""{field_name}""#).into()

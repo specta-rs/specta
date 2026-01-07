@@ -1,0 +1,1 @@
+{"run_id":"1767766936-895204000","line":121,"new":{"module_name":"integration_tests__serde__skip","snapshot_name":"skip-2","metadata":{"source":"tests/tests/serde/skip.rs","assertion_line":121,"expression":"assert_ts_inline2::<SkipField>().unwrap()"},"snapshot":"{ \n\tb: number,\n}"},"old":{"module_name":"integration_tests__serde__skip","metadata":{},"snapshot":"{ b: number }"}}
