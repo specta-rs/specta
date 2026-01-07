@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use specta::{Type, TypeCollection};
-use specta_typescript as ts;
 
 #[derive(Type, Serialize, Deserialize)]
 #[serde(untagged)]

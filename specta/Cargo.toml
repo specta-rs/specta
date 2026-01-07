@@ -97,7 +97,7 @@ ctor = { version = "0.6.1", default-features = false, optional = true, features 
 # TODO: To be deprecated
 serde_json = { version = "1.0.145", optional = true, default-features = false, features = ["std"] }
 serde_yaml = { version = "0.9.34", optional = true, default-features = false, features = [] }
-toml = { version = "0.9.8", optional = true, default-features = false }
+toml = { version = "0.9.8", optional = true, default-features = false, features = ["serde"] }
 ulid = { version = "1.2.1", optional = true, default-features = false, features = [] }
 uuid = { version = "1.18.1", optional = true, default-features = false, features = [] } # TODO: Downgraded for Bevy (argh)
 chrono = { version = "0.4.42", optional = true, default-features = false, features = ["clock"] }

@@ -103,14 +103,14 @@ pub struct TransparentWithSkip3(#[specta(type = String)] Box<dyn Any>);
 
 /// This is intentionally just a compile or not compile test
 /// https://github.com/oscartbeaumont/specta/issues/167
-#[derive(Type, Serialize, Deserialize)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 pub enum LazilySkip {
-    #[specta(skip)]
+    #[serde(skip)]
     A(Box<dyn Any>),
-    B(#[specta(skip)] Box<dyn Any>),
+    B(#[serde(skip)] Box<dyn Any>),
     C {
-        #[specta(skip)]
+        #[serde(skip)]
         a: Box<dyn Any>,
     },
 }

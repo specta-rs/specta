@@ -3,7 +3,6 @@ use syn::{Result, Type, TypePath};
 use crate::utils::{AttrExtract, Attribute};
 
 use super::RustCAttr;
-use super::SerdeFieldAttr;
 
 #[derive(Default)]
 pub struct FieldAttr {
@@ -32,6 +31,11 @@ impl FieldAttr {
 
         if let Some(attr) = attrs.extract("specta", "skip") {
             result.skip = attr.parse_bool().unwrap_or(true);
+        } else if let Some(attr) = attrs.extract("serde", "skip") {
+            // We generally want `#[serde(...)]` attributes to only be handled by the runtime but,
+            // we make an exception for `#[serde(skip)]` because it's usually used on fields
+            // that would fail a `T: Type` so handling it at runtime would prevent your code from compiling.
+            result.skip = attr.parse_bool().unwrap_or(true);
         }
 
         if let Some(attr) = attrs.extract("specta", "optional") {
@@ -41,11 +45,6 @@ impl FieldAttr {
         if let Some(attr) = attrs.extract("specta", "default") {
             result.optional = attr.parse_bool().unwrap_or(true);
         }
-
-        // We generally want `#[serde(...)]` attributes to only be handled by the runtime but,
-        // we make an exception for `#[serde(skip)]` because it's usually used on fields
-        // that would fail a `T: Type` so handling it at runtime would prevent your code compiling.
-        result.skip = result.skip || SerdeFieldAttr::from_attrs(attrs).skip;
 
         Ok(result)
     }

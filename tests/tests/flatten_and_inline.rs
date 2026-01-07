@@ -15,7 +15,7 @@ pub struct AA {
     pub a: i32,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 pub struct B {
     #[serde(flatten)]

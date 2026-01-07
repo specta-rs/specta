@@ -55,10 +55,11 @@ impl ContainerAttr {
 
         if let Some(attr) = attrs.extract("specta", "transparent") {
             result.transparent = attr.parse_bool().unwrap_or(true);
-        }
-
-        // Handle `#[repr(transparent)]`
-        if let Some(attr) = attrs.extract("repr", "transparent") {
+        } else if let Some(attr) = attrs.extract("repr", "transparent") {
+            result.transparent = attr.parse_bool().unwrap_or(true);
+        } else if let Some(attr) = attrs.extract("serde", "transparent") {
+            // We generally want `#[serde(...)]` attributes to only be handled by the runtime but,
+            // we make an exception for `#[serde(transparent)]`.
             result.transparent = attr.parse_bool().unwrap_or(true);
         }
 

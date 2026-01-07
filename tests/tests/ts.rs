@@ -592,7 +592,7 @@ pub struct InlineOptionalType {
 }
 
 // Regression test for https://github.com/oscartbeaumont/specta/issues/56
-#[derive(Type, serde::Serialize)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 enum Rename {
     OneWord,
@@ -600,31 +600,31 @@ enum Rename {
     TwoWords,
 }
 
-#[derive(Type, serde::Serialize)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 pub struct TransparentTypeInner {
     inner: String,
 }
 
-#[derive(Type, serde::Serialize)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(transparent)]
 pub struct TransparentType(pub(crate) TransparentTypeInner);
 
-#[derive(Type, serde::Serialize)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(transparent)]
 pub struct TransparentType2(pub(crate) ());
 
-#[derive(serde::Serialize)]
+#[derive(Serialize)]
 pub struct NonTypeType;
 
-#[derive(Type, serde::Serialize)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(transparent)]
 pub struct TransparentTypeWithOverride(#[specta(type = String)] NonTypeType);
 
-#[derive(Type, serde::Serialize)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub enum BasicEnum {
     A,
@@ -632,12 +632,8 @@ pub enum BasicEnum {
 }
 
 #[derive(Type, Serialize, Deserialize)]
-#[serde(
-    collect = false,
-    tag = "type",
-    content = "value",
-    rename_all = "camelCase"
-)]
+#[specta(collect = false)]
+#[serde(tag = "type", content = "value", rename_all = "camelCase")]
 pub enum NestedEnum {
     A(String),
     B(i32),
@@ -652,14 +648,14 @@ pub struct FlattenOnNestedEnum {
     result: NestedEnum,
 }
 
-#[derive(Type, Serialize, Deserialize)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 pub struct EnumReferenceRecordKey {
     a: HashMap<BasicEnum, i32>,
 }
 
 // https://github.com/oscartbeaumont/specta/issues/88
-#[derive(Type, Serialize, Deserialize)]
+#[derive(Default, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
@@ -735,13 +731,13 @@ pub struct KebabCase {
 }
 
 // https://github.com/specta-rs/specta/issues/281
-#[derive(Type, Serialize, Deserialize)]
+#[derive(Type)]
 pub struct Issue281<'a> {
     default_unity_arguments: &'a [&'a str],
 }
 
 /// https://github.com/specta-rs/specta/issues/374
-#[derive(specta::Type)]
+#[derive(Type, Serialize)]
 struct Issue374 {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     foo: bool,
