@@ -116,14 +116,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  • rename, rename_all, rename_all_fields");
     println!("  • tag, content, untagged (enum representations)");
     println!("  • transparent, default, deny_unknown_fields");
-    println!("  • bound, remote, from, try_from, into");
-    println!("  • crate, expecting, variant_identifier, field_identifier");
+    println!("  • remote, from, try_from, into");
     println!();
     println!("Field attributes:");
     println!("  • rename, alias, default, flatten");
     println!("  • skip, skip_serializing, skip_deserializing, skip_serializing_if");
     println!("  • serialize_with, deserialize_with, with");
-    println!("  • borrow, bound, getter");
 
     println!("\n=== Demo completed successfully ===");
     Ok(())
