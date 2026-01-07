@@ -442,9 +442,10 @@ pub fn get_enum_repr(attributes: &[specta::datatype::RuntimeAttribute]) -> EnumR
                         *tag = Some(t.clone());
                     }
                 } else if key == "content"
-                    && let RuntimeLiteral::Str(c) = value {
-                        *content = Some(c.clone());
-                    }
+                    && let RuntimeLiteral::Str(c) = value
+                {
+                    *content = Some(c.clone());
+                }
             }
             RuntimeMeta::List(list) => {
                 for nested in list {

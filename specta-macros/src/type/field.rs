@@ -30,7 +30,7 @@ pub fn construct_field_with_variant_skip(
         .iter()
         .filter(|attr| {
             let path = attr.path().to_token_stream().to_string();
-            !container_attrs.skip_attrs.contains(&path) && (path == "serde" || path == "specta")
+            !container_attrs.skip_attrs.contains(&path) && path != "specta"
         })
         .filter_map(|attr| lower_attribute(attr).transpose())
         .map(|result| result.map(|attr| attr.to_tokens()))
