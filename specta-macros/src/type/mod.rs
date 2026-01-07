@@ -102,7 +102,11 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let bounds = generics_with_ident_and_bounds_only(generics);
     let type_args = generics_with_ident_only(generics);
-    let where_bound = add_type_to_where_clause(&quote!(#crate_ref::Type), generics);
+    let where_bound = add_type_to_where_clause(
+        &quote!(#crate_ref::Type),
+        generics,
+        container_attrs.bound.as_deref(),
+    );
 
     let shadow_generics = {
         let g = generics.params.iter().map(|param| match param {
