@@ -19,7 +19,18 @@ rustdoc-args = ["--cfg", "docsrs"]
 [lints]
 workspace = true
 
+[features]
+default = []
+
 [dependencies]
-specta = { path = "../specta" }
-schemars = { version = "0.8.22", default-features = false, features = [] } # TODO: move to something else or v1
-Inflector = "0.11.4"
+specta = { version = "=2.0.0-rc.22", path = "../specta" }
+specta-serde = { version = "=0.0.9", path = "../specta-serde" }
+schemars = { version = "0.8.22", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+
+[dev-dependencies]
+specta = { version = "=2.0.0-rc.22", path = "../specta", features = ["derive", "collect"] }
+specta-util = { path = "../specta-util", features = ["serde"] }
+insta = { version = "1", features = ["json"] }
