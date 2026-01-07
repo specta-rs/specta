@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
-
 #![allow(dead_code)]
+
+use serde::{Deserialize, Serialize};
 
 use specta::Type;
 

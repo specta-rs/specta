@@ -97,7 +97,7 @@ pub struct TransparentWithSkip((), #[specta(skip)] String);
 pub struct TransparentWithSkip2(#[specta(skip)] (), String);
 
 // https://github.com/oscartbeaumont/specta/issues/170
-#[derive(Type, Serialize, Deserialize)]
+#[derive(Type)]
 #[specta(transparent, collect = false)]
 pub struct TransparentWithSkip3(#[specta(type = String)] Box<dyn Any>);
 
