@@ -441,11 +441,10 @@ pub fn get_enum_repr(attributes: &[specta::datatype::RuntimeAttribute]) -> EnumR
                     if let RuntimeLiteral::Str(t) = value {
                         *tag = Some(t.clone());
                     }
-                } else if key == "content" {
-                    if let RuntimeLiteral::Str(c) = value {
+                } else if key == "content"
+                    && let RuntimeLiteral::Str(c) = value {
                         *content = Some(c.clone());
                     }
-                }
             }
             RuntimeMeta::List(list) => {
                 for nested in list {

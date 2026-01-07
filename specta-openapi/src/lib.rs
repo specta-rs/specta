@@ -4,6 +4,7 @@
     html_logo_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png",
     html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
+#![allow(warnings)] // TODO: This crate is still in development
 
 use openapiv3::{
     ArrayType, BooleanType, NumberType, ReferenceOr, Schema, SchemaData, SchemaKind, StringType,
