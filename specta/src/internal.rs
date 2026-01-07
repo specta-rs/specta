@@ -4,12 +4,8 @@
 //!
 //! DO NOT USE THEM! You have been warned!
 
-use std::borrow::Cow;
-
 #[cfg(feature = "function")]
 pub use paste::paste;
-
-use crate::datatype::{DataType, Field, NonSkipField, skip_fields, skip_fields_named};
 
 /// Functions used to construct `crate::datatype` types (they have private fields so can't be constructed directly).
 /// We intentionally keep their fields private so we can modify them without a major version bump.
@@ -51,7 +47,8 @@ pub mod construct {
 
 #[cfg(feature = "function")]
 mod functions {
-    use super::*;
+    use std::borrow::Cow;
+
     use crate::{TypeCollection, datatype::DeprecatedType, datatype::Function, function::SpectaFn};
 
     #[doc(hidden)]

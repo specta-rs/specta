@@ -11,13 +11,19 @@ pub struct Struct {
     pub(crate) attributes: Vec<RuntimeAttribute>,
 }
 
-impl Struct {
-    /// Construct a new struct with no fields. Fields can be set later with `set_fields` or `fields_mut`.
-    pub fn new() -> Self {
+impl Default for Struct {
+    fn default() -> Self {
         Self {
             fields: Fields::Unit,
             attributes: Default::default(),
         }
+    }
+}
+
+impl Struct {
+    /// Construct a new struct with no fields. Fields can be set later with `set_fields` or `fields_mut`.
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Construct a new unit struct.

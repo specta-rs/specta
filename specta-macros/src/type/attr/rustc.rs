@@ -26,7 +26,7 @@ impl RustCAttr {
             |mut s, doc| {
                 let doc = doc.parse_string()?;
                 if !s.is_empty() {
-                    s.push_str("\n");
+                    s.push('\n');
                 }
                 s.push_str(&doc);
                 Ok(s) as syn::Result<_>
@@ -54,8 +54,7 @@ impl RustCAttr {
                 Some(AttributeValue::Attribute { attr, .. }) => {
                     let since = attr
                         .iter()
-                        .filter(|attr| attr.key == "since")
-                        .next()
+                        .find(|attr| attr.key == "since")
                         .and_then(|v| v.value.as_ref())
                         .and_then(|v| match v {
                             AttributeValue::Lit(lit) => Some(lit),
@@ -68,8 +67,7 @@ impl RustCAttr {
 
                     let note = attr
                         .iter()
-                        .filter(|attr| attr.key == "note")
-                        .next()
+                        .find(|attr| attr.key == "note")
                         .and_then(|v| match v.value.as_ref() {
                             Some(AttributeValue::Lit(lit)) => Some(lit),
                             _ => None, // TODO: This should probs be an error

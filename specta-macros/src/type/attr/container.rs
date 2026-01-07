@@ -21,8 +21,10 @@ pub struct ContainerAttr {
 
 impl ContainerAttr {
     pub fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
-        let mut result = Self::default();
-        result.common = RustCAttr::from_attrs(attrs)?;
+        let mut result = Self {
+            common: RustCAttr::from_attrs(attrs)?,
+            ..Default::default()
+        };
 
         if let Some(attr) = attrs.extract("specta", "crate") {
             result.crate_name = result

@@ -87,9 +87,8 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
         }),
         // primitive_def!(Never) => "never".into(),
         DataType::Nullable(def) => {
-            let schema = to_openapi(def);
+            to_openapi(def)
             // schema.schema_data.nullable = true; // TODO
-            schema
         }
         // DataType::Map(def) => {
         //     format!("Record<{}, {}>", to_openapi(&def.0), to_openapi(&def.1))
@@ -107,7 +106,7 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
                 unique_items: false,
             })),
         }),
-        DataType::Tuple(tuple) => match &tuple.elements()[..] {
+        DataType::Tuple(tuple) => match tuple.elements() {
             [] => {
                 schema_data.nullable = true;
                 ReferenceOr::Item(Schema {
@@ -116,10 +115,10 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
                 })
             }
             [ty] => to_openapi(ty),
-            tys => todo!(),
+            _tys => todo!(),
         },
         DataType::Struct(s) => {
-            let fields = s.fields();
+            let _fields = s.fields();
 
             // match &fields[..] {
             //     [] => todo!(), // "null".to_string(),
@@ -165,7 +164,7 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
             // }
             todo!();
         }
-        DataType::Enum(e) => {
+        DataType::Enum(_e) => {
             // let variants = e.variants();
 
             // match &variants[..] {
@@ -242,7 +241,7 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
 
             todo!();
         }
-        DataType::Reference(reference) => {
+        DataType::Reference(_reference) => {
             todo!();
             // match &reference.generics()[..] {
             //     [] => {

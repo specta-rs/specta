@@ -47,7 +47,7 @@ impl Type for std::sync::Arc<str> {
     impl_passthrough!(String);
 }
 
-impl<'a, T: Type + 'static> Type for &'a T {
+impl<T: Type + 'static> Type for &T {
     impl_passthrough!(T);
 }
 

@@ -75,7 +75,7 @@ impl<T: ConstGenericPlaceholder> fmt::Debug for GenericPlaceholder<T> {
 
 impl<T: ConstGenericPlaceholder> Default for GenericPlaceholder<T> {
     fn default() -> Self {
-        panic!("Can't construct a generic type without a placeholder");
+        unreachable!("Can't construct a generic type without a placeholder");
     }
 }
 
