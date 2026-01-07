@@ -363,6 +363,13 @@ impl SerdeTransformer {
                         let transformed_ty = self.transform_datatype(field_ty)?;
                         let mut new_field = field.clone();
                         new_field.set_ty(transformed_ty);
+
+                        // Set optional flag based on serde attributes
+                        // This matches the behavior that was previously in the macro
+                        if field_attrs.skip_serializing_if.is_some() || field_attrs.base.default {
+                            new_field.set_optional(true);
+                        }
+
                         transformed_fields.push((transformed_name, new_field));
                     }
                 }
