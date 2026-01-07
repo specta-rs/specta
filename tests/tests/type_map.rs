@@ -23,7 +23,11 @@ fn test_generic_type_in_type_map() {
 
     let first = iter.next().unwrap();
     // https://github.com/specta-rs/specta/issues/171
-    insta::assert_snapshot!(specta_typescript::primitives::export(&Default::default(), &types, &first).unwrap(), @"export type ActualType = { a: GenericType<string> };");
+    insta::assert_snapshot!(specta_typescript::primitives::export(&Default::default(), &types, &first).unwrap(), @r"
+    export type ActualType = { 
+    		a: GenericType<string>,
+    	};
+    ");
 
     let second = iter.next().unwrap();
     insta::assert_snapshot!(specta_typescript::primitives::export(&Default::default(), &types, &second).unwrap(), @"export type GenericType<T> = null | T;");

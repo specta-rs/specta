@@ -401,12 +401,40 @@ fn enum_variant_datatype(
         // TODO: Remove unreachable in type system
         Fields::Unit => unreachable!("Unit enum variants have no type!"),
         Fields::Named(obj) => {
-            // Note: tag is now on parent Enum attributes, not on NamedFields
-            // For proper tag support, parent context would need to be passed down
-            let mut fields = vec![];
+            let all_fields = skip_fields_named(obj.fields()).collect::<Vec<_>>();
 
-            fields.extend(
-                skip_fields_named(obj.fields())
+            let (flattened, non_flattened): (Vec<_>, Vec<_>) = all_fields
+                .iter()
+                .partition(|(_, (f, _))| is_field_flattened(f));
+
+            let mut field_sections = flattened
+                .into_iter()
+                .map(|(key, (field, ty))| {
+                    let mut s = String::new();
+                    datatype_inner(
+                        ctx.with(PathItem::Field(key.clone())),
+                        &FunctionReturnType::Value(ty.clone()),
+                        types,
+                        &mut s,
+                    )
+                    .map(|_| {
+                        inner_comments(
+                            ctx.clone(),
+                            field.deprecated(),
+                            field.docs(),
+                            format!("({s})"),
+                            true,
+                            prefix,
+                        )
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?;
+
+            let mut regular_fields = vec![];
+
+            regular_fields.extend(
+                non_flattened
+                    .into_iter()
                     .map(|(name, field_ref)| {
                         let (field, _) = field_ref;
 
@@ -431,9 +459,14 @@ fn enum_variant_datatype(
                     .collect::<Result<Vec<_>>>()?,
             );
 
-            Ok(Some(match &fields[..] {
-                [] => format!("Record<{STRING}, {NEVER}>").to_string(),
-                fields => format!("{{ {} }}", fields.join("; ")),
+            Ok(Some(match (&field_sections[..], &regular_fields[..]) {
+                ([], []) => format!("Record<{STRING}, {NEVER}>").to_string(),
+                ([], fields) => format!("{{ {} }}", fields.join("; ")),
+                (_, []) => field_sections.join(" & "),
+                (_, _) => {
+                    field_sections.push(format!("{{ {} }}", regular_fields.join("; ")));
+                    field_sections.join(" & ")
+                }
             }))
         }
         Fields::Unnamed(obj) => {
