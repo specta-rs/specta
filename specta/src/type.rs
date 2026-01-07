@@ -25,6 +25,3 @@ pub trait Type {
     /// This will also register this and any dependent types into the [`TypeCollection`].
     fn definition(types: &mut TypeCollection) -> DataType;
 }
-
-/// A marker trait for compile-time validation of which types can be flattened.
-pub trait Flatten: Type {}

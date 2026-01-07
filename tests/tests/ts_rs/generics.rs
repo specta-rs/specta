@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use serde::{Deserialize, Serialize};
+
 use std::{
     collections::{BTreeMap, HashSet},
     rc::Rc,
@@ -101,19 +103,19 @@ fn generic_struct() {
 // not currently possible in ts-rs hehe
 #[test]
 fn inline() {
-    #[derive(Type)]
+    #[derive(Type, Serialize, Deserialize)]
     #[specta(collect = false)]
     struct Generic<T> {
         t: T,
     }
 
-    #[derive(Type)]
+    #[derive(Type, Serialize, Deserialize)]
     #[specta(collect = false)]
     struct Container {
         g: Generic<String>,
         #[specta(inline)]
         gi: Generic<String>,
-        #[specta(flatten)]
+        #[serde(flatten)]
         t: Generic<String>,
     }
 

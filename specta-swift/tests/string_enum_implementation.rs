@@ -1,7 +1,8 @@
+use serde::{Deserialize, Serialize};
 use specta::{Type, TypeCollection};
 use specta_swift::{NamingConvention, Swift};
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum JobStatus {
     Queued,
@@ -12,7 +13,7 @@ pub enum JobStatus {
     Cancelled,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum Priority {
     Low,
@@ -20,7 +21,7 @@ pub enum Priority {
     High,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum LogLevel {
     Debug,
@@ -29,7 +30,7 @@ pub enum LogLevel {
     Error,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub enum UserRole {
     Admin,
@@ -38,7 +39,7 @@ pub enum UserRole {
     Guest,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ApiStatus {
     Online,
@@ -46,7 +47,7 @@ pub enum ApiStatus {
     Maintenance,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING-KEBAB-CASE")]
 pub enum DatabaseStatus {
     Connected,
@@ -55,7 +56,7 @@ pub enum DatabaseStatus {
 }
 
 // This should NOT be a string enum (has data fields)
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MixedEnum {
     Unit,

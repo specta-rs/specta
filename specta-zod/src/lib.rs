@@ -1,8 +1,8 @@
 //! TODO
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
-    html_logo_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png",
-    html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
+    html_logo_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png",
+    html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
 
 // mod context;
@@ -668,7 +668,7 @@
 // ) -> Output {
 //     let field_name_safe = sanitise_key(key, false);
 
-//     // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
+//     // https://github.com/specta-rs/rspc/issues/100#issuecomment-1373092211
 //     let (key, ty) = match field.optional() {
 //         true => (format!("{field_name_safe}").into(), ty), // TODO: optional
 //         false => (field_name_safe, ty),

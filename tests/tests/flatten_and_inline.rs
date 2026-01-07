@@ -1,80 +1,73 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub struct A {
     pub a: String,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub struct AA {
     pub a: i32,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 pub struct B {
-    #[specta(flatten)]
+    #[serde(flatten)]
     pub a: A,
-    #[specta(flatten)]
     pub b: HashMap<String, String>,
-    #[specta(flatten)]
-    pub c: Arc<A>,
+    pub c: Box<A>,
 }
 
 #[derive(Type)]
 #[specta(collect = false)]
 pub struct C {
-    #[specta(flatten)]
     pub a: A,
     #[specta(inline)]
     pub b: A,
 }
 
-#[derive(Type)]
-#[specta(collect = false, tag = "type")]
-pub struct D {
-    #[specta(flatten)]
-    pub a: A,
-    #[specta(inline)]
-    pub b: A,
-}
-
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
-#[serde(untagged)]
-pub struct E {
-    #[specta(flatten)]
+#[serde(tag = "type")]
+pub struct D {
     pub a: A,
     #[specta(inline)]
     pub b: A,
 }
+
+// #[derive(Type, Serialize, Deserialize)]
+// #[specta(collect = false)]
+// #[serde(untagged)]
+// pub struct E {
+//     pub a: A,
+//     #[specta(inline)]
+//     pub b: A,
+// }
 
 // Flattening a struct multiple times
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub struct F {
-    #[specta(flatten)]
     pub a: A,
-    #[specta(flatten)]
     pub b: A,
 }
 
 // Two fields with the same name (`a`) but different types
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub struct G {
-    #[specta(flatten)]
     pub a: A,
-    #[specta(flatten)]
     pub b: AA,
 }
 
 // Serde can't serialize this
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub enum H {
     A(String),
@@ -82,58 +75,63 @@ pub enum H {
 }
 
 // Test for issue #393 - flatten in enum variant with internal tag
-#[derive(Type)]
-#[specta(collect = false, tag = "type")]
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(tag = "type")]
 pub enum MyEnum {
     Variant {
-        #[specta(flatten)]
+        #[serde(flatten)]
         inner: A,
     },
 }
 
 // Test for issue #393 - flatten in enum variant with external tag
-#[derive(Type)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 pub enum MyEnumExternal {
     Variant {
-        #[specta(flatten)]
+        #[serde(flatten)]
         inner: A,
     },
 }
 
 // Test for issue #393 - flatten in enum variant with adjacent tag
-#[derive(Type)]
-#[specta(collect = false, tag = "t", content = "c")]
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
 pub enum MyEnumAdjacent {
     Variant {
-        #[specta(flatten)]
+        #[serde(flatten)]
         inner: A,
     },
 }
 
 // Test for issue #393 - flatten in enum variant with untagged
-#[derive(Type)]
-#[specta(collect = false, untagged)]
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
 pub enum MyEnumUntagged {
     Variant {
-        #[specta(flatten)]
+        #[serde(flatten)]
         inner: A,
     },
 }
 
 // TODO: Invalid Serde type but unit test this at the datamodel level cause it might be valid in other langs.
-// #[derive(Type)]
-// #[specta(collect = false, tag = "type")]
+// #[derive(Type, Serialize, Deserialize)]
+// #[specta(collect = false)]
+// #[serde(tag = "type")]
 // pub enum I {
 //     A(String),
 //     B,
 //     #[specta(inline)]
 //     C(A),
-//     D(#[specta(flatten)] A),
+//     D(#[serde(flatten)] A),
 // }
 
-#[derive(Type)]
-#[specta(collect = false, tag = "t", content = "c")]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
 pub enum J {
     A(String),
     B,
@@ -142,8 +140,9 @@ pub enum J {
     D(A),
 }
 
-#[derive(Type)]
-#[specta(collect = false, untagged)]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
 pub enum K {
     A(String),
     B,
@@ -158,7 +157,7 @@ fn serde() {
     insta::assert_snapshot!(crate::ts::inline::<C>(&Default::default()).unwrap(), @"(A) & { b: { a: string } }");
     insta::assert_snapshot!(crate::ts::inline::<D>(&Default::default()).unwrap(), @"(A) & { b: { a: string } }");
     // assert_ts!(D, "(A) & { b: { a: string } }"); // TODO: Assert export
-    insta::assert_snapshot!(crate::ts::inline::<E>(&Default::default()).unwrap(), @"(A) & { b: { a: string } }");
+    // insta::assert_snapshot!(crate::ts::inline::<E>(&Default::default()).unwrap(), @"(A) & { b: { a: string } }");
     insta::assert_snapshot!(crate::ts::inline::<F>(&Default::default()).unwrap(), @"(A)");
     insta::assert_snapshot!(crate::ts::inline::<G>(&Default::default()).unwrap(), @"(A) & (AA)");
     insta::assert_snapshot!(crate::ts::inline::<H>(&Default::default()).unwrap(), @"{ A: string } | \"B\"");

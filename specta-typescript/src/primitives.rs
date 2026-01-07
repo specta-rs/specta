@@ -182,12 +182,13 @@ pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<
 }
 
 // Internal function to handle inlining without cloning DataType nodes
+#[allow(clippy::too_many_arguments)]
 fn inline_datatype(
     s: &mut String,
     ts: &Typescript,
     types: &TypeCollection,
     dt: &DataType,
-    mut location: Vec<Cow<'static, str>>,
+    location: Vec<Cow<'static, str>>,
     is_export: bool,
     parent_name: Option<&str>,
     prefix: &str,
@@ -296,12 +297,13 @@ fn inline_datatype(
 }
 
 // TODO: private
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn datatype(
     s: &mut String,
     ts: &Typescript,
     types: &TypeCollection,
     dt: &DataType,
-    mut location: Vec<Cow<'static, str>>,
+    location: Vec<Cow<'static, str>>,
     is_export: bool,
     parent_name: Option<&str>,
     prefix: &str,
@@ -391,7 +393,7 @@ fn list_dt(
     ts: &Typescript,
     types: &TypeCollection,
     l: &List,
-    location: Vec<Cow<'static, str>>,
+    _location: Vec<Cow<'static, str>>,
     // TODO: Remove this???
     is_export: bool,
 ) -> Result<(), Error> {
@@ -478,7 +480,7 @@ fn map_dt(
     ts: &Typescript,
     types: &TypeCollection,
     m: &Map,
-    location: Vec<Cow<'static, str>>,
+    _location: Vec<Cow<'static, str>>,
     // TODO: Remove
     is_export: bool,
 ) -> Result<(), Error> {
@@ -528,7 +530,7 @@ fn map_dt(
         )?;
         s.push_str(" }");
         if !is_exhaustive {
-            s.push_str(">");
+            s.push('>');
         }
     }
     // assert!(flattening, "todo: map flattening");
@@ -548,7 +550,7 @@ fn enum_dt(
     ts: &Typescript,
     types: &TypeCollection,
     e: &Enum,
-    mut location: Vec<Cow<'static, str>>,
+    _location: Vec<Cow<'static, str>>,
     // TODO: Remove
     is_export: bool,
     prefix: &str,
@@ -925,7 +927,7 @@ fn enum_dt(
 //     if !f.flatten() {
 //         if let Some(key) = key {
 //             s.push_str(&*escape_key(key));
-//             // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
+//             // https://github.com/specta-rs/rspc/issues/100#issuecomment-1373092211
 //             if f.optional() {
 //                 s.push_str("?");
 //             }
@@ -984,7 +986,7 @@ fn tuple_dt(
     ts: &Typescript,
     types: &TypeCollection,
     t: &Tuple,
-    location: Vec<Cow<'static, str>>,
+    _location: Vec<Cow<'static, str>>,
     // TODO: Remove
     is_export: bool,
 ) -> Result<(), Error> {
@@ -1031,11 +1033,11 @@ fn reference_dt(
     is_export: bool,
 ) -> Result<(), Error> {
     // Check if this reference should be inlined
-    if r.inline() {
-        if let Some(ndt) = r.get(types) {
-            // Inline the referenced type directly without cloning the entire DataType
-            return datatype(s, ts, types, ndt.ty(), location, is_export, None, "");
-        }
+    if r.inline()
+        && let Some(ndt) = r.get(types)
+    {
+        // Inline the referenced type directly without cloning the entire DataType
+        return datatype(s, ts, types, ndt.ty(), location, is_export, None, "");
     }
 
     if let Some((_, typescript)) = ts.references.iter().find(|(re, _)| re.ref_eq(r)) {
@@ -1044,7 +1046,9 @@ fn reference_dt(
     }
     // TODO: Legacy stuff
     {
-        let ndt = r.get(types).unwrap(); // TODO: Error handling
+        let ndt = r
+            .get(types)
+            .expect("TypeCollection should have been populated by now");
 
         let name = match ts.layout {
             Layout::ModulePrefixedName => {
@@ -1203,6 +1207,7 @@ fn reference_dt(
 // }
 
 /// Iterate with separate and error handling
+#[allow(dead_code)]
 fn iter_with_sep<T>(
     s: &mut String,
     i: impl IntoIterator<Item = T>,

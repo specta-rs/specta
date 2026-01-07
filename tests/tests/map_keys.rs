@@ -1,25 +1,26 @@
 use std::{collections::HashMap, convert::Infallible};
 
+use serde::{Deserialize, Serialize};
 use specta::{Type, TypeCollection};
-use specta_serde::Error;
 use specta_typescript::Any;
 
 // Export needs a `NamedDataType` but uses `Type::reference` instead of `Type::inline` so we test it.
-#[derive(Type)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 struct Regular(HashMap<String, ()>);
 
-#[derive(Type)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 struct RegularStruct {
     a: String,
 }
 
-#[derive(Type)]
-#[specta(collect = false, transparent)]
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
 struct TransparentStruct(String);
 
-#[derive(Type)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 enum UnitVariants {
     A,
@@ -27,23 +28,25 @@ enum UnitVariants {
     C,
 }
 
-#[derive(Type)]
-#[specta(collect = false, untagged)]
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
 enum UntaggedVariants {
     A(String),
     B(i32),
     C(u8),
 }
 
-#[derive(Type)]
-#[specta(collect = false, untagged)]
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
 enum InvalidUntaggedVariants {
     A(String),
     B(i32, String),
     C(u8),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 enum Variants {
     A(String),
@@ -51,24 +54,29 @@ enum Variants {
     C(u8),
 }
 
-#[derive(Type)]
-#[specta(collect = false, transparent)]
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
 pub struct MaybeValidKey<T>(T);
 
-#[derive(Type)]
-#[specta(collect = false, transparent)]
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
 pub struct ValidMaybeValidKey(HashMap<MaybeValidKey<String>, ()>);
 
-#[derive(Type)]
-#[specta(collect = false, transparent)]
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
 pub struct ValidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<String>>, ()>);
 
-#[derive(Type)]
-#[specta(collect = false, transparent)]
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
 pub struct InvalidMaybeValidKey(HashMap<MaybeValidKey<()>, ()>);
 
-#[derive(Type)]
-#[specta(collect = false, transparent)]
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
 pub struct InvalidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<()>>, ()>);
 
 #[test]
@@ -97,5 +105,7 @@ fn map_keys() {
 fn check<T: Type>() -> Result<(), String> {
     let mut types = TypeCollection::default();
     let dt = T::definition(&mut types);
-    specta_serde::validate(&types).map_err(|e| format!("{:?}", e))
+    // Validation happens during serialization/deserialization processing
+    specta_serde::process_for_serialization(&types).map_err(|e| format!("{:?}", e))?;
+    Ok(())
 }

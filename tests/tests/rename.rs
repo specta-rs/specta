@@ -1,38 +1,43 @@
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
-#[derive(Type)]
-#[specta(collect = false, rename = "StructNew", tag = "t")]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename = "StructNew", tag = "t")]
 pub struct Struct {
     a: String,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub struct Struct2 {
-    #[specta(rename = "b")]
+    #[serde(rename = "b")]
     a: String,
 }
 
-#[derive(Type)]
-#[specta(collect = false, rename = "EnumNew", tag = "t")]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename = "EnumNew", tag = "t")]
 pub enum Enum {
     A,
     B,
 }
 
-#[derive(Type)]
-#[specta(collect = false, rename = "EnumNew", tag = "t")]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename = "EnumNew", tag = "t")]
 pub enum Enum2 {
-    #[specta(rename = "C")]
+    #[serde(rename = "C")]
     A,
     B,
 }
 
-#[derive(Type)]
-#[specta(collect = false, rename = "EnumNew", tag = "t")]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename = "EnumNew", tag = "t")]
 pub enum Enum3 {
     A {
-        #[specta(rename = "b")]
+        #[serde(rename = "b")]
         a: String,
     },
 }

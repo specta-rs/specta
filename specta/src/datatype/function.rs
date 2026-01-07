@@ -2,8 +2,8 @@ use std::borrow::Cow;
 
 use super::{DataType, DeprecatedType};
 
-/// Contains type information about a function annotated with [`specta`](macro@crate::specta).
-/// Returned by [`fn_datatype`].
+/// Contains type information about a function annotated with the `#[specta]` attribute.
+/// Returned by the `fn_datatype!` macro.
 #[derive(Debug, Clone)]
 pub struct Function {
     /// Whether the function is async.

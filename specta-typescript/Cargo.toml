@@ -5,10 +5,11 @@ version = "0.0.9"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2024"
 license = "MIT"
-repository = "https://github.com/oscartbeaumont/specta"
+repository = "https://github.com/specta-rs/specta"
 documentation = "https://docs.rs/specta-zod/latest/specta-zod"
 keywords = ["async", "specta", "rspc", "typescript", "typesafe"]
 categories = ["web-programming", "asynchronous"]
+readme = "../README.md"
 
 # /bin/sh RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
 [package.metadata."docs.rs"]

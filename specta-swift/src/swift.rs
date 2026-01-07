@@ -3,6 +3,7 @@
 use std::{borrow::Cow, path::Path};
 
 use specta::TypeCollection;
+use specta_serde::SerdeMode;
 
 use crate::error::Result;
 use crate::primitives::{export_type, is_duration_struct};
@@ -22,8 +23,8 @@ pub struct Swift {
     pub optionals: OptionalStyle,
     /// Additional protocols to conform to.
     pub protocols: Vec<Cow<'static, str>>,
-    /// Enable Serde validation.
-    pub serde: bool,
+    /// Serde mode for type transformations.
+    pub serde: Option<SerdeMode>,
 }
 
 /// Indentation style for generated Swift code.
@@ -82,7 +83,7 @@ impl Default for Swift {
             generics: GenericStyle::default(),
             optionals: OptionalStyle::default(),
             protocols: vec![],
-            serde: false,
+            serde: Some(SerdeMode::Both),
         }
     }
 }
@@ -123,9 +124,25 @@ impl Swift {
         self
     }
 
-    /// Enable Serde validation.
-    pub fn with_serde(mut self) -> Self {
-        self.serde = true;
+    /// Enable Serde validation with specified mode.
+    pub fn with_serde(mut self, mode: SerdeMode) -> Self {
+        self.serde = Some(mode);
+        self
+    }
+
+    /// Enable Serde validation for serialization only.
+    pub fn with_serde_serialize(self) -> Self {
+        self.with_serde(SerdeMode::Serialize)
+    }
+
+    /// Enable Serde validation for deserialization only.
+    pub fn with_serde_deserialize(self) -> Self {
+        self.with_serde(SerdeMode::Deserialize)
+    }
+
+    /// Disable Serde validation.
+    pub fn without_serde(mut self) -> Self {
+        self.serde = None;
         self
     }
 
@@ -137,9 +154,16 @@ impl Swift {
 
     /// Export types to a Swift string.
     pub fn export(&self, types: &TypeCollection) -> Result<String> {
-        if self.serde {
-            specta_serde::validate(types)?;
-        }
+        // Apply Serde transformations if enabled
+        let processed_types = if let Some(mode) = self.serde {
+            let mut types_clone = types.clone();
+            specta_serde::apply(&mut types_clone, mode)?;
+            types_clone
+        } else {
+            types.clone()
+        };
+
+        let types = &processed_types;
 
         let mut result = String::new();
 
@@ -151,7 +175,7 @@ impl Swift {
 
         // Add imports
         result.push_str("import Foundation\n");
-        if self.serde {
+        if self.serde.is_some() {
             result.push_str("import Codable\n");
         }
         for protocol in &self.protocols {
@@ -214,6 +238,7 @@ impl NamingConvention {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn to_camel_case(&self, name: &str) -> String {
         // Convert snake_case or PascalCase to camelCase
         if name.contains('_') {
@@ -258,6 +283,7 @@ impl NamingConvention {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn to_pascal_case(&self, name: &str) -> String {
         // Convert snake_case to PascalCase
         name.split('_')
@@ -271,12 +297,13 @@ impl NamingConvention {
             .collect()
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn to_snake_case(&self, name: &str) -> String {
         // Convert camelCase/PascalCase to snake_case
         let mut result = String::new();
-        let mut chars = name.chars().peekable();
+        let chars = name.chars();
 
-        while let Some(c) = chars.next() {
+        for c in chars {
             if c.is_uppercase() && !result.is_empty() {
                 result.push('_');
             }
@@ -294,23 +321,22 @@ fn needs_duration_helper(types: &TypeCollection) -> bool {
             return true;
         }
         // Also check if any struct fields contain Duration
-        if let specta::datatype::DataType::Struct(s) = ndt.ty() {
-            if let specta::datatype::Fields::Named(fields) = s.fields() {
-                for (_, field) in fields.fields() {
-                    if let Some(ty) = field.ty() {
-                        if let specta::datatype::DataType::Reference(r) = ty {
-                            if let Some(referenced_ndt) = r.get(types) {
-                                if referenced_ndt.name() == "Duration" {
-                                    return true;
-                                }
-                            }
-                        }
-                        // Also check if the field type is a Duration struct directly
-                        if let specta::datatype::DataType::Struct(struct_ty) = ty {
-                            if is_duration_struct(struct_ty) {
-                                return true;
-                            }
-                        }
+        if let specta::datatype::DataType::Struct(s) = ndt.ty()
+            && let specta::datatype::Fields::Named(fields) = s.fields()
+        {
+            for (_, field) in fields.fields() {
+                if let Some(ty) = field.ty() {
+                    if let specta::datatype::DataType::Reference(r) = ty
+                        && let Some(referenced_ndt) = r.get(types)
+                        && referenced_ndt.name() == "Duration"
+                    {
+                        return true;
+                    }
+                    // Also check if the field type is a Duration struct directly
+                    if let specta::datatype::DataType::Struct(struct_ty) = ty
+                        && is_duration_struct(struct_ty)
+                    {
+                        return true;
                     }
                 }
             }

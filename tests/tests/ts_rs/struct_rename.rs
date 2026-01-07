@@ -1,10 +1,11 @@
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
 #[test]
 fn rename_all() {
-    #[derive(Type)]
+    #[derive(Type, Serialize, Deserialize)]
     #[specta(collect = false)]
-    #[specta(rename_all = "UPPERCASE")]
+    #[serde(rename_all = "UPPERCASE")]
     struct Rename {
         a: i32,
         b: i32,

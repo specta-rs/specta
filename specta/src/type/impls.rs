@@ -11,12 +11,19 @@ impl_primitives!(
 );
 
 // TODO: Reenable this at some point. It's being really annoying.
-// #[cfg(feature = "nightly")]
-// impl Type for f16 {
-//     fn definition(_: &mut TypeCollection) -> DataType {
-//         DataType::Primitive(datatype::Primitive::f16)
-//     }
-// }
+#[cfg(is_nightly)]
+impl Type for f16 {
+    fn definition(_: &mut TypeCollection) -> DataType {
+        DataType::Primitive(datatype::Primitive::f16)
+    }
+}
+
+#[cfg(is_nightly)]
+impl Type for f128 {
+    fn definition(_: &mut TypeCollection) -> DataType {
+        DataType::Primitive(datatype::Primitive::f16)
+    }
+}
 
 impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13); // Technically we only support 12-tuples but the `T13` is required due to how the macro works
 
@@ -47,7 +54,7 @@ impl Type for std::sync::Arc<str> {
     impl_passthrough!(String);
 }
 
-impl<'a, T: Type + 'static> Type for &'a T {
+impl<T: Type + 'static> Type for &T {
     impl_passthrough!(T);
 }
 
@@ -59,7 +66,6 @@ impl<'a, T: ?Sized + ToOwned + Type + 'static> Type for std::borrow::Cow<'a, T> 
     impl_passthrough!(T);
 }
 
-use std::cell::Ref;
 use std::ffi::*;
 impl_as!(
     str as String
@@ -119,12 +125,12 @@ impl_as!(
 
 use std::collections::*;
 impl_for_list!(
-    false; Vec<T> as "Vec"
-    false; VecDeque<T> as "VecDeque"
-    false; BinaryHeap<T> as "BinaryHeap"
-    false; LinkedList<T> as "LinkedList"
-    true; HashSet<T> as "HashSet"
-    true; BTreeSet<T> as "BTreeSet"
+    false; Vec<T>
+    false; VecDeque<T>
+    false; BinaryHeap<T>
+    false; LinkedList<T>
+    true; HashSet<T>
+    true; BTreeSet<T>
 );
 
 impl<T: Type> Type for &[T] {
@@ -156,10 +162,7 @@ impl<T> Type for std::marker::PhantomData<T> {
 const _: () = {
     impl Type for std::convert::Infallible {
         fn definition(_: &mut TypeCollection) -> DataType {
-            DataType::Enum(internal::construct::r#enum(
-                Some(EnumRepr::External),
-                vec![],
-            ))
+            DataType::Enum(Enum::default())
         }
     }
 };
@@ -174,89 +177,79 @@ impl<T: Type> Type for std::ops::Range<T> {
                         "start".into(),
                         Field {
                             optional: false,
-                            flatten: false,
+
                             deprecated: None,
                             docs: Cow::Borrowed(""),
                             inline: false,
                             ty: ty.clone(),
+                            attributes: Vec::new(),
                         },
                     ),
                     (
                         "end".into(),
                         Field {
                             optional: false,
-                            flatten: false,
+
                             deprecated: None,
                             docs: Cow::Borrowed(""),
                             inline: false,
                             ty,
+                            attributes: Vec::new(),
                         },
                     ),
                 ],
-                tag: None,
+                attributes: Vec::new(),
             }),
+            attributes: vec![],
         })
     }
 }
-
-impl<T: Type> Flatten for std::ops::Range<T> {}
 
 impl<T: Type> Type for std::ops::RangeInclusive<T> {
     impl_passthrough!(std::ops::Range<T>); // Yeah Serde are cringe
 }
 
-impl<T: Type> Flatten for std::ops::RangeInclusive<T> {}
+impl_for_map!(HashMap<K, V>);
+impl_for_map!(BTreeMap<K, V>);
 
-impl_for_map!(HashMap<K, V> as "HashMap");
-impl_for_map!(BTreeMap<K, V> as "BTreeMap");
-impl<K: Type, V: Type> Flatten for std::collections::HashMap<K, V> {}
-impl<K: Type, V: Type> Flatten for std::collections::BTreeMap<K, V> {}
-
-const _: () = {
-    impl Type for std::time::SystemTime {
-        fn definition(types: &mut TypeCollection) -> DataType {
-            DataType::Struct(internal::construct::r#struct(
-                internal::construct::fields_named(
-                    vec![
-                        (
-                            "duration_since_epoch".into(),
-                            internal::construct::field::<i64>(false, false, None, "".into(), types),
-                        ),
-                        (
-                            "duration_since_unix_epoch".into(),
-                            internal::construct::field::<u32>(false, false, None, "".into(), types),
-                        ),
-                    ],
-                    None,
+impl Type for std::time::SystemTime {
+    fn definition(types: &mut TypeCollection) -> DataType {
+        let fields = internal::construct::fields_named(
+            vec![
+                (
+                    "duration_since_epoch".into(),
+                    Field::new(<i64 as crate::Type>::definition(types)),
                 ),
-            ))
-        }
-    }
-
-    #[automatically_derived]
-    impl Flatten for std::time::SystemTime {}
-};
-
-const _: () = {
-    impl Type for std::time::Duration {
-        fn definition(types: &mut TypeCollection) -> DataType {
-            DataType::Struct(internal::construct::r#struct(
-                internal::construct::fields_named(
-                    vec![
-                        (
-                            "secs".into(),
-                            internal::construct::field::<u64>(false, false, None, "".into(), types),
-                        ),
-                        (
-                            "nanos".into(),
-                            internal::construct::field::<u32>(false, false, None, "".into(), types),
-                        ),
-                    ],
-                    None,
+                (
+                    "duration_since_unix_epoch".into(),
+                    Field::new(<u32 as crate::Type>::definition(types)),
                 ),
-            ))
-        }
+            ],
+            vec![],
+        );
+        let mut s = crate::datatype::Struct::new();
+        s.set_fields(fields);
+        DataType::Struct(s)
     }
+}
 
-    impl Flatten for std::time::Duration {}
-};
+impl Type for std::time::Duration {
+    fn definition(types: &mut TypeCollection) -> DataType {
+        let fields = internal::construct::fields_named(
+            vec![
+                (
+                    "secs".into(),
+                    Field::new(<u64 as crate::Type>::definition(types)),
+                ),
+                (
+                    "nanos".into(),
+                    Field::new(<u32 as crate::Type>::definition(types)),
+                ),
+            ],
+            vec![],
+        );
+        let mut s = crate::datatype::Struct::new();
+        s.set_fields(fields);
+        DataType::Struct(s)
+    }
+}

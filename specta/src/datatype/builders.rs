@@ -30,6 +30,7 @@ impl StructBuilder<NamedFields> {
     pub fn build(self) -> DataType {
         DataType::Struct(Struct {
             fields: Fields::Named(self.fields),
+            attributes: Default::default(),
         })
     }
 }
@@ -44,9 +45,12 @@ impl StructBuilder<UnnamedFields> {
         self.fields.fields.push(field);
     }
 
+    // TODO: Allow configuring attributes???
+
     pub fn build(self) -> DataType {
         DataType::Struct(Struct {
             fields: Fields::Unnamed(self.fields),
+            attributes: Default::default(),
         })
     }
 }
@@ -97,9 +101,9 @@ impl VariantBuilder<NamedFields> {
     }
 }
 
-impl Into<EnumVariant> for VariantBuilder<NamedFields> {
-    fn into(self) -> EnumVariant {
-        self.build()
+impl From<VariantBuilder<NamedFields>> for EnumVariant {
+    fn from(val: VariantBuilder<NamedFields>) -> Self {
+        val.build()
     }
 }
 
@@ -126,9 +130,9 @@ impl VariantBuilder<UnnamedFields> {
     }
 }
 
-impl Into<EnumVariant> for VariantBuilder<UnnamedFields> {
-    fn into(self) -> EnumVariant {
-        self.build()
+impl From<VariantBuilder<UnnamedFields>> for EnumVariant {
+    fn from(val: VariantBuilder<UnnamedFields>) -> Self {
+        val.build()
     }
 }
 

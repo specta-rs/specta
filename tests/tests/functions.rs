@@ -23,7 +23,7 @@ mod test {
     #[specta]
     fn e<T: fmt::Debug>(window: T) {}
 
-    // https://github.com/oscartbeaumont/tauri-specta/issues/24
+    // https://github.com/specta-rs/tauri-specta/issues/24
     #[specta]
     #[allow(unused_mut)]
     fn f(mut demo: String) -> i32 {

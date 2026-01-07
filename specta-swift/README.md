@@ -4,7 +4,7 @@
 [![Documentation](https://docs.rs/specta-swift/badge.svg)](https://docs.rs/specta-swift)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A Rust crate for exporting Rust types to Swift, built on top of [Specta](https://github.com/oscartbeaumont/specta). Generate idiomatic Swift code from your Rust type definitions with support for complex unions, generics, and nested structures.
+A Rust crate for exporting Rust types to Swift, built on top of [Specta](https://github.com/specta-rs/specta). Generate idiomatic Swift code from your Rust type definitions with support for complex unions, generics, and nested structures.
 
 ## Features
 
@@ -384,7 +384,7 @@ The test suite includes:
 
 ## Contributing
 
-Contributions are welcome! Please see the main [Specta repository](https://github.com/oscartbeaumont/specta) for contribution guidelines.
+Contributions are welcome! Please see the main [Specta repository](https://github.com/specta-rs/specta) for contribution guidelines.
 
 ## License
 
@@ -392,6 +392,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Related Projects
 
-- [Specta](https://github.com/oscartbeaumont/specta) - Core type introspection library
-- [Specta TypeScript](https://github.com/oscartbeaumont/specta/tree/main/specta-typescript) - TypeScript exporter
-- [Specta Go](https://github.com/oscartbeaumont/specta/tree/main/specta-go) - Go exporter
+- [Specta](https://github.com/specta-rs/specta) - Core type introspection library
+- [Specta TypeScript](https://github.com/specta-rs/specta/tree/main/specta-typescript) - TypeScript exporter
+- [Specta Go](https://github.com/specta-rs/specta/tree/main/specta-go) - Go exporter

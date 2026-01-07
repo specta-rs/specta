@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
 #[derive(Type)]
@@ -43,90 +44,84 @@ fn test_type_aliases() {
     insta::assert_snapshot!(crate::ts::inline::<Struct<u32>>(&Default::default()).unwrap(), @"{ field: Demo<number, boolean> }");
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct D {
     flattened: u32,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct GenericFlattened<T> {
     generic_flattened: T,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct C {
     a: u32,
-    #[specta(flatten)]
+    #[serde(flatten)]
     b: D,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct B {
     b: u32,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct A {
     a: B,
     #[specta(inline)]
     b: B,
-    #[specta(flatten)]
     c: B,
-    #[specta(inline, flatten)]
+    #[specta(inline)]
     d: D,
-    #[specta(inline, flatten)]
+    #[specta(inline)]
     e: GenericFlattened<u32>,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct ToBeFlattened {
     a: String,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct DoubleFlattened {
-    #[specta(flatten)]
     a: ToBeFlattened,
-    #[specta(flatten)]
     b: ToBeFlattened,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct Inner {
     a: i32,
-    #[specta(flatten)]
     b: Box<FlattenedInner>,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct FlattenedInner {
-    #[specta(flatten)]
     c: Inner,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct BoxedInner {
     a: i32,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct BoxFlattened {
-    #[specta(flatten)]
     b: Box<BoxedInner>,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct BoxInline {
     #[specta(inline)]

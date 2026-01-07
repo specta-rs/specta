@@ -1,11 +1,10 @@
 //! [JSON Schema](https://json-schema.org) language exporter.
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
-    html_logo_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png",
-    html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
+    html_logo_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png",
+    html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
-
-// use specta::datatype::{DataType, Primitive};
+#![allow(warnings)] // TODO: leaving this until it's implemented to avoid unnecessary warnings.
 
 use std::path::Path;
 
@@ -31,7 +30,7 @@ impl JsonSchema {
 // TODO: What should we call this?
 // TODO: `TypeCollection` so we can handle references?
 pub fn to_ast(schema: &Schema) -> Result<DataType, ()> {
-    let mut types = TypeCollection::default();
+    let types = TypeCollection::default();
 
     match schema {
         Schema::Bool(b) => todo!(), // Ok(DataType::Literal((*b).into())),
