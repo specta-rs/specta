@@ -41,14 +41,14 @@ pub struct D {
     pub b: A,
 }
 
-#[derive(Type, Serialize, Deserialize)]
-#[specta(collect = false)]
-#[serde(untagged)]
-pub struct E {
-    pub a: A,
-    #[specta(inline)]
-    pub b: A,
-}
+// #[derive(Type, Serialize, Deserialize)]
+// #[specta(collect = false)]
+// #[serde(untagged)]
+// pub struct E {
+//     pub a: A,
+//     #[specta(inline)]
+//     pub b: A,
+// }
 
 // Flattening a struct multiple times
 #[derive(Type, Serialize, Deserialize)]
@@ -77,7 +77,7 @@ pub enum H {
 // TODO: Invalid Serde type but unit test this at the datamodel level cause it might be valid in other langs.
 // #[derive(Type, Serialize, Deserialize)]
 // #[specta(collect = false)]
-#[serde(tag = "type")]
+// #[serde(tag = "type")]
 // pub enum I {
 //     A(String),
 //     B,
@@ -85,6 +85,7 @@ pub enum H {
 //     C(A),
 //     D(#[serde(flatten)] A),
 // }
+
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "t", content = "c")]
@@ -113,7 +114,7 @@ fn serde() {
     insta::assert_snapshot!(crate::ts::inline::<C>(&Default::default()).unwrap(), @"(A) & { b: { a: string } }");
     insta::assert_snapshot!(crate::ts::inline::<D>(&Default::default()).unwrap(), @"(A) & { b: { a: string } }");
     // assert_ts!(D, "(A) & { b: { a: string } }"); // TODO: Assert export
-    insta::assert_snapshot!(crate::ts::inline::<E>(&Default::default()).unwrap(), @"(A) & { b: { a: string } }");
+    // insta::assert_snapshot!(crate::ts::inline::<E>(&Default::default()).unwrap(), @"(A) & { b: { a: string } }");
     insta::assert_snapshot!(crate::ts::inline::<F>(&Default::default()).unwrap(), @"(A)");
     insta::assert_snapshot!(crate::ts::inline::<G>(&Default::default()).unwrap(), @"(A) & (AA)");
     insta::assert_snapshot!(crate::ts::inline::<H>(&Default::default()).unwrap(), @"{ A: string } | \"B\"");

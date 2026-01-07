@@ -6,13 +6,13 @@ use specta::Type;
 use crate::ts::assert_ts_inline2;
 
 // This type won't even compile with Serde macros
-#[derive(Type, Serialize, Deserialize)]
-#[specta(collect = false)]
-#[serde(tag = "type")]
-pub enum A {
-    // For internal tagging all variants must be a unit, named or *unnamed with a single variant*.
-    A(String, u32),
-}
+// #[derive(Type, Serialize, Deserialize)]
+// #[specta(collect = false)]
+// #[serde(tag = "type")]
+// pub enum A {
+//     // For internal tagging all variants must be a unit, named or *unnamed with a single variant*.
+//     A(String, u32),
+// }
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
@@ -139,10 +139,10 @@ pub enum MInner {
 
 #[test]
 fn internally_tagged() {
-    insta::assert_snapshot!(
-        assert_ts_inline2::<A>().unwrap_err(),
-        @"#[specta(tag = \"...\")] cannot be used with tuple variants\n"
-    );
+    // insta::assert_snapshot!(
+    //     assert_ts_inline2::<A>().unwrap_err(),
+    //     @"#[specta(tag = \"...\")] cannot be used with tuple variants\n"
+    // );
     insta::assert_snapshot!(
         assert_ts_inline2::<B>().unwrap_err(),
         @"#[specta(tag = \"...\")] cannot be used with tuple variants\n"
