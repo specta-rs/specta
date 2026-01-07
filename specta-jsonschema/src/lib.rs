@@ -5,8 +5,6 @@
     html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
 
-// use specta::datatype::{DataType, Primitive};
-
 use std::path::Path;
 
 use schemars::schema::{InstanceType, Schema, SingleOrVec};
