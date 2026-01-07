@@ -3,6 +3,7 @@
 use std::{borrow::Cow, path::Path};
 
 use specta::TypeCollection;
+use specta_serde::SerdeMode;
 
 use crate::error::Result;
 use crate::primitives::{export_type, is_duration_struct};
@@ -22,8 +23,8 @@ pub struct Swift {
     pub optionals: OptionalStyle,
     /// Additional protocols to conform to.
     pub protocols: Vec<Cow<'static, str>>,
-    /// Enable Serde validation.
-    pub serde: bool,
+    /// Serde mode for type transformations.
+    pub serde: Option<SerdeMode>,
 }
 
 /// Indentation style for generated Swift code.
@@ -82,7 +83,7 @@ impl Default for Swift {
             generics: GenericStyle::default(),
             optionals: OptionalStyle::default(),
             protocols: vec![],
-            serde: false,
+            serde: Some(SerdeMode::Both),
         }
     }
 }
@@ -123,9 +124,25 @@ impl Swift {
         self
     }
 
-    /// Enable Serde validation.
-    pub fn with_serde(mut self) -> Self {
-        self.serde = true;
+    /// Enable Serde validation with specified mode.
+    pub fn with_serde(mut self, mode: SerdeMode) -> Self {
+        self.serde = Some(mode);
+        self
+    }
+
+    /// Enable Serde validation for serialization only.
+    pub fn with_serde_serialize(self) -> Self {
+        self.with_serde(SerdeMode::Serialize)
+    }
+
+    /// Enable Serde validation for deserialization only.
+    pub fn with_serde_deserialize(self) -> Self {
+        self.with_serde(SerdeMode::Deserialize)
+    }
+
+    /// Disable Serde validation.
+    pub fn without_serde(mut self) -> Self {
+        self.serde = None;
         self
     }
 
@@ -136,14 +153,18 @@ impl Swift {
     }
 
     /// Export types to a Swift string.
-    #[allow(clippy::todo)]
-    #[allow(unused_variables)]
     pub fn export(&self, types: &TypeCollection) -> Result<String> {
-        // Note: Serde validation is now handled by the exporter when processing types
-        // If you need to validate types, use specta_serde::process_for_serialization(types)
-        todo!("properly handle Serde w/ specta-serde");
+        // Apply Serde transformations if enabled
+        let processed_types = if let Some(mode) = self.serde {
+            let mut types_clone = types.clone();
+            specta_serde::apply(&mut types_clone, mode)?;
+            types_clone
+        } else {
+            types.clone()
+        };
 
-        #[allow(unreachable_code)]
+        let types = &processed_types;
+
         let mut result = String::new();
 
         // Add header
@@ -154,7 +175,7 @@ impl Swift {
 
         // Add imports
         result.push_str("import Foundation\n");
-        if self.serde {
+        if self.serde.is_some() {
             result.push_str("import Codable\n");
         }
         for protocol in &self.protocols {

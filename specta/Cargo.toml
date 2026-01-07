@@ -123,3 +123,6 @@ camino = { version = "1.2.1", optional = true, default-features = false }
 
 [dev-dependencies]
 serde = { version = "1.0.228", features = ["derive"] } # TODO: Can we remove this?
+
+[build-dependencies]
+rustc_version = "0.4.1"

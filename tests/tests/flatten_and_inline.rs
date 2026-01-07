@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -75,41 +75,44 @@ pub enum H {
 }
 
 // Test for issue #393 - flatten in enum variant with internal tag
-#[derive(Type)]
-#[specta(collect = false, tag = "type")]
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(tag = "type")]
 pub enum MyEnum {
     Variant {
-        #[specta(flatten)]
+        #[serde(flatten)]
         inner: A,
     },
 }
 
 // Test for issue #393 - flatten in enum variant with external tag
-#[derive(Type)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 pub enum MyEnumExternal {
     Variant {
-        #[specta(flatten)]
+        #[serde(flatten)]
         inner: A,
     },
 }
 
 // Test for issue #393 - flatten in enum variant with adjacent tag
-#[derive(Type)]
-#[specta(collect = false, tag = "t", content = "c")]
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
 pub enum MyEnumAdjacent {
     Variant {
-        #[specta(flatten)]
+        #[serde(flatten)]
         inner: A,
     },
 }
 
 // Test for issue #393 - flatten in enum variant with untagged
-#[derive(Type)]
-#[specta(collect = false, untagged)]
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
 pub enum MyEnumUntagged {
     Variant {
-        #[specta(flatten)]
+        #[serde(flatten)]
         inner: A,
     },
 }

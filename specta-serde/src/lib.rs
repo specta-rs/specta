@@ -61,6 +61,7 @@ mod repr;
 mod serde_attrs;
 
 pub use error::Error;
+pub use repr::EnumRepr;
 pub use serde_attrs::{SerdeMode, apply_serde_transformations};
 
 use specta::TypeCollection;
@@ -354,6 +355,128 @@ fn validate_enum(e: &Enum, _types: &TypeCollection) -> Result<(), Error> {
     // }
 
     Ok(())
+}
+
+/// Check if a field has the `#[serde(flatten)]` attribute
+///
+/// This is a utility function for exporters that need to handle flattened fields.
+/// It checks both `#[serde(flatten)]` and `#[specta(flatten)]` attributes.
+///
+/// # Example
+/// ```ignore
+/// use specta::datatype::Field;
+/// use specta_serde::is_field_flattened;
+///
+/// fn process_field(field: &Field) {
+///     if is_field_flattened(field) {
+///         // Handle flattened field
+///     } else {
+///         // Handle regular field
+///     }
+/// }
+/// ```
+pub fn is_field_flattened(field: &specta::datatype::Field) -> bool {
+    use specta::datatype::{RuntimeMeta, RuntimeNestedMeta};
+
+    field.attributes().iter().any(|attr| {
+        if attr.path == "serde" || attr.path == "specta" {
+            match &attr.kind {
+                RuntimeMeta::Path(path) => path == "flatten",
+                RuntimeMeta::List(items) => items.iter().any(|item| {
+                    matches!(item, RuntimeNestedMeta::Meta(RuntimeMeta::Path(path)) if path == "flatten")
+                }),
+                _ => false,
+            }
+        } else {
+            false
+        }
+    })
+}
+
+/// Get the enum representation from serde attributes
+///
+/// This function parses `#[serde(tag = "...")]`, `#[serde(content = "...")]`,
+/// and `#[serde(untagged)]` attributes to determine the enum representation.
+///
+/// Returns `EnumRepr::External` by default if no representation attributes are found.
+///
+/// # Example
+/// ```ignore
+/// use specta::datatype::Enum;
+/// use specta_serde::{get_enum_repr, EnumRepr};
+///
+/// fn process_enum(e: &Enum) {
+///     let repr = get_enum_repr(e.attributes());
+///     match repr {
+///         EnumRepr::External => { /* handle external */ },
+///         EnumRepr::Internal { tag } => { /* handle internal */ },
+///         EnumRepr::Adjacent { tag, content } => { /* handle adjacent */ },
+///         EnumRepr::Untagged => { /* handle untagged */ },
+///         _ => {}
+///     }
+/// }
+/// ```
+pub fn get_enum_repr(attributes: &[specta::datatype::RuntimeAttribute]) -> EnumRepr {
+    use specta::datatype::{RuntimeLiteral, RuntimeMeta, RuntimeNestedMeta};
+    use std::borrow::Cow;
+
+    let mut tag = None;
+    let mut content = None;
+    let mut untagged = false;
+
+    fn parse_repr_from_meta(
+        meta: &RuntimeMeta,
+        tag: &mut Option<String>,
+        content: &mut Option<String>,
+        untagged: &mut bool,
+    ) {
+        match meta {
+            RuntimeMeta::Path(path) => {
+                if path == "untagged" {
+                    *untagged = true;
+                }
+            }
+            RuntimeMeta::NameValue { key, value } => {
+                if key == "tag" {
+                    if let RuntimeLiteral::Str(t) = value {
+                        *tag = Some(t.clone());
+                    }
+                } else if key == "content"
+                    && let RuntimeLiteral::Str(c) = value
+                {
+                    *content = Some(c.clone());
+                }
+            }
+            RuntimeMeta::List(list) => {
+                for nested in list {
+                    if let RuntimeNestedMeta::Meta(nested_meta) = nested {
+                        parse_repr_from_meta(nested_meta, tag, content, untagged);
+                    }
+                }
+            }
+        }
+    }
+
+    for attr in attributes {
+        if attr.path == "serde" {
+            parse_repr_from_meta(&attr.kind, &mut tag, &mut content, &mut untagged);
+        }
+    }
+
+    if let (Some(tag_name), Some(content_name)) = (tag.clone(), content.clone()) {
+        EnumRepr::Adjacent {
+            tag: Cow::Owned(tag_name),
+            content: Cow::Owned(content_name),
+        }
+    } else if let Some(tag_name) = tag {
+        EnumRepr::Internal {
+            tag: Cow::Owned(tag_name),
+        }
+    } else if untagged {
+        EnumRepr::Untagged
+    } else {
+        EnumRepr::External
+    }
 }
 
 // TODO: Implement these validation functions once enum representation parsing is complete

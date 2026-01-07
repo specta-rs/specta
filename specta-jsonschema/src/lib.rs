@@ -107,6 +107,7 @@
     html_logo_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png",
     html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
+#![allow(warnings)] // TODO: leaving this until it's implemented to avoid unnecessary warnings.
 
 mod error;
 pub mod import;

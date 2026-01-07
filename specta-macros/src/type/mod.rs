@@ -6,6 +6,8 @@ use syn::{Data, DeriveInput, GenericParam, parse};
 
 use crate::utils::{parse_attrs, unraw_raw_ident};
 
+use self::lower_attr::lower_attribute;
+
 use self::generics::{
     add_type_to_where_clause, generics_with_ident_and_bounds_only, generics_with_ident_only,
 };
@@ -28,10 +30,24 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     // We pass all the attributes at the start and when decoding them pop them off the list.
     // This means at the end we can check for any that weren't consumed and throw an error.
+    let raw_attrs = attrs; // Preserve raw attrs before parse_attrs shadows the variable
     let mut attrs = parse_attrs(attrs)?;
 
     let container_attrs = ContainerAttr::from_attrs(&mut attrs)?;
     let crate_ref = container_attrs.crate_name.clone().unwrap_or(quote!(specta));
+
+    // Lower the container attributes to RuntimeAttribute tokens
+    // We use the raw attrs from DeriveInput, not the parsed ones
+    // This follows the same pattern as variant attribute lowering in enum.rs:58-71
+    let lowered_attrs = raw_attrs
+        .iter()
+        .filter(|attr| {
+            let path = attr.path().to_token_stream().to_string();
+            !container_attrs.skip_attrs.contains(&path) && path != "specta"
+        })
+        .filter_map(|attr| lower_attribute(attr).transpose())
+        .map(|result| result.map(|attr| attr.to_tokens()))
+        .collect::<Result<Vec<_>, _>>()?;
 
     let ident = container_attrs
         .remote
@@ -86,7 +102,11 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let bounds = generics_with_ident_and_bounds_only(generics);
     let type_args = generics_with_ident_only(generics);
-    let where_bound = add_type_to_where_clause(&quote!(#crate_ref::Type), generics);
+    let where_bound = add_type_to_where_clause(
+        &quote!(#crate_ref::Type),
+        generics,
+        container_attrs.bound.as_deref(),
+    );
 
     let shadow_generics = {
         let g = generics.params.iter().map(|param| match param {
@@ -186,7 +206,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
                                     datatype::DataType::#dt_type({
                                         let mut e = datatype::#dt_type::new();
-                                        // *e.attributes_mut() = vec![#(#lowered_attrs),*]; // TODO
+                                        *e.attributes_mut() = vec![#(#lowered_attrs),*];
                                         #dt_impl
                                         e
                                     })

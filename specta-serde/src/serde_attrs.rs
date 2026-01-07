@@ -75,11 +75,6 @@ pub struct SerdeAttributes {
     pub content: Option<String>,
     /// Untagged enum
     pub untagged: bool,
-    /// Custom trait bounds #[serde(bound = "...")]
-    pub bound: Option<String>,
-    /// Separate bounds for serialization and deserialization
-    pub bound_serialize: Option<String>,
-    pub bound_deserialize: Option<String>,
     /// Remote type definition #[serde(remote = "...")]
     pub remote: Option<String>,
     /// Convert from another type #[serde(from = "...")]
@@ -88,14 +83,6 @@ pub struct SerdeAttributes {
     pub try_from: Option<String>,
     /// Convert into another type #[serde(into = "...")]
     pub into: Option<String>,
-    /// Custom crate path #[serde(crate = "...")]
-    pub crate_path: Option<String>,
-    /// Custom expectation message #[serde(expecting = "...")]
-    pub expecting: Option<String>,
-    /// Variant identifier for enum deserialization
-    pub variant_identifier: bool,
-    /// Field identifier for struct deserialization
-    pub field_identifier: bool,
     /// Deserialize unknown variants to this variant #[serde(other)]
     pub other: bool,
     /// Aliases for deserialization #[serde(alias = "name")]
@@ -106,8 +93,6 @@ pub struct SerdeAttributes {
     pub deserialize_with: Option<String>,
     /// Combined serialize/deserialize with module #[serde(with = "module")]
     pub with: Option<String>,
-    /// Borrow data during deserialization #[serde(borrow)]
-    pub borrow: Option<String>,
 }
 
 /// Contains parsed serde attributes for a field
@@ -126,12 +111,6 @@ pub struct SerdeFieldAttributes {
     pub with: Option<String>,
     /// Skip serializing if condition is true #[serde(skip_serializing_if = "path")]
     pub skip_serializing_if: Option<String>,
-    /// Borrow data during deserialization #[serde(borrow)]
-    #[allow(dead_code)]
-    pub borrow: Option<String>,
-    /// Getter function for private fields #[serde(getter = "...")]
-    #[allow(dead_code)]
-    pub getter: Option<String>,
 }
 
 /// Apply serde transformations to a DataType for the specified mode
@@ -241,7 +220,38 @@ impl SerdeTransformer {
                 true, // is_variant
             )?;
 
-            let transformed_fields = self.transform_fields(variant.fields(), &attrs)?;
+            // For enum variant fields, use rename_all_fields instead of rename_all
+            let mut variant_field_attrs = attrs.clone();
+            // Apply rename_all_fields to variant fields based on mode
+            match self.mode {
+                SerdeMode::Serialize => {
+                    if let Some(rule) = attrs
+                        .rename_all_fields_serialize
+                        .or(attrs.rename_all_fields)
+                    {
+                        variant_field_attrs.rename_all = Some(rule);
+                        variant_field_attrs.rename_all_serialize = Some(rule);
+                    }
+                }
+                SerdeMode::Deserialize => {
+                    if let Some(rule) = attrs
+                        .rename_all_fields_deserialize
+                        .or(attrs.rename_all_fields)
+                    {
+                        variant_field_attrs.rename_all = Some(rule);
+                        variant_field_attrs.rename_all_deserialize = Some(rule);
+                    }
+                }
+                SerdeMode::Both => {
+                    // For Both mode, use rename_all_fields if available
+                    if let Some(rule) = attrs.rename_all_fields {
+                        variant_field_attrs.rename_all = Some(rule);
+                    }
+                }
+            }
+
+            let transformed_fields =
+                self.transform_fields(variant.fields(), &variant_field_attrs)?;
 
             let mut new_variant = variant.clone();
             new_variant.set_fields(transformed_fields);
@@ -552,11 +562,6 @@ fn parse_serde_attribute_content(
                     }
                     _ => {}
                 },
-                "bound" => {
-                    if let RuntimeLiteral::Str(bound_str) = value {
-                        attrs.bound = Some(bound_str.clone());
-                    }
-                }
                 "remote" => {
                     if let RuntimeLiteral::Str(remote_type) = value {
                         attrs.remote = Some(remote_type.clone());
@@ -577,16 +582,6 @@ fn parse_serde_attribute_content(
                         attrs.into = Some(into_type.clone());
                     }
                 }
-                "crate" => {
-                    if let RuntimeLiteral::Str(crate_path) = value {
-                        attrs.crate_path = Some(crate_path.clone());
-                    }
-                }
-                "expecting" => {
-                    if let RuntimeLiteral::Str(expecting_msg) = value {
-                        attrs.expecting = Some(expecting_msg.clone());
-                    }
-                }
                 "alias" => {
                     if let RuntimeLiteral::Str(alias_name) = value {
                         attrs.alias.push(alias_name.clone());
@@ -605,11 +600,6 @@ fn parse_serde_attribute_content(
                 "with" => {
                     if let RuntimeLiteral::Str(with_module) = value {
                         attrs.with = Some(with_module.clone());
-                    }
-                }
-                "borrow" => {
-                    if let RuntimeLiteral::Str(borrow_str) = value {
-                        attrs.borrow = Some(borrow_str.clone());
                     }
                 }
                 _ => {}
@@ -690,7 +680,6 @@ fn parse_complex_serde_attribute(
                                 attrs.rename_all_fields_serialize = Some(rule);
                             }
                         }
-                        "bound" => attrs.bound_serialize = Some(name.clone()),
                         _ => {}
                     }
                 }
@@ -709,7 +698,6 @@ fn parse_complex_serde_attribute(
                                 attrs.rename_all_fields_deserialize = Some(rule);
                             }
                         }
-                        "bound" => attrs.bound_deserialize = Some(name.clone()),
                         _ => {}
                     }
                 }
@@ -741,10 +729,7 @@ fn parse_serde_path_attribute(attrs: &mut SerdeAttributes, attribute_name: &str)
         "transparent" => attrs.transparent = true,
         "untagged" => attrs.untagged = true,
         "deny_unknown_fields" => attrs.deny_unknown_fields = true,
-        "variant_identifier" => attrs.variant_identifier = true,
-        "field_identifier" => attrs.field_identifier = true,
         "other" => attrs.other = true,
-        "borrow" => attrs.borrow = Some(String::new()),
         _ => {}
     }
 }
@@ -804,18 +789,6 @@ fn parse_serde_field_attribute_content(
             "skip_serializing_if" => {
                 if let RuntimeLiteral::Str(func_name) = value {
                     attrs.skip_serializing_if = Some(func_name.clone());
-                }
-            }
-            "borrow" => {
-                if let RuntimeLiteral::Str(borrow_spec) = value {
-                    attrs.borrow = Some(borrow_spec.clone());
-                } else if let RuntimeLiteral::Bool(true) = value {
-                    attrs.borrow = Some(String::new()); // Empty string indicates simple borrow
-                }
-            }
-            "getter" => {
-                if let RuntimeLiteral::Str(getter_func) = value {
-                    attrs.getter = Some(getter_func.clone());
                 }
             }
             _ => {}
@@ -1474,21 +1447,6 @@ mod tests {
             )
             .unwrap();
         assert_eq!(result, "TestField"); // Uses common rule
-    }
-
-    #[test]
-    fn test_borrow_attribute_parsing() {
-        let mut attrs = SerdeAttributes::default();
-        parse_serde_path_attribute(&mut attrs, "borrow");
-        assert_eq!(attrs.borrow, Some(String::new()));
-
-        let mut attrs2 = SerdeAttributes::default();
-        let meta = RuntimeMeta::NameValue {
-            key: "borrow".to_string(),
-            value: RuntimeLiteral::Str("'a + 'b".to_string()),
-        };
-        parse_serde_attribute_content(&meta, &mut attrs2).expect("Failed to parse borrow");
-        assert_eq!(attrs2.borrow, Some("'a + 'b".to_string()));
     }
 
     #[test]

@@ -29,7 +29,7 @@ impl TypeCollection {
         self
     }
 
-    /// Register a [`NamedType`] with the collection.
+    /// Register a [`Type`](crate::Type) with the collection.
     pub fn register_mut<T: Type>(&mut self) -> &mut Self {
         T::definition(self);
         self

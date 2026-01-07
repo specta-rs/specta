@@ -1,4 +1,4 @@
-//! This file has been directed copied from Serde (https://github.com/serde-rs/serde/blob/master/serde_derive/src/internals/case.rs).
+//! This file has been directed copied from Serde (<https://github.com/serde-rs/serde/blob/master/serde_derive/src/internals/case.rs>).
 //! All code is licensed under the MIT & Apache license by it's original authors.
 //!
 //! We use this to ensure we maintain the exact same result as Serde in regards to renames.

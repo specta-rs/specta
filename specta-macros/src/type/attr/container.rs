@@ -17,6 +17,9 @@ pub struct ContainerAttr {
 
     // Struct only (we pass it anyway so enums get nice errors)
     pub transparent: bool,
+
+    // Custom where clause bounds (None = automatic, Some(vec) = custom)
+    pub bound: Option<Vec<syn::WherePredicate>>,
 }
 
 impl ContainerAttr {
@@ -63,6 +66,28 @@ impl ContainerAttr {
             // We generally want `#[serde(...)]` attributes to only be handled by the runtime but,
             // we make an exception for `#[serde(transparent)]`.
             result.transparent = attr.parse_bool().unwrap_or(true);
+        }
+
+        if let Some(attr) = attrs.extract("specta", "bound") {
+            let bound_str = attr.parse_string()?;
+            if bound_str.is_empty() {
+                // Empty string means explicitly no automatic bounds
+                result.bound = Some(Vec::new());
+            } else {
+                // Parse where predicates from string
+                let where_clause_str = format!("where {}", bound_str);
+                match syn::parse_str::<syn::WhereClause>(&where_clause_str) {
+                    Ok(where_clause) => {
+                        result.bound = Some(where_clause.predicates.into_iter().collect());
+                    }
+                    Err(e) => {
+                        return Err(syn::Error::new(
+                            attr.value_span(),
+                            format!("Failed to parse bound attribute: {}", e),
+                        ));
+                    }
+                }
+            }
         }
 
         Ok(result)

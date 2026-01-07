@@ -39,7 +39,7 @@
 //!
 //! Now you're set up with Specta Swift!
 //!
-//! If you get tired of listing all your types, checkout [`specta::collect`].
+//! If you get tired of listing all your types, checkout the `specta::collect` function.
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
     html_logo_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png",
@@ -52,3 +52,6 @@ mod swift;
 
 pub use error::Error;
 pub use swift::{GenericStyle, IndentStyle, NamingConvention, OptionalStyle, Swift};
+
+// Re-export SerdeMode from specta-serde for convenience
+pub use specta_serde::SerdeMode;

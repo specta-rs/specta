@@ -12,8 +12,10 @@ use crate::swift::Swift;
 
 /// Check if an enum is a string enum (has String repr)
 fn is_string_enum(e: &specta::datatype::Enum) -> bool {
-    // If all variants are unit variants, it's a string enum
-    e.is_string_enum()
+    // For Swift, we only treat it as a string enum if:
+    // 1. All variants are unit variants
+    // 2. There's a serde rename_all attribute (which means we can generate raw values)
+    e.is_string_enum() && get_rename_all_from_attributes(e.attributes()).is_some()
 }
 
 /// Helper function to get rename_all from serde attributes  

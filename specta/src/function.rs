@@ -13,7 +13,7 @@ pub use result::{FunctionResultFutureMarker, FunctionResultMarker};
 pub(crate) use specta_fn::SpectaFn;
 
 /// Returns a [`Function`](crate::datatype::Function) for a given function that has been annotated with
-/// [`specta`](macro@crate::specta).
+/// the `#[specta]` attribute.
 ///
 /// # Examples
 ///

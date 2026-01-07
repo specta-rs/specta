@@ -153,7 +153,7 @@ impl Typescript {
 
     /// Export the files into a single string.
     ///
-    /// Note: This will return [`Error:UnableToExport`] if the format is `Format::Files`.
+    /// Note: This will return [`Error::UnableToExport`](crate::Error::UnableToExport) if the format is `Format::Files`.
     pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
         let processed_types = if let Some(mode) = self.serde {
             let mut types_clone = types.clone();
@@ -190,19 +190,15 @@ impl Typescript {
                 }
 
                 // Sort root namespaces for consistent output
-                let mut sorted_roots: Vec<_> = root_namespaces.keys().collect();
-                sorted_roots.sort();
+                let mut sorted_roots: Vec<_> = root_namespaces.into_iter().collect();
+                sorted_roots.sort_by(|a, b| a.0.cmp(&b.0));
 
                 let mut root_aliases = Vec::with_capacity(sorted_roots.len());
 
-                for (i, root_name) in sorted_roots.iter().enumerate() {
+                for (i, (root_name, modules_in_root)) in sorted_roots.iter().enumerate() {
                     if i != 0 {
                         out += "\n";
                     }
-
-                    let modules_in_root = root_namespaces
-                        .get(*root_name)
-                        .expect("root_name should exist in root_namespaces");
 
                     // Sort modules to process them in order
                     let mut sorted_modules = modules_in_root.clone();

@@ -25,3 +25,40 @@ fn adjacently_tagged() {
         @r#"{ t: "A" } | { t: "B"; c: { id: string; method: string } } | { t: "C"; c: string }"#
     );
 }
+
+// Test for https://github.com/specta-rs/specta/issues/395
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    tag = "event",
+    content = "data"
+)]
+enum LoadProjectEvent {
+    Started {
+        project_name: String,
+    },
+    ProgressTest {
+        project_name: String,
+        status: String,
+        progress: i32,
+    },
+    Finished {
+        project_name: String,
+    },
+}
+
+#[test]
+fn adjacently_tagged_rename_all_fields() {
+    // Test for https://github.com/specta-rs/specta/issues/395
+    // The `rename_all_fields = "camelCase"` should convert field names to camelCase
+    insta::assert_snapshot!(
+        assert_ts_export2::<LoadProjectEvent>().unwrap(),
+        @r#"export type LoadProjectEvent = { event: "started"; data: { projectName: string } } | { event: "progressTest"; data: { projectName: string; status: string; progress: number } } | { event: "finished"; data: { projectName: string } };"#
+    );
+    insta::assert_snapshot!(
+        assert_ts_inline2::<LoadProjectEvent>().unwrap(),
+        @r#"{ event: "started"; data: { projectName: string } } | { event: "progressTest"; data: { projectName: string; status: string; progress: number } } | { event: "finished"; data: { projectName: string } }"#
+    );
+}

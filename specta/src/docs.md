@@ -54,7 +54,7 @@ Compatibility
 - `serde_json` - Support for [serde-json](https://github.com/serde-rs/json)
 - `serde_yaml` - Support for [serde_yaml](https://github.com/dtolnay/serde-yaml)
 - `toml` - Support for [toml](https://github.com/toml-rs/toml)
-- `tauri` - Support for [Tauri](https://tauri.app). This is required when using [`specta::function`](macro@crate::specta) with Tauri Commands.
+- `tauri` - Support for [Tauri](https://tauri.app). This is required when using the `#[specta]` attribute with Tauri Commands.
 
 External types
 

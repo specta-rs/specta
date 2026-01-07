@@ -50,7 +50,7 @@ pub fn derive_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     r#type::derive(input).unwrap_or_else(|err| err.into_compile_error().into())
 }
 
-/// Prepares a function to have its types extracted using [`functions::fn_datatype`](specta::functions::fn_datatype)
+/// Prepares a function to have its types extracted using [`fn_datatype!`](specta::fn_datatype)
 ///
 /// ## Example
 ///
