@@ -153,7 +153,7 @@ impl Typescript {
 
     /// Export the files into a single string.
     ///
-    /// Note: This will return [`Error:UnableToExport`] if the format is `Format::Files`.
+    /// Note: This will return `Error::UnableToExport` if the format is `Format::Files`.
     pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
         let processed_types = if let Some(mode) = self.serde {
             let mut types_clone = types.clone();
