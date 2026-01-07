@@ -79,7 +79,7 @@ enum I {
     B(Demo),
 }
 
-// https://github.com/oscartbeaumont/specta/issues/174
+// https://github.com/specta-rs/specta/issues/174
 #[test]
 fn empty_enums() {
     // `never & { tag = "a" }` would coalesce to `never` so we don't need to include it.

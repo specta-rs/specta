@@ -4,8 +4,8 @@
 //! You shouldn't need to use this crate directly.
 //! Checkout [Specta](https://docs.rs/specta).
 #![doc(
-    html_logo_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png",
-    html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
+    html_logo_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png",
+    html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
 
 #[cfg(feature = "DO_NOT_USE_function")]

@@ -12,7 +12,7 @@ struct A {}
 #[serde(tag = "a")]
 struct B {}
 
-// https://github.com/oscartbeaumont/specta/issues/174
+// https://github.com/specta-rs/specta/issues/174
 #[test]
 fn empty_enums() {
     insta::assert_snapshot!(assert_ts_export2::<A>().unwrap(), @r#"export type A = Record<string, never>;"#);

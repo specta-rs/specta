@@ -86,23 +86,23 @@ pub enum SkipNamedFieldInVariant {
     },
 }
 
-// https://github.com/oscartbeaumont/specta/issues/170
+// https://github.com/specta-rs/specta/issues/170
 #[derive(Type, Serialize, Deserialize)]
 #[specta(transparent, collect = false)]
 pub struct TransparentWithSkip((), #[specta(skip)] String);
 
-// https://github.com/oscartbeaumont/specta/issues/170
+// https://github.com/specta-rs/specta/issues/170
 #[derive(Type, Serialize, Deserialize)]
 #[specta(transparent, collect = false)]
 pub struct TransparentWithSkip2(#[specta(skip)] (), String);
 
-// https://github.com/oscartbeaumont/specta/issues/170
+// https://github.com/specta-rs/specta/issues/170
 #[derive(Type)]
 #[specta(transparent, collect = false)]
 pub struct TransparentWithSkip3(#[specta(type = String)] Box<dyn Any>);
 
 /// This is intentionally just a compile or not compile test
-/// https://github.com/oscartbeaumont/specta/issues/167
+/// https://github.com/specta-rs/specta/issues/167
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
 pub enum LazilySkip {

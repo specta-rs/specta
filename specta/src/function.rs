@@ -38,7 +38,7 @@ pub(crate) use specta_fn::SpectaFn;
 ///
 /// This macro requires recursion internally to correctly function so you may run into the recursion limit. From my testing you can have 31 path segments before you hit the recursion limit. The size of the segment or the amount of generics in the segment should not affect this limit.
 ///
-/// If your having issues with this limit you can increase your [`recursion_limit`](https://doc.rust-lang.org/reference/attributes/limits.html#the-recursion_limit-attribute) by adding `#![recursion_limit = "1024"]` to your `main.rs`. If your able to hit this limit in other scenarios please [let us know](https://github.com/oscartbeaumont/tauri-specta/issues/114) and we can apply some potential optimizations.
+/// If your having issues with this limit you can increase your [`recursion_limit`](https://doc.rust-lang.org/reference/attributes/limits.html#the-recursion_limit-attribute) by adding `#![recursion_limit = "1024"]` to your `main.rs`. If your able to hit this limit in other scenarios please [let us know](https://github.com/specta-rs/tauri-specta/issues/114) and we can apply some potential optimizations.
 ///
 #[doc(hidden)]
 #[macro_export]

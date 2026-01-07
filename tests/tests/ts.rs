@@ -203,7 +203,7 @@ fn typescript_types() {
 
     insta::assert_snapshot!(inline::<Option<i32>>(&Default::default()).unwrap(), @"number | null");
 
-    // https://github.com/oscartbeaumont/specta/issues/88
+    // https://github.com/specta-rs/specta/issues/88
     insta::assert_snapshot!(inline::<Unit1>(&Default::default()).unwrap(), @"null");
     insta::assert_snapshot!(inline::<Unit2>(&Default::default()).unwrap(), @"Record<string, never>");
     insta::assert_snapshot!(inline::<Unit3>(&Default::default()).unwrap(), @"[]");
@@ -270,22 +270,22 @@ fn typescript_types() {
     // insta::assert_snapshot!(inline_ref(&(..5), &Default::default()).unwrap(), @r#"{ end: 5 }"#);
     // insta::assert_snapshot!(inline_ref(&(..=5), &Default::default()).unwrap(), @r#"{ end: 5 }"#);
 
-    // https://github.com/oscartbeaumont/specta/issues/66
+    // https://github.com/specta-rs/specta/issues/66
     insta::assert_snapshot!(
         inline::<[Option<u8>; 3]>(&Default::default()).unwrap(),
         @r#"[(number | null), (number | null), (number | null)]"#
     );
 
-    // https://github.com/oscartbeaumont/specta/issues/65
+    // https://github.com/specta-rs/specta/issues/65
     insta::assert_snapshot!(inline::<HashMap<BasicEnum, ()>>(&Default::default()).unwrap(), @r#"Partial<{ [key in "A" | "B"]: null }>"#);
 
-    // https://github.com/oscartbeaumont/specta/issues/60
+    // https://github.com/specta-rs/specta/issues/60
     insta::assert_snapshot!(inline::<Option<Option<Option<Option<i32>>>>>(&Default::default()).unwrap(), @r#"number | null"#);
 
-    // https://github.com/oscartbeaumont/specta/issues/71
+    // https://github.com/specta-rs/specta/issues/71
     insta::assert_snapshot!(inline::<Vec<PlaceholderInnerField>>(&Default::default()).unwrap(), @r#"{ a: string }[]"#);
 
-    // https://github.com/oscartbeaumont/specta/issues/77
+    // https://github.com/specta-rs/specta/issues/77
     insta::assert_snapshot!(
         inline::<std::time::SystemTime>(&Typescript::new().bigint(BigIntExportBehavior::Number))
             .unwrap(),
@@ -331,18 +331,18 @@ fn typescript_types() {
         @"export type MyEmptyInput = Record<string, never>;"
     );
 
-    // https://github.com/oscartbeaumont/specta/issues/142
+    // https://github.com/specta-rs/specta/issues/142
     #[allow(unused_parens)]
     {
         insta::assert_snapshot!(inline::<(String)>(&Default::default()).unwrap(), @r#"string"#);
         insta::assert_snapshot!(inline::<(String,)>(&Default::default()).unwrap(), @r#"[string]"#);
     }
 
-    // https://github.com/oscartbeaumont/specta/issues/148
+    // https://github.com/specta-rs/specta/issues/148
     insta::assert_snapshot!(inline::<ExtraBracketsInTupleVariant>(&Default::default()).unwrap(), @"{ A: string }");
     insta::assert_snapshot!(inline::<ExtraBracketsInUnnamedStruct>(&Default::default()).unwrap(), @"string");
 
-    // https://github.com/oscartbeaumont/specta/issues/156
+    // https://github.com/specta-rs/specta/issues/156
     insta::assert_snapshot!(inline::<Vec<MyEnum>>(&Default::default()).unwrap(), @r#"({ A: string } | { B: number })[]"#);
 
     insta::assert_snapshot!(inline::<InlineTuple>(&Default::default()).unwrap(), @r#"{ demo: [string, boolean] }"#);
@@ -351,7 +351,7 @@ fn typescript_types() {
         @r#"{ demo: [{ demo: [string, boolean] }, boolean] }"#
     );
 
-    // https://github.com/oscartbeaumont/specta/issues/220
+    // https://github.com/specta-rs/specta/issues/220
     insta::assert_snapshot!(inline::<Box<str>>(&Default::default()).unwrap(), @r#"string"#);
 
     insta::assert_snapshot!(
@@ -359,14 +359,14 @@ fn typescript_types() {
         @r#"{ type: "A" } | { type: "B"; data: string }"#
     );
 
-    // https://github.com/oscartbeaumont/specta/issues/239
+    // https://github.com/specta-rs/specta/issues/239
     insta::assert_snapshot!(inline::<KebabCase>(&Default::default()).unwrap(), @r#"{ "test-ing": string }"#);
 
     // https://github.com/specta-rs/specta/issues/281
     insta::assert_snapshot!(inline::<&[&str]>(&Default::default()).unwrap(), @"string[]");
     insta::assert_snapshot!(inline::<Issue281<'_>>(&Default::default()).unwrap(), @"{ default_unity_arguments: string[] }");
 
-    // https://github.com/oscartbeaumont/specta/issues/90
+    // https://github.com/specta-rs/specta/issues/90
     insta::assert_snapshot!(inline::<RenameWithWeirdCharsField>(&Default::default()).unwrap(), @r#"{ "@odata.context": string }"#);
     insta::assert_snapshot!(
         inline::<RenameWithWeirdCharsVariant>(&Default::default()).unwrap(),
@@ -591,7 +591,7 @@ pub struct InlineOptionalType {
     pub optional_field: Option<PlaceholderInnerField>,
 }
 
-// Regression test for https://github.com/oscartbeaumont/specta/issues/56
+// Regression test for https://github.com/specta-rs/specta/issues/56
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
 enum Rename {
@@ -654,7 +654,7 @@ pub struct EnumReferenceRecordKey {
     a: HashMap<BasicEnum, i32>,
 }
 
-// https://github.com/oscartbeaumont/specta/issues/88
+// https://github.com/specta-rs/specta/issues/88
 #[derive(Default, Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(rename_all = "camelCase")]

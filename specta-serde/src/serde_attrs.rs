@@ -34,7 +34,7 @@ pub enum SerdeMode {
 }
 
 /// Contains parsed serde attributes for a type
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SerdeAttributes {
     /// Direct rename specified by #[serde(rename = "name")]
     pub rename: Option<String>,
@@ -111,11 +111,12 @@ pub struct SerdeAttributes {
 }
 
 /// Contains parsed serde attributes for a field
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SerdeFieldAttributes {
     /// Field-specific attributes
     pub base: SerdeAttributes,
     /// Field alias for deserialization #[serde(alias = "name")]
+    #[allow(dead_code)]
     pub alias: Vec<String>,
     /// Serialize with custom function #[serde(serialize_with = "path")]
     pub serialize_with: Option<String>,
@@ -126,69 +127,11 @@ pub struct SerdeFieldAttributes {
     /// Skip serializing if condition is true #[serde(skip_serializing_if = "path")]
     pub skip_serializing_if: Option<String>,
     /// Borrow data during deserialization #[serde(borrow)]
+    #[allow(dead_code)]
     pub borrow: Option<String>,
     /// Getter function for private fields #[serde(getter = "...")]
+    #[allow(dead_code)]
     pub getter: Option<String>,
-}
-
-impl Default for SerdeAttributes {
-    fn default() -> Self {
-        Self {
-            rename: None,
-            rename_serialize: None,
-            rename_deserialize: None,
-            rename_all: None,
-            rename_all_serialize: None,
-            rename_all_deserialize: None,
-            rename_all_fields: None,
-            rename_all_fields_serialize: None,
-            rename_all_fields_deserialize: None,
-            skip_serializing: false,
-            skip_deserializing: false,
-            skip: false,
-            flatten: false,
-            default: false,
-            default_with: None,
-            transparent: false,
-            deny_unknown_fields: false,
-            repr: None,
-            tag: None,
-            content: None,
-            untagged: false,
-            bound: None,
-            bound_serialize: None,
-            bound_deserialize: None,
-            remote: None,
-            from: None,
-            try_from: None,
-            into: None,
-            crate_path: None,
-            expecting: None,
-            variant_identifier: false,
-            field_identifier: false,
-            other: false,
-            alias: Vec::new(),
-            serialize_with: None,
-            deserialize_with: None,
-            with: None,
-            borrow: None,
-        }
-    }
-}
-
-impl Default for SerdeFieldAttributes {
-    fn default() -> Self {
-        Self {
-            base: SerdeAttributes::default(),
-            alias: Vec::new(),
-            serialize_with: None,
-            deserialize_with: None,
-            with: None,
-            skip_serializing_if: None,
-            borrow: None,
-            getter: None,
-        }
-    }
 }
 
 /// Apply serde transformations to a DataType for the specified mode
@@ -492,10 +435,9 @@ impl SerdeTransformer {
                 // For Both mode, don't use mode-specific renames
                 // Only use if serialize and deserialize renames match
                 if let (Some(ser), Some(de)) = (&attrs.rename_serialize, &attrs.rename_deserialize)
+                    && ser == de
                 {
-                    if ser == de {
-                        return Ok(Cow::Owned(ser.clone()));
-                    }
+                    return Ok(Cow::Owned(ser.clone()));
                 }
             }
         }
@@ -677,11 +619,11 @@ fn parse_serde_attribute_content(
             // Check if this is a complex attribute with serialize/deserialize modifiers
             let mut has_serialize_deserialize = false;
             for nested in list {
-                if let RuntimeNestedMeta::Meta(RuntimeMeta::NameValue { key, .. }) = nested {
-                    if key == "serialize" || key == "deserialize" {
-                        has_serialize_deserialize = true;
-                        break;
-                    }
+                if let RuntimeNestedMeta::Meta(RuntimeMeta::NameValue { key, .. }) = nested
+                    && (key == "serialize" || key == "deserialize")
+                {
+                    has_serialize_deserialize = true;
+                    break;
                 }
             }
 
@@ -808,9 +750,12 @@ fn parse_serde_path_attribute(attrs: &mut SerdeAttributes, attribute_name: &str)
 }
 
 /// Parse serde field attributes from a vector of RuntimeAttribute
+#[allow(dead_code)]
 fn parse_serde_field_attributes(attrs: &[RuntimeAttribute]) -> Result<SerdeFieldAttributes, Error> {
-    let mut result = SerdeFieldAttributes::default();
-    result.base = parse_serde_attributes(attrs)?;
+    let mut result = SerdeFieldAttributes {
+        base: parse_serde_attributes(attrs)?,
+        ..Default::default()
+    };
 
     for attr in attrs {
         if attr.path == "serde" {
@@ -822,6 +767,7 @@ fn parse_serde_field_attributes(attrs: &[RuntimeAttribute]) -> Result<SerdeField
 }
 
 /// Parse the content of a serde field attribute
+#[allow(dead_code)]
 fn parse_serde_field_attribute_content(
     meta: &RuntimeMeta,
     attrs: &mut SerdeFieldAttributes,
@@ -901,11 +847,11 @@ fn parse_field_serde_attributes(
                 specta::datatype::RuntimeMeta::List(nested) => {
                     // Parse nested serde attributes
                     for nested_meta in nested {
-                        if let specta::datatype::RuntimeNestedMeta::Literal(literal) = nested_meta {
-                            if let specta::datatype::RuntimeLiteral::Str(content) = literal {
-                                // Parse the serialized attribute content
-                                parse_serde_attribute_string(content, &mut field_attrs);
-                            }
+                        if let specta::datatype::RuntimeNestedMeta::Literal(literal) = nested_meta
+                            && let specta::datatype::RuntimeLiteral::Str(content) = literal
+                        {
+                            // Parse the serialized attribute content
+                            parse_serde_attribute_string(content, &mut field_attrs);
                         }
                     }
                 }
@@ -940,11 +886,11 @@ fn parse_serde_attribute_string(content: &str, field_attrs: &mut SerdeFieldAttri
     }
 
     // Parse rename attribute
-    if let Some(start) = content.find("rename = \"") {
-        if let Some(end) = content[start + 10..].find("\"") {
-            let rename_value = &content[start + 10..start + 10 + end];
-            field_attrs.base.rename = Some(rename_value.to_string());
-        }
+    if let Some(start) = content.find("rename = \"")
+        && let Some(end) = content[start + 10..].find("\"")
+    {
+        let rename_value = &content[start + 10..start + 10 + end];
+        field_attrs.base.rename = Some(rename_value.to_string());
     }
 }
 

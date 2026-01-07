@@ -200,7 +200,9 @@ impl Typescript {
                         out += "\n";
                     }
 
-                    let modules_in_root = root_namespaces.get(*root_name).unwrap();
+                    let modules_in_root = root_namespaces
+                        .get(*root_name)
+                        .expect("root_name should exist in root_namespaces");
 
                     // Sort modules to process them in order
                     let mut sorted_modules = modules_in_root.clone();

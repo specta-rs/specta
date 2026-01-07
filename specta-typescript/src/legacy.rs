@@ -114,7 +114,7 @@ use std::fmt::Write;
 
 use specta::datatype::{
     DataType, DeprecatedType, Enum, EnumVariant, Field, Fields, FunctionReturnType, Generic,
-    Reference, RuntimeMeta, Struct, Tuple,
+    RuntimeMeta, Struct, Tuple,
 };
 use specta::datatype::{NonSkipField, skip_fields, skip_fields_named};
 
@@ -280,7 +280,7 @@ pub(crate) fn tuple_datatype(ctx: ExportContext, tuple: &Tuple, types: &TypeColl
 
 pub(crate) fn struct_datatype(
     ctx: ExportContext,
-    parent_name: Option<&str>,
+    _parent_name: Option<&str>,
     strct: &Struct,
     types: &TypeCollection,
     s: &mut String,
@@ -332,7 +332,7 @@ pub(crate) fn struct_datatype(
                 })
                 .collect::<Result<Vec<_>>>()?;
 
-            let mut unflattened_fields = non_flattened
+            let unflattened_fields = non_flattened
                 .into_iter()
                 .map(|(key, field_ref)| {
                     let (field, _) = field_ref;
@@ -393,7 +393,7 @@ pub(crate) fn struct_datatype(
 fn enum_variant_datatype(
     ctx: ExportContext,
     types: &TypeCollection,
-    name: Cow<'static, str>,
+    _name: Cow<'static, str>,
     variant: &EnumVariant,
     prefix: &str,
 ) -> Result<Option<String>> {
@@ -533,7 +533,7 @@ fn object_field_to_ts(
 ) -> Result<()> {
     let field_name_safe = sanitise_key(key, false);
 
-    // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
+    // https://github.com/specta-rs/rspc/issues/100#issuecomment-1373092211
     let (key, ty) = match field.optional() {
         true => (format!("{field_name_safe}?").into(), ty),
         false => (field_name_safe, ty),
@@ -573,14 +573,15 @@ pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: 
         return Err(Error::ForbiddenNameLegacy(loc, ctx.export_path(), name));
     }
 
-    if let Some(first_char) = ident.chars().next() {
-        if !first_char.is_alphabetic() && first_char != '_' {
-            return Err(Error::InvalidNameLegacy(
-                loc,
-                ctx.export_path(),
-                ident.to_string(),
-            ));
-        }
+    if let Some(first_char) = ident.chars().next()
+        && !first_char.is_alphabetic()
+        && first_char != '_'
+    {
+        return Err(Error::InvalidNameLegacy(
+            loc,
+            ctx.export_path(),
+            ident.to_string(),
+        ));
     }
 
     if ident
@@ -597,6 +598,7 @@ pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: 
     Ok(ident.to_string())
 }
 
+#[allow(dead_code)]
 fn validate_type_for_tagged_intersection(
     ctx: ExportContext,
     ty: DataType,
@@ -630,7 +632,7 @@ fn validate_type_for_tagged_intersection(
                 Ok(false)
             }
         },
-        DataType::Enum(v) => {
+        DataType::Enum(_v) => {
             // Simplified: treat all enums as External representation (objects)
             Ok(false)
         }
@@ -653,7 +655,9 @@ fn validate_type_for_tagged_intersection(
     }
 }
 
+#[allow(dead_code)]
 const ANY: &str = "any";
+#[allow(dead_code)]
 const UNKNOWN: &str = "unknown";
 const STRING: &str = "string";
 const NULL: &str = "null";
@@ -706,6 +710,7 @@ pub(crate) fn js_doc(docs: &str, deprecated: Option<&DeprecatedType>) -> String 
             );
         }
 
+        #[allow(dead_code)]
         pub fn push_generic(&mut self, generic: &Generic) {
             self.push_internal(["@template ", generic.borrow()])
         }
