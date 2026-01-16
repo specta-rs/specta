@@ -88,6 +88,8 @@ bevy_input = ["dep:bevy_input", "dep:bevy_ecs", "dep:glam"]
 camino = ["dep:camino"]
 ## [geojson](https://docs.rs/geojson) crate
 geojson = ["dep:geojson", "serde_json"]
+# [geozero](https://docs.rs/geozero) crate
+geozero = ["dep:geozero"]
 
 [lints]
 workspace = true
@@ -124,6 +126,7 @@ bevy_input = { version = "0.17.3", optional = true, default-features = false, fe
 jiff = { version = "0.2", optional = true, default-features = false }
 camino = { version = "1.2.1", optional = true, default-features = false }
 geojson = { version = "0.24", optional = true, default-features = false }
+geozero = { version = "0.14.0", optional = true, default-features = false, features = ["with-mvt"] }
 
 [dev-dependencies]
 serde = { version = "1.0.228", features = ["derive"] } # TODO: Can we remove this?

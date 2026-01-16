@@ -870,3 +870,60 @@ const _: () = {
         Number(serde_json::Number),
     }
 };
+
+#[cfg(feature = "geozero")]
+const _: () = {
+    use geozero::mvt::tile;
+
+    #[derive(Type)]
+    #[specta(rename = "GeoZeroTile", remote = geozero::mvt::Tile, crate = crate, collect = false)]
+    #[allow(dead_code)]
+    pub struct GeoZeroTile {
+        pub layers: Vec<tile::Layer>,
+    }
+
+    #[derive(Type)]
+    #[specta(rename = "GeoZeroValue", remote = tile::Value, crate = crate, collect = false)]
+    #[allow(dead_code)]
+    pub struct GeoZeroValue {
+        pub string_value: Option<String>,
+        pub float_value: Option<f32>,
+        pub double_value: Option<f64>,
+        pub int_value: Option<i64>,
+        pub uint_value: Option<u64>,
+        pub sint_value: Option<i64>,
+        pub bool_value: Option<bool>,
+    }
+
+    #[derive(Type)]
+    #[specta(rename = "GeoZeroFeature", remote = tile::Feature, crate = crate, collect = false)]
+    #[allow(dead_code)]
+    pub struct GeoZeroFeature {
+        pub id: Option<u64>,
+        pub tags: Vec<u32>,
+        pub r#type: Option<i32>,
+        pub geometry: Vec<u32>,
+    }
+
+    #[derive(Type)]
+    #[specta(rename = "GeoZeroLayer", remote = tile::Layer, crate = crate, collect = false)]
+    #[allow(dead_code)]
+    pub struct GeoZeroLayer {
+        pub version: u32,
+        pub name: String,
+        pub features: Vec<tile::Feature>,
+        pub keys: Vec<String>,
+        pub values: Vec<tile::Value>,
+        pub extent: Option<u32>,
+    }
+
+    #[derive(Type)]
+    #[specta(rename = "GeoZeroGeomType", remote = tile::GeomType, crate = crate, collect = false)]
+    #[allow(dead_code)]
+    pub enum GeoZeroGeomType {
+        Unknown = 0,
+        Point = 1,
+        Linestring = 2,
+        Polygon = 3,
+    }
+};
