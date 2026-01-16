@@ -16,7 +16,7 @@ specta-serde = { path = "../specta-serde" }
 specta-typescript = { path = "../specta-typescript" }
 specta-util = { path = "../specta-util", features = ["serde"] }                # TODO: Remove `serde` feature
 
-serde = { version = "1.0.228", features = ["derive"] }
+serde = { version = "1.0.228", features = ["std", "derive"] }
 trybuild = "1.0.114"
 wasm-bindgen = "0.2.105"
 serde_json = "1.0.145"

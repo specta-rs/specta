@@ -1,14 +1,14 @@
+use serde::{Deserialize, Serialize};
 use specta::{Type, TypeCollection};
-use specta_typescript as ts;
 
-#[derive(Type)]
-#[specta(untagged)]
+#[derive(Type, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum GenericType<T> {
     Undefined,
     Value(T),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 pub struct ActualType {
     a: GenericType<String>,
 }
@@ -22,7 +22,7 @@ fn test_generic_type_in_type_map() {
     let mut iter = types.into_sorted_iter();
 
     let first = iter.next().unwrap();
-    // https://github.com/oscartbeaumont/specta/issues/171
+    // https://github.com/specta-rs/specta/issues/171
     insta::assert_snapshot!(specta_typescript::primitives::export(&Default::default(), &types, &first).unwrap(), @r"
     export type ActualType = { 
     		a: GenericType<string>,

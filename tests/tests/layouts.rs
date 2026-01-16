@@ -2,8 +2,7 @@ use std::fs::read_to_string;
 
 use specta::{
     Type, TypeCollection,
-    builder::NamedDataTypeBuilder,
-    datatype::{DataType, NamedDataType, Primitive},
+    datatype::{DataType, NamedDataTypeBuilder, Primitive},
 };
 use specta_typescript::Layout;
 

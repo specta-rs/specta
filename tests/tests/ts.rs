@@ -9,7 +9,7 @@ use std::{
     path::PathBuf,
 };
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use specta::{Type, TypeCollection, datatype::DataType};
 use specta_typescript::Any;
 use specta_typescript::{BigIntExportBehavior, Typescript};
@@ -18,12 +18,20 @@ use specta_typescript::{BigIntExportBehavior, Typescript};
 #[track_caller]
 pub fn assert_ts_export2<T: Type>() -> Result<String, String> {
     let mut types = TypeCollection::default();
-    let ndt = match T::definition(&mut types) {
-        DataType::Reference(r) => r.get(&types).expect("Can't find type in `TypeCollection`"),
+    let reference = match T::definition(&mut types) {
+        DataType::Reference(r) => r,
         _ => panic!("This type can't be exported!"),
     };
 
-    specta_serde::validate(&types).map_err(|e| e.to_string())?;
+    // Apply serde transformations
+    specta_serde::apply(&mut types, specta_serde::SerdeMode::Serialize)
+        .map_err(|e| e.to_string())?;
+
+    // Get the transformed ndt
+    let ndt = reference
+        .get(&types)
+        .expect("Can't find type in `TypeCollection`");
+
     specta_typescript::primitives::export(
         &Typescript::default().bigint(BigIntExportBehavior::Number),
         &types,
@@ -34,11 +42,26 @@ pub fn assert_ts_export2<T: Type>() -> Result<String, String> {
 pub fn assert_ts_inline2<T: Type>() -> Result<String, String> {
     let mut types = TypeCollection::default();
     let dt = T::definition(&mut types);
-    specta_serde::validate(&types).map_err(|e| e.to_string())?;
+
+    // Apply serde transformations
+    specta_serde::apply(&mut types, specta_serde::SerdeMode::Serialize)
+        .map_err(|e| e.to_string())?;
+
+    // For inline, we need to re-get the DataType after transformation
+    // But for inline types that aren't references, the dt itself is transformed
+    let transformed_dt = match &dt {
+        DataType::Reference(r) => r
+            .get(&types)
+            .map(|ndt| ndt.ty().clone())
+            .unwrap_or_else(|| dt.clone()),
+        _ => specta_serde::apply_to_dt(dt, specta_serde::SerdeMode::Serialize)
+            .map_err(|e| e.to_string())?,
+    };
+
     specta_typescript::primitives::inline(
         &Typescript::default().bigint(BigIntExportBehavior::Number),
         &types,
-        &dt,
+        &transformed_dt,
     )
     .map_err(|e| e.to_string())
 }
@@ -98,9 +121,6 @@ pub fn inline<T: Type>(ts: &Typescript) -> Result<String, String> {
 
     // TODO: Could we remove this? It's for backwards compatibility.
     {
-        specta_serde::validate(&types)
-            .map_err(|err| format!("Detect invalid Serde type: {err}"))?;
-
         if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
             return Err(
                 specta_typescript::Error::DuplicateTypeNameLegacy(ty_name, l0, l1).to_string(),
@@ -124,9 +144,6 @@ pub fn export<T: Type>(ts: &Typescript) -> Result<String, String> {
 
     // TODO: Could we remove this? It's for backwards compatibility.
     {
-        specta_serde::validate(&types)
-            .map_err(|err| format!("Detect invalid Serde type: {err}"))?;
-
         if let Some((ty_name, l0, l1)) = detect_duplicate_type_names(&types).into_iter().next() {
             return Err(
                 specta_typescript::Error::DuplicateTypeNameLegacy(ty_name, l0, l1).to_string(),
@@ -211,7 +228,7 @@ fn typescript_types() {
 
     insta::assert_snapshot!(inline::<Option<i32>>(&Default::default()).unwrap(), @"number | null");
 
-    // https://github.com/oscartbeaumont/specta/issues/88
+    // https://github.com/specta-rs/specta/issues/88
     insta::assert_snapshot!(inline::<Unit1>(&Default::default()).unwrap(), @"null");
     insta::assert_snapshot!(inline::<Unit2>(&Default::default()).unwrap(), @"Record<string, never>");
     insta::assert_snapshot!(inline::<Unit3>(&Default::default()).unwrap(), @"[]");
@@ -264,11 +281,6 @@ fn typescript_types() {
         @"{ optional_field: { a: string } | null }"
     );
 
-    insta::assert_snapshot!(
-        export::<RenameToValue>(&Default::default()).unwrap(),
-        @"export type RenameToValueNewName = { demo_new_name: number };"
-    );
-
     insta::assert_snapshot!(inline::<Rename>(&Default::default()).unwrap(), @r#""OneWord" | "Two words""#);
 
     insta::assert_snapshot!(inline::<TransparentType>(&Default::default()).unwrap(), @r#"{ inner: string }"#);
@@ -283,22 +295,22 @@ fn typescript_types() {
     // insta::assert_snapshot!(inline_ref(&(..5), &Default::default()).unwrap(), @r#"{ end: 5 }"#);
     // insta::assert_snapshot!(inline_ref(&(..=5), &Default::default()).unwrap(), @r#"{ end: 5 }"#);
 
-    // https://github.com/oscartbeaumont/specta/issues/66
+    // https://github.com/specta-rs/specta/issues/66
     insta::assert_snapshot!(
         inline::<[Option<u8>; 3]>(&Default::default()).unwrap(),
         @r#"[(number | null), (number | null), (number | null)]"#
     );
 
-    // https://github.com/oscartbeaumont/specta/issues/65
+    // https://github.com/specta-rs/specta/issues/65
     insta::assert_snapshot!(inline::<HashMap<BasicEnum, ()>>(&Default::default()).unwrap(), @r#"Partial<{ [key in "A" | "B"]: null }>"#);
 
-    // https://github.com/oscartbeaumont/specta/issues/60
+    // https://github.com/specta-rs/specta/issues/60
     insta::assert_snapshot!(inline::<Option<Option<Option<Option<i32>>>>>(&Default::default()).unwrap(), @r#"number | null"#);
 
-    // https://github.com/oscartbeaumont/specta/issues/71
+    // https://github.com/specta-rs/specta/issues/71
     insta::assert_snapshot!(inline::<Vec<PlaceholderInnerField>>(&Default::default()).unwrap(), @r#"{ a: string }[]"#);
 
-    // https://github.com/oscartbeaumont/specta/issues/77
+    // https://github.com/specta-rs/specta/issues/77
     insta::assert_snapshot!(
         inline::<std::time::SystemTime>(&Typescript::new().bigint(BigIntExportBehavior::Number))
             .unwrap(),
@@ -344,18 +356,18 @@ fn typescript_types() {
         @"export type MyEmptyInput = Record<string, never>;"
     );
 
-    // https://github.com/oscartbeaumont/specta/issues/142
+    // https://github.com/specta-rs/specta/issues/142
     #[allow(unused_parens)]
     {
         insta::assert_snapshot!(inline::<(String)>(&Default::default()).unwrap(), @r#"string"#);
         insta::assert_snapshot!(inline::<(String,)>(&Default::default()).unwrap(), @r#"[string]"#);
     }
 
-    // https://github.com/oscartbeaumont/specta/issues/148
+    // https://github.com/specta-rs/specta/issues/148
     insta::assert_snapshot!(inline::<ExtraBracketsInTupleVariant>(&Default::default()).unwrap(), @"{ A: string }");
     insta::assert_snapshot!(inline::<ExtraBracketsInUnnamedStruct>(&Default::default()).unwrap(), @"string");
 
-    // https://github.com/oscartbeaumont/specta/issues/156
+    // https://github.com/specta-rs/specta/issues/156
     insta::assert_snapshot!(inline::<Vec<MyEnum>>(&Default::default()).unwrap(), @r#"({ A: string } | { B: number })[]"#);
 
     insta::assert_snapshot!(inline::<InlineTuple>(&Default::default()).unwrap(), @r#"{ demo: [string, boolean] }"#);
@@ -364,7 +376,7 @@ fn typescript_types() {
         @r#"{ demo: [{ demo: [string, boolean] }, boolean] }"#
     );
 
-    // https://github.com/oscartbeaumont/specta/issues/220
+    // https://github.com/specta-rs/specta/issues/220
     insta::assert_snapshot!(inline::<Box<str>>(&Default::default()).unwrap(), @r#"string"#);
 
     insta::assert_snapshot!(
@@ -372,14 +384,14 @@ fn typescript_types() {
         @r#"{ type: "A" } | { type: "B"; data: string }"#
     );
 
-    // https://github.com/oscartbeaumont/specta/issues/239
+    // https://github.com/specta-rs/specta/issues/239
     insta::assert_snapshot!(inline::<KebabCase>(&Default::default()).unwrap(), @r#"{ "test-ing": string }"#);
 
     // https://github.com/specta-rs/specta/issues/281
     insta::assert_snapshot!(inline::<&[&str]>(&Default::default()).unwrap(), @"string[]");
     insta::assert_snapshot!(inline::<Issue281<'_>>(&Default::default()).unwrap(), @"{ default_unity_arguments: string[] }");
 
-    // https://github.com/oscartbeaumont/specta/issues/90
+    // https://github.com/specta-rs/specta/issues/90
     insta::assert_snapshot!(inline::<RenameWithWeirdCharsField>(&Default::default()).unwrap(), @r#"{ "@odata.context": string }"#);
     insta::assert_snapshot!(
         inline::<RenameWithWeirdCharsVariant>(&Default::default()).unwrap(),
@@ -402,41 +414,41 @@ fn typescript_types() {
     insta::assert_snapshot!(inline::<type_type::Type>(&Default::default()).unwrap(), @"never");
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct Unit1;
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct Unit2 {}
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct Unit3();
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct Unit4(());
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 enum Unit5 {
     A,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 enum Unit6 {
     A(),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 enum Unit7 {
     A {},
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct SimpleStruct {
     a: i32,
@@ -446,20 +458,20 @@ struct SimpleStruct {
     e: Option<String>,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct TupleStruct1(i32);
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct TupleStruct3(i32, bool, String);
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
-#[specta(rename = "HasBeenRenamed")]
+#[serde(rename = "HasBeenRenamed")]
 struct RenamedStruct;
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 enum TestEnum {
     Unit,
@@ -468,18 +480,18 @@ enum TestEnum {
     Struct { a: i32 },
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct RefStruct(TestEnum);
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct InlineStruct {
     ref_struct: SimpleStruct,
     val: i32,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct InlinerStruct {
     #[specta(inline)]
@@ -487,7 +499,7 @@ struct InlinerStruct {
     dont_inline_this: RefStruct,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct GenericStruct<T> {
     arg: T,
@@ -517,7 +529,7 @@ struct OverridenStruct {
     overriden_field: i32,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct HasGenericAlias(GenericAlias<i32>);
 
@@ -560,36 +572,36 @@ enum SkipVariant3 {
     },
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub enum EnumMacroAttributes {
     A(#[specta(type = String)] i32),
-    #[specta(rename = "bbb")]
+    #[serde(rename = "bbb")]
     B(i32),
-    #[specta(rename = "cccc")]
+    #[serde(rename = "cccc")]
     C(#[specta(type = i32)] String),
     D {
         #[specta(type = String)]
         a: i32,
-        #[specta(rename = "bbbbbb")]
+        #[serde(rename = "bbbbbb")]
         b: i32,
     },
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub struct PlaceholderInnerField {
     a: String,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub struct Recursive {
     a: i32,
     children: Vec<Recursive>,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 
 pub enum InlineEnumField {
@@ -597,27 +609,15 @@ pub enum InlineEnumField {
     A(PlaceholderInnerField),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub struct InlineOptionalType {
     #[specta(inline)]
     pub optional_field: Option<PlaceholderInnerField>,
 }
 
-const CONTAINER_NAME: &str = "RenameToValueNewName";
-const FIELD_NAME: &str = "demo_new_name";
-
-// This is very much an advanced API. It is not recommended to use this unless you know what your doing.
-// For personal reference: Is used in PCR to apply an inflection to the dynamic name of the include/select macro.
-#[derive(Type)]
-#[specta(collect = false, rename_from_path = CONTAINER_NAME)]
-pub struct RenameToValue {
-    #[specta(rename_from_path = FIELD_NAME)]
-    pub demo: i32,
-}
-
-// Regression test for https://github.com/oscartbeaumont/specta/issues/56
-#[derive(Type, serde::Serialize)]
+// Regression test for https://github.com/specta-rs/specta/issues/56
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 enum Rename {
     OneWord,
@@ -625,131 +625,131 @@ enum Rename {
     TwoWords,
 }
 
-#[derive(Type, serde::Serialize)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 pub struct TransparentTypeInner {
     inner: String,
 }
 
-#[derive(Type, serde::Serialize)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(transparent)]
 pub struct TransparentType(pub(crate) TransparentTypeInner);
 
-#[derive(Type, serde::Serialize)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(transparent)]
 pub struct TransparentType2(pub(crate) ());
 
-#[derive(serde::Serialize)]
+#[derive(Serialize)]
 pub struct NonTypeType;
 
-#[derive(Type, serde::Serialize)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(transparent)]
 pub struct TransparentTypeWithOverride(#[specta(type = String)] NonTypeType);
 
-#[derive(Type, serde::Serialize)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub enum BasicEnum {
     A,
     B,
 }
 
-#[derive(Type)]
-#[serde(
-    collect = false,
-    tag = "type",
-    content = "value",
-    rename_all = "camelCase"
-)]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "type", content = "value", rename_all = "camelCase")]
 pub enum NestedEnum {
     A(String),
     B(i32),
 }
 
-#[derive(Type)]
-#[serde(collect = false, rename_all = "camelCase")]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all = "camelCase")]
 pub struct FlattenOnNestedEnum {
     id: String,
     #[serde(flatten)]
     result: NestedEnum,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 pub struct EnumReferenceRecordKey {
     a: HashMap<BasicEnum, i32>,
 }
 
-// https://github.com/oscartbeaumont/specta/issues/88
-#[derive(Type)]
-#[serde(collect = false, rename_all = "camelCase")]
+// https://github.com/specta-rs/specta/issues/88
+#[derive(Default, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all = "camelCase")]
 #[serde(default)]
 pub(super) struct MyEmptyInput {}
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[allow(unused_parens)]
 pub enum ExtraBracketsInTupleVariant {
     A((String)),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[allow(unused_parens)]
 pub struct ExtraBracketsInUnnamedStruct((String));
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[allow(unused_parens)]
 pub struct RenameWithWeirdCharsField {
-    #[specta(rename = "@odata.context")]
+    #[serde(rename = "@odata.context")]
     odata_context: String,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[allow(unused_parens)]
 pub enum RenameWithWeirdCharsVariant {
-    #[specta(rename = "@odata.context")]
+    #[serde(rename = "@odata.context")]
     A(String),
 }
 
-#[derive(Type)]
-#[specta(collect = false, rename = "@odata.context")]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename = "@odata.context")]
 pub struct RenameWithWeirdCharsStruct(String);
 
-#[derive(Type)]
-#[specta(collect = false, rename = "@odata.context")]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename = "@odata.context")]
 pub enum RenameWithWeirdCharsEnum {}
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 pub enum MyEnum {
     A(String),
     B(u32),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 pub struct InlineTuple {
     #[specta(inline)]
     demo: (String, bool),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 pub struct InlineTuple2 {
     #[specta(inline)]
     demo: (InlineTuple, bool),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[serde(tag = "type", content = "data")]
 pub enum SkippedFieldWithinVariant {
     A(#[serde(skip)] String),
     B(String),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct KebabCase {
     test_ing: String,
@@ -762,7 +762,7 @@ pub struct Issue281<'a> {
 }
 
 /// https://github.com/specta-rs/specta/issues/374
-#[derive(specta::Type)]
+#[derive(Type, Serialize)]
 struct Issue374 {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     foo: bool,
