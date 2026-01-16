@@ -6,10 +6,11 @@ authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2024"
 license = "MIT"
 include = ["/src", "/examples", "/LICENCE", "/README.md"]
-repository = "https://github.com/oscartbeaumont/specta"
+repository = "https://github.com/specta-rs/specta"
 documentation = "https://docs.rs/specta/latest/specta"
 keywords = ["async", "specta", "rspc", "typescript", "typesafe"]
 categories = ["web-programming", "asynchronous"]
+readme = "../README.md"
 
 # /bin/sh RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
 [package.metadata."docs.rs"]
@@ -97,7 +98,7 @@ ctor = { version = "0.6.1", default-features = false, optional = true, features 
 # TODO: To be deprecated
 serde_json = { version = "1.0.145", optional = true, default-features = false, features = ["std"] }
 serde_yaml = { version = "0.9.34", optional = true, default-features = false, features = [] }
-toml = { version = "0.9.8", optional = true, default-features = false }
+toml = { version = "0.9.8", optional = true, default-features = false, features = ["serde"] }
 ulid = { version = "1.2.1", optional = true, default-features = false, features = [] }
 uuid = { version = "1.18.1", optional = true, default-features = false, features = [] } # TODO: Downgraded for Bevy (argh)
 chrono = { version = "0.4.42", optional = true, default-features = false, features = ["clock"] }
@@ -122,3 +123,6 @@ camino = { version = "1.2.1", optional = true, default-features = false }
 
 [dev-dependencies]
 serde = { version = "1.0.228", features = ["derive"] } # TODO: Can we remove this?
+
+[build-dependencies]
+rustc_version = "0.4.1"

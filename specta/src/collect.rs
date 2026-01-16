@@ -46,5 +46,5 @@ pub mod internal {
 
     // We expose this for the macros
     #[cfg(feature = "collect")]
-    pub use ::ctor;
+    pub use ctor;
 }

@@ -1,4 +1,5 @@
 mod adjacently_tagged;
+mod alias;
 mod empty_enum;
 mod empty_struct;
 mod externally_tagged;

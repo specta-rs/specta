@@ -1,22 +1,23 @@
-use std::{collections::HashMap, convert::Infallible, sync::Arc};
+use std::collections::HashMap;
 
+use serde::Serialize;
 use specta::{Type, TypeCollection};
 
-#[derive(Type)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 pub struct A {
     pub a: String,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 pub struct B {
-    #[specta(flatten)]
+    #[serde(flatten)]
     pub a: A,
-    #[specta(flatten)]
+    #[serde(flatten)]
     pub b: HashMap<String, String>,
-    #[specta(flatten)]
-    pub c: Arc<A>,
+    #[serde(flatten)]
+    pub c: Box<A>,
 }
 
 fn main() {

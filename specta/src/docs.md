@@ -7,7 +7,7 @@ Specta provides a system for type introspection and a set of language exporters 
 ## Features
 
 - Export structs and enums to [Typescript](https://www.typescriptlang.org)
-- Get function types to use in libraries like [tauri-specta](https://github.com/oscartbeaumont/tauri-specta)
+- Get function types to use in libraries like [tauri-specta](https://github.com/specta-rs/tauri-specta)
 - Supports wide range of common crates in Rust ecosystem
 - Supports type inference - can determine type of `fn demo() -> impl Type`.
 
@@ -54,7 +54,7 @@ Compatibility
 - `serde_json` - Support for [serde-json](https://github.com/serde-rs/json)
 - `serde_yaml` - Support for [serde_yaml](https://github.com/dtolnay/serde-yaml)
 - `toml` - Support for [toml](https://github.com/toml-rs/toml)
-- `tauri` - Support for [Tauri](https://tauri.app). This is required when using [`specta::function`](macro@crate::specta) with Tauri Commands.
+- `tauri` - Support for [Tauri](https://tauri.app). This is required when using the `#[specta]` attribute with Tauri Commands.
 
 External types
 
@@ -84,7 +84,7 @@ External types
 #### Why not ts-rs?
 
 [ts-rs](https://github.com/Aleph-Alpha/ts-rs) is a great library,
-but it has a few limitations which became a problem when I was building [rspc](https://github.com/oscartbeaumont/rspc).
+but it has a few limitations which became a problem when I was building [rspc](https://github.com/specta-rs/rspc).
 Namely it deals with types individually which means it is not possible to export a type and all of the other types it depends on.
 
 #### Why not Typeshare?

@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
 enum EnumWithInternalTag {
@@ -8,19 +9,19 @@ enum EnumWithInternalTag {
     B { bar: i32 },
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct InnerA {
     foo: String,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct InnerB {
     bar: i32,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
 enum EnumWithInternalTag2 {
