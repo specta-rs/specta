@@ -2,3 +2,15 @@
 {"run_id":"1767771407-927383000","line":18,"new":null,"old":null}
 {"run_id":"1767771407-927383000","line":19,"new":null,"old":null}
 {"run_id":"1767771407-927383000","line":20,"new":{"module_name":"integration_tests__serde__empty_struct","snapshot_name":"empty_enums-3","metadata":{"source":"tests/tests/serde/empty_struct.rs","assertion_line":20,"expression":"assert_ts_export2::<B>().unwrap()"},"snapshot":"export type B = Record<string, never>;"},"old":{"module_name":"integration_tests__serde__empty_struct","metadata":{},"snapshot":"export type B = { \"a\": \"B\" };"}}
+{"run_id":"1767797697-258416000","line":18,"new":null,"old":null}
+{"run_id":"1767797697-258416000","line":19,"new":null,"old":null}
+{"run_id":"1767797697-258416000","line":20,"new":{"module_name":"integration_tests__serde__empty_struct","snapshot_name":"empty_enums-3","metadata":{"source":"tests/tests/serde/empty_struct.rs","assertion_line":20,"expression":"assert_ts_export2::<B>().unwrap()"},"snapshot":"export type B = Record<string, never>;"},"old":{"module_name":"integration_tests__serde__empty_struct","metadata":{},"snapshot":"export type B = { \"a\": \"B\" };"}}
+{"run_id":"1767797704-780779000","line":18,"new":null,"old":null}
+{"run_id":"1767797704-780779000","line":19,"new":null,"old":null}
+{"run_id":"1767797704-780779000","line":20,"new":{"module_name":"integration_tests__serde__empty_struct","snapshot_name":"empty_enums-3","metadata":{"source":"tests/tests/serde/empty_struct.rs","assertion_line":20,"expression":"assert_ts_export2::<B>().unwrap()"},"snapshot":"export type B = Record<string, never>;"},"old":{"module_name":"integration_tests__serde__empty_struct","metadata":{},"snapshot":"export type B = { \"a\": \"B\" };"}}
+{"run_id":"1767916268-200739000","line":18,"new":null,"old":null}
+{"run_id":"1767916268-200739000","line":19,"new":null,"old":null}
+{"run_id":"1767916268-200739000","line":20,"new":{"module_name":"integration_tests__serde__empty_struct","snapshot_name":"empty_enums-3","metadata":{"source":"tests/tests/serde/empty_struct.rs","assertion_line":20,"expression":"assert_ts_export2::<B>().unwrap()"},"snapshot":"export type B = Record<string, never>;"},"old":{"module_name":"integration_tests__serde__empty_struct","metadata":{},"snapshot":"export type B = { \"a\": \"B\" };"}}
+{"run_id":"1768544480-805792000","line":18,"new":null,"old":null}
+{"run_id":"1768544480-805792000","line":19,"new":null,"old":null}
+{"run_id":"1768544480-805792000","line":20,"new":{"module_name":"integration_tests__serde__empty_struct","snapshot_name":"empty_enums-3","metadata":{"source":"tests/tests/serde/empty_struct.rs","assertion_line":20,"expression":"assert_ts_export2::<B>().unwrap()"},"snapshot":"export type B = { \n\t\ta: \"B\",\n\t};"},"old":{"module_name":"integration_tests__serde__empty_struct","metadata":{},"snapshot":"export type B = { \"a\": \"B\" };"}}

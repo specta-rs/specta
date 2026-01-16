@@ -28,37 +28,83 @@ fn test_basic_transformation() {
 }
 
 #[test]
-fn test_rename_all_transformation() {
-    // Create a struct with rename_all attribute
-    let serde_attr = RuntimeAttribute {
+fn test_optional_fields_with_skip_serializing_if_and_default() {
+    use specta::datatype::{
+        DataType, Field, Primitive, RuntimeAttribute, RuntimeLiteral, RuntimeMeta,
+        RuntimeNestedMeta, Struct,
+    };
+    use specta_serde::{SerdeMode, apply_serde_transformations};
+
+    // Test 1: Field with #[serde(skip_serializing_if = "Option::is_none")]
+    let skip_if_attr = RuntimeAttribute {
         path: "serde".to_string(),
         kind: RuntimeMeta::NameValue {
-            key: "rename_all".to_string(),
-            value: RuntimeLiteral::Str("camelCase".to_string()),
+            key: "skip_serializing_if".to_string(),
+            value: RuntimeLiteral::Str("Option::is_none".to_string()),
         },
     };
 
-    let field1 = Field::new(DataType::Primitive(Primitive::String));
-    let field2 = Field::new(DataType::Primitive(Primitive::u32));
+    let mut field_with_skip_if = Field::new(DataType::Nullable(Box::new(DataType::Primitive(
+        Primitive::String,
+    ))));
+    field_with_skip_if.set_attributes(vec![skip_if_attr]);
 
-    let mut s = match Struct::named()
-        .field("first_name", field1)
-        .field("user_id", field2)
-        .build()
-    {
-        DataType::Struct(s) => s,
-        _ => unreachable!(),
+    // Test 2: Field with #[serde(default)]
+    let default_attr = RuntimeAttribute {
+        path: "serde".to_string(),
+        kind: RuntimeMeta::Path("default".to_string()),
     };
-    s.set_attributes(vec![serde_attr]);
-    let struct_dt = DataType::Struct(s);
+
+    let mut field_with_default = Field::new(DataType::Primitive(Primitive::bool));
+    field_with_default.set_attributes(vec![default_attr]);
+
+    // Test 3: Regular field without these attributes
+    let normal_field = Field::new(DataType::Nullable(Box::new(DataType::Primitive(
+        Primitive::i32,
+    ))));
+
+    let struct_dt = Struct::named()
+        .field("optional_string", field_with_skip_if)
+        .field("has_default", field_with_default)
+        .field("normal_field", normal_field)
+        .build();
 
     // Transform for serialization
     let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
     assert!(ser_result.is_ok());
 
-    let transformed = ser_result.unwrap();
-    // The transformation should have been applied
-    assert!(matches!(transformed, DataType::Struct(_)));
+    if let Ok(DataType::Struct(transformed)) = ser_result {
+        match transformed.fields() {
+            specta::datatype::Fields::Named(named) => {
+                let fields = named.fields();
+                assert_eq!(fields.len(), 3, "All fields should be present");
+
+                // Field with skip_serializing_if should be marked as optional
+                let (_, field_skip_if) = &fields[0];
+                assert!(
+                    field_skip_if.optional(),
+                    "Field with skip_serializing_if should be marked as optional"
+                );
+
+                // Field with default should be marked as optional
+                let (_, field_default) = &fields[1];
+                assert!(
+                    field_default.optional(),
+                    "Field with default should be marked as optional"
+                );
+
+                // Normal field should NOT be marked as optional
+                let (_, field_normal) = &fields[2];
+                assert!(
+                    !field_normal.optional(),
+                    "Normal field should NOT be marked as optional"
+                );
+            }
+            _ => panic!("Expected named fields"),
+        }
+    } else {
+        panic!("Transformation failed");
+    }
 }
 
 #[test]

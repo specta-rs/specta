@@ -118,18 +118,29 @@ pub fn apply_serde_transformations(
     datatype: &DataType,
     mode: SerdeMode,
 ) -> Result<DataType, Error> {
-    let mut transformer = SerdeTransformer::new(mode);
+    let mut transformer = SerdeTransformer::new(mode, None);
+    transformer.transform_datatype(datatype)
+}
+
+/// Apply serde transformations to a DataType with a type name (for struct tagging)
+pub fn apply_serde_transformations_with_name(
+    datatype: &DataType,
+    type_name: &Cow<'static, str>,
+    mode: SerdeMode,
+) -> Result<DataType, Error> {
+    let mut transformer = SerdeTransformer::new(mode, Some(type_name.to_string()));
     transformer.transform_datatype(datatype)
 }
 
 /// Internal transformer that applies serde attributes to DataType instances
 struct SerdeTransformer {
     mode: SerdeMode,
+    type_name: Option<String>,
 }
 
 impl SerdeTransformer {
-    fn new(mode: SerdeMode) -> Self {
-        Self { mode }
+    fn new(mode: SerdeMode, type_name: Option<String>) -> Self {
+        Self { mode, type_name }
     }
 
     /// Transform a DataType with serde attributes applied
@@ -177,7 +188,13 @@ impl SerdeTransformer {
             return Ok(DataType::Tuple(Tuple::new(vec![])));
         }
 
-        let transformed_fields = self.transform_fields(struct_type.fields(), &attrs)?;
+        let mut transformed_fields = self.transform_fields(struct_type.fields(), &attrs)?;
+
+        // If the struct has a tag attribute (for struct tagging), add the tag field
+        if let Some(tag_name) = &attrs.tag {
+            transformed_fields =
+                self.add_struct_tag_field(tag_name, struct_type, transformed_fields)?;
+        }
 
         let mut new_struct = Struct::new();
         new_struct.set_fields(transformed_fields);
@@ -196,7 +213,7 @@ impl SerdeTransformer {
         }
 
         // Determine enum representation
-        let _repr = attrs.repr.clone().unwrap_or(EnumRepr::External);
+        let repr = attrs.repr.clone().unwrap_or(EnumRepr::External);
 
         // Handle string enums specially
         if enum_type.is_string_enum() && attrs.rename_all.is_some() {
@@ -253,8 +270,12 @@ impl SerdeTransformer {
             let transformed_fields =
                 self.transform_fields(variant.fields(), &variant_field_attrs)?;
 
+            // Apply enum tagging transformation based on representation
+            let final_fields =
+                self.apply_enum_tagging(&repr, &transformed_name, transformed_fields)?;
+
             let mut new_variant = variant.clone();
-            new_variant.set_fields(transformed_fields);
+            new_variant.set_fields(final_fields);
 
             transformed_variants.push((transformed_name, new_variant));
         }
@@ -363,6 +384,13 @@ impl SerdeTransformer {
                         let transformed_ty = self.transform_datatype(field_ty)?;
                         let mut new_field = field.clone();
                         new_field.set_ty(transformed_ty);
+
+                        // Set optional flag based on serde attributes
+                        // This matches the behavior that was previously in the macro
+                        if field_attrs.skip_serializing_if.is_some() || field_attrs.base.default {
+                            new_field.set_optional(true);
+                        }
+
                         transformed_fields.push((transformed_name, new_field));
                     }
                 }
@@ -490,6 +518,195 @@ impl SerdeTransformer {
 
         // No transformation needed
         Ok(Cow::Owned(original_name.to_string()))
+    }
+
+    /// Apply enum tagging transformation to variant fields based on representation
+    /// This transforms the DataType to include tag/content fields for Internal/Adjacent representations
+    fn apply_enum_tagging(
+        &self,
+        repr: &EnumRepr,
+        variant_name: &Cow<'static, str>,
+        fields: Fields,
+    ) -> Result<Fields, Error> {
+        match repr {
+            EnumRepr::External | EnumRepr::Untagged | EnumRepr::String { .. } => {
+                // No transformation needed for external/untagged enums
+                Ok(fields)
+            }
+            EnumRepr::Internal { tag } => {
+                // Add tag field to the variant
+                self.add_tag_field(tag, variant_name, fields)
+            }
+            EnumRepr::Adjacent { tag, content } => {
+                // Wrap fields in content and add tag field
+                self.add_adjacent_tag_fields(tag, content, variant_name, fields)
+            }
+        }
+    }
+
+    /// Create a literal string type using an enum with a single unit variant
+    fn create_literal_string_type(value: &str) -> DataType {
+        use specta::datatype::EnumVariant;
+
+        let mut literal_enum = Enum::new();
+        let unit_variant = EnumVariant::unit();
+        *literal_enum.variants_mut() = vec![(Cow::Owned(value.to_string()), unit_variant)];
+        DataType::Enum(literal_enum)
+    }
+
+    /// Add a tag field to a struct (for `#[serde(tag = "...")]` on structs)
+    fn add_struct_tag_field(
+        &self,
+        tag_name: &str,
+        _struct_type: &Struct,
+        fields: Fields,
+    ) -> Result<Fields, Error> {
+        use specta::datatype::Field;
+
+        // Get the struct name from the transformer
+        let struct_name = self
+            .type_name
+            .as_ref()
+            .map(|s| s.as_str())
+            .unwrap_or("Unknown");
+        let tag_type = Self::create_literal_string_type(struct_name);
+
+        match fields {
+            Fields::Named(named) => {
+                let mut new_fields = vec![];
+
+                // Add tag field first
+                let tag_field = Field::new(tag_type);
+                new_fields.push((Cow::Owned(tag_name.to_string()), tag_field));
+
+                // Add existing fields
+                for (field_name, field) in named.fields() {
+                    new_fields.push((field_name.clone(), field.clone()));
+                }
+
+                Ok(internal::construct::fields_named(new_fields, vec![]))
+            }
+            _ => {
+                // Struct tagging only works with named fields
+                Ok(fields)
+            }
+        }
+    }
+
+    /// Add a tag field to variant fields for internally tagged enums
+    fn add_tag_field(
+        &self,
+        tag_name: &str,
+        variant_name: &Cow<'static, str>,
+        fields: Fields,
+    ) -> Result<Fields, Error> {
+        use specta::datatype::Field;
+
+        let tag_type = Self::create_literal_string_type(variant_name);
+
+        match fields {
+            Fields::Unit => {
+                // Unit variant becomes { tag: "VariantName" }
+                let tag_field = Field::new(tag_type);
+                Ok(internal::construct::fields_named(
+                    vec![(Cow::Owned(tag_name.to_string()), tag_field)],
+                    vec![],
+                ))
+            }
+            Fields::Named(named) => {
+                // Named variant: add tag field to existing fields
+                let mut new_fields = vec![];
+
+                // Add tag field first
+                let tag_field = Field::new(tag_type);
+                new_fields.push((Cow::Owned(tag_name.to_string()), tag_field));
+
+                // Add existing fields
+                for (field_name, field) in named.fields() {
+                    new_fields.push((field_name.clone(), field.clone()));
+                }
+
+                Ok(internal::construct::fields_named(new_fields, vec![]))
+            }
+            Fields::Unnamed(_) => {
+                // Tuple variants in internally tagged enums are not well-supported by serde
+                // For now, just add the tag as a named field
+                let tag_field = Field::new(tag_type);
+                Ok(internal::construct::fields_named(
+                    vec![(Cow::Owned(tag_name.to_string()), tag_field)],
+                    vec![],
+                ))
+            }
+        }
+    }
+
+    /// Add tag and content fields for adjacently tagged enums
+    fn add_adjacent_tag_fields(
+        &self,
+        tag_name: &str,
+        content_name: &str,
+        variant_name: &Cow<'static, str>,
+        fields: Fields,
+    ) -> Result<Fields, Error> {
+        use specta::datatype::Field;
+
+        let tag_type = Self::create_literal_string_type(variant_name);
+
+        match fields {
+            Fields::Unit => {
+                // Unit variant becomes { tag: "VariantName" } (no content field)
+                let tag_field = Field::new(tag_type);
+                Ok(internal::construct::fields_named(
+                    vec![(Cow::Owned(tag_name.to_string()), tag_field)],
+                    vec![],
+                ))
+            }
+            Fields::Named(named) => {
+                // Named variant: { tag: "VariantName", content: { ...fields } }
+                let mut new_fields = vec![];
+
+                // Add tag field
+                let tag_field = Field::new(tag_type);
+                new_fields.push((Cow::Owned(tag_name.to_string()), tag_field));
+
+                // Wrap existing fields in a struct for content
+                let mut content_struct = Struct::new();
+                content_struct.set_fields(Fields::Named(named.clone()));
+
+                let content_field = Field::new(DataType::Struct(content_struct));
+                new_fields.push((Cow::Owned(content_name.to_string()), content_field));
+
+                Ok(internal::construct::fields_named(new_fields, vec![]))
+            }
+            Fields::Unnamed(unnamed) => {
+                // Tuple variant: { tag: "VariantName", content: tuple }
+                let mut new_fields = vec![];
+
+                // Add tag field
+                let tag_field = Field::new(tag_type);
+                new_fields.push((Cow::Owned(tag_name.to_string()), tag_field));
+
+                // Wrap tuple fields as content
+                let tuple_types: Vec<DataType> = unnamed
+                    .fields()
+                    .iter()
+                    .filter_map(|f| f.ty().cloned())
+                    .collect();
+
+                let content_type = if tuple_types.len() == 1 {
+                    // Single field: unwrap tuple
+                    tuple_types.into_iter().next().unwrap()
+                } else {
+                    // Multiple fields: keep as tuple
+                    DataType::Tuple(Tuple::new(tuple_types))
+                };
+
+                let content_field = Field::new(content_type);
+                new_fields.push((Cow::Owned(content_name.to_string()), content_field));
+
+                Ok(internal::construct::fields_named(new_fields, vec![]))
+            }
+        }
     }
 }
 
@@ -965,7 +1182,7 @@ mod tests {
         let mut attrs = SerdeAttributes::default();
 
         // Test various skip scenarios
-        let transformer = SerdeTransformer::new(SerdeMode::Serialize);
+        let transformer = SerdeTransformer::new(SerdeMode::Serialize, None);
         attrs.skip = true;
         assert!(transformer.should_skip_type(&attrs));
 
@@ -973,7 +1190,7 @@ mod tests {
         attrs.skip_serializing = true;
         assert!(transformer.should_skip_type(&attrs));
 
-        let deserialize_transformer = SerdeTransformer::new(SerdeMode::Deserialize);
+        let deserialize_transformer = SerdeTransformer::new(SerdeMode::Deserialize, None);
         assert!(!deserialize_transformer.should_skip_type(&attrs));
     }
 
@@ -1010,7 +1227,7 @@ mod tests {
 
     #[test]
     fn test_rename_rule_application() {
-        let transformer = SerdeTransformer::new(SerdeMode::Serialize);
+        let transformer = SerdeTransformer::new(SerdeMode::Serialize, None);
 
         // Test field renaming
         let result = transformer
@@ -1108,7 +1325,7 @@ mod tests {
 
     #[test]
     fn test_primitive_type_passthrough() {
-        let mut transformer = SerdeTransformer::new(SerdeMode::Serialize);
+        let mut transformer = SerdeTransformer::new(SerdeMode::Serialize, None);
         let primitive = DataType::Primitive(Primitive::String);
 
         let result = transformer.transform_datatype(&primitive).unwrap();
@@ -1117,7 +1334,7 @@ mod tests {
 
     #[test]
     fn test_nullable_type_transformation() {
-        let mut transformer = SerdeTransformer::new(SerdeMode::Serialize);
+        let mut transformer = SerdeTransformer::new(SerdeMode::Serialize, None);
         let nullable = DataType::Nullable(Box::new(DataType::Primitive(Primitive::String)));
 
         let result = transformer.transform_datatype(&nullable).unwrap();
@@ -1131,7 +1348,7 @@ mod tests {
 
     #[test]
     fn test_list_type_transformation() {
-        let mut transformer = SerdeTransformer::new(SerdeMode::Serialize);
+        let mut transformer = SerdeTransformer::new(SerdeMode::Serialize, None);
         let list = DataType::List(specta::datatype::List::new(DataType::Primitive(
             Primitive::String,
         )));
@@ -1151,8 +1368,8 @@ mod tests {
 
         // Test skip_serializing only affects serialize mode
         attrs.skip_serializing = true;
-        let ser_transformer = SerdeTransformer::new(SerdeMode::Serialize);
-        let de_transformer = SerdeTransformer::new(SerdeMode::Deserialize);
+        let ser_transformer = SerdeTransformer::new(SerdeMode::Serialize, None);
+        let de_transformer = SerdeTransformer::new(SerdeMode::Deserialize, None);
 
         assert!(ser_transformer.should_skip_type(&attrs));
         assert!(!de_transformer.should_skip_type(&attrs));
@@ -1174,7 +1391,7 @@ mod tests {
 
     #[test]
     fn test_transparent_struct_handling() {
-        let mut transformer = SerdeTransformer::new(SerdeMode::Serialize);
+        let mut transformer = SerdeTransformer::new(SerdeMode::Serialize, None);
 
         // Create a transparent struct with single field using List format
         let transparent_attr = RuntimeAttribute {
@@ -1307,8 +1524,8 @@ mod tests {
         attrs.rename_serialize = Some("ser_name".to_string());
         attrs.rename_deserialize = Some("de_name".to_string());
 
-        let ser_transformer = SerdeTransformer::new(SerdeMode::Serialize);
-        let de_transformer = SerdeTransformer::new(SerdeMode::Deserialize);
+        let ser_transformer = SerdeTransformer::new(SerdeMode::Serialize, None);
+        let de_transformer = SerdeTransformer::new(SerdeMode::Deserialize, None);
 
         let ser_result = ser_transformer
             .apply_rename_rule("original", None, &None, &attrs, false)
@@ -1327,8 +1544,8 @@ mod tests {
         attrs.rename_all_serialize = Some(RenameRule::CamelCase);
         attrs.rename_all_deserialize = Some(RenameRule::SnakeCase);
 
-        let ser_transformer = SerdeTransformer::new(SerdeMode::Serialize);
-        let de_transformer = SerdeTransformer::new(SerdeMode::Deserialize);
+        let ser_transformer = SerdeTransformer::new(SerdeMode::Serialize, None);
+        let de_transformer = SerdeTransformer::new(SerdeMode::Deserialize, None);
 
         // Test field renaming (fields start as snake_case in Rust)
         let ser_result = ser_transformer
@@ -1356,7 +1573,7 @@ mod tests {
     #[test]
     fn test_both_mode_skip_behavior() {
         let mut attrs = SerdeAttributes::default();
-        let both_transformer = SerdeTransformer::new(SerdeMode::Both);
+        let both_transformer = SerdeTransformer::new(SerdeMode::Both, None);
 
         // Test that Both mode only skips if both modes skip
         attrs.skip_serializing = true;
@@ -1381,7 +1598,7 @@ mod tests {
 
     #[test]
     fn test_both_mode_rename_behavior() {
-        let both_transformer = SerdeTransformer::new(SerdeMode::Both);
+        let both_transformer = SerdeTransformer::new(SerdeMode::Both, None);
         let mut attrs = SerdeAttributes::default();
 
         // Test that Both mode uses common rename
@@ -1411,7 +1628,7 @@ mod tests {
 
     #[test]
     fn test_both_mode_rename_all_behavior() {
-        let both_transformer = SerdeTransformer::new(SerdeMode::Both);
+        let both_transformer = SerdeTransformer::new(SerdeMode::Both, None);
         let mut attrs = SerdeAttributes::default();
 
         // Test that Both mode uses common rename_all

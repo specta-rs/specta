@@ -1206,22 +1206,21 @@ fn reference_dt(
 //     // TODO: When enabled: arguments, result types
 // }
 
-/// Iterate with separate and error handling
-#[allow(dead_code)]
-fn iter_with_sep<T>(
-    s: &mut String,
-    i: impl IntoIterator<Item = T>,
-    mut item: impl FnMut(&mut String, T) -> Result<(), Error>,
-    sep: &'static str,
-) -> Result<(), Error> {
-    for (i, e) in i.into_iter().enumerate() {
-        if i != 0 {
-            s.push_str(sep);
-        }
-        (item)(s, e)?;
-    }
-    Ok(())
-}
+// /// Iterate with separate and error handling
+// fn iter_with_sep<T>(
+//     s: &mut String,
+//     i: impl IntoIterator<Item = T>,
+//     mut item: impl FnMut(&mut String, T) -> Result<(), Error>,
+//     sep: &'static str,
+// ) -> Result<(), Error> {
+//     for (i, e) in i.into_iter().enumerate() {
+//         if i != 0 {
+//             s.push_str(sep);
+//         }
+//         (item)(s, e)?;
+//     }
+//     Ok(())
+// }
 
 // A smaller helper until this is stablised into the Rust standard library.
 fn intersperse<T: Clone>(iter: impl Iterator<Item = T>, sep: T) -> impl Iterator<Item = T> {

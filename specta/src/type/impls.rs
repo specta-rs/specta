@@ -177,7 +177,6 @@ impl<T: Type> Type for std::ops::Range<T> {
                         "start".into(),
                         Field {
                             optional: false,
-
                             deprecated: None,
                             docs: Cow::Borrowed(""),
                             inline: false,
@@ -189,7 +188,6 @@ impl<T: Type> Type for std::ops::Range<T> {
                         "end".into(),
                         Field {
                             optional: false,
-
                             deprecated: None,
                             docs: Cow::Borrowed(""),
                             inline: false,

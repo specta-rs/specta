@@ -5,6 +5,7 @@ use syn::{Lit, Result};
 
 use crate::utils::{Attribute, AttributeValue};
 
+// Copy of `specta/src/datatype/named.rs`
 pub enum DeprecatedType {
     Deprecated,
     DeprecatedWithSince {
@@ -34,7 +35,6 @@ impl RustCAttr {
         )?;
 
         let mut deprecated = None;
-        // Find and remove the deprecated attribute
         if let Some(pos) = attrs.iter().position(|attr| attr.key == "deprecated") {
             let attr_value = attrs[pos].clone();
 
@@ -87,8 +87,7 @@ impl RustCAttr {
                 None => deprecated = Some(DeprecatedType::Deprecated),
             }
 
-            // Remove the attribute after processing
-            attrs.swap_remove(pos);
+            attrs.swap_removehopos);
         };
 
         Ok(RustCAttr { doc, deprecated })

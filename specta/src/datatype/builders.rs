@@ -8,7 +8,7 @@ use crate::{
     DataType, TypeCollection,
     datatype::{
         ArcId, DeprecatedType, EnumVariant, Field, Fields, Generic, NamedDataType, NamedFields,
-        Struct, UnnamedFields,
+        RuntimeAttribute, Struct, UnnamedFields,
     },
 };
 
@@ -45,7 +45,14 @@ impl StructBuilder<UnnamedFields> {
         self.fields.fields.push(field);
     }
 
-    // TODO: Allow configuring attributes???
+    pub fn attributes(mut self, attributes: Vec<RuntimeAttribute>) -> Self {
+        self.fields.attributes = attributes;
+        self
+    }
+
+    pub fn attributes_mut(&mut self, attributes: Vec<RuntimeAttribute>) {
+        self.fields.attributes = attributes;
+    }
 
     pub fn build(self) -> DataType {
         DataType::Struct(Struct {
@@ -75,6 +82,15 @@ impl<T> VariantBuilder<T> {
     pub fn deprecated(mut self, reason: DeprecatedType) -> Self {
         self.v.deprecated = Some(reason);
         self
+    }
+
+    pub fn attributes(mut self, attributes: Vec<RuntimeAttribute>) -> Self {
+        self.v.attributes = attributes;
+        self
+    }
+
+    pub fn attributes_mut(&mut self, attributes: Vec<RuntimeAttribute>) {
+        self.v.attributes = attributes;
     }
 }
 
