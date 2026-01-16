@@ -19,7 +19,11 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 # Run `node ./.github/features.js` to update the docs
 [features]
-default = []
+default = ["std"]
+
+#! Core Features
+## Enable support for the Rust standard library. Enabled by default.
+std = []
 
 ## Derive macros
 derive = ["dep:specta-macros"]
