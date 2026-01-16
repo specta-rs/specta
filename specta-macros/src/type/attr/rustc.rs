@@ -87,7 +87,7 @@ impl RustCAttr {
                 None => deprecated = Some(DeprecatedType::Deprecated),
             }
 
-            attrs.swap_removehopos);
+            attrs.swap_remove(pos);
         };
 
         Ok(RustCAttr { doc, deprecated })

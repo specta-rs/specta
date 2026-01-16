@@ -39,9 +39,8 @@ const _: () = {
             NonZeroI8, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI128, NonZeroIsize, NonZeroU8,
             NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128, NonZeroUsize,
         },
-        ops::Range,
+        ops::{Range, RangeInclusive},
         path::{Path, PathBuf},
-        range::{Range, RangeInclusive},
         rc::Rc,
         sync::{
             Arc,
