@@ -815,3 +815,58 @@ impl_as!(
     camino::Utf8Path as String
     camino::Utf8PathBuf as String
 );
+
+#[cfg(feature = "geojson")]
+const _: () = {
+    use geojson::{Feature, FeatureCollection, Geometry, Value};
+
+    #[derive(Type)]
+    #[specta(rename = "GeoJsonValue", untagged, remote = Value, crate = crate, collect = false)]
+    #[allow(dead_code)]
+    pub enum GeoJsonValue {
+        Point(geojson::PointType),
+        MultiPoint(Vec<geojson::PointType>),
+        LineString(geojson::LineStringType),
+        MultiLineString(Vec<geojson::LineStringType>),
+        Polygon(geojson::PolygonType),
+        MultiPolygon(Vec<geojson::PolygonType>),
+        GeometryCollection(Vec<Geometry>),
+    }
+
+    #[derive(Type)]
+    #[specta(rename = "GeoJsonGeometry", remote = Geometry, crate = crate, collect = false)]
+    #[allow(dead_code)]
+    pub struct GeoJsonGeometry {
+        pub bbox: Option<geojson::Bbox>,
+        pub value: Value,
+        pub foreign_members: Option<geojson::JsonObject>,
+    }
+
+    #[derive(Type)]
+    #[specta(rename = "GeoJsonFeature", remote = Feature, crate = crate, collect = false)]
+    #[allow(dead_code)]
+    pub struct GeoJsonFeature {
+        pub bbox: Option<geojson::Bbox>,
+        pub geometry: Option<Geometry>,
+        pub id: Option<geojson::feature::Id>,
+        pub properties: Option<geojson::JsonObject>,
+        pub foreign_members: Option<geojson::JsonObject>,
+    }
+
+    #[derive(Type)]
+    #[specta(rename = "GeoJsonFeatureCollection", remote = FeatureCollection, crate = crate, collect = false)]
+    #[allow(dead_code)]
+    pub struct GeoJsonFeatureCollection {
+        pub bbox: Option<geojson::Bbox>,
+        pub features: Vec<Feature>,
+        pub foreign_members: Option<geojson::JsonObject>,
+    }
+
+    #[derive(Type)]
+    #[specta(rename = "GeoJsonFeatureId", untagged, remote = geojson::feature::Id, crate = crate, collect = false)]
+    #[allow(dead_code)]
+    pub enum GeoJsonFeatureId {
+        String(String),
+        Number(serde_json::Number),
+    }
+};

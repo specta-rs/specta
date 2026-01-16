@@ -86,6 +86,8 @@ bevy_ecs = ["dep:bevy_ecs"]
 bevy_input = ["dep:bevy_input", "dep:bevy_ecs", "dep:glam"]
 # [camino](https://docs.rs/camino) crate
 camino = ["dep:camino"]
+## [geojson](https://docs.rs/geojson) crate
+geojson = ["dep:geojson", "serde_json"]
 
 [lints]
 workspace = true
@@ -121,6 +123,7 @@ bevy_ecs = { version = "0.17.3", optional = true, default-features = false, feat
 bevy_input = { version = "0.17.3", optional = true, default-features = false, features = ["std", "bevy_reflect"] }
 jiff = { version = "0.2", optional = true, default-features = false }
 camino = { version = "1.2.1", optional = true, default-features = false }
+geojson = { version = "0.24", optional = true, default-features = false }
 
 [dev-dependencies]
 serde = { version = "1.0.228", features = ["derive"] } # TODO: Can we remove this?
