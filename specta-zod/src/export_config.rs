@@ -1,5 +1,3 @@
-
-
 /// Allows you to configure how Specta's Zod exporter will deal with BigInt types ([i64], [i128] etc).
 ///
 /// WARNING: None of these settings affect how your data is actually ser/deserialized.

@@ -27,13 +27,19 @@ impl fmt::Display for NamedLocation {
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
-    #[error("Attempted to export '{0}' but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!")]
+    #[error(
+        "Attempted to export '{0}' but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!"
+    )]
     BigIntForbidden(ExportPath),
     #[error("Serde error: {0}")]
     Serde(#[from] specta_serde::Error),
-    #[error("Attempted to export '{1}' but was unable to due to {0} name '{2}' conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`")]
+    #[error(
+        "Attempted to export '{1}' but was unable to due to {0} name '{2}' conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`"
+    )]
     ForbiddenName(NamedLocation, ExportPath, &'static str),
-    #[error("Attempted to export '{1}' but was unable to due to {0} name '{2}' containing an invalid character")]
+    #[error(
+        "Attempted to export '{1}' but was unable to due to {0} name '{2}' containing an invalid character"
+    )]
     InvalidName(NamedLocation, ExportPath, String),
     #[error("Attempted to export '{0}' with tagging but the type is not tagged.")]
     InvalidTagging(ExportPath),
@@ -67,9 +73,16 @@ impl PartialEq for Error {
                 Self::InvalidTaggedVariantContainingTupleStruct(l0),
                 Self::InvalidTaggedVariantContainingTupleStruct(r0),
             ) => l0 == r0,
-            (Self::DuplicateTypeName { name: l0, types: l1 }, Self::DuplicateTypeName { name: r0, types: r1 }) => {
-                l0 == r0 && l1 == r1
-            }
+            (
+                Self::DuplicateTypeName {
+                    name: l0,
+                    types: l1,
+                },
+                Self::DuplicateTypeName {
+                    name: r0,
+                    types: r1,
+                },
+            ) => l0 == r0 && l1 == r1,
             (Self::Io(l0), Self::Io(r0)) => l0.to_string() == r0.to_string(), // This is a bit hacky but it will be fine for usage in unit tests!
             (Self::Other(l0, l1), Self::Other(r0, r1)) => l0 == r0 && l1 == r1,
             _ => false,
