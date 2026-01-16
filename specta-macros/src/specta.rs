@@ -12,7 +12,7 @@ fn unraw(s: &str) -> &str {
     if s.starts_with("r#") {
         s.split_at(2).1
     } else {
-        s.as_ref()
+        s
     }
 }
 
@@ -45,10 +45,7 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
 
     let function_name = &function.sig.ident;
     let function_name_str = unraw(&function_name.to_string()).to_string();
-    let function_asyncness = match function.sig.asyncness {
-        Some(_) => true,
-        None => false,
-    };
+    let function_asyncness = function.sig.asyncness.is_some();
 
     let mut arg_names = Vec::new();
     for input in function.sig.inputs.iter() {
@@ -82,13 +79,15 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
             s
         };
 
-        arg_names.push(TokenStream::from_str(&s).unwrap());
+        arg_names.push(TokenStream::from_str(&s).map_err(|err| {
+            syn::Error::new_spanned(input, format!("invalid token stream for argument: {err}"))
+        })?);
     }
 
     let arg_signatures = function.sig.inputs.iter().map(|_| quote!(_));
 
     let mut attrs = parse_attrs(&function.attrs)?;
-    let common = crate::r#type::attr::CommonAttr::from_attrs(&mut attrs)?;
+    let common = crate::r#type::attr::RustCAttr::from_attrs(&mut attrs)?;
 
     let deprecated = common.deprecated_as_tokens();
     let docs = common.doc;

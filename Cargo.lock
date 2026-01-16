@@ -7,10 +7,6 @@ name = "Inflector"
 version = "0.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe438c63458706e03479442743baae6c88256498e6431708f6dfc520a26515d3"
-dependencies = [
- "lazy_static",
- "regex",
-]
 
 [[package]]
 name = "ahash"
@@ -782,6 +778,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "geojson"
+version = "0.24.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e26f3c45b36fccc9cf2805e61d4da6bc4bbd5a3a9589b01afa3a40eff703bd79"
+dependencies = [
+ "log",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "geozero"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1034,6 +1042,7 @@ checksum = "e8732d3774162a0851e3f2b150eb98f31a9885dd75985099421d393385a01dfd"
 dependencies = [
  "console",
  "once_cell",
+ "serde",
  "similar",
 ]
 
@@ -1589,6 +1598,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustc_version"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfcb3a22ef46e85b45de6ee7e79d063319ebb6594faafcf1c225ea92ab6e9b92"
+dependencies = [
+ "semver",
+]
+
+[[package]]
 name = "rustix"
 version = "0.38.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1642,6 +1660,12 @@ name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
+
+[[package]]
+name = "semver"
+version = "1.0.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d767eb0aabc880b29956c35734170f26ed551a859dbd361d140cdbeca61ab1e2"
 
 [[package]]
 name = "serde"
@@ -1774,6 +1798,7 @@ dependencies = [
  "chrono",
  "ctor",
  "either",
+ "geojson",
  "geozero",
  "glam",
  "indexmap",
@@ -1782,6 +1807,7 @@ dependencies = [
  "mac_address",
  "paste",
  "rust_decimal",
+ "rustc_version",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -1806,9 +1832,14 @@ dependencies = [
 name = "specta-jsonschema"
 version = "0.0.1"
 dependencies = [
- "Inflector",
+ "insta",
  "schemars",
+ "serde",
+ "serde_json",
  "specta",
+ "specta-serde",
+ "specta-util",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -1840,7 +1871,10 @@ dependencies = [
 name = "specta-serde"
 version = "0.0.9"
 dependencies = [
+ "serde",
+ "serde_json",
  "specta",
+ "specta-macros",
 ]
 
 [[package]]

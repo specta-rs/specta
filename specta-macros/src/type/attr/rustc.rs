@@ -5,37 +5,29 @@ use syn::{Lit, Result};
 
 use crate::utils::{Attribute, AttributeValue};
 
-#[derive(Clone)]
-#[non_exhaustive]
+// Copy of `specta/src/datatype/named.rs`
 pub enum DeprecatedType {
-    /// A type that has been deprecated without a message.
-    ///
-    /// Eg. `#[deprecated]`
     Deprecated,
-    /// A type that has been deprecated with a message and an optional `since` version.
-    ///
-    /// Eg. `#[deprecated = "Use something else"]` or `#[deprecated(since = "1.0.0", message = "Use something else")]`
-    #[non_exhaustive]
     DeprecatedWithSince {
         since: Option<Cow<'static, str>>,
         note: Cow<'static, str>,
     },
 }
 
-#[derive(Default, Clone)]
-pub struct CommonAttr {
+#[derive(Default)]
+pub struct RustCAttr {
     pub doc: String,
     pub deprecated: Option<DeprecatedType>,
 }
 
-impl CommonAttr {
+impl RustCAttr {
     pub fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
-        let doc = attrs.iter().filter(|attr| attr.key == "doc").try_fold(
+        let doc = attrs.extract_if(.., |attr| attr.key == "doc").try_fold(
             String::new(),
             |mut s, doc| {
                 let doc = doc.parse_string()?;
                 if !s.is_empty() {
-                    s.push_str("\n");
+                    s.push('\n');
                 }
                 s.push_str(&doc);
                 Ok(s) as syn::Result<_>
@@ -43,7 +35,9 @@ impl CommonAttr {
         )?;
 
         let mut deprecated = None;
-        if let Some(attr_value) = attrs.iter().filter(|attr| attr.key == "deprecated").next() {
+        if let Some(pos) = attrs.iter().position(|attr| attr.key == "deprecated") {
+            let attr_value = attrs[pos].clone();
+
             match &attr_value.value {
                 Some(AttributeValue::Lit(lit)) => {
                     deprecated = Some(DeprecatedType::DeprecatedWithSince {
@@ -60,8 +54,7 @@ impl CommonAttr {
                 Some(AttributeValue::Attribute { attr, .. }) => {
                     let since = attr
                         .iter()
-                        .filter(|attr| attr.key == "since")
-                        .next()
+                        .find(|attr| attr.key == "since")
                         .and_then(|v| v.value.as_ref())
                         .and_then(|v| match v {
                             AttributeValue::Lit(lit) => Some(lit),
@@ -74,8 +67,7 @@ impl CommonAttr {
 
                     let note = attr
                         .iter()
-                        .filter(|attr| attr.key == "note")
-                        .next()
+                        .find(|attr| attr.key == "note")
                         .and_then(|v| match v.value.as_ref() {
                             Some(AttributeValue::Lit(lit)) => Some(lit),
                             _ => None, // TODO: This should probs be an error
@@ -94,9 +86,11 @@ impl CommonAttr {
                 }
                 None => deprecated = Some(DeprecatedType::Deprecated),
             }
+
+            attrs.swap_remove(pos);
         };
 
-        Ok(CommonAttr { doc, deprecated })
+        Ok(RustCAttr { doc, deprecated })
     }
 
     pub fn deprecated_as_tokens(&self) -> proc_macro2::TokenStream {

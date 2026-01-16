@@ -1,94 +1,91 @@
 //! The plan is to try and move these into the ecosystem for the v2 release.
 use super::macros::*;
-use crate::{Flatten, Type, TypeCollection, datatype::*};
+use crate::{Type, TypeCollection, datatype::*};
 
 use std::borrow::Cow;
 
 #[cfg(feature = "indexmap")]
 const _: () = {
-    impl_for_list!(true; indexmap::IndexSet<T> as "IndexSet");
-    impl_for_map!(indexmap::IndexMap<K, V> as "IndexMap");
-    impl<K: Type, V: Type> Flatten for indexmap::IndexMap<K, V> {}
+    impl_for_list!(true; indexmap::IndexSet<T>);
+    impl_for_map!(indexmap::IndexMap<K, V>);
 };
 
 #[cfg(feature = "serde_json")]
 const _: () = {
     use serde_json::{Map, Number, Value};
 
-    impl_for_map!(Map<K, V> as "Map");
-    impl<K: Type, V: Type> Flatten for Map<K, V> {}
+    impl_for_map!(Map<K, V>);
 
-    #[derive(Type)]
-    #[specta(rename = "JsonValue", untagged, remote = Value, crate = crate, collect = false)]
-    pub enum JsonValue {
-        Null,
-        Bool(bool),
-        Number(Number),
-        String(String),
-        Array(Vec<Value>),
-        Object(Map<String, Value>),
+    impl Type for Value {
+        fn definition(types: &mut TypeCollection) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    ("Null".into(), EnumVariant::unit()),
+                    (
+                        "Bool".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(bool::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Number".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(Number::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "String".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(String::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Array".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(Vec::<Value>::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Object".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(Map::<String, Value>::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: vec![],
+            })
+        }
     }
 
     impl Type for Number {
         fn definition(_: &mut TypeCollection) -> DataType {
             DataType::Enum(Enum {
-                repr: Some(EnumRepr::Untagged),
                 variants: vec![
                     (
                         "f64".into(),
-                        EnumVariant {
-                            skip: false,
-                            docs: Cow::Borrowed(""),
-                            deprecated: None,
-                            fields: Fields::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    inline: false,
-                                    deprecated: None,
-                                    docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(Primitive::f64)),
-                                }],
-                            }),
-                        },
+                        EnumVariant::unnamed()
+                            .field(Field::new(DataType::Primitive(Primitive::f64)))
+                            .build(),
                     ),
                     (
                         "i64".into(),
-                        EnumVariant {
-                            skip: false,
-                            docs: Cow::Borrowed(""),
-                            deprecated: None,
-                            fields: Fields::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    inline: false,
-                                    deprecated: None,
-                                    docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(Primitive::i64)),
-                                }],
-                            }),
-                        },
+                        EnumVariant::unnamed()
+                            .field(Field::new(DataType::Primitive(Primitive::i64)))
+                            .build(),
                     ),
                     (
                         "u64".into(),
-                        EnumVariant {
-                            skip: false,
-                            docs: Cow::Borrowed(""),
-                            deprecated: None,
-                            fields: Fields::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    inline: false,
-                                    deprecated: None,
-                                    docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(Primitive::u64)),
-                                }],
-                            }),
-                        },
+                        EnumVariant::unnamed()
+                            .field(Field::new(DataType::Primitive(Primitive::u64)))
+                            .build(),
                     ),
                 ],
+                attributes: vec![RuntimeAttribute {
+                    path: String::from("serde"),
+                    kind: RuntimeMeta::List(vec![RuntimeNestedMeta::Meta(RuntimeMeta::Path(
+                        String::from("untagged"),
+                    ))]),
+                }],
             })
         }
     }
@@ -96,24 +93,14 @@ const _: () = {
 
 #[cfg(feature = "serde_yaml")]
 const _: () = {
-    use serde_yaml::{Mapping, Number, Sequence, Value, value::TaggedValue};
-
-    #[derive(Type)]
-    #[specta(rename = "YamlValue", untagged, remote = Value, crate = crate, collect = false)]
-    pub enum YamlValue {
-        Null,
-        Bool(bool),
-        Number(Number),
-        String(String),
-        Sequence(Sequence),
-        Mapping(Mapping),
-        Tagged(Box<TaggedValue>),
-    }
+    use serde_yaml::{Number, Value, value::TaggedValue};
 
     impl Type for serde_yaml::Mapping {
         fn definition(types: &mut TypeCollection) -> DataType {
-            // We don't type this more accurately because `serde_json` doesn't allow non-string map keys so neither does Specta // TODO
-            std::collections::HashMap::<serde_yaml::Value, serde_yaml::Value>::definition(types)
+            DataType::Map(crate::datatype::Map::new(
+                serde_yaml::Value::definition(types),
+                serde_yaml::Value::definition(types),
+            ))
         }
     }
 
@@ -123,66 +110,80 @@ const _: () = {
         }
     }
 
+    impl Type for Value {
+        fn definition(types: &mut TypeCollection) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    ("Null".into(), EnumVariant::unit()),
+                    (
+                        "Bool".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(bool::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Number".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(Number::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "String".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(String::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Sequence".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(Vec::<Value>::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Mapping".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(std::collections::BTreeMap::<
+                                serde_yaml::Value,
+                                serde_yaml::Value,
+                            >::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Tagged".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(Box::<TaggedValue>::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: vec![],
+            })
+        }
+    }
+
     impl Type for serde_yaml::Number {
         fn definition(_: &mut TypeCollection) -> DataType {
             DataType::Enum(Enum {
-                repr: Some(EnumRepr::Untagged),
                 variants: vec![
                     (
                         "f64".into(),
-                        EnumVariant {
-                            skip: false,
-                            docs: Cow::Borrowed(""),
-                            deprecated: None,
-                            fields: Fields::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    inline: false,
-                                    deprecated: None,
-                                    docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(Primitive::f64)),
-                                }],
-                            }),
-                        },
+                        EnumVariant::unnamed()
+                            .field(Field::new(DataType::Primitive(Primitive::f64)))
+                            .build(),
                     ),
                     (
                         "i64".into(),
-                        EnumVariant {
-                            skip: false,
-                            docs: Cow::Borrowed(""),
-                            deprecated: None,
-                            fields: Fields::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    inline: false,
-                                    deprecated: None,
-                                    docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(Primitive::i64)),
-                                }],
-                            }),
-                        },
+                        EnumVariant::unnamed()
+                            .field(Field::new(DataType::Primitive(Primitive::i64)))
+                            .build(),
                     ),
                     (
                         "u64".into(),
-                        EnumVariant {
-                            skip: false,
-                            docs: Cow::Borrowed(""),
-                            deprecated: None,
-                            fields: Fields::Unnamed(UnnamedFields {
-                                fields: vec![Field {
-                                    optional: false,
-                                    flatten: false,
-                                    inline: false,
-                                    deprecated: None,
-                                    docs: Cow::Borrowed(""),
-                                    ty: Some(DataType::Primitive(Primitive::u64)),
-                                }],
-                            }),
-                        },
+                        EnumVariant::unnamed()
+                            .field(Field::new(DataType::Primitive(Primitive::u64)))
+                            .build(),
                     ),
                 ],
+                attributes: vec![],
             })
         }
     }
@@ -190,29 +191,85 @@ const _: () = {
 
 #[cfg(feature = "toml")]
 const _: () = {
-    use toml::{Value, value::Array, value::Datetime, value::Table};
+    use toml::{Value, value};
 
-    impl_for_map!(toml::map::Map<K, V> as "Map");
-    impl<K: Type, V: Type> Flatten for toml::map::Map<K, V> {}
+    impl_for_map!(toml::map::Map<K, V>);
 
-    #[derive(Type)]
-    #[specta(rename = "TomlValue", untagged, remote = Value, crate = crate, collect = false)]
-    pub enum TomlValue {
-        String(String),
-        Integer(i64),
-        Float(f64),
-        Boolean(bool),
-        Datetime(Datetime),
-        Array(Array),
-        Table(Table),
+    impl Type for value::Datetime {
+        fn definition(types: &mut TypeCollection) -> DataType {
+            DataType::Struct(Struct {
+                fields: Fields::Named(NamedFields {
+                    fields: vec![(
+                        "v".into(),
+                        Field {
+                            optional: false,
+
+                            inline: false,
+                            deprecated: None,
+                            docs: Cow::Borrowed(""),
+                            ty: Some(String::definition(types)),
+                            attributes: Vec::new(),
+                        },
+                    )],
+                    attributes: Vec::new(),
+                }),
+                attributes: Vec::new(),
+            })
+        }
     }
 
-    #[derive(Type)]
-    #[specta(rename = "Datetime", remote = Datetime, crate = crate, collect = false)]
-    #[allow(dead_code)]
-    struct DatetimeDef {
-        #[specta(rename = "$__toml_private_datetime")]
-        pub v: String,
+    impl Type for Value {
+        fn definition(types: &mut TypeCollection) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "String".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(String::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Integer".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(i64::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Float".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(f64::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Boolean".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(bool::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Datetime".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(value::Datetime::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Array".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(Vec::<Value>::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Table".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(
+                                std::collections::BTreeMap::<String, Value>::definition(types),
+                            ))
+                            .build(),
+                    ),
+                ],
+                attributes: vec![],
+            })
+        }
     }
 };
 
@@ -316,12 +373,41 @@ const _: () = {
         ID as NonZeroU128
     );
 
-    #[derive(Type)]
-    #[specta(remote = Timestamp, crate = crate, collect = false)]
-    #[allow(dead_code)]
-    struct Timestamp {
-        time: NTP64,
-        id: ID,
+    impl Type for Timestamp {
+        fn definition(types: &mut TypeCollection) -> DataType {
+            DataType::Struct(Struct {
+                fields: Fields::Named(NamedFields {
+                    fields: vec![
+                        (
+                            "time".into(),
+                            Field {
+                                optional: false,
+
+                                inline: false,
+                                deprecated: None,
+                                docs: Cow::Borrowed(""),
+                                ty: Some(NTP64::definition(types)),
+                                attributes: Vec::new(),
+                            },
+                        ),
+                        (
+                            "id".into(),
+                            Field {
+                                optional: false,
+
+                                inline: false,
+                                deprecated: None,
+                                docs: Cow::Borrowed(""),
+                                ty: Some(ID::definition(types)),
+                                attributes: Vec::new(),
+                            },
+                        ),
+                    ],
+                    attributes: Vec::new(),
+                }),
+                attributes: Vec::new(),
+            })
+        }
     }
 };
 
@@ -331,10 +417,11 @@ const _: () = {
         (
             $name: ident as $representation: ty
         ) => {
-            #[derive(Type)]
-            #[specta(remote = glam::$name, crate = crate, collect = false)]
-            #[allow(dead_code)]
-            struct $name($representation);
+            impl Type for glam::$name {
+                fn definition(types: &mut TypeCollection) -> DataType {
+                    <$representation>::definition(types)
+                }
+            }
         };
     }
 
@@ -434,75 +521,120 @@ impl_as!(url::Url as String);
 impl<L: Type, R: Type> Type for either::Either<L, R> {
     fn definition(types: &mut TypeCollection) -> DataType {
         DataType::Enum(Enum {
-            repr: Some(EnumRepr::Untagged),
             variants: vec![
                 (
                     "Left".into(),
-                    EnumVariant {
-                        skip: false,
-                        docs: Cow::Borrowed(""),
-                        deprecated: None,
-                        fields: Fields::Unnamed(UnnamedFields {
-                            fields: vec![Field {
-                                optional: false,
-                                flatten: false,
-                                inline: false,
-                                deprecated: None,
-                                docs: Cow::Borrowed(""),
-                                ty: Some(L::definition(types)),
-                            }],
-                        }),
-                    },
+                    EnumVariant::unnamed()
+                        .field(Field::new(L::definition(types)))
+                        .build(),
                 ),
                 (
                     "Right".into(),
-                    EnumVariant {
-                        skip: false,
-                        docs: Cow::Borrowed(""),
-                        deprecated: None,
-                        fields: Fields::Unnamed(UnnamedFields {
-                            fields: vec![Field {
-                                optional: false,
-                                flatten: false,
-                                inline: false,
-                                deprecated: None,
-                                docs: Cow::Borrowed(""),
-                                ty: Some(R::definition(types)),
-                            }],
-                        }),
-                    },
+                    EnumVariant::unnamed()
+                        .field(Field::new(R::definition(types)))
+                        .build(),
                 ),
             ],
+            attributes: vec![],
         })
     }
 }
 
 #[cfg(feature = "bevy_ecs")]
 const _: () = {
-    #[derive(Type)]
-    #[specta(rename = "Entity", remote = bevy_ecs::entity::Entity, crate = crate, collect = false)]
-    #[allow(dead_code)]
-    struct EntityDef(u64);
+    impl Type for bevy_ecs::entity::Entity {
+        fn definition(types: &mut TypeCollection) -> DataType {
+            DataType::Struct(Struct {
+                fields: Fields::Unnamed(UnnamedFields {
+                    fields: vec![Field {
+                        optional: false,
+                        inline: false,
+                        deprecated: None,
+                        docs: Cow::Borrowed(""),
+                        ty: Some(u64::definition(types)),
+                        attributes: Vec::new(),
+                    }],
+                    attributes: Vec::new(),
+                }),
+                attributes: Vec::new(),
+            })
+        }
+    }
 };
 
 #[cfg(feature = "bevy_input")]
 const _: () = {
-    #[derive(Type)]
-    #[specta(remote = bevy_input::ButtonState, crate = crate, collect = false)]
-    #[allow(dead_code)]
-    enum ButtonState {
-        Pressed,
-        Released,
+    impl Type for bevy_input::ButtonState {
+        fn definition(_: &mut TypeCollection) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    ("Pressed".into(), EnumVariant::unit()),
+                    ("Released".into(), EnumVariant::unit()),
+                ],
+                attributes: vec![],
+            })
+        }
     }
 
-    #[derive(Type)]
-    #[specta(remote = bevy_input::keyboard::KeyboardInput, crate = crate, collect = false)]
-    #[allow(dead_code)]
-    struct KeyboardInput {
-        pub key_code: bevy_input::keyboard::KeyCode,
-        pub logical_key: bevy_input::keyboard::Key,
-        pub state: bevy_input::ButtonState,
-        pub window: bevy_ecs::entity::Entity,
+    impl Type for bevy_input::keyboard::KeyboardInput {
+        fn definition(types: &mut TypeCollection) -> DataType {
+            DataType::Struct(Struct {
+                fields: Fields::Named(NamedFields {
+                    fields: vec![
+                        (
+                            "key_code".into(),
+                            Field {
+                                optional: false,
+
+                                inline: false,
+                                deprecated: None,
+                                docs: Cow::Borrowed(""),
+                                ty: Some(bevy_input::keyboard::KeyCode::definition(types)),
+                                attributes: Vec::new(),
+                            },
+                        ),
+                        (
+                            "logical_key".into(),
+                            Field {
+                                optional: false,
+
+                                inline: false,
+                                deprecated: None,
+                                docs: Cow::Borrowed(""),
+                                ty: Some(bevy_input::keyboard::Key::definition(types)),
+                                attributes: Vec::new(),
+                            },
+                        ),
+                        (
+                            "state".into(),
+                            Field {
+                                optional: false,
+
+                                inline: false,
+                                deprecated: None,
+                                docs: Cow::Borrowed(""),
+                                ty: Some(bevy_input::ButtonState::definition(types)),
+                                attributes: Vec::new(),
+                            },
+                        ),
+                        (
+                            "window".into(),
+                            Field {
+                                optional: false,
+
+                                inline: false,
+                                deprecated: None,
+                                docs: Cow::Borrowed(""),
+                                ty: Some(bevy_ecs::entity::Entity::definition(types)),
+                                attributes: Vec::new(),
+                            },
+                        ),
+                    ],
+                    attributes: Vec::new(),
+                }),
+                attributes: Vec::new(),
+            })
+        }
     }
 
     // Reduced KeyCode and Key to String to avoid redefining a quite large enum (for now)
@@ -511,50 +643,170 @@ const _: () = {
         bevy_input::keyboard::Key as String
     );
 
-    #[derive(Type)]
-    #[specta(remote = bevy_input::mouse::MouseButtonInput, crate = crate, collect = false)]
-    #[allow(dead_code)]
-    pub struct MouseButtonInput {
-        pub button: bevy_input::mouse::MouseButton,
-        pub state: bevy_input::ButtonState,
-        pub window: bevy_ecs::entity::Entity,
+    impl Type for bevy_input::mouse::MouseButtonInput {
+        fn definition(types: &mut TypeCollection) -> DataType {
+            DataType::Struct(Struct {
+                fields: Fields::Named(NamedFields {
+                    fields: vec![
+                        (
+                            "button".into(),
+                            Field {
+                                optional: false,
+
+                                inline: false,
+                                deprecated: None,
+                                docs: Cow::Borrowed(""),
+                                ty: Some(bevy_input::mouse::MouseButton::definition(types)),
+                                attributes: Vec::new(),
+                            },
+                        ),
+                        (
+                            "state".into(),
+                            Field {
+                                optional: false,
+
+                                inline: false,
+                                deprecated: None,
+                                docs: Cow::Borrowed(""),
+                                ty: Some(bevy_input::ButtonState::definition(types)),
+                                attributes: Vec::new(),
+                            },
+                        ),
+                        (
+                            "window".into(),
+                            Field {
+                                optional: false,
+
+                                inline: false,
+                                deprecated: None,
+                                docs: Cow::Borrowed(""),
+                                ty: Some(bevy_ecs::entity::Entity::definition(types)),
+                                attributes: Vec::new(),
+                            },
+                        ),
+                    ],
+                    attributes: Vec::new(),
+                }),
+                attributes: Vec::new(),
+            })
+        }
     }
 
-    #[derive(Type)]
-    #[specta(remote = bevy_input::mouse::MouseButton, crate = crate, collect = false)]
-    #[allow(dead_code)]
-    pub enum MouseButton {
-        Left,
-        Right,
-        Middle,
-        Back,
-        Forward,
-        Other(u16),
+    impl Type for bevy_input::mouse::MouseButton {
+        fn definition(types: &mut TypeCollection) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    ("Left".into(), EnumVariant::unit()),
+                    ("Right".into(), EnumVariant::unit()),
+                    ("Middle".into(), EnumVariant::unit()),
+                    ("Back".into(), EnumVariant::unit()),
+                    ("Forward".into(), EnumVariant::unit()),
+                    (
+                        "Other".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(u16::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: vec![],
+            })
+        }
     }
 
-    #[derive(Type)]
-    #[specta(remote = bevy_input::mouse::MouseWheel, crate = crate, collect = false)]
-    #[allow(dead_code)]
-    pub struct MouseWheel {
-        pub unit: bevy_input::mouse::MouseScrollUnit,
-        pub x: f32,
-        pub y: f32,
-        pub window: bevy_ecs::entity::Entity,
+    impl Type for bevy_input::mouse::MouseWheel {
+        fn definition(types: &mut TypeCollection) -> DataType {
+            DataType::Struct(Struct {
+                fields: Fields::Named(NamedFields {
+                    fields: vec![
+                        (
+                            "unit".into(),
+                            Field {
+                                optional: false,
+
+                                inline: false,
+                                deprecated: None,
+                                docs: Cow::Borrowed(""),
+                                ty: Some(bevy_input::mouse::MouseScrollUnit::definition(types)),
+                                attributes: Vec::new(),
+                            },
+                        ),
+                        (
+                            "x".into(),
+                            Field {
+                                optional: false,
+
+                                inline: false,
+                                deprecated: None,
+                                docs: Cow::Borrowed(""),
+                                ty: Some(f32::definition(types)),
+                                attributes: Vec::new(),
+                            },
+                        ),
+                        (
+                            "y".into(),
+                            Field {
+                                optional: false,
+
+                                inline: false,
+                                deprecated: None,
+                                docs: Cow::Borrowed(""),
+                                ty: Some(f32::definition(types)),
+                                attributes: Vec::new(),
+                            },
+                        ),
+                        (
+                            "window".into(),
+                            Field {
+                                optional: false,
+
+                                inline: false,
+                                deprecated: None,
+                                docs: Cow::Borrowed(""),
+                                ty: Some(bevy_ecs::entity::Entity::definition(types)),
+                                attributes: Vec::new(),
+                            },
+                        ),
+                    ],
+                    attributes: Vec::new(),
+                }),
+                attributes: Vec::new(),
+            })
+        }
     }
 
-    #[derive(Type)]
-    #[specta(remote = bevy_input::mouse::MouseScrollUnit, crate = crate, collect = false)]
-    #[allow(dead_code)]
-    pub enum MouseScrollUnit {
-        Line,
-        Pixel,
+    impl Type for bevy_input::mouse::MouseScrollUnit {
+        fn definition(_: &mut TypeCollection) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    ("Line".into(), EnumVariant::unit()),
+                    ("Pixel".into(), EnumVariant::unit()),
+                ],
+                attributes: vec![],
+            })
+        }
     }
 
-    #[derive(Type)]
-    #[specta(remote = bevy_input::mouse::MouseMotion, crate = crate, collect = false)]
-    #[allow(dead_code)]
-    pub struct MouseMotion {
-        pub delta: glam::Vec2,
+    impl Type for bevy_input::mouse::MouseMotion {
+        fn definition(types: &mut TypeCollection) -> DataType {
+            DataType::Struct(Struct {
+                fields: Fields::Named(NamedFields {
+                    fields: vec![(
+                        "delta".into(),
+                        Field {
+                            optional: false,
+
+                            inline: false,
+                            deprecated: None,
+                            docs: Cow::Borrowed(""),
+                            ty: Some(glam::Vec2::definition(types)),
+                            attributes: Vec::new(),
+                        },
+                    )],
+                    attributes: Vec::new(),
+                }),
+                attributes: Vec::new(),
+            })
+        }
     }
 };
 
@@ -563,6 +815,61 @@ impl_as!(
     camino::Utf8Path as String
     camino::Utf8PathBuf as String
 );
+
+#[cfg(feature = "geojson")]
+const _: () = {
+    use geojson::{Feature, FeatureCollection, Geometry, Value};
+
+    #[derive(Type)]
+    #[specta(rename = "GeoJsonValue", untagged, remote = Value, crate = crate, collect = false)]
+    #[allow(dead_code)]
+    pub enum GeoJsonValue {
+        Point(geojson::PointType),
+        MultiPoint(Vec<geojson::PointType>),
+        LineString(geojson::LineStringType),
+        MultiLineString(Vec<geojson::LineStringType>),
+        Polygon(geojson::PolygonType),
+        MultiPolygon(Vec<geojson::PolygonType>),
+        GeometryCollection(Vec<Geometry>),
+    }
+
+    #[derive(Type)]
+    #[specta(rename = "GeoJsonGeometry", remote = Geometry, crate = crate, collect = false)]
+    #[allow(dead_code)]
+    pub struct GeoJsonGeometry {
+        pub bbox: Option<geojson::Bbox>,
+        pub value: Value,
+        pub foreign_members: Option<geojson::JsonObject>,
+    }
+
+    #[derive(Type)]
+    #[specta(rename = "GeoJsonFeature", remote = Feature, crate = crate, collect = false)]
+    #[allow(dead_code)]
+    pub struct GeoJsonFeature {
+        pub bbox: Option<geojson::Bbox>,
+        pub geometry: Option<Geometry>,
+        pub id: Option<geojson::feature::Id>,
+        pub properties: Option<geojson::JsonObject>,
+        pub foreign_members: Option<geojson::JsonObject>,
+    }
+
+    #[derive(Type)]
+    #[specta(rename = "GeoJsonFeatureCollection", remote = FeatureCollection, crate = crate, collect = false)]
+    #[allow(dead_code)]
+    pub struct GeoJsonFeatureCollection {
+        pub bbox: Option<geojson::Bbox>,
+        pub features: Vec<Feature>,
+        pub foreign_members: Option<geojson::JsonObject>,
+    }
+
+    #[derive(Type)]
+    #[specta(rename = "GeoJsonFeatureId", untagged, remote = geojson::feature::Id, crate = crate, collect = false)]
+    #[allow(dead_code)]
+    pub enum GeoJsonFeatureId {
+        String(String),
+        Number(serde_json::Number),
+    }
+};
 
 #[cfg(feature = "geozero")]
 const _: () = {
