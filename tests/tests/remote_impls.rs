@@ -27,6 +27,6 @@ fn typescript_types_bevy_ecs() {
     // TODO: As we inline `Entity` never ends up in the type map so it falls back to "Entity" in the error instead of the path to the type. Is this what we want or not?
     insta::assert_snapshot!(format!("{:?}", crate::ts::inline::<bevy_ecs::entity::Entity>(&Default::default()).unwrap_err()), @"BigIntForbidden(ExportPath { path: \"Entity -> u64\" })");
 
-    // https://github.com/oscartbeaumont/specta/issues/161#issuecomment-1822735951
+    // https://github.com/specta-rs/specta/issues/161#issuecomment-1822735951
     insta::assert_snapshot!(crate::ts::export::<bevy_ecs::entity::Entity>(&ExportConfig::default().bigint(BigIntExportBehavior::Number)).unwrap(), @"export type Entity = number");
 }

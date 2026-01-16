@@ -1,17 +1,18 @@
 use std::any::Any;
 
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use crate::ts::assert_ts_inline2;
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub struct SkipOnlyField {
     #[specta(skip)]
     a: String,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub struct SkipField {
     #[specta(skip)]
@@ -19,35 +20,38 @@ pub struct SkipField {
     b: i32,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub enum SkipOnlyVariantExternallyTagged {
     #[specta(skip)]
     A(String),
 }
 
-#[derive(Type)]
-#[specta(collect = false, tag = "t")]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t")]
 pub enum SkipOnlyVariantInternallyTagged {
     #[specta(skip)]
     A(String),
 }
 
-#[derive(Type)]
-#[specta(collect = false, tag = "t", content = "c")]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
 pub enum SkipOnlyVariantAdjacentlyTagged {
     #[specta(skip)]
     A(String),
 }
 
-#[derive(Type)]
-#[specta(collect = false, untagged)]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
 pub enum SkipOnlyVariantUntagged {
     #[specta(skip)]
     A(String),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub enum SkipVariant {
     #[specta(skip)]
@@ -55,7 +59,7 @@ pub enum SkipVariant {
     B(i32),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub enum SkipUnnamedFieldInVariant {
     // only field
@@ -66,7 +70,7 @@ pub enum SkipUnnamedFieldInVariant {
     B(#[specta(skip)] String, i32),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 pub enum SkipNamedFieldInVariant {
     // only field
@@ -82,31 +86,31 @@ pub enum SkipNamedFieldInVariant {
     },
 }
 
-// https://github.com/oscartbeaumont/specta/issues/170
-#[derive(Type)]
+// https://github.com/specta-rs/specta/issues/170
+#[derive(Type, Serialize, Deserialize)]
 #[specta(transparent, collect = false)]
 pub struct TransparentWithSkip((), #[specta(skip)] String);
 
-// https://github.com/oscartbeaumont/specta/issues/170
-#[derive(Type)]
+// https://github.com/specta-rs/specta/issues/170
+#[derive(Type, Serialize, Deserialize)]
 #[specta(transparent, collect = false)]
 pub struct TransparentWithSkip2(#[specta(skip)] (), String);
 
-// https://github.com/oscartbeaumont/specta/issues/170
+// https://github.com/specta-rs/specta/issues/170
 #[derive(Type)]
 #[specta(transparent, collect = false)]
 pub struct TransparentWithSkip3(#[specta(type = String)] Box<dyn Any>);
 
 /// This is intentionally just a compile or not compile test
-/// https://github.com/oscartbeaumont/specta/issues/167
-#[derive(Type)]
+/// https://github.com/specta-rs/specta/issues/167
+#[derive(Type, Serialize)]
 #[specta(collect = false)]
 pub enum LazilySkip {
-    #[specta(skip)]
+    #[serde(skip)]
     A(Box<dyn Any>),
-    B(#[specta(skip)] Box<dyn Any>),
+    B(#[serde(skip)] Box<dyn Any>),
     C {
-        #[specta(skip)]
+        #[serde(skip)]
         a: Box<dyn Any>,
     },
 }

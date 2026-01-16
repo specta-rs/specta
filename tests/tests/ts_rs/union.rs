@@ -1,12 +1,13 @@
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 enum SimpleEnum1 {
-    #[specta(rename = "asdf")]
+    #[serde(rename = "asdf")]
     A,
     B,
-    #[specta(rename_all = "camelCase")]
+    #[serde(rename_all = "camelCase")]
     C {
         enum_field: (),
     },

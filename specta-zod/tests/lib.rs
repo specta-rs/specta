@@ -105,7 +105,7 @@
 
 //     assert_zod!(Option<i32>, "z.number().nullable()");
 
-//     // // https://github.com/oscartbeaumont/specta/issues/88
+//     // // https://github.com/specta-rs/specta/issues/88
 //     assert_zod!(Unit1, "z.null()");
 //     assert_zod!(Unit2, "z.record(z.string(), z.never())");
 //     assert_zod!(Unit3, "z.tuple([])");
@@ -199,28 +199,28 @@
 //     // assert_ts!(() => ..5, r#"{ end: 5 }"#);
 //     // assert_ts!(() => ..=5, r#"{ end: 5 }"#);
 
-//     // https://github.com/oscartbeaumont/specta/issues/66
+//     // https://github.com/specta-rs/specta/issues/66
 //     assert_zod!(
 //         [Option<u8>; 3],
 //         r#"z.tuple([z.number().nullable(), z.number().nullable(), z.number().nullable()])"#
 //     );
 
-//     // https://github.com/oscartbeaumont/specta/issues/65
+//     // https://github.com/specta-rs/specta/issues/65
 //     assert_zod!(HashMap<BasicEnum, ()>, r#"z.record(z.union([z.literal("A"), z.literal("B")]), z.null())"#);
 
-//     // https://github.com/oscartbeaumont/specta/issues/60
+//     // https://github.com/specta-rs/specta/issues/60
 //     assert_zod!(
 //         Option<Option<Option<Option<i32>>>>,
 //         r#"z.number().nullable()"#
 //     );
 
-//     // https://github.com/oscartbeaumont/specta/issues/71
+//     // https://github.com/specta-rs/specta/issues/71
 //     assert_zod!(
 //         Vec<PlaceholderInnerField>,
 //         r#"z.array(z.object({ a: z.string() }))"#
 //     );
 
-//     // https://github.com/oscartbeaumont/specta/issues/77
+//     // https://github.com/specta-rs/specta/issues/77
 //     assert_eq!(
 //         specta_zod::inline::<std::time::SystemTime>(
 //             &ExportConfig::new().bigint(BigIntExportBehavior::Number)
@@ -279,21 +279,21 @@
 //         "export const MyEmptyInput = z.record(z.string(), z.never())"
 //     );
 
-//     // https://github.com/oscartbeaumont/specta/issues/142
+//     // https://github.com/specta-rs/specta/issues/142
 //     #[allow(unused_parens)]
 //     {
 //         assert_zod!((String), r#"z.string()"#);
 //         assert_zod!((String,), r#"z.tuple([z.string()])"#);
 //     }
 
-//     // https://github.com/oscartbeaumont/specta/issues/148
+//     // https://github.com/specta-rs/specta/issues/148
 //     assert_zod!(
 //         ExtraBracketsInTupleVariant,
 //         r#"z.object({ A: z.string() })"#
 //     );
 //     assert_zod!(ExtraBracketsInUnnamedStruct, "z.string()");
 
-//     // https://github.com/oscartbeaumont/specta/issues/90 // TODO: Fix these
+//     // https://github.com/specta-rs/specta/issues/90 // TODO: Fix these
 //     // assert_zod!(
 //     //     RenameWithWeirdCharsField,
 //     //     r#"z.object({ "@odata.context": z.string() })"#
@@ -327,7 +327,7 @@
 //     //     )
 //     // );
 
-//     // https://github.com/oscartbeaumont/specta/issues/156
+//     // https://github.com/specta-rs/specta/issues/156
 //     assert_zod!(
 //         Vec<MyEnum>,
 //         r#"z.array(z.union([z.object({ A: z.string() }), z.object({ B: z.number() })]))"#
@@ -342,7 +342,7 @@
 //         r#"z.object({ demo: z.tuple([z.object({ demo: z.tuple([z.string(), z.boolean()]) }), z.boolean()]) })"#
 //     );
 
-//     // https://github.com/oscartbeaumont/specta/issues/220
+//     // https://github.com/specta-rs/specta/issues/220
 //     // assert_zod!(Box<str>, r#"z.string()"#);
 // }
 
@@ -560,7 +560,7 @@
 //     pub demo: i32,
 // }
 
-// // Regression test for https://github.com/oscartbeaumont/specta/issues/56
+// // Regression test for https://github.com/specta-rs/specta/issues/56
 // #[derive(Type)]
 // #[specta(collect = false)]
 // enum Rename {
@@ -626,7 +626,7 @@
 //     a: HashMap<BasicEnum, i32>,
 // }
 
-// // https://github.com/oscartbeaumont/specta/issues/88
+// // https://github.com/specta-rs/specta/issues/88
 // #[derive(Type)]
 // #[serde(collect = false, rename_all = "camelCase")]
 // #[serde(default)]

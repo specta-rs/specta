@@ -1,0 +1,26 @@
+{"run_id":"1767766936-895204000","line":91,"new":{"module_name":"integration_tests__serde__empty_enum","snapshot_name":"empty_enums-5","metadata":{"source":"tests/tests/serde/empty_enum.rs","assertion_line":91,"expression":"assert_ts_inline2::<E>().unwrap()"},"snapshot":"{ A: Inner } | { B: Inner }"},"old":{"module_name":"integration_tests__serde__empty_enum","metadata":{},"snapshot":"({ a: \"A\" }) | ({ a: \"B\" })"}}
+{"run_id":"1767771407-927383000","line":86,"new":null,"old":null}
+{"run_id":"1767771407-927383000","line":87,"new":null,"old":null}
+{"run_id":"1767771407-927383000","line":88,"new":null,"old":null}
+{"run_id":"1767771407-927383000","line":89,"new":null,"old":null}
+{"run_id":"1767771407-927383000","line":91,"new":{"module_name":"integration_tests__serde__empty_enum","snapshot_name":"empty_enums-5","metadata":{"source":"tests/tests/serde/empty_enum.rs","assertion_line":91,"expression":"assert_ts_inline2::<E>().unwrap()"},"snapshot":"{ a: \"A\" } | { a: \"B\" }"},"old":{"module_name":"integration_tests__serde__empty_enum","metadata":{},"snapshot":"({ a: \"A\" }) | ({ a: \"B\" })"}}
+{"run_id":"1767797697-258416000","line":86,"new":null,"old":null}
+{"run_id":"1767797697-258416000","line":87,"new":null,"old":null}
+{"run_id":"1767797697-258416000","line":88,"new":null,"old":null}
+{"run_id":"1767797697-258416000","line":89,"new":null,"old":null}
+{"run_id":"1767797697-258416000","line":91,"new":{"module_name":"integration_tests__serde__empty_enum","snapshot_name":"empty_enums-5","metadata":{"source":"tests/tests/serde/empty_enum.rs","assertion_line":91,"expression":"assert_ts_inline2::<E>().unwrap()"},"snapshot":"{ a: \"A\" } | { a: \"B\" }"},"old":{"module_name":"integration_tests__serde__empty_enum","metadata":{},"snapshot":"({ a: \"A\" }) | ({ a: \"B\" })"}}
+{"run_id":"1767797704-780779000","line":86,"new":null,"old":null}
+{"run_id":"1767797704-780779000","line":87,"new":null,"old":null}
+{"run_id":"1767797704-780779000","line":88,"new":null,"old":null}
+{"run_id":"1767797704-780779000","line":89,"new":null,"old":null}
+{"run_id":"1767797704-780779000","line":91,"new":{"module_name":"integration_tests__serde__empty_enum","snapshot_name":"empty_enums-5","metadata":{"source":"tests/tests/serde/empty_enum.rs","assertion_line":91,"expression":"assert_ts_inline2::<E>().unwrap()"},"snapshot":"{ a: \"A\" } | { a: \"B\" }"},"old":{"module_name":"integration_tests__serde__empty_enum","metadata":{},"snapshot":"({ a: \"A\" }) | ({ a: \"B\" })"}}
+{"run_id":"1767916268-200739000","line":86,"new":null,"old":null}
+{"run_id":"1767916268-200739000","line":87,"new":null,"old":null}
+{"run_id":"1767916268-200739000","line":88,"new":null,"old":null}
+{"run_id":"1767916268-200739000","line":89,"new":null,"old":null}
+{"run_id":"1767916268-200739000","line":91,"new":{"module_name":"integration_tests__serde__empty_enum","snapshot_name":"empty_enums-5","metadata":{"source":"tests/tests/serde/empty_enum.rs","assertion_line":91,"expression":"assert_ts_inline2::<E>().unwrap()"},"snapshot":"Inner"},"old":{"module_name":"integration_tests__serde__empty_enum","metadata":{},"snapshot":"({ a: \"A\" }) | ({ a: \"B\" })"}}
+{"run_id":"1768544480-805792000","line":86,"new":null,"old":null}
+{"run_id":"1768544480-805792000","line":87,"new":null,"old":null}
+{"run_id":"1768544480-805792000","line":88,"new":null,"old":null}
+{"run_id":"1768544480-805792000","line":89,"new":null,"old":null}
+{"run_id":"1768544480-805792000","line":91,"new":{"module_name":"integration_tests__serde__empty_enum","snapshot_name":"empty_enums-5","metadata":{"source":"tests/tests/serde/empty_enum.rs","assertion_line":91,"expression":"assert_ts_inline2::<E>().unwrap()"},"snapshot":"{ a: \"A\" } | { a: \"B\" }"},"old":{"module_name":"integration_tests__serde__empty_enum","metadata":{},"snapshot":"({ a: \"A\" }) | ({ a: \"B\" })"}}

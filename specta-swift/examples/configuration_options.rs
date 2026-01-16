@@ -178,7 +178,7 @@ fn main() {
     // 8. SERDE VALIDATION
     println!("\n📋 8. SERDE VALIDATION");
     println!("{}", "-".repeat(40));
-    let with_serde = Swift::new().with_serde();
+    let with_serde = Swift::new().with_serde(specta_serde::SerdeMode::Both);
     let serde_output = with_serde.export(&types).unwrap();
     println!("With Serde validation:\n{}", serde_output);
     with_serde
@@ -197,7 +197,7 @@ fn main() {
         .optionals(OptionalStyle::Optional)
         .add_protocol("Equatable")
         .add_protocol("Hashable")
-        .with_serde();
+        .with_serde(specta_serde::SerdeMode::Both);
 
     let combined_output = combined.export(&types).unwrap();
     println!("Combined custom configuration:\n{}", combined_output);

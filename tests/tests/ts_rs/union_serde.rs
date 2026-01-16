@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "kind", content = "d")]
 enum SimpleEnumA {
@@ -8,7 +9,7 @@ enum SimpleEnumA {
     B,
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "kind", content = "data")]
 enum ComplexEnum {
@@ -19,7 +20,7 @@ enum ComplexEnum {
     T(i32, SimpleEnumA),
 }
 
-#[derive(Type)]
+#[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(untagged)]
 enum Untagged {

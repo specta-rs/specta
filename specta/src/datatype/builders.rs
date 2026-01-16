@@ -8,7 +8,7 @@ use crate::{
     DataType, TypeCollection,
     datatype::{
         ArcId, DeprecatedType, EnumVariant, Field, Fields, Generic, NamedDataType, NamedFields,
-        Struct, UnnamedFields,
+        RuntimeAttribute, Struct, UnnamedFields,
     },
 };
 
@@ -30,6 +30,7 @@ impl StructBuilder<NamedFields> {
     pub fn build(self) -> DataType {
         DataType::Struct(Struct {
             fields: Fields::Named(self.fields),
+            attributes: Default::default(),
         })
     }
 }
@@ -44,9 +45,19 @@ impl StructBuilder<UnnamedFields> {
         self.fields.fields.push(field);
     }
 
+    pub fn attributes(mut self, attributes: Vec<RuntimeAttribute>) -> Self {
+        self.fields.attributes = attributes;
+        self
+    }
+
+    pub fn attributes_mut(&mut self, attributes: Vec<RuntimeAttribute>) {
+        self.fields.attributes = attributes;
+    }
+
     pub fn build(self) -> DataType {
         DataType::Struct(Struct {
             fields: Fields::Unnamed(self.fields),
+            attributes: Default::default(),
         })
     }
 }
@@ -71,6 +82,15 @@ impl<T> VariantBuilder<T> {
     pub fn deprecated(mut self, reason: DeprecatedType) -> Self {
         self.v.deprecated = Some(reason);
         self
+    }
+
+    pub fn attributes(mut self, attributes: Vec<RuntimeAttribute>) -> Self {
+        self.v.attributes = attributes;
+        self
+    }
+
+    pub fn attributes_mut(&mut self, attributes: Vec<RuntimeAttribute>) {
+        self.v.attributes = attributes;
     }
 }
 
@@ -97,9 +117,9 @@ impl VariantBuilder<NamedFields> {
     }
 }
 
-impl Into<EnumVariant> for VariantBuilder<NamedFields> {
-    fn into(self) -> EnumVariant {
-        self.build()
+impl From<VariantBuilder<NamedFields>> for EnumVariant {
+    fn from(val: VariantBuilder<NamedFields>) -> Self {
+        val.build()
     }
 }
 
@@ -126,9 +146,9 @@ impl VariantBuilder<UnnamedFields> {
     }
 }
 
-impl Into<EnumVariant> for VariantBuilder<UnnamedFields> {
-    fn into(self) -> EnumVariant {
-        self.build()
+impl From<VariantBuilder<UnnamedFields>> for EnumVariant {
+    fn from(val: VariantBuilder<UnnamedFields>) -> Self {
+        val.build()
     }
 }
 
