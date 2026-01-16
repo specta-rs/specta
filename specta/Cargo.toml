@@ -31,9 +31,6 @@ collect = ["dep:ctor", "specta-macros/DO_NOT_USE_collect"]
 ## Support for exporting the types of Rust functions.
 function = ["specta-macros?/DO_NOT_USE_function", "dep:paste"]
 
-# Enable nightly features
-nightly = []
-
 #! Compatibility
 ## Support for [serde-json](https://github.com/serde-rs/json)
 serde_json = ["dep:serde_json"]

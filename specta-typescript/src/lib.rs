@@ -58,3 +58,6 @@ pub use error::Error;
 pub use js_doc::JSDoc;
 pub use types::{Any, Never, Unknown};
 pub use typescript::{BigIntExportBehavior, Layout, Typescript};
+
+// Re-export SerdeMode from specta-serde for convenience
+pub use specta_serde::SerdeMode;

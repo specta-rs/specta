@@ -44,7 +44,7 @@ pub fn generics_with_ident_only(generics: &Generics) -> Option<TokenStream> {
         .map(|gs| quote!(<#(#gs),*>))
 }
 
-// Code copied from ts-rs. Thanks to it's original author!
+// Code adopted from ts-rs. Thanks to it's original author!
 pub fn add_type_to_where_clause(
     ty: &TokenStream,
     generics: &Generics,

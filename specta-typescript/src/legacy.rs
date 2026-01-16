@@ -281,9 +281,11 @@ pub(crate) fn struct_datatype(
             let fields = skip_fields_named(named.fields()).collect::<Vec<_>>();
 
             if fields.is_empty() {
-                // Note: tag is now on parent Enum/Struct attributes, not on NamedFields
-                // For proper tag support, parent context would need to be passed down
-                // For now, we treat all empty named fields as Record<string, never>
+                // TODO: Handle this
+                // match (named.tag().as_ref(), parent_name) {
+                //     (Some(tag), Some(key)) => write!(s, r#"{{ "{tag}": "{key}" }}"#)?,
+                //     (_, _) => write!(s, "Record<{STRING}, {NEVER}>")?,
+                // }
                 write!(s, "Record<{STRING}, {NEVER}>")?;
                 return Ok(());
             }
@@ -340,9 +342,10 @@ pub(crate) fn struct_datatype(
                 })
                 .collect::<Result<Vec<_>>>()?;
 
-            // Note: tag is now on parent Enum/Struct attributes, not on NamedFields
-            // For proper tag support, parent context would need to be passed down
-            // Skipping tag field for now
+            // TODO: Handle this
+            // if let (Some(tag), Some(key)) = (&named.tag(), parent_name) {
+            //     unflattened_fields.push(format!("{tag}: \"{key}\""));
+            // }
 
             if !unflattened_fields.is_empty() {
                 let mut s = "{ ".to_string();
@@ -414,6 +417,13 @@ fn enum_variant_datatype(
                 .collect::<Result<Vec<_>>>()?;
 
             let mut regular_fields = vec![];
+            // TODO
+            // let mut regular_fields = if let Some(tag) = &obj.tag() {
+            //     let sanitised_name = sanitise_key(name, true);
+            //     vec![format!("{tag}: {sanitised_name}")]
+            // } else {
+            //     vec![]
+            // };
 
             regular_fields.extend(
                 non_flattened
@@ -495,7 +505,8 @@ pub(crate) fn enum_datatype(
         return Ok(write!(s, "{NEVER}")?);
     }
 
-    // Get enum representation from serde attributes
+    // After specta_serde::apply, enum tagging is already applied to the variant fields
+    // So we can treat all enums the same way - just export the variant fields as-is
     let repr = specta_serde::get_enum_repr(e.attributes());
 
     let mut variants = e
@@ -508,116 +519,64 @@ pub(crate) fn enum_datatype(
                 variant.deprecated(),
                 variant.docs(),
                 match &repr {
-                    specta_serde::EnumRepr::External => {
-                        // External representation
-                        match &variant.fields() {
-                            Fields::Unit => {
-                                let sanitised_name = sanitise_key(variant_name.clone(), true);
-                                sanitised_name.to_string()
-                            }
-                            _ => {
-                                let ts_values = enum_variant_datatype(
-                                    ctx.with(PathItem::Variant(variant_name.clone())),
-                                    types,
-                                    variant_name.clone(),
-                                    variant,
-                                    prefix,
-                                )?;
-                                let sanitised_name = sanitise_key(variant_name.clone(), false);
+                    // For External and Untagged, handle as before
+                    specta_serde::EnumRepr::External => match &variant.fields() {
+                        Fields::Unit => {
+                            let sanitised_name = sanitise_key(variant_name.clone(), true);
+                            sanitised_name.to_string()
+                        }
+                        _ => {
+                            let ts_values = enum_variant_datatype(
+                                ctx.with(PathItem::Variant(variant_name.clone())),
+                                types,
+                                variant_name.clone(),
+                                variant,
+                                prefix,
+                            )?;
+                            let sanitised_name = sanitise_key(variant_name.clone(), false);
 
-                                match ts_values {
-                                    Some(ts_values) => {
-                                        format!("{{ {sanitised_name}: {ts_values} }}")
-                                    }
-                                    None => format!(r#""{sanitised_name}""#),
+                            match ts_values {
+                                Some(ts_values) => {
+                                    format!("{{ {sanitised_name}: {ts_values} }}")
                                 }
+                                None => format!(r#""{sanitised_name}""#),
                             }
                         }
-                    }
-                    specta_serde::EnumRepr::Internal { tag } => {
-                        // Internal representation: { tag: "VariantName", ...fields }
-                        let tag_key = sanitise_key(Cow::Owned(tag.to_string()), false);
-                        let variant_value = sanitise_key(variant_name.clone(), true);
-                        
-                        match &variant.fields() {
-                            Fields::Unit => {
-                                format!("{{ {tag_key}: {variant_value} }}")
-                            }
-                            Fields::Named(_) => {
-                                let ts_values = enum_variant_datatype(
-                                    ctx.with(PathItem::Variant(variant_name.clone())),
-                                    types,
-                                    variant_name.clone(),
-                                    variant,
-                                    prefix,
-                                )?;
-                                
-                                if let Some(ts_values) = ts_values {
-                                    // Remove outer braces from ts_values if present
-                                    let inner = ts_values.trim_start_matches("{ ").trim_end_matches(" }");
-                                    format!("{{ {tag_key}: {variant_value}; {inner} }}")
-                                } else {
-                                    format!("{{ {tag_key}: {variant_value} }}")
-                                }
-                            }
-                            _ => {
-                                // Tuple variants not supported in internally tagged enums
-                                format!("{{ {tag_key}: {variant_value} }}")
-                            }
+                    },
+                    specta_serde::EnumRepr::Untagged => match &variant.fields() {
+                        Fields::Unit => {
+                            let sanitised_name = sanitise_key(variant_name.clone(), true);
+                            sanitised_name.to_string()
                         }
-                    }
-                    specta_serde::EnumRepr::Adjacent { tag, content } => {
-                        // Adjacent representation: { tag: "VariantName", content: data }
-                        let tag_key = sanitise_key(Cow::Owned(tag.to_string()), false);
-                        let content_key = sanitise_key(Cow::Owned(content.to_string()), false);
-                        let variant_value = sanitise_key(variant_name.clone(), true);
-                        
-                        match &variant.fields() {
-                            Fields::Unit => {
-                                format!("{{ {tag_key}: {variant_value} }}")
-                            }
-                            _ => {
-                                let ts_values = enum_variant_datatype(
-                                    ctx.with(PathItem::Variant(variant_name.clone())),
-                                    types,
-                                    variant_name.clone(),
-                                    variant,
-                                    prefix,
-                                )?;
-                                
-                                match ts_values {
-                                    Some(ts_values) => {
-                                        format!("{{ {tag_key}: {variant_value}; {content_key}: {ts_values} }}")
-                                    }
-                                    None => format!("{{ {tag_key}: {variant_value} }}"),
-                                }
-                            }
+                        _ => {
+                            let ts_values = enum_variant_datatype(
+                                ctx.with(PathItem::Variant(variant_name.clone())),
+                                types,
+                                variant_name.clone(),
+                                variant,
+                                prefix,
+                            )?;
+
+                            ts_values.unwrap_or_else(|| "never".to_string())
                         }
-                    }
-                    specta_serde::EnumRepr::Untagged => {
-                        // Untagged representation: just the variant data
-                        match &variant.fields() {
-                            Fields::Unit => {
-                                let sanitised_name = sanitise_key(variant_name.clone(), true);
-                                sanitised_name.to_string()
-                            }
-                            _ => {
-                                let ts_values = enum_variant_datatype(
-                                    ctx.with(PathItem::Variant(variant_name.clone())),
-                                    types,
-                                    variant_name.clone(),
-                                    variant,
-                                    prefix,
-                                )?;
-                                
-                                ts_values.unwrap_or_else(|| "never".to_string())
-                            }
-                        }
-                    }
+                    },
                     specta_serde::EnumRepr::String { .. } => {
-                        // String enum representation - treat as External with string literals
                         let sanitised_name = sanitise_key(variant_name.clone(), true);
                         sanitised_name.to_string()
+                    }
+                    // For Internal and Adjacent, the tag/content fields are already in the variant
+                    // So we can just export them as named fields
+                    specta_serde::EnumRepr::Internal { .. }
+                    | specta_serde::EnumRepr::Adjacent { .. } => {
+                        let ts_values = enum_variant_datatype(
+                            ctx.with(PathItem::Variant(variant_name.clone())),
+                            types,
+                            variant_name.clone(),
+                            variant,
+                            prefix,
+                        )?;
+
+                        ts_values.unwrap_or_else(|| "never".to_string())
                     }
                 },
                 true,
@@ -735,6 +694,11 @@ fn validate_type_for_tagged_intersection(
                 ))
             }
             Fields::Named(fields) => {
+                // TODO
+                // if fields.tag().is_none() && fields.fields().is_empty() {
+                //     return Ok(true);
+                // }
+
                 // Prevent `{ tag: "{tag}" } & Record<string | never>`
                 // Note: tag is now on parent Enum attributes, not on NamedFields
                 if fields.fields().is_empty() {
@@ -748,6 +712,24 @@ fn validate_type_for_tagged_intersection(
             // Simplified: treat all enums as External representation (objects)
             Ok(false)
         }
+        // TODO
+        // DataType::Enum(v) => {
+        //     match v.repr().unwrap_or(&EnumRepr::External) {
+        //         EnumRepr::Untagged => {
+        //             Ok(v.variants().iter().any(|(_, v)| match &v.fields() {
+        //                 // `{ .. } & null` is `never`
+        //                 Fields::Unit => true,
+        //                     // `{ ... } & Record<string, never>` is not useful
+        //                 Fields::Named(v) => v.tag().is_none() && v.fields().is_empty(),
+        //                 Fields::Unnamed(_) => false,
+        //             }))
+        //         },
+        //         // All of these repr's are always objects.
+        //         EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. } | EnumRepr::External => Ok(false),
+        //         // String enums are string literals, not objects
+        //         EnumRepr::String { .. } => Ok(false),
+        //     }
+        // }
         DataType::Tuple(v) => {
             // Empty tuple is `null`
             if v.elements().is_empty() {
@@ -767,10 +749,6 @@ fn validate_type_for_tagged_intersection(
     }
 }
 
-#[allow(dead_code)]
-const ANY: &str = "any";
-#[allow(dead_code)]
-const UNKNOWN: &str = "unknown";
 const STRING: &str = "string";
 const NULL: &str = "null";
 const NEVER: &str = "never";
@@ -822,10 +800,10 @@ pub(crate) fn js_doc(docs: &str, deprecated: Option<&DeprecatedType>) -> String 
             );
         }
 
-        #[allow(dead_code)]
-        pub fn push_generic(&mut self, generic: &Generic) {
-            self.push_internal(["@template ", generic.borrow()])
-        }
+        // TODO: Bring this back?
+        // pub fn push_generic(&mut self, generic: &Generic) {
+        //     self.push_internal(["@template ", generic.borrow()])
+        // }
 
         pub fn build(mut self) -> String {
             if self.value == START {

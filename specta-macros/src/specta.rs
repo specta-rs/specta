@@ -79,8 +79,8 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
             s
         };
 
-        arg_names.push(TokenStream::from_str(&s).map_err(|e| {
-            syn::Error::new_spanned(input, format!("invalid token stream for argument: {}", e))
+        arg_names.push(TokenStream::from_str(&s).map_err(|err| {
+            syn::Error::new_spanned(input, format!("invalid token stream for argument: {err}"))
         })?);
     }
 

@@ -106,7 +106,8 @@ pub fn apply(types: &mut TypeCollection, mode: SerdeMode) -> Result<(), Error> {
     // Apply transformations to each type in the collection
     let transformed = types.clone().map(|mut ndt| {
         // Apply serde transformations - we validated above so this should succeed
-        match serde_attrs::apply_serde_transformations(ndt.ty(), mode) {
+        // Pass the type name for struct tagging
+        match serde_attrs::apply_serde_transformations_with_name(ndt.ty(), ndt.name(), mode) {
             Ok(transformed_dt) => {
                 ndt.set_ty(transformed_dt);
                 ndt

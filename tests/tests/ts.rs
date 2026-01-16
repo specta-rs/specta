@@ -18,10 +18,19 @@ use specta_typescript::{BigIntExportBehavior, Typescript};
 #[track_caller]
 pub fn assert_ts_export2<T: Type>() -> Result<String, String> {
     let mut types = TypeCollection::default();
-    let ndt = match T::definition(&mut types) {
-        DataType::Reference(r) => r.get(&types).expect("Can't find type in `TypeCollection`"),
+    let reference = match T::definition(&mut types) {
+        DataType::Reference(r) => r,
         _ => panic!("This type can't be exported!"),
     };
+
+    // Apply serde transformations
+    specta_serde::apply(&mut types, specta_serde::SerdeMode::Serialize)
+        .map_err(|e| e.to_string())?;
+
+    // Get the transformed ndt
+    let ndt = reference
+        .get(&types)
+        .expect("Can't find type in `TypeCollection`");
 
     specta_typescript::primitives::export(
         &Typescript::default().bigint(BigIntExportBehavior::Number),
@@ -33,10 +42,26 @@ pub fn assert_ts_export2<T: Type>() -> Result<String, String> {
 pub fn assert_ts_inline2<T: Type>() -> Result<String, String> {
     let mut types = TypeCollection::default();
     let dt = T::definition(&mut types);
+
+    // Apply serde transformations
+    specta_serde::apply(&mut types, specta_serde::SerdeMode::Serialize)
+        .map_err(|e| e.to_string())?;
+
+    // For inline, we need to re-get the DataType after transformation
+    // But for inline types that aren't references, the dt itself is transformed
+    let transformed_dt = match &dt {
+        DataType::Reference(r) => r
+            .get(&types)
+            .map(|ndt| ndt.ty().clone())
+            .unwrap_or_else(|| dt.clone()),
+        _ => specta_serde::apply_to_dt(dt, specta_serde::SerdeMode::Serialize)
+            .map_err(|e| e.to_string())?,
+    };
+
     specta_typescript::primitives::inline(
         &Typescript::default().bigint(BigIntExportBehavior::Number),
         &types,
-        &dt,
+        &transformed_dt,
     )
     .map_err(|e| e.to_string())
 }
