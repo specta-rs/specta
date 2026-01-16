@@ -5,10 +5,11 @@ version = "0.0.9"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2024"
 license = "MIT"
-repository = "https://github.com/oscartbeaumont/specta"
+repository = "https://github.com/specta-rs/specta"
 documentation = "https://docs.rs/specta-util/latest/specta-util"
 keywords = ["async", "specta", "rspc", "typescript", "typesafe"]
 categories = ["web-programming", "asynchronous"]
+readme = "../README.md"
 
 # /bin/sh RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
 [package.metadata."docs.rs"]
@@ -20,9 +21,6 @@ default = []
 
 ## Support for [serde](https://serde.rs)
 serde = ["dep:serde"]
-
-## Enable the experimental `specta::json` macro.
-unstable_json_macro = ["dep:serde_json", "dep:serde"]
 
 [lints]
 workspace = true

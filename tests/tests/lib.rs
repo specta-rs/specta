@@ -1,6 +1,7 @@
 #![allow(unused_variables, dead_code)]
 
 mod advanced_types;
+mod attribute_literals;
 mod bigints;
 mod comments;
 mod const_types;
@@ -9,9 +10,8 @@ mod deprecated;
 mod duplicate_ty_name;
 mod export;
 mod flatten_and_inline;
-mod formats;
 mod functions;
-mod json;
+mod layouts;
 mod macro_decls;
 mod map_keys;
 mod optional;
@@ -22,6 +22,7 @@ mod reserved_keywords;
 mod selection;
 mod serde;
 mod sid;
+mod skip_attr;
 mod static_types;
 mod transparent;
 pub mod ts;

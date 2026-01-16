@@ -4,8 +4,8 @@
 //! You shouldn't need to use this crate directly.
 //! Checkout [Specta](https://docs.rs/specta).
 #![doc(
-    html_logo_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png",
-    html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
+    html_logo_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png",
+    html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
 
 #[cfg(feature = "DO_NOT_USE_function")]
@@ -21,7 +21,7 @@ mod utils;
 /// Specta also introduces some of it's own attributes:
 ///  - `#[specta(optional)]` - When paired with an `Option<T>` field, this will result in `{ a?: T | null }` instead of `{ a: T | null }`.
 ///  - `#[specta(type = ::std::string::String)]` - Will override the type of a item, variant or field to a given type.
-///  - `#[specta(export = false)]` - When using the `export` feature, this will prevent the specific type from being exported.
+///  - `#[specta(collect = false)]` - When using the `collect` feature, this will prevent the specific type from being exported.
 ///
 /// ## Example
 ///
@@ -45,12 +45,12 @@ mod utils;
 ///     VariantThree { name: String, age: i32 },
 /// }
 /// ```
-#[proc_macro_derive(Type, attributes(specta, serde))]
+#[proc_macro_derive(Type, attributes(specta))]
 pub fn derive_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     r#type::derive(input).unwrap_or_else(|err| err.into_compile_error().into())
 }
 
-/// Prepares a function to have its types extracted using [`functions::fn_datatype`](specta::functions::fn_datatype)
+/// Prepares a function to have its types extracted using [`fn_datatype!`](specta::fn_datatype)
 ///
 /// ## Example
 ///

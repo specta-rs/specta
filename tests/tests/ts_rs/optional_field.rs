@@ -1,9 +1,8 @@
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::ts::assert_ts;
-
-#[derive(Type)]
-#[specta(export = false)]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct Optional {
     a: Option<i32>,
     #[specta(optional)]
@@ -16,8 +15,5 @@ struct Optional {
 
 #[test]
 fn test() {
-    assert_ts!(
-        Optional,
-        "{ a: number | null; b?: number | null; c?: string | null; d?: boolean }"
-    );
+    insta::assert_snapshot!(crate::ts::inline::<Optional>(&Default::default()).unwrap(), @"{ a: number | null; b?: number | null; c?: string | null; d?: boolean }");
 }

@@ -1,7 +1,7 @@
 use super::DataType;
 
 /// A list of items. This will be a [`Vec`](https://doc.rust-lang.org/std/vec/struct.Vec.html) or similar types.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct List {
     ty: Box<DataType>,
     length: Option<usize>,
@@ -30,7 +30,7 @@ impl List {
 
     /// Set the type of the elements in the list.
     pub fn set_ty(&mut self, ty: DataType) {
-        self.ty = Box::new(ty);
+        *self.ty = ty;
     }
 
     /// Get the length of the list.

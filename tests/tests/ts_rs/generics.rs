@@ -1,36 +1,37 @@
 #![allow(dead_code)]
 
+use serde::{Deserialize, Serialize};
+
 use std::{
     collections::{BTreeMap, HashSet},
     rc::Rc,
 };
 
-use crate::ts::assert_ts_export;
 use specta::Type;
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Generic1<T: Type> {
     value: T,
     values: Vec<T>,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct GenericAutoBound<T> {
     value: T,
     values: Vec<T>,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct GenericAutoBound2<T: PartialEq> {
     value: T,
     values: Vec<T>,
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Container1 {
     foo: Generic1<u32>,
     bar: HashSet<Generic1<u32>>,
@@ -39,31 +40,16 @@ struct Container1 {
 
 #[test]
 fn test() {
-    assert_ts_export!(
-        Generic1<()>,
-        "export type Generic1<T> = { value: T; values: T[] };"
-    );
-
-    assert_ts_export!(
-        GenericAutoBound<()>,
-        "export type GenericAutoBound<T> = { value: T; values: T[] };"
-    );
-
-    assert_ts_export!(
-        GenericAutoBound2<()>,
-        "export type GenericAutoBound2<T> = { value: T; values: T[] };"
-    );
-
-    assert_ts_export!(
-        Container1,
-        "export type Container1 = { foo: Generic1<number>; bar: Generic1<number>[]; baz: { [key in string]: Generic1<string> } };"
-    );
+    insta::assert_snapshot!(crate::ts::export::<Generic1<()>>(&Default::default()).unwrap(), @"export type Generic1<T> = { value: T; values: T[] };");
+    insta::assert_snapshot!(crate::ts::export::<GenericAutoBound<()>>(&Default::default()).unwrap(), @"export type GenericAutoBound<T> = { value: T; values: T[] };");
+    insta::assert_snapshot!(crate::ts::export::<GenericAutoBound2<()>>(&Default::default()).unwrap(), @"export type GenericAutoBound2<T> = { value: T; values: T[] };");
+    insta::assert_snapshot!(crate::ts::export::<Container1>(&Default::default()).unwrap(), @"export type Container1 = { foo: Generic1<number>; bar: Generic1<number>[]; baz: { [key in string]: Generic1<string> } };");
 }
 
 #[test]
 fn generic_enum() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     enum Generic2<A, B, C> {
         A(A),
         B(B, B, B),
@@ -75,34 +61,31 @@ fn generic_enum() {
         Z(Vec<Vec<i32>>),
     }
 
-    assert_ts_export!(
-        Generic2::<(), (), ()>,
-        r#"export type Generic2<A, B, C> = { A: A } | { B: [B, B, B] } | { C: C[] } | { D: A[][][] } | { E: { a: A; b: B; c: C } } | { X: number[] } | { Y: number } | { Z: number[][] };"#
-    )
+    insta::assert_snapshot!(crate::ts::export::<Generic2::<(), (), ()>>(&Default::default()).unwrap(), @r#"export type Generic2<A, B, C> = { A: A } | { B: [B, B, B] } | { C: C[] } | { D: A[][][] } | { E: { a: A; b: B; c: C } } | { X: number[] } | { Y: number } | { Z: number[][] };"#);
 }
 
 #[test]
 fn generic_newtype() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct NewType1<T>(Vec<Vec<T>>);
 
-    assert_ts_export!(NewType1::<()>, r#"export type NewType1<T> = T[][];"#);
+    insta::assert_snapshot!(crate::ts::export::<NewType1::<()>>(&Default::default()).unwrap(), @r#"export type NewType1<T> = T[][];"#);
 }
 
 #[test]
 fn generic_tuple() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct Tuple<T>(T, Vec<T>, Vec<Vec<T>>);
 
-    assert_ts_export!(Tuple::<()>, r#"export type Tuple<T> = [T, T[], T[][]];"#);
+    insta::assert_snapshot!(crate::ts::export::<Tuple::<()>>(&Default::default()).unwrap(), @r#"export type Tuple<T> = [T, T[], T[][]];"#);
 }
 
 #[test]
 fn generic_struct() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct GenericStruct2<T> {
         a: T,
         b: (T, T),
@@ -114,42 +97,36 @@ fn generic_struct() {
         h: Vec<[(T, T); 3]>,
     }
 
-    assert_ts_export!(
-        GenericStruct2::<()>,
-        "export type GenericStruct2<T> = { a: T; b: [T, T]; c: [T, [T, T]]; d: [T, T, T]; e: [([T, T]), ([T, T]), ([T, T])]; f: T[]; g: T[][]; h: ([([T, T]), ([T, T]), ([T, T])])[] };"
-    )
+    insta::assert_snapshot!(crate::ts::export::<GenericStruct2::<()>>(&Default::default()).unwrap(), @"export type GenericStruct2<T> = { a: T; b: [T, T]; c: [T, [T, T]]; d: [T, T, T]; e: [([T, T]), ([T, T]), ([T, T])]; f: T[]; g: T[][]; h: ([([T, T]), ([T, T]), ([T, T])])[] };");
 }
 
 // not currently possible in ts-rs hehe
 #[test]
 fn inline() {
-    #[derive(Type)]
-    #[specta(export = false)]
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
     struct Generic<T> {
         t: T,
     }
 
-    #[derive(Type)]
-    #[specta(export = false)]
+    #[derive(Type, Serialize, Deserialize)]
+    #[specta(collect = false)]
     struct Container {
         g: Generic<String>,
         #[specta(inline)]
         gi: Generic<String>,
-        #[specta(flatten)]
+        #[serde(flatten)]
         t: Generic<String>,
     }
 
-    assert_ts_export!(Generic::<()>, "export type Generic<T> = { t: T };");
-    assert_ts_export!(
-        Container,
-        "export type Container = (Generic<string>) & { g: Generic<string>; gi: { t: string } };"
-    );
+    insta::assert_snapshot!(crate::ts::export::<Generic::<()>>(&Default::default()).unwrap(), @"export type Generic<T> = { t: T };");
+    insta::assert_snapshot!(crate::ts::export::<Container>(&Default::default()).unwrap(), @"export type Container = (Generic<string>) & { g: Generic<string>; gi: { t: string } };");
 }
 
 // #[test]
 // fn default() {
 //     #[derive(Type)]
-//     #[specta(export = false)]
+//     #[specta(collect = false)]
 //     struct A<T = String> {
 //         t: T,
 //     }
@@ -159,7 +136,7 @@ fn inline() {
 //     );
 
 //     #[derive(Type)]
-//     #[specta(export = false)]
+//     #[specta(collect = false)]
 //     struct B<U = Option<A<i32>>> {
 //         u: U,
 //     }
@@ -169,7 +146,7 @@ fn inline() {
 //     );
 
 //     #[derive(Type)]
-//     #[specta(export = false)]
+//     #[specta(collect = false)]
 //     struct Y {
 //         a1: A,
 //         a2: A<i32>,
@@ -224,20 +201,17 @@ fn inline() {
 #[test]
 fn generic_parameter_order_preserved() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct Pair<Z, A> {
         first: Z,
         second: A,
     }
 
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     struct Container {
         pair: Pair<i32, String>,
     }
 
-    assert_ts_export!(
-        Container,
-        "export type Container = { pair: Pair<number, string> };"
-    );
+    insta::assert_snapshot!(crate::ts::export::<Container>(&Default::default()).unwrap(), @"export type Container = { pair: Pair<number, string> };");
 }

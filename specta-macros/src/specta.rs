@@ -3,8 +3,8 @@
 use std::str::FromStr;
 
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
-use syn::{parse, FnArg, ItemFn, Pat, Visibility};
+use quote::{ToTokens, quote};
+use syn::{FnArg, ItemFn, Pat, Visibility, parse};
 
 use crate::utils::{format_fn_wrapper, parse_attrs};
 
@@ -12,7 +12,7 @@ fn unraw(s: &str) -> &str {
     if s.starts_with("r#") {
         s.split_at(2).1
     } else {
-        s.as_ref()
+        s
     }
 }
 
@@ -45,10 +45,7 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
 
     let function_name = &function.sig.ident;
     let function_name_str = unraw(&function_name.to_string()).to_string();
-    let function_asyncness = match function.sig.asyncness {
-        Some(_) => true,
-        None => false,
-    };
+    let function_asyncness = function.sig.asyncness.is_some();
 
     let mut arg_names = Vec::new();
     for input in function.sig.inputs.iter() {
@@ -57,7 +54,7 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
                 return Err(syn::Error::new_spanned(
                     input,
                     "functions with `#[specta]` cannot take 'self'",
-                ))
+                ));
             }
             FnArg::Typed(arg) => match &*arg.pat {
                 Pat::Ident(ident) => ident.ident.to_token_stream(),
@@ -69,7 +66,7 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
                     return Err(syn::Error::new_spanned(
                         input,
                         "functions with `#[specta]` must take named arguments",
-                    ))
+                    ));
                 }
             },
         };
@@ -82,15 +79,17 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
             s
         };
 
-        arg_names.push(TokenStream::from_str(&s).unwrap());
+        arg_names.push(TokenStream::from_str(&s).map_err(|err| {
+            syn::Error::new_spanned(input, format!("invalid token stream for argument: {err}"))
+        })?);
     }
 
     let arg_signatures = function.sig.inputs.iter().map(|_| quote!(_));
 
     let mut attrs = parse_attrs(&function.attrs)?;
-    let common = crate::r#type::attr::CommonAttr::from_attrs(&mut attrs)?;
+    let common = crate::r#type::attr::RustCAttr::from_attrs(&mut attrs)?;
 
-    let deprecated = common.deprecated_as_tokens(&crate_ref);
+    let deprecated = common.deprecated_as_tokens();
     let docs = common.doc;
 
     let no_return_type = match function.sig.output {
@@ -106,7 +105,8 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
         macro_rules! #wrapper {
             // We take in `$function` from the invocation so we have `fn_name::<concrete_generics_types>`
             (@export_fn; $function:path) => {{
-                fn export(types: &mut #crate_ref::TypeCollection) -> #crate_ref::datatype::Function {
+                use #crate_ref::datatype;
+                fn export(types: &mut #crate_ref::TypeCollection) -> datatype::Function {
                     #crate_ref::internal::get_fn_datatype(
                         $function as fn(#(#arg_signatures),*) -> _,
                         #function_asyncness,

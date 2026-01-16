@@ -1,12 +1,10 @@
 use specta_typescript::{Any, Unknown};
 
-use crate::ts::assert_ts;
-
 #[test]
 fn static_types() {
-    assert_ts!(Any, "any");
-    assert_ts!(Unknown, "unknown");
+    insta::assert_snapshot!(crate::ts::inline::<Any>(&Default::default()).unwrap(), @"any");
+    insta::assert_snapshot!(crate::ts::inline::<Unknown>(&Default::default()).unwrap(), @"unknown");
 
-    assert_ts!(Any<String>, "any");
-    assert_ts!(Unknown<String>, "unknown");
+    insta::assert_snapshot!(crate::ts::inline::<Any<String>>(&Default::default()).unwrap(), @"any");
+    insta::assert_snapshot!(crate::ts::inline::<Unknown<String>>(&Default::default()).unwrap(), @"unknown");
 }

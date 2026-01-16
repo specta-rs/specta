@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
-use crate::builder::VariantBuilder;
+use super::VariantBuilder;
 
-use super::{DataType, DeprecatedType, Fields, NamedFields, UnnamedFields};
+use super::{DataType, DeprecatedType, Fields, NamedFields, RuntimeAttribute, UnnamedFields};
 
 /// represents a Rust [enum](https://doc.rust-lang.org/std/keyword.enum.html).
 ///
@@ -10,31 +10,16 @@ use super::{DataType, DeprecatedType, Fields, NamedFields, UnnamedFields};
 /// The variants can be either unit variants (no fields), tuple variants (fields in a tuple), or struct variants (fields in a struct).
 ///
 /// An enum is also assigned a repr which follows [Serde repr semantics](https://serde.rs/enum-representations.html).
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Enum {
-    pub(crate) repr: Option<EnumRepr>,
     pub(crate) variants: Vec<(Cow<'static, str>, EnumVariant)>,
+    pub(crate) attributes: Vec<RuntimeAttribute>,
 }
 
 impl Enum {
     /// Construct a new empty enum.
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Get an immutable reference to the enum's representation.
-    pub fn repr(&self) -> Option<&EnumRepr> {
-        self.repr.as_ref()
-    }
-
-    /// Get a mutable reference to the enum's representation.
-    pub fn repr_mut(&mut self) -> Option<&mut EnumRepr> {
-        self.repr.as_mut()
-    }
-
-    /// Set the enum's representation.
-    pub fn set_repr(&mut self, repr: EnumRepr) {
-        self.repr = Some(repr);
     }
 
     /// Get an immutable reference to the enum's variants.
@@ -45,6 +30,16 @@ impl Enum {
     /// Get a mutable reference to the enum's variants.
     pub fn variants_mut(&mut self) -> &mut Vec<(Cow<'static, str>, EnumVariant)> {
         &mut self.variants
+    }
+
+    /// Get an immutable reference to the enum's attributes.
+    pub fn attributes(&self) -> &Vec<RuntimeAttribute> {
+        &self.attributes
+    }
+
+    /// Get a mutable reference to the enum's attributes.
+    pub fn attributes_mut(&mut self) -> &mut Vec<RuntimeAttribute> {
+        &mut self.attributes
     }
 
     /// Check if this enum should be serialized as a string enum.
@@ -62,42 +57,8 @@ impl From<Enum> for DataType {
     }
 }
 
-/// Serde representation of an enum.
-/// Refer to the [Serde documentation](https://serde.rs/enum-representations.html) for more information.
-#[derive(Debug, Clone, PartialEq)]
-pub enum EnumRepr {
-    Untagged,
-    External,
-    Internal {
-        tag: Cow<'static, str>,
-    },
-    Adjacent {
-        tag: Cow<'static, str>,
-        content: Cow<'static, str>,
-    },
-    /// String enum representation for unit-only enums with serde rename_all
-    String {
-        rename_all: Option<Cow<'static, str>>,
-    },
-}
-
-impl EnumRepr {
-    /// Check if this is a string enum representation
-    pub fn is_string(&self) -> bool {
-        matches!(self, EnumRepr::String { .. })
-    }
-
-    /// Get the rename_all inflection for string enums
-    pub fn rename_all(&self) -> Option<&str> {
-        match self {
-            EnumRepr::String { rename_all } => rename_all.as_deref(),
-            _ => None,
-        }
-    }
-}
-
 /// represents a variant of an enum.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct EnumVariant {
     /// Did the user apply a `#[serde(skip)]` or `#[specta(skip)]` attribute.
     ///
@@ -110,6 +71,8 @@ pub struct EnumVariant {
     pub(crate) deprecated: Option<DeprecatedType>,
     /// The type of the variant.
     pub(crate) fields: Fields,
+    /// Runtime attributes for this variant
+    pub(crate) attributes: Vec<RuntimeAttribute>,
 }
 
 impl EnumVariant {
@@ -120,6 +83,7 @@ impl EnumVariant {
             docs: "".into(),
             deprecated: None,
             fields: Fields::Unit,
+            attributes: Vec::new(),
         }
     }
 
@@ -129,7 +93,7 @@ impl EnumVariant {
             v: Self::unit(),
             variant: NamedFields {
                 fields: vec![],
-                tag: None,
+                attributes: vec![],
             },
         }
     }
@@ -140,6 +104,7 @@ impl EnumVariant {
             v: Self::unit(),
             variant: UnnamedFields {
                 fields: Default::default(),
+                attributes: Default::default(),
             },
         }
     }
@@ -194,8 +159,23 @@ impl EnumVariant {
         &mut self.fields
     }
 
-    /// Set the fields of the variant.
+    /// Set the fields of this enum variant.
     pub fn set_fields(&mut self, fields: Fields) {
         self.fields = fields;
+    }
+
+    /// Get an immutable reference to the runtime attributes for this variant.
+    pub fn attributes(&self) -> &Vec<RuntimeAttribute> {
+        &self.attributes
+    }
+
+    /// Mutable reference to the runtime attributes for this variant.
+    pub fn attributes_mut(&mut self) -> &mut Vec<RuntimeAttribute> {
+        &mut self.attributes
+    }
+
+    /// Set the runtime attributes for this variant.
+    pub fn set_attributes(&mut self, attrs: Vec<RuntimeAttribute>) {
+        self.attributes = attrs;
     }
 }

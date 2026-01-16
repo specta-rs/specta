@@ -1,17 +1,17 @@
 #![allow(dead_code)]
 
-use crate::ts::assert_ts;
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
-#[derive(Type)]
-#[specta(export = false)]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct Rename1 {
     a: i32,
-    #[specta(rename = "bb")]
+    #[serde(rename = "bb")]
     b: i32,
 }
 
 #[test]
 fn test() {
-    assert_ts!(Rename1, "{ a: number; bb: number }")
+    insta::assert_snapshot!(crate::ts::inline::<Rename1>(&Default::default()).unwrap(), @"{ a: number; bb: number }");
 }

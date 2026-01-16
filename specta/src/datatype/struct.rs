@@ -1,24 +1,34 @@
-use std::borrow::Cow;
+use crate::datatype::{DataType, Fields, RuntimeAttribute};
 
-use crate::{
-    builder::StructBuilder,
-    datatype::{DataType, Fields},
-};
+use super::StructBuilder;
 
 use super::{NamedFields, UnnamedFields};
 
 /// represents a Rust [struct](https://doc.rust-lang.org/std/keyword.struct.html).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Struct {
     pub(crate) fields: Fields,
+    pub(crate) attributes: Vec<RuntimeAttribute>,
+}
+
+impl Default for Struct {
+    fn default() -> Self {
+        Self {
+            fields: Fields::Unit,
+            attributes: Default::default(),
+        }
+    }
 }
 
 impl Struct {
+    /// Construct a new struct with no fields. Fields can be set later with `set_fields` or `fields_mut`.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Construct a new unit struct.
     pub fn unit() -> Self {
-        Self {
-            fields: Fields::Unit,
-        }
+        Self::new()
     }
 
     /// Construct a named struct.
@@ -26,7 +36,7 @@ impl Struct {
         StructBuilder {
             fields: NamedFields {
                 fields: Default::default(),
-                tag: Default::default(),
+                attributes: Default::default(),
             },
         }
     }
@@ -36,6 +46,7 @@ impl Struct {
         StructBuilder {
             fields: UnnamedFields {
                 fields: Default::default(),
+                attributes: Default::default(),
             },
         }
     }
@@ -55,22 +66,19 @@ impl Struct {
         self.fields = fields;
     }
 
-    /// Get a immutable reference to the tag of the struct.
-    pub fn tag(&self) -> Option<&Cow<'static, str>> {
-        match &self.fields {
-            Fields::Unit => None,
-            Fields::Unnamed(_) => None,
-            Fields::Named(named) => named.tag.as_ref(),
-        }
+    /// Get a immutable reference to the attributes of the struct.
+    pub fn attributes(&self) -> &Vec<RuntimeAttribute> {
+        &self.attributes
     }
 
-    /// Set the tag of the struct.
-    pub fn set_tag(&mut self, tag: Option<Cow<'static, str>>) {
-        match &mut self.fields {
-            Fields::Unit => {}
-            Fields::Unnamed(_) => {}
-            Fields::Named(named) => named.tag = tag,
-        }
+    /// Get a mutable reference to the attributes of the struct.
+    pub fn attributes_mut(&mut self) -> &mut Vec<RuntimeAttribute> {
+        &mut self.attributes
+    }
+
+    /// Set the attributes of the struct.
+    pub fn set_attributes(&mut self, attributes: Vec<RuntimeAttribute>) {
+        self.attributes = attributes;
     }
 }
 

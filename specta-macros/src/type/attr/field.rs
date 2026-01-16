@@ -1,59 +1,53 @@
-use proc_macro2::TokenStream;
-use quote::ToTokens;
 use syn::{Result, Type, TypePath};
 
-use crate::utils::{impl_parse, Attribute};
+use crate::utils::{AttrExtract, Attribute};
 
-use super::CommonAttr;
+use super::RustCAttr;
 
 #[derive(Default)]
 pub struct FieldAttr {
-    pub rename: Option<TokenStream>,
     pub r#type: Option<Type>,
     pub inline: bool,
     pub skip: bool,
     pub optional: bool,
-    pub flatten: bool,
-    pub common: CommonAttr,
-}
-
-impl_parse! {
-    FieldAttr(attr, out) {
-        "rename" => {
-            let attr = attr.parse_string()?;
-            out.rename = out.rename.take().or_else(|| Some(
-                attr.to_token_stream()
-            ))
-        },
-        "rename_from_path" => {
-            let attr = attr.parse_path()?;
-            out.rename = out.rename.take().or_else(|| Some({
-                let expr = attr.to_token_stream();
-                quote::quote!( #expr )
-            }))
-        },
-        "type" => out.r#type = out.r#type.take().or(Some(Type::Path(TypePath {
-            qself: None,
-            path: attr.parse_path()?,
-        }))),
-        "inline" => out.inline = attr.parse_bool().unwrap_or(true),
-        "skip" => out.skip = attr.parse_bool().unwrap_or(true),
-        "skip_serializing" => out.skip = true,
-        "skip_deserializing" => out.skip = true,
-        "skip_serializing_if" => out.optional = true,
-        // Specta only attribute
-        "optional" => out.optional = attr.parse_bool().unwrap_or(true),
-        "default" => out.optional = attr.parse_bool().unwrap_or(true),
-        "flatten" => out.flatten = attr.parse_bool().unwrap_or(true),
-    }
+    pub common: RustCAttr,
 }
 
 impl FieldAttr {
     pub fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
-        let mut result = Self::default();
-        result.common = CommonAttr::from_attrs(attrs)?;
-        Self::try_from_attrs("specta", attrs, &mut result)?;
-        Self::try_from_attrs("serde", attrs, &mut result)?;
+        let mut result = Self {
+            common: RustCAttr::from_attrs(attrs)?,
+            ..Default::default()
+        };
+
+        if let Some(attr) = attrs.extract("specta", "type") {
+            result.r#type = result.r#type.take().or(Some(Type::Path(TypePath {
+                qself: None,
+                path: attr.parse_path()?,
+            })));
+        }
+
+        if let Some(attr) = attrs.extract("specta", "inline") {
+            result.inline = attr.parse_bool().unwrap_or(true);
+        }
+
+        if let Some(attr) = attrs.extract("specta", "skip") {
+            result.skip = attr.parse_bool().unwrap_or(true);
+        } else if let Some(attr) = attrs.extract("serde", "skip") {
+            // We generally want `#[serde(...)]` attributes to only be handled by the runtime but,
+            // we make an exception for `#[serde(skip)]` because it's usually used on fields
+            // that would fail a `T: Type` so handling it at runtime would prevent your code from compiling.
+            result.skip = attr.parse_bool().unwrap_or(true);
+        }
+
+        if let Some(attr) = attrs.extract("specta", "optional") {
+            result.optional = attr.parse_bool().unwrap_or(true);
+        }
+
+        if let Some(attr) = attrs.extract("specta", "default") {
+            result.optional = attr.parse_bool().unwrap_or(true);
+        }
+
         Ok(result)
     }
 }

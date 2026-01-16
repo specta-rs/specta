@@ -2,7 +2,6 @@ use specta::{Type, TypeCollection};
 use specta_zod::{BigIntExportBehavior, Zod};
 
 #[derive(Type)]
-#[specta(export = false)]
 struct SimpleStruct {
     a: i32,
     b: String,
@@ -10,11 +9,9 @@ struct SimpleStruct {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
 struct TupleStruct(i32, String);
 
 #[derive(Type)]
-#[specta(export = false)]
 enum SimpleEnum {
     A,
     B,
@@ -22,7 +19,6 @@ enum SimpleEnum {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
 enum ComplexEnum {
     Unit,
     Single(i32),
@@ -34,7 +30,7 @@ enum ComplexEnum {
 fn test_simple_struct() {
     let types = TypeCollection::default().register::<SimpleStruct>();
     let result = Zod::default().export(&types).unwrap();
-    
+
     assert!(result.contains("export const SimpleStruct = z.object"));
     assert!(result.contains("a: z.number()"));
     assert!(result.contains("b: z.string()"));
@@ -45,7 +41,7 @@ fn test_simple_struct() {
 fn test_tuple_struct() {
     let types = TypeCollection::default().register::<TupleStruct>();
     let result = Zod::default().export(&types).unwrap();
-    
+
     assert!(result.contains("export const TupleStruct = z.tuple"));
     assert!(result.contains("z.number()"));
     assert!(result.contains("z.string()"));
@@ -55,16 +51,20 @@ fn test_tuple_struct() {
 fn test_simple_enum() {
     let types = TypeCollection::default().register::<SimpleEnum>();
     let result = Zod::default().export(&types).unwrap();
-    
+
     assert!(result.contains("export const SimpleEnum = z.union"));
-    assert!(result.contains("z.literal(\"A\")") || result.contains("z.literal(\"B\")") || result.contains("z.literal(\"C\")"));
+    assert!(
+        result.contains("z.literal(\"A\")")
+            || result.contains("z.literal(\"B\")")
+            || result.contains("z.literal(\"C\")")
+    );
 }
 
 #[test]
 fn test_complex_enum() {
     let types = TypeCollection::default().register::<ComplexEnum>();
     let result = Zod::default().export(&types).unwrap();
-    
+
     assert!(result.contains("export const ComplexEnum"));
     assert!(result.contains("z.union"));
 }
@@ -72,113 +72,105 @@ fn test_complex_enum() {
 #[test]
 fn test_nullable() {
     #[derive(Type)]
-    #[specta(export = false)]
     struct WithOptional {
         optional_field: Option<String>,
     }
-    
+
     let types = TypeCollection::default().register::<WithOptional>();
     let result = Zod::default().export(&types).unwrap();
-    
+
     assert!(result.contains("z.string().nullable()"));
 }
 
 #[test]
 fn test_vec() {
     #[derive(Type)]
-    #[specta(export = false)]
     struct WithVec {
         items: Vec<i32>,
     }
-    
+
     let types = TypeCollection::default().register::<WithVec>();
     let result = Zod::default().export(&types).unwrap();
-    
+
     assert!(result.contains("z.array(z.number())"));
 }
 
 #[test]
 fn test_bigint_string() {
     #[derive(Type)]
-    #[specta(export = false)]
     struct WithBigInt {
         big: i64,
     }
-    
+
     let types = TypeCollection::default().register::<WithBigInt>();
     let result = Zod::default()
         .bigint(BigIntExportBehavior::String)
         .export(&types)
         .unwrap();
-    
+
     assert!(result.contains("z.string()"));
 }
 
 #[test]
 fn test_bigint_number() {
     #[derive(Type)]
-    #[specta(export = false)]
     struct WithBigInt {
         big: i64,
     }
-    
+
     let types = TypeCollection::default().register::<WithBigInt>();
     let result = Zod::default()
         .bigint(BigIntExportBehavior::Number)
         .export(&types)
         .unwrap();
-    
+
     assert!(result.contains("z.number()"));
 }
 
 #[test]
 fn test_bigint_bigint() {
     #[derive(Type)]
-    #[specta(export = false)]
     struct WithBigInt {
         big: i64,
     }
-    
+
     let types = TypeCollection::default().register::<WithBigInt>();
     let result = Zod::default()
         .bigint(BigIntExportBehavior::BigInt)
         .export(&types)
         .unwrap();
-    
+
     assert!(result.contains("z.bigint()"));
 }
 
 #[test]
 fn test_bigint_fail() {
     #[derive(Type)]
-    #[specta(export = false)]
     struct WithBigInt {
         big: i64,
     }
-    
+
     let types = TypeCollection::default().register::<WithBigInt>();
     let result = Zod::default().export(&types);
-    
+
     assert!(result.is_err());
 }
 
 #[test]
 fn test_nested_types() {
     #[derive(Type)]
-    #[specta(export = false)]
     struct Inner {
         value: String,
     }
-    
+
     #[derive(Type)]
-    #[specta(export = false)]
     struct Outer {
         inner: Inner,
     }
-    
+
     let types = TypeCollection::default().register::<Outer>();
     let result = Zod::default().export(&types).unwrap();
-    
+
     assert!(result.contains("export const Inner"));
     assert!(result.contains("export const Outer"));
     assert!(result.contains("inner: Inner"));
@@ -187,14 +179,13 @@ fn test_nested_types() {
 #[test]
 fn test_tuple() {
     #[derive(Type)]
-    #[specta(export = false)]
     struct WithTuple {
         tuple: (i32, String, bool),
     }
-    
+
     let types = TypeCollection::default().register::<WithTuple>();
     let result = Zod::default().export(&types).unwrap();
-    
+
     assert!(result.contains("z.tuple"));
     assert!(result.contains("z.number()"));
     assert!(result.contains("z.string()"));
@@ -208,7 +199,7 @@ fn test_header() {
         .header("// Custom header\n")
         .export(&types)
         .unwrap();
-    
+
     assert!(result.contains("// Custom header"));
 }
 
@@ -216,38 +207,36 @@ fn test_header() {
 fn test_framework_header() {
     let types = TypeCollection::default().register::<SimpleStruct>();
     let result = Zod::default().export(&types).unwrap();
-    
+
     assert!(result.contains("// This file has been generated by Specta. DO NOT EDIT."));
 }
 
 #[test]
 fn test_literals() {
     #[derive(Type)]
-    #[specta(export = false)]
     enum Literals {
         String,
         Number,
     }
-    
+
     let types = TypeCollection::default().register::<Literals>();
     let result = Zod::default().export(&types).unwrap();
-    
+
     assert!(result.contains("z.literal"));
 }
 
 #[test]
 fn test_map() {
     use std::collections::HashMap;
-    
+
     #[derive(Type)]
-    #[specta(export = false)]
     struct WithMap {
         map: HashMap<String, i32>,
     }
-    
+
     let types = TypeCollection::default().register::<WithMap>();
     let result = Zod::default().export(&types).unwrap();
-    
+
     assert!(result.contains("z.record"));
     assert!(result.contains("z.string()"));
     assert!(result.contains("z.number()"));

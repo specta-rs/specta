@@ -19,14 +19,14 @@ struct D(String);
 #[test]
 fn type_collection_export() {
     let types = TypeCollection::default().register::<A>();
-    assert_eq!(types.len(), 2);
+    insta::assert_snapshot!(types.len(), @"2");
 }
 
 #[test]
 fn type_collection_duplicate_register_ty() {
     let types = TypeCollection::default().register::<C>().register::<C>();
 
-    assert_eq!(types.len(), 1);
+    insta::assert_snapshot!(types.len(), @"1");
 }
 
 // TODO: Bring this back

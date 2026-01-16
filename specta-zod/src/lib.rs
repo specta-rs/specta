@@ -43,23 +43,19 @@
 //!
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
-    html_logo_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png",
-    html_favicon_url = "https://github.com/oscartbeaumont/specta/raw/main/.github/logo-128.png"
+    html_logo_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png",
+    html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
 
 mod context;
 mod error;
 mod export_config;
 
-use std::{
-    borrow::Cow,
-    collections::HashMap,
-    path::Path,
-};
+use std::{borrow::Cow, collections::HashMap, path::Path};
 
 use specta::{
-    datatype::{DataType, EnumRepr, Fields, NamedDataType, Primitive},
     TypeCollection,
+    datatype::{DataType, EnumRepr, Fields, NamedDataType, Primitive},
 };
 
 pub use context::*;
@@ -214,7 +210,12 @@ impl Zod {
                     String(v) => format!(r#"z.literal("{v}")"#),
                     char(v) => format!(r#"z.literal("{v}")"#),
                     None => "z.null()".to_string(),
-                    _ => return Err(Error::Other(ctx.export_path(), "Unsupported literal type".to_string())),
+                    _ => {
+                        return Err(Error::Other(
+                            ctx.export_path(),
+                            "Unsupported literal type".to_string(),
+                        ));
+                    }
                 }
             }
             DataType::Nullable(inner) => {
@@ -259,7 +260,10 @@ impl Zod {
             }
             DataType::Reference(r) => {
                 let ndt = types.get(r.sid()).ok_or_else(|| {
-                    Error::Other(ctx.export_path(), format!("Missing type reference: {:?}", r.sid()))
+                    Error::Other(
+                        ctx.export_path(),
+                        format!("Missing type reference: {:?}", r.sid()),
+                    )
                 })?;
 
                 if !r.generics().is_empty() {
@@ -357,12 +361,9 @@ impl Zod {
                 for (key, field) in non_flattened {
                     let ty = field.ty().unwrap();
                     let field_key = sanitise_key(key.clone());
-                    let field_schema = self.datatype_to_zod(
-                        ctx.with(PathItem::Field(key.clone())),
-                        ty,
-                        types,
-                    )?;
-                    
+                    let field_schema =
+                        self.datatype_to_zod(ctx.with(PathItem::Field(key.clone())), ty, types)?;
+
                     if field.optional() {
                         unflattened_fields.push(format!("{field_key}: {field_schema}.optional()"));
                     } else {
@@ -375,7 +376,8 @@ impl Zod {
 
                 if !unflattened_fields.is_empty() {
                     if field_sections.is_empty() {
-                        field_sections.push(format!("z.object({{ {} }})", unflattened_fields.join(", ")));
+                        field_sections
+                            .push(format!("z.object({{ {} }})", unflattened_fields.join(", ")));
                     } else {
                         field_sections.push(format!(
                             ".and(z.object({{ {} }}))",
@@ -395,11 +397,7 @@ impl Zod {
         e: &specta::datatype::Enum,
         types: &TypeCollection,
     ) -> Result<String, Error> {
-        let variants: Vec<_> = e
-            .variants()
-            .iter()
-            .filter(|(_, v)| !v.skip())
-            .collect();
+        let variants: Vec<_> = e.variants().iter().filter(|(_, v)| !v.skip()).collect();
 
         if variants.is_empty() {
             return Ok("z.never()".to_string());
@@ -528,7 +526,7 @@ impl Zod {
                             ty,
                             types,
                         )?;
-                        
+
                         if field.optional() {
                             Ok(format!("{field_key}: {field_schema}.optional()"))
                         } else {
@@ -576,7 +574,10 @@ fn sanitise_type_name(
         }
     }
 
-    if ident.find(|c: char| !c.is_alphanumeric() && c != '_').is_some() {
+    if ident
+        .find(|c: char| !c.is_alphanumeric() && c != '_')
+        .is_some()
+    {
         return Err(Error::InvalidName(
             loc,
             ctx.export_path(),

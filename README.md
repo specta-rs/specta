@@ -15,7 +15,7 @@
 ## Features
 
 - Export structs and enums to multiple languages
-- Get function types to use in libraries like [tauri-specta](https://github.com/oscartbeaumont/tauri-specta)
+- Get function types to use in libraries like [tauri-specta](https://github.com/specta-rs/tauri-specta)
 - Supports wide range of common crates in Rust ecosystem
 - Supports type inference - can determine type of `fn demo() -> impl Type`
 
@@ -55,8 +55,8 @@ For the most up-to-date status of each exporter, check the individual crate docu
 
 Specta can be used in your application either directly or through a library which simplifies the process of using it.
 
-- [rspc](https://github.com/oscartbeaumont/rspc) - Easily building end-to-end typesafe APIs
-- [tauri-specta](https://github.com/oscartbeaumont/tauri-specta) - Typesafe Tauri commands and events
+- [rspc](https://github.com/specta-rs/rspc) - Easily building end-to-end typesafe APIs
+- [tauri-specta](https://github.com/specta-rs/tauri-specta) - Typesafe Tauri commands and events
 - [TauRPC](https://github.com/MatsDK/TauRPC) - Tauri extension to give you a fully-typed IPC layer.
 
 ## Usage
@@ -194,7 +194,7 @@ pub enum MyEnum {
 }
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct DontExportMe {
     field: String,
 }

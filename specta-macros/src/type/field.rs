@@ -1,45 +1,53 @@
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{ToTokens, quote};
 use syn::Type;
 
-use super::{ContainerAttr, FieldAttr};
+use super::{ContainerAttr, FieldAttr, lower_attr::lower_attribute};
 
-// Construct a field.
 pub fn construct_field(
-    crate_ref: &TokenStream,
     container_attrs: &ContainerAttr,
     attrs: FieldAttr,
     field_ty: &Type,
-) -> TokenStream {
-    let field_ty = attrs.r#type.as_ref().unwrap_or(&field_ty);
-    let deprecated = attrs.common.deprecated_as_tokens(crate_ref);
+    raw_attrs: &[syn::Attribute],
+) -> syn::Result<TokenStream> {
+    construct_field_with_variant_skip(container_attrs, attrs, field_ty, raw_attrs, false)
+}
+
+pub fn construct_field_with_variant_skip(
+    container_attrs: &ContainerAttr,
+    attrs: FieldAttr,
+    field_ty: &Type,
+    raw_attrs: &[syn::Attribute],
+    variant_skip: bool,
+) -> syn::Result<TokenStream> {
+    let field_ty = attrs.r#type.as_ref().unwrap_or(field_ty);
+    let deprecated = attrs.common.deprecated_as_tokens();
     let optional = attrs.optional;
     let doc = attrs.common.doc;
-    let flatten = attrs.flatten;
     let inline = container_attrs.inline || attrs.inline;
 
-    // Skip must be handled by the macro so that we don't try and constrain the inner type to `Type` or `Flatten` traits.
-    if attrs.skip {
-        return quote!(#crate_ref::internal::construct::skipped_field(
-            #optional,
-            #flatten,
-            #inline,
-            #deprecated,
-            #doc.into()
-        ));
-    }
+    let lowered_field_attrs = raw_attrs
+        .iter()
+        .filter(|attr| {
+            let path = attr.path().to_token_stream().to_string();
+            !container_attrs.skip_attrs.contains(&path) && path != "specta"
+        })
+        .filter_map(|attr| lower_attribute(attr).transpose())
+        .map(|result| result.map(|attr| attr.to_tokens()))
+        .collect::<Result<Vec<_>, _>>()?;
 
-    let method = attrs
-        .flatten
-        .then(|| quote!(field_flattened))
-        .unwrap_or_else(|| quote!(field));
-    let ty = quote!(#crate_ref::internal::construct::#method::<#field_ty>(
+    let ty = if attrs.skip || variant_skip {
+        quote!(None)
+    } else {
+        quote!(Some(<#field_ty as specta::Type>::definition(types)))
+    };
+
+    Ok(quote!(internal::construct::field(
         #optional,
-        #inline,
         #deprecated,
         #doc.into(),
-        types
-    ));
-
-    ty
+        #inline,
+        vec![#(#lowered_field_attrs),*],
+        #ty
+    )))
 }

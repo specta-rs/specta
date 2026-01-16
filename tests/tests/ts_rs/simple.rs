@@ -5,7 +5,7 @@ use specta::Type;
 use crate::ts::assert_ts;
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Simple {
     a: i32,
     b: String,
@@ -16,8 +16,8 @@ struct Simple {
 
 #[test]
 fn test_def() {
-    assert_ts!(
-        Simple,
-        "{ a: number; b: string; c: [number, string, number]; d: string[]; e: string | null }"
+    insta::assert_snapshot!(
+        crate::ts::inline::<Simple>(&Default::default()).unwrap(),
+        @"{ a: number; b: string; c: [number, string, number]; d: string[]; e: string | null }"
     );
 }

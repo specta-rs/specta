@@ -5,10 +5,11 @@
 use std::{borrow::Cow, fmt::Debug, panic::Location};
 
 use crate::{
+    DataType, TypeCollection,
     datatype::{
-        DeprecatedType, EnumVariant, Field, Fields, Generic, NamedFields, Struct, UnnamedFields,
+        ArcId, DeprecatedType, EnumVariant, Field, Fields, Generic, NamedDataType, NamedFields,
+        RuntimeAttribute, Struct, UnnamedFields,
     },
-    DataType,
 };
 
 #[derive(Debug, Clone)]
@@ -29,6 +30,7 @@ impl StructBuilder<NamedFields> {
     pub fn build(self) -> DataType {
         DataType::Struct(Struct {
             fields: Fields::Named(self.fields),
+            attributes: Default::default(),
         })
     }
 }
@@ -43,9 +45,19 @@ impl StructBuilder<UnnamedFields> {
         self.fields.fields.push(field);
     }
 
+    pub fn attributes(mut self, attributes: Vec<RuntimeAttribute>) -> Self {
+        self.fields.attributes = attributes;
+        self
+    }
+
+    pub fn attributes_mut(&mut self, attributes: Vec<RuntimeAttribute>) {
+        self.fields.attributes = attributes;
+    }
+
     pub fn build(self) -> DataType {
         DataType::Struct(Struct {
             fields: Fields::Unnamed(self.fields),
+            attributes: Default::default(),
         })
     }
 }
@@ -70,6 +82,15 @@ impl<T> VariantBuilder<T> {
     pub fn deprecated(mut self, reason: DeprecatedType) -> Self {
         self.v.deprecated = Some(reason);
         self
+    }
+
+    pub fn attributes(mut self, attributes: Vec<RuntimeAttribute>) -> Self {
+        self.v.attributes = attributes;
+        self
+    }
+
+    pub fn attributes_mut(&mut self, attributes: Vec<RuntimeAttribute>) {
+        self.v.attributes = attributes;
     }
 }
 
@@ -96,9 +117,9 @@ impl VariantBuilder<NamedFields> {
     }
 }
 
-impl Into<EnumVariant> for VariantBuilder<NamedFields> {
-    fn into(self) -> EnumVariant {
-        self.build()
+impl From<VariantBuilder<NamedFields>> for EnumVariant {
+    fn from(val: VariantBuilder<NamedFields>) -> Self {
+        val.build()
     }
 }
 
@@ -125,9 +146,9 @@ impl VariantBuilder<UnnamedFields> {
     }
 }
 
-impl Into<EnumVariant> for VariantBuilder<UnnamedFields> {
-    fn into(self) -> EnumVariant {
-        self.build()
+impl From<VariantBuilder<UnnamedFields>> for EnumVariant {
+    fn from(val: VariantBuilder<UnnamedFields>) -> Self {
+        val.build()
     }
 }
 
@@ -137,7 +158,6 @@ pub struct NamedDataTypeBuilder {
     pub(crate) docs: Cow<'static, str>,
     pub(crate) deprecated: Option<DeprecatedType>,
     pub(crate) module_path: Cow<'static, str>,
-    pub(crate) location: Location<'static>,
     pub(crate) generics: Vec<Generic>,
     pub(crate) inner: DataType,
 }
@@ -149,7 +169,6 @@ impl NamedDataTypeBuilder {
             docs: Cow::Borrowed(""),
             deprecated: None,
             module_path: Cow::Borrowed("virtual"),
-            location: Location::caller().clone(),
             generics,
             inner: dt,
         }
@@ -171,5 +190,22 @@ impl NamedDataTypeBuilder {
     pub fn deprecated(mut self, deprecated: DeprecatedType) -> Self {
         self.deprecated = Some(deprecated);
         self
+    }
+
+    #[track_caller]
+    pub fn build(self, types: &mut TypeCollection) -> NamedDataType {
+        let ndt = NamedDataType {
+            id: ArcId::Dynamic(Default::default()),
+            name: self.name,
+            docs: self.docs,
+            deprecated: self.deprecated,
+            module_path: self.module_path,
+            location: Location::caller().to_owned(),
+            generics: self.generics,
+            inner: self.inner,
+        };
+
+        types.0.insert(ndt.id.clone(), Some(ndt.clone()));
+        ndt
     }
 }
