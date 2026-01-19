@@ -10,6 +10,16 @@ const _: () = {
     impl_for_map!(indexmap::IndexMap<K, V>);
 };
 
+#[cfg(feature = "bytes")]
+const _: () = {
+    use bytes::{Bytes, BytesMut};
+
+    impl_as!(
+        Bytes as Vec<u8>
+        BytesMut as Vec<u8>
+    );
+};
+
 #[cfg(feature = "serde_json")]
 const _: () = {
     use serde_json::{Map, Number, Value};
