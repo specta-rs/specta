@@ -9,7 +9,15 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*/
 
 /**
+	* @typedef {{ 
+	*		a: GenericType<string>,
+	*	}} ActualType
+	*/
+/**
 	* @typedef {"A" | "B"} BasicEnum
+	*/
+/**
+	* @typedef {string} BracedStruct
 	*/
 /**
 	* @typedef {{ A: string } | { bbb: number } | { cccc: number } | { D: { a: string; b: number } }} EnumMacroAttributes
@@ -42,6 +50,12 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @typedef {{ 
 	*		arg: T,
 	*	}} GenericStruct<T>
+	*/
+/**
+	* @typedef {T} GenericTupleStruct<T>
+	*/
+/**
+	* @typedef {"Undefined" | T} GenericType<T>
 	*/
 /**
 	* @typedef {{ [key in number]: string }} HasGenericAlias
@@ -78,6 +92,11 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*/
 /**
 	* @typedef {{ 
+	*		cause: null | null,
+	*	}} InvalidToValidType
+	*/
+/**
+	* @typedef {{ 
 	*		default_unity_arguments: string[],
 	*	}} Issue281
 	*/
@@ -95,6 +114,17 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*	}} KebabCase
 	*/
 /**
+	* @typedef {{ Demo: string } | { Demo2: { demo2: string } }} MacroEnum
+	*/
+/**
+	* @typedef {string} MacroStruct
+	*/
+/**
+	* @typedef {{ 
+	*		demo: string,
+	*	}} MacroStruct2
+	*/
+/**
 	* @typedef {Record<string, never>} MyEmptyInput
 	*/
 /**
@@ -102,6 +132,23 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*/
 /**
 	* @typedef {{ type: "a"; value: string } | { type: "b"; value: number }} NestedEnum
+	*/
+/**
+	* @typedef {string | null} NonOptional
+	*/
+/**
+	* @typedef {{ A: string | null } | { B: { a: string | null } } | { C: { a?: string | null } }} OptionalInEnum
+	*/
+/**
+	* @typedef {string | null} OptionalOnNamedField
+	*/
+/**
+	* @typedef {{ 
+	*		b: string | null,
+	*	}} OptionalOnTransparentNamedField
+	*/
+/**
+	* @typedef {string | null} OptionalOnTransparentNamedFieldInner
 	*/
 /**
 	* @typedef {{ 
@@ -194,51 +241,90 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		"41": SkipVariant2,
 	*		"42": SkipVariant3,
 	*		"43": EnumMacroAttributes,
-	*		"44": Recursive,
-	*		"45": InlineEnumField,
-	*		"46": InlineOptionalType,
-	*		"47": Rename,
-	*		"48": TransparentType,
-	*		"49": TransparentType2,
-	*		"4a": TransparentTypeWithOverride,
-	*		"4b": (number | null)[],
-	*		"4c": Partial<{ [key in BasicEnum]: null }>,
-	*		"4d": number | null,
-	*		"4e": PlaceholderInnerField[],
-	*		"4f": Partial<{ [key in BasicEnum]: number }>,
-	*		"50": EnumReferenceRecordKey,
-	*		"51": FlattenOnNestedEnum,
+	*		"44": InlineEnumField,
+	*		"45": InlineOptionalType,
+	*		"46": Rename,
+	*		"47": TransparentType,
+	*		"48": TransparentType2,
+	*		"49": TransparentTypeWithOverride,
+	*		"4a": (number | null)[],
+	*		"4b": Partial<{ [key in BasicEnum]: null }>,
+	*		"4c": number | null,
+	*		"4d": PlaceholderInnerField[],
+	*		"4e": Partial<{ [key in BasicEnum]: number }>,
+	*		"4f": EnumReferenceRecordKey,
+	*		"50": FlattenOnNestedEnum,
+	*		"51": null,
 	*		"52": null,
-	*		"53": null,
-	*		"54": never,
-	*		"55": MyEmptyInput,
-	*		"56": string,
-	*		"57": [string],
-	*		"58": ExtraBracketsInTupleVariant,
-	*		"59": ExtraBracketsInUnnamedStruct,
-	*		"5a": MyEnum[],
-	*		"5b": InlineTuple,
-	*		"5c": InlineTuple2,
+	*		"53": never,
+	*		"54": MyEmptyInput,
+	*		"55": string,
+	*		"56": [string],
+	*		"57": ExtraBracketsInTupleVariant,
+	*		"58": ExtraBracketsInUnnamedStruct,
+	*		"59": MyEnum[],
+	*		"5a": InlineTuple,
+	*		"5b": InlineTuple2,
+	*		"5c": string,
 	*		"5d": string,
-	*		"5e": string,
-	*		"5f": SkippedFieldWithinVariant,
-	*		"60": KebabCase,
-	*		"61": string[],
-	*		"62": Issue281,
-	*		"63": RenameWithWeirdCharsField,
-	*		"64": RenameWithWeirdCharsVariant,
-	*		"65": Issue374,
-	*		"66": Type,
+	*		"5e": SkippedFieldWithinVariant,
+	*		"5f": KebabCase,
+	*		"60": string[],
+	*		"61": Issue281,
+	*		"62": RenameWithWeirdCharsField,
+	*		"63": RenameWithWeirdCharsVariant,
+	*		"64": Issue374,
+	*		"65": Type,
+	*		"66": ActualType,
+	*		"67": SpectaTypeOverride,
+	*		"68": InvalidToValidType,
+	*		"69": TupleStruct,
+	*		"6a": TupleStructWithRep,
+	*		"6b": GenericTupleStruct<string>,
+	*		"6c": BracedStruct,
+	*		"6d": Recursive,
+	*		"6e": RecursiveMapValue,
+	*		"6f": RecursiveTransparent,
+	*		"70": RecursiveInEnum,
+	*		"71": NonOptional,
+	*		"72": OptionalOnNamedField,
+	*		"73": OptionalOnTransparentNamedField,
+	*		"74": OptionalInEnum,
+	*		"75": { [key in string]: null },
+	*		"76": Regular,
+	*		"77": { [key in never]: null },
+	*		"78": Partial<{ [key in UnitVariants]: null }>,
+	*		"79": Partial<{ [key in UntaggedVariants]: null }>,
+	*		"7a": Partial<{ [key in Variants]: null }>,
+	*		"7b": MacroStruct,
+	*		"7c": MacroStruct2,
+	*		"7d": MacroEnum,
 	*	}} Primitives
 	*/
 /**
 	* @typedef {{ 
-	*		a: number,
-	*		children: Recursive[],
+	*		demo: Recursive,
 	*	}} Recursive
 	*/
 /**
+	* @typedef {{ A: (RecursiveInEnum) }} RecursiveInEnum
+	*/
+/**
+	* @typedef {(RecursiveInline)} RecursiveInline
+	*/
+/**
+	* @typedef {{ 
+	*		demo: { [key in string]: RecursiveMapValue },
+	*	}} RecursiveMapValue
+	*/
+/**
+	* @typedef {RecursiveInline} RecursiveTransparent
+	*/
+/**
 	* @typedef {TestEnum} RefStruct
+	*/
+/**
+	* @typedef {{ [key in string]: null }} Regular
 	*/
 /**
 	* @typedef {"OneWord" | "Two words"} Rename
@@ -273,6 +359,13 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @typedef {{ type: "A"; data: null } | { type: "B"; data: string }} SkippedFieldWithinVariant
 	*/
 /**
+	* @typedef {{ 
+	*		string_ident: string,
+	*		u32_ident: number,
+	*		path: string,
+	*	}} SpectaTypeOverride
+	*/
+/**
 	* @typedef {"Unit" | { Single: number } | { Multiple: [number, number] } | { Struct: { a: number } }} TestEnum
 	*/
 /**
@@ -290,10 +383,16 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @typedef {string} TransparentTypeWithOverride
 	*/
 /**
+	* @typedef {string} TupleStruct
+	*/
+/**
 	* @typedef {number} TupleStruct1
 	*/
 /**
 	* @typedef {[number, boolean, string]} TupleStruct3
+	*/
+/**
+	* @typedef {string} TupleStructWithRep
 	*/
 /**
 	* @typedef {never} Type
@@ -318,4 +417,25 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*/
 /**
 	* @typedef {{ A: Record<string, never> }} Unit7
+	*/
+/**
+	* @typedef {"A" | "B" | "C"} UnitVariants
+	*/
+/**
+	* @typedef {string | number} UntaggedVariants
+	*/
+/**
+	* @typedef {{ 
+	*		name: name,
+	*		age: age,
+	*	}} UserListSelection<name, age>
+	*/
+/**
+	* @typedef {{ 
+	*		name: name,
+	*		age: age,
+	*	}} UserSelection<name, age>
+	*/
+/**
+	* @typedef {{ A: string } | { B: number } | { C: number }} Variants
 	*/

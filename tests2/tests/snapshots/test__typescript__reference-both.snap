@@ -81,7 +81,6 @@ SkipVariant: SkipVariant
 SkipVariant2: SkipVariant2
 SkipVariant3: SkipVariant3
 EnumMacroAttributes: EnumMacroAttributes
-Recursive: Recursive
 InlineEnumField: InlineEnumField
 InlineOptionalType: InlineOptionalType
 Rename: Rename
@@ -116,3 +115,27 @@ RenameWithWeirdCharsField: RenameWithWeirdCharsField
 RenameWithWeirdCharsVariant: RenameWithWeirdCharsVariant
 Issue374: Issue374
 type_type::Type: Type
+ActualType: ActualType
+SpectaTypeOverride: SpectaTypeOverride
+InvalidToValidType: InvalidToValidType
+TupleStruct: TupleStruct
+TupleStructWithRep: TupleStructWithRep
+GenericTupleStruct<String>: GenericTupleStruct<string>
+BracedStruct: BracedStruct
+Recursive: Recursive
+RecursiveMapValue: RecursiveMapValue
+RecursiveTransparent: RecursiveTransparent
+RecursiveInEnum: RecursiveInEnum
+NonOptional: NonOptional
+OptionalOnNamedField: OptionalOnNamedField
+OptionalOnTransparentNamedField: OptionalOnTransparentNamedField
+OptionalInEnum: OptionalInEnum
+HashMap<String, ()>: { [key in string]: null }
+Regular: Regular
+HashMap<Infallible, ()>: { [key in never]: null }
+HashMap<UnitVariants, ()>: Partial<{ [key in UnitVariants]: null }>
+HashMap<UntaggedVariants, ()>: Partial<{ [key in UntaggedVariants]: null }>
+HashMap<Variants, ()>: Partial<{ [key in Variants]: null }>
+MacroStruct: MacroStruct
+MacroStruct2: MacroStruct2
+MacroEnum: MacroEnum

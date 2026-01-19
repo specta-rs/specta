@@ -98,10 +98,6 @@ SkipVariant: { A: string }
 SkipVariant2: string
 SkipVariant3: { A: { a: string } }
 EnumMacroAttributes: { A: string } | { B: number } | { C: number } | { D: { a: string; b: number } }
-Recursive: { 
-	a: number,
-	children: Recursive[],
-}
 InlineEnumField: { A: PlaceholderInnerField }
 InlineOptionalType: { 
 	optional_field: PlaceholderInnerField | null,
@@ -155,3 +151,43 @@ Issue374: {
 	bar: boolean,
 }
 type_type::Type: never
+ActualType: { 
+	a: GenericType<string>,
+}
+SpectaTypeOverride: { 
+	string_ident: string,
+	u32_ident: number,
+	path: string,
+}
+InvalidToValidType: { 
+	cause: null | null,
+}
+TupleStruct: string
+TupleStructWithRep: string
+GenericTupleStruct<String>: T
+BracedStruct: string
+Recursive: { 
+	demo: Recursive,
+}
+RecursiveMapValue: { 
+	demo: { [key in string]: RecursiveMapValue },
+}
+RecursiveTransparent: RecursiveInline
+RecursiveInEnum: { A: (RecursiveInEnum) }
+NonOptional: string | null
+OptionalOnNamedField: string | null
+OptionalOnTransparentNamedField: { 
+	b: string | null,
+}
+OptionalInEnum: { A: string | null } | { B: { a: string | null } } | { C: { a?: string | null } }
+HashMap<String, ()>: { [key in string]: null }
+Regular: { [key in string]: null }
+HashMap<Infallible, ()>: { [key in never]: null }
+HashMap<UnitVariants, ()>: Partial<{ [key in UnitVariants]: null }>
+HashMap<UntaggedVariants, ()>: Partial<{ [key in UntaggedVariants]: null }>
+HashMap<Variants, ()>: Partial<{ [key in Variants]: null }>
+MacroStruct: string
+MacroStruct2: { 
+	demo: string,
+}
+MacroEnum: { Demo: string } | { Demo2: { demo2: string } }

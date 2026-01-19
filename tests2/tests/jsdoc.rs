@@ -1,5 +1,3 @@
-// TODO
-
 use specta_serde::SerdeMode;
 use specta_typescript::{BigIntExportBehavior, JSDoc};
 
@@ -24,3 +22,5 @@ fn export() {
 // TODO: BigInt checks
 // TODO: Confirm different layouts
 // TODO: Unit test JSDoc and other languages
+
+// TODO: Ensure this is feature matching with the Typescript testing

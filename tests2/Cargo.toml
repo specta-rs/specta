@@ -11,7 +11,7 @@ path = "tests/mod.rs"
 harness = true
 
 [dependencies]
-specta = { path = "../specta", features = ["std", "derive", "serde_json", "serde_yaml", "toml", "chrono", "either", "ulid", "glam"] }
+specta = { path = "../specta", features = ["function", "std", "derive", "serde_json", "serde_yaml", "toml", "chrono", "either", "ulid", "glam"] }
 specta-serde = { path = "../specta-serde" }
 specta-typescript = { path = "../specta-typescript" }
 specta-util = { path = "../specta-util", features = ["serde"] }                # TODO: Remove `serde` feature

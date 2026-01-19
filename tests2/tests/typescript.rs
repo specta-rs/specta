@@ -1,11 +1,35 @@
 use std::path::Path;
 
-use specta::datatype::DataType;
+use specta::{Type, TypeCollection, datatype::DataType};
 use specta_serde::SerdeMode;
-use specta_typescript::{BigIntExportBehavior, Layout, Typescript, primitives};
+use specta_typescript::{
+    Any, BigIntExportBehavior, Layout, Never, Typescript, Unknown, primitives,
+};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
+
+pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
+    let (mut types, dts) = crate::types();
+
+    // Test ts-specific types
+    // types = types
+    //     .register::<Any>()
+    //     .register::<Any<String>>()
+    //     .register::<Unknown>()
+    //     .register::<Unknown<String>>()
+    //     .register::<Never>()
+    //     .register::<Never<String>>();
+
+    // dts.push(value);
+
+    // Test that the types don't get duplicated in the type map.
+    #[derive(Type)]
+    pub enum A {}
+    types = types.register::<A>().register::<A>();
+
+    (types, dts)
+}
 
 #[test]
 fn typescript_export() {
@@ -19,7 +43,7 @@ fn typescript_export() {
             Typescript::default()
                 .with_serde(mode)
                 .bigint(BigIntExportBehavior::Number)
-                .export(&crate::types().0)
+                .export(&types().0)
                 .unwrap()
         );
     }
@@ -53,7 +77,7 @@ fn typescript_export_to() {
                 .with_serde(mode)
                 .bigint(BigIntExportBehavior::Number)
                 .layout(layout)
-                .export_to(&path, &crate::types().0)
+                .export_to(&path, &types().0)
                 .unwrap();
 
             insta::assert_snapshot!(name, fs_to_string(&path).unwrap());
@@ -141,7 +165,63 @@ fn primitives_inline() {
     }
 }
 
+#[test]
+fn reserved_names() {
+    {
+        #[derive(Type)]
+        #[specta(collect = false)]
+        #[allow(non_camel_case_types)]
+        pub struct r#enum {
+            a: String,
+        }
+
+        let mut types = TypeCollection::default();
+        let ndt = match r#enum::definition(&mut types) {
+            DataType::Reference(r) => r.get(&types).unwrap(),
+            _ => panic!("Failed to get reference"),
+        };
+
+        insta::assert_snapshot!(primitives::export(&Default::default(), &types, ndt).unwrap_err().to_string(), @r#"Attempted to export Type but was unable to due to name  conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+    }
+
+    {
+        #[derive(Type)]
+        #[specta(collect = false)]
+        #[allow(non_camel_case_types)]
+        pub struct r#enum(String);
+
+        let mut types = TypeCollection::default();
+        let ndt = match r#enum::definition(&mut types) {
+            DataType::Reference(r) => r.get(&types).unwrap(),
+            _ => panic!("Failed to get reference"),
+        };
+
+        insta::assert_snapshot!(primitives::export(&Default::default(), &types, ndt).unwrap_err().to_string(), @r#"Attempted to export Type but was unable to due to name  conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+    }
+
+    {
+        // Typescript reserved type name
+        #[derive(Type)]
+        #[specta(collect = false)]
+        #[allow(non_camel_case_types)]
+        pub enum r#enum {
+            A(String),
+        }
+
+        let mut types = TypeCollection::default();
+        let ndt = match r#enum::definition(&mut types) {
+            DataType::Reference(r) => r.get(&types).unwrap(),
+            _ => panic!("Failed to get reference"),
+        };
+
+        insta::assert_snapshot!(primitives::export(&Default::default(), &types, ndt).unwrap_err().to_string(), @r#"Attempted to export Type but was unable to due to name  conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+    }
+}
+
 // TODO
+//
+// Break out testing of `specta_typescript` types from all languages (just jsdoc & typescript)
+// Make a `typescript` folder for extra testing on the Typescript exporter
 //
 // Testing different combos of feature flags + external impls. Can we come up with a proper multi-binary system for this???
 //

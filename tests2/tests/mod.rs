@@ -1,6 +1,7 @@
 //! We register a single entrypoint so all tests are compiled into a single binary.
-#![allow(unused_parens)]
+#![allow(unused_parens, dead_code)]
 
+mod functions;
 mod jsdoc;
 mod types;
 mod typescript;

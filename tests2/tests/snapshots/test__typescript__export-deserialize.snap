@@ -63,11 +63,6 @@ SkipVariant3: export type SkipVariant3 = { A: { a: string } };
 
 EnumMacroAttributes: export type EnumMacroAttributes = { A: string } | { B: number } | { C: number } | { D: { a: string; b: number } };
 
-Recursive: export type Recursive = { 
-		a: number,
-		children: Recursive[],
-	};
-
 InlineEnumField: export type InlineEnumField = { A: PlaceholderInnerField };
 
 InlineOptionalType: export type InlineOptionalType = { 
@@ -129,3 +124,57 @@ export type Issue374 = {
 	};
 
 type_type::Type: export type Type = never;
+
+ActualType: export type ActualType = { 
+		a: GenericType<string>,
+	};
+
+SpectaTypeOverride: export type SpectaTypeOverride = { 
+		string_ident: string,
+		u32_ident: number,
+		path: string,
+	};
+
+InvalidToValidType: export type InvalidToValidType = { 
+		cause: null | null,
+	};
+
+TupleStruct: export type TupleStruct = string;
+
+TupleStructWithRep: export type TupleStructWithRep = string;
+
+GenericTupleStruct<String>: export type GenericTupleStruct<T> = T;
+
+BracedStruct: export type BracedStruct = string;
+
+Recursive: export type Recursive = { 
+		demo: Recursive,
+	};
+
+RecursiveMapValue: export type RecursiveMapValue = { 
+		demo: { [key in string]: RecursiveMapValue },
+	};
+
+RecursiveTransparent: export type RecursiveTransparent = RecursiveInline;
+
+RecursiveInEnum: export type RecursiveInEnum = { A: (RecursiveInEnum) };
+
+NonOptional: export type NonOptional = string | null;
+
+OptionalOnNamedField: export type OptionalOnNamedField = string | null;
+
+OptionalOnTransparentNamedField: export type OptionalOnTransparentNamedField = { 
+		b: string | null,
+	};
+
+OptionalInEnum: export type OptionalInEnum = { A: string | null } | { B: { a: string | null } } | { C: { a?: string | null } };
+
+Regular: export type Regular = { [key in string]: null };
+
+MacroStruct: export type MacroStruct = string;
+
+MacroStruct2: export type MacroStruct2 = { 
+		demo: string,
+	};
+
+MacroEnum: export type MacroEnum = { Demo: string } | { Demo2: { demo2: string } };

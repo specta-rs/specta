@@ -40,6 +40,40 @@ macro_rules! types {
         specta::datatype::NamedDataTypeBuilder::new("Primitives", vec![], s.build())
             .build(&mut types);
 
+        // Test `selection!`
+        {
+            #[derive(Clone)]
+            #[allow(dead_code)]
+            struct User {
+                pub id: i32,
+                pub name: &'static str,
+                pub email: &'static str,
+                pub age: i32,
+                pub password: &'static str,
+            }
+
+            fn register<T: specta::Type>(types: &mut specta::TypeCollection, _: T) {
+                types.register_mut::<T>();
+            }
+            let user = User {
+                id: 1,
+                name: "Monty Beaumont".into(),
+                email: "monty@otbeaumont.me".into(),
+                age: 7,
+                password: "password123".into(),
+            };
+
+            let s1 = specta_util::selection!(user.clone(), { name, age } as UserSelection);
+            assert_eq!(s1.name, "Monty Beaumont");
+            assert_eq!(s1.age, 7);
+            register(&mut types, s1);
+
+            let s2 = specta_util::selection!(vec![user; 3], [{ name, age }] as UserListSelection);
+            assert_eq!(s2[0].name, "Monty Beaumont");
+            assert_eq!(s2[0].age, 7);
+            register(&mut types, s2);
+        }
+
         (types, dts)
     }};
 }
@@ -102,8 +136,6 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         SkipVariant3,
 
         EnumMacroAttributes,
-
-        Recursive,
 
         InlineEnumField,
 
@@ -174,6 +206,59 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
 
         // https://github.com/specta-rs/specta/issues/386
         type_type::Type,
+
+        // https://github.com/specta-rs/specta/issues/171
+        ActualType,
+
+        SpectaTypeOverride,
+        InvalidToValidType,
+
+        // `#[specta(transparent)]`
+        TupleStruct,
+        TupleStructWithRep,
+        GenericTupleStruct<String>,
+        BracedStruct,
+
+        // `#[serde(rename)]`
+        // Struct,
+        // Struct2,
+        // Enum,
+        // Enum2,
+        // Enum3, // TODO: Fix these
+
+        // Recursive types
+        Recursive,
+        // RecursiveMapKey, // TODO: Fix this
+        RecursiveMapValue,
+        RecursiveTransparent,
+        RecursiveInEnum,
+
+        // `#[serde(optional)]`
+        NonOptional,
+        OptionalOnNamedField,
+        OptionalOnTransparentNamedField,
+        OptionalInEnum,
+
+        // Valid Map keys
+        HashMap<String, ()>,
+        Regular,
+        HashMap<Infallible, ()>,
+        // HashMap<Any, ()>, // TODO: Fix this
+        // HashMap<TransparentStruct, ()>, // TODO: Fix this
+        HashMap<UnitVariants, ()>,
+        HashMap<UntaggedVariants, ()>,
+        // ValidMaybeValidKey, // TODO: Fix this
+        // ValidMaybeValidKeyNested, // TODO: Fix this
+        // HashMap<() /* `null` */, ()>, // TODO: Fix this
+        // HashMap<RegularStruct, ()>, // TODO: Fix this
+        HashMap<Variants, ()>,
+        // InvalidMaybeValidKey, // TODO: Fix this
+        // InvalidMaybeValidKeyNested, // TODO: Fix this
+
+        // `macro_rules!` in decl
+        MacroStruct,
+        MacroStruct2,
+        MacroEnum,
     )
 }
 
@@ -359,13 +444,6 @@ pub struct PlaceholderInnerField {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
-pub struct Recursive {
-    a: i32,
-    children: Vec<Recursive>,
-}
-
-#[derive(Type, Serialize, Deserialize)]
-#[specta(collect = false)]
 pub enum InlineEnumField {
     #[specta(inline)]
     A(PlaceholderInnerField),
@@ -537,4 +615,270 @@ struct Issue374 {
 mod type_type {
     #[derive(specta::Type)]
     pub enum Type {}
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum GenericType<T> {
+    Undefined,
+    Value(T),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+pub struct ActualType {
+    a: GenericType<String>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct SpectaTypeOverride {
+    #[specta(type = String)] // Ident
+    string_ident: (),
+    #[specta(type = u32)] // Ident
+    u32_ident: (),
+    #[specta(type = ::std::string::String)] // Path
+    path: (),
+}
+
+// Checking that you can override the type of a field that is invalid. This is to ensure user code can override Specta in the case we have a bug/unsupported type.
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct InvalidToValidType {
+    #[specta(type = Option<()>)]
+    pub(crate) cause: Option<Box<dyn std::error::Error + Send + Sync>>,
+}
+
+#[derive(Type)]
+#[specta(collect = false, transparent)]
+struct TupleStruct(String);
+
+#[repr(transparent)]
+#[derive(Type)]
+#[specta(collect = false)]
+struct TupleStructWithRep(String);
+
+#[derive(Type)]
+#[specta(collect = false, transparent)]
+struct GenericTupleStruct<T>(T);
+
+#[derive(Type)]
+#[specta(collect = false, transparent)]
+pub struct BracedStruct {
+    a: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename = "StructNew", tag = "t")]
+pub struct Struct {
+    a: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+pub struct Struct2 {
+    #[serde(rename = "b")]
+    a: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename = "EnumNew", tag = "t")]
+pub enum Enum {
+    A,
+    B,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename = "EnumNew", tag = "t")]
+pub enum Enum2 {
+    #[serde(rename = "C")]
+    A,
+    B,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename = "EnumNew", tag = "t")]
+pub enum Enum3 {
+    A {
+        #[serde(rename = "b")]
+        a: String,
+    },
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct Recursive {
+    demo: Box<Recursive>,
+}
+
+#[derive(Type)]
+#[specta(transparent, collect = false)]
+pub struct RecursiveMapKeyTrick(RecursiveMapKey);
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct RecursiveMapKey {
+    demo: HashMap<RecursiveMapKeyTrick, String>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct RecursiveMapValue {
+    demo: HashMap<String, RecursiveMapValue>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+pub struct RecursiveInline {
+    #[serde(flatten)]
+    demo: Box<RecursiveInline>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(transparent, collect = false)]
+pub struct RecursiveTransparent(Box<RecursiveInline>);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+pub enum RecursiveInEnum {
+    A {
+        #[serde(flatten)]
+        demo: Box<RecursiveInEnum>,
+    },
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct NonOptional(Option<String>);
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct OptionalOnNamedField(#[specta(optional)] Option<String>); // Should do nothing
+
+#[derive(Type)]
+#[specta(collect = false, transparent, inline)]
+struct OptionalOnTransparentNamedFieldInner(#[specta(optional)] Option<String>);
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct OptionalOnTransparentNamedField {
+    // Now it should work
+    b: OptionalOnTransparentNamedFieldInner,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+enum OptionalInEnum {
+    // Should do nothing
+    A(#[specta(optional)] Option<String>),
+    // Base case without `optional`
+    B {
+        a: Option<String>,
+    },
+    // Should add `?` on field
+    C {
+        #[specta(optional)]
+        a: Option<String>,
+    },
+}
+
+// Export needs a `NamedDataType` but uses `Type::reference` instead of `Type::inline` so we test it.
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct Regular(HashMap<String, ()>);
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct RegularStruct {
+    a: String,
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
+struct TransparentStruct(String);
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+enum UnitVariants {
+    A,
+    B,
+    C,
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedVariants {
+    A(String),
+    B(i32),
+    C(u8),
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum InvalidUntaggedVariants {
+    A(String),
+    B(i32, String),
+    C(u8),
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+enum Variants {
+    A(String),
+    B(i32),
+    C(u8),
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
+pub struct MaybeValidKey<T>(T);
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
+pub struct ValidMaybeValidKey(HashMap<MaybeValidKey<String>, ()>);
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
+pub struct ValidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<String>>, ()>);
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
+pub struct InvalidMaybeValidKey(HashMap<MaybeValidKey<()>, ()>);
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
+pub struct InvalidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<()>>, ()>);
+
+macro_rules! field_ty_macro {
+    () => {
+        String
+    };
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct MacroStruct(field_ty_macro!());
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct MacroStruct2 {
+    demo: field_ty_macro!(),
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub enum MacroEnum {
+    Demo(field_ty_macro!()),
+    Demo2 { demo2: field_ty_macro!() },
 }
