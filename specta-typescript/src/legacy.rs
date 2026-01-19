@@ -1,6 +1,5 @@
 // TODO: Drop this stuff
 
-use std::borrow::Borrow;
 use std::collections::BTreeSet;
 use std::{borrow::Cow, fmt};
 
@@ -113,7 +112,7 @@ use crate::{Error, Typescript};
 use std::fmt::Write;
 
 use specta::datatype::{
-    DataType, DeprecatedType, Enum, EnumVariant, Fields, FunctionReturnType, Generic, Struct, Tuple,
+    DataType, DeprecatedType, Enum, EnumVariant, Fields, FunctionReturnType, Struct, Tuple,
 };
 use specta::datatype::{NonSkipField, skip_fields, skip_fields_named};
 

@@ -1,0 +1,131 @@
+---
+source: tests2/tests/typescript.rs
+expression: "dts.iter().filter_map(|(s, ty)| match ty\n{\n    DataType::Reference(r) => r.get(&types).cloned().map(|ty| (s, ty)), _ =>\n    None,\n}).map(|(s, ty)|\nprimitives::export(&ts, &types,\n&ty).map(|ty| format!(\"{s}: {ty}\"))).collect::<Result<Vec<_>,\n_>>().unwrap().join(\"\\n\")"
+---
+Unit1: export type Unit1 = null;
+
+Unit2: export type Unit2 = Record<string, never>;
+
+Unit3: export type Unit3 = [];
+
+Unit4: export type Unit4 = null;
+
+Unit5: export type Unit5 = "A";
+
+Unit6: export type Unit6 = { A: [] };
+
+Unit7: export type Unit7 = { A: Record<string, never> };
+
+SimpleStruct: export type SimpleStruct = { 
+		a: number,
+		b: string,
+		c: [number, string, number],
+		d: string[],
+		e: string | null,
+	};
+
+TupleStruct1: export type TupleStruct1 = number;
+
+TupleStruct3: export type TupleStruct3 = [number, boolean, string];
+
+TestEnum: export type TestEnum = "Unit" | { Single: number } | { Multiple: [number, number] } | { Struct: { a: number } };
+
+RefStruct: export type RefStruct = TestEnum;
+
+InlinerStruct: export type InlinerStruct = { 
+		inline_this: InlineStruct,
+		dont_inline_this: RefStruct,
+	};
+
+GenericStruct<i32>: export type GenericStruct<T> = { 
+		arg: T,
+	};
+
+GenericStruct<String>: export type GenericStruct<T> = { 
+		arg: T,
+	};
+
+FlattenEnumStruct: export type FlattenEnumStruct = (FlattenEnum) & { 
+		outer: string,
+	};
+
+OverridenStruct: export type OverridenStruct = { 
+		overriden_field: string,
+	};
+
+HasGenericAlias: export type HasGenericAlias = { [key in number]: string };
+
+SkipVariant: export type SkipVariant = { A: string };
+
+SkipVariant2: export type SkipVariant2 = string;
+
+SkipVariant3: export type SkipVariant3 = { A: { a: string } };
+
+EnumMacroAttributes: export type EnumMacroAttributes = { A: string } | { B: number } | { C: number } | { D: { a: string; b: number } };
+
+Recursive: export type Recursive = { 
+		a: number,
+		children: Recursive[],
+	};
+
+InlineEnumField: export type InlineEnumField = { A: PlaceholderInnerField };
+
+InlineOptionalType: export type InlineOptionalType = { 
+		optional_field: PlaceholderInnerField | null,
+	};
+
+Rename: export type Rename = "OneWord" | "TwoWords";
+
+TransparentType: export type TransparentType = TransparentTypeInner;
+
+TransparentType2: export type TransparentType2 = null;
+
+TransparentTypeWithOverride: export type TransparentTypeWithOverride = string;
+
+EnumReferenceRecordKey: export type EnumReferenceRecordKey = { 
+		a: Partial<{ [key in BasicEnum]: number }>,
+	};
+
+FlattenOnNestedEnum: export type FlattenOnNestedEnum = (NestedEnum) & { 
+		id: string,
+	};
+
+MyEmptyInput: export type MyEmptyInput = Record<string, never>;
+
+ExtraBracketsInTupleVariant: export type ExtraBracketsInTupleVariant = { A: string };
+
+ExtraBracketsInUnnamedStruct: export type ExtraBracketsInUnnamedStruct = string;
+
+InlineTuple: export type InlineTuple = { 
+		demo: [string, boolean],
+	};
+
+InlineTuple2: export type InlineTuple2 = { 
+		demo: [InlineTuple, boolean],
+	};
+
+SkippedFieldWithinVariant: export type SkippedFieldWithinVariant = never | string;
+
+KebabCase: export type KebabCase = { 
+		test_ing: string,
+	};
+
+Issue281<'_>: export type Issue281 = { 
+		default_unity_arguments: string[],
+	};
+
+RenameWithWeirdCharsField: export type RenameWithWeirdCharsField = { 
+		odata_context: string,
+	};
+
+RenameWithWeirdCharsVariant: export type RenameWithWeirdCharsVariant = { A: string };
+
+Issue374: /**
+ * https://github.com/specta-rs/specta/issues/374
+ */
+export type Issue374 = { 
+		foo: boolean,
+		bar: boolean,
+	};
+
+type_type::Type: export type Type = never;

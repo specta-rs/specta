@@ -4,7 +4,7 @@
 //! `#[serde(rename_all = "...")]`, and repr-related attributes, and apply them to DataType
 //! instances with separate handling for serialization and deserialization phases.
 
-use std::borrow::Cow;
+use std::{borrow::Cow, fmt};
 
 use specta::{
     DataType,
@@ -31,6 +31,12 @@ pub enum SerdeMode {
     /// A field/type is only skipped if it's skipped in both modes.
     #[default]
     Both,
+}
+
+impl fmt::Display for SerdeMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self:?}")
+    }
 }
 
 /// Contains parsed serde attributes for a type
@@ -196,7 +202,7 @@ impl SerdeTransformer {
                 self.add_struct_tag_field(tag_name, struct_type, transformed_fields)?;
         }
 
-        let mut new_struct = Struct::new();
+        let mut new_struct = Struct::unit();
         new_struct.set_fields(transformed_fields);
         new_struct.set_attributes(struct_type.attributes().clone());
 
@@ -670,7 +676,7 @@ impl SerdeTransformer {
                 new_fields.push((Cow::Owned(tag_name.to_string()), tag_field));
 
                 // Wrap existing fields in a struct for content
-                let mut content_struct = Struct::new();
+                let mut content_struct = Struct::unit();
                 content_struct.set_fields(Fields::Named(named.clone()));
 
                 let content_field = Field::new(DataType::Struct(content_struct));

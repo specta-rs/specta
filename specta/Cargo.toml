@@ -41,7 +41,7 @@ serde_json = ["dep:serde_json"]
 ## Support for [serde_yaml](https://github.com/dtolnay/serde-yaml)
 serde_yaml = ["dep:serde_yaml"]
 ## Support for [toml](https://github.com/toml-rs/toml)
-toml = ["dep:toml"]
+toml = ["dep:toml", "std"]
 
 #! External types
 ## [uuid](https://docs.rs/uuid) crate

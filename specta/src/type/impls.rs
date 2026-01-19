@@ -31,7 +31,7 @@ impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13); // Technica
 const _: () = {
     use std::{
         cell::{Cell, RefCell},
-        collections::{BTreeSet, BinaryHeap, HashSet, LinkedList, Vec, VecDeque},
+        collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, LinkedList, VecDeque},
         convert::Infallible,
         ffi::{CStr, CString, OsStr, OsString},
         net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
@@ -137,11 +137,12 @@ const _: () = {
 
     impl<T: Type> Type for Range<T> {
         fn definition(types: &mut TypeCollection) -> DataType {
-            let mut s = crate::datatype::Struct::new();
+            let ty = T::definition(types);
+            let mut s = crate::datatype::Struct::unit();
             s.set_fields(internal::construct::fields_named(
                 vec![
                     ("start".into(), Field::new(ty.clone())),
-                    ("end".into(), Field::new(T::definition(types))),
+                    ("end".into(), Field::new(ty)),
                 ],
                 vec![],
             ));
@@ -155,27 +156,28 @@ const _: () = {
 
     impl Type for SystemTime {
         fn definition(types: &mut TypeCollection) -> DataType {
-            DataType::Struct(internal::construct::r#struct(
-                internal::construct::fields_named(
-                    vec![
-                        (
-                            "duration_since_epoch".into(),
-                            internal::construct::field::<i64>(false, false, None, "".into(), types),
-                        ),
-                        (
-                            "duration_since_unix_epoch".into(),
-                            internal::construct::field::<u32>(false, false, None, "".into(), types),
-                        ),
-                    ],
-                    None,
-                ),
-            ))
+            let mut s = crate::datatype::Struct::unit();
+            s.set_fields(internal::construct::fields_named(
+                vec![
+                    (
+                        "duration_since_epoch".into(),
+                        Field::new(<i64 as crate::Type>::definition(types)),
+                    ),
+                    (
+                        "duration_since_unix_epoch".into(),
+                        Field::new(<u32 as crate::Type>::definition(types)),
+                    ),
+                ],
+                vec![],
+            ));
+            DataType::Struct(s)
         }
     }
 
     impl Type for Duration {
         fn definition(types: &mut TypeCollection) -> DataType {
-            let fields = internal::construct::fields_named(
+            let mut s = crate::datatype::Struct::unit();
+            s.set_fields(internal::construct::fields_named(
                 vec![
                     (
                         "secs".into(),
@@ -187,9 +189,7 @@ const _: () = {
                     ),
                 ],
                 vec![],
-            );
-            let mut s = crate::datatype::Struct::new();
-            s.set_fields(fields);
+            ));
             DataType::Struct(s)
         }
     }

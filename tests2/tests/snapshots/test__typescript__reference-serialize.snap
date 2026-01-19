@@ -1,0 +1,118 @@
+---
+source: tests2/tests/typescript.rs
+expression: "dts.iter().map(|(s, ty)|\nprimitives::reference(&ts, &types,\nty).map(|ty| format!(\"{s}: {ty}\"))).collect::<Result<Vec<_>,\n_>>().unwrap().join(\"\\n\")"
+---
+i8: number
+i16: number
+i32: number
+i64: number
+i128: number
+isize: number
+u8: number
+u16: number
+u32: number
+u64: number
+u128: number
+usize: number
+f32: number
+f64: number
+bool: boolean
+char: string
+Range<i32>: { 
+	start: number,
+	end: number,
+}
+RangeInclusive<i32>: { 
+	start: number,
+	end: number,
+}
+(): null
+(String, i32): [string, number]
+(String, i32, bool): [string, number, boolean]
+(bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool): [boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean]
+String: string
+PathBuf: string
+IpAddr: string
+Ipv4Addr: string
+Ipv6Addr: string
+SocketAddr: string
+SocketAddrV4: string
+SocketAddrV6: string
+SystemTime: { 
+	duration_since_epoch: number,
+	duration_since_unix_epoch: number,
+}
+Duration: { 
+	secs: number,
+	nanos: number,
+}
+&'static str: string
+&'static bool: boolean
+&'static i32: number
+Vec<i32>: number[]
+&'static [i32]: number[]
+&'static [i32; 3]: [number, number, number]
+Vec<MyEnum>: MyEnum[]
+&'static [MyEnum]: MyEnum[]
+&'static [MyEnum; 6]: [MyEnum, MyEnum, MyEnum, MyEnum, MyEnum, MyEnum]
+&'static [i32; 1]: [number]
+&'static [i32; 0]: []
+Option<i32>: number | null
+Option<()>: null | null
+Unit1: Unit1
+Unit2: Unit2
+Unit3: Unit3
+Unit4: Unit4
+Unit5: Unit5
+Unit6: Unit6
+Unit7: Unit7
+SimpleStruct: SimpleStruct
+TupleStruct1: TupleStruct1
+TupleStruct3: TupleStruct3
+TestEnum: TestEnum
+RefStruct: RefStruct
+InlinerStruct: InlinerStruct
+GenericStruct<i32>: GenericStruct<number>
+GenericStruct<String>: GenericStruct<string>
+FlattenEnumStruct: FlattenEnumStruct
+OverridenStruct: OverridenStruct
+HasGenericAlias: HasGenericAlias
+SkipVariant: SkipVariant
+SkipVariant2: SkipVariant2
+SkipVariant3: SkipVariant3
+EnumMacroAttributes: EnumMacroAttributes
+Recursive: Recursive
+InlineEnumField: InlineEnumField
+InlineOptionalType: InlineOptionalType
+Rename: Rename
+TransparentType: TransparentType
+TransparentType2: TransparentType2
+TransparentTypeWithOverride: TransparentTypeWithOverride
+[Option<u8>; 3]: [(number | null), (number | null), (number | null)]
+HashMap<BasicEnum, ()>: Partial<{ [key in BasicEnum]: null }>
+Option<Option<Option<Option<i32>>>>: number | null
+Vec<PlaceholderInnerField>: PlaceholderInnerField[]
+HashMap<BasicEnum, i32>: Partial<{ [key in BasicEnum]: number }>
+EnumReferenceRecordKey: EnumReferenceRecordKey
+FlattenOnNestedEnum: FlattenOnNestedEnum
+PhantomData<()>: null
+PhantomData<String>: null
+Infallible: never
+MyEmptyInput: MyEmptyInput
+(String): string
+(String,): [string]
+ExtraBracketsInTupleVariant: ExtraBracketsInTupleVariant
+ExtraBracketsInUnnamedStruct: ExtraBracketsInUnnamedStruct
+Vec<MyEnum>: MyEnum[]
+InlineTuple: InlineTuple
+InlineTuple2: InlineTuple2
+Box<str>: string
+Box<String>: string
+SkippedFieldWithinVariant: SkippedFieldWithinVariant
+KebabCase: KebabCase
+&[&str]: string[]
+Issue281<'_>: Issue281
+RenameWithWeirdCharsField: RenameWithWeirdCharsField
+RenameWithWeirdCharsVariant: RenameWithWeirdCharsVariant
+Issue374: Issue374
+type_type::Type: Type

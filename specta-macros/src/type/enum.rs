@@ -156,6 +156,9 @@ pub fn parse_enum(
 
     Ok((
         quote!(Enum),
-        quote!(*e.variants_mut() = vec![#(#variant_types),*];),
+        quote!(
+            let mut e = datatype::Enum::new();
+            *e.variants_mut() = vec![#(#variant_types),*];
+        ),
     ))
 }

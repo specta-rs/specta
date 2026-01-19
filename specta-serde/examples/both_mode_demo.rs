@@ -96,7 +96,7 @@ fn create_struct_with_rename_all() -> DataType {
         vec![],
     );
 
-    let mut s = specta::datatype::Struct::new();
+    let mut s = specta::datatype::Struct::unit();
     s.set_fields(fields);
     s.set_attributes(vec![serde_attr]);
 
@@ -132,7 +132,7 @@ fn create_partially_skipped_struct() -> DataType {
         vec![],
     );
 
-    let mut s = specta::datatype::Struct::new();
+    let mut s = specta::datatype::Struct::unit();
     s.set_fields(fields);
 
     DataType::Struct(s)
@@ -158,7 +158,7 @@ fn create_universally_skipped_struct() -> DataType {
         vec![],
     );
 
-    let mut s = specta::datatype::Struct::new();
+    let mut s = specta::datatype::Struct::unit();
     s.set_fields(fields);
 
     DataType::Struct(s)

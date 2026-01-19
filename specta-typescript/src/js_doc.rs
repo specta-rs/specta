@@ -1,6 +1,7 @@
 use std::{borrow::Cow, path::Path};
 
 use specta::{TypeCollection, datatype::Reference};
+use specta_serde::SerdeMode;
 
 use crate::{BigIntExportBehavior, Error, Layout, Typescript};
 
@@ -78,9 +79,19 @@ impl JSDoc {
         Self(self.0.layout(layout))
     }
 
-    /// TODO: Explain
-    pub fn with_serde(self) -> Self {
+    /// Configure the exporter to use specta-serde with the specified mode
+    pub fn with_serde(self, mode: SerdeMode) -> Self {
+        Self(self.0.with_serde(mode))
+    }
+
+    /// Configure the exporter to export the types for `#[derive(serde::Serialize)]`
+    pub fn with_serde_serialize(self) -> Self {
         Self(self.0.with_serde_serialize())
+    }
+
+    /// Configure the exporter to export the types for `#[derive(serde::Deserialize)]`
+    pub fn with_serde_deserialize(self) -> Self {
+        Self(self.0.with_serde_deserialize())
     }
 
     /// Get a reference to the inner [Typescript] instance.

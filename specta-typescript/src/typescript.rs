@@ -1,6 +1,7 @@
 use std::{
     borrow::Cow,
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    fmt,
     path::{Path, PathBuf},
 };
 
@@ -50,6 +51,12 @@ pub enum Layout {
     /// This mode doesn't support having multiple types with the same name.
     #[default]
     FlatFile,
+}
+
+impl fmt::Display for Layout {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self:?}")
+    }
 }
 
 /// Typescript language exporter.

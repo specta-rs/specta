@@ -11,24 +11,15 @@ pub struct Struct {
     pub(crate) attributes: Vec<RuntimeAttribute>,
 }
 
-impl Default for Struct {
-    fn default() -> Self {
+// Do not implement `Default` for `Struct` as it's unclear what that would be. `Unit`, yes but still.
+
+impl Struct {
+    /// Construct a new unit struct.
+    pub fn unit() -> Self {
         Self {
             fields: Fields::Unit,
             attributes: Default::default(),
         }
-    }
-}
-
-impl Struct {
-    /// Construct a new struct with no fields. Fields can be set later with `set_fields` or `fields_mut`.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Construct a new unit struct.
-    pub fn unit() -> Self {
-        Self::new()
     }
 
     /// Construct a named struct.

@@ -55,7 +55,6 @@ pub fn decode_field_attrs<'a>(
 
 pub fn parse_struct(
     container_attrs: &ContainerAttr,
-    _crate_ref: &TokenStream,
     data: &DataStruct,
 ) -> syn::Result<(TokenStream, TokenStream)> {
     if container_attrs.transparent {
@@ -92,7 +91,10 @@ pub fn parse_struct(
 
         return Ok((
             quote!(Struct),
-            quote!(*e.fields_mut() = internal::construct::fields_unnamed(vec![#field], vec![]);),
+            quote!(
+                let mut e = datatype::Struct::unit();
+                *e.fields_mut() = internal::construct::fields_unnamed(vec![#field], vec![]);
+            ),
         ));
     }
 
@@ -144,5 +146,11 @@ pub fn parse_struct(
         Fields::Unit => quote!(datatype::Fields::Unit),
     };
 
-    Ok((quote!(Struct), quote!(*e.fields_mut() = #fields;)))
+    Ok((
+        quote!(Struct),
+        quote!(
+            let mut e = datatype::Struct::unit();
+            *e.fields_mut() = #fields;
+        ),
+    ))
 }
