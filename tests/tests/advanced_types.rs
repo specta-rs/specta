@@ -2,12 +2,11 @@
 
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::ts::{assert_ts, assert_ts_export2};
-
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Demo<A, B> {
     a: A,
     b: B,
@@ -25,114 +24,105 @@ type MapB<B> = HashMap<B, String>;
 type MapC<B> = HashMap<String, Struct<B>>;
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Struct<T> {
     field: HalfGenericA<T>,
 }
 
 #[test]
 fn test_type_aliases() {
-    assert_ts!(NonGeneric, "{ a: number; b: boolean }");
-    assert_ts!(HalfGenericA<u8>, "{ a: number; b: boolean }");
-    assert_ts!(HalfGenericB<bool>, "{ a: number; b: boolean }");
-    assert_ts!(FullGeneric<u8, bool>, "{ a: number; b: boolean }");
-    assert_ts!(Another<bool>, "{ a: number; b: boolean }");
+    insta::assert_snapshot!(crate::ts::inline::<NonGeneric>(&Default::default()).unwrap(), @"{ a: number; b: boolean }");
+    insta::assert_snapshot!(crate::ts::inline::<HalfGenericA<u8>>(&Default::default()).unwrap(), @"{ a: number; b: boolean }");
+    insta::assert_snapshot!(crate::ts::inline::<HalfGenericB<bool>>(&Default::default()).unwrap(), @"{ a: number; b: boolean }");
+    insta::assert_snapshot!(crate::ts::inline::<FullGeneric<u8, bool>>(&Default::default()).unwrap(), @"{ a: number; b: boolean }");
+    insta::assert_snapshot!(crate::ts::inline::<Another<bool>>(&Default::default()).unwrap(), @"{ a: number; b: boolean }");
 
-    assert_ts!(MapA<u32>, "{ [key in string]: number }");
-    assert_ts!(MapB<u32>, "{ [key in number]: string }");
-    assert_ts!(
-        MapC<u32>,
-        "{ [key in string]: { field: Demo<number, boolean> } }"
-    );
+    insta::assert_snapshot!(crate::ts::inline::<MapA<u32>>(&Default::default()).unwrap(), @"{ [key in string]: number }");
+    insta::assert_snapshot!(crate::ts::inline::<MapB<u32>>(&Default::default()).unwrap(), @"{ [key in number]: string }");
+    insta::assert_snapshot!(crate::ts::inline::<MapC<u32>>(&Default::default()).unwrap(), @"{ [key in string]: { field: Demo<number, boolean> } }");
 
-    assert_ts!(Struct<u32>, "{ field: Demo<number, boolean> }");
+    insta::assert_snapshot!(crate::ts::inline::<Struct<u32>>(&Default::default()).unwrap(), @"{ field: Demo<number, boolean> }");
 }
 
-#[derive(Type)]
-#[specta(export = false)]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct D {
     flattened: u32,
 }
 
-#[derive(Type)]
-#[specta(export = false)]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct GenericFlattened<T> {
     generic_flattened: T,
 }
 
-#[derive(Type)]
-#[specta(export = false)]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct C {
     a: u32,
-    #[specta(flatten)]
+    #[serde(flatten)]
     b: D,
 }
 
-#[derive(Type)]
-#[specta(export = false)]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct B {
     b: u32,
 }
 
-#[derive(Type)]
-#[specta(export = false)]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct A {
     a: B,
     #[specta(inline)]
     b: B,
-    #[specta(flatten)]
     c: B,
-    #[specta(inline, flatten)]
+    #[specta(inline)]
     d: D,
-    #[specta(inline, flatten)]
+    #[specta(inline)]
     e: GenericFlattened<u32>,
 }
 
-#[derive(Type)]
-#[specta(export = false)]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct ToBeFlattened {
     a: String,
 }
 
-#[derive(Type)]
-#[specta(export = false)]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct DoubleFlattened {
-    #[specta(flatten)]
     a: ToBeFlattened,
-    #[specta(flatten)]
     b: ToBeFlattened,
 }
 
-#[derive(Type)]
-#[specta(export = false)]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct Inner {
     a: i32,
-    #[specta(flatten)]
     b: Box<FlattenedInner>,
 }
 
-#[derive(Type)]
-#[specta(export = false)]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct FlattenedInner {
-    #[specta(flatten)]
     c: Inner,
 }
 
-#[derive(Type)]
-#[specta(export = false)]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct BoxedInner {
     a: i32,
 }
 
-#[derive(Type)]
-#[specta(export = false)]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct BoxFlattened {
-    #[specta(flatten)]
     b: Box<BoxedInner>,
 }
 
-#[derive(Type)]
-#[specta(export = false)]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct BoxInline {
     #[specta(inline)]
     c: Box<BoxedInner>,
@@ -140,10 +130,7 @@ struct BoxInline {
 
 #[test]
 fn test_inlining() {
-    assert_eq!(
-        assert_ts_export2::<A>(),
-        Ok(r#"export type A = (B) & (D) & (GenericFlattened<number>) & { a: B; b: B };"#.into())
-    );
+    insta::assert_snapshot!(crate::ts::export::<A>(&Default::default()).unwrap(), @r#"export type A = (B) & (D) & (GenericFlattened<number>) & { a: B; b: B };"#);
 
     // assert_ts!(
     //     A,

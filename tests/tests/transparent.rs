@@ -1,25 +1,23 @@
 use specta::{
-    datatype::{DataType, Primitive},
     Type, TypeCollection,
+    datatype::{DataType, Primitive},
 };
 
-use crate::ts::assert_ts;
-
 #[derive(Type)]
-#[specta(export = false, transparent)]
+#[specta(collect = false, transparent)]
 struct TupleStruct(String);
 
 #[repr(transparent)]
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct TupleStructWithRep(String);
 
 #[derive(Type)]
-#[specta(export = false, transparent)]
+#[specta(collect = false, transparent)]
 struct GenericTupleStruct<T>(T);
 
 #[derive(Type)]
-#[specta(export = false, transparent)]
+#[specta(collect = false, transparent)]
 pub struct BracedStruct {
     a: String,
 }
@@ -50,8 +48,8 @@ fn transparent() {
     //     DataType::Primitive(Primitive::String)
     // );
 
-    assert_ts!(TupleStruct, "string");
-    assert_ts!(TupleStructWithRep, "string");
-    assert_ts!(GenericTupleStruct::<String>, "string");
-    assert_ts!(BracedStruct, "string");
+    insta::assert_snapshot!(crate::ts::inline::<TupleStruct>(&Default::default()).unwrap(), @"string");
+    insta::assert_snapshot!(crate::ts::inline::<TupleStructWithRep>(&Default::default()).unwrap(), @"string");
+    insta::assert_snapshot!(crate::ts::inline::<GenericTupleStruct::<String>>(&Default::default()).unwrap(), @"string");
+    insta::assert_snapshot!(crate::ts::inline::<BracedStruct>(&Default::default()).unwrap(), @"string");
 }

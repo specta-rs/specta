@@ -30,7 +30,7 @@ impl List {
 
     /// Set the type of the elements in the list.
     pub fn set_ty(&mut self, ty: DataType) {
-        self.ty = Box::new(ty);
+        *self.ty = ty;
     }
 
     /// Get the length of the list.

@@ -8,13 +8,13 @@ use crate::{Type, TypeCollection};
 #[allow(clippy::type_complexity)]
 static TYPES: OnceLock<Mutex<Vec<fn(&mut TypeCollection)>>> = OnceLock::new();
 
-/// Get the global type store containing all automatically registered types.
+/// Get the global type store containing all automatically collected types.
 ///
-/// All types with the [`Type`](macro@specta::Type) macro will automatically be registered here unless they have been explicitly disabled with `#[specta(export = false)]`.
+/// All types with the [`Type`](macro@specta::Type) macro will automatically be registered here unless they have been explicitly disabled with `#[specta(collect = false)]`.
 ///
 /// Note that when enabling the `export` feature, you will not be able to enable the `unsafe_code` lint as [`ctor`](https://docs.rs/ctor) (which is used internally) is marked unsafe.
 ///
-pub fn export() -> TypeCollection {
+pub fn collect() -> TypeCollection {
     let types = TYPES
         .get_or_init(Default::default)
         .lock()
@@ -45,6 +45,6 @@ pub mod internal {
     }
 
     // We expose this for the macros
-    #[cfg(feature = "export")]
+    #[cfg(feature = "collect")]
     pub use ::ctor;
 }

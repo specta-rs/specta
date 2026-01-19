@@ -1,50 +1,63 @@
 use crate::{
     r#type::field::construct_field,
-    utils::{AttributeValue, parse_attrs, unraw_raw_ident},
+    utils::{parse_attrs_with_filter, unraw_raw_ident},
 };
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use syn::{DataStruct, Field, Fields, spanned::Spanned};
+use syn::{DataStruct, Field, Fields, Type, spanned::Spanned};
 
 use super::attr::*;
 
-pub fn decode_field_attrs(field: &Field) -> syn::Result<FieldAttr> {
+pub fn decode_field_attrs<'a>(
+    field: &'a Field,
+    skip_attrs: &[String],
+) -> syn::Result<(FieldAttr, &'a [syn::Attribute])> {
     // We pass all the attributes at the start and when decoding them pop them off the list.
     // This means at the end we can check for any that weren't consumed and throw an error.
-    let mut attrs = parse_attrs(&field.attrs)?;
+    let raw_attrs = parse_attrs_with_filter(&field.attrs, skip_attrs)?;
+    let mut attrs = raw_attrs.clone();
     let field_attrs = FieldAttr::from_attrs(&mut attrs)?;
 
     // The expectation is that when an attribute is processed it will be removed so if any are left over we know they are invalid
     // but we only throw errors for Specta-specific attributes so we don't continually break other attributes.
-    if let Some(attrs) = attrs.iter().find(|attr| attr.key == "specta") {
-        match &attrs.value {
-            Some(AttributeValue::Attribute { attr, .. }) => {
-                if let Some(attr) = attr.first() {
+    if let Some(attr) = attrs.iter().find(|attr| attr.source == "specta") {
+        match &attr.value {
+            None
+            | Some(crate::utils::AttributeValue::Lit(_))
+            | Some(crate::utils::AttributeValue::Path(_)) => {
+                return Err(syn::Error::new(
+                    attr.key.span(),
+                    "specta: invalid formatted attribute",
+                ));
+            }
+            Some(crate::utils::AttributeValue::Attribute {
+                attr: inner_attrs, ..
+            }) => {
+                if let Some(inner_attr) = inner_attrs.first() {
                     return Err(syn::Error::new(
-                        attr.key.span(),
-                        format!("specta: Found unsupported field attribute '{}'", attr.key),
+                        inner_attr.key.span(),
+                        format!(
+                            "specta: Found unsupported field attribute '{}'",
+                            inner_attr.key
+                        ),
                     ));
                 }
-            }
-            _ => {
                 return Err(syn::Error::new(
-                    attrs.key.span(),
+                    attr.key.span(),
                     "specta: invalid formatted attribute",
                 ));
             }
         }
     }
 
-    Ok(field_attrs)
+    Ok((field_attrs, &field.attrs))
 }
 
 pub fn parse_struct(
-    name: &TokenStream,
     container_attrs: &ContainerAttr,
-    crate_ref: &TokenStream,
     data: &DataStruct,
-) -> syn::Result<(TokenStream, bool)> {
-    let definition = if container_attrs.transparent {
+) -> syn::Result<(TokenStream, TokenStream)> {
+    if container_attrs.transparent {
         if let Fields::Unit = data.fields {
             return Err(syn::Error::new(
                 data.fields.span(),
@@ -55,10 +68,13 @@ pub fn parse_struct(
         let fields = data
             .fields
             .iter()
-            .map(|field| decode_field_attrs(field).map(|v| (field.ty.clone(), v)))
-            .collect::<Result<Vec<_>, _>>()?
+            .map(|field| {
+                decode_field_attrs(field, &container_attrs.skip_attrs)
+                    .map(|(attrs, raw)| (field.ty.clone(), attrs, raw))
+            })
+            .collect::<syn::Result<Vec<(Type, FieldAttr, &[syn::Attribute])>>>()?
             .into_iter()
-            .filter(|(_, attrs)| !attrs.skip)
+            .filter(|(_, attrs, _)| !attrs.skip)
             .collect::<Vec<_>>();
 
         if fields.len() != 1 {
@@ -68,85 +84,73 @@ pub fn parse_struct(
             ));
         }
 
-        let (field_ty, field_attrs) = fields.into_iter().next().expect("fields.len() != 1");
-        let field_ty = field_attrs.r#type.as_ref().unwrap_or(&field_ty);
+        let (field_ty, field_attrs, raw_attrs) =
+            fields.into_iter().next().expect("fields.len() != 1");
 
-        // TODO: Should we check container too?
-        // if container_attrs.inline || field_attrs.inline {
-        //     // TODO: Duplicate of code in `field.rs` we should refactor out into helper.
-        //     // let generics = generics.params.iter().filter_map(|p| match p {
-        //     //     GenericParam::Const(..) | GenericParam::Lifetime(..) => None,
-        //     //     GenericParam::Type(p) => {
-        //     //         let ident = &p.ident;
-        //     //         let ident_str = p.ident.to_string();
+        let field = construct_field(container_attrs, field_attrs, &field_ty, raw_attrs)?;
 
-        //     //         quote!((std::borrow::Cow::Borrowed(#ident_str).into(), <#ident as #crate_ref::Type>::definition(types))).into()
-        //     //     }
-        //     // });
+        return Ok((
+            quote!(Struct),
+            quote!(
+                let mut e = datatype::Struct::unit();
+                *e.fields_mut() = internal::construct::fields_unnamed(vec![#field], vec![]);
+            ),
+        ));
+    }
 
-        //     // quote!(datatype::inline::<#field_ty>(types))
-        //     todo!();
-        // } else {
-        //     quote!(<#field_ty as #crate_ref::Type>::definition(types))
-        // }
+    let fields = match &data.fields {
+        Fields::Named(_) => {
+            let fields = data
+                .fields
+                .iter()
+                .map(|field| {
+                    let (field_attrs, raw_attrs) =
+                        decode_field_attrs(field, &container_attrs.skip_attrs)?;
 
-        // TODO: How can we passthrough the inline to this reference?
-        quote!(<#field_ty as #crate_ref::Type>::definition(types))
-    } else {
-        let fields = match &data.fields {
-            Fields::Named(_) => {
-                let fields = data
-                    .fields
-                    .iter()
-                    .map(|field| {
-                        let field_attrs = decode_field_attrs(field)?;
+                    let field_ident_str =
+                        unraw_raw_ident(field.ident.as_ref().ok_or_else(|| {
+                            syn::Error::new(
+                                field.span(),
+                                "specta: named field must have an identifier",
+                            )
+                        })?);
+                    let field_name = field_ident_str.to_token_stream();
 
-                        let field_ident_str = unraw_raw_ident(field.ident.as_ref().unwrap());
-                        let field_name =
-                            match (field_attrs.rename.clone(), container_attrs.rename_all) {
-                                (Some(name), _) => name,
-                                (_, Some(inflection)) => {
-                                    inflection.apply(&field_ident_str).to_token_stream()
-                                }
-                                (_, _) => field_ident_str.to_token_stream(),
-                            };
+                    let inner =
+                        construct_field(container_attrs, field_attrs, &field.ty, raw_attrs)?;
+                    Ok(quote!((#field_name.into(), #inner)))
+                })
+                .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                        let inner =
-                            construct_field(crate_ref, container_attrs, field_attrs, &field.ty);
-                        Ok(quote!((#field_name.into(), #inner)))
-                    })
-                    .collect::<syn::Result<Vec<TokenStream>>>()?;
+            quote!(internal::construct::fields_named(
+                vec![#(#fields),*],
+                vec![]
+            ))
+        }
+        Fields::Unnamed(_) => {
+            let fields = data
+                .fields
+                .iter()
+                .map(|field| {
+                    let (field_attrs, raw_attrs) =
+                        decode_field_attrs(field, &container_attrs.skip_attrs)?;
+                    construct_field(container_attrs, field_attrs, &field.ty, raw_attrs)
+                })
+                .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                let tag = container_attrs
-                    .tag
-                    .as_ref()
-                    .map(|t| quote!(Some(#t.into())))
-                    .unwrap_or(quote!(None));
-
-                quote!(internal::construct::fields_named(vec![#(#fields),*], #tag))
-            }
-            Fields::Unnamed(_) => {
-                let fields = data
-                    .fields
-                    .iter()
-                    .map(|field| {
-                        let field_attrs = decode_field_attrs(field)?;
-                        Ok(construct_field(
-                            crate_ref,
-                            container_attrs,
-                            field_attrs,
-                            &field.ty,
-                        ))
-                    })
-                    .collect::<syn::Result<Vec<TokenStream>>>()?;
-
-                quote!(internal::construct::fields_unnamed(vec![#(#fields),*]))
-            }
-            Fields::Unit => quote!(internal::construct::fields_unit()),
-        };
-
-        quote!(datatype::DataType::Struct(internal::construct::r#struct(#fields)))
+            quote!(internal::construct::fields_unnamed(
+                vec![#(#fields),*],
+                vec![]
+            ))
+        }
+        Fields::Unit => quote!(datatype::Fields::Unit),
     };
 
-    Ok((definition, true))
+    Ok((
+        quote!(Struct),
+        quote!(
+            let mut e = datatype::Struct::unit();
+            *e.fields_mut() = #fields;
+        ),
+    ))
 }

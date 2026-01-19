@@ -34,12 +34,12 @@ fn main() {
     Typescript::default()
         .layout(specta_typescript::Layout::Files)
         // This requires the `export` feature to be enabled on Specta
-        .export_to("./bindings", &specta::export())
+        .export_to("./bindings", &specta::collect())
         .unwrap();
 
     JSDoc::default()
         .layout(specta_typescript::Layout::Files)
         // This requires the `export` feature to be enabled on Specta
-        .export_to("./bindings2", &specta::export())
+        .export_to("./bindings2", &specta::collect())
         .unwrap();
 }

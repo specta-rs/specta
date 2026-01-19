@@ -1,13 +1,12 @@
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::ts::assert_ts;
-
-#[derive(Type)]
-#[specta(export = false)]
-#[specta(rename_all = "lowercase")]
-#[specta(rename = "SimpleEnum")]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all = "lowercase")]
+#[serde(rename = "SimpleEnum")]
 enum RenamedEnum {
-    #[specta(rename = "ASDF")]
+    #[serde(rename = "ASDF")]
     A,
     B,
     C,
@@ -15,5 +14,5 @@ enum RenamedEnum {
 
 #[test]
 fn test_simple_enum() {
-    assert_ts!(RenamedEnum, r#""ASDF" | "b" | "c""#)
+    insta::assert_snapshot!(crate::ts::inline::<RenamedEnum>(&Default::default()).unwrap(), @r#""ASDF" | "b" | "c""#);
 }

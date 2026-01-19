@@ -1,22 +1,20 @@
 use specta::Type;
 
-use crate::ts::assert_ts;
-
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct UnitA;
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct UnitB {}
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct UnitC();
 
 #[test]
 fn test() {
-    assert_ts!(UnitA, "null");
-    assert_ts!(UnitB, "Record<string, never>");
-    assert_ts!(UnitC, "[]");
+    insta::assert_snapshot!(crate::ts::inline::<UnitA>(&Default::default()).unwrap(), @"null");
+    insta::assert_snapshot!(crate::ts::inline::<UnitB>(&Default::default()).unwrap(), @"Record<string, never>");
+    insta::assert_snapshot!(crate::ts::inline::<UnitC>(&Default::default()).unwrap(), @"[]");
 }

@@ -1,14 +1,13 @@
+use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::ts::assert_ts;
-
-#[derive(Type)]
-#[specta(export = false)]
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 enum SimpleEnum1 {
-    #[specta(rename = "asdf")]
+    #[serde(rename = "asdf")]
     A,
     B,
-    #[specta(rename_all = "camelCase")]
+    #[serde(rename_all = "camelCase")]
     C {
         enum_field: (),
     },
@@ -17,13 +16,13 @@ enum SimpleEnum1 {
 #[test]
 fn test_empty() {
     #[derive(Type)]
-    #[specta(export = false)]
+    #[specta(collect = false)]
     enum Empty {}
 
-    assert_ts!(Empty, "never");
+    insta::assert_snapshot!(crate::ts::inline::<Empty>(&Default::default()).unwrap(), @"never");
 }
 
 #[test]
 fn test_simple_enum() {
-    assert_ts!(SimpleEnum1, r#""asdf" | "B" | { C: { enumField: null } }"#)
+    insta::assert_snapshot!(crate::ts::inline::<SimpleEnum1>(&Default::default()).unwrap(), @r#""asdf" | "B" | { C: { enumField: null } }"#);
 }

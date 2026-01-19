@@ -15,7 +15,10 @@ use specta::{
     },
 };
 
-use crate::{BigIntExportBehavior, Error, JSDoc, Layout, Typescript, legacy::js_doc};
+use crate::{
+    BigIntExportBehavior, Error, JSDoc, Layout, Typescript, legacy::js_doc,
+    typescript::root_alias_ident,
+};
 
 /// Generate an `export Type = ...` Typescript string for a specific [`NamedDataType`].
 ///
@@ -179,12 +182,13 @@ pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<
 }
 
 // Internal function to handle inlining without cloning DataType nodes
+#[allow(clippy::too_many_arguments)]
 fn inline_datatype(
     s: &mut String,
     ts: &Typescript,
     types: &TypeCollection,
     dt: &DataType,
-    mut location: Vec<Cow<'static, str>>,
+    location: Vec<Cow<'static, str>>,
     is_export: bool,
     parent_name: Option<&str>,
     prefix: &str,
@@ -237,32 +241,50 @@ fn inline_datatype(
         }
         DataType::Map(m) => map_dt(s, ts, types, m, location, is_export)?,
         DataType::Nullable(def) => {
-            inline_datatype(s, ts, types, def, location, is_export, parent_name, prefix, depth + 1)?;
+            inline_datatype(
+                s,
+                ts,
+                types,
+                def,
+                location,
+                is_export,
+                parent_name,
+                prefix,
+                depth + 1,
+            )?;
             let or_null = " | null";
             if !s.ends_with(&or_null) {
                 s.push_str(or_null);
             }
         }
-        DataType::Struct(st) => {
-            crate::legacy::struct_datatype(
-                crate::legacy::ExportContext {
-                    cfg: ts,
-                    path: vec![],
-                    is_export,
-                },
-                parent_name,
-                st,
-                types,
-                s,
-                prefix,
-            )?
-        }
+        DataType::Struct(st) => crate::legacy::struct_datatype(
+            crate::legacy::ExportContext {
+                cfg: ts,
+                path: vec![],
+                is_export,
+            },
+            parent_name,
+            st,
+            types,
+            s,
+            prefix,
+        )?,
         DataType::Enum(e) => enum_dt(s, ts, types, e, location, is_export, prefix)?,
         DataType::Tuple(t) => tuple_dt(s, ts, types, t, location, is_export)?,
         DataType::Reference(r) => {
             // Always inline references when in inline mode
             if let Some(ndt) = r.get(types) {
-                inline_datatype(s, ts, types, ndt.ty(), location, is_export, parent_name, prefix, depth + 1)?;
+                inline_datatype(
+                    s,
+                    ts,
+                    types,
+                    ndt.ty(),
+                    location,
+                    is_export,
+                    parent_name,
+                    prefix,
+                    depth + 1,
+                )?;
             } else {
                 // Fallback to regular reference if type not found
                 reference_dt(s, ts, types, r, location, is_export)?;
@@ -275,12 +297,13 @@ fn inline_datatype(
 }
 
 // TODO: private
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn datatype(
     s: &mut String,
     ts: &Typescript,
     types: &TypeCollection,
     dt: &DataType,
-    mut location: Vec<Cow<'static, str>>,
+    location: Vec<Cow<'static, str>>,
     is_export: bool,
     parent_name: Option<&str>,
     prefix: &str,
@@ -370,7 +393,7 @@ fn list_dt(
     ts: &Typescript,
     types: &TypeCollection,
     l: &List,
-    location: Vec<Cow<'static, str>>,
+    _location: Vec<Cow<'static, str>>,
     // TODO: Remove this???
     is_export: bool,
 ) -> Result<(), Error> {
@@ -457,7 +480,7 @@ fn map_dt(
     ts: &Typescript,
     types: &TypeCollection,
     m: &Map,
-    location: Vec<Cow<'static, str>>,
+    _location: Vec<Cow<'static, str>>,
     // TODO: Remove
     is_export: bool,
 ) -> Result<(), Error> {
@@ -507,7 +530,7 @@ fn map_dt(
         )?;
         s.push_str(" }");
         if !is_exhaustive {
-            s.push_str(">");
+            s.push('>');
         }
     }
     // assert!(flattening, "todo: map flattening");
@@ -527,7 +550,7 @@ fn enum_dt(
     ts: &Typescript,
     types: &TypeCollection,
     e: &Enum,
-    mut location: Vec<Cow<'static, str>>,
+    _location: Vec<Cow<'static, str>>,
     // TODO: Remove
     is_export: bool,
     prefix: &str,
@@ -536,7 +559,7 @@ fn enum_dt(
     {
         crate::legacy::enum_datatype(
             crate::legacy::ExportContext {
-                cfg: &ts,
+                cfg: ts,
                 path: vec![],
                 is_export,
             },
@@ -904,7 +927,7 @@ fn enum_dt(
 //     if !f.flatten() {
 //         if let Some(key) = key {
 //             s.push_str(&*escape_key(key));
-//             // https://github.com/oscartbeaumont/rspc/issues/100#issuecomment-1373092211
+//             // https://github.com/specta-rs/rspc/issues/100#issuecomment-1373092211
 //             if f.optional() {
 //                 s.push_str("?");
 //             }
@@ -963,7 +986,7 @@ fn tuple_dt(
     ts: &Typescript,
     types: &TypeCollection,
     t: &Tuple,
-    location: Vec<Cow<'static, str>>,
+    _location: Vec<Cow<'static, str>>,
     // TODO: Remove
     is_export: bool,
 ) -> Result<(), Error> {
@@ -1010,11 +1033,11 @@ fn reference_dt(
     is_export: bool,
 ) -> Result<(), Error> {
     // Check if this reference should be inlined
-    if r.inline() {
-        if let Some(ndt) = r.get(types) {
-            // Inline the referenced type directly without cloning the entire DataType
-            return datatype(s, ts, types, ndt.ty(), location, is_export, None, "");
-        }
+    if r.inline()
+        && let Some(ndt) = r.get(types)
+    {
+        // Inline the referenced type directly without cloning the entire DataType
+        return datatype(s, ts, types, ndt.ty(), location, is_export, None, "");
     }
 
     if let Some((_, typescript)) = ts.references.iter().find(|(re, _)| re.ref_eq(r)) {
@@ -1023,30 +1046,39 @@ fn reference_dt(
     }
     // TODO: Legacy stuff
     {
-        let ndt = r.get(types).unwrap(); // TODO: Error handling
+        let ndt = r
+            .get(types)
+            .expect("TypeCollection should have been populated by now");
 
         let name = match ts.layout {
             Layout::ModulePrefixedName => {
                 let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
-                s.push_str("_");
+                s.push('_');
                 s.push_str(ndt.name());
                 Cow::Owned(s)
             }
             Layout::Namespaces => {
-                let mut s = "$$specta_ns$$".to_string();
-                for (i, root_module) in ndt.module_path().split("::").enumerate() {
-                    if i != 0 {
-                        s.push_str(".");
+                if ndt.module_path().is_empty() {
+                    ndt.name().clone()
+                } else {
+                    let parts: Vec<&str> = ndt.module_path().split("::").collect();
+                    if let Some((root, rest)) = parts.split_first() {
+                        let mut s = root_alias_ident(root);
+                        if !rest.is_empty() {
+                            s.push('.');
+                            s.push_str(&rest.join("."));
+                        }
+                        s.push('.');
+                        s.push_str(ndt.name());
+                        Cow::Owned(s)
+                    } else {
+                        ndt.name().clone()
                     }
-                    s.push_str(root_module);
                 }
-                s.push_str(".");
-                s.push_str(ndt.name());
-                Cow::Owned(s)
             }
             Layout::Files => {
                 let mut s = ndt.module_path().replace("::", "_");
-                s.push_str("_");
+                s.push('_');
                 s.push_str(ndt.name());
                 Cow::Owned(s)
             }
@@ -1054,7 +1086,7 @@ fn reference_dt(
         };
 
         s.push_str(&name);
-        if r.generics().len() != 0 {
+        if !r.generics().is_empty() {
             s.push('<');
 
             for (i, (_, v)) in r.generics().iter().enumerate() {
@@ -1174,21 +1206,21 @@ fn reference_dt(
 //     // TODO: When enabled: arguments, result types
 // }
 
-/// Iterate with separate and error handling
-fn iter_with_sep<T>(
-    s: &mut String,
-    i: impl IntoIterator<Item = T>,
-    mut item: impl FnMut(&mut String, T) -> Result<(), Error>,
-    sep: &'static str,
-) -> Result<(), Error> {
-    for (i, e) in i.into_iter().enumerate() {
-        if i != 0 {
-            s.push_str(sep);
-        }
-        (item)(s, e)?;
-    }
-    Ok(())
-}
+// /// Iterate with separate and error handling
+// fn iter_with_sep<T>(
+//     s: &mut String,
+//     i: impl IntoIterator<Item = T>,
+//     mut item: impl FnMut(&mut String, T) -> Result<(), Error>,
+//     sep: &'static str,
+// ) -> Result<(), Error> {
+//     for (i, e) in i.into_iter().enumerate() {
+//         if i != 0 {
+//             s.push_str(sep);
+//         }
+//         (item)(s, e)?;
+//     }
+//     Ok(())
+// }
 
 // A smaller helper until this is stablised into the Rust standard library.
 fn intersperse<T: Clone>(iter: impl Iterator<Item = T>, sep: T) -> impl Iterator<Item = T> {

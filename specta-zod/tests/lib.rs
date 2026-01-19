@@ -105,7 +105,7 @@
 
 //     assert_zod!(Option<i32>, "z.number().nullable()");
 
-//     // // https://github.com/oscartbeaumont/specta/issues/88
+//     // // https://github.com/specta-rs/specta/issues/88
 //     assert_zod!(Unit1, "z.null()");
 //     assert_zod!(Unit2, "z.record(z.string(), z.never())");
 //     assert_zod!(Unit3, "z.tuple([])");
@@ -199,28 +199,28 @@
 //     // assert_ts!(() => ..5, r#"{ end: 5 }"#);
 //     // assert_ts!(() => ..=5, r#"{ end: 5 }"#);
 
-//     // https://github.com/oscartbeaumont/specta/issues/66
+//     // https://github.com/specta-rs/specta/issues/66
 //     assert_zod!(
 //         [Option<u8>; 3],
 //         r#"z.tuple([z.number().nullable(), z.number().nullable(), z.number().nullable()])"#
 //     );
 
-//     // https://github.com/oscartbeaumont/specta/issues/65
+//     // https://github.com/specta-rs/specta/issues/65
 //     assert_zod!(HashMap<BasicEnum, ()>, r#"z.record(z.union([z.literal("A"), z.literal("B")]), z.null())"#);
 
-//     // https://github.com/oscartbeaumont/specta/issues/60
+//     // https://github.com/specta-rs/specta/issues/60
 //     assert_zod!(
 //         Option<Option<Option<Option<i32>>>>,
 //         r#"z.number().nullable()"#
 //     );
 
-//     // https://github.com/oscartbeaumont/specta/issues/71
+//     // https://github.com/specta-rs/specta/issues/71
 //     assert_zod!(
 //         Vec<PlaceholderInnerField>,
 //         r#"z.array(z.object({ a: z.string() }))"#
 //     );
 
-//     // https://github.com/oscartbeaumont/specta/issues/77
+//     // https://github.com/specta-rs/specta/issues/77
 //     assert_eq!(
 //         specta_zod::inline::<std::time::SystemTime>(
 //             &ExportConfig::new().bigint(BigIntExportBehavior::Number)
@@ -279,21 +279,21 @@
 //         "export const MyEmptyInput = z.record(z.string(), z.never())"
 //     );
 
-//     // https://github.com/oscartbeaumont/specta/issues/142
+//     // https://github.com/specta-rs/specta/issues/142
 //     #[allow(unused_parens)]
 //     {
 //         assert_zod!((String), r#"z.string()"#);
 //         assert_zod!((String,), r#"z.tuple([z.string()])"#);
 //     }
 
-//     // https://github.com/oscartbeaumont/specta/issues/148
+//     // https://github.com/specta-rs/specta/issues/148
 //     assert_zod!(
 //         ExtraBracketsInTupleVariant,
 //         r#"z.object({ A: z.string() })"#
 //     );
 //     assert_zod!(ExtraBracketsInUnnamedStruct, "z.string()");
 
-//     // https://github.com/oscartbeaumont/specta/issues/90 // TODO: Fix these
+//     // https://github.com/specta-rs/specta/issues/90 // TODO: Fix these
 //     // assert_zod!(
 //     //     RenameWithWeirdCharsField,
 //     //     r#"z.object({ "@odata.context": z.string() })"#
@@ -327,7 +327,7 @@
 //     //     )
 //     // );
 
-//     // https://github.com/oscartbeaumont/specta/issues/156
+//     // https://github.com/specta-rs/specta/issues/156
 //     assert_zod!(
 //         Vec<MyEnum>,
 //         r#"z.array(z.union([z.object({ A: z.string() }), z.object({ B: z.number() })]))"#
@@ -342,46 +342,46 @@
 //         r#"z.object({ demo: z.tuple([z.object({ demo: z.tuple([z.string(), z.boolean()]) }), z.boolean()]) })"#
 //     );
 
-//     // https://github.com/oscartbeaumont/specta/issues/220
+//     // https://github.com/specta-rs/specta/issues/220
 //     // assert_zod!(Box<str>, r#"z.string()"#);
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // struct Unit1;
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // struct Unit2 {}
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // struct Unit3();
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // struct Unit4(());
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // enum Unit5 {
 //     A,
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // enum Unit6 {
 //     A(),
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // enum Unit7 {
 //     A {},
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // struct SimpleStruct {
 //     a: i32,
 //     b: String,
@@ -391,20 +391,20 @@
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // struct TupleStruct1(i32);
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // struct TupleStruct3(i32, bool, String);
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // #[specta(rename = "HasBeenRenamed")]
 // struct RenamedStruct;
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // enum TestEnum {
 //     Unit,
 //     Single(i32),
@@ -413,18 +413,18 @@
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // struct RefStruct(TestEnum);
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // struct InlineStruct {
 //     ref_struct: SimpleStruct,
 //     val: i32,
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // struct InlinerStruct {
 //     #[specta(inline)]
 //     inline_this: InlineStruct,
@@ -432,13 +432,13 @@
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // struct GenericStruct<T> {
 //     arg: T,
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // struct FlattenEnumStruct {
 //     outer: String,
 //     #[serde(flatten)]
@@ -446,7 +446,7 @@
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // #[serde(tag = "tag", content = "test")]
 // enum FlattenEnum {
 //     One,
@@ -455,20 +455,20 @@
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // struct OverridenStruct {
 //     #[specta(type = String)]
 //     overriden_field: i32,
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // struct HasGenericAlias(GenericAlias<i32>);
 
 // type GenericAlias<T> = std::collections::HashMap<T, String>;
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // enum SkipVariant {
 //     A(String),
 //     #[serde(skip)]
@@ -478,7 +478,7 @@
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // #[serde(tag = "tag", content = "data")]
 // enum SkipVariant2 {
 //     A(String),
@@ -489,7 +489,7 @@
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // enum SkipVariant3 {
 //     A {
 //         a: String,
@@ -505,7 +505,7 @@
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // pub enum EnumMacroAttributes {
 //     A(#[specta(type = String)] i32),
 //     #[specta(rename = "bbb")]
@@ -521,20 +521,20 @@
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // pub struct PlaceholderInnerField {
 //     a: String,
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // pub struct Recursive {
 //     a: i32,
 //     children: Vec<Recursive>,
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 
 // pub enum InlineEnumField {
 //     #[specta(inline)]
@@ -542,7 +542,7 @@
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // pub struct InlineOptionalType {
 //     #[specta(inline)]
 //     pub optional_field: Option<PlaceholderInnerField>,
@@ -554,15 +554,15 @@
 // // This is very much an advanced API. It is not recommended to use this unless you know what your doing.
 // // For personal reference: Is used in PCR to apply an inflection to the dynamic name of the include/select macro.
 // #[derive(Type)]
-// #[specta(export = false, rename_from_path = CONTAINER_NAME)]
+// #[specta(collect = false, rename_from_path = CONTAINER_NAME)]
 // pub struct RenameToValue {
 //     #[specta(rename_from_path = FIELD_NAME)]
 //     pub demo: i32,
 // }
 
-// // Regression test for https://github.com/oscartbeaumont/specta/issues/56
+// // Regression test for https://github.com/specta-rs/specta/issues/56
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // enum Rename {
 //     OneWord,
 //     #[serde(rename = "Two words")]
@@ -570,18 +570,18 @@
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // pub struct TransparentTypeInner {
 //     inner: String,
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // #[serde(transparent)]
 // pub struct TransparentType(pub(crate) TransparentTypeInner);
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // #[serde(transparent)]
 // pub struct TransparentType2(pub(crate) ());
 
@@ -589,12 +589,12 @@
 // pub struct NonTypeType;
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // #[serde(transparent)]
 // pub struct TransparentTypeWithOverride(#[specta(type = String)] NonTypeType);
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // pub enum BasicEnum {
 //     A,
 //     B,
@@ -602,7 +602,7 @@
 
 // #[derive(Type)]
 // #[serde(
-//     export = false,
+//     collect = false,
 //     tag = "type",
 //     content = "value",
 //     rename_all = "camelCase"
@@ -613,7 +613,7 @@
 // }
 
 // #[derive(Type)]
-// #[serde(export = false, rename_all = "camelCase")]
+// #[serde(collect = false, rename_all = "camelCase")]
 // pub struct FlattenOnNestedEnum {
 //     id: String,
 //     #[serde(flatten)]
@@ -621,31 +621,31 @@
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // pub struct EnumReferenceRecordKey {
 //     a: HashMap<BasicEnum, i32>,
 // }
 
-// // https://github.com/oscartbeaumont/specta/issues/88
+// // https://github.com/specta-rs/specta/issues/88
 // #[derive(Type)]
-// #[serde(export = false, rename_all = "camelCase")]
+// #[serde(collect = false, rename_all = "camelCase")]
 // #[serde(default)]
 // pub struct MyEmptyInput {}
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // #[allow(unused_parens)]
 // pub enum ExtraBracketsInTupleVariant {
 //     A((String)),
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // #[allow(unused_parens)]
 // pub struct ExtraBracketsInUnnamedStruct((String));
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // #[allow(unused_parens)]
 // pub struct RenameWithWeirdCharsField {
 //     #[specta(rename = "@odata.context")]
@@ -653,7 +653,7 @@
 // }
 
 // #[derive(Type)]
-// #[specta(export = false)]
+// #[specta(collect = false)]
 // #[allow(unused_parens)]
 // pub enum RenameWithWeirdCharsVariant {
 //     #[specta(rename = "@odata.context")]
@@ -661,11 +661,11 @@
 // }
 
 // #[derive(Type)]
-// #[specta(export = false, rename = "@odata.context")]
+// #[specta(collect = false, rename = "@odata.context")]
 // pub struct RenameWithWeirdCharsStruct(String);
 
 // #[derive(Type)]
-// #[specta(export = false, rename = "@odata.context")]
+// #[specta(collect = false, rename = "@odata.context")]
 // pub enum RenameWithWeirdCharsEnum {}
 
 // #[derive(Type)]

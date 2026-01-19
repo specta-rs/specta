@@ -1,4 +1,4 @@
-use crate::{datatype::DataType, Type, TypeCollection};
+use crate::{Type, TypeCollection, datatype::DataType};
 
 /// Implemented by types that can be used as an argument in a function annotated with
 /// [`specta`](crate::specta).

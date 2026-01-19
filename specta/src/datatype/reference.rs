@@ -25,7 +25,7 @@ impl Reference {
     ///
     /// An opaque type is unable to represents using the [DataType] system and requires specific exporter integration to handle it.
     ///
-    /// This should NOT be used in a [Type::definition] declaration as that will either result in equality issues or a persistent memory allocation.
+    /// This should NOT be used in a [`Type::definition`](crate::Type::definition) declaration as that will either result in equality issues or a persistent memory allocation.
     ///
     /// An opaque [Reference] is equal when cloned and can be compared using the [Self::ref_eq] or [PartialEq].
     ///
@@ -41,7 +41,7 @@ impl Reference {
     ///
     /// An opaque type is unable to represents using the [DataType] system and requires specific exporter integration to handle it.
     ///
-    /// This should NOT be used in a [Type::definition] declaration as that will either result in equality issues or a persistent memory allocation.
+    /// This should NOT be used in a [`Type::definition`](crate::Type::definition) declaration as that will either result in equality issues or a persistent memory allocation.
     ///
     /// # Safety
     ///
@@ -117,7 +117,11 @@ impl fmt::Debug for ArcId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{:?}",
+            "{}_{:?}",
+            match self {
+                ArcId::Static(..) => "s",
+                ArcId::Dynamic(..) => "d",
+            },
             match self {
                 ArcId::Static(ptr) => *ptr as *const (),
                 ArcId::Dynamic(arc) => Arc::as_ptr(arc),

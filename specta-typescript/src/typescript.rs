@@ -1,6 +1,7 @@
 use std::{
     borrow::Cow,
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    fmt,
     path::{Path, PathBuf},
 };
 
@@ -8,6 +9,7 @@ use specta::{
     TypeCollection,
     datatype::{DataType, Fields, NamedDataType, Reference},
 };
+use specta_serde::SerdeMode;
 
 use crate::{Error, primitives, types};
 
@@ -51,6 +53,12 @@ pub enum Layout {
     FlatFile,
 }
 
+impl fmt::Display for Layout {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
 /// Typescript language exporter.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -61,7 +69,7 @@ pub struct Typescript {
     pub(crate) references: Vec<(Reference, Cow<'static, str>)>,
     pub bigint: BigIntExportBehavior,
     pub layout: Layout,
-    pub serde: bool,
+    pub serde: Option<SerdeMode>,
     pub(crate) jsdoc: bool,
 }
 
@@ -80,7 +88,7 @@ impl Default for Typescript {
             ],
             bigint: Default::default(),
             layout: Default::default(),
-            serde: false,
+            serde: Some(SerdeMode::Both),
             jsdoc: false,
         }
     }
@@ -134,19 +142,35 @@ impl Typescript {
         self
     }
 
-    /// TODO: Explain
-    pub fn with_serde(mut self) -> Self {
-        self.serde = true;
+    /// Configure the exporter to use specta-serde with the specified mode
+    pub fn with_serde(mut self, mode: SerdeMode) -> Self {
+        self.serde = Some(mode);
         self
+    }
+
+    /// Configure the exporter to export the types for `#[derive(serde::Serialize)]`
+    pub fn with_serde_serialize(self) -> Self {
+        self.with_serde(SerdeMode::Serialize)
+    }
+
+    /// Configure the exporter to export the types for `#[derive(serde::Deserialize)]`
+    pub fn with_serde_deserialize(self) -> Self {
+        self.with_serde(SerdeMode::Deserialize)
     }
 
     /// Export the files into a single string.
     ///
-    /// Note: This will return [`Error:UnableToExport`] if the format is `Format::Files`.
+    /// Note: This will return [`Error::UnableToExport`](crate::Error::UnableToExport) if the format is `Format::Files`.
     pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
-        if self.serde {
-            specta_serde::validate(types)?;
-        }
+        let processed_types = if let Some(mode) = self.serde {
+            let mut types_clone = types.clone();
+            specta_serde::apply(&mut types_clone, mode)?;
+            types_clone
+        } else {
+            types.clone()
+        };
+
+        let types = &processed_types;
 
         match self.layout {
             Layout::Namespaces => {
@@ -160,68 +184,148 @@ impl Typescript {
                         .push(ndt.clone());
                 }
 
-                fn export_module(
-                    types: &TypeCollection,
-                    ts: &Typescript,
-                    module_types: &mut HashMap<String, Vec<NamedDataType>>,
-                    current_module: &str,
-                    indent: usize,
-                ) -> Result<String, Error> {
-                    let mut out = String::new();
-                    if let Some(types_in_module) = module_types.get_mut(current_module) {
-                        types_in_module.sort_by(|a, b| {
-                            a.name()
-                                .cmp(b.name())
-                                .then(a.module_path().cmp(b.module_path()))
-                                .then(a.location().cmp(&b.location()))
-                        });
-                        for ndt in types_in_module {
-                            out += &"    ".repeat(indent);
-                            out += &primitives::export(ts, types, ndt)?;
-                            out += "\n\n";
-                        }
+                // Group all modules by their root namespace (first segment)
+                let mut root_namespaces: HashMap<String, Vec<String>> = HashMap::new();
+
+                for module_path in module_types.keys() {
+                    if let Some(root) = module_path.split("::").next() {
+                        root_namespaces
+                            .entry(root.to_string())
+                            .or_default()
+                            .push(module_path.clone());
                     }
-
-                    let mut child_modules = module_types
-                        .keys()
-                        .filter(|k| {
-                            k.starts_with(&format!("{}::", current_module))
-                                && k[current_module.len() + 2..].split("::").count() == 1
-                        })
-                        .cloned()
-                        .collect::<Vec<_>>();
-                    child_modules.sort();
-
-                    for child in child_modules {
-                        let module_name = child.split("::").last().unwrap();
-                        out += &"    ".repeat(indent);
-                        out += &format!("export namespace {module_name} {{\n");
-                        out += &export_module(types, ts, module_types, &child, indent + 1)?;
-                        out += &"    ".repeat(indent);
-                        out += "}\n";
-                    }
-
-                    Ok(out)
                 }
 
-                let mut root_modules = module_types.keys().cloned().collect::<Vec<_>>();
-                root_modules.sort();
+                // Sort root namespaces for consistent output
+                let mut sorted_roots: Vec<_> = root_namespaces.into_iter().collect();
+                sorted_roots.sort_by(|a, b| a.0.cmp(&b.0));
 
-                for root_module in root_modules.iter() {
-                    out += "import $$specta_ns$$";
-                    out += root_module;
-                    out += " = ";
-                    out += root_module;
-                    out += ";\n\n";
-                }
+                let mut root_aliases = Vec::with_capacity(sorted_roots.len());
 
-                for (i, root_module) in root_modules.iter().enumerate() {
+                for (i, (root_name, modules_in_root)) in sorted_roots.iter().enumerate() {
                     if i != 0 {
                         out += "\n";
                     }
-                    out += &format!("export namespace {} {{\n", root_module);
-                    out += &export_module(types, self, &mut module_types, root_module, 1)?;
-                    out += "}";
+
+                    // Sort modules to process them in order
+                    let mut sorted_modules = modules_in_root.clone();
+                    sorted_modules.sort();
+
+                    // Build a tree structure: map from parent path to its direct children
+                    // This will help us generate namespaces hierarchically
+                    let mut path_children: HashMap<String, BTreeSet<String>> = HashMap::new();
+
+                    for module_path in &sorted_modules {
+                        let parts: Vec<&str> = module_path.split("::").collect();
+
+                        // For each level, track direct parent-child relationships only
+                        for depth in 0..parts.len() {
+                            let parent = if depth == 0 {
+                                String::new()
+                            } else {
+                                parts[0..depth].join("::")
+                            };
+                            let child_name = parts[depth].to_string();
+
+                            path_children.entry(parent).or_default().insert(child_name);
+                        }
+                    }
+
+                    // Recursive function to generate nested namespaces
+                    fn write_namespace(
+                        out: &mut String,
+                        current_path: &str,
+                        depth: usize,
+                        path_children: &HashMap<String, BTreeSet<String>>,
+                        module_types: &mut HashMap<String, Vec<NamedDataType>>,
+                        ts: &Typescript,
+                        types: &TypeCollection,
+                    ) -> Result<(), Error> {
+                        let indent = "    ".repeat(depth);
+
+                        // Get types for this exact path
+                        let has_types =
+                            if let Some(types_in_module) = module_types.get_mut(current_path) {
+                                types_in_module.sort_by(|a, b| {
+                                    a.name()
+                                        .cmp(b.name())
+                                        .then(a.module_path().cmp(b.module_path()))
+                                        .then(a.location().cmp(&b.location()))
+                                });
+
+                                for ndt in types_in_module {
+                                    *out += &indent;
+                                    *out += &primitives::export(ts, types, ndt)?;
+                                    *out += "\n";
+                                }
+                                true
+                            } else {
+                                false
+                            };
+
+                        // Get child namespace names
+                        if let Some(child_names) = path_children.get(current_path) {
+                            for (i, child_name) in child_names.iter().enumerate() {
+                                // Add blank line between siblings or after types
+                                if i > 0 || has_types {
+                                    *out += "\n";
+                                }
+
+                                *out += &indent;
+                                *out += &format!("export namespace {child_name} {{\n");
+
+                                // Build the full path for the child
+                                let child_path = if current_path.is_empty() {
+                                    child_name.clone()
+                                } else {
+                                    format!("{}::{}", current_path, child_name)
+                                };
+
+                                write_namespace(
+                                    out,
+                                    &child_path,
+                                    depth + 1,
+                                    path_children,
+                                    module_types,
+                                    ts,
+                                    types,
+                                )?;
+
+                                *out += &indent;
+                                *out += "}\n";
+                            }
+                        }
+
+                        Ok(())
+                    }
+
+                    // Start with the root namespace
+                    out += &format!("export namespace {root_name} {{\n");
+                    write_namespace(
+                        &mut out,
+                        root_name,
+                        1,
+                        &path_children,
+                        &mut module_types,
+                        self,
+                        types,
+                    )?;
+                    out += "}\n";
+
+                    if !root_name.is_empty() {
+                        root_aliases.push(format!(
+                            "export import {} = {};\n",
+                            root_alias_ident(root_name),
+                            root_name
+                        ));
+                    }
+                }
+
+                if !root_aliases.is_empty() {
+                    out += "\n";
+                    for alias in root_aliases {
+                        out += &alias;
+                    }
                 }
 
                 Ok(out)
@@ -302,7 +406,7 @@ impl Typescript {
 
         for (i, ndt) in ndts.enumerate() {
             if i != 0 {
-                out += "\n\n";
+                out += "\n";
             }
 
             if self.jsdoc {
@@ -324,9 +428,14 @@ impl Typescript {
         let path = path.as_ref();
 
         if self.layout == Layout::Files {
-            if self.serde {
-                specta_serde::validate(types)?;
-            }
+            let processed_types = if let Some(mode) = self.serde {
+                let mut types_clone = types.clone();
+                specta_serde::apply(&mut types_clone, mode)?;
+                types_clone
+            } else {
+                types.clone()
+            };
+            let types = &processed_types;
 
             std::fs::create_dir_all(path)?;
 
@@ -406,10 +515,7 @@ impl Typescript {
                 std::fs::create_dir_all(parent)?;
             }
 
-            std::fs::write(
-                path,
-                self.export(types).map(|s| format!("{}{s}", self.header))?,
-            )?;
+            std::fs::write(path, self.export(types)?)?;
         }
 
         Ok(())
@@ -482,4 +588,17 @@ fn crawl_for_imports(dt: &DataType, types: &TypeCollection, imports: &mut Import
         }
         DataType::Generic(_) => {}
     }
+}
+
+pub(crate) fn root_alias_ident(root: &str) -> String {
+    let mut alias = String::from("$specta$root$");
+    for ch in root.chars() {
+        if ch == '_' || ch.is_ascii_alphanumeric() {
+            alias.push(ch);
+        } else {
+            alias.push('_');
+        }
+    }
+    alias.push('$');
+    alias
 }

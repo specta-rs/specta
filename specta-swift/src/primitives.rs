@@ -10,6 +10,101 @@ use specta::{
 use crate::error::{Error, Result};
 use crate::swift::Swift;
 
+/// Check if an enum is a string enum (has String repr)
+fn is_string_enum(e: &specta::datatype::Enum) -> bool {
+    // For Swift, we only treat it as a string enum if:
+    // 1. All variants are unit variants
+    // 2. There's a serde rename_all attribute (which means we can generate raw values)
+    e.is_string_enum() && get_rename_all_from_attributes(e.attributes()).is_some()
+}
+
+/// Helper function to get rename_all from serde attributes  
+fn get_rename_all_from_attributes(
+    attributes: &[specta::datatype::RuntimeAttribute],
+) -> Option<String> {
+    use specta::datatype::RuntimeMeta;
+
+    for attr in attributes {
+        if attr.path == "serde"
+            && let RuntimeMeta::List(list) = &attr.kind
+        {
+            for nested in list {
+                if let specta::datatype::RuntimeNestedMeta::Meta(meta) = nested
+                    && let RuntimeMeta::NameValue { key, value } = meta
+                    && key == "rename_all"
+                    && let specta::datatype::RuntimeLiteral::Str(s) = value
+                {
+                    return Some(s.clone());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Check if an enum is adjacently tagged
+fn is_adjacently_tagged_enum(e: &specta::datatype::Enum) -> bool {
+    use specta::datatype::RuntimeMeta;
+
+    let mut has_tag = false;
+    let mut has_content = false;
+
+    for attr in e.attributes() {
+        if attr.path == "serde"
+            && let RuntimeMeta::List(list) = &attr.kind
+        {
+            for nested in list {
+                if let specta::datatype::RuntimeNestedMeta::Meta(meta) = nested
+                    && let RuntimeMeta::NameValue { key, .. } = meta
+                {
+                    if key == "tag" {
+                        has_tag = true;
+                    } else if key == "content" {
+                        has_content = true;
+                    }
+                }
+            }
+        }
+    }
+
+    has_tag && has_content
+}
+
+/// Get the tag and content field names for an adjacently tagged enum
+fn get_adjacent_tag_content(e: &specta::datatype::Enum) -> Option<(String, String)> {
+    use specta::datatype::RuntimeMeta;
+
+    let mut tag = None;
+    let mut content = None;
+
+    for attr in e.attributes() {
+        if attr.path == "serde"
+            && let RuntimeMeta::List(list) = &attr.kind
+        {
+            for nested in list {
+                if let specta::datatype::RuntimeNestedMeta::Meta(meta) = nested
+                    && let RuntimeMeta::NameValue { key, value } = meta
+                {
+                    if key == "tag" {
+                        if let specta::datatype::RuntimeLiteral::Str(s) = value {
+                            tag = Some(s.clone());
+                        }
+                    } else if key == "content"
+                        && let specta::datatype::RuntimeLiteral::Str(s) = value
+                    {
+                        content = Some(s.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    match (tag, content) {
+        (Some(t), Some(c)) => Some((t, c)),
+        _ => None,
+    }
+}
+
 /// Export a single type to Swift.
 pub fn export_type(
     swift: &Swift,
@@ -65,7 +160,7 @@ pub fn export_type(
 
             result.push_str(&format!("public struct {}{}: Codable {{\n", name, generics));
             result.push_str(&type_def);
-            result.push_str("}");
+            result.push('}');
         }
         DataType::Enum(e) => {
             let name = swift.naming.convert(ndt.name());
@@ -83,7 +178,7 @@ pub fn export_type(
             };
 
             // Check if this is a string enum
-            let is_string_enum = e.repr().map(|repr| repr.is_string()).unwrap_or(false);
+            let is_string_enum_val = is_string_enum(e);
 
             // Check if this enum has struct-like variants (needs custom Codable)
             let has_struct_variants = e.variants().iter().any(|(_, variant)| {
@@ -91,18 +186,16 @@ pub fn export_type(
             });
 
             // Determine protocols based on whether we'll generate custom Codable
-            let protocols = if is_string_enum {
+            let protocols = if is_string_enum_val {
                 if has_struct_variants {
                     "String" // Custom Codable will be generated
                 } else {
                     "String, Codable"
                 }
+            } else if has_struct_variants {
+                "" // Custom Codable will be generated
             } else {
-                if has_struct_variants {
-                    "" // Custom Codable will be generated
-                } else {
-                    "Codable"
-                }
+                "Codable"
             };
 
             let protocol_part = if protocols.is_empty() {
@@ -115,10 +208,9 @@ pub fn export_type(
                 "public enum {}{}{} {{\n",
                 name, generics, protocol_part
             ));
-            let enum_body =
-                enum_to_swift(swift, types, e, vec![], false, None, Some(&name))?;
+            let enum_body = enum_to_swift(swift, types, e, vec![], false, None, Some(&name))?;
             result.push_str(&enum_body);
-            result.push_str("}");
+            result.push('}');
 
             // Generate struct definitions for named field variants
             let struct_definitions =
@@ -199,17 +291,20 @@ pub fn is_duration_struct(s: &specta::datatype::Struct) -> bool {
 }
 
 /// Check if a type is a special standard library type that needs special handling
-fn is_special_std_type(types: &TypeCollection, reference: Option<&specta::datatype::Reference>) -> Option<String> {
-    if let Some(r) = reference {
-        if let Some(ndt) = r.get(types) {
-            // Check for std::time::Duration
-            if ndt.name() == "Duration" {
-                return Some("RustDuration".to_string());
-            }
-            // Check for std::time::SystemTime
-            if ndt.name() == "SystemTime" {
-                return Some("Date".to_string());
-            }
+fn is_special_std_type(
+    types: &TypeCollection,
+    reference: Option<&specta::datatype::Reference>,
+) -> Option<String> {
+    if let Some(r) = reference
+        && let Some(ndt) = r.get(types)
+    {
+        // Check for std::time::Duration
+        if ndt.name() == "Duration" {
+            return Some("RustDuration".to_string());
+        }
+        // Check for std::time::SystemTime
+        if ndt.name() == "SystemTime" {
+            return Some("Date".to_string());
         }
     }
     None
@@ -309,7 +404,9 @@ fn struct_to_swift(
                 let field_type = datatype_to_swift(
                     swift,
                     types,
-                    &fields.fields()[0].ty().unwrap(),
+                    fields.fields()[0]
+                        .ty()
+                        .expect("tuple field should have a type"),
                     location,
                     is_export,
                     None,
@@ -322,7 +419,7 @@ fn struct_to_swift(
                     let field_type = datatype_to_swift(
                         swift,
                         types,
-                        field.ty().unwrap(),
+                        field.ty().expect("tuple field should have a type"),
                         location.clone(),
                         is_export,
                         None,
@@ -375,6 +472,7 @@ fn struct_to_swift(
 }
 
 /// Generate raw value for string enum variants
+#[allow(clippy::unwrap_used)]
 fn generate_raw_value(variant_name: &str, rename_all: Option<&str>) -> String {
     match rename_all {
         Some("lowercase") => variant_name.to_lowercase(),
@@ -454,7 +552,7 @@ fn enum_to_swift(
     let mut result = String::new();
 
     // Check if this is a string enum
-    let is_string_enum = e.repr().map(|repr| repr.is_string()).unwrap_or(false);
+    let is_string_enum = is_string_enum(e);
 
     for (original_variant_name, variant) in e.variants() {
         if variant.skip() {
@@ -469,7 +567,7 @@ fn enum_to_swift(
                     // For string enums, generate raw value assignments
                     let raw_value = generate_raw_value(
                         original_variant_name,
-                        e.repr().and_then(|r| r.rename_all()),
+                        get_rename_all_from_attributes(e.attributes()).as_deref(),
                     );
                     result.push_str(&format!("    case {} = \"{}\"\n", variant_name, raw_value));
                 } else {
@@ -487,7 +585,7 @@ fn enum_to_swift(
                             datatype_to_swift(
                                 swift,
                                 types,
-                                f.ty().unwrap(),
+                                f.ty().expect("enum variant field should have a type"),
                                 location.clone(),
                                 is_export,
                                 None,
@@ -538,47 +636,47 @@ fn generate_enum_structs(
             continue;
         }
 
-        if let specta::datatype::Fields::Named(fields) = variant.fields() {
-            if !fields.fields().is_empty() {
-                let pascal_variant_name = to_pascal_case(original_variant_name);
-                let struct_name = format!("{}{}Data", enum_name, pascal_variant_name);
+        if let specta::datatype::Fields::Named(fields) = variant.fields()
+            && !fields.fields().is_empty()
+        {
+            let pascal_variant_name = to_pascal_case(original_variant_name);
+            let struct_name = format!("{}{}Data", enum_name, pascal_variant_name);
 
-                // Generate struct definition with custom CodingKeys for field name mapping
-                result.push_str(&format!("\npublic struct {}: Codable {{\n", struct_name));
+            // Generate struct definition with custom CodingKeys for field name mapping
+            result.push_str(&format!("\npublic struct {}: Codable {{\n", struct_name));
 
-                // Generate struct fields
-                let mut field_mappings = Vec::new();
-                for (original_field_name, field) in fields.fields() {
-                    if let Some(ty) = field.ty() {
-                        let field_type =
-                            datatype_to_swift(swift, types, ty, location.clone(), is_export, None)?;
-                        let optional_marker = if field.optional() { "?" } else { "" };
-                        let swift_field_name = swift.naming.convert_field(original_field_name);
-                        result.push_str(&format!(
-                            "    public let {}: {}{}\n",
-                            swift_field_name, field_type, optional_marker
-                        ));
-                        field_mappings.push((swift_field_name, original_field_name.to_string()));
-                    }
+            // Generate struct fields
+            let mut field_mappings = Vec::new();
+            for (original_field_name, field) in fields.fields() {
+                if let Some(ty) = field.ty() {
+                    let field_type =
+                        datatype_to_swift(swift, types, ty, location.clone(), is_export, None)?;
+                    let optional_marker = if field.optional() { "?" } else { "" };
+                    let swift_field_name = swift.naming.convert_field(original_field_name);
+                    result.push_str(&format!(
+                        "    public let {}: {}{}\n",
+                        swift_field_name, field_type, optional_marker
+                    ));
+                    field_mappings.push((swift_field_name, original_field_name.to_string()));
                 }
-
-                // Generate custom CodingKeys if field names were converted
-                let needs_custom_coding_keys = field_mappings
-                    .iter()
-                    .any(|(swift_name, rust_name)| swift_name != rust_name);
-                if needs_custom_coding_keys {
-                    result.push_str("\n    private enum CodingKeys: String, CodingKey {\n");
-                    for (swift_name, rust_name) in &field_mappings {
-                        result.push_str(&format!(
-                            "        case {} = \"{}\"\n",
-                            swift_name, rust_name
-                        ));
-                    }
-                    result.push_str("    }\n");
-                }
-
-                result.push_str("}\n");
             }
+
+            // Generate custom CodingKeys if field names were converted
+            let needs_custom_coding_keys = field_mappings
+                .iter()
+                .any(|(swift_name, rust_name)| swift_name != rust_name);
+            if needs_custom_coding_keys {
+                result.push_str("\n    private enum CodingKeys: String, CodingKey {\n");
+                for (swift_name, rust_name) in &field_mappings {
+                    result.push_str(&format!(
+                        "        case {} = \"{}\"\n",
+                        swift_name, rust_name
+                    ));
+                }
+                result.push_str("    }\n");
+            }
+
+            result.push_str("}\n");
         }
     }
 
@@ -588,7 +686,7 @@ fn generate_enum_structs(
 /// Convert a string to PascalCase
 fn to_pascal_case(s: &str) -> String {
     // If it's already PascalCase (starts with uppercase), return as-is
-    if s.chars().next().map_or(false, |c| c.is_uppercase()) {
+    if s.chars().next().is_some_and(|c| c.is_uppercase()) {
         return s.to_string();
     }
 
@@ -679,11 +777,7 @@ fn generate_enum_codable_impl(
     result.push_str(&format!("extension {}: Codable {{\n", enum_name));
 
     // Check if this is an adjacently tagged enum
-    let is_adjacently_tagged = if let Some(repr) = e.repr() {
-        matches!(repr, specta::datatype::EnumRepr::Adjacent { .. })
-    } else {
-        false
-    };
+    let is_adjacently_tagged = is_adjacently_tagged_enum(e);
 
     if is_adjacently_tagged {
         return generate_adjacently_tagged_codable(swift, e, enum_name);
@@ -818,14 +912,8 @@ fn generate_adjacently_tagged_codable(
     let mut result = String::new();
 
     // Get tag and content field names
-    let (tag_field, content_field) =
-        if let Some(specta::datatype::EnumRepr::Adjacent { tag, content }) = e.repr() {
-            (tag.as_ref(), content.as_ref())
-        } else {
-            return Err(Error::UnsupportedType(
-                "Expected adjacently tagged enum".to_string(),
-            ));
-        };
+    let (tag_field, content_field) = get_adjacent_tag_content(e)
+        .ok_or_else(|| Error::UnsupportedType("Expected adjacently tagged enum".to_string()))?;
 
     result.push_str(&format!(
         "\n// MARK: - {} Adjacently Tagged Codable Implementation\n",

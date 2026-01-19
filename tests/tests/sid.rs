@@ -1,23 +1,23 @@
 use specta::{Type, TypeCollection};
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct A {}
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct B {}
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct C {}
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct Z {}
 
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 pub struct BagOfTypes {
     // Fields are outta order intentionally so we don't fluke the test
     a: A,
@@ -34,11 +34,8 @@ fn test_sid() {
     BagOfTypes::definition(&mut types);
 
     // `TypeCollection` is a `BTreeMap` so it's sorted by SID. It should be sorted alphabetically by name
-    assert_eq!(
-        types
+    insta::assert_snapshot!(format!("{:?}", types
             .into_sorted_iter()
             .map(|t| t.name().clone())
-            .collect::<Vec<_>>(),
-        ["A", "B", "BagOfTypes", "C", "Z"]
-    );
+            .collect::<Vec<_>>()), @r#"["A", "B", "BagOfTypes", "C", "Z"]"#);
 }

@@ -5,10 +5,11 @@ version = "0.0.9"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2024"
 license = "MIT"
-repository = "https://github.com/oscartbeaumont/specta"
+repository = "https://github.com/specta-rs/specta"
 documentation = "https://docs.rs/specta-zod/latest/specta-zod"
 keywords = ["async", "specta", "rspc", "typescript", "typesafe"]
 categories = ["web-programming", "asynchronous"]
+readme = "../README.md"
 
 # /bin/sh RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
 [package.metadata."docs.rs"]
@@ -31,5 +32,5 @@ serde = { version = "1", default-features = false, optional = true }
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }
-specta = { version = "=2.0.0-rc.22", path = "../specta", features = ["derive", "export"] }
+specta = { version = "=2.0.0-rc.22", path = "../specta", features = ["derive", "collect"] }
 specta-util = { path = "../specta-util", features = ["serde"] }

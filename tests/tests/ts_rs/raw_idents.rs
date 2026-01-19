@@ -1,10 +1,8 @@
 use specta::Type;
 
-use crate::ts::assert_ts;
-
 #[allow(non_camel_case_types)]
 #[derive(Type)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct r#struct {
     // r#type: i32, // TS reserved keyword
     r#use: i32,
@@ -15,5 +13,5 @@ struct r#struct {
 
 #[test]
 fn raw_idents() {
-    assert_ts!(r#struct, "{ use: number; struct: number }");
+    insta::assert_snapshot!(crate::ts::inline::<r#struct>(&Default::default()).unwrap(), @"{ use: number; struct: number }");
 }

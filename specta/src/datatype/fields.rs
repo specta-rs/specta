@@ -1,8 +1,32 @@
 //! Field types are used by both enums and structs.
 
+use super::{DataType, DeprecatedType, RuntimeAttribute};
 use std::borrow::Cow;
 
-use super::{DataType, DeprecatedType};
+/// A non-skipped field with its type information.
+pub type NonSkipField<'a> = (&'a Field, &'a DataType);
+
+/// Filter out skipped fields from a collection of fields.
+///
+/// Returns an iterator of tuples containing the field and its type, excluding fields with `None` type.
+pub fn skip_fields<'a>(
+    fields: impl IntoIterator<Item = &'a Field>,
+) -> impl Iterator<Item = NonSkipField<'a>> {
+    fields
+        .into_iter()
+        .filter_map(|field| field.ty().map(|ty| (field, ty)))
+}
+
+/// Filter out skipped fields from a collection of named fields.
+///
+/// Returns an iterator of tuples containing the field name, the field, and its type, excluding fields with `None` type.
+pub fn skip_fields_named<'a>(
+    fields: impl IntoIterator<Item = &'a (Cow<'static, str>, Field)>,
+) -> impl Iterator<Item = (&'a Cow<'static, str>, NonSkipField<'a>)> {
+    fields
+        .into_iter()
+        .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+}
 
 /// Data stored within an enum variant or struct.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -25,19 +49,19 @@ pub enum Fields {
 pub struct Field {
     /// Did the user apply a `#[specta(optional)]` attribute.
     pub(crate) optional: bool,
-    /// Did the user apply a `#[serde(flatten)]` or `#[specta(flatten)]` attribute.
-    pub(crate) flatten: bool,
     /// Deprecated attribute for the field.
     pub(crate) deprecated: Option<DeprecatedType>,
     /// Documentation comments for the field.
     pub(crate) docs: Cow<'static, str>,
+    /// Should we inline the definition of this type.
+    pub(crate) inline: bool,
+    /// Runtime attributes for this field (e.g., serde attributes)
+    pub(crate) attributes: Vec<RuntimeAttribute>,
     /// Type for the field. Is optional if `#[serde(skip)]` or `#[specta(skip)]` was applied.
     ///
     /// You might think, well why not apply this in the macro and just not emit the variant?
     /// Well in Serde `A(String)` and `A(#[serde(skip)] (), String)` export as different Typescript types so the exporter needs runtime knowledge of this.
     pub(crate) ty: Option<DataType>,
-    // TODO: This is a Typescript-specific thing
-    pub(crate) inline: bool,
 }
 
 impl Field {
@@ -47,11 +71,11 @@ impl Field {
     pub fn new(ty: DataType) -> Self {
         Field {
             optional: false,
-            flatten: false,
             deprecated: None,
             docs: "".into(),
             inline: false,
             ty: Some(ty),
+            attributes: Vec::new(),
         }
     }
 
@@ -63,16 +87,6 @@ impl Field {
     /// Set the optional attribute for this field.
     pub fn set_optional(&mut self, optional: bool) {
         self.optional = optional;
-    }
-
-    /// Has the Serde or Specta flatten attribute been applied to this field?
-    pub fn flatten(&self) -> bool {
-        self.flatten
-    }
-
-    /// Set the flatten attribute for this field.
-    pub fn set_flatten(&mut self, flatten: bool) {
-        self.flatten = flatten;
     }
 
     /// Has the Serde inline attribute been applied to this field?
@@ -129,12 +143,28 @@ impl Field {
     pub fn set_ty(&mut self, ty: DataType) {
         self.ty = Some(ty);
     }
+
+    /// Get an immutable reference to the runtime attributes for this field.
+    pub fn attributes(&self) -> &Vec<RuntimeAttribute> {
+        &self.attributes
+    }
+
+    /// Mutable reference to the runtime attributes for this field.
+    pub fn attributes_mut(&mut self) -> &mut Vec<RuntimeAttribute> {
+        &mut self.attributes
+    }
+
+    /// Set the runtime attributes for this field.
+    pub fn set_attributes(&mut self, attrs: Vec<RuntimeAttribute>) {
+        self.attributes = attrs;
+    }
 }
 
 /// The fields of an unnamed enum variant.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UnnamedFields {
     pub(crate) fields: Vec<Field>,
+    pub(crate) attributes: Vec<RuntimeAttribute>,
 }
 
 impl UnnamedFields {
@@ -147,13 +177,28 @@ impl UnnamedFields {
     pub fn fields_mut(&mut self) -> &mut Vec<Field> {
         &mut self.fields
     }
+
+    /// Get an immutable reference to the runtime attributes for this unnamed fields.
+    pub fn attributes(&self) -> &Vec<RuntimeAttribute> {
+        &self.attributes
+    }
+
+    /// Mutable reference to the runtime attributes for this unnamed fields.
+    pub fn attributes_mut(&mut self) -> &mut Vec<RuntimeAttribute> {
+        &mut self.attributes
+    }
+
+    /// Set the runtime attributes for this unnamed fields.
+    pub fn set_attributes(&mut self, attrs: Vec<RuntimeAttribute>) {
+        self.attributes = attrs;
+    }
 }
 
 /// The fields of an named enum variant or a struct.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NamedFields {
     pub(crate) fields: Vec<(Cow<'static, str>, Field)>,
-    pub(crate) tag: Option<Cow<'static, str>>,
+    pub(crate) attributes: Vec<RuntimeAttribute>,
 }
 
 impl NamedFields {
@@ -167,18 +212,18 @@ impl NamedFields {
         &mut self.fields
     }
 
-    /// Get an immutable reference to the tag.
-    pub fn tag(&self) -> Option<&Cow<'static, str>> {
-        self.tag.as_ref()
+    /// Get an immutable reference to the runtime attributes for this named fields.
+    pub fn attributes(&self) -> &Vec<RuntimeAttribute> {
+        &self.attributes
     }
 
-    /// Get a mutable reference to the tag.
-    pub fn tag_mut(&mut self) -> Option<&mut Cow<'static, str>> {
-        self.tag.as_mut()
+    /// Mutable reference to the runtime attributes for this named fields.
+    pub fn attributes_mut(&mut self) -> &mut Vec<RuntimeAttribute> {
+        &mut self.attributes
     }
 
-    /// Set the tag of this named enum variant or struct.
-    pub fn set_tag(&mut self, tag: Cow<'static, str>) {
-        self.tag = Some(tag);
+    /// Set the runtime attributes for this named fields.
+    pub fn set_attributes(&mut self, attrs: Vec<RuntimeAttribute>) {
+        self.attributes = attrs;
     }
 }

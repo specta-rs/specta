@@ -1,22 +1,20 @@
 use serde::Serialize;
 use specta::Type;
 
-use crate::ts::assert_ts;
-
 #[derive(Type, Serialize)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Bar {
     field: i32,
 }
 
 #[derive(Type, Serialize)]
-#[specta(export = false)]
+#[specta(collect = false)]
 struct Foo {
     bar: Bar,
 }
 
 #[derive(Type, Serialize)]
-#[specta(export = false)]
+#[specta(collect = false)]
 enum SimpleEnum2 {
     A(String),
     B(i32),
@@ -28,12 +26,9 @@ enum SimpleEnum2 {
 
 #[test]
 fn test_stateful_enum() {
-    assert_ts!(Bar, r#"{ field: number }"#);
+    insta::assert_snapshot!(crate::ts::inline::<Bar>(&Default::default()).unwrap(), @r#"{ field: number }"#);
 
-    assert_ts!(Foo, r#"{ bar: Bar }"#);
+    insta::assert_snapshot!(crate::ts::inline::<Foo>(&Default::default()).unwrap(), @r#"{ bar: Bar }"#);
 
-    assert_ts!(
-        SimpleEnum2,
-        r#"{ A: string } | { B: number } | "C" | { D: [string, number] } | { E: Foo } | { F: { a: number; b: string } }"#
-    );
+    insta::assert_snapshot!(crate::ts::inline::<SimpleEnum2>(&Default::default()).unwrap(), @r#"{ A: string } | { B: number } | "C" | { D: [string, number] } | { E: Foo } | { F: { a: number; b: string } }"#);
 }

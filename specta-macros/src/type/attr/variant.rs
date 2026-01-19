@@ -1,37 +1,36 @@
-use proc_macro2::TokenStream;
-use quote::ToTokens;
 use syn::Result;
 
-use crate::utils::{impl_parse, Attribute, Inflection};
+use crate::utils::{AttrExtract, Attribute};
 
-use super::CommonAttr;
+use super::RustCAttr;
 
 #[derive(Default)]
 pub struct VariantAttr {
-    pub rename_all: Option<Inflection>,
-    pub rename: Option<TokenStream>,
     pub skip: bool,
     pub inline: bool,
-    pub common: CommonAttr,
-}
-
-impl_parse! {
-    VariantAttr(attr, out) {
-        "rename_all" => out.rename_all = out.rename_all.take().or(Some(attr.parse_inflection()?)),
-        "rename" => out.rename = out.rename.take().or(Some(attr.parse_string()?.to_token_stream())),
-        "skip" => out.skip = attr.parse_bool().unwrap_or(true),
-        "skip_serializing" => out.skip = true,
-        "skip_deserializing" => out.skip = true,
-        "inline" => out.inline = attr.parse_bool().unwrap_or(true),
-    }
+    pub common: RustCAttr,
 }
 
 impl VariantAttr {
     pub fn from_attrs(attrs: &mut Vec<Attribute>) -> Result<Self> {
-        let mut result = Self::default();
-        result.common = CommonAttr::from_attrs(attrs)?;
-        Self::try_from_attrs("specta", attrs, &mut result)?;
-        Self::try_from_attrs("serde", attrs, &mut result)?;
+        let mut result = Self {
+            common: RustCAttr::from_attrs(attrs)?,
+            ..Default::default()
+        };
+
+        if let Some(attr) = attrs.extract("specta", "skip") {
+            result.skip = attr.parse_bool().unwrap_or(true);
+        } else if let Some(attr) = attrs.extract("serde", "skip") {
+            // We generally want `#[serde(...)]` attributes to only be handled by the runtime but,
+            // we make an exception for `#[serde(skip)]` because it's usually used on fields
+            // that would fail a `T: Type` so handling it at runtime would prevent your code from compiling.
+            result.skip = attr.parse_bool().unwrap_or(true);
+        }
+
+        if let Some(attr) = attrs.extract("specta", "inline") {
+            result.inline = attr.parse_bool().unwrap_or(true);
+        }
+
         Ok(result)
     }
 }

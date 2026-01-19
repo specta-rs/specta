@@ -1,9 +1,10 @@
+use serde::{Deserialize, Serialize};
 use specta::{Type, TypeCollection};
 use specta_swift::Swift;
 
 /// Test enum with snake_case rename_all - should generate string enum
-#[derive(Type)]
-#[specta(rename_all = "snake_case")]
+#[derive(Type, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 enum JobStatus {
     Completed,
     Running,

@@ -6,10 +6,11 @@ authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2024"
 license = "MIT"
 include = ["/src", "/examples", "/LICENCE", "/README.md"]
-repository = "https://github.com/oscartbeaumont/specta"
+repository = "https://github.com/specta-rs/specta"
 documentation = "https://docs.rs/specta/latest/specta"
 keywords = ["async", "specta", "rspc", "typescript", "typesafe"]
 categories = ["web-programming", "asynchronous"]
+readme = "../README.md"
 
 # /bin/sh RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
 [package.metadata."docs.rs"]
@@ -18,20 +19,21 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 # Run `node ./.github/features.js` to update the docs
 [features]
-default = []
+default = ["std"]
+
+#! Core Features
+## Enable support for the Rust standard library. Enabled by default.
+std = []
 
 ## Derive macros
 derive = ["dep:specta-macros"]
 
 ## Support for collecting up a global type map
-export = ["dep:ctor", "specta-macros/DO_NOT_USE_export"]
+collect = ["dep:ctor", "specta-macros/DO_NOT_USE_collect"]
 
 #! Features
 ## Support for exporting the types of Rust functions.
 function = ["specta-macros?/DO_NOT_USE_function", "dep:paste"]
-
-# Enable nightly features
-nightly = []
 
 #! Compatibility
 ## Support for [serde-json](https://github.com/serde-rs/json)
@@ -39,7 +41,7 @@ serde_json = ["dep:serde_json"]
 ## Support for [serde_yaml](https://github.com/dtolnay/serde-yaml)
 serde_yaml = ["dep:serde_yaml"]
 ## Support for [toml](https://github.com/toml-rs/toml)
-toml = ["dep:toml"]
+toml = ["dep:toml", "std"]
 
 #! External types
 ## [uuid](https://docs.rs/uuid) crate
@@ -84,6 +86,10 @@ bevy_ecs = ["dep:bevy_ecs"]
 bevy_input = ["dep:bevy_input", "dep:bevy_ecs", "dep:glam"]
 # [camino](https://docs.rs/camino) crate
 camino = ["dep:camino"]
+## [geojson](https://docs.rs/geojson) crate
+geojson = ["dep:geojson", "serde_json"]
+# [geozero](https://docs.rs/geozero) crate
+geozero = ["dep:geozero"]
 
 [lints]
 workspace = true
@@ -97,7 +103,7 @@ ctor = { version = "0.6.1", default-features = false, optional = true, features 
 # TODO: To be deprecated
 serde_json = { version = "1.0.145", optional = true, default-features = false, features = ["std"] }
 serde_yaml = { version = "0.9.34", optional = true, default-features = false, features = [] }
-toml = { version = "0.9.8", optional = true, default-features = false }
+toml = { version = "0.9.8", optional = true, default-features = false, features = ["serde"] }
 ulid = { version = "1.2.1", optional = true, default-features = false, features = [] }
 uuid = { version = "1.18.1", optional = true, default-features = false, features = [] } # TODO: Downgraded for Bevy (argh)
 chrono = { version = "0.4.42", optional = true, default-features = false, features = ["clock"] }
@@ -119,6 +125,11 @@ bevy_ecs = { version = "0.17.3", optional = true, default-features = false, feat
 bevy_input = { version = "0.17.3", optional = true, default-features = false, features = ["std", "bevy_reflect"] }
 jiff = { version = "0.2", optional = true, default-features = false }
 camino = { version = "1.2.1", optional = true, default-features = false }
+geojson = { version = "0.24", optional = true, default-features = false }
+geozero = { version = "0.14.0", optional = true, default-features = false, features = ["with-mvt"] }
 
 [dev-dependencies]
 serde = { version = "1.0.228", features = ["derive"] } # TODO: Can we remove this?
+
+[build-dependencies]
+rustc_version = "0.4.1"

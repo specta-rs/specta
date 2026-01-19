@@ -1,11 +1,11 @@
 use std::future::Future;
 
-use crate::{datatype::FunctionReturnType, Type, TypeCollection};
+use crate::{Type, TypeCollection, datatype::FunctionReturnType};
 
 /// Implemented by types that can be returned from a function annotated with
 /// [`specta`](crate::specta).
 pub trait FunctionResult<TMarker> {
-    /// Gets the type of the result as a [`DataType`].
+    /// Gets the type of the result as a [`FunctionReturnType`](crate::datatype::FunctionReturnType).
     fn to_datatype(types: &mut TypeCollection) -> FunctionReturnType;
 }
 

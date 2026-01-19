@@ -1,10 +1,12 @@
 [workspace]
-members = ["specta", "specta-*", "tests"]
+members = ["specta", "specta-*", "tests", "tests2"]
 resolver = "2"
 
 [workspace.lints.rust]
 # unsafe_code = { level = "forbid", priority = -1 } # The `export` feature uses unsafe.
 # missing_docs = { level = "warn", priority = -1 } # TODO: Enable this
+
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(is_nightly)'] }
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
@@ -13,3 +15,7 @@ unwrap_used = { level = "warn", priority = -1 }
 panic = { level = "warn", priority = -1 }
 todo = { level = "warn", priority = -1 }
 panic_in_result_fn = { level = "warn", priority = -1 }
+
+[profile.dev.package]
+insta.opt-level = 3
+similar.opt-level = 3
