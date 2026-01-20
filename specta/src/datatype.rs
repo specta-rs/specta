@@ -16,9 +16,8 @@ mod tuple;
 
 pub use attrs::{RuntimeAttribute, RuntimeLiteral, RuntimeMeta, RuntimeNestedMeta};
 pub use builders::{NamedDataTypeBuilder, StructBuilder, VariantBuilder};
-pub use r#enum::{Enum, EnumVariant};
 pub use fields::{
-    Field, Fields, NamedFields, NonSkipField, UnnamedFields, skip_fields, skip_fields_named,
+    skip_fields, skip_fields_named, Field, Fields, NamedFields, NonSkipField, UnnamedFields,
 };
 pub use function::{Function, FunctionReturnType};
 pub use generic::{ConstGenericPlaceholder, Generic, GenericPlaceholder};
@@ -26,12 +25,10 @@ pub use list::List;
 pub use map::Map;
 pub use named::{DeprecatedType, NamedDataType};
 pub use primitive::Primitive;
-pub use reference::Reference;
+pub use r#enum::{Enum, EnumVariant};
 pub use r#struct::Struct;
+pub use reference::{ArcId, Reference};
 pub use tuple::Tuple;
-
-// TODO: Remove this
-pub(crate) use reference::ArcId;
 
 /// Runtime type-erased representation of a Rust type.
 ///

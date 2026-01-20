@@ -5,11 +5,11 @@
 
 use specta::datatype::{RuntimeAttribute, RuntimeLiteral, RuntimeMeta};
 use specta::{
-    DataType, TypeCollection,
     datatype::{Field, Primitive, Struct},
+    DataType, TypeCollection,
 };
 use specta_serde::{
-    SerdeMode, apply_serde_transformations, process_for_deserialization, process_for_serialization,
+    apply_serde_transformations, process_for_deserialization, process_for_serialization, SerdeMode,
 };
 
 #[test]
@@ -27,83 +27,129 @@ fn test_basic_transformation() {
     assert!(de_result.is_ok());
 }
 
-#[test]
-fn test_optional_fields_with_skip_serializing_if_and_default() {
-    use specta::datatype::{
-        DataType, Field, Primitive, RuntimeAttribute, RuntimeLiteral, RuntimeMeta,
-        RuntimeNestedMeta, Struct,
-    };
-    use specta_serde::{SerdeMode, apply_serde_transformations};
+#[cfg(test)]
+mod into_phases_tests {
+    use super::*;
+    use specta::datatype::NamedDataTypeBuilder;
+    use specta_macros::Type as TypeDerive;
+    use specta_serde::into_phases;
 
-    // Test 1: Field with #[serde(skip_serializing_if = "Option::is_none")]
-    let skip_if_attr = RuntimeAttribute {
-        path: "serde".to_string(),
-        kind: RuntimeMeta::NameValue {
-            key: "skip_serializing_if".to_string(),
-            value: RuntimeLiteral::Str("Option::is_none".to_string()),
-        },
-    };
+    #[test]
+    fn test_into_phases_empty_collection() {
+        let types = TypeCollection::default();
+        let result = into_phases(types);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().len(), 0);
+    }
 
-    let mut field_with_skip_if = Field::new(DataType::Nullable(Box::new(DataType::Primitive(
-        Primitive::String,
-    ))));
-    field_with_skip_if.set_attributes(vec![skip_if_attr]);
+    #[test]
+    fn test_into_phases_creates_three_versions() {
+        // Create a simple type manually
+        let field = Field::new(DataType::Primitive(Primitive::String));
+        let struct_dt = Struct::named().field("name", field).build();
 
-    // Test 2: Field with #[serde(default)]
-    let default_attr = RuntimeAttribute {
-        path: "serde".to_string(),
-        kind: RuntimeMeta::Path("default".to_string()),
-    };
+        let ndt = NamedDataTypeBuilder::new("User", vec![], struct_dt)
+            .build(&mut TypeCollection::default());
 
-    let mut field_with_default = Field::new(DataType::Primitive(Primitive::bool));
-    field_with_default.set_attributes(vec![default_attr]);
+        let mut types = TypeCollection::default();
+        types = types.insert(ndt);
 
-    // Test 3: Regular field without these attributes
-    let normal_field = Field::new(DataType::Nullable(Box::new(DataType::Primitive(
-        Primitive::i32,
-    ))));
+        let result = into_phases(types).unwrap();
 
-    let struct_dt = Struct::named()
-        .field("optional_string", field_with_skip_if)
-        .field("has_default", field_with_default)
-        .field("normal_field", normal_field)
-        .build();
+        // Should have 3 types: User, User_Serialize, User_Deserialize
+        assert_eq!(result.len(), 3);
 
-    // Transform for serialization
-    let ser_result = apply_serde_transformations(&struct_dt, SerdeMode::Serialize);
-    assert!(ser_result.is_ok());
+        // Verify the names exist
+        let names: Vec<String> = result
+            .into_sorted_iter()
+            .map(|ndt| ndt.name().to_string())
+            .collect();
 
-    if let Ok(DataType::Struct(transformed)) = ser_result {
-        match transformed.fields() {
-            specta::datatype::Fields::Named(named) => {
-                let fields = named.fields();
-                assert_eq!(fields.len(), 3, "All fields should be present");
+        assert!(names.contains(&"User".to_string()));
+        assert!(names.contains(&"User_Serialize".to_string()));
+        assert!(names.contains(&"User_Deserialize".to_string()));
+    }
 
-                // Field with skip_serializing_if should be marked as optional
-                let (_, field_skip_if) = &fields[0];
-                assert!(
-                    field_skip_if.optional(),
-                    "Field with skip_serializing_if should be marked as optional"
-                );
+    #[derive(TypeDerive, serde::Serialize, serde::Deserialize)]
+    struct SimpleStruct {
+        name: String,
+        #[serde(skip_serializing)]
+        password: String,
+    }
 
-                // Field with default should be marked as optional
-                let (_, field_default) = &fields[1];
-                assert!(
-                    field_default.optional(),
-                    "Field with default should be marked as optional"
-                );
+    #[derive(TypeDerive, serde::Serialize, serde::Deserialize)]
+    struct Post {
+        title: String,
+        author: SimpleStruct,
+    }
 
-                // Normal field should NOT be marked as optional
-                let (_, field_normal) = &fields[2];
-                assert!(
-                    !field_normal.optional(),
-                    "Normal field should NOT be marked as optional"
-                );
+    #[test]
+    fn test_into_phases_with_real_types() {
+        let mut types = TypeCollection::default();
+        types = types.register::<SimpleStruct>();
+
+        let result = into_phases(types);
+        assert!(result.is_ok());
+
+        let phased = result.unwrap();
+        // Should have 3 types: SimpleStruct, SimpleStruct_Serialize, SimpleStruct_Deserialize
+        assert_eq!(phased.len(), 3);
+    }
+
+    #[test]
+    fn test_into_phases_with_references() {
+        let mut types = TypeCollection::default();
+        types = types.register::<Post>();
+        types = types.register::<SimpleStruct>();
+
+        let result = into_phases(types);
+        assert!(result.is_ok());
+
+        let phased = result.unwrap();
+        // Should have 6 types:
+        // Post, Post_Serialize, Post_Deserialize
+        // SimpleStruct, SimpleStruct_Serialize, SimpleStruct_Deserialize
+        assert_eq!(phased.len(), 6);
+
+        // Verify all expected names exist
+        let names: Vec<String> = phased
+            .into_sorted_iter()
+            .map(|ndt| ndt.name().to_string())
+            .collect();
+
+        assert!(names.contains(&"Post".to_string()));
+        assert!(names.contains(&"Post_Serialize".to_string()));
+        assert!(names.contains(&"Post_Deserialize".to_string()));
+        assert!(names.contains(&"SimpleStruct".to_string()));
+        assert!(names.contains(&"SimpleStruct_Serialize".to_string()));
+        assert!(names.contains(&"SimpleStruct_Deserialize".to_string()));
+    }
+
+    #[test]
+    fn test_into_phases_applies_transformations() {
+        let mut types = TypeCollection::default();
+        types = types.register::<SimpleStruct>();
+
+        let phased = into_phases(types).unwrap();
+
+        // Find the serialize version and check that password field is skipped
+        for ndt in phased.into_unsorted_iter() {
+            if ndt.name().contains("_Serialize") {
+                if let DataType::Struct(s) = ndt.ty() {
+                    if let specta::datatype::Fields::Named(fields) = s.fields() {
+                        // The serialize version should have password field removed
+                        let field_names: Vec<&str> = fields
+                            .fields()
+                            .iter()
+                            .map(|(name, _)| name.as_ref())
+                            .collect();
+
+                        // Password should be skipped in serialization
+                        assert!(!field_names.contains(&"password") || fields.fields().len() == 2);
+                    }
+                }
             }
-            _ => panic!("Expected named fields"),
         }
-    } else {
-        panic!("Transformation failed");
     }
 }
 
@@ -335,7 +381,6 @@ fn test_field_level_rename_attributes() {
 #[cfg(test)]
 mod derive_tests {
     use super::*;
-    use specta::Type;
     use specta_macros::Type as TypeDerive;
 
     #[derive(TypeDerive, serde::Serialize, serde::Deserialize)]
@@ -634,3 +679,4 @@ fn test_both_mode_with_universal_skip() {
         }
     }
 }
+

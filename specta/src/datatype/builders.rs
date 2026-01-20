@@ -5,11 +5,11 @@
 use std::{borrow::Cow, fmt::Debug, panic::Location};
 
 use crate::{
-    DataType, TypeCollection,
     datatype::{
         ArcId, DeprecatedType, EnumVariant, Field, Fields, Generic, NamedDataType, NamedFields,
         RuntimeAttribute, Struct, UnnamedFields,
     },
+    DataType, TypeCollection,
 };
 
 #[derive(Debug, Clone)]

@@ -1,8 +1,8 @@
 use std::{collections::HashMap, fmt};
 
 use crate::{
-    Type,
     datatype::{ArcId, NamedDataType},
+    Type,
 };
 
 /// Define a set of types which can be exported together.
@@ -81,6 +81,13 @@ impl TypeCollection {
                 *ndt = Some(f(named_data_type));
             }
         }
+        self
+    }
+
+    /// Insert a [`NamedDataType`] into the collection.
+    /// This is useful for programmatically constructing types.
+    pub fn insert(mut self, ndt: NamedDataType) -> Self {
+        self.0.insert(ndt.id().clone(), Some(ndt));
         self
     }
 }
