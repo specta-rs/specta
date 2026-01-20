@@ -191,3 +191,103 @@ MacroStruct2: {
 	demo: string,
 }
 MacroEnum: { Demo: string } | { Demo2: { demo2: string } }
+DeprecatedType: { 
+	a: number,
+}
+DeprecatedTypeWithMsg: { 
+	a: number,
+}
+DeprecatedTypeWithMsg2: { 
+	a: number,
+}
+DeprecatedFields: { 
+	a: number,
+	b: string,
+	c: string,
+	d: string,
+}
+DeprecatedTupleVariant: [string, string, number]
+DeprecatedEnumVariants: "A" | "B" | "C"
+CommentedStruct: { 
+	a: number,
+}
+CommentedEnum: { A: number } | { B: { a: number } }
+SingleLineComment: { A: number } | { B: { a: number } }
+NonGeneric: { 
+	a: A,
+	b: B,
+}
+HalfGenericA<u8>: { 
+	a: A,
+	b: B,
+}
+HalfGenericB<bool>: { 
+	a: A,
+	b: B,
+}
+FullGeneric<u8, bool>: { 
+	a: A,
+	b: B,
+}
+Another<bool>: { 
+	a: A,
+	b: B,
+}
+MapA<u32>: { [key in string]: number }
+MapB<u32>: { [key in number]: string }
+MapC<u32>: { [key in string]: AGenericStruct<number> }
+AGenericStruct<u32>: { 
+	field: Demo<T, boolean>,
+}
+A: { 
+	a: B,
+	b: B,
+	c: B,
+	d: D,
+	e: GenericFlattened<number>,
+}
+DoubleFlattened: { 
+	a: ToBeFlattened,
+	b: ToBeFlattened,
+}
+FlattenedInner: { 
+	c: Inner,
+}
+BoxFlattened: { 
+	b: BoxedInner,
+}
+BoxInline: { 
+	c: BoxedInner,
+}
+First: { 
+	a: string,
+}
+Second: { 
+	a: number,
+}
+Third: (First) & { 
+	b: { [key in string]: string },
+	c: First,
+}
+Fourth: { 
+	a: First,
+	b: First,
+}
+Fifth: { 
+	a: First,
+	b: First,
+}
+Sixth: { 
+	a: First,
+	b: First,
+}
+Seventh: { 
+	a: First,
+	b: Second,
+}
+Eight: { A: string } | "B"
+Tenth: string | "B" | First
+MyEnumTagged: (First)
+MyEnumExternal: { Variant: (First) }
+MyEnumAdjacent: (First)
+MyEnumUntagged: (First)

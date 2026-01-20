@@ -10,14 +10,114 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 
 /**
 	* @typedef {{ 
+	*		a: B,
+	*		b: B,
+	*		c: B,
+	*		d: D,
+	*		e: GenericFlattened<number>,
+	*	}} A
+	*/
+/**
+	* @typedef {{ 
+	*		field: Demo<T, boolean>,
+	*	}} AGenericStruct<T>
+	*/
+/**
+	* @typedef {{ 
 	*		a: GenericType<string>,
 	*	}} ActualType
+	*/
+/**
+	* @typedef {{ 
+	*		b: number,
+	*	}} B
 	*/
 /**
 	* @typedef {"A" | "B"} BasicEnum
 	*/
 /**
+	* @typedef {{ 
+	*		b: BoxedInner,
+	*	}} BoxFlattened
+	*/
+/**
+	* @typedef {{ 
+	*		c: BoxedInner,
+	*	}} BoxInline
+	*/
+/**
+	* @typedef {{ 
+	*		a: number,
+	*	}} BoxedInner
+	*/
+/**
 	* @typedef {string} BracedStruct
+	*/
+/**
+	*  Some triple-slash comment
+	*  Some more triple-slash comment
+	*
+	* @typedef {{ A: number } | { B: { a: number } }} CommentedEnum
+	*/
+/**
+	*  Some triple-slash comment
+	*  Some more triple-slash comment
+	*
+	* @typedef {{ 
+	*		a: number,
+	*	}} CommentedStruct
+	*/
+/**
+	* @typedef {{ 
+	*		flattened: number,
+	*	}} D
+	*/
+/**
+	* @typedef {{ 
+	*		a: A,
+	*		b: B,
+	*	}} Demo<A, B>
+	*/
+/**
+	* @typedef {"A" | "B" | "C"} DeprecatedEnumVariants
+	*/
+/**
+	* @typedef {{ 
+	*		a: number,
+	*		b: string,
+	*		c: string,
+	*		d: string,
+	*	}} DeprecatedFields
+	*/
+/**
+	* @typedef {[string, string, number]} DeprecatedTupleVariant
+	*/
+/**
+	* @deprecated
+	* @typedef {{ 
+	*		a: number,
+	*	}} DeprecatedType
+	*/
+/**
+	* @deprecated Look at you big man using a deprecation message
+	* @typedef {{ 
+	*		a: number,
+	*	}} DeprecatedTypeWithMsg
+	*/
+/**
+	* @deprecated Look at you big man using a deprecation message
+	* @typedef {{ 
+	*		a: number,
+	*	}} DeprecatedTypeWithMsg2
+	*/
+/**
+	* @typedef {{ 
+	*		a: ToBeFlattened,
+	*		b: ToBeFlattened,
+	*	}} DoubleFlattened
+	*/
+/**
+	* @typedef {{ A: string } | "B"} Eight
 	*/
 /**
 	* @typedef {{ A: string } | { bbb: number } | { cccc: number } | { D: { a: string; b: number } }} EnumMacroAttributes
@@ -34,6 +134,18 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @typedef {string} ExtraBracketsInUnnamedStruct
 	*/
 /**
+	* @typedef {{ 
+	*		type: "Fifth",
+	*		a: First,
+	*		b: First,
+	*	}} Fifth
+	*/
+/**
+	* @typedef {{ 
+	*		a: string,
+	*	}} First
+	*/
+/**
 	* @typedef {{ tag: "One" } | { tag: "Two" } | { tag: "Three" }} FlattenEnum
 	*/
 /**
@@ -45,6 +157,22 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @typedef {(NestedEnum) & { 
 	*		id: string,
 	*	}} FlattenOnNestedEnum
+	*/
+/**
+	* @typedef {{ 
+	*		c: Inner,
+	*	}} FlattenedInner
+	*/
+/**
+	* @typedef {{ 
+	*		a: First,
+	*		b: First,
+	*	}} Fourth
+	*/
+/**
+	* @typedef {{ 
+	*		generic_flattened: T,
+	*	}} GenericFlattened<T>
 	*/
 /**
 	* @typedef {{ 
@@ -92,6 +220,12 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*/
 /**
 	* @typedef {{ 
+	*		a: number,
+	*		b: FlattenedInner,
+	*	}} Inner
+	*/
+/**
+	* @typedef {{ 
 	*		cause: null | null,
 	*	}} InvalidToValidType
 	*/
@@ -129,6 +263,18 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*/
 /**
 	* @typedef {{ A: string } | { B: number }} MyEnum
+	*/
+/**
+	* @typedef {{ t: "Variant"; c: (First) }} MyEnumAdjacent
+	*/
+/**
+	* @typedef {{ Variant: (First) }} MyEnumExternal
+	*/
+/**
+	* @typedef {(First) & { type: "Variant" }} MyEnumTagged
+	*/
+/**
+	* @typedef {(First)} MyEnumUntagged
 	*/
 /**
 	* @typedef {{ type: "a"; value: string } | { type: "b"; value: number }} NestedEnum
@@ -299,6 +445,42 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		"7b": MacroStruct,
 	*		"7c": MacroStruct2,
 	*		"7d": MacroEnum,
+	*		"7e": DeprecatedType,
+	*		"7f": DeprecatedTypeWithMsg,
+	*		"80": DeprecatedTypeWithMsg2,
+	*		"81": DeprecatedFields,
+	*		"82": DeprecatedTupleVariant,
+	*		"83": DeprecatedEnumVariants,
+	*		"84": CommentedStruct,
+	*		"85": CommentedEnum,
+	*		"86": SingleLineComment,
+	*		"87": Demo<number, boolean>,
+	*		"88": Demo<number, boolean>,
+	*		"89": Demo<number, boolean>,
+	*		"8a": Demo<number, boolean>,
+	*		"8b": Demo<number, boolean>,
+	*		"8c": { [key in string]: number },
+	*		"8d": { [key in number]: string },
+	*		"8e": { [key in string]: AGenericStruct<number> },
+	*		"8f": AGenericStruct<number>,
+	*		"90": A,
+	*		"91": DoubleFlattened,
+	*		"92": FlattenedInner,
+	*		"93": BoxFlattened,
+	*		"94": BoxInline,
+	*		"95": First,
+	*		"96": Second,
+	*		"97": Third,
+	*		"98": Fourth,
+	*		"99": Fifth,
+	*		"9a": Sixth,
+	*		"9b": Seventh,
+	*		"9c": Eight,
+	*		"9d": Tenth,
+	*		"9e": MyEnumTagged,
+	*		"9f": MyEnumExternal,
+	*		a0: MyEnumAdjacent,
+	*		a1: MyEnumUntagged,
 	*	}} Primitives
 	*/
 /**
@@ -340,11 +522,33 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 /**
 	* @typedef {{ 
 	*		a: number,
+	*	}} Second
+	*/
+/**
+	* @typedef {{ 
+	*		a: First,
+	*		b: Second,
+	*	}} Seventh
+	*/
+/**
+	* @typedef {{ 
+	*		a: number,
 	*		b: string,
 	*		c: [number, string, number],
 	*		d: string[],
 	*		e: string | null,
 	*	}} SimpleStruct
+	*/
+/**
+	*  Some single-line comment
+	*
+	* @typedef {{ A: number } | { B: { a: number } }} SingleLineComment
+	*/
+/**
+	* @typedef {{ 
+	*		a: First,
+	*		b: First,
+	*	}} Sixth
 	*/
 /**
 	* @typedef {{ A: string }} SkipVariant
@@ -366,7 +570,21 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*	}} SpectaTypeOverride
 	*/
 /**
+	* @typedef {string | "B" | First} Tenth
+	*/
+/**
 	* @typedef {"Unit" | { Single: number } | { Multiple: [number, number] } | { Struct: { a: number } }} TestEnum
+	*/
+/**
+	* @typedef {(First) & { 
+	*		b: { [key in string]: string },
+	*		c: First,
+	*	}} Third
+	*/
+/**
+	* @typedef {{ 
+	*		a: string,
+	*	}} ToBeFlattened
 	*/
 /**
 	* @typedef {TransparentTypeInner} TransparentType

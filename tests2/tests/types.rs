@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -259,6 +261,54 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         MacroStruct,
         MacroStruct2,
         MacroEnum,
+
+        // Deprecated
+        DeprecatedType,
+        DeprecatedTypeWithMsg,
+        DeprecatedTypeWithMsg2,
+        DeprecatedFields,
+        DeprecatedTupleVariant,
+        DeprecatedEnumVariants,
+
+        // Comments
+        CommentedStruct,
+        CommentedEnum,
+        SingleLineComment,
+
+        // Type aliases
+        NonGeneric,
+        HalfGenericA<u8>,
+        HalfGenericB<bool>,
+        FullGeneric<u8, bool>,
+        Another<bool>,
+        MapA<u32>,
+        MapB<u32>,
+        MapC<u32>,
+        AGenericStruct<u32>,
+
+        A,
+        DoubleFlattened,
+        FlattenedInner, // TODO: Fix this
+        BoxFlattened, // TODO: Fix this
+        BoxInline, // TODO: Fix this
+
+        // Flatten and inline
+        First,
+        Second,
+        Third,
+        Fourth,
+        Fifth,
+        Sixth,
+        Seventh,
+        Eight,
+        // Ninth, // TODO: Fix this
+        Tenth,
+
+        // Test for issue #393 - flatten in enum variants
+        MyEnumTagged,
+        MyEnumExternal,
+        MyEnumAdjacent,
+        MyEnumUntagged,
     )
 }
 
@@ -881,4 +931,337 @@ pub struct MacroStruct2 {
 pub enum MacroEnum {
     Demo(field_ty_macro!()),
     Demo2 { demo2: field_ty_macro!() },
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+#[deprecated]
+struct DeprecatedType {
+    a: i32,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+#[deprecated = "Look at you big man using a deprecation message"]
+struct DeprecatedTypeWithMsg {
+    a: i32,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+#[deprecated(note = "Look at you big man using a deprecation message")]
+struct DeprecatedTypeWithMsg2 {
+    a: i32,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct DeprecatedFields {
+    a: i32,
+    #[deprecated]
+    b: String,
+    #[deprecated = "This field is cringe!"]
+    c: String,
+    #[deprecated(note = "This field is cringe!")]
+    d: String,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct DeprecatedTupleVariant(
+    #[deprecated] String,
+    #[deprecated = "Nope"] String,
+    #[deprecated(note = "Nope")] i32,
+);
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub enum DeprecatedEnumVariants {
+    #[deprecated]
+    A,
+    #[deprecated = "Nope"]
+    B,
+    #[deprecated(note = "Nope")]
+    C,
+}
+
+// Some double-slash comment which is ignored
+/// Some triple-slash comment
+/// Some more triple-slash comment
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct CommentedStruct {
+    // Some double-slash comment which is ignored
+    /// Some triple-slash comment
+    /// Some more triple-slash comment
+    a: i32,
+}
+
+// Some double-slash comment which is ignored
+/// Some triple-slash comment
+/// Some more triple-slash comment
+#[derive(Type)]
+#[specta(collect = false)]
+pub enum CommentedEnum {
+    // Some double-slash comment which is ignored
+    /// Some triple-slash comment
+    /// Some more triple-slash comment
+    A(i32),
+    // Some double-slash comment which is ignored
+    /// Some triple-slash comment
+    /// Some more triple-slash comment
+    B {
+        // Some double-slash comment which is ignored
+        /// Some triple-slash comment
+        /// Some more triple-slash comment
+        a: i32,
+    },
+}
+
+/// Some single-line comment
+#[derive(Type)]
+#[specta(collect = false)]
+pub enum SingleLineComment {
+    /// Some single-line comment
+    A(i32),
+    /// Some single-line comment
+    B {
+        /// Some single-line comment
+        a: i32,
+    },
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct Demo<A, B> {
+    a: A,
+    b: B,
+}
+
+type NonGeneric = Demo<u8, bool>;
+type HalfGenericA<T> = Demo<T, bool>;
+type HalfGenericB<T> = Demo<u8, T>;
+type FullGeneric<T, U> = Demo<T, U>;
+
+type Another<T> = FullGeneric<u8, T>;
+
+type MapA<A> = HashMap<String, A>;
+type MapB<B> = HashMap<B, String>;
+type MapC<B> = HashMap<String, AGenericStruct<B>>;
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct AGenericStruct<T> {
+    field: HalfGenericA<T>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct D {
+    flattened: u32,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct GenericFlattened<T> {
+    generic_flattened: T,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct C {
+    a: u32,
+    #[serde(flatten)]
+    b: D,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct B {
+    b: u32,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct A {
+    a: B,
+    #[specta(inline)]
+    b: B,
+    c: B,
+    #[specta(inline)]
+    d: D,
+    #[specta(inline)]
+    e: GenericFlattened<u32>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ToBeFlattened {
+    a: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct DoubleFlattened {
+    a: ToBeFlattened,
+    b: ToBeFlattened,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct Inner {
+    a: i32,
+    b: Box<FlattenedInner>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenedInner {
+    c: Inner,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct BoxedInner {
+    a: i32,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct BoxFlattened {
+    b: Box<BoxedInner>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct BoxInline {
+    #[specta(inline)]
+    c: Box<BoxedInner>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+pub struct First {
+    pub a: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+pub struct Second {
+    pub a: i32,
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+pub struct Third {
+    #[serde(flatten)]
+    pub a: First,
+    pub b: HashMap<String, String>,
+    pub c: Box<First>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub struct Fourth {
+    pub a: First,
+    #[specta(inline)]
+    pub b: First,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "type")]
+pub struct Fifth {
+    pub a: First,
+    #[specta(inline)]
+    pub b: First,
+}
+
+// Flattening a struct multiple times
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+pub struct Sixth {
+    pub a: First,
+    pub b: First,
+}
+
+// Two fields with the same name (`a`) but different types
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+pub struct Seventh {
+    pub a: First,
+    pub b: Second,
+}
+
+// Serde can't serialize this
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+pub enum Eight {
+    A(String),
+    B,
+}
+
+// Test for issue #393 - flatten in enum variant with internal tag
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(tag = "type")]
+pub enum MyEnumTagged {
+    Variant {
+        #[serde(flatten)]
+        inner: First,
+    },
+}
+
+// Test for issue #393 - flatten in enum variant with external tag
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+pub enum MyEnumExternal {
+    Variant {
+        #[serde(flatten)]
+        inner: First,
+    },
+}
+
+// Test for issue #393 - flatten in enum variant with adjacent tag
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
+pub enum MyEnumAdjacent {
+    Variant {
+        #[serde(flatten)]
+        inner: First,
+    },
+}
+
+// Test for issue #393 - flatten in enum variant with untagged
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+pub enum MyEnumUntagged {
+    Variant {
+        #[serde(flatten)]
+        inner: First,
+    },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
+pub enum Ninth {
+    A(String),
+    B,
+    #[specta(inline)]
+    C(First),
+    D(First),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+pub enum Tenth {
+    A(String),
+    B,
+    #[specta(inline)]
+    C(First),
+    D(First),
 }

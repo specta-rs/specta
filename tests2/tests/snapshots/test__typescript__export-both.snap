@@ -178,3 +178,221 @@ MacroStruct2: export type MacroStruct2 = {
 	};
 
 MacroEnum: export type MacroEnum = { Demo: string } | { Demo2: { demo2: string } };
+
+DeprecatedType: /**
+ * @deprecated
+ */
+export type DeprecatedType = { 
+		a: number,
+	};
+
+DeprecatedTypeWithMsg: /**
+ * @deprecated Look at you big man using a deprecation message
+ */
+export type DeprecatedTypeWithMsg = { 
+		a: number,
+	};
+
+DeprecatedTypeWithMsg2: /**
+ * @deprecated Look at you big man using a deprecation message
+ */
+export type DeprecatedTypeWithMsg2 = { 
+		a: number,
+	};
+
+DeprecatedFields: export type DeprecatedFields = { 
+		a: number,
+		
+	/**
+ * @deprecated
+ */
+b: string,
+		
+	/**
+ * @deprecated This field is cringe!
+ */
+c: string,
+		
+	/**
+ * @deprecated This field is cringe!
+ */
+d: string,
+	};
+
+DeprecatedTupleVariant: export type DeprecatedTupleVariant = [
+	/**
+ * @deprecated
+ */
+string, 
+	/**
+ * @deprecated Nope
+ */
+string, 
+	/**
+ * @deprecated Nope
+ */
+number];
+
+DeprecatedEnumVariants: export type DeprecatedEnumVariants = 
+	/**
+ * @deprecated
+ */
+"A" | 
+	/**
+ * @deprecated Nope
+ */
+"B" | 
+	/**
+ * @deprecated Nope
+ */
+"C";
+
+CommentedStruct: /**
+ * Some triple-slash comment
+ * Some more triple-slash comment
+ */
+export type CommentedStruct = { 
+		
+	/**
+ * Some triple-slash comment
+ * Some more triple-slash comment
+ */
+a: number,
+	};
+
+CommentedEnum: /**
+ * Some triple-slash comment
+ * Some more triple-slash comment
+ */
+export type CommentedEnum = 
+	/**
+ * Some triple-slash comment
+ * Some more triple-slash comment
+ */
+{ A: number } | 
+	/**
+ * Some triple-slash comment
+ * Some more triple-slash comment
+ */
+{ B: { 
+	/**
+ * Some triple-slash comment
+ * Some more triple-slash comment
+ */
+a: number } };
+
+SingleLineComment: /**
+ * Some single-line comment
+ */
+export type SingleLineComment = 
+	/**
+ * Some single-line comment
+ */
+{ A: number } | 
+	/**
+ * Some single-line comment
+ */
+{ B: { 
+	/**
+ * Some single-line comment
+ */
+a: number } };
+
+NonGeneric: export type Demo<A, B> = { 
+		a: A,
+		b: B,
+	};
+
+HalfGenericA<u8>: export type Demo<A, B> = { 
+		a: A,
+		b: B,
+	};
+
+HalfGenericB<bool>: export type Demo<A, B> = { 
+		a: A,
+		b: B,
+	};
+
+FullGeneric<u8, bool>: export type Demo<A, B> = { 
+		a: A,
+		b: B,
+	};
+
+Another<bool>: export type Demo<A, B> = { 
+		a: A,
+		b: B,
+	};
+
+AGenericStruct<u32>: export type AGenericStruct<T> = { 
+		field: Demo<T, boolean>,
+	};
+
+A: export type A = { 
+		a: B,
+		b: B,
+		c: B,
+		d: D,
+		e: GenericFlattened<number>,
+	};
+
+DoubleFlattened: export type DoubleFlattened = { 
+		a: ToBeFlattened,
+		b: ToBeFlattened,
+	};
+
+FlattenedInner: export type FlattenedInner = { 
+		c: Inner,
+	};
+
+BoxFlattened: export type BoxFlattened = { 
+		b: BoxedInner,
+	};
+
+BoxInline: export type BoxInline = { 
+		c: BoxedInner,
+	};
+
+First: export type First = { 
+		a: string,
+	};
+
+Second: export type Second = { 
+		a: number,
+	};
+
+Third: export type Third = (First) & { 
+		b: { [key in string]: string },
+		c: First,
+	};
+
+Fourth: export type Fourth = { 
+		a: First,
+		b: First,
+	};
+
+Fifth: export type Fifth = { 
+		a: First,
+		b: First,
+	};
+
+Sixth: export type Sixth = { 
+		a: First,
+		b: First,
+	};
+
+Seventh: export type Seventh = { 
+		a: First,
+		b: Second,
+	};
+
+Eight: export type Eight = { A: string } | "B";
+
+Tenth: export type Tenth = string | "B" | First;
+
+MyEnumTagged: export type MyEnumTagged = (First);
+
+MyEnumExternal: export type MyEnumExternal = { Variant: (First) };
+
+MyEnumAdjacent: export type MyEnumAdjacent = (First);
+
+MyEnumUntagged: export type MyEnumUntagged = (First);

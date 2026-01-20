@@ -6,15 +6,159 @@ expression: "Typescript::default().with_serde(mode).bigint(BigIntExportBehavior:
 
 
 
-export type A = never;
+export type A = { 
+		a: B,
+		b: B,
+		c: B,
+		d: D,
+		e: GenericFlattened<number>,
+	};
+
+export type AGenericStruct<T> = { 
+		field: Demo<T, boolean>,
+	};
 
 export type ActualType = { 
 		a: GenericType<string>,
 	};
 
+export type B = { 
+		b: number,
+	};
+
 export type BasicEnum = "A" | "B";
 
+export type BoxFlattened = { 
+		b: BoxedInner,
+	};
+
+export type BoxInline = { 
+		c: BoxedInner,
+	};
+
+export type BoxedInner = { 
+		a: number,
+	};
+
 export type BracedStruct = string;
+
+/**
+ * Some triple-slash comment
+ * Some more triple-slash comment
+ */
+export type CommentedEnum = 
+	/**
+ * Some triple-slash comment
+ * Some more triple-slash comment
+ */
+{ A: number } | 
+	/**
+ * Some triple-slash comment
+ * Some more triple-slash comment
+ */
+{ B: { 
+	/**
+ * Some triple-slash comment
+ * Some more triple-slash comment
+ */
+a: number } };
+
+/**
+ * Some triple-slash comment
+ * Some more triple-slash comment
+ */
+export type CommentedStruct = { 
+		
+	/**
+ * Some triple-slash comment
+ * Some more triple-slash comment
+ */
+a: number,
+	};
+
+export type D = { 
+		flattened: number,
+	};
+
+export type Demo<A, B> = { 
+		a: A,
+		b: B,
+	};
+
+export type DeprecatedEnumVariants = 
+	/**
+ * @deprecated
+ */
+"A" | 
+	/**
+ * @deprecated Nope
+ */
+"B" | 
+	/**
+ * @deprecated Nope
+ */
+"C";
+
+export type DeprecatedFields = { 
+		a: number,
+		
+	/**
+ * @deprecated
+ */
+b: string,
+		
+	/**
+ * @deprecated This field is cringe!
+ */
+c: string,
+		
+	/**
+ * @deprecated This field is cringe!
+ */
+d: string,
+	};
+
+export type DeprecatedTupleVariant = [
+	/**
+ * @deprecated
+ */
+string, 
+	/**
+ * @deprecated Nope
+ */
+string, 
+	/**
+ * @deprecated Nope
+ */
+number];
+
+/**
+ * @deprecated
+ */
+export type DeprecatedType = { 
+		a: number,
+	};
+
+/**
+ * @deprecated Look at you big man using a deprecation message
+ */
+export type DeprecatedTypeWithMsg = { 
+		a: number,
+	};
+
+/**
+ * @deprecated Look at you big man using a deprecation message
+ */
+export type DeprecatedTypeWithMsg2 = { 
+		a: number,
+	};
+
+export type DoubleFlattened = { 
+		a: ToBeFlattened,
+		b: ToBeFlattened,
+	};
+
+export type Eight = { A: string } | "B";
 
 export type EnumMacroAttributes = { A: string } | { bbb: number } | { cccc: number } | { D: { a: string; b: number } };
 
@@ -26,6 +170,16 @@ export type ExtraBracketsInTupleVariant = { A: string };
 
 export type ExtraBracketsInUnnamedStruct = string;
 
+export type Fifth = { 
+		type: "Fifth",
+		a: First,
+		b: First,
+	};
+
+export type First = { 
+		a: string,
+	};
+
 export type FlattenEnum = { tag: "One" } | { tag: "Two" } | { tag: "Three" };
 
 export type FlattenEnumStruct = (FlattenEnum) & { 
@@ -34,6 +188,19 @@ export type FlattenEnumStruct = (FlattenEnum) & {
 
 export type FlattenOnNestedEnum = (NestedEnum) & { 
 		id: string,
+	};
+
+export type FlattenedInner = { 
+		c: Inner,
+	};
+
+export type Fourth = { 
+		a: First,
+		b: First,
+	};
+
+export type GenericFlattened<T> = { 
+		generic_flattened: T,
 	};
 
 export type GenericStruct<T> = { 
@@ -70,6 +237,11 @@ export type InlinerStruct = {
 		dont_inline_this: RefStruct,
 	};
 
+export type Inner = { 
+		a: number,
+		b: FlattenedInner,
+	};
+
 export type InvalidToValidType = { 
 		cause: null | null,
 	};
@@ -101,6 +273,14 @@ export type MacroStruct2 = {
 export type MyEmptyInput = Record<string, never>;
 
 export type MyEnum = { A: string } | { B: number };
+
+export type MyEnumAdjacent = { t: "Variant"; c: (First) };
+
+export type MyEnumExternal = { Variant: (First) };
+
+export type MyEnumTagged = (First) & { type: "Variant" };
+
+export type MyEnumUntagged = (First);
 
 export type NestedEnum = { type: "a"; value: string } | { type: "b"; value: number };
 
@@ -262,6 +442,42 @@ export type Primitives = {
 		"7b": MacroStruct,
 		"7c": MacroStruct2,
 		"7d": MacroEnum,
+		"7e": DeprecatedType,
+		"7f": DeprecatedTypeWithMsg,
+		"80": DeprecatedTypeWithMsg2,
+		"81": DeprecatedFields,
+		"82": DeprecatedTupleVariant,
+		"83": DeprecatedEnumVariants,
+		"84": CommentedStruct,
+		"85": CommentedEnum,
+		"86": SingleLineComment,
+		"87": Demo<number, boolean>,
+		"88": Demo<number, boolean>,
+		"89": Demo<number, boolean>,
+		"8a": Demo<number, boolean>,
+		"8b": Demo<number, boolean>,
+		"8c": { [key in string]: number },
+		"8d": { [key in number]: string },
+		"8e": { [key in string]: AGenericStruct<number> },
+		"8f": AGenericStruct<number>,
+		"90": A,
+		"91": DoubleFlattened,
+		"92": FlattenedInner,
+		"93": BoxFlattened,
+		"94": BoxInline,
+		"95": First,
+		"96": Second,
+		"97": Third,
+		"98": Fourth,
+		"99": Fifth,
+		"9a": Sixth,
+		"9b": Seventh,
+		"9c": Eight,
+		"9d": Tenth,
+		"9e": MyEnumTagged,
+		"9f": MyEnumExternal,
+		a0: MyEnumAdjacent,
+		a1: MyEnumUntagged,
 	};
 
 export type Recursive = { 
@@ -290,12 +506,43 @@ export type RenameWithWeirdCharsField = {
 
 export type RenameWithWeirdCharsVariant = { "@odata.context": string };
 
+export type Second = { 
+		a: number,
+	};
+
+export type Seventh = { 
+		a: First,
+		b: Second,
+	};
+
 export type SimpleStruct = { 
 		a: number,
 		b: string,
 		c: [number, string, number],
 		d: string[],
 		e: string | null,
+	};
+
+/**
+ * Some single-line comment
+ */
+export type SingleLineComment = 
+	/**
+ * Some single-line comment
+ */
+{ A: number } | 
+	/**
+ * Some single-line comment
+ */
+{ B: { 
+	/**
+ * Some single-line comment
+ */
+a: number } };
+
+export type Sixth = { 
+		a: First,
+		b: First,
 	};
 
 export type SkipVariant = { A: string };
@@ -312,7 +559,20 @@ export type SpectaTypeOverride = {
 		path: string,
 	};
 
+export type Tenth = string | "B" | First;
+
+export type TestCollectionRegister = never;
+
 export type TestEnum = "Unit" | { Single: number } | { Multiple: [number, number] } | { Struct: { a: number } };
+
+export type Third = (First) & { 
+		b: { [key in string]: string },
+		c: First,
+	};
+
+export type ToBeFlattened = { 
+		a: string,
+	};
 
 export type TransparentType = TransparentTypeInner;
 

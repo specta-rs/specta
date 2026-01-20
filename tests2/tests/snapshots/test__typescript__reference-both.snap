@@ -139,3 +139,39 @@ HashMap<Variants, ()>: Partial<{ [key in Variants]: null }>
 MacroStruct: MacroStruct
 MacroStruct2: MacroStruct2
 MacroEnum: MacroEnum
+DeprecatedType: DeprecatedType
+DeprecatedTypeWithMsg: DeprecatedTypeWithMsg
+DeprecatedTypeWithMsg2: DeprecatedTypeWithMsg2
+DeprecatedFields: DeprecatedFields
+DeprecatedTupleVariant: DeprecatedTupleVariant
+DeprecatedEnumVariants: DeprecatedEnumVariants
+CommentedStruct: CommentedStruct
+CommentedEnum: CommentedEnum
+SingleLineComment: SingleLineComment
+NonGeneric: Demo<number, boolean>
+HalfGenericA<u8>: Demo<number, boolean>
+HalfGenericB<bool>: Demo<number, boolean>
+FullGeneric<u8, bool>: Demo<number, boolean>
+Another<bool>: Demo<number, boolean>
+MapA<u32>: { [key in string]: number }
+MapB<u32>: { [key in number]: string }
+MapC<u32>: { [key in string]: AGenericStruct<number> }
+AGenericStruct<u32>: AGenericStruct<number>
+A: A
+DoubleFlattened: DoubleFlattened
+FlattenedInner: FlattenedInner
+BoxFlattened: BoxFlattened
+BoxInline: BoxInline
+First: First
+Second: Second
+Third: Third
+Fourth: Fourth
+Fifth: Fifth
+Sixth: Sixth
+Seventh: Seventh
+Eight: Eight
+Tenth: Tenth
+MyEnumTagged: MyEnumTagged
+MyEnumExternal: MyEnumExternal
+MyEnumAdjacent: MyEnumAdjacent
+MyEnumUntagged: MyEnumUntagged

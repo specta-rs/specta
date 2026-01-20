@@ -25,8 +25,10 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
 
     // Test that the types don't get duplicated in the type map.
     #[derive(Type)]
-    pub enum A {}
-    types = types.register::<A>().register::<A>();
+    pub enum TestCollectionRegister {}
+    types = types
+        .register::<TestCollectionRegister>()
+        .register::<TestCollectionRegister>();
 
     (types, dts)
 }
@@ -217,6 +219,33 @@ fn reserved_names() {
         insta::assert_snapshot!(primitives::export(&Default::default(), &types, ndt).unwrap_err().to_string(), @r#"Attempted to export Type but was unable to due to name  conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
     }
 }
+
+// #[test]
+// fn duplicate_ty_name() {
+//     mod one {
+//         use super::*;
+
+//         #[derive(Type)]
+//         #[specta(collect = false)]
+//         pub struct One {
+//             pub a: String,
+//         }
+//     }
+
+//     #[derive(Type)]
+//     #[specta(collect = false)]
+//     pub struct One {
+//         pub one: one::One,
+//     }
+
+//     assert!(
+//         Typescript::default()
+//             .export(&TypeCollection::default().register::<Demo>())
+//             .is_err_and(|err| err
+//                 .to_string()
+//                 .starts_with("Detected multiple types with the same name:"))
+//     );
+// }
 
 // TODO
 //
