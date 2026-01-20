@@ -1,5 +1,5 @@
 ---
-source: tests2/tests/typescript.rs
+source: tests/tests/typescript.rs
 expression: "dts.iter().map(|(s, ty)|\nprimitives::inline(&ts, &types,\nty).map(|ty| format!(\"{s}: {ty}\"))).collect::<Result<Vec<_>,\n_>>().unwrap().join(\"\\n\")"
 ---
 i8: number
@@ -29,6 +29,7 @@ RangeInclusive<i32>: {
 (): null
 (String, i32): [string, number]
 (String, i32, bool): [string, number, boolean]
+((String, i32), (bool, char, bool), ()): [[string, number], [boolean, string, boolean], null]
 (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool): [boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean]
 String: string
 PathBuf: string
@@ -52,13 +53,18 @@ Duration: {
 Vec<i32>: number[]
 &'static [i32]: number[]
 &'static [i32; 3]: [number, number, number]
+[i32; 3]: [number, number, number]
 Vec<MyEnum>: MyEnum[]
 &'static [MyEnum]: MyEnum[]
 &'static [MyEnum; 6]: [MyEnum, MyEnum, MyEnum, MyEnum, MyEnum, MyEnum]
+[MyEnum; 2]: [MyEnum, MyEnum]
 &'static [i32; 1]: [number]
 &'static [i32; 0]: []
 Option<i32>: number | null
 Option<()>: null | null
+Option<Vec<i32>>: number[] | null
+Option<Option<String>>: string | null
+Option<Option<Option<String>>>: string | null
 Unit1: null
 Unit2: Record<string, never>
 Unit3: []
@@ -97,6 +103,12 @@ HasGenericAlias: { [key in number]: string }
 SkipVariant: { A: string }
 SkipVariant2: string
 SkipVariant3: { A: { a: string } }
+SkipStructFields: { 
+	a: number,
+}
+SpectaSkipNonTypeField: { 
+	a: number,
+}
 EnumMacroAttributes: { A: string } | { B: number } | { C: number } | { D: { a: string; b: number } }
 InlineEnumField: { A: PlaceholderInnerField }
 InlineOptionalType: { 
@@ -166,6 +178,14 @@ TupleStruct: string
 TupleStructWithRep: string
 GenericTupleStruct<String>: T
 BracedStruct: string
+StructRenameAllUppercase: { 
+	a: number,
+	b: number,
+}
+RenameSerdeSpecialChar: { 
+	b: number,
+}
+EnumRenameAllUppercase: "HelloWorld" | "VariantB" | "TestingWords"
 Recursive: { 
 	demo: Recursive,
 }
@@ -180,11 +200,19 @@ OptionalOnTransparentNamedField: {
 	b: string | null,
 }
 OptionalInEnum: { A: string | null } | { B: { a: string | null } } | { C: { a?: string | null } }
+Optional: { 
+	a: number | null,
+	b?: number | null,
+	c: string | null,
+	d: boolean,
+}
+UntaggedVariants: string | number | { id: string } | [string, boolean]
+UntaggedVariantsWithoutValue: string | [number, string] | number
 HashMap<String, ()>: { [key in string]: null }
 Regular: { [key in string]: null }
 HashMap<Infallible, ()>: { [key in never]: null }
 HashMap<UnitVariants, ()>: Partial<{ [key in UnitVariants]: null }>
-HashMap<UntaggedVariants, ()>: Partial<{ [key in UntaggedVariants]: null }>
+HashMap<UntaggedVariantsKey, ()>: Partial<{ [key in UntaggedVariantsKey]: null }>
 HashMap<Variants, ()>: Partial<{ [key in Variants]: null }>
 MacroStruct: string
 MacroStruct2: { 
@@ -273,7 +301,7 @@ Fourth: {
 	a: First,
 	b: First,
 }
-Fifth: { 
+TagOnStructWithInline: { 
 	a: First,
 	b: First,
 }

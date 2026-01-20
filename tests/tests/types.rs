@@ -98,6 +98,7 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         (),
         (String, i32),
         (String, i32, bool),
+        ((String, i32), (bool, char, bool), ()),
         (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool),
 
         String, PathBuf,
@@ -111,7 +112,10 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         Vec<i32>, &'static [i32], &'static [i32; 3], [i32; 3],
         Vec<MyEnum>, &'static [MyEnum], &'static [MyEnum; 6], [MyEnum; 2],
         &'static [i32; 1], &'static [i32; 0],
-        Option<i32>, Option<()>,
+        Option<i32>, Option<()>, Option<Vec<i32>>,
+
+        Option<Option<String>>,
+        Option<Option<Option<String>>>,
 
         // https://github.com/specta-rs/specta/issues/88
         Unit1, Unit2, Unit3, Unit4, Unit5, Unit6, Unit7,
@@ -136,6 +140,8 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         SkipVariant,
         SkipVariant2,
         SkipVariant3,
+        SkipStructFields,
+        SpectaSkipNonTypeField,
 
         EnumMacroAttributes,
 
@@ -227,6 +233,9 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         // Enum,
         // Enum2,
         // Enum3, // TODO: Fix these
+        StructRenameAllUppercase,
+        RenameSerdeSpecialChar,
+        EnumRenameAllUppercase,
 
         // Recursive types
         Recursive,
@@ -240,6 +249,10 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         OptionalOnNamedField,
         OptionalOnTransparentNamedField,
         OptionalInEnum,
+        Optional,
+
+        UntaggedVariants,
+        UntaggedVariantsWithoutValue,
 
         // Valid Map keys
         HashMap<String, ()>,
@@ -248,7 +261,7 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         // HashMap<Any, ()>, // TODO: Fix this
         // HashMap<TransparentStruct, ()>, // TODO: Fix this
         HashMap<UnitVariants, ()>,
-        HashMap<UntaggedVariants, ()>,
+        HashMap<UntaggedVariantsKey, ()>,
         // ValidMaybeValidKey, // TODO: Fix this
         // ValidMaybeValidKeyNested, // TODO: Fix this
         // HashMap<() /* `null` */, ()>, // TODO: Fix this
@@ -297,7 +310,7 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         Second,
         Third,
         Fourth,
-        Fifth,
+        TagOnStructWithInline,
         Sixth,
         Seventh,
         Eight,
@@ -468,6 +481,24 @@ enum SkipVariant3 {
     C {
         b: i32,
     },
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+struct SkipStructFields {
+    a: i32,
+    #[specta(skip)]
+    b: String,
+    #[serde(skip)]
+    d: Box<dyn std::any::Any>, // `!Type`
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct SpectaSkipNonTypeField {
+    a: i32,
+    #[specta(skip)]
+    d: Box<dyn std::any::Any>, // `!Type`
 }
 
 #[derive(Type, Serialize, Deserialize)]
@@ -746,6 +777,34 @@ pub enum Enum2 {
     #[serde(rename = "C")]
     A,
     B,
+    #[serde(rename_all = "camelCase")]
+    D {
+        enum_field: (),
+    },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all = "UPPERCASE")]
+struct StructRenameAllUppercase {
+    a: i32,
+    b: i32,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(rename_all = "UPPERCASE")]
+enum EnumRenameAllUppercase {
+    HelloWorld,
+    VariantB,
+    TestingWords,
+}
+
+#[derive(serde::Serialize, Type)]
+#[specta(collect = false)]
+struct RenameSerdeSpecialChar {
+    #[serde(rename = "a/b")]
+    b: i32,
 }
 
 #[derive(Type, Serialize, Deserialize)]
@@ -862,9 +921,29 @@ enum UnitVariants {
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(untagged)]
+enum UntaggedVariantsKey {
+    A(String),
+    B(i32),
+    C(u8),
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
 enum UntaggedVariants {
     A(String),
     B(i32),
+    C(u8),
+    D { id: String },
+    E(String, bool),
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedVariantsWithoutValue {
+    A(String),
+    B(i32, String),
     C(u8),
 }
 
@@ -1171,7 +1250,7 @@ pub struct Fourth {
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
-pub struct Fifth {
+pub struct TagOnStructWithInline {
     pub a: First,
     #[specta(inline)]
     pub b: First,
@@ -1264,4 +1343,16 @@ pub enum Tenth {
     #[specta(inline)]
     C(First),
     D(First),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct Optional {
+    a: Option<i32>,
+    #[specta(optional)]
+    b: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    c: Option<String>,
+    #[serde(default)]
+    d: bool,
 }

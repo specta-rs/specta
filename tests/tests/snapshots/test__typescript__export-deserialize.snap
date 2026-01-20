@@ -1,5 +1,5 @@
 ---
-source: tests2/tests/typescript.rs
+source: tests/tests/typescript.rs
 expression: "dts.iter().filter_map(|(s, ty)| match ty\n{\n    DataType::Reference(r) => r.get(&types).cloned().map(|ty| (s, ty)), _ =>\n    None,\n}).map(|(s, ty)|\nprimitives::export(&ts, &types,\n&ty).map(|ty| format!(\"{s}: {ty}\"))).collect::<Result<Vec<_>,\n_>>().unwrap().join(\"\\n\")"
 ---
 Unit1: export type Unit1 = null;
@@ -60,6 +60,14 @@ SkipVariant: export type SkipVariant = { A: string };
 SkipVariant2: export type SkipVariant2 = string;
 
 SkipVariant3: export type SkipVariant3 = { A: { a: string } };
+
+SkipStructFields: export type SkipStructFields = { 
+		a: number,
+	};
+
+SpectaSkipNonTypeField: export type SpectaSkipNonTypeField = { 
+		a: number,
+	};
 
 EnumMacroAttributes: export type EnumMacroAttributes = { A: string } | { B: number } | { C: number } | { D: { a: string; b: number } };
 
@@ -147,6 +155,17 @@ GenericTupleStruct<String>: export type GenericTupleStruct<T> = T;
 
 BracedStruct: export type BracedStruct = string;
 
+StructRenameAllUppercase: export type StructRenameAllUppercase = { 
+		a: number,
+		b: number,
+	};
+
+RenameSerdeSpecialChar: export type RenameSerdeSpecialChar = { 
+		b: number,
+	};
+
+EnumRenameAllUppercase: export type EnumRenameAllUppercase = "HelloWorld" | "VariantB" | "TestingWords";
+
 Recursive: export type Recursive = { 
 		demo: Recursive,
 	};
@@ -168,6 +187,17 @@ OptionalOnTransparentNamedField: export type OptionalOnTransparentNamedField = {
 	};
 
 OptionalInEnum: export type OptionalInEnum = { A: string | null } | { B: { a: string | null } } | { C: { a?: string | null } };
+
+Optional: export type Optional = { 
+		a: number | null,
+		b?: number | null,
+		c: string | null,
+		d: boolean,
+	};
+
+UntaggedVariants: export type UntaggedVariants = string | number | { id: string } | [string, boolean];
+
+UntaggedVariantsWithoutValue: export type UntaggedVariantsWithoutValue = string | [number, string] | number;
 
 Regular: export type Regular = { [key in string]: null };
 
@@ -370,7 +400,7 @@ Fourth: export type Fourth = {
 		b: First,
 	};
 
-Fifth: export type Fifth = { 
+TagOnStructWithInline: export type TagOnStructWithInline = { 
 		a: First,
 		b: First,
 	};

@@ -1,5 +1,5 @@
 ---
-source: tests2/tests/typescript.rs
+source: tests/tests/typescript.rs
 expression: "dts.iter().map(|(s, ty)|\nprimitives::reference(&ts, &types,\nty).map(|ty| format!(\"{s}: {ty}\"))).collect::<Result<Vec<_>,\n_>>().unwrap().join(\"\\n\")"
 ---
 i8: number
@@ -29,6 +29,7 @@ RangeInclusive<i32>: {
 (): null
 (String, i32): [string, number]
 (String, i32, bool): [string, number, boolean]
+((String, i32), (bool, char, bool), ()): [[string, number], [boolean, string, boolean], null]
 (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool): [boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean]
 String: string
 PathBuf: string
@@ -52,13 +53,18 @@ Duration: {
 Vec<i32>: number[]
 &'static [i32]: number[]
 &'static [i32; 3]: [number, number, number]
+[i32; 3]: [number, number, number]
 Vec<MyEnum>: MyEnum[]
 &'static [MyEnum]: MyEnum[]
 &'static [MyEnum; 6]: [MyEnum, MyEnum, MyEnum, MyEnum, MyEnum, MyEnum]
+[MyEnum; 2]: [MyEnum, MyEnum]
 &'static [i32; 1]: [number]
 &'static [i32; 0]: []
 Option<i32>: number | null
 Option<()>: null | null
+Option<Vec<i32>>: number[] | null
+Option<Option<String>>: string | null
+Option<Option<Option<String>>>: string | null
 Unit1: Unit1
 Unit2: Unit2
 Unit3: Unit3
@@ -80,6 +86,8 @@ HasGenericAlias: HasGenericAlias
 SkipVariant: SkipVariant
 SkipVariant2: SkipVariant2
 SkipVariant3: SkipVariant3
+SkipStructFields: SkipStructFields
+SpectaSkipNonTypeField: SpectaSkipNonTypeField
 EnumMacroAttributes: EnumMacroAttributes
 InlineEnumField: InlineEnumField
 InlineOptionalType: InlineOptionalType
@@ -122,6 +130,9 @@ TupleStruct: TupleStruct
 TupleStructWithRep: TupleStructWithRep
 GenericTupleStruct<String>: GenericTupleStruct<string>
 BracedStruct: BracedStruct
+StructRenameAllUppercase: StructRenameAllUppercase
+RenameSerdeSpecialChar: RenameSerdeSpecialChar
+EnumRenameAllUppercase: EnumRenameAllUppercase
 Recursive: Recursive
 RecursiveMapValue: RecursiveMapValue
 RecursiveTransparent: RecursiveTransparent
@@ -130,11 +141,14 @@ NonOptional: NonOptional
 OptionalOnNamedField: OptionalOnNamedField
 OptionalOnTransparentNamedField: OptionalOnTransparentNamedField
 OptionalInEnum: OptionalInEnum
+Optional: Optional
+UntaggedVariants: UntaggedVariants
+UntaggedVariantsWithoutValue: UntaggedVariantsWithoutValue
 HashMap<String, ()>: { [key in string]: null }
 Regular: Regular
 HashMap<Infallible, ()>: { [key in never]: null }
 HashMap<UnitVariants, ()>: Partial<{ [key in UnitVariants]: null }>
-HashMap<UntaggedVariants, ()>: Partial<{ [key in UntaggedVariants]: null }>
+HashMap<UntaggedVariantsKey, ()>: Partial<{ [key in UntaggedVariantsKey]: null }>
 HashMap<Variants, ()>: Partial<{ [key in Variants]: null }>
 MacroStruct: MacroStruct
 MacroStruct2: MacroStruct2
@@ -166,7 +180,7 @@ First: First
 Second: Second
 Third: Third
 Fourth: Fourth
-Fifth: Fifth
+TagOnStructWithInline: TagOnStructWithInline
 Sixth: Sixth
 Seventh: Seventh
 Eight: Eight
