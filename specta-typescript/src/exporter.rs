@@ -73,9 +73,10 @@ pub struct Exporter {
     pub(crate) jsdoc: bool,
 }
 
-impl Default for Exporter {
-    fn default() -> Self {
-        Self {
+impl Exporter {
+    // You should get this from either a [Typescript] or [JSDoc], not construct it directly.
+    pub(crate) fn default() -> Exporter {
+        Exporter {
             header: Cow::Borrowed(""),
             framework_runtime: Cow::Borrowed(""),
             framework_prelude: Cow::Borrowed(
@@ -92,13 +93,6 @@ impl Default for Exporter {
             jsdoc: false,
         }
     }
-}
-
-impl Exporter {
-    /// Construct a new Typescript exporter with the default options configured.
-    pub fn new() -> Self {
-        Default::default()
-    }
 
     /// Define a custom Typescript type which can be injected in place of a `Reference`.
     ///
@@ -108,15 +102,14 @@ impl Exporter {
         self.references.push((reference.clone(), typescript.into()));
         reference
     }
+
     /// Provide a prelude which is added to the start of all exported files.
-    #[doc(hidden)]
     pub fn framework_prelude(mut self, prelude: impl Into<Cow<'static, str>>) -> Self {
         self.framework_prelude = prelude.into();
         self
     }
 
     /// Inject some code which is exported into the bindings file (or a root `index.ts` file).
-    #[doc(hidden)]
     pub fn framework_runtime(mut self, runtime: impl Into<Cow<'static, str>>) -> Self {
         self.framework_runtime = runtime.into();
         self
