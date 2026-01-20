@@ -1,6 +1,7 @@
 //! We register a single entrypoint so all tests are compiled into a single binary.
 #![allow(unused_parens, unused_variables, dead_code, unused_mut)]
 
+mod branded;
 mod functions;
 mod jsdoc;
 mod types;

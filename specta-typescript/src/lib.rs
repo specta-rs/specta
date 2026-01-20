@@ -46,6 +46,7 @@
     html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
 
+mod branded;
 mod error;
 mod exporter;
 mod jsdoc;

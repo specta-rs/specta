@@ -109,14 +109,12 @@ impl Exporter {
         reference
     }
     /// Provide a prelude which is added to the start of all exported files.
-    #[doc(hidden)]
     pub fn framework_prelude(mut self, prelude: impl Into<Cow<'static, str>>) -> Self {
         self.framework_prelude = prelude.into();
         self
     }
 
     /// Inject some code which is exported into the bindings file (or a root `index.ts` file).
-    #[doc(hidden)]
     pub fn framework_runtime(mut self, runtime: impl Into<Cow<'static, str>>) -> Self {
         self.framework_runtime = runtime.into();
         self

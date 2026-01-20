@@ -1,6 +1,6 @@
 use std::{borrow::Cow, path::Path};
 
-use specta::{TypeCollection, datatype::Reference};
+use specta::TypeCollection;
 use specta_serde::SerdeMode;
 
 use crate::{BigIntExportBehavior, Error, Exporter, Layout};
@@ -33,32 +33,6 @@ impl JSDoc {
     /// Construct a new JSDoc exporter with the default options configured.
     pub fn new() -> Self {
         Default::default()
-    }
-
-    /// Define a custom Typescript type which can be injected in place of a `Reference`.
-    ///
-    /// This is an advanced feature which should be used with caution.
-    pub fn define(&mut self, typescript: impl Into<Cow<'static, str>>) -> Reference {
-        self.0.define(typescript)
-    }
-
-    /// Provide a prelude which is added to the start of all exported files.
-    #[doc(hidden)]
-    pub fn framework_prelude(self, prelude: impl Into<Cow<'static, str>>) -> Self {
-        Self(self.0.framework_prelude(prelude))
-    }
-
-    /// Inject some code which is exported into the bindings file (or a root `index.ts` file).
-    #[doc(hidden)]
-    pub fn framework_runtime(self, runtime: impl Into<Cow<'static, str>>) -> Self {
-        Self(self.0.framework_runtime(runtime))
-    }
-
-    /// Override the header for the exported file.
-    /// You should prefer `Self::header` instead unless your a framework.
-    #[doc(hidden)] // Although this is hidden it's still public API.
-    pub fn framework_header(self, header: impl Into<Cow<'static, str>>) -> Self {
-        Self(self.0.framework_prelude(header))
     }
 
     /// Configure a header for the file.
