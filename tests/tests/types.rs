@@ -108,8 +108,8 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         SystemTime, Duration,
 
         &'static str, &'static bool, &'static i32,
-        Vec<i32>, &'static [i32], &'static [i32; 3],
-        Vec<MyEnum>, &'static [MyEnum], &'static [MyEnum; 6],
+        Vec<i32>, &'static [i32], &'static [i32; 3], [i32; 3],
+        Vec<MyEnum>, &'static [MyEnum], &'static [MyEnum; 6], [MyEnum; 2],
         &'static [i32; 1], &'static [i32; 0],
         Option<i32>, Option<()>,
 

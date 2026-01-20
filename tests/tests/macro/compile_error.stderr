@@ -1,9 +1,3 @@
-error: specta: found string literal containing an unsupported inflection
- --> tests/macro/compile_error.rs:7:22
-  |
-7 | #[serde(rename_all = "camelCase123")]
-  |                      ^^^^^^^^^^^^^^
-
 error: specta: Found unsupported container attribute 'noshot'
   --> tests/macro/compile_error.rs:75:10
    |
@@ -46,23 +40,161 @@ error: specta: invalid formatted attribute
 103 | #[specta = "todo"]
     |   ^^^^^^
 
-error[E0432]: unresolved import `specta::specta`
- --> tests/macro/compile_error.rs:3:14
+error: specta: You must apply the #[specta] macro before the #[wasm_bindgen] macro
+   --> tests/macro/compile_error.rs:108:1
+    |
+108 | #[wasm_bindgen]
+    | ^^^^^^^^^^^^^^^
+    |
+    = note: this error originates in the attribute macro `wasm_bindgen` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0255]: the name `__specta__fn__testing` is defined multiple times
+   --> tests/macro/compile_error.rs:110:8
+    |
+109 | #[specta]
+    | --------- previous definition of the macro `__specta__fn__testing` here
+110 | pub fn testing() {}
+    |        ^^^^^^^ `__specta__fn__testing` reimported here
+    |
+    = note: `__specta__fn__testing` must be defined only once in the macro namespace of this module
+
+error: cannot find attribute `serde` in this scope
+ --> tests/macro/compile_error.rs:7:3
   |
-3 | use specta::{specta, Type};
-  |              ^^^^^^ no `specta` in the root
+7 | #[serde(rename_all = "camelCase123")]
+  |   ^^^^^
   |
-note: found an item that was configured out
- --> $WORKSPACE/specta/src/lib.rs
+  = note: `serde` is in scope, but it is a crate, not an attribute
+help: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
   |
-  | #[cfg(all(feature = "derive", feature = "function"))]
-  |                               -------------------- the item is gated behind the `function` feature
-  | #[cfg_attr(docsrs, doc(cfg(all(feature = "derive", feature = "function"))))]
-  | pub use specta_macros::specta;
-  |                        ^^^^^^
+8 + #[derive(Deserialize, Serialize)]
+9 | pub enum Demo2 {}
+  |
+
+error: cannot find attribute `serde` in this scope
+  --> tests/macro/compile_error.rs:31:7
+   |
+31 |     #[serde(flatten)]
+   |       ^^^^^
+   |
+   = note: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
+   = note: `serde` is in scope, but it is a crate, not an attribute
+
+error: cannot find attribute `serde` in this scope
+  --> tests/macro/compile_error.rs:33:7
+   |
+33 |     #[serde(flatten)]
+   |       ^^^^^
+   |
+   = note: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
+   = note: `serde` is in scope, but it is a crate, not an attribute
+
+error: cannot find attribute `serde` in this scope
+  --> tests/macro/compile_error.rs:38:3
+   |
+38 | #[serde(untagged)]
+   |   ^^^^^
+   |
+   = note: `serde` is in scope, but it is a crate, not an attribute
+help: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
+   |
+39 + #[derive(Deserialize, Serialize)]
+40 | enum UnnamedUntagged {
+   |
+
+error: cannot find attribute `serde` in this scope
+  --> tests/macro/compile_error.rs:44:3
+   |
+44 | #[serde(untagged)]
+   |   ^^^^^
+   |
+   = note: `serde` is in scope, but it is a crate, not an attribute
+help: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
+   |
+45 + #[derive(Deserialize, Serialize)]
+46 | enum UnnamedMultiUntagged {
+   |
+
+error: cannot find attribute `serde` in this scope
+  --> tests/macro/compile_error.rs:51:7
+   |
+51 |     #[serde(flatten)]
+   |       ^^^^^
+   |
+   = note: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
+   = note: `serde` is in scope, but it is a crate, not an attribute
+
+error: cannot find attribute `serde` in this scope
+  --> tests/macro/compile_error.rs:53:7
+   |
+53 |     #[serde(flatten)]
+   |       ^^^^^
+   |
+   = note: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
+   = note: `serde` is in scope, but it is a crate, not an attribute
+
+error: cannot find attribute `serde` in this scope
+  --> tests/macro/compile_error.rs:60:3
+   |
+60 | #[serde(tag = "tag")]
+   |   ^^^^^
+   |
+   = note: `serde` is in scope, but it is a crate, not an attribute
+help: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
+   |
+61 + #[derive(Deserialize, Serialize)]
+62 | enum UnnamedInternal {
+   |
+
+error: cannot find attribute `serde` in this scope
+  --> tests/macro/compile_error.rs:69:7
+   |
+69 |     #[serde(flatten)]
+   |       ^^^^^
+   |
+   = note: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
+   = note: `serde` is in scope, but it is a crate, not an attribute
 
 error[E0601]: `main` function not found in crate `$CRATE`
    --> tests/macro/compile_error.rs:110:20
     |
 110 | pub fn testing() {}
     |                    ^ consider adding a `main` function to `$DIR/tests/macro/compile_error.rs`
+
+error[E0277]: the trait `specta::Type` is not implemented for `dyn std::error::Error + Send + Sync`
+  --> tests/macro/compile_error.rs:13:23
+   |
+13 |     pub(crate) cause: Option<Box<dyn std::error::Error + Send + Sync>>,
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `dyn std::error::Error + Send + Sync` must implement `Type`
+   |
+   = help: the trait `Type` is not implemented for `dyn std::error::Error + Send + Sync`
+   = note: Depending on your use case, this can be fixed in multiple ways:
+            - If your using an type defined in one of your own crates, ensure you have `#[derive(specta::Type)]` on it.
+            - If your using a crate with official Specta support enable the feature flag on the 'specta' crate, refer to the documentation at https://docs.rs/specta/latest/specta/#feature-flags.
+            - If your using an external crate without Specta support, you may need to wrap your type in a new-type wrapper, refer to the examples at https://docs.rs/specta/latest/specta/trait.Type.html
+
+   = help: the following other types implement trait `Type`:
+             &T
+             &[T]
+             &str
+             ()
+             (T10, T11, T12, T13)
+             (T11, T12, T13)
+             (T12, T13)
+             (T13,)
+           and $N others
+   = note: required for `Box<dyn std::error::Error + Send + Sync>` to implement `Type`
+   = note: 1 redundant requirement hidden
+   = note: required for `Option<Box<dyn std::error::Error + Send + Sync>>` to implement `Type`
+
+error[E0277]: the size for values of type `dyn std::error::Error + Send + Sync` cannot be known at compilation time
+  --> tests/macro/compile_error.rs:13:23
+   |
+13 |     pub(crate) cause: Option<Box<dyn std::error::Error + Send + Sync>>,
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ doesn't have a size known at compile-time
+   |
+   = help: the trait `Sized` is not implemented for `dyn std::error::Error + Send + Sync`
+   = help: the trait `Type` is implemented for `Option<T>`
+   = note: required for `Box<dyn std::error::Error + Send + Sync>` to implement `Type`
+   = note: 1 redundant requirement hidden
+   = note: required for `Option<Box<dyn std::error::Error + Send + Sync>>` to implement `Type`
