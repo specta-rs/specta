@@ -1,8 +1,8 @@
 use std::{borrow::Cow, panic::Location};
 
 use crate::{
+    datatype::{reference::ArcId, Generic, Reference},
     DataType, TypeCollection,
-    datatype::{Generic, Reference, reference::ArcId},
 };
 
 /// A named type represents a non-primitive type capable of being exported as it's own named entity.
@@ -169,6 +169,26 @@ impl NamedDataType {
     /// Set the inner [`DataType`]
     pub fn set_ty(&mut self, ty: DataType) {
         self.inner = ty;
+    }
+
+    /// Get the internal ArcId (for advanced use cases like type mapping)
+    pub fn id(&self) -> &ArcId {
+        &self.id
+    }
+
+    /// Clone this NamedDataType with a new ArcId and name
+    /// This is useful for creating derivative types (e.g., serialization-specific versions)
+    pub fn clone_with_id(&self, id: ArcId, name: Cow<'static, str>) -> Self {
+        Self {
+            id,
+            name,
+            docs: self.docs.clone(),
+            deprecated: self.deprecated.clone(),
+            module_path: self.module_path.clone(),
+            location: self.location,
+            generics: self.generics.clone(),
+            inner: self.inner.clone(),
+        }
     }
 }
 

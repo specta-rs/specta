@@ -2,7 +2,7 @@
 
 use std::{fmt, hash, sync::Arc};
 
-use crate::{TypeCollection, datatype::NamedDataType};
+use crate::{datatype::NamedDataType, TypeCollection};
 
 use super::{DataType, Generic};
 
@@ -71,6 +71,29 @@ impl Reference {
     pub fn inline(&self) -> bool {
         self.inline
     }
+
+    /// Get a mutable reference to the generic parameters
+    pub fn generics_mut(&mut self) -> &mut Vec<(Generic, DataType)> {
+        &mut self.generics
+    }
+
+    /// Get the internal ArcId (for advanced use cases like type mapping)
+    pub fn id(&self) -> &ArcId {
+        &self.id
+    }
+
+    /// Create a new Reference from components (for advanced use cases like type cloning)
+    ///
+    /// # Note
+    /// This is an advanced API that should be used carefully. The ArcId should be valid
+    /// and correspond to an actual type in a TypeCollection.
+    pub fn from_parts(id: ArcId, generics: Vec<(Generic, DataType)>, inline: bool) -> Self {
+        Self {
+            id,
+            generics,
+            inline,
+        }
+    }
 }
 
 impl From<Reference> for DataType {
@@ -86,11 +109,19 @@ impl From<Reference> for DataType {
 /// it requires a program-length allocation which is cringe so we use the pointer
 /// to a static which is much more error-prone.
 #[derive(Clone)]
-pub(crate) enum ArcId {
+pub enum ArcId {
     // A pointer to a `static ...: ()`.
     // These are all given a unique pointer.
     Static(&'static ()),
     Dynamic(Arc<()>),
+}
+
+impl ArcId {
+    /// Create a new dynamic ArcId
+    /// This is useful for creating types programmatically
+    pub fn new_dynamic() -> Self {
+        Self::Dynamic(Arc::new(()))
+    }
 }
 
 impl PartialEq for ArcId {

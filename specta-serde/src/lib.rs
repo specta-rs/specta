@@ -67,8 +67,10 @@ pub use serde_attrs::{SerdeMode, apply_serde_transformations};
 use specta::TypeCollection;
 use specta::datatype::{
     DataType, Enum, Fields, Generic, Primitive, Reference, skip_fields, skip_fields_named,
+    ArcId,
 };
-use std::collections::HashSet;
+use std::borrow::Cow;
+use std::collections::{HashSet, HashMap};
 
 /// Apply Serde attributes to a [TypeCollection] in-place.
 ///
@@ -195,6 +197,209 @@ pub fn process_for_both(types: &TypeCollection) -> Result<(TypeCollection, TypeC
     let ser_types = process_for_serialization(types)?;
     let de_types = process_for_deserialization(types)?;
     Ok((ser_types, de_types))
+}
+
+/// Transform a TypeCollection into phases with separate types for serialization and deserialization
+///
+/// This function takes a `TypeCollection` and returns a new collection containing:
+/// - All original types (unchanged)
+/// - A `{OriginalName}_Serialize` version of each type with serialization transformations applied
+/// - A `{OriginalName}_Deserialize` version of each type with deserialization transformations applied
+///
+/// References between types are automatically updated so that types in the serialize phase
+/// reference other serialize-phase types, and likewise for deserialize-phase types.
+///
+/// This is useful when you need separate type definitions for input and output in an API,
+/// or when serialization and deserialization representations differ significantly.
+///
+/// # Example
+/// ```ignore
+/// use specta::TypeCollection;
+/// use specta_serde::into_phases;
+///
+/// let mut types = TypeCollection::default();
+/// types.register::<User>();
+/// types.register::<Post>();
+///
+/// // Returns collection with: User, User_Serialize, User_Deserialize, Post, Post_Serialize, Post_Deserialize
+/// let phased = into_phases(types)?;
+/// ```
+///
+/// # Behavior
+/// - Each type gets two new versions with `_Serialize` and `_Deserialize` suffixes
+/// - Original types remain unchanged in the returned collection
+/// - References are updated: `User_Serialize` referencing `Post` becomes a reference to `Post_Serialize`
+/// - Serde transformations are applied according to the phase (serialize or deserialize)
+/// - Generic parameters are preserved in the phase-specific versions
+pub fn into_phases(types: TypeCollection) -> Result<TypeCollection, Error> {
+    // Step 1: Build mapping from original ArcId to phase-specific ArcIds
+    let mut id_mapping: HashMap<ArcId, (ArcId, ArcId)> = HashMap::new();
+    let mut serialize_types = TypeCollection::default();
+    let mut deserialize_types = TypeCollection::default();
+    
+    // Step 2: Create phase-specific versions of each type
+    for ndt in types.into_unsorted_iter() {
+        let original_id = ndt.id().clone();
+        
+        // Create new ArcIds for phase-specific versions
+        let ser_id = ArcId::new_dynamic();
+        let de_id = ArcId::new_dynamic();
+        id_mapping.insert(original_id, (ser_id.clone(), de_id.clone()));
+        
+        // Clone for serialize version
+        let ser_name = format!("{}_Serialize", ndt.name());
+        let ser_ndt = ndt.clone_with_id(ser_id, Cow::Owned(ser_name));
+        serialize_types = serialize_types.insert(ser_ndt);
+        
+        // Clone for deserialize version
+        let de_name = format!("{}_Deserialize", ndt.name());
+        let de_ndt = ndt.clone_with_id(de_id, Cow::Owned(de_name));
+        deserialize_types = deserialize_types.insert(de_ndt);
+    }
+
+    // Step 3: Update references in phase-specific types
+    serialize_types = serialize_types.map(|mut ndt| {
+        let transformed_dt = update_references_in_datatype(
+            ndt.ty().clone(),
+            SerdeMode::Serialize,
+            &id_mapping,
+        );
+        ndt.set_ty(transformed_dt);
+        ndt
+    });
+    
+    deserialize_types = deserialize_types.map(|mut ndt| {
+        let transformed_dt = update_references_in_datatype(
+            ndt.ty().clone(),
+            SerdeMode::Deserialize,
+            &id_mapping,
+        );
+        ndt.set_ty(transformed_dt);
+        ndt
+    });
+
+    // Step 4: Apply serde transformations to each phase
+    apply(&mut serialize_types, SerdeMode::Serialize)?;
+    apply(&mut deserialize_types, SerdeMode::Deserialize)?;
+
+    // Step 5: Merge all collections (original + serialize + deserialize)
+    let mut result = types;
+    for ndt in serialize_types.into_sorted_iter() {
+        result = result.insert(ndt);
+    }
+    for ndt in deserialize_types.into_sorted_iter() {
+        result = result.insert(ndt);
+    }
+    
+    Ok(result)
+}
+
+/// Helper function to recursively update references in a DataType
+fn update_references_in_datatype(
+    dt: DataType,
+    phase: SerdeMode,
+    mapping: &HashMap<ArcId, (ArcId, ArcId)>,
+) -> DataType {
+    match dt {
+        DataType::Nullable(inner) => {
+            DataType::Nullable(Box::new(update_references_in_datatype(*inner, phase, mapping)))
+        }
+        DataType::Map(mut map) => {
+            let key = update_references_in_datatype(map.key_ty().clone(), phase, mapping);
+            let value = update_references_in_datatype(map.value_ty().clone(), phase, mapping);
+            *map.key_ty_mut() = key;
+            *map.value_ty_mut() = value;
+            DataType::Map(map)
+        }
+        DataType::Struct(mut s) => {
+            let fields = match s.fields().clone() {
+                Fields::Unit => Fields::Unit,
+                Fields::Unnamed(mut fields) => {
+                    for field in fields.fields_mut() {
+                        if let Some(ty) = field.ty_mut() {
+                            *ty = update_references_in_datatype(ty.clone(), phase, mapping);
+                        }
+                    }
+                    Fields::Unnamed(fields)
+                }
+                Fields::Named(mut fields) => {
+                    for (_, field) in fields.fields_mut() {
+                        if let Some(ty) = field.ty_mut() {
+                            *ty = update_references_in_datatype(ty.clone(), phase, mapping);
+                        }
+                    }
+                    Fields::Named(fields)
+                }
+            };
+            s.set_fields(fields);
+            DataType::Struct(s)
+        }
+        DataType::Enum(mut e) => {
+            for (_, variant) in e.variants_mut() {
+                let fields = match variant.fields().clone() {
+                    Fields::Unit => Fields::Unit,
+                    Fields::Unnamed(mut fields) => {
+                        for field in fields.fields_mut() {
+                            if let Some(ty) = field.ty_mut() {
+                                *ty = update_references_in_datatype(ty.clone(), phase, mapping);
+                            }
+                        }
+                        Fields::Unnamed(fields)
+                    }
+                    Fields::Named(mut fields) => {
+                        for (_, field) in fields.fields_mut() {
+                            if let Some(ty) = field.ty_mut() {
+                                *ty = update_references_in_datatype(ty.clone(), phase, mapping);
+                            }
+                        }
+                        Fields::Named(fields)
+                    }
+                };
+                variant.set_fields(fields);
+            }
+            DataType::Enum(e)
+        }
+        DataType::Tuple(mut tuple) => {
+            let elements = tuple.elements().iter()
+                .map(|elem| update_references_in_datatype(elem.clone(), phase, mapping))
+                .collect();
+            *tuple.elements_mut() = elements;
+            DataType::Tuple(tuple)
+        }
+        DataType::List(mut list) => {
+            let ty = update_references_in_datatype(list.ty().clone(), phase, mapping);
+            *list.ty_mut() = ty;
+            DataType::List(list)
+        }
+        DataType::Reference(mut reference) => {
+            // Update generic parameters
+            let updated_generics: Vec<(Generic, DataType)> = reference.generics().iter()
+                .map(|(g, dt)| (g.clone(), update_references_in_datatype(dt.clone(), phase, mapping)))
+                .collect();
+            *reference.generics_mut() = updated_generics;
+            
+            // Check if we need to update this reference to a phase-specific version
+            if let Some((ser_id, de_id)) = mapping.get(reference.id()) {
+                let target_id = match phase {
+                    SerdeMode::Serialize => ser_id,
+                    SerdeMode::Deserialize => de_id,
+                    SerdeMode::Both => reference.id(), // Keep original for Both mode
+                };
+                
+                // Reconstruct the reference with updated id
+                Reference::from_parts(
+                    target_id.clone(),
+                    reference.generics().to_vec(),
+                    reference.inline(),
+                ).into()
+            } else {
+                // No mapping found, return updated reference
+                DataType::Reference(reference)
+            }
+        }
+        // Primitives and other types don't contain references
+        other => other,
+    }
 }
 
 /// Internal validation function that recursively validates types
