@@ -48,7 +48,7 @@
 
 mod error;
 mod exporter;
-mod js_doc;
+mod jsdoc;
 mod legacy; // TODO: Remove this
 pub mod primitives;
 pub(crate) mod reserved_names;
@@ -57,7 +57,7 @@ mod typescript;
 
 pub use error::Error;
 pub use exporter::{BigIntExportBehavior, Exporter, Layout};
-pub use js_doc::JSDoc;
+pub use jsdoc::JSDoc;
 pub use types::{Any, Never, Unknown};
 pub use typescript::Typescript;
 
