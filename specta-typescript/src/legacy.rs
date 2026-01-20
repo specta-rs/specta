@@ -16,7 +16,7 @@ use specta::{
 
 use crate::{
     Error, Exporter,
-    reserved_names::{RESERVED_IDENTS, RESERVED_TYPE_NAMES},
+    reserved_names::RESERVED_TYPE_NAMES,
 };
 
 /// Describes where an error occurred.
@@ -623,9 +623,6 @@ fn object_field_to_ts(
 
 /// sanitise a string to be a valid Typescript key
 fn sanitise_key<'a>(field_name: Cow<'static, str>, force_string: bool) -> Cow<'a, str> {
-    // Check if it's a reserved identifier (JavaScript keyword)
-    let is_reserved = RESERVED_IDENTS.iter().any(|v| *v == field_name.as_ref());
-
     let valid = field_name
         .chars()
         .all(|c| c.is_alphanumeric() || c == '_' || c == '$')
@@ -633,8 +630,7 @@ fn sanitise_key<'a>(field_name: Cow<'static, str>, force_string: bool) -> Cow<'a
             .chars()
             .next()
             .map(|first| !first.is_numeric())
-            .unwrap_or(true)
-        && !is_reserved;
+            .unwrap_or(true);
 
     if force_string || !valid {
         format!(r#""{field_name}""#).into()
