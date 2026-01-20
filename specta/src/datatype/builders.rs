@@ -206,6 +206,7 @@ impl NamedDataTypeBuilder {
         };
 
         types.0.insert(ndt.id.clone(), Some(ndt.clone()));
+        // TODO: Handle `COLLECTED_TYPES`
         ndt
     }
 }

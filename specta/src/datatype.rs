@@ -24,7 +24,7 @@ pub use function::{Function, FunctionReturnType};
 pub use generic::{ConstGenericPlaceholder, Generic, GenericPlaceholder};
 pub use list::List;
 pub use map::Map;
-pub use named::{DeprecatedType, NamedDataType};
+pub use named::{DeprecatedType, NamedDataType, collect};
 pub use primitive::Primitive;
 pub use reference::Reference;
 pub use r#struct::Struct;

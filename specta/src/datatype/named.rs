@@ -1,12 +1,28 @@
-use std::{borrow::Cow, panic::Location};
+use std::{borrow::Cow, cell::RefCell, collections::HashMap, panic::Location};
 
 use crate::{
     DataType, TypeCollection,
     datatype::{Generic, Reference, reference::ArcId},
 };
 
+thread_local! {
+    static COLLECTED_TYPES: RefCell<Option<HashMap<ArcId, NamedDataType>>> = const { RefCell::new(None) };
+}
+
+/// TODO
+///
+/// TODO: Rename
+pub fn collect(func: impl FnOnce()) -> impl Iterator<Item = NamedDataType> {
+    // TODO: Do we need to handle unwinds??
+    // TODO: What if `COLLECTED_TYPES` is already set?
+
+    COLLECTED_TYPES.set(Some(Default::default()));
+    func();
+    COLLECTED_TYPES.take().unwrap().into_iter().map(|v| v.1) // TODO: Error handling
+}
+
 /// A named type represents a non-primitive type capable of being exported as it's own named entity.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NamedDataType {
     pub(crate) id: ArcId,
     pub(crate) name: Cow<'static, str>,
@@ -41,8 +57,22 @@ impl NamedDataType {
         let id = ArcId::Static(sentinel);
         let location = Location::caller().to_owned();
 
-        // We have never encountered this type. Start resolving it!
-        if !types.0.contains_key(&id) {
+        // TODO: If id is already in `types` this might mismatch.
+        // TODO: This will register a type multiple times which it shouldn't.
+
+        if let Some(ndt) = types.0.get(&id) {
+            // If this is `None` we will add into the `COLLECTED_TYPES`,
+            // when resolution is finished.
+            if let Some(ndt) = ndt {
+                COLLECTED_TYPES.with_borrow_mut(|v| {
+                    if let Some(types) = v {
+                        types.insert(id.clone(), ndt.clone());
+                    }
+                });
+            }
+        } else {
+            // We have never encountered this type. Start resolving it!
+
             types.0.insert(id.clone(), None);
             let mut ndt = NamedDataType {
                 id: id.clone(),
@@ -55,6 +85,11 @@ impl NamedDataType {
                 inner: DataType::Primitive(super::Primitive::i8),
             };
             build_ndt(types, &mut ndt);
+            COLLECTED_TYPES.with_borrow_mut(|v| {
+                if let Some(types) = v {
+                    types.insert(id.clone(), ndt.clone());
+                }
+            });
             types.0.insert(id.clone(), Some(ndt));
         }
 

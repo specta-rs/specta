@@ -1,6 +1,6 @@
 use std::{borrow::Cow, path::Path};
 
-use specta::{TypeCollection, datatype::Reference};
+use specta::TypeCollection;
 use specta_serde::SerdeMode;
 
 use crate::{BigIntExportBehavior, Error, Exporter, Layout};
@@ -65,11 +65,6 @@ impl JSDoc {
     /// Configure the exporter to export the types for `#[derive(serde::Deserialize)]`
     pub fn with_serde_deserialize(self) -> Self {
         Self(self.0.with_serde_deserialize())
-    }
-
-    /// Get a reference to the inner [Exporter] instance.
-    pub fn exporter(&self) -> &Exporter {
-        &self.0
     }
 
     /// Export the files into a single string.
