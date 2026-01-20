@@ -5,6 +5,7 @@ use quote::{ToTokens, quote};
 use syn::{DataEnum, Fields, spanned::Spanned};
 
 pub fn parse_enum(
+    crate_ref: &TokenStream,
     container_attrs: &ContainerAttr,
     data: &DataEnum,
 ) -> syn::Result<(TokenStream, TokenStream)> {
@@ -89,6 +90,7 @@ pub fn parse_enum(
                             let (field_attrs, raw_attrs) =
                                 decode_field_attrs(field, &container_attrs.skip_attrs)?;
                             construct_field_with_variant_skip(
+                                crate_ref,
                                 container_attrs,
                                 field_attrs,
                                 &field.ty,
@@ -122,6 +124,7 @@ pub fn parse_enum(
                             let field_name = field_ident_str;
 
                             let inner = construct_field_with_variant_skip(
+                                crate_ref,
                                 container_attrs,
                                 field_attrs,
                                 &field.ty,

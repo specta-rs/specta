@@ -19,5 +19,3 @@ node_modules
 /bindings2.ts
 
 /tests/.temp
-# TODO: Remove after restructure
-/tests2/.temp

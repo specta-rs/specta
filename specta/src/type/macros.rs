@@ -45,7 +45,7 @@ macro_rules! _impl_containers {
 }
 
 macro_rules! _impl_as {
-    ($($ty:path as $tty:ident)+) => {$(
+    ($($ty:path as $tty:ty)+) => {$(
         impl Type for $ty {
             fn definition(types: &mut TypeCollection) -> DataType {
                 <$tty as Type>::definition(types)

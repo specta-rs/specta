@@ -3,30 +3,29 @@ use std::{borrow::Cow, path::Path};
 use specta::{TypeCollection, datatype::Reference};
 use specta_serde::SerdeMode;
 
-use crate::{BigIntExportBehavior, Error, Layout, Typescript};
+use crate::{BigIntExportBehavior, Error, Exporter, Layout};
 
 /// JSDoc language exporter.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub struct JSDoc(Typescript);
+pub struct JSDoc(Exporter);
 
 impl Default for JSDoc {
     fn default() -> Self {
-        Typescript::default().into()
+        Exporter::default().into()
     }
 }
 
-impl From<Typescript> for JSDoc {
-    fn from(mut ts: Typescript) -> Self {
-        ts.jsdoc = true;
-        Self(ts)
+impl From<JSDoc> for Exporter {
+    fn from(value: JSDoc) -> Self {
+        value.0
     }
 }
 
-impl From<JSDoc> for Typescript {
-    fn from(mut jsdoc: JSDoc) -> Self {
-        jsdoc.0.jsdoc = false;
-        jsdoc.0
+impl From<Exporter> for JSDoc {
+    fn from(mut value: Exporter) -> Self {
+        value.jsdoc = false;
+        Self(value)
     }
 }
 
@@ -94,8 +93,8 @@ impl JSDoc {
         Self(self.0.with_serde_deserialize())
     }
 
-    /// Get a reference to the inner [Typescript] instance.
-    pub fn inner_ref(&self) -> &Typescript {
+    /// Get a reference to the inner [Exporter] instance.
+    pub fn exporter(&self) -> &Exporter {
         &self.0
     }
 
@@ -113,5 +112,11 @@ impl JSDoc {
     ///
     pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
         self.0.export_to(path, types)
+    }
+}
+
+impl AsRef<Exporter> for JSDoc {
+    fn as_ref(&self) -> &Exporter {
+        &self.0
     }
 }

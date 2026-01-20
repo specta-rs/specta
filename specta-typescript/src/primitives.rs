@@ -16,8 +16,7 @@ use specta::{
 };
 
 use crate::{
-    BigIntExportBehavior, Error, JSDoc, Layout, Typescript, legacy::js_doc,
-    typescript::root_alias_ident,
+    BigIntExportBehavior, Error, Exporter, Layout, exporter::root_alias_ident, legacy::js_doc,
 };
 
 /// Generate an `export Type = ...` Typescript string for a specific [`NamedDataType`].
@@ -28,10 +27,12 @@ use crate::{
 ///  - Transforming the type for your serialization format (Eg. Serde)
 ///
 pub fn export(
-    ts: &Typescript,
+    exporter: &dyn AsRef<Exporter>,
     types: &TypeCollection,
     ndt: &NamedDataType,
 ) -> Result<String, Error> {
+    let exporter = exporter.as_ref();
+
     let generics = (!ndt.generics().is_empty())
         .then(|| {
             iter::once("<")
@@ -44,12 +45,12 @@ pub fn export(
     // TODO: Modernise this
     let name = crate::legacy::sanitise_type_name(
         crate::legacy::ExportContext {
-            cfg: ts,
+            cfg: exporter,
             path: vec![],
             is_export: false,
         },
         crate::legacy::NamedLocation::Type,
-        &match ts.layout {
+        &match exporter.layout {
             Layout::ModulePrefixedName => {
                 let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
                 s.push('_');
@@ -72,7 +73,7 @@ pub fn export(
 
     datatype(
         &mut result,
-        ts,
+        exporter,
         types,
         ndt.ty(),
         vec![ndt.name().clone()],
@@ -85,21 +86,22 @@ pub fn export(
     Ok(result)
 }
 
-/// Generate a JSDoc `@typedef` comment for defining a [NamedDataType].
-///
-/// This method leaves the following up to the implementer:
-///  - Ensuring all referenced types are exported
-///  - Handling multiple type with overlapping names
-///  - Transforming the type for your serialization format (Eg. Serde)
-///
-pub fn typedef(js: &JSDoc, types: &TypeCollection, dt: &NamedDataType) -> Result<String, Error> {
-    typedef_internal(js.inner_ref(), types, dt)
-}
+// TODO: I think we should remove this?
+// /// Generate a JSDoc `@typedef` comment for defining a [NamedDataType].
+// ///
+// /// This method leaves the following up to the implementer:
+// ///  - Ensuring all referenced types are exported
+// ///  - Handling multiple type with overlapping names
+// ///  - Transforming the type for your serialization format (Eg. Serde)
+// ///
+// pub fn typedef(js: &JSDoc, types: &TypeCollection, dt: &NamedDataType) -> Result<String, Error> {
+//     typedef_internal(js.exporter(), types, dt)
+// }
 
 // This can be used internally to prevent cloning `Typescript` instances.
 // Externally this shouldn't be a concern so we don't expose it.
 pub(crate) fn typedef_internal(
-    ts: &Typescript,
+    ts: &Exporter,
     types: &TypeCollection,
     dt: &NamedDataType,
 ) -> Result<String, Error> {
@@ -162,9 +164,22 @@ pub(crate) fn typedef_internal(
 /// For primitives this will include the literal type but for named type it will contain a reference.
 ///
 /// See [`export`] for the list of things to consider when using this.
-pub fn reference(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<String, Error> {
+pub fn reference(
+    exporter: &dyn AsRef<Exporter>,
+    types: &TypeCollection,
+    dt: &DataType,
+) -> Result<String, Error> {
     let mut s = String::new();
-    datatype(&mut s, ts, types, dt, vec![], false, None, "")?;
+    datatype(
+        &mut s,
+        exporter.as_ref(),
+        types,
+        dt,
+        vec![],
+        false,
+        None,
+        "",
+    )?;
     Ok(s)
 }
 
@@ -175,9 +190,23 @@ pub fn reference(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Resu
 /// Note that calling this method with a tagged struct or enum may cause the tag to not be exported.
 /// The type should be wrapped in a [`NamedDataType`] to provide a proper name.
 ///
-pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<String, Error> {
+pub fn inline(
+    exporter: &dyn AsRef<Exporter>,
+    types: &TypeCollection,
+    dt: &DataType,
+) -> Result<String, Error> {
     let mut s = String::new();
-    inline_datatype(&mut s, ts, types, dt, vec![], false, None, "", 0)?;
+    inline_datatype(
+        &mut s,
+        exporter.as_ref(),
+        types,
+        dt,
+        vec![],
+        false,
+        None,
+        "",
+        0,
+    )?;
     Ok(s)
 }
 
@@ -185,7 +214,7 @@ pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<
 #[allow(clippy::too_many_arguments)]
 fn inline_datatype(
     s: &mut String,
-    ts: &Typescript,
+    ts: &Exporter,
     types: &TypeCollection,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
@@ -300,7 +329,7 @@ fn inline_datatype(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn datatype(
     s: &mut String,
-    ts: &Typescript,
+    ts: &Exporter,
     types: &TypeCollection,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
@@ -390,7 +419,7 @@ fn primitive_dt(
 
 fn list_dt(
     s: &mut String,
-    ts: &Typescript,
+    ts: &Exporter,
     types: &TypeCollection,
     l: &List,
     _location: Vec<Cow<'static, str>>,
@@ -477,7 +506,7 @@ fn list_dt(
 
 fn map_dt(
     s: &mut String,
-    ts: &Typescript,
+    ts: &Exporter,
     types: &TypeCollection,
     m: &Map,
     _location: Vec<Cow<'static, str>>,
@@ -547,7 +576,7 @@ fn map_dt(
 
 fn enum_dt(
     s: &mut String,
-    ts: &Typescript,
+    ts: &Exporter,
     types: &TypeCollection,
     e: &Enum,
     _location: Vec<Cow<'static, str>>,
@@ -983,7 +1012,7 @@ fn enum_dt(
 
 fn tuple_dt(
     s: &mut String,
-    ts: &Typescript,
+    ts: &Exporter,
     types: &TypeCollection,
     t: &Tuple,
     _location: Vec<Cow<'static, str>>,
@@ -1025,7 +1054,7 @@ fn tuple_dt(
 
 fn reference_dt(
     s: &mut String,
-    ts: &Typescript,
+    ts: &Exporter,
     types: &TypeCollection,
     r: &Reference,
     location: Vec<Cow<'static, str>>,

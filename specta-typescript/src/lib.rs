@@ -47,6 +47,7 @@
 )]
 
 mod error;
+mod exporter;
 mod js_doc;
 mod legacy; // TODO: Remove this
 pub mod primitives;
@@ -55,9 +56,10 @@ mod types;
 mod typescript;
 
 pub use error::Error;
+pub use exporter::{BigIntExportBehavior, Exporter, Layout};
 pub use js_doc::JSDoc;
 pub use types::{Any, Never, Unknown};
-pub use typescript::{BigIntExportBehavior, Layout, Typescript};
+pub use typescript::Typescript;
 
 // Re-export SerdeMode from specta-serde for convenience
 pub use specta_serde::SerdeMode;

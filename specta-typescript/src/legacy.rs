@@ -1,7 +1,23 @@
 // TODO: Drop this stuff
 
-use std::collections::BTreeSet;
-use std::{borrow::Cow, fmt};
+use std::{
+    borrow::Cow,
+    collections::BTreeSet,
+    fmt::{self, Write},
+};
+
+use specta::{
+    TypeCollection,
+    datatype::{
+        DataType, DeprecatedType, Enum, EnumVariant, Fields, FunctionReturnType, NonSkipField,
+        Struct, Tuple, skip_fields, skip_fields_named,
+    },
+};
+
+use crate::{
+    Error, Exporter,
+    reserved_names::{RESERVED_IDENTS, RESERVED_TYPE_NAMES},
+};
 
 /// Describes where an error occurred.
 #[derive(Debug, PartialEq)]
@@ -31,7 +47,7 @@ pub(crate) enum PathItem {
 
 #[derive(Clone)]
 pub(crate) struct ExportContext<'a> {
-    pub(crate) cfg: &'a Typescript,
+    pub(crate) cfg: &'a Exporter,
     pub(crate) path: Vec<PathItem>,
     // `false` when inline'ing and `true` when exporting as named.
     pub(crate) is_export: bool,
@@ -104,17 +120,6 @@ impl fmt::Display for ExportPath {
         write!(f, "{}", self.0)
     }
 }
-
-use specta::TypeCollection;
-
-use crate::reserved_names::{RESERVED_IDENTS, RESERVED_TYPE_NAMES};
-use crate::{Error, Typescript};
-use std::fmt::Write;
-
-use specta::datatype::{
-    DataType, DeprecatedType, Enum, EnumVariant, Fields, FunctionReturnType, Struct, Tuple,
-};
-use specta::datatype::{NonSkipField, skip_fields, skip_fields_named};
 
 #[allow(missing_docs)]
 pub(crate) type Result<T> = std::result::Result<T, Error>;

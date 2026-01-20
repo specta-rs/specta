@@ -5,15 +5,24 @@ use syn::Type;
 use super::{ContainerAttr, FieldAttr, lower_attr::lower_attribute};
 
 pub fn construct_field(
+    crate_ref: &TokenStream,
     container_attrs: &ContainerAttr,
     attrs: FieldAttr,
     field_ty: &Type,
     raw_attrs: &[syn::Attribute],
 ) -> syn::Result<TokenStream> {
-    construct_field_with_variant_skip(container_attrs, attrs, field_ty, raw_attrs, false)
+    construct_field_with_variant_skip(
+        crate_ref,
+        container_attrs,
+        attrs,
+        field_ty,
+        raw_attrs,
+        false,
+    )
 }
 
 pub fn construct_field_with_variant_skip(
+    crate_ref: &TokenStream,
     container_attrs: &ContainerAttr,
     attrs: FieldAttr,
     field_ty: &Type,
@@ -39,7 +48,7 @@ pub fn construct_field_with_variant_skip(
     let ty = if attrs.skip || variant_skip {
         quote!(None)
     } else {
-        quote!(Some(<#field_ty as specta::Type>::definition(types)))
+        quote!(Some(<#field_ty as #crate_ref::Type>::definition(types)))
     };
 
     Ok(quote!(internal::construct::field(
