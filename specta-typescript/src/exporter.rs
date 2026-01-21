@@ -373,7 +373,6 @@ impl Exporter {
             out.push('\n');
         }
 
-        // Call framework_prelude with the list of types
         out += &self.framework_prelude;
         out.push('\n');
 
@@ -381,7 +380,8 @@ impl Exporter {
         let mut runtime_imports = ImportMap::default();
         if include_runtime && let Some(runtime_fn) = &self.framework_runtime {
             let ndts = specta::datatype::collect(|| {
-                let _ = (runtime_fn.0)(); // TODO: Handle result
+                out.push_str(&(runtime_fn.0)());
+                out.push('\n');
             });
 
             for ndt in ndts {
@@ -429,15 +429,7 @@ impl Exporter {
 
         out.push_str("\n\n");
 
-        // Emit the runtime code if present
-        if include_runtime && let Some(runtime_fn) = &self.framework_runtime {
-            out.push_str(&(runtime_fn.0)());
-            out.push('\n');
-        }
-
         for (i, ndt) in ndts.enumerate() {
-            // if ndt
-
             if i != 0 {
                 out += "\n";
             }
@@ -505,11 +497,14 @@ impl Exporter {
                 // TODO: Does this risk conflicting with an `index.rs` module???
                 let p = path.join(if self.jsdoc { "index.js" } else { "index.ts" });
 
-                // Collect runtime imports
+                let mut content = self.framework_prelude.to_string();
+                content.push('\n');
+
                 let mut runtime_imports = ImportMap::default();
+                let mut runtime = Cow::default();
                 if let Some(runtime_fn) = &self.framework_runtime {
                     let collected_ndts: Vec<NamedDataType> = specta::datatype::collect(|| {
-                        let _ = (runtime_fn.0)();
+                        runtime = (runtime_fn.0)();
                     })
                     .collect();
 
@@ -517,9 +512,6 @@ impl Exporter {
                         crawl_for_imports(ndt.ty(), types, &mut runtime_imports);
                     }
                 }
-
-                let mut content = self.framework_prelude.to_string();
-                content.push('\n');
 
                 // Add imports
                 if !runtime_imports.is_empty() {
@@ -557,10 +549,8 @@ impl Exporter {
                     content.push_str("\n\n");
                 }
 
-                if let Some(runtime_fn) = &self.framework_runtime {
-                    content.push_str(&(runtime_fn.0)());
-                    content.push('\n');
-                }
+                content.push_str(&runtime);
+                content.push('\n');
 
                 std::fs::write(&p, content)?;
 
