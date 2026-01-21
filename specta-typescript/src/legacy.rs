@@ -10,14 +10,11 @@ use specta::{
     TypeCollection,
     datatype::{
         DataType, DeprecatedType, Enum, EnumVariant, Fields, FunctionReturnType, NonSkipField,
-        Struct, Tuple, skip_fields, skip_fields_named,
+        Reference, Struct, Tuple, skip_fields, skip_fields_named,
     },
 };
 
-use crate::{
-    Error, Exporter,
-    reserved_names::RESERVED_TYPE_NAMES,
-};
+use crate::{Error, Exporter, reserved_names::RESERVED_TYPE_NAMES};
 
 /// Describes where an error occurred.
 #[derive(Debug, PartialEq)]
@@ -738,7 +735,7 @@ fn validate_type_for_tagged_intersection(
 
             Ok(false)
         }
-        DataType::Reference(r) => validate_type_for_tagged_intersection(
+        DataType::Reference(Reference::Named(r)) => validate_type_for_tagged_intersection(
             ctx,
             r.get(types)
                 .expect("TypeCollection should have been populated by now")
@@ -746,6 +743,7 @@ fn validate_type_for_tagged_intersection(
                 .clone(),
             types,
         ),
+        DataType::Reference(Reference::Opaque(_)) => Ok(true),
     }
 }
 

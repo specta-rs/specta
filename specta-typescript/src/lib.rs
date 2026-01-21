@@ -46,6 +46,8 @@
     html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
 
+mod branded;
+mod define;
 mod error;
 mod exporter;
 mod jsdoc;
@@ -55,6 +57,8 @@ pub(crate) mod reserved_names;
 mod types;
 mod typescript;
 
+pub use branded::Branded;
+pub use define::define;
 pub use error::Error;
 pub use exporter::{BigIntExportBehavior, Exporter, Layout};
 pub use jsdoc::JSDoc;
