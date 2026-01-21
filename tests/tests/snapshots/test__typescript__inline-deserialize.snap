@@ -1,0 +1,321 @@
+---
+source: tests/tests/typescript.rs
+expression: "dts.iter().map(|(s, ty)|\nprimitives::inline(&ts, &types,\nty).map(|ty| format!(\"{s}: {ty}\"))).collect::<Result<Vec<_>,\n_>>().unwrap().join(\"\\n\")"
+---
+i8: number
+i16: number
+i32: number
+i64: number
+i128: number
+isize: number
+u8: number
+u16: number
+u32: number
+u64: number
+u128: number
+usize: number
+f32: number
+f64: number
+bool: boolean
+char: string
+Range<i32>: { 
+	start: number,
+	end: number,
+}
+RangeInclusive<i32>: { 
+	start: number,
+	end: number,
+}
+(): null
+(String, i32): [string, number]
+(String, i32, bool): [string, number, boolean]
+((String, i32), (bool, char, bool), ()): [[string, number], [boolean, string, boolean], null]
+(bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool): [boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean]
+String: string
+PathBuf: string
+IpAddr: string
+Ipv4Addr: string
+Ipv6Addr: string
+SocketAddr: string
+SocketAddrV4: string
+SocketAddrV6: string
+SystemTime: { 
+	duration_since_epoch: number,
+	duration_since_unix_epoch: number,
+}
+Duration: { 
+	secs: number,
+	nanos: number,
+}
+&'static str: string
+&'static bool: boolean
+&'static i32: number
+Vec<i32>: number[]
+&'static [i32]: number[]
+&'static [i32; 3]: [number, number, number]
+[i32; 3]: [number, number, number]
+Vec<MyEnum>: MyEnum[]
+&'static [MyEnum]: MyEnum[]
+&'static [MyEnum; 6]: [MyEnum, MyEnum, MyEnum, MyEnum, MyEnum, MyEnum]
+[MyEnum; 2]: [MyEnum, MyEnum]
+&'static [i32; 1]: [number]
+&'static [i32; 0]: []
+Option<i32>: number | null
+Option<()>: null | null
+Option<Vec<i32>>: number[] | null
+Option<Option<String>>: string | null
+Option<Option<Option<String>>>: string | null
+Unit1: null
+Unit2: Record<string, never>
+Unit3: []
+Unit4: null
+Unit5: "A"
+Unit6: { A: [] }
+Unit7: { A: Record<string, never> }
+SimpleStruct: { 
+	a: number,
+	b: string,
+	c: [number, string, number],
+	d: string[],
+	e: string | null,
+}
+TupleStruct1: number
+TupleStruct3: [number, boolean, string]
+TestEnum: "Unit" | { Single: number } | { Multiple: [number, number] } | { Struct: { a: number } }
+RefStruct: TestEnum
+InlinerStruct: { 
+	inline_this: InlineStruct,
+	dont_inline_this: RefStruct,
+}
+GenericStruct<i32>: { 
+	arg: T,
+}
+GenericStruct<String>: { 
+	arg: T,
+}
+FlattenEnumStruct: (FlattenEnum) & { 
+	outer: string,
+}
+OverridenStruct: { 
+	overriden_field: string,
+}
+HasGenericAlias: { [key in number]: string }
+SkipVariant: { A: string }
+SkipVariant2: string
+SkipVariant3: { A: { a: string } }
+SkipStructFields: { 
+	a: number,
+}
+SpectaSkipNonTypeField: { 
+	a: number,
+}
+EnumMacroAttributes: { A: string } | { B: number } | { C: number } | { D: { a: string; b: number } }
+InlineEnumField: { A: PlaceholderInnerField }
+InlineOptionalType: { 
+	optional_field: PlaceholderInnerField | null,
+}
+Rename: "OneWord" | "TwoWords"
+TransparentType: TransparentTypeInner
+TransparentType2: null
+TransparentTypeWithOverride: string
+[Option<u8>; 3]: [(number | null), (number | null), (number | null)]
+HashMap<BasicEnum, ()>: Partial<{ [key in BasicEnum]: null }>
+Option<Option<Option<Option<i32>>>>: number | null
+Vec<PlaceholderInnerField>: PlaceholderInnerField[]
+HashMap<BasicEnum, i32>: Partial<{ [key in BasicEnum]: number }>
+EnumReferenceRecordKey: { 
+	a: Partial<{ [key in BasicEnum]: number }>,
+}
+FlattenOnNestedEnum: (NestedEnum) & { 
+	id: string,
+}
+PhantomData<()>: null
+PhantomData<String>: null
+Infallible: never
+MyEmptyInput: Record<string, never>
+(String): string
+(String,): [string]
+ExtraBracketsInTupleVariant: { A: string }
+ExtraBracketsInUnnamedStruct: string
+Vec<MyEnum>: MyEnum[]
+InlineTuple: { 
+	demo: [string, boolean],
+}
+InlineTuple2: { 
+	demo: [InlineTuple, boolean],
+}
+Box<str>: string
+Box<String>: string
+SkippedFieldWithinVariant: never | string
+KebabCase: { 
+	test_ing: string,
+}
+&[&str]: string[]
+Issue281<'_>: { 
+	default_unity_arguments: string[],
+}
+RenameWithWeirdCharsField: { 
+	odata_context: string,
+}
+RenameWithWeirdCharsVariant: { A: string }
+Issue374: { 
+	foo: boolean,
+	bar: boolean,
+}
+type_type::Type: never
+ActualType: { 
+	a: GenericType<string>,
+}
+SpectaTypeOverride: { 
+	string_ident: string,
+	u32_ident: number,
+	path: string,
+}
+InvalidToValidType: { 
+	cause: null | null,
+}
+TupleStruct: string
+TupleStructWithRep: string
+GenericTupleStruct<String>: T
+BracedStruct: string
+StructRenameAllUppercase: { 
+	a: number,
+	b: number,
+}
+RenameSerdeSpecialChar: { 
+	b: number,
+}
+EnumRenameAllUppercase: "HelloWorld" | "VariantB" | "TestingWords"
+Recursive: { 
+	demo: Recursive,
+}
+RecursiveMapValue: { 
+	demo: { [key in string]: RecursiveMapValue },
+}
+RecursiveTransparent: RecursiveInline
+RecursiveInEnum: { A: (RecursiveInEnum) }
+NonOptional: string | null
+OptionalOnNamedField: string | null
+OptionalOnTransparentNamedField: { 
+	b: string | null,
+}
+OptionalInEnum: { A: string | null } | { B: { a: string | null } } | { C: { a?: string | null } }
+Optional: { 
+	a: number | null,
+	b?: number | null,
+	c: string | null,
+	d: boolean,
+}
+UntaggedVariants: string | number | { id: string } | [string, boolean]
+UntaggedVariantsWithoutValue: string | [number, string] | number
+HashMap<String, ()>: { [key in string]: null }
+Regular: { [key in string]: null }
+HashMap<Infallible, ()>: { [key in never]: null }
+HashMap<UnitVariants, ()>: Partial<{ [key in UnitVariants]: null }>
+HashMap<UntaggedVariantsKey, ()>: Partial<{ [key in UntaggedVariantsKey]: null }>
+HashMap<Variants, ()>: Partial<{ [key in Variants]: null }>
+MacroStruct: string
+MacroStruct2: { 
+	demo: string,
+}
+MacroEnum: { Demo: string } | { Demo2: { demo2: string } }
+DeprecatedType: { 
+	a: number,
+}
+DeprecatedTypeWithMsg: { 
+	a: number,
+}
+DeprecatedTypeWithMsg2: { 
+	a: number,
+}
+DeprecatedFields: { 
+	a: number,
+	b: string,
+	c: string,
+	d: string,
+}
+DeprecatedTupleVariant: [string, string, number]
+DeprecatedEnumVariants: "A" | "B" | "C"
+CommentedStruct: { 
+	a: number,
+}
+CommentedEnum: { A: number } | { B: { a: number } }
+SingleLineComment: { A: number } | { B: { a: number } }
+NonGeneric: { 
+	a: A,
+	b: B,
+}
+HalfGenericA<u8>: { 
+	a: A,
+	b: B,
+}
+HalfGenericB<bool>: { 
+	a: A,
+	b: B,
+}
+FullGeneric<u8, bool>: { 
+	a: A,
+	b: B,
+}
+Another<bool>: { 
+	a: A,
+	b: B,
+}
+MapA<u32>: { [key in string]: number }
+MapB<u32>: { [key in number]: string }
+MapC<u32>: { [key in string]: AGenericStruct<number> }
+AGenericStruct<u32>: { 
+	field: Demo<T, boolean>,
+}
+A: { 
+	a: B,
+	b: B,
+	c: B,
+	d: D,
+	e: GenericFlattened<number>,
+}
+DoubleFlattened: { 
+	a: ToBeFlattened,
+	b: ToBeFlattened,
+}
+FlattenedInner: { 
+	c: Inner,
+}
+BoxFlattened: { 
+	b: BoxedInner,
+}
+BoxInline: { 
+	c: BoxedInner,
+}
+First: { 
+	a: string,
+}
+Second: { 
+	a: number,
+}
+Third: (First) & { 
+	b: { [key in string]: string },
+	c: First,
+}
+Fourth: { 
+	a: First,
+	b: First,
+}
+TagOnStructWithInline: { 
+	a: First,
+	b: First,
+}
+Sixth: { 
+	a: First,
+	b: First,
+}
+Seventh: { 
+	a: First,
+	b: Second,
+}
+Eight: { A: string } | "B"
+Tenth: string | "B" | First
+MyEnumTagged: (First)
+MyEnumExternal: { Variant: (First) }
+MyEnumAdjacent: (First)
+MyEnumUntagged: (First)

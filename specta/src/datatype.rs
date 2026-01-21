@@ -24,14 +24,13 @@ pub use function::{Function, FunctionReturnType};
 pub use generic::{ConstGenericPlaceholder, Generic, GenericPlaceholder};
 pub use list::List;
 pub use map::Map;
-pub use named::{DeprecatedType, NamedDataType};
+pub use named::{DeprecatedType, NamedDataType, collect};
 pub use primitive::Primitive;
-pub use reference::Reference;
+pub use reference::{NamedReference, OpaqueReference, Reference};
 pub use r#struct::Struct;
 pub use tuple::Tuple;
 
-// TODO: Remove this
-pub(crate) use reference::ArcId;
+pub(crate) use reference::NamedId;
 
 /// Runtime type-erased representation of a Rust type.
 ///

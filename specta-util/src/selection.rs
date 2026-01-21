@@ -37,32 +37,37 @@
 // TODO: better docs w/ example
 #[macro_export]
 macro_rules! selection {
-    ( $s:expr, { $($n:ident),+ $(,)? } ) => {{
+    ( $s:expr, { $($n:ident),+ $(,)? } as $name:ident ) => {{
         #[allow(non_camel_case_types)]
         mod selection {
             #[derive(serde::Serialize, specta::Type)]
             #[specta(inline)]
-            pub struct Selection<$($n,)*> {
+            pub struct $name<$($n,)*> {
                 $(pub $n: $n),*
             }
         }
-        use selection::Selection;
+        use selection::$name;
         #[allow(non_camel_case_types)]
-        Selection { $($n: $s.$n,)* }
+        $name { $($n: $s.$n,)* }
     }};
-    ( $s:expr, [{ $($n:ident),+ $(,)? }] ) => {{
+    ( $s:expr, { $($n:ident),+ $(,)? } ) => {{
+        $crate::selection!($s, { $($n),+ } as Selection)
+    }};
+
+    ( $s:expr, [{ $($n:ident),+ $(,)? }] as $name:ident ) => {{
         #[allow(non_camel_case_types)]
         mod selection {
             #[derive(serde::Serialize, specta::Type)]
             #[specta(inline)]
-            pub struct Selection<$($n,)*> {
-                $(pub $n: $n,)*
+            pub struct $name<$($n,)*> {
+                $(pub $n: $n),*
             }
         }
-        use selection::Selection;
+        use selection::$name;
         #[allow(non_camel_case_types)]
-        $s.into_iter().map(|v| Selection { $($n: v.$n,)* }).collect::<Vec<_>>()
+        $s.into_iter().map(|v| $name { $($n: v.$n,)* }).collect::<Vec<_>>()
+    }};
+    ( $s:expr, [{ $($n:ident),+ $(,)? }] ) => {{
+        $crate::selection!($s, [{ $($n),+ }] as Selection)
     }};
 }
-
-// Tests in `src/tests/selection.rs` due to `$crate` issues

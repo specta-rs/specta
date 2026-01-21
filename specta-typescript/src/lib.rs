@@ -46,18 +46,24 @@
     html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
 
+mod branded;
+mod define;
 mod error;
-mod js_doc;
+mod exporter;
+mod jsdoc;
 mod legacy; // TODO: Remove this
 pub mod primitives;
 pub(crate) mod reserved_names;
 mod types;
 mod typescript;
 
+pub use branded::Branded;
+pub use define::define;
 pub use error::Error;
-pub use js_doc::JSDoc;
+pub use exporter::{BigIntExportBehavior, Exporter, Layout};
+pub use jsdoc::JSDoc;
 pub use types::{Any, Never, Unknown};
-pub use typescript::{BigIntExportBehavior, Layout, Typescript};
+pub use typescript::Typescript;
 
 // Re-export SerdeMode from specta-serde for convenience
 pub use specta_serde::SerdeMode;

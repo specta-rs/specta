@@ -1,7 +1,20 @@
 // TODO: Drop this stuff
 
-use std::collections::BTreeSet;
-use std::{borrow::Cow, fmt};
+use std::{
+    borrow::Cow,
+    collections::BTreeSet,
+    fmt::{self, Write},
+};
+
+use specta::{
+    TypeCollection,
+    datatype::{
+        DataType, DeprecatedType, Enum, EnumVariant, Fields, FunctionReturnType, NonSkipField,
+        Reference, Struct, Tuple, skip_fields, skip_fields_named,
+    },
+};
+
+use crate::{Error, Exporter, reserved_names::RESERVED_TYPE_NAMES};
 
 /// Describes where an error occurred.
 #[derive(Debug, PartialEq)]
@@ -31,7 +44,7 @@ pub(crate) enum PathItem {
 
 #[derive(Clone)]
 pub(crate) struct ExportContext<'a> {
-    pub(crate) cfg: &'a Typescript,
+    pub(crate) cfg: &'a Exporter,
     pub(crate) path: Vec<PathItem>,
     // `false` when inline'ing and `true` when exporting as named.
     pub(crate) is_export: bool,
@@ -104,17 +117,6 @@ impl fmt::Display for ExportPath {
         write!(f, "{}", self.0)
     }
 }
-
-use specta::TypeCollection;
-
-use crate::reserved_names::{RESERVED_IDENTS, RESERVED_TYPE_NAMES};
-use crate::{Error, Typescript};
-use std::fmt::Write;
-
-use specta::datatype::{
-    DataType, DeprecatedType, Enum, EnumVariant, Fields, FunctionReturnType, Struct, Tuple,
-};
-use specta::datatype::{NonSkipField, skip_fields, skip_fields_named};
 
 #[allow(missing_docs)]
 pub(crate) type Result<T> = std::result::Result<T, Error>;
@@ -618,9 +620,6 @@ fn object_field_to_ts(
 
 /// sanitise a string to be a valid Typescript key
 fn sanitise_key<'a>(field_name: Cow<'static, str>, force_string: bool) -> Cow<'a, str> {
-    // Check if it's a reserved identifier (JavaScript keyword)
-    let is_reserved = RESERVED_IDENTS.iter().any(|v| *v == field_name.as_ref());
-
     let valid = field_name
         .chars()
         .all(|c| c.is_alphanumeric() || c == '_' || c == '$')
@@ -628,8 +627,7 @@ fn sanitise_key<'a>(field_name: Cow<'static, str>, force_string: bool) -> Cow<'a
             .chars()
             .next()
             .map(|first| !first.is_numeric())
-            .unwrap_or(true)
-        && !is_reserved;
+            .unwrap_or(true);
 
     if force_string || !valid {
         format!(r#""{field_name}""#).into()
@@ -737,7 +735,7 @@ fn validate_type_for_tagged_intersection(
 
             Ok(false)
         }
-        DataType::Reference(r) => validate_type_for_tagged_intersection(
+        DataType::Reference(Reference::Named(r)) => validate_type_for_tagged_intersection(
             ctx,
             r.get(types)
                 .expect("TypeCollection should have been populated by now")
@@ -745,6 +743,7 @@ fn validate_type_for_tagged_intersection(
                 .clone(),
             types,
         ),
+        DataType::Reference(Reference::Opaque(_)) => Ok(true),
     }
 }
 

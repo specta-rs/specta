@@ -1,14 +1,73 @@
-use std::{borrow::Cow, collections::HashSet, panic::Location};
-
-use crate::{
-    DataType, TypeCollection,
-    datatype::{Generic, Reference, reference::ArcId},
+use std::{
+    borrow::Cow,
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    panic::Location,
+    sync::Arc,
 };
 
+use crate::{
+    datatype::{
+        reference::NamedId, DataType, Generic, NamedDataTypeBuilder, NamedReference, Reference,
+    },
+    TypeCollection,
+};
+
+thread_local! {
+    static COLLECTED_TYPES: RefCell<Option<Vec<HashMap<NamedId, NamedDataType>>>> = const { RefCell::new(None) };
+}
+
+/// Collects all named data types constructed within the provided closure.
+///
+/// This is useful for collecting up the required imports when generating an output file.
+pub fn collect(func: impl FnOnce()) -> impl Iterator<Item = NamedDataType> {
+    struct Guard;
+    impl Drop for Guard {
+        fn drop(&mut self) {
+            COLLECTED_TYPES.with_borrow_mut(|types| {
+                if let Some(v) = types {
+                    // Last collection means we can drop all memory
+                    if v.len() == 1 {
+                        *types = None;
+                    } else {
+                        // Otherwise just remove the current collection.
+                        v.pop();
+                    }
+                }
+            })
+        }
+    }
+
+    // If we have no collection, register one
+    // If we already have one create a new context.
+    COLLECTED_TYPES.with_borrow_mut(|v| {
+        if let Some(v) = v {
+            v.push(Default::default());
+        } else {
+            *v = Some(vec![Default::default()]);
+        }
+    });
+
+    let guard = Guard;
+    func();
+    // We only use the guard when unwinding
+    std::mem::forget(guard);
+
+    COLLECTED_TYPES.with_borrow_mut(|types| {
+        types
+            .as_mut()
+            .expect("COLLECTED_TYPES is unset but it should be set")
+            .pop()
+            .expect("COLLECTED_TYPES is missing a valid collection context")
+            .into_iter()
+            .map(|v| v.1)
+    })
+}
+
 /// A named type represents a non-primitive type capable of being exported as it's own named entity.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NamedDataType {
-    pub(crate) id: ArcId,
+    pub(crate) id: NamedId,
     pub(crate) name: Cow<'static, str>,
     pub(crate) docs: Cow<'static, str>,
     pub(crate) deprecated: Option<DeprecatedType>,
@@ -39,42 +98,115 @@ impl NamedDataType {
         sentinel: &'static (),
         build_ndt: fn(&mut TypeCollection, &mut NamedDataType),
     ) -> Reference {
-        let id = ArcId::Static(sentinel);
+        let id = NamedId::Static(sentinel);
         let location = Location::caller().to_owned();
 
-        // We have never encountered this type. Start resolving it!
-        if !types.0.contains_key(&id) {
+        if let Some(ndt) = types.0.get(&id) {
+            // If this is `None` we will add into the `COLLECTED_TYPES`,
+            // when resolution is finished.
+            if let Some(ndt) = ndt {
+                let needs_references = COLLECTED_TYPES.with_borrow_mut(|ctxs| {
+                    if let Some(ctxs) = ctxs {
+                        for ctx in ctxs {
+                            ctx.insert(ndt.id.clone(), ndt.clone());
+                        }
+
+                        true
+                    } else {
+                        false
+                    }
+                });
+
+                // If a type has already been resolved we can just pull it's `NamedDataType` from the `TypeCollection`.
+                // However this means any dependent types are never registered as references are not created in this scope.
+                // We run the `build_ndt` function to resolve these dependent, even though we do just throw out the result.
+                if needs_references {
+                    build_ndt(
+                        types,
+                        &mut NamedDataType {
+                            id: id.clone(),
+                            location,
+                            // `build_ndt` will just override all of this
+                            name: Cow::Borrowed(""),
+                            docs: Cow::Borrowed(""),
+                            deprecated: None,
+                            module_path: Cow::Borrowed(""),
+                            generics: vec![],
+                            inner: DataType::Primitive(super::Primitive::i8),
+                        },
+                    );
+                }
+            }
+        } else {
+            // We have never encountered this type. Start resolving it!
+
             types.0.insert(id.clone(), None);
             let mut ndt = NamedDataType {
                 id: id.clone(),
+                location,
+                // `build_ndt` will just override all of this
                 name: Cow::Borrowed(""),
                 docs: Cow::Borrowed(""),
                 deprecated: None,
                 module_path: Cow::Borrowed(""),
-                location,
                 generics: vec![],
                 inner: DataType::Primitive(super::Primitive::i8),
             };
             build_ndt(types, &mut ndt);
+            COLLECTED_TYPES.with_borrow_mut(|ctxs| {
+                if let Some(ctxs) = ctxs {
+                    for ctx in ctxs {
+                        ctx.insert(ndt.id.clone(), ndt.clone());
+                    }
+                }
+            });
             types.0.insert(id.clone(), Some(ndt));
         }
 
-        Reference {
+        Reference::Named(NamedReference {
             id,
             generics,
             inline,
-        }
+        })
+    }
+
+    /// Register a runtime named datatype.
+    /// This is exposed via [NamedDataTypeBuilder::build].
+    pub(crate) fn register(
+        builder: NamedDataTypeBuilder,
+        types: &mut TypeCollection,
+    ) -> NamedDataType {
+        let ndt = NamedDataType {
+            id: NamedId::Dynamic(Arc::new(())),
+            name: builder.name,
+            docs: builder.docs,
+            deprecated: builder.deprecated,
+            module_path: builder.module_path,
+            location: Location::caller().to_owned(),
+            generics: builder.generics,
+            inner: builder.inner,
+        };
+
+        types.0.insert(ndt.id.clone(), Some(ndt.clone()));
+        COLLECTED_TYPES.with_borrow_mut(|ctxs| {
+            if let Some(ctxs) = ctxs {
+                for ctx in ctxs {
+                    ctx.insert(ndt.id.clone(), ndt.clone());
+                }
+            }
+        });
+        ndt
     }
 
     /// TODO
     // TODO: Problematic to seal + allow generics to be `Cow`
     // TODO: HashMap instead of array for better typesafety??
     pub fn reference(&self, generics: Vec<(Generic, DataType)>, inline: bool) -> Reference {
-        Reference {
+        Reference::Named(NamedReference {
             id: self.id.clone(),
             generics,
             inline,
-        }
+        })
     }
 
     /// The name of the type

@@ -11,13 +11,14 @@ use std::{
 use specta::{
     TypeCollection,
     datatype::{
-        DataType, DeprecatedType, Enum, List, Map, NamedDataType, Primitive, Reference, Tuple,
+        DataType, DeprecatedType, Enum, List, Map, NamedDataType, NamedReference, OpaqueReference,
+        Primitive, Reference, Tuple,
     },
 };
 
 use crate::{
-    BigIntExportBehavior, Error, JSDoc, Layout, Typescript, legacy::js_doc,
-    typescript::root_alias_ident,
+    BigIntExportBehavior, Branded, Error, Exporter, Layout, define::Define,
+    exporter::root_alias_ident, legacy::js_doc,
 };
 
 /// Generate an `export Type = ...` Typescript string for a specific [`NamedDataType`].
@@ -28,10 +29,12 @@ use crate::{
 ///  - Transforming the type for your serialization format (Eg. Serde)
 ///
 pub fn export(
-    ts: &Typescript,
+    exporter: &dyn AsRef<Exporter>,
     types: &TypeCollection,
     ndt: &NamedDataType,
 ) -> Result<String, Error> {
+    let exporter = exporter.as_ref();
+
     let generics = (!ndt.generics().is_empty())
         .then(|| {
             iter::once("<")
@@ -44,12 +47,12 @@ pub fn export(
     // TODO: Modernise this
     let name = crate::legacy::sanitise_type_name(
         crate::legacy::ExportContext {
-            cfg: ts,
+            cfg: exporter,
             path: vec![],
             is_export: false,
         },
         crate::legacy::NamedLocation::Type,
-        &match ts.layout {
+        &match exporter.layout {
             Layout::ModulePrefixedName => {
                 let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
                 s.push('_');
@@ -72,7 +75,7 @@ pub fn export(
 
     datatype(
         &mut result,
-        ts,
+        exporter,
         types,
         ndt.ty(),
         vec![ndt.name().clone()],
@@ -85,21 +88,22 @@ pub fn export(
     Ok(result)
 }
 
-/// Generate a JSDoc `@typedef` comment for defining a [NamedDataType].
-///
-/// This method leaves the following up to the implementer:
-///  - Ensuring all referenced types are exported
-///  - Handling multiple type with overlapping names
-///  - Transforming the type for your serialization format (Eg. Serde)
-///
-pub fn typedef(js: &JSDoc, types: &TypeCollection, dt: &NamedDataType) -> Result<String, Error> {
-    typedef_internal(js.inner_ref(), types, dt)
-}
+// TODO: I think we should remove this?
+// /// Generate a JSDoc `@typedef` comment for defining a [NamedDataType].
+// ///
+// /// This method leaves the following up to the implementer:
+// ///  - Ensuring all referenced types are exported
+// ///  - Handling multiple type with overlapping names
+// ///  - Transforming the type for your serialization format (Eg. Serde)
+// ///
+// pub fn typedef(js: &JSDoc, types: &TypeCollection, dt: &NamedDataType) -> Result<String, Error> {
+//     typedef_internal(js.exporter(), types, dt)
+// }
 
 // This can be used internally to prevent cloning `Typescript` instances.
 // Externally this shouldn't be a concern so we don't expose it.
 pub(crate) fn typedef_internal(
-    ts: &Typescript,
+    exporter: &Exporter,
     types: &TypeCollection,
     dt: &NamedDataType,
 ) -> Result<String, Error> {
@@ -141,7 +145,7 @@ pub(crate) fn typedef_internal(
     s.push_str("\t* @typedef {");
     datatype(
         &mut s,
-        ts,
+        exporter,
         types,
         dt.ty(),
         vec![dt.name().clone()],
@@ -162,9 +166,22 @@ pub(crate) fn typedef_internal(
 /// For primitives this will include the literal type but for named type it will contain a reference.
 ///
 /// See [`export`] for the list of things to consider when using this.
-pub fn reference(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<String, Error> {
+pub fn reference(
+    exporter: &dyn AsRef<Exporter>,
+    types: &TypeCollection,
+    dt: &DataType,
+) -> Result<String, Error> {
     let mut s = String::new();
-    datatype(&mut s, ts, types, dt, vec![], false, None, "")?;
+    datatype(
+        &mut s,
+        exporter.as_ref(),
+        types,
+        dt,
+        vec![],
+        false,
+        None,
+        "",
+    )?;
     Ok(s)
 }
 
@@ -175,9 +192,23 @@ pub fn reference(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Resu
 /// Note that calling this method with a tagged struct or enum may cause the tag to not be exported.
 /// The type should be wrapped in a [`NamedDataType`] to provide a proper name.
 ///
-pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<String, Error> {
+pub fn inline(
+    exporter: &dyn AsRef<Exporter>,
+    types: &TypeCollection,
+    dt: &DataType,
+) -> Result<String, Error> {
     let mut s = String::new();
-    inline_datatype(&mut s, ts, types, dt, vec![], false, None, "", 0)?;
+    inline_datatype(
+        &mut s,
+        exporter.as_ref(),
+        types,
+        dt,
+        vec![],
+        false,
+        None,
+        "",
+        0,
+    )?;
     Ok(s)
 }
 
@@ -185,7 +216,7 @@ pub fn inline(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Result<
 #[allow(clippy::too_many_arguments)]
 fn inline_datatype(
     s: &mut String,
-    ts: &Typescript,
+    exporter: &Exporter,
     types: &TypeCollection,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
@@ -203,13 +234,13 @@ fn inline_datatype(
     }
 
     match dt {
-        DataType::Primitive(p) => s.push_str(primitive_dt(&ts.bigint, p, location)?),
+        DataType::Primitive(p) => s.push_str(primitive_dt(&exporter.bigint, p, location)?),
         DataType::List(l) => {
             // Inline the list element type
             let mut dt_str = String::new();
             crate::legacy::datatype_inner(
                 crate::legacy::ExportContext {
-                    cfg: ts,
+                    cfg: exporter,
                     path: vec![],
                     is_export,
                 },
@@ -239,11 +270,11 @@ fn inline_datatype(
                 write!(s, "{dt_str}[]")?;
             }
         }
-        DataType::Map(m) => map_dt(s, ts, types, m, location, is_export)?,
+        DataType::Map(m) => map_dt(s, exporter, types, m, location, is_export)?,
         DataType::Nullable(def) => {
             inline_datatype(
                 s,
-                ts,
+                exporter,
                 types,
                 def,
                 location,
@@ -259,7 +290,7 @@ fn inline_datatype(
         }
         DataType::Struct(st) => crate::legacy::struct_datatype(
             crate::legacy::ExportContext {
-                cfg: ts,
+                cfg: exporter,
                 path: vec![],
                 is_export,
             },
@@ -269,14 +300,16 @@ fn inline_datatype(
             s,
             prefix,
         )?,
-        DataType::Enum(e) => enum_dt(s, ts, types, e, location, is_export, prefix)?,
-        DataType::Tuple(t) => tuple_dt(s, ts, types, t, location, is_export)?,
+        DataType::Enum(e) => enum_dt(s, exporter, types, e, location, is_export, prefix)?,
+        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, is_export)?,
         DataType::Reference(r) => {
             // Always inline references when in inline mode
-            if let Some(ndt) = r.get(types) {
+            if let Reference::Named(r) = r
+                && let Some(ndt) = r.get(types)
+            {
                 inline_datatype(
                     s,
-                    ts,
+                    exporter,
                     types,
                     ndt.ty(),
                     location,
@@ -287,7 +320,7 @@ fn inline_datatype(
                 )?;
             } else {
                 // Fallback to regular reference if type not found
-                reference_dt(s, ts, types, r, location, is_export)?;
+                reference_dt(s, exporter, types, r, location, is_export)?;
             }
         }
         DataType::Generic(g) => s.push_str(g.borrow()),
@@ -300,7 +333,7 @@ fn inline_datatype(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn datatype(
     s: &mut String,
-    ts: &Typescript,
+    exporter: &Exporter,
     types: &TypeCollection,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
@@ -311,14 +344,14 @@ pub(crate) fn datatype(
     // TODO: Validating the variant from `dt` can be flattened
 
     match dt {
-        DataType::Primitive(p) => s.push_str(primitive_dt(&ts.bigint, p, location)?),
-        DataType::List(l) => list_dt(s, ts, types, l, location, is_export)?,
-        DataType::Map(m) => map_dt(s, ts, types, m, location, is_export)?,
+        DataType::Primitive(p) => s.push_str(primitive_dt(&exporter.bigint, p, location)?),
+        DataType::List(l) => list_dt(s, exporter, types, l, location, is_export)?,
+        DataType::Map(m) => map_dt(s, exporter, types, m, location, is_export)?,
         DataType::Nullable(def) => {
             // TODO: Replace legacy stuff
             crate::legacy::datatype_inner(
                 crate::legacy::ExportContext {
-                    cfg: ts,
+                    cfg: exporter,
                     path: vec![],
                     is_export,
                 },
@@ -344,7 +377,7 @@ pub(crate) fn datatype(
 
             crate::legacy::struct_datatype(
                 crate::legacy::ExportContext {
-                    cfg: ts,
+                    cfg: exporter,
                     path: vec![],
                     is_export,
                 },
@@ -355,9 +388,9 @@ pub(crate) fn datatype(
                 prefix,
             )?
         }
-        DataType::Enum(e) => enum_dt(s, ts, types, e, location, is_export, prefix)?,
-        DataType::Tuple(t) => tuple_dt(s, ts, types, t, location, is_export)?,
-        DataType::Reference(r) => reference_dt(s, ts, types, r, location, is_export)?,
+        DataType::Enum(e) => enum_dt(s, exporter, types, e, location, is_export, prefix)?,
+        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, is_export)?,
+        DataType::Reference(r) => reference_dt(s, exporter, types, r, location, is_export)?,
         DataType::Generic(g) => s.push_str(g.borrow()),
     };
 
@@ -390,7 +423,7 @@ fn primitive_dt(
 
 fn list_dt(
     s: &mut String,
-    ts: &Typescript,
+    exporter: &Exporter,
     types: &TypeCollection,
     l: &List,
     _location: Vec<Cow<'static, str>>,
@@ -402,7 +435,7 @@ fn list_dt(
         let mut dt = String::new();
         crate::legacy::datatype_inner(
             crate::legacy::ExportContext {
-                cfg: ts,
+                cfg: exporter,
                 path: vec![],
                 is_export,
             },
@@ -477,7 +510,7 @@ fn list_dt(
 
 fn map_dt(
     s: &mut String,
-    ts: &Typescript,
+    exporter: &Exporter,
     types: &TypeCollection,
     m: &Map,
     _location: Vec<Cow<'static, str>>,
@@ -488,13 +521,14 @@ fn map_dt(
         fn is_exhaustive(dt: &DataType, types: &TypeCollection) -> bool {
             match dt {
                 DataType::Enum(e) => e.variants().iter().filter(|(_, v)| !v.skip()).count() == 0,
-                DataType::Reference(r) => {
+                DataType::Reference(Reference::Named(r)) => {
                     if let Some(ndt) = r.get(types) {
                         is_exhaustive(ndt.ty(), types)
                     } else {
                         false
                     }
                 }
+                DataType::Reference(Reference::Opaque(_)) => false,
                 _ => true,
             }
         }
@@ -509,7 +543,7 @@ fn map_dt(
         s.push_str("{ [key in ");
         crate::legacy::datatype_inner(
             crate::legacy::ExportContext {
-                cfg: ts,
+                cfg: exporter,
                 path: vec![],
                 is_export: true,
             },
@@ -520,7 +554,7 @@ fn map_dt(
         s.push_str("]: ");
         crate::legacy::datatype_inner(
             crate::legacy::ExportContext {
-                cfg: ts,
+                cfg: exporter,
                 path: vec![],
                 is_export,
             },
@@ -547,7 +581,7 @@ fn map_dt(
 
 fn enum_dt(
     s: &mut String,
-    ts: &Typescript,
+    exporter: &Exporter,
     types: &TypeCollection,
     e: &Enum,
     _location: Vec<Cow<'static, str>>,
@@ -559,7 +593,7 @@ fn enum_dt(
     {
         crate::legacy::enum_datatype(
             crate::legacy::ExportContext {
-                cfg: ts,
+                cfg: exporter,
                 path: vec![],
                 is_export,
             },
@@ -983,7 +1017,7 @@ fn enum_dt(
 
 fn tuple_dt(
     s: &mut String,
-    ts: &Typescript,
+    exporter: &Exporter,
     types: &TypeCollection,
     t: &Tuple,
     _location: Vec<Cow<'static, str>>,
@@ -993,7 +1027,7 @@ fn tuple_dt(
     {
         s.push_str(&crate::legacy::tuple_datatype(
             crate::legacy::ExportContext {
-                cfg: ts,
+                cfg: exporter,
                 path: vec![],
                 is_export,
             },
@@ -1025,32 +1059,61 @@ fn tuple_dt(
 
 fn reference_dt(
     s: &mut String,
-    ts: &Typescript,
+    exporter: &Exporter,
     types: &TypeCollection,
     r: &Reference,
     location: Vec<Cow<'static, str>>,
     // TODO: Remove
     is_export: bool,
 ) -> Result<(), Error> {
-    // Check if this reference should be inlined
-    if r.inline()
-        && let Some(ndt) = r.get(types)
-    {
-        // Inline the referenced type directly without cloning the entire DataType
-        return datatype(s, ts, types, ndt.ty(), location, is_export, None, "");
+    match r {
+        Reference::Named(r) => reference_named_dt(s, exporter, types, r, location, is_export),
+        Reference::Opaque(r) => reference_opaque_dt(s, exporter, types, r),
     }
+}
 
-    if let Some((_, typescript)) = ts.references.iter().find(|(re, _)| re.ref_eq(r)) {
-        s.push_str(typescript);
+fn reference_opaque_dt(
+    s: &mut String,
+    exporter: &Exporter,
+    types: &TypeCollection,
+    r: &OpaqueReference,
+) -> Result<(), Error> {
+    if let Some(def) = r.downcast_ref::<Define>() {
+        s.push_str(&def.0);
+        return Ok(());
+    } else if let Some(def) = r.downcast_ref::<Branded>() {
+        s.push_str(&reference(exporter, types, def.ty())?);
+        s.push_str(r#" & ""#);
+        s.push_str(def.brand());
+        s.push('"');
         return Ok(());
     }
+
+    return Err(Error::UnsupportedOpaqueReference(r.clone()));
+}
+
+fn reference_named_dt(
+    s: &mut String,
+    exporter: &Exporter,
+    types: &TypeCollection,
+    r: &NamedReference,
+    location: Vec<Cow<'static, str>>,
+    // TODO: Remove
+    is_export: bool,
+) -> Result<(), Error> {
     // TODO: Legacy stuff
     {
         let ndt = r
             .get(types)
             .expect("TypeCollection should have been populated by now");
 
-        let name = match ts.layout {
+        // Check if this reference should be inlined
+        if r.inline() {
+            // Inline the referenced type directly without cloning the entire DataType
+            return datatype(s, exporter, types, ndt.ty(), location, is_export, None, "");
+        }
+
+        let name = match exporter.layout {
             Layout::ModulePrefixedName => {
                 let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
                 s.push('_');
@@ -1096,7 +1159,7 @@ fn reference_dt(
 
                 crate::legacy::datatype_inner(
                     crate::legacy::ExportContext {
-                        cfg: ts,
+                        cfg: exporter,
                         path: vec![],
                         is_export,
                     },

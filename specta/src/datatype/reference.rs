@@ -1,65 +1,37 @@
-//! Helpers for generating [Type::reference] implementations
-
-use std::{fmt, hash, sync::Arc};
+use std::{
+    any::{Any, TypeId},
+    fmt, hash,
+    sync::Arc,
+};
 
 use crate::{TypeCollection, datatype::NamedDataType};
 
 use super::{DataType, Generic};
 
+/// A reference to another type.
+/// This can either an [NamedReference] or [OpaqueReference].
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Reference {
+    Named(NamedReference),
+    Opaque(OpaqueReference),
+}
+
 /// A reference to a [NamedDataType].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Reference {
-    pub(crate) id: ArcId,
+pub struct NamedReference {
+    pub(crate) id: NamedId,
     // TODO: Should this be a map-type???
     pub(crate) generics: Vec<(Generic, DataType)>, // TODO: Cow<'static, [(Generic, DataType)]>,
     pub(crate) inline: bool,
 }
 
-impl Reference {
+impl NamedReference {
     /// Get a reference to a [NamedDataType] from a [TypeCollection].
+    ///
+    /// This is guaranteed to return a [NamedDataType] if the [TypeCollection] matches,
+    /// what was used to get the original [Reference].
     pub fn get<'a>(&self, types: &'a TypeCollection) -> Option<&'a NamedDataType> {
         types.0.get(&self.id)?.as_ref()
-    }
-
-    /// Construct a new reference to an opaque type.
-    ///
-    /// An opaque type is unable to represents using the [DataType] system and requires specific exporter integration to handle it.
-    ///
-    /// This should NOT be used in a [`Type::definition`](crate::Type::definition) declaration as that will either result in equality issues or a persistent memory allocation.
-    ///
-    /// An opaque [Reference] is equal when cloned and can be compared using the [Self::ref_eq] or [PartialEq].
-    ///
-    pub fn opaque() -> Self {
-        Self {
-            id: ArcId::Dynamic(Default::default()),
-            generics: Vec::with_capacity(0),
-            inline: false,
-        }
-    }
-
-    /// Construct a new opaque reference to a type with a fixed reference.
-    ///
-    /// An opaque type is unable to represents using the [DataType] system and requires specific exporter integration to handle it.
-    ///
-    /// This should NOT be used in a [`Type::definition`](crate::Type::definition) declaration as that will either result in equality issues or a persistent memory allocation.
-    ///
-    /// # Safety
-    ///
-    /// It's critical that this reference points to a `static ...: () = ();` which is uniquely created for this reference. If it points to a `const` or `Box::leak`d value, the reference will not maintain it's invariants.
-    ///
-    pub const fn opaque_from_sentinel(sentinel: &'static ()) -> Reference {
-        Self {
-            id: ArcId::Static(sentinel),
-            generics: Vec::new(),
-            inline: false,
-        }
-    }
-
-    /// Compare if two references are pointing to the same type.
-    ///
-    /// Unlike `PartialEq::eq`, this method only compares the types, not the generics, inline and other reference attributes.
-    pub fn ref_eq(&self, other: &Self) -> bool {
-        self.id == other.id
     }
 
     /// Get the generic parameters set on this reference which will be filled in by the [NamedDataType].
@@ -73,59 +45,144 @@ impl Reference {
     }
 }
 
+/// A reference to an opaque type which is understood by the type exporter.
+/// This powers [specta_typescript::branded], [specta_typescript::define] and more.
+///
+/// This is an advanced feature designed for language exporters so should generally be avoided.
+#[derive(Clone)]
+pub struct OpaqueReference(Arc<dyn DynOpaqueReference>);
+
+trait DynOpaqueReference: Any + Send + Sync {
+    fn type_name(&self) -> &'static str;
+    fn hash(&self, hasher: &mut dyn hash::Hasher);
+    fn eq(&self, other: &dyn Any) -> bool;
+    fn as_any(&self) -> &dyn Any;
+}
+
+#[derive(Debug)]
+struct OpaqueReferenceInner<T>(T);
+impl<T: hash::Hash + Eq + Send + Sync + 'static> DynOpaqueReference for OpaqueReferenceInner<T> {
+    fn type_name(&self) -> &'static str {
+        std::any::type_name::<T>()
+    }
+    fn hash(&self, mut hasher: &mut dyn hash::Hasher) {
+        self.0.hash(&mut hasher)
+    }
+    fn eq(&self, other: &dyn Any) -> bool {
+        other
+            .downcast_ref::<T>()
+            .map(|other| self.0 == *other)
+            .unwrap_or_default()
+    }
+    fn as_any(&self) -> &dyn Any {
+        &self.0
+    }
+}
+
+impl fmt::Debug for OpaqueReference {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("OpaqueReference")
+            .field(&self.0.type_name())
+            .finish()
+    }
+}
+
+impl PartialEq for OpaqueReference {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq(other.0.as_any())
+    }
+}
+
+impl Eq for OpaqueReference {}
+
+impl hash::Hash for OpaqueReference {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state)
+    }
+}
+
+impl OpaqueReference {
+    pub fn type_name(&self) -> &'static str {
+        self.0.type_name()
+    }
+
+    pub fn type_id(&self) -> TypeId {
+        self.0.as_any().type_id()
+    }
+
+    pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
+        self.0.as_any().downcast_ref::<T>()
+    }
+}
+
+impl Reference {
+    /// Construct a new reference to an opaque type.
+    ///
+    /// An opaque type is unable to be represented using the [DataType] system and requires specific exporter integration to handle it.
+    ///
+    /// Opaque [Reference]'s are compared using [PartialEq]. For example `Reference::opaque(()) == Reference::opaque(())` so you must ensure each reference you intent to be unique is implemented as such.
+    pub fn opaque<T: hash::Hash + Eq + Send + Sync + 'static>(state: T) -> Self {
+        Self::Opaque(OpaqueReference(Arc::new(OpaqueReferenceInner(state))))
+    }
+
+    /// Compare if two references point to the same type.
+    ///
+    /// This is different from using `Eq`, `PartialEq`, or `Hash` as those compare the [Reference].
+    /// A [Reference] contains generics, inline and other attributes which this ignores.
+    pub fn ty_eq(&self, other: &Reference) -> bool {
+        match (self, other) {
+            (Reference::Named(a), Reference::Named(b)) => a.id == b.id,
+            (Reference::Opaque(a), Reference::Opaque(b)) => *a == *b,
+            _ => false,
+        }
+    }
+}
+
 impl From<Reference> for DataType {
     fn from(r: Reference) -> Self {
         Self::Reference(r)
     }
 }
 
-/// A unique identifier for a type.
+/// A unique identifier for a [NamedDataType].
 ///
 /// `Arc<()>` is a great way of creating a virtual ID which
 /// can be compared to itself but for any types defined with the macro
-/// it requires a program-length allocation which is cringe so we use the pointer
-/// to a static which is much more error-prone.
+/// it requires a 'static allocation which is cringe so we use the pointer
+/// to a static which doesn't allocate but is much more error-prone so it's only used internally.
 #[derive(Clone)]
-pub(crate) enum ArcId {
-    // A pointer to a `static ...: ()`.
+pub(crate) enum NamedId {
+    // A pointer to a `static ...: ...`.
     // These are all given a unique pointer.
     Static(&'static ()),
     Dynamic(Arc<()>),
 }
 
-impl PartialEq for ArcId {
+impl PartialEq for NamedId {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (ArcId::Static(a), ArcId::Static(b)) => std::ptr::eq(*a, *b),
-            (ArcId::Dynamic(a), ArcId::Dynamic(b)) => Arc::ptr_eq(a, b),
+            (NamedId::Static(a), NamedId::Static(b)) => std::ptr::eq(*a, *b),
+            (NamedId::Dynamic(a), NamedId::Dynamic(b)) => Arc::ptr_eq(a, b),
             _ => false,
         }
     }
 }
-impl Eq for ArcId {}
+impl Eq for NamedId {}
 
-impl hash::Hash for ArcId {
+impl hash::Hash for NamedId {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         match self {
-            ArcId::Static(ptr) => ptr.hash(state),
-            ArcId::Dynamic(arc) => Arc::as_ptr(arc).hash(state),
+            NamedId::Static(p) => std::ptr::hash(*p, state),
+            NamedId::Dynamic(p) => std::ptr::hash(Arc::as_ptr(p), state),
         }
     }
 }
 
-impl fmt::Debug for ArcId {
+impl fmt::Debug for NamedId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}_{:?}",
-            match self {
-                ArcId::Static(..) => "s",
-                ArcId::Dynamic(..) => "d",
-            },
-            match self {
-                ArcId::Static(ptr) => *ptr as *const (),
-                ArcId::Dynamic(arc) => Arc::as_ptr(arc),
-            }
-        )
+        match self {
+            NamedId::Static(p) => write!(f, "s{:p})", *p),
+            NamedId::Dynamic(p) => write!(f, "d{:p})", Arc::as_ptr(p)),
+        }
     }
 }

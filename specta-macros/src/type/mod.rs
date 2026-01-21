@@ -92,8 +92,8 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     }
 
     let (dt_type, dt_impl) = match data {
-        Data::Struct(data) => parse_struct(&container_attrs, data),
-        Data::Enum(data) => parse_enum(&container_attrs, data),
+        Data::Struct(data) => parse_struct(&crate_ref, &container_attrs, data),
+        Data::Enum(data) => parse_enum(&crate_ref, &container_attrs, data),
         Data::Union(data) => Err(syn::Error::new_spanned(
             data.union_token,
             "specta: Union types are not supported by Specta yet!",

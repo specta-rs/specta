@@ -10,6 +10,16 @@ const _: () = {
     impl_for_map!(indexmap::IndexMap<K, V>);
 };
 
+#[cfg(feature = "bytes")]
+const _: () = {
+    use bytes::{Bytes, BytesMut};
+
+    impl_as!(
+        Bytes as Vec<u8>
+        BytesMut as Vec<u8>
+    );
+};
+
 #[cfg(feature = "serde_json")]
 const _: () = {
     use serde_json::{Map, Number, Value};
@@ -821,7 +831,7 @@ const _: () = {
     use geojson::{Feature, FeatureCollection, Geometry, Value};
 
     #[derive(Type)]
-    #[specta(rename = "GeoJsonValue", untagged, remote = Value, crate = crate, collect = false)]
+    #[specta(untagged, remote = Value, crate = crate, collect = false)]
     #[allow(dead_code)]
     pub enum GeoJsonValue {
         Point(geojson::PointType),
@@ -834,7 +844,7 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(rename = "GeoJsonGeometry", remote = Geometry, crate = crate, collect = false)]
+    #[specta(remote = Geometry, crate = crate, collect = false)]
     #[allow(dead_code)]
     pub struct GeoJsonGeometry {
         pub bbox: Option<geojson::Bbox>,
@@ -843,7 +853,7 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(rename = "GeoJsonFeature", remote = Feature, crate = crate, collect = false)]
+    #[specta(remote = Feature, crate = crate, collect = false)]
     #[allow(dead_code)]
     pub struct GeoJsonFeature {
         pub bbox: Option<geojson::Bbox>,
@@ -854,7 +864,7 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(rename = "GeoJsonFeatureCollection", remote = FeatureCollection, crate = crate, collect = false)]
+    #[specta(remote = FeatureCollection, crate = crate, collect = false)]
     #[allow(dead_code)]
     pub struct GeoJsonFeatureCollection {
         pub bbox: Option<geojson::Bbox>,
@@ -863,7 +873,7 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(rename = "GeoJsonFeatureId", untagged, remote = geojson::feature::Id, crate = crate, collect = false)]
+    #[specta(untagged, remote = geojson::feature::Id, crate = crate, collect = false)]
     #[allow(dead_code)]
     pub enum GeoJsonFeatureId {
         String(String),
@@ -876,14 +886,14 @@ const _: () = {
     use geozero::mvt::tile;
 
     #[derive(Type)]
-    #[specta(rename = "GeoZeroTile", remote = geozero::mvt::Tile, crate = crate, collect = false)]
+    #[specta(remote = geozero::mvt::Tile, crate = crate, collect = false)]
     #[allow(dead_code)]
     pub struct GeoZeroTile {
         pub layers: Vec<tile::Layer>,
     }
 
     #[derive(Type)]
-    #[specta(rename = "GeoZeroValue", remote = tile::Value, crate = crate, collect = false)]
+    #[specta(remote = tile::Value, crate = crate, collect = false)]
     #[allow(dead_code)]
     pub struct GeoZeroValue {
         pub string_value: Option<String>,
@@ -896,7 +906,7 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(rename = "GeoZeroFeature", remote = tile::Feature, crate = crate, collect = false)]
+    #[specta(remote = tile::Feature, crate = crate, collect = false)]
     #[allow(dead_code)]
     pub struct GeoZeroFeature {
         pub id: Option<u64>,
@@ -906,7 +916,7 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(rename = "GeoZeroLayer", remote = tile::Layer, crate = crate, collect = false)]
+    #[specta(remote = tile::Layer, crate = crate, collect = false)]
     #[allow(dead_code)]
     pub struct GeoZeroLayer {
         pub version: u32,
@@ -918,7 +928,7 @@ const _: () = {
     }
 
     #[derive(Type)]
-    #[specta(rename = "GeoZeroGeomType", remote = tile::GeomType, crate = crate, collect = false)]
+    #[specta(remote = tile::GeomType, crate = crate, collect = false)]
     #[allow(dead_code)]
     pub enum GeoZeroGeomType {
         Unknown = 0,

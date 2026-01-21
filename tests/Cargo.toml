@@ -6,12 +6,12 @@ publish = false
 autotests = false
 
 [[test]]
-name = "integration_tests"
-path = "tests/lib.rs"
+name = "test"
+path = "tests/mod.rs"
 harness = true
 
 [dependencies]
-specta = { path = "../specta", features = ["std", "derive", "serde_json", "serde_yaml", "toml", "chrono", "either", "ulid", "glam"] }
+specta = { path = "../specta", features = ["function", "std", "derive", "serde_json", "serde_yaml", "toml", "chrono", "either", "ulid", "glam"] }
 specta-serde = { path = "../specta-serde" }
 specta-typescript = { path = "../specta-typescript" }
 specta-util = { path = "../specta-util", features = ["serde"] }                # TODO: Remove `serde` feature
@@ -27,3 +27,4 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 either = { version = "1.15", default-features = false }
 ulid = { version = "1.2", default-features = false, features = [] }
 glam = { version = "0.30", default-features = false, features = ["std"] }
+tempfile = "3.24.0"

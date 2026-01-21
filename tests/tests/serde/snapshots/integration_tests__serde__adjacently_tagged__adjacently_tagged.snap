@@ -1,7 +1,0 @@
----
-source: tests/tests/serde/adjacently_tagged.rs
-expression: "assert_ts_export2::<A>()"
----
-Ok(
-    "export type A = { t: \"A\" } | { t: \"B\"; c: { id: string; method: string } } | { t: \"C\"; c: string };",
-)

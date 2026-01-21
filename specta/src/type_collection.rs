@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt};
 
 use crate::{
     Type,
-    datatype::{ArcId, NamedDataType},
+    datatype::{NamedDataType, NamedId},
 };
 
 /// Define a set of types which can be exported together.
@@ -13,7 +13,7 @@ use crate::{
 pub struct TypeCollection(
     // `None` indicates that the entry is a placeholder.
     // It is a reference and we are currently resolving it's definition.
-    pub(crate) HashMap<ArcId, Option<NamedDataType>>,
+    pub(crate) HashMap<NamedId, Option<NamedDataType>>,
 );
 
 impl fmt::Debug for TypeCollection {

@@ -1793,6 +1793,7 @@ dependencies = [
  "bigdecimal",
  "bit-vec",
  "bson",
+ "bytes",
  "bytesize",
  "camino",
  "chrono",
@@ -1893,27 +1894,6 @@ dependencies = [
 
 [[package]]
 name = "specta-tests"
-version = "0.0.0"
-dependencies = [
- "chrono",
- "either",
- "glam",
- "insta",
- "serde",
- "serde_json",
- "serde_yaml",
- "specta",
- "specta-serde",
- "specta-typescript",
- "specta-util",
- "toml",
- "trybuild",
- "ulid",
- "wasm-bindgen",
-]
-
-[[package]]
-name = "specta-tests2"
 version = "0.0.0"
 dependencies = [
  "chrono",
