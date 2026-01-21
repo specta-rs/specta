@@ -41,25 +41,27 @@ use specta::datatype::DataType;
 /// - The `as "name"` syntax is optional; if omitted, the struct name is used
 #[macro_export]
 macro_rules! branded {
-    // TODO: Bring this back
-    // // Pattern with generics and optional TypeScript name
-    // (
-    //     $(#[$attr:meta])*
-    //     $vis:vis struct $ident:ident<$($generic:ident),+ $(,)?> ( $ty:ty ) $(as $ts_name:literal)?
-    // ) => {
-    //     $(#[$attr])*
-    //     $vis struct $ident<$($generic),+>($ty);
+    // Pattern with generics and optional TypeScript name
+    (
+        $(#[$attr:meta])*
+        $vis:vis struct $ident:ident<$($generic:ident),+ $(,)?> ( $ty:ty ) $(as $ts_name:literal)?
+    ) => {
+        $(#[$attr])*
+        $vis struct $ident<$($generic),+>($ty);
 
-    //     impl<$($generic: specta::Type),+> specta::Type for $ident<$($generic),+> {
-    //         fn definition(types: &mut specta::TypeCollection) -> specta::datatype::DataType {
-    //             // TODO: This needs to be consistent (or does it??)
+        impl<$($generic: specta::Type),+> specta::Type for $ident<$($generic),+> {
+            fn definition(types: &mut specta::TypeCollection) -> specta::datatype::DataType {
+                let ty = <$ty as specta::Type>::definition(types);
+                let brand: &'static str = branded!(@brand $ident $( $ts_name )?);
 
-    //             static SENTINEL: $crate::Branded = $crate::Branded::new(std::borrow::Cow::Borrowed("todo"), <$ty as specta::Type>::definition(types));
-
-    //             specta::datatype::DataType::Reference(specta::datatype::Reference::opaque_from_sentinel(&SENTINEL))
-    //         }
-    //     }
-    // };
+                specta::datatype::DataType::Reference(
+                    specta::datatype::Reference::opaque(
+                        $crate::Branded::new(std::borrow::Cow::Borrowed(brand), ty)
+                    )
+                )
+            }
+        }
+    };
 
     // Pattern without generics
     (
