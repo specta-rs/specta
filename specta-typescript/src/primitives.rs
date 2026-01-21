@@ -1089,7 +1089,7 @@ fn reference_opaque_dt(
         return Ok(());
     }
 
-    panic!("TODO"); // TODO: Proper error
+    return Err(Error::UnsupportedOpaqueReference(r.clone()));
 }
 
 fn reference_named_dt(

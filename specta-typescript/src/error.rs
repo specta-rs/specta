@@ -1,11 +1,13 @@
 use std::{borrow::Cow, error, fmt, io, panic::Location};
 
+use specta::datatype::OpaqueReference;
+
 use crate::legacy::NamedLocation;
 
 use super::legacy::ExportPath;
 
 /// The error type for the TypeScript exporter.
-#[derive(Debug)]
+#[derive(Debug)] // TODO: Should be be replaced with the `Display` impl???
 #[non_exhaustive]
 pub enum Error {
     /// Attempted to export a bigint type but the configuration forbids it.
@@ -32,6 +34,10 @@ pub enum Error {
     /// An filesystem IO error.
     /// This is possible when using `Typescript::export_to` when writing to a file or formatting the file.
     Io(io::Error),
+    /// Found an opaque reference which the Typescript exporter doesn't know how to handle.
+    /// You may be referencing a type which is not supported by the Typescript exporter.
+    UnsupportedOpaqueReference(OpaqueReference),
+
     //
     //
     // TODO: Break
@@ -96,6 +102,13 @@ impl fmt::Display for Error {
                 "Detected multiple types with the same name: {name:?} in {types:?}"
             ),
             Error::Io(err) => write!(f, "IO error: {err}"),
+            Error::UnsupportedOpaqueReference(r) => {
+                write!(
+                    f,
+                    "Found unsupported opaque reference '{}'. It is not supported by the Typescript exporter.",
+                    r.type_name()
+                )
+            }
             // TODO:
             Error::BigIntForbiddenLegacy(path) => writeln!(
                 f,
