@@ -12,7 +12,7 @@ use specta::{
 };
 use specta_serde::SerdeMode;
 
-use crate::{Error, primitives, types};
+use crate::{Error, primitives};
 
 /// Allows you to configure how Specta's Typescript exporter will deal with BigInt types ([i64], [i128] etc).
 ///
@@ -645,7 +645,7 @@ fn crawl_for_imports(dt: &DataType, types: &TypeCollection, imports: &mut Import
                 crawl_for_imports(field, types, imports);
             }
         }
-        DataType::Reference(r) => {
+        DataType::Reference(Reference::Named(r)) => {
             if let Some(ndt) = r.get(types) {
                 let mut path = "./".to_string();
 
@@ -660,7 +660,7 @@ fn crawl_for_imports(dt: &DataType, types: &TypeCollection, imports: &mut Import
                     .insert((ndt.name().clone(), ndt.module_path().replace("::", "_")));
             }
         }
-        DataType::Generic(_) => {}
+        DataType::Reference(Reference::Opaque(_)) | DataType::Generic(_) => {}
     }
 }
 

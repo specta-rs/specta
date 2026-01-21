@@ -66,7 +66,8 @@ pub use serde_attrs::{SerdeMode, apply_serde_transformations};
 
 use specta::TypeCollection;
 use specta::datatype::{
-    DataType, Enum, Fields, Generic, Primitive, Reference, skip_fields, skip_fields_named,
+    DataType, Enum, Fields, Generic, NamedReference, Primitive, Reference, skip_fields,
+    skip_fields_named,
 };
 use std::collections::HashSet;
 
@@ -202,7 +203,7 @@ fn validate_type(
     dt: &DataType,
     types: &TypeCollection,
     generics: &[(Generic, DataType)],
-    checked_references: &mut HashSet<Reference>,
+    checked_references: &mut HashSet<NamedReference>,
 ) -> Result<(), Error> {
     match dt {
         DataType::Nullable(ty) => validate_type(ty, types, generics, checked_references)?,
@@ -250,7 +251,7 @@ fn validate_type(
         DataType::List(ty) => {
             validate_type(ty.ty(), types, generics, checked_references)?;
         }
-        DataType::Reference(r) => {
+        DataType::Reference(Reference::Named(r)) => {
             for (_, dt) in r.generics() {
                 validate_type(dt, types, &[], checked_references)?;
             }
@@ -262,6 +263,7 @@ fn validate_type(
                 }
             }
         }
+        DataType::Reference(Reference::Opaque(_)) => {}
         _ => {}
     }
 
@@ -322,12 +324,13 @@ fn is_valid_map_key(
 
             Ok(())
         }
-        DataType::Reference(r) => {
+        DataType::Reference(Reference::Named(r)) => {
             if let Some(ndt) = r.get(types) {
                 is_valid_map_key(ndt.ty(), types, r.generics())?;
             }
             Ok(())
         }
+        DataType::Reference(Reference::Opaque(_)) => Ok(()),
         DataType::Generic(g) => {
             let ty = generics
                 .iter()

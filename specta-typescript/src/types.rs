@@ -1,9 +1,6 @@
-use std::{cell::Ref, fmt::Debug};
+use std::fmt::Debug;
 
-use specta::{
-    Type, TypeCollection,
-    datatype::{DataType, Reference},
-};
+use specta::{Type, TypeCollection, datatype::DataType};
 
 /// Cast a Rust type to a Typescript `any` type.
 ///

@@ -92,7 +92,7 @@ macro_rules! branded {
      };
 }
 
-#[derive(Debug, Clone)] // TODO
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Branded {
     brand: Cow<'static, str>,
     ty: DataType,

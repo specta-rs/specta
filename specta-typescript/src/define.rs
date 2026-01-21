@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use specta::datatype::Reference;
 
+#[derive(PartialEq, Eq, Hash)]
 pub(crate) struct Define(pub(crate) Cow<'static, str>);
 
 /// Define a custom Typescript string which can be used as a `DataType::Reference`.

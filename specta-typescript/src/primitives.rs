@@ -11,7 +11,8 @@ use std::{
 use specta::{
     TypeCollection,
     datatype::{
-        DataType, DeprecatedType, Enum, List, Map, NamedDataType, Primitive, Reference, Tuple,
+        DataType, DeprecatedType, Enum, List, Map, NamedDataType, NamedReference, OpaqueReference,
+        Primitive, Reference, Tuple,
     },
 };
 
@@ -303,7 +304,9 @@ fn inline_datatype(
         DataType::Tuple(t) => tuple_dt(s, ts, types, t, location, is_export)?,
         DataType::Reference(r) => {
             // Always inline references when in inline mode
-            if let Some(ndt) = r.get(types) {
+            if let Reference::Named(r) = r
+                && let Some(ndt) = r.get(types)
+            {
                 inline_datatype(
                     s,
                     ts,
@@ -518,13 +521,14 @@ fn map_dt(
         fn is_exhaustive(dt: &DataType, types: &TypeCollection) -> bool {
             match dt {
                 DataType::Enum(e) => e.variants().iter().filter(|(_, v)| !v.skip()).count() == 0,
-                DataType::Reference(r) => {
+                DataType::Reference(Reference::Named(r)) => {
                     if let Some(ndt) = r.get(types) {
                         is_exhaustive(ndt.ty(), types)
                     } else {
                         false
                     }
                 }
+                DataType::Reference(Reference::Opaque(_)) => false,
                 _ => true,
             }
         }
@@ -1062,6 +1066,18 @@ fn reference_dt(
     // TODO: Remove
     is_export: bool,
 ) -> Result<(), Error> {
+    match r {
+        Reference::Named(r) => reference_named_dt(s, ts, types, r, location, is_export),
+        Reference::Opaque(r) => reference_opaque_dt(s, ts, types, r),
+    }
+}
+
+fn reference_opaque_dt(
+    s: &mut String,
+    ts: &Exporter,
+    types: &TypeCollection,
+    r: &OpaqueReference,
+) -> Result<(), Error> {
     if let Some(def) = r.downcast_ref::<Define>() {
         s.push_str(&def.0);
         return Ok(());
@@ -1073,8 +1089,18 @@ fn reference_dt(
         return Ok(());
     }
 
-    // TODO: Special error if this is a opaque reference
+    panic!("TODO"); // TODO: Proper error
+}
 
+fn reference_named_dt(
+    s: &mut String,
+    ts: &Exporter,
+    types: &TypeCollection,
+    r: &NamedReference,
+    location: Vec<Cow<'static, str>>,
+    // TODO: Remove
+    is_export: bool,
+) -> Result<(), Error> {
     // TODO: Legacy stuff
     {
         let ndt = r
