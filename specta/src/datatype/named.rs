@@ -9,31 +9,26 @@ thread_local! {
     static COLLECTED_TYPES: RefCell<Option<Vec<HashMap<ArcId, NamedDataType>>>> = const { RefCell::new(None) };
 }
 
-/// TODO
+/// Collects all named data types constructed within the provided closure.
 ///
-/// TODO: Rename
+/// This is useful for collecting up the required imports when generating an output file.
 pub fn collect(func: impl FnOnce()) -> impl Iterator<Item = NamedDataType> {
-    struct Guard(bool);
+    struct Guard;
     impl Drop for Guard {
         fn drop(&mut self) {
-            // This will be `true` during unwinding from within `func`
-            if true {
-                COLLECTED_TYPES.with_borrow_mut(|types| {
-                    if let Some(v) = types {
-                        // Last collection means we can drop all memory
-                        if v.len() == 1 {
-                            *types = None;
-                        } else {
-                            // Otherwise just remove the current collection.
-                            v.pop();
-                        }
+            COLLECTED_TYPES.with_borrow_mut(|types| {
+                if let Some(v) = types {
+                    // Last collection means we can drop all memory
+                    if v.len() == 1 {
+                        *types = None;
+                    } else {
+                        // Otherwise just remove the current collection.
+                        v.pop();
                     }
-                })
-            }
+                }
+            })
         }
     }
-
-    let mut guard = Guard(true);
 
     // If we have no collection, register one
     // If we already have one create a new context.
@@ -45,9 +40,10 @@ pub fn collect(func: impl FnOnce()) -> impl Iterator<Item = NamedDataType> {
         }
     });
 
+    let guard = Guard;
     func();
-    // We did not unwind, so ignore the `Drop` hook
-    guard.0 = false;
+    // We only use the guard when unwinding
+    std::mem::forget(guard);
 
     COLLECTED_TYPES.with_borrow_mut(|types| {
         types
