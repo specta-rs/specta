@@ -2,23 +2,62 @@ use std::{borrow::Cow, cell::RefCell, collections::HashMap, panic::Location};
 
 use crate::{
     TypeCollection,
-    datatype::{DataType, Generic, Reference, reference::ArcId},
+    datatype::{DataType, Generic, NamedDataTypeBuilder, Reference, reference::ArcId},
 };
 
 thread_local! {
-    static COLLECTED_TYPES: RefCell<Option<HashMap<ArcId, NamedDataType>>> = const { RefCell::new(None) };
+    static COLLECTED_TYPES: RefCell<Option<Vec<HashMap<ArcId, NamedDataType>>>> = const { RefCell::new(None) };
 }
 
 /// TODO
 ///
 /// TODO: Rename
 pub fn collect(func: impl FnOnce()) -> impl Iterator<Item = NamedDataType> {
-    // TODO: Do we need to handle unwinds??
-    // TODO: What if `COLLECTED_TYPES` is already set?
+    struct Guard(bool);
+    impl Drop for Guard {
+        fn drop(&mut self) {
+            // This will be `true` during unwinding from within `func`
+            if true {
+                COLLECTED_TYPES.with_borrow_mut(|types| {
+                    if let Some(v) = types {
+                        // Last collection means we can drop all memory
+                        if v.len() == 1 {
+                            *types = None;
+                        } else {
+                            // Otherwise just remove the current collection.
+                            v.pop();
+                        }
+                    }
+                })
+            }
+        }
+    }
 
-    COLLECTED_TYPES.set(Some(Default::default()));
+    let mut guard = Guard(true);
+
+    // If we have no collection, register one
+    // If we already have one create a new context.
+    COLLECTED_TYPES.with_borrow_mut(|v| {
+        if let Some(v) = v {
+            v.push(Default::default());
+        } else {
+            *v = Some(vec![Default::default()]);
+        }
+    });
+
     func();
-    COLLECTED_TYPES.take().unwrap().into_iter().map(|v| v.1) // TODO: Error handling
+    // We did not unwind, so ignore the `Drop` hook
+    guard.0 = false;
+
+    COLLECTED_TYPES.with_borrow_mut(|types| {
+        types
+            .as_mut()
+            .expect("COLLECTED_TYPES is unset but it should be set")
+            .pop()
+            .expect("COLLECTED_TYPES is missing a valid collection context")
+            .into_iter()
+            .map(|v| v.1)
+    })
 }
 
 /// A named type represents a non-primitive type capable of being exported as it's own named entity.
@@ -61,9 +100,11 @@ impl NamedDataType {
             // If this is `None` we will add into the `COLLECTED_TYPES`,
             // when resolution is finished.
             if let Some(ndt) = ndt {
-                COLLECTED_TYPES.with_borrow_mut(|v| {
-                    if let Some(types) = v {
-                        types.insert(id.clone(), ndt.clone());
+                COLLECTED_TYPES.with_borrow_mut(|ctxs| {
+                    if let Some(ctxs) = ctxs {
+                        for ctx in ctxs {
+                            ctx.insert(ndt.id.clone(), ndt.clone());
+                        }
                     }
                 });
             }
@@ -82,9 +123,11 @@ impl NamedDataType {
                 inner: DataType::Primitive(super::Primitive::i8),
             };
             build_ndt(types, &mut ndt);
-            COLLECTED_TYPES.with_borrow_mut(|v| {
-                if let Some(types) = v {
-                    types.insert(id.clone(), ndt.clone());
+            COLLECTED_TYPES.with_borrow_mut(|ctxs| {
+                if let Some(ctxs) = ctxs {
+                    for ctx in ctxs {
+                        ctx.insert(ndt.id.clone(), ndt.clone());
+                    }
                 }
             });
             types.0.insert(id.clone(), Some(ndt));
@@ -95,6 +138,34 @@ impl NamedDataType {
             generics,
             inline,
         }
+    }
+
+    /// Register a runtime named datatype.
+    /// This is exposed via [NamedDataTypeBuilder::build].
+    pub(crate) fn register(
+        builder: NamedDataTypeBuilder,
+        types: &mut TypeCollection,
+    ) -> NamedDataType {
+        let ndt = NamedDataType {
+            id: ArcId::Dynamic(Default::default()),
+            name: builder.name,
+            docs: builder.docs,
+            deprecated: builder.deprecated,
+            module_path: builder.module_path,
+            location: Location::caller().to_owned(),
+            generics: builder.generics,
+            inner: builder.inner,
+        };
+
+        types.0.insert(ndt.id.clone(), Some(ndt.clone()));
+        COLLECTED_TYPES.with_borrow_mut(|ctxs| {
+            if let Some(ctxs) = ctxs {
+                for ctx in ctxs {
+                    ctx.insert(ndt.id.clone(), ndt.clone());
+                }
+            }
+        });
+        ndt
     }
 
     /// TODO
