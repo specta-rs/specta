@@ -1,3 +1,5 @@
+use std::any::TypeId;
+
 use specta::{
     Type, TypeCollection,
     datatype::{DataType, Reference},
@@ -16,6 +18,18 @@ fn references() {
     assert_eq!(Reference::opaque(true), Reference::opaque(true));
     assert_ne!(Reference::opaque(true), Reference::opaque(false));
     assert_ne!(Reference::opaque(42u32), Reference::opaque('a'));
+
+    // Ensure opaque metadata can be extracted again
+    {
+        let r = match Reference::opaque(()) {
+            Reference::Opaque(r) => r,
+            _ => panic!("Expected an opaque reference"),
+        };
+
+        assert_eq!(r.type_id(), TypeId::of::<()>());
+        assert_eq!(r.type_name(), "()");
+        assert_eq!(r.downcast_ref(), Some(&()));
+    }
 
     let mut types = TypeCollection::default();
 

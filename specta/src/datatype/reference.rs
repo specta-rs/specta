@@ -49,17 +49,47 @@ impl NamedReference {
 /// This powers [specta_typescript::branded], [specta_typescript::define] and more.
 ///
 /// This is an advanced feature designed for language exporters so should generally be avoided.
-#[derive(Debug, Clone)]
-pub struct OpaqueReference {
-    inner: Arc<dyn Any + Send + Sync>,
-    type_name: &'static str,
-    hash: fn(&(dyn Any + Send + Sync), &mut dyn hash::Hasher),
-    eq: fn(&(dyn Any + Send + Sync), &(dyn Any + Send + Sync)) -> bool,
+#[derive(Clone)]
+pub struct OpaqueReference(Arc<dyn DynOpaqueReference>);
+
+trait DynOpaqueReference: Any + Send + Sync {
+    fn type_name(&self) -> &'static str;
+    fn hash(&self, hasher: &mut dyn hash::Hasher);
+    fn eq(&self, other: &dyn Any) -> bool;
+    fn as_any(&self) -> &dyn Any;
+}
+
+#[derive(Debug)]
+struct OpaqueReferenceInner<T>(T);
+impl<T: hash::Hash + Eq + Send + Sync + 'static> DynOpaqueReference for OpaqueReferenceInner<T> {
+    fn type_name(&self) -> &'static str {
+        std::any::type_name::<T>()
+    }
+    fn hash(&self, mut hasher: &mut dyn hash::Hasher) {
+        self.0.hash(&mut hasher)
+    }
+    fn eq(&self, other: &dyn Any) -> bool {
+        other
+            .downcast_ref::<T>()
+            .map(|other| self.0 == *other)
+            .unwrap_or_default()
+    }
+    fn as_any(&self) -> &dyn Any {
+        &self.0
+    }
+}
+
+impl fmt::Debug for OpaqueReference {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("OpaqueReference")
+            .field(&self.0.type_name())
+            .finish()
+    }
 }
 
 impl PartialEq for OpaqueReference {
     fn eq(&self, other: &Self) -> bool {
-        (self.eq)(&*self.inner, &*other.inner)
+        self.0.eq(other.0.as_any())
     }
 }
 
@@ -67,21 +97,21 @@ impl Eq for OpaqueReference {}
 
 impl hash::Hash for OpaqueReference {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        (self.hash)(&*self.inner, state)
+        self.0.hash(state)
     }
 }
 
 impl OpaqueReference {
     pub fn type_name(&self) -> &'static str {
-        self.type_name
+        self.0.type_name()
     }
 
     pub fn type_id(&self) -> TypeId {
-        (*self.inner).type_id() // TODO: Check this is the inner type not `Arc`
+        self.0.as_any().type_id()
     }
 
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
-        self.inner.downcast_ref::<T>()
+        self.0.as_any().downcast_ref::<T>()
     }
 }
 
@@ -92,25 +122,7 @@ impl Reference {
     ///
     /// Opaque [Reference]'s are compared using [PartialEq]. For example `Reference::opaque(()) == Reference::opaque(())` so you must ensure each reference you intent to be unique is implemented as such.
     pub fn opaque<T: hash::Hash + Eq + Send + Sync + 'static>(state: T) -> Self {
-        Self::Opaque(OpaqueReference {
-            inner: Arc::new(state),
-            type_name: std::any::type_name::<T>(),
-            hash: |inner, mut hasher| {
-                inner
-                    .downcast_ref::<T>()
-                    .expect("opaque reference failed to downcast into self")
-                    .hash(&mut hasher);
-            },
-            eq: |a, b| {
-                b.downcast_ref::<T>()
-                    .map(|b| {
-                        a.downcast_ref::<T>()
-                            .expect("opaque reference failed to downcast into self")
-                            .eq(b)
-                    })
-                    .unwrap_or_default()
-            },
-        })
+        Self::Opaque(OpaqueReference(Arc::new(OpaqueReferenceInner(state))))
     }
 
     /// Compare if two references point to the same type.
@@ -120,7 +132,7 @@ impl Reference {
     pub fn ty_eq(&self, other: &Reference) -> bool {
         match (self, other) {
             (Reference::Named(a), Reference::Named(b)) => a.id == b.id,
-            (Reference::Opaque(a), Reference::Opaque(b)) => a == b,
+            (Reference::Opaque(a), Reference::Opaque(b)) => *a == *b,
             _ => false,
         }
     }
