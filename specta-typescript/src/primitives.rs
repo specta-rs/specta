@@ -1061,23 +1061,22 @@ fn reference_dt(
     // TODO: Remove
     is_export: bool,
 ) -> Result<(), Error> {
-    // Check if this reference should be inlined
-    if r.inline()
-        && let Some(ndt) = r.get(types)
-    {
-        // Inline the referenced type directly without cloning the entire DataType
-        return datatype(s, ts, types, ndt.ty(), location, is_export, None, "");
-    }
-
     if let Some((_, typescript)) = ts.references.iter().find(|(re, _)| re.ref_eq(r)) {
         s.push_str(typescript);
         return Ok(());
     }
+
     // TODO: Legacy stuff
     {
         let ndt = r
             .get(types)
             .expect("TypeCollection should have been populated by now");
+
+        // Check if this reference should be inlined
+        if r.inline() {
+            // Inline the referenced type directly without cloning the entire DataType
+            return datatype(s, ts, types, ndt.ty(), location, is_export, None, "");
+        }
 
         let name = match ts.layout {
             Layout::ModulePrefixedName => {

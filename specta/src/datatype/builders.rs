@@ -2,12 +2,12 @@
 //!
 //! TODO: Option to build types with generics???
 
-use std::{borrow::Cow, fmt::Debug, panic::Location};
+use std::{borrow::Cow, fmt::Debug};
 
 use crate::{
-    DataType, TypeCollection,
+    TypeCollection,
     datatype::{
-        ArcId, DeprecatedType, EnumVariant, Field, Fields, Generic, NamedDataType, NamedFields,
+        DataType, DeprecatedType, EnumVariant, Field, Fields, Generic, NamedDataType, NamedFields,
         RuntimeAttribute, Struct, UnnamedFields,
     },
 };
@@ -194,18 +194,6 @@ impl NamedDataTypeBuilder {
 
     #[track_caller]
     pub fn build(self, types: &mut TypeCollection) -> NamedDataType {
-        let ndt = NamedDataType {
-            id: ArcId::Dynamic(Default::default()),
-            name: self.name,
-            docs: self.docs,
-            deprecated: self.deprecated,
-            module_path: self.module_path,
-            location: Location::caller().to_owned(),
-            generics: self.generics,
-            inner: self.inner,
-        };
-
-        types.0.insert(ndt.id.clone(), Some(ndt.clone()));
-        ndt
+        NamedDataType::register(self, types)
     }
 }
