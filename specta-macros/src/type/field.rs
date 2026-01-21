@@ -1,8 +1,8 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::{quote, ToTokens};
 use syn::Type;
 
-use super::{ContainerAttr, FieldAttr, lower_attr::lower_attribute};
+use super::{lower_attr::lower_attribute, ContainerAttr, FieldAttr};
 
 pub fn construct_field(
     crate_ref: &TokenStream,
@@ -51,12 +51,14 @@ pub fn construct_field_with_variant_skip(
         quote!(Some(<#field_ty as #crate_ref::Type>::definition(types)))
     };
 
-    Ok(quote!(internal::construct::field(
-        #optional,
-        #deprecated,
-        #doc.into(),
-        #inline,
-        vec![#(#lowered_field_attrs),*],
-        #ty
+    Ok(quote!(internal::construct::merge_inline_from_type(
+        internal::construct::field(
+            #optional,
+            #deprecated,
+            #doc.into(),
+            #inline,
+            vec![#(#lowered_field_attrs),*],
+            #ty
+        )
     )))
 }
