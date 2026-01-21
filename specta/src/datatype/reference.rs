@@ -31,7 +31,7 @@ impl NamedReference {
     /// This is guaranteed to return a [NamedDataType] if the [TypeCollection] matches,
     /// what was used to get the original [Reference].
     pub fn get<'a>(&self, types: &'a TypeCollection) -> Option<&'a NamedDataType> {
-        types.0.get(&ArcId::Named(self.id.clone()))?.as_ref()
+        types.0.get(&self.id)?.as_ref()
     }
 
     /// Get the generic parameters set on this reference which will be filled in by the [NamedDataType].
@@ -127,6 +127,12 @@ impl From<Reference> for DataType {
     }
 }
 
+/// A unique identifier for a [NamedDataType].
+///
+/// `Arc<()>` is a great way of creating a virtual ID which
+/// can be compared to itself but for any types defined with the macro
+/// it requires a 'static allocation which is cringe so we use the pointer
+/// to a static which doesn't allocate but is much more error-prone so it's only used internally.
 #[derive(Clone)]
 pub(crate) enum NamedId {
     // A pointer to a `static ...: ...`.
@@ -162,16 +168,4 @@ impl fmt::Debug for NamedId {
             NamedId::Dynamic(p) => write!(f, "d_{p:p})"),
         }
     }
-}
-
-/// A unique identifier for a type.
-///
-/// `Arc<()>` is a great way of creating a virtual ID which
-/// can be compared to itself but for any types defined with the macro
-/// it requires a program-length allocation which is cringe so we use the pointer
-/// to a static which is much more error-prone.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum ArcId {
-    Named(NamedId),
-    Opaque(OpaqueReference),
 }

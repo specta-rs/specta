@@ -3,8 +3,7 @@ use std::{borrow::Cow, cell::RefCell, collections::HashMap, panic::Location, syn
 use crate::{
     TypeCollection,
     datatype::{
-        DataType, Generic, NamedDataTypeBuilder, NamedReference, Reference,
-        reference::{ArcId, NamedId},
+        DataType, Generic, NamedDataTypeBuilder, NamedReference, Reference, reference::NamedId,
     },
 };
 
@@ -93,10 +92,9 @@ impl NamedDataType {
         build_ndt: fn(&mut TypeCollection, &mut NamedDataType),
     ) -> Reference {
         let id = NamedId::Static(sentinel);
-        let arc_id = ArcId::Named(id.clone());
         let location = Location::caller().to_owned();
 
-        if let Some(ndt) = types.0.get(&arc_id) {
+        if let Some(ndt) = types.0.get(&id) {
             // If this is `None` we will add into the `COLLECTED_TYPES`,
             // when resolution is finished.
             if let Some(ndt) = ndt {
@@ -135,7 +133,7 @@ impl NamedDataType {
         } else {
             // We have never encountered this type. Start resolving it!
 
-            types.0.insert(arc_id.clone(), None);
+            types.0.insert(id.clone(), None);
             let mut ndt = NamedDataType {
                 id: id.clone(),
                 location,
@@ -155,7 +153,7 @@ impl NamedDataType {
                     }
                 }
             });
-            types.0.insert(arc_id, Some(ndt));
+            types.0.insert(id.clone(), Some(ndt));
         }
 
         Reference::Named(NamedReference {
@@ -182,9 +180,7 @@ impl NamedDataType {
             inner: builder.inner,
         };
 
-        types
-            .0
-            .insert(ArcId::Named(ndt.id.clone()), Some(ndt.clone()));
+        types.0.insert(ndt.id.clone(), Some(ndt.clone()));
         COLLECTED_TYPES.with_borrow_mut(|ctxs| {
             if let Some(ctxs) = ctxs {
                 for ctx in ctxs {

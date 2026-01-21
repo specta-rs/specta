@@ -30,8 +30,7 @@ pub use reference::{NamedReference, OpaqueReference, Reference};
 pub use r#struct::Struct;
 pub use tuple::Tuple;
 
-// TODO: Remove this
-pub(crate) use reference::ArcId;
+pub(crate) use reference::NamedId;
 
 /// Runtime type-erased representation of a Rust type.
 ///
