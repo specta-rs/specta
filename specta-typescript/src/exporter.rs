@@ -3,7 +3,6 @@ use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fmt,
     path::{Path, PathBuf},
-    sync::Arc,
 };
 
 use specta::{
@@ -60,23 +59,12 @@ impl fmt::Display for Layout {
     }
 }
 
-#[derive(Clone)]
-struct RuntimeFn(Arc<dyn Fn() -> Cow<'static, str>>);
-
-impl fmt::Debug for RuntimeFn {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("RuntimeFn")
-            .field(&format!("{self:p}"))
-            .finish()
-    }
-}
-
 /// Typescript language exporter.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Exporter {
     pub header: Cow<'static, str>,
-    framework_runtime: Option<RuntimeFn>,
+    framework_runtime: Option<(Cow<'static, str>, Vec<NamedDataType>)>,
     framework_prelude: Cow<'static, str>,
     pub bigint: BigIntExportBehavior,
     pub layout: Layout,
@@ -111,8 +99,10 @@ impl Exporter {
     ///
     /// The closure is wrapped in [`specta::datatype::collect()`] to capture any referenced types.
     /// Ensure you call `T::reference()` within the closure if you want an import to be created.
-    pub fn framework_runtime(mut self, runtime: impl Fn() -> Cow<'static, str> + 'static) -> Self {
-        self.framework_runtime = Some(RuntimeFn(Arc::new(runtime)));
+    pub fn framework_runtime(mut self, builder: impl FnOnce() -> Cow<'static, str>) -> Self {
+        let mut runtime = Cow::default();
+        let ndts = specta::datatype::collect(|| runtime = (builder)()).collect::<Vec<_>>();
+        self.framework_runtime = Some((runtime, ndts));
         self
     }
 
@@ -363,11 +353,9 @@ impl Exporter {
 
         // Collect runtime imports and generate runtime code
         let mut runtime_imports = ImportMap::default();
-        if include_runtime && let Some(runtime_fn) = &self.framework_runtime {
-            let ndts = specta::datatype::collect(|| {
-                out.push_str(&(runtime_fn.0)());
-                out.push('\n');
-            });
+        if include_runtime && let Some((runtime, ndts)) = &self.framework_runtime {
+            out.push_str(runtime);
+            out.push('\n');
 
             for ndt in ndts {
                 crawl_for_imports(ndt.ty(), types, &mut runtime_imports);
@@ -486,14 +474,8 @@ impl Exporter {
                 content.push('\n');
 
                 let mut runtime_imports = ImportMap::default();
-                let mut runtime = Cow::default();
-                if let Some(runtime_fn) = &self.framework_runtime {
-                    let collected_ndts: Vec<NamedDataType> = specta::datatype::collect(|| {
-                        runtime = (runtime_fn.0)();
-                    })
-                    .collect();
-
-                    for ndt in collected_ndts {
+                if let Some((_, ndts)) = &self.framework_runtime {
+                    for ndt in ndts {
                         crawl_for_imports(ndt.ty(), types, &mut runtime_imports);
                     }
                 }
@@ -534,8 +516,10 @@ impl Exporter {
                     content.push_str("\n\n");
                 }
 
-                content.push_str(&runtime);
-                content.push('\n');
+                if let Some((runtime, _)) = &self.framework_runtime {
+                    content.push_str(&runtime);
+                    content.push('\n');
+                }
 
                 std::fs::write(&p, content)?;
 
