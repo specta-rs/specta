@@ -7,10 +7,9 @@
 use std::{borrow::Cow, fmt};
 
 use specta::{
-    DataType,
     datatype::{
-        Enum, Fields, RuntimeAttribute, RuntimeLiteral, RuntimeMeta, RuntimeNestedMeta, Struct,
-        Tuple,
+        DataType, Enum, Fields, RuntimeAttribute, RuntimeLiteral, RuntimeMeta, RuntimeNestedMeta,
+        Struct, Tuple,
     },
     internal,
 };

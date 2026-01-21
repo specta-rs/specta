@@ -1,6 +1,6 @@
 use std::{borrow::Cow, path::Path};
 
-use specta::{TypeCollection, datatype::Reference};
+use specta::TypeCollection;
 use specta_serde::SerdeMode;
 
 use crate::{BigIntExportBehavior, Error, Exporter, Layout};
@@ -67,11 +67,6 @@ impl Typescript {
         Self(self.0.with_serde_deserialize())
     }
 
-    /// Get a reference to the inner [Exporter] instance.
-    pub fn exporter(&self) -> &Exporter {
-        &self.0
-    }
-
     /// Export the files into a single string.
     ///
     /// Note: This will return [`Error::UnableToExport`](crate::Error::UnableToExport) if the format is `Format::Files`.
@@ -92,5 +87,11 @@ impl Typescript {
 impl AsRef<Exporter> for Typescript {
     fn as_ref(&self) -> &Exporter {
         &self.0
+    }
+}
+
+impl AsMut<Exporter> for Typescript {
+    fn as_mut(&mut self) -> &mut Exporter {
+        &mut self.0
     }
 }
