@@ -41,20 +41,25 @@ use specta::datatype::DataType;
 /// - The `as "name"` syntax is optional; if omitted, the struct name is used
 #[macro_export]
 macro_rules! branded {
-    // Pattern with generics and optional TypeScript name
-    (
-        $(#[$attr:meta])*
-        $vis:vis struct $ident:ident<$($generic:ident),+ $(,)?> ( $ty:ty ) $(as $ts_name:literal)?
-    ) => {
-        $(#[$attr])*
-        $vis struct $ident<$($generic),+>($ty);
+    // TODO: Bring this back
+    // // Pattern with generics and optional TypeScript name
+    // (
+    //     $(#[$attr:meta])*
+    //     $vis:vis struct $ident:ident<$($generic:ident),+ $(,)?> ( $ty:ty ) $(as $ts_name:literal)?
+    // ) => {
+    //     $(#[$attr])*
+    //     $vis struct $ident<$($generic),+>($ty);
 
-        impl<$($generic: specta::Type),+> specta::Type for $ident<$($generic),+> {
-            fn definition(_types: &mut specta::TypeCollection) -> specta::DataType {
-                todo!("branded type implementation for {}", stringify!($ident))
-            }
-        }
-    };
+    //     impl<$($generic: specta::Type),+> specta::Type for $ident<$($generic),+> {
+    //         fn definition(types: &mut specta::TypeCollection) -> specta::datatype::DataType {
+    //             // TODO: This needs to be consistent (or does it??)
+
+    //             static SENTINEL: $crate::Branded = $crate::Branded::new(std::borrow::Cow::Borrowed("todo"), <$ty as specta::Type>::definition(types));
+
+    //             specta::datatype::DataType::Reference(specta::datatype::Reference::opaque_from_sentinel(&SENTINEL))
+    //         }
+    //     }
+    // };
 
     // Pattern without generics
     (
@@ -65,11 +70,26 @@ macro_rules! branded {
         $vis struct $ident($ty);
 
         impl specta::Type for $ident {
-            fn definition(_types: &mut specta::TypeCollection) -> specta::DataType {
-                todo!("branded type implementation for {}", stringify!($ident))
+            fn definition(types: &mut specta::TypeCollection) -> specta::datatype::DataType {
+                let ty = <$ty as specta::Type>::definition(types);
+                let brand: &'static str = branded!(@brand $ident $( $ts_name )?);
+
+                specta::datatype::DataType::Reference(
+                    specta::datatype::Reference::opaque(
+                        $crate::Branded::new(std::borrow::Cow::Borrowed(brand), ty)
+                    )
+                )
             }
         }
     };
+
+    // Internal
+     (@brand $ident:ident $ts_name:literal) => {
+         $ts_name
+     };
+     (@brand $ident:ident) => {
+         stringify!($ident)
+     };
 }
 
 #[derive(Debug, Clone)] // TODO
@@ -79,8 +99,11 @@ pub struct Branded {
 }
 
 impl Branded {
-    pub fn new(brand: Cow<'static, str>, ty: DataType) -> Self {
-        Self { brand, ty }
+    pub fn new(brand: impl Into<Cow<'static, str>>, ty: DataType) -> Self {
+        Self {
+            brand: brand.into(),
+            ty,
+        }
     }
 
     pub fn brand(&self) -> &Cow<'static, str> {

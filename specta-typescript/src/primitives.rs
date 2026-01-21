@@ -16,7 +16,8 @@ use specta::{
 };
 
 use crate::{
-    BigIntExportBehavior, Error, Exporter, Layout, exporter::root_alias_ident, legacy::js_doc,
+    BigIntExportBehavior, Branded, Error, Exporter, Layout, define::Define,
+    exporter::root_alias_ident, legacy::js_doc,
 };
 
 /// Generate an `export Type = ...` Typescript string for a specific [`NamedDataType`].
@@ -1061,10 +1062,18 @@ fn reference_dt(
     // TODO: Remove
     is_export: bool,
 ) -> Result<(), Error> {
-    if let Some((_, typescript)) = ts.references.iter().find(|(re, _)| re.ref_eq(r)) {
-        s.push_str(typescript);
+    if let Some(def) = r.downcast_ref::<Define>() {
+        s.push_str(&def.0);
+        return Ok(());
+    } else if let Some(def) = r.downcast_ref::<Branded>() {
+        s.push_str(&reference(ts, types, def.ty())?);
+        s.push_str(r#" & ""#);
+        s.push_str(def.brand());
+        s.push('"');
         return Ok(());
     }
+
+    // TODO: Special error if this is a opaque reference
 
     // TODO: Legacy stuff
     {

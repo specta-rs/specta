@@ -1,6 +1,10 @@
 //! Helpers for generating [Type::reference] implementations
 
-use std::{fmt, hash, sync::Arc};
+use std::{
+    any::{Any, TypeId, type_name, type_name_of_val},
+    fmt, hash,
+    sync::Arc,
+};
 
 use crate::{TypeCollection, datatype::NamedDataType};
 
@@ -29,14 +33,15 @@ impl Reference {
     ///
     /// An opaque [Reference] is equal when cloned and can be compared using the [Self::ref_eq] or [PartialEq].
     ///
-    pub fn opaque() -> Self {
+    pub fn opaque<T: Send + Sync + 'static>(state: T) -> Self {
         Self {
-            id: ArcId::Dynamic(Default::default()),
+            id: ArcId::Dynamic(Arc::new(state), type_name::<T>()),
             generics: Vec::with_capacity(0),
             inline: false,
         }
     }
 
+    // TODO: Remove this. I think the macros rely on it.
     /// Construct a new opaque reference to a type with a fixed reference.
     ///
     /// An opaque type is unable to represents using the [DataType] system and requires specific exporter integration to handle it.
@@ -47,13 +52,36 @@ impl Reference {
     ///
     /// It's critical that this reference points to a `static ...: () = ();` which is uniquely created for this reference. If it points to a `const` or `Box::leak`d value, the reference will not maintain it's invariants.
     ///
-    pub const fn opaque_from_sentinel(sentinel: &'static ()) -> Reference {
+    pub const fn opaque_from_sentinel<T: Send + Sync>(sentinel: &'static T) -> Reference {
         Self {
             id: ArcId::Static(sentinel),
             generics: Vec::new(),
             inline: false,
         }
     }
+
+    pub fn type_name(&self) -> &str {
+        match &self.id {
+            ArcId::Static(p) => std::any::type_name_of_val(p), // TODO: Does this work?
+            ArcId::Dynamic(_, type_name) => type_name,
+        }
+    }
+
+    pub fn type_id(&self) -> TypeId {
+        match &self.id {
+            ArcId::Static(p) => p.type_id(),
+            ArcId::Dynamic(p, _) => p.type_id(),
+        }
+    }
+
+    pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
+        match &self.id {
+            ArcId::Static(p) => p.downcast_ref(),
+            ArcId::Dynamic(p, _) => p.downcast_ref(),
+        }
+    }
+
+    // TODO: Rethink equality in the new world
 
     /// Compare if two references are pointing to the same type.
     ///
@@ -87,17 +115,17 @@ impl From<Reference> for DataType {
 /// to a static which is much more error-prone.
 #[derive(Clone)]
 pub(crate) enum ArcId {
-    // A pointer to a `static ...: ()`.
+    // A pointer to a `static ...: ...`.
     // These are all given a unique pointer.
-    Static(&'static ()),
-    Dynamic(Arc<()>),
+    Static(&'static (dyn Any + Send + Sync)), // TODO: Remove this variant if it's no longer constructable???
+    Dynamic(Arc<dyn Any + Send + Sync>, &'static str),
 }
 
 impl PartialEq for ArcId {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (ArcId::Static(a), ArcId::Static(b)) => std::ptr::eq(*a, *b),
-            (ArcId::Dynamic(a), ArcId::Dynamic(b)) => Arc::ptr_eq(a, b),
+            (ArcId::Dynamic(a, _), ArcId::Dynamic(b, _)) => Arc::ptr_eq(a, b),
             _ => false,
         }
     }
@@ -107,8 +135,8 @@ impl Eq for ArcId {}
 impl hash::Hash for ArcId {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         match self {
-            ArcId::Static(ptr) => ptr.hash(state),
-            ArcId::Dynamic(arc) => Arc::as_ptr(arc).hash(state),
+            ArcId::Static(ptr) => (ptr as *const _ as usize).hash(state),
+            ArcId::Dynamic(arc, _) => Arc::as_ptr(arc).hash(state),
         }
     }
 }
@@ -117,14 +145,19 @@ impl fmt::Debug for ArcId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{}_{:?}",
+            "{}_{}_{:?}", // TODO: Using `{:p}`
             match self {
                 ArcId::Static(..) => "s",
                 ArcId::Dynamic(..) => "d",
             },
+            // TODO: Does this work
             match self {
-                ArcId::Static(ptr) => *ptr as *const (),
-                ArcId::Dynamic(arc) => Arc::as_ptr(arc),
+                ArcId::Static(ptr) => type_name_of_val(ptr),
+                ArcId::Dynamic(arc, _) => type_name_of_val(arc),
+            },
+            match self {
+                ArcId::Static(ptr) => *ptr as *const _,
+                ArcId::Dynamic(arc, _) => Arc::as_ptr(arc),
             }
         )
     }

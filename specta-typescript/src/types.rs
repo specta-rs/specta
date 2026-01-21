@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{cell::Ref, fmt::Debug};
 
 use specta::{
     Type, TypeCollection,
@@ -39,14 +39,9 @@ use specta::{
 /// ```
 pub struct Any<T = ()>(T);
 
-pub(crate) static ANY_REFERENCE: Reference = Reference::opaque_from_sentinel({
-    static SENTINEL: () = ();
-    &SENTINEL
-});
-
 impl<T> Type for Any<T> {
     fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Reference(ANY_REFERENCE.clone())
+        DataType::Reference(crate::define("any"))
     }
 }
 
@@ -111,14 +106,9 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
 /// ```
 pub struct Unknown<T = ()>(T);
 
-pub(crate) static UNKNOWN_REFERENCE: Reference = Reference::opaque_from_sentinel({
-    static SENTINEL: () = ();
-    &SENTINEL
-});
-
 impl<T> Type for Unknown<T> {
     fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Reference(UNKNOWN_REFERENCE.clone())
+        DataType::Reference(crate::define("unknown"))
     }
 }
 
@@ -183,14 +173,9 @@ impl<T: serde::Serialize> serde::Serialize for Unknown<T> {
 /// ```
 pub struct Never<T = ()>(T);
 
-pub(crate) static NEVER_REFERENCE: Reference = Reference::opaque_from_sentinel({
-    static SENTINEL: () = ();
-    &SENTINEL
-});
-
 impl<T> Type for Never<T> {
     fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Reference(NEVER_REFERENCE.clone())
+        DataType::Reference(crate::define("never"))
     }
 }
 

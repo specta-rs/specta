@@ -1,4 +1,6 @@
-use std::{borrow::Cow, cell::RefCell, collections::HashMap, panic::Location};
+use std::{
+    any::type_name, borrow::Cow, cell::RefCell, collections::HashMap, panic::Location, sync::Arc,
+};
 
 use crate::{
     TypeCollection,
@@ -168,7 +170,7 @@ impl NamedDataType {
         types: &mut TypeCollection,
     ) -> NamedDataType {
         let ndt = NamedDataType {
-            id: ArcId::Dynamic(Default::default()),
+            id: ArcId::Dynamic(Arc::new(()), type_name::<()>()), // TODO: Is this correct?
             name: builder.name,
             docs: builder.docs,
             deprecated: builder.deprecated,
