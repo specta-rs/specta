@@ -37,12 +37,7 @@ pub use specta_macros::Type;
 #[cfg_attr(docsrs, doc(cfg(all(feature = "derive", feature = "function"))))]
 pub use specta_macros::specta;
 
-// TODO: Remove this for major
-// This existing is really a mistake but it's depended on by the Tauri alpha's so keeping it for now.
+// TODO(v2): Remove this. This must be kept for Specta v1 as Tauri v2 depends on it.
 #[doc(hidden)]
-pub use datatype::DataType;
-
-// TODO: Remove this for major
-// To ensure Tauri doesn't have a breaking change.
-#[doc(hidden)]
+#[deprecated(note = "Migrate from `TypeMap` to `TypeCollection`")]
 pub type TypeMap = TypeCollection;

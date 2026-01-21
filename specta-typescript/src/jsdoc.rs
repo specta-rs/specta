@@ -89,3 +89,9 @@ impl AsRef<Exporter> for JSDoc {
         &self.0
     }
 }
+
+impl AsMut<Exporter> for JSDoc {
+    fn as_mut(&mut self) -> &mut Exporter {
+        &mut self.0
+    }
+}

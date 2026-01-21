@@ -89,3 +89,9 @@ impl AsRef<Exporter> for Typescript {
         &self.0
     }
 }
+
+impl AsMut<Exporter> for Typescript {
+    fn as_mut(&mut self) -> &mut Exporter {
+        &mut self.0
+    }
+}

@@ -1,8 +1,8 @@
 use std::{borrow::Cow, cell::RefCell, collections::HashMap, panic::Location};
 
 use crate::{
-    DataType, TypeCollection,
-    datatype::{Generic, Reference, reference::ArcId},
+    TypeCollection,
+    datatype::{DataType, Generic, Reference, reference::ArcId},
 };
 
 thread_local! {
@@ -56,9 +56,6 @@ impl NamedDataType {
     ) -> Reference {
         let id = ArcId::Static(sentinel);
         let location = Location::caller().to_owned();
-
-        // TODO: If id is already in `types` this might mismatch.
-        // TODO: This will register a type multiple times which it shouldn't.
 
         if let Some(ndt) = types.0.get(&id) {
             // If this is `None` we will add into the `COLLECTED_TYPES`,

@@ -121,16 +121,11 @@ impl Exporter {
         self
     }
 
-    // TODO: Drop this
     /// Inject some code which is exported into the bindings file (or a root `index.ts` file).
-    pub fn framework_runtime(mut self, runtime: impl Into<Cow<'static, str>>) -> Self {
-        let runtime = runtime.into();
-        self.framework_runtime = Some(RuntimeFn(Arc::new(move || runtime.clone())));
-        self
-    }
-
-    /// Inject some code which is exported into the bindings file (or a root `index.ts` file).
-    pub fn framework_runtime2(mut self, runtime: impl Fn() -> Cow<'static, str> + 'static) -> Self {
+    ///
+    /// The closure is wrapped in `specta::datatype::collect()` to capture any `NamedDataType`s
+    /// that are referenced during execution, and imports will be generated for them.
+    pub fn framework_runtime(mut self, runtime: impl Fn() -> Cow<'static, str> + 'static) -> Self {
         self.framework_runtime = Some(RuntimeFn(Arc::new(runtime)));
         self
     }
@@ -376,19 +371,34 @@ impl Exporter {
         if !out.is_empty() {
             out.push('\n');
         }
+
+        // Call framework_prelude with the list of types
         out += &self.framework_prelude;
         out.push('\n');
-        todo!();
-        // if include_runtime {
-        //     out.push_str(&self.framework_runtime);
-        //     out.push('\n');
-        // }
+
+        // Collect runtime imports and generate runtime code
+        let mut runtime_imports = ImportMap::default();
+        if include_runtime && let Some(runtime_fn) = &self.framework_runtime {
+            let ndts = specta::datatype::collect(|| {
+                let _ = (runtime_fn.0)(); // TODO: Handle result
+            });
+
+            for ndt in ndts {
+                crawl_for_imports(ndt.ty(), types, &mut runtime_imports);
+            }
+        }
 
         if self.jsdoc {
             out += "\n/**";
         }
 
-        for (src, items) in references.iter().flatten() {
+        // Merge runtime imports with provided references
+        let mut all_references = references.unwrap_or_default();
+        for (src, items) in runtime_imports {
+            all_references.entry(src).or_default().extend(items);
+        }
+
+        for (src, items) in &all_references {
             if self.jsdoc {
                 out += "\n\t* @import";
             } else {
@@ -418,7 +428,15 @@ impl Exporter {
 
         out.push_str("\n\n");
 
+        // Emit the runtime code if present
+        if include_runtime && let Some(runtime_fn) = &self.framework_runtime {
+            out.push_str(&(runtime_fn.0)());
+            out.push('\n');
+        }
+
         for (i, ndt) in ndts.enumerate() {
+            // if ndt
+
             if i != 0 {
                 out += "\n";
             }
@@ -482,19 +500,72 @@ impl Exporter {
                 )?;
             }
 
-            todo!();
-            // if !self.framework_runtime.is_empty() {
-            //     // TODO: Does this risk conflicting with an `index.rs` module???
-            //     let p = path.join("index.ts");
-            //     let mut content = self.framework_prelude.to_string();
-            //     content.push('\n');
-            //     content.push_str(&self.framework_runtime);
-            //     content.push('\n');
-            //     std::fs::write(&p, content)?;
+            if self.framework_runtime.is_some() {
+                // TODO: Does this risk conflicting with an `index.rs` module???
+                let p = path.join(if self.jsdoc { "index.js" } else { "index.ts" });
 
-            //     // This is to ensure `remove_unused_ts_files` doesn't remove it
-            //     used_paths.insert(p);
-            // }
+                // Collect runtime imports
+                let mut runtime_imports = ImportMap::default();
+                if let Some(runtime_fn) = &self.framework_runtime {
+                    let collected_ndts: Vec<NamedDataType> = specta::datatype::collect(|| {
+                        let _ = (runtime_fn.0)();
+                    })
+                    .collect();
+
+                    for ndt in collected_ndts {
+                        crawl_for_imports(ndt.ty(), types, &mut runtime_imports);
+                    }
+                }
+
+                let mut content = self.framework_prelude.to_string();
+                content.push('\n');
+
+                // Add imports
+                if !runtime_imports.is_empty() {
+                    if self.jsdoc {
+                        content.push_str("\n/**");
+                    }
+
+                    for (src, items) in &runtime_imports {
+                        if self.jsdoc {
+                            content.push_str("\n\t* @import");
+                        } else {
+                            content.push_str("\nimport type");
+                        }
+
+                        content.push_str(" { ");
+                        for (i, (name, alias)) in items.iter().enumerate() {
+                            if i != 0 {
+                                content.push_str(", ");
+                            }
+                            content.push_str(name);
+                            if alias != name {
+                                content.push_str(" as ");
+                                content.push_str(alias);
+                            }
+                        }
+
+                        content.push_str(" } from \"");
+                        content.push_str(src);
+                        content.push_str("\";");
+                    }
+
+                    if self.jsdoc {
+                        content.push_str("\n\t*/");
+                    }
+                    content.push_str("\n\n");
+                }
+
+                if let Some(runtime_fn) = &self.framework_runtime {
+                    content.push_str(&(runtime_fn.0)());
+                    content.push('\n');
+                }
+
+                std::fs::write(&p, content)?;
+
+                // This is to ensure `remove_unused_ts_files` doesn't remove it
+                used_paths.insert(p);
+            }
 
             if path.exists() && path.is_dir() {
                 fn remove_unused_ts_files(
@@ -539,6 +610,12 @@ impl Exporter {
 
 impl AsRef<Exporter> for Exporter {
     fn as_ref(&self) -> &Exporter {
+        self
+    }
+}
+
+impl AsMut<Exporter> for Exporter {
+    fn as_mut(&mut self) -> &mut Exporter {
         self
     }
 }

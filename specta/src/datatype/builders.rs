@@ -5,10 +5,10 @@
 use std::{borrow::Cow, fmt::Debug, panic::Location};
 
 use crate::{
-    DataType, TypeCollection,
+    TypeCollection,
     datatype::{
-        ArcId, DeprecatedType, EnumVariant, Field, Fields, Generic, NamedDataType, NamedFields,
-        RuntimeAttribute, Struct, UnnamedFields,
+        ArcId, DataType, DeprecatedType, EnumVariant, Field, Fields, Generic, NamedDataType,
+        NamedFields, RuntimeAttribute, Struct, UnnamedFields,
     },
 };
 
