@@ -96,13 +96,37 @@ impl NamedDataType {
             // If this is `None` we will add into the `COLLECTED_TYPES`,
             // when resolution is finished.
             if let Some(ndt) = ndt {
-                COLLECTED_TYPES.with_borrow_mut(|ctxs| {
+                let needs_references = COLLECTED_TYPES.with_borrow_mut(|ctxs| {
                     if let Some(ctxs) = ctxs {
                         for ctx in ctxs {
                             ctx.insert(ndt.id.clone(), ndt.clone());
                         }
+
+                        true
+                    } else {
+                        false
                     }
                 });
+
+                // If a type has already been resolved we can just pull it's `NamedDataType` from the `TypeCollection`.
+                // However this means any dependent types are never registered as references are not created in this scope.
+                // We run the `build_ndt` function to resolve these dependent, even though we do just throw out the result.
+                if needs_references {
+                    build_ndt(
+                        types,
+                        &mut NamedDataType {
+                            id: id.clone(),
+                            location,
+                            // `build_ndt` will just override all of this
+                            name: Cow::Borrowed(""),
+                            docs: Cow::Borrowed(""),
+                            deprecated: None,
+                            module_path: Cow::Borrowed(""),
+                            generics: vec![],
+                            inner: DataType::Primitive(super::Primitive::i8),
+                        },
+                    );
+                }
             }
         } else {
             // We have never encountered this type. Start resolving it!
@@ -110,11 +134,12 @@ impl NamedDataType {
             types.0.insert(id.clone(), None);
             let mut ndt = NamedDataType {
                 id: id.clone(),
+                location,
+                // `build_ndt` will just override all of this
                 name: Cow::Borrowed(""),
                 docs: Cow::Borrowed(""),
                 deprecated: None,
                 module_path: Cow::Borrowed(""),
-                location,
                 generics: vec![],
                 inner: DataType::Primitive(super::Primitive::i8),
             };
