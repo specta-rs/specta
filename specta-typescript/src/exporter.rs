@@ -121,10 +121,11 @@ impl Exporter {
         self
     }
 
-    /// Inject some code which is exported into the bindings file (or a root `index.ts` file).
+    /// Add some custom Typescript or Javascript code that is exported as part of the bindings.
+    /// It's appending to the types file for single-file layouts or put in a root `index.{ts/js}` for multi-file.
     ///
-    /// The closure is wrapped in `specta::datatype::collect()` to capture any `NamedDataType`s
-    /// that are referenced during execution, and imports will be generated for them.
+    /// The closure is wrapped in [`specta::datatype::collect()`] to capture any referenced types.
+    /// Ensure you call `T::reference()` within the closure if you want an import to be created.
     pub fn framework_runtime(mut self, runtime: impl Fn() -> Cow<'static, str> + 'static) -> Self {
         self.framework_runtime = Some(RuntimeFn(Arc::new(runtime)));
         self
