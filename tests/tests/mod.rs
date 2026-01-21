@@ -4,6 +4,7 @@
 mod branded;
 mod functions;
 mod jsdoc;
+mod references;
 mod types;
 mod typescript;
 mod utils;
@@ -12,7 +13,7 @@ pub use types::types;
 pub use utils::fs_to_string;
 
 #[test]
-fn test_compile_errors() {
+fn compile_errors() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/macro/compile_error.rs");
 }

@@ -59,7 +59,7 @@ pub struct OpaqueReference {
 
 impl PartialEq for OpaqueReference {
     fn eq(&self, other: &Self) -> bool {
-        (self.eq)(&self.inner, &other.inner)
+        (self.eq)(&*self.inner, &*other.inner)
     }
 }
 
@@ -67,7 +67,7 @@ impl Eq for OpaqueReference {}
 
 impl hash::Hash for OpaqueReference {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        (self.hash)(&self.inner, state)
+        (self.hash)(&*self.inner, state)
     }
 }
 
@@ -86,6 +86,11 @@ impl OpaqueReference {
 }
 
 impl Reference {
+    /// Construct a new reference to an opaque type.
+    ///
+    /// An opaque type is unable to be represented using the [DataType] system and requires specific exporter integration to handle it.
+    ///
+    /// Opaque [Reference]'s are compared using [PartialEq]. For example `Reference::opaque(()) == Reference::opaque(())` so you must ensure each reference you intent to be unique is implemented as such.
     pub fn opaque<T: hash::Hash + Eq + Send + Sync + 'static>(state: T) -> Self {
         Self::Opaque(OpaqueReference {
             inner: Arc::new(state),
@@ -144,7 +149,7 @@ pub(crate) enum NamedId {
 impl PartialEq for NamedId {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (NamedId::Static(a), NamedId::Static(b)) => std::ptr::eq(a, b),
+            (NamedId::Static(a), NamedId::Static(b)) => std::ptr::eq(*a, *b),
             (NamedId::Dynamic(a), NamedId::Dynamic(b)) => Arc::ptr_eq(a, b),
             _ => false,
         }
@@ -155,7 +160,7 @@ impl Eq for NamedId {}
 impl hash::Hash for NamedId {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         match self {
-            NamedId::Static(p) => std::ptr::hash(p, state),
+            NamedId::Static(p) => std::ptr::hash(*p, state),
             NamedId::Dynamic(p) => std::ptr::hash(Arc::as_ptr(p), state),
         }
     }
@@ -164,8 +169,8 @@ impl hash::Hash for NamedId {
 impl fmt::Debug for NamedId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            NamedId::Static(p) => write!(f, "s_{p:p})"),
-            NamedId::Dynamic(p) => write!(f, "d_{p:p})"),
+            NamedId::Static(p) => write!(f, "s{:p})", *p),
+            NamedId::Dynamic(p) => write!(f, "d{:p})", Arc::as_ptr(p)),
         }
     }
 }

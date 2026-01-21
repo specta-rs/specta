@@ -1,6 +1,9 @@
 use std::path::Path;
 
-use specta::{Type, TypeCollection, datatype::DataType};
+use specta::{
+    Type, TypeCollection,
+    datatype::{DataType, Reference},
+};
 use specta_serde::SerdeMode;
 use specta_typescript::{
     Any, BigIntExportBehavior, Layout, Never, Typescript, Unknown, primitives,
@@ -112,7 +115,8 @@ fn primitives_export() {
             format!("export-{}", mode.to_string().to_lowercase()),
             dts.iter()
                 .filter_map(|(s, ty)| match ty {
-                    DataType::Reference(r) => r.get(&types).cloned().map(|ty| (s, ty)),
+                    DataType::Reference(Reference::Named(r)) =>
+                        r.get(&types).cloned().map(|ty| (s, ty)),
                     _ => None,
                 })
                 .map(|(s, ty)| primitives::export(&ts, &types, &ty).map(|ty| format!("{s}: {ty}")))
@@ -179,7 +183,7 @@ fn reserved_names() {
 
         let mut types = TypeCollection::default();
         let ndt = match r#enum::definition(&mut types) {
-            DataType::Reference(r) => r.get(&types).unwrap(),
+            DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
             _ => panic!("Failed to get reference"),
         };
 
@@ -194,7 +198,7 @@ fn reserved_names() {
 
         let mut types = TypeCollection::default();
         let ndt = match r#enum::definition(&mut types) {
-            DataType::Reference(r) => r.get(&types).unwrap(),
+            DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
             _ => panic!("Failed to get reference"),
         };
 
@@ -212,7 +216,7 @@ fn reserved_names() {
 
         let mut types = TypeCollection::default();
         let ndt = match r#enum::definition(&mut types) {
-            DataType::Reference(r) => r.get(&types).unwrap(),
+            DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
             _ => panic!("Failed to get reference"),
         };
 
