@@ -1,13 +1,16 @@
 #![allow(deprecated)]
 
 use std::{
+    any::Any,
+    borrow::Cow,
     cell::RefCell,
-    collections::HashMap,
+    collections::{BTreeMap, HashMap, HashSet},
     convert::Infallible,
     marker::PhantomData,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
     ops::{Range, RangeInclusive},
     path::PathBuf,
+    rc::Rc,
     time::{Duration, SystemTime},
 };
 
@@ -47,11 +50,11 @@ macro_rules! types {
             #[derive(Clone)]
             #[allow(dead_code)]
             struct User {
-                pub id: i32,
-                pub name: &'static str,
-                pub email: &'static str,
-                pub age: i32,
-                pub password: &'static str,
+                id: i32,
+                name: &'static str,
+                email: &'static str,
+                age: i32,
+                password: &'static str,
             }
 
             fn register<T: specta::Type>(types: &mut specta::TypeCollection, _: T) {
@@ -100,10 +103,12 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         (String, i32, bool),
         ((String, i32), (bool, char, bool), ()),
         (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool),
+        (Vec<i32>, Vec<bool>),
 
         String, PathBuf,
         IpAddr, Ipv4Addr, Ipv6Addr,
         SocketAddr, SocketAddrV4, SocketAddrV6,
+        Cow<'static, str>, Cow<'static, i32>,
 
         // https://github.com/specta-rs/specta/issues/77
         SystemTime, Duration,
@@ -113,9 +118,14 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         Vec<MyEnum>, &'static [MyEnum], &'static [MyEnum; 6], [MyEnum; 2],
         &'static [i32; 1], &'static [i32; 0],
         Option<i32>, Option<()>, Option<Vec<i32>>,
+        Vec<Option<Cow<'static, i32>>>, Option<Vec<Cow<'static, i32>>>, [Vec<String>; 3],
 
         Option<Option<String>>,
         Option<Option<Option<String>>>,
+
+        PhantomData<()>,
+        PhantomData<String>,
+        Infallible,
 
         // https://github.com/specta-rs/specta/issues/88
         Unit1, Unit2, Unit3, Unit4, Unit5, Unit6, Unit7,
@@ -136,12 +146,6 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
 
         OverridenStruct,
         HasGenericAlias,
-
-        SkipVariant,
-        SkipVariant2,
-        SkipVariant3,
-        SkipStructFields,
-        SpectaSkipNonTypeField,
 
         EnumMacroAttributes,
 
@@ -171,10 +175,6 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         EnumReferenceRecordKey,
 
         FlattenOnNestedEnum,
-
-        PhantomData<()>,
-        PhantomData<String>,
-        Infallible,
 
         MyEmptyInput,
 
@@ -322,6 +322,98 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         MyEnumExternal,
         MyEnumAdjacent,
         MyEnumUntagged,
+
+        // https://github.com/specta-rs/specta/issues/174
+        EmptyStruct,
+        EmptyStructWithTag,
+
+        // Serde - Adjacently Tagged
+        AdjacentlyTagged,
+        LoadProjectEvent,
+
+        // Serde - Externally Tagged
+        ExternallyTagged,
+
+        // Serde - Internally Tagged
+        InternallyTaggedB,
+        InternallyTaggedC,
+        InternallyTaggedD,
+        InternallyTaggedE,
+        InternallyTaggedF,
+        InternallyTaggedG,
+        InternallyTaggedH,
+        InternallyTaggedI,
+        InternallyTaggedL,
+        InternallyTaggedM,
+
+        // Alias
+        StructWithAlias,
+        StructWithMultipleAliases,
+        StructWithAliasAndRename,
+
+        EnumWithVariantAlias,
+        EnumWithMultipleVariantAliases,
+        EnumWithVariantAliasAndRename,
+
+        InternallyTaggedWithAlias,
+        AdjacentlyTaggedWithAlias,
+        UntaggedWithAlias,
+
+        // https://github.com/specta-rs/specta/issues/174
+        // `never & { tag = "a" }` would coalesce to `never` so we don't need to include it.
+        EmptyEnum,
+        EmptyEnumTagged,
+        EmptyEnumTaggedWContent,
+        EmptyEnumUntagged,
+
+        TaggedEnumOfUnitStruct,
+        TaggedEnumOfEmptyBracedStruct,
+        TaggedEnumOfEmptyTupleStruct,
+        TaggedEnumOfEmptyTupleBracedStructs,
+        TaggedStructOfStructWithTuple,
+
+        // Skip
+        SkipOnlyField,
+        SkipField,
+        SkipOnlyVariantExternallyTagged,
+        SkipOnlyVariantInternallyTagged,
+        SkipOnlyVariantAdjacentlyTagged,
+        SkipOnlyVariantUntagged,
+        SkipVariant,
+        SkipUnnamedFieldInVariant,
+        SkipNamedFieldInVariant,
+        TransparentWithSkip,
+        TransparentWithSkip2,
+        TransparentWithSkip3,
+        SkipVariant2,
+        SkipVariant3,
+        SkipStructFields,
+        SpectaSkipNonTypeField,
+
+        // Flatten
+        FlattenA,
+        FlattenB,
+        FlattenC,
+        FlattenD,
+        FlattenE,
+        FlattenF,
+        FlattenG,
+
+        // Generic Fields
+        TupleNested,
+
+        // Generic
+        Generic1<()>,
+        GenericAutoBound<()>,
+        GenericAutoBound2<()>,
+        Container1,
+        Generic2<(), String, i32>,
+        GenericNewType1<()>,
+        GenericTuple<()>,
+        GenericStruct2<()>,
+        InlineFlattenGenericsG<()>,
+        InlineFlattenGenerics,
+        GenericParameterOrderPreserved,
     )
 }
 
@@ -503,7 +595,7 @@ struct SpectaSkipNonTypeField {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
-pub enum EnumMacroAttributes {
+enum EnumMacroAttributes {
     A(#[specta(type = String)] i32),
     #[serde(rename = "bbb")]
     B(i32),
@@ -519,22 +611,22 @@ pub enum EnumMacroAttributes {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
-pub struct PlaceholderInnerField {
+struct PlaceholderInnerField {
     a: String,
 }
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
-pub enum InlineEnumField {
+enum InlineEnumField {
     #[specta(inline)]
     A(PlaceholderInnerField),
 }
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
-pub struct InlineOptionalType {
+struct InlineOptionalType {
     #[specta(inline)]
-    pub optional_field: Option<PlaceholderInnerField>,
+    optional_field: Option<PlaceholderInnerField>,
 }
 
 // Regression test for https://github.com/specta-rs/specta/issues/56
@@ -548,31 +640,31 @@ enum Rename {
 
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
-pub struct TransparentTypeInner {
+struct TransparentTypeInner {
     inner: String,
 }
 
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(transparent)]
-pub struct TransparentType(pub(crate) TransparentTypeInner);
+struct TransparentType(TransparentTypeInner);
 
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(transparent)]
-pub struct TransparentType2(pub(crate) ());
+struct TransparentType2(());
 
 #[derive(Serialize)]
-pub struct NonTypeType;
+struct NonTypeType;
 
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(transparent)]
-pub struct TransparentTypeWithOverride(#[specta(type = String)] NonTypeType);
+struct TransparentTypeWithOverride(#[specta(type = String)] NonTypeType);
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
-pub enum BasicEnum {
+enum BasicEnum {
     A,
     B,
 }
@@ -580,7 +672,7 @@ pub enum BasicEnum {
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type", content = "value", rename_all = "camelCase")]
-pub enum NestedEnum {
+enum NestedEnum {
     A(String),
     B(i32),
 }
@@ -588,7 +680,7 @@ pub enum NestedEnum {
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(rename_all = "camelCase")]
-pub struct FlattenOnNestedEnum {
+struct FlattenOnNestedEnum {
     id: String,
     #[serde(flatten)]
     result: NestedEnum,
@@ -596,7 +688,7 @@ pub struct FlattenOnNestedEnum {
 
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
-pub struct EnumReferenceRecordKey {
+struct EnumReferenceRecordKey {
     a: HashMap<BasicEnum, i32>,
 }
 
@@ -605,23 +697,32 @@ pub struct EnumReferenceRecordKey {
 #[specta(collect = false)]
 #[serde(rename_all = "camelCase")]
 #[serde(default)]
-pub(super) struct MyEmptyInput {}
+struct MyEmptyInput {}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct EmptyStruct {}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "a")]
+struct EmptyStructWithTag {}
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[allow(unused_parens)]
-pub enum ExtraBracketsInTupleVariant {
+enum ExtraBracketsInTupleVariant {
     A((String)),
 }
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
-pub struct ExtraBracketsInUnnamedStruct((String));
+struct ExtraBracketsInUnnamedStruct((String));
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[allow(unused_parens)]
-pub struct RenameWithWeirdCharsField {
+struct RenameWithWeirdCharsField {
     #[serde(rename = "@odata.context")]
     odata_context: String,
 }
@@ -629,7 +730,7 @@ pub struct RenameWithWeirdCharsField {
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[allow(unused_parens)]
-pub enum RenameWithWeirdCharsVariant {
+enum RenameWithWeirdCharsVariant {
     #[serde(rename = "@odata.context")]
     A(String),
 }
@@ -637,47 +738,47 @@ pub enum RenameWithWeirdCharsVariant {
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(rename = "@odata.context")]
-pub struct RenameWithWeirdCharsStruct(String);
+struct RenameWithWeirdCharsStruct(String);
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(rename = "@odata.context")]
-pub enum RenameWithWeirdCharsEnum {}
+enum RenameWithWeirdCharsEnum {}
 
 #[derive(Type, Serialize, Deserialize)]
-pub enum MyEnum {
+enum MyEnum {
     A(String),
     B(u32),
 }
 
 #[derive(Type, Serialize, Deserialize)]
-pub struct InlineTuple {
+struct InlineTuple {
     #[specta(inline)]
     demo: (String, bool),
 }
 
 #[derive(Type, Serialize, Deserialize)]
-pub struct InlineTuple2 {
+struct InlineTuple2 {
     #[specta(inline)]
     demo: (InlineTuple, bool),
 }
 
 #[derive(Type, Serialize, Deserialize)]
 #[serde(tag = "type", content = "data")]
-pub enum SkippedFieldWithinVariant {
+enum SkippedFieldWithinVariant {
     A(#[serde(skip)] String),
     B(String),
 }
 
 #[derive(Type, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct KebabCase {
+struct KebabCase {
     test_ing: String,
 }
 
 // https://github.com/specta-rs/specta/issues/281
 #[derive(Type)]
-pub struct Issue281<'a> {
+struct Issue281<'a> {
     default_unity_arguments: &'a [&'a str],
 }
 
@@ -695,24 +796,24 @@ struct Issue374 {
 // so it clashes with our user-defined `Type`.
 mod type_type {
     #[derive(specta::Type)]
-    pub enum Type {}
+    pub(super) enum Type {}
 }
 
 #[derive(Type, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum GenericType<T> {
+enum GenericType<T> {
     Undefined,
     Value(T),
 }
 
 #[derive(Type, Serialize, Deserialize)]
-pub struct ActualType {
+struct ActualType {
     a: GenericType<String>,
 }
 
 #[derive(Type)]
 #[specta(collect = false)]
-pub struct SpectaTypeOverride {
+struct SpectaTypeOverride {
     #[specta(type = String)] // Ident
     string_ident: (),
     #[specta(type = u32)] // Ident
@@ -724,9 +825,9 @@ pub struct SpectaTypeOverride {
 // Checking that you can override the type of a field that is invalid. This is to ensure user code can override Specta in the case we have a bug/unsupported type.
 #[derive(Type)]
 #[specta(collect = false)]
-pub struct InvalidToValidType {
+struct InvalidToValidType {
     #[specta(type = Option<()>)]
-    pub(crate) cause: Option<Box<dyn std::error::Error + Send + Sync>>,
+    cause: Option<Box<dyn std::error::Error + Send + Sync>>,
 }
 
 #[derive(Type)]
@@ -744,20 +845,20 @@ struct GenericTupleStruct<T>(T);
 
 #[derive(Type)]
 #[specta(collect = false, transparent)]
-pub struct BracedStruct {
+struct BracedStruct {
     a: String,
 }
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(rename = "StructNew", tag = "t")]
-pub struct Struct {
+struct Struct {
     a: String,
 }
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
-pub struct Struct2 {
+struct Struct2 {
     #[serde(rename = "b")]
     a: String,
 }
@@ -765,7 +866,7 @@ pub struct Struct2 {
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(rename = "EnumNew", tag = "t")]
-pub enum Enum {
+enum Enum {
     A,
     B,
 }
@@ -773,7 +874,7 @@ pub enum Enum {
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(rename = "EnumNew", tag = "t")]
-pub enum Enum2 {
+enum Enum2 {
     #[serde(rename = "C")]
     A,
     B,
@@ -810,7 +911,7 @@ struct RenameSerdeSpecialChar {
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(rename = "EnumNew", tag = "t")]
-pub enum Enum3 {
+enum Enum3 {
     A {
         #[serde(rename = "b")]
         a: String,
@@ -819,40 +920,40 @@ pub enum Enum3 {
 
 #[derive(Type)]
 #[specta(collect = false)]
-pub struct Recursive {
+struct Recursive {
     demo: Box<Recursive>,
 }
 
 #[derive(Type)]
 #[specta(transparent, collect = false)]
-pub struct RecursiveMapKeyTrick(RecursiveMapKey);
+struct RecursiveMapKeyTrick(RecursiveMapKey);
 
 #[derive(Type)]
 #[specta(collect = false)]
-pub struct RecursiveMapKey {
+struct RecursiveMapKey {
     demo: HashMap<RecursiveMapKeyTrick, String>,
 }
 
 #[derive(Type)]
 #[specta(collect = false)]
-pub struct RecursiveMapValue {
+struct RecursiveMapValue {
     demo: HashMap<String, RecursiveMapValue>,
 }
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
-pub struct RecursiveInline {
+struct RecursiveInline {
     #[serde(flatten)]
     demo: Box<RecursiveInline>,
 }
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(transparent, collect = false)]
-pub struct RecursiveTransparent(Box<RecursiveInline>);
+struct RecursiveTransparent(Box<RecursiveInline>);
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
-pub enum RecursiveInEnum {
+enum RecursiveInEnum {
     A {
         #[serde(flatten)]
         demo: Box<RecursiveInEnum>,
@@ -967,27 +1068,27 @@ enum Variants {
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(transparent)]
-pub struct MaybeValidKey<T>(T);
+struct MaybeValidKey<T>(T);
 
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(transparent)]
-pub struct ValidMaybeValidKey(HashMap<MaybeValidKey<String>, ()>);
+struct ValidMaybeValidKey(HashMap<MaybeValidKey<String>, ()>);
 
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(transparent)]
-pub struct ValidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<String>>, ()>);
+struct ValidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<String>>, ()>);
 
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(transparent)]
-pub struct InvalidMaybeValidKey(HashMap<MaybeValidKey<()>, ()>);
+struct InvalidMaybeValidKey(HashMap<MaybeValidKey<()>, ()>);
 
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(transparent)]
-pub struct InvalidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<()>>, ()>);
+struct InvalidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<()>>, ()>);
 
 macro_rules! field_ty_macro {
     () => {
@@ -997,17 +1098,17 @@ macro_rules! field_ty_macro {
 
 #[derive(Type)]
 #[specta(collect = false)]
-pub struct MacroStruct(field_ty_macro!());
+struct MacroStruct(field_ty_macro!());
 
 #[derive(Type)]
 #[specta(collect = false)]
-pub struct MacroStruct2 {
+struct MacroStruct2 {
     demo: field_ty_macro!(),
 }
 
 #[derive(Type)]
 #[specta(collect = false)]
-pub enum MacroEnum {
+enum MacroEnum {
     Demo(field_ty_macro!()),
     Demo2 { demo2: field_ty_macro!() },
 }
@@ -1047,7 +1148,7 @@ struct DeprecatedFields {
 
 #[derive(Type)]
 #[specta(collect = false)]
-pub struct DeprecatedTupleVariant(
+struct DeprecatedTupleVariant(
     #[deprecated] String,
     #[deprecated = "Nope"] String,
     #[deprecated(note = "Nope")] i32,
@@ -1055,7 +1156,7 @@ pub struct DeprecatedTupleVariant(
 
 #[derive(Type)]
 #[specta(collect = false)]
-pub enum DeprecatedEnumVariants {
+enum DeprecatedEnumVariants {
     #[deprecated]
     A,
     #[deprecated = "Nope"]
@@ -1069,7 +1170,7 @@ pub enum DeprecatedEnumVariants {
 /// Some more triple-slash comment
 #[derive(Type)]
 #[specta(collect = false)]
-pub struct CommentedStruct {
+struct CommentedStruct {
     // Some double-slash comment which is ignored
     /// Some triple-slash comment
     /// Some more triple-slash comment
@@ -1081,7 +1182,7 @@ pub struct CommentedStruct {
 /// Some more triple-slash comment
 #[derive(Type)]
 #[specta(collect = false)]
-pub enum CommentedEnum {
+enum CommentedEnum {
     // Some double-slash comment which is ignored
     /// Some triple-slash comment
     /// Some more triple-slash comment
@@ -1100,7 +1201,7 @@ pub enum CommentedEnum {
 /// Some single-line comment
 #[derive(Type)]
 #[specta(collect = false)]
-pub enum SingleLineComment {
+enum SingleLineComment {
     /// Some single-line comment
     A(i32),
     /// Some single-line comment
@@ -1220,62 +1321,62 @@ struct BoxInline {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
-pub struct First {
-    pub a: String,
+struct First {
+    a: String,
 }
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
-pub struct Second {
-    pub a: i32,
+struct Second {
+    a: i32,
 }
 
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
-pub struct Third {
+struct Third {
     #[serde(flatten)]
-    pub a: First,
-    pub b: HashMap<String, String>,
-    pub c: Box<First>,
+    a: First,
+    b: HashMap<String, String>,
+    c: Box<First>,
 }
 
 #[derive(Type)]
 #[specta(collect = false)]
-pub struct Fourth {
-    pub a: First,
+struct Fourth {
+    a: First,
     #[specta(inline)]
-    pub b: First,
+    b: First,
 }
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
-pub struct TagOnStructWithInline {
-    pub a: First,
+struct TagOnStructWithInline {
+    a: First,
     #[specta(inline)]
-    pub b: First,
+    b: First,
 }
 
 // Flattening a struct multiple times
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
-pub struct Sixth {
-    pub a: First,
-    pub b: First,
+struct Sixth {
+    a: First,
+    b: First,
 }
 
 // Two fields with the same name (`a`) but different types
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
-pub struct Seventh {
-    pub a: First,
-    pub b: Second,
+struct Seventh {
+    a: First,
+    b: Second,
 }
 
 // Serde can't serialize this
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
-pub enum Eight {
+enum Eight {
     A(String),
     B,
 }
@@ -1284,7 +1385,7 @@ pub enum Eight {
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(tag = "type")]
-pub enum MyEnumTagged {
+enum MyEnumTagged {
     Variant {
         #[serde(flatten)]
         inner: First,
@@ -1294,7 +1395,7 @@ pub enum MyEnumTagged {
 // Test for issue #393 - flatten in enum variant with external tag
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
-pub enum MyEnumExternal {
+enum MyEnumExternal {
     Variant {
         #[serde(flatten)]
         inner: First,
@@ -1305,7 +1406,7 @@ pub enum MyEnumExternal {
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(tag = "t", content = "c")]
-pub enum MyEnumAdjacent {
+enum MyEnumAdjacent {
     Variant {
         #[serde(flatten)]
         inner: First,
@@ -1316,7 +1417,7 @@ pub enum MyEnumAdjacent {
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(untagged)]
-pub enum MyEnumUntagged {
+enum MyEnumUntagged {
     Variant {
         #[serde(flatten)]
         inner: First,
@@ -1326,7 +1427,7 @@ pub enum MyEnumUntagged {
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(tag = "t", content = "c")]
-pub enum Ninth {
+enum Ninth {
     A(String),
     B,
     #[specta(inline)]
@@ -1337,7 +1438,7 @@ pub enum Ninth {
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(untagged)]
-pub enum Tenth {
+enum Tenth {
     A(String),
     B,
     #[specta(inline)]
@@ -1356,3 +1457,837 @@ struct Optional {
     #[serde(default)]
     d: bool,
 }
+
+// Test that attributes with format strings are properly parsed
+// This tests the fix for parsing attributes like #[error("io error: {0}")]
+// which were causing "expected ident" errors in the lower_attr.rs parser
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[allow(dead_code)]
+enum TypeWithComplexAttributes {
+    // These attributes will be parsed by lower_attr.rs and should not cause errors
+    #[doc = "This is a variant with format-like strings in docs: {0}"]
+    A(String),
+
+    #[doc = "Another variant: {line} {msg}"]
+    B { line: usize, msg: String },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
+enum AdjacentlyTagged {
+    A,
+    B { id: String, method: String },
+    C(String),
+}
+
+// Test for https://github.com/specta-rs/specta/issues/395
+// The `rename_all_fields = "camelCase"` should convert field names to camelCase
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    tag = "event",
+    content = "data"
+)]
+enum LoadProjectEvent {
+    Started {
+        project_name: String,
+    },
+    ProgressTest {
+        project_name: String,
+        status: String,
+        progress: i32,
+    },
+    Finished {
+        project_name: String,
+    },
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+enum ExternallyTagged {
+    A,
+    B { id: String, method: String },
+    C(String),
+}
+
+// Test struct with field alias
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct StructWithAlias {
+    #[serde(alias = "bruh")]
+    field: String,
+}
+
+// Test struct with multiple aliases on same field
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct StructWithMultipleAliases {
+    #[serde(alias = "bruh", alias = "alternative", alias = "another")]
+    field: String,
+}
+
+// Test struct with alias and rename
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct StructWithAliasAndRename {
+    #[serde(rename = "renamed_field", alias = "bruh")]
+    field: String,
+}
+
+// Test enum variant with alias
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum EnumWithVariantAlias {
+    #[serde(alias = "bruh")]
+    Variant,
+    Other,
+}
+
+// Test enum with multiple variant aliases
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum EnumWithMultipleVariantAliases {
+    #[serde(alias = "bruh", alias = "alternative")]
+    Variant,
+    Other,
+}
+
+// Test enum variant with alias and rename
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum EnumWithVariantAliasAndRename {
+    #[serde(rename = "renamed_variant", alias = "bruh")]
+    Variant,
+    Other,
+}
+
+// Test internally tagged enum with field alias
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "type")]
+enum InternallyTaggedWithAlias {
+    A {
+        #[serde(alias = "bruh")]
+        field: String,
+    },
+    B {
+        other: i32,
+    },
+}
+
+// Test adjacently tagged enum with field alias
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "type", content = "data")]
+enum AdjacentlyTaggedWithAlias {
+    A {
+        #[serde(alias = "bruh")]
+        field: String,
+    },
+    B {
+        other: i32,
+    },
+}
+
+// Test untagged enum with field alias
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedWithAlias {
+    A {
+        #[serde(alias = "bruh")]
+        field: String,
+    },
+    B {
+        other: i32,
+    },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum EmptyEnum {}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "a")]
+enum EmptyEnumTagged {}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "a", content = "b")]
+enum EmptyEnumTaggedWContent {}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum EmptyEnumUntagged {}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct UnitStruct;
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct EmptyBracedStruct {}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct EmptyTupleStruct();
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "a")]
+enum TaggedEnumOfUnitStruct {
+    A(UnitStruct),
+    B(UnitStruct),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "a")]
+enum TaggedEnumOfEmptyBracedStruct {
+    A(EmptyBracedStruct),
+    B(EmptyBracedStruct),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "a")]
+enum TaggedEnumOfEmptyTupleStruct {
+    A(EmptyTupleStruct),
+    B(EmptyTupleStruct),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "a")]
+enum TaggedEnumOfEmptyTupleBracedStructs {
+    #[specta(skip)]
+    A(EmptyTupleStruct),
+    B(EmptyBracedStruct),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false, transparent)]
+struct TupleStructWithTuple(());
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "a")]
+enum TaggedStructOfStructWithTuple {
+    A(TupleStructWithTuple),
+    B(TupleStructWithTuple),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "type")]
+enum InternallyTaggedB {
+    // Is not a map-type so invalid.
+    A(String),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "type")]
+enum InternallyTaggedC {
+    // Is not a map-type so invalid.
+    A(Vec<String>),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "type")]
+enum InternallyTaggedD {
+    // Is a map type so valid.
+    A(HashMap<String, String>),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "type")]
+enum InternallyTaggedE {
+    // Null is valid (although it's not a map-type)
+    A(()),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "type")]
+enum InternallyTaggedF {
+    // `FInner` is untagged so this is *only* valid if it is (which it is)
+    A(InternallyTaggedFInner),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum InternallyTaggedFInner {
+    A(()),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "type")]
+enum InternallyTaggedG {
+    // `GInner` is untagged so this is *only* valid if it is (which it is not)
+    A(InternallyTaggedGInner),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum InternallyTaggedGInner {
+    A(String),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "type")]
+enum InternallyTaggedH {
+    // `HInner` is transparent so this is *only* valid if it is (which it is)
+    A(InternallyTaggedHInner),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
+struct InternallyTaggedHInner(());
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "type")]
+enum InternallyTaggedI {
+    // `IInner` is transparent so this is *only* valid if it is (which it is not)
+    A(InternallyTaggedIInner),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
+struct InternallyTaggedIInner(String);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "type")]
+enum InternallyTaggedL {
+    // Internally tag enum with inlined field that is itself internally tagged
+    #[specta(inline)]
+    A(InternallyTaggedLInner),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "type")]
+enum InternallyTaggedLInner {
+    A,
+    B,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "type")]
+enum InternallyTaggedM {
+    // Internally tag enum with inlined field that is untagged
+    // `MInner` is `null` - Test `B` in `untagged.rs`
+    #[specta(inline)]
+    A(InternallyTaggedMInner),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum InternallyTaggedMInner {
+    A,
+    B,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SkipOnlyField {
+    #[specta(skip)]
+    a: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SkipField {
+    #[specta(skip)]
+    a: String,
+    b: i32,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum SkipOnlyVariantExternallyTagged {
+    #[specta(skip)]
+    A(String),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t")]
+enum SkipOnlyVariantInternallyTagged {
+    #[specta(skip)]
+    A(String),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "t", content = "c")]
+enum SkipOnlyVariantAdjacentlyTagged {
+    #[specta(skip)]
+    A(String),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum SkipOnlyVariantUntagged {
+    #[specta(skip)]
+    A(String),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum SkipUnnamedFieldInVariant {
+    // only field
+    A(#[specta(skip)] String),
+    // not only field
+    //
+    // This will `B(String)` == `String` in TS whether this will be `[String]`. This is why `#[serde(skip)]` is processed at runtime not in the macro.
+    B(#[specta(skip)] String, i32),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum SkipNamedFieldInVariant {
+    // only field
+    A {
+        #[specta(skip)]
+        a: String,
+    },
+    // not only field
+    B {
+        #[specta(skip)]
+        a: String,
+        b: i32,
+    },
+}
+
+// https://github.com/specta-rs/specta/issues/170
+#[derive(Type, Serialize, Deserialize)]
+#[specta(transparent, collect = false)]
+struct TransparentWithSkip((), #[specta(skip)] String);
+
+// https://github.com/specta-rs/specta/issues/170
+#[derive(Type, Serialize, Deserialize)]
+#[specta(transparent, collect = false)]
+struct TransparentWithSkip2(#[specta(skip)] (), String);
+
+// https://github.com/specta-rs/specta/issues/170
+#[derive(Type)]
+#[specta(transparent, collect = false)]
+struct TransparentWithSkip3(#[specta(type = String)] Box<dyn Any>);
+
+/// This is intentionally just a compile or not compile test
+/// https://github.com/specta-rs/specta/issues/167
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+enum LazilySkip {
+    #[serde(skip)]
+    A(Box<dyn Any>),
+    B(#[serde(skip)] Box<dyn Any>),
+    C {
+        #[serde(skip)]
+        a: Box<dyn Any>,
+    },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenA {
+    a: i32,
+    b: i32,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenB {
+    #[serde(flatten)]
+    a: FlattenA,
+    c: i32,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenC {
+    #[serde(flatten)]
+    a: FlattenA,
+    c: i32,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenD {
+    a: FlattenA,
+    c: i32,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenE {
+    #[specta(inline)]
+    b: FlattenB,
+    d: i32,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenF {
+    #[specta(inline = true)]
+    b: FlattenB,
+    d: i32,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FlattenG {
+    #[specta(inline = false)]
+    b: FlattenB,
+    d: i32,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct TupleNested(Vec<i32>, (Vec<i32>, Vec<i32>), [Vec<i32>; 3]);
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct Generic1<T: Type> {
+    value: T,
+    values: Vec<T>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericAutoBound<T> {
+    value: T,
+    values: Vec<T>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericAutoBound2<T: PartialEq> {
+    value: T,
+    values: Vec<T>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct Container1 {
+    foo: Generic1<u32>,
+    bar: HashSet<Generic1<u32>>,
+    baz: BTreeMap<String, Rc<Generic1<String>>>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+enum Generic2<A, B, C> {
+    A(A),
+    B(B, B, B),
+    C(Vec<C>),
+    D(Vec<Vec<Vec<A>>>),
+    E { a: A, b: B, c: C },
+    X(Vec<i32>),
+    Y(i32),
+    Z(Vec<Vec<i32>>),
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericStruct2<T> {
+    a: T,
+    b: (T, T),
+    c: (T, (T, T)),
+    d: [T; 3],
+    e: [(T, T); 3],
+    f: Vec<T>,
+    g: Vec<Vec<T>>,
+    h: Vec<[(T, T); 3]>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericNewType1<T>(Vec<Vec<T>>);
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericTuple<T>(T, Vec<T>, Vec<Vec<T>>);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct InlineFlattenGenericsG<T> {
+    t: T,
+}
+
+// not currently possible in ts-rs hehe
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct InlineFlattenGenerics {
+    g: InlineFlattenGenericsG<String>,
+    #[specta(inline)]
+    gi: InlineFlattenGenericsG<String>,
+    #[serde(flatten)]
+    t: InlineFlattenGenericsG<String>,
+}
+
+// #[test]
+// fn default() {
+//     #[derive(Type)]
+//     #[specta(collect = false)]
+//     struct A<T = String> {
+//         t: T,
+//     }
+//     assert_ts_export!(
+//         ts_A::<()>,
+//         "export type A<T = string> = { t: T, }"
+//     );
+
+//     #[derive(Type)]
+//     #[specta(collect = false)]
+//     struct B<U = Option<A<i32>>> {
+//         u: U,
+//     }
+//     assert_ts_export!(
+//         ts_B::<()>,
+//         "export type B<U = A<number> | null>  = { u: U, }"
+//     );
+
+//     #[derive(Type)]
+//     #[specta(collect = false)]
+//     struct Y {
+//         a1: A,
+//         a2: A<i32>,
+// https://github.com/Aleph-Alpha/ts-rs/issues/56
+// TODO: fixme
+// #[ts(inline)]
+// xi: X,
+// #[ts(inline)]
+// xi2: X<i32>
+// }
+// assert_ts_export!(
+//     ts_Y,
+//     "type Y = { a1: A, a2: A<number> }"
+// )
+// }
+
+// TODO
+
+// #[test]
+// fn test_generic_trait_bounds() {
+//     #[derive(Type)]
+//     struct A<T: ToString = i32> {
+//         t: T,
+//     }
+//     assert_ts_export!(A::<i32>, "export type A<T = number> = { t: T, }");
+
+//     #[derive(Type)]
+//     struct B<T: ToString + std::fmt::Debug + Clone + 'static>(T);
+//     assert_ts_export!(B::<&'static str>, "export type B<T> = T;");
+
+//     #[derive(Type)]
+//     enum C<T: Copy + Clone + PartialEq, K: Copy + PartialOrd = i32> {
+//         A { t: T },
+//         B(T),
+//         C,
+//         D(T, K),
+//     }
+//     assert_ts_export!(
+//         C::<&'static str, i32>,
+//         "export type C<T, K = number> = { A: { t: T, } } | { B: T } | \"C\" | { D: [T, K] };"
+//     );
+
+//     #[derive(Type)]
+//     struct D<T: ToString, const N: usize> {
+//         t: [T; N],
+//     }
+
+//     assert_ts_export!(D::<&str, 41>, "export type D<T> = { t: Array<T>, }")
+// }
+
+// https://github.com/specta-rs/specta/issues/400
+#[derive(Type)]
+#[specta(collect = false)]
+struct Pair<Z, A> {
+    first: Z,
+    second: A,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericParameterOrderPreserved {
+    pair: Pair<i32, String>,
+}
+
+// mod type_overrides {
+//     #![allow(dead_code)]
+
+//     use std::time::Instant;
+
+//     use specta::Type;
+
+//     struct Unsupported<T>(T);
+//     struct Unsupported2;
+
+//     #[test]
+//     fn simple() {
+//         #[derive(Type)]
+//         #[specta(collect = false)]
+//         struct Override {
+//             a: i32,
+//             #[specta(type = String)]
+//             x: Instant,
+//             #[specta(type = String)]
+//             y: Unsupported<Unsupported<Unsupported2>>,
+//             #[specta(type = Option<String>)]
+//             z: Option<Unsupported2>,
+//         }
+
+//         insta::assert_snapshot!(crate::ts::inline::<Override>(&Default::default()).unwrap(), @"{ a: number; x: string; y: string; z: string | null }");
+//     }
+
+//     #[test]
+//     fn newtype() {
+//         #[derive(Type)]
+//         #[specta(collect = false)]
+//         struct New1(#[specta(type = String)] Unsupported2);
+//         #[derive(Type)]
+//         #[specta(collect = false)]
+//         struct New2(#[specta(type = Option<String>)] Unsupported<Unsupported2>);
+
+//         insta::assert_snapshot!(crate::ts::inline::<New1>(&Default::default()).unwrap(), @r#"string"#);
+//         insta::assert_snapshot!(crate::ts::inline::<New2>(&Default::default()).unwrap(), @r#"string | null"#);
+//     }
+// }
+
+// mod union_serde {
+//     use serde::{Deserialize, Serialize};
+//     use specta::Type;
+
+//     #[derive(Type, Serialize, Deserialize)]
+//     #[specta(collect = false)]
+//     #[serde(tag = "kind", content = "d")]
+//     enum SimpleEnumA {
+//         A,
+//         B,
+//     }
+
+//     #[derive(Type, Serialize, Deserialize)]
+//     #[specta(collect = false)]
+//     #[serde(tag = "kind", content = "data")]
+//     enum ComplexEnum {
+//         A,
+//         B { foo: String, bar: f64 },
+//         W(SimpleEnumA),
+//         F { nested: SimpleEnumA },
+//         T(i32, SimpleEnumA),
+//     }
+
+//     #[derive(Type, Serialize, Deserialize)]
+//     #[specta(collect = false)]
+//     #[serde(untagged)]
+//     enum Untagged {
+//         Foo(String),
+//         Bar(i32),
+//         None,
+//     }
+
+//     #[test]
+//     fn test_serde_enum() {
+//         insta::assert_snapshot!(crate::ts::inline::<SimpleEnumA>(&Default::default()).unwrap(), @r#"{ kind: "A" } | { kind: "B" }"#);
+//         insta::assert_snapshot!(crate::ts::inline::<ComplexEnum>(&Default::default()).unwrap(), @r#"{ kind: "A" } | { kind: "B"; data: { foo: string; bar: number } } | { kind: "W"; data: SimpleEnumA } | { kind: "F"; data: { nested: SimpleEnumA } } | { kind: "T"; data: [number, SimpleEnumA] }"#);
+//         insta::assert_snapshot!(crate::ts::inline::<Untagged>(&Default::default()).unwrap(), @r#"string | number | null"#);
+//     }
+// }
+
+// mod union_with_serde {
+//     use serde::Serialize;
+//     use specta::Type;
+
+//     #[derive(Type, Serialize)]
+//     #[specta(collect = false)]
+//     struct Bar {
+//         field: i32,
+//     }
+
+//     #[derive(Type, Serialize)]
+//     #[specta(collect = false)]
+//     struct Foo {
+//         bar: Bar,
+//     }
+
+//     #[derive(Type, Serialize)]
+//     #[specta(collect = false)]
+//     enum SimpleEnum2 {
+//         A(String),
+//         B(i32),
+//         C,
+//         D(String, i32),
+//         E(Foo),
+//         F { a: i32, b: String },
+//     }
+
+//     #[test]
+//     fn test_stateful_enum() {
+//         insta::assert_snapshot!(crate::ts::inline::<Bar>(&Default::default()).unwrap(), @r#"{ field: number }"#);
+
+//         insta::assert_snapshot!(crate::ts::inline::<Foo>(&Default::default()).unwrap(), @r#"{ bar: Bar }"#);
+
+//         insta::assert_snapshot!(crate::ts::inline::<SimpleEnum2>(&Default::default()).unwrap(), @r#"{ A: string } | { B: number } | "C" | { D: [string, number] } | { E: Foo } | { F: { a: number; b: string } }"#);
+//     }
+// }
+
+// mod union_with_internal_tag {
+//     use serde::{Deserialize, Serialize};
+//     use specta::Type;
+
+//     #[derive(Type, Serialize, Deserialize)]
+//     #[specta(collect = false)]
+//     #[serde(tag = "type")]
+//     enum EnumWithInternalTag {
+//         A { foo: String },
+//         B { bar: i32 },
+//     }
+
+//     #[derive(Type, Serialize, Deserialize)]
+//     #[specta(collect = false)]
+//     struct InnerA {
+//         foo: String,
+//     }
+
+//     #[derive(Type, Serialize, Deserialize)]
+//     #[specta(collect = false)]
+//     struct InnerB {
+//         bar: i32,
+//     }
+
+//     #[derive(Type, Serialize, Deserialize)]
+//     #[specta(collect = false)]
+//     #[serde(tag = "type")]
+//     enum EnumWithInternalTag2 {
+//         A(InnerA),
+//         B(InnerB),
+//     }
+
+//     #[test]
+//     fn test_enums_with_internal_tags() {
+//         insta::assert_snapshot!(crate::ts::inline::<EnumWithInternalTag>(&Default::default()).unwrap(), @r#"{ type: "A"; foo: string } | { type: "B"; bar: number }"#);
+
+//         insta::assert_snapshot!(crate::ts::inline::<EnumWithInternalTag2>(&Default::default()).unwrap(), @r#"({ type: "A" } & InnerA) | ({ type: "B" } & InnerB)"#);
+//     }
+// }

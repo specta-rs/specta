@@ -31,6 +31,7 @@ RangeInclusive<i32>: {
 (String, i32, bool): [string, number, boolean]
 ((String, i32), (bool, char, bool), ()): [[string, number], [boolean, string, boolean], null]
 (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool): [boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean]
+(Vec<i32>, Vec<bool>): [number[], boolean[]]
 String: string
 PathBuf: string
 IpAddr: string
@@ -39,6 +40,8 @@ Ipv6Addr: string
 SocketAddr: string
 SocketAddrV4: string
 SocketAddrV6: string
+Cow<'static, str>: string
+Cow<'static, i32>: number
 SystemTime: { 
 	duration_since_epoch: number,
 	duration_since_unix_epoch: number,
@@ -63,8 +66,14 @@ Vec<MyEnum>: MyEnum[]
 Option<i32>: number | null
 Option<()>: null | null
 Option<Vec<i32>>: number[] | null
+Vec<Option<Cow<'static, i32>>>: (number | null)[]
+Option<Vec<Cow<'static, i32>>>: number[] | null
+[Vec<String>; 3]: [string[], string[], string[]]
 Option<Option<String>>: string | null
 Option<Option<Option<String>>>: string | null
+PhantomData<()>: null
+PhantomData<String>: null
+Infallible: never
 Unit1: Unit1
 Unit2: Unit2
 Unit3: Unit3
@@ -83,11 +92,6 @@ GenericStruct<String>: GenericStruct<string>
 FlattenEnumStruct: FlattenEnumStruct
 OverridenStruct: OverridenStruct
 HasGenericAlias: HasGenericAlias
-SkipVariant: SkipVariant
-SkipVariant2: SkipVariant2
-SkipVariant3: SkipVariant3
-SkipStructFields: SkipStructFields
-SpectaSkipNonTypeField: SpectaSkipNonTypeField
 EnumMacroAttributes: EnumMacroAttributes
 InlineEnumField: InlineEnumField
 InlineOptionalType: InlineOptionalType
@@ -102,9 +106,6 @@ Vec<PlaceholderInnerField>: PlaceholderInnerField[]
 HashMap<BasicEnum, i32>: Partial<{ [key in BasicEnum]: number }>
 EnumReferenceRecordKey: EnumReferenceRecordKey
 FlattenOnNestedEnum: FlattenOnNestedEnum
-PhantomData<()>: null
-PhantomData<String>: null
-Infallible: never
 MyEmptyInput: MyEmptyInput
 (String): string
 (String,): [string]
@@ -189,3 +190,71 @@ MyEnumTagged: MyEnumTagged
 MyEnumExternal: MyEnumExternal
 MyEnumAdjacent: MyEnumAdjacent
 MyEnumUntagged: MyEnumUntagged
+EmptyStruct: EmptyStruct
+EmptyStructWithTag: EmptyStructWithTag
+AdjacentlyTagged: AdjacentlyTagged
+LoadProjectEvent: LoadProjectEvent
+ExternallyTagged: ExternallyTagged
+InternallyTaggedB: InternallyTaggedB
+InternallyTaggedC: InternallyTaggedC
+InternallyTaggedD: InternallyTaggedD
+InternallyTaggedE: InternallyTaggedE
+InternallyTaggedF: InternallyTaggedF
+InternallyTaggedG: InternallyTaggedG
+InternallyTaggedH: InternallyTaggedH
+InternallyTaggedI: InternallyTaggedI
+InternallyTaggedL: InternallyTaggedL
+InternallyTaggedM: InternallyTaggedM
+StructWithAlias: StructWithAlias
+StructWithMultipleAliases: StructWithMultipleAliases
+StructWithAliasAndRename: StructWithAliasAndRename
+EnumWithVariantAlias: EnumWithVariantAlias
+EnumWithMultipleVariantAliases: EnumWithMultipleVariantAliases
+EnumWithVariantAliasAndRename: EnumWithVariantAliasAndRename
+InternallyTaggedWithAlias: InternallyTaggedWithAlias
+AdjacentlyTaggedWithAlias: AdjacentlyTaggedWithAlias
+UntaggedWithAlias: UntaggedWithAlias
+EmptyEnum: EmptyEnum
+EmptyEnumTagged: EmptyEnumTagged
+EmptyEnumTaggedWContent: EmptyEnumTaggedWContent
+EmptyEnumUntagged: EmptyEnumUntagged
+TaggedEnumOfUnitStruct: TaggedEnumOfUnitStruct
+TaggedEnumOfEmptyBracedStruct: TaggedEnumOfEmptyBracedStruct
+TaggedEnumOfEmptyTupleStruct: TaggedEnumOfEmptyTupleStruct
+TaggedEnumOfEmptyTupleBracedStructs: TaggedEnumOfEmptyTupleBracedStructs
+TaggedStructOfStructWithTuple: TaggedStructOfStructWithTuple
+SkipOnlyField: SkipOnlyField
+SkipField: SkipField
+SkipOnlyVariantExternallyTagged: SkipOnlyVariantExternallyTagged
+SkipOnlyVariantInternallyTagged: SkipOnlyVariantInternallyTagged
+SkipOnlyVariantAdjacentlyTagged: SkipOnlyVariantAdjacentlyTagged
+SkipOnlyVariantUntagged: SkipOnlyVariantUntagged
+SkipVariant: SkipVariant
+SkipUnnamedFieldInVariant: SkipUnnamedFieldInVariant
+SkipNamedFieldInVariant: SkipNamedFieldInVariant
+TransparentWithSkip: TransparentWithSkip
+TransparentWithSkip2: TransparentWithSkip2
+TransparentWithSkip3: TransparentWithSkip3
+SkipVariant2: SkipVariant2
+SkipVariant3: SkipVariant3
+SkipStructFields: SkipStructFields
+SpectaSkipNonTypeField: SpectaSkipNonTypeField
+FlattenA: FlattenA
+FlattenB: FlattenB
+FlattenC: FlattenC
+FlattenD: FlattenD
+FlattenE: FlattenE
+FlattenF: FlattenF
+FlattenG: FlattenG
+TupleNested: TupleNested
+Generic1<()>: Generic1<null>
+GenericAutoBound<()>: GenericAutoBound<null>
+GenericAutoBound2<()>: GenericAutoBound2<null>
+Container1: Container1
+Generic2<(), String, i32>: Generic2<null, string, number>
+GenericNewType1<()>: GenericNewType1<null>
+GenericTuple<()>: GenericTuple<null>
+GenericStruct2<()>: GenericStruct2<null>
+InlineFlattenGenericsG<()>: InlineFlattenGenericsG<null>
+InlineFlattenGenerics: InlineFlattenGenerics
+GenericParameterOrderPreserved: GenericParameterOrderPreserved
