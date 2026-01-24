@@ -69,8 +69,12 @@ const _: () = {
         impl_passthrough!(String);
     }
 
-    impl<'a, T: ?Sized + ToOwned + Type + 'static> Type for Cow<'a, T> {
+    impl<'a, T: ?Sized + ToOwned + Type + 'a> Type for Cow<'a, T> {
         impl_passthrough!(T);
+    }
+
+    impl<'a> Type for Cow<'a, str> {
+        impl_passthrough!(String);
     }
 
     impl_as!(
