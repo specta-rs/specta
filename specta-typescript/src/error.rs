@@ -37,6 +37,8 @@ pub enum Error {
     /// Found an opaque reference which the Typescript exporter doesn't know how to handle.
     /// You may be referencing a type which is not supported by the Typescript exporter.
     UnsupportedOpaqueReference(OpaqueReference),
+    /// An error occurred in your exporter framework.
+    Framework(Cow<'static, str>),
 
     //
     //
@@ -108,6 +110,9 @@ impl fmt::Display for Error {
                     "Found unsupported opaque reference '{}'. It is not supported by the Typescript exporter.",
                     r.type_name()
                 )
+            }
+            Error::Framework(e) => {
+                write!(f, "Framework error: {e}")
             }
             // TODO:
             Error::BigIntForbiddenLegacy(path) => writeln!(

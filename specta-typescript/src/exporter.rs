@@ -3,6 +3,7 @@ use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fmt,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use specta::{
@@ -59,12 +60,21 @@ impl fmt::Display for Layout {
     }
 }
 
+#[derive(Clone)]
+struct RuntimeFn(Arc<dyn Fn(Cow<'static, str>) -> Cow<'static, str>>);
+
+impl fmt::Debug for RuntimeFn {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RuntimeFn({:p})", self.0)
+    }
+}
+
 /// Typescript language exporter.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Exporter {
     pub header: Cow<'static, str>,
-    framework_runtime: Option<(Cow<'static, str>, Vec<NamedDataType>)>,
+    framework_runtime: Option<RuntimeFn>,
     framework_prelude: Cow<'static, str>,
     pub bigint: BigIntExportBehavior,
     pub layout: Layout,
@@ -99,10 +109,11 @@ impl Exporter {
     ///
     /// The closure is wrapped in [`specta::datatype::collect()`] to capture any referenced types.
     /// Ensure you call `T::reference()` within the closure if you want an import to be created.
-    pub fn framework_runtime(mut self, builder: impl FnOnce() -> Cow<'static, str>) -> Self {
-        let mut runtime = Cow::default();
-        let ndts = specta::datatype::collect(|| runtime = (builder)()).collect::<Vec<_>>();
-        self.framework_runtime = Some((runtime, ndts));
+    pub fn framework_runtime(
+        mut self,
+        builder: impl Fn(Cow<'static, str>) -> Cow<'static, str> + 'static,
+    ) -> Self {
+        self.framework_runtime = Some(RuntimeFn(Arc::new(builder)));
         self
     }
 
@@ -349,15 +360,37 @@ impl Exporter {
         }
 
         out += &self.framework_prelude;
-        out.push('\n');
+        if !self.framework_prelude.is_empty() {
+            out.push('\n');
+        }
+
+        let mut types_str = {
+            let mut types_str = String::new();
+
+            for ndt in ndts {
+                types_str += "\n";
+
+                if self.jsdoc {
+                    types_str += &primitives::typedef_internal(self, types, &ndt)?;
+                } else {
+                    types_str += &primitives::export(self, types, &ndt)?;
+                }
+            }
+
+            Some(types_str)
+        };
 
         // Collect runtime imports and generate runtime code
         let mut runtime_imports = ImportMap::default();
-        if include_runtime && let Some((runtime, ndts)) = &self.framework_runtime {
-            out.push_str(runtime);
-            out.push('\n');
+        if include_runtime && let Some(framework_runtime) = &self.framework_runtime {
+            let mut runtime = Cow::default();
+            let runtime_ndts = specta::datatype::collect(|| {
+                runtime = (framework_runtime.0)(Cow::Owned(types_str.take().unwrap_or_default()));
+            })
+            .collect::<Vec<_>>();
+            out.push_str(&runtime);
 
-            for ndt in ndts {
+            for ndt in runtime_ndts {
                 crawl_for_imports(ndt.ty(), types, &mut runtime_imports);
             }
         }
@@ -400,18 +433,8 @@ impl Exporter {
             out += "\n\t*/";
         }
 
-        out.push_str("\n\n");
-
-        for (i, ndt) in ndts.enumerate() {
-            if i != 0 {
-                out += "\n";
-            }
-
-            if self.jsdoc {
-                out += &primitives::typedef_internal(self, types, &ndt)?;
-            } else {
-                out += &primitives::export(self, types, &ndt)?;
-            }
+        if let Some(types_str) = types_str.take() {
+            out += &types_str;
         }
 
         Ok(out)
@@ -466,18 +489,24 @@ impl Exporter {
                 )?;
             }
 
-            if self.framework_runtime.is_some() {
+            if let Some(framework_runtime) = &self.framework_runtime {
                 // TODO: Does this risk conflicting with an `index.rs` module???
                 let p = path.join(if self.jsdoc { "index.js" } else { "index.ts" });
 
                 let mut content = self.framework_prelude.to_string();
-                content.push('\n');
+                if !self.framework_prelude.is_empty() {
+                    content.push('\n');
+                }
+
+                let mut runtime = Cow::default();
+                let ndts = specta::datatype::collect(|| {
+                    runtime = (framework_runtime.0)("// Hello World\n".into()); // TODO: Fix this
+                })
+                .collect::<Vec<_>>();
 
                 let mut runtime_imports = ImportMap::default();
-                if let Some((_, ndts)) = &self.framework_runtime {
-                    for ndt in ndts {
-                        crawl_for_imports(ndt.ty(), types, &mut runtime_imports);
-                    }
+                for ndt in ndts {
+                    crawl_for_imports(ndt.ty(), types, &mut runtime_imports);
                 }
 
                 // Add imports
@@ -516,8 +545,8 @@ impl Exporter {
                     content.push_str("\n\n");
                 }
 
-                if let Some((runtime, _)) = &self.framework_runtime {
-                    content.push_str(&runtime);
+                content.push_str(&runtime);
+                if !runtime.is_empty() {
                     content.push('\n');
                 }
 
