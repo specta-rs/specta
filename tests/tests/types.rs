@@ -15,7 +15,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use specta::{Type, TypeCollection, datatype::DataType};
+use specta::{datatype::DataType, Type, TypeCollection};
 
 /// A macro to collect up the types for better testing.
 ///
@@ -138,6 +138,7 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         RefStruct,
 
         InlinerStruct,
+        ContainerInlineParent,
 
         GenericStruct<i32>,
         GenericStruct<String>,
@@ -500,6 +501,22 @@ struct InlinerStruct {
     #[specta(inline)]
     inline_this: InlineStruct,
     dont_inline_this: RefStruct,
+}
+
+// Test container-level inline attribute
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false, inline)]
+struct ContainerInlineStruct {
+    value: String,
+    number: i32,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct ContainerInlineParent {
+    // This field should be inlined because ContainerInlineStruct has #[specta(inline)]
+    inlined_field: ContainerInlineStruct,
+    normal_field: RefStruct,
 }
 
 #[derive(Type, Serialize, Deserialize)]

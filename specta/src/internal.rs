@@ -43,13 +43,25 @@ pub mod construct {
     ) -> Fields {
         Fields::Named(NamedFields { fields, attributes })
     }
+
+    /// Merges the inline flag from a field's type if it's a Reference with inline=true.
+    /// This ensures that types marked with `#[specta(inline)]` as a container attribute
+    /// are properly inlined when used as fields in other types.
+    pub fn merge_inline_from_type(mut field: Field) -> Field {
+        if let Some(DataType::Reference(r)) = &field.ty {
+            if r.inline() {
+                field.inline = true;
+            }
+        }
+        field
+    }
 }
 
 #[cfg(feature = "function")]
 mod functions {
     use std::borrow::Cow;
 
-    use crate::{TypeCollection, datatype::DeprecatedType, datatype::Function, function::SpectaFn};
+    use crate::{datatype::DeprecatedType, datatype::Function, function::SpectaFn, TypeCollection};
 
     #[doc(hidden)]
     /// A helper for exporting a command to a [`CommandDataType`].
