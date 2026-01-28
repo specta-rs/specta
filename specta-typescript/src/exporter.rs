@@ -4,13 +4,17 @@ use std::{
     fmt,
     ops::Deref,
     path::{Path, PathBuf},
+    slice::RChunksExact,
     sync::Arc,
 };
 
 use specta::{TypeCollection, datatype::NamedDataType};
 use specta_serde::SerdeMode;
 
-use crate::{Error, primitives};
+use crate::{
+    Error,
+    primitives::{self, export_internal},
+};
 
 /// Allows you to configure how Specta's Typescript exporter will deal with BigInt types ([i64], [i128] etc).
 ///
@@ -256,11 +260,10 @@ impl Exporter {
             exporter: &Exporter,
             types: &TypeCollection,
             module: &mut Module,
+            s: &mut String,
             path: &Path,
             files: &mut HashMap<PathBuf, String>,
-        ) -> Result<String, Error> {
-            let mut s = String::new();
-
+        ) -> Result<(), Error> {
             module.types.sort_by(|a, b| {
                 a.name()
                     .cmp(b.name())
@@ -271,28 +274,24 @@ impl Exporter {
                 s.push('\n');
 
                 if exporter.jsdoc {
-                    primitives::typedef_internal(&mut s, exporter, types, ndt)?;
+                    primitives::typedef_internal(s, exporter, types, ndt)?;
                 } else {
-                    primitives::export_internal(&mut s, exporter, types, ndt)?;
+                    primitives::export_internal(s, exporter, types, ndt)?;
                 }
             }
 
             for (name, module) in &mut module.children {
                 let mut path = path.join(name);
-                // TODO: Should `export` take `&mut String` instead???
-                let result = export(exporter, types, module, &path, files)?;
                 let mut out = render_file_header(exporter)?;
-                out.push_str(&result); // TODO: newlines?
+                export(exporter, types, module, &mut out, &path, files)?;
                 path.set_extension(if exporter.jsdoc { "js" } else { "ts" });
                 files.insert(path, out);
             }
 
-            Ok(s)
+            Ok(())
         }
 
-        // TODO: Make root types work by injecting into runtime file
         // TODO: Remove no-longer required files
-        // TODO: Handle `header` and `framework_prelude`
         // TODO: Cross-file imports in runtime
         // TODO: Cross-file imports in types files
 
@@ -300,10 +299,12 @@ impl Exporter {
         let mut runtime_path = path.join("index");
         runtime_path.set_extension(if self.jsdoc { "js" } else { "ts" });
 
-        let root_types = export(
+        let mut root_types = String::new();
+        export(
             self,
             &types,
             &mut build_module_graph(&types),
+            &mut root_types,
             path,
             &mut files,
         )?;
@@ -473,46 +474,115 @@ fn render_types(
 ) -> Result<(), Error> {
     match exporter.layout {
         Layout::Namespaces => {
-            fn export(
+            // fn export(
+            //     exporter: &Exporter,
+            //     types: &TypeCollection,
+            //     s: &mut String,
+            //     module: &mut Module,
+            //     depth: usize,
+            // ) -> Result<(), Error> {
+            //     let indent = "\t".repeat(depth);
+
+            //     module.types.sort_by(|a, b| {
+            //         a.name()
+            //             .cmp(b.name())
+            //             .then(a.module_path().cmp(b.module_path()))
+            //             .then(a.location().cmp(&b.location()))
+            //     });
+            //     for ndt in &module.types {
+            //         s.push('\n');
+            //         s.push_str(&indent);
+
+            //         if exporter.jsdoc {
+            //             primitives::typedef_internal(s, exporter, types, ndt)?;
+            //         } else {
+            //             primitives::export_internal(s, exporter, types, ndt)?;
+            //         }
+            //     }
+
+            //     for (name, module) in &mut module.children {
+            //         s.push('\n');
+            //         s.push_str(&indent);
+            //         if depth != 0 && *name != "$specta$" {
+            //             s.push_str("export ");
+            //         }
+            //         s.push_str("namespace ");
+            //         s.push_str(name);
+            //         s.push_str(" {\n");
+            //         export(exporter, types, s, module, depth + 1)?;
+            //         s.push_str("}\n");
+            //     }
+
+            //     Ok(())
+            // }
+
+            fn export<'a>(
                 exporter: &Exporter,
                 types: &TypeCollection,
                 s: &mut String,
-                module: &mut Module,
+                module: impl Iterator<Item = (&'a &'a str, &'a mut Module<'a>)>,
                 depth: usize,
             ) -> Result<(), Error> {
                 let indent = "\t".repeat(depth);
 
-                module.types.sort_by(|a, b| {
-                    a.name()
-                        .cmp(b.name())
-                        .then(a.module_path().cmp(b.module_path()))
-                        .then(a.location().cmp(&b.location()))
-                });
-                for ndt in &module.types {
+                for (name, module) in module {
                     s.push('\n');
                     s.push_str(&indent);
-
-                    if exporter.jsdoc {
-                        primitives::typedef_internal(s, exporter, types, ndt)?;
-                    } else {
-                        primitives::export_internal(s, exporter, types, ndt)?;
+                    if depth != 0 && *name != "$specta$" {
+                        s.push_str("export ");
                     }
-                }
-
-                for (name, module) in &mut module.children {
-                    s.push('\n');
-                    s.push_str(&indent);
-                    s.push_str("export namespace ");
+                    s.push_str("namespace ");
                     s.push_str(name);
                     s.push_str(" {\n");
-                    export(exporter, types, s, module, depth + 1)?;
+
+                    // Types
+                    module.types.sort_by(|a, b| {
+                        a.name()
+                            .cmp(b.name())
+                            .then(a.module_path().cmp(b.module_path()))
+                            .then(a.location().cmp(&b.location()))
+                    });
+                    for ndt in &module.types {
+                        s.push('\n');
+                        s.push_str(&indent);
+
+                        if exporter.jsdoc {
+                            primitives::typedef_internal(s, exporter, types, ndt)?;
+                        } else {
+                            primitives::export_internal(s, exporter, types, ndt)?;
+                        }
+                    }
+
+                    // Namespaces
+                    export(exporter, types, s, module.children.iter_mut(), depth + 1)?;
+
                     s.push_str("}\n");
                 }
 
                 Ok(())
             }
 
-            export(exporter, types, s, &mut build_module_graph(types), 0)?;
+            let mut module = build_module_graph(types);
+
+            let reexports = {
+                let mut reexports = String::new();
+                for name in module
+                    .children
+                    .keys()
+                    .cloned()
+                    .chain(module.types.iter().map(|ndt| &**ndt.name()))
+                {
+                    reexports.push_str("export import ");
+                    reexports.push_str(name);
+                    reexports.push_str(" = $s$.");
+                    reexports.push_str(name);
+                    reexports.push_str(";\n");
+                }
+                reexports
+            };
+
+            export(exporter, types, s, [(&"$s$", &mut module)].into_iter(), 0)?;
+            s.push_str(&reexports);
         }
         Layout::ModulePrefixedName | Layout::FlatFile => {
             for ndt in types.into_sorted_iter() {
@@ -535,17 +605,4 @@ fn render_types(
     }
 
     Ok(())
-}
-
-pub(crate) fn root_alias_ident(root: &str) -> String {
-    let mut alias = String::from("$specta$root$");
-    for ch in root.chars() {
-        if ch == '_' || ch.is_ascii_alphanumeric() {
-            alias.push(ch);
-        } else {
-            alias.push('_');
-        }
-    }
-    alias.push('$');
-    alias
 }

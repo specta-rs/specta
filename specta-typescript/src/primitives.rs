@@ -19,8 +19,7 @@ use specta::{
 };
 
 use crate::{
-    BigIntExportBehavior, Branded, Error, Exporter, Layout, define::Define,
-    exporter::root_alias_ident, legacy::js_doc,
+    BigIntExportBehavior, Branded, Error, Exporter, Layout, define::Define, legacy::js_doc,
 };
 
 /// Generate an `export Type = ...` Typescript string for a specific [`NamedDataType`].
@@ -1174,19 +1173,16 @@ fn reference_named_dt(
                 if ndt.module_path().is_empty() {
                     ndt.name().clone()
                 } else {
-                    let parts: Vec<&str> = ndt.module_path().split("::").collect();
-                    if let Some((root, rest)) = parts.split_first() {
-                        let mut s = root_alias_ident(root);
-                        if !rest.is_empty() {
-                            s.push('.');
-                            s.push_str(&rest.join("."));
-                        }
-                        s.push('.');
-                        s.push_str(ndt.name());
-                        Cow::Owned(s)
-                    } else {
-                        ndt.name().clone()
-                    }
+                    let mut path =
+                        ndt.module_path()
+                            .split("::")
+                            .fold("$s$.".to_string(), |mut s, segment| {
+                                s.push_str(segment);
+                                s.push('.');
+                                s
+                            });
+                    path.push_str(ndt.name());
+                    Cow::Owned(path)
                 }
             }
             Layout::Files => {
