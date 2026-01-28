@@ -31,6 +31,7 @@ RangeInclusive<i32>: {
 (String, i32, bool): [string, number, boolean]
 ((String, i32), (bool, char, bool), ()): [[string, number], [boolean, string, boolean], null]
 (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool): [boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean]
+(Vec<i32>, Vec<bool>): [number[], boolean[]]
 String: string
 PathBuf: string
 IpAddr: string
@@ -39,6 +40,8 @@ Ipv6Addr: string
 SocketAddr: string
 SocketAddrV4: string
 SocketAddrV6: string
+Cow<'static, str>: string
+Cow<'static, i32>: number
 SystemTime: { 
 	duration_since_epoch: number,
 	duration_since_unix_epoch: number,
@@ -63,8 +66,14 @@ Vec<MyEnum>: MyEnum[]
 Option<i32>: number | null
 Option<()>: null | null
 Option<Vec<i32>>: number[] | null
+Vec<Option<Cow<'static, i32>>>: (number | null)[]
+Option<Vec<Cow<'static, i32>>>: number[] | null
+[Vec<String>; 3]: [string[], string[], string[]]
 Option<Option<String>>: string | null
 Option<Option<Option<String>>>: string | null
+PhantomData<()>: null
+PhantomData<String>: null
+Infallible: never
 Unit1: null
 Unit2: Record<string, never>
 Unit3: []
@@ -100,15 +109,6 @@ OverridenStruct: {
 	overriden_field: string,
 }
 HasGenericAlias: { [key in number]: string }
-SkipVariant: { A: string }
-SkipVariant2: string
-SkipVariant3: { A: { a: string } }
-SkipStructFields: { 
-	a: number,
-}
-SpectaSkipNonTypeField: { 
-	a: number,
-}
 EnumMacroAttributes: { A: string } | { B: number } | { C: number } | { D: { a: string; b: number } }
 InlineEnumField: { A: PlaceholderInnerField }
 InlineOptionalType: { 
@@ -129,9 +129,6 @@ EnumReferenceRecordKey: {
 FlattenOnNestedEnum: (NestedEnum) & { 
 	id: string,
 }
-PhantomData<()>: null
-PhantomData<String>: null
-Infallible: never
 MyEmptyInput: Record<string, never>
 (String): string
 (String,): [string]
@@ -319,3 +316,131 @@ MyEnumTagged: (First)
 MyEnumExternal: { Variant: (First) }
 MyEnumAdjacent: (First)
 MyEnumUntagged: (First)
+EmptyStruct: Record<string, never>
+EmptyStructWithTag: Record<string, never>
+AdjacentlyTagged: {} | { id: string; method: string } | string
+LoadProjectEvent: { project_name: string } | { project_name: string; status: string; progress: number } | { project_name: string }
+ExternallyTagged: "A" | { B: { id: string; method: string } } | { C: string }
+InternallyTaggedB: string
+InternallyTaggedC: string[]
+InternallyTaggedD: { [key in string]: string }
+InternallyTaggedE: null
+InternallyTaggedF: InternallyTaggedFInner
+InternallyTaggedG: InternallyTaggedGInner
+InternallyTaggedH: InternallyTaggedHInner
+InternallyTaggedI: InternallyTaggedIInner
+InternallyTaggedL: InternallyTaggedLInner
+InternallyTaggedM: InternallyTaggedMInner
+StructWithAlias: { 
+	field: string,
+}
+StructWithMultipleAliases: { 
+	field: string,
+}
+StructWithAliasAndRename: { 
+	field: string,
+}
+EnumWithVariantAlias: "Variant" | "Other"
+EnumWithMultipleVariantAliases: "Variant" | "Other"
+EnumWithVariantAliasAndRename: "Variant" | "Other"
+InternallyTaggedWithAlias: { field: string } | { other: number }
+AdjacentlyTaggedWithAlias: { field: string } | { other: number }
+UntaggedWithAlias: { field: string } | { other: number }
+EmptyEnum: never
+EmptyEnumTagged: never
+EmptyEnumTaggedWContent: never
+EmptyEnumUntagged: never
+TaggedEnumOfUnitStruct: UnitStruct
+TaggedEnumOfEmptyBracedStruct: EmptyBracedStruct
+TaggedEnumOfEmptyTupleStruct: EmptyTupleStruct
+TaggedEnumOfEmptyTupleBracedStructs: EmptyBracedStruct
+TaggedStructOfStructWithTuple: TupleStructWithTuple
+SkipOnlyField: Record<string, never>
+SkipField: { 
+	b: number,
+}
+SkipOnlyVariantExternallyTagged: never
+SkipOnlyVariantInternallyTagged: never
+SkipOnlyVariantAdjacentlyTagged: never
+SkipOnlyVariantUntagged: never
+SkipVariant: { A: string }
+SkipUnnamedFieldInVariant: "A" | { B: [number] }
+SkipNamedFieldInVariant: { A: Record<string, never> } | { B: { b: number } }
+TransparentWithSkip: null
+TransparentWithSkip2: string
+TransparentWithSkip3: string
+SkipVariant2: string
+SkipVariant3: { A: { a: string } }
+SkipStructFields: { 
+	a: number,
+}
+SpectaSkipNonTypeField: { 
+	a: number,
+}
+FlattenA: { 
+	a: number,
+	b: number,
+}
+FlattenB: (FlattenA) & { 
+	c: number,
+}
+FlattenC: (FlattenA) & { 
+	c: number,
+}
+FlattenD: { 
+	a: FlattenA,
+	c: number,
+}
+FlattenE: { 
+	b: FlattenB,
+	d: number,
+}
+FlattenF: { 
+	b: FlattenB,
+	d: number,
+}
+FlattenG: { 
+	b: FlattenB,
+	d: number,
+}
+TupleNested: [number[], [number[], number[]], [number[], number[], number[]]]
+Generic1<()>: { 
+	value: T,
+	values: T[],
+}
+GenericAutoBound<()>: { 
+	value: T,
+	values: T[],
+}
+GenericAutoBound2<()>: { 
+	value: T,
+	values: T[],
+}
+Container1: { 
+	foo: Generic1<number>,
+	bar: Generic1<number>[],
+	baz: { [key in string]: Generic1<string> },
+}
+Generic2<(), String, i32>: { A: A } | { B: [B, B, B] } | { C: C[] } | { D: A[][][] } | { E: { a: A; b: B; c: C } } | { X: number[] } | { Y: number } | { Z: number[][] }
+GenericNewType1<()>: T[][]
+GenericTuple<()>: [T, T[], T[][]]
+GenericStruct2<()>: { 
+	a: T,
+	b: [T, T],
+	c: [T, [T, T]],
+	d: [T, T, T],
+	e: [([T, T]), ([T, T]), ([T, T])],
+	f: T[],
+	g: T[][],
+	h: ([([T, T]), ([T, T]), ([T, T])])[],
+}
+InlineFlattenGenericsG<()>: { 
+	t: T,
+}
+InlineFlattenGenerics: (InlineFlattenGenericsG<string>) & { 
+	g: InlineFlattenGenericsG<string>,
+	gi: InlineFlattenGenericsG<string>,
+}
+GenericParameterOrderPreserved: { 
+	pair: Pair<number, string>,
+}

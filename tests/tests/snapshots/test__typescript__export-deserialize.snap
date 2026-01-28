@@ -1,6 +1,6 @@
 ---
 source: tests/tests/typescript.rs
-expression: "dts.iter().filter_map(|(s, ty)| match ty\n{\n    DataType::Reference(r) => r.get(&types).cloned().map(|ty| (s, ty)), _ =>\n    None,\n}).map(|(s, ty)|\nprimitives::export(&ts, &types,\n&ty).map(|ty| format!(\"{s}: {ty}\"))).collect::<Result<Vec<_>,\n_>>().unwrap().join(\"\\n\")"
+expression: "dts.iter().filter_map(|(s, ty)| match ty\n{\n    DataType::Reference(Reference::Named(r)) =>\n    r.get(&types).cloned().map(|ty| (s, ty)), _ => None,\n}).map(|(s, ty)|\nprimitives::export(&ts, &types,\n&ty).map(|ty| format!(\"{s}: {ty}\"))).collect::<Result<Vec<_>,\n_>>().unwrap().join(\"\\n\")"
 ---
 Unit1: export type Unit1 = null;
 
@@ -54,20 +54,6 @@ OverridenStruct: export type OverridenStruct = {
 	};
 
 HasGenericAlias: export type HasGenericAlias = { [key in number]: string };
-
-SkipVariant: export type SkipVariant = { A: string };
-
-SkipVariant2: export type SkipVariant2 = string;
-
-SkipVariant3: export type SkipVariant3 = { A: { a: string } };
-
-SkipStructFields: export type SkipStructFields = { 
-		a: number,
-	};
-
-SpectaSkipNonTypeField: export type SpectaSkipNonTypeField = { 
-		a: number,
-	};
 
 EnumMacroAttributes: export type EnumMacroAttributes = { A: string } | { B: number } | { C: number } | { D: { a: string; b: number } };
 
@@ -426,3 +412,199 @@ MyEnumExternal: export type MyEnumExternal = { Variant: (First) };
 MyEnumAdjacent: export type MyEnumAdjacent = (First);
 
 MyEnumUntagged: export type MyEnumUntagged = (First);
+
+EmptyStruct: export type EmptyStruct = Record<string, never>;
+
+EmptyStructWithTag: export type EmptyStructWithTag = Record<string, never>;
+
+AdjacentlyTagged: export type AdjacentlyTagged = {} | { id: string; method: string } | string;
+
+LoadProjectEvent: export type LoadProjectEvent = { project_name: string } | { project_name: string; status: string; progress: number } | { project_name: string };
+
+ExternallyTagged: export type ExternallyTagged = "A" | { B: { id: string; method: string } } | { C: string };
+
+InternallyTaggedB: export type InternallyTaggedB = string;
+
+InternallyTaggedC: export type InternallyTaggedC = string[];
+
+InternallyTaggedD: export type InternallyTaggedD = { [key in string]: string };
+
+InternallyTaggedE: export type InternallyTaggedE = null;
+
+InternallyTaggedF: export type InternallyTaggedF = InternallyTaggedFInner;
+
+InternallyTaggedG: export type InternallyTaggedG = InternallyTaggedGInner;
+
+InternallyTaggedH: export type InternallyTaggedH = InternallyTaggedHInner;
+
+InternallyTaggedI: export type InternallyTaggedI = InternallyTaggedIInner;
+
+InternallyTaggedL: export type InternallyTaggedL = InternallyTaggedLInner;
+
+InternallyTaggedM: export type InternallyTaggedM = InternallyTaggedMInner;
+
+StructWithAlias: export type StructWithAlias = { 
+		field: string,
+	};
+
+StructWithMultipleAliases: export type StructWithMultipleAliases = { 
+		field: string,
+	};
+
+StructWithAliasAndRename: export type StructWithAliasAndRename = { 
+		field: string,
+	};
+
+EnumWithVariantAlias: export type EnumWithVariantAlias = "Variant" | "Other";
+
+EnumWithMultipleVariantAliases: export type EnumWithMultipleVariantAliases = "Variant" | "Other";
+
+EnumWithVariantAliasAndRename: export type EnumWithVariantAliasAndRename = "Variant" | "Other";
+
+InternallyTaggedWithAlias: export type InternallyTaggedWithAlias = { field: string } | { other: number };
+
+AdjacentlyTaggedWithAlias: export type AdjacentlyTaggedWithAlias = { field: string } | { other: number };
+
+UntaggedWithAlias: export type UntaggedWithAlias = { field: string } | { other: number };
+
+EmptyEnum: export type EmptyEnum = never;
+
+EmptyEnumTagged: export type EmptyEnumTagged = never;
+
+EmptyEnumTaggedWContent: export type EmptyEnumTaggedWContent = never;
+
+EmptyEnumUntagged: export type EmptyEnumUntagged = never;
+
+TaggedEnumOfUnitStruct: export type TaggedEnumOfUnitStruct = UnitStruct;
+
+TaggedEnumOfEmptyBracedStruct: export type TaggedEnumOfEmptyBracedStruct = EmptyBracedStruct;
+
+TaggedEnumOfEmptyTupleStruct: export type TaggedEnumOfEmptyTupleStruct = EmptyTupleStruct;
+
+TaggedEnumOfEmptyTupleBracedStructs: export type TaggedEnumOfEmptyTupleBracedStructs = EmptyBracedStruct;
+
+TaggedStructOfStructWithTuple: export type TaggedStructOfStructWithTuple = TupleStructWithTuple;
+
+SkipOnlyField: export type SkipOnlyField = Record<string, never>;
+
+SkipField: export type SkipField = { 
+		b: number,
+	};
+
+SkipOnlyVariantExternallyTagged: export type SkipOnlyVariantExternallyTagged = never;
+
+SkipOnlyVariantInternallyTagged: export type SkipOnlyVariantInternallyTagged = never;
+
+SkipOnlyVariantAdjacentlyTagged: export type SkipOnlyVariantAdjacentlyTagged = never;
+
+SkipOnlyVariantUntagged: export type SkipOnlyVariantUntagged = never;
+
+SkipVariant: export type SkipVariant = { A: string };
+
+SkipUnnamedFieldInVariant: export type SkipUnnamedFieldInVariant = "A" | { B: [number] };
+
+SkipNamedFieldInVariant: export type SkipNamedFieldInVariant = { A: Record<string, never> } | { B: { b: number } };
+
+TransparentWithSkip: export type TransparentWithSkip = null;
+
+TransparentWithSkip2: export type TransparentWithSkip2 = string;
+
+TransparentWithSkip3: export type TransparentWithSkip3 = string;
+
+SkipVariant2: export type SkipVariant2 = string;
+
+SkipVariant3: export type SkipVariant3 = { A: { a: string } };
+
+SkipStructFields: export type SkipStructFields = { 
+		a: number,
+	};
+
+SpectaSkipNonTypeField: export type SpectaSkipNonTypeField = { 
+		a: number,
+	};
+
+FlattenA: export type FlattenA = { 
+		a: number,
+		b: number,
+	};
+
+FlattenB: export type FlattenB = (FlattenA) & { 
+		c: number,
+	};
+
+FlattenC: export type FlattenC = (FlattenA) & { 
+		c: number,
+	};
+
+FlattenD: export type FlattenD = { 
+		a: FlattenA,
+		c: number,
+	};
+
+FlattenE: export type FlattenE = { 
+		b: FlattenB,
+		d: number,
+	};
+
+FlattenF: export type FlattenF = { 
+		b: FlattenB,
+		d: number,
+	};
+
+FlattenG: export type FlattenG = { 
+		b: FlattenB,
+		d: number,
+	};
+
+TupleNested: export type TupleNested = [number[], [number[], number[]], [number[], number[], number[]]];
+
+Generic1<()>: export type Generic1<T> = { 
+		value: T,
+		values: T[],
+	};
+
+GenericAutoBound<()>: export type GenericAutoBound<T> = { 
+		value: T,
+		values: T[],
+	};
+
+GenericAutoBound2<()>: export type GenericAutoBound2<T> = { 
+		value: T,
+		values: T[],
+	};
+
+Container1: export type Container1 = { 
+		foo: Generic1<number>,
+		bar: Generic1<number>[],
+		baz: { [key in string]: Generic1<string> },
+	};
+
+Generic2<(), String, i32>: export type Generic2<A, B, C> = { A: A } | { B: [B, B, B] } | { C: C[] } | { D: A[][][] } | { E: { a: A; b: B; c: C } } | { X: number[] } | { Y: number } | { Z: number[][] };
+
+GenericNewType1<()>: export type GenericNewType1<T> = T[][];
+
+GenericTuple<()>: export type GenericTuple<T> = [T, T[], T[][]];
+
+GenericStruct2<()>: export type GenericStruct2<T> = { 
+		a: T,
+		b: [T, T],
+		c: [T, [T, T]],
+		d: [T, T, T],
+		e: [([T, T]), ([T, T]), ([T, T])],
+		f: T[],
+		g: T[][],
+		h: ([([T, T]), ([T, T]), ([T, T])])[],
+	};
+
+InlineFlattenGenericsG<()>: export type InlineFlattenGenericsG<T> = { 
+		t: T,
+	};
+
+InlineFlattenGenerics: export type InlineFlattenGenerics = (InlineFlattenGenericsG<string>) & { 
+		g: InlineFlattenGenericsG<string>,
+		gi: InlineFlattenGenericsG<string>,
+	};
+
+GenericParameterOrderPreserved: export type GenericParameterOrderPreserved = { 
+		pair: Pair<number, string>,
+	};

@@ -194,7 +194,11 @@ error[E0277]: the size for values of type `dyn std::error::Error + Send + Sync` 
    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ doesn't have a size known at compile-time
    |
    = help: the trait `Sized` is not implemented for `dyn std::error::Error + Send + Sync`
-   = help: the trait `Type` is implemented for `Option<T>`
+help: the trait `Type` is implemented for `Option<T>`
+  --> $WORKSPACE/specta/src/type/impls.rs
+   |
+   | impl<T: Type> Type for Option<T> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    = note: required for `Box<dyn std::error::Error + Send + Sync>` to implement `Type`
    = note: 1 redundant requirement hidden
    = note: required for `Option<Box<dyn std::error::Error + Send + Sync>>` to implement `Type`

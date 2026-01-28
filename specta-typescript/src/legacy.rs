@@ -586,7 +586,13 @@ pub(crate) fn enum_datatype(
         })
         .collect::<Result<Vec<_>>>()?;
     variants.dedup();
-    s.push_str(&variants.join(" | "));
+
+    // If all variants are skipped, the enum has no valid values
+    if variants.is_empty() {
+        s.push_str(NEVER);
+    } else {
+        s.push_str(&variants.join(" | "));
+    }
 
     Ok(())
 }
