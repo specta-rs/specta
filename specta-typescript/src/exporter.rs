@@ -1,23 +1,16 @@
 use std::{
     borrow::Cow,
-    cell::RefCell,
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    collections::{BTreeMap, HashMap},
     fmt,
+    ops::Deref,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
-use specta::{
-    TypeCollection,
-    datatype::{DataType, Fields, NamedDataType, Reference},
-};
+use specta::{TypeCollection, datatype::NamedDataType};
 use specta_serde::SerdeMode;
 
-use crate::{Error, exporter, primitives};
-
-thread_local! {
-    static HAS_MANUALLY_EXPORTED_USER_TYPES: RefCell<bool> = const { RefCell::new(false) };
-}
+use crate::{Error, primitives};
 
 /// Allows you to configure how Specta's Typescript exporter will deal with BigInt types ([i64], [i128] etc).
 ///
@@ -66,7 +59,7 @@ impl fmt::Display for Layout {
 }
 
 #[derive(Clone)]
-struct RuntimeFn(Arc<dyn Fn(&Exporter, &TypeCollection) -> Result<Cow<'static, str>, Error>>);
+struct RuntimeFn(Arc<dyn Fn(FrameworkExporter) -> Result<Cow<'static, str>, Error>>);
 
 impl fmt::Debug for RuntimeFn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -116,7 +109,7 @@ impl Exporter {
     /// Ensure you call `T::reference()` within the closure if you want an import to be created.
     pub fn framework_runtime(
         mut self,
-        builder: impl Fn(&Exporter, &TypeCollection) -> Result<Cow<'static, str>, Error> + 'static,
+        builder: impl Fn(FrameworkExporter) -> Result<Cow<'static, str>, Error> + 'static,
     ) -> Self {
         self.framework_runtime = Some(RuntimeFn(Arc::new(builder)));
         self
@@ -188,23 +181,18 @@ impl Exporter {
             }
         };
 
-        let mut out = self.header.to_string();
-        if !self.header.is_empty() {
-            out += "\n";
-        }
+        let mut out = render_file_header(self)?;
 
-        out += &self.framework_prelude;
-        if !self.framework_prelude.is_empty() {
-            out += "\n\n";
-        }
-
-        let mut requires_user_types = true;
+        let mut has_manually_exported_user_types = false;
         let mut runtime = Ok(Cow::default());
         if let Some(framework_runtime) = &self.framework_runtime {
             let runtime_references = primitives::collect_references(|| {
-                HAS_MANUALLY_EXPORTED_USER_TYPES.set(false);
-                runtime = (framework_runtime.0)(self, &types);
-                requires_user_types = !HAS_MANUALLY_EXPORTED_USER_TYPES.replace(false);
+                runtime = (framework_runtime.0)(FrameworkExporter {
+                    exporter: self,
+                    has_manually_exported_user_types: &mut has_manually_exported_user_types,
+                    files_root_types: "",
+                    types: &types,
+                });
             });
 
             // TODO: We need to properly deduplicate references
@@ -223,14 +211,17 @@ impl Exporter {
         // TODO: Check our reference generation is up to spec
 
         // Framework runtime
+        if !runtime.is_empty() {
+            out += "\n";
+        }
         out += &runtime;
         if !runtime.is_empty() {
             out += "\n";
         }
 
         // User types (if not included in framework runtime)
-        if requires_user_types {
-            render_types(&mut out, self, &types)?;
+        if !has_manually_exported_user_types {
+            render_types(&mut out, self, &types, "")?;
         }
 
         Ok(out)
@@ -253,160 +244,128 @@ impl Exporter {
             return Ok(());
         }
 
-        // TODO: Generate file before doing FS operations
+        let types = if let Some(mode) = self.serde {
+            let mut types = types.clone(); // TODO: Can we avoid this?
+            specta_serde::apply(&mut types, mode)?;
+            Cow::Owned(types)
+        } else {
+            Cow::Borrowed(types)
+        };
 
-        todo!();
-        // let processed_types = if let Some(mode) = self.serde {
-        //     let mut types_clone = types.clone();
-        //     specta_serde::apply(&mut types_clone, mode)?;
-        //     types_clone
-        // } else {
-        //     types.clone()
-        // };
-        // let types = &processed_types;
+        fn export(
+            exporter: &Exporter,
+            types: &TypeCollection,
+            module: &mut Module,
+            path: &Path,
+            files: &mut HashMap<PathBuf, String>,
+        ) -> Result<String, Error> {
+            let mut s = String::new();
 
-        // std::fs::create_dir_all(path)?;
+            module.types.sort_by(|a, b| {
+                a.name()
+                    .cmp(b.name())
+                    .then(a.module_path().cmp(b.module_path()))
+                    .then(a.location().cmp(&b.location()))
+            });
+            for ndt in &module.types {
+                s.push('\n');
 
-        // let mut files = HashMap::<PathBuf, Vec<NamedDataType>>::new();
+                if exporter.jsdoc {
+                    primitives::typedef_internal(&mut s, exporter, types, ndt)?;
+                } else {
+                    primitives::export_internal(&mut s, exporter, types, ndt)?;
+                }
+            }
 
-        // for ndt in types.into_sorted_iter() {
-        //     let mut path = PathBuf::from(path);
-        //     for m in ndt.module_path().split("::") {
-        //         path = path.join(m);
-        //     }
-        //     path.set_extension(if self.jsdoc { "js" } else { "ts" });
-        //     files.entry(path).or_default().push(ndt);
-        // }
+            for (name, module) in &mut module.children {
+                let mut path = path.join(name);
+                // TODO: Should `export` take `&mut String` instead???
+                let result = export(exporter, types, module, &path, files)?;
+                let mut out = render_file_header(exporter)?;
+                out.push_str(&result); // TODO: newlines?
+                path.set_extension(if exporter.jsdoc { "js" } else { "ts" });
+                files.insert(path, out);
+            }
 
-        // let mut used_paths = files.keys().cloned().collect::<HashSet<_>>();
+            Ok(s)
+        }
 
-        // for (path, ndts) in files {
-        //     if let Some(parent) = path.parent() {
-        //         std::fs::create_dir_all(parent)?;
-        //     }
+        // TODO: Make root types work by injecting into runtime file
+        // TODO: Remove no-longer required files
+        // TODO: Handle `header` and `framework_prelude`
+        // TODO: Cross-file imports in runtime
+        // TODO: Cross-file imports in types files
 
-        //     let mut references = ImportMap::default();
-        //     for ndt in ndts.iter() {
-        //         crawl_for_imports(ndt.ty(), types, &mut references);
-        //     }
+        let mut files = HashMap::new();
+        let mut runtime_path = path.join("index");
+        runtime_path.set_extension(if self.jsdoc { "js" } else { "ts" });
 
-        //     std::fs::write(
-        //         &path,
-        //         self.export_internal(ndts.into_iter(), Some(references), types, false)?,
-        //     )?;
-        // }
+        let root_types = export(
+            self,
+            &types,
+            &mut build_module_graph(&types),
+            path,
+            &mut files,
+        )?;
 
-        // if let Some(framework_runtime) = &self.framework_runtime {
-        //     // TODO: Does this risk conflicting with an `index.rs` module???
-        //     let p = path.join(if self.jsdoc { "index.js" } else { "index.ts" });
+        {
+            let mut has_manually_exported_user_types = false;
+            let mut runtime = Ok(Cow::default());
+            if let Some(framework_runtime) = &self.framework_runtime {
+                let runtime_references = primitives::collect_references(|| {
+                    runtime = (framework_runtime.0)(FrameworkExporter {
+                        exporter: self,
+                        has_manually_exported_user_types: &mut has_manually_exported_user_types,
+                        files_root_types: &root_types,
+                        types: &types,
+                    });
+                });
 
-        //     let mut content = self.framework_prelude.to_string();
-        //     if !self.framework_prelude.is_empty() {
-        //         content.push('\n');
-        //     }
+                // TODO: We need to properly deduplicate references
+                println!(
+                    "{:#?}",
+                    runtime_references
+                        .iter()
+                        .map(|r| r.get(&types).unwrap().name())
+                        .collect::<Vec<_>>()
+                );
+                // TODO: runtime_references
+            }
+            let runtime = runtime?;
 
-        //     let mut runtime = Cow::default();
-        //     let runtime_references = primitives::collect_references(|| {
-        //         todo!();
-        //         // runtime = (framework_runtime.0)(self, "// Hello World\n".into()); // TODO: Fix this
-        //     });
+            // TODO: Handle imports
 
-        //     let mut runtime_imports = ImportMap::default();
-        //     for r in runtime_references {
-        //         if let Some(ndt) = r.get(types) {
-        //             crawl_for_imports(ndt.ty(), types, &mut runtime_imports);
-        //         }
-        //     }
+            if !runtime.is_empty() {
+                files.insert(runtime_path, {
+                    let mut out = render_file_header(self)?;
 
-        //     // Add imports
-        //     if !runtime_imports.is_empty() {
-        //         if self.jsdoc {
-        //             content.push_str("\n/**");
-        //         }
+                    // Framework runtime
+                    out.push('\n');
+                    out.push_str(&runtime);
+                    if !runtime.is_empty() {
+                        out += "\n";
+                    }
 
-        //         for (src, items) in &runtime_imports {
-        //             if self.jsdoc {
-        //                 content.push_str("\n\t* @import");
-        //             } else {
-        //                 content.push_str("\nimport type");
-        //             }
+                    // User types (if not included in framework runtime)
+                    if !has_manually_exported_user_types {
+                        render_types(&mut out, self, &types, "")?;
+                    }
 
-        //             content.push_str(" { ");
-        //             for (i, (name, alias)) in items.iter().enumerate() {
-        //                 if i != 0 {
-        //                     content.push_str(", ");
-        //                 }
-        //                 content.push_str(name);
-        //                 if alias != name {
-        //                     content.push_str(" as ");
-        //                     content.push_str(alias);
-        //                 }
-        //             }
+                    out
+                });
+            }
+        }
 
-        //             content.push_str(" } from \"");
-        //             content.push_str(src);
-        //             content.push_str("\";");
-        //         }
+        println!("{:#?}", files); // TODO
 
-        //         if self.jsdoc {
-        //             content.push_str("\n\t*/");
-        //         }
-        //         content.push_str("\n\n");
-        //     }
-
-        //     content.push_str(&runtime);
-        //     if !runtime.is_empty() {
-        //         content.push('\n');
-        //     }
-
-        //     std::fs::write(&p, content)?;
-
-        //     // This is to ensure `remove_unused_ts_files` doesn't remove it
-        //     used_paths.insert(p);
-        // }
-
-        // if path.exists() && path.is_dir() {
-        //     fn remove_unused_ts_files(
-        //         dir: &Path,
-        //         used_paths: &HashSet<PathBuf>,
-        //     ) -> std::io::Result<()> {
-        //         for entry in std::fs::read_dir(dir)? {
-        //             let entry = entry?;
-        //             let entry_path = entry.path();
-
-        //             if entry_path.is_dir() {
-        //                 remove_unused_ts_files(&entry_path, used_paths)?;
-
-        //                 // Remove empty directories
-        //                 if std::fs::read_dir(&entry_path)?.next().is_none() {
-        //                     std::fs::remove_dir(&entry_path)?;
-        //                 }
-        //             } else if matches!(
-        //                 entry_path.extension().and_then(|ext| ext.to_str()),
-        //                 Some("ts" | "js")
-        //             ) && !used_paths.contains(&entry_path)
-        //             {
-        //                 std::fs::remove_file(&entry_path)?;
-        //             }
-        //         }
-        //         Ok(())
-        //     }
-
-        //     let _ = remove_unused_ts_files(path, &used_paths);
-        // }
+        for (path, content) in files {
+            if let Some(path) = path.parent() {
+                std::fs::create_dir_all(path)?;
+            }
+            std::fs::write(path, content)?;
+        }
 
         Ok(())
-    }
-
-    /// Render the types within the [TypeCollection].
-    ///
-    /// This will only work if used within [Self::framework_runtime] function.
-    /// It allows frameworks to intersperse their user types into their runtime code.
-    pub fn render_types(&self, types: &TypeCollection) -> Result<Cow<'static, str>, Error> {
-        let mut s = String::new();
-        render_types(&mut s, self, types)?;
-        HAS_MANUALLY_EXPORTED_USER_TYPES.set(true);
-        Ok(Cow::Owned(s))
     }
 }
 
@@ -422,97 +381,157 @@ impl AsMut<Exporter> for Exporter {
     }
 }
 
-#[derive(Default)]
-struct Namespace<'a> {
-    types: Vec<&'a NamedDataType>,
-    children: BTreeMap<&'a str, Namespace<'a>>,
+/// Reference to Typescript language exporter for framework
+pub struct FrameworkExporter<'a> {
+    exporter: &'a Exporter,
+    has_manually_exported_user_types: &'a mut bool,
+    // For `Layout::Files` we need to inject the value
+    files_root_types: &'a str,
+    pub types: &'a TypeCollection,
 }
 
-fn render_types(s: &mut String, exporter: &Exporter, types: &TypeCollection) -> Result<(), Error> {
+impl fmt::Debug for FrameworkExporter<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.exporter.fmt(f)
+    }
+}
+
+impl AsRef<Exporter> for FrameworkExporter<'_> {
+    fn as_ref(&self) -> &Exporter {
+        self
+    }
+}
+
+impl Deref for FrameworkExporter<'_> {
+    type Target = Exporter;
+
+    fn deref(&self) -> &Self::Target {
+        self.exporter
+    }
+}
+
+impl FrameworkExporter<'_> {
+    /// Render the types within the [TypeCollection].
+    ///
+    /// This will only work if used within [Self::framework_runtime] function.
+    /// It allows frameworks to intersperse their user types into their runtime code.
+    pub fn render_types(&mut self, types: &TypeCollection) -> Result<Cow<'static, str>, Error> {
+        let mut s = String::new();
+        render_types(&mut s, self.exporter, types, self.files_root_types)?;
+        *self.has_manually_exported_user_types = true;
+        Ok(Cow::Owned(s))
+    }
+}
+
+#[derive(Default)]
+struct Module<'a> {
+    // path: String,
+    types: Vec<&'a NamedDataType>,
+    children: BTreeMap<&'a str, Module<'a>>,
+}
+
+fn build_module_graph(types: &TypeCollection) -> Module<'_> {
+    types
+        .into_unsorted_iter()
+        .fold(Module::default(), |mut ns, ndt| {
+            let path = ndt.module_path();
+
+            if path.is_empty() {
+                ns.types.push(ndt);
+            } else {
+                let mut current = &mut ns;
+                for segment in path.split("::") {
+                    current = current.children.entry(segment).or_default();
+                }
+
+                current.types.push(ndt);
+            }
+
+            ns
+        })
+}
+
+fn render_file_header(exporter: &Exporter) -> Result<String, Error> {
+    let mut out = exporter.header.to_string();
+    if !exporter.header.is_empty() {
+        out += "\n";
+    }
+
+    out += &exporter.framework_prelude;
+    if !exporter.framework_prelude.is_empty() {
+        out += "\n";
+    }
+
+    Ok(out)
+}
+
+fn render_types(
+    s: &mut String,
+    exporter: &Exporter,
+    types: &TypeCollection,
+    files_user_types: &str,
+) -> Result<(), Error> {
     match exporter.layout {
         Layout::Namespaces => {
             fn export(
                 exporter: &Exporter,
                 types: &TypeCollection,
                 s: &mut String,
-                ns: &mut Namespace,
+                module: &mut Module,
                 depth: usize,
             ) -> Result<(), Error> {
                 let indent = "\t".repeat(depth);
 
-                ns.types.sort_by(|a, b| {
+                module.types.sort_by(|a, b| {
                     a.name()
                         .cmp(b.name())
                         .then(a.module_path().cmp(b.module_path()))
                         .then(a.location().cmp(&b.location()))
                 });
-                for ndt in &ns.types {
+                for ndt in &module.types {
                     s.push('\n');
                     s.push_str(&indent);
 
                     if exporter.jsdoc {
-                        // TODO: Don't allocate local string
-                        s.push_str(&primitives::typedef_internal(exporter, types, ndt)?);
+                        primitives::typedef_internal(s, exporter, types, ndt)?;
                     } else {
-                        // TODO: Don't allocate local string
-                        s.push_str(&primitives::export(exporter, types, ndt)?);
+                        primitives::export_internal(s, exporter, types, ndt)?;
                     }
                 }
 
-                for (name, ns) in &mut ns.children {
+                for (name, module) in &mut module.children {
                     s.push('\n');
                     s.push_str(&indent);
                     s.push_str("export namespace ");
                     s.push_str(name);
                     s.push_str(" {\n");
-                    export(exporter, types, s, ns, depth + 1)?;
+                    export(exporter, types, s, module, depth + 1)?;
                     s.push_str("}\n");
                 }
 
                 Ok(())
             }
 
-            export(
-                exporter,
-                types,
-                s,
-                &mut types
-                    .into_unsorted_iter()
-                    .fold(Namespace::default(), |mut ns, ndt| {
-                        let path = ndt.module_path();
-
-                        if path.is_empty() {
-                            ns.types.push(ndt);
-                        } else {
-                            let mut current = &mut ns;
-                            for segment in path.split("::") {
-                                current = current.children.entry(segment).or_default();
-                            }
-
-                            current.types.push(ndt);
-                        }
-
-                        ns
-                    }),
-                0,
-            )?;
+            export(exporter, types, s, &mut build_module_graph(types), 0)?;
         }
         Layout::ModulePrefixedName | Layout::FlatFile => {
             for ndt in types.into_sorted_iter() {
                 s.push('\n');
 
                 if exporter.jsdoc {
-                    // TODO: Don't allocate local string
-                    s.push_str(&primitives::typedef_internal(exporter, types, &ndt)?);
+                    primitives::typedef_internal(s, exporter, types, &ndt)?;
                 } else {
-                    // TODO: Don't allocate local string
-                    s.push_str(&primitives::export(exporter, types, &ndt)?);
+                    primitives::export_internal(s, exporter, types, &ndt)?;
                 }
             }
         }
         // The types will get their own files
         // So we keep the user types empty for easy downstream detection.
-        Layout::Files => {}
+        Layout::Files => {
+            if !files_user_types.is_empty() {
+                s.push_str(files_user_types);
+            }
+        }
     }
 
     Ok(())

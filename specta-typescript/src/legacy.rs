@@ -136,7 +136,8 @@ fn inner_comments(
         return other;
     }
 
-    let comments = js_doc(docs, deprecated);
+    let mut comments = String::new();
+    js_doc(&mut comments, docs, deprecated);
 
     let (prefix_a, prefix_b) = match start_with_newline && !comments.is_empty() {
         true => ("\n", prefix),
@@ -758,94 +759,47 @@ const NULL: &str = "null";
 const NEVER: &str = "never";
 
 // TODO: Merge this into main expoerter
-pub(crate) fn js_doc(docs: &str, deprecated: Option<&DeprecatedType>) -> String {
-    const START: &str = "/**\n";
-
-    pub struct Builder {
-        value: String,
+pub(crate) fn js_doc(s: &mut String, docs: &str, deprecated: Option<&DeprecatedType>) {
+    // Early return - no-op if nothing to document
+    if docs.is_empty() && deprecated.is_none() {
+        return;
     }
 
-    impl Builder {
-        pub fn push(&mut self, line: &str) {
-            self.push_internal([line.trim()]);
-        }
+    // Start JSDoc comment
+    s.push_str("/**\n");
 
-        pub(crate) fn push_internal<'a>(&mut self, parts: impl IntoIterator<Item = &'a str>) {
-            self.value.push_str(" * ");
-
-            for part in parts.into_iter() {
-                self.value.push_str(part);
-            }
-
-            self.value.push('\n');
-        }
-
-        pub fn push_deprecated(&mut self, typ: &DeprecatedType) {
-            self.push_internal(
-                ["@deprecated"].into_iter().chain(
-                    match typ {
-                        DeprecatedType::DeprecatedWithSince {
-                            note: message,
-                            since,
-                        } => Some((since.as_ref(), message)),
-                        _ => None,
-                    }
-                    .map(|(since, message)| {
-                        [" ", message.trim()].into_iter().chain(
-                            since
-                                .map(|since| [" since ", since.trim()])
-                                .into_iter()
-                                .flatten(),
-                        )
-                    })
-                    .into_iter()
-                    .flatten(),
-                ),
-            );
-        }
-
-        // TODO: Bring this back?
-        // pub fn push_generic(&mut self, generic: &Generic) {
-        //     self.push_internal(["@template ", generic.borrow()])
-        // }
-
-        pub fn build(mut self) -> String {
-            if self.value == START {
-                return String::new();
-            }
-
-            self.value.push_str(" */\n");
-            self.value
-        }
-    }
-
-    impl Default for Builder {
-        fn default() -> Self {
-            Self {
-                value: START.to_string(),
-            }
-        }
-    }
-
-    impl<T: AsRef<str>> Extend<T> for Builder {
-        fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
-            for item in iter {
-                self.push(item.as_ref());
-            }
-        }
-    }
-
-    let mut builder = Builder::default();
-
+    // Add documentation lines
     if !docs.is_empty() {
-        builder.extend(docs.split('\n'));
+        for line in docs.split('\n') {
+            s.push_str(" * ");
+            s.push_str(line.trim());
+            s.push('\n');
+        }
     }
 
-    if let Some(deprecated) = deprecated {
-        builder.push_deprecated(deprecated);
+    // Add @deprecated tag if present
+    if let Some(typ) = deprecated {
+        s.push_str(" * @deprecated");
+
+        if let DeprecatedType::DeprecatedWithSince {
+            note: message,
+            since,
+        } = typ
+        {
+            s.push(' ');
+            s.push_str(message.trim());
+
+            if let Some(since_val) = since {
+                s.push_str(" since ");
+                s.push_str(since_val.trim());
+            }
+        }
+
+        s.push('\n');
     }
 
-    builder.build()
+    // Close JSDoc comment
+    s.push_str(" */\n");
 }
 
 // pub fn typedef_named_datatype(

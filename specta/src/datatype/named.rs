@@ -74,13 +74,21 @@ impl NamedDataType {
         builder: NamedDataTypeBuilder,
         types: &mut TypeCollection,
     ) -> NamedDataType {
+        let location = Location::caller();
+
+        let module_path = builder.module_path.unwrap_or_else(|| {
+            file_path_to_module_path(location.file())
+                .map(Into::into)
+                .unwrap_or(Cow::Borrowed("virtual"))
+        });
+
         let ndt = NamedDataType {
             id: NamedId::Dynamic(Arc::new(())),
             name: builder.name,
             docs: builder.docs,
             deprecated: builder.deprecated,
-            module_path: builder.module_path,
-            location: Location::caller().to_owned(),
+            module_path,
+            location: location.to_owned(),
             generics: builder.generics,
             inner: builder.inner,
         };
@@ -210,4 +218,25 @@ pub enum DeprecatedType {
         since: Option<Cow<'static, str>>,
         note: Cow<'static, str>,
     },
+}
+
+fn file_path_to_module_path(file_path: &str) -> Option<String> {
+    // Try different prefixes
+    let (prefix, path) = if let Some(p) = file_path.strip_prefix("src/") {
+        ("crate", p)
+    } else if let Some(p) = file_path.strip_prefix("tests/") {
+        ("tests", p)
+    } else {
+        return None;
+    };
+
+    let path = path.strip_suffix(".rs")?;
+    let path = path.strip_suffix("/mod").unwrap_or(path);
+    let module_path = path.replace('/', "::");
+
+    if module_path.is_empty() {
+        Some(prefix.to_string())
+    } else {
+        Some(format!("{}::{}", prefix, module_path))
+    }
 }

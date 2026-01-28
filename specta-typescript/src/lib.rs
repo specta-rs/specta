@@ -60,7 +60,7 @@ mod typescript;
 pub use branded::Branded;
 pub use define::define;
 pub use error::Error;
-pub use exporter::{BigIntExportBehavior, Exporter, Layout};
+pub use exporter::{BigIntExportBehavior, Exporter, FrameworkExporter, Layout};
 pub use jsdoc::JSDoc;
 pub use types::{Any, Never, Unknown};
 pub use typescript::Typescript;

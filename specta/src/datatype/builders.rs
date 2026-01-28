@@ -157,7 +157,7 @@ pub struct NamedDataTypeBuilder {
     pub(crate) name: Cow<'static, str>,
     pub(crate) docs: Cow<'static, str>,
     pub(crate) deprecated: Option<DeprecatedType>,
-    pub(crate) module_path: Cow<'static, str>,
+    pub(crate) module_path: Option<Cow<'static, str>>,
     pub(crate) generics: Vec<Generic>,
     pub(crate) inner: DataType,
 }
@@ -168,7 +168,7 @@ impl NamedDataTypeBuilder {
             name: name.into(),
             docs: Cow::Borrowed(""),
             deprecated: None,
-            module_path: Cow::Borrowed("virtual"),
+            module_path: None,
             generics,
             inner: dt,
         }
@@ -178,7 +178,7 @@ impl NamedDataTypeBuilder {
     ///
     /// The value for this is usually determined by [`module_path`](std::module_path). It's important you keep this in the form `edge::edge::edge::node` or `node`.
     pub fn module_path(mut self, module_path: impl Into<Cow<'static, str>>) -> Self {
-        self.module_path = module_path.into();
+        self.module_path = Some(module_path.into());
         self
     }
 

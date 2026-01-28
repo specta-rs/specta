@@ -35,8 +35,17 @@ pub fn export(
     types: &TypeCollection,
     ndt: &NamedDataType,
 ) -> Result<String, Error> {
-    let exporter = exporter.as_ref();
+    let mut s = String::new();
+    export_internal(&mut s, exporter.as_ref(), types, ndt)?;
+    Ok(s)
+}
 
+pub(crate) fn export_internal(
+    s: &mut String,
+    exporter: &Exporter,
+    types: &TypeCollection,
+    ndt: &NamedDataType,
+) -> Result<(), Error> {
     let generics = (!ndt.generics().is_empty())
         .then(|| {
             iter::once("<")
@@ -66,17 +75,17 @@ pub fn export(
     )?
     .leak(); // TODO: Leaking bad
 
-    let s = iter::empty()
-        .chain(["export type ", name])
-        .chain(generics)
-        .chain([" = "])
-        .collect::<String>(); // TODO: Don't collect and instead build into `result`
+    js_doc(s, ndt.docs(), ndt.deprecated());
 
-    let mut result = js_doc(ndt.docs(), ndt.deprecated());
-    result.push_str(&s);
+    s.push_str("export type ");
+    s.push_str(name);
+    for part in generics {
+        s.push_str(part);
+    }
+    s.push_str(" = ");
 
     datatype(
-        &mut result,
+        s,
         exporter,
         types,
         ndt.ty(),
@@ -85,9 +94,9 @@ pub fn export(
         Some(ndt.name()),
         "\t",
     )?;
-    result.push_str(";\n");
+    s.push_str(";\n");
 
-    Ok(result)
+    Ok(())
 }
 
 /// Generate an inlined Typescript string for a specific [`DataType`].
@@ -120,10 +129,11 @@ pub fn inline(
 // This can be used internally to prevent cloning `Typescript` instances.
 // Externally this shouldn't be a concern so we don't expose it.
 pub(crate) fn typedef_internal(
+    s: &mut String,
     exporter: &Exporter,
     types: &TypeCollection,
     dt: &NamedDataType,
-) -> Result<String, Error> {
+) -> Result<(), Error> {
     let generics = (!dt.generics().is_empty())
         .then(|| {
             iter::once("<")
@@ -139,7 +149,7 @@ pub(crate) fn typedef_internal(
         .chain(generics)
         .collect::<String>();
 
-    let mut s = "/**\n".to_string();
+    s.push_str("/**\n");
 
     if !dt.docs().is_empty() {
         for line in dt.docs().lines() {
@@ -161,7 +171,7 @@ pub(crate) fn typedef_internal(
 
     s.push_str("\t* @typedef {");
     datatype(
-        &mut s,
+        s,
         exporter,
         types,
         dt.ty(),
@@ -175,7 +185,7 @@ pub(crate) fn typedef_internal(
     s.push('\n');
     s.push_str("\t*/");
 
-    Ok(s)
+    Ok(())
 }
 
 thread_local! {
