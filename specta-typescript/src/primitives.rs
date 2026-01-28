@@ -4,6 +4,8 @@
 
 use std::{
     borrow::{Borrow, Cow},
+    cell::RefCell,
+    collections::HashSet,
     fmt::Write as _,
     iter,
 };
@@ -88,17 +90,32 @@ pub fn export(
     Ok(result)
 }
 
-// TODO: I think we should remove this?
-// /// Generate a JSDoc `@typedef` comment for defining a [NamedDataType].
-// ///
-// /// This method leaves the following up to the implementer:
-// ///  - Ensuring all referenced types are exported
-// ///  - Handling multiple type with overlapping names
-// ///  - Transforming the type for your serialization format (Eg. Serde)
-// ///
-// pub fn typedef(js: &JSDoc, types: &TypeCollection, dt: &NamedDataType) -> Result<String, Error> {
-//     typedef_internal(js.exporter(), types, dt)
-// }
+/// Generate an inlined Typescript string for a specific [`DataType`].
+///
+/// This methods leaves all the same things as the [`export`] method up to the user.
+///
+/// Note that calling this method with a tagged struct or enum may cause the tag to not be exported.
+/// The type should be wrapped in a [`NamedDataType`] to provide a proper name.
+///
+pub fn inline(
+    exporter: &dyn AsRef<Exporter>,
+    types: &TypeCollection,
+    dt: &DataType,
+) -> Result<String, Error> {
+    let mut s = String::new();
+    inline_datatype(
+        &mut s,
+        exporter.as_ref(),
+        types,
+        dt,
+        vec![],
+        false,
+        None,
+        "",
+        0,
+    )?;
+    Ok(s)
+}
 
 // This can be used internally to prevent cloning `Typescript` instances.
 // Externally this shouldn't be a concern so we don't expose it.
@@ -161,6 +178,52 @@ pub(crate) fn typedef_internal(
     Ok(s)
 }
 
+thread_local! {
+    static COLLECTED_TYPES: RefCell<Option<Vec<HashSet<NamedReference>>>> = const { RefCell::new(None) };
+}
+
+pub(crate) fn collect_references(func: impl FnOnce()) -> HashSet<NamedReference> {
+    struct Guard;
+    impl Drop for Guard {
+        fn drop(&mut self) {
+            COLLECTED_TYPES.with_borrow_mut(|types| {
+                if let Some(v) = types {
+                    // Last collection means we can drop all memory
+                    if v.len() == 1 {
+                        *types = None;
+                    } else {
+                        // Otherwise just remove the current collection.
+                        v.pop();
+                    }
+                }
+            })
+        }
+    }
+
+    // If we have no collection, register one
+    // If we already have one create a new context.
+    COLLECTED_TYPES.with_borrow_mut(|v| {
+        if let Some(v) = v {
+            v.push(Default::default());
+        } else {
+            *v = Some(vec![Default::default()]);
+        }
+    });
+
+    let guard = Guard;
+    func();
+    // We only use the guard when unwinding
+    std::mem::forget(guard);
+
+    COLLECTED_TYPES.with_borrow_mut(|types| {
+        types
+            .as_mut()
+            .expect("COLLECTED_TYPES is unset but it should be set")
+            .pop()
+            .expect("COLLECTED_TYPES is missing a valid collection context")
+    })
+}
+
 /// Generate an Typescript string to refer to a specific [`DataType`].
 ///
 /// For primitives this will include the literal type but for named type it will contain a reference.
@@ -169,46 +232,10 @@ pub(crate) fn typedef_internal(
 pub fn reference(
     exporter: &dyn AsRef<Exporter>,
     types: &TypeCollection,
-    dt: &Reference,
+    r: &Reference,
 ) -> Result<String, Error> {
     let mut s = String::new();
-    datatype(
-        &mut s,
-        exporter.as_ref(),
-        types,
-        &DataType::Reference(dt.clone()), // TODO: Avoid this clone
-        vec![],
-        false,
-        None,
-        "",
-    )?;
-    Ok(s)
-}
-
-/// Generate an inlined Typescript string for a specific [`DataType`].
-///
-/// This methods leaves all the same things as the [`export`] method up to the user.
-///
-/// Note that calling this method with a tagged struct or enum may cause the tag to not be exported.
-/// The type should be wrapped in a [`NamedDataType`] to provide a proper name.
-///
-pub fn inline(
-    exporter: &dyn AsRef<Exporter>,
-    types: &TypeCollection,
-    dt: &DataType,
-) -> Result<String, Error> {
-    let mut s = String::new();
-    inline_datatype(
-        &mut s,
-        exporter.as_ref(),
-        types,
-        dt,
-        vec![],
-        false,
-        None,
-        "",
-        0,
-    )?;
+    reference_dt(&mut s, exporter.as_ref(), types, r, vec![], false)?;
     Ok(s)
 }
 
@@ -1105,6 +1132,15 @@ fn reference_named_dt(
     // TODO: Remove
     is_export: bool,
 ) -> Result<(), Error> {
+    // TODO: This could be problematic if it errors??
+    COLLECTED_TYPES.with_borrow_mut(|ctxs| {
+        if let Some(ctxs) = ctxs {
+            for ctx in ctxs {
+                ctx.insert(r.clone());
+            }
+        }
+    });
+
     // TODO: Legacy stuff
     {
         let ndt = r
