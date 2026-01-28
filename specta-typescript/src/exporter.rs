@@ -1,20 +1,16 @@
 use std::{
     borrow::Cow,
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     fmt,
     ops::Deref,
     path::{Path, PathBuf},
-    slice::RChunksExact,
     sync::Arc,
 };
 
 use specta::{TypeCollection, datatype::NamedDataType};
 use specta_serde::SerdeMode;
 
-use crate::{
-    Error,
-    primitives::{self, export_internal},
-};
+use crate::{Error, primitives};
 
 /// Allows you to configure how Specta's Typescript exporter will deal with BigInt types ([i64], [i128] etc).
 ///
@@ -242,6 +238,7 @@ impl Exporter {
             Cow::Borrowed(types)
         };
 
+        #[allow(clippy::too_many_arguments)]
         fn export(
             exporter: &Exporter,
             types: &TypeCollection,
@@ -372,14 +369,18 @@ impl Exporter {
             }
         }
 
-        println!("{:#?}", files); // TODO
+        if let Ok(meta) = path.metadata()
+            && !meta.is_dir()
+        {
+            std::fs::remove_file(path)?;
+        }
 
-        for (path, content) in files {
-            if let Some(path) = path.parent() {
-                std::fs::create_dir_all(path)?;
-            }
+        for (path, content) in &files {
+            path.parent().map(std::fs::create_dir_all).transpose()?;
             std::fs::write(path, content)?;
         }
+
+        cleanup_stale_files(path, &files, if self.jsdoc { "js" } else { "ts" })?;
 
         Ok(())
     }
@@ -577,5 +578,55 @@ fn render_types(
         }
     }
 
+    Ok(())
+}
+
+/// Collect all TypeScript/JavaScript files in a directory recursively
+fn collect_existing_files(
+    root: &Path,
+    extension: &str,
+) -> Result<HashSet<PathBuf>, std::io::Error> {
+    if !root.exists() {
+        return Ok(HashSet::new());
+    }
+
+    Ok(std::fs::read_dir(root)?
+        .filter_map(Result::ok)
+        .flat_map(|entry| {
+            let path = entry.path();
+            if path.is_dir() {
+                collect_existing_files(&path, extension).unwrap_or_default()
+            } else if path.extension().and_then(|e| e.to_str()) == Some(extension) {
+                HashSet::from([path])
+            } else {
+                HashSet::new()
+            }
+        })
+        .collect::<HashSet<_>>())
+}
+
+/// Remove empty directories recursively, stopping at the root
+fn remove_empty_dirs(path: &Path, root: &Path) -> Result<(), std::io::Error> {
+    std::fs::read_dir(path)?
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().is_dir())
+        .try_for_each(|entry| remove_empty_dirs(&entry.path(), root))?;
+    if path != root && path.read_dir()?.next().is_none() {
+        std::fs::remove_dir(path)?;
+    }
+    Ok(())
+}
+
+/// Delete stale files and clean up empty directories
+fn cleanup_stale_files(
+    root: &Path,
+    current_files: &HashMap<PathBuf, String>,
+    extension: &str,
+) -> Result<(), Error> {
+    collect_existing_files(root, extension)?
+        .into_iter()
+        .filter(|path| !current_files.contains_key(path))
+        .try_for_each(|path| std::fs::remove_file(&path).map_err(Error::from))?;
+    remove_empty_dirs(root, root).ok(); // Ignore errors for directory cleanup
     Ok(())
 }
