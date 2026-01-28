@@ -141,6 +141,10 @@ fn primitives_reference() {
         insta::assert_snapshot!(
             format!("reference-{}", mode.to_string().to_lowercase()),
             dts.iter()
+                .filter_map(|(s, ty)| match ty {
+                    DataType::Reference(r) => Some((s, r)),
+                    _ => None,
+                })
                 .map(|(s, ty)| primitives::reference(&ts, &types, ty).map(|ty| format!("{s}: {ty}")))
                 .collect::<Result<Vec<_>, _>>()
                 .unwrap()

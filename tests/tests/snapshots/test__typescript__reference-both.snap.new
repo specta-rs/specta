@@ -1,5 +1,6 @@
 ---
 source: tests/tests/typescript.rs
+assertion_line: 141
 expression: "dts.iter().filter_map(|(s, ty)| match ty\n{\n    DataType::Reference(r) => Some((s, r)), _ => None,\n}).map(|(s, ty)|\nprimitives::reference(&ts, &types,\nty).map(|ty| format!(\"{s}: {ty}\"))).collect::<Result<Vec<_>,\n_>>().unwrap().join(\"\\n\")"
 ---
 Unit1: Unit1

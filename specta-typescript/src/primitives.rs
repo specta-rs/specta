@@ -169,14 +169,14 @@ pub(crate) fn typedef_internal(
 pub fn reference(
     exporter: &dyn AsRef<Exporter>,
     types: &TypeCollection,
-    dt: &DataType,
+    dt: &Reference,
 ) -> Result<String, Error> {
     let mut s = String::new();
     datatype(
         &mut s,
         exporter.as_ref(),
         types,
-        dt,
+        &DataType::Reference(dt.clone()), // TODO: Avoid this clone
         vec![],
         false,
         None,
@@ -1082,7 +1082,11 @@ fn reference_opaque_dt(
         s.push_str(&def.0);
         return Ok(());
     } else if let Some(def) = r.downcast_ref::<Branded>() {
-        s.push_str(&reference(exporter, types, def.ty())?);
+        // TODO: Build onto `s` instead of appending a separate string
+        s.push_str(&match def.ty() {
+            DataType::Reference(r) => reference(exporter, types, r),
+            ty => inline(exporter, types, ty),
+        }?);
         s.push_str(r#" & ""#);
         s.push_str(def.brand());
         s.push('"');
