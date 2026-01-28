@@ -187,52 +187,6 @@ pub(crate) fn typedef_internal(
     Ok(())
 }
 
-thread_local! {
-    static COLLECTED_TYPES: RefCell<Option<Vec<HashSet<NamedReference>>>> = const { RefCell::new(None) };
-}
-
-pub(crate) fn collect_references(func: impl FnOnce()) -> HashSet<NamedReference> {
-    struct Guard;
-    impl Drop for Guard {
-        fn drop(&mut self) {
-            COLLECTED_TYPES.with_borrow_mut(|types| {
-                if let Some(v) = types {
-                    // Last collection means we can drop all memory
-                    if v.len() == 1 {
-                        *types = None;
-                    } else {
-                        // Otherwise just remove the current collection.
-                        v.pop();
-                    }
-                }
-            })
-        }
-    }
-
-    // If we have no collection, register one
-    // If we already have one create a new context.
-    COLLECTED_TYPES.with_borrow_mut(|v| {
-        if let Some(v) = v {
-            v.push(Default::default());
-        } else {
-            *v = Some(vec![Default::default()]);
-        }
-    });
-
-    let guard = Guard;
-    func();
-    // We only use the guard when unwinding
-    std::mem::forget(guard);
-
-    COLLECTED_TYPES.with_borrow_mut(|types| {
-        types
-            .as_mut()
-            .expect("COLLECTED_TYPES is unset but it should be set")
-            .pop()
-            .expect("COLLECTED_TYPES is missing a valid collection context")
-    })
-}
-
 /// Generate an Typescript string to refer to a specific [`DataType`].
 ///
 /// For primitives this will include the literal type but for named type it will contain a reference.
@@ -1141,15 +1095,6 @@ fn reference_named_dt(
     // TODO: Remove
     is_export: bool,
 ) -> Result<(), Error> {
-    // TODO: This could be problematic if it errors??
-    COLLECTED_TYPES.with_borrow_mut(|ctxs| {
-        if let Some(ctxs) = ctxs {
-            for ctx in ctxs {
-                ctx.insert(r.clone());
-            }
-        }
-    });
-
     // TODO: Legacy stuff
     {
         let ndt = r
