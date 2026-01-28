@@ -1154,6 +1154,7 @@ fn reference_named_dt(
     {
         let ndt = r
             .get(types)
+            // TODO: This should return runtime error not panic
             .expect("TypeCollection should have been populated by now");
 
         // Check if this reference should be inlined
@@ -1186,10 +1187,20 @@ fn reference_named_dt(
                 }
             }
             Layout::Files => {
-                let mut s = ndt.module_path().replace("::", "_");
-                s.push('_');
-                s.push_str(ndt.name());
-                Cow::Owned(s)
+                if ndt.module_path().is_empty() {
+                    ndt.name().clone()
+                } else {
+                    let mut path =
+                        ndt.module_path()
+                            .split("::")
+                            .fold(String::new(), |mut s, segment| {
+                                s.push_str(segment);
+                                s.push('.');
+                                s
+                            });
+                    path.push_str(ndt.name());
+                    Cow::Owned(path)
+                }
             }
             _ => ndt.name().clone(),
         };

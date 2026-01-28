@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     fmt,
     ops::Deref,
     path::{Path, PathBuf},
@@ -190,29 +190,14 @@ impl Exporter {
         let mut has_manually_exported_user_types = false;
         let mut runtime = Ok(Cow::default());
         if let Some(framework_runtime) = &self.framework_runtime {
-            let runtime_references = primitives::collect_references(|| {
-                runtime = (framework_runtime.0)(FrameworkExporter {
-                    exporter: self,
-                    has_manually_exported_user_types: &mut has_manually_exported_user_types,
-                    files_root_types: "",
-                    types: &types,
-                });
+            runtime = (framework_runtime.0)(FrameworkExporter {
+                exporter: self,
+                has_manually_exported_user_types: &mut has_manually_exported_user_types,
+                files_root_types: "",
+                types: &types,
             });
-
-            // TODO: We need to properly deduplicate references
-            println!(
-                "{:#?}",
-                runtime_references
-                    .iter()
-                    .map(|r| r.get(&types).unwrap().name())
-                    .collect::<Vec<_>>()
-            );
-            // TODO: runtime_references
         }
         let runtime = runtime?;
-
-        // TODO: Should only need imports when `Layout::Files`???
-        // TODO: Check our reference generation is up to spec
 
         // Framework runtime
         if !runtime.is_empty() {
@@ -262,6 +247,7 @@ impl Exporter {
             module: &mut Module,
             s: &mut String,
             path: &Path,
+            parent_name: &str,
             files: &mut HashMap<PathBuf, String>,
         ) -> Result<(), Error> {
             module.types.sort_by(|a, b| {
@@ -280,20 +266,39 @@ impl Exporter {
                 }
             }
 
+            if !module.children.is_empty() {
+                for name in module.children.keys() {
+                    s.push_str("\nimport type * as ");
+                    s.push_str(name);
+                    s.push_str(" from \"./");
+                    if !parent_name.is_empty() {
+                        s.push_str(parent_name);
+                        s.push('/');
+                    }
+                    s.push_str(name);
+                    s.push_str("\";");
+                }
+
+                s.push_str("\n\nexport { ");
+                for (i, name) in module.children.keys().enumerate() {
+                    if i != 0 {
+                        s.push_str(", ");
+                    }
+                    s.push_str(name);
+                }
+                s.push_str(" };\n");
+            }
+
             for (name, module) in &mut module.children {
                 let mut path = path.join(name);
                 let mut out = render_file_header(exporter)?;
-                export(exporter, types, module, &mut out, &path, files)?;
+                export(exporter, types, module, &mut out, &path, name, files)?;
                 path.set_extension(if exporter.jsdoc { "js" } else { "ts" });
                 files.insert(path, out);
             }
 
             Ok(())
         }
-
-        // TODO: Remove no-longer required files
-        // TODO: Cross-file imports in runtime
-        // TODO: Cross-file imports in types files
 
         let mut files = HashMap::new();
         let mut runtime_path = path.join("index");
@@ -306,35 +311,21 @@ impl Exporter {
             &mut build_module_graph(&types),
             &mut root_types,
             path,
+            "",
             &mut files,
         )?;
 
         {
             let mut has_manually_exported_user_types = false;
-            let mut runtime = Ok(Cow::default());
+            let mut runtime = Cow::default();
             if let Some(framework_runtime) = &self.framework_runtime {
-                let runtime_references = primitives::collect_references(|| {
-                    runtime = (framework_runtime.0)(FrameworkExporter {
-                        exporter: self,
-                        has_manually_exported_user_types: &mut has_manually_exported_user_types,
-                        files_root_types: &root_types,
-                        types: &types,
-                    });
-                });
-
-                // TODO: We need to properly deduplicate references
-                println!(
-                    "{:#?}",
-                    runtime_references
-                        .iter()
-                        .map(|r| r.get(&types).unwrap().name())
-                        .collect::<Vec<_>>()
-                );
-                // TODO: runtime_references
+                runtime = (framework_runtime.0)(FrameworkExporter {
+                    exporter: self,
+                    has_manually_exported_user_types: &mut has_manually_exported_user_types,
+                    files_root_types: &root_types,
+                    types: &types,
+                })?;
             }
-            let runtime = runtime?;
-
-            // TODO: Handle imports
 
             if !runtime.is_empty() {
                 files.insert(runtime_path, {
@@ -474,48 +465,6 @@ fn render_types(
 ) -> Result<(), Error> {
     match exporter.layout {
         Layout::Namespaces => {
-            // fn export(
-            //     exporter: &Exporter,
-            //     types: &TypeCollection,
-            //     s: &mut String,
-            //     module: &mut Module,
-            //     depth: usize,
-            // ) -> Result<(), Error> {
-            //     let indent = "\t".repeat(depth);
-
-            //     module.types.sort_by(|a, b| {
-            //         a.name()
-            //             .cmp(b.name())
-            //             .then(a.module_path().cmp(b.module_path()))
-            //             .then(a.location().cmp(&b.location()))
-            //     });
-            //     for ndt in &module.types {
-            //         s.push('\n');
-            //         s.push_str(&indent);
-
-            //         if exporter.jsdoc {
-            //             primitives::typedef_internal(s, exporter, types, ndt)?;
-            //         } else {
-            //             primitives::export_internal(s, exporter, types, ndt)?;
-            //         }
-            //     }
-
-            //     for (name, module) in &mut module.children {
-            //         s.push('\n');
-            //         s.push_str(&indent);
-            //         if depth != 0 && *name != "$specta$" {
-            //             s.push_str("export ");
-            //         }
-            //         s.push_str("namespace ");
-            //         s.push_str(name);
-            //         s.push_str(" {\n");
-            //         export(exporter, types, s, module, depth + 1)?;
-            //         s.push_str("}\n");
-            //     }
-
-            //     Ok(())
-            // }
-
             fn export<'a>(
                 exporter: &Exporter,
                 types: &TypeCollection,
