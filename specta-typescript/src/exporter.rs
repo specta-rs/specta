@@ -63,6 +63,7 @@ impl fmt::Display for Layout {
 }
 
 #[derive(Clone)]
+#[allow(clippy::type_complexity)]
 struct RuntimeFn(Arc<dyn Fn(FrameworkExporter) -> Result<Cow<'static, str>, Error>>);
 
 impl fmt::Debug for RuntimeFn {
@@ -249,6 +250,7 @@ impl Exporter {
             path: &Path,
             parent_name: &str,
             files: &mut HashMap<PathBuf, String>,
+            depth: usize,
         ) -> Result<(), Error> {
             module.types.sort_by(|a, b| {
                 a.name()
@@ -286,13 +288,34 @@ impl Exporter {
                     }
                     s.push_str(name);
                 }
-                s.push_str(" };\n");
+                s.push_str(" };");
             }
 
             for (name, module) in &mut module.children {
                 let mut path = path.join(name);
                 let mut out = render_file_header(exporter)?;
-                export(exporter, types, module, &mut out, &path, name, files)?;
+
+                // TODO: Only add this if it's used
+                out.push_str("\nimport * as framework from \"");
+                if depth == 0 {
+                    out.push_str("./");
+                } else {
+                    for _ in 0..depth {
+                        out.push_str("../");
+                    }
+                }
+                out.push_str("index\";\n");
+
+                export(
+                    exporter,
+                    types,
+                    module,
+                    &mut out,
+                    &path,
+                    name,
+                    files,
+                    depth + 1,
+                )?;
                 path.set_extension(if exporter.jsdoc { "js" } else { "ts" });
                 files.insert(path, out);
             }
@@ -313,6 +336,7 @@ impl Exporter {
             path,
             "",
             &mut files,
+            0,
         )?;
 
         {
