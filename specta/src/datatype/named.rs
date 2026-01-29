@@ -72,6 +72,7 @@ impl NamedDataType {
             }
 
             types.0.insert(id.clone(), Some((ndt, !inline)));
+            types.1 += 1;
         } else if let Some(Some((_, should_export))) = types.0.get_mut(&id) {
             *should_export = *should_export || !inline;
         }
@@ -110,6 +111,7 @@ impl NamedDataType {
         };
 
         types.0.insert(ndt.id.clone(), Some((ndt.clone(), false)));
+        types.1 += 1;
         ndt
     }
 

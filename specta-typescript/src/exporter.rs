@@ -3,6 +3,7 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt,
     ops::Deref,
+    panic::Location,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -238,7 +239,19 @@ impl Exporter {
             files: &mut HashMap<PathBuf, String>,
             depth: usize,
         ) -> Result<(), Error> {
-            let mut exports = HashMap::with_capacity(module.types.len());
+            // Types
+            // for ndt in &module.types {
+            //     // TODO: Make this only restrict the user when `framework` exists (Eg. whenever a reference exists in the current file).
+            //     if ndt.name() == "framework" {
+            //         return Err(Error::DuplicateTypeName {
+            //             types: (
+            //                 TypeOrModuleOrImport::Import("framework".into()),
+            //                 ndt.location().into(),
+            //             ),
+            //             name: ndt.name().clone(),
+            //         });
+            //     }
+            // }
 
             module.types.sort_by(|a, b| {
                 a.name()
@@ -246,49 +259,23 @@ impl Exporter {
                     .then(a.module_path().cmp(b.module_path()))
                     .then(a.location().cmp(&b.location()))
             });
-            for ndt in &module.types {
-                // TODO: Make this only restrict the user when `framework` is used.
-                if ndt.name() == "framework" {
-                    return Err(Error::DuplicateTypeName {
-                        types: (
-                            TypeOrModuleOrImport::Import("framework".into()),
-                            ndt.location().into(),
-                        ),
-                        name: ndt.name().clone(),
-                    });
-                } else if let Some(other) = exports.insert(ndt.name().to_string(), ndt.location()) {
-                    return Err(Error::DuplicateTypeName {
-                        types: (ndt.location().into(), other.into()),
-                        name: ndt.name().clone(),
-                    });
-                }
-
-                s.push('\n');
-
-                if exporter.jsdoc {
-                    primitives::typedef_internal(s, exporter, types, ndt)?;
-                } else {
-                    primitives::export_internal(s, exporter, types, ndt)?;
-                }
-            }
+            let exports = render_flat_types(s, exporter, types, module.types.iter().copied(), "")?;
 
             if !module.children.is_empty() {
                 for name in module.children.keys() {
                     // TODO: Make this only restrict the user when `framework` is used.
-                    if *name == "framework" {
+                    // if *name == "framework" {
+                    //     return Err(Error::DuplicateTypeName {
+                    //         types: (
+                    //             TypeOrModuleOrImport::Import("framework".into()),
+                    //             construct_module(&module.module_path, name),
+                    //         ),
+                    //         name: name.to_string().into(),
+                    //     });
+                    // } else
+                    if let Some(other) = exports.get(*name) {
                         return Err(Error::DuplicateTypeName {
-                            types: (
-                                TypeOrModuleOrImport::Import("framework".into()),
-                                construct_module(&module.module_path, &name),
-                            ),
-                            name: name.to_string().into(),
-                        });
-                    } else if let Some(other) = exports.get(*name) {
-                        return Err(Error::DuplicateTypeName {
-                            types: (
-                                construct_module(&module.module_path, &name),
-                                (*other).into(),
-                            ),
+                            types: (construct_module(&module.module_path, name), (*other).into()),
                             name: name.to_string().into(),
                         });
                     }
@@ -560,33 +547,13 @@ fn render_types(
                     s.push_str(" {\n");
 
                     // Types
-                    let mut exports = HashMap::with_capacity(module.types.len());
-
                     module.types.sort_by(|a, b| {
                         a.name()
                             .cmp(b.name())
                             .then(a.module_path().cmp(b.module_path()))
                             .then(a.location().cmp(&b.location()))
                     });
-
-                    for ndt in &module.types {
-                        if let Some(other) = exports.insert(ndt.name().to_string(), ndt.location())
-                        {
-                            return Err(Error::DuplicateTypeName {
-                                types: (ndt.location().into(), other.into()),
-                                name: ndt.name().clone(),
-                            });
-                        }
-
-                        s.push('\n');
-                        s.push_str(&indent);
-
-                        if exporter.jsdoc {
-                            primitives::typedef_internal(s, exporter, types, ndt)?;
-                        } else {
-                            primitives::export_internal(s, exporter, types, ndt)?;
-                        }
-                    }
+                    render_flat_types(s, exporter, types, module.types.iter().copied(), &indent)?;
 
                     // Namespaces
                     export(exporter, types, s, module.children.iter_mut(), depth + 1)?;
@@ -620,26 +587,7 @@ fn render_types(
             s.push_str(&reexports);
         }
         Layout::ModulePrefixedName | Layout::FlatFile => {
-            let mut exports = HashMap::with_capacity(types.len());
-            for ndt in types.into_sorted_iter() {
-                if !ndt.requires_reference(types) {
-                    continue;
-                }
-
-                if let Some(other) = exports.insert(ndt.name().clone(), ndt.location()) {
-                    return Err(Error::DuplicateTypeName {
-                        types: (ndt.location().into(), other.into()),
-                        name: ndt.name().clone(),
-                    });
-                }
-
-                s.push('\n');
-                if exporter.jsdoc {
-                    primitives::typedef_internal(s, exporter, types, &ndt)?;
-                } else {
-                    primitives::export_internal(s, exporter, types, &ndt)?;
-                }
-            }
+            render_flat_types(s, exporter, types, types.into_sorted_iter(), "")?;
         }
         // The types will get their own files
         // So we keep the user types empty for easy downstream detection.
@@ -651,6 +599,42 @@ fn render_types(
     }
 
     Ok(())
+}
+
+// Implementation of `Layout::ModulePrefixedName | Layout::FlatFile`,
+// but is used by `Layout::Namespace` and `Layout::Files`
+fn render_flat_types<'a>(
+    s: &mut String,
+    exporter: &Exporter,
+    types: &TypeCollection,
+    ndts: impl ExactSizeIterator<Item = &'a NamedDataType>,
+    indent: &str,
+) -> Result<HashMap<String, Location<'static>>, Error> {
+    let mut exports = HashMap::with_capacity(ndts.len());
+
+    for ndt in ndts {
+        if !ndt.requires_reference(types) {
+            continue;
+        }
+
+        if let Some(other) = exports.insert(ndt.name().to_string(), ndt.location()) {
+            return Err(Error::DuplicateTypeName {
+                types: (ndt.location().into(), other.into()),
+                name: ndt.name().clone(),
+            });
+        }
+
+        s.push('\n');
+        s.push_str(indent);
+
+        if exporter.jsdoc {
+            primitives::typedef_internal(s, exporter, types, ndt)?;
+        } else {
+            primitives::export_internal(s, exporter, types, ndt)?;
+        }
+    }
+
+    Ok(exports)
 }
 
 /// Collect all TypeScript/JavaScript files in a directory recursively

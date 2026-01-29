@@ -1,4 +1,7 @@
-use std::{collections::HashMap, fmt};
+use std::{
+    collections::{HashMap, hash_map},
+    fmt,
+};
 
 use crate::{
     Type,
@@ -17,6 +20,9 @@ pub struct TypeCollection(
     // `should_export` is a bool which is `true` if *all* references are inlined.
     // This can be used to omit non-references types from the final bindings.
     pub(crate) HashMap<NamedId, Option<(NamedDataType, bool)>>,
+    // The count of non-`None` items in the collection.
+    // We store this to avoid expensive iteration.
+    pub(crate) usize,
 );
 
 impl fmt::Debug for TypeCollection {
@@ -40,7 +46,13 @@ impl TypeCollection {
 
     /// Get the length of the collection.
     pub fn len(&self) -> usize {
-        self.0.iter().filter_map(|(_, ndt)| ndt.as_ref()).count()
+        debug_assert_eq!(
+            self.1,
+            self.0.iter().filter_map(|(_, ndt)| ndt.as_ref()).count(),
+            "TypeCollection count logic mismatch"
+        );
+
+        self.1
     }
 
     /// Check if the collection is empty.
@@ -77,12 +89,13 @@ impl TypeCollection {
     /// The sort order is not necessarily guaranteed to be stable between versions but currently we sort by name.
     ///
     /// This method requires reallocating the map to sort the collection. You should prefer [Self::into_unsorted_iter] if you don't care about the order.
-    pub fn into_sorted_iter(&self) -> impl Iterator<Item = NamedDataType> {
+    pub fn into_sorted_iter(&self) -> impl ExactSizeIterator<Item = &'_ NamedDataType> {
         let mut v = self
             .0
             .iter()
-            .filter_map(|(_, ndt)| ndt.clone().map(|(ndt, _)| ndt))
+            .filter_map(|(_, ndt)| ndt.as_ref().map(|(ndt, _)| ndt))
             .collect::<Vec<_>>();
+        assert_eq!(v.len(), self.1, "TypeCollection count logic mismatch");
         v.sort_by(|a, b| {
             a.name
                 .cmp(&b.name)
@@ -93,10 +106,11 @@ impl TypeCollection {
     }
 
     /// Return the unsorted iterator over the collection.
-    pub fn into_unsorted_iter(&self) -> impl Iterator<Item = &NamedDataType> {
-        self.0
-            .iter()
-            .filter_map(|(_, ndt)| ndt.as_ref().map(|(dt, _)| dt))
+    pub fn into_unsorted_iter(&self) -> impl ExactSizeIterator<Item = &NamedDataType> {
+        UnsortedIter {
+            iter: self.0.iter(),
+            count: self.1,
+        }
     }
 
     /// Return an mutable iterator over the type collection.
@@ -126,3 +140,23 @@ impl TypeCollection {
         self
     }
 }
+
+struct UnsortedIter<'a> {
+    iter: hash_map::Iter<'a, NamedId, Option<(NamedDataType, bool)>>,
+    count: usize,
+}
+
+impl<'a> Iterator for UnsortedIter<'a> {
+    type Item = &'a NamedDataType;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter
+            .find_map(|(_, ndt)| ndt.as_ref().map(|(ndt, _)| ndt))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.count, Some(self.count))
+    }
+}
+
+impl ExactSizeIterator for UnsortedIter<'_> {}
