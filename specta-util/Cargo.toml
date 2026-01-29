@@ -28,5 +28,5 @@ workspace = true
 [dependencies]
 specta = { version = "=2.0.0-rc.22", path = "../specta" }
 specta-macros = { version = "=2.0.0-rc.18", path = "../specta-macros", default-features = false, optional = true }
-serde = { version = "1.0.228", optional = true, default-features = false }
-serde_json = { version = "1.0.145", optional = true, default-features = false, features = ["std"] }
+serde = { version = "1", optional = true, default-features = false }
+serde_json = { version = "1", optional = true, default-features = false, features = ["std"] }
