@@ -17,6 +17,7 @@ pub struct NamedDataType {
     pub(crate) module_path: Cow<'static, str>,
     pub(crate) location: Location<'static>,
     pub(crate) generics: Vec<Generic>,
+    pub(crate) inline: bool,
     pub(crate) inner: DataType,
 }
 
@@ -44,7 +45,11 @@ impl NamedDataType {
         let location = Location::caller().to_owned();
 
         // We have never encountered this type. Start resolving it!
-        if !types.0.contains_key(&id) {
+        if let Some(ndt) = types.0.get(&id) {
+            if let Some(ndt) = ndt {
+                inline = inline || ndt.inline;
+            }
+        } else {
             types.0.insert(id.clone(), None);
             let mut ndt = NamedDataType {
                 id: id.clone(),
@@ -55,6 +60,7 @@ impl NamedDataType {
                 deprecated: None,
                 module_path: Cow::Borrowed(""),
                 generics: vec![],
+                inline,
                 inner: DataType::Primitive(super::Primitive::i8),
             };
             build_ndt(types, &mut ndt);
@@ -69,12 +75,11 @@ impl NamedDataType {
                 // This ensures that we never create a `export type Channel`,
                 // instead the definition gets inlined into each callsite.
                 inline = true;
+                ndt.inline = true;
             }
 
-            types.0.insert(id.clone(), Some((ndt, !inline)));
+            types.0.insert(id.clone(), Some(ndt));
             types.1 += 1;
-        } else if let Some(Some((_, should_export))) = types.0.get_mut(&id) {
-            *should_export = *should_export || !inline;
         }
 
         Reference::Named(NamedReference {
@@ -87,10 +92,7 @@ impl NamedDataType {
     /// Register a runtime named datatype.
     /// This is exposed via [NamedDataTypeBuilder::build].
     #[track_caller]
-    pub(crate) fn register(
-        builder: NamedDataTypeBuilder,
-        types: &mut TypeCollection,
-    ) -> NamedDataType {
+    pub(crate) fn register(builder: NamedDataTypeBuilder, types: &mut TypeCollection) -> Self {
         let location = Location::caller();
 
         let module_path = builder.module_path.unwrap_or_else(|| {
@@ -107,10 +109,11 @@ impl NamedDataType {
             module_path,
             location: location.to_owned(),
             generics: builder.generics,
+            inline: builder.inline,
             inner: builder.inner,
         };
 
-        types.0.insert(ndt.id.clone(), Some((ndt.clone(), false)));
+        types.0.insert(ndt.id.clone(), Some(ndt.clone()));
         types.1 += 1;
         ndt
     }
@@ -118,15 +121,15 @@ impl NamedDataType {
     /// Construct a [Reference] to a [NamedDataType].
     /// This can be included in a `DataType::Reference` within another type.
     ///
-    /// If you want an inlined reference refer to [Reference::inline].
-    pub fn reference(&self, generics: Vec<(Generic, DataType)>) -> Reference {
+    /// Note: `inline` will be ignored if the type is marked as inlined.
+    pub fn reference(&self, generics: Vec<(Generic, DataType)>, inline: bool) -> Reference {
         // TODO: allow generics to be `Cow`
         // TODO: HashMap instead of array for better typesafety??
 
         Reference::Named(NamedReference {
             id: self.id.clone(),
             generics,
-            inline: false,
+            inline: self.inline || inline,
         })
     }
 
@@ -135,15 +138,12 @@ impl NamedDataType {
     /// This if `false` is all [Reference]'s created for the type are inlined,
     /// in that case it doesn't need to be exported because it will never be
     /// referenced.
-    pub fn requires_reference(&self, types: &TypeCollection) -> bool {
-        types
-            .0
-            .get(&self.id)
-            .and_then(|v| v.as_ref().map(|(_, should_export)| *should_export))
-            // `true` being the default might seem weird,
-            // but we don't want false-positives and types that hit this,
-            // will likely fail export due to to `TypeCollection` mismatches.
-            .unwrap_or(true)
+    pub fn requires_reference(&self, _types: &TypeCollection) -> bool {
+        // `TypeCollection` is unused but I wanna keep it for future flexibility.
+
+        // If a type is inlined, all it's references are,
+        // therefor we don't need to export a named version of it.
+        !self.inline
     }
 
     /// The name of the type

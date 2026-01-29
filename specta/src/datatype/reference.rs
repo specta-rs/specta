@@ -31,7 +31,7 @@ impl NamedReference {
     /// This is guaranteed to return a [NamedDataType] if the [TypeCollection] matches,
     /// what was used to get the original [Reference].
     pub fn get<'a>(&self, types: &'a TypeCollection) -> Option<&'a NamedDataType> {
-        types.0.get(&self.id)?.as_ref().map(|(ndt, _)| ndt)
+        types.0.get(&self.id)?.as_ref()
     }
 
     /// Get the generic parameters set on this reference which will be filled in by the [NamedDataType].
@@ -138,12 +138,11 @@ impl Reference {
     }
 
     /// Convert an existing [Reference] into an inlined one.
-    pub fn inline(mut self, types: &mut TypeCollection) -> Reference {
+    ///
+    /// It's not safe to go the other way incase the type is inlined which requires all [Reference]'s to be inlined.
+    pub fn inline(mut self) -> Reference {
         if let Reference::Named(n) = &mut self {
             n.inline = true;
-            if let Some(Some((_, should_export))) = types.0.get_mut(&n.id) {
-                *should_export = true;
-            }
         }
         self
     }
@@ -192,8 +191,8 @@ impl hash::Hash for NamedId {
 impl fmt::Debug for NamedId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            NamedId::Static(p) => write!(f, "s{:p})", *p),
-            NamedId::Dynamic(p) => write!(f, "d{:p})", Arc::as_ptr(p)),
+            NamedId::Static(p) => write!(f, "s{:p}", *p),
+            NamedId::Dynamic(p) => write!(f, "d{:p}", Arc::as_ptr(p)),
         }
     }
 }

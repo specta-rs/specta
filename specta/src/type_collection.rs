@@ -16,10 +16,7 @@ use crate::{
 pub struct TypeCollection(
     // `None` indicates that the entry is a placeholder.
     // It is a reference and we are currently resolving it's definition.
-    //
-    // `should_export` is a bool which is `true` if *all* references are inlined.
-    // This can be used to omit non-references types from the final bindings.
-    pub(crate) HashMap<NamedId, Option<(NamedDataType, bool)>>,
+    pub(crate) HashMap<NamedId, Option<NamedDataType>>,
     // The count of non-`None` items in the collection.
     // We store this to avoid expensive iteration.
     pub(crate) usize,
@@ -62,24 +59,24 @@ impl TypeCollection {
 
     /// Merge types from another collection into this one.
     pub fn merge(&mut self, other: &Self) {
-        for (id, other_value) in &other.0 {
-            if let Some(current_value) = self.0.get(id) {
-                // Type exists in current collection
-                if let (Some((current_ndt, current_export)), Some((_, other_export))) =
-                    (current_value, other_value)
-                {
-                    self.0.insert(
-                        id.clone(),
-                        Some((current_ndt.clone(), *current_export || *other_export)),
-                    );
+        for (id, other) in &other.0 {
+            match self.0.get(id) {
+                // Key doesn't exist - insert from other
+                None => {
+                    if other.is_some() {
+                        self.1 += 1;
+                    }
+                    self.0.insert(id.clone(), other.clone());
                 }
-                // If current has Some and other has None (placeholder), keep current (do nothing)
-                // If current has None (placeholder) and other has Some, fall through to insert below
-                else if current_value.is_none() {
-                    self.0.insert(id.clone(), other_value.clone());
+                // Key exists with Some - keep self (prefer self over other)
+                Some(Some(_)) => {}
+                // Key exists with None, but other has Some - use other (prefer Some over None)
+                Some(None) if other.is_some() => {
+                    self.1 += 1;
+                    self.0.insert(id.clone(), other.clone());
                 }
-            } else {
-                self.0.insert(id.clone(), other_value.clone());
+                // Key exists with None, other also None - do nothing
+                Some(None) => {}
             }
         }
     }
@@ -93,7 +90,7 @@ impl TypeCollection {
         let mut v = self
             .0
             .iter()
-            .filter_map(|(_, ndt)| ndt.as_ref().map(|(ndt, _)| ndt))
+            .filter_map(|(_, ndt)| ndt.as_ref())
             .collect::<Vec<_>>();
         assert_eq!(v.len(), self.1, "TypeCollection count logic mismatch");
         v.sort_by(|a, b| {
@@ -120,8 +117,8 @@ impl TypeCollection {
         F: FnMut(&mut NamedDataType),
     {
         for (_, ndt) in self.0.iter_mut() {
-            if let Some((named_data_type, _)) = ndt {
-                f(named_data_type);
+            if let Some(ndt) = ndt {
+                f(ndt);
             }
         }
     }
@@ -132,9 +129,9 @@ impl TypeCollection {
     where
         F: FnMut(NamedDataType) -> NamedDataType,
     {
-        for (_, ndt) in self.0.iter_mut() {
-            if let Some((named_data_type, should_export)) = ndt.take() {
-                *ndt = Some((f(named_data_type), should_export));
+        for (_, slot) in self.0.iter_mut() {
+            if let Some(ndt) = slot.take() {
+                *slot = Some(f(ndt));
             }
         }
         self
@@ -142,7 +139,7 @@ impl TypeCollection {
 }
 
 struct UnsortedIter<'a> {
-    iter: hash_map::Iter<'a, NamedId, Option<(NamedDataType, bool)>>,
+    iter: hash_map::Iter<'a, NamedId, Option<NamedDataType>>,
     count: usize,
 }
 
@@ -150,8 +147,7 @@ impl<'a> Iterator for UnsortedIter<'a> {
     type Item = &'a NamedDataType;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter
-            .find_map(|(_, ndt)| ndt.as_ref().map(|(ndt, _)| ndt))
+        self.iter.find_map(|(_, ndt)| ndt.as_ref())
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {

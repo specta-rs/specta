@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 //! The plan is to try and move these into the ecosystem for the v2 release.
 use super::macros::*;
 use crate::{Type, TypeCollection, datatype::*};
