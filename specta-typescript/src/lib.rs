@@ -58,7 +58,7 @@ mod types;
 mod typescript;
 
 pub use branded::Branded;
-pub use error::Error;
+pub use error::{Error, TypeOrModuleOrImport};
 pub use exporter::{BigIntExportBehavior, Exporter, FrameworkExporter, Layout};
 pub use jsdoc::JSDoc;
 pub use opaque::define;

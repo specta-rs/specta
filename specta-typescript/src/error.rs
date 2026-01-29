@@ -26,9 +26,13 @@ pub enum Error {
         path: String,
         name: Cow<'static, str>,
     },
-    /// Detected multiple types with the same name.
+    /// Detected multiple items within the same scope with the same name.
+    /// Typescript doesn't support this so we error out.
+    ///
+    /// Using anything other than [Layout::FlatFile] should make this basically impossible.
     DuplicateTypeName {
-        types: (Location<'static>, Location<'static>),
+        // TODO: Flatten tuple into fields.
+        types: (TypeOrModuleOrImport, TypeOrModuleOrImport),
         name: Cow<'static, str>,
     },
     /// An filesystem IO error.
@@ -146,3 +150,17 @@ impl fmt::Display for Error {
 }
 
 impl error::Error for Error {}
+
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum TypeOrModuleOrImport {
+    Type(Location<'static>),
+    Module(Cow<'static, str>),
+    Import(Cow<'static, str>),
+}
+
+impl From<Location<'static>> for TypeOrModuleOrImport {
+    fn from(location: Location<'static>) -> Self {
+        TypeOrModuleOrImport::Type(location)
+    }
+}

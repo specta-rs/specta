@@ -85,6 +85,7 @@ impl NamedDataType {
 
     /// Register a runtime named datatype.
     /// This is exposed via [NamedDataTypeBuilder::build].
+    #[track_caller]
     pub(crate) fn register(
         builder: NamedDataTypeBuilder,
         types: &mut TypeCollection,

@@ -9,11 +9,11 @@ use std::{
 
 use specta::{
     TypeCollection,
-    datatype::{DataType, Generic, NamedDataType, Reference},
+    datatype::{DataType, NamedDataType, Reference},
 };
 use specta_serde::SerdeMode;
 
-use crate::{Error, opaque, primitives};
+use crate::{Error, TypeOrModuleOrImport, primitives};
 
 /// Allows you to configure how Specta's Typescript exporter will deal with BigInt types ([i64], [i128] etc).
 ///
@@ -167,23 +167,9 @@ impl Exporter {
             Cow::Borrowed(types)
         };
 
-        match self.layout {
-            Layout::ModulePrefixedName | Layout::Namespaces => {}
-            Layout::Files => return Err(Error::UnableToExport),
-            Layout::FlatFile => {
-                let mut map = HashMap::with_capacity(types.len());
-                for dt in types.into_unsorted_iter() {
-                    if let Some(existing_dt) = map.insert(dt.name().clone(), dt)
-                        && existing_dt != dt
-                    {
-                        return Err(Error::DuplicateTypeName {
-                            types: (dt.location(), existing_dt.location()),
-                            name: dt.name().clone(),
-                        });
-                    }
-                }
-            }
-        };
+        if let Layout::Files = self.layout {
+            return Err(Error::UnableToExport);
+        }
 
         let mut out = render_file_header(self)?;
 
@@ -252,6 +238,8 @@ impl Exporter {
             files: &mut HashMap<PathBuf, String>,
             depth: usize,
         ) -> Result<(), Error> {
+            let mut exports = HashMap::with_capacity(module.types.len());
+
             module.types.sort_by(|a, b| {
                 a.name()
                     .cmp(b.name())
@@ -259,6 +247,22 @@ impl Exporter {
                     .then(a.location().cmp(&b.location()))
             });
             for ndt in &module.types {
+                // TODO: Make this only restrict the user when `framework` is used.
+                if ndt.name() == "framework" {
+                    return Err(Error::DuplicateTypeName {
+                        types: (
+                            TypeOrModuleOrImport::Import("framework".into()),
+                            ndt.location().into(),
+                        ),
+                        name: ndt.name().clone(),
+                    });
+                } else if let Some(other) = exports.insert(ndt.name().to_string(), ndt.location()) {
+                    return Err(Error::DuplicateTypeName {
+                        types: (ndt.location().into(), other.into()),
+                        name: ndt.name().clone(),
+                    });
+                }
+
                 s.push('\n');
 
                 if exporter.jsdoc {
@@ -270,6 +274,25 @@ impl Exporter {
 
             if !module.children.is_empty() {
                 for name in module.children.keys() {
+                    // TODO: Make this only restrict the user when `framework` is used.
+                    if *name == "framework" {
+                        return Err(Error::DuplicateTypeName {
+                            types: (
+                                TypeOrModuleOrImport::Import("framework".into()),
+                                construct_module(&module.module_path, &name),
+                            ),
+                            name: name.to_string().into(),
+                        });
+                    } else if let Some(other) = exports.get(*name) {
+                        return Err(Error::DuplicateTypeName {
+                            types: (
+                                construct_module(&module.module_path, &name),
+                                (*other).into(),
+                            ),
+                            name: name.to_string().into(),
+                        });
+                    }
+
                     s.push_str("\nimport type * as ");
                     s.push_str(name);
                     s.push_str(" from \"./");
@@ -459,16 +482,20 @@ impl FrameworkExporter<'_> {
     }
 }
 
-#[derive(Default)]
 struct Module<'a> {
     types: Vec<&'a NamedDataType>,
     children: BTreeMap<&'a str, Module<'a>>,
+    module_path: Cow<'static, str>,
 }
 
 fn build_module_graph(types: &TypeCollection) -> Module<'_> {
-    types
-        .into_unsorted_iter()
-        .fold(Module::default(), |mut ns, ndt| {
+    types.into_unsorted_iter().fold(
+        Module {
+            types: Default::default(),
+            children: Default::default(),
+            module_path: Default::default(),
+        },
+        |mut ns, ndt| {
             let path = ndt.module_path();
 
             if path.is_empty() {
@@ -476,14 +503,19 @@ fn build_module_graph(types: &TypeCollection) -> Module<'_> {
             } else {
                 let mut current = &mut ns;
                 for segment in path.split("::") {
-                    current = current.children.entry(segment).or_default();
+                    current = current.children.entry(segment).or_insert_with(|| Module {
+                        types: Default::default(),
+                        children: Default::default(),
+                        module_path: path.clone(),
+                    });
                 }
 
                 current.types.push(ndt);
             }
 
             ns
-        })
+        },
+    )
 }
 
 fn render_file_header(exporter: &Exporter) -> Result<String, Error> {
@@ -512,7 +544,7 @@ fn render_types(
                 exporter: &Exporter,
                 types: &TypeCollection,
                 s: &mut String,
-                module: impl Iterator<Item = (&'a &'a str, &'a mut Module<'a>)>,
+                module: impl ExactSizeIterator<Item = (&'a &'a str, &'a mut Module<'a>)>,
                 depth: usize,
             ) -> Result<(), Error> {
                 let indent = "\t".repeat(depth);
@@ -528,13 +560,24 @@ fn render_types(
                     s.push_str(" {\n");
 
                     // Types
+                    let mut exports = HashMap::with_capacity(module.types.len());
+
                     module.types.sort_by(|a, b| {
                         a.name()
                             .cmp(b.name())
                             .then(a.module_path().cmp(b.module_path()))
                             .then(a.location().cmp(&b.location()))
                     });
+
                     for ndt in &module.types {
+                        if let Some(other) = exports.insert(ndt.name().to_string(), ndt.location())
+                        {
+                            return Err(Error::DuplicateTypeName {
+                                types: (ndt.location().into(), other.into()),
+                                name: ndt.name().clone(),
+                            });
+                        }
+
                         s.push('\n');
                         s.push_str(&indent);
 
@@ -577,9 +620,17 @@ fn render_types(
             s.push_str(&reexports);
         }
         Layout::ModulePrefixedName | Layout::FlatFile => {
+            let mut exports = HashMap::with_capacity(types.len());
             for ndt in types.into_sorted_iter() {
                 if !ndt.requires_reference(types) {
                     continue;
+                }
+
+                if let Some(other) = exports.insert(ndt.name().clone(), ndt.location()) {
+                    return Err(Error::DuplicateTypeName {
+                        types: (ndt.location().into(), other.into()),
+                        name: ndt.name().clone(),
+                    });
                 }
 
                 s.push('\n');
@@ -643,4 +694,15 @@ fn cleanup_stale_files(root: &Path, current_files: &HashMap<PathBuf, String>) ->
         .try_for_each(|path| std::fs::remove_file(&path).map_err(Error::from))?;
     remove_empty_dirs(root, root).ok(); // Ignore errors for directory cleanup
     Ok(())
+}
+
+fn construct_module(path: &str, ident: &str) -> TypeOrModuleOrImport {
+    TypeOrModuleOrImport::Module(
+        if path.is_empty() {
+            format!("::{ident}")
+        } else {
+            format!("{path}::{ident}")
+        }
+        .into(),
+    )
 }
