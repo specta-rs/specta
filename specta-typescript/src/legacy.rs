@@ -350,7 +350,7 @@ pub(crate) fn struct_datatype(
             // }
 
             if !unflattened_fields.is_empty() {
-                let mut s = "{ ".to_string();
+                let mut s = "{".to_string();
 
                 for field in unflattened_fields {
                     // TODO: Inline or not for newline?

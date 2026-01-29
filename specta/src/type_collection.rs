@@ -13,7 +13,10 @@ use crate::{
 pub struct TypeCollection(
     // `None` indicates that the entry is a placeholder.
     // It is a reference and we are currently resolving it's definition.
-    pub(crate) HashMap<NamedId, Option<NamedDataType>>,
+    //
+    // `should_export` is a bool which is `true` if *all* references are inlined.
+    // This can be used to omit non-references types from the final bindings.
+    pub(crate) HashMap<NamedId, Option<(NamedDataType, bool)>>,
 );
 
 impl fmt::Debug for TypeCollection {
@@ -54,7 +57,7 @@ impl TypeCollection {
         let mut v = self
             .0
             .iter()
-            .filter_map(|(_, ndt)| ndt.clone())
+            .filter_map(|(_, ndt)| ndt.clone().map(|(ndt, _)| ndt))
             .collect::<Vec<_>>();
         v.sort_by(|a, b| {
             a.name
@@ -67,7 +70,22 @@ impl TypeCollection {
 
     /// Return the unsorted iterator over the collection.
     pub fn into_unsorted_iter(&self) -> impl Iterator<Item = &NamedDataType> {
-        self.0.iter().filter_map(|(_, ndt)| ndt.as_ref())
+        self.0
+            .iter()
+            .filter_map(|(_, ndt)| ndt.as_ref().map(|(dt, _)| dt))
+    }
+
+    /// Return an mutable iterator over the type collection.
+    /// Note: The order returned is unsorted.
+    pub fn iter_mut<F>(&mut self, mut f: F)
+    where
+        F: FnMut(&mut NamedDataType),
+    {
+        for (_, ndt) in self.0.iter_mut() {
+            if let Some((named_data_type, _)) = ndt {
+                f(named_data_type);
+            }
+        }
     }
 
     /// Map over the collection, transforming each `NamedDataType` with the given closure.
@@ -77,8 +95,8 @@ impl TypeCollection {
         F: FnMut(NamedDataType) -> NamedDataType,
     {
         for (_, ndt) in self.0.iter_mut() {
-            if let Some(named_data_type) = ndt.take() {
-                *ndt = Some(f(named_data_type));
+            if let Some((named_data_type, should_export)) = ndt.take() {
+                *ndt = Some((f(named_data_type), should_export));
             }
         }
         self

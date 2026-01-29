@@ -7,10 +7,13 @@ use std::{
     sync::Arc,
 };
 
-use specta::{TypeCollection, datatype::NamedDataType};
+use specta::{
+    TypeCollection,
+    datatype::{DataType, Generic, NamedDataType, Reference},
+};
 use specta_serde::SerdeMode;
 
-use crate::{Error, primitives};
+use crate::{Error, opaque, primitives};
 
 /// Allows you to configure how Specta's Typescript exporter will deal with BigInt types ([i64], [i128] etc).
 ///
@@ -278,14 +281,14 @@ impl Exporter {
                     s.push_str("\";");
                 }
 
-                s.push_str("\n\nexport { ");
+                s.push_str("\n\nexport type { ");
                 for (i, name) in module.children.keys().enumerate() {
                     if i != 0 {
                         s.push_str(", ");
                     }
                     s.push_str(name);
                 }
-                s.push_str(" };");
+                s.push_str(" };\n");
             }
 
             for (name, module) in &mut module.children {
@@ -355,12 +358,13 @@ impl Exporter {
                     // Framework runtime
                     out.push('\n');
                     out.push_str(&runtime);
-                    if !runtime.is_empty() {
-                        out += "\n";
-                    }
 
                     // User types (if not included in framework runtime)
                     if !has_manually_exported_user_types {
+                        if !runtime.is_empty() {
+                            out += "\n";
+                        }
+
                         render_types(&mut out, self, &types, "")?;
                     }
 
@@ -380,7 +384,7 @@ impl Exporter {
             std::fs::write(path, content)?;
         }
 
-        cleanup_stale_files(path, &files, if self.jsdoc { "js" } else { "ts" })?;
+        cleanup_stale_files(path, &files)?;
 
         Ok(())
     }
@@ -432,17 +436,31 @@ impl FrameworkExporter<'_> {
     ///
     /// This will only work if used within [Self::framework_runtime] function.
     /// It allows frameworks to intersperse their user types into their runtime code.
-    pub fn render_types(&mut self, types: &TypeCollection) -> Result<Cow<'static, str>, Error> {
+    pub fn render_types(&mut self) -> Result<Cow<'static, str>, Error> {
         let mut s = String::new();
-        render_types(&mut s, self.exporter, types, self.files_root_types)?;
+        render_types(&mut s, self.exporter, self.types, self.files_root_types)?;
         *self.has_manually_exported_user_types = true;
         Ok(Cow::Owned(s))
+    }
+
+    /// [primitives::export]
+    pub fn export(&self, ndt: &NamedDataType) -> Result<String, Error> {
+        primitives::export(self, self.types, ndt)
+    }
+
+    /// [primitives::inline]
+    pub fn inline(&self, dt: &DataType) -> Result<String, Error> {
+        primitives::inline(self, self.types, dt)
+    }
+
+    /// [primitives::reference]
+    pub fn reference(&self, r: &Reference) -> Result<String, Error> {
+        primitives::reference(self, self.types, r)
     }
 }
 
 #[derive(Default)]
 struct Module<'a> {
-    // path: String,
     types: Vec<&'a NamedDataType>,
     children: BTreeMap<&'a str, Module<'a>>,
 }
@@ -560,8 +578,11 @@ fn render_types(
         }
         Layout::ModulePrefixedName | Layout::FlatFile => {
             for ndt in types.into_sorted_iter() {
-                s.push('\n');
+                if !ndt.requires_reference(types) {
+                    continue;
+                }
 
+                s.push('\n');
                 if exporter.jsdoc {
                     primitives::typedef_internal(s, exporter, types, &ndt)?;
                 } else {
@@ -582,10 +603,7 @@ fn render_types(
 }
 
 /// Collect all TypeScript/JavaScript files in a directory recursively
-fn collect_existing_files(
-    root: &Path,
-    extension: &str,
-) -> Result<HashSet<PathBuf>, std::io::Error> {
+fn collect_existing_files(root: &Path) -> Result<HashSet<PathBuf>, std::io::Error> {
     if !root.exists() {
         return Ok(HashSet::new());
     }
@@ -595,8 +613,8 @@ fn collect_existing_files(
         .flat_map(|entry| {
             let path = entry.path();
             if path.is_dir() {
-                collect_existing_files(&path, extension).unwrap_or_default()
-            } else if path.extension().and_then(|e| e.to_str()) == Some(extension) {
+                collect_existing_files(&path).unwrap_or_default()
+            } else if matches!(path.extension().and_then(|e| e.to_str()), Some("ts" | "js")) {
                 HashSet::from([path])
             } else {
                 HashSet::new()
@@ -618,12 +636,8 @@ fn remove_empty_dirs(path: &Path, root: &Path) -> Result<(), std::io::Error> {
 }
 
 /// Delete stale files and clean up empty directories
-fn cleanup_stale_files(
-    root: &Path,
-    current_files: &HashMap<PathBuf, String>,
-    extension: &str,
-) -> Result<(), Error> {
-    collect_existing_files(root, extension)?
+fn cleanup_stale_files(root: &Path, current_files: &HashMap<PathBuf, String>) -> Result<(), Error> {
+    collect_existing_files(root)?
         .into_iter()
         .filter(|path| !current_files.contains_key(path))
         .try_for_each(|path| std::fs::remove_file(&path).map_err(Error::from))?;

@@ -1,10 +1,16 @@
-use std::{borrow::Cow, panic::Location, sync::Arc};
+use std::{
+    borrow::Cow,
+    convert::Infallible,
+    panic::Location,
+    sync::{Arc, atomic::AtomicBool},
+};
 
 use crate::{
-    TypeCollection,
+    Type, TypeCollection,
     datatype::{
         DataType, Generic, NamedDataTypeBuilder, NamedReference, Reference, reference::NamedId,
     },
+    r#type,
 };
 
 /// A named type represents a non-primitive type capable of being exported as it's own named entity.
@@ -35,7 +41,7 @@ impl NamedDataType {
     #[track_caller]
     pub fn init_with_sentinel(
         generics: Vec<(Generic, DataType)>,
-        inline: bool,
+        mut inline: bool,
         types: &mut TypeCollection,
         sentinel: &'static (),
         build_ndt: fn(&mut TypeCollection, &mut NamedDataType),
@@ -58,7 +64,22 @@ impl NamedDataType {
                 inner: DataType::Primitive(super::Primitive::i8),
             };
             build_ndt(types, &mut ndt);
-            types.0.insert(id.clone(), Some(ndt));
+
+            // We patch the Tauri `Type` implementation.
+            // TODO: Can we upstream these without backwards compatibility issues???
+            if ndt.name() == "TAURI_CHANNEL" && ndt.module_path().starts_with("tauri::") {
+                // This produces `never`.
+                // It's expected a framework replaces this with it's own setup.
+                ndt.inner = Infallible::definition(types);
+
+                // This ensures that we never create a `export type Channel`,
+                // instead the definition gets inlined into each callsite.
+                inline = true;
+            }
+
+            types.0.insert(id.clone(), Some((ndt, !inline)));
+        } else if let Some(Some((_, should_export))) = types.0.get_mut(&id) {
+            *should_export = *should_export || !inline;
         }
 
         Reference::Named(NamedReference {
@@ -82,7 +103,7 @@ impl NamedDataType {
                 .unwrap_or(Cow::Borrowed("virtual"))
         });
 
-        let ndt = NamedDataType {
+        let ndt = Self {
             id: NamedId::Dynamic(Arc::new(())),
             name: builder.name,
             docs: builder.docs,
@@ -93,19 +114,39 @@ impl NamedDataType {
             inner: builder.inner,
         };
 
-        types.0.insert(ndt.id.clone(), Some(ndt.clone()));
+        types.0.insert(ndt.id.clone(), Some((ndt.clone(), false)));
         ndt
     }
 
-    /// TODO
-    // TODO: Problematic to seal + allow generics to be `Cow`
-    // TODO: HashMap instead of array for better typesafety??
-    pub fn reference(&self, generics: Vec<(Generic, DataType)>, inline: bool) -> Reference {
+    /// Construct a [Reference] to a [NamedDataType].
+    /// This can be included in a `DataType::Reference` within another type.
+    ///
+    /// If you want an inlined reference refer to [Reference::inline].
+    pub fn reference(&self, generics: Vec<(Generic, DataType)>) -> Reference {
+        // TODO: allow generics to be `Cow`
+        // TODO: HashMap instead of array for better typesafety??
+
         Reference::Named(NamedReference {
             id: self.id.clone(),
             generics,
-            inline,
+            inline: false,
         })
+    }
+
+    /// Check whether a type requires a reference to be generated.
+    ///
+    /// This if `false` is all [Reference]'s created for the type are inlined,
+    /// in that case it doesn't need to be exported because it will never be
+    /// referenced.
+    pub fn requires_reference(&self, types: &TypeCollection) -> bool {
+        types
+            .0
+            .get(&self.id)
+            .and_then(|v| v.as_ref().map(|(_, should_export)| *should_export))
+            // `true` being the default might seem weird,
+            // but we don't want false-positives and types that hit this,
+            // will likely fail export due to to `TypeCollection` mismatches.
+            .unwrap_or(true)
     }
 
     /// The name of the type

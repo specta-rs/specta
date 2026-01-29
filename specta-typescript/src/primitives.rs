@@ -4,8 +4,6 @@
 
 use std::{
     borrow::{Borrow, Cow},
-    cell::RefCell,
-    collections::HashSet,
     fmt::Write as _,
     iter,
 };
@@ -19,7 +17,9 @@ use specta::{
 };
 
 use crate::{
-    BigIntExportBehavior, Branded, Error, Exporter, Layout, define::Define, legacy::js_doc,
+    BigIntExportBehavior, Branded, Error, Exporter, Layout,
+    legacy::js_doc,
+    opaque::{self, Define},
 };
 
 /// Generate an `export Type = ...` Typescript string for a specific [`NamedDataType`].
@@ -1068,8 +1068,17 @@ fn reference_opaque_dt(
     types: &TypeCollection,
     r: &OpaqueReference,
 ) -> Result<(), Error> {
-    if let Some(def) = r.downcast_ref::<Define>() {
+    if let Some(def) = r.downcast_ref::<opaque::Define>() {
         s.push_str(&def.0);
+        return Ok(());
+    } else if r.downcast_ref::<opaque::Any>().is_some() {
+        s.push_str("any");
+        return Ok(());
+    } else if r.downcast_ref::<opaque::Unknown>().is_some() {
+        s.push_str("unknown");
+        return Ok(());
+    } else if r.downcast_ref::<opaque::Never>().is_some() {
+        s.push_str("never");
         return Ok(());
     } else if let Some(def) = r.downcast_ref::<Branded>() {
         // TODO: Build onto `s` instead of appending a separate string

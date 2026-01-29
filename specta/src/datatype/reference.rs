@@ -31,7 +31,7 @@ impl NamedReference {
     /// This is guaranteed to return a [NamedDataType] if the [TypeCollection] matches,
     /// what was used to get the original [Reference].
     pub fn get<'a>(&self, types: &'a TypeCollection) -> Option<&'a NamedDataType> {
-        types.0.get(&self.id)?.as_ref()
+        types.0.get(&self.id)?.as_ref().map(|(ndt, _)| ndt)
     }
 
     /// Get the generic parameters set on this reference which will be filled in by the [NamedDataType].
@@ -135,6 +135,17 @@ impl Reference {
             (Reference::Opaque(a), Reference::Opaque(b)) => *a == *b,
             _ => false,
         }
+    }
+
+    /// Convert an existing [Reference] into an inlined one.
+    pub fn inline(mut self, types: &mut TypeCollection) -> Reference {
+        if let Reference::Named(n) = &mut self {
+            n.inline = true;
+            if let Some(Some((_, should_export))) = types.0.get_mut(&n.id) {
+                *should_export = true;
+            }
+        }
+        self
     }
 }
 

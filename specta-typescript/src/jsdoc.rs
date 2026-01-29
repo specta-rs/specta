@@ -12,7 +12,9 @@ pub struct JSDoc(Exporter);
 
 impl Default for JSDoc {
     fn default() -> Self {
-        Exporter::default().into()
+        let mut exporter = Exporter::default();
+        exporter.jsdoc = true;
+        exporter.into()
     }
 }
 
@@ -24,7 +26,7 @@ impl From<JSDoc> for Exporter {
 
 impl From<Exporter> for JSDoc {
     fn from(mut value: Exporter) -> Self {
-        value.jsdoc = false;
+        value.jsdoc = true;
         Self(value)
     }
 }
