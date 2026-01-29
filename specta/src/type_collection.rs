@@ -48,6 +48,30 @@ impl TypeCollection {
         self.0.is_empty()
     }
 
+    /// Merge types from another collection into this one.
+    pub fn merge(&mut self, other: &Self) {
+        for (id, other_value) in &other.0 {
+            if let Some(current_value) = self.0.get(id) {
+                // Type exists in current collection
+                if let (Some((current_ndt, current_export)), Some((_, other_export))) =
+                    (current_value, other_value)
+                {
+                    self.0.insert(
+                        id.clone(),
+                        Some((current_ndt.clone(), *current_export || *other_export)),
+                    );
+                }
+                // If current has Some and other has None (placeholder), keep current (do nothing)
+                // If current has None (placeholder) and other has Some, fall through to insert below
+                else if current_value.is_none() {
+                    self.0.insert(id.clone(), other_value.clone());
+                }
+            } else {
+                self.0.insert(id.clone(), other_value.clone());
+            }
+        }
+    }
+
     /// Sort the collection into a consistent order and return an iterator.
     ///
     /// The sort order is not necessarily guaranteed to be stable between versions but currently we sort by name.

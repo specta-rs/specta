@@ -16,11 +16,7 @@ use specta::{
     },
 };
 
-use crate::{
-    BigIntExportBehavior, Branded, Error, Exporter, Layout,
-    legacy::js_doc,
-    opaque::{self, Define},
-};
+use crate::{BigIntExportBehavior, Branded, Error, Exporter, Layout, legacy::js_doc, opaque};
 
 /// Generate an `export Type = ...` Typescript string for a specific [`NamedDataType`].
 ///
