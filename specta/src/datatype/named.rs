@@ -1,16 +1,10 @@
-use std::{
-    borrow::Cow,
-    convert::Infallible,
-    panic::Location,
-    sync::{Arc, atomic::AtomicBool},
-};
+use std::{borrow::Cow, convert::Infallible, panic::Location, sync::Arc};
 
 use crate::{
     Type, TypeCollection,
     datatype::{
         DataType, Generic, NamedDataTypeBuilder, NamedReference, Reference, reference::NamedId,
     },
-    r#type,
 };
 
 /// A named type represents a non-primitive type capable of being exported as it's own named entity.

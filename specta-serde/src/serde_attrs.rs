@@ -410,17 +410,25 @@ impl SerdeTransformer {
 
     /// Handle transparent structs
     fn handle_transparent_struct(&mut self, struct_type: &Struct) -> Result<DataType, Error> {
+        use specta::datatype::{skip_fields, skip_fields_named};
+
         match struct_type.fields() {
-            Fields::Unnamed(unnamed) if unnamed.fields().len() == 1 => {
-                if let Some(field_ty) = unnamed.fields()[0].ty() {
-                    self.transform_datatype(field_ty)
+            Fields::Unnamed(unnamed) => {
+                // Collect non-skipped fields
+                let non_skipped: Vec<_> = skip_fields(unnamed.fields()).collect();
+                
+                if non_skipped.len() == 1 {
+                    self.transform_datatype(non_skipped[0].1)
                 } else {
                     Err(Error::InvalidUsageOfSkip)
                 }
             }
-            Fields::Named(named) if named.fields().len() == 1 => {
-                if let Some(field_ty) = named.fields()[0].1.ty() {
-                    self.transform_datatype(field_ty)
+            Fields::Named(named) => {
+                // Collect non-skipped fields
+                let non_skipped: Vec<_> = skip_fields_named(named.fields()).collect();
+                
+                if non_skipped.len() == 1 {
+                    self.transform_datatype(non_skipped[0].1.1)
                 } else {
                     Err(Error::InvalidUsageOfSkip)
                 }

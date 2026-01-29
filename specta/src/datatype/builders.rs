@@ -8,7 +8,7 @@ use crate::{
     TypeCollection,
     datatype::{
         DataType, DeprecatedType, EnumVariant, Field, Fields, Generic, NamedDataType, NamedFields,
-        Reference, RuntimeAttribute, Struct, UnnamedFields,
+        RuntimeAttribute, Struct, UnnamedFields,
     },
 };
 
