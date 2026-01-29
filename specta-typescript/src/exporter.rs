@@ -238,7 +238,7 @@ impl Exporter {
             parent_name: &str,
             files: &mut HashMap<PathBuf, String>,
             depth: usize,
-        ) -> Result<(), Error> {
+        ) -> Result<bool, Error> {
             // Types
             // for ndt in &module.types {
             //     // TODO: Make this only restrict the user when `framework` exists (Eg. whenever a reference exists in the current file).
@@ -302,6 +302,12 @@ impl Exporter {
             }
 
             for (name, module) in &mut module.children {
+                // This doesn't account for `NamedDataType::requires_reference`
+                // but we keep it for performance.
+                if module.types.is_empty() && module.children.is_empty() {
+                    continue;
+                }
+
                 let mut path = path.join(name);
                 let mut out = render_file_header(exporter)?;
 
@@ -316,7 +322,7 @@ impl Exporter {
                 }
                 out.push_str("index\";\n");
 
-                export(
+                let has_types = export(
                     exporter,
                     types,
                     module,
@@ -326,11 +332,13 @@ impl Exporter {
                     files,
                     depth + 1,
                 )?;
-                path.set_extension(if exporter.jsdoc { "js" } else { "ts" });
-                files.insert(path, out);
+                if has_types {
+                    path.set_extension(if exporter.jsdoc { "js" } else { "ts" });
+                    files.insert(path, out);
+                }
             }
 
-            Ok(())
+            Ok(!(exports.is_empty() && module.children.is_empty()))
         }
 
         let mut files = HashMap::new();

@@ -121,15 +121,15 @@ impl NamedDataType {
     /// Construct a [Reference] to a [NamedDataType].
     /// This can be included in a `DataType::Reference` within another type.
     ///
-    /// Note: `inline` will be ignored if the type is marked as inlined.
-    pub fn reference(&self, generics: Vec<(Generic, DataType)>, inline: bool) -> Reference {
+    /// This reference will be inlined if the type is inlined, otherwise you can inline it with [Reference::inline].
+    pub fn reference(&self, generics: Vec<(Generic, DataType)>) -> Reference {
         // TODO: allow generics to be `Cow`
         // TODO: HashMap instead of array for better typesafety??
 
         Reference::Named(NamedReference {
             id: self.id.clone(),
             generics,
-            inline: self.inline || inline,
+            inline: self.inline,
         })
     }
 
