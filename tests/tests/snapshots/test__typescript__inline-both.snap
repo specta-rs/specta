@@ -18,11 +18,11 @@ f32: number
 f64: number
 bool: boolean
 char: string
-Range<i32>: { 
+Range<i32>: {
 	start: number,
 	end: number,
 }
-RangeInclusive<i32>: { 
+RangeInclusive<i32>: {
 	start: number,
 	end: number,
 }
@@ -42,11 +42,11 @@ SocketAddrV4: string
 SocketAddrV6: string
 Cow<'static, str>: string
 Cow<'static, i32>: number
-SystemTime: { 
+SystemTime: {
 	duration_since_epoch: number,
 	duration_since_unix_epoch: number,
 }
-Duration: { 
+Duration: {
 	secs: number,
 	nanos: number,
 }
@@ -81,7 +81,7 @@ Unit4: null
 Unit5: "A"
 Unit6: { A: [] }
 Unit7: { A: Record<string, never> }
-SimpleStruct: { 
+SimpleStruct: {
 	a: number,
 	b: string,
 	c: [number, string, number],
@@ -92,26 +92,26 @@ TupleStruct1: number
 TupleStruct3: [number, boolean, string]
 TestEnum: "Unit" | { Single: number } | { Multiple: [number, number] } | { Struct: { a: number } }
 RefStruct: TestEnum
-InlinerStruct: { 
+InlinerStruct: {
 	inline_this: InlineStruct,
 	dont_inline_this: RefStruct,
 }
-GenericStruct<i32>: { 
+GenericStruct<i32>: {
 	arg: T,
 }
-GenericStruct<String>: { 
+GenericStruct<String>: {
 	arg: T,
 }
-FlattenEnumStruct: (FlattenEnum) & { 
+FlattenEnumStruct: (FlattenEnum) & {
 	outer: string,
 }
-OverridenStruct: { 
+OverridenStruct: {
 	overriden_field: string,
 }
 HasGenericAlias: { [key in number]: string }
 EnumMacroAttributes: { A: string } | { B: number } | { C: number } | { D: { a: string; b: number } }
 InlineEnumField: { A: PlaceholderInnerField }
-InlineOptionalType: { 
+InlineOptionalType: {
 	optional_field: PlaceholderInnerField | null,
 }
 Rename: "OneWord" | "TwoWords"
@@ -123,10 +123,10 @@ HashMap<BasicEnum, ()>: Partial<{ [key in BasicEnum]: null }>
 Option<Option<Option<Option<i32>>>>: number | null
 Vec<PlaceholderInnerField>: PlaceholderInnerField[]
 HashMap<BasicEnum, i32>: Partial<{ [key in BasicEnum]: number }>
-EnumReferenceRecordKey: { 
+EnumReferenceRecordKey: {
 	a: Partial<{ [key in BasicEnum]: number }>,
 }
-FlattenOnNestedEnum: (NestedEnum) & { 
+FlattenOnNestedEnum: (NestedEnum) & {
 	id: string,
 }
 MyEmptyInput: Record<string, never>
@@ -135,69 +135,69 @@ MyEmptyInput: Record<string, never>
 ExtraBracketsInTupleVariant: { A: string }
 ExtraBracketsInUnnamedStruct: string
 Vec<MyEnum>: MyEnum[]
-InlineTuple: { 
+InlineTuple: {
 	demo: [string, boolean],
 }
-InlineTuple2: { 
+InlineTuple2: {
 	demo: [InlineTuple, boolean],
 }
 Box<str>: string
 Box<String>: string
 SkippedFieldWithinVariant: never | string
-KebabCase: { 
+KebabCase: {
 	test_ing: string,
 }
 &[&str]: string[]
-Issue281<'_>: { 
+Issue281<'_>: {
 	default_unity_arguments: string[],
 }
-RenameWithWeirdCharsField: { 
+RenameWithWeirdCharsField: {
 	odata_context: string,
 }
 RenameWithWeirdCharsVariant: { A: string }
-Issue374: { 
+Issue374: {
 	foo: boolean,
 	bar: boolean,
 }
 type_type::Type: never
-ActualType: { 
+ActualType: {
 	a: GenericType<string>,
 }
-SpectaTypeOverride: { 
+SpectaTypeOverride: {
 	string_ident: string,
 	u32_ident: number,
 	path: string,
 }
-InvalidToValidType: { 
+InvalidToValidType: {
 	cause: null | null,
 }
 TupleStruct: string
 TupleStructWithRep: string
 GenericTupleStruct<String>: T
 BracedStruct: string
-StructRenameAllUppercase: { 
+StructRenameAllUppercase: {
 	a: number,
 	b: number,
 }
-RenameSerdeSpecialChar: { 
+RenameSerdeSpecialChar: {
 	b: number,
 }
 EnumRenameAllUppercase: "HelloWorld" | "VariantB" | "TestingWords"
-Recursive: { 
+Recursive: {
 	demo: Recursive,
 }
-RecursiveMapValue: { 
+RecursiveMapValue: {
 	demo: { [key in string]: RecursiveMapValue },
 }
 RecursiveTransparent: RecursiveInline
 RecursiveInEnum: { A: (RecursiveInEnum) }
 NonOptional: string | null
 OptionalOnNamedField: string | null
-OptionalOnTransparentNamedField: { 
+OptionalOnTransparentNamedField: {
 	b: string | null,
 }
 OptionalInEnum: { A: string | null } | { B: { a: string | null } } | { C: { a?: string | null } }
-Optional: { 
+Optional: {
 	a: number | null,
 	b?: number | null,
 	c: string | null,
@@ -212,20 +212,20 @@ HashMap<UnitVariants, ()>: Partial<{ [key in UnitVariants]: null }>
 HashMap<UntaggedVariantsKey, ()>: Partial<{ [key in UntaggedVariantsKey]: null }>
 HashMap<Variants, ()>: Partial<{ [key in Variants]: null }>
 MacroStruct: string
-MacroStruct2: { 
+MacroStruct2: {
 	demo: string,
 }
 MacroEnum: { Demo: string } | { Demo2: { demo2: string } }
-DeprecatedType: { 
+DeprecatedType: {
 	a: number,
 }
-DeprecatedTypeWithMsg: { 
+DeprecatedTypeWithMsg: {
 	a: number,
 }
-DeprecatedTypeWithMsg2: { 
+DeprecatedTypeWithMsg2: {
 	a: number,
 }
-DeprecatedFields: { 
+DeprecatedFields: {
 	a: number,
 	b: string,
 	c: string,
@@ -233,80 +233,80 @@ DeprecatedFields: {
 }
 DeprecatedTupleVariant: [string, string, number]
 DeprecatedEnumVariants: "A" | "B" | "C"
-CommentedStruct: { 
+CommentedStruct: {
 	a: number,
 }
 CommentedEnum: { A: number } | { B: { a: number } }
 SingleLineComment: { A: number } | { B: { a: number } }
-NonGeneric: { 
+NonGeneric: {
 	a: A,
 	b: B,
 }
-HalfGenericA<u8>: { 
+HalfGenericA<u8>: {
 	a: A,
 	b: B,
 }
-HalfGenericB<bool>: { 
+HalfGenericB<bool>: {
 	a: A,
 	b: B,
 }
-FullGeneric<u8, bool>: { 
+FullGeneric<u8, bool>: {
 	a: A,
 	b: B,
 }
-Another<bool>: { 
+Another<bool>: {
 	a: A,
 	b: B,
 }
 MapA<u32>: { [key in string]: number }
 MapB<u32>: { [key in number]: string }
 MapC<u32>: { [key in string]: AGenericStruct<number> }
-AGenericStruct<u32>: { 
+AGenericStruct<u32>: {
 	field: Demo<T, boolean>,
 }
-A: { 
+A: {
 	a: B,
 	b: B,
 	c: B,
 	d: D,
 	e: GenericFlattened<number>,
 }
-DoubleFlattened: { 
+DoubleFlattened: {
 	a: ToBeFlattened,
 	b: ToBeFlattened,
 }
-FlattenedInner: { 
+FlattenedInner: {
 	c: Inner,
 }
-BoxFlattened: { 
+BoxFlattened: {
 	b: BoxedInner,
 }
-BoxInline: { 
+BoxInline: {
 	c: BoxedInner,
 }
-First: { 
+First: {
 	a: string,
 }
-Second: { 
+Second: {
 	a: number,
 }
-Third: (First) & { 
+Third: (First) & {
 	b: { [key in string]: string },
 	c: First,
 }
-Fourth: { 
+Fourth: {
 	a: First,
 	b: First,
 }
-TagOnStructWithInline: { 
+TagOnStructWithInline: {
 	a: First,
 	b: First,
 }
-Sixth: { 
+Sixth: {
 	a: First,
 	b: First,
 }
-Seventh: { 
+Seventh: {
 	a: First,
 	b: Second,
 }
@@ -318,7 +318,7 @@ MyEnumAdjacent: (First)
 MyEnumUntagged: (First)
 EmptyStruct: Record<string, never>
 EmptyStructWithTag: Record<string, never>
-AdjacentlyTagged: {} | { id: string; method: string } | string
+AdjacentlyTagged: Brother | { id: string; method: string } | string
 LoadProjectEvent: { project_name: string } | { project_name: string; status: string; progress: number } | { project_name: string }
 ExternallyTagged: "A" | { B: { id: string; method: string } } | { C: string }
 InternallyTaggedB: string
@@ -331,13 +331,13 @@ InternallyTaggedH: InternallyTaggedHInner
 InternallyTaggedI: InternallyTaggedIInner
 InternallyTaggedL: InternallyTaggedLInner
 InternallyTaggedM: InternallyTaggedMInner
-StructWithAlias: { 
+StructWithAlias: {
 	field: string,
 }
-StructWithMultipleAliases: { 
+StructWithMultipleAliases: {
 	field: string,
 }
-StructWithAliasAndRename: { 
+StructWithAliasAndRename: {
 	field: string,
 }
 EnumWithVariantAlias: "Variant" | "Other"
@@ -356,7 +356,7 @@ TaggedEnumOfEmptyTupleStruct: EmptyTupleStruct
 TaggedEnumOfEmptyTupleBracedStructs: EmptyBracedStruct
 TaggedStructOfStructWithTuple: TupleStructWithTuple
 SkipOnlyField: Record<string, never>
-SkipField: { 
+SkipField: {
 	b: number,
 }
 SkipOnlyVariantExternallyTagged: never
@@ -371,52 +371,52 @@ TransparentWithSkip2: string
 TransparentWithSkip3: string
 SkipVariant2: string
 SkipVariant3: { A: { a: string } }
-SkipStructFields: { 
+SkipStructFields: {
 	a: number,
 }
-SpectaSkipNonTypeField: { 
+SpectaSkipNonTypeField: {
 	a: number,
 }
-FlattenA: { 
+FlattenA: {
 	a: number,
 	b: number,
 }
-FlattenB: (FlattenA) & { 
+FlattenB: (FlattenA) & {
 	c: number,
 }
-FlattenC: (FlattenA) & { 
+FlattenC: (FlattenA) & {
 	c: number,
 }
-FlattenD: { 
+FlattenD: {
 	a: FlattenA,
 	c: number,
 }
-FlattenE: { 
+FlattenE: {
 	b: FlattenB,
 	d: number,
 }
-FlattenF: { 
+FlattenF: {
 	b: FlattenB,
 	d: number,
 }
-FlattenG: { 
+FlattenG: {
 	b: FlattenB,
 	d: number,
 }
 TupleNested: [number[], [number[], number[]], [number[], number[], number[]]]
-Generic1<()>: { 
+Generic1<()>: {
 	value: T,
 	values: T[],
 }
-GenericAutoBound<()>: { 
+GenericAutoBound<()>: {
 	value: T,
 	values: T[],
 }
-GenericAutoBound2<()>: { 
+GenericAutoBound2<()>: {
 	value: T,
 	values: T[],
 }
-Container1: { 
+Container1: {
 	foo: Generic1<number>,
 	bar: Generic1<number>[],
 	baz: { [key in string]: Generic1<string> },
@@ -424,7 +424,7 @@ Container1: {
 Generic2<(), String, i32>: { A: A } | { B: [B, B, B] } | { C: C[] } | { D: A[][][] } | { E: { a: A; b: B; c: C } } | { X: number[] } | { Y: number } | { Z: number[][] }
 GenericNewType1<()>: T[][]
 GenericTuple<()>: [T, T[], T[][]]
-GenericStruct2<()>: { 
+GenericStruct2<()>: {
 	a: T,
 	b: [T, T],
 	c: [T, [T, T]],
@@ -434,13 +434,13 @@ GenericStruct2<()>: {
 	g: T[][],
 	h: ([([T, T]), ([T, T]), ([T, T])])[],
 }
-InlineFlattenGenericsG<()>: { 
+InlineFlattenGenericsG<()>: {
 	t: T,
 }
-InlineFlattenGenerics: (InlineFlattenGenericsG<string>) & { 
+InlineFlattenGenerics: (InlineFlattenGenericsG<string>) & {
 	g: InlineFlattenGenericsG<string>,
 	gi: InlineFlattenGenericsG<string>,
 }
-GenericParameterOrderPreserved: { 
+GenericParameterOrderPreserved: {
 	pair: Pair<number, string>,
 }

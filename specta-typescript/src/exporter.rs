@@ -169,7 +169,12 @@ impl Exporter {
         };
 
         if let Layout::Files = self.layout {
-            return Err(Error::UnableToExport);
+            return Err(Error::UnableToExport(self.layout));
+        }
+        if let Layout::Namespaces = self.layout
+            && self.jsdoc
+        {
+            return Err(Error::UnableToExport(self.layout));
         }
 
         let mut out = render_file_header(self)?;

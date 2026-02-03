@@ -2,7 +2,7 @@ use std::{borrow::Cow, error, fmt, io, panic::Location};
 
 use specta::datatype::OpaqueReference;
 
-use crate::legacy::NamedLocation;
+use crate::{Layout, legacy::NamedLocation};
 
 use super::legacy::ExportPath;
 
@@ -66,7 +66,7 @@ pub enum Error {
     DuplicateTypeNameLegacy(Cow<'static, str>, Location<'static>, Location<'static>),
     // #[error("fmt error: {0}")]
     FmtLegacy(std::fmt::Error),
-    UnableToExport,
+    UnableToExport(Layout),
 }
 
 impl From<io::Error> for Error {
@@ -144,7 +144,10 @@ impl fmt::Display for Error {
                 "Attempted to export {a:?} but was unable to due to name {b:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`"
             ),
             Error::FmtLegacy(err) => writeln!(f, "formatter: {err:?}"),
-            Error::UnableToExport => writeln!(f, "Unable to export type"),
+            Error::UnableToExport(layout) => writeln!(
+                f,
+                "Unable to export layout {layout} with the current configuration. Maybe try `Exporter::export_to` or switching to Typescript."
+            ),
         }
     }
 }

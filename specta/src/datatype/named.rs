@@ -66,7 +66,6 @@ impl NamedDataType {
             build_ndt(types, &mut ndt);
 
             // We patch the Tauri `Type` implementation.
-            // TODO: Can we upstream these without backwards compatibility issues???
             if ndt.name() == "TAURI_CHANNEL" && ndt.module_path().starts_with("tauri::") {
                 // This produces `never`.
                 // It's expected a framework replaces this with it's own setup.
