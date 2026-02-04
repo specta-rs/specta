@@ -1,11 +1,11 @@
 use std::{borrow::Cow, panic::Location, sync::Arc};
 
 use crate::{
-    TypeCollection,
     datatype::{
-        DataType, Generic, NamedDataTypeBuilder, NamedReference, Reference,
         reference::{self, NamedId},
+        DataType, Generic, NamedDataTypeBuilder, NamedReference, Reference,
     },
+    TypeCollection,
 };
 
 /// A named type represents a non-primitive type capable of being exported as it's own named entity.
@@ -23,12 +23,6 @@ pub struct NamedDataType {
 }
 
 impl NamedDataType {
-    // ## Sentinel
-    //
-    // MUST point to a `static ...: () = ();`. This is used as a unique identifier for the type and `const` or `Box::leak` SHOULD NOT be used.
-    //
-    // If this invariant is violated you will see unexpected behavior.
-    //
     // ## Why return a reference?
     //
     // If a recursive type is being resolved it's possible the `init_with_sentinel` function will be called recursively.
@@ -39,7 +33,7 @@ impl NamedDataType {
         generics: Vec<(Generic, DataType)>,
         mut inline: bool,
         types: &mut TypeCollection,
-        sentinel: &'static (),
+        sentinel: &'static str,
         build_ndt: fn(&mut TypeCollection, &mut NamedDataType),
     ) -> Reference {
         let id = NamedId::Static(sentinel);

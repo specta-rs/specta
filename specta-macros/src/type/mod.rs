@@ -1,8 +1,8 @@
 use attr::*;
+use quote::{format_ident, quote, ToTokens};
 use r#enum::parse_enum;
-use quote::{ToTokens, format_ident, quote};
 use r#struct::parse_struct;
-use syn::{Data, DeriveInput, GenericParam, parse};
+use syn::{parse, Data, DeriveInput, GenericParam};
 
 use crate::utils::{parse_attrs, unraw_raw_ident};
 
@@ -188,13 +188,13 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 fn definition(types: &mut #crate_ref::TypeCollection) -> datatype::DataType {
                     #(#generic_placeholders)*
 
-                    static SENTINEL: () = ();
+                    static SENTINEL: &str = concat!(module_path!(), "::", stringify!(#raw_ident));
                     datatype::DataType::Reference(
                         datatype::NamedDataType::init_with_sentinel(
                             vec![#(#reference_generics),*],
                             #inline,
                             types,
-                            &SENTINEL,
+                            SENTINEL,
                             |types, ndt| {
                                 ndt.set_name(Cow::Borrowed(#name));
                                 ndt.set_docs(Cow::Borrowed(#comments));
