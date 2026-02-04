@@ -52,11 +52,35 @@ impl NamedReference {
 #[derive(Clone)]
 pub struct OpaqueReference(Arc<dyn DynOpaqueReference>);
 
+pub(crate) fn tauri() -> Reference {
+    Reference::Opaque(OpaqueReference(Arc::new(TauriChannelReferenceInner)))
+}
+
 trait DynOpaqueReference: Any + Send + Sync {
     fn type_name(&self) -> &'static str;
     fn hash(&self, hasher: &mut dyn hash::Hasher);
     fn eq(&self, other: &dyn Any) -> bool;
     fn as_any(&self) -> &dyn Any;
+}
+
+#[derive(PartialEq, Eq)]
+struct TauriChannelReferenceInner;
+impl DynOpaqueReference for TauriChannelReferenceInner {
+    fn type_name(&self) -> &'static str {
+        "tauri::ipc::Channel"
+    }
+    fn hash(&self, hasher: &mut dyn hash::Hasher) {
+        hasher.write_u64(0);
+    }
+    fn eq(&self, other: &dyn Any) -> bool {
+        other
+            .downcast_ref::<Self>()
+            .map(|other| self == other)
+            .unwrap_or_default()
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 #[derive(Debug)]

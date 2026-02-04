@@ -1,9 +1,10 @@
-use std::{borrow::Cow, convert::Infallible, panic::Location, sync::Arc};
+use std::{borrow::Cow, panic::Location, sync::Arc};
 
 use crate::{
-    Type, TypeCollection,
+    TypeCollection,
     datatype::{
-        DataType, Generic, NamedDataTypeBuilder, NamedReference, Reference, reference::NamedId,
+        DataType, Generic, NamedDataTypeBuilder, NamedReference, Reference,
+        reference::{self, NamedId},
     },
 };
 
@@ -67,9 +68,9 @@ impl NamedDataType {
 
             // We patch the Tauri `Type` implementation.
             if ndt.name() == "TAURI_CHANNEL" && ndt.module_path().starts_with("tauri::") {
-                // This produces `never`.
-                // It's expected a framework replaces this with it's own setup.
-                ndt.inner = Infallible::definition(types);
+                // This causes an exporter that isn't aware of Tauri's channel to error.
+                // This is effectively `Reference::opaque(TauriChannel)` but we do some hacker for better errors.
+                ndt.inner = reference::tauri().into();
 
                 // This ensures that we never create a `export type Channel`,
                 // instead the definition gets inlined into each callsite.
