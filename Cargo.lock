@@ -1826,7 +1826,10 @@ dependencies = [
 name = "specta-go"
 version = "0.0.1"
 dependencies = [
+ "serde",
  "specta",
+ "specta-serde",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

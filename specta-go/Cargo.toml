@@ -20,4 +20,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
-specta = { path = "../specta" }
+specta = { path = "../specta", features = ["derive"] }
+specta-serde = { path = "../specta-serde" }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "2.0.18"
