@@ -421,7 +421,7 @@ pub fn is_field_flattened(field: &specta::datatype::Field) -> bool {
 /// }
 /// ```
 pub fn get_enum_repr(attributes: &[specta::datatype::RuntimeAttribute]) -> EnumRepr {
-    use specta::datatype::{RuntimeLiteral, RuntimeMeta, RuntimeNestedMeta};
+    use specta::datatype::{RuntimeLiteral, RuntimeMeta, RuntimeNestedMeta, RuntimeValue};
     use std::borrow::Cow;
 
     let mut tag = None;
@@ -442,11 +442,11 @@ pub fn get_enum_repr(attributes: &[specta::datatype::RuntimeAttribute]) -> EnumR
             }
             RuntimeMeta::NameValue { key, value } => {
                 if key == "tag" {
-                    if let RuntimeLiteral::Str(t) = value {
+                    if let RuntimeValue::Literal(RuntimeLiteral::Str(t)) = value {
                         *tag = Some(t.clone());
                     }
                 } else if key == "content"
-                    && let RuntimeLiteral::Str(c) = value
+                    && let RuntimeValue::Literal(RuntimeLiteral::Str(c)) = value
                 {
                     *content = Some(c.clone());
                 }

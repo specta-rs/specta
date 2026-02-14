@@ -3,7 +3,7 @@
 //! These tests verify that the serde attribute parsing and transformation system
 //! works correctly with real DataType structures.
 
-use specta::datatype::{RuntimeAttribute, RuntimeLiteral, RuntimeMeta};
+use specta::datatype::{RuntimeAttribute, RuntimeLiteral, RuntimeMeta, RuntimeValue};
 use specta::{
     DataType, TypeCollection,
     datatype::{Field, Primitive, Struct},
@@ -40,7 +40,7 @@ fn test_optional_fields_with_skip_serializing_if_and_default() {
         path: "serde".to_string(),
         kind: RuntimeMeta::NameValue {
             key: "skip_serializing_if".to_string(),
-            value: RuntimeLiteral::Str("Option::is_none".to_string()),
+            value: RuntimeValue::Literal(RuntimeLiteral::Str("Option::is_none".to_string())),
         },
     };
 
@@ -153,7 +153,7 @@ fn test_string_enum_with_rename_all() {
         path: "serde".to_string(),
         kind: RuntimeMeta::NameValue {
             key: "rename_all".to_string(),
-            value: RuntimeLiteral::Str("snake_case".to_string()),
+            value: RuntimeValue::Literal(RuntimeLiteral::Str("snake_case".to_string())),
         },
     };
 
@@ -180,7 +180,7 @@ fn test_transparent_struct() {
         path: "serde".to_string(),
         kind: RuntimeMeta::NameValue {
             key: "transparent".to_string(),
-            value: RuntimeLiteral::Bool(true),
+            value: RuntimeValue::Literal(RuntimeLiteral::Bool(true)),
         },
     };
 
@@ -264,7 +264,7 @@ fn test_field_level_skip_attributes() {
         path: "serde".to_string(),
         kind: RuntimeMeta::NameValue {
             key: "skip".to_string(),
-            value: RuntimeLiteral::Bool(true),
+            value: RuntimeValue::Literal(RuntimeLiteral::Bool(true)),
         },
     }]);
 
@@ -273,7 +273,7 @@ fn test_field_level_skip_attributes() {
         path: "serde".to_string(),
         kind: RuntimeMeta::NameValue {
             key: "skip_serializing".to_string(),
-            value: RuntimeLiteral::Bool(true),
+            value: RuntimeValue::Literal(RuntimeLiteral::Bool(true)),
         },
     }]);
 
@@ -282,7 +282,7 @@ fn test_field_level_skip_attributes() {
         path: "serde".to_string(),
         kind: RuntimeMeta::NameValue {
             key: "skip_deserializing".to_string(),
-            value: RuntimeLiteral::Bool(true),
+            value: RuntimeValue::Literal(RuntimeLiteral::Bool(true)),
         },
     }]);
 
@@ -312,7 +312,7 @@ fn test_field_level_rename_attributes() {
         path: "serde".to_string(),
         kind: RuntimeMeta::NameValue {
             key: "rename".to_string(),
-            value: RuntimeLiteral::Str("customName".to_string()),
+            value: RuntimeValue::Literal(RuntimeLiteral::Str("customName".to_string())),
         },
     }]);
 
@@ -502,7 +502,7 @@ fn test_both_mode_with_common_attributes() {
         path: "serde".to_string(),
         kind: RuntimeMeta::NameValue {
             key: "rename_all".to_string(),
-            value: RuntimeLiteral::Str("camelCase".to_string()),
+            value: RuntimeValue::Literal(RuntimeLiteral::Str("camelCase".to_string())),
         },
     };
 
