@@ -185,42 +185,38 @@ impl Parse for NestedAttributeList {
     fn parse(input: ParseStream) -> Result<Self> {
         let mut attrs = Vec::new();
         while !input.is_empty() {
-            if input.peek(Lit) {
-                let lit: Lit = input.parse()?;
-                attrs.push(Attribute {
-                    source: String::new(),
-                    key: Ident::new("__literal", lit.span()),
-                    value: Some(AttributeValue::Lit(lit)),
-                });
-            } else if input.peek(Ident::peek_any) {
-                let key = input.call(Ident::parse_any)?;
-                let key_span = key.span();
+            if input.peek(Ident::peek_any) {
+                let fork = input.fork();
+                let _ = fork.call(Ident::parse_any)?;
 
-                attrs.push(Attribute {
-                    source: String::new(), // Will be updated by caller
-                    key,
-                    value: match false {
-                        _ if input.peek(Paren) => Some(AttributeValue::Attribute {
-                            span: key_span,
-                            attr: input.parse::<NestedAttributeList>()?.attrs,
-                        }),
-                        _ if input.peek(Token![=]) => {
-                            input.parse::<Token![=]>()?;
-                            Some(input.parse()?)
-                        }
-                        _ => None,
-                    },
-                });
+                if fork.peek(Token![::]) {
+                    let _ignored: syn::Expr = input.parse()?;
+                } else {
+                    let key = input.call(Ident::parse_any)?;
+                    let key_span = key.span();
+
+                    attrs.push(Attribute {
+                        source: String::new(),
+                        key,
+                        value: match false {
+                            _ if input.peek(Paren) => {
+                                let content;
+                                syn::parenthesized!(content in input);
+                                Some(AttributeValue::Attribute {
+                                    span: key_span,
+                                    attr: content.parse::<NestedAttributeList>()?.attrs,
+                                })
+                            }
+                            _ if input.peek(Token![=]) => {
+                                input.parse::<Token![=]>()?;
+                                Some(input.parse()?)
+                            }
+                            _ => None,
+                        },
+                    });
+                }
             } else {
-                let expr: syn::Expr = input.parse()?;
-                attrs.push(Attribute {
-                    source: String::new(),
-                    key: Ident::new("__expr", expr.span()),
-                    value: Some(AttributeValue::Lit(Lit::Str(syn::LitStr::new(
-                        &expr.to_token_stream().to_string(),
-                        expr.span(),
-                    )))),
-                });
+                let _ignored: syn::Expr = input.parse()?;
             }
 
             if input.peek(Token![,]) {
