@@ -645,11 +645,7 @@ fn render_flat_types<'a>(
         s.push('\n');
         s.push_str(indent);
 
-        if exporter.jsdoc {
-            primitives::typedef_internal(s, exporter, types, ndt)?;
-        } else {
-            primitives::export_internal(s, exporter, types, ndt)?;
-        }
+        primitives::export_internal(s, exporter, types, ndt)?;
     }
 
     Ok(exports)

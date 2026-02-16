@@ -41,6 +41,10 @@ pub(crate) fn export_internal(
     types: &TypeCollection,
     ndt: &NamedDataType,
 ) -> Result<(), Error> {
+    if exporter.jsdoc {
+        return typedef_internal(s, exporter, types, ndt);
+    }
+
     let generics = (!ndt.generics().is_empty())
         .then(|| {
             iter::once("<")
