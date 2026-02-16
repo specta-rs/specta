@@ -374,21 +374,26 @@ impl Exporter {
                 })?;
             }
 
-            if !runtime.is_empty() {
+            let should_export_user_types =
+                !has_manually_exported_user_types && !root_types.is_empty();
+
+            if !runtime.is_empty() || should_export_user_types {
                 files.insert(runtime_path, {
                     let mut out = render_file_header(self)?;
 
                     // Framework runtime
-                    out.push('\n');
-                    out.push_str(&runtime);
+                    if !runtime.is_empty() {
+                        out.push('\n');
+                        out.push_str(&runtime);
+                    }
 
                     // User types (if not included in framework runtime)
-                    if !has_manually_exported_user_types {
+                    if should_export_user_types {
                         if !runtime.is_empty() {
                             out += "\n";
                         }
 
-                        render_types(&mut out, self, &types, "")?;
+                        render_types(&mut out, self, &types, &root_types)?;
                     }
 
                     out
