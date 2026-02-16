@@ -63,23 +63,51 @@ pub fn export(
     match ndt.ty() {
         DataType::Struct(st) => {
             s.push_str("struct {\n");
-            struct_fields(&mut s, exporter, types, st, ctx)?;
+            struct_fields(
+                &mut s,
+                exporter,
+                types,
+                st,
+                vec![ndt.name().to_string()],
+                ctx,
+            )?;
             s.push('}');
         }
         DataType::Enum(e) => {
             s.push_str("struct {\n");
-            enum_variants(&mut s, exporter, types, e, ctx)?;
+            enum_variants(
+                &mut s,
+                exporter,
+                types,
+                e,
+                vec![ndt.name().to_string()],
+                ctx,
+            )?;
             s.push('}');
         }
         DataType::Tuple(t) => {
             if t.elements().len() == 1 {
-                datatype(&mut s, exporter, types, &t.elements()[0], ctx)?;
+                datatype(
+                    &mut s,
+                    exporter,
+                    types,
+                    &t.elements()[0],
+                    vec![ndt.name().to_string(), "0".into()],
+                    ctx,
+                )?;
             } else {
                 s.push_str("[]any");
             }
         }
         _ => {
-            datatype(&mut s, exporter, types, ndt.ty(), ctx)?;
+            datatype(
+                &mut s,
+                exporter,
+                types,
+                ndt.ty(),
+                vec![ndt.name().to_string()],
+                ctx,
+            )?;
         }
     }
     s.push('\n');
@@ -92,6 +120,7 @@ fn struct_fields(
     exporter: &Go,
     types: &TypeCollection,
     st: &Struct,
+    location: Vec<String>,
     ctx: &mut GoContext,
 ) -> Result<(), Error> {
     match st.fields() {
@@ -107,7 +136,9 @@ fn struct_fields(
                 }
 
                 if let Some(ty) = field.ty() {
-                    datatype(s, exporter, types, ty, ctx)?;
+                    let mut location = location.clone();
+                    location.push(i.to_string());
+                    datatype(s, exporter, types, ty, location, ctx)?;
                 } else {
                     s.push_str("any");
                 }
@@ -132,7 +163,9 @@ fn struct_fields(
                 }
 
                 if let Some(ty) = field.ty() {
-                    datatype(s, exporter, types, ty, ctx)?;
+                    let mut location = location.clone();
+                    location.push(name.to_string());
+                    datatype(s, exporter, types, ty, location, ctx)?;
                 } else {
                     s.push_str("any");
                 }
@@ -149,6 +182,7 @@ fn enum_variants(
     exporter: &Go,
     types: &TypeCollection,
     e: &Enum,
+    location: Vec<String>,
     ctx: &mut GoContext,
 ) -> Result<(), Error> {
     for (name, variant) in e.variants() {
@@ -173,7 +207,10 @@ fn enum_variants(
                     s.push_str(&i.to_string());
                     s.push(' ');
                     if let Some(ty) = field.ty() {
-                        datatype(s, exporter, types, ty, ctx)?;
+                        let mut location = location.clone();
+                        location.push(name.to_string());
+                        location.push(i.to_string());
+                        datatype(s, exporter, types, ty, location, ctx)?;
                     } else {
                         s.push_str("any");
                     }
@@ -187,7 +224,9 @@ fn enum_variants(
                 let mut fill_in = Struct::unit();
                 fill_in.set_fields(Fields::Named(f.clone()));
 
-                struct_fields(s, exporter, types, &fill_in, ctx)?;
+                let mut location = location.clone();
+                location.push(name.to_string());
+                struct_fields(s, exporter, types, &fill_in, location, ctx)?;
                 s.push('\t');
                 s.push('}');
             }
@@ -202,6 +241,7 @@ fn datatype(
     exporter: &Go,
     types: &TypeCollection,
     dt: &DataType,
+    location: Vec<String>,
     ctx: &mut GoContext,
 ) -> Result<(), Error> {
     match dt {
@@ -218,22 +258,25 @@ fn datatype(
             Primitive::f64 => s.push_str("float64"),
             Primitive::bool => s.push_str("bool"),
             Primitive::String | Primitive::char => s.push_str("string"),
-            Primitive::i128 => return Err(Error::BigIntForbidden { path: "".into() }),
-            Primitive::u128 => return Err(Error::BigIntForbidden { path: "".into() }),
+            Primitive::i128 | Primitive::u128 => {
+                return Err(Error::BigIntForbidden {
+                    path: location.join("."),
+                });
+            }
         },
         DataType::Nullable(t) => {
             s.push('*');
-            datatype(s, exporter, types, t, ctx)?;
+            datatype(s, exporter, types, t, location, ctx)?;
         }
         DataType::Map(m) => {
             s.push_str("map[");
-            datatype(s, exporter, types, m.key_ty(), ctx)?;
+            datatype(s, exporter, types, m.key_ty(), location.clone(), ctx)?;
             s.push(']');
-            datatype(s, exporter, types, m.value_ty(), ctx)?;
+            datatype(s, exporter, types, m.value_ty(), location, ctx)?;
         }
         DataType::List(l) => {
             s.push_str("[]");
-            datatype(s, exporter, types, l.ty(), ctx)?;
+            datatype(s, exporter, types, l.ty(), location, ctx)?;
         }
         DataType::Tuple(t) => {
             if t.elements().is_empty() {
@@ -244,12 +287,12 @@ fn datatype(
         }
         DataType::Struct(st) => {
             s.push_str("struct {\n");
-            struct_fields(s, exporter, types, st, ctx)?;
+            struct_fields(s, exporter, types, st, location, ctx)?;
             s.push('}');
         }
         DataType::Enum(e) => {
             s.push_str("struct {\n");
-            enum_variants(s, exporter, types, e, ctx)?;
+            enum_variants(s, exporter, types, e, location, ctx)?;
             s.push('}');
         }
         DataType::Reference(r) => match r {
@@ -268,7 +311,9 @@ fn datatype(
                         if i != 0 {
                             s.push_str(", ");
                         }
-                        datatype(s, exporter, types, g, ctx)?;
+                        let mut location = location.clone();
+                        location.push(format!("generic{}", i));
+                        datatype(s, exporter, types, g, location, ctx)?;
                     }
                     s.push(']');
                 }
