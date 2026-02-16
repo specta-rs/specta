@@ -19,8 +19,10 @@
 //!     .unwrap();
 //! ```
 
+mod error;
 mod go;
 mod primitives;
 mod reserved_names;
 
-pub use go::{Error, Go, Layout};
+pub use error::Error;
+pub use go::{Go, Layout};

@@ -1,9 +1,12 @@
-use std::{borrow::Cow, fmt, io, path::Path};
+use std::{borrow::Cow, path::Path};
 
 use specta::TypeCollection;
 use specta_serde::SerdeMode;
 
-use crate::primitives::{self, GoContext};
+use crate::{
+    primitives::{self, GoContext},
+    Error,
+};
 
 /// Allows configuring the format of the final file.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -13,22 +16,6 @@ pub enum Layout {
     FlatFile,
     /// Produce a dedicated file for each type (Not recommended for Go)
     Files,
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    #[error("IO error: {0}")]
-    Io(#[from] io::Error),
-    #[error("Fmt error: {0}")]
-    Fmt(#[from] fmt::Error),
-    #[error("Serde error: {0}")]
-    Serde(#[from] specta_serde::Error),
-    #[error("Forbidden name: {name} in {path}")]
-    ForbiddenName { path: String, name: String },
-    #[error("BigInt forbidden in {path}")]
-    BigIntForbidden { path: String },
-    #[error("Unable to export layout: {0:?}")]
-    UnableToExport(Layout),
 }
 
 /// Go language exporter.

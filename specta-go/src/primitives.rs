@@ -218,8 +218,8 @@ fn datatype(
             Primitive::f64 => s.push_str("float64"),
             Primitive::bool => s.push_str("bool"),
             Primitive::String | Primitive::char => s.push_str("string"),
-            Primitive::i128 => s.push_str("int128"),
-            Primitive::u128 => s.push_str("uint128"),
+            Primitive::i128 => return Err(Error::BigIntForbidden { path: "".into() }),
+            Primitive::u128 => return Err(Error::BigIntForbidden { path: "".into() }),
         },
         DataType::Nullable(t) => {
             s.push('*');
@@ -294,7 +294,6 @@ fn datatype(
             },
         },
         DataType::Generic(g) => s.push_str(&g.to_string()),
-        _ => s.push_str("any"),
     }
     Ok(())
 }
