@@ -545,6 +545,14 @@ fn render_types(
 ) -> Result<(), Error> {
     match exporter.layout {
         Layout::Namespaces => {
+            fn has_renderable_content(module: &Module<'_>, types: &TypeCollection) -> bool {
+                module.types.iter().any(|ndt| ndt.requires_reference(types))
+                    || module
+                        .children
+                        .values()
+                        .any(|child| has_renderable_content(child, types))
+            }
+
             fn export<'a>(
                 exporter: &Exporter,
                 types: &TypeCollection,
@@ -555,6 +563,10 @@ fn render_types(
                 let indent = "\t".repeat(depth);
 
                 for (name, module) in module {
+                    if !has_renderable_content(module, types) {
+                        continue;
+                    }
+
                     s.push('\n');
                     s.push_str(&indent);
                     if depth != 0 && *name != "$specta$" {
@@ -588,9 +600,17 @@ fn render_types(
                 let mut reexports = String::new();
                 for name in module
                     .children
-                    .keys()
-                    .cloned()
-                    .chain(module.types.iter().map(|ndt| &**ndt.name()))
+                    .iter()
+                    .filter_map(|(name, module)| {
+                        has_renderable_content(module, types).then_some(*name)
+                    })
+                    .chain(
+                        module
+                            .types
+                            .iter()
+                            .filter(|ndt| ndt.requires_reference(types))
+                            .map(|ndt| ndt.name().as_ref()),
+                    )
                 {
                     reexports.push_str("export import ");
                     reexports.push_str(name);
