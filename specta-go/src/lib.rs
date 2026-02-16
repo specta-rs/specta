@@ -19,10 +19,8 @@
 //!     .unwrap();
 //! ```
 
-mod config;
 mod go;
 mod primitives;
 mod reserved_names;
 
-pub use config::{BigIntExportBehavior, Error, Layout};
-pub use go::Go;
+pub use go::{Error, Go, Layout};

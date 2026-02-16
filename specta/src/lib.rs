@@ -1,5 +1,3 @@
-#![feature(f128)]
-#![feature(f16)]
 #![doc = include_str!("./docs.md")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(

@@ -1,24 +1,53 @@
-use std::{borrow::Cow, path::Path};
+use std::{borrow::Cow, fmt, io, path::Path};
 
 use specta::TypeCollection;
 use specta_serde::SerdeMode;
 
-use crate::{
-    config::{BigIntExportBehavior, Error, Exporter, Layout},
-    primitives::{self, GoContext},
-};
+use crate::primitives::{self, GoContext};
 
+/// Allows configuring the format of the final file.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Layout {
+    /// Flatten all types into a single file. (Idiomatic for Go packages)
+    #[default]
+    FlatFile,
+    /// Produce a dedicated file for each type (Not recommended for Go)
+    Files,
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("IO error: {0}")]
+    Io(#[from] io::Error),
+    #[error("Fmt error: {0}")]
+    Fmt(#[from] fmt::Error),
+    #[error("Serde error: {0}")]
+    Serde(#[from] specta_serde::Error),
+    #[error("Forbidden name: {name} in {path}")]
+    ForbiddenName { path: String, name: String },
+    #[error("BigInt forbidden in {path}")]
+    BigIntForbidden { path: String },
+    #[error("Unable to export layout: {0:?}")]
+    UnableToExport(Layout),
+}
+
+/// Go language exporter.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Go {
-    exporter: Exporter,
+    pub header: Cow<'static, str>,
+    pub layout: Layout,
     package_name: String,
+    pub serde: Option<SerdeMode>,
 }
 
 impl Default for Go {
     fn default() -> Self {
         Self {
-            exporter: Exporter::default(),
+            header: Cow::Borrowed(""),
+            layout: Layout::FlatFile,
             package_name: "bindings".into(),
+            serde: Some(SerdeMode::Both),
         }
     }
 }
@@ -34,17 +63,12 @@ impl Go {
     }
 
     pub fn header(mut self, header: impl Into<Cow<'static, str>>) -> Self {
-        self.exporter.header = header.into();
-        self
-    }
-
-    pub fn bigint(mut self, bigint: BigIntExportBehavior) -> Self {
-        self.exporter.bigint = bigint;
+        self.header = header.into();
         self
     }
 
     pub fn with_serde(mut self, mode: SerdeMode) -> Self {
-        self.exporter.serde = Some(mode);
+        self.serde = Some(mode);
         self
     }
 
@@ -52,7 +76,7 @@ impl Go {
         let mut ctx = GoContext::default();
         let mut body = String::new();
 
-        let types = if let Some(mode) = self.exporter.serde {
+        let types = if let Some(mode) = self.serde {
             let mut types = types.clone();
             specta_serde::apply(&mut types, mode)?;
             Cow::Owned(types)
@@ -61,14 +85,14 @@ impl Go {
         };
 
         for ndt in types.into_sorted_iter() {
-            let type_def = primitives::export(&self.exporter, &types, ndt, &mut ctx)?;
+            let type_def = primitives::export(&self, &types, ndt, &mut ctx)?;
             body.push_str(&type_def);
             body.push('\n');
         }
 
         let mut out = String::new();
-        if !self.exporter.header.is_empty() {
-            out.push_str(&self.exporter.header);
+        if !self.header.is_empty() {
+            out.push_str(&self.header);
             out.push('\n');
         }
 
@@ -91,7 +115,7 @@ impl Go {
     }
 
     pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
-        if self.exporter.layout == Layout::Files {
+        if self.layout == Layout::Files {
             return Err(Error::UnableToExport(Layout::Files));
         }
 

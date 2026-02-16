@@ -1,14 +1,11 @@
-use std::{borrow::Cow, collections::HashSet};
+use std::collections::HashSet;
 
 use specta::{
     TypeCollection,
     datatype::{DataType, Enum, Fields, NamedDataType, Primitive, Reference, Struct},
 };
 
-use crate::{
-    config::{BigIntExportBehavior, Error, Exporter},
-    reserved_names::RESERVED_GO_NAMES,
-};
+use crate::{Error, Go, reserved_names::RESERVED_GO_NAMES};
 
 /// Tracks necessary Go imports (e.g. "time", "encoding/json")
 #[derive(Default)]
@@ -23,7 +20,7 @@ impl GoContext {
 }
 
 pub fn export(
-    exporter: &Exporter,
+    exporter: &Go,
     types: &TypeCollection,
     ndt: &NamedDataType,
     ctx: &mut GoContext,
@@ -92,7 +89,7 @@ pub fn export(
 
 fn struct_fields(
     s: &mut String,
-    exporter: &Exporter,
+    exporter: &Go,
     types: &TypeCollection,
     st: &Struct,
     ctx: &mut GoContext,
@@ -149,7 +146,7 @@ fn struct_fields(
 
 fn enum_variants(
     s: &mut String,
-    exporter: &Exporter,
+    exporter: &Go,
     types: &TypeCollection,
     e: &Enum,
     ctx: &mut GoContext,
@@ -202,7 +199,7 @@ fn enum_variants(
 
 fn datatype(
     s: &mut String,
-    exporter: &Exporter,
+    exporter: &Go,
     types: &TypeCollection,
     dt: &DataType,
     ctx: &mut GoContext,
@@ -212,21 +209,11 @@ fn datatype(
             Primitive::i8 => s.push_str("int8"),
             Primitive::i16 => s.push_str("int16"),
             Primitive::i32 => s.push_str("int32"),
-            Primitive::i64 | Primitive::isize => match exporter.bigint {
-                BigIntExportBehavior::String => s.push_str("string"),
-                BigIntExportBehavior::Number
-                | BigIntExportBehavior::Fail
-                | BigIntExportBehavior::BigInt => s.push_str("int64"),
-            },
+            Primitive::i64 | Primitive::isize => s.push_str("int64"),
             Primitive::u8 => s.push_str("uint8"),
             Primitive::u16 => s.push_str("uint16"),
             Primitive::u32 => s.push_str("uint32"),
-            Primitive::u64 | Primitive::usize => match exporter.bigint {
-                BigIntExportBehavior::String => s.push_str("string"),
-                BigIntExportBehavior::Number
-                | BigIntExportBehavior::Fail
-                | BigIntExportBehavior::BigInt => s.push_str("uint64"),
-            },
+            Primitive::u64 | Primitive::usize => s.push_str("uint64"),
             Primitive::f16 | Primitive::f32 => s.push_str("float32"),
             Primitive::f64 => s.push_str("float64"),
             Primitive::bool => s.push_str("bool"),
@@ -266,7 +253,7 @@ fn datatype(
             s.push('}');
         }
         DataType::Reference(r) => match r {
-            Reference::Named(_) => {
+            Reference::Named(r) => {
                 let ndt = r.get(types).ok_or_else(|| Error::ForbiddenName {
                     path: "lookup".into(),
                     name: "missing_reference_in_collection".into(),
