@@ -560,7 +560,8 @@ fn render_types(
                 module: impl ExactSizeIterator<Item = (&'a &'a str, &'a mut Module<'a>)>,
                 depth: usize,
             ) -> Result<(), Error> {
-                let indent = "\t".repeat(depth);
+                let namespace_indent = "\t".repeat(depth);
+                let content_indent = "\t".repeat(depth + 1);
 
                 for (name, module) in module {
                     if !has_renderable_content(module, types) {
@@ -568,7 +569,7 @@ fn render_types(
                     }
 
                     s.push('\n');
-                    s.push_str(&indent);
+                    s.push_str(&namespace_indent);
                     if depth != 0 && *name != "$specta$" {
                         s.push_str("export ");
                     }
@@ -583,11 +584,18 @@ fn render_types(
                             .then(a.module_path().cmp(b.module_path()))
                             .then(a.location().cmp(&b.location()))
                     });
-                    render_flat_types(s, exporter, types, module.types.iter().copied(), &indent)?;
+                    render_flat_types(
+                        s,
+                        exporter,
+                        types,
+                        module.types.iter().copied(),
+                        &content_indent,
+                    )?;
 
                     // Namespaces
                     export(exporter, types, s, module.children.iter_mut(), depth + 1)?;
 
+                    s.push_str(&namespace_indent);
                     s.push_str("}\n");
                 }
 
