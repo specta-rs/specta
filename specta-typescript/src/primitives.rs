@@ -67,13 +67,12 @@ pub(crate) fn export_internal(
             }
             _ => ndt.name().clone(),
         },
-    )?
-    .leak(); // TODO: Leaking bad
+    )?;
 
     js_doc(s, ndt.docs(), ndt.deprecated());
 
     s.push_str("export type ");
-    s.push_str(name);
+    s.push_str(&name);
     for part in generics {
         s.push_str(part);
     }
