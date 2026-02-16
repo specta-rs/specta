@@ -6,6 +6,7 @@ use specta::Type;
 use thiserror::Error;
 
 #[derive(Type, Error, Debug)]
+#[specta(collect = false)]
 pub enum MyError {
     #[error("data store disconnected")]
     Disconnect(

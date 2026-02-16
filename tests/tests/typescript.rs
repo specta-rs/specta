@@ -28,6 +28,7 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
 
     // Test that the types don't get duplicated in the type map.
     #[derive(Type)]
+    #[specta(collect = false)]
     pub enum TestCollectionRegister {}
     types = types
         .register::<TestCollectionRegister>()
