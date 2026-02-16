@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 
 use specta::{
-    TypeCollection,
     datatype::{DataType, Enum, Fields, NamedDataType, Primitive, Reference, Struct},
+    TypeCollection,
 };
 
-use crate::{Error, Go, reserved_names::RESERVED_GO_NAMES};
+use crate::{reserved_names::RESERVED_GO_NAMES, Error, Go};
 
 /// Tracks necessary Go imports (e.g. "time", "encoding/json")
 #[derive(Default)]
@@ -170,7 +170,11 @@ fn struct_fields(
                     s.push_str("any");
                 }
 
-                s.push_str(&format!(" `json:\"{},omitempty\"`\n", name));
+                if field.optional() {
+                    s.push_str(&format!(" `json:\"{},omitempty\"`\n", name));
+                } else {
+                    s.push_str(&format!(" `json:\"{}\"`\n", name));
+                }
             }
         }
     }
