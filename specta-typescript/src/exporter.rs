@@ -401,10 +401,25 @@ impl Exporter {
             }
         }
 
-        if let Ok(meta) = path.metadata()
-            && !meta.is_dir()
-        {
-            std::fs::remove_file(path)?;
+        match path.metadata() {
+            Ok(meta) if !meta.is_dir() => std::fs::remove_file(path).or_else(|source| {
+                if source.kind() == std::io::ErrorKind::NotFound {
+                    Ok(())
+                } else {
+                    Err(Error::RemoveFile {
+                        path: path.to_path_buf(),
+                        source,
+                    })
+                }
+            })?,
+            Ok(_) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(source) => {
+                return Err(Error::Metadata {
+                    path: path.to_path_buf(),
+                    source,
+                });
+            }
         }
 
         for (path, content) in &files {
@@ -680,34 +695,85 @@ fn render_flat_types<'a>(
 }
 
 /// Collect all TypeScript/JavaScript files in a directory recursively
-fn collect_existing_files(root: &Path) -> Result<HashSet<PathBuf>, std::io::Error> {
+fn collect_existing_files(root: &Path) -> Result<HashSet<PathBuf>, Error> {
     if !root.exists() {
         return Ok(HashSet::new());
     }
 
-    Ok(std::fs::read_dir(root)?
-        .filter_map(Result::ok)
-        .flat_map(|entry| {
-            let path = entry.path();
-            if path.is_dir() {
-                collect_existing_files(&path).unwrap_or_default()
-            } else if matches!(path.extension().and_then(|e| e.to_str()), Some("ts" | "js")) {
-                HashSet::from([path])
-            } else {
-                HashSet::new()
-            }
-        })
-        .collect::<HashSet<_>>())
+    let mut files = HashSet::new();
+    let entries = std::fs::read_dir(root).map_err(|source| Error::ReadDir {
+        path: root.to_path_buf(),
+        source,
+    })?;
+    for entry in entries {
+        let entry = entry.map_err(|source| Error::ReadDir {
+            path: root.to_path_buf(),
+            source,
+        })?;
+        let path = entry.path();
+        let file_type = entry.file_type().map_err(|source| Error::Metadata {
+            path: path.clone(),
+            source,
+        })?;
+
+        if file_type.is_symlink() {
+            continue;
+        }
+
+        if file_type.is_dir() {
+            files.extend(collect_existing_files(&path)?);
+        } else if matches!(path.extension().and_then(|e| e.to_str()), Some("ts" | "js")) {
+            files.insert(path);
+        }
+    }
+
+    Ok(files)
 }
 
 /// Remove empty directories recursively, stopping at the root
-fn remove_empty_dirs(path: &Path, root: &Path) -> Result<(), std::io::Error> {
-    std::fs::read_dir(path)?
-        .filter_map(Result::ok)
-        .filter(|entry| entry.path().is_dir())
-        .try_for_each(|entry| remove_empty_dirs(&entry.path(), root))?;
-    if path != root && path.read_dir()?.next().is_none() {
-        std::fs::remove_dir(path)?;
+fn remove_empty_dirs(path: &Path, root: &Path) -> Result<(), Error> {
+    let entries = std::fs::read_dir(path).map_err(|source| Error::ReadDir {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    for entry in entries {
+        let entry = entry.map_err(|source| Error::ReadDir {
+            path: path.to_path_buf(),
+            source,
+        })?;
+        let entry_path = entry.path();
+        let file_type = entry.file_type().map_err(|source| Error::Metadata {
+            path: entry_path.clone(),
+            source,
+        })?;
+        if file_type.is_symlink() {
+            continue;
+        }
+        if file_type.is_dir() {
+            remove_empty_dirs(&entry_path, root)?;
+        }
+    }
+
+    let is_empty = path
+        .read_dir()
+        .map_err(|source| Error::ReadDir {
+            path: path.to_path_buf(),
+            source,
+        })?
+        .next()
+        .is_none();
+
+    if path != root && is_empty {
+        match std::fs::remove_dir(path) {
+            Ok(()) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(source) => {
+                return Err(Error::RemoveDir {
+                    path: path.to_path_buf(),
+                    source,
+                });
+            }
+        }
     }
     Ok(())
 }
@@ -717,8 +783,21 @@ fn cleanup_stale_files(root: &Path, current_files: &HashMap<PathBuf, String>) ->
     collect_existing_files(root)?
         .into_iter()
         .filter(|path| !current_files.contains_key(path))
-        .try_for_each(|path| std::fs::remove_file(&path).map_err(Error::from))?;
-    remove_empty_dirs(root, root).ok(); // Ignore errors for directory cleanup
+        .try_for_each(|path| {
+            std::fs::remove_file(&path).or_else(|source| {
+                if source.kind() == std::io::ErrorKind::NotFound {
+                    Ok(())
+                } else {
+                    Err(Error::RemoveFile {
+                        path: path.clone(),
+                        source,
+                    })
+                }
+            })
+        })?;
+
+    remove_empty_dirs(root, root)?;
+
     Ok(())
 }
 

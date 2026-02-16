@@ -1,4 +1,4 @@
-use std::{borrow::Cow, error, fmt, io, panic::Location};
+use std::{borrow::Cow, error, fmt, io, panic::Location, path::PathBuf};
 
 use specta::datatype::OpaqueReference;
 
@@ -38,6 +38,26 @@ pub enum Error {
     /// An filesystem IO error.
     /// This is possible when using `Typescript::export_to` when writing to a file or formatting the file.
     Io(io::Error),
+    /// Failed to read a directory while exporting files.
+    ReadDir {
+        path: PathBuf,
+        source: io::Error,
+    },
+    /// Failed to inspect filesystem metadata while exporting files.
+    Metadata {
+        path: PathBuf,
+        source: io::Error,
+    },
+    /// Failed to remove a stale file while exporting files.
+    RemoveFile {
+        path: PathBuf,
+        source: io::Error,
+    },
+    /// Failed to remove an empty directory while exporting files.
+    RemoveDir {
+        path: PathBuf,
+        source: io::Error,
+    },
     /// Found an opaque reference which the Typescript exporter doesn't know how to handle.
     /// You may be referencing a type which is not supported by the Typescript exporter.
     UnsupportedOpaqueReference(OpaqueReference),
@@ -112,6 +132,26 @@ impl fmt::Display for Error {
                 "Detected multiple types with the same name: {name:?} in {types:?}"
             ),
             Error::Io(err) => write!(f, "IO error: {err}"),
+            Error::ReadDir { path, source } => {
+                write!(f, "Failed to read directory '{}': {source}", path.display())
+            }
+            Error::Metadata { path, source } => {
+                write!(
+                    f,
+                    "Failed to read metadata for '{}': {source}",
+                    path.display()
+                )
+            }
+            Error::RemoveFile { path, source } => {
+                write!(f, "Failed to remove file '{}': {source}", path.display())
+            }
+            Error::RemoveDir { path, source } => {
+                write!(
+                    f,
+                    "Failed to remove directory '{}': {source}",
+                    path.display()
+                )
+            }
             Error::UnsupportedOpaqueReference(r) => {
                 write!(
                     f,
