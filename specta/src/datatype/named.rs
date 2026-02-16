@@ -1,11 +1,11 @@
 use std::{borrow::Cow, panic::Location, sync::Arc};
 
 use crate::{
-    datatype::{
-        reference::{self, NamedId},
-        DataType, Generic, NamedDataTypeBuilder, NamedReference, Reference,
-    },
     TypeCollection,
+    datatype::{
+        DataType, Generic, NamedDataTypeBuilder, NamedReference, Reference,
+        reference::{self, NamedId},
+    },
 };
 
 /// A named type represents a non-primitive type capable of being exported as it's own named entity.

@@ -12,10 +12,7 @@ pub struct RuntimeAttributeIR {
 
 pub enum RuntimeMetaIR {
     Path(String),
-    NameValue {
-        key: String,
-        value: RuntimeValueIR,
-    },
+    NameValue { key: String, value: RuntimeValueIR },
     List(Vec<RuntimeNestedMetaIR>),
 }
 
@@ -106,9 +103,9 @@ fn parse_nested_meta_items(list: &syn::MetaList) -> syn::Result<Vec<RuntimeNeste
         .map(|item| match item {
             NestedItem::Meta(meta) => Ok(RuntimeNestedMetaIR::Meta(lower_meta(&meta)?)),
             NestedItem::Lit(lit) => Ok(RuntimeNestedMetaIR::Literal(lower_lit(&lit)?)),
-            NestedItem::Expr(expr) => {
-                Ok(RuntimeNestedMetaIR::Expr(expr.to_token_stream().to_string()))
-            }
+            NestedItem::Expr(expr) => Ok(RuntimeNestedMetaIR::Expr(
+                expr.to_token_stream().to_string(),
+            )),
         })
         .collect()
 }

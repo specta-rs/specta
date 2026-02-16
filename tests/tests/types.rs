@@ -15,7 +15,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use specta::{datatype::DataType, Type, TypeCollection};
+use specta::{Type, TypeCollection, datatype::DataType};
 
 /// A macro to collect up the types for better testing.
 ///
@@ -411,6 +411,8 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         GenericNewType1<()>,
         GenericTuple<()>,
         GenericStruct2<()>,
+        InlineGenericNewtype<String>,
+        InlineGenericNested<String>,
         InlineFlattenGenericsG<()>,
         InlineFlattenGenerics,
         GenericParameterOrderPreserved,
@@ -2028,6 +2030,29 @@ struct GenericNewType1<T>(Vec<Vec<T>>);
 #[derive(Type)]
 #[specta(collect = false)]
 struct GenericTuple<T>(T, Vec<T>, Vec<Vec<T>>);
+
+#[derive(Type)]
+#[specta(collect = false, inline)]
+struct InlineGenericNewtype<T>(T);
+
+#[derive(Type)]
+#[specta(collect = false, inline)]
+enum InlineGenericEnum<T> {
+    Unit,
+    Unnamed(T),
+    Named { value: T },
+}
+
+#[derive(Type)]
+#[specta(collect = false, inline)]
+struct InlineGenericNested<T>(
+    InlineGenericNewtype<T>,
+    Vec<T>,
+    (T, T),
+    HashMap<String, T>,
+    Option<T>,
+    InlineGenericEnum<T>,
+);
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
