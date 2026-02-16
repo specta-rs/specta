@@ -1,18 +1,20 @@
 use std::{
     borrow::Cow,
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     fmt,
+    ops::Deref,
+    panic::Location,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
 use specta::{
     TypeCollection,
-    datatype::{DataType, Fields, NamedDataType, Reference},
+    datatype::{DataType, NamedDataType, Reference},
 };
 use specta_serde::SerdeMode;
 
-use crate::{Error, primitives};
+use crate::{Error, TypeOrModuleOrImport, primitives};
 
 /// Allows you to configure how Specta's Typescript exporter will deal with BigInt types ([i64], [i128] etc).
 ///
@@ -61,13 +63,12 @@ impl fmt::Display for Layout {
 }
 
 #[derive(Clone)]
-struct RuntimeFn(Arc<dyn Fn() -> Cow<'static, str>>);
+#[allow(clippy::type_complexity)]
+struct RuntimeFn(Arc<dyn Fn(FrameworkExporter) -> Result<Cow<'static, str>, Error>>);
 
 impl fmt::Debug for RuntimeFn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("RuntimeFn")
-            .field(&format!("{self:p}"))
-            .finish()
+        write!(f, "RuntimeFn({:p})", self.0)
     }
 }
 
@@ -111,8 +112,11 @@ impl Exporter {
     ///
     /// The closure is wrapped in [`specta::datatype::collect()`] to capture any referenced types.
     /// Ensure you call `T::reference()` within the closure if you want an import to be created.
-    pub fn framework_runtime(mut self, runtime: impl Fn() -> Cow<'static, str> + 'static) -> Self {
-        self.framework_runtime = Some(RuntimeFn(Arc::new(runtime)));
+    pub fn framework_runtime(
+        mut self,
+        builder: impl Fn(FrameworkExporter) -> Result<Cow<'static, str>, Error> + 'static,
+    ) -> Self {
+        self.framework_runtime = Some(RuntimeFn(Arc::new(builder)));
         self
     }
 
@@ -156,274 +160,49 @@ impl Exporter {
     ///
     /// Note: This will return [`Error::UnableToExport`](crate::Error::UnableToExport) if the format is `Format::Files`.
     pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
-        let processed_types = if let Some(mode) = self.serde {
-            let mut types_clone = types.clone();
-            specta_serde::apply(&mut types_clone, mode)?;
-            types_clone
+        let types = if let Some(mode) = self.serde {
+            let mut types = types.clone(); // TODO: Can we avoid this?
+            specta_serde::apply(&mut types, mode)?;
+            Cow::Owned(types)
         } else {
-            types.clone()
+            Cow::Borrowed(types)
         };
 
-        let types = &processed_types;
-
-        match self.layout {
-            Layout::Namespaces => {
-                let mut out = self.export_internal([].into_iter(), None, types, true)?;
-                let mut module_types: HashMap<_, Vec<_>> = HashMap::new();
-
-                for ndt in types.into_unsorted_iter() {
-                    module_types
-                        .entry(ndt.module_path().to_string())
-                        .or_default()
-                        .push(ndt.clone());
-                }
-
-                // Group all modules by their root namespace (first segment)
-                let mut root_namespaces: HashMap<String, Vec<String>> = HashMap::new();
-
-                for module_path in module_types.keys() {
-                    if let Some(root) = module_path.split("::").next() {
-                        root_namespaces
-                            .entry(root.to_string())
-                            .or_default()
-                            .push(module_path.clone());
-                    }
-                }
-
-                // Sort root namespaces for consistent output
-                let mut sorted_roots: Vec<_> = root_namespaces.into_iter().collect();
-                sorted_roots.sort_by(|a, b| a.0.cmp(&b.0));
-
-                let mut root_aliases = Vec::with_capacity(sorted_roots.len());
-
-                for (i, (root_name, modules_in_root)) in sorted_roots.iter().enumerate() {
-                    if i != 0 {
-                        out += "\n";
-                    }
-
-                    // Sort modules to process them in order
-                    let mut sorted_modules = modules_in_root.clone();
-                    sorted_modules.sort();
-
-                    // Build a tree structure: map from parent path to its direct children
-                    // This will help us generate namespaces hierarchically
-                    let mut path_children: HashMap<String, BTreeSet<String>> = HashMap::new();
-
-                    for module_path in &sorted_modules {
-                        let parts: Vec<&str> = module_path.split("::").collect();
-
-                        // For each level, track direct parent-child relationships only
-                        for depth in 0..parts.len() {
-                            let parent = if depth == 0 {
-                                String::new()
-                            } else {
-                                parts[0..depth].join("::")
-                            };
-                            let child_name = parts[depth].to_string();
-
-                            path_children.entry(parent).or_default().insert(child_name);
-                        }
-                    }
-
-                    // Recursive function to generate nested namespaces
-                    fn write_namespace(
-                        out: &mut String,
-                        current_path: &str,
-                        depth: usize,
-                        path_children: &HashMap<String, BTreeSet<String>>,
-                        module_types: &mut HashMap<String, Vec<NamedDataType>>,
-                        ts: &Exporter,
-                        types: &TypeCollection,
-                    ) -> Result<(), Error> {
-                        let indent = "    ".repeat(depth);
-
-                        // Get types for this exact path
-                        let has_types =
-                            if let Some(types_in_module) = module_types.get_mut(current_path) {
-                                types_in_module.sort_by(|a, b| {
-                                    a.name()
-                                        .cmp(b.name())
-                                        .then(a.module_path().cmp(b.module_path()))
-                                        .then(a.location().cmp(&b.location()))
-                                });
-
-                                for ndt in types_in_module {
-                                    *out += &indent;
-                                    *out += &primitives::export(ts, types, ndt)?;
-                                    *out += "\n";
-                                }
-                                true
-                            } else {
-                                false
-                            };
-
-                        // Get child namespace names
-                        if let Some(child_names) = path_children.get(current_path) {
-                            for (i, child_name) in child_names.iter().enumerate() {
-                                // Add blank line between siblings or after types
-                                if i > 0 || has_types {
-                                    *out += "\n";
-                                }
-
-                                *out += &indent;
-                                *out += &format!("export namespace {child_name} {{\n");
-
-                                // Build the full path for the child
-                                let child_path = if current_path.is_empty() {
-                                    child_name.clone()
-                                } else {
-                                    format!("{}::{}", current_path, child_name)
-                                };
-
-                                write_namespace(
-                                    out,
-                                    &child_path,
-                                    depth + 1,
-                                    path_children,
-                                    module_types,
-                                    ts,
-                                    types,
-                                )?;
-
-                                *out += &indent;
-                                *out += "}\n";
-                            }
-                        }
-
-                        Ok(())
-                    }
-
-                    // Start with the root namespace
-                    out += &format!("export namespace {root_name} {{\n");
-                    write_namespace(
-                        &mut out,
-                        root_name,
-                        1,
-                        &path_children,
-                        &mut module_types,
-                        self,
-                        types,
-                    )?;
-                    out += "}\n";
-
-                    if !root_name.is_empty() {
-                        root_aliases.push(format!(
-                            "export import {} = {};\n",
-                            root_alias_ident(root_name),
-                            root_name
-                        ));
-                    }
-                }
-
-                if !root_aliases.is_empty() {
-                    out += "\n";
-                    for alias in root_aliases {
-                        out += &alias;
-                    }
-                }
-
-                Ok(out)
-            }
-            // You can't `inline` while using `Files`.
-            Layout::Files => Err(Error::UnableToExport),
-            Layout::FlatFile | Layout::ModulePrefixedName => {
-                if self.layout == Layout::FlatFile {
-                    let mut map = HashMap::with_capacity(types.len());
-                    for dt in types.into_unsorted_iter() {
-                        if let Some(existing_dt) = map.insert(dt.name().clone(), dt)
-                            && existing_dt != dt
-                        {
-                            return Err(Error::DuplicateTypeName {
-                                types: (dt.location(), existing_dt.location()),
-                                name: dt.name().clone(),
-                            });
-                        }
-                    }
-                }
-
-                self.export_internal(types.into_sorted_iter(), None, types, true)
-            }
+        if let Layout::Files = self.layout {
+            return Err(Error::UnableToExport(self.layout));
         }
-    }
-
-    fn export_internal(
-        &self,
-        ndts: impl Iterator<Item = NamedDataType>,
-        references: Option<ImportMap>,
-        types: &TypeCollection,
-        include_runtime: bool,
-    ) -> Result<String, Error> {
-        let mut out = self.header.to_string();
-        if !out.is_empty() {
-            out.push('\n');
+        if let Layout::Namespaces = self.layout
+            && self.jsdoc
+        {
+            return Err(Error::UnableToExport(self.layout));
         }
 
-        out += &self.framework_prelude;
-        out.push('\n');
+        let mut out = render_file_header(self)?;
 
-        // Collect runtime imports and generate runtime code
-        let mut runtime_imports = ImportMap::default();
-        if include_runtime && let Some(runtime_fn) = &self.framework_runtime {
-            let ndts = specta::datatype::collect(|| {
-                out.push_str(&(runtime_fn.0)());
-                out.push('\n');
+        let mut has_manually_exported_user_types = false;
+        let mut runtime = Ok(Cow::default());
+        if let Some(framework_runtime) = &self.framework_runtime {
+            runtime = (framework_runtime.0)(FrameworkExporter {
+                exporter: self,
+                has_manually_exported_user_types: &mut has_manually_exported_user_types,
+                files_root_types: "",
+                types: &types,
             });
+        }
+        let runtime = runtime?;
 
-            for ndt in ndts {
-                crawl_for_imports(ndt.ty(), types, &mut runtime_imports);
-            }
+        // Framework runtime
+        if !runtime.is_empty() {
+            out += "\n";
+        }
+        out += &runtime;
+        if !runtime.is_empty() {
+            out += "\n";
         }
 
-        if self.jsdoc {
-            out += "\n/**";
-        }
-
-        // Merge runtime imports with provided references
-        let mut all_references = references.unwrap_or_default();
-        for (src, items) in runtime_imports {
-            all_references.entry(src).or_default().extend(items);
-        }
-
-        for (src, items) in &all_references {
-            if self.jsdoc {
-                out += "\n\t* @import";
-            } else {
-                out += "\nimport type";
-            }
-
-            out += " { ";
-            for (i, (src, alias)) in items.iter().enumerate() {
-                if i != 0 {
-                    out += ", ";
-                }
-                out += src;
-                if alias != src {
-                    out += " as ";
-                    out += alias;
-                }
-            }
-
-            out += " } from \"";
-            out += src;
-            out += "\";";
-        }
-
-        if self.jsdoc {
-            out += "\n\t*/";
-        }
-
-        out.push_str("\n\n");
-
-        for (i, ndt) in ndts.enumerate() {
-            if i != 0 {
-                out += "\n";
-            }
-
-            if self.jsdoc {
-                out += &primitives::typedef_internal(self, types, &ndt)?;
-            } else {
-                out += &primitives::export(self, types, &ndt)?;
-            }
+        // User types (if not included in framework runtime)
+        if !has_manually_exported_user_types {
+            render_types(&mut out, self, &types, "")?;
         }
 
         Ok(out)
@@ -437,148 +216,198 @@ impl Exporter {
     pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
         let path = path.as_ref();
 
-        if self.layout == Layout::Files {
-            let processed_types = if let Some(mode) = self.serde {
-                let mut types_clone = types.clone();
-                specta_serde::apply(&mut types_clone, mode)?;
-                types_clone
-            } else {
-                types.clone()
-            };
-            let types = &processed_types;
-
-            std::fs::create_dir_all(path)?;
-
-            let mut files = HashMap::<PathBuf, Vec<NamedDataType>>::new();
-
-            for ndt in types.into_sorted_iter() {
-                let mut path = PathBuf::from(path);
-                for m in ndt.module_path().split("::") {
-                    path = path.join(m);
-                }
-                path.set_extension(if self.jsdoc { "js" } else { "ts" });
-                files.entry(path).or_default().push(ndt);
-            }
-
-            let mut used_paths = files.keys().cloned().collect::<HashSet<_>>();
-
-            for (path, ndts) in files {
-                if let Some(parent) = path.parent() {
-                    std::fs::create_dir_all(parent)?;
-                }
-
-                let mut references = ImportMap::default();
-                for ndt in ndts.iter() {
-                    crawl_for_imports(ndt.ty(), types, &mut references);
-                }
-
-                std::fs::write(
-                    &path,
-                    self.export_internal(ndts.into_iter(), Some(references), types, false)?,
-                )?;
-            }
-
-            if self.framework_runtime.is_some() {
-                // TODO: Does this risk conflicting with an `index.rs` module???
-                let p = path.join(if self.jsdoc { "index.js" } else { "index.ts" });
-
-                let mut content = self.framework_prelude.to_string();
-                content.push('\n');
-
-                let mut runtime_imports = ImportMap::default();
-                let mut runtime = Cow::default();
-                if let Some(runtime_fn) = &self.framework_runtime {
-                    let collected_ndts: Vec<NamedDataType> = specta::datatype::collect(|| {
-                        runtime = (runtime_fn.0)();
-                    })
-                    .collect();
-
-                    for ndt in collected_ndts {
-                        crawl_for_imports(ndt.ty(), types, &mut runtime_imports);
-                    }
-                }
-
-                // Add imports
-                if !runtime_imports.is_empty() {
-                    if self.jsdoc {
-                        content.push_str("\n/**");
-                    }
-
-                    for (src, items) in &runtime_imports {
-                        if self.jsdoc {
-                            content.push_str("\n\t* @import");
-                        } else {
-                            content.push_str("\nimport type");
-                        }
-
-                        content.push_str(" { ");
-                        for (i, (name, alias)) in items.iter().enumerate() {
-                            if i != 0 {
-                                content.push_str(", ");
-                            }
-                            content.push_str(name);
-                            if alias != name {
-                                content.push_str(" as ");
-                                content.push_str(alias);
-                            }
-                        }
-
-                        content.push_str(" } from \"");
-                        content.push_str(src);
-                        content.push_str("\";");
-                    }
-
-                    if self.jsdoc {
-                        content.push_str("\n\t*/");
-                    }
-                    content.push_str("\n\n");
-                }
-
-                content.push_str(&runtime);
-                content.push('\n');
-
-                std::fs::write(&p, content)?;
-
-                // This is to ensure `remove_unused_ts_files` doesn't remove it
-                used_paths.insert(p);
-            }
-
-            if path.exists() && path.is_dir() {
-                fn remove_unused_ts_files(
-                    dir: &Path,
-                    used_paths: &HashSet<PathBuf>,
-                ) -> std::io::Result<()> {
-                    for entry in std::fs::read_dir(dir)? {
-                        let entry = entry?;
-                        let entry_path = entry.path();
-
-                        if entry_path.is_dir() {
-                            remove_unused_ts_files(&entry_path, used_paths)?;
-
-                            // Remove empty directories
-                            if std::fs::read_dir(&entry_path)?.next().is_none() {
-                                std::fs::remove_dir(&entry_path)?;
-                            }
-                        } else if matches!(
-                            entry_path.extension().and_then(|ext| ext.to_str()),
-                            Some("ts" | "js")
-                        ) && !used_paths.contains(&entry_path)
-                        {
-                            std::fs::remove_file(&entry_path)?;
-                        }
-                    }
-                    Ok(())
-                }
-
-                let _ = remove_unused_ts_files(path, &used_paths);
-            }
-        } else {
+        if self.layout != Layout::Files {
+            let result = self.export(types)?;
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)?;
+            };
+            std::fs::write(path, result)?;
+            return Ok(());
+        }
+
+        let types = if let Some(mode) = self.serde {
+            let mut types = types.clone(); // TODO: Can we avoid this?
+            specta_serde::apply(&mut types, mode)?;
+            Cow::Owned(types)
+        } else {
+            Cow::Borrowed(types)
+        };
+
+        #[allow(clippy::too_many_arguments)]
+        fn export(
+            exporter: &Exporter,
+            types: &TypeCollection,
+            module: &mut Module,
+            s: &mut String,
+            path: &Path,
+            parent_name: &str,
+            files: &mut HashMap<PathBuf, String>,
+            depth: usize,
+        ) -> Result<bool, Error> {
+            // Types
+            // for ndt in &module.types {
+            //     // TODO: Make this only restrict the user when `framework` exists (Eg. whenever a reference exists in the current file).
+            //     if ndt.name() == "framework" {
+            //         return Err(Error::DuplicateTypeName {
+            //             types: (
+            //                 TypeOrModuleOrImport::Import("framework".into()),
+            //                 ndt.location().into(),
+            //             ),
+            //             name: ndt.name().clone(),
+            //         });
+            //     }
+            // }
+
+            module.types.sort_by(|a, b| {
+                a.name()
+                    .cmp(b.name())
+                    .then(a.module_path().cmp(b.module_path()))
+                    .then(a.location().cmp(&b.location()))
+            });
+            let exports = render_flat_types(s, exporter, types, module.types.iter().copied(), "")?;
+
+            if !module.children.is_empty() {
+                for name in module.children.keys() {
+                    // TODO: Make this only restrict the user when `framework` is used.
+                    // if *name == "framework" {
+                    //     return Err(Error::DuplicateTypeName {
+                    //         types: (
+                    //             TypeOrModuleOrImport::Import("framework".into()),
+                    //             construct_module(&module.module_path, name),
+                    //         ),
+                    //         name: name.to_string().into(),
+                    //     });
+                    // } else
+                    if let Some(other) = exports.get(*name) {
+                        return Err(Error::DuplicateTypeName {
+                            types: (construct_module(&module.module_path, name), (*other).into()),
+                            name: name.to_string().into(),
+                        });
+                    }
+
+                    s.push_str("\nimport type * as ");
+                    s.push_str(name);
+                    s.push_str(" from \"./");
+                    if !parent_name.is_empty() {
+                        s.push_str(parent_name);
+                        s.push('/');
+                    }
+                    s.push_str(name);
+                    s.push_str("\";");
+                }
+
+                s.push_str("\n\nexport type { ");
+                for (i, name) in module.children.keys().enumerate() {
+                    if i != 0 {
+                        s.push_str(", ");
+                    }
+                    s.push_str(name);
+                }
+                s.push_str(" };\n");
             }
 
-            std::fs::write(path, self.export(types)?)?;
+            for (name, module) in &mut module.children {
+                // This doesn't account for `NamedDataType::requires_reference`
+                // but we keep it for performance.
+                if module.types.is_empty() && module.children.is_empty() {
+                    continue;
+                }
+
+                let mut path = path.join(name);
+                let mut out = render_file_header(exporter)?;
+
+                // TODO: Only add this if it's used
+                out.push_str("\nimport * as framework from \"");
+                if depth == 0 {
+                    out.push_str("./");
+                } else {
+                    for _ in 0..depth {
+                        out.push_str("../");
+                    }
+                }
+                out.push_str("index\";\n");
+
+                let has_types = export(
+                    exporter,
+                    types,
+                    module,
+                    &mut out,
+                    &path,
+                    name,
+                    files,
+                    depth + 1,
+                )?;
+                if has_types {
+                    path.set_extension(if exporter.jsdoc { "js" } else { "ts" });
+                    files.insert(path, out);
+                }
+            }
+
+            Ok(!(exports.is_empty() && module.children.is_empty()))
         }
+
+        let mut files = HashMap::new();
+        let mut runtime_path = path.join("index");
+        runtime_path.set_extension(if self.jsdoc { "js" } else { "ts" });
+
+        let mut root_types = String::new();
+        export(
+            self,
+            &types,
+            &mut build_module_graph(&types),
+            &mut root_types,
+            path,
+            "",
+            &mut files,
+            0,
+        )?;
+
+        {
+            let mut has_manually_exported_user_types = false;
+            let mut runtime = Cow::default();
+            if let Some(framework_runtime) = &self.framework_runtime {
+                runtime = (framework_runtime.0)(FrameworkExporter {
+                    exporter: self,
+                    has_manually_exported_user_types: &mut has_manually_exported_user_types,
+                    files_root_types: &root_types,
+                    types: &types,
+                })?;
+            }
+
+            if !runtime.is_empty() {
+                files.insert(runtime_path, {
+                    let mut out = render_file_header(self)?;
+
+                    // Framework runtime
+                    out.push('\n');
+                    out.push_str(&runtime);
+
+                    // User types (if not included in framework runtime)
+                    if !has_manually_exported_user_types {
+                        if !runtime.is_empty() {
+                            out += "\n";
+                        }
+
+                        render_types(&mut out, self, &types, "")?;
+                    }
+
+                    out
+                });
+            }
+        }
+
+        if let Ok(meta) = path.metadata()
+            && !meta.is_dir()
+        {
+            std::fs::remove_file(path)?;
+        }
+
+        for (path, content) in &files {
+            path.parent().map(std::fs::create_dir_all).transpose()?;
+            std::fs::write(path, content)?;
+        }
+
+        cleanup_stale_files(path, &files)?;
 
         Ok(())
     }
@@ -596,83 +425,281 @@ impl AsMut<Exporter> for Exporter {
     }
 }
 
-type ImportMap = BTreeMap<String, BTreeSet<(Cow<'static, str>, String)>>;
+/// Reference to Typescript language exporter for framework
+pub struct FrameworkExporter<'a> {
+    exporter: &'a Exporter,
+    has_manually_exported_user_types: &'a mut bool,
+    // For `Layout::Files` we need to inject the value
+    files_root_types: &'a str,
+    pub types: &'a TypeCollection,
+}
 
-/// Scan for references in a `DataType` chain and collate the required cross-file imports.
-fn crawl_for_imports(dt: &DataType, types: &TypeCollection, imports: &mut ImportMap) {
-    fn crawl_references_fields(fields: &Fields, types: &TypeCollection, imports: &mut ImportMap) {
-        match fields {
-            Fields::Unit => {}
-            Fields::Unnamed(fields) => {
-                for field in fields.fields() {
-                    if let Some(ty) = field.ty() {
-                        crawl_for_imports(ty, types, imports);
-                    }
-                }
-            }
-            Fields::Named(fields) => {
-                for (_, field) in fields.fields() {
-                    if let Some(ty) = field.ty() {
-                        crawl_for_imports(ty, types, imports);
-                    }
-                }
-            }
-        }
-    }
-
-    match dt {
-        DataType::Primitive(..) => {}
-        DataType::List(list) => {
-            crawl_for_imports(list.ty(), types, imports);
-        }
-        DataType::Map(map) => {
-            crawl_for_imports(map.key_ty(), types, imports);
-            crawl_for_imports(map.value_ty(), types, imports);
-        }
-        DataType::Nullable(dt) => {
-            crawl_for_imports(dt, types, imports);
-        }
-        DataType::Struct(s) => {
-            crawl_references_fields(s.fields(), types, imports);
-        }
-        DataType::Enum(e) => {
-            for (_, variant) in e.variants() {
-                crawl_references_fields(variant.fields(), types, imports);
-            }
-        }
-        DataType::Tuple(tuple) => {
-            for field in tuple.elements() {
-                crawl_for_imports(field, types, imports);
-            }
-        }
-        DataType::Reference(Reference::Named(r)) => {
-            if let Some(ndt) = r.get(types) {
-                let mut path = "./".to_string();
-
-                let depth = ndt.module_path().split("::").count();
-                for _ in 2..depth {
-                    path.push_str("../");
-                }
-
-                imports
-                    .entry(path)
-                    .or_default()
-                    .insert((ndt.name().clone(), ndt.module_path().replace("::", "_")));
-            }
-        }
-        DataType::Reference(Reference::Opaque(_)) | DataType::Generic(_) => {}
+impl fmt::Debug for FrameworkExporter<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.exporter.fmt(f)
     }
 }
 
-pub(crate) fn root_alias_ident(root: &str) -> String {
-    let mut alias = String::from("$specta$root$");
-    for ch in root.chars() {
-        if ch == '_' || ch.is_ascii_alphanumeric() {
-            alias.push(ch);
-        } else {
-            alias.push('_');
+impl AsRef<Exporter> for FrameworkExporter<'_> {
+    fn as_ref(&self) -> &Exporter {
+        self
+    }
+}
+
+impl Deref for FrameworkExporter<'_> {
+    type Target = Exporter;
+
+    fn deref(&self) -> &Self::Target {
+        self.exporter
+    }
+}
+
+impl FrameworkExporter<'_> {
+    /// Render the types within the [TypeCollection].
+    ///
+    /// This will only work if used within [Self::framework_runtime] function.
+    /// It allows frameworks to intersperse their user types into their runtime code.
+    pub fn render_types(&mut self) -> Result<Cow<'static, str>, Error> {
+        let mut s = String::new();
+        render_types(&mut s, self.exporter, self.types, self.files_root_types)?;
+        *self.has_manually_exported_user_types = true;
+        Ok(Cow::Owned(s))
+    }
+
+    /// [primitives::export]
+    pub fn export(&self, ndt: &NamedDataType) -> Result<String, Error> {
+        primitives::export(self, self.types, ndt)
+    }
+
+    /// [primitives::inline]
+    pub fn inline(&self, dt: &DataType) -> Result<String, Error> {
+        primitives::inline(self, self.types, dt)
+    }
+
+    /// [primitives::reference]
+    pub fn reference(&self, r: &Reference) -> Result<String, Error> {
+        primitives::reference(self, self.types, r)
+    }
+}
+
+struct Module<'a> {
+    types: Vec<&'a NamedDataType>,
+    children: BTreeMap<&'a str, Module<'a>>,
+    module_path: Cow<'static, str>,
+}
+
+fn build_module_graph(types: &TypeCollection) -> Module<'_> {
+    types.into_unsorted_iter().fold(
+        Module {
+            types: Default::default(),
+            children: Default::default(),
+            module_path: Default::default(),
+        },
+        |mut ns, ndt| {
+            let path = ndt.module_path();
+
+            if path.is_empty() {
+                ns.types.push(ndt);
+            } else {
+                let mut current = &mut ns;
+                for segment in path.split("::") {
+                    current = current.children.entry(segment).or_insert_with(|| Module {
+                        types: Default::default(),
+                        children: Default::default(),
+                        module_path: path.clone(),
+                    });
+                }
+
+                current.types.push(ndt);
+            }
+
+            ns
+        },
+    )
+}
+
+fn render_file_header(exporter: &Exporter) -> Result<String, Error> {
+    let mut out = exporter.header.to_string();
+    if !exporter.header.is_empty() {
+        out += "\n";
+    }
+
+    out += &exporter.framework_prelude;
+    if !exporter.framework_prelude.is_empty() {
+        out += "\n";
+    }
+
+    Ok(out)
+}
+
+fn render_types(
+    s: &mut String,
+    exporter: &Exporter,
+    types: &TypeCollection,
+    files_user_types: &str,
+) -> Result<(), Error> {
+    match exporter.layout {
+        Layout::Namespaces => {
+            fn export<'a>(
+                exporter: &Exporter,
+                types: &TypeCollection,
+                s: &mut String,
+                module: impl ExactSizeIterator<Item = (&'a &'a str, &'a mut Module<'a>)>,
+                depth: usize,
+            ) -> Result<(), Error> {
+                let indent = "\t".repeat(depth);
+
+                for (name, module) in module {
+                    s.push('\n');
+                    s.push_str(&indent);
+                    if depth != 0 && *name != "$specta$" {
+                        s.push_str("export ");
+                    }
+                    s.push_str("namespace ");
+                    s.push_str(name);
+                    s.push_str(" {\n");
+
+                    // Types
+                    module.types.sort_by(|a, b| {
+                        a.name()
+                            .cmp(b.name())
+                            .then(a.module_path().cmp(b.module_path()))
+                            .then(a.location().cmp(&b.location()))
+                    });
+                    render_flat_types(s, exporter, types, module.types.iter().copied(), &indent)?;
+
+                    // Namespaces
+                    export(exporter, types, s, module.children.iter_mut(), depth + 1)?;
+
+                    s.push_str("}\n");
+                }
+
+                Ok(())
+            }
+
+            let mut module = build_module_graph(types);
+
+            let reexports = {
+                let mut reexports = String::new();
+                for name in module
+                    .children
+                    .keys()
+                    .cloned()
+                    .chain(module.types.iter().map(|ndt| &**ndt.name()))
+                {
+                    reexports.push_str("export import ");
+                    reexports.push_str(name);
+                    reexports.push_str(" = $s$.");
+                    reexports.push_str(name);
+                    reexports.push_str(";\n");
+                }
+                reexports
+            };
+
+            export(exporter, types, s, [(&"$s$", &mut module)].into_iter(), 0)?;
+            s.push_str(&reexports);
+        }
+        Layout::ModulePrefixedName | Layout::FlatFile => {
+            render_flat_types(s, exporter, types, types.into_sorted_iter(), "")?;
+        }
+        // The types will get their own files
+        // So we keep the user types empty for easy downstream detection.
+        Layout::Files => {
+            if !files_user_types.is_empty() {
+                s.push_str(files_user_types);
+            }
         }
     }
-    alias.push('$');
-    alias
+
+    Ok(())
+}
+
+// Implementation of `Layout::ModulePrefixedName | Layout::FlatFile`,
+// but is used by `Layout::Namespace` and `Layout::Files`
+fn render_flat_types<'a>(
+    s: &mut String,
+    exporter: &Exporter,
+    types: &TypeCollection,
+    ndts: impl ExactSizeIterator<Item = &'a NamedDataType>,
+    indent: &str,
+) -> Result<HashMap<String, Location<'static>>, Error> {
+    let mut exports = HashMap::with_capacity(ndts.len());
+
+    for ndt in ndts {
+        if !ndt.requires_reference(types) {
+            continue;
+        }
+
+        if let Some(other) = exports.insert(ndt.name().to_string(), ndt.location()) {
+            return Err(Error::DuplicateTypeName {
+                types: (ndt.location().into(), other.into()),
+                name: ndt.name().clone(),
+            });
+        }
+
+        s.push('\n');
+        s.push_str(indent);
+
+        if exporter.jsdoc {
+            primitives::typedef_internal(s, exporter, types, ndt)?;
+        } else {
+            primitives::export_internal(s, exporter, types, ndt)?;
+        }
+    }
+
+    Ok(exports)
+}
+
+/// Collect all TypeScript/JavaScript files in a directory recursively
+fn collect_existing_files(root: &Path) -> Result<HashSet<PathBuf>, std::io::Error> {
+    if !root.exists() {
+        return Ok(HashSet::new());
+    }
+
+    Ok(std::fs::read_dir(root)?
+        .filter_map(Result::ok)
+        .flat_map(|entry| {
+            let path = entry.path();
+            if path.is_dir() {
+                collect_existing_files(&path).unwrap_or_default()
+            } else if matches!(path.extension().and_then(|e| e.to_str()), Some("ts" | "js")) {
+                HashSet::from([path])
+            } else {
+                HashSet::new()
+            }
+        })
+        .collect::<HashSet<_>>())
+}
+
+/// Remove empty directories recursively, stopping at the root
+fn remove_empty_dirs(path: &Path, root: &Path) -> Result<(), std::io::Error> {
+    std::fs::read_dir(path)?
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().is_dir())
+        .try_for_each(|entry| remove_empty_dirs(&entry.path(), root))?;
+    if path != root && path.read_dir()?.next().is_none() {
+        std::fs::remove_dir(path)?;
+    }
+    Ok(())
+}
+
+/// Delete stale files and clean up empty directories
+fn cleanup_stale_files(root: &Path, current_files: &HashMap<PathBuf, String>) -> Result<(), Error> {
+    collect_existing_files(root)?
+        .into_iter()
+        .filter(|path| !current_files.contains_key(path))
+        .try_for_each(|path| std::fs::remove_file(&path).map_err(Error::from))?;
+    remove_empty_dirs(root, root).ok(); // Ignore errors for directory cleanup
+    Ok(())
+}
+
+fn construct_module(path: &str, ident: &str) -> TypeOrModuleOrImport {
+    TypeOrModuleOrImport::Module(
+        if path.is_empty() {
+            format!("::{ident}")
+        } else {
+            format!("{path}::{ident}")
+        }
+        .into(),
+    )
 }

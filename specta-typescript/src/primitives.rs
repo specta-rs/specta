@@ -16,10 +16,7 @@ use specta::{
     },
 };
 
-use crate::{
-    BigIntExportBehavior, Branded, Error, Exporter, Layout, define::Define,
-    exporter::root_alias_ident, legacy::js_doc,
-};
+use crate::{BigIntExportBehavior, Branded, Error, Exporter, Layout, legacy::js_doc, opaque};
 
 /// Generate an `export Type = ...` Typescript string for a specific [`NamedDataType`].
 ///
@@ -33,8 +30,17 @@ pub fn export(
     types: &TypeCollection,
     ndt: &NamedDataType,
 ) -> Result<String, Error> {
-    let exporter = exporter.as_ref();
+    let mut s = String::new();
+    export_internal(&mut s, exporter.as_ref(), types, ndt)?;
+    Ok(s)
+}
 
+pub(crate) fn export_internal(
+    s: &mut String,
+    exporter: &Exporter,
+    types: &TypeCollection,
+    ndt: &NamedDataType,
+) -> Result<(), Error> {
     let generics = (!ndt.generics().is_empty())
         .then(|| {
             iter::once("<")
@@ -64,17 +70,17 @@ pub fn export(
     )?
     .leak(); // TODO: Leaking bad
 
-    let s = iter::empty()
-        .chain(["export type ", name])
-        .chain(generics)
-        .chain([" = "])
-        .collect::<String>(); // TODO: Don't collect and instead build into `result`
+    js_doc(s, ndt.docs(), ndt.deprecated());
 
-    let mut result = js_doc(ndt.docs(), ndt.deprecated());
-    result.push_str(&s);
+    s.push_str("export type ");
+    s.push_str(name);
+    for part in generics {
+        s.push_str(part);
+    }
+    s.push_str(" = ");
 
     datatype(
-        &mut result,
+        s,
         exporter,
         types,
         ndt.ty(),
@@ -83,106 +89,9 @@ pub fn export(
         Some(ndt.name()),
         "\t",
     )?;
-    result.push_str(";\n");
+    s.push_str(";\n");
 
-    Ok(result)
-}
-
-// TODO: I think we should remove this?
-// /// Generate a JSDoc `@typedef` comment for defining a [NamedDataType].
-// ///
-// /// This method leaves the following up to the implementer:
-// ///  - Ensuring all referenced types are exported
-// ///  - Handling multiple type with overlapping names
-// ///  - Transforming the type for your serialization format (Eg. Serde)
-// ///
-// pub fn typedef(js: &JSDoc, types: &TypeCollection, dt: &NamedDataType) -> Result<String, Error> {
-//     typedef_internal(js.exporter(), types, dt)
-// }
-
-// This can be used internally to prevent cloning `Typescript` instances.
-// Externally this shouldn't be a concern so we don't expose it.
-pub(crate) fn typedef_internal(
-    exporter: &Exporter,
-    types: &TypeCollection,
-    dt: &NamedDataType,
-) -> Result<String, Error> {
-    let generics = (!dt.generics().is_empty())
-        .then(|| {
-            iter::once("<")
-                .chain(intersperse(dt.generics().iter().map(|g| g.borrow()), ", "))
-                .chain(iter::once(">"))
-        })
-        .into_iter()
-        .flatten();
-
-    let name = dt.name();
-    let type_name = iter::empty()
-        .chain([name.as_ref()])
-        .chain(generics)
-        .collect::<String>();
-
-    let mut s = "/**\n".to_string();
-
-    if !dt.docs().is_empty() {
-        for line in dt.docs().lines() {
-            s.push_str("\t* ");
-            s.push_str(line);
-            s.push('\n');
-        }
-        s.push_str("\t*\n");
-    }
-
-    if let Some(deprecated) = dt.deprecated() {
-        s.push_str("\t* @deprecated");
-        if let DeprecatedType::DeprecatedWithSince { note, .. } = deprecated {
-            s.push(' ');
-            s.push_str(note);
-        }
-        s.push('\n');
-    }
-
-    s.push_str("\t* @typedef {");
-    datatype(
-        &mut s,
-        exporter,
-        types,
-        dt.ty(),
-        vec![dt.name().clone()],
-        false,
-        Some(dt.name()),
-        "\t*\t",
-    )?;
-    s.push_str("} ");
-    s.push_str(&type_name);
-    s.push('\n');
-    s.push_str("\t*/");
-
-    Ok(s)
-}
-
-/// Generate an Typescript string to refer to a specific [`DataType`].
-///
-/// For primitives this will include the literal type but for named type it will contain a reference.
-///
-/// See [`export`] for the list of things to consider when using this.
-pub fn reference(
-    exporter: &dyn AsRef<Exporter>,
-    types: &TypeCollection,
-    dt: &DataType,
-) -> Result<String, Error> {
-    let mut s = String::new();
-    datatype(
-        &mut s,
-        exporter.as_ref(),
-        types,
-        dt,
-        vec![],
-        false,
-        None,
-        "",
-    )?;
-    Ok(s)
+    Ok(())
 }
 
 /// Generate an inlined Typescript string for a specific [`DataType`].
@@ -209,6 +118,83 @@ pub fn inline(
         "",
         0,
     )?;
+    Ok(s)
+}
+
+// This can be used internally to prevent cloning `Typescript` instances.
+// Externally this shouldn't be a concern so we don't expose it.
+pub(crate) fn typedef_internal(
+    s: &mut String,
+    exporter: &Exporter,
+    types: &TypeCollection,
+    dt: &NamedDataType,
+) -> Result<(), Error> {
+    let generics = (!dt.generics().is_empty())
+        .then(|| {
+            iter::once("<")
+                .chain(intersperse(dt.generics().iter().map(|g| g.borrow()), ", "))
+                .chain(iter::once(">"))
+        })
+        .into_iter()
+        .flatten();
+
+    let name = dt.name();
+    let type_name = iter::empty()
+        .chain([name.as_ref()])
+        .chain(generics)
+        .collect::<String>();
+
+    s.push_str("/**\n");
+
+    if !dt.docs().is_empty() {
+        for line in dt.docs().lines() {
+            s.push_str("\t* ");
+            s.push_str(line);
+            s.push('\n');
+        }
+        s.push_str("\t*\n");
+    }
+
+    if let Some(deprecated) = dt.deprecated() {
+        s.push_str("\t* @deprecated");
+        if let DeprecatedType::DeprecatedWithSince { note, .. } = deprecated {
+            s.push(' ');
+            s.push_str(note);
+        }
+        s.push('\n');
+    }
+
+    s.push_str("\t* @typedef {");
+    datatype(
+        s,
+        exporter,
+        types,
+        dt.ty(),
+        vec![dt.name().clone()],
+        false,
+        Some(dt.name()),
+        "\t*\t",
+    )?;
+    s.push_str("} ");
+    s.push_str(&type_name);
+    s.push('\n');
+    s.push_str("\t*/");
+
+    Ok(())
+}
+
+/// Generate an Typescript string to refer to a specific [`DataType`].
+///
+/// For primitives this will include the literal type but for named type it will contain a reference.
+///
+/// See [`export`] for the list of things to consider when using this.
+pub fn reference(
+    exporter: &dyn AsRef<Exporter>,
+    types: &TypeCollection,
+    r: &Reference,
+) -> Result<String, Error> {
+    let mut s = String::new();
+    reference_dt(&mut s, exporter.as_ref(), types, r, vec![], false)?;
     Ok(s)
 }
 
@@ -1078,11 +1064,24 @@ fn reference_opaque_dt(
     types: &TypeCollection,
     r: &OpaqueReference,
 ) -> Result<(), Error> {
-    if let Some(def) = r.downcast_ref::<Define>() {
+    if let Some(def) = r.downcast_ref::<opaque::Define>() {
         s.push_str(&def.0);
         return Ok(());
+    } else if r.downcast_ref::<opaque::Any>().is_some() {
+        s.push_str("any");
+        return Ok(());
+    } else if r.downcast_ref::<opaque::Unknown>().is_some() {
+        s.push_str("unknown");
+        return Ok(());
+    } else if r.downcast_ref::<opaque::Never>().is_some() {
+        s.push_str("never");
+        return Ok(());
     } else if let Some(def) = r.downcast_ref::<Branded>() {
-        s.push_str(&reference(exporter, types, def.ty())?);
+        // TODO: Build onto `s` instead of appending a separate string
+        s.push_str(&match def.ty() {
+            DataType::Reference(r) => reference(exporter, types, r),
+            ty => inline(exporter, types, ty),
+        }?);
         s.push_str(r#" & ""#);
         s.push_str(def.brand());
         s.push('"');
@@ -1105,6 +1104,7 @@ fn reference_named_dt(
     {
         let ndt = r
             .get(types)
+            // TODO: This should return runtime error not panic
             .expect("TypeCollection should have been populated by now");
 
         // Check if this reference should be inlined
@@ -1124,26 +1124,33 @@ fn reference_named_dt(
                 if ndt.module_path().is_empty() {
                     ndt.name().clone()
                 } else {
-                    let parts: Vec<&str> = ndt.module_path().split("::").collect();
-                    if let Some((root, rest)) = parts.split_first() {
-                        let mut s = root_alias_ident(root);
-                        if !rest.is_empty() {
-                            s.push('.');
-                            s.push_str(&rest.join("."));
-                        }
-                        s.push('.');
-                        s.push_str(ndt.name());
-                        Cow::Owned(s)
-                    } else {
-                        ndt.name().clone()
-                    }
+                    let mut path =
+                        ndt.module_path()
+                            .split("::")
+                            .fold("$s$.".to_string(), |mut s, segment| {
+                                s.push_str(segment);
+                                s.push('.');
+                                s
+                            });
+                    path.push_str(ndt.name());
+                    Cow::Owned(path)
                 }
             }
             Layout::Files => {
-                let mut s = ndt.module_path().replace("::", "_");
-                s.push('_');
-                s.push_str(ndt.name());
-                Cow::Owned(s)
+                if ndt.module_path().is_empty() {
+                    ndt.name().clone()
+                } else {
+                    let mut path =
+                        ndt.module_path()
+                            .split("::")
+                            .fold(String::new(), |mut s, segment| {
+                                s.push_str(segment);
+                                s.push('.');
+                                s
+                            });
+                    path.push_str(ndt.name());
+                    Cow::Owned(path)
+                }
             }
             _ => ndt.name().clone(),
         };

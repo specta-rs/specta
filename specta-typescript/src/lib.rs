@@ -47,21 +47,21 @@
 )]
 
 mod branded;
-mod define;
 mod error;
 mod exporter;
 mod jsdoc;
 mod legacy; // TODO: Remove this
+mod opaque;
 pub mod primitives;
 pub(crate) mod reserved_names;
 mod types;
 mod typescript;
 
 pub use branded::Branded;
-pub use define::define;
-pub use error::Error;
-pub use exporter::{BigIntExportBehavior, Exporter, Layout};
+pub use error::{Error, TypeOrModuleOrImport};
+pub use exporter::{BigIntExportBehavior, Exporter, FrameworkExporter, Layout};
 pub use jsdoc::JSDoc;
+pub use opaque::define;
 pub use types::{Any, Never, Unknown};
 pub use typescript::Typescript;
 

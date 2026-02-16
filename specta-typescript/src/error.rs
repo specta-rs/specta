@@ -2,7 +2,7 @@ use std::{borrow::Cow, error, fmt, io, panic::Location};
 
 use specta::datatype::OpaqueReference;
 
-use crate::legacy::NamedLocation;
+use crate::{Layout, legacy::NamedLocation};
 
 use super::legacy::ExportPath;
 
@@ -26,9 +26,13 @@ pub enum Error {
         path: String,
         name: Cow<'static, str>,
     },
-    /// Detected multiple types with the same name.
+    /// Detected multiple items within the same scope with the same name.
+    /// Typescript doesn't support this so we error out.
+    ///
+    /// Using anything other than [Layout::FlatFile] should make this basically impossible.
     DuplicateTypeName {
-        types: (Location<'static>, Location<'static>),
+        // TODO: Flatten tuple into fields.
+        types: (TypeOrModuleOrImport, TypeOrModuleOrImport),
         name: Cow<'static, str>,
     },
     /// An filesystem IO error.
@@ -37,6 +41,8 @@ pub enum Error {
     /// Found an opaque reference which the Typescript exporter doesn't know how to handle.
     /// You may be referencing a type which is not supported by the Typescript exporter.
     UnsupportedOpaqueReference(OpaqueReference),
+    /// An error occurred in your exporter framework.
+    Framework(Cow<'static, str>),
 
     //
     //
@@ -60,7 +66,7 @@ pub enum Error {
     DuplicateTypeNameLegacy(Cow<'static, str>, Location<'static>, Location<'static>),
     // #[error("fmt error: {0}")]
     FmtLegacy(std::fmt::Error),
-    UnableToExport,
+    UnableToExport(Layout),
 }
 
 impl From<io::Error> for Error {
@@ -109,6 +115,9 @@ impl fmt::Display for Error {
                     r.type_name()
                 )
             }
+            Error::Framework(e) => {
+                write!(f, "Framework error: {e}")
+            }
             // TODO:
             Error::BigIntForbiddenLegacy(path) => writeln!(
                 f,
@@ -135,9 +144,26 @@ impl fmt::Display for Error {
                 "Attempted to export {a:?} but was unable to due to name {b:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`"
             ),
             Error::FmtLegacy(err) => writeln!(f, "formatter: {err:?}"),
-            Error::UnableToExport => writeln!(f, "Unable to export type"),
+            Error::UnableToExport(layout) => writeln!(
+                f,
+                "Unable to export layout {layout} with the current configuration. Maybe try `Exporter::export_to` or switching to Typescript."
+            ),
         }
     }
 }
 
 impl error::Error for Error {}
+
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum TypeOrModuleOrImport {
+    Type(Location<'static>),
+    Module(Cow<'static, str>),
+    Import(Cow<'static, str>),
+}
+
+impl From<Location<'static>> for TypeOrModuleOrImport {
+    fn from(location: Location<'static>) -> Self {
+        TypeOrModuleOrImport::Type(location)
+    }
+}

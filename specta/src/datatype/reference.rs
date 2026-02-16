@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::{TypeCollection, datatype::NamedDataType};
+use crate::{datatype::NamedDataType, TypeCollection};
 
 use super::{DataType, Generic};
 
@@ -52,11 +52,35 @@ impl NamedReference {
 #[derive(Clone)]
 pub struct OpaqueReference(Arc<dyn DynOpaqueReference>);
 
+pub(crate) fn tauri() -> Reference {
+    Reference::Opaque(OpaqueReference(Arc::new(TauriChannelReferenceInner)))
+}
+
 trait DynOpaqueReference: Any + Send + Sync {
     fn type_name(&self) -> &'static str;
     fn hash(&self, hasher: &mut dyn hash::Hasher);
     fn eq(&self, other: &dyn Any) -> bool;
     fn as_any(&self) -> &dyn Any;
+}
+
+#[derive(PartialEq, Eq)]
+struct TauriChannelReferenceInner;
+impl DynOpaqueReference for TauriChannelReferenceInner {
+    fn type_name(&self) -> &'static str {
+        "tauri::ipc::Channel"
+    }
+    fn hash(&self, hasher: &mut dyn hash::Hasher) {
+        hasher.write_u64(0);
+    }
+    fn eq(&self, other: &dyn Any) -> bool {
+        other
+            .downcast_ref::<Self>()
+            .map(|other| self == other)
+            .unwrap_or_default()
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 #[derive(Debug)]
@@ -136,6 +160,16 @@ impl Reference {
             _ => false,
         }
     }
+
+    /// Convert an existing [Reference] into an inlined one.
+    ///
+    /// It's not safe to go the other way incase the type is inlined which requires all [Reference]'s to be inlined.
+    pub fn inline(mut self) -> Reference {
+        if let Reference::Named(n) = &mut self {
+            n.inline = true;
+        }
+        self
+    }
 }
 
 impl From<Reference> for DataType {
@@ -146,22 +180,19 @@ impl From<Reference> for DataType {
 
 /// A unique identifier for a [NamedDataType].
 ///
-/// `Arc<()>` is a great way of creating a virtual ID which
-/// can be compared to itself but for any types defined with the macro
-/// it requires a 'static allocation which is cringe so we use the pointer
-/// to a static which doesn't allocate but is much more error-prone so it's only used internally.
+/// For static types (from derive macros), we use a unique string based on the
+/// type's module path and name. For dynamic types, we use an Arc pointer.
 #[derive(Clone)]
 pub(crate) enum NamedId {
-    // A pointer to a `static ...: ...`.
-    // These are all given a unique pointer.
-    Static(&'static ()),
+    // A unique string identifying the type (module_path::TypeName).
+    Static(&'static str),
     Dynamic(Arc<()>),
 }
 
 impl PartialEq for NamedId {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (NamedId::Static(a), NamedId::Static(b)) => std::ptr::eq(*a, *b),
+            (NamedId::Static(a), NamedId::Static(b)) => a == b,
             (NamedId::Dynamic(a), NamedId::Dynamic(b)) => Arc::ptr_eq(a, b),
             _ => false,
         }
@@ -172,7 +203,7 @@ impl Eq for NamedId {}
 impl hash::Hash for NamedId {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         match self {
-            NamedId::Static(p) => std::ptr::hash(*p, state),
+            NamedId::Static(s) => s.hash(state),
             NamedId::Dynamic(p) => std::ptr::hash(Arc::as_ptr(p), state),
         }
     }
@@ -181,8 +212,8 @@ impl hash::Hash for NamedId {
 impl fmt::Debug for NamedId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            NamedId::Static(p) => write!(f, "s{:p})", *p),
-            NamedId::Dynamic(p) => write!(f, "d{:p})", Arc::as_ptr(p)),
+            NamedId::Static(s) => write!(f, "s:{}", s),
+            NamedId::Dynamic(p) => write!(f, "d{:p}", Arc::as_ptr(p)),
         }
     }
 }

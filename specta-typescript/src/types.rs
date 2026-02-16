@@ -1,6 +1,11 @@
 use std::fmt::Debug;
 
-use specta::{Type, TypeCollection, datatype::DataType};
+use specta::{
+    Type, TypeCollection,
+    datatype::{DataType, Reference},
+};
+
+use crate::opaque;
 
 /// Cast a Rust type to a Typescript `any` type.
 ///
@@ -38,7 +43,7 @@ pub struct Any<T = ()>(T);
 
 impl<T> Type for Any<T> {
     fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Reference(crate::define("any"))
+        DataType::Reference(Reference::opaque(opaque::Any))
     }
 }
 
@@ -105,7 +110,7 @@ pub struct Unknown<T = ()>(T);
 
 impl<T> Type for Unknown<T> {
     fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Reference(crate::define("unknown"))
+        DataType::Reference(Reference::opaque(opaque::Unknown))
     }
 }
 
@@ -172,7 +177,7 @@ pub struct Never<T = ()>(T);
 
 impl<T> Type for Never<T> {
     fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Reference(crate::define("never"))
+        DataType::Reference(Reference::opaque(opaque::Never))
     }
 }
 
