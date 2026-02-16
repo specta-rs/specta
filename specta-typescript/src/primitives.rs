@@ -1335,9 +1335,9 @@ fn reference_opaque_dt(
             DataType::Reference(r) => reference(exporter, types, r),
             ty => inline(exporter, types, ty),
         }?);
-        s.push_str(r#" & ""#);
+        s.push_str(r#" & { { readonly __brand: ""#);
         s.push_str(def.brand());
-        s.push('"');
+        s.push_str("\" }");
         return Ok(());
     }
 
