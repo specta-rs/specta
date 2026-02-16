@@ -1330,6 +1330,16 @@ fn reference_opaque_dt(
         s.push_str("never");
         return Ok(());
     } else if let Some(def) = r.downcast_ref::<Branded>() {
+        if let Some(branded_type) = exporter
+            .branded_type_impl
+            .as_ref()
+            .map(|builder| (builder.0)(def))
+            .transpose()?
+        {
+            s.push_str(branded_type.as_ref());
+            return Ok(());
+        }
+
         // TODO: Build onto `s` instead of appending a separate string
         s.push_str(&match def.ty() {
             DataType::Reference(r) => reference(exporter, types, r),
