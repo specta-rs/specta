@@ -41,6 +41,10 @@ pub enum Error {
     /// Found an opaque reference which the Typescript exporter doesn't know how to handle.
     /// You may be referencing a type which is not supported by the Typescript exporter.
     UnsupportedOpaqueReference(OpaqueReference),
+    /// Found a named reference that cannot be resolved from the provided [`TypeCollection`](specta::TypeCollection).
+    DanglingNamedReference {
+        reference: String,
+    },
     /// An error occurred in your exporter framework.
     Framework(Cow<'static, str>),
 
@@ -113,6 +117,12 @@ impl fmt::Display for Error {
                     f,
                     "Found unsupported opaque reference '{}'. It is not supported by the Typescript exporter.",
                     r.type_name()
+                )
+            }
+            Error::DanglingNamedReference { reference } => {
+                write!(
+                    f,
+                    "Found dangling named reference {reference}. The referenced type is missing from `TypeCollection`."
                 )
             }
             Error::Framework(e) => {

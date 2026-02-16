@@ -785,7 +785,9 @@ fn validate_type_for_tagged_intersection(
         DataType::Reference(Reference::Named(r)) => validate_type_for_tagged_intersection(
             ctx,
             r.get(types)
-                .expect("TypeCollection should have been populated by now")
+                .ok_or_else(|| Error::DanglingNamedReference {
+                    reference: format!("{r:?}"),
+                })?
                 .ty()
                 .clone(),
             types,

@@ -1356,10 +1356,9 @@ fn reference_named_dt(
 ) -> Result<(), Error> {
     // TODO: Legacy stuff
     {
-        let ndt = r
-            .get(types)
-            // TODO: This should return runtime error not panic
-            .expect("TypeCollection should have been populated by now");
+        let ndt = r.get(types).ok_or_else(|| Error::DanglingNamedReference {
+            reference: format!("{r:?}"),
+        })?;
 
         // Check if this reference should be inlined
         if r.inline() {
