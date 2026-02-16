@@ -15,7 +15,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use specta::{Type, TypeCollection, datatype::DataType};
+use specta::{datatype::DataType, Type, TypeCollection};
 
 /// A macro to collect up the types for better testing.
 ///
@@ -2291,3 +2291,37 @@ struct GenericParameterOrderPreserved {
 //         insta::assert_snapshot!(crate::ts::inline::<EnumWithInternalTag2>(&Default::default()).unwrap(), @r#"({ type: "A" } & InnerA) | ({ type: "B" } & InnerB)"#);
 //     }
 // }
+
+// Transparent wrappers should have distinct type IDs (regression test for linker ICF bug)
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
+struct TransparentA(String);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
+struct TransparentB(String);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct UsesTransparent {
+    a: TransparentA,
+    b: TransparentB,
+}
+
+#[test]
+fn transparent_wrappers_have_distinct_ids() {
+    let mut types = TypeCollection::default();
+    let id_a = TransparentA::definition(&mut types);
+    let id_b = TransparentB::definition(&mut types);
+    assert_ne!(format!("{:?}", id_a), format!("{:?}", id_b));
+    assert_eq!(types.len(), 2);
+}
+
+#[test]
+fn struct_collects_all_transparent_field_types() {
+    let mut types = TypeCollection::default();
+    UsesTransparent::definition(&mut types);
+    assert_eq!(types.len(), 3); // UsesTransparent + TransparentA + TransparentB
+}
