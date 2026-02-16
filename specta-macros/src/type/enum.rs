@@ -65,7 +65,7 @@ pub fn parse_enum(
                     if container_attrs.skip_attrs.contains(&path) {
                         return false;
                     }
-                    path == "serde" || path == "specta"
+                    path != "specta"
                 })
                 .filter_map(|attr| lower_attribute(attr).transpose())
                 .map(|result| result.map(|attr| attr.to_tokens()))

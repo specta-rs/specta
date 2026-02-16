@@ -1,11 +1,11 @@
 use std::{borrow::Cow, panic::Location, sync::Arc};
 
 use crate::{
-    datatype::{
-        reference::{self, NamedId},
-        DataType, Generic, NamedDataTypeBuilder, NamedReference, Reference,
-    },
     TypeCollection,
+    datatype::{
+        DataType, Generic, NamedDataTypeBuilder, NamedReference, Reference,
+        reference::{self, NamedId},
+    },
 };
 
 /// A named type represents a non-primitive type capable of being exported as it's own named entity.
@@ -63,7 +63,7 @@ impl NamedDataType {
             // We patch the Tauri `Type` implementation.
             if ndt.name() == "TAURI_CHANNEL" && ndt.module_path().starts_with("tauri::") {
                 // This causes an exporter that isn't aware of Tauri's channel to error.
-                // This is effectively `Reference::opaque(TauriChannel)` but we do some hacker for better errors.
+                // This is effectively `Reference::opaque(TauriChannel)` but we do some hackery for better errors.
                 ndt.inner = reference::tauri().into();
 
                 // This ensures that we never create a `export type Channel`,

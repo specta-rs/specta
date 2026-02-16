@@ -11,8 +11,8 @@ use std::{
 use specta::{
     TypeCollection,
     datatype::{
-        DataType, DeprecatedType, Enum, List, Map, NamedDataType, NamedReference, OpaqueReference,
-        Primitive, Reference, Tuple,
+        DataType, DeprecatedType, Enum, Generic, List, Map, NamedDataType, NamedReference,
+        OpaqueReference, Primitive, Reference, Tuple,
     },
 };
 
@@ -41,6 +41,10 @@ pub(crate) fn export_internal(
     types: &TypeCollection,
     ndt: &NamedDataType,
 ) -> Result<(), Error> {
+    if exporter.jsdoc {
+        return typedef_internal(s, exporter, types, ndt);
+    }
+
     let generics = (!ndt.generics().is_empty())
         .then(|| {
             iter::once("<")
@@ -67,13 +71,12 @@ pub(crate) fn export_internal(
             }
             _ => ndt.name().clone(),
         },
-    )?
-    .leak(); // TODO: Leaking bad
+    )?;
 
     js_doc(s, ndt.docs(), ndt.deprecated());
 
     s.push_str("export type ");
-    s.push_str(name);
+    s.push_str(&name);
     for part in generics {
         s.push_str(part);
     }
@@ -117,6 +120,7 @@ pub fn inline(
         None,
         "",
         0,
+        &[],
     )?;
     Ok(s)
 }
@@ -194,8 +198,101 @@ pub fn reference(
     r: &Reference,
 ) -> Result<String, Error> {
     let mut s = String::new();
-    reference_dt(&mut s, exporter.as_ref(), types, r, vec![], false)?;
+    reference_dt(&mut s, exporter.as_ref(), types, r, vec![], false, &[])?;
     Ok(s)
+}
+
+fn merged_generics(
+    parent: &[(Generic, DataType)],
+    child: &[(Generic, DataType)],
+) -> Vec<(Generic, DataType)> {
+    child
+        .iter()
+        .map(|(generic, dt)| (generic.clone(), resolve_generics_in_datatype(dt, parent)))
+        .chain(parent.iter().cloned())
+        .collect()
+}
+
+fn resolve_generics_in_datatype(dt: &DataType, generics: &[(Generic, DataType)]) -> DataType {
+    match dt {
+        DataType::Primitive(_) | DataType::Reference(_) => dt.clone(),
+        DataType::List(l) => {
+            let mut out = l.clone();
+            out.set_ty(resolve_generics_in_datatype(l.ty(), generics));
+            DataType::List(out)
+        }
+        DataType::Map(m) => {
+            let mut out = m.clone();
+            out.set_key_ty(resolve_generics_in_datatype(m.key_ty(), generics));
+            out.set_value_ty(resolve_generics_in_datatype(m.value_ty(), generics));
+            DataType::Map(out)
+        }
+        DataType::Nullable(def) => {
+            DataType::Nullable(Box::new(resolve_generics_in_datatype(def, generics)))
+        }
+        DataType::Struct(st) => {
+            let mut out = st.clone();
+            match out.fields_mut() {
+                specta::datatype::Fields::Unit => {}
+                specta::datatype::Fields::Unnamed(unnamed) => {
+                    for field in unnamed.fields_mut() {
+                        if let Some(ty) = field.ty_mut() {
+                            *ty = resolve_generics_in_datatype(ty, generics);
+                        }
+                    }
+                }
+                specta::datatype::Fields::Named(named) => {
+                    for (_, field) in named.fields_mut() {
+                        if let Some(ty) = field.ty_mut() {
+                            *ty = resolve_generics_in_datatype(ty, generics);
+                        }
+                    }
+                }
+            }
+            DataType::Struct(out)
+        }
+        DataType::Enum(en) => {
+            let mut out = en.clone();
+            for (_, variant) in out.variants_mut() {
+                match variant.fields_mut() {
+                    specta::datatype::Fields::Unit => {}
+                    specta::datatype::Fields::Unnamed(unnamed) => {
+                        for field in unnamed.fields_mut() {
+                            if let Some(ty) = field.ty_mut() {
+                                *ty = resolve_generics_in_datatype(ty, generics);
+                            }
+                        }
+                    }
+                    specta::datatype::Fields::Named(named) => {
+                        for (_, field) in named.fields_mut() {
+                            if let Some(ty) = field.ty_mut() {
+                                *ty = resolve_generics_in_datatype(ty, generics);
+                            }
+                        }
+                    }
+                }
+            }
+            DataType::Enum(out)
+        }
+        DataType::Tuple(t) => {
+            let mut out = t.clone();
+            for element in out.elements_mut() {
+                *element = resolve_generics_in_datatype(element, generics);
+            }
+            DataType::Tuple(out)
+        }
+        DataType::Generic(g) => {
+            if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
+                if matches!(resolved_dt, DataType::Generic(inner) if inner == g) {
+                    dt.clone()
+                } else {
+                    resolve_generics_in_datatype(resolved_dt, generics)
+                }
+            } else {
+                dt.clone()
+            }
+        }
+    }
 }
 
 // Internal function to handle inlining without cloning DataType nodes
@@ -210,6 +307,7 @@ fn inline_datatype(
     parent_name: Option<&str>,
     prefix: &str,
     depth: usize,
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     // Prevent infinite recursion
     if depth == 25 {
@@ -233,6 +331,7 @@ fn inline_datatype(
                 &specta::datatype::FunctionReturnType::Value(l.ty().clone()),
                 types,
                 &mut dt_str,
+                generics,
             )?;
 
             let dt_str = if (dt_str.contains(' ') && !dt_str.ends_with('}'))
@@ -256,7 +355,7 @@ fn inline_datatype(
                 write!(s, "{dt_str}[]")?;
             }
         }
-        DataType::Map(m) => map_dt(s, exporter, types, m, location, is_export)?,
+        DataType::Map(m) => map_dt(s, exporter, types, m, location, is_export, generics)?,
         DataType::Nullable(def) => {
             inline_datatype(
                 s,
@@ -268,31 +367,98 @@ fn inline_datatype(
                 parent_name,
                 prefix,
                 depth + 1,
+                generics,
             )?;
             let or_null = " | null";
             if !s.ends_with(&or_null) {
                 s.push_str(or_null);
             }
         }
-        DataType::Struct(st) => crate::legacy::struct_datatype(
-            crate::legacy::ExportContext {
-                cfg: exporter,
-                path: vec![],
-                is_export,
-            },
-            parent_name,
-            st,
-            types,
-            s,
-            prefix,
-        )?,
-        DataType::Enum(e) => enum_dt(s, exporter, types, e, location, is_export, prefix)?,
-        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, is_export)?,
+        DataType::Struct(st) => {
+            // If we have generics to resolve, handle the struct inline to preserve context
+            if !generics.is_empty() {
+                use specta::datatype::Fields;
+                match st.fields() {
+                    Fields::Unit => s.push_str("null"),
+                    Fields::Named(named) => {
+                        s.push('{');
+                        let mut has_field = false;
+                        for (key, field) in named.fields() {
+                            // Skip fields without a type (e.g., flattened or skipped fields)
+                            let Some(field_ty) = field.ty() else {
+                                continue;
+                            };
+
+                            has_field = true;
+                            s.push('\n');
+                            s.push_str(prefix);
+                            s.push('\t');
+                            s.push_str(key);
+                            s.push_str(": ");
+                            inline_datatype(
+                                s,
+                                exporter,
+                                types,
+                                field_ty,
+                                location.clone(),
+                                is_export,
+                                parent_name,
+                                prefix,
+                                depth + 1,
+                                generics,
+                            )?;
+                            s.push(',');
+                        }
+
+                        if has_field {
+                            s.push('\n');
+                            s.push_str(prefix);
+                        }
+
+                        s.push('}');
+                    }
+                    Fields::Unnamed(_) => {
+                        // For unnamed fields, fall back to legacy handling
+                        crate::legacy::struct_datatype(
+                            crate::legacy::ExportContext {
+                                cfg: exporter,
+                                path: vec![],
+                                is_export,
+                            },
+                            parent_name,
+                            st,
+                            types,
+                            s,
+                            prefix,
+                            generics,
+                        )?
+                    }
+                }
+            } else {
+                // No generics, use legacy path
+                crate::legacy::struct_datatype(
+                    crate::legacy::ExportContext {
+                        cfg: exporter,
+                        path: vec![],
+                        is_export,
+                    },
+                    parent_name,
+                    st,
+                    types,
+                    s,
+                    prefix,
+                    Default::default(),
+                )?
+            }
+        }
+        DataType::Enum(e) => enum_dt(s, exporter, types, e, location, is_export, prefix, generics)?,
+        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, is_export, generics)?,
         DataType::Reference(r) => {
             // Always inline references when in inline mode
             if let Reference::Named(r) = r
                 && let Some(ndt) = r.get(types)
             {
+                let combined_generics = merged_generics(generics, r.generics());
                 inline_datatype(
                     s,
                     exporter,
@@ -303,13 +469,39 @@ fn inline_datatype(
                     parent_name,
                     prefix,
                     depth + 1,
+                    &combined_generics,
                 )?;
             } else {
                 // Fallback to regular reference if type not found
-                reference_dt(s, exporter, types, r, location, is_export)?;
+                reference_dt(s, exporter, types, r, location, is_export, generics)?;
             }
         }
-        DataType::Generic(g) => s.push_str(g.borrow()),
+        DataType::Generic(g) => {
+            // Try to resolve the generic from the generics map
+            if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
+                if matches!(resolved_dt, DataType::Generic(inner) if inner == g) {
+                    s.push_str(<Generic as Borrow<str>>::borrow(g));
+                    return Ok(());
+                }
+                // Recursively inline the resolved type
+                inline_datatype(
+                    s,
+                    exporter,
+                    types,
+                    resolved_dt,
+                    location,
+                    is_export,
+                    parent_name,
+                    prefix,
+                    depth + 1,
+                    generics,
+                )?;
+            } else {
+                // Fallback to placeholder name if not found in the generics map
+                // This can happen for unsubstituted generic types
+                s.push_str(<Generic as Borrow<str>>::borrow(g));
+            }
+        }
     }
 
     Ok(())
@@ -327,12 +519,37 @@ pub(crate) fn datatype(
     parent_name: Option<&str>,
     prefix: &str,
 ) -> Result<(), Error> {
+    datatype_with_generics(
+        s,
+        exporter,
+        types,
+        dt,
+        location,
+        is_export,
+        parent_name,
+        prefix,
+        &[],
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn datatype_with_generics(
+    s: &mut String,
+    exporter: &Exporter,
+    types: &TypeCollection,
+    dt: &DataType,
+    location: Vec<Cow<'static, str>>,
+    is_export: bool,
+    parent_name: Option<&str>,
+    prefix: &str,
+    generics: &[(Generic, DataType)],
+) -> Result<(), Error> {
     // TODO: Validating the variant from `dt` can be flattened
 
     match dt {
         DataType::Primitive(p) => s.push_str(primitive_dt(&exporter.bigint, p, location)?),
-        DataType::List(l) => list_dt(s, exporter, types, l, location, is_export)?,
-        DataType::Map(m) => map_dt(s, exporter, types, m, location, is_export)?,
+        DataType::List(l) => list_dt(s, exporter, types, l, location, is_export, generics)?,
+        DataType::Map(m) => map_dt(s, exporter, types, m, location, is_export, generics)?,
         DataType::Nullable(def) => {
             // TODO: Replace legacy stuff
             crate::legacy::datatype_inner(
@@ -344,6 +561,7 @@ pub(crate) fn datatype(
                 &specta::datatype::FunctionReturnType::Value((**def).clone()),
                 types,
                 s,
+                generics,
             )?;
 
             let or_null = " | null";
@@ -372,12 +590,35 @@ pub(crate) fn datatype(
                 types,
                 s,
                 prefix,
+                generics,
             )?
         }
-        DataType::Enum(e) => enum_dt(s, exporter, types, e, location, is_export, prefix)?,
-        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, is_export)?,
-        DataType::Reference(r) => reference_dt(s, exporter, types, r, location, is_export)?,
-        DataType::Generic(g) => s.push_str(g.borrow()),
+        DataType::Enum(e) => enum_dt(s, exporter, types, e, location, is_export, prefix, generics)?,
+        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, is_export, generics)?,
+        DataType::Reference(r) => {
+            reference_dt(s, exporter, types, r, location, is_export, generics)?
+        }
+        DataType::Generic(g) => {
+            if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
+                if matches!(resolved_dt, DataType::Generic(inner) if inner == g) {
+                    s.push_str(g.borrow());
+                    return Ok(());
+                }
+                datatype_with_generics(
+                    s,
+                    exporter,
+                    types,
+                    resolved_dt,
+                    location,
+                    is_export,
+                    parent_name,
+                    prefix,
+                    generics,
+                )?;
+            } else {
+                s.push_str(g.borrow());
+            }
+        }
     };
 
     Ok(())
@@ -415,6 +656,7 @@ fn list_dt(
     _location: Vec<Cow<'static, str>>,
     // TODO: Remove this???
     is_export: bool,
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     // TODO: This is the legacy stuff
     {
@@ -428,6 +670,7 @@ fn list_dt(
             &specta::datatype::FunctionReturnType::Value(l.ty().clone()),
             types,
             &mut dt,
+            generics,
         )?;
 
         let dt = if (dt.contains(' ') && !dt.ends_with('}'))
@@ -502,6 +745,7 @@ fn map_dt(
     _location: Vec<Cow<'static, str>>,
     // TODO: Remove
     is_export: bool,
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     {
         fn is_exhaustive(dt: &DataType, types: &TypeCollection) -> bool {
@@ -536,6 +780,7 @@ fn map_dt(
             &specta::datatype::FunctionReturnType::Value(m.key_ty().clone()),
             types,
             s,
+            generics,
         )?;
         s.push_str("]: ");
         crate::legacy::datatype_inner(
@@ -547,6 +792,7 @@ fn map_dt(
             &specta::datatype::FunctionReturnType::Value(m.value_ty().clone()),
             types,
             s,
+            generics,
         )?;
         s.push_str(" }");
         if !is_exhaustive {
@@ -574,6 +820,7 @@ fn enum_dt(
     // TODO: Remove
     is_export: bool,
     prefix: &str,
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     // TODO: Drop legacy stuff
     {
@@ -587,6 +834,7 @@ fn enum_dt(
             types,
             s,
             prefix,
+            generics,
         )?
     }
 
@@ -1009,6 +1257,7 @@ fn tuple_dt(
     _location: Vec<Cow<'static, str>>,
     // TODO: Remove
     is_export: bool,
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     {
         s.push_str(&crate::legacy::tuple_datatype(
@@ -1019,6 +1268,7 @@ fn tuple_dt(
             },
             t,
             types,
+            generics,
         )?);
     }
 
@@ -1051,9 +1301,12 @@ fn reference_dt(
     location: Vec<Cow<'static, str>>,
     // TODO: Remove
     is_export: bool,
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     match r {
-        Reference::Named(r) => reference_named_dt(s, exporter, types, r, location, is_export),
+        Reference::Named(r) => {
+            reference_named_dt(s, exporter, types, r, location, is_export, generics)
+        }
         Reference::Opaque(r) => reference_opaque_dt(s, exporter, types, r),
     }
 }
@@ -1077,14 +1330,24 @@ fn reference_opaque_dt(
         s.push_str("never");
         return Ok(());
     } else if let Some(def) = r.downcast_ref::<Branded>() {
+        if let Some(branded_type) = exporter
+            .branded_type_impl
+            .as_ref()
+            .map(|builder| (builder.0)(def))
+            .transpose()?
+        {
+            s.push_str(branded_type.as_ref());
+            return Ok(());
+        }
+
         // TODO: Build onto `s` instead of appending a separate string
         s.push_str(&match def.ty() {
             DataType::Reference(r) => reference(exporter, types, r),
             ty => inline(exporter, types, ty),
         }?);
-        s.push_str(r#" & ""#);
+        s.push_str(r#" & { { readonly __brand: ""#);
         s.push_str(def.brand());
-        s.push('"');
+        s.push_str("\" }");
         return Ok(());
     }
 
@@ -1099,18 +1362,30 @@ fn reference_named_dt(
     location: Vec<Cow<'static, str>>,
     // TODO: Remove
     is_export: bool,
+    generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     // TODO: Legacy stuff
     {
-        let ndt = r
-            .get(types)
-            // TODO: This should return runtime error not panic
-            .expect("TypeCollection should have been populated by now");
+        let ndt = r.get(types).ok_or_else(|| Error::DanglingNamedReference {
+            reference: format!("{r:?}"),
+        })?;
 
         // Check if this reference should be inlined
         if r.inline() {
-            // Inline the referenced type directly without cloning the entire DataType
-            return datatype(s, exporter, types, ndt.ty(), location, is_export, None, "");
+            // Inline the referenced type directly, resolving generics
+            let combined_generics = merged_generics(generics, r.generics());
+            return inline_datatype(
+                s,
+                exporter,
+                types,
+                ndt.ty(),
+                location,
+                is_export,
+                None,
+                "",
+                0,
+                &combined_generics,
+            );
         }
 
         let name = match exporter.layout {
@@ -1173,6 +1448,7 @@ fn reference_named_dt(
                     &specta::datatype::FunctionReturnType::Value(v.clone()),
                     types,
                     s,
+                    generics,
                 )?;
             }
 

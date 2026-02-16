@@ -2,12 +2,18 @@
 
 use std::io;
 
+use specta::Type;
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Type, Error, Debug)]
+#[specta(collect = false)]
 pub enum MyError {
     #[error("data store disconnected")]
-    Disconnect(#[from] io::Error),
+    Disconnect(
+        #[specta(type = String)]
+        #[from]
+        io::Error,
+    ),
     #[error("the data for key `{0}` is not available")]
     Redaction(String),
     #[error("invalid header (expected {expected:?}, found {found:?})")]

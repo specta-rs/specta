@@ -9,7 +9,7 @@ use std::{borrow::Cow, fmt};
 use specta::{
     datatype::{
         DataType, Enum, Fields, RuntimeAttribute, RuntimeLiteral, RuntimeMeta, RuntimeNestedMeta,
-        Struct, Tuple,
+        RuntimeValue, Struct, Tuple,
     },
     internal,
 };
@@ -754,12 +754,12 @@ fn parse_serde_attribute_content(
         RuntimeMeta::NameValue { key, value } => {
             match key.as_str() {
                 "rename" => {
-                    if let RuntimeLiteral::Str(name) = value {
+                    if let RuntimeValue::Literal(RuntimeLiteral::Str(name)) = value {
                         attrs.rename = Some(name.clone());
                     }
                 }
                 "rename_all" => {
-                    if let RuntimeLiteral::Str(rule_str) = value {
+                    if let RuntimeValue::Literal(RuntimeLiteral::Str(rule_str)) = value {
                         attrs.rename_all = Some(
                             RenameRule::from_str(rule_str)
                                 .map_err(|_| Error::InvalidUsageOfSkip)?,
@@ -767,7 +767,7 @@ fn parse_serde_attribute_content(
                     }
                 }
                 "rename_all_fields" => {
-                    if let RuntimeLiteral::Str(rule_str) = value {
+                    if let RuntimeValue::Literal(RuntimeLiteral::Str(rule_str)) = value {
                         attrs.rename_all_fields = Some(
                             RenameRule::from_str(rule_str)
                                 .map_err(|_| Error::InvalidUsageOfSkip)?,
@@ -775,7 +775,7 @@ fn parse_serde_attribute_content(
                     }
                 }
                 "tag" => {
-                    if let RuntimeLiteral::Str(tag_name) = value {
+                    if let RuntimeValue::Literal(RuntimeLiteral::Str(tag_name)) = value {
                         attrs.tag = Some(tag_name.clone());
                         // If we have a tag, this is an internally tagged enum
                         if attrs.repr.is_none() {
@@ -786,57 +786,60 @@ fn parse_serde_attribute_content(
                     }
                 }
                 "content" => {
-                    if let RuntimeLiteral::Str(content_name) = value {
+                    if let RuntimeValue::Literal(RuntimeLiteral::Str(content_name)) = value {
                         attrs.content = Some(content_name.clone());
                     }
                 }
                 "default" => match value {
-                    RuntimeLiteral::Bool(true) => attrs.default = true,
-                    RuntimeLiteral::Str(func_path) => {
+                    RuntimeValue::Literal(RuntimeLiteral::Bool(true)) => attrs.default = true,
+                    RuntimeValue::Literal(RuntimeLiteral::Str(func_path)) => {
                         attrs.default_with = Some(func_path.clone());
                     }
+                    RuntimeValue::Expr(func_path) => attrs.default_with = Some(func_path.clone()),
                     _ => {}
                 },
                 "remote" => {
-                    if let RuntimeLiteral::Str(remote_type) = value {
+                    if let RuntimeValue::Literal(RuntimeLiteral::Str(remote_type)) = value {
                         attrs.remote = Some(remote_type.clone());
                     }
                 }
                 "from" => {
-                    if let RuntimeLiteral::Str(from_type) = value {
+                    if let RuntimeValue::Literal(RuntimeLiteral::Str(from_type)) = value {
                         attrs.from = Some(from_type.clone());
                     }
                 }
                 "try_from" => {
-                    if let RuntimeLiteral::Str(try_from_type) = value {
+                    if let RuntimeValue::Literal(RuntimeLiteral::Str(try_from_type)) = value {
                         attrs.try_from = Some(try_from_type.clone());
                     }
                 }
                 "into" => {
-                    if let RuntimeLiteral::Str(into_type) = value {
+                    if let RuntimeValue::Literal(RuntimeLiteral::Str(into_type)) = value {
                         attrs.into = Some(into_type.clone());
                     }
                 }
                 "alias" => {
-                    if let RuntimeLiteral::Str(alias_name) = value {
+                    if let RuntimeValue::Literal(RuntimeLiteral::Str(alias_name)) = value {
                         attrs.alias.push(alias_name.clone());
                     }
                 }
                 "serialize_with" => {
-                    if let RuntimeLiteral::Str(serialize_fn) = value {
+                    if let RuntimeValue::Literal(RuntimeLiteral::Str(serialize_fn)) = value {
                         attrs.serialize_with = Some(serialize_fn.clone());
                     }
                 }
                 "deserialize_with" => {
-                    if let RuntimeLiteral::Str(deserialize_fn) = value {
+                    if let RuntimeValue::Literal(RuntimeLiteral::Str(deserialize_fn)) = value {
                         attrs.deserialize_with = Some(deserialize_fn.clone());
                     }
                 }
-                "with" => {
-                    if let RuntimeLiteral::Str(with_module) = value {
+                "with" => match value {
+                    RuntimeValue::Literal(RuntimeLiteral::Str(with_module))
+                    | RuntimeValue::Expr(with_module) => {
                         attrs.with = Some(with_module.clone());
                     }
-                }
+                    _ => {}
+                },
                 _ => {}
             }
         }
@@ -870,6 +873,7 @@ fn parse_serde_attribute_content(
                             // Handle string literals that might be path attributes
                             parse_serde_path_attribute(attrs, s);
                         }
+                        RuntimeNestedMeta::Expr(_) => {}
                         RuntimeNestedMeta::Literal(_) => {
                             // Handle other literal values in lists if needed
                         }
@@ -902,7 +906,7 @@ fn parse_complex_serde_attribute(
     match meta {
         RuntimeMeta::NameValue { key, value } => match key.as_str() {
             "serialize" => {
-                if let RuntimeLiteral::Str(name) = value {
+                if let RuntimeValue::Literal(RuntimeLiteral::Str(name)) = value {
                     match parent_key {
                         "rename" => attrs.rename_serialize = Some(name.clone()),
                         "rename_all" => {
@@ -920,7 +924,7 @@ fn parse_complex_serde_attribute(
                 }
             }
             "deserialize" => {
-                if let RuntimeLiteral::Str(name) = value {
+                if let RuntimeValue::Literal(RuntimeLiteral::Str(name)) = value {
                     match parent_key {
                         "rename" => attrs.rename_deserialize = Some(name.clone()),
                         "rename_all" => {
@@ -1002,27 +1006,29 @@ fn parse_serde_field_attribute_content(
         }
         RuntimeMeta::NameValue { key, value } => match key.as_str() {
             "alias" => {
-                if let RuntimeLiteral::Str(alias_name) = value {
+                if let RuntimeValue::Literal(RuntimeLiteral::Str(alias_name)) = value {
                     attrs.alias.push(alias_name.clone());
                 }
             }
             "serialize_with" => {
-                if let RuntimeLiteral::Str(func_name) = value {
+                if let RuntimeValue::Literal(RuntimeLiteral::Str(func_name)) = value {
                     attrs.serialize_with = Some(func_name.clone());
                 }
             }
             "deserialize_with" => {
-                if let RuntimeLiteral::Str(func_name) = value {
+                if let RuntimeValue::Literal(RuntimeLiteral::Str(func_name)) = value {
                     attrs.deserialize_with = Some(func_name.clone());
                 }
             }
-            "with" => {
-                if let RuntimeLiteral::Str(module_path) = value {
+            "with" => match value {
+                RuntimeValue::Literal(RuntimeLiteral::Str(module_path))
+                | RuntimeValue::Expr(module_path) => {
                     attrs.with = Some(module_path.clone());
                 }
-            }
+                _ => {}
+            },
             "skip_serializing_if" => {
-                if let RuntimeLiteral::Str(func_name) = value {
+                if let RuntimeValue::Literal(RuntimeLiteral::Str(func_name)) = value {
                     attrs.skip_serializing_if = Some(func_name.clone());
                 }
             }
@@ -1104,59 +1110,95 @@ fn parse_serde_attribute_string(content: &str, field_attrs: &mut SerdeFieldAttri
 
 fn apply_serde_field_attribute(
     key: &str,
-    value: &specta::datatype::RuntimeLiteral,
+    value: &specta::datatype::RuntimeValue,
     field_attrs: &mut SerdeFieldAttributes,
 ) {
     match key {
         "rename" => {
-            if let specta::datatype::RuntimeLiteral::Str(s) = value {
+            if let specta::datatype::RuntimeValue::Literal(specta::datatype::RuntimeLiteral::Str(
+                s,
+            )) = value
+            {
                 field_attrs.base.rename = Some(s.clone());
             }
         }
         "skip" => {
-            if let specta::datatype::RuntimeLiteral::Bool(true) = value {
+            if let specta::datatype::RuntimeValue::Literal(
+                specta::datatype::RuntimeLiteral::Bool(true),
+            ) = value
+            {
                 field_attrs.base.skip = true;
             }
         }
         "skip_serializing" => {
-            if let specta::datatype::RuntimeLiteral::Bool(true) = value {
+            if let specta::datatype::RuntimeValue::Literal(
+                specta::datatype::RuntimeLiteral::Bool(true),
+            ) = value
+            {
                 field_attrs.base.skip_serializing = true;
             }
         }
         "skip_deserializing" => {
-            if let specta::datatype::RuntimeLiteral::Bool(true) = value {
+            if let specta::datatype::RuntimeValue::Literal(
+                specta::datatype::RuntimeLiteral::Bool(true),
+            ) = value
+            {
                 field_attrs.base.skip_deserializing = true;
             }
         }
         "flatten" => {
-            if let specta::datatype::RuntimeLiteral::Bool(true) = value {
+            if let specta::datatype::RuntimeValue::Literal(
+                specta::datatype::RuntimeLiteral::Bool(true),
+            ) = value
+            {
                 field_attrs.base.flatten = true;
             }
         }
         "default" => {
-            if let specta::datatype::RuntimeLiteral::Bool(true) = value {
+            if let specta::datatype::RuntimeValue::Literal(
+                specta::datatype::RuntimeLiteral::Bool(true),
+            ) = value
+            {
                 field_attrs.base.default = true;
-            } else if let specta::datatype::RuntimeLiteral::Str(s) = value {
+            } else if let specta::datatype::RuntimeValue::Literal(
+                specta::datatype::RuntimeLiteral::Str(s),
+            )
+            | specta::datatype::RuntimeValue::Expr(s) = value
+            {
                 field_attrs.base.default_with = Some(s.clone());
             }
         }
         "serialize_with" => {
-            if let specta::datatype::RuntimeLiteral::Str(s) = value {
+            if let specta::datatype::RuntimeValue::Literal(specta::datatype::RuntimeLiteral::Str(
+                s,
+            )) = value
+            {
                 field_attrs.serialize_with = Some(s.clone());
             }
         }
         "deserialize_with" => {
-            if let specta::datatype::RuntimeLiteral::Str(s) = value {
+            if let specta::datatype::RuntimeValue::Literal(specta::datatype::RuntimeLiteral::Str(
+                s,
+            )) = value
+            {
                 field_attrs.deserialize_with = Some(s.clone());
             }
         }
         "with" => {
-            if let specta::datatype::RuntimeLiteral::Str(s) = value {
+            if let specta::datatype::RuntimeValue::Literal(specta::datatype::RuntimeLiteral::Str(
+                s,
+            ))
+            | specta::datatype::RuntimeValue::Expr(s) = value
+            {
                 field_attrs.with = Some(s.clone());
             }
         }
         "skip_serializing_if" => {
-            if let specta::datatype::RuntimeLiteral::Str(s) = value {
+            if let specta::datatype::RuntimeValue::Literal(specta::datatype::RuntimeLiteral::Str(
+                s,
+            ))
+            | specta::datatype::RuntimeValue::Expr(s) = value
+            {
                 field_attrs.skip_serializing_if = Some(s.clone());
             }
         }

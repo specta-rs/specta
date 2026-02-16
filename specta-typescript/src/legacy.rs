@@ -9,8 +9,8 @@ use std::{
 use specta::{
     TypeCollection,
     datatype::{
-        DataType, DeprecatedType, Enum, EnumVariant, Fields, FunctionReturnType, NonSkipField,
-        Reference, Struct, Tuple, skip_fields, skip_fields_named,
+        DataType, DeprecatedType, Enum, EnumVariant, Fields, FunctionReturnType, Generic,
+        NonSkipField, Reference, Struct, Tuple, skip_fields, skip_fields_named,
     },
 };
 
@@ -152,6 +152,7 @@ pub(crate) fn datatype_inner(
     typ: &FunctionReturnType,
     types: &TypeCollection,
     s: &mut String,
+    generics: &[(Generic, DataType)],
 ) -> Result<()> {
     let typ = match typ {
         FunctionReturnType::Value(t) => t,
@@ -164,12 +165,19 @@ pub(crate) fn datatype_inner(
                         &FunctionReturnType::Value(t.clone()),
                         types,
                         &mut v,
+                        generics,
                     )?;
                     v
                 },
                 {
                     let mut v = String::new();
-                    datatype_inner(ctx, &FunctionReturnType::Value(e.clone()), types, &mut v)?;
+                    datatype_inner(
+                        ctx,
+                        &FunctionReturnType::Value(e.clone()),
+                        types,
+                        &mut v,
+                        generics,
+                    )?;
                     v
                 },
             ];
@@ -179,7 +187,17 @@ pub(crate) fn datatype_inner(
         }
     };
 
-    crate::primitives::datatype(s, ctx.cfg, types, typ, vec![], ctx.is_export, None, "")
+    crate::primitives::datatype_with_generics(
+        s,
+        ctx.cfg,
+        types,
+        typ,
+        vec![],
+        ctx.is_export,
+        None,
+        "",
+        generics,
+    )
 }
 
 // Can be used with `StructUnnamedFields.fields` or `EnumNamedFields.fields`
@@ -189,6 +207,7 @@ fn unnamed_fields_datatype(
     types: &TypeCollection,
     s: &mut String,
     prefix: &str,
+    generics: &[(Generic, DataType)],
 ) -> Result<()> {
     match fields {
         [(field, ty)] => {
@@ -198,6 +217,7 @@ fn unnamed_fields_datatype(
                 &FunctionReturnType::Value((*ty).clone()),
                 types,
                 &mut v,
+                generics,
             )?;
             s.push_str(&inner_comments(
                 ctx,
@@ -222,6 +242,7 @@ fn unnamed_fields_datatype(
                     &FunctionReturnType::Value((*ty).clone()),
                     types,
                     &mut v,
+                    generics,
                 )?;
                 s.push_str(&inner_comments(
                     ctx.clone(),
@@ -240,7 +261,12 @@ fn unnamed_fields_datatype(
     Ok(())
 }
 
-pub(crate) fn tuple_datatype(ctx: ExportContext, tuple: &Tuple, types: &TypeCollection) -> Output {
+pub(crate) fn tuple_datatype(
+    ctx: ExportContext,
+    tuple: &Tuple,
+    types: &TypeCollection,
+    generics: &[(Generic, DataType)],
+) -> Output {
     match &tuple.elements() {
         [] => Ok(NULL.to_string()),
         tys => Ok(format!(
@@ -253,6 +279,7 @@ pub(crate) fn tuple_datatype(ctx: ExportContext, tuple: &Tuple, types: &TypeColl
                         &FunctionReturnType::Value(v.clone()),
                         types,
                         &mut s,
+                        generics,
                     )
                     .map(|_| s)
                 })
@@ -269,6 +296,7 @@ pub(crate) fn struct_datatype(
     types: &TypeCollection,
     s: &mut String,
     prefix: &str,
+    generics: &[(Generic, DataType)],
 ) -> Result<()> {
     match &strct.fields() {
         Fields::Unit => s.push_str(NULL),
@@ -278,6 +306,7 @@ pub(crate) fn struct_datatype(
             types,
             s,
             prefix,
+            generics,
         )?,
         Fields::Named(named) => {
             let fields = skip_fields_named(named.fields()).collect::<Vec<_>>();
@@ -305,6 +334,7 @@ pub(crate) fn struct_datatype(
                         &FunctionReturnType::Value(ty.clone()),
                         types,
                         &mut s,
+                        generics,
                     )
                     .map(|_| {
                         inner_comments(
@@ -331,6 +361,7 @@ pub(crate) fn struct_datatype(
                         field_ref,
                         types,
                         &mut other,
+                        generics,
                     )?;
 
                     Ok(inner_comments(
@@ -381,13 +412,13 @@ pub(crate) fn struct_datatype(
 fn enum_variant_datatype(
     ctx: ExportContext,
     types: &TypeCollection,
-    _name: Cow<'static, str>,
+    name: Cow<'static, str>,
     variant: &EnumVariant,
     prefix: &str,
+    generics: &[(Generic, DataType)],
 ) -> Result<Option<String>> {
     match &variant.fields() {
-        // TODO: Remove unreachable in type system
-        Fields::Unit => unreachable!("Unit enum variants have no type!"),
+        Fields::Unit => Ok(Some(sanitise_key(name, false).to_string())),
         Fields::Named(obj) => {
             let all_fields = skip_fields_named(obj.fields()).collect::<Vec<_>>();
 
@@ -404,6 +435,7 @@ fn enum_variant_datatype(
                         &FunctionReturnType::Value(ty.clone()),
                         types,
                         &mut s,
+                        generics,
                     )
                     .map(|_| {
                         inner_comments(
@@ -440,6 +472,7 @@ fn enum_variant_datatype(
                             field_ref,
                             types,
                             &mut other,
+                            generics,
                         )?;
 
                         Ok(inner_comments(
@@ -473,6 +506,7 @@ fn enum_variant_datatype(
                         &FunctionReturnType::Value(ty.clone()),
                         types,
                         &mut s,
+                        generics,
                     )
                     .map(|_| s)
                 })
@@ -502,6 +536,7 @@ pub(crate) fn enum_datatype(
     types: &TypeCollection,
     s: &mut String,
     prefix: &str,
+    generics: &[(Generic, DataType)],
 ) -> Result<()> {
     if e.variants().is_empty() {
         return Ok(write!(s, "{NEVER}")?);
@@ -534,6 +569,7 @@ pub(crate) fn enum_datatype(
                                 variant_name.clone(),
                                 variant,
                                 prefix,
+                                generics,
                             )?;
                             let sanitised_name = sanitise_key(variant_name.clone(), false);
 
@@ -557,6 +593,7 @@ pub(crate) fn enum_datatype(
                                 variant_name.clone(),
                                 variant,
                                 prefix,
+                                generics,
                             )?;
 
                             ts_values.unwrap_or_else(|| "never".to_string())
@@ -576,6 +613,7 @@ pub(crate) fn enum_datatype(
                             variant_name.clone(),
                             variant,
                             prefix,
+                            generics,
                         )?;
 
                         ts_values.unwrap_or_else(|| "never".to_string())
@@ -605,6 +643,7 @@ fn object_field_to_ts(
     (field, ty): NonSkipField,
     types: &TypeCollection,
     s: &mut String,
+    generics: &[(Generic, DataType)],
 ) -> Result<()> {
     let field_name_safe = sanitise_key(key, false);
 
@@ -620,6 +659,7 @@ fn object_field_to_ts(
         &FunctionReturnType::Value(ty.clone()),
         types,
         &mut value,
+        generics,
     )?;
 
     Ok(write!(s, "{key}: {value}",)?)
@@ -745,7 +785,9 @@ fn validate_type_for_tagged_intersection(
         DataType::Reference(Reference::Named(r)) => validate_type_for_tagged_intersection(
             ctx,
             r.get(types)
-                .expect("TypeCollection should have been populated by now")
+                .ok_or_else(|| Error::DanglingNamedReference {
+                    reference: format!("{r:?}"),
+                })?
                 .ty()
                 .clone(),
             types,

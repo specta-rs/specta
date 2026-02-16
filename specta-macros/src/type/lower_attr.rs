@@ -3,6 +3,7 @@
 // but use owned String data instead of static str references for macro parsing
 
 use quote::ToTokens;
+use syn::parse::discouraged::Speculative;
 
 pub struct RuntimeAttributeIR {
     path: String,
@@ -11,16 +12,19 @@ pub struct RuntimeAttributeIR {
 
 pub enum RuntimeMetaIR {
     Path(String),
-    NameValue {
-        key: String,
-        value: RuntimeLiteralIR,
-    },
+    NameValue { key: String, value: RuntimeValueIR },
     List(Vec<RuntimeNestedMetaIR>),
 }
 
 pub enum RuntimeNestedMetaIR {
     Meta(RuntimeMetaIR),
     Literal(RuntimeLiteralIR),
+    Expr(String),
+}
+
+pub enum RuntimeValueIR {
+    Literal(RuntimeLiteralIR),
+    Expr(String),
 }
 
 pub enum RuntimeLiteralIR {
@@ -34,20 +38,48 @@ pub enum RuntimeLiteralIR {
     CStr(Vec<u8>),
 }
 
-fn lower_lit(expr: &syn::Expr) -> syn::Result<RuntimeLiteralIR> {
+fn lower_lit(lit: &syn::Lit) -> syn::Result<RuntimeLiteralIR> {
+    match lit {
+        syn::Lit::Str(s) => Ok(RuntimeLiteralIR::Str(s.value())),
+        syn::Lit::Int(i) => Ok(RuntimeLiteralIR::Int(i.base10_parse()?)),
+        syn::Lit::Bool(b) => Ok(RuntimeLiteralIR::Bool(b.value)),
+        syn::Lit::Float(f) => Ok(RuntimeLiteralIR::Float(f.base10_parse()?)),
+        syn::Lit::Byte(b) => Ok(RuntimeLiteralIR::Byte(b.value())),
+        syn::Lit::Char(c) => Ok(RuntimeLiteralIR::Char(c.value())),
+        syn::Lit::ByteStr(bs) => Ok(RuntimeLiteralIR::ByteStr(bs.value())),
+        syn::Lit::CStr(cs) => Ok(RuntimeLiteralIR::CStr(cs.value().to_bytes().to_vec())),
+        _ => Err(syn::Error::new_spanned(lit, "unsupported literal")),
+    }
+}
+
+fn lower_value_expr(expr: &syn::Expr) -> syn::Result<RuntimeValueIR> {
     match expr {
-        syn::Expr::Lit(syn::ExprLit { lit, .. }) => match lit {
-            syn::Lit::Str(s) => Ok(RuntimeLiteralIR::Str(s.value())),
-            syn::Lit::Int(i) => Ok(RuntimeLiteralIR::Int(i.base10_parse()?)),
-            syn::Lit::Bool(b) => Ok(RuntimeLiteralIR::Bool(b.value)),
-            syn::Lit::Float(f) => Ok(RuntimeLiteralIR::Float(f.base10_parse()?)),
-            syn::Lit::Byte(b) => Ok(RuntimeLiteralIR::Byte(b.value())),
-            syn::Lit::Char(c) => Ok(RuntimeLiteralIR::Char(c.value())),
-            syn::Lit::ByteStr(bs) => Ok(RuntimeLiteralIR::ByteStr(bs.value())),
-            syn::Lit::CStr(cs) => Ok(RuntimeLiteralIR::CStr(cs.value().to_bytes().to_vec())),
-            _ => Err(syn::Error::new_spanned(lit, "unsupported literal")),
-        },
-        _ => Err(syn::Error::new_spanned(expr, "expected literal")),
+        syn::Expr::Lit(syn::ExprLit { lit, .. }) => Ok(RuntimeValueIR::Literal(lower_lit(lit)?)),
+        _ => Ok(RuntimeValueIR::Expr(expr.to_token_stream().to_string())),
+    }
+}
+
+enum NestedItem {
+    Meta(syn::Meta),
+    Lit(syn::Lit),
+    Expr(syn::Expr),
+}
+
+impl syn::parse::Parse for NestedItem {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let fork = input.fork();
+        if let Ok(meta) = fork.parse::<syn::Meta>() {
+            input.advance_to(&fork);
+            return Ok(Self::Meta(meta));
+        }
+
+        let fork = input.fork();
+        if let Ok(lit) = fork.parse::<syn::Lit>() {
+            input.advance_to(&fork);
+            return Ok(Self::Lit(lit));
+        }
+
+        Ok(Self::Expr(input.parse()?))
     }
 }
 
@@ -61,102 +93,21 @@ fn lower_lit(expr: &syn::Expr) -> syn::Result<RuntimeLiteralIR> {
 /// - Nested lists (e.g., `key(...)`) - recursive parsing
 /// - Direct literals (e.g., `"bruh"` in `#[test("bruh")]`)
 fn parse_nested_meta_items(list: &syn::MetaList) -> syn::Result<Vec<RuntimeNestedMetaIR>> {
-    // For simple function-like attributes like #[test("bruh")], we need to parse the tokens directly
-    // because parse_nested_meta doesn't handle bare literals well
-    let tokens = &list.tokens;
+    use syn::parse::Parser;
 
-    // Try to parse as a single literal first (handles #[test("bruh")] case)
-    if let Ok(lit) = syn::parse2::<syn::Lit>(tokens.clone()) {
-        let runtime_lit = match lit {
-            syn::Lit::Str(s) => RuntimeLiteralIR::Str(s.value()),
-            syn::Lit::Int(i) => RuntimeLiteralIR::Int(i.base10_parse()?),
-            syn::Lit::Bool(b) => RuntimeLiteralIR::Bool(b.value),
-            syn::Lit::Float(f) => RuntimeLiteralIR::Float(f.base10_parse()?),
-            syn::Lit::Byte(b) => RuntimeLiteralIR::Byte(b.value()),
-            syn::Lit::Char(c) => RuntimeLiteralIR::Char(c.value()),
-            syn::Lit::ByteStr(bs) => RuntimeLiteralIR::ByteStr(bs.value()),
-            syn::Lit::CStr(cs) => RuntimeLiteralIR::CStr(cs.value().to_bytes().to_vec()),
-            _ => return Err(syn::Error::new_spanned(lit, "unsupported literal")),
-        };
-        return Ok(vec![RuntimeNestedMetaIR::Literal(runtime_lit)]);
-    }
+    let parser = syn::punctuated::Punctuated::<NestedItem, syn::Token![,]>::parse_terminated;
+    let parsed = parser.parse2(list.tokens.clone())?;
 
-    // Fall back to the standard parse_nested_meta API
-    let mut items = Vec::new();
-
-    list.parse_nested_meta(|meta| {
-        // Handle different types of nested meta items
-
-        // Check if it's a path-only meta (like `untagged`)
-        if meta.input.is_empty() {
-            let path_str = meta.path.to_token_stream().to_string();
-            items.push(RuntimeNestedMetaIR::Meta(RuntimeMetaIR::Path(path_str)));
-            return Ok(());
-        }
-
-        // Check if it's a name-value pair (like `rename = "value"`)
-        if meta.input.peek(syn::Token![=]) {
-            let value_stream = meta.value()?;
-
-            // Try to parse as a literal first
-            if let Ok(lit) = value_stream.parse::<syn::Lit>() {
-                let runtime_lit = match lit {
-                    syn::Lit::Str(s) => RuntimeLiteralIR::Str(s.value()),
-                    syn::Lit::Int(i) => RuntimeLiteralIR::Int(i.base10_parse()?),
-                    syn::Lit::Bool(b) => RuntimeLiteralIR::Bool(b.value),
-                    syn::Lit::Float(f) => RuntimeLiteralIR::Float(f.base10_parse()?),
-                    syn::Lit::Byte(b) => RuntimeLiteralIR::Byte(b.value()),
-                    syn::Lit::Char(c) => RuntimeLiteralIR::Char(c.value()),
-                    syn::Lit::ByteStr(bs) => RuntimeLiteralIR::ByteStr(bs.value()),
-                    syn::Lit::CStr(cs) => RuntimeLiteralIR::CStr(cs.value().to_bytes().to_vec()),
-                    _ => return Err(syn::Error::new_spanned(lit, "unsupported literal")),
-                };
-
-                let path_str = meta.path.to_token_stream().to_string();
-                items.push(RuntimeNestedMetaIR::Meta(RuntimeMetaIR::NameValue {
-                    key: path_str,
-                    value: runtime_lit,
-                }));
-            } else {
-                // Fall back to parsing as token stream and converting to string
-                // This handles complex expressions like `remote = Value` or `crate = crate`
-                let tokens: proc_macro2::TokenStream = value_stream.parse()?;
-                let value_str = tokens.to_string();
-                let path_str = meta.path.to_token_stream().to_string();
-
-                items.push(RuntimeNestedMetaIR::Meta(RuntimeMetaIR::NameValue {
-                    key: path_str,
-                    value: RuntimeLiteralIR::Str(value_str),
-                }));
-            }
-
-            return Ok(());
-        }
-
-        // Handle nested lists (like `key(...)`) by parsing recursively
-        if meta.input.peek(syn::token::Paren) {
-            let content;
-            syn::parenthesized!(content in meta.input);
-
-            // Create a synthetic MetaList for recursive parsing
-            let nested_list = syn::MetaList {
-                path: meta.path.clone(),
-                delimiter: syn::MacroDelimiter::Paren(Default::default()),
-                tokens: content.parse()?,
-            };
-
-            let nested_items = parse_nested_meta_items(&nested_list)?;
-            items.push(RuntimeNestedMetaIR::Meta(RuntimeMetaIR::List(nested_items)));
-            return Ok(());
-        }
-
-        // Default case: treat as path
-        let path_str = meta.path.to_token_stream().to_string();
-        items.push(RuntimeNestedMetaIR::Meta(RuntimeMetaIR::Path(path_str)));
-        Ok(())
-    })?;
-
-    Ok(items)
+    parsed
+        .into_iter()
+        .map(|item| match item {
+            NestedItem::Meta(meta) => Ok(RuntimeNestedMetaIR::Meta(lower_meta(&meta)?)),
+            NestedItem::Lit(lit) => Ok(RuntimeNestedMetaIR::Literal(lower_lit(&lit)?)),
+            NestedItem::Expr(expr) => Ok(RuntimeNestedMetaIR::Expr(
+                expr.to_token_stream().to_string(),
+            )),
+        })
+        .collect()
 }
 
 /// Convert a syn::Meta to RuntimeMetaIR.
@@ -170,7 +121,7 @@ fn lower_meta(meta: &syn::Meta) -> syn::Result<RuntimeMetaIR> {
 
         syn::Meta::NameValue(nv) => RuntimeMetaIR::NameValue {
             key: nv.path.to_token_stream().to_string(),
-            value: lower_lit(&nv.value)?,
+            value: lower_value_expr(&nv.value)?,
         },
 
         syn::Meta::List(list) => {
@@ -228,6 +179,23 @@ impl RuntimeNestedMetaIR {
             RuntimeNestedMetaIR::Literal(l) => {
                 let l = l.to_tokens();
                 quote::quote!(datatype::RuntimeNestedMeta::Literal(#l))
+            }
+            RuntimeNestedMetaIR::Expr(expr) => {
+                quote::quote!(datatype::RuntimeNestedMeta::Expr(String::from(#expr)))
+            }
+        }
+    }
+}
+
+impl RuntimeValueIR {
+    pub fn to_tokens(&self) -> proc_macro2::TokenStream {
+        match self {
+            RuntimeValueIR::Literal(lit) => {
+                let lit = lit.to_tokens();
+                quote::quote!(datatype::RuntimeValue::Literal(#lit))
+            }
+            RuntimeValueIR::Expr(expr) => {
+                quote::quote!(datatype::RuntimeValue::Expr(String::from(#expr)))
             }
         }
     }

@@ -5,7 +5,9 @@
 
 #[test]
 fn test_runtime_attributes_with_various_types() {
-    use specta::datatype::{RuntimeAttribute, RuntimeLiteral, RuntimeMeta, RuntimeNestedMeta};
+    use specta::datatype::{
+        RuntimeAttribute, RuntimeLiteral, RuntimeMeta, RuntimeNestedMeta, RuntimeValue,
+    };
 
     // Test that we can construct all variations of RuntimeAttribute
 
@@ -20,7 +22,7 @@ fn test_runtime_attributes_with_various_types() {
         path: "test".to_string(),
         kind: RuntimeMeta::NameValue {
             key: "rename".to_string(),
-            value: RuntimeLiteral::Str("new_name".to_string()),
+            value: RuntimeValue::Literal(RuntimeLiteral::Str("new_name".to_string())),
         },
     };
 
@@ -29,7 +31,7 @@ fn test_runtime_attributes_with_various_types() {
         path: "test".to_string(),
         kind: RuntimeMeta::NameValue {
             key: "version".to_string(),
-            value: RuntimeLiteral::Int(42),
+            value: RuntimeValue::Literal(RuntimeLiteral::Int(42)),
         },
     };
 
@@ -38,7 +40,7 @@ fn test_runtime_attributes_with_various_types() {
         path: "test".to_string(),
         kind: RuntimeMeta::NameValue {
             key: "enabled".to_string(),
-            value: RuntimeLiteral::Bool(true),
+            value: RuntimeValue::Literal(RuntimeLiteral::Bool(true)),
         },
     };
 
@@ -47,7 +49,7 @@ fn test_runtime_attributes_with_various_types() {
         path: "test".to_string(),
         kind: RuntimeMeta::NameValue {
             key: "ratio".to_string(),
-            value: RuntimeLiteral::Float(3.14),
+            value: RuntimeValue::Literal(RuntimeLiteral::Float(3.14)),
         },
     };
 
@@ -58,7 +60,7 @@ fn test_runtime_attributes_with_various_types() {
             RuntimeNestedMeta::Meta(RuntimeMeta::Path("skip".to_string())),
             RuntimeNestedMeta::Meta(RuntimeMeta::NameValue {
                 key: "rename".to_string(),
-                value: RuntimeLiteral::Str("foo".to_string()),
+                value: RuntimeValue::Literal(RuntimeLiteral::Str("foo".to_string())),
             }),
         ]),
     };
@@ -84,7 +86,7 @@ fn test_runtime_attributes_with_various_types() {
         path: "test".to_string(),
         kind: RuntimeMeta::NameValue {
             key: "byte_val".to_string(),
-            value: RuntimeLiteral::Byte(b'x'),
+            value: RuntimeValue::Literal(RuntimeLiteral::Byte(b'x')),
         },
     };
 
@@ -93,7 +95,7 @@ fn test_runtime_attributes_with_various_types() {
         path: "test".to_string(),
         kind: RuntimeMeta::NameValue {
             key: "char_val".to_string(),
-            value: RuntimeLiteral::Char('a'),
+            value: RuntimeValue::Literal(RuntimeLiteral::Char('a')),
         },
     };
 
@@ -102,7 +104,7 @@ fn test_runtime_attributes_with_various_types() {
         path: "test".to_string(),
         kind: RuntimeMeta::NameValue {
             key: "bytes".to_string(),
-            value: RuntimeLiteral::ByteStr(b"hello".to_vec()),
+            value: RuntimeValue::Literal(RuntimeLiteral::ByteStr(b"hello".to_vec())),
         },
     };
 
@@ -111,7 +113,7 @@ fn test_runtime_attributes_with_various_types() {
         path: "test".to_string(),
         kind: RuntimeMeta::NameValue {
             key: "cstr".to_string(),
-            value: RuntimeLiteral::CStr(b"hello\0".to_vec()),
+            value: RuntimeValue::Literal(RuntimeLiteral::CStr(b"hello\0".to_vec())),
         },
     };
 

@@ -32,7 +32,9 @@ fn get_rename_all_from_attributes(
                 if let specta::datatype::RuntimeNestedMeta::Meta(meta) = nested
                     && let RuntimeMeta::NameValue { key, value } = meta
                     && key == "rename_all"
-                    && let specta::datatype::RuntimeLiteral::Str(s) = value
+                    && let specta::datatype::RuntimeValue::Literal(
+                        specta::datatype::RuntimeLiteral::Str(s),
+                    ) = value
                 {
                     return Some(s.clone());
                 }
@@ -86,11 +88,16 @@ fn get_adjacent_tag_content(e: &specta::datatype::Enum) -> Option<(String, Strin
                     && let RuntimeMeta::NameValue { key, value } = meta
                 {
                     if key == "tag" {
-                        if let specta::datatype::RuntimeLiteral::Str(s) = value {
+                        if let specta::datatype::RuntimeValue::Literal(
+                            specta::datatype::RuntimeLiteral::Str(s),
+                        ) = value
+                        {
                             tag = Some(s.clone());
                         }
                     } else if key == "content"
-                        && let specta::datatype::RuntimeLiteral::Str(s) = value
+                        && let specta::datatype::RuntimeValue::Literal(
+                            specta::datatype::RuntimeLiteral::Str(s),
+                        ) = value
                     {
                         content = Some(s.clone());
                     }
