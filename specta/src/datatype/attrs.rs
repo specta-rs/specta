@@ -43,7 +43,7 @@ use std::hash::{Hash, Hasher};
 ///     kind: RuntimeMeta::List(vec![
 ///         RuntimeNestedMeta::Meta(RuntimeMeta::NameValue {
 ///             key: "rename".to_string(),
-///             value: RuntimeLiteral::Str("userName".to_string()),
+///             value: RuntimeValue::Literal(RuntimeLiteral::Str("userName".to_string())),
 ///         })
 ///     ])
 /// }
@@ -87,14 +87,14 @@ pub struct RuntimeAttribute {
 /// // NameValue variant - parsed from: #[serde(rename = "userId")]
 /// RuntimeMeta::NameValue {
 ///     key: "rename".to_string(),
-///     value: RuntimeLiteral::Str("userId".to_string()),
+///     value: RuntimeValue::Literal(RuntimeLiteral::Str("userId".to_string())),
 /// }
 ///
 /// // List variant - parsed from: #[serde(rename = "id", skip_serializing)]
 /// RuntimeMeta::List(vec![
 ///     RuntimeNestedMeta::Meta(RuntimeMeta::NameValue {
 ///         key: "rename".to_string(),
-///         value: RuntimeLiteral::Str("id".to_string()),
+///         value: RuntimeValue::Literal(RuntimeLiteral::Str("id".to_string())),
 ///     }),
 ///     RuntimeNestedMeta::Meta(RuntimeMeta::Path("skip_serializing".to_string())),
 /// ])
@@ -112,10 +112,10 @@ pub enum RuntimeMeta {
     /// Commonly used for boolean-like flags in attributes.
     Path(String),
 
-    /// A key-value pair (e.g., `rename = "value"`, `default = 42`).
+    /// A key-value pair (e.g., `rename = "value"`, `default = 42`, `with = module::path`).
     ///
     /// Used when an attribute option needs an associated value.
-    NameValue { key: String, value: RuntimeLiteral },
+    NameValue { key: String, value: RuntimeValue },
 
     /// A list of nested metadata items (e.g., the contents of `#[serde(...)]`).
     ///
@@ -134,7 +134,7 @@ pub enum RuntimeMeta {
 /// // Meta variant - parsed from: #[serde(rename = "value")]
 /// RuntimeNestedMeta::Meta(RuntimeMeta::NameValue {
 ///     key: "rename".to_string(),
-///     value: RuntimeLiteral::Str("value".to_string()),
+///     value: RuntimeValue::Literal(RuntimeLiteral::Str("value".to_string())),
 /// })
 ///
 /// // Literal variant - parsed from: #[custom("raw_string_value")]
@@ -151,6 +151,21 @@ pub enum RuntimeNestedMeta {
     Meta(RuntimeMeta),
     /// A direct literal value.
     Literal(RuntimeLiteral),
+    /// A non-literal expression captured from attribute syntax.
+    Expr(String),
+}
+
+/// A value in a name-value attribute pair.
+///
+/// Rust attributes permit both literals and non-literal expressions in `key = value` positions.
+/// This enum keeps those forms distinct so runtime consumers can avoid conflating tokenized
+/// expressions with string literals.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum RuntimeValue {
+    /// A literal value (e.g., `rename = "value"`, `default = true`).
+    Literal(RuntimeLiteral),
+    /// A non-literal expression (e.g., `with = module::path`, `default = path::to::func`).
+    Expr(String),
 }
 
 /// A literal value that can appear in an attribute.

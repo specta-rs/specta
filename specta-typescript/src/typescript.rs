@@ -3,7 +3,7 @@ use std::{borrow::Cow, path::Path};
 use specta::TypeCollection;
 use specta_serde::SerdeMode;
 
-use crate::{BigIntExportBehavior, Error, Exporter, Layout};
+use crate::{BigIntExportBehavior, Branded, Error, Exporter, Layout};
 
 /// JSDoc language exporter.
 #[derive(Debug, Clone)]
@@ -50,6 +50,16 @@ impl Typescript {
     /// Configure the layout of the generated file
     pub fn layout(self, layout: Layout) -> Self {
         Self(self.0.layout(layout))
+    }
+
+    /// Configure how `specta_typescript::branded!` types are rendered.
+    ///
+    /// See [`Exporter::branded_type_impl`] for `ts-brand` and Effect examples.
+    pub fn branded_type_impl(
+        self,
+        builder: impl Fn(&Branded) -> Result<Cow<'static, str>, Error> + 'static,
+    ) -> Self {
+        Self(self.0.branded_type_impl(builder))
     }
 
     /// Configure the exporter to use specta-serde with the specified mode

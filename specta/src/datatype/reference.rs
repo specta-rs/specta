@@ -180,22 +180,19 @@ impl From<Reference> for DataType {
 
 /// A unique identifier for a [NamedDataType].
 ///
-/// `Arc<()>` is a great way of creating a virtual ID which
-/// can be compared to itself but for any types defined with the macro
-/// it requires a 'static allocation which is cringe so we use the pointer
-/// to a static which doesn't allocate but is much more error-prone so it's only used internally.
+/// For static types (from derive macros), we use a unique string based on the
+/// type's module path and name. For dynamic types, we use an Arc pointer.
 #[derive(Clone)]
 pub(crate) enum NamedId {
-    // A pointer to a `static ...: ...`.
-    // These are all given a unique pointer.
-    Static(&'static ()),
+    // A unique string identifying the type (module_path::TypeName).
+    Static(&'static str),
     Dynamic(Arc<()>),
 }
 
 impl PartialEq for NamedId {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (NamedId::Static(a), NamedId::Static(b)) => std::ptr::eq(*a, *b),
+            (NamedId::Static(a), NamedId::Static(b)) => a == b,
             (NamedId::Dynamic(a), NamedId::Dynamic(b)) => Arc::ptr_eq(a, b),
             _ => false,
         }
@@ -206,7 +203,7 @@ impl Eq for NamedId {}
 impl hash::Hash for NamedId {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         match self {
-            NamedId::Static(p) => std::ptr::hash(*p, state),
+            NamedId::Static(s) => s.hash(state),
             NamedId::Dynamic(p) => std::ptr::hash(Arc::as_ptr(p), state),
         }
     }
@@ -215,7 +212,7 @@ impl hash::Hash for NamedId {
 impl fmt::Debug for NamedId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            NamedId::Static(p) => write!(f, "s{:p}", *p),
+            NamedId::Static(s) => write!(f, "s:{}", s),
             NamedId::Dynamic(p) => write!(f, "d{:p}", Arc::as_ptr(p)),
         }
     }

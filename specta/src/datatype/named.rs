@@ -23,12 +23,6 @@ pub struct NamedDataType {
 }
 
 impl NamedDataType {
-    // ## Sentinel
-    //
-    // MUST point to a `static ...: () = ();`. This is used as a unique identifier for the type and `const` or `Box::leak` SHOULD NOT be used.
-    //
-    // If this invariant is violated you will see unexpected behavior.
-    //
     // ## Why return a reference?
     //
     // If a recursive type is being resolved it's possible the `init_with_sentinel` function will be called recursively.
@@ -39,7 +33,7 @@ impl NamedDataType {
         generics: Vec<(Generic, DataType)>,
         mut inline: bool,
         types: &mut TypeCollection,
-        sentinel: &'static (),
+        sentinel: &'static str,
         build_ndt: fn(&mut TypeCollection, &mut NamedDataType),
     ) -> Reference {
         let id = NamedId::Static(sentinel);
@@ -69,7 +63,7 @@ impl NamedDataType {
             // We patch the Tauri `Type` implementation.
             if ndt.name() == "TAURI_CHANNEL" && ndt.module_path().starts_with("tauri::") {
                 // This causes an exporter that isn't aware of Tauri's channel to error.
-                // This is effectively `Reference::opaque(TauriChannel)` but we do some hacker for better errors.
+                // This is effectively `Reference::opaque(TauriChannel)` but we do some hackery for better errors.
                 ndt.inner = reference::tauri().into();
 
                 // This ensures that we never create a `export type Channel`,

@@ -411,6 +411,8 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         GenericNewType1<()>,
         GenericTuple<()>,
         GenericStruct2<()>,
+        InlineGenericNewtype<String>,
+        InlineGenericNested<String>,
         InlineFlattenGenericsG<()>,
         InlineFlattenGenerics,
         GenericParameterOrderPreserved,
@@ -746,24 +748,28 @@ struct RenameWithWeirdCharsStruct(String);
 enum RenameWithWeirdCharsEnum {}
 
 #[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 enum MyEnum {
     A(String),
     B(u32),
 }
 
 #[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct InlineTuple {
     #[specta(inline)]
     demo: (String, bool),
 }
 
 #[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct InlineTuple2 {
     #[specta(inline)]
     demo: (InlineTuple, bool),
 }
 
 #[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 #[serde(tag = "type", content = "data")]
 enum SkippedFieldWithinVariant {
     A(#[serde(skip)] String),
@@ -771,6 +777,7 @@ enum SkippedFieldWithinVariant {
 }
 
 #[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 #[serde(rename_all = "kebab-case")]
 struct KebabCase {
     test_ing: String,
@@ -778,12 +785,14 @@ struct KebabCase {
 
 // https://github.com/specta-rs/specta/issues/281
 #[derive(Type)]
+#[specta(collect = false)]
 struct Issue281<'a> {
     default_unity_arguments: &'a [&'a str],
 }
 
 /// https://github.com/specta-rs/specta/issues/374
 #[derive(Type, Serialize)]
+#[specta(collect = false)]
 struct Issue374 {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     foo: bool,
@@ -796,10 +805,12 @@ struct Issue374 {
 // so it clashes with our user-defined `Type`.
 mod type_type {
     #[derive(specta::Type)]
+    #[specta(collect = false)]
     pub(super) enum Type {}
 }
 
 #[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 #[serde(untagged)]
 enum GenericType<T> {
     Undefined,
@@ -807,6 +818,7 @@ enum GenericType<T> {
 }
 
 #[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 struct ActualType {
     a: GenericType<String>,
 }
@@ -2029,6 +2041,29 @@ struct GenericNewType1<T>(Vec<Vec<T>>);
 #[specta(collect = false)]
 struct GenericTuple<T>(T, Vec<T>, Vec<Vec<T>>);
 
+#[derive(Type)]
+#[specta(collect = false, inline)]
+struct InlineGenericNewtype<T>(T);
+
+#[derive(Type)]
+#[specta(collect = false, inline)]
+enum InlineGenericEnum<T> {
+    Unit,
+    Unnamed(T),
+    Named { value: T },
+}
+
+#[derive(Type)]
+#[specta(collect = false, inline)]
+struct InlineGenericNested<T>(
+    InlineGenericNewtype<T>,
+    Vec<T>,
+    (T, T),
+    HashMap<String, T>,
+    Option<T>,
+    InlineGenericEnum<T>,
+);
+
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct InlineFlattenGenericsG<T> {
@@ -2291,3 +2326,37 @@ struct GenericParameterOrderPreserved {
 //         insta::assert_snapshot!(crate::ts::inline::<EnumWithInternalTag2>(&Default::default()).unwrap(), @r#"({ type: "A" } & InnerA) | ({ type: "B" } & InnerB)"#);
 //     }
 // }
+
+// Transparent wrappers should have distinct type IDs (regression test for linker ICF bug)
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
+struct TransparentA(String);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(transparent)]
+struct TransparentB(String);
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct UsesTransparent {
+    a: TransparentA,
+    b: TransparentB,
+}
+
+#[test]
+fn transparent_wrappers_have_distinct_ids() {
+    let mut types = TypeCollection::default();
+    let id_a = TransparentA::definition(&mut types);
+    let id_b = TransparentB::definition(&mut types);
+    assert_ne!(format!("{:?}", id_a), format!("{:?}", id_b));
+    assert_eq!(types.len(), 2);
+}
+
+#[test]
+fn struct_collects_all_transparent_field_types() {
+    let mut types = TypeCollection::default();
+    UsesTransparent::definition(&mut types);
+    assert_eq!(types.len(), 3); // UsesTransparent + TransparentA + TransparentB
+}

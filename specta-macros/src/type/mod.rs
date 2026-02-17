@@ -188,13 +188,13 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 fn definition(types: &mut #crate_ref::TypeCollection) -> datatype::DataType {
                     #(#generic_placeholders)*
 
-                    static SENTINEL: () = ();
+                    static SENTINEL: &str = concat!(module_path!(), "::", stringify!(#raw_ident));
                     datatype::DataType::Reference(
                         datatype::NamedDataType::init_with_sentinel(
                             vec![#(#reference_generics),*],
                             #inline,
                             types,
-                            &SENTINEL,
+                            SENTINEL,
                             |types, ndt| {
                                 ndt.set_name(Cow::Borrowed(#name));
                                 ndt.set_docs(Cow::Borrowed(#comments));
