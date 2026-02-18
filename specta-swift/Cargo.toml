@@ -21,14 +21,14 @@ workspace = true
 [dependencies]
 specta = { path = "../specta", features = ["derive", "uuid", "chrono"] }
 specta-serde = { path = "../specta-serde" }
-thiserror = "1.0"
+thiserror = "2.0"
 serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
-insta = "1.42"
+insta = "1.46"
 trybuild = "1.0"
-uuid = "1.12.1"
-chrono = { version = "0.4.40", features = ["clock"] }
+uuid = "1.21.0"
+chrono = { version = "0.4.43", features = ["clock"] }
 
 [[example]]
 name = "basic_types"
