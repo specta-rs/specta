@@ -1,106 +1,117 @@
 error: specta: Found unsupported container attribute 'noshot'
-  --> tests/macro/compile_error.rs:75:10
+  --> tests/macro/compile_error.rs:86:10
    |
-75 | #[specta(noshot = true)]
+86 | #[specta(noshot = true)]
    |          ^^^^^^
 
 error: specta: Found unsupported container attribute 'noshot'
-  --> tests/macro/compile_error.rs:79:10
+  --> tests/macro/compile_error.rs:91:10
    |
-79 | #[specta(noshot)]
+91 | #[specta(noshot)]
    |          ^^^^^^
 
 error: specta: Found unsupported field attribute 'noshot'
-  --> tests/macro/compile_error.rs:84:14
+  --> tests/macro/compile_error.rs:97:14
    |
-84 |     #[specta(noshot = true)]
+97 |     #[specta(noshot = true)]
    |              ^^^^^^
 
 error: specta: Found unsupported field attribute 'noshot'
-  --> tests/macro/compile_error.rs:90:14
-   |
-90 |     #[specta(noshot)]
-   |              ^^^^^^
+   --> tests/macro/compile_error.rs:104:14
+    |
+104 |     #[specta(noshot)]
+    |              ^^^^^^
+
+error: specta: `#[specta(rename ...)]` is no longer supported on containers. Use `#[serde(rename = "...")]` instead.
+   --> tests/macro/compile_error.rs:111:10
+    |
+111 | #[specta(rename = "Renamed")]
+    |          ^^^^^^
+
+error: specta: `#[specta(rename ...)]` is no longer supported on fields. Use `#[serde(rename = "...")]` instead.
+   --> tests/macro/compile_error.rs:117:14
+    |
+117 |     #[specta(rename = "renamed")]
+    |              ^^^^^^
+
+error: specta: `#[specta(rename ...)]` is no longer supported on variants. Use `#[serde(rename = "...")]` instead.
+   --> tests/macro/compile_error.rs:124:14
+    |
+124 |     #[specta(rename = "renamed")]
+    |              ^^^^^^
+
+error: specta: Found unsupported field attribute 'rename_from_path'
+   --> tests/macro/compile_error.rs:133:14
+    |
+133 |     #[specta(rename_from_path = INTERNAL_RENAME_KEY)]
+    |              ^^^^^^^^^^^^^^^^
 
 error: #[specta(transparent)] is not allowed on an enum
-  --> tests/macro/compile_error.rs:96:5
-   |
-96 | pub enum TransparentEnum {}
-   |     ^^^^
-
-error: specta: invalid formatted attribute
-  --> tests/macro/compile_error.rs:99:3
-   |
-99 | #[specta]
-   |   ^^^^^^
-
-error: specta: invalid formatted attribute
-   --> tests/macro/compile_error.rs:103:3
+   --> tests/macro/compile_error.rs:140:5
     |
-103 | #[specta = "todo"]
+140 | pub enum TransparentEnum {}
+    |     ^^^^
+
+error: specta: invalid formatted attribute
+   --> tests/macro/compile_error.rs:144:3
+    |
+144 | #[specta]
+    |   ^^^^^^
+
+error: specta: invalid formatted attribute
+   --> tests/macro/compile_error.rs:149:3
+    |
+149 | #[specta = "todo"]
     |   ^^^^^^
 
 error: specta: You must apply the #[specta] macro before the #[wasm_bindgen] macro
-   --> tests/macro/compile_error.rs:108:1
+   --> tests/macro/compile_error.rs:154:1
     |
-108 | #[wasm_bindgen]
+154 | #[wasm_bindgen]
     | ^^^^^^^^^^^^^^^
     |
     = note: this error originates in the attribute macro `wasm_bindgen` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0255]: the name `__specta__fn__testing` is defined multiple times
-   --> tests/macro/compile_error.rs:110:8
+   --> tests/macro/compile_error.rs:156:8
     |
-109 | #[specta]
+155 | #[specta]
     | --------- previous definition of the macro `__specta__fn__testing` here
-110 | pub fn testing() {}
+156 | pub fn testing() {}
     |        ^^^^^^^ `__specta__fn__testing` reimported here
     |
     = note: `__specta__fn__testing` must be defined only once in the macro namespace of this module
 
 error: cannot find attribute `serde` in this scope
- --> tests/macro/compile_error.rs:7:3
+ --> tests/macro/compile_error.rs:8:3
   |
-7 | #[serde(rename_all = "camelCase123")]
+8 | #[serde(rename_all = "camelCase123")]
   |   ^^^^^
   |
   = note: `serde` is in scope, but it is a crate, not an attribute
 help: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
   |
-8 + #[derive(Deserialize, Serialize)]
-9 | pub enum Demo2 {}
+9 + #[derive(Deserialize, Serialize)]
+10| pub enum Demo2 {}
   |
 
 error: cannot find attribute `serde` in this scope
-  --> tests/macro/compile_error.rs:31:7
+  --> tests/macro/compile_error.rs:36:7
    |
-31 |     #[serde(flatten)]
+36 |     #[serde(flatten)]
    |       ^^^^^
    |
    = note: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
    = note: `serde` is in scope, but it is a crate, not an attribute
 
 error: cannot find attribute `serde` in this scope
-  --> tests/macro/compile_error.rs:33:7
+  --> tests/macro/compile_error.rs:38:7
    |
-33 |     #[serde(flatten)]
+38 |     #[serde(flatten)]
    |       ^^^^^
    |
    = note: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
    = note: `serde` is in scope, but it is a crate, not an attribute
-
-error: cannot find attribute `serde` in this scope
-  --> tests/macro/compile_error.rs:38:3
-   |
-38 | #[serde(untagged)]
-   |   ^^^^^
-   |
-   = note: `serde` is in scope, but it is a crate, not an attribute
-help: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
-   |
-39 + #[derive(Deserialize, Serialize)]
-40 | enum UnnamedUntagged {
-   |
 
 error: cannot find attribute `serde` in this scope
   --> tests/macro/compile_error.rs:44:3
@@ -112,59 +123,72 @@ error: cannot find attribute `serde` in this scope
 help: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
    |
 45 + #[derive(Deserialize, Serialize)]
-46 | enum UnnamedMultiUntagged {
+46 | enum UnnamedUntagged {
    |
 
 error: cannot find attribute `serde` in this scope
-  --> tests/macro/compile_error.rs:51:7
+  --> tests/macro/compile_error.rs:51:3
    |
-51 |     #[serde(flatten)]
-   |       ^^^^^
-   |
-   = note: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
-   = note: `serde` is in scope, but it is a crate, not an attribute
-
-error: cannot find attribute `serde` in this scope
-  --> tests/macro/compile_error.rs:53:7
-   |
-53 |     #[serde(flatten)]
-   |       ^^^^^
-   |
-   = note: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
-   = note: `serde` is in scope, but it is a crate, not an attribute
-
-error: cannot find attribute `serde` in this scope
-  --> tests/macro/compile_error.rs:60:3
-   |
-60 | #[serde(tag = "tag")]
+51 | #[serde(untagged)]
    |   ^^^^^
    |
    = note: `serde` is in scope, but it is a crate, not an attribute
 help: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
    |
-61 + #[derive(Deserialize, Serialize)]
-62 | enum UnnamedInternal {
+52 + #[derive(Deserialize, Serialize)]
+53 | enum UnnamedMultiUntagged {
    |
 
 error: cannot find attribute `serde` in this scope
-  --> tests/macro/compile_error.rs:69:7
+  --> tests/macro/compile_error.rs:59:7
    |
-69 |     #[serde(flatten)]
+59 |     #[serde(flatten)]
+   |       ^^^^^
+   |
+   = note: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
+   = note: `serde` is in scope, but it is a crate, not an attribute
+
+error: cannot find attribute `serde` in this scope
+  --> tests/macro/compile_error.rs:61:7
+   |
+61 |     #[serde(flatten)]
+   |       ^^^^^
+   |
+   = note: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
+   = note: `serde` is in scope, but it is a crate, not an attribute
+
+error: cannot find attribute `serde` in this scope
+  --> tests/macro/compile_error.rs:69:3
+   |
+69 | #[serde(tag = "tag")]
+   |   ^^^^^
+   |
+   = note: `serde` is in scope, but it is a crate, not an attribute
+help: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
+   |
+70 + #[derive(Deserialize, Serialize)]
+71 | enum UnnamedInternal {
+   |
+
+error: cannot find attribute `serde` in this scope
+  --> tests/macro/compile_error.rs:79:7
+   |
+79 |     #[serde(flatten)]
    |       ^^^^^
    |
    = note: `serde` is an attribute that can be used by the derive macros `Deserialize` and `Serialize`, you might be missing a `derive` attribute
    = note: `serde` is in scope, but it is a crate, not an attribute
 
 error[E0601]: `main` function not found in crate `$CRATE`
-   --> tests/macro/compile_error.rs:110:20
+   --> tests/macro/compile_error.rs:156:20
     |
-110 | pub fn testing() {}
+156 | pub fn testing() {}
     |                    ^ consider adding a `main` function to `$DIR/tests/macro/compile_error.rs`
 
 error[E0277]: the trait `specta::Type` is not implemented for `dyn std::error::Error + Send + Sync`
-  --> tests/macro/compile_error.rs:13:23
+  --> tests/macro/compile_error.rs:15:23
    |
-13 |     pub(crate) cause: Option<Box<dyn std::error::Error + Send + Sync>>,
+15 |     pub(crate) cause: Option<Box<dyn std::error::Error + Send + Sync>>,
    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `dyn std::error::Error + Send + Sync` must implement `Type`
    |
    = help: the trait `Type` is not implemented for `dyn std::error::Error + Send + Sync`
@@ -188,9 +212,9 @@ error[E0277]: the trait `specta::Type` is not implemented for `dyn std::error::E
    = note: required for `Option<Box<dyn std::error::Error + Send + Sync>>` to implement `Type`
 
 error[E0277]: the size for values of type `dyn std::error::Error + Send + Sync` cannot be known at compilation time
-  --> tests/macro/compile_error.rs:13:23
+  --> tests/macro/compile_error.rs:15:23
    |
-13 |     pub(crate) cause: Option<Box<dyn std::error::Error + Send + Sync>>,
+15 |     pub(crate) cause: Option<Box<dyn std::error::Error + Send + Sync>>,
    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ doesn't have a size known at compile-time
    |
    = help: the trait `Sized` is not implemented for `dyn std::error::Error + Send + Sync`

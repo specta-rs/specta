@@ -1,6 +1,6 @@
 //! This file is run with the `trybuild` crate to assert compilation errors in the Specta macros.
 
-use specta::{specta, Type};
+use specta::{Type, specta};
 
 // Invalid inflection
 #[derive(Type)]
@@ -102,6 +102,35 @@ struct InvalidAttrs3 {
 #[specta(collect = false)]
 struct InvalidAttrs4 {
     #[specta(noshot)]
+    a: String,
+}
+
+// Legacy `#[specta(...)]` migration errors
+#[derive(Type)]
+#[specta(collect = false)]
+#[specta(rename = "Renamed")]
+struct LegacyContainerRename;
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct LegacyFieldRename {
+    #[specta(rename = "renamed")]
+    a: String,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+enum LegacyVariantRename {
+    #[specta(rename = "renamed")]
+    A,
+}
+
+const INTERNAL_RENAME_KEY: &str = "renamed";
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct InternalRenameFromPath {
+    #[specta(rename_from_path = INTERNAL_RENAME_KEY)]
     a: String,
 }
 

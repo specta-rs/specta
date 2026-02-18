@@ -417,7 +417,7 @@ EmptyStruct: export type EmptyStruct = Record<string, never>;
 
 EmptyStructWithTag: export type EmptyStructWithTag = Record<string, never>;
 
-AdjacentlyTagged: export type AdjacentlyTagged = Brother | { id: string; method: string } | string;
+AdjacentlyTagged: export type AdjacentlyTagged = A | { id: string; method: string } | string;
 
 LoadProjectEvent: export type LoadProjectEvent = { project_name: string } | { project_name: string; status: string; progress: number } | { project_name: string };
 
@@ -595,6 +595,10 @@ GenericStruct2<()>: export type GenericStruct2<T> = {
 		g: T[][],
 		h: ([([T, T]), ([T, T]), ([T, T])])[],
 	};
+
+InlineGenericNewtype<String>: export type InlineGenericNewtype<T> = T;
+
+InlineGenericNested<String>: export type InlineGenericNested<T> = [T, T[], [T, T], { [key in string]: T }, T | null, "Unit" | { Unnamed: T } | { Named: { value: T } }];
 
 InlineFlattenGenericsG<()>: export type InlineFlattenGenericsG<T> = {
 		t: T,

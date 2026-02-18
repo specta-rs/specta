@@ -97,10 +97,10 @@ InlinerStruct: {
 	dont_inline_this: RefStruct,
 }
 GenericStruct<i32>: {
-	arg: T,
+	arg: number,
 }
 GenericStruct<String>: {
-	arg: T,
+	arg: string,
 }
 FlattenEnumStruct: (FlattenEnum) & {
 	outer: string,
@@ -173,7 +173,7 @@ InvalidToValidType: {
 }
 TupleStruct: string
 TupleStructWithRep: string
-GenericTupleStruct<String>: T
+GenericTupleStruct<String>: string
 BracedStruct: string
 StructRenameAllUppercase: {
 	a: number,
@@ -239,30 +239,33 @@ CommentedStruct: {
 CommentedEnum: { A: number } | { B: { a: number } }
 SingleLineComment: { A: number } | { B: { a: number } }
 NonGeneric: {
-	a: A,
-	b: B,
+	a: number,
+	b: boolean,
 }
 HalfGenericA<u8>: {
-	a: A,
-	b: B,
+	a: number,
+	b: boolean,
 }
 HalfGenericB<bool>: {
-	a: A,
-	b: B,
+	a: number,
+	b: boolean,
 }
 FullGeneric<u8, bool>: {
-	a: A,
-	b: B,
+	a: number,
+	b: boolean,
 }
 Another<bool>: {
-	a: A,
-	b: B,
+	a: number,
+	b: boolean,
 }
 MapA<u32>: { [key in string]: number }
 MapB<u32>: { [key in number]: string }
 MapC<u32>: { [key in string]: AGenericStruct<number> }
 AGenericStruct<u32>: {
-	field: Demo<T, boolean>,
+	field: {
+	a: number,
+	b: boolean,
+},
 }
 A: {
 	a: B,
@@ -318,7 +321,7 @@ MyEnumAdjacent: (First)
 MyEnumUntagged: (First)
 EmptyStruct: Record<string, never>
 EmptyStructWithTag: Record<string, never>
-AdjacentlyTagged: Brother | { id: string; method: string } | string
+AdjacentlyTagged: A | { id: string; method: string } | string
 LoadProjectEvent: { project_name: string } | { project_name: string; status: string; progress: number } | { project_name: string }
 ExternallyTagged: "A" | { B: { id: string; method: string } } | { C: string }
 InternallyTaggedB: string
@@ -405,37 +408,39 @@ FlattenG: {
 }
 TupleNested: [number[], [number[], number[]], [number[], number[], number[]]]
 Generic1<()>: {
-	value: T,
-	values: T[],
+	value: null,
+	values: null[],
 }
 GenericAutoBound<()>: {
-	value: T,
-	values: T[],
+	value: null,
+	values: null[],
 }
 GenericAutoBound2<()>: {
-	value: T,
-	values: T[],
+	value: null,
+	values: null[],
 }
 Container1: {
 	foo: Generic1<number>,
 	bar: Generic1<number>[],
 	baz: { [key in string]: Generic1<string> },
 }
-Generic2<(), String, i32>: { A: A } | { B: [B, B, B] } | { C: C[] } | { D: A[][][] } | { E: { a: A; b: B; c: C } } | { X: number[] } | { Y: number } | { Z: number[][] }
-GenericNewType1<()>: T[][]
-GenericTuple<()>: [T, T[], T[][]]
+Generic2<(), String, i32>: { A: null } | { B: [string, string, string] } | { C: number[] } | { D: null[][][] } | { E: { a: null; b: string; c: number } } | { X: number[] } | { Y: number } | { Z: number[][] }
+GenericNewType1<()>: null[][]
+GenericTuple<()>: [null, null[], null[][]]
 GenericStruct2<()>: {
-	a: T,
-	b: [T, T],
-	c: [T, [T, T]],
-	d: [T, T, T],
-	e: [([T, T]), ([T, T]), ([T, T])],
-	f: T[],
-	g: T[][],
-	h: ([([T, T]), ([T, T]), ([T, T])])[],
+	a: null,
+	b: [null, null],
+	c: [null, [null, null]],
+	d: [null, null, null],
+	e: [([null, null]), ([null, null]), ([null, null])],
+	f: null[],
+	g: null[][],
+	h: ([([null, null]), ([null, null]), ([null, null])])[],
 }
+InlineGenericNewtype<String>: string
+InlineGenericNested<String>: [string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | { Unnamed: string } | { Named: { value: string } }]
 InlineFlattenGenericsG<()>: {
-	t: T,
+	t: null,
 }
 InlineFlattenGenerics: (InlineFlattenGenericsG<string>) & {
 	g: InlineFlattenGenericsG<string>,

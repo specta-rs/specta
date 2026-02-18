@@ -164,6 +164,8 @@ Generic2<(), String, i32>: Generic2<null, string, number>
 GenericNewType1<()>: GenericNewType1<null>
 GenericTuple<()>: GenericTuple<null>
 GenericStruct2<()>: GenericStruct2<null>
+InlineGenericNewtype<String>: string
+InlineGenericNested<String>: [string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | { Unnamed: string } | { Named: { value: string } }]
 InlineFlattenGenericsG<()>: InlineFlattenGenericsG<null>
 InlineFlattenGenerics: InlineFlattenGenerics
 GenericParameterOrderPreserved: GenericParameterOrderPreserved

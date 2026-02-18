@@ -74,6 +74,12 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             }) => {
                 // If there are nested attributes remaining, report the first one
                 if let Some(inner_attr) = inner_attrs.first() {
+                    if let Some(message) =
+                        migration_hint(Scope::Container, &inner_attr.key.to_string())
+                    {
+                        return Err(syn::Error::new(inner_attr.key.span(), message));
+                    }
+
                     return Err(syn::Error::new(
                         inner_attr.key.span(),
                         format!(
