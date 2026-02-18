@@ -4,6 +4,35 @@ use specta::datatype::NamedReference;
 
 thread_local! {
     static REFERENCED_TYPES: RefCell<Option<Vec<HashSet<NamedReference>>>> = const { RefCell::new(None) };
+    static MODULE_PATH_CONTEXT: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+}
+
+pub(crate) fn with_module_path<R>(module_path: &str, func: impl FnOnce() -> R) -> R {
+    struct Guard;
+    impl Drop for Guard {
+        fn drop(&mut self) {
+            MODULE_PATH_CONTEXT.with_borrow_mut(|ctx| {
+                ctx.pop();
+            });
+        }
+    }
+
+    MODULE_PATH_CONTEXT.with_borrow_mut(|ctx| {
+        ctx.push(module_path.to_string());
+    });
+
+    let guard = Guard;
+    let result = func();
+    std::mem::forget(guard);
+    MODULE_PATH_CONTEXT.with_borrow_mut(|ctx| {
+        ctx.pop();
+    });
+
+    result
+}
+
+pub(crate) fn current_module_path() -> Option<String> {
+    MODULE_PATH_CONTEXT.with_borrow(|ctx| ctx.last().cloned())
 }
 
 /// This function collects all Typescript references which are created within the given closure.

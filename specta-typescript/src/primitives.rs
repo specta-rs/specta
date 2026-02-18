@@ -1347,9 +1347,6 @@ fn reference_named_dt(
             reference: format!("{r:?}"),
         })?;
 
-        // We check it's valid before tracking
-        crate::references::track_nr(r);
-
         // Check if this reference should be inlined
         if r.inline() {
             // Inline the referenced type directly, resolving generics
@@ -1367,6 +1364,9 @@ fn reference_named_dt(
                 &combined_generics,
             );
         }
+
+        // We check it's valid before tracking
+        crate::references::track_nr(r);
 
         let name = match exporter.layout {
             Layout::ModulePrefixedName => {
@@ -1392,17 +1392,14 @@ fn reference_named_dt(
                 }
             }
             Layout::Files => {
-                if ndt.module_path().is_empty() {
+                let current_module_path =
+                    crate::references::current_module_path().unwrap_or_default();
+
+                if ndt.module_path() == &current_module_path {
                     ndt.name().clone()
                 } else {
-                    let mut path =
-                        ndt.module_path()
-                            .split("::")
-                            .fold(String::new(), |mut s, segment| {
-                                s.push_str(segment);
-                                s.push('.');
-                                s
-                            });
+                    let mut path = crate::exporter::module_alias(ndt.module_path());
+                    path.push('.');
                     path.push_str(ndt.name());
                     Cow::Owned(path)
                 }
