@@ -857,7 +857,9 @@ const _: () = {
                     (
                         "MultiLineString".into(),
                         EnumVariant::unnamed()
-                            .field(Field::new(Vec::<geojson::LineStringType>::definition(types)))
+                            .field(Field::new(Vec::<geojson::LineStringType>::definition(
+                                types,
+                            )))
                             .build(),
                     ),
                     (

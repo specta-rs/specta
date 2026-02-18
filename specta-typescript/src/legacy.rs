@@ -812,9 +812,9 @@ pub(crate) fn js_doc(s: &mut String, docs: &str, deprecated: Option<&DeprecatedT
 
     // Add documentation lines
     if !docs.is_empty() {
-        for line in docs.split('\n') {
+        for line in docs.lines() {
             s.push_str(" * ");
-            s.push_str(line.trim());
+            s.push_str(&escape_jsdoc_text(line));
             s.push('\n');
         }
     }
@@ -823,18 +823,9 @@ pub(crate) fn js_doc(s: &mut String, docs: &str, deprecated: Option<&DeprecatedT
     if let Some(typ) = deprecated {
         s.push_str(" * @deprecated");
 
-        if let DeprecatedType::DeprecatedWithSince {
-            note: message,
-            since,
-        } = typ
-        {
+        if let Some(details) = deprecated_details(typ) {
             s.push(' ');
-            s.push_str(message.trim());
-
-            if let Some(since_val) = since {
-                s.push_str(" since ");
-                s.push_str(since_val.trim());
-            }
+            s.push_str(&details);
         }
 
         s.push('\n');
@@ -842,6 +833,32 @@ pub(crate) fn js_doc(s: &mut String, docs: &str, deprecated: Option<&DeprecatedT
 
     // Close JSDoc comment
     s.push_str(" */\n");
+}
+
+pub(crate) fn escape_jsdoc_text(text: &str) -> Cow<'_, str> {
+    if text.contains("*/") {
+        Cow::Owned(text.replace("*/", "*\\/"))
+    } else {
+        Cow::Borrowed(text)
+    }
+}
+
+pub(crate) fn deprecated_details(typ: &DeprecatedType) -> Option<String> {
+    match typ {
+        DeprecatedType::Deprecated => None,
+        DeprecatedType::DeprecatedWithSince { note, since } => {
+            let note = note.trim();
+            let since = since.as_ref().map(|v| v.trim()).filter(|v| !v.is_empty());
+
+            match (note.is_empty(), since) {
+                (false, Some(since)) => Some(format!("{note} since {since}")),
+                (false, None) => Some(note.to_string()),
+                (true, Some(since)) => Some(format!("since {since}")),
+                (true, None) => None,
+            }
+        }
+        _ => None,
+    }
 }
 
 // pub fn typedef_named_datatype(

@@ -11,12 +11,16 @@ use std::{
 use specta::{
     TypeCollection,
     datatype::{
-        DataType, DeprecatedType, Enum, Generic, List, Map, NamedDataType, NamedReference,
+        DataType, DeprecatedType, Enum, Fields, Generic, List, Map, NamedDataType, NamedReference,
         OpaqueReference, Primitive, Reference, Tuple,
     },
 };
 
-use crate::{BigIntExportBehavior, Branded, Error, Exporter, Layout, legacy::js_doc, opaque};
+use crate::{
+    BigIntExportBehavior, Branded, Error, Exporter, Layout,
+    legacy::{ExportContext, deprecated_details, escape_jsdoc_text, js_doc},
+    opaque,
+};
 
 /// Generate an `export Type = ...` Typescript string for a specific [`NamedDataType`].
 ///
@@ -149,29 +153,9 @@ pub(crate) fn typedef_internal(
         .chain(generics)
         .collect::<String>();
 
-    s.push_str("/**\n");
-
-    if !dt.docs().is_empty() {
-        for line in dt.docs().lines() {
-            s.push_str("\t* ");
-            s.push_str(line);
-            s.push('\n');
-        }
-        s.push_str("\t*\n");
-    }
-
-    if let Some(deprecated) = dt.deprecated() {
-        s.push_str("\t* @deprecated");
-        if let DeprecatedType::DeprecatedWithSince { note, .. } = deprecated {
-            s.push(' ');
-            s.push_str(note);
-        }
-        s.push('\n');
-    }
-
-    s.push_str("\t* @typedef {");
+    let mut typedef_ty = String::new();
     datatype(
-        s,
+        &mut typedef_ty,
         exporter,
         types,
         dt.ty(),
@@ -181,12 +165,210 @@ pub(crate) fn typedef_internal(
         "\t*\t",
         Default::default(),
     )?;
+
+    s.push_str("/**\n");
+
+    if !dt.docs().is_empty() {
+        for line in dt.docs().lines() {
+            s.push_str("\t* ");
+            s.push_str(&escape_jsdoc_text(line));
+            s.push('\n');
+        }
+        s.push_str("\t*\n");
+    }
+
+    if let Some(deprecated) = dt.deprecated() {
+        s.push_str("\t* @deprecated");
+        if let Some(details) = deprecated_details(deprecated) {
+            s.push(' ');
+            s.push_str(&details);
+        }
+        s.push('\n');
+    }
+
+    s.push_str("\t* @typedef {");
+    s.push_str(&typedef_ty);
     s.push_str("} ");
     s.push_str(&type_name);
     s.push('\n');
+
+    append_jsdoc_properties(s, exporter, types, dt)?;
+
     s.push_str("\t*/");
 
     Ok(())
+}
+
+fn append_jsdoc_properties(
+    s: &mut String,
+    exporter: &Exporter,
+    types: &TypeCollection,
+    dt: &NamedDataType,
+) -> Result<(), Error> {
+    match dt.ty() {
+        DataType::Struct(strct) => match strct.fields() {
+            Fields::Unit => {}
+            Fields::Unnamed(unnamed) => {
+                for (idx, field) in unnamed.fields().iter().enumerate() {
+                    let Some(ty) = field.ty() else {
+                        continue;
+                    };
+
+                    let mut ty_str = String::new();
+                    datatype(
+                        &mut ty_str,
+                        exporter,
+                        types,
+                        ty,
+                        vec![dt.name().clone(), idx.to_string().into()],
+                        false,
+                        Some(dt.name()),
+                        "\t*\t",
+                        Default::default(),
+                    )?;
+
+                    push_jsdoc_property(
+                        s,
+                        &ty_str,
+                        &idx.to_string(),
+                        field.optional(),
+                        field.docs(),
+                        field.deprecated(),
+                    );
+                }
+            }
+            Fields::Named(named) => {
+                for (name, field) in named.fields() {
+                    let Some(ty) = field.ty() else {
+                        continue;
+                    };
+
+                    let mut ty_str = String::new();
+                    datatype(
+                        &mut ty_str,
+                        exporter,
+                        types,
+                        ty,
+                        vec![dt.name().clone(), name.clone()],
+                        false,
+                        Some(dt.name()),
+                        "\t*\t",
+                        Default::default(),
+                    )?;
+
+                    push_jsdoc_property(
+                        s,
+                        &ty_str,
+                        name,
+                        field.optional(),
+                        field.docs(),
+                        field.deprecated(),
+                    );
+                }
+            }
+        },
+        DataType::Enum(enm) => {
+            for (variant_name, variant) in enm.variants().iter().filter(|(_, v)| !v.skip()) {
+                let mut one_variant_enum = enm.clone();
+                one_variant_enum
+                    .variants_mut()
+                    .retain(|(name, _)| name == variant_name);
+
+                let mut variant_ty = String::new();
+                crate::legacy::enum_datatype(
+                    ExportContext {
+                        cfg: exporter,
+                        path: vec![],
+                        is_export: false,
+                    },
+                    &one_variant_enum,
+                    types,
+                    &mut variant_ty,
+                    "\t",
+                    &[],
+                )?;
+
+                push_jsdoc_property(
+                    s,
+                    &variant_ty,
+                    variant_name,
+                    false,
+                    variant.docs(),
+                    variant.deprecated(),
+                );
+            }
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn push_jsdoc_property(
+    s: &mut String,
+    ty: &str,
+    name: &str,
+    optional: bool,
+    docs: &str,
+    deprecated: Option<&DeprecatedType>,
+) {
+    s.push_str("\t* @property {");
+    s.push_str(ty);
+    s.push_str("} ");
+    s.push_str(&jsdoc_property_name(name, optional));
+
+    if let Some(description) = jsdoc_description(docs, deprecated) {
+        s.push_str(" - ");
+        s.push_str(&description);
+    }
+
+    s.push('\n');
+}
+
+fn jsdoc_property_name(name: &str, optional: bool) -> String {
+    fn is_identifier(name: &str) -> bool {
+        let mut chars = name.chars();
+        let Some(first) = chars.next() else {
+            return false;
+        };
+
+        (first.is_ascii_alphabetic() || first == '_' || first == '$')
+            && chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '$')
+    }
+
+    let name = if is_identifier(name) {
+        name.to_string()
+    } else {
+        format!("\"{}\"", name.replace('"', "\\\""))
+    };
+
+    if optional { format!("[{name}]") } else { name }
+}
+
+fn jsdoc_description(docs: &str, deprecated: Option<&DeprecatedType>) -> Option<String> {
+    let docs = docs
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(|line| escape_jsdoc_text(line).into_owned())
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    let deprecated = deprecated.map(|deprecated| {
+        let mut value = String::from("@deprecated");
+        if let Some(details) = deprecated_details(deprecated) {
+            value.push(' ');
+            value.push_str(&escape_jsdoc_text(&details));
+        }
+        value
+    });
+
+    match (docs.is_empty(), deprecated) {
+        (true, None) => None,
+        (true, Some(deprecated)) => Some(deprecated),
+        (false, None) => Some(docs),
+        (false, Some(deprecated)) => Some(format!("{docs} {deprecated}")),
+    }
 }
 
 /// Generate an Typescript string to refer to a specific [`DataType`].
