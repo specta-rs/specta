@@ -79,27 +79,34 @@ pub fn datatype_to_schema(
 
         // Reference
         DataType::Reference(r) => {
-            if is_definition {
-                // When exporting a definition, inline it
-                if let Some(referenced_ndt) = r.get(types) {
-                    datatype_to_schema(js, types, referenced_ndt.ty(), true)
-                } else {
-                    Err(Error::InvalidReference(format!(
-                        "Reference not found in TypeCollection"
-                    )))
+            match r {
+                Reference::Named(r) => {
+                    if is_definition {
+                        // When exporting a definition, inline it
+                        if let Some(referenced_ndt) = r.get(types) {
+                            datatype_to_schema(js, types, referenced_ndt.ty(), true)
+                        } else {
+                            Err(Error::InvalidReference(
+                                "Reference not found in TypeCollection".to_string(),
+                            ))
+                        }
+                    } else {
+                        // Use $ref for references
+                        let defs_key = js.schema_version.definitions_key();
+                        if let Some(referenced_ndt) = r.get(types) {
+                            Ok(json!({
+                                "$ref": format!("#/{}/{}", defs_key, referenced_ndt.name())
+                            }))
+                        } else {
+                            Err(Error::InvalidReference(
+                                "Reference not found in TypeCollection".to_string(),
+                            ))
+                        }
+                    }
                 }
-            } else {
-                // Use $ref for references
-                let defs_key = js.schema_version.definitions_key();
-                if let Some(referenced_ndt) = r.get(types) {
-                    Ok(json!({
-                        "$ref": format!("#/{}/{}", defs_key, referenced_ndt.name())
-                    }))
-                } else {
-                    Err(Error::InvalidReference(format!(
-                        "Reference not found in TypeCollection"
-                    )))
-                }
+                Reference::Opaque(_) => Err(Error::UnsupportedDataType(
+                    "Opaque references are not supported by JSON Schema exporter".to_string(),
+                )),
             }
         }
 

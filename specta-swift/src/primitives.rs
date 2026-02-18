@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 use specta::{
     TypeCollection,
-    datatype::{DataType, Primitive},
+    datatype::{DataType, Primitive, Reference},
 };
 
 use crate::error::{Error, Result};
@@ -302,7 +302,7 @@ fn is_special_std_type(
     types: &TypeCollection,
     reference: Option<&specta::datatype::Reference>,
 ) -> Option<String> {
-    if let Some(r) = reference
+    if let Some(Reference::Named(r)) = reference
         && let Some(ndt) = r.get(types)
     {
         // Check for std::time::Duration
@@ -742,25 +742,31 @@ fn reference_to_swift(
     types: &TypeCollection,
     r: &specta::datatype::Reference,
 ) -> Result<String> {
-    // Get the name from the TypeCollection using the SID
-    let name = if let Some(ndt) = r.get(types) {
-        swift.naming.convert(ndt.name())
-    } else {
-        return Err(Error::InvalidIdentifier(
-            "Reference to unknown type".to_string(),
-        ));
-    };
+    match r {
+        Reference::Named(r) => {
+            let name = if let Some(ndt) = r.get(types) {
+                swift.naming.convert(ndt.name())
+            } else {
+                return Err(Error::InvalidIdentifier(
+                    "Reference to unknown type".to_string(),
+                ));
+            };
 
-    if r.generics().is_empty() {
-        Ok(name)
-    } else {
-        let generics = r
-            .generics()
-            .iter()
-            .map(|(_, t)| datatype_to_swift(swift, types, t, vec![], false, None))
-            .collect::<std::result::Result<Vec<_>, _>>()?
-            .join(", ");
-        Ok(format!("{}<{}>", name, generics))
+            if r.generics().is_empty() {
+                Ok(name)
+            } else {
+                let generics = r
+                    .generics()
+                    .iter()
+                    .map(|(_, t)| datatype_to_swift(swift, types, t, vec![], false, None))
+                    .collect::<std::result::Result<Vec<_>, _>>()?
+                    .join(", ");
+                Ok(format!("{}<{}>", name, generics))
+            }
+        }
+        Reference::Opaque(_) => Err(Error::UnsupportedType(
+            "Opaque references are not supported by Swift exporter".to_string(),
+        )),
     }
 }
 

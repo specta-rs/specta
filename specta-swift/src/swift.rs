@@ -2,7 +2,10 @@
 
 use std::{borrow::Cow, path::Path};
 
-use specta::TypeCollection;
+use specta::{
+    TypeCollection,
+    datatype::{DataType, Fields, Reference},
+};
 use specta_serde::SerdeMode;
 
 use crate::error::Result;
@@ -321,19 +324,19 @@ fn needs_duration_helper(types: &TypeCollection) -> bool {
             return true;
         }
         // Also check if any struct fields contain Duration
-        if let specta::datatype::DataType::Struct(s) = ndt.ty()
-            && let specta::datatype::Fields::Named(fields) = s.fields()
+        if let DataType::Struct(s) = ndt.ty()
+            && let Fields::Named(fields) = s.fields()
         {
             for (_, field) in fields.fields() {
                 if let Some(ty) = field.ty() {
-                    if let specta::datatype::DataType::Reference(r) = ty
+                    if let DataType::Reference(Reference::Named(r)) = ty
                         && let Some(referenced_ndt) = r.get(types)
                         && referenced_ndt.name() == "Duration"
                     {
                         return true;
                     }
                     // Also check if the field type is a Duration struct directly
-                    if let specta::datatype::DataType::Struct(struct_ty) = ty
+                    if let DataType::Struct(struct_ty) = ty
                         && is_duration_struct(struct_ty)
                     {
                         return true;
