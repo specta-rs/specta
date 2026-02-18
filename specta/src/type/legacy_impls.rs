@@ -832,17 +832,61 @@ impl_as!(
 const _: () = {
     use geojson::{Feature, FeatureCollection, Geometry, Value};
 
-    #[derive(Type)]
-    #[specta(untagged, remote = Value, crate = crate, collect = false)]
-    #[allow(dead_code)]
-    pub enum GeoJsonValue {
-        Point(geojson::PointType),
-        MultiPoint(Vec<geojson::PointType>),
-        LineString(geojson::LineStringType),
-        MultiLineString(Vec<geojson::LineStringType>),
-        Polygon(geojson::PolygonType),
-        MultiPolygon(Vec<geojson::PolygonType>),
-        GeometryCollection(Vec<Geometry>),
+    impl Type for Value {
+        fn definition(types: &mut TypeCollection) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "Point".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(geojson::PointType::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "MultiPoint".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(Vec::<geojson::PointType>::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "LineString".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(geojson::LineStringType::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "MultiLineString".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(Vec::<geojson::LineStringType>::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Polygon".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(geojson::PolygonType::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "MultiPolygon".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(Vec::<geojson::PolygonType>::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "GeometryCollection".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(Vec::<Geometry>::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: vec![RuntimeAttribute {
+                    path: String::from("serde"),
+                    kind: RuntimeMeta::List(vec![RuntimeNestedMeta::Meta(RuntimeMeta::Path(
+                        String::from("untagged"),
+                    ))]),
+                }],
+            })
+        }
     }
 
     #[derive(Type)]
@@ -874,12 +918,31 @@ const _: () = {
         pub foreign_members: Option<geojson::JsonObject>,
     }
 
-    #[derive(Type)]
-    #[specta(untagged, remote = geojson::feature::Id, crate = crate, collect = false)]
-    #[allow(dead_code)]
-    pub enum GeoJsonFeatureId {
-        String(String),
-        Number(serde_json::Number),
+    impl Type for geojson::feature::Id {
+        fn definition(types: &mut TypeCollection) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "String".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(String::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Number".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(serde_json::Number::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: vec![RuntimeAttribute {
+                    path: String::from("serde"),
+                    kind: RuntimeMeta::List(vec![RuntimeNestedMeta::Meta(RuntimeMeta::Path(
+                        String::from("untagged"),
+                    ))]),
+                }],
+            })
+        }
     }
 };
 

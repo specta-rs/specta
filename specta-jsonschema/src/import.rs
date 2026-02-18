@@ -31,7 +31,7 @@ fn schema_object_to_datatype(obj: &SchemaObject) -> Result<DataType, Error> {
             .ok_or_else(|| Error::ConversionError(format!("Invalid $ref: {}", reference)))?;
 
         // Create an opaque reference since we don't have the TypeCollection context
-        todo();
+        todo!();
         // return `Ok(DataType::Reference(Reference::opaque()));
     }
 
