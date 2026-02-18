@@ -1,8 +1,23 @@
-use specta::{Type, TypeCollection, datatype::NamedDataTypeBuilder};
+use specta::{
+    Type, TypeCollection,
+    datatype::{DataType, NamedDataTypeBuilder},
+};
 use specta_typescript::{Exporter, Layout, Typescript, primitives};
+use specta_util::selection;
 
+// #[derive(Type)]
+// #[specta(rename = "bruh")]
+// pub struct OneTwo {
+//     a: String,
+//     b: testing::Testing,
+// }
+
+/// Comment on `One`
 #[derive(Type)]
 pub struct One {
+    /// Comment on `a`
+    ///
+    /// Another comment on `a`
     a: String,
     b: testing::Testing,
 }
@@ -50,12 +65,36 @@ pub struct MyChannel;
 #[derive(Type)]
 pub struct RecursiveMe {
     testing: Vec<RecursiveMe>,
+    /// Inlined container comment
+    inlined_container: InlinedContainer,
+    inlined_container2: InlinedContainer,
+}
+
+/// JSDoc comment on inlined struct
+#[derive(Type)]
+#[specta(inline)]
+pub struct InlinedContainer {
+    /// JSDoc comment on `a`
+    a: String,
+    /// JSDoc comment on `b`
+    ///
+    /// Comment continued
+    b: i32,
+    #[specta(inline)]
+    inline_in_inlined: AnotherOne,
+}
+
+#[derive(Type)]
+pub struct AnotherOne {
+    /// Hello world from really inlined.
+    abc: String,
 }
 
 fn main() {
     let mut types = TypeCollection::default()
         .register::<One>()
-        .register::<MyChannel>();
+        .register::<MyChannel>()
+        .register::<RecursiveMe>();
 
     NamedDataTypeBuilder::new("VirtualOne", vec![], i32::definition(&mut types)).build(&mut types);
     let ndt = NamedDataTypeBuilder::new("VirtualTwo", vec![], i32::definition(&mut types))

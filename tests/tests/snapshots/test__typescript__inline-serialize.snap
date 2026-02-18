@@ -94,9 +94,9 @@ TestEnum: "Unit" | { Single: number } | { Multiple: [number, number] } | { Struc
 RefStruct: TestEnum
 InlinerStruct: {
 	inline_this: {
-	ref_struct: SimpleStruct,
-	val: number,
-},
+		ref_struct: SimpleStruct,
+		val: number,
+	},
 	dont_inline_this: RefStruct,
 }
 GenericStruct<i32>: {
@@ -116,13 +116,8 @@ EnumMacroAttributes: { A: string } | { B: number } | { C: number } | { D: { a: s
 InlineEnumField: { A: PlaceholderInnerField }
 InlineOptionalType: {
 	optional_field: {
-	a: string,
-} | null,
-}
-ShallowInlineContainerOuter: {
-	value: {
-	nested: RefStruct,
-},
+		a: string,
+	} | null,
 }
 Rename: "OneWord" | "TwoWords"
 TransparentType: TransparentTypeInner
@@ -150,8 +145,8 @@ InlineTuple: {
 }
 InlineTuple2: {
 	demo: [{
-	demo: [string, boolean],
-}, boolean],
+		demo: [string, boolean],
+	}, boolean],
 }
 Box<str>: string
 Box<String>: string
@@ -282,15 +277,15 @@ AGenericStruct<u32>: {
 A: {
 	a: B,
 	b: {
-	b: number,
-},
+		b: number,
+	},
 	c: B,
 	d: {
-	flattened: number,
-},
+		flattened: number,
+	},
 	e: {
-	generic_flattened: number,
-},
+		generic_flattened: number,
+	},
 }
 DoubleFlattened: {
 	a: ToBeFlattened,
@@ -304,8 +299,8 @@ BoxFlattened: {
 }
 BoxInline: {
 	c: {
-	a: number,
-},
+		a: number,
+	},
 }
 First: {
 	a: string,
@@ -320,14 +315,14 @@ Third: (First) & {
 Fourth: {
 	a: First,
 	b: {
-	a: string,
-},
+		a: string,
+	},
 }
 TagOnStructWithInline: {
 	a: First,
 	b: {
-	a: string,
-},
+		a: string,
+	},
 }
 Sixth: {
 	a: First,
@@ -420,14 +415,14 @@ FlattenD: {
 }
 FlattenE: {
 	b: (FlattenA) & {
-	c: number,
-},
+		c: number,
+	},
 	d: number,
 }
 FlattenF: {
 	b: (FlattenA) & {
-	c: number,
-},
+		c: number,
+	},
 	d: number,
 }
 FlattenG: {
@@ -473,8 +468,8 @@ InlineFlattenGenericsG<()>: {
 InlineFlattenGenerics: (InlineFlattenGenericsG<string>) & {
 	g: InlineFlattenGenericsG<string>,
 	gi: {
-	t: string,
-},
+		t: string,
+	},
 }
 GenericParameterOrderPreserved: {
 	pair: Pair<number, string>,

@@ -127,7 +127,7 @@ pub(crate) type Output = Result<String>;
 fn inner_comments(
     ctx: ExportContext,
     deprecated: Option<&DeprecatedType>,
-    docs: &Cow<'static, str>,
+    docs: &str,
     other: String,
     start_with_newline: bool,
     prefix: &str,
@@ -138,13 +138,23 @@ fn inner_comments(
 
     let mut comments = String::new();
     js_doc(&mut comments, docs, deprecated);
+    if comments.is_empty() {
+        return other;
+    }
 
-    let (prefix_a, prefix_b) = match start_with_newline && !comments.is_empty() {
-        true => ("\n", prefix),
-        false => ("", ""),
-    };
+    let mut out = String::new();
+    if start_with_newline {
+        out.push('\n');
+    }
 
-    format!("{prefix_a}{prefix_b}{comments}{other}")
+    for line in comments.lines() {
+        out.push_str(prefix);
+        out.push_str(line);
+        out.push('\n');
+    }
+
+    out.push_str(&other);
+    out
 }
 
 pub(crate) fn datatype_inner(
@@ -369,26 +379,36 @@ pub(crate) fn struct_datatype(
             let unflattened_fields = non_flattened
                 .into_iter()
                 .map(|(key, field_ref)| {
-                    let (field, _) = field_ref;
+                    let (field, ty) = field_ref;
+                    let field_prefix = format!("{prefix}\t");
 
                     let mut other = String::new();
                     object_field_to_ts(
                         ctx.with(PathItem::Field(key.clone())),
                         key.clone(),
-                        field_ref,
+                        (field, ty),
                         types,
                         &mut other,
                         generics,
+                        &field_prefix,
                         false,
                     )?;
+
+                    let docs = field
+                        .docs()
+                        .trim()
+                        .is_empty()
+                        .then(|| inline_reference_docs(types, (field, ty), false))
+                        .flatten()
+                        .unwrap_or(field.docs());
 
                     Ok(inner_comments(
                         ctx.clone(),
                         field.deprecated(),
-                        field.docs(),
+                        docs,
                         other,
-                        true,
-                        prefix,
+                        false,
+                        &field_prefix,
                     ))
                 })
                 .collect::<Result<Vec<_>>>()?;
@@ -402,9 +422,9 @@ pub(crate) fn struct_datatype(
                 let mut s = "{".to_string();
 
                 for field in unflattened_fields {
-                    // TODO: Inline or not for newline?
-                    // s.push_str(&format!("{field}; "));
-                    s.push_str(&format!("\n{prefix}\t{field},"));
+                    s.push('\n');
+                    s.push_str(&field);
+                    s.push(',');
                 }
 
                 s.push('\n');
@@ -486,23 +506,32 @@ fn enum_variant_datatype(
                 non_flattened
                     .into_iter()
                     .map(|(name, field_ref)| {
-                        let (field, _) = field_ref;
+                        let (field, ty) = field_ref;
 
                         let mut other = String::new();
                         object_field_to_ts(
                             ctx.with(PathItem::Field(name.clone())),
                             name.clone(),
-                            field_ref,
+                            (field, ty),
                             types,
                             &mut other,
                             generics,
+                            "",
                             false,
                         )?;
+
+                        let docs = field
+                            .docs()
+                            .trim()
+                            .is_empty()
+                            .then(|| inline_reference_docs(types, (field, ty), false))
+                            .flatten()
+                            .unwrap_or(field.docs());
 
                         Ok(inner_comments(
                             ctx.clone(),
                             field.deprecated(),
-                            field.docs(),
+                            docs,
                             other,
                             true,
                             prefix,
@@ -669,12 +698,14 @@ pub(crate) fn enum_datatype(
 fn object_field_to_ts(
     ctx: ExportContext,
     key: Cow<'static, str>,
-    (field, ty): NonSkipField,
+    field_ref: NonSkipField,
     types: &TypeCollection,
     s: &mut String,
     generics: &[(Generic, DataType)],
+    prefix: &str,
     force_inline: bool,
 ) -> Result<()> {
+    let (field, ty) = field_ref;
     let field_name_safe = sanitise_key(key, false);
 
     // https://github.com/specta-rs/rspc/issues/100#issuecomment-1373092211
@@ -692,12 +723,30 @@ fn object_field_to_ts(
         vec![],
         ctx.is_export,
         None,
-        "",
+        prefix,
         generics,
         force_inline || field.inline(),
     )?;
 
-    Ok(write!(s, "{key}: {value}",)?)
+    Ok(write!(s, "{prefix}{key}: {value}",)?)
+}
+
+fn inline_reference_docs<'a>(
+    types: &'a TypeCollection,
+    (field, ty): NonSkipField,
+    force_inline: bool,
+) -> Option<&'a str> {
+    let DataType::Reference(Reference::Named(r)) = ty else {
+        return None;
+    };
+
+    if !(force_inline || field.inline() || r.inline()) {
+        return None;
+    }
+
+    r.get(types)
+        .filter(|ndt| !ndt.docs().trim().is_empty())
+        .map(|ndt| ndt.docs().as_ref())
 }
 
 /// sanitise a string to be a valid Typescript key

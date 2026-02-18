@@ -335,7 +335,7 @@ impl Exporter {
                 }
             }
 
-            if import_count > 1 && !rendered_types.is_empty() {
+            if import_count > 0 && !rendered_types.is_empty() {
                 s.push('\n');
             }
 
@@ -436,7 +436,7 @@ impl Exporter {
 
                     if !body.is_empty() {
                         out.push('\n');
-                        if import_count > 1 {
+                        if import_count > 0 {
                             out.push('\n');
                         }
                         out.push_str(&body);

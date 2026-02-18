@@ -34,9 +34,9 @@ RefStruct: export type RefStruct = TestEnum;
 
 InlinerStruct: export type InlinerStruct = {
 		inline_this: {
-	ref_struct: SimpleStruct,
-	val: number,
-},
+			ref_struct: SimpleStruct,
+			val: number,
+		},
 		dont_inline_this: RefStruct,
 	};
 
@@ -64,14 +64,8 @@ InlineEnumField: export type InlineEnumField = { A: PlaceholderInnerField };
 
 InlineOptionalType: export type InlineOptionalType = {
 		optional_field: {
-	a: string,
-} | null,
-	};
-
-ShallowInlineContainerOuter: export type ShallowInlineContainerOuter = {
-		value: {
-	nested: RefStruct,
-},
+			a: string,
+		} | null,
 	};
 
 Rename: export type Rename = "OneWord" | "TwoWords";
@@ -102,8 +96,8 @@ InlineTuple: export type InlineTuple = {
 
 InlineTuple2: export type InlineTuple2 = {
 		demo: [{
-	demo: [string, boolean],
-}, boolean],
+			demo: [string, boolean],
+		}, boolean],
 	};
 
 SkippedFieldWithinVariant: export type SkippedFieldWithinVariant = never | string;
@@ -231,49 +225,46 @@ export type DeprecatedTypeWithMsg2 = {
 
 DeprecatedFields: export type DeprecatedFields = {
 		a: number,
-		
-	/**
- * @deprecated
- */
-b: string,
-		
-	/**
- * @deprecated This field is cringe!
- */
-c: string,
-		
-	/**
- * @deprecated This field is cringe!
- */
-d: string,
+		/**
+		 * @deprecated
+		 */
+		b: string,
+		/**
+		 * @deprecated This field is cringe!
+		 */
+		c: string,
+		/**
+		 * @deprecated This field is cringe!
+		 */
+		d: string,
 	};
 
 DeprecatedTupleVariant: export type DeprecatedTupleVariant = [
 	/**
- * @deprecated
- */
+	 * @deprecated
+	 */
 string, 
 	/**
- * @deprecated Nope
- */
+	 * @deprecated Nope
+	 */
 string, 
 	/**
- * @deprecated Nope
- */
+	 * @deprecated Nope
+	 */
 number];
 
 DeprecatedEnumVariants: export type DeprecatedEnumVariants = 
 	/**
- * @deprecated
- */
+	 * @deprecated
+	 */
 "A" | 
 	/**
- * @deprecated Nope
- */
+	 * @deprecated Nope
+	 */
 "B" | 
 	/**
- * @deprecated Nope
- */
+	 * @deprecated Nope
+	 */
 "C";
 
 CommentedStruct: /**
@@ -281,12 +272,11 @@ CommentedStruct: /**
  *  Some more triple-slash comment
  */
 export type CommentedStruct = {
-		
-	/**
- *  Some triple-slash comment
- *  Some more triple-slash comment
- */
-a: number,
+		/**
+		 *  Some triple-slash comment
+		 *  Some more triple-slash comment
+		 */
+		a: number,
 	};
 
 CommentedEnum: /**
@@ -295,19 +285,19 @@ CommentedEnum: /**
  */
 export type CommentedEnum = 
 	/**
- *  Some triple-slash comment
- *  Some more triple-slash comment
- */
+	 *  Some triple-slash comment
+	 *  Some more triple-slash comment
+	 */
 { A: number } | 
 	/**
- *  Some triple-slash comment
- *  Some more triple-slash comment
- */
+	 *  Some triple-slash comment
+	 *  Some more triple-slash comment
+	 */
 { B: { 
 	/**
- *  Some triple-slash comment
- *  Some more triple-slash comment
- */
+	 *  Some triple-slash comment
+	 *  Some more triple-slash comment
+	 */
 a: number } };
 
 SingleLineComment: /**
@@ -315,16 +305,16 @@ SingleLineComment: /**
  */
 export type SingleLineComment = 
 	/**
- *  Some single-line comment
- */
+	 *  Some single-line comment
+	 */
 { A: number } | 
 	/**
- *  Some single-line comment
- */
+	 *  Some single-line comment
+	 */
 { B: { 
 	/**
- *  Some single-line comment
- */
+	 *  Some single-line comment
+	 */
 a: number } };
 
 NonGeneric: export type Demo<A, B> = {
@@ -359,15 +349,15 @@ AGenericStruct<u32>: export type AGenericStruct<T> = {
 A: export type A = {
 		a: B,
 		b: {
-	b: number,
-},
+			b: number,
+		},
 		c: B,
 		d: {
-	flattened: number,
-},
+			flattened: number,
+		},
 		e: {
-	generic_flattened: number,
-},
+			generic_flattened: number,
+		},
 	};
 
 DoubleFlattened: export type DoubleFlattened = {
@@ -385,8 +375,8 @@ BoxFlattened: export type BoxFlattened = {
 
 BoxInline: export type BoxInline = {
 		c: {
-	a: number,
-},
+			a: number,
+		},
 	};
 
 First: export type First = {
@@ -405,15 +395,15 @@ Third: export type Third = (First) & {
 Fourth: export type Fourth = {
 		a: First,
 		b: {
-	a: string,
-},
+			a: string,
+		},
 	};
 
 TagOnStructWithInline: export type TagOnStructWithInline = {
 		a: First,
 		b: {
-	a: string,
-},
+			a: string,
+		},
 	};
 
 Sixth: export type Sixth = {
@@ -568,15 +558,15 @@ FlattenD: export type FlattenD = {
 
 FlattenE: export type FlattenE = {
 		b: (FlattenA) & {
-	c: number,
-},
+			c: number,
+		},
 		d: number,
 	};
 
 FlattenF: export type FlattenF = {
 		b: (FlattenA) & {
-	c: number,
-},
+			c: number,
+		},
 		d: number,
 	};
 
@@ -636,8 +626,8 @@ InlineFlattenGenericsG<()>: export type InlineFlattenGenericsG<T> = {
 InlineFlattenGenerics: export type InlineFlattenGenerics = (InlineFlattenGenericsG<string>) & {
 		g: InlineFlattenGenericsG<string>,
 		gi: {
-	t: string,
-},
+			t: string,
+		},
 	};
 
 GenericParameterOrderPreserved: export type GenericParameterOrderPreserved = {

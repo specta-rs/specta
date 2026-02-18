@@ -382,7 +382,7 @@ pub fn reference(
     r: &Reference,
 ) -> Result<String, Error> {
     let mut s = String::new();
-    reference_dt(&mut s, exporter.as_ref(), types, r, vec![], false, &[])?;
+    reference_dt(&mut s, exporter.as_ref(), types, r, vec![], false, "", &[])?;
     Ok(s)
 }
 
@@ -910,7 +910,7 @@ fn inline_datatype(
                 )?;
             } else {
                 // Fallback to regular reference if type not found
-                reference_dt(s, exporter, types, r, location, is_export, generics)?;
+                reference_dt(s, exporter, types, r, location, is_export, prefix, generics)?;
             }
         }
         DataType::Generic(g) => {
@@ -1008,7 +1008,7 @@ pub(crate) fn datatype(
         DataType::Enum(e) => enum_dt(s, exporter, types, e, location, is_export, prefix, generics)?,
         DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, is_export, generics)?,
         DataType::Reference(r) => {
-            reference_dt(s, exporter, types, r, location, is_export, generics)?
+            reference_dt(s, exporter, types, r, location, is_export, prefix, generics)?
         }
         DataType::Generic(g) => {
             if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
@@ -1713,11 +1713,12 @@ fn reference_dt(
     location: Vec<Cow<'static, str>>,
     // TODO: Remove
     is_export: bool,
+    prefix: &str,
     generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     match r {
         Reference::Named(r) => {
-            reference_named_dt(s, exporter, types, r, location, is_export, generics)
+            reference_named_dt(s, exporter, types, r, location, is_export, prefix, generics)
         }
         Reference::Opaque(r) => reference_opaque_dt(s, exporter, types, r),
     }
@@ -1774,6 +1775,7 @@ fn reference_named_dt(
     location: Vec<Cow<'static, str>>,
     // TODO: Remove
     is_export: bool,
+    prefix: &str,
     generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     // TODO: Legacy stuff
@@ -1794,7 +1796,7 @@ fn reference_named_dt(
                 location,
                 is_export,
                 None,
-                "",
+                prefix,
                 &combined_generics,
             );
         }
