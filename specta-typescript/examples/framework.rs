@@ -14,6 +14,8 @@ mod testing {
     pub struct Testing {
         c: char,
         another: AnotherNestedOne,
+        #[specta(inline)]
+        inlined: AnotherNestedOne,
     }
 
     #[derive(Type)]

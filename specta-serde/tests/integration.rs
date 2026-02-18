@@ -5,8 +5,8 @@
 
 use specta::datatype::{RuntimeAttribute, RuntimeLiteral, RuntimeMeta, RuntimeValue};
 use specta::{
-    DataType, TypeCollection,
-    datatype::{Field, Primitive, Struct},
+    TypeCollection,
+    datatype::{DataType, Field, Primitive, Struct},
 };
 use specta_serde::{
     SerdeMode, apply_serde_transformations, process_for_deserialization, process_for_serialization,
@@ -30,8 +30,7 @@ fn test_basic_transformation() {
 #[test]
 fn test_optional_fields_with_skip_serializing_if_and_default() {
     use specta::datatype::{
-        DataType, Field, Primitive, RuntimeAttribute, RuntimeLiteral, RuntimeMeta,
-        RuntimeNestedMeta, Struct,
+        DataType, Field, Primitive, RuntimeAttribute, RuntimeLiteral, RuntimeMeta, Struct,
     };
     use specta_serde::{SerdeMode, apply_serde_transformations};
 
