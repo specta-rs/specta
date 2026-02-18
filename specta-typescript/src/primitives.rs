@@ -1328,7 +1328,7 @@ fn reference_opaque_dt(
         return Ok(());
     }
 
-    return Err(Error::UnsupportedOpaqueReference(r.clone()));
+    Err(Error::UnsupportedOpaqueReference(r.clone()))
 }
 
 fn reference_named_dt(
@@ -1346,6 +1346,9 @@ fn reference_named_dt(
         let ndt = r.get(types).ok_or_else(|| Error::DanglingNamedReference {
             reference: format!("{r:?}"),
         })?;
+
+        // We check it's valid before tracking
+        crate::references::track_nr(r);
 
         // Check if this reference should be inlined
         if r.inline() {
