@@ -386,6 +386,46 @@ pub fn reference(
     Ok(s)
 }
 
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn datatype_with_inline_attr(
+    s: &mut String,
+    exporter: &Exporter,
+    types: &TypeCollection,
+    dt: &DataType,
+    location: Vec<Cow<'static, str>>,
+    is_export: bool,
+    parent_name: Option<&str>,
+    prefix: &str,
+    generics: &[(Generic, DataType)],
+    inline: bool,
+) -> Result<(), Error> {
+    if inline {
+        return shallow_inline_datatype(
+            s,
+            exporter,
+            types,
+            dt,
+            location,
+            is_export,
+            parent_name,
+            prefix,
+            generics,
+        );
+    }
+
+    datatype(
+        s,
+        exporter,
+        types,
+        dt,
+        location,
+        is_export,
+        parent_name,
+        prefix,
+        generics,
+    )
+}
+
 fn merged_generics(
     parent: &[(Generic, DataType)],
     child: &[(Generic, DataType)],
@@ -395,6 +435,219 @@ fn merged_generics(
         .map(|(generic, dt)| (generic.clone(), resolve_generics_in_datatype(dt, parent)))
         .chain(parent.iter().cloned())
         .collect()
+}
+
+#[allow(clippy::too_many_arguments)]
+fn shallow_inline_datatype(
+    s: &mut String,
+    exporter: &Exporter,
+    types: &TypeCollection,
+    dt: &DataType,
+    location: Vec<Cow<'static, str>>,
+    is_export: bool,
+    parent_name: Option<&str>,
+    prefix: &str,
+    generics: &[(Generic, DataType)],
+) -> Result<(), Error> {
+    match dt {
+        DataType::Primitive(p) => s.push_str(primitive_dt(&exporter.bigint, p, location)?),
+        DataType::List(list) => {
+            let mut inner = String::new();
+            shallow_inline_datatype(
+                &mut inner,
+                exporter,
+                types,
+                list.ty(),
+                location,
+                is_export,
+                parent_name,
+                prefix,
+                generics,
+            )?;
+
+            let inner = if (inner.contains(' ') && !inner.ends_with('}'))
+                || (inner.contains(' ') && (inner.contains('&') || inner.contains('|')))
+            {
+                format!("({inner})")
+            } else {
+                inner
+            };
+
+            if let Some(length) = list.length() {
+                s.push('[');
+                for i in 0..length {
+                    if i != 0 {
+                        s.push_str(", ");
+                    }
+                    s.push_str(&inner);
+                }
+                s.push(']');
+            } else {
+                write!(s, "{inner}[]")?;
+            }
+        }
+        DataType::Map(map) => {
+            fn is_exhaustive(dt: &DataType, types: &TypeCollection) -> bool {
+                match dt {
+                    DataType::Enum(e) => {
+                        e.variants().iter().filter(|(_, v)| !v.skip()).count() == 0
+                    }
+                    DataType::Reference(Reference::Named(r)) => r
+                        .get(types)
+                        .is_some_and(|ndt| is_exhaustive(ndt.ty(), types)),
+                    DataType::Reference(Reference::Opaque(_)) => false,
+                    _ => true,
+                }
+            }
+
+            let exhaustive = is_exhaustive(map.key_ty(), types);
+            if !exhaustive {
+                s.push_str("Partial<");
+            }
+
+            s.push_str("{ [key in ");
+            shallow_inline_datatype(
+                s,
+                exporter,
+                types,
+                map.key_ty(),
+                location.clone(),
+                true,
+                parent_name,
+                prefix,
+                generics,
+            )?;
+            s.push_str("]: ");
+            shallow_inline_datatype(
+                s,
+                exporter,
+                types,
+                map.value_ty(),
+                location,
+                is_export,
+                parent_name,
+                prefix,
+                generics,
+            )?;
+            s.push_str(" }");
+
+            if !exhaustive {
+                s.push('>');
+            }
+        }
+        DataType::Nullable(dt) => {
+            shallow_inline_datatype(
+                s,
+                exporter,
+                types,
+                dt,
+                location,
+                is_export,
+                parent_name,
+                prefix,
+                generics,
+            )?;
+            if !s.ends_with(" | null") {
+                s.push_str(" | null");
+            }
+        }
+        DataType::Struct(st) => {
+            crate::legacy::struct_datatype(
+                crate::legacy::ExportContext {
+                    cfg: exporter,
+                    path: vec![],
+                    is_export,
+                },
+                parent_name,
+                st,
+                types,
+                s,
+                prefix,
+                generics,
+            )?;
+        }
+        DataType::Enum(enm) => {
+            crate::legacy::enum_datatype(
+                crate::legacy::ExportContext {
+                    cfg: exporter,
+                    path: vec![],
+                    is_export,
+                },
+                enm,
+                types,
+                s,
+                prefix,
+                generics,
+            )?;
+        }
+        DataType::Tuple(tuple) => match tuple.elements() {
+            [] => s.push_str("null"),
+            elements => {
+                s.push('[');
+                for (idx, dt) in elements.iter().enumerate() {
+                    if idx != 0 {
+                        s.push_str(", ");
+                    }
+                    shallow_inline_datatype(
+                        s,
+                        exporter,
+                        types,
+                        dt,
+                        location.clone(),
+                        is_export,
+                        parent_name,
+                        prefix,
+                        generics,
+                    )?;
+                }
+                s.push(']');
+            }
+        },
+        DataType::Reference(r) => match r {
+            Reference::Named(r) => {
+                let ndt = r.get(types).ok_or_else(|| Error::DanglingNamedReference {
+                    reference: format!("{r:?}"),
+                })?;
+                let combined_generics = merged_generics(generics, r.generics());
+                let resolved = resolve_generics_in_datatype(ndt.ty(), &combined_generics);
+                datatype(
+                    s,
+                    exporter,
+                    types,
+                    &resolved,
+                    location,
+                    is_export,
+                    parent_name,
+                    prefix,
+                    &combined_generics,
+                )
+            }
+            Reference::Opaque(r) => reference_opaque_dt(s, exporter, types, r),
+        }?,
+        DataType::Generic(g) => {
+            if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
+                if matches!(resolved_dt, DataType::Generic(inner) if inner == g) {
+                    s.push_str(g.borrow());
+                } else {
+                    shallow_inline_datatype(
+                        s,
+                        exporter,
+                        types,
+                        resolved_dt,
+                        location,
+                        is_export,
+                        parent_name,
+                        prefix,
+                        generics,
+                    )?;
+                }
+            } else {
+                s.push_str(g.borrow());
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn resolve_generics_in_datatype(dt: &DataType, generics: &[(Generic, DataType)]) -> DataType {
@@ -1531,18 +1784,17 @@ fn reference_named_dt(
 
         // Check if this reference should be inlined
         if r.inline() {
-            // Inline the referenced type directly, resolving generics
             let combined_generics = merged_generics(generics, r.generics());
-            return inline_datatype(
+            let resolved = resolve_generics_in_datatype(ndt.ty(), &combined_generics);
+            return datatype(
                 s,
                 exporter,
                 types,
-                ndt.ty(),
+                &resolved,
                 location,
                 is_export,
                 None,
                 "",
-                0,
                 &combined_generics,
             );
         }

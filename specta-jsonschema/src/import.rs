@@ -225,11 +225,15 @@ fn handle_any_of(schemas: &[Value]) -> Result<DataType, Error> {
         };
 
         if is_null(&schemas[0]) {
-            return Ok(DataType::Nullable(Box::new(value_to_datatype(&schemas[1])?)));
+            return Ok(DataType::Nullable(Box::new(value_to_datatype(
+                &schemas[1],
+            )?)));
         }
 
         if is_null(&schemas[1]) {
-            return Ok(DataType::Nullable(Box::new(value_to_datatype(&schemas[0])?)));
+            return Ok(DataType::Nullable(Box::new(value_to_datatype(
+                &schemas[0],
+            )?)));
         }
     }
 

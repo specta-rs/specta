@@ -208,16 +208,22 @@ fn unnamed_fields_datatype(
     s: &mut String,
     prefix: &str,
     generics: &[(Generic, DataType)],
+    force_inline: bool,
 ) -> Result<()> {
     match fields {
         [(field, ty)] => {
             let mut v = String::new();
-            datatype_inner(
-                ctx.clone(),
-                &FunctionReturnType::Value((*ty).clone()),
-                types,
+            crate::primitives::datatype_with_inline_attr(
                 &mut v,
+                ctx.cfg,
+                types,
+                ty,
+                vec![],
+                ctx.is_export,
+                None,
+                "",
                 generics,
+                force_inline || field.inline(),
             )?;
             s.push_str(&inner_comments(
                 ctx,
@@ -237,12 +243,17 @@ fn unnamed_fields_datatype(
                 }
 
                 let mut v = String::new();
-                datatype_inner(
-                    ctx.clone(),
-                    &FunctionReturnType::Value((*ty).clone()),
-                    types,
+                crate::primitives::datatype_with_inline_attr(
                     &mut v,
+                    ctx.cfg,
+                    types,
+                    ty,
+                    vec![],
+                    ctx.is_export,
+                    None,
+                    "",
                     generics,
+                    force_inline || field.inline(),
                 )?;
                 s.push_str(&inner_comments(
                     ctx.clone(),
@@ -307,6 +318,7 @@ pub(crate) fn struct_datatype(
             s,
             prefix,
             generics,
+            false,
         )?,
         Fields::Named(named) => {
             let fields = skip_fields_named(named.fields()).collect::<Vec<_>>();
@@ -327,14 +339,19 @@ pub(crate) fn struct_datatype(
 
             let mut field_sections = flattened
                 .into_iter()
-                .map(|(key, (field, ty))| {
+                .map(|(_key, (field, ty))| {
                     let mut s = String::new();
-                    datatype_inner(
-                        ctx.with(PathItem::Field(key.clone())),
-                        &FunctionReturnType::Value(ty.clone()),
-                        types,
+                    crate::primitives::datatype_with_inline_attr(
                         &mut s,
+                        ctx.cfg,
+                        types,
+                        ty,
+                        vec![],
+                        ctx.is_export,
+                        None,
+                        "",
                         generics,
+                        field.inline(),
                     )
                     .map(|_| {
                         inner_comments(
@@ -362,6 +379,7 @@ pub(crate) fn struct_datatype(
                         types,
                         &mut other,
                         generics,
+                        false,
                     )?;
 
                     Ok(inner_comments(
@@ -428,14 +446,19 @@ fn enum_variant_datatype(
 
             let mut field_sections = flattened
                 .into_iter()
-                .map(|(key, (field, ty))| {
+                .map(|(_key, (field, ty))| {
                     let mut s = String::new();
-                    datatype_inner(
-                        ctx.with(PathItem::Field(key.clone())),
-                        &FunctionReturnType::Value(ty.clone()),
-                        types,
+                    crate::primitives::datatype_with_inline_attr(
                         &mut s,
+                        ctx.cfg,
+                        types,
+                        ty,
+                        vec![],
+                        ctx.is_export,
+                        None,
+                        "",
                         generics,
+                        field.inline(),
                     )
                     .map(|_| {
                         inner_comments(
@@ -473,6 +496,7 @@ fn enum_variant_datatype(
                             types,
                             &mut other,
                             generics,
+                            false,
                         )?;
 
                         Ok(inner_comments(
@@ -499,14 +523,19 @@ fn enum_variant_datatype(
         }
         Fields::Unnamed(obj) => {
             let fields = skip_fields(obj.fields())
-                .map(|(_, ty)| {
+                .map(|(field, ty)| {
                     let mut s = String::new();
-                    datatype_inner(
-                        ctx.clone(),
-                        &FunctionReturnType::Value(ty.clone()),
-                        types,
+                    crate::primitives::datatype_with_inline_attr(
                         &mut s,
+                        ctx.cfg,
+                        types,
+                        ty,
+                        vec![],
+                        ctx.is_export,
+                        None,
+                        "",
                         generics,
+                        field.inline(),
                     )
                     .map(|_| s)
                 })
@@ -644,6 +673,7 @@ fn object_field_to_ts(
     types: &TypeCollection,
     s: &mut String,
     generics: &[(Generic, DataType)],
+    force_inline: bool,
 ) -> Result<()> {
     let field_name_safe = sanitise_key(key, false);
 
@@ -654,12 +684,17 @@ fn object_field_to_ts(
     };
 
     let mut value = String::new();
-    datatype_inner(
-        ctx,
-        &FunctionReturnType::Value(ty.clone()),
-        types,
+    crate::primitives::datatype_with_inline_attr(
         &mut value,
+        ctx.cfg,
+        types,
+        ty,
+        vec![],
+        ctx.is_export,
+        None,
+        "",
         generics,
+        force_inline || field.inline(),
     )?;
 
     Ok(write!(s, "{key}: {value}",)?)

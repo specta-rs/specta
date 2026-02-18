@@ -93,7 +93,10 @@ TupleStruct3: [number, boolean, string]
 TestEnum: "Unit" | { Single: number } | { Multiple: [number, number] } | { Struct: { a: number } }
 RefStruct: TestEnum
 InlinerStruct: {
-	inline_this: InlineStruct,
+	inline_this: {
+	ref_struct: SimpleStruct,
+	val: number,
+},
 	dont_inline_this: RefStruct,
 }
 GenericStruct<i32>: {
@@ -112,7 +115,14 @@ HasGenericAlias: { [key in number]: string }
 EnumMacroAttributes: { A: string } | { B: number } | { C: number } | { D: { a: string; b: number } }
 InlineEnumField: { A: PlaceholderInnerField }
 InlineOptionalType: {
-	optional_field: PlaceholderInnerField | null,
+	optional_field: {
+	a: string,
+} | null,
+}
+ShallowInlineContainerOuter: {
+	value: {
+	nested: RefStruct,
+},
 }
 Rename: "OneWord" | "TwoWords"
 TransparentType: TransparentTypeInner
@@ -139,7 +149,9 @@ InlineTuple: {
 	demo: [string, boolean],
 }
 InlineTuple2: {
-	demo: [InlineTuple, boolean],
+	demo: [{
+	demo: [string, boolean],
+}, boolean],
 }
 Box<str>: string
 Box<String>: string
@@ -269,10 +281,16 @@ AGenericStruct<u32>: {
 }
 A: {
 	a: B,
-	b: B,
+	b: {
+	b: number,
+},
 	c: B,
-	d: D,
-	e: GenericFlattened<number>,
+	d: {
+	flattened: number,
+},
+	e: {
+	generic_flattened: number,
+},
 }
 DoubleFlattened: {
 	a: ToBeFlattened,
@@ -285,7 +303,9 @@ BoxFlattened: {
 	b: BoxedInner,
 }
 BoxInline: {
-	c: BoxedInner,
+	c: {
+	a: number,
+},
 }
 First: {
 	a: string,
@@ -299,11 +319,15 @@ Third: (First) & {
 }
 Fourth: {
 	a: First,
-	b: First,
+	b: {
+	a: string,
+},
 }
 TagOnStructWithInline: {
 	a: First,
-	b: First,
+	b: {
+	a: string,
+},
 }
 Sixth: {
 	a: First,
@@ -395,11 +419,15 @@ FlattenD: {
 	c: number,
 }
 FlattenE: {
-	b: FlattenB,
+	b: (FlattenA) & {
+	c: number,
+},
 	d: number,
 }
 FlattenF: {
-	b: FlattenB,
+	b: (FlattenA) & {
+	c: number,
+},
 	d: number,
 }
 FlattenG: {
@@ -444,7 +472,9 @@ InlineFlattenGenericsG<()>: {
 }
 InlineFlattenGenerics: (InlineFlattenGenericsG<string>) & {
 	g: InlineFlattenGenericsG<string>,
-	gi: InlineFlattenGenericsG<string>,
+	gi: {
+	t: string,
+},
 }
 GenericParameterOrderPreserved: {
 	pair: Pair<number, string>,

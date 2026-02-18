@@ -23,6 +23,7 @@ HasGenericAlias: HasGenericAlias
 EnumMacroAttributes: EnumMacroAttributes
 InlineEnumField: InlineEnumField
 InlineOptionalType: InlineOptionalType
+ShallowInlineContainerOuter: ShallowInlineContainerOuter
 Rename: Rename
 TransparentType: TransparentType
 TransparentType2: TransparentType2
