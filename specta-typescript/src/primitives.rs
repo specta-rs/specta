@@ -94,7 +94,7 @@ pub(crate) fn export_internal(
         vec![ndt.name().clone()],
         true,
         Some(ndt.name()),
-        "\t",
+        "",
         Default::default(),
     )?;
     s.push_str(";\n");
