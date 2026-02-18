@@ -187,7 +187,7 @@ pub(crate) fn datatype_inner(
         }
     };
 
-    crate::primitives::datatype_with_generics(
+    crate::primitives::datatype(
         s,
         ctx.cfg,
         types,

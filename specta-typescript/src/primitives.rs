@@ -91,6 +91,7 @@ pub(crate) fn export_internal(
         true,
         Some(ndt.name()),
         "\t",
+        Default::default(),
     )?;
     s.push_str(";\n");
 
@@ -178,6 +179,7 @@ pub(crate) fn typedef_internal(
         false,
         Some(dt.name()),
         "\t*\t",
+        Default::default(),
     )?;
     s.push_str("} ");
     s.push_str(&type_name);
@@ -507,33 +509,8 @@ fn inline_datatype(
     Ok(())
 }
 
-// TODO: private
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn datatype(
-    s: &mut String,
-    exporter: &Exporter,
-    types: &TypeCollection,
-    dt: &DataType,
-    location: Vec<Cow<'static, str>>,
-    is_export: bool,
-    parent_name: Option<&str>,
-    prefix: &str,
-) -> Result<(), Error> {
-    datatype_with_generics(
-        s,
-        exporter,
-        types,
-        dt,
-        location,
-        is_export,
-        parent_name,
-        prefix,
-        &[],
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn datatype_with_generics(
     s: &mut String,
     exporter: &Exporter,
     types: &TypeCollection,
@@ -604,7 +581,7 @@ pub(crate) fn datatype_with_generics(
                     s.push_str(g.borrow());
                     return Ok(());
                 }
-                datatype_with_generics(
+                datatype(
                     s,
                     exporter,
                     types,

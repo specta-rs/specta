@@ -171,16 +171,6 @@ impl Exporter {
         self
     }
 
-    pub(crate) fn render_branded_type(
-        &self,
-        branded: &Branded,
-    ) -> Result<Option<Cow<'static, str>>, Error> {
-        self.branded_type_impl
-            .as_ref()
-            .map(|builder| (builder.0)(branded))
-            .transpose()
-    }
-
     /// Configure a header for the file.
     ///
     /// This is perfect for configuring lint ignore rules or other file-level comments.
