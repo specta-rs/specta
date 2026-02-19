@@ -34,9 +34,60 @@ pub fn export(
     types: &TypeCollection,
     ndt: &NamedDataType,
 ) -> Result<String, Error> {
+    export_many(exporter, types, iter::once(ndt))
+}
+
+/// Generate a Typescript or JSDoc string for many [`NamedDataType`] definitions.
+pub fn export_many<'a>(
+    exporter: &dyn AsRef<Exporter>,
+    types: &TypeCollection,
+    ndts: impl Iterator<Item = &'a NamedDataType>,
+) -> Result<String, Error> {
     let mut s = String::new();
-    export_internal(&mut s, exporter.as_ref(), types, ndt)?;
+    export_many_internal(&mut s, exporter.as_ref(), types, ndts, "")?;
     Ok(s)
+}
+
+pub(crate) fn export_many_internal<'a>(
+    s: &mut String,
+    exporter: &Exporter,
+    types: &TypeCollection,
+    ndts: impl Iterator<Item = &'a NamedDataType>,
+    indent: &str,
+) -> Result<(), Error> {
+    if exporter.jsdoc {
+        let mut ndts = ndts.peekable();
+        if ndts.peek().is_none() {
+            return Ok(());
+        }
+
+        s.push_str(indent);
+        s.push_str("/**\n");
+
+        for (index, ndt) in ndts.enumerate() {
+            if index != 0 {
+                s.push_str(indent);
+                s.push_str("\t*\n");
+            }
+
+            append_typedef_body(s, exporter, types, ndt, indent)?;
+        }
+
+        s.push_str(indent);
+        s.push_str("\t*/");
+        return Ok(());
+    }
+
+    for (index, ndt) in ndts.enumerate() {
+        if index != 0 {
+            s.push('\n');
+        }
+
+        s.push_str(indent);
+        export_internal(s, exporter, types, ndt)?;
+    }
+
+    Ok(())
 }
 
 pub(crate) fn export_internal(
@@ -138,61 +189,8 @@ pub(crate) fn typedef_internal(
     types: &TypeCollection,
     dt: &NamedDataType,
 ) -> Result<(), Error> {
-    let generics = (!dt.generics().is_empty())
-        .then(|| {
-            iter::once("<")
-                .chain(intersperse(dt.generics().iter().map(|g| g.borrow()), ", "))
-                .chain(iter::once(">"))
-        })
-        .into_iter()
-        .flatten();
-
-    let name = dt.name();
-    let type_name = iter::empty()
-        .chain([name.as_ref()])
-        .chain(generics)
-        .collect::<String>();
-
-    let mut typedef_ty = String::new();
-    datatype(
-        &mut typedef_ty,
-        exporter,
-        types,
-        dt.ty(),
-        vec![dt.name().clone()],
-        false,
-        Some(dt.name()),
-        "\t*\t",
-        Default::default(),
-    )?;
-
     s.push_str("/**\n");
-
-    if !dt.docs().is_empty() {
-        for line in dt.docs().lines() {
-            s.push_str("\t* ");
-            s.push_str(&escape_jsdoc_text(line));
-            s.push('\n');
-        }
-        s.push_str("\t*\n");
-    }
-
-    if let Some(deprecated) = dt.deprecated() {
-        s.push_str("\t* @deprecated");
-        if let Some(details) = deprecated_details(deprecated) {
-            s.push(' ');
-            s.push_str(&details);
-        }
-        s.push('\n');
-    }
-
-    s.push_str("\t* @typedef {");
-    s.push_str(&typedef_ty);
-    s.push_str("} ");
-    s.push_str(&type_name);
-    s.push('\n');
-
-    append_jsdoc_properties(s, exporter, types, dt)?;
+    append_typedef_body(s, exporter, types, dt, "")?;
 
     s.push_str("\t*/");
 
@@ -204,6 +202,7 @@ fn append_jsdoc_properties(
     exporter: &Exporter,
     types: &TypeCollection,
     dt: &NamedDataType,
+    indent: &str,
 ) -> Result<(), Error> {
     match dt.ty() {
         DataType::Struct(strct) => match strct.fields() {
@@ -215,6 +214,7 @@ fn append_jsdoc_properties(
                     };
 
                     let mut ty_str = String::new();
+                    let datatype_prefix = format!("{indent}\t*\t");
                     datatype(
                         &mut ty_str,
                         exporter,
@@ -223,7 +223,7 @@ fn append_jsdoc_properties(
                         vec![dt.name().clone(), idx.to_string().into()],
                         false,
                         Some(dt.name()),
-                        "\t*\t",
+                        &datatype_prefix,
                         Default::default(),
                     )?;
 
@@ -234,6 +234,7 @@ fn append_jsdoc_properties(
                         field.optional(),
                         field.docs(),
                         field.deprecated(),
+                        indent,
                     );
                 }
             }
@@ -244,6 +245,7 @@ fn append_jsdoc_properties(
                     };
 
                     let mut ty_str = String::new();
+                    let datatype_prefix = format!("{indent}\t*\t");
                     datatype(
                         &mut ty_str,
                         exporter,
@@ -252,7 +254,7 @@ fn append_jsdoc_properties(
                         vec![dt.name().clone(), name.clone()],
                         false,
                         Some(dt.name()),
-                        "\t*\t",
+                        &datatype_prefix,
                         Default::default(),
                     )?;
 
@@ -263,6 +265,7 @@ fn append_jsdoc_properties(
                         field.optional(),
                         field.docs(),
                         field.deprecated(),
+                        indent,
                     );
                 }
             }
@@ -295,6 +298,7 @@ fn append_jsdoc_properties(
                     false,
                     variant.docs(),
                     variant.deprecated(),
+                    indent,
                 );
             }
         }
@@ -311,7 +315,9 @@ fn push_jsdoc_property(
     optional: bool,
     docs: &str,
     deprecated: Option<&DeprecatedType>,
+    indent: &str,
 ) {
+    s.push_str(indent);
     s.push_str("\t* @property {");
     s.push_str(ty);
     s.push_str("} ");
@@ -343,6 +349,75 @@ fn jsdoc_property_name(name: &str, optional: bool) -> String {
     };
 
     if optional { format!("[{name}]") } else { name }
+}
+
+fn append_typedef_body(
+    s: &mut String,
+    exporter: &Exporter,
+    types: &TypeCollection,
+    dt: &NamedDataType,
+    indent: &str,
+) -> Result<(), Error> {
+    let generics = (!dt.generics().is_empty())
+        .then(|| {
+            iter::once("<")
+                .chain(intersperse(dt.generics().iter().map(|g| g.borrow()), ", "))
+                .chain(iter::once(">"))
+        })
+        .into_iter()
+        .flatten();
+
+    let name = dt.name();
+    let type_name = iter::empty()
+        .chain([name.as_ref()])
+        .chain(generics)
+        .collect::<String>();
+
+    let mut typedef_ty = String::new();
+    let datatype_prefix = format!("{indent}\t*\t");
+    datatype(
+        &mut typedef_ty,
+        exporter,
+        types,
+        dt.ty(),
+        vec![dt.name().clone()],
+        false,
+        Some(dt.name()),
+        &datatype_prefix,
+        Default::default(),
+    )?;
+
+    if !dt.docs().is_empty() {
+        for line in dt.docs().lines() {
+            s.push_str(indent);
+            s.push_str("\t* ");
+            s.push_str(&escape_jsdoc_text(line));
+            s.push('\n');
+        }
+        s.push_str(indent);
+        s.push_str("\t*\n");
+    }
+
+    if let Some(deprecated) = dt.deprecated() {
+        s.push_str(indent);
+        s.push_str("\t* @deprecated");
+        if let Some(details) = deprecated_details(deprecated) {
+            s.push(' ');
+            s.push_str(&details);
+        }
+        s.push('\n');
+    }
+
+    s.push_str(indent);
+    s.push_str("\t* @typedef {");
+    s.push_str(&typedef_ty);
+    s.push_str("} ");
+    s.push_str(&type_name);
+    s.push('\n');
+
+    append_jsdoc_properties(s, exporter, types, dt, indent)?;
+
+    Ok(())
 }
 
 fn jsdoc_description(docs: &str, deprecated: Option<&DeprecatedType>) -> Option<String> {

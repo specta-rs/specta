@@ -17,12 +17,12 @@ Unit6: export type Unit6 = { A: [] };
 Unit7: export type Unit7 = { A: Record<string, never> };
 
 SimpleStruct: export type SimpleStruct = {
-		a: number,
-		b: string,
-		c: [number, string, number],
-		d: string[],
-		e: string | null,
-	};
+	a: number,
+	b: string,
+	c: [number, string, number],
+	d: string[],
+	e: string | null,
+};
 
 TupleStruct1: export type TupleStruct1 = number;
 
@@ -33,28 +33,28 @@ TestEnum: export type TestEnum = "Unit" | { Single: number } | { Multiple: [numb
 RefStruct: export type RefStruct = TestEnum;
 
 InlinerStruct: export type InlinerStruct = {
-		inline_this: {
-			ref_struct: SimpleStruct,
-			val: number,
-		},
-		dont_inline_this: RefStruct,
-	};
+	inline_this: {
+		ref_struct: SimpleStruct,
+		val: number,
+	},
+	dont_inline_this: RefStruct,
+};
 
 GenericStruct<i32>: export type GenericStruct<T> = {
-		arg: T,
-	};
+	arg: T,
+};
 
 GenericStruct<String>: export type GenericStruct<T> = {
-		arg: T,
-	};
+	arg: T,
+};
 
 FlattenEnumStruct: export type FlattenEnumStruct = (FlattenEnum) & {
-		outer: string,
-	};
+	outer: string,
+};
 
 OverridenStruct: export type OverridenStruct = {
-		overriden_field: string,
-	};
+	overriden_field: string,
+};
 
 HasGenericAlias: export type HasGenericAlias = { [key in number]: string };
 
@@ -63,10 +63,10 @@ EnumMacroAttributes: export type EnumMacroAttributes = { A: string } | { B: numb
 InlineEnumField: export type InlineEnumField = { A: PlaceholderInnerField };
 
 InlineOptionalType: export type InlineOptionalType = {
-		optional_field: {
-			a: string,
-		} | null,
-	};
+	optional_field: {
+		a: string,
+	} | null,
+};
 
 Rename: export type Rename = "OneWord" | "TwoWords";
 
@@ -77,12 +77,12 @@ TransparentType2: export type TransparentType2 = null;
 TransparentTypeWithOverride: export type TransparentTypeWithOverride = string;
 
 EnumReferenceRecordKey: export type EnumReferenceRecordKey = {
-		a: Partial<{ [key in BasicEnum]: number }>,
-	};
+	a: Partial<{ [key in BasicEnum]: number }>,
+};
 
 FlattenOnNestedEnum: export type FlattenOnNestedEnum = (NestedEnum) & {
-		id: string,
-	};
+	id: string,
+};
 
 MyEmptyInput: export type MyEmptyInput = Record<string, never>;
 
@@ -91,28 +91,28 @@ ExtraBracketsInTupleVariant: export type ExtraBracketsInTupleVariant = { A: stri
 ExtraBracketsInUnnamedStruct: export type ExtraBracketsInUnnamedStruct = string;
 
 InlineTuple: export type InlineTuple = {
-		demo: [string, boolean],
-	};
+	demo: [string, boolean],
+};
 
 InlineTuple2: export type InlineTuple2 = {
-		demo: [{
-			demo: [string, boolean],
-		}, boolean],
-	};
+	demo: [{
+		demo: [string, boolean],
+	}, boolean],
+};
 
 SkippedFieldWithinVariant: export type SkippedFieldWithinVariant = never | string;
 
 KebabCase: export type KebabCase = {
-		test_ing: string,
-	};
+	test_ing: string,
+};
 
 Issue281<'_>: export type Issue281 = {
-		default_unity_arguments: string[],
-	};
+	default_unity_arguments: string[],
+};
 
 RenameWithWeirdCharsField: export type RenameWithWeirdCharsField = {
-		odata_context: string,
-	};
+	odata_context: string,
+};
 
 RenameWithWeirdCharsVariant: export type RenameWithWeirdCharsVariant = { A: string };
 
@@ -120,25 +120,25 @@ Issue374: /**
  *  https://github.com/specta-rs/specta/issues/374
  */
 export type Issue374 = {
-		foo: boolean,
-		bar: boolean,
-	};
+	foo: boolean,
+	bar: boolean,
+};
 
 type_type::Type: export type Type = never;
 
 ActualType: export type ActualType = {
-		a: GenericType<string>,
-	};
+	a: GenericType<string>,
+};
 
 SpectaTypeOverride: export type SpectaTypeOverride = {
-		string_ident: string,
-		u32_ident: number,
-		path: string,
-	};
+	string_ident: string,
+	u32_ident: number,
+	path: string,
+};
 
 InvalidToValidType: export type InvalidToValidType = {
-		cause: null | null,
-	};
+	cause: null | null,
+};
 
 TupleStruct: export type TupleStruct = string;
 
@@ -149,23 +149,23 @@ GenericTupleStruct<String>: export type GenericTupleStruct<T> = T;
 BracedStruct: export type BracedStruct = string;
 
 StructRenameAllUppercase: export type StructRenameAllUppercase = {
-		a: number,
-		b: number,
-	};
+	a: number,
+	b: number,
+};
 
 RenameSerdeSpecialChar: export type RenameSerdeSpecialChar = {
-		b: number,
-	};
+	b: number,
+};
 
 EnumRenameAllUppercase: export type EnumRenameAllUppercase = "HelloWorld" | "VariantB" | "TestingWords";
 
 Recursive: export type Recursive = {
-		demo: Recursive,
-	};
+	demo: Recursive,
+};
 
 RecursiveMapValue: export type RecursiveMapValue = {
-		demo: { [key in string]: RecursiveMapValue },
-	};
+	demo: { [key in string]: RecursiveMapValue },
+};
 
 RecursiveTransparent: export type RecursiveTransparent = RecursiveInline;
 
@@ -176,17 +176,17 @@ NonOptional: export type NonOptional = string | null;
 OptionalOnNamedField: export type OptionalOnNamedField = string | null;
 
 OptionalOnTransparentNamedField: export type OptionalOnTransparentNamedField = {
-		b: string | null,
-	};
+	b: string | null,
+};
 
 OptionalInEnum: export type OptionalInEnum = { A: string | null } | { B: { a: string | null } } | { C: { a?: string | null } };
 
 Optional: export type Optional = {
-		a: number | null,
-		b?: number | null,
-		c: string | null,
-		d: boolean,
-	};
+	a: number | null,
+	b?: number | null,
+	c: string | null,
+	d: boolean,
+};
 
 UntaggedVariants: export type UntaggedVariants = string | number | { id: string } | [string, boolean];
 
@@ -197,8 +197,8 @@ Regular: export type Regular = { [key in string]: null };
 MacroStruct: export type MacroStruct = string;
 
 MacroStruct2: export type MacroStruct2 = {
-		demo: string,
-	};
+	demo: string,
+};
 
 MacroEnum: export type MacroEnum = { Demo: string } | { Demo2: { demo2: string } };
 
@@ -206,65 +206,65 @@ DeprecatedType: /**
  * @deprecated
  */
 export type DeprecatedType = {
-		a: number,
-	};
+	a: number,
+};
 
 DeprecatedTypeWithMsg: /**
  * @deprecated Look at you big man using a deprecation message
  */
 export type DeprecatedTypeWithMsg = {
-		a: number,
-	};
+	a: number,
+};
 
 DeprecatedTypeWithMsg2: /**
  * @deprecated Look at you big man using a deprecation message
  */
 export type DeprecatedTypeWithMsg2 = {
-		a: number,
-	};
+	a: number,
+};
 
 DeprecatedFields: export type DeprecatedFields = {
-		a: number,
-		/**
-		 * @deprecated
-		 */
-		b: string,
-		/**
-		 * @deprecated This field is cringe!
-		 */
-		c: string,
-		/**
-		 * @deprecated This field is cringe!
-		 */
-		d: string,
-	};
-
-DeprecatedTupleVariant: export type DeprecatedTupleVariant = [
+	a: number,
 	/**
 	 * @deprecated
 	 */
-string, 
+	b: string,
 	/**
-	 * @deprecated Nope
+	 * @deprecated This field is cringe!
 	 */
-string, 
+	c: string,
 	/**
-	 * @deprecated Nope
+	 * @deprecated This field is cringe!
 	 */
+	d: string,
+};
+
+DeprecatedTupleVariant: export type DeprecatedTupleVariant = [
+/**
+ * @deprecated
+ */
+string, 
+/**
+ * @deprecated Nope
+ */
+string, 
+/**
+ * @deprecated Nope
+ */
 number];
 
 DeprecatedEnumVariants: export type DeprecatedEnumVariants = 
-	/**
-	 * @deprecated
-	 */
+/**
+ * @deprecated
+ */
 "A" | 
-	/**
-	 * @deprecated Nope
-	 */
+/**
+ * @deprecated Nope
+ */
 "B" | 
-	/**
-	 * @deprecated Nope
-	 */
+/**
+ * @deprecated Nope
+ */
 "C";
 
 CommentedStruct: /**
@@ -272,149 +272,149 @@ CommentedStruct: /**
  *  Some more triple-slash comment
  */
 export type CommentedStruct = {
-		/**
-		 *  Some triple-slash comment
-		 *  Some more triple-slash comment
-		 */
-		a: number,
-	};
+	/**
+	 *  Some triple-slash comment
+	 *  Some more triple-slash comment
+	 */
+	a: number,
+};
 
 CommentedEnum: /**
  *  Some triple-slash comment
  *  Some more triple-slash comment
  */
 export type CommentedEnum = 
-	/**
-	 *  Some triple-slash comment
-	 *  Some more triple-slash comment
-	 */
+/**
+ *  Some triple-slash comment
+ *  Some more triple-slash comment
+ */
 { A: number } | 
-	/**
-	 *  Some triple-slash comment
-	 *  Some more triple-slash comment
-	 */
+/**
+ *  Some triple-slash comment
+ *  Some more triple-slash comment
+ */
 { B: { 
-	/**
-	 *  Some triple-slash comment
-	 *  Some more triple-slash comment
-	 */
+/**
+ *  Some triple-slash comment
+ *  Some more triple-slash comment
+ */
 a: number } };
 
 SingleLineComment: /**
  *  Some single-line comment
  */
 export type SingleLineComment = 
-	/**
-	 *  Some single-line comment
-	 */
+/**
+ *  Some single-line comment
+ */
 { A: number } | 
-	/**
-	 *  Some single-line comment
-	 */
+/**
+ *  Some single-line comment
+ */
 { B: { 
-	/**
-	 *  Some single-line comment
-	 */
+/**
+ *  Some single-line comment
+ */
 a: number } };
 
 NonGeneric: export type Demo<A, B> = {
-		a: A,
-		b: B,
-	};
+	a: A,
+	b: B,
+};
 
 HalfGenericA<u8>: export type Demo<A, B> = {
-		a: A,
-		b: B,
-	};
+	a: A,
+	b: B,
+};
 
 HalfGenericB<bool>: export type Demo<A, B> = {
-		a: A,
-		b: B,
-	};
+	a: A,
+	b: B,
+};
 
 FullGeneric<u8, bool>: export type Demo<A, B> = {
-		a: A,
-		b: B,
-	};
+	a: A,
+	b: B,
+};
 
 Another<bool>: export type Demo<A, B> = {
-		a: A,
-		b: B,
-	};
+	a: A,
+	b: B,
+};
 
 AGenericStruct<u32>: export type AGenericStruct<T> = {
-		field: Demo<T, boolean>,
-	};
+	field: Demo<T, boolean>,
+};
 
 A: export type A = {
-		a: B,
-		b: {
-			b: number,
-		},
-		c: B,
-		d: {
-			flattened: number,
-		},
-		e: {
-			generic_flattened: number,
-		},
-	};
+	a: B,
+	b: {
+		b: number,
+	},
+	c: B,
+	d: {
+		flattened: number,
+	},
+	e: {
+		generic_flattened: number,
+	},
+};
 
 DoubleFlattened: export type DoubleFlattened = {
-		a: ToBeFlattened,
-		b: ToBeFlattened,
-	};
+	a: ToBeFlattened,
+	b: ToBeFlattened,
+};
 
 FlattenedInner: export type FlattenedInner = {
-		c: Inner,
-	};
+	c: Inner,
+};
 
 BoxFlattened: export type BoxFlattened = {
-		b: BoxedInner,
-	};
+	b: BoxedInner,
+};
 
 BoxInline: export type BoxInline = {
-		c: {
-			a: number,
-		},
-	};
+	c: {
+		a: number,
+	},
+};
 
 First: export type First = {
-		a: string,
-	};
+	a: string,
+};
 
 Second: export type Second = {
-		a: number,
-	};
+	a: number,
+};
 
 Third: export type Third = (First) & {
-		b: { [key in string]: string },
-		c: First,
-	};
+	b: { [key in string]: string },
+	c: First,
+};
 
 Fourth: export type Fourth = {
-		a: First,
-		b: {
-			a: string,
-		},
-	};
+	a: First,
+	b: {
+		a: string,
+	},
+};
 
 TagOnStructWithInline: export type TagOnStructWithInline = {
-		a: First,
-		b: {
-			a: string,
-		},
-	};
+	a: First,
+	b: {
+		a: string,
+	},
+};
 
 Sixth: export type Sixth = {
-		a: First,
-		b: First,
-	};
+	a: First,
+	b: First,
+};
 
 Seventh: export type Seventh = {
-		a: First,
-		b: Second,
-	};
+	a: First,
+	b: Second,
+};
 
 Eight: export type Eight = { A: string } | "B";
 
@@ -459,16 +459,16 @@ InternallyTaggedL: export type InternallyTaggedL = InternallyTaggedLInner;
 InternallyTaggedM: export type InternallyTaggedM = InternallyTaggedMInner;
 
 StructWithAlias: export type StructWithAlias = {
-		field: string,
-	};
+	field: string,
+};
 
 StructWithMultipleAliases: export type StructWithMultipleAliases = {
-		field: string,
-	};
+	field: string,
+};
 
 StructWithAliasAndRename: export type StructWithAliasAndRename = {
-		field: string,
-	};
+	field: string,
+};
 
 EnumWithVariantAlias: export type EnumWithVariantAlias = "Variant" | "Other";
 
@@ -503,8 +503,8 @@ TaggedStructOfStructWithTuple: export type TaggedStructOfStructWithTuple = Tuple
 SkipOnlyField: export type SkipOnlyField = Record<string, never>;
 
 SkipField: export type SkipField = {
-		b: number,
-	};
+	b: number,
+};
 
 SkipOnlyVariantExternallyTagged: export type SkipOnlyVariantExternallyTagged = never;
 
@@ -531,72 +531,72 @@ SkipVariant2: export type SkipVariant2 = string;
 SkipVariant3: export type SkipVariant3 = { A: { a: string } };
 
 SkipStructFields: export type SkipStructFields = {
-		a: number,
-	};
+	a: number,
+};
 
 SpectaSkipNonTypeField: export type SpectaSkipNonTypeField = {
-		a: number,
-	};
+	a: number,
+};
 
 FlattenA: export type FlattenA = {
-		a: number,
-		b: number,
-	};
+	a: number,
+	b: number,
+};
 
 FlattenB: export type FlattenB = (FlattenA) & {
-		c: number,
-	};
+	c: number,
+};
 
 FlattenC: export type FlattenC = (FlattenA) & {
-		c: number,
-	};
+	c: number,
+};
 
 FlattenD: export type FlattenD = {
-		a: FlattenA,
-		c: number,
-	};
+	a: FlattenA,
+	c: number,
+};
 
 FlattenE: export type FlattenE = {
-		b: (FlattenA) & {
-			c: number,
-		},
-		d: number,
-	};
+	b: (FlattenA) & {
+		c: number,
+	},
+	d: number,
+};
 
 FlattenF: export type FlattenF = {
-		b: (FlattenA) & {
-			c: number,
-		},
-		d: number,
-	};
+	b: (FlattenA) & {
+		c: number,
+	},
+	d: number,
+};
 
 FlattenG: export type FlattenG = {
-		b: FlattenB,
-		d: number,
-	};
+	b: FlattenB,
+	d: number,
+};
 
 TupleNested: export type TupleNested = [number[], [number[], number[]], [number[], number[], number[]]];
 
 Generic1<()>: export type Generic1<T> = {
-		value: T,
-		values: T[],
-	};
+	value: T,
+	values: T[],
+};
 
 GenericAutoBound<()>: export type GenericAutoBound<T> = {
-		value: T,
-		values: T[],
-	};
+	value: T,
+	values: T[],
+};
 
 GenericAutoBound2<()>: export type GenericAutoBound2<T> = {
-		value: T,
-		values: T[],
-	};
+	value: T,
+	values: T[],
+};
 
 Container1: export type Container1 = {
-		foo: Generic1<number>,
-		bar: Generic1<number>[],
-		baz: { [key in string]: Generic1<string> },
-	};
+	foo: Generic1<number>,
+	bar: Generic1<number>[],
+	baz: { [key in string]: Generic1<string> },
+};
 
 Generic2<(), String, i32>: export type Generic2<A, B, C> = { A: A } | { B: [B, B, B] } | { C: C[] } | { D: A[][][] } | { E: { a: A; b: B; c: C } } | { X: number[] } | { Y: number } | { Z: number[][] };
 
@@ -605,31 +605,31 @@ GenericNewType1<()>: export type GenericNewType1<T> = T[][];
 GenericTuple<()>: export type GenericTuple<T> = [T, T[], T[][]];
 
 GenericStruct2<()>: export type GenericStruct2<T> = {
-		a: T,
-		b: [T, T],
-		c: [T, [T, T]],
-		d: [T, T, T],
-		e: [([T, T]), ([T, T]), ([T, T])],
-		f: T[],
-		g: T[][],
-		h: ([([T, T]), ([T, T]), ([T, T])])[],
-	};
+	a: T,
+	b: [T, T],
+	c: [T, [T, T]],
+	d: [T, T, T],
+	e: [([T, T]), ([T, T]), ([T, T])],
+	f: T[],
+	g: T[][],
+	h: ([([T, T]), ([T, T]), ([T, T])])[],
+};
 
 InlineGenericNewtype<String>: export type InlineGenericNewtype<T> = T;
 
 InlineGenericNested<String>: export type InlineGenericNested<T> = [T, T[], [T, T], { [key in string]: T }, T | null, "Unit" | { Unnamed: T } | { Named: { value: T } }];
 
 InlineFlattenGenericsG<()>: export type InlineFlattenGenericsG<T> = {
-		t: T,
-	};
+	t: T,
+};
 
 InlineFlattenGenerics: export type InlineFlattenGenerics = (InlineFlattenGenericsG<string>) & {
-		g: InlineFlattenGenericsG<string>,
-		gi: {
-			t: string,
-		},
-	};
+	g: InlineFlattenGenericsG<string>,
+	gi: {
+		t: string,
+	},
+};
 
 GenericParameterOrderPreserved: export type GenericParameterOrderPreserved = {
-		pair: Pair<number, string>,
-	};
+	pair: Pair<number, string>,
+};

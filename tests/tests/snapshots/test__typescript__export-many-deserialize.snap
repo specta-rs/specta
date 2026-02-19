@@ -1,0 +1,635 @@
+---
+source: tests/tests/typescript.rs
+expression: "primitives::export_many(&ts, &types, ndts.into_iter()).unwrap()"
+---
+export type Unit1 = null;
+
+export type Unit2 = Record<string, never>;
+
+export type Unit3 = [];
+
+export type Unit4 = null;
+
+export type Unit5 = "A";
+
+export type Unit6 = { A: [] };
+
+export type Unit7 = { A: Record<string, never> };
+
+export type SimpleStruct = {
+	a: number,
+	b: string,
+	c: [number, string, number],
+	d: string[],
+	e: string | null,
+};
+
+export type TupleStruct1 = number;
+
+export type TupleStruct3 = [number, boolean, string];
+
+export type TestEnum = "Unit" | { Single: number } | { Multiple: [number, number] } | { Struct: { a: number } };
+
+export type RefStruct = TestEnum;
+
+export type InlinerStruct = {
+	inline_this: {
+		ref_struct: SimpleStruct,
+		val: number,
+	},
+	dont_inline_this: RefStruct,
+};
+
+export type GenericStruct<T> = {
+	arg: T,
+};
+
+export type GenericStruct<T> = {
+	arg: T,
+};
+
+export type FlattenEnumStruct = (FlattenEnum) & {
+	outer: string,
+};
+
+export type OverridenStruct = {
+	overriden_field: string,
+};
+
+export type HasGenericAlias = { [key in number]: string };
+
+export type EnumMacroAttributes = { A: string } | { B: number } | { C: number } | { D: { a: string; b: number } };
+
+export type InlineEnumField = { A: PlaceholderInnerField };
+
+export type InlineOptionalType = {
+	optional_field: {
+		a: string,
+	} | null,
+};
+
+export type Rename = "OneWord" | "TwoWords";
+
+export type TransparentType = TransparentTypeInner;
+
+export type TransparentType2 = null;
+
+export type TransparentTypeWithOverride = string;
+
+export type EnumReferenceRecordKey = {
+	a: Partial<{ [key in BasicEnum]: number }>,
+};
+
+export type FlattenOnNestedEnum = (NestedEnum) & {
+	id: string,
+};
+
+export type MyEmptyInput = Record<string, never>;
+
+export type ExtraBracketsInTupleVariant = { A: string };
+
+export type ExtraBracketsInUnnamedStruct = string;
+
+export type InlineTuple = {
+	demo: [string, boolean],
+};
+
+export type InlineTuple2 = {
+	demo: [{
+		demo: [string, boolean],
+	}, boolean],
+};
+
+export type SkippedFieldWithinVariant = never | string;
+
+export type KebabCase = {
+	test_ing: string,
+};
+
+export type Issue281 = {
+	default_unity_arguments: string[],
+};
+
+export type RenameWithWeirdCharsField = {
+	odata_context: string,
+};
+
+export type RenameWithWeirdCharsVariant = { A: string };
+
+/**
+ *  https://github.com/specta-rs/specta/issues/374
+ */
+export type Issue374 = {
+	foo: boolean,
+	bar: boolean,
+};
+
+export type Type = never;
+
+export type ActualType = {
+	a: GenericType<string>,
+};
+
+export type SpectaTypeOverride = {
+	string_ident: string,
+	u32_ident: number,
+	path: string,
+};
+
+export type InvalidToValidType = {
+	cause: null | null,
+};
+
+export type TupleStruct = string;
+
+export type TupleStructWithRep = string;
+
+export type GenericTupleStruct<T> = T;
+
+export type BracedStruct = string;
+
+export type StructRenameAllUppercase = {
+	a: number,
+	b: number,
+};
+
+export type RenameSerdeSpecialChar = {
+	b: number,
+};
+
+export type EnumRenameAllUppercase = "HelloWorld" | "VariantB" | "TestingWords";
+
+export type Recursive = {
+	demo: Recursive,
+};
+
+export type RecursiveMapValue = {
+	demo: { [key in string]: RecursiveMapValue },
+};
+
+export type RecursiveTransparent = RecursiveInline;
+
+export type RecursiveInEnum = { A: (RecursiveInEnum) };
+
+export type NonOptional = string | null;
+
+export type OptionalOnNamedField = string | null;
+
+export type OptionalOnTransparentNamedField = {
+	b: string | null,
+};
+
+export type OptionalInEnum = { A: string | null } | { B: { a: string | null } } | { C: { a?: string | null } };
+
+export type Optional = {
+	a: number | null,
+	b?: number | null,
+	c: string | null,
+	d: boolean,
+};
+
+export type UntaggedVariants = string | number | { id: string } | [string, boolean];
+
+export type UntaggedVariantsWithoutValue = string | [number, string] | number;
+
+export type Regular = { [key in string]: null };
+
+export type MacroStruct = string;
+
+export type MacroStruct2 = {
+	demo: string,
+};
+
+export type MacroEnum = { Demo: string } | { Demo2: { demo2: string } };
+
+/**
+ * @deprecated
+ */
+export type DeprecatedType = {
+	a: number,
+};
+
+/**
+ * @deprecated Look at you big man using a deprecation message
+ */
+export type DeprecatedTypeWithMsg = {
+	a: number,
+};
+
+/**
+ * @deprecated Look at you big man using a deprecation message
+ */
+export type DeprecatedTypeWithMsg2 = {
+	a: number,
+};
+
+export type DeprecatedFields = {
+	a: number,
+	/**
+	 * @deprecated
+	 */
+	b: string,
+	/**
+	 * @deprecated This field is cringe!
+	 */
+	c: string,
+	/**
+	 * @deprecated This field is cringe!
+	 */
+	d: string,
+};
+
+export type DeprecatedTupleVariant = [
+/**
+ * @deprecated
+ */
+string, 
+/**
+ * @deprecated Nope
+ */
+string, 
+/**
+ * @deprecated Nope
+ */
+number];
+
+export type DeprecatedEnumVariants = 
+/**
+ * @deprecated
+ */
+"A" | 
+/**
+ * @deprecated Nope
+ */
+"B" | 
+/**
+ * @deprecated Nope
+ */
+"C";
+
+/**
+ *  Some triple-slash comment
+ *  Some more triple-slash comment
+ */
+export type CommentedStruct = {
+	/**
+	 *  Some triple-slash comment
+	 *  Some more triple-slash comment
+	 */
+	a: number,
+};
+
+/**
+ *  Some triple-slash comment
+ *  Some more triple-slash comment
+ */
+export type CommentedEnum = 
+/**
+ *  Some triple-slash comment
+ *  Some more triple-slash comment
+ */
+{ A: number } | 
+/**
+ *  Some triple-slash comment
+ *  Some more triple-slash comment
+ */
+{ B: { 
+/**
+ *  Some triple-slash comment
+ *  Some more triple-slash comment
+ */
+a: number } };
+
+/**
+ *  Some single-line comment
+ */
+export type SingleLineComment = 
+/**
+ *  Some single-line comment
+ */
+{ A: number } | 
+/**
+ *  Some single-line comment
+ */
+{ B: { 
+/**
+ *  Some single-line comment
+ */
+a: number } };
+
+export type Demo<A, B> = {
+	a: A,
+	b: B,
+};
+
+export type Demo<A, B> = {
+	a: A,
+	b: B,
+};
+
+export type Demo<A, B> = {
+	a: A,
+	b: B,
+};
+
+export type Demo<A, B> = {
+	a: A,
+	b: B,
+};
+
+export type Demo<A, B> = {
+	a: A,
+	b: B,
+};
+
+export type AGenericStruct<T> = {
+	field: Demo<T, boolean>,
+};
+
+export type A = {
+	a: B,
+	b: {
+		b: number,
+	},
+	c: B,
+	d: {
+		flattened: number,
+	},
+	e: {
+		generic_flattened: number,
+	},
+};
+
+export type DoubleFlattened = {
+	a: ToBeFlattened,
+	b: ToBeFlattened,
+};
+
+export type FlattenedInner = {
+	c: Inner,
+};
+
+export type BoxFlattened = {
+	b: BoxedInner,
+};
+
+export type BoxInline = {
+	c: {
+		a: number,
+	},
+};
+
+export type First = {
+	a: string,
+};
+
+export type Second = {
+	a: number,
+};
+
+export type Third = (First) & {
+	b: { [key in string]: string },
+	c: First,
+};
+
+export type Fourth = {
+	a: First,
+	b: {
+		a: string,
+	},
+};
+
+export type TagOnStructWithInline = {
+	a: First,
+	b: {
+		a: string,
+	},
+};
+
+export type Sixth = {
+	a: First,
+	b: First,
+};
+
+export type Seventh = {
+	a: First,
+	b: Second,
+};
+
+export type Eight = { A: string } | "B";
+
+export type Tenth = string | "B" | First;
+
+export type MyEnumTagged = (First);
+
+export type MyEnumExternal = { Variant: (First) };
+
+export type MyEnumAdjacent = (First);
+
+export type MyEnumUntagged = (First);
+
+export type EmptyStruct = Record<string, never>;
+
+export type EmptyStructWithTag = Record<string, never>;
+
+export type AdjacentlyTagged = A | { id: string; method: string } | string;
+
+export type LoadProjectEvent = { project_name: string } | { project_name: string; status: string; progress: number } | { project_name: string };
+
+export type ExternallyTagged = "A" | { B: { id: string; method: string } } | { C: string };
+
+export type InternallyTaggedB = string;
+
+export type InternallyTaggedC = string[];
+
+export type InternallyTaggedD = { [key in string]: string };
+
+export type InternallyTaggedE = null;
+
+export type InternallyTaggedF = InternallyTaggedFInner;
+
+export type InternallyTaggedG = InternallyTaggedGInner;
+
+export type InternallyTaggedH = InternallyTaggedHInner;
+
+export type InternallyTaggedI = InternallyTaggedIInner;
+
+export type InternallyTaggedL = InternallyTaggedLInner;
+
+export type InternallyTaggedM = InternallyTaggedMInner;
+
+export type StructWithAlias = {
+	field: string,
+};
+
+export type StructWithMultipleAliases = {
+	field: string,
+};
+
+export type StructWithAliasAndRename = {
+	field: string,
+};
+
+export type EnumWithVariantAlias = "Variant" | "Other";
+
+export type EnumWithMultipleVariantAliases = "Variant" | "Other";
+
+export type EnumWithVariantAliasAndRename = "Variant" | "Other";
+
+export type InternallyTaggedWithAlias = { field: string } | { other: number };
+
+export type AdjacentlyTaggedWithAlias = { field: string } | { other: number };
+
+export type UntaggedWithAlias = { field: string } | { other: number };
+
+export type EmptyEnum = never;
+
+export type EmptyEnumTagged = never;
+
+export type EmptyEnumTaggedWContent = never;
+
+export type EmptyEnumUntagged = never;
+
+export type TaggedEnumOfUnitStruct = UnitStruct;
+
+export type TaggedEnumOfEmptyBracedStruct = EmptyBracedStruct;
+
+export type TaggedEnumOfEmptyTupleStruct = EmptyTupleStruct;
+
+export type TaggedEnumOfEmptyTupleBracedStructs = EmptyBracedStruct;
+
+export type TaggedStructOfStructWithTuple = TupleStructWithTuple;
+
+export type SkipOnlyField = Record<string, never>;
+
+export type SkipField = {
+	b: number,
+};
+
+export type SkipOnlyVariantExternallyTagged = never;
+
+export type SkipOnlyVariantInternallyTagged = never;
+
+export type SkipOnlyVariantAdjacentlyTagged = never;
+
+export type SkipOnlyVariantUntagged = never;
+
+export type SkipVariant = { A: string };
+
+export type SkipUnnamedFieldInVariant = "A" | { B: [number] };
+
+export type SkipNamedFieldInVariant = { A: Record<string, never> } | { B: { b: number } };
+
+export type TransparentWithSkip = null;
+
+export type TransparentWithSkip2 = string;
+
+export type TransparentWithSkip3 = string;
+
+export type SkipVariant2 = string;
+
+export type SkipVariant3 = { A: { a: string } };
+
+export type SkipStructFields = {
+	a: number,
+};
+
+export type SpectaSkipNonTypeField = {
+	a: number,
+};
+
+export type FlattenA = {
+	a: number,
+	b: number,
+};
+
+export type FlattenB = (FlattenA) & {
+	c: number,
+};
+
+export type FlattenC = (FlattenA) & {
+	c: number,
+};
+
+export type FlattenD = {
+	a: FlattenA,
+	c: number,
+};
+
+export type FlattenE = {
+	b: (FlattenA) & {
+		c: number,
+	},
+	d: number,
+};
+
+export type FlattenF = {
+	b: (FlattenA) & {
+		c: number,
+	},
+	d: number,
+};
+
+export type FlattenG = {
+	b: FlattenB,
+	d: number,
+};
+
+export type TupleNested = [number[], [number[], number[]], [number[], number[], number[]]];
+
+export type Generic1<T> = {
+	value: T,
+	values: T[],
+};
+
+export type GenericAutoBound<T> = {
+	value: T,
+	values: T[],
+};
+
+export type GenericAutoBound2<T> = {
+	value: T,
+	values: T[],
+};
+
+export type Container1 = {
+	foo: Generic1<number>,
+	bar: Generic1<number>[],
+	baz: { [key in string]: Generic1<string> },
+};
+
+export type Generic2<A, B, C> = { A: A } | { B: [B, B, B] } | { C: C[] } | { D: A[][][] } | { E: { a: A; b: B; c: C } } | { X: number[] } | { Y: number } | { Z: number[][] };
+
+export type GenericNewType1<T> = T[][];
+
+export type GenericTuple<T> = [T, T[], T[][]];
+
+export type GenericStruct2<T> = {
+	a: T,
+	b: [T, T],
+	c: [T, [T, T]],
+	d: [T, T, T],
+	e: [([T, T]), ([T, T]), ([T, T])],
+	f: T[],
+	g: T[][],
+	h: ([([T, T]), ([T, T]), ([T, T])])[],
+};
+
+export type InlineGenericNewtype<T> = T;
+
+export type InlineGenericNested<T> = [T, T[], [T, T], { [key in string]: T }, T | null, "Unit" | { Unnamed: T } | { Named: { value: T } }];
+
+export type InlineFlattenGenericsG<T> = {
+	t: T,
+};
+
+export type InlineFlattenGenerics = (InlineFlattenGenericsG<string>) & {
+	g: InlineFlattenGenericsG<string>,
+	gi: {
+		t: string,
+	},
+};
+
+export type GenericParameterOrderPreserved = {
+	pair: Pair<number, string>,
+};

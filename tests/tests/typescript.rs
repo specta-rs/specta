@@ -129,6 +129,32 @@ fn primitives_export() {
 }
 
 #[test]
+fn primitives_export_many() {
+    for mode in [
+        SerdeMode::Both,
+        SerdeMode::Serialize,
+        SerdeMode::Deserialize,
+    ] {
+        let ts = Typescript::default()
+            .with_serde(mode)
+            .bigint(BigIntExportBehavior::Number);
+        let (types, dts) = crate::types();
+        let ndts = dts
+            .iter()
+            .filter_map(|(_, ty)| match ty {
+                DataType::Reference(Reference::Named(r)) => r.get(&types),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        insta::assert_snapshot!(
+            format!("export-many-{}", mode.to_string().to_lowercase()),
+            primitives::export_many(&ts, &types, ndts.into_iter()).unwrap()
+        );
+    }
+}
+
+#[test]
 fn primitives_reference() {
     for mode in [
         SerdeMode::Both,

@@ -725,23 +725,24 @@ fn render_flat_types<'a>(
 ) -> Result<HashMap<String, Location<'static>>, Error> {
     let mut exports = HashMap::with_capacity(ndts.len());
 
-    for ndt in ndts {
-        if !ndt.requires_reference(types) {
-            continue;
-        }
+    let ndts = ndts
+        .filter(|ndt| ndt.requires_reference(types))
+        .map(|ndt| {
+            let export_name = exported_type_name(exporter, ndt);
+            if let Some(other) = exports.insert(export_name.to_string(), ndt.location()) {
+                return Err(Error::DuplicateTypeName {
+                    types: (ndt.location().into(), other.into()),
+                    name: export_name,
+                });
+            }
 
-        let export_name = exported_type_name(exporter, ndt);
-        if let Some(other) = exports.insert(export_name.to_string(), ndt.location()) {
-            return Err(Error::DuplicateTypeName {
-                types: (ndt.location().into(), other.into()),
-                name: export_name,
-            });
-        }
+            Ok(ndt)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
+    if !ndts.is_empty() {
         s.push('\n');
-        s.push_str(indent);
-
-        primitives::export_internal(s, exporter, types, ndt)?;
+        primitives::export_many_internal(s, exporter, types, ndts.into_iter(), indent)?;
     }
 
     Ok(exports)
