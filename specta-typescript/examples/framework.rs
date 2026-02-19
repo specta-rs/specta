@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use specta::{
     Type, TypeCollection,
     datatype::{DataType, NamedDataTypeBuilder},
@@ -143,76 +145,80 @@ fn main() {
 
     let dt = One::definition(&mut types);
 
-    let exporter = Exporter::from(Typescript::default());
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("out");
+    std::fs::create_dir_all(&base).unwrap();
 
-    let exporter = exporter.framework_runtime(move |exporter| {
-        // `TypeCollection`
-        // exporter.types;
+    {
+        let exporter = Exporter::from(Typescript::default());
 
-        // Can access any `Exporter` properties via `Deref`
-        // exporter.bigint
+        let exporter = exporter.framework_runtime(move |exporter| {
+            // `TypeCollection`
+            // exporter.types;
 
-        // `exporter.render_types()` allows rendering types within your runtime code,
-        // if not called `Exporter` will append it.
+            // Can access any `Exporter` properties via `Deref`
+            // exporter.bigint
 
-        // `exporter.inline`, `exporter.reference` are helpers which passthrough the `TypeCollection` for you.
+            // `exporter.render_types()` allows rendering types within your runtime code,
+            // if not called `Exporter` will append it.
 
-        Ok(format!(
-            "// Runtime\nexport function testing(_: {}) {{}}",
-            exporter.inline(&dt)?
-        )
-        .into())
-    });
-    // or
-    // let exporter = exporter.framework_runtime(move |mut exporter| {
-    //     Ok(format!(
-    //         "// Runtime\nexport function testing(_: {}) {{}}\n\n// User Types{}",
-    //         exporter.inline(&dt)?,
-    //         exporter.render_types()?
-    //     )
-    //     .into())
-    // });
+            // `exporter.inline`, `exporter.reference` are helpers which passthrough the `TypeCollection` for you.
 
-    exporter.export_to("./framework.ts", &types).unwrap();
+            Ok(format!(
+                "// Runtime\nexport function testing(_: {}) {{}}",
+                exporter.inline(&dt)?
+            )
+            .into())
+        });
+        // or
+        // let exporter = exporter.framework_runtime(move |mut exporter| {
+        //     Ok(format!(
+        //         "// Runtime\nexport function testing(_: {}) {{}}\n\n// User Types{}",
+        //         exporter.inline(&dt)?,
+        //         exporter.render_types()?
+        //     )
+        //     .into())
+        // });
 
-    exporter
-        .clone()
-        .layout(Layout::ModulePrefixedName)
-        .export_to("./framework-prefixed.ts", &types)
-        .unwrap();
+        exporter
+            .export_to(base.join("framework.ts"), &types)
+            .unwrap();
 
-    exporter
-        .clone()
-        .layout(Layout::Namespaces)
-        .export_to("./framework-namespaces.ts", &types)
-        .unwrap();
+        exporter
+            .clone()
+            .layout(Layout::ModulePrefixedName)
+            .export_to(base.join("framework-prefixed.ts"), &types)
+            .unwrap();
 
-    exporter
-        .layout(Layout::Files)
-        .export_to("./framework_output", &types)
-        .unwrap();
+        exporter
+            .clone()
+            .layout(Layout::Namespaces)
+            .export_to(base.join("framework-namespaces.ts"), &types)
+            .unwrap();
 
-    let exporter = Exporter::from(JSDoc::default());
+        exporter
+            .layout(Layout::Files)
+            .export_to(base.join("framework-output"), &types)
+            .unwrap();
+    }
 
-    exporter
-        .clone()
-        .layout(Layout::Files)
-        .export_to("./framework_output_js", &types)
-        .unwrap();
+    {
+        let exporter = Exporter::from(JSDoc::default());
 
-    exporter
-        .clone()
-        .export_to("./framework.js", &types)
-        .unwrap();
+        exporter
+            .clone()
+            .layout(Layout::Files)
+            .export_to(base.join("framework-output-js"), &types)
+            .unwrap();
 
-    exporter
-        .clone()
-        .layout(Layout::ModulePrefixedName)
-        .export_to("./framework-prefixed.js", &types)
-        .unwrap();
+        exporter
+            .clone()
+            .export_to(base.join("framework.js"), &types)
+            .unwrap();
 
-    // exporter
-    //     .layout(Layout::Namespaces)
-    //     .export_to("./framework-namespaces.js", &types)
-    //     .unwrap();
+        exporter
+            .clone()
+            .layout(Layout::ModulePrefixedName)
+            .export_to(base.join("framework-prefixed.js"), &types)
+            .unwrap();
+    }
 }

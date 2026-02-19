@@ -19,3 +19,6 @@ node_modules
 /bindings2.ts
 
 /tests/.temp
+
+# Used by examples as a place to export files.
+/specta-typescript/out
