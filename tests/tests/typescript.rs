@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{iter, path::Path};
 
 use specta::{
     Type, TypeCollection,
@@ -120,7 +120,10 @@ fn primitives_export() {
                         r.get(&types).cloned().map(|ty| (s, ty)),
                     _ => None,
                 })
-                .map(|(s, ty)| primitives::export(&ts, &types, &ty).map(|ty| format!("{s}: {ty}")))
+                .map(
+                    |(s, ty)| primitives::export(&ts, &types, iter::once(&ty), "")
+                        .map(|ty| format!("{s}: {ty}"))
+                )
                 .collect::<Result<Vec<_>, _>>()
                 .unwrap()
                 .join("\n")
@@ -149,7 +152,7 @@ fn primitives_export_many() {
 
         insta::assert_snapshot!(
             format!("export-many-{}", mode.to_string().to_lowercase()),
-            primitives::export_many(&ts, &types, ndts.into_iter()).unwrap()
+            primitives::export(&ts, &types, ndts.into_iter(), "").unwrap()
         );
     }
 }
@@ -218,7 +221,7 @@ fn reserved_names() {
             _ => panic!("Failed to get reference"),
         };
 
-        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, ndt).unwrap_err().to_string(), @r#"Attempted to export Type but was unable to due to name  conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export Type but was unable to due to name  conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
     }
 
     {
@@ -233,7 +236,7 @@ fn reserved_names() {
             _ => panic!("Failed to get reference"),
         };
 
-        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, ndt).unwrap_err().to_string(), @r#"Attempted to export Type but was unable to due to name  conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export Type but was unable to due to name  conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
     }
 
     {
@@ -251,7 +254,7 @@ fn reserved_names() {
             _ => panic!("Failed to get reference"),
         };
 
-        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, ndt).unwrap_err().to_string(), @r#"Attempted to export Type but was unable to due to name  conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export Type but was unable to due to name  conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
     }
 }
 

@@ -2,7 +2,7 @@ use specta::{
     Type, TypeCollection,
     datatype::{DataType, NamedDataTypeBuilder},
 };
-use specta_typescript::{Exporter, Layout, Typescript, primitives};
+use specta_typescript::{Exporter, JSDoc, Layout, Typescript, primitives};
 use specta_util::selection;
 
 // #[derive(Type)]
@@ -191,4 +191,28 @@ fn main() {
         .layout(Layout::Files)
         .export_to("./framework_output", &types)
         .unwrap();
+
+    let exporter = Exporter::from(JSDoc::default());
+
+    exporter
+        .clone()
+        .layout(Layout::Files)
+        .export_to("./framework_output_js", &types)
+        .unwrap();
+
+    exporter
+        .clone()
+        .export_to("./framework.js", &types)
+        .unwrap();
+
+    exporter
+        .clone()
+        .layout(Layout::ModulePrefixedName)
+        .export_to("./framework-prefixed.js", &types)
+        .unwrap();
+
+    // exporter
+    //     .layout(Layout::Namespaces)
+    //     .export_to("./framework-namespaces.js", &types)
+    //     .unwrap();
 }

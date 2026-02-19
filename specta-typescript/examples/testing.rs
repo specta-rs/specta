@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, iter};
 
 use specta::{
     Type, TypeCollection,
@@ -23,10 +23,11 @@ fn main() {
         primitives::export(
             &Typescript::default(),
             &types,
-            match ty {
+            iter::once(match ty {
                 DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
                 _ => todo!(),
-            }
+            }),
+            ""
         )
         .unwrap()
     );

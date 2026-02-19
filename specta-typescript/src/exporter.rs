@@ -546,8 +546,9 @@ impl FrameworkExporter<'_> {
     pub fn export<'a>(
         &self,
         ndts: impl Iterator<Item = &'a NamedDataType>,
+        indent: &'a str,
     ) -> Result<String, Error> {
-        primitives::export(self, self.types, ndts)
+        primitives::export(self, self.types, ndts, indent)
     }
 }
 

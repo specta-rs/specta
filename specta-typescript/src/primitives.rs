@@ -35,9 +35,10 @@ pub fn export<'a>(
     exporter: &dyn AsRef<Exporter>,
     types: &TypeCollection,
     ndts: impl Iterator<Item = &'a NamedDataType>,
+    indent: &str,
 ) -> Result<String, Error> {
     let mut s = String::new();
-    export_internal(&mut s, exporter.as_ref(), types, ndts, "")?;
+    export_internal(&mut s, exporter.as_ref(), types, ndts, indent)?;
     Ok(s)
 }
 
