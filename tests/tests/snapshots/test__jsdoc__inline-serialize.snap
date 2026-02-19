@@ -191,11 +191,11 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*
 	* @typedef {[]} EmptyTupleStruct
 	*
-	* @typedef {{ A: string } | { bbb: number } | { cccc: number } | { D: { a: string; b: number } }} EnumMacroAttributes
+	* @typedef {{ A: string } | { bbb: number } | { cccc: number } | { D: { a: string; bbbbbb: number } }} EnumMacroAttributes
 	* @property {{ A: string }} A
 	* @property {{ bbb: number }} bbb
 	* @property {{ cccc: number }} cccc
-	* @property {{ D: { a: string; b: number } }} D
+	* @property {{ D: { a: string; bbbbbb: number } }} D
 	*
 	* @typedef {{
 	*		a: Partial<{ [key in BasicEnum]: number }>,
@@ -370,20 +370,20 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		a: T,
 	*		b: [T, T],
 	*		c: [T, [T, T]],
-	*		d: T[],
-	*		e: ([T, T])[],
+	*		d: [T, T, T],
+	*		e: [([T, T]), ([T, T]), ([T, T])],
 	*		f: T[],
 	*		g: T[][],
-	*		h: (([T, T])[])[],
+	*		h: ([([T, T]), ([T, T]), ([T, T])])[],
 	*	}} GenericStruct2<T>
 	* @property {T} a
 	* @property {[T, T]} b
 	* @property {[T, [T, T]]} c
-	* @property {T[]} d
-	* @property {([T, T])[]} e
+	* @property {[T, T, T]} d
+	* @property {[([T, T]), ([T, T]), ([T, T])]} e
 	* @property {T[]} f
 	* @property {T[][]} g
-	* @property {(([T, T])[])[]} h
+	* @property {([([T, T]), ([T, T]), ([T, T])])[]} h
 	*
 	* @typedef {[T, T[], T[][]]} GenericTuple<T>
 	* @property {T} "0"
@@ -400,8 +400,12 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @typedef {{ [key in number]: string }} HasGenericAlias
 	* @property {{ [key in number]: string }} "0"
 	*
-	* @typedef {{ A: PlaceholderInnerField }} InlineEnumField
-	* @property {{ A: PlaceholderInnerField }} A
+	* @typedef {{ A: {
+	a: string,
+} }} InlineEnumField
+	* @property {{ A: {
+	a: string,
+} }} A
 	*
 	* @typedef {(InlineFlattenGenericsG<string>) & {
 	*		g: InlineFlattenGenericsG<string>,
@@ -526,11 +530,11 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*  https://github.com/specta-rs/specta/issues/374
 	*
 	* @typedef {{
-	*		foo: boolean,
-	*		bar: boolean,
+	*		foo?: boolean,
+	*		bar?: boolean,
 	*	}} Issue374
-	* @property {boolean} foo
-	* @property {boolean} bar
+	* @property {boolean} [foo]
+	* @property {boolean} [bar]
 	*
 	* @typedef {{
 	*		"test-ing": string,
@@ -598,13 +602,13 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @typedef {{
 	*		a: number | null,
 	*		b?: number | null,
-	*		c: string | null,
-	*		d: boolean,
+	*		c?: string | null,
+	*		d?: boolean,
 	*	}} Optional
 	* @property {number | null} a
 	* @property {number | null} [b]
-	* @property {string | null} c
-	* @property {boolean} d
+	* @property {string | null} [c]
+	* @property {boolean} [d]
 	*
 	* @typedef {{ A: string | null } | { B: { a: string | null } } | { C: { a?: string | null } }} OptionalInEnum
 	* @property {{ A: string | null }} A
@@ -690,20 +694,20 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		"27": number,
 	*		"28": number[],
 	*		"29": number[],
-	*		"2a": number[],
-	*		"2b": number[],
+	*		"2a": [number, number, number],
+	*		"2b": [number, number, number],
 	*		"2c": MyEnum[],
 	*		"2d": MyEnum[],
-	*		"2e": MyEnum[],
-	*		"2f": MyEnum[],
-	*		"30": number[],
-	*		"31": number[],
+	*		"2e": [MyEnum, MyEnum, MyEnum, MyEnum, MyEnum, MyEnum],
+	*		"2f": [MyEnum, MyEnum],
+	*		"30": [number],
+	*		"31": [],
 	*		"32": number | null,
 	*		"33": null | null,
 	*		"34": number[] | null,
 	*		"35": (number | null)[],
 	*		"36": number[] | null,
-	*		"37": string[][],
+	*		"37": [string[], string[], string[]],
 	*		"38": string | null,
 	*		"39": string | null,
 	*		"3a": null,
@@ -734,7 +738,7 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		"53": TransparentType,
 	*		"54": TransparentType2,
 	*		"55": TransparentTypeWithOverride,
-	*		"56": (number | null)[],
+	*		"56": [(number | null), (number | null), (number | null)],
 	*		"57": Partial<{ [key in BasicEnum]: null }>,
 	*		"58": number | null,
 	*		"59": PlaceholderInnerField[],
@@ -949,20 +953,20 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {number} "27"
 	* @property {number[]} "28"
 	* @property {number[]} "29"
-	* @property {number[]} "2a"
-	* @property {number[]} "2b"
+	* @property {[number, number, number]} "2a"
+	* @property {[number, number, number]} "2b"
 	* @property {MyEnum[]} "2c"
 	* @property {MyEnum[]} "2d"
-	* @property {MyEnum[]} "2e"
-	* @property {MyEnum[]} "2f"
-	* @property {number[]} "30"
-	* @property {number[]} "31"
+	* @property {[MyEnum, MyEnum, MyEnum, MyEnum, MyEnum, MyEnum]} "2e"
+	* @property {[MyEnum, MyEnum]} "2f"
+	* @property {[number]} "30"
+	* @property {[]} "31"
 	* @property {number | null} "32"
 	* @property {null | null} "33"
 	* @property {number[] | null} "34"
 	* @property {(number | null)[]} "35"
 	* @property {number[] | null} "36"
-	* @property {string[][]} "37"
+	* @property {[string[], string[], string[]]} "37"
 	* @property {string | null} "38"
 	* @property {string | null} "39"
 	* @property {null} "3a"
@@ -993,7 +997,7 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {TransparentType} "53"
 	* @property {TransparentType2} "54"
 	* @property {TransparentTypeWithOverride} "55"
-	* @property {(number | null)[]} "56"
+	* @property {[(number | null), (number | null), (number | null)]} "56"
 	* @property {Partial<{ [key in BasicEnum]: null }>} "57"
 	* @property {number | null} "58"
 	* @property {PlaceholderInnerField[]} "59"
@@ -1185,14 +1189,14 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {"Two words"} "Two words"
 	*
 	* @typedef {{
-	*		b: number,
+	*		"a/b": number,
 	*	}} RenameSerdeSpecialChar
-	* @property {number} b
+	* @property {number} "a/b"
 	*
 	* @typedef {{
-	*		odata_context: string,
+	*		"@odata.context": string,
 	*	}} RenameWithWeirdCharsField
-	* @property {string} odata_context
+	* @property {string} "@odata.context"
 	*
 	* @typedef {{ "@odata.context": string }} RenameWithWeirdCharsVariant
 	* @property {{ "@odata.context": string }} "@odata.context"
@@ -1303,9 +1307,9 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {string} field
 	*
 	* @typedef {{
-	*		field: string,
+	*		renamed_field: string,
 	*	}} StructWithAliasAndRename
-	* @property {string} field
+	* @property {string} renamed_field
 	*
 	* @typedef {{
 	*		field: string,
@@ -1342,10 +1346,14 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {{ a: "A" }} A
 	* @property {{ a: "B" }} B
 	*
-	* @typedef {string | "B" | First} Tenth
+	* @typedef {string | "B" | {
+	a: string,
+} | First} Tenth
 	* @property {string} A
 	* @property {"B"} B
-	* @property {First} C
+	* @property {{
+	a: string,
+}} C
 	* @property {First} D
 	*
 	* @typedef {"Unit" | { Single: number } | { Multiple: [number, number] } | { Struct: { a: number } }} TestEnum
@@ -1387,10 +1395,10 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @typedef {string} TransparentWithSkip3
 	* @property {string} "0"
 	*
-	* @typedef {[number[], [number[], number[]], number[][]]} TupleNested
+	* @typedef {[number[], [number[], number[]], [number[], number[], number[]]]} TupleNested
 	* @property {number[]} "0"
 	* @property {[number[], number[]]} "1"
-	* @property {number[][]} "2"
+	* @property {[number[], number[], number[]]} "2"
 	*
 	* @typedef {string} TupleStruct
 	* @property {string} "0"

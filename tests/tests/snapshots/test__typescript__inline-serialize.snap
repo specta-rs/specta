@@ -113,7 +113,9 @@ OverridenStruct: {
 }
 HasGenericAlias: { [key in number]: string }
 EnumMacroAttributes: { A: string } | { B: number } | { C: number } | { D: { a: string; b: number } }
-InlineEnumField: { A: PlaceholderInnerField }
+InlineEnumField: { A: {
+	a: string,
+} }
 InlineOptionalType: {
 	optional_field: {
 		a: string,
@@ -333,7 +335,9 @@ Seventh: {
 	b: Second,
 }
 Eight: { A: string } | "B"
-Tenth: string | "B" | First
+Tenth: string | "B" | {
+	a: string,
+} | First
 MyEnumTagged: (First)
 MyEnumExternal: { Variant: (First) }
 MyEnumAdjacent: (First)
@@ -351,8 +355,8 @@ InternallyTaggedF: InternallyTaggedFInner
 InternallyTaggedG: InternallyTaggedGInner
 InternallyTaggedH: InternallyTaggedHInner
 InternallyTaggedI: InternallyTaggedIInner
-InternallyTaggedL: InternallyTaggedLInner
-InternallyTaggedM: InternallyTaggedMInner
+InternallyTaggedL: A | B
+InternallyTaggedM: "A" | "B"
 StructWithAlias: {
 	field: string,
 }

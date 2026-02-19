@@ -154,9 +154,9 @@ impl SerdeTransformer {
             DataType::Primitive(p) => Ok(DataType::Primitive(p.clone())),
             DataType::List(list) => {
                 let transformed_inner = self.transform_datatype(list.ty())?;
-                Ok(DataType::List(specta::datatype::List::new(
-                    transformed_inner,
-                )))
+                let mut transformed_list = list.clone();
+                transformed_list.set_ty(transformed_inner);
+                Ok(DataType::List(transformed_list))
             }
             DataType::Map(map) => {
                 let transformed_key = self.transform_datatype(map.key_ty())?;
@@ -376,7 +376,7 @@ impl SerdeTransformer {
 
                 for (field_name, field) in named.fields() {
                     // Parse field-specific serde attributes from stored runtime attributes
-                    let field_attrs = parse_field_serde_attributes(field.attributes());
+                    let field_attrs = parse_field_serde_attributes(field.attributes())?;
 
                     if self.should_skip_field(&field_attrs) {
                         continue;
@@ -1042,164 +1042,8 @@ fn parse_serde_field_attribute_content(
 
 fn parse_field_serde_attributes(
     attributes: &[specta::datatype::RuntimeAttribute],
-) -> SerdeFieldAttributes {
-    let mut field_attrs = SerdeFieldAttributes::default();
-
-    for attr in attributes {
-        if attr.path == "serde" {
-            match &attr.kind {
-                specta::datatype::RuntimeMeta::Path(path) => {
-                    // Handle simple #[serde(path)] attributes (e.g., #[serde(skip)])
-                    parse_serde_path_attribute(&mut field_attrs.base, path);
-                }
-                specta::datatype::RuntimeMeta::List(nested) => {
-                    // Parse nested serde attributes
-                    for nested_meta in nested {
-                        if let specta::datatype::RuntimeNestedMeta::Literal(literal) = nested_meta
-                            && let specta::datatype::RuntimeLiteral::Str(content) = literal
-                        {
-                            // Parse the serialized attribute content
-                            parse_serde_attribute_string(content, &mut field_attrs);
-                        }
-                    }
-                }
-                specta::datatype::RuntimeMeta::NameValue { key, value } => {
-                    // Handle key-value serde attributes
-                    apply_serde_field_attribute(key, value, &mut field_attrs);
-                }
-            }
-        }
-    }
-
-    field_attrs
-}
-
-fn parse_serde_attribute_string(content: &str, field_attrs: &mut SerdeFieldAttributes) {
-    // Simple parsing for common serde attributes
-    // This is a basic implementation that can be expanded
-    if content.contains("skip") {
-        field_attrs.base.skip = true;
-    }
-    if content.contains("skip_serializing") {
-        field_attrs.base.skip_serializing = true;
-    }
-    if content.contains("skip_deserializing") {
-        field_attrs.base.skip_deserializing = true;
-    }
-    if content.contains("flatten") {
-        field_attrs.base.flatten = true;
-    }
-    if content.contains("default") && !content.contains("default =") {
-        field_attrs.base.default = true;
-    }
-
-    // Parse rename attribute
-    if let Some(start) = content.find("rename = \"")
-        && let Some(end) = content[start + 10..].find("\"")
-    {
-        let rename_value = &content[start + 10..start + 10 + end];
-        field_attrs.base.rename = Some(rename_value.to_string());
-    }
-}
-
-fn apply_serde_field_attribute(
-    key: &str,
-    value: &specta::datatype::RuntimeValue,
-    field_attrs: &mut SerdeFieldAttributes,
-) {
-    match key {
-        "rename" => {
-            if let specta::datatype::RuntimeValue::Literal(specta::datatype::RuntimeLiteral::Str(
-                s,
-            )) = value
-            {
-                field_attrs.base.rename = Some(s.clone());
-            }
-        }
-        "skip" => {
-            if let specta::datatype::RuntimeValue::Literal(
-                specta::datatype::RuntimeLiteral::Bool(true),
-            ) = value
-            {
-                field_attrs.base.skip = true;
-            }
-        }
-        "skip_serializing" => {
-            if let specta::datatype::RuntimeValue::Literal(
-                specta::datatype::RuntimeLiteral::Bool(true),
-            ) = value
-            {
-                field_attrs.base.skip_serializing = true;
-            }
-        }
-        "skip_deserializing" => {
-            if let specta::datatype::RuntimeValue::Literal(
-                specta::datatype::RuntimeLiteral::Bool(true),
-            ) = value
-            {
-                field_attrs.base.skip_deserializing = true;
-            }
-        }
-        "flatten" => {
-            if let specta::datatype::RuntimeValue::Literal(
-                specta::datatype::RuntimeLiteral::Bool(true),
-            ) = value
-            {
-                field_attrs.base.flatten = true;
-            }
-        }
-        "default" => {
-            if let specta::datatype::RuntimeValue::Literal(
-                specta::datatype::RuntimeLiteral::Bool(true),
-            ) = value
-            {
-                field_attrs.base.default = true;
-            } else if let specta::datatype::RuntimeValue::Literal(
-                specta::datatype::RuntimeLiteral::Str(s),
-            )
-            | specta::datatype::RuntimeValue::Expr(s) = value
-            {
-                field_attrs.base.default_with = Some(s.clone());
-            }
-        }
-        "serialize_with" => {
-            if let specta::datatype::RuntimeValue::Literal(specta::datatype::RuntimeLiteral::Str(
-                s,
-            )) = value
-            {
-                field_attrs.serialize_with = Some(s.clone());
-            }
-        }
-        "deserialize_with" => {
-            if let specta::datatype::RuntimeValue::Literal(specta::datatype::RuntimeLiteral::Str(
-                s,
-            )) = value
-            {
-                field_attrs.deserialize_with = Some(s.clone());
-            }
-        }
-        "with" => {
-            if let specta::datatype::RuntimeValue::Literal(specta::datatype::RuntimeLiteral::Str(
-                s,
-            ))
-            | specta::datatype::RuntimeValue::Expr(s) = value
-            {
-                field_attrs.with = Some(s.clone());
-            }
-        }
-        "skip_serializing_if" => {
-            if let specta::datatype::RuntimeValue::Literal(specta::datatype::RuntimeLiteral::Str(
-                s,
-            ))
-            | specta::datatype::RuntimeValue::Expr(s) = value
-            {
-                field_attrs.skip_serializing_if = Some(s.clone());
-            }
-        }
-        _ => {
-            // Ignore unknown attributes
-        }
-    }
+) -> Result<SerdeFieldAttributes, Error> {
+    parse_serde_field_attributes(attributes)
 }
 
 // #[cfg(test)]

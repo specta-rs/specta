@@ -85,6 +85,7 @@ pub fn parse_enum(
             let variant_ident_str = unraw_raw_ident(&variant.ident);
             let variant_name_str = variant_ident_str.to_token_stream();
             let variant_skip = attrs.skip;
+            let variant_inline = attrs.inline;
 
             let inner = match &variant.fields {
                 Fields::Unit => quote!(datatype::Fields::Unit),
@@ -92,9 +93,15 @@ pub fn parse_enum(
                     let fields = fields
                         .unnamed
                         .iter()
-                        .map(|field| {
-                            let (field_attrs, raw_attrs) =
+                        .enumerate()
+                        .map(|(idx, field)| {
+                            let (mut field_attrs, raw_attrs) =
                                 decode_field_attrs(field, &container_attrs.skip_attrs)?;
+
+                            if variant_inline && idx == 0 {
+                                field_attrs.inline = true;
+                            }
+
                             construct_field_with_variant_skip(
                                 crate_ref,
                                 container_attrs,

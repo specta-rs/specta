@@ -92,6 +92,7 @@ fn bigint_errors_propagate_from_nested_types() {
         inline_for::<StructWithStructWithBigInt>(&ts),
         inline_for::<StructWithStructWithStructWithBigInt>(&ts),
         inline_for::<StructWithOptionWithStructWithBigInt>(&ts),
+        inline_for::<EnumWithStructWithStructWithBigInt>(&ts),
         inline_for::<EnumWithInlineStructWithBigInt>(&ts),
     ] {
         let err = err.expect_err("bigint export should be rejected by default");
@@ -100,6 +101,4 @@ fn bigint_errors_propagate_from_nested_types() {
             "unexpected error: {err}"
         );
     }
-
-    assert!(inline_for::<EnumWithStructWithStructWithBigInt>(&ts).is_ok());
 }

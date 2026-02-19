@@ -197,7 +197,7 @@ export type EmptyStructWithTag = {
 
 export type EmptyTupleStruct = [];
 
-export type EnumMacroAttributes = { A: string } | { bbb: number } | { cccc: number } | { D: { a: string; b: number } };
+export type EnumMacroAttributes = { A: string } | { bbb: number } | { cccc: number } | { D: { a: string; bbbbbb: number } };
 
 export type EnumReferenceRecordKey = {
 	a: Partial<{ [key in BasicEnum]: number }>,
@@ -314,11 +314,11 @@ export type GenericStruct2<T> = {
 	a: T,
 	b: [T, T],
 	c: [T, [T, T]],
-	d: T[],
-	e: ([T, T])[],
+	d: [T, T, T],
+	e: [([T, T]), ([T, T]), ([T, T])],
 	f: T[],
 	g: T[][],
-	h: (([T, T])[])[],
+	h: ([([T, T]), ([T, T]), ([T, T])])[],
 };
 
 export type GenericTuple<T> = [T, T[], T[][]];
@@ -329,7 +329,9 @@ export type GenericType<T> = "Undefined" | T;
 
 export type HasGenericAlias = { [key in number]: string };
 
-export type InlineEnumField = { A: PlaceholderInnerField };
+export type InlineEnumField = { A: {
+	a: string,
+} };
 
 export type InlineFlattenGenerics = (InlineFlattenGenericsG<string>) & {
 	g: InlineFlattenGenericsG<string>,
@@ -422,8 +424,8 @@ export type Issue281 = {
  *  https://github.com/specta-rs/specta/issues/374
  */
 export type Issue374 = {
-	foo: boolean,
-	bar: boolean,
+	foo?: boolean,
+	bar?: boolean,
 };
 
 export type KebabCase = {
@@ -467,8 +469,8 @@ export type NonOptional = string | null;
 export type Optional = {
 	a: number | null,
 	b?: number | null,
-	c: string | null,
-	d: boolean,
+	c?: string | null,
+	d?: boolean,
 };
 
 export type OptionalInEnum = { A: string | null } | { B: { a: string | null } } | { C: { a?: string | null } };
@@ -546,20 +548,20 @@ export type Primitives = {
 	"27": number,
 	"28": number[],
 	"29": number[],
-	"2a": number[],
-	"2b": number[],
+	"2a": [number, number, number],
+	"2b": [number, number, number],
 	"2c": MyEnum[],
 	"2d": MyEnum[],
-	"2e": MyEnum[],
-	"2f": MyEnum[],
-	"30": number[],
-	"31": number[],
+	"2e": [MyEnum, MyEnum, MyEnum, MyEnum, MyEnum, MyEnum],
+	"2f": [MyEnum, MyEnum],
+	"30": [number],
+	"31": [],
 	"32": number | null,
 	"33": null | null,
 	"34": number[] | null,
 	"35": (number | null)[],
 	"36": number[] | null,
-	"37": string[][],
+	"37": [string[], string[], string[]],
 	"38": string | null,
 	"39": string | null,
 	"3a": null,
@@ -590,7 +592,7 @@ export type Primitives = {
 	"53": TransparentType,
 	"54": TransparentType2,
 	"55": TransparentTypeWithOverride,
-	"56": (number | null)[],
+	"56": [(number | null), (number | null), (number | null)],
 	"57": Partial<{ [key in BasicEnum]: null }>,
 	"58": number | null,
 	"59": PlaceholderInnerField[],
@@ -774,11 +776,11 @@ export type Regular = { [key in string]: null };
 export type Rename = "OneWord" | "Two words";
 
 export type RenameSerdeSpecialChar = {
-	b: number,
+	"a/b": number,
 };
 
 export type RenameWithWeirdCharsField = {
-	odata_context: string,
+	"@odata.context": string,
 };
 
 export type RenameWithWeirdCharsVariant = { "@odata.context": string };
@@ -872,7 +874,7 @@ export type StructWithAlias = {
 };
 
 export type StructWithAliasAndRename = {
-	field: string,
+	renamed_field: string,
 };
 
 export type StructWithMultipleAliases = {
@@ -897,7 +899,9 @@ export type TaggedEnumOfUnitStruct = { a: "A" } | { a: "B" };
 
 export type TaggedStructOfStructWithTuple = { a: "A" } | { a: "B" };
 
-export type Tenth = string | "B" | First;
+export type Tenth = string | "B" | {
+	a: string,
+} | First;
 
 export type TestCollectionRegister = never;
 
@@ -928,7 +932,7 @@ export type TransparentWithSkip2 = string;
 
 export type TransparentWithSkip3 = string;
 
-export type TupleNested = [number[], [number[], number[]], number[][]];
+export type TupleNested = [number[], [number[], number[]], [number[], number[], number[]]];
 
 export type TupleStruct = string;
 

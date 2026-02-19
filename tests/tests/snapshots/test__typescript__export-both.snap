@@ -60,7 +60,9 @@ HasGenericAlias: export type HasGenericAlias = { [key in number]: string };
 
 EnumMacroAttributes: export type EnumMacroAttributes = { A: string } | { B: number } | { C: number } | { D: { a: string; b: number } };
 
-InlineEnumField: export type InlineEnumField = { A: PlaceholderInnerField };
+InlineEnumField: export type InlineEnumField = { A: {
+	a: string,
+} };
 
 InlineOptionalType: export type InlineOptionalType = {
 	optional_field: {
@@ -418,7 +420,9 @@ Seventh: export type Seventh = {
 
 Eight: export type Eight = { A: string } | "B";
 
-Tenth: export type Tenth = string | "B" | First;
+Tenth: export type Tenth = string | "B" | {
+	a: string,
+} | First;
 
 MyEnumTagged: export type MyEnumTagged = (First);
 
@@ -454,9 +458,9 @@ InternallyTaggedH: export type InternallyTaggedH = InternallyTaggedHInner;
 
 InternallyTaggedI: export type InternallyTaggedI = InternallyTaggedIInner;
 
-InternallyTaggedL: export type InternallyTaggedL = InternallyTaggedLInner;
+InternallyTaggedL: export type InternallyTaggedL = A | B;
 
-InternallyTaggedM: export type InternallyTaggedM = InternallyTaggedMInner;
+InternallyTaggedM: export type InternallyTaggedM = "A" | "B";
 
 StructWithAlias: export type StructWithAlias = {
 	field: string,

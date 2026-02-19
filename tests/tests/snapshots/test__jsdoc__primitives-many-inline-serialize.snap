@@ -91,8 +91,12 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {{ C: number }} C
 	* @property {{ D: { a: string; b: number } }} D
 	*
-	* @typedef {{ A: PlaceholderInnerField }} InlineEnumField
-	* @property {{ A: PlaceholderInnerField }} A
+	* @typedef {{ A: {
+	a: string,
+} }} InlineEnumField
+	* @property {{ A: {
+	a: string,
+} }} A
 	*
 	* @typedef {{
 	*		optional_field: {
@@ -493,10 +497,14 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {{ A: string }} A
 	* @property {"B"} B
 	*
-	* @typedef {string | "B" | First} Tenth
+	* @typedef {string | "B" | {
+	a: string,
+} | First} Tenth
 	* @property {string} A
 	* @property {"B"} B
-	* @property {First} C
+	* @property {{
+	a: string,
+}} C
 	* @property {First} D
 	*
 	* @typedef {(First)} MyEnumTagged
@@ -554,11 +562,11 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @typedef {InternallyTaggedIInner} InternallyTaggedI
 	* @property {InternallyTaggedIInner} A
 	*
-	* @typedef {InternallyTaggedLInner} InternallyTaggedL
-	* @property {InternallyTaggedLInner} A
+	* @typedef {A | B} InternallyTaggedL
+	* @property {A | B} A
 	*
-	* @typedef {InternallyTaggedMInner} InternallyTaggedM
-	* @property {InternallyTaggedMInner} A
+	* @typedef {"A" | "B"} InternallyTaggedM
+	* @property {"A" | "B"} A
 	*
 	* @typedef {{
 	*		field: string,
