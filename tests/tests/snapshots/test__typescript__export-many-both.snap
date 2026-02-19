@@ -1,6 +1,6 @@
 ---
 source: tests/tests/typescript.rs
-expression: "primitives::export_many(&ts, &types, ndts.into_iter()).unwrap()"
+expression: "primitives::export(&ts, &types, ndts.into_iter(), \"\").unwrap()"
 ---
 export type Unit1 = null;
 

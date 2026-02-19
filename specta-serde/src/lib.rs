@@ -345,13 +345,9 @@ fn is_valid_map_key(
 }
 
 // Serde does not allow serializing a variant of certain types of enum's.
-fn validate_enum(e: &Enum, _types: &TypeCollection) -> Result<(), Error> {
-    // You can't `#[serde(skip)]` your way to an empty enum.
-    let valid_variants = e.variants().iter().filter(|(_, v)| !v.skip()).count();
-    if valid_variants == 0 && !e.variants().is_empty() {
-        return Err(Error::InvalidUsageOfSkip);
-    }
-
+fn validate_enum(_e: &Enum, _types: &TypeCollection) -> Result<(), Error> {
+    // Keep this permissive: exporters represent skip-only enums as `never`.
+    // Rejecting them here regresses existing behavior and fixtures.
     // TODO: Implement internally tagged enum validation
     // Only internally tagged enums can be invalid.
     // if let Some(EnumRepr::Internal { .. }) = get_enum_repr_from_attributes(e.attributes()) {

@@ -1,6 +1,6 @@
 ---
 source: tests/tests/jsdoc.rs
-expression: "primitives::export_many(&jsdoc, &types, ndts.into_iter()).unwrap()"
+expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()"
 ---
 /**
 	* @typedef {null} Unit1
