@@ -236,17 +236,81 @@ DeprecatedTypeWithMsg2: {
 }
 DeprecatedFields: {
 	a: number,
+	/**
+	 * @deprecated
+	 */
 	b: string,
+	/**
+	 * @deprecated This field is cringe!
+	 */
 	c: string,
+	/**
+	 * @deprecated This field is cringe!
+	 */
 	d: string,
 }
-DeprecatedTupleVariant: [string, string, number]
-DeprecatedEnumVariants: "A" | "B" | "C"
+DeprecatedTupleVariant: [
+/**
+ * @deprecated
+ */
+string, 
+/**
+ * @deprecated Nope
+ */
+string, 
+/**
+ * @deprecated Nope
+ */
+number]
+DeprecatedEnumVariants: 
+/**
+ * @deprecated
+ */
+"A" | 
+/**
+ * @deprecated Nope
+ */
+"B" | 
+/**
+ * @deprecated Nope
+ */
+"C"
 CommentedStruct: {
+	/**
+	 *  Some triple-slash comment
+	 *  Some more triple-slash comment
+	 */
 	a: number,
 }
-CommentedEnum: { A: number } | { B: { a: number } }
-SingleLineComment: { A: number } | { B: { a: number } }
+CommentedEnum: 
+/**
+ *  Some triple-slash comment
+ *  Some more triple-slash comment
+ */
+{ A: number } | 
+/**
+ *  Some triple-slash comment
+ *  Some more triple-slash comment
+ */
+{ B: { 
+/**
+ *  Some triple-slash comment
+ *  Some more triple-slash comment
+ */
+a: number } }
+SingleLineComment: 
+/**
+ *  Some single-line comment
+ */
+{ A: number } | 
+/**
+ *  Some single-line comment
+ */
+{ B: { 
+/**
+ *  Some single-line comment
+ */
+a: number } }
 NonGeneric: {
 	a: number,
 	b: boolean,

@@ -46,8 +46,6 @@ pub(crate) enum PathItem {
 pub(crate) struct ExportContext<'a> {
     pub(crate) cfg: &'a Exporter,
     pub(crate) path: Vec<PathItem>,
-    // `false` when inline'ing and `true` when exporting as named.
-    pub(crate) is_export: bool,
 }
 
 impl ExportContext<'_> {
@@ -125,17 +123,12 @@ pub(crate) type Output = Result<String>;
 
 #[allow(clippy::ptr_arg)]
 fn inner_comments(
-    ctx: ExportContext,
     deprecated: Option<&DeprecatedType>,
     docs: &str,
     other: String,
     start_with_newline: bool,
     prefix: &str,
 ) -> String {
-    if !ctx.is_export {
-        return other;
-    }
-
     let mut comments = String::new();
     js_doc(&mut comments, docs, deprecated);
     if comments.is_empty() {
@@ -197,17 +190,7 @@ pub(crate) fn datatype_inner(
         }
     };
 
-    crate::primitives::datatype(
-        s,
-        ctx.cfg,
-        types,
-        typ,
-        vec![],
-        ctx.is_export,
-        None,
-        "",
-        generics,
-    )
+    crate::primitives::datatype(s, ctx.cfg, types, typ, vec![], None, "", generics)
 }
 
 // Can be used with `StructUnnamedFields.fields` or `EnumNamedFields.fields`
@@ -229,14 +212,12 @@ fn unnamed_fields_datatype(
                 types,
                 ty,
                 vec![],
-                ctx.is_export,
                 None,
                 "",
                 generics,
                 force_inline || field.inline(),
             )?;
             s.push_str(&inner_comments(
-                ctx,
                 field.deprecated(),
                 field.docs(),
                 v,
@@ -259,14 +240,12 @@ fn unnamed_fields_datatype(
                     types,
                     ty,
                     vec![],
-                    ctx.is_export,
                     None,
                     "",
                     generics,
                     force_inline || field.inline(),
                 )?;
                 s.push_str(&inner_comments(
-                    ctx.clone(),
                     field.deprecated(),
                     field.docs(),
                     v,
@@ -357,7 +336,6 @@ pub(crate) fn struct_datatype(
                         types,
                         ty,
                         vec![],
-                        ctx.is_export,
                         None,
                         "",
                         generics,
@@ -365,7 +343,6 @@ pub(crate) fn struct_datatype(
                     )
                     .map(|_| {
                         inner_comments(
-                            ctx.clone(),
                             field.deprecated(),
                             field.docs(),
                             format!("({s})"),
@@ -403,7 +380,6 @@ pub(crate) fn struct_datatype(
                         .unwrap_or(field.docs());
 
                     Ok(inner_comments(
-                        ctx.clone(),
                         field.deprecated(),
                         docs,
                         other,
@@ -474,7 +450,6 @@ fn enum_variant_datatype(
                         types,
                         ty,
                         vec![],
-                        ctx.is_export,
                         None,
                         "",
                         generics,
@@ -482,7 +457,6 @@ fn enum_variant_datatype(
                     )
                     .map(|_| {
                         inner_comments(
-                            ctx.clone(),
                             field.deprecated(),
                             field.docs(),
                             format!("({s})"),
@@ -529,7 +503,6 @@ fn enum_variant_datatype(
                             .unwrap_or(field.docs());
 
                         Ok(inner_comments(
-                            ctx.clone(),
                             field.deprecated(),
                             docs,
                             other,
@@ -560,7 +533,6 @@ fn enum_variant_datatype(
                         types,
                         ty,
                         vec![],
-                        ctx.is_export,
                         None,
                         "",
                         generics,
@@ -610,7 +582,6 @@ pub(crate) fn enum_datatype(
         .filter(|(_, variant)| !variant.skip())
         .map(|(variant_name, variant)| {
             Ok(inner_comments(
-                ctx.clone(),
                 variant.deprecated(),
                 variant.docs(),
                 match &repr {
@@ -742,7 +713,6 @@ fn object_field_to_ts(
         types,
         ty,
         vec![],
-        ctx.is_export,
         None,
         prefix,
         generics,
@@ -975,8 +945,6 @@ pub(crate) fn deprecated_details(typ: &DeprecatedType) -> Option<String> {
 //         &ExportContext {
 //             cfg,
 //             path: vec![],
-//             // TODO: Should JS doc support per field or variant comments???
-//             is_export: false,
 //         },
 //         typ,
 //         types,

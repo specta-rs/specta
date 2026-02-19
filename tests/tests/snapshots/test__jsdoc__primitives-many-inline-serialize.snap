@@ -320,8 +320,17 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*
 	* @typedef {{
 	*		a: number,
+	*		/**
+	*		 * @deprecated
+	*		 */
 	*		b: string,
+	*		/**
+	*		 * @deprecated This field is cringe!
+	*		 */
 	*		c: string,
+	*		/**
+	*		 * @deprecated This field is cringe!
+	*		 */
 	*		d: string,
 	*	}} DeprecatedFields
 	* @property {number} a
@@ -329,20 +338,60 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {string} c - @deprecated This field is cringe!
 	* @property {string} d - @deprecated This field is cringe!
 	*
-	* @typedef {[string, string, number]} DeprecatedTupleVariant
+	* @typedef {[
+	*	/**
+	*	 * @deprecated
+	*	 */
+	* string, 
+	*	/**
+	*	 * @deprecated Nope
+	*	 */
+	* string, 
+	*	/**
+	*	 * @deprecated Nope
+	*	 */
+	* number]} DeprecatedTupleVariant
 	* @property {string} "0" - @deprecated
 	* @property {string} "1" - @deprecated Nope
 	* @property {number} "2" - @deprecated Nope
 	*
-	* @typedef {"A" | "B" | "C"} DeprecatedEnumVariants
-	* @property {"A"} A - @deprecated
-	* @property {"B"} B - @deprecated Nope
-	* @property {"C"} C - @deprecated Nope
+	* @typedef {
+	*	/**
+	*	 * @deprecated
+	*	 */
+	* "A" | 
+	*	/**
+	*	 * @deprecated Nope
+	*	 */
+	* "B" | 
+	*	/**
+	*	 * @deprecated Nope
+	*	 */
+	* "C"} DeprecatedEnumVariants
+	* @property {
+	* /**
+	*  * @deprecated
+	*  */
+	* "A"} A - @deprecated
+	* @property {
+	* /**
+	*  * @deprecated Nope
+	*  */
+	* "B"} B - @deprecated Nope
+	* @property {
+	* /**
+	*  * @deprecated Nope
+	*  */
+	* "C"} C - @deprecated Nope
 	*
 	*  Some triple-slash comment
 	*  Some more triple-slash comment
 	*
 	* @typedef {{
+	*		/**
+	*		 *  Some triple-slash comment
+	*		 *  Some more triple-slash comment
+	*		 */
 	*		a: number,
 	*	}} CommentedStruct
 	* @property {number} a - Some triple-slash comment Some more triple-slash comment
@@ -350,15 +399,69 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*  Some triple-slash comment
 	*  Some more triple-slash comment
 	*
-	* @typedef {{ A: number } | { B: { a: number } }} CommentedEnum
-	* @property {{ A: number }} A - Some triple-slash comment Some more triple-slash comment
-	* @property {{ B: { a: number } }} B - Some triple-slash comment Some more triple-slash comment
+	* @typedef {
+	*	/**
+	*	 *  Some triple-slash comment
+	*	 *  Some more triple-slash comment
+	*	 */
+	* { A: number } | 
+	*	/**
+	*	 *  Some triple-slash comment
+	*	 *  Some more triple-slash comment
+	*	 */
+	* { B: { 
+	*	/**
+	*	 *  Some triple-slash comment
+	*	 *  Some more triple-slash comment
+	*	 */
+	* a: number } }} CommentedEnum
+	* @property {
+	* /**
+	*  *  Some triple-slash comment
+	*  *  Some more triple-slash comment
+	*  */
+	* { A: number }} A - Some triple-slash comment Some more triple-slash comment
+	* @property {
+	* /**
+	*  *  Some triple-slash comment
+	*  *  Some more triple-slash comment
+	*  */
+	* { B: { 
+	* /**
+	*  *  Some triple-slash comment
+	*  *  Some more triple-slash comment
+	*  */
+	* a: number } }} B - Some triple-slash comment Some more triple-slash comment
 	*
 	*  Some single-line comment
 	*
-	* @typedef {{ A: number } | { B: { a: number } }} SingleLineComment
-	* @property {{ A: number }} A - Some single-line comment
-	* @property {{ B: { a: number } }} B - Some single-line comment
+	* @typedef {
+	*	/**
+	*	 *  Some single-line comment
+	*	 */
+	* { A: number } | 
+	*	/**
+	*	 *  Some single-line comment
+	*	 */
+	* { B: { 
+	*	/**
+	*	 *  Some single-line comment
+	*	 */
+	* a: number } }} SingleLineComment
+	* @property {
+	* /**
+	*  *  Some single-line comment
+	*  */
+	* { A: number }} A - Some single-line comment
+	* @property {
+	* /**
+	*  *  Some single-line comment
+	*  */
+	* { B: { 
+	* /**
+	*  *  Some single-line comment
+	*  */
+	* a: number } }} B - Some single-line comment
 	*
 	* @typedef {{
 	*		a: A,

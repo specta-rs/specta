@@ -115,7 +115,6 @@ fn export_single_internal(
         crate::legacy::ExportContext {
             cfg: exporter,
             path: vec![],
-            is_export: false,
         },
         crate::legacy::NamedLocation::Type,
         &match exporter.layout {
@@ -153,7 +152,6 @@ fn export_single_internal(
         types,
         ndt.ty(),
         vec![ndt.name().clone()],
-        true,
         Some(ndt.name()),
         indent,
         Default::default(),
@@ -182,7 +180,6 @@ pub fn inline(
         types,
         dt,
         vec![],
-        false,
         None,
         "",
         0,
@@ -231,7 +228,6 @@ fn append_jsdoc_properties(
                         types,
                         ty,
                         vec![dt.name().clone(), idx.to_string().into()],
-                        false,
                         Some(dt.name()),
                         &datatype_prefix,
                         Default::default(),
@@ -262,7 +258,6 @@ fn append_jsdoc_properties(
                         types,
                         ty,
                         vec![dt.name().clone(), name.clone()],
-                        false,
                         Some(dt.name()),
                         &datatype_prefix,
                         Default::default(),
@@ -292,7 +287,6 @@ fn append_jsdoc_properties(
                     ExportContext {
                         cfg: exporter,
                         path: vec![],
-                        is_export: false,
                     },
                     &one_variant_enum,
                     types,
@@ -413,7 +407,6 @@ fn append_typedef_body(
         types,
         dt.ty(),
         vec![dt.name().clone()],
-        false,
         Some(dt.name()),
         &datatype_prefix,
         Default::default(),
@@ -489,7 +482,7 @@ pub fn reference(
     r: &Reference,
 ) -> Result<String, Error> {
     let mut s = String::new();
-    reference_dt(&mut s, exporter.as_ref(), types, r, vec![], false, "", &[])?;
+    reference_dt(&mut s, exporter.as_ref(), types, r, vec![], "", &[])?;
     Ok(s)
 }
 
@@ -499,7 +492,6 @@ pub(crate) fn datatype_with_inline_attr(
     types: &TypeCollection,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
-    is_export: bool,
     parent_name: Option<&str>,
     prefix: &str,
     generics: &[(Generic, DataType)],
@@ -512,7 +504,6 @@ pub(crate) fn datatype_with_inline_attr(
             types,
             dt,
             location,
-            is_export,
             parent_name,
             prefix,
             generics,
@@ -525,7 +516,6 @@ pub(crate) fn datatype_with_inline_attr(
         types,
         dt,
         location,
-        is_export,
         parent_name,
         prefix,
         generics,
@@ -549,7 +539,6 @@ fn shallow_inline_datatype(
     types: &TypeCollection,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
-    is_export: bool,
     parent_name: Option<&str>,
     prefix: &str,
     generics: &[(Generic, DataType)],
@@ -564,7 +553,6 @@ fn shallow_inline_datatype(
                 types,
                 list.ty(),
                 location,
-                is_export,
                 parent_name,
                 prefix,
                 generics,
@@ -617,7 +605,6 @@ fn shallow_inline_datatype(
                 types,
                 map.key_ty(),
                 location.clone(),
-                true,
                 parent_name,
                 prefix,
                 generics,
@@ -629,7 +616,6 @@ fn shallow_inline_datatype(
                 types,
                 map.value_ty(),
                 location,
-                is_export,
                 parent_name,
                 prefix,
                 generics,
@@ -647,7 +633,6 @@ fn shallow_inline_datatype(
                 types,
                 dt,
                 location,
-                is_export,
                 parent_name,
                 prefix,
                 generics,
@@ -661,7 +646,6 @@ fn shallow_inline_datatype(
                 crate::legacy::ExportContext {
                     cfg: exporter,
                     path: vec![],
-                    is_export,
                 },
                 parent_name,
                 st,
@@ -676,7 +660,6 @@ fn shallow_inline_datatype(
                 crate::legacy::ExportContext {
                     cfg: exporter,
                     path: vec![],
-                    is_export,
                 },
                 enm,
                 types,
@@ -699,7 +682,6 @@ fn shallow_inline_datatype(
                         types,
                         dt,
                         location.clone(),
-                        is_export,
                         parent_name,
                         prefix,
                         generics,
@@ -721,7 +703,6 @@ fn shallow_inline_datatype(
                     types,
                     &resolved,
                     location,
-                    is_export,
                     parent_name,
                     prefix,
                     &combined_generics,
@@ -740,7 +721,6 @@ fn shallow_inline_datatype(
                         types,
                         resolved_dt,
                         location,
-                        is_export,
                         parent_name,
                         prefix,
                         generics,
@@ -844,7 +824,6 @@ fn inline_datatype(
     types: &TypeCollection,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
-    is_export: bool,
     parent_name: Option<&str>,
     prefix: &str,
     depth: usize,
@@ -867,7 +846,6 @@ fn inline_datatype(
                 crate::legacy::ExportContext {
                     cfg: exporter,
                     path: vec![],
-                    is_export,
                 },
                 &specta::datatype::FunctionReturnType::Value(l.ty().clone()),
                 types,
@@ -896,7 +874,7 @@ fn inline_datatype(
                 write!(s, "{dt_str}[]")?;
             }
         }
-        DataType::Map(m) => map_dt(s, exporter, types, m, location, is_export, generics)?,
+        DataType::Map(m) => map_dt(s, exporter, types, m, location, generics)?,
         DataType::Nullable(def) => {
             inline_datatype(
                 s,
@@ -904,7 +882,6 @@ fn inline_datatype(
                 types,
                 def,
                 location,
-                is_export,
                 parent_name,
                 prefix,
                 depth + 1,
@@ -942,7 +919,6 @@ fn inline_datatype(
                                 types,
                                 field_ty,
                                 location.clone(),
-                                is_export,
                                 parent_name,
                                 prefix,
                                 depth + 1,
@@ -964,7 +940,6 @@ fn inline_datatype(
                             crate::legacy::ExportContext {
                                 cfg: exporter,
                                 path: vec![],
-                                is_export,
                             },
                             parent_name,
                             st,
@@ -981,7 +956,6 @@ fn inline_datatype(
                     crate::legacy::ExportContext {
                         cfg: exporter,
                         path: vec![],
-                        is_export,
                     },
                     parent_name,
                     st,
@@ -992,8 +966,8 @@ fn inline_datatype(
                 )?
             }
         }
-        DataType::Enum(e) => enum_dt(s, exporter, types, e, location, is_export, prefix, generics)?,
-        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, is_export, generics)?,
+        DataType::Enum(e) => enum_dt(s, exporter, types, e, location, prefix, generics)?,
+        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, generics)?,
         DataType::Reference(r) => {
             // Always inline references when in inline mode
             if let Reference::Named(r) = r
@@ -1006,7 +980,6 @@ fn inline_datatype(
                     types,
                     ndt.ty(),
                     location,
-                    is_export,
                     parent_name,
                     prefix,
                     depth + 1,
@@ -1014,7 +987,7 @@ fn inline_datatype(
                 )?;
             } else {
                 // Fallback to regular reference if type not found
-                reference_dt(s, exporter, types, r, location, is_export, prefix, generics)?;
+                reference_dt(s, exporter, types, r, location, prefix, generics)?;
             }
         }
         DataType::Generic(g) => {
@@ -1031,7 +1004,6 @@ fn inline_datatype(
                     types,
                     resolved_dt,
                     location,
-                    is_export,
                     parent_name,
                     prefix,
                     depth + 1,
@@ -1054,7 +1026,6 @@ pub(crate) fn datatype(
     types: &TypeCollection,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
-    is_export: bool,
     parent_name: Option<&str>,
     prefix: &str,
     generics: &[(Generic, DataType)],
@@ -1063,15 +1034,14 @@ pub(crate) fn datatype(
 
     match dt {
         DataType::Primitive(p) => s.push_str(primitive_dt(&exporter.bigint, p, location)?),
-        DataType::List(l) => list_dt(s, exporter, types, l, location, is_export, generics)?,
-        DataType::Map(m) => map_dt(s, exporter, types, m, location, is_export, generics)?,
+        DataType::List(l) => list_dt(s, exporter, types, l, location, generics)?,
+        DataType::Map(m) => map_dt(s, exporter, types, m, location, generics)?,
         DataType::Nullable(def) => {
             // TODO: Replace legacy stuff
             crate::legacy::datatype_inner(
                 crate::legacy::ExportContext {
                     cfg: exporter,
                     path: vec![],
-                    is_export,
                 },
                 &specta::datatype::FunctionReturnType::Value((**def).clone()),
                 types,
@@ -1098,7 +1068,6 @@ pub(crate) fn datatype(
                 crate::legacy::ExportContext {
                     cfg: exporter,
                     path: vec![],
-                    is_export,
                 },
                 parent_name,
                 st,
@@ -1108,11 +1077,9 @@ pub(crate) fn datatype(
                 generics,
             )?
         }
-        DataType::Enum(e) => enum_dt(s, exporter, types, e, location, is_export, prefix, generics)?,
-        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, is_export, generics)?,
-        DataType::Reference(r) => {
-            reference_dt(s, exporter, types, r, location, is_export, prefix, generics)?
-        }
+        DataType::Enum(e) => enum_dt(s, exporter, types, e, location, prefix, generics)?,
+        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, generics)?,
+        DataType::Reference(r) => reference_dt(s, exporter, types, r, location, prefix, generics)?,
         DataType::Generic(g) => {
             if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
                 if matches!(resolved_dt, DataType::Generic(inner) if inner == g) {
@@ -1125,7 +1092,6 @@ pub(crate) fn datatype(
                     types,
                     resolved_dt,
                     location,
-                    is_export,
                     parent_name,
                     prefix,
                     generics,
@@ -1169,8 +1135,6 @@ fn list_dt(
     types: &TypeCollection,
     l: &List,
     _location: Vec<Cow<'static, str>>,
-    // TODO: Remove this???
-    is_export: bool,
     generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     // TODO: This is the legacy stuff
@@ -1180,7 +1144,6 @@ fn list_dt(
             crate::legacy::ExportContext {
                 cfg: exporter,
                 path: vec![],
-                is_export,
             },
             &specta::datatype::FunctionReturnType::Value(l.ty().clone()),
             types,
@@ -1258,8 +1221,6 @@ fn map_dt(
     types: &TypeCollection,
     m: &Map,
     _location: Vec<Cow<'static, str>>,
-    // TODO: Remove
-    is_export: bool,
     generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     {
@@ -1290,7 +1251,6 @@ fn map_dt(
             crate::legacy::ExportContext {
                 cfg: exporter,
                 path: vec![],
-                is_export: true,
             },
             &specta::datatype::FunctionReturnType::Value(m.key_ty().clone()),
             types,
@@ -1302,7 +1262,6 @@ fn map_dt(
             crate::legacy::ExportContext {
                 cfg: exporter,
                 path: vec![],
-                is_export,
             },
             &specta::datatype::FunctionReturnType::Value(m.value_ty().clone()),
             types,
@@ -1332,8 +1291,6 @@ fn enum_dt(
     types: &TypeCollection,
     e: &Enum,
     _location: Vec<Cow<'static, str>>,
-    // TODO: Remove
-    is_export: bool,
     prefix: &str,
     generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
@@ -1343,7 +1300,6 @@ fn enum_dt(
             crate::legacy::ExportContext {
                 cfg: exporter,
                 path: vec![],
-                is_export,
             },
             e,
             types,
@@ -1770,8 +1726,6 @@ fn tuple_dt(
     types: &TypeCollection,
     t: &Tuple,
     _location: Vec<Cow<'static, str>>,
-    // TODO: Remove
-    is_export: bool,
     generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     {
@@ -1779,7 +1733,6 @@ fn tuple_dt(
             crate::legacy::ExportContext {
                 cfg: exporter,
                 path: vec![],
-                is_export,
             },
             t,
             types,
@@ -1814,14 +1767,12 @@ fn reference_dt(
     types: &TypeCollection,
     r: &Reference,
     location: Vec<Cow<'static, str>>,
-    // TODO: Remove
-    is_export: bool,
     prefix: &str,
     generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
     match r {
         Reference::Named(r) => {
-            reference_named_dt(s, exporter, types, r, location, is_export, prefix, generics)
+            reference_named_dt(s, exporter, types, r, location, prefix, generics)
         }
         Reference::Opaque(r) => reference_opaque_dt(s, exporter, types, r),
     }
@@ -1876,8 +1827,6 @@ fn reference_named_dt(
     types: &TypeCollection,
     r: &NamedReference,
     location: Vec<Cow<'static, str>>,
-    // TODO: Remove
-    is_export: bool,
     prefix: &str,
     generics: &[(Generic, DataType)],
 ) -> Result<(), Error> {
@@ -1897,7 +1846,6 @@ fn reference_named_dt(
                 types,
                 &resolved,
                 location,
-                is_export,
                 None,
                 prefix,
                 &combined_generics,
@@ -1959,7 +1907,6 @@ fn reference_named_dt(
                     crate::legacy::ExportContext {
                         cfg: exporter,
                         path: vec![],
-                        is_export,
                     },
                     &specta::datatype::FunctionReturnType::Value(v.clone()),
                     types,
