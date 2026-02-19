@@ -86,12 +86,16 @@ impl fmt::Debug for BrandedTypeImpl {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Exporter {
+    /// Custom header prepended to exported files.
     pub header: Cow<'static, str>,
     framework_runtime: Option<RuntimeFn>,
     pub(crate) branded_type_impl: Option<BrandedTypeImpl>,
     framework_prelude: Cow<'static, str>,
+    /// Strategy for exporting Rust bigint-compatible primitives.
     pub bigint: BigIntExportBehavior,
+    /// Output layout mode for generated TypeScript.
     pub layout: Layout,
+    /// Optional Serde compatibility processing mode.
     pub serde: Option<SerdeMode>,
     pub(crate) jsdoc: bool,
 }
@@ -496,6 +500,7 @@ pub struct FrameworkExporter<'a> {
     has_manually_exported_user_types: &'a mut bool,
     // For `Layout::Files` we need to inject the value
     files_root_types: &'a str,
+    /// Collected types currently being exported.
     pub types: &'a TypeCollection,
 }
 

@@ -12,7 +12,9 @@ use super::{DataType, Generic};
 /// This can either an [NamedReference] or [OpaqueReference].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Reference {
+    /// A reference to a named type collected in a [`TypeCollection`].
     Named(NamedReference),
+    /// A reference to an opaque exporter-specific type.
     Opaque(OpaqueReference),
 }
 
@@ -126,14 +128,17 @@ impl hash::Hash for OpaqueReference {
 }
 
 impl OpaqueReference {
+    /// Get the Rust type name of the stored opaque state.
     pub fn type_name(&self) -> &'static str {
         self.0.type_name()
     }
 
+    /// Get the [`TypeId`] of the stored opaque state.
     pub fn type_id(&self) -> TypeId {
         self.0.as_any().type_id()
     }
 
+    /// Attempt to downcast the opaque state to `T`.
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.0.as_any().downcast_ref::<T>()
     }

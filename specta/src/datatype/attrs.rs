@@ -115,7 +115,12 @@ pub enum RuntimeMeta {
     /// A key-value pair (e.g., `rename = "value"`, `default = 42`, `with = module::path`).
     ///
     /// Used when an attribute option needs an associated value.
-    NameValue { key: String, value: RuntimeValue },
+    NameValue {
+        /// The option key (for example `rename` or `default`).
+        key: String,
+        /// The option value associated with [`Self::NameValue::key`].
+        value: RuntimeValue,
+    },
 
     /// A list of nested metadata items (e.g., the contents of `#[serde(...)]`).
     ///

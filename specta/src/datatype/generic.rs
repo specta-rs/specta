@@ -18,6 +18,7 @@ use super::DataType;
 pub struct Generic(pub(crate) Cow<'static, str>);
 
 impl Generic {
+    /// Construct a generic placeholder by name.
     pub fn new(name: impl Into<Cow<'static, str>>) -> Self {
         Self(Into::into(name))
     }
@@ -50,6 +51,7 @@ impl From<Generic> for DataType {
 
 /// A generic placeholder.
 pub trait ConstGenericPlaceholder {
+    /// Static identifier used when rendering this generic placeholder.
     const PLACEHOLDER: &'static str;
 }
 

@@ -707,11 +707,9 @@ impl SerdeTransformer {
                     .filter_map(|f| f.ty().cloned())
                     .collect();
 
-                let content_type = if tuple_types.len() == 1 {
-                    // Single field: unwrap tuple
-                    tuple_types.into_iter().next().unwrap()
+                let content_type = if let [single] = tuple_types.as_slice() {
+                    single.clone()
                 } else {
-                    // Multiple fields: keep as tuple
                     DataType::Tuple(Tuple::new(tuple_types))
                 };
 

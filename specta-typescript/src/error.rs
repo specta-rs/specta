@@ -12,18 +12,23 @@ use super::legacy::ExportPath;
 pub enum Error {
     /// Attempted to export a bigint type but the configuration forbids it.
     BigIntForbidden {
+        /// Path to the item being exported.
         path: String,
     },
     /// Failed to validate a type is Serde compatible.
     Serde(specta_serde::Error),
     /// A type's name conflicts with a reserved keyword in Typescript.
     ForbiddenName {
+        /// Path to the item being exported.
         path: String,
+        /// The reserved keyword that caused the failure.
         name: &'static str,
     },
     /// A type's name contains invalid characters or is not valid.
     InvalidName {
+        /// Path to the item being exported.
         path: String,
+        /// The invalid name encountered during export.
         name: Cow<'static, str>,
     },
     /// Detected multiple items within the same scope with the same name.
@@ -32,7 +37,9 @@ pub enum Error {
     /// Using anything other than [Layout::FlatFile] should make this basically impossible.
     DuplicateTypeName {
         // TODO: Flatten tuple into fields.
+        /// The conflicting symbols (type/module/import) that share a name.
         types: (TypeOrModuleOrImport, TypeOrModuleOrImport),
+        /// The duplicated name.
         name: Cow<'static, str>,
     },
     /// An filesystem IO error.
@@ -40,22 +47,30 @@ pub enum Error {
     Io(io::Error),
     /// Failed to read a directory while exporting files.
     ReadDir {
+        /// Directory path that failed to be read.
         path: PathBuf,
+        /// The underlying IO error.
         source: io::Error,
     },
     /// Failed to inspect filesystem metadata while exporting files.
     Metadata {
+        /// Path whose metadata lookup failed.
         path: PathBuf,
+        /// The underlying IO error.
         source: io::Error,
     },
     /// Failed to remove a stale file while exporting files.
     RemoveFile {
+        /// File path that failed to be removed.
         path: PathBuf,
+        /// The underlying IO error.
         source: io::Error,
     },
     /// Failed to remove an empty directory while exporting files.
     RemoveDir {
+        /// Directory path that failed to be removed.
         path: PathBuf,
+        /// The underlying IO error.
         source: io::Error,
     },
     /// Found an opaque reference which the Typescript exporter doesn't know how to handle.
@@ -63,6 +78,7 @@ pub enum Error {
     UnsupportedOpaqueReference(OpaqueReference),
     /// Found a named reference that cannot be resolved from the provided [`TypeCollection`](specta::TypeCollection).
     DanglingNamedReference {
+        /// Debug identifier for the unresolved reference.
         reference: String,
     },
     /// An error occurred in your exporter framework.
@@ -74,22 +90,30 @@ pub enum Error {
     //
     //
     // #[error("Attempted to export '{0}' but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!")]
+    /// Legacy bigint-export failure variant.
     BigIntForbiddenLegacy(ExportPath),
     // #[error("Attempted to export '{0}' but was unable to export a tagged type which is unnamed")]
     // UnableToTagUnnamedType(ExportPath),
     // #[error("Attempted to export '{1}' but was unable to due to {0} name '{2}' conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`")]
+    /// Legacy reserved-name failure variant.
     ForbiddenNameLegacy(NamedLocation, ExportPath, &'static str),
     // #[error("Attempted to export '{1}' but was unable to due to {0} name '{2}' containing an invalid character")]
+    /// Legacy invalid-name failure variant.
     InvalidNameLegacy(NamedLocation, ExportPath, String),
     // #[error("Attempted to export '{0}' with tagging but the type is not tagged.")]
+    /// Legacy invalid-tagging failure variant.
     InvalidTaggingLegacy(ExportPath),
     // #[error("Attempted to export '{0}' with internal tagging but the variant is a tuple struct.")]
+    /// Legacy internally tagged tuple-variant failure variant.
     InvalidTaggedVariantContainingTupleStructLegacy(ExportPath),
     // #[error("Unable to export type named '{0}' from locations")]
     // TODO: '{:?}' '{:?}'", .1.as_str(), .2.as_str())
+    /// Legacy duplicate type name failure variant.
     DuplicateTypeNameLegacy(Cow<'static, str>, Location<'static>, Location<'static>),
     // #[error("fmt error: {0}")]
+    /// Legacy formatter error.
     FmtLegacy(std::fmt::Error),
+    /// Export layout is incompatible with the requested operation.
     UnableToExport(Layout),
 }
 
@@ -204,11 +228,15 @@ impl fmt::Display for Error {
 
 impl error::Error for Error {}
 
+/// A source location used when describing duplicate names.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum TypeOrModuleOrImport {
+    /// A Rust type declaration location.
     Type(Location<'static>),
+    /// A generated module path.
     Module(Cow<'static, str>),
+    /// A generated import path.
     Import(Cow<'static, str>),
 }
 

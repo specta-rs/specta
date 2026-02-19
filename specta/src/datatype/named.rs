@@ -238,6 +238,7 @@ impl NamedDataType {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
+/// Runtime representation of Rust's `#[deprecated]` metadata.
 pub enum DeprecatedType {
     /// A type that has been deprecated without a message.
     ///
@@ -247,7 +248,9 @@ pub enum DeprecatedType {
     ///
     /// Eg. `#[deprecated = "Use something else"]` or `#[deprecated(since = "1.0.0", message = "Use something else")]`
     DeprecatedWithSince {
+        /// Optional version string from `since = "..."`.
         since: Option<Cow<'static, str>>,
+        /// Deprecation note/message.
         note: Cow<'static, str>,
     },
 }

@@ -45,6 +45,7 @@ pub enum Fields {
     Named(NamedFields),
 }
 
+/// Field metadata for a struct field or enum variant field.
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Field {
     /// Did the user apply a `#[specta(optional)]` attribute.

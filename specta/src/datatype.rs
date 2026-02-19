@@ -37,13 +37,22 @@ pub(crate) use reference::NamedId;
 /// A language exporter takes this general format and converts it into a language specific syntax.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DataType {
+    /// A primitive scalar type like integers, floats, booleans, chars, or strings.
     Primitive(Primitive),
+    /// A sequential collection type.
     List(List),
+    /// A map/dictionary type.
     Map(Map),
+    /// A nullable wrapper around another type.
     Nullable(Box<DataType>),
+    /// A struct type with named, unnamed, or unit fields.
     Struct(Struct),
+    /// An enum type.
     Enum(Enum),
+    /// A tuple type.
     Tuple(Tuple),
+    /// A reference to another named or opaque type.
     Reference(Reference),
+    /// A generic placeholder type parameter.
     Generic(Generic),
 }
