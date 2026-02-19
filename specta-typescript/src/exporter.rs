@@ -329,6 +329,7 @@ impl Exporter {
                 for module_path in import_paths {
                     s.push('\n');
                     s.push_str(&module_import_statement(
+                        exporter,
                         module.module_path.as_ref(),
                         &module_path,
                     ));
@@ -427,7 +428,7 @@ impl Exporter {
                     let import_count = import_paths.len();
 
                     for module_path in import_paths {
-                        let import_statement = module_import_statement("", &module_path);
+                        let import_statement = module_import_statement(self, "", &module_path);
                         if !body.contains(&import_statement) {
                             out.push('\n');
                             out.push_str(&import_statement);
@@ -875,9 +876,12 @@ pub(crate) fn module_alias(module_path: &str) -> String {
     }
 }
 
-fn module_import_statement(from_module_path: &str, to_module_path: &str) -> String {
+fn module_import_statement(exporter: &Exporter, from_module_path: &str, to_module_path: &str) -> String {
+    let import_keyword = if exporter.jsdoc { "import" } else { "import type" };
+
     format!(
-        "import type * as {} from \"{}\";",
+        "{} * as {} from \"{}\";",
+        import_keyword,
         module_alias(to_module_path),
         module_import_path(from_module_path, to_module_path)
     )
