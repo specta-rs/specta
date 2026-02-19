@@ -22,23 +22,16 @@ use crate::{
     opaque,
 };
 
-/// Generate an `export Type = ...` Typescript string for a specific [`NamedDataType`].
+/// Generate a group of `export Type = ...` Typescript string for a specific [`NamedDataType`].
 ///
 /// This method leaves the following up to the implementer:
 ///  - Ensuring all referenced types are exported
 ///  - Handling multiple type with overlapping names
 ///  - Transforming the type for your serialization format (Eg. Serde)
 ///
-pub fn export(
-    exporter: &dyn AsRef<Exporter>,
-    types: &TypeCollection,
-    ndt: &NamedDataType,
-) -> Result<String, Error> {
-    export_many(exporter, types, iter::once(ndt))
-}
-
-/// Generate a Typescript or JSDoc string for many [`NamedDataType`] definitions.
-pub fn export_many<'a>(
+/// We recommend passing in your types in bulk instead of doing individual calls as it leaves formatting to us and also for JSDoc we can merge them into a single large JSDoc comment.
+///
+pub fn export<'a>(
     exporter: &dyn AsRef<Exporter>,
     types: &TypeCollection,
     ndts: impl Iterator<Item = &'a NamedDataType>,

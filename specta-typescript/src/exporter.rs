@@ -533,11 +533,6 @@ impl FrameworkExporter<'_> {
         Ok(Cow::Owned(s))
     }
 
-    /// [primitives::export]
-    pub fn export(&self, ndt: &NamedDataType) -> Result<String, Error> {
-        primitives::export(self, self.types, ndt)
-    }
-
     /// [primitives::inline]
     pub fn inline(&self, dt: &DataType) -> Result<String, Error> {
         primitives::inline(self, self.types, dt)
@@ -546,6 +541,14 @@ impl FrameworkExporter<'_> {
     /// [primitives::reference]
     pub fn reference(&self, r: &Reference) -> Result<String, Error> {
         primitives::reference(self, self.types, r)
+    }
+
+    /// [primitives::export]
+    pub fn export<'a>(
+        &self,
+        ndts: impl Iterator<Item = &'a NamedDataType>,
+    ) -> Result<String, Error> {
+        primitives::export(self, self.types, ndts)
     }
 }
 
@@ -876,8 +879,16 @@ pub(crate) fn module_alias(module_path: &str) -> String {
     }
 }
 
-fn module_import_statement(exporter: &Exporter, from_module_path: &str, to_module_path: &str) -> String {
-    let import_keyword = if exporter.jsdoc { "import" } else { "import type" };
+fn module_import_statement(
+    exporter: &Exporter,
+    from_module_path: &str,
+    to_module_path: &str,
+) -> String {
+    let import_keyword = if exporter.jsdoc {
+        "import"
+    } else {
+        "import type"
+    };
 
     format!(
         "{} * as {} from \"{}\";",
