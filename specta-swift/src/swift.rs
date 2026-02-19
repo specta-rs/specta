@@ -193,7 +193,7 @@ impl Swift {
 
         // Export types
         for ndt in types.into_sorted_iter() {
-            result.push_str(&export_type(self, types, &ndt)?);
+            result.push_str(&export_type(self, types, ndt)?);
             result.push_str("\n\n");
         }
 

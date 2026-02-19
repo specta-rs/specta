@@ -54,7 +54,6 @@ mod functions {
     #[doc(hidden)]
     /// A helper for exporting a command to a [`CommandDataType`].
     /// You shouldn't use this directly and instead should use [`fn_datatype!`](crate::fn_datatype).
-    #[allow(clippy::too_many_arguments)]
     pub fn get_fn_datatype<TMarker, T: SpectaFn<TMarker>>(
         _: T,
         asyncness: bool,

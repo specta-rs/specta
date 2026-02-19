@@ -3,8 +3,8 @@ members = ["specta", "specta-*", "tests"]
 resolver = "2"
 
 [workspace.lints.rust]
-# unsafe_code = { level = "forbid", priority = -1 } # The `export` feature uses unsafe.
-# missing_docs = { level = "warn", priority = -1 } # TODO: Enable this
+unsafe_code = { level = "forbid", priority = -1 }
+missing_docs = { level = "warn", priority = -1 }
 
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(is_nightly)'] }
 
@@ -15,6 +15,7 @@ unwrap_used = { level = "warn", priority = -1 }
 panic = { level = "warn", priority = -1 }
 todo = { level = "warn", priority = -1 }
 panic_in_result_fn = { level = "warn", priority = -1 }
+too_many_arguments = { level = "allow", priority = 0 }
 
 [profile.dev.package]
 insta.opt-level = 3

@@ -130,7 +130,7 @@ pub fn apply_serde_transformations(
 /// Apply serde transformations to a DataType with a type name (for struct tagging)
 pub fn apply_serde_transformations_with_name(
     datatype: &DataType,
-    type_name: &Cow<'static, str>,
+    type_name: &str,
     mode: SerdeMode,
 ) -> Result<DataType, Error> {
     let mut transformer = SerdeTransformer::new(mode, Some(type_name.to_string()));
@@ -543,7 +543,7 @@ impl SerdeTransformer {
     fn apply_enum_tagging(
         &self,
         repr: &EnumRepr,
-        variant_name: &Cow<'static, str>,
+        variant_name: &str,
         fields: Fields,
     ) -> Result<Fields, Error> {
         match repr {
@@ -582,11 +582,7 @@ impl SerdeTransformer {
         use specta::datatype::Field;
 
         // Get the struct name from the transformer
-        let struct_name = self
-            .type_name
-            .as_ref()
-            .map(|s| s.as_str())
-            .unwrap_or("Unknown");
+        let struct_name = self.type_name.as_deref().unwrap_or("Unknown");
         let tag_type = Self::create_literal_string_type(struct_name);
 
         match fields {
@@ -615,7 +611,7 @@ impl SerdeTransformer {
     fn add_tag_field(
         &self,
         tag_name: &str,
-        variant_name: &Cow<'static, str>,
+        variant_name: &str,
         fields: Fields,
     ) -> Result<Fields, Error> {
         use specta::datatype::Field;
@@ -663,7 +659,7 @@ impl SerdeTransformer {
         &self,
         tag_name: &str,
         content_name: &str,
-        variant_name: &Cow<'static, str>,
+        variant_name: &str,
         fields: Fields,
     ) -> Result<Fields, Error> {
         use specta::datatype::Field;

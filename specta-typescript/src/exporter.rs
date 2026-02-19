@@ -284,7 +284,6 @@ impl Exporter {
             Cow::Borrowed(types)
         };
 
-        #[allow(clippy::too_many_arguments)]
         fn export(
             exporter: &Exporter,
             types: &TypeCollection,

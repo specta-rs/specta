@@ -471,7 +471,6 @@ pub fn reference(
     Ok(s)
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn datatype_with_inline_attr(
     s: &mut String,
     exporter: &Exporter,
@@ -522,7 +521,6 @@ fn merged_generics(
         .collect()
 }
 
-#[allow(clippy::too_many_arguments)]
 fn shallow_inline_datatype(
     s: &mut String,
     exporter: &Exporter,
@@ -818,7 +816,6 @@ fn resolve_generics_in_datatype(dt: &DataType, generics: &[(Generic, DataType)])
 }
 
 // Internal function to handle inlining without cloning DataType nodes
-#[allow(clippy::too_many_arguments)]
 fn inline_datatype(
     s: &mut String,
     exporter: &Exporter,
@@ -1029,7 +1026,6 @@ fn inline_datatype(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn datatype(
     s: &mut String,
     exporter: &Exporter,
