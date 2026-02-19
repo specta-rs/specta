@@ -323,20 +323,16 @@ impl Exporter {
                 })
                 .filter(|module_path| module_path != module.module_path.as_ref())
                 .collect::<BTreeSet<_>>();
-
-            let import_count = import_paths.len();
             if !import_paths.is_empty() {
-                for module_path in import_paths {
-                    s.push('\n');
-                    s.push_str(&module_import_statement(
-                        exporter,
-                        module.module_path.as_ref(),
-                        &module_path,
-                    ));
-                }
+                s.push('\n');
+                s.push_str(&module_import_block(
+                    exporter,
+                    module.module_path.as_ref(),
+                    &import_paths,
+                ));
             }
 
-            if import_count > 0 && !rendered_types.is_empty() {
+            if !import_paths.is_empty() && !rendered_types.is_empty() {
                 s.push('\n');
             }
 
@@ -425,19 +421,22 @@ impl Exporter {
                         })
                         .filter(|module_path| !module_path.is_empty())
                         .collect::<BTreeSet<_>>();
-                    let import_count = import_paths.len();
 
-                    for module_path in import_paths {
-                        let import_statement = module_import_statement(self, "", &module_path);
-                        if !body.contains(&import_statement) {
-                            out.push('\n');
-                            out.push_str(&import_statement);
-                        }
+                    let import_paths = import_paths
+                        .into_iter()
+                        .filter(|module_path| {
+                            !body.contains(&module_import_statement(self, "", module_path))
+                        })
+                        .collect::<BTreeSet<_>>();
+
+                    if !import_paths.is_empty() {
+                        out.push('\n');
+                        out.push_str(&module_import_block(self, "", &import_paths));
                     }
 
                     if !body.is_empty() {
                         out.push('\n');
-                        if import_count > 0 {
+                        if !import_paths.is_empty() {
                             out.push('\n');
                         }
                         out.push_str(&body);
@@ -896,6 +895,33 @@ fn module_import_statement(
         module_alias(to_module_path),
         module_import_path(from_module_path, to_module_path)
     )
+}
+
+fn module_import_block(
+    exporter: &Exporter,
+    from_module_path: &str,
+    import_paths: &BTreeSet<String>,
+) -> String {
+    if exporter.jsdoc {
+        let mut out = String::from("/**\n");
+
+        for module_path in import_paths {
+            out.push_str(" * @typedef {import(\"");
+            out.push_str(&module_import_path(from_module_path, module_path));
+            out.push_str("\")} ");
+            out.push_str(&module_alias(module_path));
+            out.push('\n');
+        }
+
+        out.push_str(" */");
+        out
+    } else {
+        import_paths
+            .iter()
+            .map(|module_path| module_import_statement(exporter, from_module_path, module_path))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
 }
 
 fn module_import_path(from_module_path: &str, to_module_path: &str) -> String {
