@@ -77,8 +77,7 @@ pub(crate) fn export_internal<'a>(
             s.push('\n');
         }
 
-        s.push_str(indent);
-        export_single_internal(s, exporter, types, ndt)?;
+        export_single_internal(s, exporter, types, ndt, indent)?;
     }
 
     Ok(())
@@ -89,9 +88,17 @@ fn export_single_internal(
     exporter: &Exporter,
     types: &TypeCollection,
     ndt: &NamedDataType,
+    indent: &str,
 ) -> Result<(), Error> {
     if exporter.jsdoc {
-        return typedef_internal(s, exporter, types, ndt);
+        let mut typedef = String::new();
+        typedef_internal(&mut typedef, exporter, types, ndt)?;
+        for line in typedef.lines() {
+            s.push_str(indent);
+            s.push_str(line);
+            s.push('\n');
+        }
+        return Ok(());
     }
 
     let generics = (!ndt.generics().is_empty())
@@ -122,8 +129,17 @@ fn export_single_internal(
         },
     )?;
 
-    js_doc(s, ndt.docs(), ndt.deprecated());
+    let mut comments = String::new();
+    js_doc(&mut comments, ndt.docs(), ndt.deprecated());
+    if !comments.is_empty() {
+        for line in comments.lines() {
+            s.push_str(indent);
+            s.push_str(line);
+            s.push('\n');
+        }
+    }
 
+    s.push_str(indent);
     s.push_str("export type ");
     s.push_str(&name);
     for part in generics {
@@ -139,7 +155,7 @@ fn export_single_internal(
         vec![ndt.name().clone()],
         true,
         Some(ndt.name()),
-        "",
+        indent,
         Default::default(),
     )?;
     s.push_str(";\n");
