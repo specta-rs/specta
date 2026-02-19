@@ -420,7 +420,7 @@ Seventh: export type Seventh = {
 
 Eight: export type Eight = { A: string } | "B";
 
-Tenth: export type Tenth = string | "B" | {
+Tenth: export type Tenth = string | null | {
 	a: string,
 } | First;
 
@@ -460,7 +460,7 @@ InternallyTaggedI: export type InternallyTaggedI = InternallyTaggedIInner;
 
 InternallyTaggedL: export type InternallyTaggedL = A | B;
 
-InternallyTaggedM: export type InternallyTaggedM = "A" | "B";
+InternallyTaggedM: export type InternallyTaggedM = { type: "A" };
 
 StructWithAlias: export type StructWithAlias = {
 	field: string,

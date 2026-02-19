@@ -325,7 +325,7 @@ export type GenericTuple<T> = [T, T[], T[][]];
 
 export type GenericTupleStruct<T> = T;
 
-export type GenericType<T> = "Undefined" | T;
+export type GenericType<T> = null | T;
 
 export type HasGenericAlias = { [key in number]: string };
 
@@ -408,7 +408,7 @@ export type InternallyTaggedLInner = { type: "A" } | { type: "B" };
 
 export type InternallyTaggedM = { type: "A" };
 
-export type InternallyTaggedMInner = "A" | "B";
+export type InternallyTaggedMInner = null;
 
 export type InternallyTaggedWithAlias = { type: "A"; field: string } | { type: "B"; other: number };
 
@@ -852,7 +852,7 @@ export type SkipVariant2 = { tag: "A"; data: string };
 
 export type SkipVariant3 = { A: { a: string } };
 
-export type SkippedFieldWithinVariant = { type: "A"; data: null } | { type: "B"; data: string };
+export type SkippedFieldWithinVariant = { type: "A" } | { type: "B"; data: string };
 
 export type SpectaSkipNonTypeField = {
 	a: number,
@@ -899,7 +899,7 @@ export type TaggedEnumOfUnitStruct = { a: "A" } | { a: "B" };
 
 export type TaggedStructOfStructWithTuple = { a: "A" } | { a: "B" };
 
-export type Tenth = string | "B" | {
+export type Tenth = string | null | {
 	a: string,
 } | First;
 

@@ -297,7 +297,7 @@ fn append_jsdoc_properties(
                     &one_variant_enum,
                     types,
                     &mut variant_ty,
-                    "\t",
+                    "",
                     &[],
                 )?;
 
@@ -329,7 +329,7 @@ fn push_jsdoc_property(
 ) {
     s.push_str(indent);
     s.push_str("\t* @property {");
-    s.push_str(ty);
+    push_jsdoc_type(s, ty, indent);
     s.push_str("} ");
     s.push_str(&jsdoc_property_name(name, optional));
 
@@ -339,6 +339,28 @@ fn push_jsdoc_property(
     }
 
     s.push('\n');
+}
+
+fn push_jsdoc_type(s: &mut String, ty: &str, indent: &str) {
+    let mut lines = ty.lines();
+    if let Some(first_line) = lines.next() {
+        s.push_str(first_line);
+    }
+
+    for line in lines {
+        s.push('\n');
+
+        if line
+            .strip_prefix(indent)
+            .is_some_and(|rest| rest.starts_with("\t*"))
+        {
+            s.push_str(line);
+        } else {
+            s.push_str(indent);
+            s.push_str("\t* ");
+            s.push_str(line);
+        }
+    }
 }
 
 fn jsdoc_property_name(name: &str, optional: bool) -> String {
@@ -420,7 +442,7 @@ fn append_typedef_body(
 
     s.push_str(indent);
     s.push_str("\t* @typedef {");
-    s.push_str(&typedef_ty);
+    push_jsdoc_type(s, &typedef_ty, indent);
     s.push_str("} ");
     s.push_str(&type_name);
     s.push('\n');

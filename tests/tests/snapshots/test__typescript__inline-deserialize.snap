@@ -335,7 +335,7 @@ Seventh: {
 	b: Second,
 }
 Eight: { A: string } | "B"
-Tenth: string | "B" | {
+Tenth: string | null | {
 	a: string,
 } | First
 MyEnumTagged: (First)
@@ -356,7 +356,7 @@ InternallyTaggedG: InternallyTaggedGInner
 InternallyTaggedH: InternallyTaggedHInner
 InternallyTaggedI: InternallyTaggedIInner
 InternallyTaggedL: A | B
-InternallyTaggedM: "A" | "B"
+InternallyTaggedM: { type: "A" }
 StructWithAlias: {
 	field: string,
 }

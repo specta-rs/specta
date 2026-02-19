@@ -35,27 +35,27 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {GenericType<string>} a
 	*
 	* @typedef {{ t: "A" } | { t: "B"; c: {
-	id: string,
-	method: string,
-} } | { t: "C"; c: string }} AdjacentlyTagged
+	* 	id: string,
+	* 	method: string,
+	* } } | { t: "C"; c: string }} AdjacentlyTagged
 	* @property {{ t: "A" }} A
 	* @property {{ t: "B"; c: {
-	id: string,
-	method: string,
-} }} B
+	* 	id: string,
+	* 	method: string,
+	* } }} B
 	* @property {{ t: "C"; c: string }} C
 	*
 	* @typedef {{ type: "A"; data: {
-	field: string,
-} } | { type: "B"; data: {
-	other: number,
-} }} AdjacentlyTaggedWithAlias
+	* 	field: string,
+	* } } | { type: "B"; data: {
+	* 	other: number,
+	* } }} AdjacentlyTaggedWithAlias
 	* @property {{ type: "A"; data: {
-	field: string,
-} }} A
+	* 	field: string,
+	* } }} A
 	* @property {{ type: "B"; data: {
-	other: number,
-} }} B
+	* 	other: number,
+	* } }} B
 	*
 	* @typedef {{
 	*		b: number,
@@ -393,19 +393,19 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @typedef {T} GenericTupleStruct<T>
 	* @property {T} "0"
 	*
-	* @typedef {"Undefined" | T} GenericType<T>
-	* @property {"Undefined"} Undefined
+	* @typedef {null | T} GenericType<T>
+	* @property {null} Undefined
 	* @property {T} Value
 	*
 	* @typedef {{ [key in number]: string }} HasGenericAlias
 	* @property {{ [key in number]: string }} "0"
 	*
 	* @typedef {{ A: {
-	a: string,
-} }} InlineEnumField
+	* 	a: string,
+	* } }} InlineEnumField
 	* @property {{ A: {
-	a: string,
-} }} A
+	* 	a: string,
+	* } }} A
 	*
 	* @typedef {(InlineFlattenGenericsG<string>) & {
 	*		g: InlineFlattenGenericsG<string>,
@@ -509,9 +509,9 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @typedef {{ type: "A" }} InternallyTaggedM
 	* @property {{ type: "A" }} A
 	*
-	* @typedef {"A" | "B"} InternallyTaggedMInner
-	* @property {"A"} A
-	* @property {"B"} B
+	* @typedef {null} InternallyTaggedMInner
+	* @property {null} A
+	* @property {null} B
 	*
 	* @typedef {{ type: "A"; field: string } | { type: "B"; other: number }} InternallyTaggedWithAlias
 	* @property {{ type: "A"; field: string }} A
@@ -542,25 +542,25 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {string} "test-ing"
 	*
 	* @typedef {{ event: "started"; data: {
-	projectName: string,
-} } | { event: "progressTest"; data: {
-	projectName: string,
-	status: string,
-	progress: number,
-} } | { event: "finished"; data: {
-	projectName: string,
-} }} LoadProjectEvent
+	* 	projectName: string,
+	* } } | { event: "progressTest"; data: {
+	* 	projectName: string,
+	* 	status: string,
+	* 	progress: number,
+	* } } | { event: "finished"; data: {
+	* 	projectName: string,
+	* } }} LoadProjectEvent
 	* @property {{ event: "started"; data: {
-	projectName: string,
-} }} started
+	* 	projectName: string,
+	* } }} started
 	* @property {{ event: "progressTest"; data: {
-	projectName: string,
-	status: string,
-	progress: number,
-} }} progressTest
+	* 	projectName: string,
+	* 	status: string,
+	* 	progress: number,
+	* } }} progressTest
 	* @property {{ event: "finished"; data: {
-	projectName: string,
-} }} finished
+	* 	projectName: string,
+	* } }} finished
 	*
 	* @typedef {{ Demo: string } | { Demo2: { demo2: string } }} MacroEnum
 	* @property {{ Demo: string }} Demo
@@ -1276,8 +1276,8 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @typedef {{ A: { a: string } }} SkipVariant3
 	* @property {{ A: { a: string } }} A
 	*
-	* @typedef {{ type: "A"; data: null } | { type: "B"; data: string }} SkippedFieldWithinVariant
-	* @property {{ type: "A"; data: null }} A
+	* @typedef {{ type: "A" } | { type: "B"; data: string }} SkippedFieldWithinVariant
+	* @property {{ type: "A" }} A
 	* @property {{ type: "B"; data: string }} B
 	*
 	* @typedef {{
@@ -1346,14 +1346,14 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {{ a: "A" }} A
 	* @property {{ a: "B" }} B
 	*
-	* @typedef {string | "B" | {
-	a: string,
-} | First} Tenth
+	* @typedef {string | null | {
+	* 	a: string,
+	* } | First} Tenth
 	* @property {string} A
-	* @property {"B"} B
+	* @property {null} B
 	* @property {{
-	a: string,
-}} C
+	* 	a: string,
+	* }} C
 	* @property {First} D
 	*
 	* @typedef {"Unit" | { Single: number } | { Multiple: [number, number] } | { Struct: { a: number } }} TestEnum

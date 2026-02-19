@@ -640,10 +640,7 @@ pub(crate) fn enum_datatype(
                         }
                     },
                     specta_serde::EnumRepr::Untagged => match &variant.fields() {
-                        Fields::Unit => {
-                            let sanitised_name = sanitise_key(variant_name.clone(), true);
-                            sanitised_name.to_string()
-                        }
+                        Fields::Unit => NULL.to_string(),
                         _ => {
                             let ts_values = enum_variant_datatype(
                                 ctx.with(PathItem::Variant(variant_name.clone())),
@@ -674,7 +671,31 @@ pub(crate) fn enum_datatype(
                             generics,
                         )?;
 
-                        ts_values.unwrap_or_else(|| "never".to_string())
+                        let ts_values = ts_values.unwrap_or_else(|| "never".to_string());
+
+                        // `primitives::{export, inline}` can be called on untransformed `DataType`s.
+                        // In that mode, an internally tagged enum variant with an inlined untagged
+                        // enum of unit variants can collapse to `null` (eg `InternallyTaggedM`).
+                        // Preserve the internal tag wrapper for this case so the output shape
+                        // remains `{ tag: "Variant" }`.
+                        if matches!(repr, specta_serde::EnumRepr::Internal { .. })
+                            && ts_values == NULL
+                            && matches!(
+                                variant.fields(),
+                                Fields::Unnamed(unnamed)
+                                    if unnamed.fields().iter().any(|field| field.inline())
+                            )
+                        {
+                            if let specta_serde::EnumRepr::Internal { tag } = &repr {
+                                let tag = sanitise_key(tag.clone().into(), false);
+                                let variant_name = sanitise_key(variant_name.clone(), true);
+                                format!("{{ {tag}: {variant_name} }}")
+                            } else {
+                                unreachable!("matched above")
+                            }
+                        } else {
+                            ts_values
+                        }
                     }
                 },
                 true,

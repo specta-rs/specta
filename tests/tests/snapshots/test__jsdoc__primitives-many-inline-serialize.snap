@@ -92,11 +92,11 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {{ D: { a: string; b: number } }} D
 	*
 	* @typedef {{ A: {
-	a: string,
-} }} InlineEnumField
+	* 	a: string,
+	* } }} InlineEnumField
 	* @property {{ A: {
-	a: string,
-} }} A
+	* 	a: string,
+	* } }} A
 	*
 	* @typedef {{
 	*		optional_field: {
@@ -497,14 +497,14 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {{ A: string }} A
 	* @property {"B"} B
 	*
-	* @typedef {string | "B" | {
-	a: string,
-} | First} Tenth
+	* @typedef {string | null | {
+	* 	a: string,
+	* } | First} Tenth
 	* @property {string} A
-	* @property {"B"} B
+	* @property {null} B
 	* @property {{
-	a: string,
-}} C
+	* 	a: string,
+	* }} C
 	* @property {First} D
 	*
 	* @typedef {(First)} MyEnumTagged
@@ -565,8 +565,8 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @typedef {A | B} InternallyTaggedL
 	* @property {A | B} A
 	*
-	* @typedef {"A" | "B"} InternallyTaggedM
-	* @property {"A" | "B"} A
+	* @typedef {{ type: "A" }} InternallyTaggedM
+	* @property {{ type: "A" }} A
 	*
 	* @typedef {{
 	*		field: string,

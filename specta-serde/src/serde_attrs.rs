@@ -358,12 +358,34 @@ impl SerdeTransformer {
                 let mut transformed_fields = Vec::new();
 
                 for (idx, field) in unnamed.fields().iter().enumerate() {
-                    if let Some(field_ty) = field.ty() {
-                        let transformed_ty = self.transform_datatype(field_ty)?;
-                        let mut new_field = field.clone();
-                        new_field.set_ty(transformed_ty);
+                    let field_attrs = parse_field_serde_attributes(field.attributes())?;
+
+                    if self.should_skip_field(&field_attrs) {
+                        let new_field = internal::construct::field(
+                            field.optional(),
+                            field.deprecated().cloned(),
+                            field.docs().clone(),
+                            field.inline(),
+                            field.attributes().clone(),
+                            None,
+                        );
                         transformed_fields.push((idx, new_field));
+                        continue;
                     }
+
+                    let new_field = match field.ty().cloned() {
+                        Some(field_ty) => {
+                            let transformed_ty = self.transform_datatype(&field_ty)?;
+                            let mut new_field = field.clone();
+                            new_field.set_ty(transformed_ty);
+                            new_field
+                        }
+                        // Keep previous behavior for `#[specta(skip)]` fields that were
+                        // lowered to `ty = None` by the macro.
+                        None => continue,
+                    };
+
+                    transformed_fields.push((idx, new_field));
                 }
 
                 Ok(internal::construct::fields_unnamed(
@@ -693,6 +715,8 @@ impl SerdeTransformer {
                 Ok(internal::construct::fields_named(new_fields, vec![]))
             }
             Fields::Unnamed(unnamed) => {
+                use specta::datatype::skip_fields;
+
                 // Tuple variant: { tag: "VariantName", content: tuple }
                 let mut new_fields = vec![];
 
@@ -701,11 +725,15 @@ impl SerdeTransformer {
                 new_fields.push((Cow::Owned(tag_name.to_string()), tag_field));
 
                 // Wrap tuple fields as content
-                let tuple_types: Vec<DataType> = unnamed
-                    .fields()
-                    .iter()
-                    .filter_map(|f| f.ty().cloned())
+                let tuple_types: Vec<DataType> = skip_fields(unnamed.fields())
+                    .map(|(_, ty)| ty.clone())
                     .collect();
+
+                // If all tuple fields are skipped, omit content.
+                // This keeps adjacently tagged output aligned with serde behavior.
+                if tuple_types.is_empty() && !unnamed.fields().is_empty() {
+                    return Ok(internal::construct::fields_named(new_fields, vec![]));
+                }
 
                 let content_type = if let [single] = tuple_types.as_slice() {
                     single.clone()
