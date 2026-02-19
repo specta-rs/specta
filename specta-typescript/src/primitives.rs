@@ -29,7 +29,7 @@ use crate::{
 ///  - Handling multiple type with overlapping names
 ///  - Transforming the type for your serialization format (Eg. Serde)
 ///
-/// We recommend passing in your types in bulk instead of doing individual calls as it leaves formatting to us and also for JSDoc we can merge them into a single large JSDoc comment.
+/// We recommend passing in your types in bulk instead of doing individual calls as it leaves formatting to us and also allows us to merge the JSDoc types into a single large comment.
 ///
 pub fn export<'a>(
     exporter: &dyn AsRef<Exporter>,
@@ -37,11 +37,11 @@ pub fn export<'a>(
     ndts: impl Iterator<Item = &'a NamedDataType>,
 ) -> Result<String, Error> {
     let mut s = String::new();
-    export_many_internal(&mut s, exporter.as_ref(), types, ndts, "")?;
+    export_internal(&mut s, exporter.as_ref(), types, ndts, "")?;
     Ok(s)
 }
 
-pub(crate) fn export_many_internal<'a>(
+pub(crate) fn export_internal<'a>(
     s: &mut String,
     exporter: &Exporter,
     types: &TypeCollection,
@@ -77,13 +77,13 @@ pub(crate) fn export_many_internal<'a>(
         }
 
         s.push_str(indent);
-        export_internal(s, exporter, types, ndt)?;
+        export_single_internal(s, exporter, types, ndt)?;
     }
 
     Ok(())
 }
 
-pub(crate) fn export_internal(
+fn export_single_internal(
     s: &mut String,
     exporter: &Exporter,
     types: &TypeCollection,
