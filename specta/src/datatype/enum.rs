@@ -90,7 +90,16 @@ impl EnumVariant {
     /// Construct a new struct enum variant with named fields.
     pub fn named() -> VariantBuilder<NamedFields> {
         VariantBuilder {
-            v: Self::unit(),
+            v: Self {
+                skip: false,
+                docs: "".into(),
+                deprecated: None,
+                fields: Fields::Named(NamedFields {
+                    fields: Default::default(),
+                    attributes: Default::default(),
+                }),
+                attributes: Vec::new(),
+            },
             variant: NamedFields {
                 fields: vec![],
                 attributes: vec![],
@@ -101,7 +110,16 @@ impl EnumVariant {
     /// Construct a new tuple enum variant without unnamed fields.
     pub fn unnamed() -> VariantBuilder<UnnamedFields> {
         VariantBuilder {
-            v: Self::unit(),
+            v: Self {
+                skip: false,
+                docs: "".into(),
+                deprecated: None,
+                fields: Fields::Unnamed(UnnamedFields {
+                    fields: Default::default(),
+                    attributes: Default::default(),
+                }),
+                attributes: Vec::new(),
+            },
             variant: UnnamedFields {
                 fields: Default::default(),
                 attributes: Default::default(),
