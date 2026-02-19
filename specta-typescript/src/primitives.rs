@@ -68,7 +68,7 @@ pub(crate) fn export_internal<'a>(
         }
 
         s.push_str(indent);
-        s.push_str("\t*/");
+        s.push_str("\t*/\n");
         return Ok(());
     }
 
