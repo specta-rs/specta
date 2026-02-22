@@ -751,7 +751,9 @@ impl SerdeTransformer {
 }
 
 /// Parse serde attributes from a vector of RuntimeAttribute
-fn parse_serde_attributes(attributes: &[RuntimeAttribute]) -> Result<SerdeAttributes, Error> {
+pub(crate) fn parse_serde_attributes(
+    attributes: &[RuntimeAttribute],
+) -> Result<SerdeAttributes, Error> {
     let mut attrs = SerdeAttributes::default();
 
     for attr in attributes {
