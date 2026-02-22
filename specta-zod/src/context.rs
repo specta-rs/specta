@@ -1,18 +1,17 @@
 use std::{borrow::Cow, fmt};
 
-use crate::{export_config::ExportConfig, ImplLocation};
+use crate::Zod;
 
 #[derive(Clone, Debug)]
 pub(crate) enum PathItem {
     Type(Cow<'static, str>),
-    TypeExtended(Cow<'static, str>, ImplLocation),
     Field(Cow<'static, str>),
     Variant(Cow<'static, str>),
 }
 
 #[derive(Clone)]
 pub(crate) struct ExportContext<'a> {
-    pub(crate) cfg: &'a ExportConfig,
+    pub(crate) cfg: &'a Zod,
     pub(crate) path: Vec<PathItem>,
     // `false` when inline'ing and `true` when exporting as named.
     pub(crate) is_export: bool,
@@ -42,7 +41,6 @@ impl ExportPath {
         while let Some(item) = path.next() {
             s.push_str(match item {
                 PathItem::Type(v) => v,
-                PathItem::TypeExtended(_, loc) => loc.as_str(),
                 PathItem::Field(v) => v,
                 PathItem::Variant(v) => v,
             });
@@ -50,7 +48,6 @@ impl ExportPath {
             if let Some(next) = path.peek() {
                 s.push_str(match next {
                     PathItem::Type(_) => " -> ",
-                    PathItem::TypeExtended(_, _) => " -> ",
                     PathItem::Field(_) => ".",
                     PathItem::Variant(_) => "::",
                 });
