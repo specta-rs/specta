@@ -1,6 +1,17 @@
 version: 2
+
+multi-ecosystem-groups:
+  specta-deps:
+    schedule:
+      interval: "weekly"
+
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
-    schedule:
-      interval: "weekly"
+    multi-ecosystem-group: "specta-deps"
+    patterns: ["*"]
+
+  - package-ecosystem: "cargo"
+    directory: "/"
+    multi-ecosystem-group: "specta-deps"
+    patterns: ["*"]
