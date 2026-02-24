@@ -12,6 +12,8 @@ pub struct Error {
     kind: ErrorKind,
 }
 
+type FrameworkSource = Box<dyn error::Error + Send + Sync + 'static>;
+
 #[allow(dead_code)]
 enum ErrorKind {
     /// Attempted to export a bigint type but the configuration forbids it.
@@ -70,7 +72,10 @@ enum ErrorKind {
         reference: String,
     },
     /// An error occurred in your exporter framework.
-    Framework(Cow<'static, str>),
+    Framework {
+        message: Cow<'static, str>,
+        source: FrameworkSource,
+    },
 
     //
     //
@@ -88,10 +93,16 @@ enum ErrorKind {
 }
 
 impl Error {
-    /// Construct an error from custom framework-specific logic.
-    pub fn framework(message: impl Into<Cow<'static, str>>) -> Self {
+    /// Construct an error for framework-specific logic.
+    pub fn framework(
+        message: impl Into<Cow<'static, str>>,
+        source: impl error::Error + Send + Sync + 'static,
+    ) -> Self {
         Self {
-            kind: ErrorKind::Framework(message.into()),
+            kind: ErrorKind::Framework {
+                message: message.into(),
+                source: Box::new(source),
+            },
         }
     }
 
@@ -293,7 +304,16 @@ impl fmt::Display for Error {
                 f,
                 "Found dangling named reference {reference}. The referenced type is missing from `TypeCollection`."
             ),
-            ErrorKind::Framework(error) => write!(f, "Framework error: {error}"),
+            ErrorKind::Framework { message, source } => {
+                let source = source.to_string();
+                if message.is_empty() && source.is_empty() {
+                    write!(f, "Framework error")
+                } else if source.is_empty() {
+                    write!(f, "Framework error: {message}")
+                } else {
+                    write!(f, "Framework error: {message}: {source}")
+                }
+            }
             ErrorKind::BigIntForbiddenLegacy(path) => write!(
                 f,
                 "Attempted to export {path:?} but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!"
@@ -344,6 +364,7 @@ impl error::Error for Error {
             | ErrorKind::Metadata { source, .. }
             | ErrorKind::RemoveFile { source, .. }
             | ErrorKind::RemoveDir { source, .. } => Some(source),
+            ErrorKind::Framework { source, .. } => Some(source.as_ref()),
             ErrorKind::FmtLegacy(error) => Some(error),
             _ => None,
         }

@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use specta::{
     Type, TypeCollection,
     datatype::{DataType, Primitive},
@@ -18,9 +16,10 @@ fn ts_base_type(ty: &DataType) -> Result<&'static str, Error> {
         DataType::Primitive(Primitive::String | Primitive::char) => Ok("string"),
         DataType::Primitive(Primitive::bool) => Ok("boolean"),
         DataType::Primitive(_) => Ok("number"),
-        other => Err(Error::framework(Cow::Owned(format!(
-            "example only supports primitive branded types, got {other:?}"
-        )))),
+        other => Err(Error::framework(
+            "example only supports primitive branded types",
+            std::io::Error::other(format!("got {other:?}")),
+        )),
     }
 }
 

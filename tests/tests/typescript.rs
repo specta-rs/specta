@@ -96,9 +96,13 @@ fn typescript_export_to() {
 
 #[test]
 fn primitives_typescript_framework_utils() {
-    let error = Error::framework("framework failed");
+    let error = Error::framework("framework failed", std::io::Error::other("inner failure"));
     assert_eq!(error.to_string(), "Framework error: framework failed");
     assert_eq!(format!("{error:?}"), error.to_string());
+    assert_eq!(
+        std::error::Error::source(&error).unwrap().to_string(),
+        "inner failure"
+    );
 }
 
 #[test]
