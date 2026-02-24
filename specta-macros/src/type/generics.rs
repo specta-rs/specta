@@ -1,8 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{
-    ConstParam, GenericParam, Generics, LifetimeParam, Type, TypeParam, WhereClause,
-    parse_quote,
+    ConstParam, GenericParam, Generics, LifetimeParam, Type, TypeParam, WhereClause, parse_quote,
 };
 
 pub fn generics_with_ident_and_bounds_only(generics: &Generics) -> Option<TokenStream> {
@@ -149,9 +148,7 @@ fn path_uses_ident(path: &syn::Path, ident: &syn::Ident) -> bool {
                 syn::PathArguments::None => false,
                 syn::PathArguments::AngleBracketed(args) => args.args.iter().any(|arg| match arg {
                     syn::GenericArgument::Type(ty) => type_uses_ident(ty, ident),
-                    syn::GenericArgument::AssocType(binding) => {
-                        type_uses_ident(&binding.ty, ident)
-                    }
+                    syn::GenericArgument::AssocType(binding) => type_uses_ident(&binding.ty, ident),
                     syn::GenericArgument::AssocConst(_) => true,
                     syn::GenericArgument::Constraint(constraint) => constraint
                         .bounds
@@ -161,7 +158,9 @@ fn path_uses_ident(path: &syn::Path, ident: &syn::Ident) -> bool {
                     _ => true,
                 }),
                 syn::PathArguments::Parenthesized(args) => {
-                    args.inputs.iter().any(|input| type_uses_ident(input, ident))
+                    args.inputs
+                        .iter()
+                        .any(|input| type_uses_ident(input, ident))
                         || return_type_uses_ident(&args.output, ident)
                 }
             }
