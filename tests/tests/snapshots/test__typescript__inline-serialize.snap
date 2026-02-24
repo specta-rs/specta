@@ -169,6 +169,8 @@ RenamedFieldKeys: {
 	quote: string,
 	backslash: string,
 	newline: string,
+	line_separator: string,
+	paragraph_separator: string,
 }
 RenamedVariantWithSkippedPayload: "A"
 Issue374: {

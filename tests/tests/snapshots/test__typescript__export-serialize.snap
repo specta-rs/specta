@@ -123,6 +123,8 @@ RenamedFieldKeys: export type RenamedFieldKeys = {
 	quote: string,
 	backslash: string,
 	newline: string,
+	line_separator: string,
+	paragraph_separator: string,
 };
 
 RenamedVariantWithSkippedPayload: export type RenamedVariantWithSkippedPayload = "A";

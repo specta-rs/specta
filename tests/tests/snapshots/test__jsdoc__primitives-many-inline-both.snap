@@ -176,11 +176,15 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*		quote: string,
 	*		backslash: string,
 	*		newline: string,
+	*		line_separator: string,
+	*		paragraph_separator: string,
 	*	}} RenamedFieldKeys
 	* @property {string} empty
 	* @property {string} quote
 	* @property {string} backslash
 	* @property {string} newline
+	* @property {string} line_separator
+	* @property {string} paragraph_separator
 	*
 	* @typedef {"A"} RenamedVariantWithSkippedPayload
 	* @property {"A"} A

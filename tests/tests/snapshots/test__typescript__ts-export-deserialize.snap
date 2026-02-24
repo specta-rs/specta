@@ -798,6 +798,8 @@ export type RenamedFieldKeys = {
 	"a\"b": string,
 	"a\\b": string,
 	"line\nbreak": string,
+	"line\u2028break": string,
+	"line\u2029break": string,
 };
 
 export type RenamedVariantWithSkippedPayload = "a-b";

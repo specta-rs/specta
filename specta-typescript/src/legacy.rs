@@ -764,7 +764,13 @@ pub(crate) fn is_identifier(name: &str) -> bool {
 pub(crate) fn escape_typescript_string_literal(value: &str) -> Cow<'_, str> {
     if !value
         .chars()
-        .any(|ch| ch == '"' || ch == '\\' || ch.is_control())
+        .any(|ch| {
+            ch == '"'
+                || ch == '\\'
+                || ch == '\u{2028}'
+                || ch == '\u{2029}'
+                || ch.is_control()
+        })
     {
         return Cow::Borrowed(value);
     }
@@ -777,6 +783,8 @@ pub(crate) fn escape_typescript_string_literal(value: &str) -> Cow<'_, str> {
             '\n' => escaped.push_str(r#"\n"#),
             '\r' => escaped.push_str(r#"\r"#),
             '\t' => escaped.push_str(r#"\t"#),
+            '\u{2028}' => escaped.push_str(r#"\u2028"#),
+            '\u{2029}' => escaped.push_str(r#"\u2029"#),
             ch if ch.is_control() => {
                 write!(escaped, r#"\u{:04X}"#, ch as u32).expect("infallible");
             }

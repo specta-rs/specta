@@ -746,6 +746,10 @@ struct RenamedFieldKeys {
     backslash: String,
     #[serde(rename = "line\nbreak")]
     newline: String,
+    #[serde(rename = "line\u{2028}break")]
+    line_separator: String,
+    #[serde(rename = "line\u{2029}break")]
+    paragraph_separator: String,
 }
 
 #[derive(Type, Serialize, Deserialize)]

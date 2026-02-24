@@ -1301,11 +1301,15 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		"a\"b": string,
 	*		"a\\b": string,
 	*		"line\nbreak": string,
+	*		"line\u2028break": string,
+	*		"line\u2029break": string,
 	*	}} RenamedFieldKeys
 	* @property {string} ""
 	* @property {string} "a\"b"
 	* @property {string} "a\\b"
 	* @property {string} "line\nbreak"
+	* @property {string} "line\u2028break"
+	* @property {string} "line\u2029break"
 	*
 	* @typedef {"a-b"} RenamedVariantWithSkippedPayload
 	* @property {"a-b"} "a-b"
