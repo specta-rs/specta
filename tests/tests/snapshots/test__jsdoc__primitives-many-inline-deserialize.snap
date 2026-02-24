@@ -196,6 +196,12 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {number} u32_ident
 	* @property {string} path
 	*
+	* @typedef {string} ContainerTypeOverrideStruct
+	*
+	* @typedef {string} ContainerTypeOverrideEnum
+	*
+	* @typedef {string} ContainerTypeOverrideGeneric<T>
+	*
 	* @typedef {{
 	*		cause: null | null,
 	*	}} InvalidToValidType

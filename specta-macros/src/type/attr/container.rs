@@ -1,6 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::Result;
+use syn::{Type, TypePath};
 
 use crate::utils::{AttrExtract, Attribute};
 
@@ -8,6 +9,7 @@ use super::RustCAttr;
 
 #[derive(Default)]
 pub struct ContainerAttr {
+    pub r#type: Option<Type>,
     pub crate_name: Option<TokenStream>,
     pub inline: bool,
     pub remote: Option<TokenStream>,
@@ -34,6 +36,13 @@ impl ContainerAttr {
                 .crate_name
                 .take()
                 .or(Some(attr.parse_path()?.to_token_stream()));
+        }
+
+        if let Some(attr) = attrs.extract("specta", "type") {
+            result.r#type = result.r#type.take().or(Some(Type::Path(TypePath {
+                qself: None,
+                path: attr.parse_path()?,
+            })));
         }
 
         if let Some(attr) = attrs.extract("specta", "inline") {

@@ -138,6 +138,12 @@ export type SpectaTypeOverride = {
 	path: string,
 };
 
+export type ContainerTypeOverrideStruct = string;
+
+export type ContainerTypeOverrideEnum = string;
+
+export type ContainerTypeOverrideGeneric<T> = string;
+
 export type InvalidToValidType = {
 	cause: null | null,
 };

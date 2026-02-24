@@ -219,6 +219,9 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         ActualType,
 
         SpectaTypeOverride,
+        ContainerTypeOverrideStruct,
+        ContainerTypeOverrideEnum,
+        ContainerTypeOverrideGeneric<Box<dyn Any>>,
         InvalidToValidType,
 
         // `#[specta(transparent)]`
@@ -833,6 +836,22 @@ struct SpectaTypeOverride {
     #[specta(type = ::std::string::String)] // Path
     path: (),
 }
+
+#[derive(Type)]
+#[specta(collect = false, type = String)]
+struct ContainerTypeOverrideStruct {
+    cause: Box<dyn std::error::Error + Send + Sync>,
+}
+
+#[derive(Type)]
+#[specta(collect = false, type = String)]
+enum ContainerTypeOverrideEnum {
+    A(Box<dyn std::error::Error + Send + Sync>),
+}
+
+#[derive(Type)]
+#[specta(collect = false, type = String)]
+struct ContainerTypeOverrideGeneric<T>(std::marker::PhantomData<T>);
 
 // Checking that you can override the type of a field that is invalid. This is to ensure user code can override Specta in the case we have a bug/unsupported type.
 #[derive(Type)]

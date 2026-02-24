@@ -9,7 +9,8 @@ use crate::utils::{parse_attrs, unraw_raw_ident};
 use self::lower_attr::lower_attribute;
 
 use self::generics::{
-    add_type_to_where_clause, generics_with_ident_and_bounds_only, generics_with_ident_only,
+    add_type_to_where_clause, container_type_uses_generic, generics_with_ident_and_bounds_only,
+    generics_with_ident_only,
 };
 
 pub(crate) mod attr;
@@ -35,6 +36,13 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let container_attrs = ContainerAttr::from_attrs(&mut attrs)?;
     let crate_ref = container_attrs.crate_name.clone().unwrap_or(quote!(specta));
+
+    if container_attrs.r#type.is_some() && container_attrs.transparent {
+        return Err(syn::Error::new(
+            raw_ident.span(),
+            "specta: `#[specta(type = ...)]` cannot be combined with `#[specta(transparent)]`",
+        ));
+    }
 
     // Lower the container attributes to RuntimeAttribute tokens
     // We use the raw attrs from DeriveInput, not the parsed ones
@@ -97,14 +105,26 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         }
     }
 
-    let (dt_type, dt_impl) = match data {
-        Data::Struct(data) => parse_struct(&crate_ref, &container_attrs, data),
-        Data::Enum(data) => parse_enum(&crate_ref, &container_attrs, data),
-        Data::Union(data) => Err(syn::Error::new_spanned(
-            data.union_token,
-            "specta: Union types are not supported by Specta yet!",
-        )),
-    }?;
+    let dt_expr = if let Some(container_ty) = &container_attrs.r#type {
+        quote!(<#container_ty as #crate_ref::Type>::definition(types))
+    } else {
+        let (dt_type, dt_impl) = match data {
+            Data::Struct(data) => parse_struct(&crate_ref, &container_attrs, data),
+            Data::Enum(data) => parse_enum(&crate_ref, &container_attrs, data),
+            Data::Union(data) => Err(syn::Error::new_spanned(
+                data.union_token,
+                "specta: Union types are not supported by Specta yet!",
+            )),
+        }?;
+
+        quote!(
+            datatype::DataType::#dt_type({
+                #dt_impl
+                *e.attributes_mut() = vec![#(#lowered_attrs),*];
+                e
+            })
+        )
+    };
 
     let bounds = generics_with_ident_and_bounds_only(generics);
     let type_args = generics_with_ident_only(generics);
@@ -112,6 +132,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         &quote!(#crate_ref::Type),
         generics,
         container_attrs.bound.as_deref(),
+        container_attrs.r#type.as_ref(),
     );
 
     let shadow_generics = {
@@ -170,6 +191,11 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
         GenericParam::Type(t) => {
             let i = &t.ident;
+            if let Some(container_ty) = &container_attrs.r#type
+                && !container_type_uses_generic(container_ty, i)
+            {
+                return None;
+            }
             let i_str = i.to_string();
             Some(quote!((#crate_ref::datatype::Generic::new(#i_str), <#i as #crate_ref::Type>::definition(types))))
         }
@@ -210,11 +236,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                                 ndt.set_ty({
                                     #shadow_generics
 
-                                    datatype::DataType::#dt_type({
-                                        #dt_impl
-                                        *e.attributes_mut() = vec![#(#lowered_attrs),*];
-                                        e
-                                    })
+                                    #dt_expr
                                 });
                             }
                         )

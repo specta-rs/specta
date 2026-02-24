@@ -177,6 +177,9 @@ SpectaTypeOverride: {
 	u32_ident: number,
 	path: string,
 }
+ContainerTypeOverrideStruct: string
+ContainerTypeOverrideEnum: string
+ContainerTypeOverrideGeneric<Box<dyn Any>>: string
 InvalidToValidType: {
 	cause: null | null,
 }

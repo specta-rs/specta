@@ -140,6 +140,10 @@ struct InternalRenameFromPath {
 pub enum TransparentEnum {}
 
 #[derive(Type)]
+#[specta(collect = false, type = String, transparent)]
+pub struct TransparentTypeOverrideConflict(String);
+
+#[derive(Type)]
 #[specta(collect = false)]
 #[specta]
 pub struct InvalidSpectaAttribute1;

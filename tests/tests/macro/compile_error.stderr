@@ -52,32 +52,38 @@ error: #[specta(transparent)] is not allowed on an enum
 140 | pub enum TransparentEnum {}
     |     ^^^^
 
-error: specta: invalid formatted attribute
-   --> tests/macro/compile_error.rs:144:3
+error: specta: `#[specta(type = ...)]` cannot be combined with `#[specta(transparent)]`
+   --> tests/macro/compile_error.rs:144:12
     |
-144 | #[specta]
+144 | pub struct TransparentTypeOverrideConflict(String);
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: specta: invalid formatted attribute
+   --> tests/macro/compile_error.rs:148:3
+    |
+148 | #[specta]
     |   ^^^^^^
 
 error: specta: invalid formatted attribute
-   --> tests/macro/compile_error.rs:149:3
+   --> tests/macro/compile_error.rs:153:3
     |
-149 | #[specta = "todo"]
+153 | #[specta = "todo"]
     |   ^^^^^^
 
 error: specta: You must apply the #[specta] macro before the #[wasm_bindgen] macro
-   --> tests/macro/compile_error.rs:154:1
+   --> tests/macro/compile_error.rs:158:1
     |
-154 | #[wasm_bindgen]
+158 | #[wasm_bindgen]
     | ^^^^^^^^^^^^^^^
     |
     = note: this error originates in the attribute macro `wasm_bindgen` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0255]: the name `__specta__fn__testing` is defined multiple times
-   --> tests/macro/compile_error.rs:156:8
+   --> tests/macro/compile_error.rs:160:8
     |
-155 | #[specta]
+159 | #[specta]
     | --------- previous definition of the macro `__specta__fn__testing` here
-156 | pub fn testing() {}
+160 | pub fn testing() {}
     |        ^^^^^^^ `__specta__fn__testing` reimported here
     |
     = note: `__specta__fn__testing` must be defined only once in the macro namespace of this module
@@ -180,9 +186,9 @@ error: cannot find attribute `serde` in this scope
    = note: `serde` is in scope, but it is a crate, not an attribute
 
 error[E0601]: `main` function not found in crate `$CRATE`
-   --> tests/macro/compile_error.rs:156:20
+   --> tests/macro/compile_error.rs:160:20
     |
-156 | pub fn testing() {}
+160 | pub fn testing() {}
     |                    ^ consider adding a `main` function to `$DIR/tests/macro/compile_error.rs`
 
 error[E0277]: the trait `specta::Type` is not implemented for `dyn std::error::Error + Send + Sync`

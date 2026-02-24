@@ -138,6 +138,12 @@ SpectaTypeOverride: export type SpectaTypeOverride = {
 	path: string,
 };
 
+ContainerTypeOverrideStruct: export type ContainerTypeOverrideStruct = string;
+
+ContainerTypeOverrideEnum: export type ContainerTypeOverrideEnum = string;
+
+ContainerTypeOverrideGeneric<Box<dyn Any>>: export type ContainerTypeOverrideGeneric<T> = string;
+
 InvalidToValidType: export type InvalidToValidType = {
 	cause: null | null,
 };
