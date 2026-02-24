@@ -53,11 +53,14 @@ pub fn add_type_to_where_clause(
     custom_bounds: Option<&[syn::WherePredicate]>,
     container_type: Option<&Type>,
 ) -> Option<WhereClause> {
+    // If custom bounds are provided, use them instead of automatic inference
     if let Some(predicates) = custom_bounds {
         if predicates.is_empty() {
+            // Empty predicates = no automatic bounds, just return existing where clause
             return generics.where_clause.clone();
         }
 
+        // Use custom predicates, merging with existing where clause
         return match &generics.where_clause {
             None => Some(parse_quote! { where #(#predicates),* }),
             Some(w) => {
