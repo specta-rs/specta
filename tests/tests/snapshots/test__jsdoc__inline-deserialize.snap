@@ -720,523 +720,535 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {string} a
 	*
 	* @typedef {{
-	*		"1": number,
-	*		"2": number,
-	*		"3": number,
-	*		"4": number,
-	*		"5": number,
-	*		"6": number,
-	*		"7": number,
-	*		"8": number,
-	*		"9": number,
-	*		a: number,
-	*		b: number,
-	*		c: number,
-	*		d: number,
-	*		e: number,
-	*		f: boolean,
-	*		"10": string,
-	*		"11": {
+	*		i8: number,
+	*		i16: number,
+	*		i32: number,
+	*		i64: number,
+	*		i128: number,
+	*		isize: number,
+	*		u8: number,
+	*		u16: number,
+	*		u32: number,
+	*		u64: number,
+	*		u128: number,
+	*		usize: number,
+	*		f32: number,
+	*		f64: number,
+	*		bool: boolean,
+	*		char: string,
+	*		"Range<i32>": {
 	*			start: number,
 	*			end: number,
 	*		},
-	*		"12": {
+	*		"RangeInclusive<i32>": {
 	*			start: number,
 	*			end: number,
 	*		},
-	*		"13": null,
-	*		"14": [string, number],
-	*		"15": [string, number, boolean],
-	*		"16": [[string, number], [boolean, string, boolean], null],
-	*		"17": [boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean],
-	*		"18": [number[], boolean[]],
-	*		"19": string,
-	*		"1a": string,
-	*		"1b": string,
-	*		"1c": string,
-	*		"1d": string,
-	*		"1e": string,
-	*		"1f": string,
-	*		"20": string,
-	*		"21": string,
-	*		"22": number,
-	*		"23": {
+	*		"()": null,
+	*		"(String, i32)": [string, number],
+	*		"(String, i32, bool)": [string, number, boolean],
+	*		"((String, i32), (bool, char, bool), ())": [[string, number], [boolean, string, boolean], null],
+	*		"(bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool)": [boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean],
+	*		"(Vec<i32>, Vec<bool>)": [number[], boolean[]],
+	*		String: string,
+	*		PathBuf: string,
+	*		IpAddr: string,
+	*		Ipv4Addr: string,
+	*		Ipv6Addr: string,
+	*		SocketAddr: string,
+	*		SocketAddrV4: string,
+	*		SocketAddrV6: string,
+	*		"Cow<'static, str>": string,
+	*		"Cow<'static, i32>": number,
+	*		SystemTime: {
 	*			duration_since_epoch: number,
 	*			duration_since_unix_epoch: number,
 	*		},
-	*		"24": {
+	*		Duration: {
 	*			secs: number,
 	*			nanos: number,
 	*		},
-	*		"25": string,
-	*		"26": boolean,
-	*		"27": number,
-	*		"28": number[],
-	*		"29": number[],
-	*		"2a": [number, number, number],
-	*		"2b": [number, number, number],
-	*		"2c": MyEnum[],
-	*		"2d": MyEnum[],
-	*		"2e": [MyEnum, MyEnum, MyEnum, MyEnum, MyEnum, MyEnum],
-	*		"2f": [MyEnum, MyEnum],
-	*		"30": [number],
-	*		"31": [],
-	*		"32": number | null,
-	*		"33": null | null,
-	*		"34": number[] | null,
-	*		"35": (number | null)[],
-	*		"36": number[] | null,
-	*		"37": [string[], string[], string[]],
-	*		"38": string | null,
-	*		"39": string | null,
-	*		"3a": null,
-	*		"3b": null,
-	*		"3c": never,
-	*		"3d": Unit1,
-	*		"3e": Unit2,
-	*		"3f": Unit3,
-	*		"40": Unit4,
-	*		"41": Unit5,
-	*		"42": Unit6,
-	*		"43": Unit7,
-	*		"44": SimpleStruct,
-	*		"45": TupleStruct1,
-	*		"46": TupleStruct3,
-	*		"47": TestEnum,
-	*		"48": RefStruct,
-	*		"49": InlinerStruct,
-	*		"4a": GenericStruct<number>,
-	*		"4b": GenericStruct<string>,
-	*		"4c": FlattenEnumStruct,
-	*		"4d": OverridenStruct,
-	*		"4e": HasGenericAlias,
-	*		"4f": EnumMacroAttributes,
-	*		"50": InlineEnumField,
-	*		"51": InlineOptionalType,
-	*		"52": Rename,
-	*		"53": TransparentType,
-	*		"54": TransparentType2,
-	*		"55": TransparentTypeWithOverride,
-	*		"56": [(number | null), (number | null), (number | null)],
-	*		"57": Partial<{ [key in BasicEnum]: null }>,
-	*		"58": number | null,
-	*		"59": PlaceholderInnerField[],
-	*		"5a": Partial<{ [key in BasicEnum]: number }>,
-	*		"5b": EnumReferenceRecordKey,
-	*		"5c": FlattenOnNestedEnum,
-	*		"5d": MyEmptyInput,
-	*		"5e": string,
-	*		"5f": [string],
-	*		"60": ExtraBracketsInTupleVariant,
-	*		"61": ExtraBracketsInUnnamedStruct,
-	*		"62": MyEnum[],
-	*		"63": InlineTuple,
-	*		"64": InlineTuple2,
-	*		"65": string,
-	*		"66": string,
-	*		"67": SkippedFieldWithinVariant,
-	*		"68": KebabCase,
-	*		"69": string[],
-	*		"6a": Issue281,
-	*		"6b": RenameWithWeirdCharsField,
-	*		"6c": RenameWithWeirdCharsVariant,
-	*		"6d": Issue374,
-	*		"6e": Type,
-	*		"6f": ActualType,
-	*		"70": SpectaTypeOverride,
-	*		"71": InvalidToValidType,
-	*		"72": TupleStruct,
-	*		"73": TupleStructWithRep,
-	*		"74": GenericTupleStruct<string>,
-	*		"75": BracedStruct,
-	*		"76": StructRenameAllUppercase,
-	*		"77": RenameSerdeSpecialChar,
-	*		"78": EnumRenameAllUppercase,
-	*		"79": Recursive,
-	*		"7a": RecursiveMapValue,
-	*		"7b": RecursiveTransparent,
-	*		"7c": RecursiveInEnum,
-	*		"7d": NonOptional,
-	*		"7e": OptionalOnNamedField,
-	*		"7f": OptionalOnTransparentNamedField,
-	*		"80": OptionalInEnum,
-	*		"81": Optional,
-	*		"82": UntaggedVariants,
-	*		"83": UntaggedVariantsWithoutValue,
-	*		"84": { [key in string]: null },
-	*		"85": Regular,
-	*		"86": { [key in never]: null },
-	*		"87": Partial<{ [key in UnitVariants]: null }>,
-	*		"88": Partial<{ [key in UntaggedVariantsKey]: null }>,
-	*		"89": Partial<{ [key in Variants]: null }>,
-	*		"8a": MacroStruct,
-	*		"8b": MacroStruct2,
-	*		"8c": MacroEnum,
-	*		"8d": DeprecatedType,
-	*		"8e": DeprecatedTypeWithMsg,
-	*		"8f": DeprecatedTypeWithMsg2,
-	*		"90": DeprecatedFields,
-	*		"91": DeprecatedTupleVariant,
-	*		"92": DeprecatedEnumVariants,
-	*		"93": CommentedStruct,
-	*		"94": CommentedEnum,
-	*		"95": SingleLineComment,
-	*		"96": Demo<number, boolean>,
-	*		"97": Demo<number, boolean>,
-	*		"98": Demo<number, boolean>,
-	*		"99": Demo<number, boolean>,
-	*		"9a": Demo<number, boolean>,
-	*		"9b": { [key in string]: number },
-	*		"9c": { [key in number]: string },
-	*		"9d": { [key in string]: AGenericStruct<number> },
-	*		"9e": AGenericStruct<number>,
-	*		"9f": A,
-	*		a0: DoubleFlattened,
-	*		a1: FlattenedInner,
-	*		a2: BoxFlattened,
-	*		a3: BoxInline,
-	*		a4: First,
-	*		a5: Second,
-	*		a6: Third,
-	*		a7: Fourth,
-	*		a8: TagOnStructWithInline,
-	*		a9: Sixth,
-	*		aa: Seventh,
-	*		ab: Eight,
-	*		ac: Tenth,
-	*		ad: MyEnumTagged,
-	*		ae: MyEnumExternal,
-	*		af: MyEnumAdjacent,
-	*		b0: MyEnumUntagged,
-	*		b1: EmptyStruct,
-	*		b2: EmptyStructWithTag,
-	*		b3: AdjacentlyTagged,
-	*		b4: LoadProjectEvent,
-	*		b5: ExternallyTagged,
-	*		b6: InternallyTaggedB,
-	*		b7: InternallyTaggedC,
-	*		b8: InternallyTaggedD,
-	*		b9: InternallyTaggedE,
-	*		ba: InternallyTaggedF,
-	*		bb: InternallyTaggedG,
-	*		bc: InternallyTaggedH,
-	*		bd: InternallyTaggedI,
-	*		be: InternallyTaggedL,
-	*		bf: InternallyTaggedM,
-	*		c0: StructWithAlias,
-	*		c1: StructWithMultipleAliases,
-	*		c2: StructWithAliasAndRename,
-	*		c3: EnumWithVariantAlias,
-	*		c4: EnumWithMultipleVariantAliases,
-	*		c5: EnumWithVariantAliasAndRename,
-	*		c6: InternallyTaggedWithAlias,
-	*		c7: AdjacentlyTaggedWithAlias,
-	*		c8: UntaggedWithAlias,
-	*		c9: EmptyEnum,
-	*		ca: EmptyEnumTagged,
-	*		cb: EmptyEnumTaggedWContent,
-	*		cc: EmptyEnumUntagged,
-	*		cd: TaggedEnumOfUnitStruct,
-	*		ce: TaggedEnumOfEmptyBracedStruct,
-	*		cf: TaggedEnumOfEmptyTupleStruct,
-	*		d0: TaggedEnumOfEmptyTupleBracedStructs,
-	*		d1: TaggedStructOfStructWithTuple,
-	*		d2: SkipOnlyField,
-	*		d3: SkipField,
-	*		d4: SkipOnlyVariantExternallyTagged,
-	*		d5: SkipOnlyVariantInternallyTagged,
-	*		d6: SkipOnlyVariantAdjacentlyTagged,
-	*		d7: SkipOnlyVariantUntagged,
-	*		d8: SkipVariant,
-	*		d9: SkipUnnamedFieldInVariant,
-	*		da: SkipNamedFieldInVariant,
-	*		db: TransparentWithSkip,
-	*		dc: TransparentWithSkip2,
-	*		dd: TransparentWithSkip3,
-	*		de: SkipVariant2,
-	*		df: SkipVariant3,
-	*		e0: SkipStructFields,
-	*		e1: SpectaSkipNonTypeField,
-	*		e2: FlattenA,
-	*		e3: FlattenB,
-	*		e4: FlattenC,
-	*		e5: FlattenD,
-	*		e6: FlattenE,
-	*		e7: FlattenF,
-	*		e8: FlattenG,
-	*		e9: TupleNested,
-	*		ea: Generic1<null>,
-	*		eb: GenericAutoBound<null>,
-	*		ec: GenericAutoBound2<null>,
-	*		ed: Container1,
-	*		ee: Generic2<null, string, number>,
-	*		ef: GenericNewType1<null>,
-	*		f0: GenericTuple<null>,
-	*		f1: GenericStruct2<null>,
-	*		f2: string,
-	*		f3: [string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | { Unnamed: string } | { Named: { value: string } }],
-	*		f4: InlineFlattenGenericsG<null>,
-	*		f5: InlineFlattenGenerics,
-	*		f6: GenericParameterOrderPreserved,
+	*		"&'static str": string,
+	*		"&'static bool": boolean,
+	*		"&'static i32": number,
+	*		"Vec<i32>": number[],
+	*		"&'static [i32]": number[],
+	*		"&'static [i32; 3]": [number, number, number],
+	*		"[i32; 3]": [number, number, number],
+	*		"Vec<MyEnum>": MyEnum[],
+	*		"&'static [MyEnum]": MyEnum[],
+	*		"&'static [MyEnum; 6]": [MyEnum, MyEnum, MyEnum, MyEnum, MyEnum, MyEnum],
+	*		"[MyEnum; 2]": [MyEnum, MyEnum],
+	*		"&'static [i32; 1]": [number],
+	*		"&'static [i32; 0]": [],
+	*		"Option<i32>": number | null,
+	*		"Option<()>": null | null,
+	*		"Option<Vec<i32>>": number[] | null,
+	*		"Vec<Option<Cow<'static, i32>>>": (number | null)[],
+	*		"Option<Vec<Cow<'static, i32>>>": number[] | null,
+	*		"[Vec<String>; 3]": [string[], string[], string[]],
+	*		"Option<Option<String>>": string | null,
+	*		"Option<Option<Option<String>>>": string | null,
+	*		"PhantomData<()>": null,
+	*		"PhantomData<String>": null,
+	*		Infallible: never,
+	*		Unit1: Unit1,
+	*		Unit2: Unit2,
+	*		Unit3: Unit3,
+	*		Unit4: Unit4,
+	*		Unit5: Unit5,
+	*		Unit6: Unit6,
+	*		Unit7: Unit7,
+	*		SimpleStruct: SimpleStruct,
+	*		TupleStruct1: TupleStruct1,
+	*		TupleStruct3: TupleStruct3,
+	*		TestEnum: TestEnum,
+	*		RefStruct: RefStruct,
+	*		InlinerStruct: InlinerStruct,
+	*		"GenericStruct<i32>": GenericStruct<number>,
+	*		"GenericStruct<String>": GenericStruct<string>,
+	*		FlattenEnumStruct: FlattenEnumStruct,
+	*		OverridenStruct: OverridenStruct,
+	*		HasGenericAlias: HasGenericAlias,
+	*		EnumMacroAttributes: EnumMacroAttributes,
+	*		InlineEnumField: InlineEnumField,
+	*		InlineOptionalType: InlineOptionalType,
+	*		Rename: Rename,
+	*		TransparentType: TransparentType,
+	*		TransparentType2: TransparentType2,
+	*		TransparentTypeWithOverride: TransparentTypeWithOverride,
+	*		"[Option<u8>; 3]": [(number | null), (number | null), (number | null)],
+	*		"HashMap<BasicEnum, ()>": Partial<{ [key in BasicEnum]: null }>,
+	*		"Option<Option<Option<Option<i32>>>>": number | null,
+	*		"Vec<PlaceholderInnerField>": PlaceholderInnerField[],
+	*		"HashMap<BasicEnum, i32>": Partial<{ [key in BasicEnum]: number }>,
+	*		EnumReferenceRecordKey: EnumReferenceRecordKey,
+	*		FlattenOnNestedEnum: FlattenOnNestedEnum,
+	*		MyEmptyInput: MyEmptyInput,
+	*		"(String)": string,
+	*		"(String,)": [string],
+	*		ExtraBracketsInTupleVariant: ExtraBracketsInTupleVariant,
+	*		ExtraBracketsInUnnamedStruct: ExtraBracketsInUnnamedStruct,
+	*		"Vec<MyEnum>": MyEnum[],
+	*		InlineTuple: InlineTuple,
+	*		InlineTuple2: InlineTuple2,
+	*		"Box<str>": string,
+	*		"Box<String>": string,
+	*		SkippedFieldWithinVariant: SkippedFieldWithinVariant,
+	*		KebabCase: KebabCase,
+	*		"&[&str]": string[],
+	*		"Issue281<'_>": Issue281,
+	*		RenameWithWeirdCharsField: RenameWithWeirdCharsField,
+	*		RenameWithWeirdCharsVariant: RenameWithWeirdCharsVariant,
+	*		Issue374: Issue374,
+	*		"type_type::Type": Type,
+	*		ActualType: ActualType,
+	*		SpectaTypeOverride: SpectaTypeOverride,
+	*		ContainerTypeOverrideStruct: string,
+	*		ContainerTypeOverrideEnum: string,
+	*		"ContainerTypeOverrideGeneric<Box<dyn Any>>": string,
+	*		"ContainerTypeOverrideToGeneric<i32>": number,
+	*		ContainerTypeOverrideTuple: [string, number],
+	*		"ContainerTypeOverrideTupleGeneric<i32>": [number, string],
+	*		InvalidToValidType: InvalidToValidType,
+	*		TupleStruct: TupleStruct,
+	*		TupleStructWithRep: TupleStructWithRep,
+	*		"GenericTupleStruct<String>": GenericTupleStruct<string>,
+	*		BracedStruct: BracedStruct,
+	*		StructRenameAllUppercase: StructRenameAllUppercase,
+	*		RenameSerdeSpecialChar: RenameSerdeSpecialChar,
+	*		EnumRenameAllUppercase: EnumRenameAllUppercase,
+	*		Recursive: Recursive,
+	*		RecursiveMapValue: RecursiveMapValue,
+	*		RecursiveTransparent: RecursiveTransparent,
+	*		RecursiveInEnum: RecursiveInEnum,
+	*		NonOptional: NonOptional,
+	*		OptionalOnNamedField: OptionalOnNamedField,
+	*		OptionalOnTransparentNamedField: OptionalOnTransparentNamedField,
+	*		OptionalInEnum: OptionalInEnum,
+	*		Optional: Optional,
+	*		UntaggedVariants: UntaggedVariants,
+	*		UntaggedVariantsWithoutValue: UntaggedVariantsWithoutValue,
+	*		"HashMap<String, ()>": { [key in string]: null },
+	*		Regular: Regular,
+	*		"HashMap<Infallible, ()>": { [key in never]: null },
+	*		"HashMap<UnitVariants, ()>": Partial<{ [key in UnitVariants]: null }>,
+	*		"HashMap<UntaggedVariantsKey, ()>": Partial<{ [key in UntaggedVariantsKey]: null }>,
+	*		"HashMap<Variants, ()>": Partial<{ [key in Variants]: null }>,
+	*		MacroStruct: MacroStruct,
+	*		MacroStruct2: MacroStruct2,
+	*		MacroEnum: MacroEnum,
+	*		DeprecatedType: DeprecatedType,
+	*		DeprecatedTypeWithMsg: DeprecatedTypeWithMsg,
+	*		DeprecatedTypeWithMsg2: DeprecatedTypeWithMsg2,
+	*		DeprecatedFields: DeprecatedFields,
+	*		DeprecatedTupleVariant: DeprecatedTupleVariant,
+	*		DeprecatedEnumVariants: DeprecatedEnumVariants,
+	*		CommentedStruct: CommentedStruct,
+	*		CommentedEnum: CommentedEnum,
+	*		SingleLineComment: SingleLineComment,
+	*		NonGeneric: Demo<number, boolean>,
+	*		"HalfGenericA<u8>": Demo<number, boolean>,
+	*		"HalfGenericB<bool>": Demo<number, boolean>,
+	*		"FullGeneric<u8, bool>": Demo<number, boolean>,
+	*		"Another<bool>": Demo<number, boolean>,
+	*		"MapA<u32>": { [key in string]: number },
+	*		"MapB<u32>": { [key in number]: string },
+	*		"MapC<u32>": { [key in string]: AGenericStruct<number> },
+	*		"AGenericStruct<u32>": AGenericStruct<number>,
+	*		A: A,
+	*		DoubleFlattened: DoubleFlattened,
+	*		FlattenedInner: FlattenedInner,
+	*		BoxFlattened: BoxFlattened,
+	*		BoxInline: BoxInline,
+	*		First: First,
+	*		Second: Second,
+	*		Third: Third,
+	*		Fourth: Fourth,
+	*		TagOnStructWithInline: TagOnStructWithInline,
+	*		Sixth: Sixth,
+	*		Seventh: Seventh,
+	*		Eight: Eight,
+	*		Tenth: Tenth,
+	*		MyEnumTagged: MyEnumTagged,
+	*		MyEnumExternal: MyEnumExternal,
+	*		MyEnumAdjacent: MyEnumAdjacent,
+	*		MyEnumUntagged: MyEnumUntagged,
+	*		EmptyStruct: EmptyStruct,
+	*		EmptyStructWithTag: EmptyStructWithTag,
+	*		AdjacentlyTagged: AdjacentlyTagged,
+	*		LoadProjectEvent: LoadProjectEvent,
+	*		ExternallyTagged: ExternallyTagged,
+	*		InternallyTaggedB: InternallyTaggedB,
+	*		InternallyTaggedC: InternallyTaggedC,
+	*		InternallyTaggedD: InternallyTaggedD,
+	*		InternallyTaggedE: InternallyTaggedE,
+	*		InternallyTaggedF: InternallyTaggedF,
+	*		InternallyTaggedG: InternallyTaggedG,
+	*		InternallyTaggedH: InternallyTaggedH,
+	*		InternallyTaggedI: InternallyTaggedI,
+	*		InternallyTaggedL: InternallyTaggedL,
+	*		InternallyTaggedM: InternallyTaggedM,
+	*		StructWithAlias: StructWithAlias,
+	*		StructWithMultipleAliases: StructWithMultipleAliases,
+	*		StructWithAliasAndRename: StructWithAliasAndRename,
+	*		EnumWithVariantAlias: EnumWithVariantAlias,
+	*		EnumWithMultipleVariantAliases: EnumWithMultipleVariantAliases,
+	*		EnumWithVariantAliasAndRename: EnumWithVariantAliasAndRename,
+	*		InternallyTaggedWithAlias: InternallyTaggedWithAlias,
+	*		AdjacentlyTaggedWithAlias: AdjacentlyTaggedWithAlias,
+	*		UntaggedWithAlias: UntaggedWithAlias,
+	*		EmptyEnum: EmptyEnum,
+	*		EmptyEnumTagged: EmptyEnumTagged,
+	*		EmptyEnumTaggedWContent: EmptyEnumTaggedWContent,
+	*		EmptyEnumUntagged: EmptyEnumUntagged,
+	*		TaggedEnumOfUnitStruct: TaggedEnumOfUnitStruct,
+	*		TaggedEnumOfEmptyBracedStruct: TaggedEnumOfEmptyBracedStruct,
+	*		TaggedEnumOfEmptyTupleStruct: TaggedEnumOfEmptyTupleStruct,
+	*		TaggedEnumOfEmptyTupleBracedStructs: TaggedEnumOfEmptyTupleBracedStructs,
+	*		TaggedStructOfStructWithTuple: TaggedStructOfStructWithTuple,
+	*		SkipOnlyField: SkipOnlyField,
+	*		SkipField: SkipField,
+	*		SkipOnlyVariantExternallyTagged: SkipOnlyVariantExternallyTagged,
+	*		SkipOnlyVariantInternallyTagged: SkipOnlyVariantInternallyTagged,
+	*		SkipOnlyVariantAdjacentlyTagged: SkipOnlyVariantAdjacentlyTagged,
+	*		SkipOnlyVariantUntagged: SkipOnlyVariantUntagged,
+	*		SkipVariant: SkipVariant,
+	*		SkipUnnamedFieldInVariant: SkipUnnamedFieldInVariant,
+	*		SkipNamedFieldInVariant: SkipNamedFieldInVariant,
+	*		TransparentWithSkip: TransparentWithSkip,
+	*		TransparentWithSkip2: TransparentWithSkip2,
+	*		TransparentWithSkip3: TransparentWithSkip3,
+	*		SkipVariant2: SkipVariant2,
+	*		SkipVariant3: SkipVariant3,
+	*		SkipStructFields: SkipStructFields,
+	*		SpectaSkipNonTypeField: SpectaSkipNonTypeField,
+	*		FlattenA: FlattenA,
+	*		FlattenB: FlattenB,
+	*		FlattenC: FlattenC,
+	*		FlattenD: FlattenD,
+	*		FlattenE: FlattenE,
+	*		FlattenF: FlattenF,
+	*		FlattenG: FlattenG,
+	*		TupleNested: TupleNested,
+	*		"Generic1<()>": Generic1<null>,
+	*		"GenericAutoBound<()>": GenericAutoBound<null>,
+	*		"GenericAutoBound2<()>": GenericAutoBound2<null>,
+	*		Container1: Container1,
+	*		"Generic2<(), String, i32>": Generic2<null, string, number>,
+	*		"GenericNewType1<()>": GenericNewType1<null>,
+	*		"GenericTuple<()>": GenericTuple<null>,
+	*		"GenericStruct2<()>": GenericStruct2<null>,
+	*		"InlineGenericNewtype<String>": string,
+	*		"InlineGenericNested<String>": [string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | { Unnamed: string } | { Named: { value: string } }],
+	*		"InlineFlattenGenericsG<()>": InlineFlattenGenericsG<null>,
+	*		InlineFlattenGenerics: InlineFlattenGenerics,
+	*		GenericParameterOrderPreserved: GenericParameterOrderPreserved,
 	*	}} Primitives
-	* @property {number} "1"
-	* @property {number} "2"
-	* @property {number} "3"
-	* @property {number} "4"
-	* @property {number} "5"
-	* @property {number} "6"
-	* @property {number} "7"
-	* @property {number} "8"
-	* @property {number} "9"
-	* @property {number} a
-	* @property {number} b
-	* @property {number} c
-	* @property {number} d
-	* @property {number} e
-	* @property {boolean} f
-	* @property {string} "10"
+	* @property {number} i8
+	* @property {number} i16
+	* @property {number} i32
+	* @property {number} i64
+	* @property {number} i128
+	* @property {number} isize
+	* @property {number} u8
+	* @property {number} u16
+	* @property {number} u32
+	* @property {number} u64
+	* @property {number} u128
+	* @property {number} usize
+	* @property {number} f32
+	* @property {number} f64
+	* @property {boolean} bool
+	* @property {string} char
 	* @property {{
 	*		start: number,
 	*		end: number,
-	*	}} "11"
+	*	}} "Range<i32>"
 	* @property {{
 	*		start: number,
 	*		end: number,
-	*	}} "12"
-	* @property {null} "13"
-	* @property {[string, number]} "14"
-	* @property {[string, number, boolean]} "15"
-	* @property {[[string, number], [boolean, string, boolean], null]} "16"
-	* @property {[boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean]} "17"
-	* @property {[number[], boolean[]]} "18"
-	* @property {string} "19"
-	* @property {string} "1a"
-	* @property {string} "1b"
-	* @property {string} "1c"
-	* @property {string} "1d"
-	* @property {string} "1e"
-	* @property {string} "1f"
-	* @property {string} "20"
-	* @property {string} "21"
-	* @property {number} "22"
+	*	}} "RangeInclusive<i32>"
+	* @property {null} "()"
+	* @property {[string, number]} "(String, i32)"
+	* @property {[string, number, boolean]} "(String, i32, bool)"
+	* @property {[[string, number], [boolean, string, boolean], null]} "((String, i32), (bool, char, bool), ())"
+	* @property {[boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean]} "(bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool)"
+	* @property {[number[], boolean[]]} "(Vec<i32>, Vec<bool>)"
+	* @property {string} String
+	* @property {string} PathBuf
+	* @property {string} IpAddr
+	* @property {string} Ipv4Addr
+	* @property {string} Ipv6Addr
+	* @property {string} SocketAddr
+	* @property {string} SocketAddrV4
+	* @property {string} SocketAddrV6
+	* @property {string} "Cow<'static, str>"
+	* @property {number} "Cow<'static, i32>"
 	* @property {{
 	*		duration_since_epoch: number,
 	*		duration_since_unix_epoch: number,
-	*	}} "23"
+	*	}} SystemTime
 	* @property {{
 	*		secs: number,
 	*		nanos: number,
-	*	}} "24"
-	* @property {string} "25"
-	* @property {boolean} "26"
-	* @property {number} "27"
-	* @property {number[]} "28"
-	* @property {number[]} "29"
-	* @property {[number, number, number]} "2a"
-	* @property {[number, number, number]} "2b"
-	* @property {MyEnum[]} "2c"
-	* @property {MyEnum[]} "2d"
-	* @property {[MyEnum, MyEnum, MyEnum, MyEnum, MyEnum, MyEnum]} "2e"
-	* @property {[MyEnum, MyEnum]} "2f"
-	* @property {[number]} "30"
-	* @property {[]} "31"
-	* @property {number | null} "32"
-	* @property {null | null} "33"
-	* @property {number[] | null} "34"
-	* @property {(number | null)[]} "35"
-	* @property {number[] | null} "36"
-	* @property {[string[], string[], string[]]} "37"
-	* @property {string | null} "38"
-	* @property {string | null} "39"
-	* @property {null} "3a"
-	* @property {null} "3b"
-	* @property {never} "3c"
-	* @property {Unit1} "3d"
-	* @property {Unit2} "3e"
-	* @property {Unit3} "3f"
-	* @property {Unit4} "40"
-	* @property {Unit5} "41"
-	* @property {Unit6} "42"
-	* @property {Unit7} "43"
-	* @property {SimpleStruct} "44"
-	* @property {TupleStruct1} "45"
-	* @property {TupleStruct3} "46"
-	* @property {TestEnum} "47"
-	* @property {RefStruct} "48"
-	* @property {InlinerStruct} "49"
-	* @property {GenericStruct<number>} "4a"
-	* @property {GenericStruct<string>} "4b"
-	* @property {FlattenEnumStruct} "4c"
-	* @property {OverridenStruct} "4d"
-	* @property {HasGenericAlias} "4e"
-	* @property {EnumMacroAttributes} "4f"
-	* @property {InlineEnumField} "50"
-	* @property {InlineOptionalType} "51"
-	* @property {Rename} "52"
-	* @property {TransparentType} "53"
-	* @property {TransparentType2} "54"
-	* @property {TransparentTypeWithOverride} "55"
-	* @property {[(number | null), (number | null), (number | null)]} "56"
-	* @property {Partial<{ [key in BasicEnum]: null }>} "57"
-	* @property {number | null} "58"
-	* @property {PlaceholderInnerField[]} "59"
-	* @property {Partial<{ [key in BasicEnum]: number }>} "5a"
-	* @property {EnumReferenceRecordKey} "5b"
-	* @property {FlattenOnNestedEnum} "5c"
-	* @property {MyEmptyInput} "5d"
-	* @property {string} "5e"
-	* @property {[string]} "5f"
-	* @property {ExtraBracketsInTupleVariant} "60"
-	* @property {ExtraBracketsInUnnamedStruct} "61"
-	* @property {MyEnum[]} "62"
-	* @property {InlineTuple} "63"
-	* @property {InlineTuple2} "64"
-	* @property {string} "65"
-	* @property {string} "66"
-	* @property {SkippedFieldWithinVariant} "67"
-	* @property {KebabCase} "68"
-	* @property {string[]} "69"
-	* @property {Issue281} "6a"
-	* @property {RenameWithWeirdCharsField} "6b"
-	* @property {RenameWithWeirdCharsVariant} "6c"
-	* @property {Issue374} "6d"
-	* @property {Type} "6e"
-	* @property {ActualType} "6f"
-	* @property {SpectaTypeOverride} "70"
-	* @property {InvalidToValidType} "71"
-	* @property {TupleStruct} "72"
-	* @property {TupleStructWithRep} "73"
-	* @property {GenericTupleStruct<string>} "74"
-	* @property {BracedStruct} "75"
-	* @property {StructRenameAllUppercase} "76"
-	* @property {RenameSerdeSpecialChar} "77"
-	* @property {EnumRenameAllUppercase} "78"
-	* @property {Recursive} "79"
-	* @property {RecursiveMapValue} "7a"
-	* @property {RecursiveTransparent} "7b"
-	* @property {RecursiveInEnum} "7c"
-	* @property {NonOptional} "7d"
-	* @property {OptionalOnNamedField} "7e"
-	* @property {OptionalOnTransparentNamedField} "7f"
-	* @property {OptionalInEnum} "80"
-	* @property {Optional} "81"
-	* @property {UntaggedVariants} "82"
-	* @property {UntaggedVariantsWithoutValue} "83"
-	* @property {{ [key in string]: null }} "84"
-	* @property {Regular} "85"
-	* @property {{ [key in never]: null }} "86"
-	* @property {Partial<{ [key in UnitVariants]: null }>} "87"
-	* @property {Partial<{ [key in UntaggedVariantsKey]: null }>} "88"
-	* @property {Partial<{ [key in Variants]: null }>} "89"
-	* @property {MacroStruct} "8a"
-	* @property {MacroStruct2} "8b"
-	* @property {MacroEnum} "8c"
-	* @property {DeprecatedType} "8d"
-	* @property {DeprecatedTypeWithMsg} "8e"
-	* @property {DeprecatedTypeWithMsg2} "8f"
-	* @property {DeprecatedFields} "90"
-	* @property {DeprecatedTupleVariant} "91"
-	* @property {DeprecatedEnumVariants} "92"
-	* @property {CommentedStruct} "93"
-	* @property {CommentedEnum} "94"
-	* @property {SingleLineComment} "95"
-	* @property {Demo<number, boolean>} "96"
-	* @property {Demo<number, boolean>} "97"
-	* @property {Demo<number, boolean>} "98"
-	* @property {Demo<number, boolean>} "99"
-	* @property {Demo<number, boolean>} "9a"
-	* @property {{ [key in string]: number }} "9b"
-	* @property {{ [key in number]: string }} "9c"
-	* @property {{ [key in string]: AGenericStruct<number> }} "9d"
-	* @property {AGenericStruct<number>} "9e"
-	* @property {A} "9f"
-	* @property {DoubleFlattened} a0
-	* @property {FlattenedInner} a1
-	* @property {BoxFlattened} a2
-	* @property {BoxInline} a3
-	* @property {First} a4
-	* @property {Second} a5
-	* @property {Third} a6
-	* @property {Fourth} a7
-	* @property {TagOnStructWithInline} a8
-	* @property {Sixth} a9
-	* @property {Seventh} aa
-	* @property {Eight} ab
-	* @property {Tenth} ac
-	* @property {MyEnumTagged} ad
-	* @property {MyEnumExternal} ae
-	* @property {MyEnumAdjacent} af
-	* @property {MyEnumUntagged} b0
-	* @property {EmptyStruct} b1
-	* @property {EmptyStructWithTag} b2
-	* @property {AdjacentlyTagged} b3
-	* @property {LoadProjectEvent} b4
-	* @property {ExternallyTagged} b5
-	* @property {InternallyTaggedB} b6
-	* @property {InternallyTaggedC} b7
-	* @property {InternallyTaggedD} b8
-	* @property {InternallyTaggedE} b9
-	* @property {InternallyTaggedF} ba
-	* @property {InternallyTaggedG} bb
-	* @property {InternallyTaggedH} bc
-	* @property {InternallyTaggedI} bd
-	* @property {InternallyTaggedL} be
-	* @property {InternallyTaggedM} bf
-	* @property {StructWithAlias} c0
-	* @property {StructWithMultipleAliases} c1
-	* @property {StructWithAliasAndRename} c2
-	* @property {EnumWithVariantAlias} c3
-	* @property {EnumWithMultipleVariantAliases} c4
-	* @property {EnumWithVariantAliasAndRename} c5
-	* @property {InternallyTaggedWithAlias} c6
-	* @property {AdjacentlyTaggedWithAlias} c7
-	* @property {UntaggedWithAlias} c8
-	* @property {EmptyEnum} c9
-	* @property {EmptyEnumTagged} ca
-	* @property {EmptyEnumTaggedWContent} cb
-	* @property {EmptyEnumUntagged} cc
-	* @property {TaggedEnumOfUnitStruct} cd
-	* @property {TaggedEnumOfEmptyBracedStruct} ce
-	* @property {TaggedEnumOfEmptyTupleStruct} cf
-	* @property {TaggedEnumOfEmptyTupleBracedStructs} d0
-	* @property {TaggedStructOfStructWithTuple} d1
-	* @property {SkipOnlyField} d2
-	* @property {SkipField} d3
-	* @property {SkipOnlyVariantExternallyTagged} d4
-	* @property {SkipOnlyVariantInternallyTagged} d5
-	* @property {SkipOnlyVariantAdjacentlyTagged} d6
-	* @property {SkipOnlyVariantUntagged} d7
-	* @property {SkipVariant} d8
-	* @property {SkipUnnamedFieldInVariant} d9
-	* @property {SkipNamedFieldInVariant} da
-	* @property {TransparentWithSkip} db
-	* @property {TransparentWithSkip2} dc
-	* @property {TransparentWithSkip3} dd
-	* @property {SkipVariant2} de
-	* @property {SkipVariant3} df
-	* @property {SkipStructFields} e0
-	* @property {SpectaSkipNonTypeField} e1
-	* @property {FlattenA} e2
-	* @property {FlattenB} e3
-	* @property {FlattenC} e4
-	* @property {FlattenD} e5
-	* @property {FlattenE} e6
-	* @property {FlattenF} e7
-	* @property {FlattenG} e8
-	* @property {TupleNested} e9
-	* @property {Generic1<null>} ea
-	* @property {GenericAutoBound<null>} eb
-	* @property {GenericAutoBound2<null>} ec
-	* @property {Container1} ed
-	* @property {Generic2<null, string, number>} ee
-	* @property {GenericNewType1<null>} ef
-	* @property {GenericTuple<null>} f0
-	* @property {GenericStruct2<null>} f1
-	* @property {string} f2
-	* @property {[string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | { Unnamed: string } | { Named: { value: string } }]} f3
-	* @property {InlineFlattenGenericsG<null>} f4
-	* @property {InlineFlattenGenerics} f5
-	* @property {GenericParameterOrderPreserved} f6
+	*	}} Duration
+	* @property {string} "&'static str"
+	* @property {boolean} "&'static bool"
+	* @property {number} "&'static i32"
+	* @property {number[]} "Vec<i32>"
+	* @property {number[]} "&'static [i32]"
+	* @property {[number, number, number]} "&'static [i32; 3]"
+	* @property {[number, number, number]} "[i32; 3]"
+	* @property {MyEnum[]} "Vec<MyEnum>"
+	* @property {MyEnum[]} "&'static [MyEnum]"
+	* @property {[MyEnum, MyEnum, MyEnum, MyEnum, MyEnum, MyEnum]} "&'static [MyEnum; 6]"
+	* @property {[MyEnum, MyEnum]} "[MyEnum; 2]"
+	* @property {[number]} "&'static [i32; 1]"
+	* @property {[]} "&'static [i32; 0]"
+	* @property {number | null} "Option<i32>"
+	* @property {null | null} "Option<()>"
+	* @property {number[] | null} "Option<Vec<i32>>"
+	* @property {(number | null)[]} "Vec<Option<Cow<'static, i32>>>"
+	* @property {number[] | null} "Option<Vec<Cow<'static, i32>>>"
+	* @property {[string[], string[], string[]]} "[Vec<String>; 3]"
+	* @property {string | null} "Option<Option<String>>"
+	* @property {string | null} "Option<Option<Option<String>>>"
+	* @property {null} "PhantomData<()>"
+	* @property {null} "PhantomData<String>"
+	* @property {never} Infallible
+	* @property {Unit1} Unit1
+	* @property {Unit2} Unit2
+	* @property {Unit3} Unit3
+	* @property {Unit4} Unit4
+	* @property {Unit5} Unit5
+	* @property {Unit6} Unit6
+	* @property {Unit7} Unit7
+	* @property {SimpleStruct} SimpleStruct
+	* @property {TupleStruct1} TupleStruct1
+	* @property {TupleStruct3} TupleStruct3
+	* @property {TestEnum} TestEnum
+	* @property {RefStruct} RefStruct
+	* @property {InlinerStruct} InlinerStruct
+	* @property {GenericStruct<number>} "GenericStruct<i32>"
+	* @property {GenericStruct<string>} "GenericStruct<String>"
+	* @property {FlattenEnumStruct} FlattenEnumStruct
+	* @property {OverridenStruct} OverridenStruct
+	* @property {HasGenericAlias} HasGenericAlias
+	* @property {EnumMacroAttributes} EnumMacroAttributes
+	* @property {InlineEnumField} InlineEnumField
+	* @property {InlineOptionalType} InlineOptionalType
+	* @property {Rename} Rename
+	* @property {TransparentType} TransparentType
+	* @property {TransparentType2} TransparentType2
+	* @property {TransparentTypeWithOverride} TransparentTypeWithOverride
+	* @property {[(number | null), (number | null), (number | null)]} "[Option<u8>; 3]"
+	* @property {Partial<{ [key in BasicEnum]: null }>} "HashMap<BasicEnum, ()>"
+	* @property {number | null} "Option<Option<Option<Option<i32>>>>"
+	* @property {PlaceholderInnerField[]} "Vec<PlaceholderInnerField>"
+	* @property {Partial<{ [key in BasicEnum]: number }>} "HashMap<BasicEnum, i32>"
+	* @property {EnumReferenceRecordKey} EnumReferenceRecordKey
+	* @property {FlattenOnNestedEnum} FlattenOnNestedEnum
+	* @property {MyEmptyInput} MyEmptyInput
+	* @property {string} "(String)"
+	* @property {[string]} "(String,)"
+	* @property {ExtraBracketsInTupleVariant} ExtraBracketsInTupleVariant
+	* @property {ExtraBracketsInUnnamedStruct} ExtraBracketsInUnnamedStruct
+	* @property {MyEnum[]} "Vec<MyEnum>"
+	* @property {InlineTuple} InlineTuple
+	* @property {InlineTuple2} InlineTuple2
+	* @property {string} "Box<str>"
+	* @property {string} "Box<String>"
+	* @property {SkippedFieldWithinVariant} SkippedFieldWithinVariant
+	* @property {KebabCase} KebabCase
+	* @property {string[]} "&[&str]"
+	* @property {Issue281} "Issue281<'_>"
+	* @property {RenameWithWeirdCharsField} RenameWithWeirdCharsField
+	* @property {RenameWithWeirdCharsVariant} RenameWithWeirdCharsVariant
+	* @property {Issue374} Issue374
+	* @property {Type} "type_type::Type"
+	* @property {ActualType} ActualType
+	* @property {SpectaTypeOverride} SpectaTypeOverride
+	* @property {string} ContainerTypeOverrideStruct
+	* @property {string} ContainerTypeOverrideEnum
+	* @property {string} "ContainerTypeOverrideGeneric<Box<dyn Any>>"
+	* @property {number} "ContainerTypeOverrideToGeneric<i32>"
+	* @property {[string, number]} ContainerTypeOverrideTuple
+	* @property {[number, string]} "ContainerTypeOverrideTupleGeneric<i32>"
+	* @property {InvalidToValidType} InvalidToValidType
+	* @property {TupleStruct} TupleStruct
+	* @property {TupleStructWithRep} TupleStructWithRep
+	* @property {GenericTupleStruct<string>} "GenericTupleStruct<String>"
+	* @property {BracedStruct} BracedStruct
+	* @property {StructRenameAllUppercase} StructRenameAllUppercase
+	* @property {RenameSerdeSpecialChar} RenameSerdeSpecialChar
+	* @property {EnumRenameAllUppercase} EnumRenameAllUppercase
+	* @property {Recursive} Recursive
+	* @property {RecursiveMapValue} RecursiveMapValue
+	* @property {RecursiveTransparent} RecursiveTransparent
+	* @property {RecursiveInEnum} RecursiveInEnum
+	* @property {NonOptional} NonOptional
+	* @property {OptionalOnNamedField} OptionalOnNamedField
+	* @property {OptionalOnTransparentNamedField} OptionalOnTransparentNamedField
+	* @property {OptionalInEnum} OptionalInEnum
+	* @property {Optional} Optional
+	* @property {UntaggedVariants} UntaggedVariants
+	* @property {UntaggedVariantsWithoutValue} UntaggedVariantsWithoutValue
+	* @property {{ [key in string]: null }} "HashMap<String, ()>"
+	* @property {Regular} Regular
+	* @property {{ [key in never]: null }} "HashMap<Infallible, ()>"
+	* @property {Partial<{ [key in UnitVariants]: null }>} "HashMap<UnitVariants, ()>"
+	* @property {Partial<{ [key in UntaggedVariantsKey]: null }>} "HashMap<UntaggedVariantsKey, ()>"
+	* @property {Partial<{ [key in Variants]: null }>} "HashMap<Variants, ()>"
+	* @property {MacroStruct} MacroStruct
+	* @property {MacroStruct2} MacroStruct2
+	* @property {MacroEnum} MacroEnum
+	* @property {DeprecatedType} DeprecatedType
+	* @property {DeprecatedTypeWithMsg} DeprecatedTypeWithMsg
+	* @property {DeprecatedTypeWithMsg2} DeprecatedTypeWithMsg2
+	* @property {DeprecatedFields} DeprecatedFields
+	* @property {DeprecatedTupleVariant} DeprecatedTupleVariant
+	* @property {DeprecatedEnumVariants} DeprecatedEnumVariants
+	* @property {CommentedStruct} CommentedStruct
+	* @property {CommentedEnum} CommentedEnum
+	* @property {SingleLineComment} SingleLineComment
+	* @property {Demo<number, boolean>} NonGeneric
+	* @property {Demo<number, boolean>} "HalfGenericA<u8>"
+	* @property {Demo<number, boolean>} "HalfGenericB<bool>"
+	* @property {Demo<number, boolean>} "FullGeneric<u8, bool>"
+	* @property {Demo<number, boolean>} "Another<bool>"
+	* @property {{ [key in string]: number }} "MapA<u32>"
+	* @property {{ [key in number]: string }} "MapB<u32>"
+	* @property {{ [key in string]: AGenericStruct<number> }} "MapC<u32>"
+	* @property {AGenericStruct<number>} "AGenericStruct<u32>"
+	* @property {A} A
+	* @property {DoubleFlattened} DoubleFlattened
+	* @property {FlattenedInner} FlattenedInner
+	* @property {BoxFlattened} BoxFlattened
+	* @property {BoxInline} BoxInline
+	* @property {First} First
+	* @property {Second} Second
+	* @property {Third} Third
+	* @property {Fourth} Fourth
+	* @property {TagOnStructWithInline} TagOnStructWithInline
+	* @property {Sixth} Sixth
+	* @property {Seventh} Seventh
+	* @property {Eight} Eight
+	* @property {Tenth} Tenth
+	* @property {MyEnumTagged} MyEnumTagged
+	* @property {MyEnumExternal} MyEnumExternal
+	* @property {MyEnumAdjacent} MyEnumAdjacent
+	* @property {MyEnumUntagged} MyEnumUntagged
+	* @property {EmptyStruct} EmptyStruct
+	* @property {EmptyStructWithTag} EmptyStructWithTag
+	* @property {AdjacentlyTagged} AdjacentlyTagged
+	* @property {LoadProjectEvent} LoadProjectEvent
+	* @property {ExternallyTagged} ExternallyTagged
+	* @property {InternallyTaggedB} InternallyTaggedB
+	* @property {InternallyTaggedC} InternallyTaggedC
+	* @property {InternallyTaggedD} InternallyTaggedD
+	* @property {InternallyTaggedE} InternallyTaggedE
+	* @property {InternallyTaggedF} InternallyTaggedF
+	* @property {InternallyTaggedG} InternallyTaggedG
+	* @property {InternallyTaggedH} InternallyTaggedH
+	* @property {InternallyTaggedI} InternallyTaggedI
+	* @property {InternallyTaggedL} InternallyTaggedL
+	* @property {InternallyTaggedM} InternallyTaggedM
+	* @property {StructWithAlias} StructWithAlias
+	* @property {StructWithMultipleAliases} StructWithMultipleAliases
+	* @property {StructWithAliasAndRename} StructWithAliasAndRename
+	* @property {EnumWithVariantAlias} EnumWithVariantAlias
+	* @property {EnumWithMultipleVariantAliases} EnumWithMultipleVariantAliases
+	* @property {EnumWithVariantAliasAndRename} EnumWithVariantAliasAndRename
+	* @property {InternallyTaggedWithAlias} InternallyTaggedWithAlias
+	* @property {AdjacentlyTaggedWithAlias} AdjacentlyTaggedWithAlias
+	* @property {UntaggedWithAlias} UntaggedWithAlias
+	* @property {EmptyEnum} EmptyEnum
+	* @property {EmptyEnumTagged} EmptyEnumTagged
+	* @property {EmptyEnumTaggedWContent} EmptyEnumTaggedWContent
+	* @property {EmptyEnumUntagged} EmptyEnumUntagged
+	* @property {TaggedEnumOfUnitStruct} TaggedEnumOfUnitStruct
+	* @property {TaggedEnumOfEmptyBracedStruct} TaggedEnumOfEmptyBracedStruct
+	* @property {TaggedEnumOfEmptyTupleStruct} TaggedEnumOfEmptyTupleStruct
+	* @property {TaggedEnumOfEmptyTupleBracedStructs} TaggedEnumOfEmptyTupleBracedStructs
+	* @property {TaggedStructOfStructWithTuple} TaggedStructOfStructWithTuple
+	* @property {SkipOnlyField} SkipOnlyField
+	* @property {SkipField} SkipField
+	* @property {SkipOnlyVariantExternallyTagged} SkipOnlyVariantExternallyTagged
+	* @property {SkipOnlyVariantInternallyTagged} SkipOnlyVariantInternallyTagged
+	* @property {SkipOnlyVariantAdjacentlyTagged} SkipOnlyVariantAdjacentlyTagged
+	* @property {SkipOnlyVariantUntagged} SkipOnlyVariantUntagged
+	* @property {SkipVariant} SkipVariant
+	* @property {SkipUnnamedFieldInVariant} SkipUnnamedFieldInVariant
+	* @property {SkipNamedFieldInVariant} SkipNamedFieldInVariant
+	* @property {TransparentWithSkip} TransparentWithSkip
+	* @property {TransparentWithSkip2} TransparentWithSkip2
+	* @property {TransparentWithSkip3} TransparentWithSkip3
+	* @property {SkipVariant2} SkipVariant2
+	* @property {SkipVariant3} SkipVariant3
+	* @property {SkipStructFields} SkipStructFields
+	* @property {SpectaSkipNonTypeField} SpectaSkipNonTypeField
+	* @property {FlattenA} FlattenA
+	* @property {FlattenB} FlattenB
+	* @property {FlattenC} FlattenC
+	* @property {FlattenD} FlattenD
+	* @property {FlattenE} FlattenE
+	* @property {FlattenF} FlattenF
+	* @property {FlattenG} FlattenG
+	* @property {TupleNested} TupleNested
+	* @property {Generic1<null>} "Generic1<()>"
+	* @property {GenericAutoBound<null>} "GenericAutoBound<()>"
+	* @property {GenericAutoBound2<null>} "GenericAutoBound2<()>"
+	* @property {Container1} Container1
+	* @property {Generic2<null, string, number>} "Generic2<(), String, i32>"
+	* @property {GenericNewType1<null>} "GenericNewType1<()>"
+	* @property {GenericTuple<null>} "GenericTuple<()>"
+	* @property {GenericStruct2<null>} "GenericStruct2<()>"
+	* @property {string} "InlineGenericNewtype<String>"
+	* @property {[string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | { Unnamed: string } | { Named: { value: string } }]} "InlineGenericNested<String>"
+	* @property {InlineFlattenGenericsG<null>} "InlineFlattenGenericsG<()>"
+	* @property {InlineFlattenGenerics} InlineFlattenGenerics
+	* @property {GenericParameterOrderPreserved} GenericParameterOrderPreserved
 	*
 	* @typedef {{
 	*		demo: Recursive,
@@ -1392,10 +1404,12 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		string_ident: string,
 	*		u32_ident: number,
 	*		path: string,
+	*		tuple: [string, number],
 	*	}} SpectaTypeOverride
 	* @property {string} string_ident
 	* @property {number} u32_ident
 	* @property {string} path
+	* @property {[string, number]} tuple
 	*
 	* @typedef {{
 	*		A: number,

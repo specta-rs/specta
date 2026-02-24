@@ -30,6 +30,12 @@ pub fn decode_field_attrs<'a>(
                     "specta: invalid formatted attribute",
                 ));
             }
+            Some(crate::utils::AttributeValue::Expr(_)) => {
+                return Err(syn::Error::new(
+                    attr.key.span(),
+                    "specta: invalid formatted attribute",
+                ));
+            }
             Some(crate::utils::AttributeValue::Attribute {
                 attr: inner_attrs, ..
             }) => {

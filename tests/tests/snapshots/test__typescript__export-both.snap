@@ -136,7 +136,20 @@ SpectaTypeOverride: export type SpectaTypeOverride = {
 	string_ident: string,
 	u32_ident: number,
 	path: string,
+	tuple: [string, number],
 };
+
+ContainerTypeOverrideStruct: export type ContainerTypeOverrideStruct = string;
+
+ContainerTypeOverrideEnum: export type ContainerTypeOverrideEnum = string;
+
+ContainerTypeOverrideGeneric<Box<dyn Any>>: export type ContainerTypeOverrideGeneric<T> = string;
+
+ContainerTypeOverrideToGeneric<i32>: export type ContainerTypeOverrideToGeneric<T> = T;
+
+ContainerTypeOverrideTuple: export type ContainerTypeOverrideTuple = [string, number];
+
+ContainerTypeOverrideTupleGeneric<i32>: export type ContainerTypeOverrideTupleGeneric<T> = [T, string];
 
 InvalidToValidType: export type InvalidToValidType = {
 	cause: null | null,

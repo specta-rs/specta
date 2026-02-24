@@ -136,7 +136,20 @@ export type SpectaTypeOverride = {
 	string_ident: string,
 	u32_ident: number,
 	path: string,
+	tuple: [string, number],
 };
+
+export type ContainerTypeOverrideStruct = string;
+
+export type ContainerTypeOverrideEnum = string;
+
+export type ContainerTypeOverrideGeneric<T> = string;
+
+export type ContainerTypeOverrideToGeneric<T> = T;
+
+export type ContainerTypeOverrideTuple = [string, number];
+
+export type ContainerTypeOverrideTupleGeneric<T> = [T, string];
 
 export type InvalidToValidType = {
 	cause: null | null,

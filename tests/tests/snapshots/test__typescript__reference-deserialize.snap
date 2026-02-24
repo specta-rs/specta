@@ -43,6 +43,12 @@ Issue374: Issue374
 type_type::Type: Type
 ActualType: ActualType
 SpectaTypeOverride: SpectaTypeOverride
+ContainerTypeOverrideStruct: string
+ContainerTypeOverrideEnum: string
+ContainerTypeOverrideGeneric<Box<dyn Any>>: string
+ContainerTypeOverrideToGeneric<i32>: number
+ContainerTypeOverrideTuple: [string, number]
+ContainerTypeOverrideTupleGeneric<i32>: [number, string]
 InvalidToValidType: InvalidToValidType
 TupleStruct: TupleStruct
 TupleStructWithRep: TupleStructWithRep

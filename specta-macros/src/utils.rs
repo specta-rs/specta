@@ -1,7 +1,7 @@
 use proc_macro2::Span;
 use quote::ToTokens;
 use syn::{
-    Ident, Lit, Meta, Path, Result, Token,
+    Expr, Ident, Lit, Meta, Path, Result, Token, Type, TypePath,
     ext::IdentExt,
     parse::{Parse, ParseStream},
     spanned::Spanned,
@@ -15,6 +15,9 @@ pub enum AttributeValue {
     /// Path value. Eg. `#[specta(type = String)]` or `#[specta(type = ::std::string::String)]`
     /// Path doesn't follow the Rust spec hence the need for this custom parser. We are doing this anyway for backwards compatibility.
     Path(Path),
+    /// Expression value for values that are not valid paths.
+    /// This allows us to later parse richer forms such as tuple/array/reference types.
+    Expr(Expr),
     /// A nested attribute. Eg. the `deprecated(note = "some note") in `#[specta(deprecated(note = "some note"))]`
     Attribute { span: Span, attr: Vec<Attribute> },
 }
@@ -24,6 +27,7 @@ impl AttributeValue {
         match self {
             Self::Lit(lit) => lit.span(),
             Self::Path(path) => path.span(),
+            Self::Expr(expr) => expr.span(),
             Self::Attribute { span, .. } => *span,
         }
     }
@@ -33,7 +37,13 @@ impl Parse for AttributeValue {
     fn parse(input: ParseStream) -> Result<Self> {
         Ok(match input.peek(Lit) {
             true => Self::Lit(input.parse()?),
-            false => Self::Path(input.parse()?),
+            false => {
+                if input.fork().parse::<Path>().is_ok() {
+                    Self::Path(input.parse()?)
+                } else {
+                    Self::Expr(input.parse()?)
+                }
+            }
         })
     }
 }
@@ -81,9 +91,29 @@ impl Attribute {
     pub fn parse_path(&self) -> Result<Path> {
         match &self.value {
             Some(AttributeValue::Path(path)) => Ok(path.clone()),
+            Some(AttributeValue::Expr(Expr::Path(path))) => Ok(path.path.clone()),
             _ => Err(syn::Error::new(
                 self.value_span(),
                 "specta: expected path. Eg. `String` or `std::string::String`",
+            )),
+        }
+    }
+
+    pub fn parse_type(&self) -> Result<Type> {
+        match &self.value {
+            Some(AttributeValue::Path(path)) => Ok(Type::Path(TypePath {
+                qself: None,
+                path: path.clone(),
+            })),
+            Some(AttributeValue::Expr(expr)) => syn::parse2(expr.to_token_stream()).map_err(|_| {
+                syn::Error::new(
+                    self.value_span(),
+                    "specta: expected type. Eg. `String`, `(String, i32)` or `Vec<T>`",
+                )
+            }),
+            _ => Err(syn::Error::new(
+                self.value_span(),
+                "specta: expected type. Eg. `String`, `(String, i32)` or `Vec<T>`",
             )),
         }
     }

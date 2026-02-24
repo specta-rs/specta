@@ -51,6 +51,9 @@ impl RustCAttr {
                 Some(AttributeValue::Path(_)) => {
                     unreachable!("deprecated attribute can't be a path!")
                 }
+                Some(AttributeValue::Expr(_)) => {
+                    unreachable!("deprecated attribute can't be an expression!")
+                }
                 Some(AttributeValue::Attribute { attr, .. }) => {
                     let since = attr
                         .iter()

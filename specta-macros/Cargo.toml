@@ -25,5 +25,5 @@ workspace = true
 [dependencies]
 proc-macro2 = "1"
 quote = "1"
-syn = { version = "2", features = ["full"] }  # TODO: default-features = false,
+syn = { version = "2", features = ["full", "visit"] }  # TODO: default-features = false,
 Inflector = { version = "0.11", default-features = false }
