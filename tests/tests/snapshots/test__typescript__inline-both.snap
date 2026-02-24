@@ -180,6 +180,7 @@ SpectaTypeOverride: {
 ContainerTypeOverrideStruct: string
 ContainerTypeOverrideEnum: string
 ContainerTypeOverrideGeneric<Box<dyn Any>>: string
+ContainerTypeOverrideToGeneric<i32>: number
 InvalidToValidType: {
 	cause: null | null,
 }

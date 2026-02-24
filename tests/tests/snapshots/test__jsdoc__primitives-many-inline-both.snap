@@ -202,6 +202,8 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*
 	* @typedef {string} ContainerTypeOverrideGeneric<T>
 	*
+	* @typedef {T} ContainerTypeOverrideToGeneric<T>
+	*
 	* @typedef {{
 	*		cause: null | null,
 	*	}} InvalidToValidType

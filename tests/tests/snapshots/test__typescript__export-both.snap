@@ -144,6 +144,8 @@ ContainerTypeOverrideEnum: export type ContainerTypeOverrideEnum = string;
 
 ContainerTypeOverrideGeneric<Box<dyn Any>>: export type ContainerTypeOverrideGeneric<T> = string;
 
+ContainerTypeOverrideToGeneric<i32>: export type ContainerTypeOverrideToGeneric<T> = T;
+
 InvalidToValidType: export type InvalidToValidType = {
 	cause: null | null,
 };

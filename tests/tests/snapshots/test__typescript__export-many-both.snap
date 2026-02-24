@@ -144,6 +144,8 @@ export type ContainerTypeOverrideEnum = string;
 
 export type ContainerTypeOverrideGeneric<T> = string;
 
+export type ContainerTypeOverrideToGeneric<T> = T;
+
 export type InvalidToValidType = {
 	cause: null | null,
 };

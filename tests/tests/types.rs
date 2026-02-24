@@ -27,7 +27,6 @@ macro_rules! types {
         let mut types = specta::TypeCollection::default();
         let mut dts = Vec::new();
         let mut s = specta::datatype::Struct::named();
-        let mut i = 0;
 
         $({
             let ty = <$t as specta::Type>::definition(&mut types);
@@ -36,8 +35,7 @@ macro_rules! types {
             // but unlike it also storing the resulting `DataType` for testing the primitives.
             dts.push((stringify!($t), ty.clone()));
 
-            i += 1;
-            s = s.field(format!("{i:x}"), specta::datatype::Field::new(ty));
+            s = s.field(stringify!($t), specta::datatype::Field::new(ty));
         })*
 
         // This allows us to end-to-end test primitives.
@@ -222,6 +220,7 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         ContainerTypeOverrideStruct,
         ContainerTypeOverrideEnum,
         ContainerTypeOverrideGeneric<Box<dyn Any>>,
+        ContainerTypeOverrideToGeneric<i32>,
         InvalidToValidType,
 
         // `#[specta(transparent)]`
@@ -852,6 +851,10 @@ enum ContainerTypeOverrideEnum {
 #[derive(Type)]
 #[specta(collect = false, type = String)]
 struct ContainerTypeOverrideGeneric<T>(std::marker::PhantomData<T>);
+
+#[derive(Type)]
+#[specta(collect = false, type = T)]
+struct ContainerTypeOverrideToGeneric<T>(std::marker::PhantomData<T>);
 
 // Checking that you can override the type of a field that is invalid. This is to ensure user code can override Specta in the case we have a bug/unsupported type.
 #[derive(Type)]
