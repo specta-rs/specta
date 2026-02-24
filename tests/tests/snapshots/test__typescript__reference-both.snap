@@ -70,6 +70,7 @@ OptionalInEnum: OptionalInEnum
 Optional: Optional
 UntaggedVariants: UntaggedVariants
 UntaggedVariantsWithoutValue: UntaggedVariantsWithoutValue
+UntaggedVariantsWithDuplicateBranches: UntaggedVariantsWithDuplicateBranches
 Regular: Regular
 MacroStruct: MacroStruct
 MacroStruct2: MacroStruct2

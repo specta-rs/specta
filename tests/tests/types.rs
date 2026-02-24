@@ -259,6 +259,7 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
 
         UntaggedVariants,
         UntaggedVariantsWithoutValue,
+        UntaggedVariantsWithDuplicateBranches,
 
         // Valid Map keys
         HashMap<String, ()>,
@@ -1120,6 +1121,15 @@ enum UntaggedVariantsWithoutValue {
     A(String),
     B(i32, String),
     C(u8),
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum UntaggedVariantsWithDuplicateBranches {
+    A(()),
+    B(i32),
+    C(()),
 }
 
 #[derive(Type, Serialize)]

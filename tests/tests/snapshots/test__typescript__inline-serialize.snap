@@ -64,7 +64,7 @@ Vec<MyEnum>: MyEnum[]
 &'static [i32; 1]: [number]
 &'static [i32; 0]: []
 Option<i32>: number | null
-Option<()>: null | null
+Option<()>: null
 Option<Vec<i32>>: number[] | null
 Vec<Option<Cow<'static, i32>>>: (number | null)[]
 Option<Vec<Cow<'static, i32>>>: number[] | null
@@ -194,7 +194,7 @@ ContainerTypeOverrideToGeneric<i32>: number
 ContainerTypeOverrideTuple: [string, number]
 ContainerTypeOverrideTupleGeneric<i32>: [number, string]
 InvalidToValidType: {
-	cause: null | null,
+	cause: null,
 }
 TupleStruct: string
 TupleStructWithRep: string
@@ -230,6 +230,7 @@ Optional: {
 }
 UntaggedVariants: string | number | { id: string } | [string, boolean]
 UntaggedVariantsWithoutValue: string | [number, string] | number
+UntaggedVariantsWithDuplicateBranches: null | number
 HashMap<String, ()>: { [key in string]: null }
 Regular: { [key in string]: null }
 HashMap<Infallible, ()>: { [key in never]: null }
@@ -425,7 +426,7 @@ MyEnumUntagged: (First)
 EmptyStruct: Record<string, never>
 EmptyStructWithTag: Record<string, never>
 AdjacentlyTagged: A | { id: string; method: string } | string
-LoadProjectEvent: { project_name: string } | { project_name: string; status: string; progress: number } | { project_name: string }
+LoadProjectEvent: { project_name: string } | { project_name: string; status: string; progress: number }
 ExternallyTagged: "A" | { B: { id: string; method: string } } | { C: string }
 InternallyTaggedB: string
 InternallyTaggedC: string[]

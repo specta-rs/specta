@@ -184,7 +184,8 @@ pub(crate) fn datatype_inner(
                     v
                 },
             ];
-            variants.dedup();
+            let mut seen = BTreeSet::new();
+            variants.retain(|variant| seen.insert(variant.clone()));
             s.push_str(&variants.join(" | "));
             return Ok(());
         }
@@ -674,7 +675,8 @@ pub(crate) fn enum_datatype(
             ))
         })
         .collect::<Result<Vec<_>>>()?;
-    variants.dedup();
+    let mut seen = BTreeSet::new();
+    variants.retain(|variant| seen.insert(variant.clone()));
 
     // If all variants are skipped, the enum has no valid values
     if variants.is_empty() {

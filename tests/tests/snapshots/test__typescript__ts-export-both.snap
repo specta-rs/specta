@@ -413,7 +413,7 @@ export type InternallyTaggedMInner = null;
 export type InternallyTaggedWithAlias = { type: "A"; field: string } | { type: "B"; other: number };
 
 export type InvalidToValidType = {
-	cause: null | null,
+	cause: null,
 };
 
 export type Issue281 = {
@@ -557,7 +557,7 @@ export type Primitives = {
 	"&'static [i32; 1]": [number],
 	"&'static [i32; 0]": [],
 	"Option<i32>": number | null,
-	"Option<()>": null | null,
+	"Option<()>": null,
 	"Option<Vec<i32>>": number[] | null,
 	"Vec<Option<Cow<'static, i32>>>": (number | null)[],
 	"Option<Vec<Cow<'static, i32>>>": number[] | null,
@@ -646,6 +646,7 @@ export type Primitives = {
 	Optional: Optional,
 	UntaggedVariants: UntaggedVariants,
 	UntaggedVariantsWithoutValue: UntaggedVariantsWithoutValue,
+	UntaggedVariantsWithDuplicateBranches: UntaggedVariantsWithDuplicateBranches,
 	"HashMap<String, ()>": { [key in string]: null },
 	Regular: Regular,
 	"HashMap<Infallible, ()>": { [key in never]: null },
@@ -987,6 +988,8 @@ export type UnitVariants = "A" | "B" | "C";
 export type UntaggedVariants = string | number | { id: string } | [string, boolean];
 
 export type UntaggedVariantsKey = string | number;
+
+export type UntaggedVariantsWithDuplicateBranches = null | number;
 
 export type UntaggedVariantsWithoutValue = string | [number, string] | number;
 

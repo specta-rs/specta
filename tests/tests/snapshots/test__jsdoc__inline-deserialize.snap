@@ -597,9 +597,9 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {{ type: "B"; other: number }} B
 	*
 	* @typedef {{
-	*		cause: null | null,
+	*		cause: null,
 	*	}} InvalidToValidType
-	* @property {null | null} cause
+	* @property {null} cause
 	*
 	* @typedef {{
 	*		default_unity_arguments: string[],
@@ -782,7 +782,7 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		"&'static [i32; 1]": [number],
 	*		"&'static [i32; 0]": [],
 	*		"Option<i32>": number | null,
-	*		"Option<()>": null | null,
+	*		"Option<()>": null,
 	*		"Option<Vec<i32>>": number[] | null,
 	*		"Vec<Option<Cow<'static, i32>>>": (number | null)[],
 	*		"Option<Vec<Cow<'static, i32>>>": number[] | null,
@@ -871,6 +871,7 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		Optional: Optional,
 	*		UntaggedVariants: UntaggedVariants,
 	*		UntaggedVariantsWithoutValue: UntaggedVariantsWithoutValue,
+	*		UntaggedVariantsWithDuplicateBranches: UntaggedVariantsWithDuplicateBranches,
 	*		"HashMap<String, ()>": { [key in string]: null },
 	*		Regular: Regular,
 	*		"HashMap<Infallible, ()>": { [key in never]: null },
@@ -1049,7 +1050,7 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {[number]} "&'static [i32; 1]"
 	* @property {[]} "&'static [i32; 0]"
 	* @property {number | null} "Option<i32>"
-	* @property {null | null} "Option<()>"
+	* @property {null} "Option<()>"
 	* @property {number[] | null} "Option<Vec<i32>>"
 	* @property {(number | null)[]} "Vec<Option<Cow<'static, i32>>>"
 	* @property {number[] | null} "Option<Vec<Cow<'static, i32>>>"
@@ -1138,6 +1139,7 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {Optional} Optional
 	* @property {UntaggedVariants} UntaggedVariants
 	* @property {UntaggedVariantsWithoutValue} UntaggedVariantsWithoutValue
+	* @property {UntaggedVariantsWithDuplicateBranches} UntaggedVariantsWithDuplicateBranches
 	* @property {{ [key in string]: null }} "HashMap<String, ()>"
 	* @property {Regular} Regular
 	* @property {{ [key in never]: null }} "HashMap<Infallible, ()>"
@@ -1594,6 +1596,11 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {string} A
 	* @property {number} B
 	* @property {number} C
+	*
+	* @typedef {null | number} UntaggedVariantsWithDuplicateBranches
+	* @property {null} A
+	* @property {number} B
+	* @property {null} C
 	*
 	* @typedef {string | [number, string] | number} UntaggedVariantsWithoutValue
 	* @property {string} A

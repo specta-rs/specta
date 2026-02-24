@@ -620,8 +620,9 @@ fn shallow_inline_datatype(
             }
         }
         DataType::Nullable(dt) => {
+            let mut inner = String::new();
             shallow_inline_datatype(
-                s,
+                &mut inner,
                 exporter,
                 types,
                 dt,
@@ -630,7 +631,9 @@ fn shallow_inline_datatype(
                 prefix,
                 generics,
             )?;
-            if !s.ends_with(" | null") {
+
+            s.push_str(&inner);
+            if inner != "null" && !inner.ends_with(" | null") {
                 s.push_str(" | null");
             }
         }
@@ -869,8 +872,9 @@ fn inline_datatype(
         }
         DataType::Map(m) => map_dt(s, exporter, types, m, location, generics)?,
         DataType::Nullable(def) => {
+            let mut inner = String::new();
             inline_datatype(
-                s,
+                &mut inner,
                 exporter,
                 types,
                 def,
@@ -880,9 +884,10 @@ fn inline_datatype(
                 depth + 1,
                 generics,
             )?;
-            let or_null = " | null";
-            if !s.ends_with(&or_null) {
-                s.push_str(or_null);
+
+            s.push_str(&inner);
+            if inner != "null" && !inner.ends_with(" | null") {
+                s.push_str(" | null");
             }
         }
         DataType::Struct(st) => {
@@ -1031,6 +1036,7 @@ pub(crate) fn datatype(
         DataType::Map(m) => map_dt(s, exporter, types, m, location, generics)?,
         DataType::Nullable(def) => {
             // TODO: Replace legacy stuff
+            let mut inner = String::new();
             crate::legacy::datatype_inner(
                 crate::legacy::ExportContext {
                     cfg: exporter,
@@ -1038,13 +1044,13 @@ pub(crate) fn datatype(
                 },
                 &specta::datatype::FunctionReturnType::Value((**def).clone()),
                 types,
-                s,
+                &mut inner,
                 generics,
             )?;
 
-            let or_null = " | null";
-            if !s.ends_with(&or_null) {
-                s.push_str(or_null);
+            s.push_str(&inner);
+            if inner != "null" && !inner.ends_with(" | null") {
+                s.push_str(" | null");
             }
 
             // datatype(s, ts, types, &*t, location, state)?;

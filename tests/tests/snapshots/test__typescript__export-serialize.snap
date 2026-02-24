@@ -163,7 +163,7 @@ ContainerTypeOverrideTuple: export type ContainerTypeOverrideTuple = [string, nu
 ContainerTypeOverrideTupleGeneric<i32>: export type ContainerTypeOverrideTupleGeneric<T> = [T, string];
 
 InvalidToValidType: export type InvalidToValidType = {
-	cause: null | null,
+	cause: null,
 };
 
 TupleStruct: export type TupleStruct = string;
@@ -217,6 +217,8 @@ Optional: export type Optional = {
 UntaggedVariants: export type UntaggedVariants = string | number | { id: string } | [string, boolean];
 
 UntaggedVariantsWithoutValue: export type UntaggedVariantsWithoutValue = string | [number, string] | number;
+
+UntaggedVariantsWithDuplicateBranches: export type UntaggedVariantsWithDuplicateBranches = null | number;
 
 Regular: export type Regular = { [key in string]: null };
 
@@ -462,7 +464,7 @@ EmptyStructWithTag: export type EmptyStructWithTag = Record<string, never>;
 
 AdjacentlyTagged: export type AdjacentlyTagged = A | { id: string; method: string } | string;
 
-LoadProjectEvent: export type LoadProjectEvent = { project_name: string } | { project_name: string; status: string; progress: number } | { project_name: string };
+LoadProjectEvent: export type LoadProjectEvent = { project_name: string } | { project_name: string; status: string; progress: number };
 
 ExternallyTagged: export type ExternallyTagged = "A" | { B: { id: string; method: string } } | { C: string };
 

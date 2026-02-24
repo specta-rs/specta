@@ -163,7 +163,7 @@ export type ContainerTypeOverrideTuple = [string, number];
 export type ContainerTypeOverrideTupleGeneric<T> = [T, string];
 
 export type InvalidToValidType = {
-	cause: null | null,
+	cause: null,
 };
 
 export type TupleStruct = string;
@@ -217,6 +217,8 @@ export type Optional = {
 export type UntaggedVariants = string | number | { id: string } | [string, boolean];
 
 export type UntaggedVariantsWithoutValue = string | [number, string] | number;
+
+export type UntaggedVariantsWithDuplicateBranches = null | number;
 
 export type Regular = { [key in string]: null };
 
@@ -462,7 +464,7 @@ export type EmptyStructWithTag = Record<string, never>;
 
 export type AdjacentlyTagged = A | { id: string; method: string } | string;
 
-export type LoadProjectEvent = { project_name: string } | { project_name: string; status: string; progress: number } | { project_name: string };
+export type LoadProjectEvent = { project_name: string } | { project_name: string; status: string; progress: number };
 
 export type ExternallyTagged = "A" | { B: { id: string; method: string } } | { C: string };
 

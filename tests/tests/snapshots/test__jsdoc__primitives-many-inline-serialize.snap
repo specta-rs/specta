@@ -229,9 +229,9 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @typedef {[T, string]} ContainerTypeOverrideTupleGeneric<T>
 	*
 	* @typedef {{
-	*		cause: null | null,
+	*		cause: null,
 	*	}} InvalidToValidType
-	* @property {null | null} cause
+	* @property {null} cause
 	*
 	* @typedef {string} TupleStruct
 	* @property {string} "0"
@@ -316,6 +316,11 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {string} A
 	* @property {[number, string]} B
 	* @property {number} C
+	*
+	* @typedef {null | number} UntaggedVariantsWithDuplicateBranches
+	* @property {null} A
+	* @property {number} B
+	* @property {null} C
 	*
 	* @typedef {{ [key in string]: null }} Regular
 	* @property {{ [key in string]: null }} "0"
@@ -663,7 +668,7 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {{ id: string; method: string }} B
 	* @property {string} C
 	*
-	* @typedef {{ project_name: string } | { project_name: string; status: string; progress: number } | { project_name: string }} LoadProjectEvent
+	* @typedef {{ project_name: string } | { project_name: string; status: string; progress: number }} LoadProjectEvent
 	* @property {{ project_name: string }} Started
 	* @property {{ project_name: string; status: string; progress: number }} ProgressTest
 	* @property {{ project_name: string }} Finished
