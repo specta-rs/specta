@@ -1,4 +1,4 @@
-use syn::{Result, Type, TypePath};
+use syn::{Result, Type};
 
 use crate::utils::{AttrExtract, Attribute};
 
@@ -21,10 +21,7 @@ impl FieldAttr {
         };
 
         if let Some(attr) = attrs.extract("specta", "type") {
-            result.r#type = result.r#type.take().or(Some(Type::Path(TypePath {
-                qself: None,
-                path: attr.parse_path()?,
-            })));
+            result.r#type = result.r#type.take().or(Some(attr.parse_type()?));
         }
 
         if let Some(attr) = attrs.extract("specta", "inline") {

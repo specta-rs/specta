@@ -9,8 +9,8 @@ use crate::utils::{parse_attrs, unraw_raw_ident};
 use self::lower_attr::lower_attribute;
 
 use self::generics::{
-    add_type_to_where_clause, container_type_uses_generic, generics_with_ident_and_bounds_only,
-    generics_with_ident_only,
+    add_type_to_where_clause, generics_with_ident_and_bounds_only, generics_with_ident_only,
+    used_type_params,
 };
 
 pub(crate) mod attr;
@@ -77,6 +77,12 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     "specta: invalid formatted attribute",
                 ));
             }
+            Some(crate::utils::AttributeValue::Expr(_)) => {
+                return Err(syn::Error::new(
+                    attr.key.span(),
+                    "specta: invalid formatted attribute",
+                ));
+            }
             Some(crate::utils::AttributeValue::Attribute {
                 attr: inner_attrs, ..
             }) => {
@@ -128,11 +134,12 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let bounds = generics_with_ident_and_bounds_only(generics);
     let type_args = generics_with_ident_only(generics);
+    let used_generic_types = used_type_params(generics, container_attrs.r#type.as_ref());
     let where_bound = add_type_to_where_clause(
         &quote!(#crate_ref::Type),
         generics,
         container_attrs.bound.as_deref(),
-        container_attrs.r#type.as_ref(),
+        &used_generic_types,
     );
 
     let shadow_generics = {
@@ -191,9 +198,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
         GenericParam::Type(t) => {
             let i = &t.ident;
-            if let Some(container_ty) = &container_attrs.r#type
-                && !container_type_uses_generic(container_ty, i)
-            {
+            if !used_generic_types.iter().any(|used| used == i) {
                 return None;
             }
             let i_str = i.to_string();

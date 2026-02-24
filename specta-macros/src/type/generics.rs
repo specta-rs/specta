@@ -1,7 +1,9 @@
 use proc_macro2::TokenStream;
 use quote::quote;
+use std::collections::HashSet;
 use syn::{
     ConstParam, GenericParam, Generics, LifetimeParam, Type, TypeParam, WhereClause, parse_quote,
+    visit::{self, Visit},
 };
 
 pub fn generics_with_ident_and_bounds_only(generics: &Generics) -> Option<TokenStream> {
@@ -47,20 +49,78 @@ pub fn generics_with_ident_only(generics: &Generics) -> Option<TokenStream> {
 }
 
 // Code adopted from ts-rs. Thanks to it's original author!
+pub fn used_type_params(generics: &Generics, container_type: Option<&Type>) -> Vec<syn::Ident> {
+    let all_generic_type_idents = generics
+        .params
+        .iter()
+        .filter_map(|gp| match gp {
+            GenericParam::Type(ty) => Some(ty.ident.clone()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    let Some(container_type) = container_type else {
+        return all_generic_type_idents;
+    };
+
+    if all_generic_type_idents.is_empty() {
+        return all_generic_type_idents;
+    }
+
+    let known_generics = all_generic_type_idents
+        .iter()
+        .map(ToString::to_string)
+        .collect::<HashSet<_>>();
+
+    let mut visitor = GenericTypeUseVisitor {
+        known_generics: &known_generics,
+        used_generics: HashSet::new(),
+        conservative: false,
+    };
+    visitor.visit_type(container_type);
+
+    if visitor.conservative {
+        return all_generic_type_idents;
+    }
+
+    all_generic_type_idents
+        .into_iter()
+        .filter(|ident| visitor.used_generics.contains(&ident.to_string()))
+        .collect()
+}
+
 pub fn add_type_to_where_clause(
     ty: &TokenStream,
     generics: &Generics,
     custom_bounds: Option<&[syn::WherePredicate]>,
-    container_type: Option<&Type>,
+    used_generic_types: &[syn::Ident],
 ) -> Option<WhereClause> {
-    // If custom bounds are provided, use them instead of automatic inference
+    if let Some(where_clause) = merge_custom_bounds(generics, custom_bounds) {
+        return Some(where_clause);
+    }
+
+    if used_generic_types.is_empty() {
+        return generics.where_clause.clone();
+    }
+
+    match &generics.where_clause {
+        None => Some(parse_quote! { where #( #used_generic_types : #ty ),* }),
+        Some(w) => {
+            let bounds = w.predicates.iter();
+            Some(parse_quote! { where #(#bounds,)* #( #used_generic_types : #ty ),* })
+        }
+    }
+}
+
+fn merge_custom_bounds(
+    generics: &Generics,
+    custom_bounds: Option<&[syn::WherePredicate]>,
+) -> Option<WhereClause> {
     if let Some(predicates) = custom_bounds {
         if predicates.is_empty() {
-            // Empty predicates = no automatic bounds, just return existing where clause
             return generics.where_clause.clone();
         }
 
-        // Use custom predicates, merging with existing where clause
         return match &generics.where_clause {
             None => Some(parse_quote! { where #(#predicates),* }),
             Some(w) => {
@@ -70,109 +130,33 @@ pub fn add_type_to_where_clause(
         };
     }
 
-    let generic_types = generics
-        .params
-        .iter()
-        .filter_map(|gp| match gp {
-            GenericParam::Type(ty) => Some(ty.ident.clone()),
-            _ => None,
-        })
-        .filter(|ident| {
-            container_type
-                .map(|container_type| type_uses_ident(container_type, ident))
-                .unwrap_or(true)
-        })
-        .collect::<Vec<_>>();
-
-    if generic_types.is_empty() {
-        return generics.where_clause.clone();
-    }
-
-    match &generics.where_clause {
-        None => Some(parse_quote! { where #( #generic_types : #ty ),* }),
-        Some(w) => {
-            let bounds = w.predicates.iter();
-            Some(parse_quote! { where #(#bounds,)* #( #generic_types : #ty ),* })
-        }
-    }
+    None
 }
 
-pub fn container_type_uses_generic(container_type: &Type, ident: &syn::Ident) -> bool {
-    type_uses_ident(container_type, ident)
+struct GenericTypeUseVisitor<'a> {
+    known_generics: &'a HashSet<String>,
+    used_generics: HashSet<String>,
+    conservative: bool,
 }
 
-fn type_uses_ident(ty: &Type, ident: &syn::Ident) -> bool {
-    match ty {
-        Type::Array(t) => type_uses_ident(&t.elem, ident),
-        Type::BareFn(t) => {
-            t.inputs.iter().any(|arg| type_uses_ident(&arg.ty, ident))
-                || return_type_uses_ident(&t.output, ident)
-        }
-        Type::Group(t) => type_uses_ident(&t.elem, ident),
-        Type::ImplTrait(t) => t
-            .bounds
-            .iter()
-            .any(|bound| type_param_bound_uses_ident(bound, ident)),
-        Type::Infer(_) => false,
-        Type::Macro(_) => true,
-        Type::Never(_) => false,
-        Type::Paren(t) => type_uses_ident(&t.elem, ident),
-        Type::Path(t) => {
-            t.qself
-                .as_ref()
-                .is_some_and(|qself| type_uses_ident(&qself.ty, ident))
-                || path_uses_ident(&t.path, ident)
-        }
-        Type::Ptr(t) => type_uses_ident(&t.elem, ident),
-        Type::Reference(t) => type_uses_ident(&t.elem, ident),
-        Type::Slice(t) => type_uses_ident(&t.elem, ident),
-        Type::TraitObject(t) => t
-            .bounds
-            .iter()
-            .any(|bound| type_param_bound_uses_ident(bound, ident)),
-        Type::Tuple(t) => t.elems.iter().any(|elem| type_uses_ident(elem, ident)),
-        Type::Verbatim(_) => true,
-        _ => true,
-    }
-}
-
-fn type_param_bound_uses_ident(bound: &syn::TypeParamBound, ident: &syn::Ident) -> bool {
-    match bound {
-        syn::TypeParamBound::Trait(trait_bound) => path_uses_ident(&trait_bound.path, ident),
-        syn::TypeParamBound::Lifetime(_) => false,
-        _ => true,
-    }
-}
-
-fn path_uses_ident(path: &syn::Path, ident: &syn::Ident) -> bool {
-    path.segments.iter().any(|segment| {
-        segment.ident == *ident
-            || match &segment.arguments {
-                syn::PathArguments::None => false,
-                syn::PathArguments::AngleBracketed(args) => args.args.iter().any(|arg| match arg {
-                    syn::GenericArgument::Type(ty) => type_uses_ident(ty, ident),
-                    syn::GenericArgument::AssocType(binding) => type_uses_ident(&binding.ty, ident),
-                    syn::GenericArgument::AssocConst(_) => true,
-                    syn::GenericArgument::Constraint(constraint) => constraint
-                        .bounds
-                        .iter()
-                        .any(|bound| type_param_bound_uses_ident(bound, ident)),
-                    syn::GenericArgument::Lifetime(_) | syn::GenericArgument::Const(_) => false,
-                    _ => true,
-                }),
-                syn::PathArguments::Parenthesized(args) => {
-                    args.inputs
-                        .iter()
-                        .any(|input| type_uses_ident(input, ident))
-                        || return_type_uses_ident(&args.output, ident)
-                }
+impl Visit<'_> for GenericTypeUseVisitor<'_> {
+    fn visit_type_path(&mut self, node: &syn::TypePath) {
+        for segment in &node.path.segments {
+            let segment_name = segment.ident.to_string();
+            if self.known_generics.contains(&segment_name) {
+                self.used_generics.insert(segment_name);
             }
-    })
-}
+        }
 
-fn return_type_uses_ident(output: &syn::ReturnType, ident: &syn::Ident) -> bool {
-    match output {
-        syn::ReturnType::Default => false,
-        syn::ReturnType::Type(_, ty) => type_uses_ident(ty, ident),
+        visit::visit_type_path(self, node);
+    }
+
+    fn visit_type(&mut self, node: &syn::Type) {
+        match node {
+            syn::Type::Macro(_) | syn::Type::Verbatim(_) => {
+                self.conservative = true;
+            }
+            _ => visit::visit_type(self, node),
+        }
     }
 }

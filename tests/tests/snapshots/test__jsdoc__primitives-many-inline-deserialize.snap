@@ -191,10 +191,12 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*		string_ident: string,
 	*		u32_ident: number,
 	*		path: string,
+	*		tuple: [string, number],
 	*	}} SpectaTypeOverride
 	* @property {string} string_ident
 	* @property {number} u32_ident
 	* @property {string} path
+	* @property {[string, number]} tuple
 	*
 	* @typedef {string} ContainerTypeOverrideStruct
 	*
@@ -203,6 +205,10 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @typedef {string} ContainerTypeOverrideGeneric<T>
 	*
 	* @typedef {T} ContainerTypeOverrideToGeneric<T>
+	*
+	* @typedef {[string, number]} ContainerTypeOverrideTuple
+	*
+	* @typedef {[T, string]} ContainerTypeOverrideTupleGeneric<T>
 	*
 	* @typedef {{
 	*		cause: null | null,

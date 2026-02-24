@@ -152,6 +152,10 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*
 	* @typedef {T} ContainerTypeOverrideToGeneric<T>
 	*
+	* @typedef {[string, number]} ContainerTypeOverrideTuple
+	*
+	* @typedef {[T, string]} ContainerTypeOverrideTupleGeneric<T>
+	*
 	* @typedef {{
 	*		flattened: number,
 	*	}} D
@@ -856,6 +860,8 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		ContainerTypeOverrideEnum: ContainerTypeOverrideEnum,
 	*		"ContainerTypeOverrideGeneric<Box<dyn Any>>": ContainerTypeOverrideGeneric,
 	*		"ContainerTypeOverrideToGeneric<i32>": ContainerTypeOverrideToGeneric<number>,
+	*		ContainerTypeOverrideTuple: ContainerTypeOverrideTuple,
+	*		"ContainerTypeOverrideTupleGeneric<i32>": ContainerTypeOverrideTupleGeneric<number>,
 	*		InvalidToValidType: InvalidToValidType,
 	*		TupleStruct: TupleStruct,
 	*		TupleStructWithRep: TupleStructWithRep,
@@ -1119,6 +1125,8 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {ContainerTypeOverrideEnum} ContainerTypeOverrideEnum
 	* @property {ContainerTypeOverrideGeneric} "ContainerTypeOverrideGeneric<Box<dyn Any>>"
 	* @property {ContainerTypeOverrideToGeneric<number>} "ContainerTypeOverrideToGeneric<i32>"
+	* @property {ContainerTypeOverrideTuple} ContainerTypeOverrideTuple
+	* @property {ContainerTypeOverrideTupleGeneric<number>} "ContainerTypeOverrideTupleGeneric<i32>"
 	* @property {InvalidToValidType} InvalidToValidType
 	* @property {TupleStruct} TupleStruct
 	* @property {TupleStructWithRep} TupleStructWithRep
@@ -1408,10 +1416,12 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		string_ident: string,
 	*		u32_ident: number,
 	*		path: string,
+	*		tuple: [string, number],
 	*	}} SpectaTypeOverride
 	* @property {string} string_ident
 	* @property {number} u32_ident
 	* @property {string} path
+	* @property {[string, number]} tuple
 	*
 	* @typedef {{
 	*		A: number,

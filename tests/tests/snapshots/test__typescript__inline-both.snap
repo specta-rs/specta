@@ -176,11 +176,14 @@ SpectaTypeOverride: {
 	string_ident: string,
 	u32_ident: number,
 	path: string,
+	tuple: [string, number],
 }
 ContainerTypeOverrideStruct: string
 ContainerTypeOverrideEnum: string
 ContainerTypeOverrideGeneric<Box<dyn Any>>: string
 ContainerTypeOverrideToGeneric<i32>: number
+ContainerTypeOverrideTuple: [string, number]
+ContainerTypeOverrideTupleGeneric<i32>: [number, string]
 InvalidToValidType: {
 	cause: null | null,
 }

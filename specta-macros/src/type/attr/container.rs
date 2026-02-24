@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::Result;
-use syn::{Type, TypePath};
+use syn::Type;
 
 use crate::utils::{AttrExtract, Attribute};
 
@@ -39,10 +39,7 @@ impl ContainerAttr {
         }
 
         if let Some(attr) = attrs.extract("specta", "type") {
-            result.r#type = result.r#type.take().or(Some(Type::Path(TypePath {
-                qself: None,
-                path: attr.parse_path()?,
-            })));
+            result.r#type = result.r#type.take().or(Some(attr.parse_type()?));
         }
 
         if let Some(attr) = attrs.extract("specta", "inline") {

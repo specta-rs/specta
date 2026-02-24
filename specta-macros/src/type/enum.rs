@@ -29,7 +29,10 @@ pub fn parse_enum(
             // but we only throw errors for Specta-specific attributes so we don't continually break other attributes.
             if let Some(attr) = attrs.iter().find(|attr| attr.source == "specta") {
                 match &attr.value {
-                    None | Some(AttributeValue::Lit(_)) | Some(AttributeValue::Path(_)) => {
+                    None
+                    | Some(AttributeValue::Lit(_))
+                    | Some(AttributeValue::Path(_))
+                    | Some(AttributeValue::Expr(_)) => {
                         return Err(syn::Error::new(
                             attr.key.span(),
                             "specta: invalid formatted attribute",
