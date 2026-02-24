@@ -18,7 +18,7 @@ fn ts_base_type(ty: &DataType) -> Result<&'static str, Error> {
         DataType::Primitive(Primitive::String | Primitive::char) => Ok("string"),
         DataType::Primitive(Primitive::bool) => Ok("boolean"),
         DataType::Primitive(_) => Ok("number"),
-        other => Err(Error::Framework(Cow::Owned(format!(
+        other => Err(Error::framework(Cow::Owned(format!(
             "example only supports primitive branded types, got {other:?}"
         )))),
     }

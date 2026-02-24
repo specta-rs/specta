@@ -4,7 +4,7 @@ use specta::{
     Type, TypeCollection,
     datatype::{DataType, NamedDataTypeBuilder, Primitive},
 };
-use specta_typescript::{Error, Layout, Typescript};
+use specta_typescript::{Layout, Typescript};
 use tempfile::TempDir;
 
 #[derive(Type)]
@@ -47,17 +47,17 @@ fn duplicate_typenames_layouts() {
         .register::<Another>()
         .register::<MoreType>();
 
-    assert!(matches!(
+    assert_error_contains(
         Typescript::default().export(&types),
-        Err(Error::DuplicateTypeName { .. })
-    ));
+        "Detected multiple types",
+    );
 
-    assert!(matches!(
+    assert_error_contains(
         Typescript::default()
             .layout(Layout::FlatFile)
             .export(&types),
-        Err(Error::DuplicateTypeName { .. })
-    ));
+        "Detected multiple types",
+    );
 
     let module_prefixed = Typescript::default()
         .layout(Layout::ModulePrefixedName)
@@ -74,10 +74,10 @@ fn duplicate_typenames_layouts() {
     assert!(namespaces.contains("export namespace"));
     assert!(namespaces.contains("testing2"));
 
-    assert!(matches!(
+    assert_error_contains(
         Typescript::default().layout(Layout::Files).export(&types),
-        Err(Error::UnableToExport(Layout::Files))
-    ));
+        "Unable to export layout Files",
+    );
 
     let temp = temp_dir();
     let path = temp.path().join("duplicate-layout");
@@ -124,10 +124,10 @@ fn non_duplicate_typenames_layouts() {
     assert!(namespaces.contains("Another"));
     assert!(namespaces.contains("MoreType"));
 
-    assert!(matches!(
+    assert_error_contains(
         Typescript::default().layout(Layout::Files).export(&types),
-        Err(Error::UnableToExport(Layout::Files))
-    ));
+        "Unable to export layout Files",
+    );
 
     let temp = temp_dir();
     let path = temp.path().join("no-duplicate-layout");
@@ -184,4 +184,15 @@ fn temp_dir() -> TempDir {
     let temp_root = Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
     std::fs::create_dir_all(&temp_root).unwrap();
     TempDir::new_in(temp_root).unwrap()
+}
+
+fn assert_error_contains<T>(result: Result<T, specta_typescript::Error>, expected: &str) {
+    let error = match result {
+        Ok(_) => panic!("expected exporter to fail"),
+        Err(error) => error,
+    };
+    assert!(
+        error.to_string().contains(expected),
+        "error '{error}' did not contain '{expected}'"
+    );
 }

@@ -762,16 +762,9 @@ pub(crate) fn is_identifier(name: &str) -> bool {
 }
 
 pub(crate) fn escape_typescript_string_literal(value: &str) -> Cow<'_, str> {
-    if !value
-        .chars()
-        .any(|ch| {
-            ch == '"'
-                || ch == '\\'
-                || ch == '\u{2028}'
-                || ch == '\u{2029}'
-                || ch.is_control()
-        })
-    {
+    if !value.chars().any(|ch| {
+        ch == '"' || ch == '\\' || ch == '\u{2028}' || ch == '\u{2029}' || ch.is_control()
+    }) {
         return Cow::Borrowed(value);
     }
 
@@ -797,14 +790,14 @@ pub(crate) fn escape_typescript_string_literal(value: &str) -> Cow<'_, str> {
 
 pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: &str) -> Output {
     if let Some(name) = RESERVED_TYPE_NAMES.iter().find(|v| **v == ident) {
-        return Err(Error::ForbiddenNameLegacy(loc, ctx.export_path(), name));
+        return Err(Error::forbidden_name_legacy(loc, ctx.export_path(), name));
     }
 
     if let Some(first_char) = ident.chars().next()
         && !first_char.is_alphabetic()
         && first_char != '_'
     {
-        return Err(Error::InvalidNameLegacy(
+        return Err(Error::invalid_name_legacy(
             loc,
             ctx.export_path(),
             ident.to_string(),
@@ -815,7 +808,7 @@ pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: 
         .find(|c: char| !c.is_alphanumeric() && c != '_')
         .is_some()
     {
-        return Err(Error::InvalidNameLegacy(
+        return Err(Error::invalid_name_legacy(
             loc,
             ctx.export_path(),
             ident.to_string(),
@@ -845,8 +838,8 @@ fn validate_type_for_tagged_intersection(
         DataType::Struct(v) => match v.fields() {
             Fields::Unit => Ok(true),
             Fields::Unnamed(_) => {
-                Err(Error::InvalidTaggedVariantContainingTupleStructLegacy(
-                   ctx.export_path()
+                Err(Error::invalid_tagged_variant_containing_tuple_struct_legacy(
+                    ctx.export_path(),
                 ))
             }
             Fields::Named(fields) => {
@@ -897,9 +890,7 @@ fn validate_type_for_tagged_intersection(
         DataType::Reference(Reference::Named(r)) => validate_type_for_tagged_intersection(
             ctx,
             r.get(types)
-                .ok_or_else(|| Error::DanglingNamedReference {
-                    reference: format!("{r:?}"),
-                })?
+                .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?
                 .ty()
                 .clone(),
             types,

@@ -213,7 +213,7 @@ impl Exporter {
 
     /// Export the files into a single string.
     ///
-    /// Note: This will return [`Error::UnableToExport`](crate::Error::UnableToExport) if the format is `Format::Files`.
+    /// Note: This returns an error if the format is `Format::Files`.
     pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
         let types = if let Some(mode) = self.serde {
             let mut types = types.clone(); // TODO: Can we avoid this?
@@ -224,12 +224,12 @@ impl Exporter {
         };
 
         if let Layout::Files = self.layout {
-            return Err(Error::UnableToExport(self.layout));
+            return Err(Error::unable_to_export(self.layout));
         }
         if let Layout::Namespaces = self.layout
             && self.jsdoc
         {
-            return Err(Error::UnableToExport(self.layout));
+            return Err(Error::unable_to_export(self.layout));
         }
 
         let mut out = render_file_header(self)?;
@@ -455,19 +455,13 @@ impl Exporter {
                 if source.kind() == std::io::ErrorKind::NotFound {
                     Ok(())
                 } else {
-                    Err(Error::RemoveFile {
-                        path: path.to_path_buf(),
-                        source,
-                    })
+                    Err(Error::remove_file(path.to_path_buf(), source))
                 }
             })?,
             Ok(_) => {}
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
             Err(source) => {
-                return Err(Error::Metadata {
-                    path: path.to_path_buf(),
-                    source,
-                });
+                return Err(Error::metadata(path.to_path_buf(), source));
             }
         }
 
@@ -738,10 +732,11 @@ fn render_flat_types<'a>(
         .map(|ndt| {
             let export_name = exported_type_name(exporter, ndt);
             if let Some(other) = exports.insert(export_name.to_string(), ndt.location()) {
-                return Err(Error::DuplicateTypeName {
-                    types: (ndt.location().into(), other.into()),
-                    name: export_name,
-                });
+                return Err(Error::duplicate_type_name(
+                    export_name,
+                    ndt.location(),
+                    other,
+                ));
             }
 
             Ok(ndt)
@@ -763,20 +758,14 @@ fn collect_existing_files(root: &Path) -> Result<HashSet<PathBuf>, Error> {
     }
 
     let mut files = HashSet::new();
-    let entries = std::fs::read_dir(root).map_err(|source| Error::ReadDir {
-        path: root.to_path_buf(),
-        source,
-    })?;
+    let entries =
+        std::fs::read_dir(root).map_err(|source| Error::read_dir(root.to_path_buf(), source))?;
     for entry in entries {
-        let entry = entry.map_err(|source| Error::ReadDir {
-            path: root.to_path_buf(),
-            source,
-        })?;
+        let entry = entry.map_err(|source| Error::read_dir(root.to_path_buf(), source))?;
         let path = entry.path();
-        let file_type = entry.file_type().map_err(|source| Error::Metadata {
-            path: path.clone(),
-            source,
-        })?;
+        let file_type = entry
+            .file_type()
+            .map_err(|source| Error::metadata(path.clone(), source))?;
 
         if file_type.is_symlink() {
             continue;
@@ -794,20 +783,14 @@ fn collect_existing_files(root: &Path) -> Result<HashSet<PathBuf>, Error> {
 
 /// Remove empty directories recursively, stopping at the root
 fn remove_empty_dirs(path: &Path, root: &Path) -> Result<(), Error> {
-    let entries = std::fs::read_dir(path).map_err(|source| Error::ReadDir {
-        path: path.to_path_buf(),
-        source,
-    })?;
+    let entries =
+        std::fs::read_dir(path).map_err(|source| Error::read_dir(path.to_path_buf(), source))?;
     for entry in entries {
-        let entry = entry.map_err(|source| Error::ReadDir {
-            path: path.to_path_buf(),
-            source,
-        })?;
+        let entry = entry.map_err(|source| Error::read_dir(path.to_path_buf(), source))?;
         let entry_path = entry.path();
-        let file_type = entry.file_type().map_err(|source| Error::Metadata {
-            path: entry_path.clone(),
-            source,
-        })?;
+        let file_type = entry
+            .file_type()
+            .map_err(|source| Error::metadata(entry_path.clone(), source))?;
         if file_type.is_symlink() {
             continue;
         }
@@ -818,10 +801,7 @@ fn remove_empty_dirs(path: &Path, root: &Path) -> Result<(), Error> {
 
     let is_empty = path
         .read_dir()
-        .map_err(|source| Error::ReadDir {
-            path: path.to_path_buf(),
-            source,
-        })?
+        .map_err(|source| Error::read_dir(path.to_path_buf(), source))?
         .next()
         .is_none();
 
@@ -830,10 +810,7 @@ fn remove_empty_dirs(path: &Path, root: &Path) -> Result<(), Error> {
             Ok(()) => {}
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
             Err(source) => {
-                return Err(Error::RemoveDir {
-                    path: path.to_path_buf(),
-                    source,
-                });
+                return Err(Error::remove_dir(path.to_path_buf(), source));
             }
         }
     }
@@ -850,10 +827,7 @@ fn cleanup_stale_files(root: &Path, current_files: &HashMap<PathBuf, String>) ->
                 if source.kind() == std::io::ErrorKind::NotFound {
                     Ok(())
                 } else {
-                    Err(Error::RemoveFile {
-                        path: path.clone(),
-                        source,
-                    })
+                    Err(Error::remove_file(path.clone(), source))
                 }
             })
         })?;

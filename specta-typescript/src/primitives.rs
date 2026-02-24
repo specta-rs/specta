@@ -685,9 +685,9 @@ fn shallow_inline_datatype(
         },
         DataType::Reference(r) => match r {
             Reference::Named(r) => {
-                let ndt = r.get(types).ok_or_else(|| Error::DanglingNamedReference {
-                    reference: format!("{r:?}"),
-                })?;
+                let ndt = r
+                    .get(types)
+                    .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
                 let combined_generics = merged_generics(generics, r.generics());
                 let resolved = resolve_generics_in_datatype(ndt.ty(), &combined_generics);
                 datatype(
@@ -824,10 +824,10 @@ fn inline_datatype(
 ) -> Result<(), Error> {
     // Prevent infinite recursion
     if depth == 25 {
-        return Err(Error::InvalidName {
-            path: location.join("."),
-            name: "Type recursion limit exceeded during inline expansion".into(),
-        });
+        return Err(Error::invalid_name(
+            location.join("."),
+            "Type recursion limit exceeded during inline expansion",
+        ));
     }
 
     match dt {
@@ -1112,9 +1112,7 @@ fn primitive_dt(
             BigIntExportBehavior::Number => "number",
             BigIntExportBehavior::BigInt => "bigint",
             BigIntExportBehavior::Fail => {
-                return Err(Error::BigIntForbidden {
-                    path: location.join("."),
-                });
+                return Err(Error::bigint_forbidden(location.join(".")));
             }
         },
         Primitive::bool => "boolean",
@@ -1811,7 +1809,7 @@ fn reference_opaque_dt(
         return Ok(());
     }
 
-    Err(Error::UnsupportedOpaqueReference(r.clone()))
+    Err(Error::unsupported_opaque_reference(r.clone()))
 }
 
 fn reference_named_dt(
@@ -1825,9 +1823,9 @@ fn reference_named_dt(
 ) -> Result<(), Error> {
     // TODO: Legacy stuff
     {
-        let ndt = r.get(types).ok_or_else(|| Error::DanglingNamedReference {
-            reference: format!("{r:?}"),
-        })?;
+        let ndt = r
+            .get(types)
+            .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
 
         // Check if this reference should be inlined
         if r.inline() {

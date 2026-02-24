@@ -5,9 +5,7 @@ use specta::{
     datatype::{DataType, Reference},
 };
 use specta_serde::SerdeMode;
-use specta_typescript::{
-    Any, BigIntExportBehavior, Layout, Never, Typescript, Unknown, primitives,
-};
+use specta_typescript::{BigIntExportBehavior, Error, Layout, Typescript, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -98,7 +96,9 @@ fn typescript_export_to() {
 
 #[test]
 fn primitives_typescript_framework_utils() {
-    // TODO
+    let error = Error::framework("framework failed");
+    assert_eq!(error.to_string(), "Framework error: framework failed");
+    assert_eq!(format!("{error:?}"), error.to_string());
 }
 
 #[test]
