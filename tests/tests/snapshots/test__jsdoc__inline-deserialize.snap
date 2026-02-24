@@ -144,18 +144,6 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {Generic1<number>[]} bar
 	* @property {{ [key in string]: Generic1<string> }} baz
 	*
-	* @typedef {string} ContainerTypeOverrideEnum
-	*
-	* @typedef {string} ContainerTypeOverrideGeneric<T>
-	*
-	* @typedef {string} ContainerTypeOverrideStruct
-	*
-	* @typedef {T} ContainerTypeOverrideToGeneric<T>
-	*
-	* @typedef {[string, number]} ContainerTypeOverrideTuple
-	*
-	* @typedef {[T, string]} ContainerTypeOverrideTupleGeneric<T>
-	*
 	* @typedef {{
 	*		flattened: number,
 	*	}} D
@@ -856,12 +844,12 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		"type_type::Type": Type,
 	*		ActualType: ActualType,
 	*		SpectaTypeOverride: SpectaTypeOverride,
-	*		ContainerTypeOverrideStruct: ContainerTypeOverrideStruct,
-	*		ContainerTypeOverrideEnum: ContainerTypeOverrideEnum,
-	*		"ContainerTypeOverrideGeneric<Box<dyn Any>>": ContainerTypeOverrideGeneric,
-	*		"ContainerTypeOverrideToGeneric<i32>": ContainerTypeOverrideToGeneric<number>,
-	*		ContainerTypeOverrideTuple: ContainerTypeOverrideTuple,
-	*		"ContainerTypeOverrideTupleGeneric<i32>": ContainerTypeOverrideTupleGeneric<number>,
+	*		ContainerTypeOverrideStruct: string,
+	*		ContainerTypeOverrideEnum: string,
+	*		"ContainerTypeOverrideGeneric<Box<dyn Any>>": string,
+	*		"ContainerTypeOverrideToGeneric<i32>": number,
+	*		ContainerTypeOverrideTuple: [string, number],
+	*		"ContainerTypeOverrideTupleGeneric<i32>": [number, string],
 	*		InvalidToValidType: InvalidToValidType,
 	*		TupleStruct: TupleStruct,
 	*		TupleStructWithRep: TupleStructWithRep,
@@ -1121,12 +1109,12 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {Type} "type_type::Type"
 	* @property {ActualType} ActualType
 	* @property {SpectaTypeOverride} SpectaTypeOverride
-	* @property {ContainerTypeOverrideStruct} ContainerTypeOverrideStruct
-	* @property {ContainerTypeOverrideEnum} ContainerTypeOverrideEnum
-	* @property {ContainerTypeOverrideGeneric} "ContainerTypeOverrideGeneric<Box<dyn Any>>"
-	* @property {ContainerTypeOverrideToGeneric<number>} "ContainerTypeOverrideToGeneric<i32>"
-	* @property {ContainerTypeOverrideTuple} ContainerTypeOverrideTuple
-	* @property {ContainerTypeOverrideTupleGeneric<number>} "ContainerTypeOverrideTupleGeneric<i32>"
+	* @property {string} ContainerTypeOverrideStruct
+	* @property {string} ContainerTypeOverrideEnum
+	* @property {string} "ContainerTypeOverrideGeneric<Box<dyn Any>>"
+	* @property {number} "ContainerTypeOverrideToGeneric<i32>"
+	* @property {[string, number]} ContainerTypeOverrideTuple
+	* @property {[number, string]} "ContainerTypeOverrideTupleGeneric<i32>"
 	* @property {InvalidToValidType} InvalidToValidType
 	* @property {TupleStruct} TupleStruct
 	* @property {TupleStructWithRep} TupleStructWithRep
