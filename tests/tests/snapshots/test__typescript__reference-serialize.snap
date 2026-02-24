@@ -39,6 +39,8 @@ KebabCase: KebabCase
 Issue281<'_>: Issue281
 RenameWithWeirdCharsField: RenameWithWeirdCharsField
 RenameWithWeirdCharsVariant: RenameWithWeirdCharsVariant
+RenamedFieldKeys: RenamedFieldKeys
+RenamedVariantWithSkippedPayload: RenamedVariantWithSkippedPayload
 Issue374: Issue374
 type_type::Type: Type
 ActualType: ActualType

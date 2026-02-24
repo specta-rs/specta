@@ -206,6 +206,8 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         // https://github.com/specta-rs/specta/issues/90
         RenameWithWeirdCharsField,
         RenameWithWeirdCharsVariant,
+        RenamedFieldKeys,
+        RenamedVariantWithSkippedPayload,
 
         // https://github.com/specta-rs/specta/issues/374
         Issue374,
@@ -731,6 +733,26 @@ struct ExtraBracketsInUnnamedStruct((String));
 struct RenameWithWeirdCharsField {
     #[serde(rename = "@odata.context")]
     odata_context: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct RenamedFieldKeys {
+    #[serde(rename = "")]
+    empty: String,
+    #[serde(rename = "a\"b")]
+    quote: String,
+    #[serde(rename = "a\\b")]
+    backslash: String,
+    #[serde(rename = "line\nbreak")]
+    newline: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum RenamedVariantWithSkippedPayload {
+    #[serde(rename = "a-b")]
+    A(#[serde(skip)] String),
 }
 
 #[derive(Type, Serialize, Deserialize)]

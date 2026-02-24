@@ -18,7 +18,10 @@ use specta::{
 
 use crate::{
     BigIntExportBehavior, Branded, Error, Exporter, Layout,
-    legacy::{ExportContext, deprecated_details, escape_jsdoc_text, js_doc},
+    legacy::{
+        ExportContext, deprecated_details, escape_jsdoc_text, escape_typescript_string_literal,
+        is_identifier, js_doc,
+    },
     opaque,
 };
 
@@ -358,20 +361,10 @@ fn push_jsdoc_type(s: &mut String, ty: &str, indent: &str) {
 }
 
 fn jsdoc_property_name(name: &str, optional: bool) -> String {
-    fn is_identifier(name: &str) -> bool {
-        let mut chars = name.chars();
-        let Some(first) = chars.next() else {
-            return false;
-        };
-
-        (first.is_ascii_alphabetic() || first == '_' || first == '$')
-            && chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '$')
-    }
-
     let name = if is_identifier(name) {
         name.to_string()
     } else {
-        format!("\"{}\"", name.replace('"', "\\\""))
+        format!("\"{}\"", escape_typescript_string_literal(name))
     };
 
     if optional { format!("[{name}]") } else { name }

@@ -606,7 +606,7 @@ pub(crate) fn enum_datatype(
                                 Some(ts_values) => {
                                     format!("{{ {sanitised_name}: {ts_values} }}")
                                 }
-                                None => format!(r#""{sanitised_name}""#),
+                                None => sanitise_key(variant_name.clone(), true).to_string(),
                             }
                         }
                     },
@@ -742,20 +742,49 @@ fn inline_reference_docs<'a>(
 
 /// sanitise a string to be a valid Typescript key
 fn sanitise_key<'a>(field_name: Cow<'static, str>, force_string: bool) -> Cow<'a, str> {
-    let valid = field_name
-        .chars()
-        .all(|c| c.is_alphanumeric() || c == '_' || c == '$')
-        && field_name
-            .chars()
-            .next()
-            .map(|first| !first.is_numeric())
-            .unwrap_or(true);
+    let valid = is_identifier(&field_name);
 
     if force_string || !valid {
-        format!(r#""{field_name}""#).into()
+        format!(r#""{}""#, escape_typescript_string_literal(&field_name)).into()
     } else {
         field_name
     }
+}
+
+pub(crate) fn is_identifier(name: &str) -> bool {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+
+    (first.is_ascii_alphabetic() || first == '_' || first == '$')
+        && chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '$')
+}
+
+pub(crate) fn escape_typescript_string_literal(value: &str) -> Cow<'_, str> {
+    if !value
+        .chars()
+        .any(|ch| ch == '"' || ch == '\\' || ch.is_control())
+    {
+        return Cow::Borrowed(value);
+    }
+
+    let mut escaped = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            '"' => escaped.push_str(r#"\""#),
+            '\\' => escaped.push_str(r#"\\"#),
+            '\n' => escaped.push_str(r#"\n"#),
+            '\r' => escaped.push_str(r#"\r"#),
+            '\t' => escaped.push_str(r#"\t"#),
+            ch if ch.is_control() => {
+                write!(escaped, r#"\u{:04X}"#, ch as u32).expect("infallible");
+            }
+            _ => escaped.push(ch),
+        }
+    }
+
+    Cow::Owned(escaped)
 }
 
 pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: &str) -> Output {

@@ -171,6 +171,20 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @typedef {{ A: string }} RenameWithWeirdCharsVariant
 	* @property {{ A: string }} A
 	*
+	* @typedef {{
+	*		empty: string,
+	*		quote: string,
+	*		backslash: string,
+	*		newline: string,
+	*	}} RenamedFieldKeys
+	* @property {string} empty
+	* @property {string} quote
+	* @property {string} backslash
+	* @property {string} newline
+	*
+	* @typedef {"A"} RenamedVariantWithSkippedPayload
+	* @property {"A"} A
+	*
 	*  https://github.com/specta-rs/specta/issues/374
 	*
 	* @typedef {{

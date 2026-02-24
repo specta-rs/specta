@@ -118,6 +118,15 @@ export type RenameWithWeirdCharsField = {
 
 export type RenameWithWeirdCharsVariant = { A: string };
 
+export type RenamedFieldKeys = {
+	empty: string,
+	quote: string,
+	backslash: string,
+	newline: string,
+};
+
+export type RenamedVariantWithSkippedPayload = "A";
+
 /**
  *  https://github.com/specta-rs/specta/issues/374
  */

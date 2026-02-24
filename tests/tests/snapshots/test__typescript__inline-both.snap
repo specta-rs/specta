@@ -164,6 +164,13 @@ RenameWithWeirdCharsField: {
 	odata_context: string,
 }
 RenameWithWeirdCharsVariant: { A: string }
+RenamedFieldKeys: {
+	empty: string,
+	quote: string,
+	backslash: string,
+	newline: string,
+}
+RenamedVariantWithSkippedPayload: "A"
 Issue374: {
 	foo: boolean,
 	bar: boolean,

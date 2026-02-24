@@ -840,6 +840,8 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		"Issue281<'_>": Issue281,
 	*		RenameWithWeirdCharsField: RenameWithWeirdCharsField,
 	*		RenameWithWeirdCharsVariant: RenameWithWeirdCharsVariant,
+	*		RenamedFieldKeys: RenamedFieldKeys,
+	*		RenamedVariantWithSkippedPayload: RenamedVariantWithSkippedPayload,
 	*		Issue374: Issue374,
 	*		"type_type::Type": Type,
 	*		ActualType: ActualType,
@@ -1105,6 +1107,8 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {Issue281} "Issue281<'_>"
 	* @property {RenameWithWeirdCharsField} RenameWithWeirdCharsField
 	* @property {RenameWithWeirdCharsVariant} RenameWithWeirdCharsVariant
+	* @property {RenamedFieldKeys} RenamedFieldKeys
+	* @property {RenamedVariantWithSkippedPayload} RenamedVariantWithSkippedPayload
 	* @property {Issue374} Issue374
 	* @property {Type} "type_type::Type"
 	* @property {ActualType} ActualType
@@ -1291,6 +1295,20 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*
 	* @typedef {{ "@odata.context": string }} RenameWithWeirdCharsVariant
 	* @property {{ "@odata.context": string }} "@odata.context"
+	*
+	* @typedef {{
+	*		"": string,
+	*		"a\"b": string,
+	*		"a\\b": string,
+	*		"line\nbreak": string,
+	*	}} RenamedFieldKeys
+	* @property {string} ""
+	* @property {string} "a\"b"
+	* @property {string} "a\\b"
+	* @property {string} "line\nbreak"
+	*
+	* @typedef {"a-b"} RenamedVariantWithSkippedPayload
+	* @property {"a-b"} "a-b"
 	*
 	* @typedef {{
 	*		a: number,

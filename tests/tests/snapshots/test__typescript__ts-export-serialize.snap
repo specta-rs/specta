@@ -615,6 +615,8 @@ export type Primitives = {
 	"Issue281<'_>": Issue281,
 	RenameWithWeirdCharsField: RenameWithWeirdCharsField,
 	RenameWithWeirdCharsVariant: RenameWithWeirdCharsVariant,
+	RenamedFieldKeys: RenamedFieldKeys,
+	RenamedVariantWithSkippedPayload: RenamedVariantWithSkippedPayload,
 	Issue374: Issue374,
 	"type_type::Type": Type,
 	ActualType: ActualType,
@@ -790,6 +792,15 @@ export type RenameWithWeirdCharsField = {
 };
 
 export type RenameWithWeirdCharsVariant = { "@odata.context": string };
+
+export type RenamedFieldKeys = {
+	"": string,
+	"a\"b": string,
+	"a\\b": string,
+	"line\nbreak": string,
+};
+
+export type RenamedVariantWithSkippedPayload = "a-b";
 
 export type Second = {
 	a: number,
