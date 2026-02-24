@@ -96,12 +96,12 @@ impl Error {
     /// Construct an error for framework-specific logic.
     pub fn framework(
         message: impl Into<Cow<'static, str>>,
-        source: impl error::Error + Send + Sync + 'static,
+        source: impl Into<Box<dyn std::error::Error + Send + Sync>>,
     ) -> Self {
         Self {
             kind: ErrorKind::Framework {
                 message: message.into(),
-                source: Box::new(source),
+                source: source.into(),
             },
         }
     }

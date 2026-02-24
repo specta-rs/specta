@@ -743,10 +743,7 @@ fn render_flat_types<'a>(
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    if !ndts.is_empty() {
-        s.push('\n');
-        primitives::export_internal(s, exporter, types, ndts.into_iter(), indent)?;
-    }
+    primitives::export_internal(s, exporter, types, ndts.into_iter(), indent)?;
 
     Ok(exports)
 }

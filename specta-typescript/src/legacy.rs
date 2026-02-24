@@ -91,11 +91,6 @@ impl ExportPath {
 
         Self(s)
     }
-
-    #[doc(hidden)]
-    pub fn new_unsafe(path: &str) -> Self {
-        Self(path.to_string())
-    }
 }
 
 impl PartialEq for ExportPath {
