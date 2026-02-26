@@ -147,10 +147,16 @@ impl Exporter {
     /// `ts-brand` style:
     /// ```rust
     /// # use std::borrow::Cow;
+    /// # use specta::TypeCollection;
     /// # use specta_typescript::{Branded, Error, Typescript};
     /// let exporter = Typescript::default().branded_type_impl(|branded: &Branded| {
+    ///     let types = TypeCollection::default();
+    ///     let datatype =
+    ///         specta_typescript::primitives::inline(&Typescript::default(), &types, branded.ty())?;
+    ///
     ///     Ok(Cow::Owned(format!(
-    ///         "import(\"ts-brand\").Brand<string, \"{}\">",
+    ///         "import(\"ts-brand\").Brand<{}, \"{}\">",
+    ///         datatype,
     ///         branded.brand()
     ///     )))
     /// });
@@ -160,10 +166,16 @@ impl Exporter {
     /// Effect style:
     /// ```rust
     /// # use std::borrow::Cow;
+    /// # use specta::TypeCollection;
     /// # use specta_typescript::{Branded, Error, Typescript};
     /// let exporter = Typescript::default().branded_type_impl(|branded: &Branded| {
+    ///     let types = TypeCollection::default();
+    ///     let datatype =
+    ///         specta_typescript::primitives::inline(&Typescript::default(), &types, branded.ty())?;
+    ///
     ///     Ok(Cow::Owned(format!(
-    ///         "string & import(\"effect\").Brand.Brand<\"{}\">",
+    ///         "{} & import(\"effect\").Brand.Brand<\"{}\">",
+    ///         datatype,
     ///         branded.brand()
     ///     )))
     /// });
