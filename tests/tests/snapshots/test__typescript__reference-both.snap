@@ -37,6 +37,8 @@ InlineTuple2: InlineTuple2
 SkippedFieldWithinVariant: SkippedFieldWithinVariant
 KebabCase: KebabCase
 Issue281<'_>: Issue281
+LifetimeGenericStruct<'_, i32>: LifetimeGenericStruct<number>
+LifetimeGenericEnum<'_, i32>: LifetimeGenericEnum<number>
 RenameWithWeirdCharsField: RenameWithWeirdCharsField
 RenameWithWeirdCharsVariant: RenameWithWeirdCharsVariant
 RenamedFieldKeys: RenamedFieldKeys

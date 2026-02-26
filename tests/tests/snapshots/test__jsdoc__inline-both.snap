@@ -619,6 +619,17 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*	}} KebabCase
 	* @property {string} "test-ing"
 	*
+	* @typedef {{ Borrowed: T } | { Owned: T }} LifetimeGenericEnum<T>
+	* @property {{ Borrowed: T }} Borrowed
+	* @property {{ Owned: T }} Owned
+	*
+	* @typedef {{
+	*		borrowed: T[],
+	*		owned: T[],
+	*	}} LifetimeGenericStruct<T>
+	* @property {T[]} borrowed
+	* @property {T[]} owned
+	*
 	* @typedef {{ event: "started"; data: {
 	* 	projectName: string,
 	* } } | { event: "progressTest"; data: {
@@ -837,6 +848,8 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		KebabCase: KebabCase,
 	*		"&[&str]": string[],
 	*		"Issue281<'_>": Issue281,
+	*		"LifetimeGenericStruct<'_, i32>": LifetimeGenericStruct<number>,
+	*		"LifetimeGenericEnum<'_, i32>": LifetimeGenericEnum<number>,
 	*		RenameWithWeirdCharsField: RenameWithWeirdCharsField,
 	*		RenameWithWeirdCharsVariant: RenameWithWeirdCharsVariant,
 	*		RenamedFieldKeys: RenamedFieldKeys,
@@ -1105,6 +1118,8 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {KebabCase} KebabCase
 	* @property {string[]} "&[&str]"
 	* @property {Issue281} "Issue281<'_>"
+	* @property {LifetimeGenericStruct<number>} "LifetimeGenericStruct<'_, i32>"
+	* @property {LifetimeGenericEnum<number>} "LifetimeGenericEnum<'_, i32>"
 	* @property {RenameWithWeirdCharsField} RenameWithWeirdCharsField
 	* @property {RenameWithWeirdCharsVariant} RenameWithWeirdCharsVariant
 	* @property {RenamedFieldKeys} RenamedFieldKeys

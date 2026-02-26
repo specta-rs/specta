@@ -203,6 +203,10 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         &[&str],
         Issue281<'_>,
 
+        // https://github.com/specta-rs/specta/issues/317
+        LifetimeGenericStruct<'_, i32>,
+        LifetimeGenericEnum<'_, i32>,
+
         // https://github.com/specta-rs/specta/issues/90
         RenameWithWeirdCharsField,
         RenameWithWeirdCharsVariant,
@@ -819,6 +823,21 @@ struct KebabCase {
 #[specta(collect = false)]
 struct Issue281<'a> {
     default_unity_arguments: &'a [&'a str],
+}
+
+// https://github.com/specta-rs/specta/issues/317
+#[derive(Type)]
+#[specta(collect = false)]
+struct LifetimeGenericStruct<'a, T> {
+    borrowed: &'a [T],
+    owned: Vec<T>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+enum LifetimeGenericEnum<'a, T> {
+    Borrowed(&'a T),
+    Owned(T),
 }
 
 /// https://github.com/specta-rs/specta/issues/374

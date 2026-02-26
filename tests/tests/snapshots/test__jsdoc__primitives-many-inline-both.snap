@@ -164,6 +164,17 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {string[]} default_unity_arguments
 	*
 	* @typedef {{
+	*		borrowed: T[],
+	*		owned: T[],
+	*	}} LifetimeGenericStruct<T>
+	* @property {T[]} borrowed
+	* @property {T[]} owned
+	*
+	* @typedef {{ Borrowed: T } | { Owned: T }} LifetimeGenericEnum<T>
+	* @property {{ Borrowed: T }} Borrowed
+	* @property {{ Owned: T }} Owned
+	*
+	* @typedef {{
 	*		odata_context: string,
 	*	}} RenameWithWeirdCharsField
 	* @property {string} odata_context

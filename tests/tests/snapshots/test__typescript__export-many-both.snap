@@ -112,6 +112,13 @@ export type Issue281 = {
 	default_unity_arguments: string[],
 };
 
+export type LifetimeGenericStruct<T> = {
+	borrowed: T[],
+	owned: T[],
+};
+
+export type LifetimeGenericEnum<T> = { Borrowed: T } | { Owned: T };
+
 export type RenameWithWeirdCharsField = {
 	odata_context: string,
 };

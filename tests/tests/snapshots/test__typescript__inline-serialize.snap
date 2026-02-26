@@ -160,6 +160,11 @@ KebabCase: {
 Issue281<'_>: {
 	default_unity_arguments: string[],
 }
+LifetimeGenericStruct<'_, i32>: {
+	borrowed: number[],
+	owned: number[],
+}
+LifetimeGenericEnum<'_, i32>: { Borrowed: number } | { Owned: number }
 RenameWithWeirdCharsField: {
 	odata_context: string,
 }
