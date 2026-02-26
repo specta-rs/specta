@@ -64,7 +64,7 @@ impl fmt::Display for Layout {
 
 #[derive(Clone)]
 #[allow(clippy::type_complexity)]
-struct RuntimeFn(Arc<dyn Fn(FrameworkExporter) -> Result<Cow<'static, str>, Error>>);
+struct RuntimeFn(Arc<dyn Fn(FrameworkExporter) -> Result<Cow<'static, str>, Error> + Send + Sync>);
 
 impl fmt::Debug for RuntimeFn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -130,7 +130,7 @@ impl Exporter {
     /// Ensure you call `T::reference()` within the closure if you want an import to be created.
     pub fn framework_runtime(
         mut self,
-        builder: impl Fn(FrameworkExporter) -> Result<Cow<'static, str>, Error> + 'static,
+        builder: impl Fn(FrameworkExporter) -> Result<Cow<'static, str>, Error> + Send + Sync + 'static,
     ) -> Self {
         self.framework_runtime = Some(RuntimeFn(Arc::new(builder)));
         self
