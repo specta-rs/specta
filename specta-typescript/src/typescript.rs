@@ -3,7 +3,7 @@ use std::{borrow::Cow, path::Path};
 use specta::TypeCollection;
 use specta_serde::SerdeMode;
 
-use crate::{BigIntExportBehavior, Branded, Error, Exporter, Layout};
+use crate::{BigIntExportBehavior, Branded, BrandedTypeExporter, Error, Exporter, Layout};
 
 /// JSDoc language exporter.
 #[derive(Debug, Clone)]
@@ -54,10 +54,13 @@ impl Typescript {
 
     /// Configure how `specta_typescript::branded!` types are rendered.
     ///
-    /// See [`Exporter::branded_type_impl`] for `ts-brand` and Effect examples.
+    /// See [`Exporter::branded_type_impl`] for details.
     pub fn branded_type_impl(
         self,
-        builder: impl Fn(&Branded) -> Result<Cow<'static, str>, Error> + Send + Sync + 'static,
+        builder: impl for<'a> Fn(BrandedTypeExporter<'a>, &Branded) -> Result<Cow<'static, str>, Error>
+        + Send
+        + Sync
+        + 'static,
     ) -> Self {
         Self(self.0.branded_type_impl(builder))
     }

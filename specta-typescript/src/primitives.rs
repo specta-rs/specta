@@ -17,7 +17,7 @@ use specta::{
 };
 
 use crate::{
-    BigIntExportBehavior, Branded, Error, Exporter, Layout,
+    BigIntExportBehavior, Branded, BrandedTypeExporter, Error, Exporter, Layout,
     legacy::{
         ExportContext, deprecated_details, escape_jsdoc_text, escape_typescript_string_literal,
         is_identifier, js_doc,
@@ -1797,7 +1797,7 @@ fn reference_opaque_dt(
         if let Some(branded_type) = exporter
             .branded_type_impl
             .as_ref()
-            .map(|builder| (builder.0)(def))
+            .map(|builder| (builder.0)(BrandedTypeExporter { exporter, types }, def))
             .transpose()?
         {
             s.push_str(branded_type.as_ref());

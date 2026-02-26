@@ -1,8 +1,9 @@
-use specta::{
-    Type, TypeCollection,
-    datatype::{DataType, Primitive},
+use std::borrow::Cow;
+
+use specta::{Type, TypeCollection};
+use specta_typescript::{
+    BigIntExportBehavior, Branded, BrandedTypeExporter, Error, Typescript, branded,
 };
-use specta_typescript::{BigIntExportBehavior, Branded, Error, Typescript, branded};
 
 branded!(pub struct UserId(String) as "UserId");
 
@@ -11,30 +12,24 @@ struct User {
     id: UserId,
 }
 
-fn ts_base_type(ty: &DataType) -> Result<&'static str, Error> {
-    match ty {
-        DataType::Primitive(Primitive::String | Primitive::char) => Ok("string"),
-        DataType::Primitive(Primitive::bool) => Ok("boolean"),
-        DataType::Primitive(_) => Ok("number"),
-        other => Err(Error::framework(
-            "example only supports primitive branded types",
-            std::io::Error::other(format!("got {other:?}")),
-        )),
-    }
-}
-
-fn ts_brand_impl(branded: &Branded) -> Result<Cow<'static, str>, Error> {
-    let base = ts_base_type(branded.ty())?;
+fn ts_brand_impl(
+    ctx: BrandedTypeExporter<'_>,
+    branded: &Branded,
+) -> Result<Cow<'static, str>, Error> {
+    let datatype = ctx.inline(branded.ty())?;
     Ok(Cow::Owned(format!(
-        "import(\"ts-brand\").Brand<{base}, \"{}\">",
+        "import(\"ts-brand\").Brand<{datatype}, \"{}\">",
         branded.brand().replace('"', "\\\"")
     )))
 }
 
-fn effect_brand_impl(branded: &Branded) -> Result<Cow<'static, str>, Error> {
-    let base = ts_base_type(branded.ty())?;
+fn effect_brand_impl(
+    ctx: BrandedTypeExporter<'_>,
+    branded: &Branded,
+) -> Result<Cow<'static, str>, Error> {
+    let datatype = ctx.inline(branded.ty())?;
     Ok(Cow::Owned(format!(
-        "{base} & import(\"effect\").Brand.Brand<\"{}\">",
+        "{datatype} & import(\"effect\").Brand.Brand<\"{}\">",
         branded.brand().replace('"', "\\\"")
     )))
 }

@@ -75,7 +75,11 @@ impl fmt::Debug for RuntimeFn {
 #[derive(Clone)]
 #[allow(clippy::type_complexity)]
 pub struct BrandedTypeImpl(
-    pub(crate) Arc<dyn Fn(&Branded) -> Result<Cow<'static, str>, Error> + Send + Sync>,
+    pub(crate)  Arc<
+        dyn for<'a> Fn(BrandedTypeExporter<'a>, &Branded) -> Result<Cow<'static, str>, Error>
+            + Send
+            + Sync,
+    >,
 );
 
 impl fmt::Debug for BrandedTypeImpl {
@@ -138,21 +142,20 @@ impl Exporter {
         self
     }
 
-    /// Configure how `specta_typescript::branded!` types are rendered.
+    /// Configure how `specta_typescript::branded!` types are rendered with exporter context.
     ///
-    /// When unset, Specta falls back to rendering types as `T & { readonly __brand: string }`.
+    /// This callback receives both the branded payload and a [`BrandedTypeExporter`], allowing
+    /// you to call [`BrandedTypeExporter::inline`] / [`BrandedTypeExporter::reference`] while
+    /// preserving the current export configuration.
     ///
     /// # Examples
     ///
     /// `ts-brand` style:
     /// ```rust
     /// # use std::borrow::Cow;
-    /// # use specta::TypeCollection;
     /// # use specta_typescript::{Branded, Error, Typescript};
-    /// let exporter = Typescript::default().branded_type_impl(|branded: &Branded| {
-    ///     let types = TypeCollection::default();
-    ///     let datatype =
-    ///         specta_typescript::primitives::inline(&Typescript::default(), &types, branded.ty())?;
+    /// let exporter = Typescript::default().branded_type_impl(|ctx, branded| {
+    ///     let datatype = ctx.inline(branded.ty())?;
     ///
     ///     Ok(Cow::Owned(format!(
     ///         "import(\"ts-brand\").Brand<{}, \"{}\">",
@@ -166,12 +169,9 @@ impl Exporter {
     /// Effect style:
     /// ```rust
     /// # use std::borrow::Cow;
-    /// # use specta::TypeCollection;
     /// # use specta_typescript::{Branded, Error, Typescript};
-    /// let exporter = Typescript::default().branded_type_impl(|branded: &Branded| {
-    ///     let types = TypeCollection::default();
-    ///     let datatype =
-    ///         specta_typescript::primitives::inline(&Typescript::default(), &types, branded.ty())?;
+    /// let exporter = Typescript::default().branded_type_impl(|ctx, branded| {
+    ///     let datatype = ctx.inline(branded.ty())?;
     ///
     ///     Ok(Cow::Owned(format!(
     ///         "{} & import(\"effect\").Brand.Brand<\"{}\">",
@@ -183,7 +183,10 @@ impl Exporter {
     /// ```
     pub fn branded_type_impl(
         mut self,
-        builder: impl Fn(&Branded) -> Result<Cow<'static, str>, Error> + Send + Sync + 'static,
+        builder: impl for<'a> Fn(BrandedTypeExporter<'a>, &Branded) -> Result<Cow<'static, str>, Error>
+        + Send
+        + Sync
+        + 'static,
     ) -> Self {
         self.branded_type_impl = Some(BrandedTypeImpl(Arc::new(builder)));
         self
@@ -499,6 +502,45 @@ impl AsRef<Exporter> for Exporter {
 impl AsMut<Exporter> for Exporter {
     fn as_mut(&mut self) -> &mut Exporter {
         self
+    }
+}
+
+/// Reference to Typescript language exporter for branded type callbacks.
+pub struct BrandedTypeExporter<'a> {
+    pub(crate) exporter: &'a Exporter,
+    /// Collected types currently being exported.
+    pub types: &'a TypeCollection,
+}
+
+impl fmt::Debug for BrandedTypeExporter<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.exporter.fmt(f)
+    }
+}
+
+impl AsRef<Exporter> for BrandedTypeExporter<'_> {
+    fn as_ref(&self) -> &Exporter {
+        self
+    }
+}
+
+impl Deref for BrandedTypeExporter<'_> {
+    type Target = Exporter;
+
+    fn deref(&self) -> &Self::Target {
+        self.exporter
+    }
+}
+
+impl BrandedTypeExporter<'_> {
+    /// [primitives::inline]
+    pub fn inline(&self, dt: &DataType) -> Result<String, Error> {
+        primitives::inline(self, self.types, dt)
+    }
+
+    /// [primitives::reference]
+    pub fn reference(&self, r: &Reference) -> Result<String, Error> {
+        primitives::reference(self, self.types, r)
     }
 }
 
