@@ -129,9 +129,7 @@ RenamedFieldKeys: export type RenamedFieldKeys = {
 
 RenamedVariantWithSkippedPayload: export type RenamedVariantWithSkippedPayload = "A";
 
-Issue374: /**
- *  https://github.com/specta-rs/specta/issues/374
- */
+Issue374: // https://github.com/specta-rs/specta/issues/374
 export type Issue374 = {
 	foo: boolean,
 	bar: boolean,
@@ -328,21 +326,13 @@ export type CommentedEnum =
  */
 a: number } };
 
-SingleLineComment: /**
- *  Some single-line comment
- */
+SingleLineComment: // Some single-line comment
 export type SingleLineComment = 
-/**
- *  Some single-line comment
- */
+// Some single-line comment
 { A: number } | 
-/**
- *  Some single-line comment
- */
+// Some single-line comment
 { B: { 
-/**
- *  Some single-line comment
- */
+// Some single-line comment
 a: number } };
 
 NonGeneric: export type Demo<A, B> = {

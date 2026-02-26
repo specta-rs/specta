@@ -132,7 +132,7 @@ fn export_single_internal(
     )?;
 
     let mut comments = String::new();
-    js_doc(&mut comments, ndt.docs(), ndt.deprecated());
+    js_doc(&mut comments, ndt.docs(), ndt.deprecated(), !exporter.jsdoc);
     if !comments.is_empty() {
         for line in comments.lines() {
             s.push_str(indent);

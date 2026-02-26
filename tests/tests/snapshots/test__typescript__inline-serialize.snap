@@ -316,17 +316,11 @@ CommentedEnum:
  */
 a: number } }
 SingleLineComment: 
-/**
- *  Some single-line comment
- */
+// Some single-line comment
 { A: number } | 
-/**
- *  Some single-line comment
- */
+// Some single-line comment
 { B: { 
-/**
- *  Some single-line comment
- */
+// Some single-line comment
 a: number } }
 NonGeneric: {
 	a: number,

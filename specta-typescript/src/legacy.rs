@@ -123,9 +123,10 @@ fn inner_comments(
     other: String,
     start_with_newline: bool,
     prefix: &str,
+    single_line_comment: bool,
 ) -> String {
     let mut comments = String::new();
-    js_doc(&mut comments, docs, deprecated);
+    js_doc(&mut comments, docs, deprecated, single_line_comment);
     if comments.is_empty() {
         return other;
     }
@@ -219,6 +220,7 @@ fn unnamed_fields_datatype(
                 v,
                 true,
                 prefix,
+                !ctx.cfg.jsdoc,
             ));
         }
         fields => {
@@ -247,6 +249,7 @@ fn unnamed_fields_datatype(
                     v,
                     true,
                     prefix,
+                    !ctx.cfg.jsdoc,
                 ));
             }
 
@@ -344,6 +347,7 @@ pub(crate) fn struct_datatype(
                             format!("({s})"),
                             true,
                             prefix,
+                            !ctx.cfg.jsdoc,
                         )
                     })
                 })
@@ -381,6 +385,7 @@ pub(crate) fn struct_datatype(
                         other,
                         false,
                         &field_prefix,
+                        !ctx.cfg.jsdoc,
                     ))
                 })
                 .collect::<Result<Vec<_>>>()?;
@@ -458,6 +463,7 @@ fn enum_variant_datatype(
                             format!("({s})"),
                             true,
                             prefix,
+                            !ctx.cfg.jsdoc,
                         )
                     })
                 })
@@ -504,6 +510,7 @@ fn enum_variant_datatype(
                             other,
                             true,
                             prefix,
+                            !ctx.cfg.jsdoc,
                         ))
                     })
                     .collect::<Result<Vec<_>>>()?,
@@ -667,6 +674,7 @@ pub(crate) fn enum_datatype(
                 },
                 true,
                 prefix,
+                !ctx.cfg.jsdoc,
             ))
         })
         .collect::<Result<Vec<_>>>()?;
@@ -901,10 +909,25 @@ const NULL: &str = "null";
 const NEVER: &str = "never";
 
 // TODO: Merge this into main expoerter
-pub(crate) fn js_doc(s: &mut String, docs: &str, deprecated: Option<&DeprecatedType>) {
+pub(crate) fn js_doc(
+    s: &mut String,
+    docs: &str,
+    deprecated: Option<&DeprecatedType>,
+    single_line_comment: bool,
+) {
     // Early return - no-op if nothing to document
     if docs.is_empty() && deprecated.is_none() {
         return;
+    }
+
+    if single_line_comment && deprecated.is_none() {
+        let mut lines = docs.lines();
+        if let (Some(line), None) = (lines.next(), lines.next()) {
+            s.push_str("//");
+            s.push_str(&escape_jsdoc_text(line));
+            s.push('\n');
+            return;
+        }
     }
 
     // Start JSDoc comment
