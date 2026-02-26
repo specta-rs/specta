@@ -74,7 +74,9 @@ impl fmt::Debug for RuntimeFn {
 
 #[derive(Clone)]
 #[allow(clippy::type_complexity)]
-pub struct BrandedTypeImpl(pub(crate) Arc<dyn Fn(&Branded) -> Result<Cow<'static, str>, Error>>);
+pub struct BrandedTypeImpl(
+    pub(crate) Arc<dyn Fn(&Branded) -> Result<Cow<'static, str>, Error> + Send + Sync>,
+);
 
 impl fmt::Debug for BrandedTypeImpl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -169,7 +171,7 @@ impl Exporter {
     /// ```
     pub fn branded_type_impl(
         mut self,
-        builder: impl Fn(&Branded) -> Result<Cow<'static, str>, Error> + 'static,
+        builder: impl Fn(&Branded) -> Result<Cow<'static, str>, Error> + Send + Sync + 'static,
     ) -> Self {
         self.branded_type_impl = Some(BrandedTypeImpl(Arc::new(builder)));
         self

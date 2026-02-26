@@ -57,7 +57,7 @@ impl Typescript {
     /// See [`Exporter::branded_type_impl`] for `ts-brand` and Effect examples.
     pub fn branded_type_impl(
         self,
-        builder: impl Fn(&Branded) -> Result<Cow<'static, str>, Error> + 'static,
+        builder: impl Fn(&Branded) -> Result<Cow<'static, str>, Error> + Send + Sync + 'static,
     ) -> Self {
         Self(self.0.branded_type_impl(builder))
     }
