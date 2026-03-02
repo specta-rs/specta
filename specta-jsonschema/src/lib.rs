@@ -1,4 +1,4 @@
-//! [JSON Schema](https://json-schema.org) exporter and importer for Specta.
+//! [JSON Schema](https://json-schema.org) exporter and importer for [Specta](specta).
 //!
 //! This crate provides bidirectional conversion between Specta types and JSON Schema:
 //! - Export Specta types to JSON Schema (Draft 7, 2019-09, or 2020-12)

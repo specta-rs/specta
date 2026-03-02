@@ -1,4 +1,4 @@
-//! [Swift](https://www.swift.org) language exporter.
+//! [Swift](https://www.swift.org) language exporter for [Specta](specta).
 //!
 //! This crate provides functionality to export Rust types to Swift code.
 //!

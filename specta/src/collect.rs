@@ -12,7 +12,7 @@ static TYPES: OnceLock<Mutex<Vec<fn(&mut TypeCollection)>>> = OnceLock::new();
 ///
 /// All types with the [`Type`](macro@specta::Type) macro will automatically be registered here unless they have been explicitly disabled with `#[specta(collect = false)]`.
 ///
-/// Note that when enabling the `export` feature, you will not be able to enable the `unsafe_code` lint as [`ctor`](https://docs.rs/ctor) (which is used internally) is marked unsafe.
+/// Note that when enabling the `export` feature, you will not be able to enable the `unsafe_code` lint as [`ctor`] (which is used internally) is marked unsafe.
 ///
 pub fn collect() -> TypeCollection {
     let types = TYPES
