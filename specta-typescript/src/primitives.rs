@@ -119,7 +119,6 @@ fn export_single_internal(
             cfg: exporter,
             path: vec![],
         },
-        crate::legacy::NamedLocation::Type,
         &match exporter.layout {
             Layout::ModulePrefixedName => {
                 let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");

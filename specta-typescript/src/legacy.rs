@@ -16,24 +16,6 @@ use specta::{
 
 use crate::{Error, Exporter, reserved_names::RESERVED_TYPE_NAMES};
 
-/// Describes where an error occurred.
-#[derive(Debug, PartialEq)]
-pub enum NamedLocation {
-    Type,
-    Field,
-    Variant,
-}
-
-impl fmt::Display for NamedLocation {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Type => write!(f, "type"),
-            Self::Field => write!(f, "field"),
-            Self::Variant => write!(f, "variant"),
-        }
-    }
-}
-
 #[derive(Clone, Debug)]
 pub(crate) enum PathItem {
     // Type(Cow<'static, str>),
@@ -631,7 +613,7 @@ pub(crate) fn enum_datatype(
                         sanitised_name.to_string()
                     }
                     specta_serde::EnumRepr::Internal { tag } => {
-                        let tag = sanitise_key(tag.clone().into(), false);
+                        let tag = sanitise_key(tag.clone(), false);
                         let variant_name_ts = sanitise_key(variant_name.clone(), true);
 
                         match variant.fields() {
@@ -660,8 +642,8 @@ pub(crate) fn enum_datatype(
                         }
                     }
                     specta_serde::EnumRepr::Adjacent { tag, content } => {
-                        let tag = sanitise_key(tag.clone().into(), false);
-                        let content = sanitise_key(content.clone().into(), false);
+                        let tag = sanitise_key(tag.clone(), false);
+                        let content = sanitise_key(content.clone(), false);
                         let variant_name_ts = sanitise_key(variant_name.clone(), true);
 
                         match variant.fields() {
@@ -809,9 +791,9 @@ pub(crate) fn escape_typescript_string_literal(value: &str) -> Cow<'_, str> {
     Cow::Owned(escaped)
 }
 
-pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: &str) -> Output {
+pub(crate) fn sanitise_type_name(ctx: ExportContext, ident: &str) -> Output {
     if let Some(name) = RESERVED_TYPE_NAMES.iter().find(|v| **v == ident) {
-        return Err(Error::forbidden_name_legacy(loc, ctx.export_path(), name));
+        return Err(Error::forbidden_name_legacy(ctx.export_path(), name));
     }
 
     if let Some(first_char) = ident.chars().next()
@@ -819,7 +801,6 @@ pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: 
         && first_char != '_'
     {
         return Err(Error::invalid_name_legacy(
-            loc,
             ctx.export_path(),
             ident.to_string(),
         ));
@@ -830,7 +811,6 @@ pub(crate) fn sanitise_type_name(ctx: ExportContext, loc: NamedLocation, ident: 
         .is_some()
     {
         return Err(Error::invalid_name_legacy(
-            loc,
             ctx.export_path(),
             ident.to_string(),
         ));
@@ -1027,7 +1007,7 @@ pub(crate) fn deprecated_details(typ: &DeprecatedType) -> Option<String> {
 
 //     let ctx = ctx.with(PathItem::Type(name.clone()));
 
-//     let name = sanitise_type_name(ctx.clone(), NamedLocation::Type, name)?;
+//     let name = sanitise_type_name(ctx.clone(), name)?;
 
 //     let mut inline_ts = String::new();
 //     datatype_inner(

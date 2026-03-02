@@ -2,7 +2,7 @@ use std::{borrow::Cow, error, fmt, io, panic::Location, path::PathBuf};
 
 use specta::datatype::OpaqueReference;
 
-use crate::{Layout, legacy::NamedLocation};
+use crate::Layout;
 
 use super::legacy::ExportPath;
 
@@ -83,11 +83,9 @@ enum ErrorKind {
     //
     //
     BigIntForbiddenLegacy(ExportPath),
-    ForbiddenNameLegacy(NamedLocation, ExportPath, &'static str),
-    InvalidNameLegacy(NamedLocation, ExportPath, String),
-    InvalidTaggingLegacy(ExportPath),
+    ForbiddenNameLegacy(ExportPath, &'static str),
+    InvalidNameLegacy(ExportPath, String),
     InvalidTaggedVariantContainingTupleStructLegacy(ExportPath),
-    DuplicateTypeNameLegacy(Cow<'static, str>, Location<'static>, Location<'static>),
     FmtLegacy(std::fmt::Error),
     UnableToExport(Layout),
 }
@@ -109,12 +107,6 @@ impl Error {
     pub(crate) fn bigint_forbidden(path: String) -> Self {
         Self {
             kind: ErrorKind::BigIntForbidden { path },
-        }
-    }
-
-    pub(crate) fn forbidden_name(path: String, name: &'static str) -> Self {
-        Self {
-            kind: ErrorKind::ForbiddenName { path, name },
         }
     }
 
@@ -178,44 +170,23 @@ impl Error {
     }
 
     pub(crate) fn forbidden_name_legacy(
-        location: NamedLocation,
         path: ExportPath,
         name: &'static str,
     ) -> Self {
         Self {
-            kind: ErrorKind::ForbiddenNameLegacy(location, path, name),
+            kind: ErrorKind::ForbiddenNameLegacy(path, name),
         }
     }
 
-    pub(crate) fn invalid_name_legacy(
-        location: NamedLocation,
-        path: ExportPath,
-        name: String,
-    ) -> Self {
+    pub(crate) fn invalid_name_legacy(path: ExportPath, name: String) -> Self {
         Self {
-            kind: ErrorKind::InvalidNameLegacy(location, path, name),
-        }
-    }
-
-    pub(crate) fn invalid_tagging_legacy(path: ExportPath) -> Self {
-        Self {
-            kind: ErrorKind::InvalidTaggingLegacy(path),
+            kind: ErrorKind::InvalidNameLegacy(path, name),
         }
     }
 
     pub(crate) fn invalid_tagged_variant_containing_tuple_struct_legacy(path: ExportPath) -> Self {
         Self {
             kind: ErrorKind::InvalidTaggedVariantContainingTupleStructLegacy(path),
-        }
-    }
-
-    pub(crate) fn duplicate_type_name_legacy(
-        name: Cow<'static, str>,
-        first: Location<'static>,
-        second: Location<'static>,
-    ) -> Self {
-        Self {
-            kind: ErrorKind::DuplicateTypeNameLegacy(name, first, second),
         }
     }
 
@@ -318,27 +289,17 @@ impl fmt::Display for Error {
                 f,
                 "Attempted to export {path:?} but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!"
             ),
-            ErrorKind::ForbiddenNameLegacy(path, name, _) => write!(
+            ErrorKind::ForbiddenNameLegacy(path, name) => write!(
                 f,
                 "Attempted to export {path:?} but was unable to due to name {name:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`"
             ),
-            ErrorKind::InvalidNameLegacy(path, name, _) => write!(
+            ErrorKind::InvalidNameLegacy(path, name) => write!(
                 f,
                 "Attempted to export {path:?} but was unable to due to name {name:?} containing an invalid character. Try renaming it or using `#[specta(rename = \"new name\")]`"
             ),
-            ErrorKind::InvalidTaggingLegacy(path) => {
-                write!(
-                    f,
-                    "Attempted to export {path:?} with tagging but the type is not tagged."
-                )
-            }
             ErrorKind::InvalidTaggedVariantContainingTupleStructLegacy(path) => write!(
                 f,
                 "Attempted to export {path:?} with tagging but the variant is a tuple struct."
-            ),
-            ErrorKind::DuplicateTypeNameLegacy(a, b, _) => write!(
-                f,
-                "Attempted to export {a:?} but was unable to due to name {b:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`"
             ),
             ErrorKind::FmtLegacy(err) => write!(f, "formatter: {err:?}"),
             ErrorKind::UnableToExport(layout) => write!(
