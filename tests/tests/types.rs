@@ -346,14 +346,10 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         ExternallyTagged,
 
         // Serde - Internally Tagged
-        InternallyTaggedB,
-        InternallyTaggedC,
         InternallyTaggedD,
         InternallyTaggedE,
         InternallyTaggedF,
-        InternallyTaggedG,
         InternallyTaggedH,
-        InternallyTaggedI,
         InternallyTaggedL,
         InternallyTaggedM,
 
@@ -377,19 +373,9 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         EmptyEnumTaggedWContent,
         EmptyEnumUntagged,
 
-        TaggedEnumOfUnitStruct,
-        TaggedEnumOfEmptyBracedStruct,
-        TaggedEnumOfEmptyTupleStruct,
-        TaggedEnumOfEmptyTupleBracedStructs,
-        TaggedStructOfStructWithTuple,
-
         // Skip
         SkipOnlyField,
         SkipField,
-        SkipOnlyVariantExternallyTagged,
-        SkipOnlyVariantInternallyTagged,
-        SkipOnlyVariantAdjacentlyTagged,
-        SkipOnlyVariantUntagged,
         SkipVariant,
         SkipUnnamedFieldInVariant,
         SkipNamedFieldInVariant,

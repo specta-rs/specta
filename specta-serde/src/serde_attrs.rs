@@ -235,7 +235,7 @@ impl SerdeTransformer {
         for (variant_name, variant) in enum_type.variants() {
             let variant_attrs = parse_serde_attributes(variant.attributes())?;
 
-            if self.should_skip_type(&variant_attrs) {
+            if variant.skip() || self.should_skip_type(&variant_attrs) {
                 continue;
             }
 
@@ -288,6 +288,10 @@ impl SerdeTransformer {
             new_variant.set_fields(final_fields);
 
             transformed_variants.push((transformed_name, new_variant));
+        }
+
+        if !enum_type.variants().is_empty() && transformed_variants.is_empty() {
+            return Err(Error::InvalidUsageOfSkip);
         }
 
         let mut new_enum = Enum::new();
@@ -594,6 +598,15 @@ impl SerdeTransformer {
         DataType::Enum(literal_enum)
     }
 
+    fn is_valid_internal_tag_payload(ty: &DataType) -> bool {
+        match ty {
+            DataType::Primitive(_) | DataType::List(_) => false,
+            DataType::Tuple(tuple) => tuple.elements().is_empty(),
+            DataType::Nullable(inner) => Self::is_valid_internal_tag_payload(inner),
+            _ => true,
+        }
+    }
+
     /// Add a tag field to a struct (for `#[serde(tag = "...")]` on structs)
     fn add_struct_tag_field(
         &self,
@@ -664,9 +677,17 @@ impl SerdeTransformer {
 
                 Ok(internal::construct::fields_named(new_fields, vec![]))
             }
-            Fields::Unnamed(_) => {
-                // Tuple variants in internally tagged enums are not well-supported by serde
-                // For now, just add the tag as a named field
+            Fields::Unnamed(unnamed) => {
+                use specta::datatype::skip_fields;
+
+                let mut non_skipped_fields = skip_fields(unnamed.fields());
+                if let Some((_, field_ty)) = non_skipped_fields.next()
+                    && (non_skipped_fields.next().is_some()
+                        || !Self::is_valid_internal_tag_payload(field_ty))
+                {
+                    return Err(Error::InvalidInternallyTaggedEnum);
+                }
+
                 let tag_field = Field::new(tag_type);
                 Ok(internal::construct::fields_named(
                     vec![(Cow::Owned(tag_name.to_string()), tag_field)],

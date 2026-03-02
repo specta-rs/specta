@@ -427,14 +427,10 @@ EmptyStructWithTag: Record<string, never>
 AdjacentlyTagged: { t: "A" } | { t: "B"; c: { id: string; method: string } } | { t: "C"; c: string }
 LoadProjectEvent: { event: "Started"; data: { project_name: string } } | { event: "ProgressTest"; data: { project_name: string; status: string; progress: number } } | { event: "Finished"; data: { project_name: string } }
 ExternallyTagged: "A" | { B: { id: string; method: string } } | { C: string }
-InternallyTaggedB: { type: "A" }
-InternallyTaggedC: { type: "A" }
 InternallyTaggedD: { type: "A" }
 InternallyTaggedE: { type: "A" }
 InternallyTaggedF: { type: "A" }
-InternallyTaggedG: { type: "A" }
 InternallyTaggedH: { type: "A" }
-InternallyTaggedI: { type: "A" }
 InternallyTaggedL: { type: "A" }
 InternallyTaggedM: { type: "A" }
 StructWithAlias: {
@@ -456,19 +452,10 @@ EmptyEnum: never
 EmptyEnumTagged: never
 EmptyEnumTaggedWContent: never
 EmptyEnumUntagged: never
-TaggedEnumOfUnitStruct: { a: "A" } | { a: "B" }
-TaggedEnumOfEmptyBracedStruct: { a: "A" } | { a: "B" }
-TaggedEnumOfEmptyTupleStruct: { a: "A" } | { a: "B" }
-TaggedEnumOfEmptyTupleBracedStructs: { a: "B" }
-TaggedStructOfStructWithTuple: { a: "A" } | { a: "B" }
 SkipOnlyField: Record<string, never>
 SkipField: {
 	b: number,
 }
-SkipOnlyVariantExternallyTagged: never
-SkipOnlyVariantInternallyTagged: never
-SkipOnlyVariantAdjacentlyTagged: never
-SkipOnlyVariantUntagged: never
 SkipVariant: { A: string }
 SkipUnnamedFieldInVariant: "A" | { B: [number] }
 SkipNamedFieldInVariant: { A: Record<string, never> } | { B: { b: number } }

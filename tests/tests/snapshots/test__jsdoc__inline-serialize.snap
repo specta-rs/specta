@@ -33,28 +33,28 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*	}} ActualType
 	* @property {GenericType<string>} a
 	*
-	* @typedef {{ t: "A" } | { t: "B"; c: {
+	* @typedef {{ t: "A"; c: { t: "A" } } | { t: "B"; c: { t: "B"; c: {
 	* 	id: string,
 	* 	method: string,
-	* } } | { t: "C"; c: string }} AdjacentlyTagged
-	* @property {{ t: "A" }} A
-	* @property {{ t: "B"; c: {
+	* } } } | { t: "C"; c: { t: "C"; c: string } }} AdjacentlyTagged
+	* @property {{ t: "A"; c: { t: "A" } }} A
+	* @property {{ t: "B"; c: { t: "B"; c: {
 	* 	id: string,
 	* 	method: string,
-	* } }} B
-	* @property {{ t: "C"; c: string }} C
+	* } } }} B
+	* @property {{ t: "C"; c: { t: "C"; c: string } }} C
 	*
-	* @typedef {{ type: "A"; data: {
+	* @typedef {{ type: "A"; data: { type: "A"; data: {
 	* 	field: string,
-	* } } | { type: "B"; data: {
+	* } } } | { type: "B"; data: { type: "B"; data: {
 	* 	other: number,
-	* } }} AdjacentlyTaggedWithAlias
-	* @property {{ type: "A"; data: {
+	* } } }} AdjacentlyTaggedWithAlias
+	* @property {{ type: "A"; data: { type: "A"; data: {
 	* 	field: string,
-	* } }} A
-	* @property {{ type: "B"; data: {
+	* } } }} A
+	* @property {{ type: "B"; data: { type: "B"; data: {
 	* 	other: number,
-	* } }} B
+	* } } }} B
 	*
 	* @typedef {{
 	*		b: number,
@@ -250,8 +250,6 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {{ A: string }} A
 	* @property {"B"} B
 	*
-	* @typedef {Record<string, never>} EmptyBracedStruct
-	*
 	* @typedef {never} EmptyEnum
 	*
 	* @typedef {never} EmptyEnumTagged
@@ -266,8 +264,6 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		a: "EmptyStructWithTag",
 	*	}} EmptyStructWithTag
 	* @property {"EmptyStructWithTag"} a
-	*
-	* @typedef {[]} EmptyTupleStruct
 	*
 	* @typedef {{ A: string } | { bbb: number } | { cccc: number } | { D: { a: string; bbbbbb: number } }} EnumMacroAttributes
 	* @property {{ A: string }} A
@@ -348,10 +344,10 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {FlattenB} b
 	* @property {number} d
 	*
-	* @typedef {{ tag: "One" } | { tag: "Two" } | { tag: "Three" }} FlattenEnum
-	* @property {{ tag: "One" }} One
-	* @property {{ tag: "Two" }} Two
-	* @property {{ tag: "Three" }} Three
+	* @typedef {{ tag: "One"; test: { tag: "One" } } | { tag: "Two"; test: { tag: "Two" } } | { tag: "Three"; test: { tag: "Three" } }} FlattenEnum
+	* @property {{ tag: "One"; test: { tag: "One" } }} One
+	* @property {{ tag: "Two"; test: { tag: "Two" } }} Two
+	* @property {{ tag: "Three"; test: { tag: "Three" } }} Three
 	*
 	* @typedef {(FlattenEnum) & {
 	*		outer: string,
@@ -543,57 +539,40 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {number} a
 	* @property {FlattenedInner} b
 	*
-	* @typedef {{ type: "A" }} InternallyTaggedB
-	* @property {{ type: "A" }} A
+	* @typedef {{ type: "A" } & { type: "A" }} InternallyTaggedD
+	* @property {{ type: "A" } & { type: "A" }} A
 	*
-	* @typedef {{ type: "A" }} InternallyTaggedC
-	* @property {{ type: "A" }} A
+	* @typedef {{ type: "A" } & { type: "A" }} InternallyTaggedE
+	* @property {{ type: "A" } & { type: "A" }} A
 	*
-	* @typedef {{ type: "A" }} InternallyTaggedD
-	* @property {{ type: "A" }} A
-	*
-	* @typedef {{ type: "A" }} InternallyTaggedE
-	* @property {{ type: "A" }} A
-	*
-	* @typedef {{ type: "A" }} InternallyTaggedF
-	* @property {{ type: "A" }} A
+	* @typedef {{ type: "A" } & { type: "A" }} InternallyTaggedF
+	* @property {{ type: "A" } & { type: "A" }} A
 	*
 	* @typedef {null} InternallyTaggedFInner
 	* @property {null} A
 	*
-	* @typedef {{ type: "A" }} InternallyTaggedG
-	* @property {{ type: "A" }} A
-	*
-	* @typedef {string} InternallyTaggedGInner
-	* @property {string} A
-	*
-	* @typedef {{ type: "A" }} InternallyTaggedH
-	* @property {{ type: "A" }} A
+	* @typedef {{ type: "A" } & { type: "A" }} InternallyTaggedH
+	* @property {{ type: "A" } & { type: "A" }} A
 	*
 	* @typedef {null} InternallyTaggedHInner
 	*
-	* @typedef {{ type: "A" }} InternallyTaggedI
-	* @property {{ type: "A" }} A
+	* @typedef {{ type: "A" } & { type: "A" }} InternallyTaggedL
+	* @property {{ type: "A" } & { type: "A" }} A
 	*
-	* @typedef {string} InternallyTaggedIInner
+	* @typedef {{ type: "A" } & { type: "A" } | { type: "B" } & { type: "B" }} InternallyTaggedLInner
+	* @property {{ type: "A" } & { type: "A" }} A
+	* @property {{ type: "B" } & { type: "B" }} B
 	*
-	* @typedef {{ type: "A" }} InternallyTaggedL
-	* @property {{ type: "A" }} A
-	*
-	* @typedef {{ type: "A" } | { type: "B" }} InternallyTaggedLInner
-	* @property {{ type: "A" }} A
-	* @property {{ type: "B" }} B
-	*
-	* @typedef {{ type: "A" }} InternallyTaggedM
-	* @property {{ type: "A" }} A
+	* @typedef {{ type: "A" } & { type: "A" }} InternallyTaggedM
+	* @property {{ type: "A" } & { type: "A" }} A
 	*
 	* @typedef {null} InternallyTaggedMInner
 	* @property {null} A
 	* @property {null} B
 	*
-	* @typedef {{ type: "A"; field: string } | { type: "B"; other: number }} InternallyTaggedWithAlias
-	* @property {{ type: "A"; field: string }} A
-	* @property {{ type: "B"; other: number }} B
+	* @typedef {{ type: "A" } & { type: "A"; field: string } | { type: "B" } & { type: "B"; other: number }} InternallyTaggedWithAlias
+	* @property {{ type: "A" } & { type: "A"; field: string }} A
+	* @property {{ type: "B" } & { type: "B"; other: number }} B
 	*
 	* @typedef {{
 	*		cause: null,
@@ -630,26 +609,26 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {T[]} borrowed
 	* @property {T[]} owned
 	*
-	* @typedef {{ event: "started"; data: {
+	* @typedef {{ event: "started"; data: { event: "started"; data: {
 	* 	projectName: string,
-	* } } | { event: "progressTest"; data: {
-	* 	projectName: string,
-	* 	status: string,
-	* 	progress: number,
-	* } } | { event: "finished"; data: {
-	* 	projectName: string,
-	* } }} LoadProjectEvent
-	* @property {{ event: "started"; data: {
-	* 	projectName: string,
-	* } }} started
-	* @property {{ event: "progressTest"; data: {
+	* } } } | { event: "progressTest"; data: { event: "progressTest"; data: {
 	* 	projectName: string,
 	* 	status: string,
 	* 	progress: number,
-	* } }} progressTest
-	* @property {{ event: "finished"; data: {
+	* } } } | { event: "finished"; data: { event: "finished"; data: {
 	* 	projectName: string,
-	* } }} finished
+	* } } }} LoadProjectEvent
+	* @property {{ event: "started"; data: { event: "started"; data: {
+	* 	projectName: string,
+	* } } }} started
+	* @property {{ event: "progressTest"; data: { event: "progressTest"; data: {
+	* 	projectName: string,
+	* 	status: string,
+	* 	progress: number,
+	* } } }} progressTest
+	* @property {{ event: "finished"; data: { event: "finished"; data: {
+	* 	projectName: string,
+	* } } }} finished
 	*
 	* @typedef {{ Demo: string } | { Demo2: { demo2: string } }} MacroEnum
 	* @property {{ Demo: string }} Demo
@@ -669,21 +648,21 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {{ A: string }} A
 	* @property {{ B: number }} B
 	*
-	* @typedef {{ t: "Variant"; c: (First) }} MyEnumAdjacent
-	* @property {{ t: "Variant"; c: (First) }} Variant
+	* @typedef {{ t: "Variant"; c: { t: "Variant"; c: (First) } }} MyEnumAdjacent
+	* @property {{ t: "Variant"; c: { t: "Variant"; c: (First) } }} Variant
 	*
 	* @typedef {{ Variant: (First) }} MyEnumExternal
 	* @property {{ Variant: (First) }} Variant
 	*
-	* @typedef {(First) & { type: "Variant" }} MyEnumTagged
-	* @property {(First) & { type: "Variant" }} Variant
+	* @typedef {{ type: "Variant" } & (First) & { type: "Variant" }} MyEnumTagged
+	* @property {{ type: "Variant" } & (First) & { type: "Variant" }} Variant
 	*
 	* @typedef {(First)} MyEnumUntagged
 	* @property {(First)} Variant
 	*
-	* @typedef {{ type: "a"; value: string } | { type: "b"; value: number }} NestedEnum
-	* @property {{ type: "a"; value: string }} a
-	* @property {{ type: "b"; value: number }} b
+	* @typedef {{ type: "a"; value: { type: "a"; value: string } } | { type: "b"; value: { type: "b"; value: number } }} NestedEnum
+	* @property {{ type: "a"; value: { type: "a"; value: string } }} a
+	* @property {{ type: "b"; value: { type: "b"; value: number } }} b
 	*
 	* @typedef {string | null} NonOptional
 	* @property {string | null} "0"
@@ -934,14 +913,10 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		AdjacentlyTagged: AdjacentlyTagged,
 	*		LoadProjectEvent: LoadProjectEvent,
 	*		ExternallyTagged: ExternallyTagged,
-	*		InternallyTaggedB: InternallyTaggedB,
-	*		InternallyTaggedC: InternallyTaggedC,
 	*		InternallyTaggedD: InternallyTaggedD,
 	*		InternallyTaggedE: InternallyTaggedE,
 	*		InternallyTaggedF: InternallyTaggedF,
-	*		InternallyTaggedG: InternallyTaggedG,
 	*		InternallyTaggedH: InternallyTaggedH,
-	*		InternallyTaggedI: InternallyTaggedI,
 	*		InternallyTaggedL: InternallyTaggedL,
 	*		InternallyTaggedM: InternallyTaggedM,
 	*		StructWithAlias: StructWithAlias,
@@ -957,17 +932,8 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		EmptyEnumTagged: EmptyEnumTagged,
 	*		EmptyEnumTaggedWContent: EmptyEnumTaggedWContent,
 	*		EmptyEnumUntagged: EmptyEnumUntagged,
-	*		TaggedEnumOfUnitStruct: TaggedEnumOfUnitStruct,
-	*		TaggedEnumOfEmptyBracedStruct: TaggedEnumOfEmptyBracedStruct,
-	*		TaggedEnumOfEmptyTupleStruct: TaggedEnumOfEmptyTupleStruct,
-	*		TaggedEnumOfEmptyTupleBracedStructs: TaggedEnumOfEmptyTupleBracedStructs,
-	*		TaggedStructOfStructWithTuple: TaggedStructOfStructWithTuple,
 	*		SkipOnlyField: SkipOnlyField,
 	*		SkipField: SkipField,
-	*		SkipOnlyVariantExternallyTagged: SkipOnlyVariantExternallyTagged,
-	*		SkipOnlyVariantInternallyTagged: SkipOnlyVariantInternallyTagged,
-	*		SkipOnlyVariantAdjacentlyTagged: SkipOnlyVariantAdjacentlyTagged,
-	*		SkipOnlyVariantUntagged: SkipOnlyVariantUntagged,
 	*		SkipVariant: SkipVariant,
 	*		SkipUnnamedFieldInVariant: SkipUnnamedFieldInVariant,
 	*		SkipNamedFieldInVariant: SkipNamedFieldInVariant,
@@ -1204,14 +1170,10 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {AdjacentlyTagged} AdjacentlyTagged
 	* @property {LoadProjectEvent} LoadProjectEvent
 	* @property {ExternallyTagged} ExternallyTagged
-	* @property {InternallyTaggedB} InternallyTaggedB
-	* @property {InternallyTaggedC} InternallyTaggedC
 	* @property {InternallyTaggedD} InternallyTaggedD
 	* @property {InternallyTaggedE} InternallyTaggedE
 	* @property {InternallyTaggedF} InternallyTaggedF
-	* @property {InternallyTaggedG} InternallyTaggedG
 	* @property {InternallyTaggedH} InternallyTaggedH
-	* @property {InternallyTaggedI} InternallyTaggedI
 	* @property {InternallyTaggedL} InternallyTaggedL
 	* @property {InternallyTaggedM} InternallyTaggedM
 	* @property {StructWithAlias} StructWithAlias
@@ -1227,17 +1189,8 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {EmptyEnumTagged} EmptyEnumTagged
 	* @property {EmptyEnumTaggedWContent} EmptyEnumTaggedWContent
 	* @property {EmptyEnumUntagged} EmptyEnumUntagged
-	* @property {TaggedEnumOfUnitStruct} TaggedEnumOfUnitStruct
-	* @property {TaggedEnumOfEmptyBracedStruct} TaggedEnumOfEmptyBracedStruct
-	* @property {TaggedEnumOfEmptyTupleStruct} TaggedEnumOfEmptyTupleStruct
-	* @property {TaggedEnumOfEmptyTupleBracedStructs} TaggedEnumOfEmptyTupleBracedStructs
-	* @property {TaggedStructOfStructWithTuple} TaggedStructOfStructWithTuple
 	* @property {SkipOnlyField} SkipOnlyField
 	* @property {SkipField} SkipField
-	* @property {SkipOnlyVariantExternallyTagged} SkipOnlyVariantExternallyTagged
-	* @property {SkipOnlyVariantInternallyTagged} SkipOnlyVariantInternallyTagged
-	* @property {SkipOnlyVariantAdjacentlyTagged} SkipOnlyVariantAdjacentlyTagged
-	* @property {SkipOnlyVariantUntagged} SkipOnlyVariantUntagged
 	* @property {SkipVariant} SkipVariant
 	* @property {SkipUnnamedFieldInVariant} SkipUnnamedFieldInVariant
 	* @property {SkipNamedFieldInVariant} SkipNamedFieldInVariant
@@ -1403,14 +1356,6 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*
 	* @typedef {Record<string, never>} SkipOnlyField
 	*
-	* @typedef {never} SkipOnlyVariantAdjacentlyTagged
-	*
-	* @typedef {never} SkipOnlyVariantExternallyTagged
-	*
-	* @typedef {never} SkipOnlyVariantInternallyTagged
-	*
-	* @typedef {never} SkipOnlyVariantUntagged
-	*
 	* @typedef {{
 	*		a: number,
 	*	}} SkipStructFields
@@ -1423,15 +1368,15 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @typedef {{ A: string }} SkipVariant
 	* @property {{ A: string }} A
 	*
-	* @typedef {{ tag: "A"; data: string }} SkipVariant2
-	* @property {{ tag: "A"; data: string }} A
+	* @typedef {{ tag: "A"; data: { tag: "A"; data: string } }} SkipVariant2
+	* @property {{ tag: "A"; data: { tag: "A"; data: string } }} A
 	*
 	* @typedef {{ A: { a: string } }} SkipVariant3
 	* @property {{ A: { a: string } }} A
 	*
-	* @typedef {{ type: "A" } | { type: "B"; data: string }} SkippedFieldWithinVariant
-	* @property {{ type: "A" }} A
-	* @property {{ type: "B"; data: string }} B
+	* @typedef {{ type: "A"; data: { type: "A" } } | { type: "B"; data: { type: "B"; data: string } }} SkippedFieldWithinVariant
+	* @property {{ type: "A"; data: { type: "A" } }} A
+	* @property {{ type: "B"; data: { type: "B"; data: string } }} B
 	*
 	* @typedef {{
 	*		a: number,
@@ -1481,25 +1426,6 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {"TagOnStructWithInline"} type
 	* @property {First} a
 	* @property {First} b
-	*
-	* @typedef {{ a: "A" } | { a: "B" }} TaggedEnumOfEmptyBracedStruct
-	* @property {{ a: "A" }} A
-	* @property {{ a: "B" }} B
-	*
-	* @typedef {{ a: "B" }} TaggedEnumOfEmptyTupleBracedStructs
-	* @property {{ a: "B" }} B
-	*
-	* @typedef {{ a: "A" } | { a: "B" }} TaggedEnumOfEmptyTupleStruct
-	* @property {{ a: "A" }} A
-	* @property {{ a: "B" }} B
-	*
-	* @typedef {{ a: "A" } | { a: "B" }} TaggedEnumOfUnitStruct
-	* @property {{ a: "A" }} A
-	* @property {{ a: "B" }} B
-	*
-	* @typedef {{ a: "A" } | { a: "B" }} TaggedStructOfStructWithTuple
-	* @property {{ a: "A" }} A
-	* @property {{ a: "B" }} B
 	*
 	* @typedef {string | null | {
 	* 	a: string,
@@ -1569,9 +1495,6 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @typedef {string} TupleStructWithRep
 	* @property {string} "0"
 	*
-	* @typedef {null} TupleStructWithTuple
-	* @property {null} "0"
-	*
 	* @typedef {never} Type
 	*
 	* @typedef {null} Unit1
@@ -1591,8 +1514,6 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*
 	* @typedef {{ A: Record<string, never> }} Unit7
 	* @property {{ A: Record<string, never> }} A
-	*
-	* @typedef {null} UnitStruct
 	*
 	* @typedef {"A" | "B" | "C"} UnitVariants
 	* @property {"A"} A

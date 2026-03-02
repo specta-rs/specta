@@ -689,12 +689,6 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {{ B: { id: string; method: string } }} B
 	* @property {{ C: string }} C
 	*
-	* @typedef {{ type: "A" }} InternallyTaggedB
-	* @property {{ type: "A" }} A
-	*
-	* @typedef {{ type: "A" }} InternallyTaggedC
-	* @property {{ type: "A" }} A
-	*
 	* @typedef {{ type: "A" }} InternallyTaggedD
 	* @property {{ type: "A" }} A
 	*
@@ -704,13 +698,7 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @typedef {{ type: "A" }} InternallyTaggedF
 	* @property {{ type: "A" }} A
 	*
-	* @typedef {{ type: "A" }} InternallyTaggedG
-	* @property {{ type: "A" }} A
-	*
 	* @typedef {{ type: "A" }} InternallyTaggedH
-	* @property {{ type: "A" }} A
-	*
-	* @typedef {{ type: "A" }} InternallyTaggedI
 	* @property {{ type: "A" }} A
 	*
 	* @typedef {{ type: "A" }} InternallyTaggedL
@@ -766,39 +754,12 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*
 	* @typedef {never} EmptyEnumUntagged
 	*
-	* @typedef {{ a: "A" } | { a: "B" }} TaggedEnumOfUnitStruct
-	* @property {{ a: "A" }} A
-	* @property {{ a: "B" }} B
-	*
-	* @typedef {{ a: "A" } | { a: "B" }} TaggedEnumOfEmptyBracedStruct
-	* @property {{ a: "A" }} A
-	* @property {{ a: "B" }} B
-	*
-	* @typedef {{ a: "A" } | { a: "B" }} TaggedEnumOfEmptyTupleStruct
-	* @property {{ a: "A" }} A
-	* @property {{ a: "B" }} B
-	*
-	* @typedef {{ a: "B" }} TaggedEnumOfEmptyTupleBracedStructs
-	* @property {{ a: "B" }} B
-	*
-	* @typedef {{ a: "A" } | { a: "B" }} TaggedStructOfStructWithTuple
-	* @property {{ a: "A" }} A
-	* @property {{ a: "B" }} B
-	*
 	* @typedef {Record<string, never>} SkipOnlyField
 	*
 	* @typedef {{
 	*		b: number,
 	*	}} SkipField
 	* @property {number} b
-	*
-	* @typedef {never} SkipOnlyVariantExternallyTagged
-	*
-	* @typedef {never} SkipOnlyVariantInternallyTagged
-	*
-	* @typedef {never} SkipOnlyVariantAdjacentlyTagged
-	*
-	* @typedef {never} SkipOnlyVariantUntagged
 	*
 	* @typedef {{ A: string }} SkipVariant
 	* @property {{ A: string }} A

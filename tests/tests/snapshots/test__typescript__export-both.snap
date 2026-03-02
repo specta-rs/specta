@@ -465,21 +465,13 @@ LoadProjectEvent: export type LoadProjectEvent = { event: "Started"; data: { pro
 
 ExternallyTagged: export type ExternallyTagged = "A" | { B: { id: string; method: string } } | { C: string };
 
-InternallyTaggedB: export type InternallyTaggedB = { type: "A" };
-
-InternallyTaggedC: export type InternallyTaggedC = { type: "A" };
-
 InternallyTaggedD: export type InternallyTaggedD = { type: "A" };
 
 InternallyTaggedE: export type InternallyTaggedE = { type: "A" };
 
 InternallyTaggedF: export type InternallyTaggedF = { type: "A" };
 
-InternallyTaggedG: export type InternallyTaggedG = { type: "A" };
-
 InternallyTaggedH: export type InternallyTaggedH = { type: "A" };
-
-InternallyTaggedI: export type InternallyTaggedI = { type: "A" };
 
 InternallyTaggedL: export type InternallyTaggedL = { type: "A" };
 
@@ -517,29 +509,11 @@ EmptyEnumTaggedWContent: export type EmptyEnumTaggedWContent = never;
 
 EmptyEnumUntagged: export type EmptyEnumUntagged = never;
 
-TaggedEnumOfUnitStruct: export type TaggedEnumOfUnitStruct = { a: "A" } | { a: "B" };
-
-TaggedEnumOfEmptyBracedStruct: export type TaggedEnumOfEmptyBracedStruct = { a: "A" } | { a: "B" };
-
-TaggedEnumOfEmptyTupleStruct: export type TaggedEnumOfEmptyTupleStruct = { a: "A" } | { a: "B" };
-
-TaggedEnumOfEmptyTupleBracedStructs: export type TaggedEnumOfEmptyTupleBracedStructs = { a: "B" };
-
-TaggedStructOfStructWithTuple: export type TaggedStructOfStructWithTuple = { a: "A" } | { a: "B" };
-
 SkipOnlyField: export type SkipOnlyField = Record<string, never>;
 
 SkipField: export type SkipField = {
 	b: number,
 };
-
-SkipOnlyVariantExternallyTagged: export type SkipOnlyVariantExternallyTagged = never;
-
-SkipOnlyVariantInternallyTagged: export type SkipOnlyVariantInternallyTagged = never;
-
-SkipOnlyVariantAdjacentlyTagged: export type SkipOnlyVariantAdjacentlyTagged = never;
-
-SkipOnlyVariantUntagged: export type SkipOnlyVariantUntagged = never;
 
 SkipVariant: export type SkipVariant = { A: string };
 

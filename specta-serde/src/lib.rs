@@ -66,8 +66,8 @@ pub use serde_attrs::{SerdeMode, apply_serde_transformations};
 
 use specta::TypeCollection;
 use specta::datatype::{
-    DataType, Enum, Fields, Generic, NamedReference, Primitive, Reference, skip_fields,
-    skip_fields_named,
+    DataType, Enum, Fields, Generic, NamedReference, Primitive, Reference, RuntimeAttribute,
+    RuntimeMeta, RuntimeNestedMeta, skip_fields, skip_fields_named,
 };
 use std::collections::HashSet;
 
@@ -105,6 +105,7 @@ pub fn apply(types: &mut TypeCollection, mode: SerdeMode) -> Result<(), Error> {
     }
 
     // Apply transformations to each type in the collection
+    let mut transform_error = None;
     let transformed = types.clone().map(|mut ndt| {
         // Apply serde transformations - we validated above so this should succeed
         // Pass the type name for struct tagging
@@ -113,12 +114,18 @@ pub fn apply(types: &mut TypeCollection, mode: SerdeMode) -> Result<(), Error> {
                 ndt.set_ty(transformed_dt);
                 ndt
             }
-            Err(_) => {
-                // This shouldn't happen since we validated, but return unchanged if it does
+            Err(err) => {
+                if transform_error.is_none() {
+                    transform_error = Some(err);
+                }
                 ndt
             }
         }
     });
+
+    if let Some(err) = transform_error {
+        return Err(err);
+    }
 
     // Validate transformed types
     for ndt in transformed.into_unsorted_iter() {
@@ -228,6 +235,10 @@ fn validate_type(
             validate_enum(ty, types)?;
 
             for (_variant_name, variant) in ty.variants().iter() {
+                if variant.skip() {
+                    continue;
+                }
+
                 match &variant.fields() {
                     Fields::Unit => {}
                     Fields::Named(variant) => {
@@ -344,17 +355,136 @@ fn is_valid_map_key(
     }
 }
 
-// Serde does not allow serializing a variant of certain types of enum's.
-fn validate_enum(_e: &Enum, _types: &TypeCollection) -> Result<(), Error> {
-    // Keep this permissive: exporters represent skip-only enums as `never`.
-    // Rejecting them here regresses existing behavior and fixtures.
-    // TODO: Implement internally tagged enum validation
-    // Only internally tagged enums can be invalid.
-    // if let Some(EnumRepr::Internal { .. }) = get_enum_repr_from_attributes(e.attributes()) {
-    //     validate_internally_tag_enum(e, types)?;
-    // }
+// Serde does not allow serializing a variant of certain enum shapes.
+fn validate_enum(e: &Enum, types: &TypeCollection) -> Result<(), Error> {
+    if matches!(get_enum_repr(e.attributes()), EnumRepr::Internal { .. }) {
+        validate_internally_tag_enum(e, types, &mut Default::default())?;
+    }
 
     Ok(())
+}
+
+fn validate_internally_tag_enum(
+    e: &Enum,
+    types: &TypeCollection,
+    checked_references: &mut HashSet<NamedReference>,
+) -> Result<(), Error> {
+    for (_variant_name, variant) in e.variants() {
+        if variant.skip() {
+            continue;
+        }
+
+        match &variant.fields() {
+            Fields::Unit | Fields::Named(_) => {}
+            Fields::Unnamed(item) => {
+                let mut fields = skip_fields(item.fields());
+
+                let Some((_, first_field)) = fields.next() else {
+                    continue;
+                };
+
+                if fields.next().is_some() {
+                    return Err(Error::InvalidInternallyTaggedEnum);
+                }
+
+                validate_internally_tag_enum_datatype(first_field, types, checked_references)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_internally_tag_enum_datatype(
+    ty: &DataType,
+    types: &TypeCollection,
+    checked_references: &mut HashSet<NamedReference>,
+) -> Result<(), Error> {
+    match ty {
+        DataType::Map(_) => Ok(()),
+        DataType::Struct(ty) => match ty.fields() {
+            Fields::Unit | Fields::Named(_) => Ok(()),
+            Fields::Unnamed(unnamed) => {
+                if !is_transparent_struct(ty.attributes()) {
+                    return Err(Error::InvalidInternallyTaggedEnum);
+                }
+
+                let mut fields = skip_fields(unnamed.fields());
+
+                let Some((_, inner_field)) = fields.next() else {
+                    return Ok(());
+                };
+
+                if fields.next().is_some() {
+                    return Err(Error::InvalidInternallyTaggedEnum);
+                }
+
+                validate_internally_tag_enum_datatype(inner_field, types, checked_references)
+            }
+        },
+        DataType::Enum(ty) => match get_enum_repr(ty.attributes()) {
+            EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. } => Ok(()),
+            EnumRepr::Untagged => {
+                for (_variant_name, variant) in ty.variants() {
+                    match variant.fields() {
+                        Fields::Unit | Fields::Named(_) => {}
+                        Fields::Unnamed(unnamed) => {
+                            let mut fields = skip_fields(unnamed.fields());
+
+                            let Some((_, inner_field)) = fields.next() else {
+                                continue;
+                            };
+
+                            if fields.next().is_some() {
+                                return Err(Error::InvalidInternallyTaggedEnum);
+                            }
+
+                            validate_internally_tag_enum_datatype(
+                                inner_field,
+                                types,
+                                checked_references,
+                            )?;
+                        }
+                    }
+                }
+
+                Ok(())
+            }
+            EnumRepr::External | EnumRepr::String { .. } => Err(Error::InvalidInternallyTaggedEnum),
+        },
+        DataType::Tuple(ty) if ty.elements().is_empty() => Ok(()),
+        DataType::Reference(Reference::Named(r)) => {
+            if !checked_references.contains(r) {
+                checked_references.insert(r.clone());
+                if let Some(ndt) = r.get(types) {
+                    validate_internally_tag_enum_datatype(ndt.ty(), types, checked_references)?;
+                }
+            }
+
+            Ok(())
+        }
+        DataType::Nullable(ty) => {
+            validate_internally_tag_enum_datatype(ty, types, checked_references)
+        }
+        DataType::Reference(Reference::Opaque(_)) | DataType::Generic(_) => Ok(()),
+        _ => Err(Error::InvalidInternallyTaggedEnum),
+    }
+}
+
+fn is_transparent_struct(attributes: &[RuntimeAttribute]) -> bool {
+    attributes.iter().any(|attr| {
+        if attr.path != "serde" && attr.path != "specta" {
+            return false;
+        }
+
+        match &attr.kind {
+            RuntimeMeta::Path(path) => path == "transparent",
+            RuntimeMeta::List(items) => items.iter().any(|item| {
+                matches!(item, RuntimeNestedMeta::Meta(RuntimeMeta::Path(path)) if path == "transparent")
+            }),
+            RuntimeMeta::NameValue { .. } => false,
+        }
+    })
 }
 
 /// Check if a field has the `#[serde(flatten)]` attribute
@@ -478,50 +608,3 @@ pub fn get_enum_repr(attributes: &[specta::datatype::RuntimeAttribute]) -> EnumR
         EnumRepr::External
     }
 }
-
-// TODO: Implement these validation functions once enum representation parsing is complete
-// fn validate_internally_tag_enum(e: &Enum, types: &TypeCollection) -> Result<(), Error> {
-//     for (_variant_name, variant) in e.variants() {
-//         match &variant.fields() {
-//             Fields::Unit => {}
-//             Fields::Named(_) => {}
-//             Fields::Unnamed(item) => {
-//                 let mut fields = skip_fields(item.fields());
-//
-//                 let Some(first_field) = fields.next() else {
-//                     continue;
-//                 };
-//
-//                 if fields.next().is_some() {
-//                     return Err(Error::InvalidInternallyTaggedEnum);
-//                 }
-//
-//                 validate_internally_tag_enum_datatype(first_field.1, types)?;
-//             }
-//         }
-//     }
-//
-//     Ok(())
-// }
-
-// fn validate_internally_tag_enum_datatype(
-//     ty: &DataType,
-//     types: &TypeCollection,
-// ) -> Result<(), Error> {
-//     match ty {
-//         DataType::Map(_) => {}
-//         DataType::Struct(_) => {}
-//         DataType::Enum(ty) => {
-//             // TODO: Check enum representation
-//         }
-//         DataType::Tuple(ty) if ty.elements().is_empty() => {}
-//         DataType::Reference(r) => {
-//             if let Some(ndt) = r.get(types) {
-//                 validate_internally_tag_enum_datatype(ndt.ty(), types)?;
-//             }
-//         }
-//         _ => return Err(Error::InvalidInternallyTaggedEnum),
-//     }
-//
-//     Ok(())
-// }
