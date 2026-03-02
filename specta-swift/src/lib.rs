@@ -7,9 +7,9 @@
 //! Add `specta` and `specta-swift` to your project:
 //!
 //! ```bash
-//! cargo add specta@2.0.0-rc.22 --features derive,export
+//! cargo add specta@2.0.0-rc.23 --features derive,export
 //! cargo add specta-swift@0.0.1
-//! cargo add specta-serde@0.0.9
+//! cargo add specta-serde@0.0.10
 //! ```
 //!
 //! Next copy the following into your `main.rs` file:

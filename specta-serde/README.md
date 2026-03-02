@@ -16,8 +16,8 @@ Add `specta-serde` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-specta = { version = "2.0.0-rc.22", features = ["derive"] }
-specta-serde = "0.0.9"
+specta = { version = "2.0.0-rc.23", features = ["derive"] }
+specta-serde = "0.0.10"
 serde = { version = "1.0", features = ["derive"] }
 ```
 
