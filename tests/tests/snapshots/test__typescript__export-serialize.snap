@@ -102,7 +102,7 @@ InlineTuple2: export type InlineTuple2 = {
 	}, boolean],
 };
 
-SkippedFieldWithinVariant: export type SkippedFieldWithinVariant = never | string;
+SkippedFieldWithinVariant: export type SkippedFieldWithinVariant = { type: "A" } | { type: "B"; data: string };
 
 KebabCase: export type KebabCase = {
 	test_ing: string,
@@ -447,11 +447,11 @@ Tenth: export type Tenth = string | null | {
 	a: string,
 } | First;
 
-MyEnumTagged: export type MyEnumTagged = (First);
+MyEnumTagged: export type MyEnumTagged = { type: "Variant" } & (First);
 
 MyEnumExternal: export type MyEnumExternal = { Variant: (First) };
 
-MyEnumAdjacent: export type MyEnumAdjacent = (First);
+MyEnumAdjacent: export type MyEnumAdjacent = { t: "Variant"; c: (First) };
 
 MyEnumUntagged: export type MyEnumUntagged = (First);
 
@@ -459,29 +459,29 @@ EmptyStruct: export type EmptyStruct = Record<string, never>;
 
 EmptyStructWithTag: export type EmptyStructWithTag = Record<string, never>;
 
-AdjacentlyTagged: export type AdjacentlyTagged = A | { id: string; method: string } | string;
+AdjacentlyTagged: export type AdjacentlyTagged = { t: "A" } | { t: "B"; c: { id: string; method: string } } | { t: "C"; c: string };
 
-LoadProjectEvent: export type LoadProjectEvent = { project_name: string } | { project_name: string; status: string; progress: number };
+LoadProjectEvent: export type LoadProjectEvent = { event: "Started"; data: { project_name: string } } | { event: "ProgressTest"; data: { project_name: string; status: string; progress: number } } | { event: "Finished"; data: { project_name: string } };
 
 ExternallyTagged: export type ExternallyTagged = "A" | { B: { id: string; method: string } } | { C: string };
 
-InternallyTaggedB: export type InternallyTaggedB = string;
+InternallyTaggedB: export type InternallyTaggedB = { type: "A" };
 
-InternallyTaggedC: export type InternallyTaggedC = string[];
+InternallyTaggedC: export type InternallyTaggedC = { type: "A" };
 
-InternallyTaggedD: export type InternallyTaggedD = { [key in string]: string };
+InternallyTaggedD: export type InternallyTaggedD = { type: "A" };
 
-InternallyTaggedE: export type InternallyTaggedE = null;
+InternallyTaggedE: export type InternallyTaggedE = { type: "A" };
 
-InternallyTaggedF: export type InternallyTaggedF = InternallyTaggedFInner;
+InternallyTaggedF: export type InternallyTaggedF = { type: "A" };
 
-InternallyTaggedG: export type InternallyTaggedG = InternallyTaggedGInner;
+InternallyTaggedG: export type InternallyTaggedG = { type: "A" };
 
-InternallyTaggedH: export type InternallyTaggedH = InternallyTaggedHInner;
+InternallyTaggedH: export type InternallyTaggedH = { type: "A" };
 
-InternallyTaggedI: export type InternallyTaggedI = InternallyTaggedIInner;
+InternallyTaggedI: export type InternallyTaggedI = { type: "A" };
 
-InternallyTaggedL: export type InternallyTaggedL = A | B;
+InternallyTaggedL: export type InternallyTaggedL = { type: "A" };
 
 InternallyTaggedM: export type InternallyTaggedM = { type: "A" };
 
@@ -503,9 +503,9 @@ EnumWithMultipleVariantAliases: export type EnumWithMultipleVariantAliases = "Va
 
 EnumWithVariantAliasAndRename: export type EnumWithVariantAliasAndRename = "Variant" | "Other";
 
-InternallyTaggedWithAlias: export type InternallyTaggedWithAlias = { field: string } | { other: number };
+InternallyTaggedWithAlias: export type InternallyTaggedWithAlias = { type: "A" } & { field: string } | { type: "B" } & { other: number };
 
-AdjacentlyTaggedWithAlias: export type AdjacentlyTaggedWithAlias = { field: string } | { other: number };
+AdjacentlyTaggedWithAlias: export type AdjacentlyTaggedWithAlias = { type: "A"; data: { field: string } } | { type: "B"; data: { other: number } };
 
 UntaggedWithAlias: export type UntaggedWithAlias = { field: string } | { other: number };
 
@@ -517,15 +517,15 @@ EmptyEnumTaggedWContent: export type EmptyEnumTaggedWContent = never;
 
 EmptyEnumUntagged: export type EmptyEnumUntagged = never;
 
-TaggedEnumOfUnitStruct: export type TaggedEnumOfUnitStruct = UnitStruct;
+TaggedEnumOfUnitStruct: export type TaggedEnumOfUnitStruct = { a: "A" } | { a: "B" };
 
-TaggedEnumOfEmptyBracedStruct: export type TaggedEnumOfEmptyBracedStruct = EmptyBracedStruct;
+TaggedEnumOfEmptyBracedStruct: export type TaggedEnumOfEmptyBracedStruct = { a: "A" } | { a: "B" };
 
-TaggedEnumOfEmptyTupleStruct: export type TaggedEnumOfEmptyTupleStruct = EmptyTupleStruct;
+TaggedEnumOfEmptyTupleStruct: export type TaggedEnumOfEmptyTupleStruct = { a: "A" } | { a: "B" };
 
-TaggedEnumOfEmptyTupleBracedStructs: export type TaggedEnumOfEmptyTupleBracedStructs = EmptyBracedStruct;
+TaggedEnumOfEmptyTupleBracedStructs: export type TaggedEnumOfEmptyTupleBracedStructs = { a: "B" };
 
-TaggedStructOfStructWithTuple: export type TaggedStructOfStructWithTuple = TupleStructWithTuple;
+TaggedStructOfStructWithTuple: export type TaggedStructOfStructWithTuple = { a: "A" } | { a: "B" };
 
 SkipOnlyField: export type SkipOnlyField = Record<string, never>;
 
@@ -553,7 +553,7 @@ TransparentWithSkip2: export type TransparentWithSkip2 = string;
 
 TransparentWithSkip3: export type TransparentWithSkip3 = string;
 
-SkipVariant2: export type SkipVariant2 = string;
+SkipVariant2: export type SkipVariant2 = { tag: "A"; data: string };
 
 SkipVariant3: export type SkipVariant3 = { A: { a: string } };
 

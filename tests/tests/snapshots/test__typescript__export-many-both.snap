@@ -102,7 +102,7 @@ export type InlineTuple2 = {
 	}, boolean],
 };
 
-export type SkippedFieldWithinVariant = never | string;
+export type SkippedFieldWithinVariant = { type: "A" } | { type: "B"; data: string };
 
 export type KebabCase = {
 	test_ing: string,
@@ -447,11 +447,11 @@ export type Tenth = string | null | {
 	a: string,
 } | First;
 
-export type MyEnumTagged = (First);
+export type MyEnumTagged = { type: "Variant" } & (First);
 
 export type MyEnumExternal = { Variant: (First) };
 
-export type MyEnumAdjacent = (First);
+export type MyEnumAdjacent = { t: "Variant"; c: (First) };
 
 export type MyEnumUntagged = (First);
 
@@ -459,29 +459,29 @@ export type EmptyStruct = Record<string, never>;
 
 export type EmptyStructWithTag = Record<string, never>;
 
-export type AdjacentlyTagged = A | { id: string; method: string } | string;
+export type AdjacentlyTagged = { t: "A" } | { t: "B"; c: { id: string; method: string } } | { t: "C"; c: string };
 
-export type LoadProjectEvent = { project_name: string } | { project_name: string; status: string; progress: number };
+export type LoadProjectEvent = { event: "Started"; data: { project_name: string } } | { event: "ProgressTest"; data: { project_name: string; status: string; progress: number } } | { event: "Finished"; data: { project_name: string } };
 
 export type ExternallyTagged = "A" | { B: { id: string; method: string } } | { C: string };
 
-export type InternallyTaggedB = string;
+export type InternallyTaggedB = { type: "A" };
 
-export type InternallyTaggedC = string[];
+export type InternallyTaggedC = { type: "A" };
 
-export type InternallyTaggedD = { [key in string]: string };
+export type InternallyTaggedD = { type: "A" };
 
-export type InternallyTaggedE = null;
+export type InternallyTaggedE = { type: "A" };
 
-export type InternallyTaggedF = InternallyTaggedFInner;
+export type InternallyTaggedF = { type: "A" };
 
-export type InternallyTaggedG = InternallyTaggedGInner;
+export type InternallyTaggedG = { type: "A" };
 
-export type InternallyTaggedH = InternallyTaggedHInner;
+export type InternallyTaggedH = { type: "A" };
 
-export type InternallyTaggedI = InternallyTaggedIInner;
+export type InternallyTaggedI = { type: "A" };
 
-export type InternallyTaggedL = A | B;
+export type InternallyTaggedL = { type: "A" };
 
 export type InternallyTaggedM = { type: "A" };
 
@@ -503,9 +503,9 @@ export type EnumWithMultipleVariantAliases = "Variant" | "Other";
 
 export type EnumWithVariantAliasAndRename = "Variant" | "Other";
 
-export type InternallyTaggedWithAlias = { field: string } | { other: number };
+export type InternallyTaggedWithAlias = { type: "A" } & { field: string } | { type: "B" } & { other: number };
 
-export type AdjacentlyTaggedWithAlias = { field: string } | { other: number };
+export type AdjacentlyTaggedWithAlias = { type: "A"; data: { field: string } } | { type: "B"; data: { other: number } };
 
 export type UntaggedWithAlias = { field: string } | { other: number };
 
@@ -517,15 +517,15 @@ export type EmptyEnumTaggedWContent = never;
 
 export type EmptyEnumUntagged = never;
 
-export type TaggedEnumOfUnitStruct = UnitStruct;
+export type TaggedEnumOfUnitStruct = { a: "A" } | { a: "B" };
 
-export type TaggedEnumOfEmptyBracedStruct = EmptyBracedStruct;
+export type TaggedEnumOfEmptyBracedStruct = { a: "A" } | { a: "B" };
 
-export type TaggedEnumOfEmptyTupleStruct = EmptyTupleStruct;
+export type TaggedEnumOfEmptyTupleStruct = { a: "A" } | { a: "B" };
 
-export type TaggedEnumOfEmptyTupleBracedStructs = EmptyBracedStruct;
+export type TaggedEnumOfEmptyTupleBracedStructs = { a: "B" };
 
-export type TaggedStructOfStructWithTuple = TupleStructWithTuple;
+export type TaggedStructOfStructWithTuple = { a: "A" } | { a: "B" };
 
 export type SkipOnlyField = Record<string, never>;
 
@@ -553,7 +553,7 @@ export type TransparentWithSkip2 = string;
 
 export type TransparentWithSkip3 = string;
 
-export type SkipVariant2 = string;
+export type SkipVariant2 = { tag: "A"; data: string };
 
 export type SkipVariant3 = { A: { a: string } };
 

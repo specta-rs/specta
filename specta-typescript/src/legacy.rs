@@ -575,8 +575,6 @@ pub(crate) fn enum_datatype(
         return Ok(write!(s, "{NEVER}")?);
     }
 
-    // After specta_serde::apply, enum tagging is already applied to the variant fields
-    // So we can treat all enums the same way - just export the variant fields as-is
     let repr = specta_serde::get_enum_repr(e.attributes());
 
     let mut variants = e
@@ -632,43 +630,61 @@ pub(crate) fn enum_datatype(
                         let sanitised_name = sanitise_key(variant_name.clone(), true);
                         sanitised_name.to_string()
                     }
-                    // For Internal and Adjacent, the tag/content fields are already in the variant
-                    // So we can just export them as named fields
-                    specta_serde::EnumRepr::Internal { .. }
-                    | specta_serde::EnumRepr::Adjacent { .. } => {
-                        let ts_values = enum_variant_datatype(
-                            ctx.with(PathItem::Variant(variant_name.clone())),
-                            types,
-                            variant_name.clone(),
-                            variant,
-                            prefix,
-                            generics,
-                        )?;
+                    specta_serde::EnumRepr::Internal { tag } => {
+                        let tag = sanitise_key(tag.clone().into(), false);
+                        let variant_name_ts = sanitise_key(variant_name.clone(), true);
 
-                        let ts_values = ts_values.unwrap_or_else(|| "never".to_string());
+                        match variant.fields() {
+                            Fields::Named(_) => {
+                                let ts_values = enum_variant_datatype(
+                                    ctx.with(PathItem::Variant(variant_name.clone())),
+                                    types,
+                                    variant_name.clone(),
+                                    variant,
+                                    prefix,
+                                    generics,
+                                )?;
 
-                        // `primitives::{export, inline}` can be called on untransformed `DataType`s.
-                        // In that mode, an internally tagged enum variant with an inlined untagged
-                        // enum of unit variants can collapse to `null` (eg `InternallyTaggedM`).
-                        // Preserve the internal tag wrapper for this case so the output shape
-                        // remains `{ tag: "Variant" }`.
-                        if matches!(repr, specta_serde::EnumRepr::Internal { .. })
-                            && ts_values == NULL
-                            && matches!(
-                                variant.fields(),
-                                Fields::Unnamed(unnamed)
-                                    if unnamed.fields().iter().any(|field| field.inline())
-                            )
-                        {
-                            if let specta_serde::EnumRepr::Internal { tag } = &repr {
-                                let tag = sanitise_key(tag.clone().into(), false);
-                                let variant_name = sanitise_key(variant_name.clone(), true);
-                                format!("{{ {tag}: {variant_name} }}")
-                            } else {
-                                unreachable!("matched above")
+                                match ts_values {
+                                    Some(ts_values)
+                                        if ts_values != format!("Record<{STRING}, {NEVER}>") =>
+                                    {
+                                        format!("{{ {tag}: {variant_name_ts} }} & {ts_values}")
+                                    }
+                                    _ => format!("{{ {tag}: {variant_name_ts} }}"),
+                                }
                             }
-                        } else {
-                            ts_values
+                            Fields::Unit | Fields::Unnamed(_) => {
+                                format!("{{ {tag}: {variant_name_ts} }}")
+                            }
+                        }
+                    }
+                    specta_serde::EnumRepr::Adjacent { tag, content } => {
+                        let tag = sanitise_key(tag.clone().into(), false);
+                        let content = sanitise_key(content.clone().into(), false);
+                        let variant_name_ts = sanitise_key(variant_name.clone(), true);
+
+                        match variant.fields() {
+                            Fields::Unit => format!("{{ {tag}: {variant_name_ts} }}"),
+                            _ => {
+                                let ts_values = enum_variant_datatype(
+                                    ctx.with(PathItem::Variant(variant_name.clone())),
+                                    types,
+                                    variant_name.clone(),
+                                    variant,
+                                    prefix,
+                                    generics,
+                                )?;
+
+                                match ts_values {
+                                    Some(ts_values) => {
+                                        format!(
+                                            "{{ {tag}: {variant_name_ts}; {content}: {ts_values} }}"
+                                        )
+                                    }
+                                    None => format!("{{ {tag}: {variant_name_ts} }}"),
+                                }
+                            }
                         }
                     }
                 },

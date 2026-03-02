@@ -149,9 +149,9 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*	}} InlineTuple2
 	* @property {[InlineTuple, boolean]} demo
 	*
-	* @typedef {never | string} SkippedFieldWithinVariant
-	* @property {never} A
-	* @property {string} B
+	* @typedef {{ type: "A" } | { type: "B"; data: string }} SkippedFieldWithinVariant
+	* @property {{ type: "A" }} A
+	* @property {{ type: "B"; data: string }} B
 	*
 	* @typedef {{
 	*		test_ing: string,
@@ -658,14 +658,14 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* }} C
 	* @property {First} D
 	*
-	* @typedef {(First)} MyEnumTagged
-	* @property {(First)} Variant
+	* @typedef {{ type: "Variant" } & (First)} MyEnumTagged
+	* @property {{ type: "Variant" } & (First)} Variant
 	*
 	* @typedef {{ Variant: (First) }} MyEnumExternal
 	* @property {{ Variant: (First) }} Variant
 	*
-	* @typedef {(First)} MyEnumAdjacent
-	* @property {(First)} Variant
+	* @typedef {{ t: "Variant"; c: (First) }} MyEnumAdjacent
+	* @property {{ t: "Variant"; c: (First) }} Variant
 	*
 	* @typedef {(First)} MyEnumUntagged
 	* @property {(First)} Variant
@@ -674,47 +674,47 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*
 	* @typedef {Record<string, never>} EmptyStructWithTag
 	*
-	* @typedef {A | { id: string; method: string } | string} AdjacentlyTagged
-	* @property {A} A
-	* @property {{ id: string; method: string }} B
-	* @property {string} C
+	* @typedef {{ t: "A" } | { t: "B"; c: { id: string; method: string } } | { t: "C"; c: string }} AdjacentlyTagged
+	* @property {{ t: "A" }} A
+	* @property {{ t: "B"; c: { id: string; method: string } }} B
+	* @property {{ t: "C"; c: string }} C
 	*
-	* @typedef {{ project_name: string } | { project_name: string; status: string; progress: number }} LoadProjectEvent
-	* @property {{ project_name: string }} Started
-	* @property {{ project_name: string; status: string; progress: number }} ProgressTest
-	* @property {{ project_name: string }} Finished
+	* @typedef {{ event: "Started"; data: { project_name: string } } | { event: "ProgressTest"; data: { project_name: string; status: string; progress: number } } | { event: "Finished"; data: { project_name: string } }} LoadProjectEvent
+	* @property {{ event: "Started"; data: { project_name: string } }} Started
+	* @property {{ event: "ProgressTest"; data: { project_name: string; status: string; progress: number } }} ProgressTest
+	* @property {{ event: "Finished"; data: { project_name: string } }} Finished
 	*
 	* @typedef {"A" | { B: { id: string; method: string } } | { C: string }} ExternallyTagged
 	* @property {"A"} A
 	* @property {{ B: { id: string; method: string } }} B
 	* @property {{ C: string }} C
 	*
-	* @typedef {string} InternallyTaggedB
-	* @property {string} A
+	* @typedef {{ type: "A" }} InternallyTaggedB
+	* @property {{ type: "A" }} A
 	*
-	* @typedef {string[]} InternallyTaggedC
-	* @property {string[]} A
+	* @typedef {{ type: "A" }} InternallyTaggedC
+	* @property {{ type: "A" }} A
 	*
-	* @typedef {{ [key in string]: string }} InternallyTaggedD
-	* @property {{ [key in string]: string }} A
+	* @typedef {{ type: "A" }} InternallyTaggedD
+	* @property {{ type: "A" }} A
 	*
-	* @typedef {null} InternallyTaggedE
-	* @property {null} A
+	* @typedef {{ type: "A" }} InternallyTaggedE
+	* @property {{ type: "A" }} A
 	*
-	* @typedef {InternallyTaggedFInner} InternallyTaggedF
-	* @property {InternallyTaggedFInner} A
+	* @typedef {{ type: "A" }} InternallyTaggedF
+	* @property {{ type: "A" }} A
 	*
-	* @typedef {InternallyTaggedGInner} InternallyTaggedG
-	* @property {InternallyTaggedGInner} A
+	* @typedef {{ type: "A" }} InternallyTaggedG
+	* @property {{ type: "A" }} A
 	*
-	* @typedef {InternallyTaggedHInner} InternallyTaggedH
-	* @property {InternallyTaggedHInner} A
+	* @typedef {{ type: "A" }} InternallyTaggedH
+	* @property {{ type: "A" }} A
 	*
-	* @typedef {InternallyTaggedIInner} InternallyTaggedI
-	* @property {InternallyTaggedIInner} A
+	* @typedef {{ type: "A" }} InternallyTaggedI
+	* @property {{ type: "A" }} A
 	*
-	* @typedef {A | B} InternallyTaggedL
-	* @property {A | B} A
+	* @typedef {{ type: "A" }} InternallyTaggedL
+	* @property {{ type: "A" }} A
 	*
 	* @typedef {{ type: "A" }} InternallyTaggedM
 	* @property {{ type: "A" }} A
@@ -746,13 +746,13 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {"Variant"} Variant
 	* @property {"Other"} Other
 	*
-	* @typedef {{ field: string } | { other: number }} InternallyTaggedWithAlias
-	* @property {{ field: string }} A
-	* @property {{ other: number }} B
+	* @typedef {{ type: "A" } & { field: string } | { type: "B" } & { other: number }} InternallyTaggedWithAlias
+	* @property {{ type: "A" } & { field: string }} A
+	* @property {{ type: "B" } & { other: number }} B
 	*
-	* @typedef {{ field: string } | { other: number }} AdjacentlyTaggedWithAlias
-	* @property {{ field: string }} A
-	* @property {{ other: number }} B
+	* @typedef {{ type: "A"; data: { field: string } } | { type: "B"; data: { other: number } }} AdjacentlyTaggedWithAlias
+	* @property {{ type: "A"; data: { field: string } }} A
+	* @property {{ type: "B"; data: { other: number } }} B
 	*
 	* @typedef {{ field: string } | { other: number }} UntaggedWithAlias
 	* @property {{ field: string }} A
@@ -766,24 +766,24 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*
 	* @typedef {never} EmptyEnumUntagged
 	*
-	* @typedef {UnitStruct} TaggedEnumOfUnitStruct
-	* @property {UnitStruct} A
-	* @property {UnitStruct} B
+	* @typedef {{ a: "A" } | { a: "B" }} TaggedEnumOfUnitStruct
+	* @property {{ a: "A" }} A
+	* @property {{ a: "B" }} B
 	*
-	* @typedef {EmptyBracedStruct} TaggedEnumOfEmptyBracedStruct
-	* @property {EmptyBracedStruct} A
-	* @property {EmptyBracedStruct} B
+	* @typedef {{ a: "A" } | { a: "B" }} TaggedEnumOfEmptyBracedStruct
+	* @property {{ a: "A" }} A
+	* @property {{ a: "B" }} B
 	*
-	* @typedef {EmptyTupleStruct} TaggedEnumOfEmptyTupleStruct
-	* @property {EmptyTupleStruct} A
-	* @property {EmptyTupleStruct} B
+	* @typedef {{ a: "A" } | { a: "B" }} TaggedEnumOfEmptyTupleStruct
+	* @property {{ a: "A" }} A
+	* @property {{ a: "B" }} B
 	*
-	* @typedef {EmptyBracedStruct} TaggedEnumOfEmptyTupleBracedStructs
-	* @property {EmptyBracedStruct} B
+	* @typedef {{ a: "B" }} TaggedEnumOfEmptyTupleBracedStructs
+	* @property {{ a: "B" }} B
 	*
-	* @typedef {TupleStructWithTuple} TaggedStructOfStructWithTuple
-	* @property {TupleStructWithTuple} A
-	* @property {TupleStructWithTuple} B
+	* @typedef {{ a: "A" } | { a: "B" }} TaggedStructOfStructWithTuple
+	* @property {{ a: "A" }} A
+	* @property {{ a: "B" }} B
 	*
 	* @typedef {Record<string, never>} SkipOnlyField
 	*
@@ -820,8 +820,8 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @typedef {string} TransparentWithSkip3
 	* @property {string} "0"
 	*
-	* @typedef {string} SkipVariant2
-	* @property {string} A
+	* @typedef {{ tag: "A"; data: string }} SkipVariant2
+	* @property {{ tag: "A"; data: string }} A
 	*
 	* @typedef {{ A: { a: string } }} SkipVariant3
 	* @property {{ A: { a: string } }} A

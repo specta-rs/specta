@@ -152,7 +152,7 @@ InlineTuple2: {
 }
 Box<str>: string
 Box<String>: string
-SkippedFieldWithinVariant: never | string
+SkippedFieldWithinVariant: { type: "A" } | { type: "B"; data: string }
 KebabCase: {
 	test_ing: string,
 }
@@ -418,24 +418,24 @@ Eight: { A: string } | "B"
 Tenth: string | null | {
 	a: string,
 } | First
-MyEnumTagged: (First)
+MyEnumTagged: { type: "Variant" } & (First)
 MyEnumExternal: { Variant: (First) }
-MyEnumAdjacent: (First)
+MyEnumAdjacent: { t: "Variant"; c: (First) }
 MyEnumUntagged: (First)
 EmptyStruct: Record<string, never>
 EmptyStructWithTag: Record<string, never>
-AdjacentlyTagged: A | { id: string; method: string } | string
-LoadProjectEvent: { project_name: string } | { project_name: string; status: string; progress: number }
+AdjacentlyTagged: { t: "A" } | { t: "B"; c: { id: string; method: string } } | { t: "C"; c: string }
+LoadProjectEvent: { event: "Started"; data: { project_name: string } } | { event: "ProgressTest"; data: { project_name: string; status: string; progress: number } } | { event: "Finished"; data: { project_name: string } }
 ExternallyTagged: "A" | { B: { id: string; method: string } } | { C: string }
-InternallyTaggedB: string
-InternallyTaggedC: string[]
-InternallyTaggedD: { [key in string]: string }
-InternallyTaggedE: null
-InternallyTaggedF: InternallyTaggedFInner
-InternallyTaggedG: InternallyTaggedGInner
-InternallyTaggedH: InternallyTaggedHInner
-InternallyTaggedI: InternallyTaggedIInner
-InternallyTaggedL: A | B
+InternallyTaggedB: { type: "A" }
+InternallyTaggedC: { type: "A" }
+InternallyTaggedD: { type: "A" }
+InternallyTaggedE: { type: "A" }
+InternallyTaggedF: { type: "A" }
+InternallyTaggedG: { type: "A" }
+InternallyTaggedH: { type: "A" }
+InternallyTaggedI: { type: "A" }
+InternallyTaggedL: { type: "A" }
 InternallyTaggedM: { type: "A" }
 StructWithAlias: {
 	field: string,
@@ -449,18 +449,18 @@ StructWithAliasAndRename: {
 EnumWithVariantAlias: "Variant" | "Other"
 EnumWithMultipleVariantAliases: "Variant" | "Other"
 EnumWithVariantAliasAndRename: "Variant" | "Other"
-InternallyTaggedWithAlias: { field: string } | { other: number }
-AdjacentlyTaggedWithAlias: { field: string } | { other: number }
+InternallyTaggedWithAlias: { type: "A" } & { field: string } | { type: "B" } & { other: number }
+AdjacentlyTaggedWithAlias: { type: "A"; data: { field: string } } | { type: "B"; data: { other: number } }
 UntaggedWithAlias: { field: string } | { other: number }
 EmptyEnum: never
 EmptyEnumTagged: never
 EmptyEnumTaggedWContent: never
 EmptyEnumUntagged: never
-TaggedEnumOfUnitStruct: UnitStruct
-TaggedEnumOfEmptyBracedStruct: EmptyBracedStruct
-TaggedEnumOfEmptyTupleStruct: EmptyTupleStruct
-TaggedEnumOfEmptyTupleBracedStructs: EmptyBracedStruct
-TaggedStructOfStructWithTuple: TupleStructWithTuple
+TaggedEnumOfUnitStruct: { a: "A" } | { a: "B" }
+TaggedEnumOfEmptyBracedStruct: { a: "A" } | { a: "B" }
+TaggedEnumOfEmptyTupleStruct: { a: "A" } | { a: "B" }
+TaggedEnumOfEmptyTupleBracedStructs: { a: "B" }
+TaggedStructOfStructWithTuple: { a: "A" } | { a: "B" }
 SkipOnlyField: Record<string, never>
 SkipField: {
 	b: number,
@@ -475,7 +475,7 @@ SkipNamedFieldInVariant: { A: Record<string, never> } | { B: { b: number } }
 TransparentWithSkip: null
 TransparentWithSkip2: string
 TransparentWithSkip3: string
-SkipVariant2: string
+SkipVariant2: { tag: "A"; data: string }
 SkipVariant3: { A: { a: string } }
 SkipStructFields: {
 	a: number,
