@@ -680,7 +680,7 @@ pub(crate) fn enum_datatype(
                         }
                         .flatten();
 
-                        render_internal_variant(tag.clone().into(), variant_name.clone(), payload)
+                        render_internal_variant(tag.clone(), variant_name.clone(), payload)
                     }
                     specta_serde::EnumRepr::Adjacent { tag, content } => {
                         let payload = match variant.fields() {
@@ -697,8 +697,8 @@ pub(crate) fn enum_datatype(
                         .flatten();
 
                         render_adjacent_variant(
-                            tag.clone().into(),
-                            content.clone().into(),
+                            tag.clone(),
+                            content.clone(),
                             variant_name.clone(),
                             payload,
                         )
