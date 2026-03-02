@@ -256,10 +256,12 @@ pub enum DeprecatedType {
 }
 
 fn file_path_to_module_path(file_path: &str) -> Option<String> {
+    let normalized = file_path.replace('\\', "/");
+
     // Try different prefixes
-    let (prefix, path) = if let Some(p) = file_path.strip_prefix("src/") {
+    let (prefix, path) = if let Some(p) = normalized.strip_prefix("src/") {
         ("crate", p)
-    } else if let Some(p) = file_path.strip_prefix("tests/") {
+    } else if let Some(p) = normalized.strip_prefix("tests/") {
         ("tests", p)
     } else {
         return None;
@@ -273,5 +275,30 @@ fn file_path_to_module_path(file_path: &str) -> Option<String> {
         Some(prefix.to_string())
     } else {
         Some(format!("{}::{}", prefix, module_path))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::file_path_to_module_path;
+
+    #[test]
+    fn file_path_to_module_path_supports_unix_and_windows_separators() {
+        assert_eq!(
+            file_path_to_module_path("src/datatype/named.rs"),
+            Some("crate::datatype::named".to_string())
+        );
+        assert_eq!(
+            file_path_to_module_path("src\\datatype\\named.rs"),
+            Some("crate::datatype::named".to_string())
+        );
+        assert_eq!(
+            file_path_to_module_path("tests/tests/types.rs"),
+            Some("tests::tests::types".to_string())
+        );
+        assert_eq!(
+            file_path_to_module_path("tests\\tests\\types.rs"),
+            Some("tests::tests::types".to_string())
+        );
     }
 }
