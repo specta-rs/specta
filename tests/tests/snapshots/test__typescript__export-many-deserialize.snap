@@ -465,15 +465,15 @@ export type LoadProjectEvent = { event: "Started"; data: { project_name: string 
 
 export type ExternallyTagged = "A" | { B: { id: string; method: string } } | { C: string };
 
-export type InternallyTaggedD = { type: "A" };
+export type InternallyTaggedD = { type: "A" } & { [key in string]: string };
 
 export type InternallyTaggedE = { type: "A" };
 
-export type InternallyTaggedF = { type: "A" };
+export type InternallyTaggedF = { type: "A" } & InternallyTaggedFInner;
 
-export type InternallyTaggedH = { type: "A" };
+export type InternallyTaggedH = { type: "A" } & InternallyTaggedHInner;
 
-export type InternallyTaggedL = { type: "A" };
+export type InternallyTaggedL = { type: "A" } | { type: "B" };
 
 export type InternallyTaggedM = { type: "A" };
 

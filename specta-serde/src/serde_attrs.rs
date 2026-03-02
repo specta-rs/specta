@@ -680,19 +680,23 @@ impl SerdeTransformer {
             Fields::Unnamed(unnamed) => {
                 use specta::datatype::skip_fields;
 
-                let mut non_skipped_fields = skip_fields(unnamed.fields());
-                if let Some((_, field_ty)) = non_skipped_fields.next()
-                    && (non_skipped_fields.next().is_some()
-                        || !Self::is_valid_internal_tag_payload(field_ty))
-                {
+                let invalid_payload = {
+                    let mut non_skipped_fields = skip_fields(unnamed.fields());
+                    if let Some((_, field_ty)) = non_skipped_fields.next() {
+                        non_skipped_fields.next().is_some()
+                            || !Self::is_valid_internal_tag_payload(field_ty)
+                    } else {
+                        false
+                    }
+                };
+
+                if invalid_payload {
                     return Err(Error::InvalidInternallyTaggedEnum);
                 }
 
-                let tag_field = Field::new(tag_type);
-                Ok(internal::construct::fields_named(
-                    vec![(Cow::Owned(tag_name.to_string()), tag_field)],
-                    vec![],
-                ))
+                // Keep tuple payloads unchanged so exporters can render `{ tag } & payload`
+                // for valid internally tagged tuple variants.
+                Ok(Fields::Unnamed(unnamed))
             }
         }
     }

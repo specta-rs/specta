@@ -689,20 +689,20 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {{ B: { id: string; method: string } }} B
 	* @property {{ C: string }} C
 	*
-	* @typedef {{ type: "A" }} InternallyTaggedD
-	* @property {{ type: "A" }} A
+	* @typedef {{ type: "A" } & { [key in string]: string }} InternallyTaggedD
+	* @property {{ type: "A" } & { [key in string]: string }} A
 	*
 	* @typedef {{ type: "A" }} InternallyTaggedE
 	* @property {{ type: "A" }} A
 	*
-	* @typedef {{ type: "A" }} InternallyTaggedF
-	* @property {{ type: "A" }} A
+	* @typedef {{ type: "A" } & InternallyTaggedFInner} InternallyTaggedF
+	* @property {{ type: "A" } & InternallyTaggedFInner} A
 	*
-	* @typedef {{ type: "A" }} InternallyTaggedH
-	* @property {{ type: "A" }} A
+	* @typedef {{ type: "A" } & InternallyTaggedHInner} InternallyTaggedH
+	* @property {{ type: "A" } & InternallyTaggedHInner} A
 	*
-	* @typedef {{ type: "A" }} InternallyTaggedL
-	* @property {{ type: "A" }} A
+	* @typedef {{ type: "A" } | { type: "B" }} InternallyTaggedL
+	* @property {{ type: "A" } | { type: "B" }} A
 	*
 	* @typedef {{ type: "A" }} InternallyTaggedM
 	* @property {{ type: "A" }} A

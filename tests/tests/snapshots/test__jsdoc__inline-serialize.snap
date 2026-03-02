@@ -33,28 +33,28 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*	}} ActualType
 	* @property {GenericType<string>} a
 	*
-	* @typedef {{ t: "A"; c: { t: "A" } } | { t: "B"; c: { t: "B"; c: {
+	* @typedef {{ t: "A"; c: { t: "A" } } | { t: "B"; c: {
 	* 	id: string,
 	* 	method: string,
-	* } } } | { t: "C"; c: { t: "C"; c: string } }} AdjacentlyTagged
+	* } } | { t: "C"; c: string }} AdjacentlyTagged
 	* @property {{ t: "A"; c: { t: "A" } }} A
-	* @property {{ t: "B"; c: { t: "B"; c: {
+	* @property {{ t: "B"; c: {
 	* 	id: string,
 	* 	method: string,
-	* } } }} B
-	* @property {{ t: "C"; c: { t: "C"; c: string } }} C
+	* } }} B
+	* @property {{ t: "C"; c: string }} C
 	*
-	* @typedef {{ type: "A"; data: { type: "A"; data: {
+	* @typedef {{ type: "A"; data: {
 	* 	field: string,
-	* } } } | { type: "B"; data: { type: "B"; data: {
+	* } } | { type: "B"; data: {
 	* 	other: number,
-	* } } }} AdjacentlyTaggedWithAlias
-	* @property {{ type: "A"; data: { type: "A"; data: {
+	* } }} AdjacentlyTaggedWithAlias
+	* @property {{ type: "A"; data: {
 	* 	field: string,
-	* } } }} A
-	* @property {{ type: "B"; data: { type: "B"; data: {
+	* } }} A
+	* @property {{ type: "B"; data: {
 	* 	other: number,
-	* } } }} B
+	* } }} B
 	*
 	* @typedef {{
 	*		b: number,
@@ -539,40 +539,40 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {number} a
 	* @property {FlattenedInner} b
 	*
-	* @typedef {{ type: "A" } & { type: "A" }} InternallyTaggedD
-	* @property {{ type: "A" } & { type: "A" }} A
+	* @typedef {{ type: "A" } & { [key in string]: string }} InternallyTaggedD
+	* @property {{ type: "A" } & { [key in string]: string }} A
 	*
-	* @typedef {{ type: "A" } & { type: "A" }} InternallyTaggedE
-	* @property {{ type: "A" } & { type: "A" }} A
+	* @typedef {{ type: "A" }} InternallyTaggedE
+	* @property {{ type: "A" }} A
 	*
-	* @typedef {{ type: "A" } & { type: "A" }} InternallyTaggedF
-	* @property {{ type: "A" } & { type: "A" }} A
+	* @typedef {{ type: "A" } & InternallyTaggedFInner} InternallyTaggedF
+	* @property {{ type: "A" } & InternallyTaggedFInner} A
 	*
 	* @typedef {null} InternallyTaggedFInner
 	* @property {null} A
 	*
-	* @typedef {{ type: "A" } & { type: "A" }} InternallyTaggedH
-	* @property {{ type: "A" } & { type: "A" }} A
+	* @typedef {{ type: "A" } & InternallyTaggedHInner} InternallyTaggedH
+	* @property {{ type: "A" } & InternallyTaggedHInner} A
 	*
 	* @typedef {null} InternallyTaggedHInner
 	*
-	* @typedef {{ type: "A" } & { type: "A" }} InternallyTaggedL
-	* @property {{ type: "A" } & { type: "A" }} A
+	* @typedef {{ type: "A" } | { type: "B" }} InternallyTaggedL
+	* @property {{ type: "A" } | { type: "B" }} A
 	*
-	* @typedef {{ type: "A" } & { type: "A" } | { type: "B" } & { type: "B" }} InternallyTaggedLInner
-	* @property {{ type: "A" } & { type: "A" }} A
-	* @property {{ type: "B" } & { type: "B" }} B
+	* @typedef {{ type: "A" } | { type: "B" }} InternallyTaggedLInner
+	* @property {{ type: "A" }} A
+	* @property {{ type: "B" }} B
 	*
-	* @typedef {{ type: "A" } & { type: "A" }} InternallyTaggedM
-	* @property {{ type: "A" } & { type: "A" }} A
+	* @typedef {{ type: "A" }} InternallyTaggedM
+	* @property {{ type: "A" }} A
 	*
 	* @typedef {null} InternallyTaggedMInner
 	* @property {null} A
 	* @property {null} B
 	*
-	* @typedef {{ type: "A" } & { type: "A"; field: string } | { type: "B" } & { type: "B"; other: number }} InternallyTaggedWithAlias
-	* @property {{ type: "A" } & { type: "A"; field: string }} A
-	* @property {{ type: "B" } & { type: "B"; other: number }} B
+	* @typedef {{ type: "A"; field: string } | { type: "B"; other: number }} InternallyTaggedWithAlias
+	* @property {{ type: "A"; field: string }} A
+	* @property {{ type: "B"; other: number }} B
 	*
 	* @typedef {{
 	*		cause: null,
@@ -609,26 +609,26 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {T[]} borrowed
 	* @property {T[]} owned
 	*
-	* @typedef {{ event: "started"; data: { event: "started"; data: {
+	* @typedef {{ event: "started"; data: {
 	* 	projectName: string,
-	* } } } | { event: "progressTest"; data: { event: "progressTest"; data: {
-	* 	projectName: string,
-	* 	status: string,
-	* 	progress: number,
-	* } } } | { event: "finished"; data: { event: "finished"; data: {
-	* 	projectName: string,
-	* } } }} LoadProjectEvent
-	* @property {{ event: "started"; data: { event: "started"; data: {
-	* 	projectName: string,
-	* } } }} started
-	* @property {{ event: "progressTest"; data: { event: "progressTest"; data: {
+	* } } | { event: "progressTest"; data: {
 	* 	projectName: string,
 	* 	status: string,
 	* 	progress: number,
-	* } } }} progressTest
-	* @property {{ event: "finished"; data: { event: "finished"; data: {
+	* } } | { event: "finished"; data: {
 	* 	projectName: string,
-	* } } }} finished
+	* } }} LoadProjectEvent
+	* @property {{ event: "started"; data: {
+	* 	projectName: string,
+	* } }} started
+	* @property {{ event: "progressTest"; data: {
+	* 	projectName: string,
+	* 	status: string,
+	* 	progress: number,
+	* } }} progressTest
+	* @property {{ event: "finished"; data: {
+	* 	projectName: string,
+	* } }} finished
 	*
 	* @typedef {{ Demo: string } | { Demo2: { demo2: string } }} MacroEnum
 	* @property {{ Demo: string }} Demo
@@ -648,8 +648,8 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {{ A: string }} A
 	* @property {{ B: number }} B
 	*
-	* @typedef {{ t: "Variant"; c: { t: "Variant"; c: (First) } }} MyEnumAdjacent
-	* @property {{ t: "Variant"; c: { t: "Variant"; c: (First) } }} Variant
+	* @typedef {{ t: "Variant"; c: (First) }} MyEnumAdjacent
+	* @property {{ t: "Variant"; c: (First) }} Variant
 	*
 	* @typedef {{ Variant: (First) }} MyEnumExternal
 	* @property {{ Variant: (First) }} Variant
@@ -660,9 +660,9 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @typedef {(First)} MyEnumUntagged
 	* @property {(First)} Variant
 	*
-	* @typedef {{ type: "a"; value: { type: "a"; value: string } } | { type: "b"; value: { type: "b"; value: number } }} NestedEnum
-	* @property {{ type: "a"; value: { type: "a"; value: string } }} a
-	* @property {{ type: "b"; value: { type: "b"; value: number } }} b
+	* @typedef {{ type: "a"; value: string } | { type: "b"; value: number }} NestedEnum
+	* @property {{ type: "a"; value: string }} a
+	* @property {{ type: "b"; value: number }} b
 	*
 	* @typedef {string | null} NonOptional
 	* @property {string | null} "0"
@@ -1368,15 +1368,15 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @typedef {{ A: string }} SkipVariant
 	* @property {{ A: string }} A
 	*
-	* @typedef {{ tag: "A"; data: { tag: "A"; data: string } }} SkipVariant2
-	* @property {{ tag: "A"; data: { tag: "A"; data: string } }} A
+	* @typedef {{ tag: "A"; data: string }} SkipVariant2
+	* @property {{ tag: "A"; data: string }} A
 	*
 	* @typedef {{ A: { a: string } }} SkipVariant3
 	* @property {{ A: { a: string } }} A
 	*
-	* @typedef {{ type: "A"; data: { type: "A" } } | { type: "B"; data: { type: "B"; data: string } }} SkippedFieldWithinVariant
+	* @typedef {{ type: "A"; data: { type: "A" } } | { type: "B"; data: string }} SkippedFieldWithinVariant
 	* @property {{ type: "A"; data: { type: "A" } }} A
-	* @property {{ type: "B"; data: { type: "B"; data: string } }} B
+	* @property {{ type: "B"; data: string }} B
 	*
 	* @typedef {{
 	*		a: number,

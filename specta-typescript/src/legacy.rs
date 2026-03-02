@@ -545,6 +545,60 @@ fn enum_variant_datatype(
     }
 }
 
+fn is_empty_record(value: &str) -> bool {
+    value == format!("Record<{STRING}, {NEVER}>")
+}
+
+fn render_internal_variant(
+    tag: Cow<'static, str>,
+    variant_name: Cow<'static, str>,
+    payload: Option<String>,
+) -> String {
+    let tag = sanitise_key(tag, false);
+    let variant_name = sanitise_key(variant_name, true);
+    let tag_only = format!("{{ {tag}: {variant_name} }}");
+
+    let Some(payload) = payload else {
+        return tag_only;
+    };
+
+    if payload == NULL || payload == NEVER || is_empty_record(&payload) {
+        return tag_only;
+    }
+
+    if payload.starts_with(&format!("{{ {tag}: {variant_name}")) {
+        return payload;
+    }
+
+    format!("{tag_only} & {payload}")
+}
+
+fn render_adjacent_variant(
+    tag: Cow<'static, str>,
+    content: Cow<'static, str>,
+    variant_name: Cow<'static, str>,
+    payload: Option<String>,
+) -> String {
+    let tag = sanitise_key(tag, false);
+    let content = sanitise_key(content, false);
+    let variant_name = sanitise_key(variant_name, true);
+    let tag_only = format!("{{ {tag}: {variant_name} }}");
+
+    let Some(payload) = payload else {
+        return tag_only;
+    };
+
+    if payload == NULL || payload == NEVER || is_empty_record(&payload) {
+        return tag_only;
+    }
+
+    if payload.starts_with(&format!("{{ {tag}: {variant_name}; {content}:")) {
+        return payload;
+    }
+
+    format!("{{ {tag}: {variant_name}; {content}: {payload} }}")
+}
+
 pub(crate) fn enum_datatype(
     ctx: ExportContext,
     e: &Enum,
@@ -613,61 +667,41 @@ pub(crate) fn enum_datatype(
                         sanitised_name.to_string()
                     }
                     specta_serde::EnumRepr::Internal { tag } => {
-                        let tag = sanitise_key(tag.clone(), false);
-                        let variant_name_ts = sanitise_key(variant_name.clone(), true);
-
-                        match variant.fields() {
-                            Fields::Named(_) => {
-                                let ts_values = enum_variant_datatype(
-                                    ctx.with(PathItem::Variant(variant_name.clone())),
-                                    types,
-                                    variant_name.clone(),
-                                    variant,
-                                    prefix,
-                                    generics,
-                                )?;
-
-                                match ts_values {
-                                    Some(ts_values)
-                                        if ts_values != format!("Record<{STRING}, {NEVER}>") =>
-                                    {
-                                        format!("{{ {tag}: {variant_name_ts} }} & {ts_values}")
-                                    }
-                                    _ => format!("{{ {tag}: {variant_name_ts} }}"),
-                                }
-                            }
-                            Fields::Unit | Fields::Unnamed(_) => {
-                                format!("{{ {tag}: {variant_name_ts} }}")
-                            }
+                        let payload = match variant.fields() {
+                            Fields::Unit => None,
+                            _ => Some(enum_variant_datatype(
+                                ctx.with(PathItem::Variant(variant_name.clone())),
+                                types,
+                                variant_name.clone(),
+                                variant,
+                                prefix,
+                                generics,
+                            )?),
                         }
+                        .flatten();
+
+                        render_internal_variant(tag.clone().into(), variant_name.clone(), payload)
                     }
                     specta_serde::EnumRepr::Adjacent { tag, content } => {
-                        let tag = sanitise_key(tag.clone(), false);
-                        let content = sanitise_key(content.clone(), false);
-                        let variant_name_ts = sanitise_key(variant_name.clone(), true);
-
-                        match variant.fields() {
-                            Fields::Unit => format!("{{ {tag}: {variant_name_ts} }}"),
-                            _ => {
-                                let ts_values = enum_variant_datatype(
-                                    ctx.with(PathItem::Variant(variant_name.clone())),
-                                    types,
-                                    variant_name.clone(),
-                                    variant,
-                                    prefix,
-                                    generics,
-                                )?;
-
-                                match ts_values {
-                                    Some(ts_values) => {
-                                        format!(
-                                            "{{ {tag}: {variant_name_ts}; {content}: {ts_values} }}"
-                                        )
-                                    }
-                                    None => format!("{{ {tag}: {variant_name_ts} }}"),
-                                }
-                            }
+                        let payload = match variant.fields() {
+                            Fields::Unit => None,
+                            _ => Some(enum_variant_datatype(
+                                ctx.with(PathItem::Variant(variant_name.clone())),
+                                types,
+                                variant_name.clone(),
+                                variant,
+                                prefix,
+                                generics,
+                            )?),
                         }
+                        .flatten();
+
+                        render_adjacent_variant(
+                            tag.clone().into(),
+                            content.clone().into(),
+                            variant_name.clone(),
+                            payload,
+                        )
                     }
                 },
                 true,

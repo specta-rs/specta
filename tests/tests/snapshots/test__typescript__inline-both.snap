@@ -427,11 +427,11 @@ EmptyStructWithTag: Record<string, never>
 AdjacentlyTagged: { t: "A" } | { t: "B"; c: { id: string; method: string } } | { t: "C"; c: string }
 LoadProjectEvent: { event: "Started"; data: { project_name: string } } | { event: "ProgressTest"; data: { project_name: string; status: string; progress: number } } | { event: "Finished"; data: { project_name: string } }
 ExternallyTagged: "A" | { B: { id: string; method: string } } | { C: string }
-InternallyTaggedD: { type: "A" }
+InternallyTaggedD: { type: "A" } & { [key in string]: string }
 InternallyTaggedE: { type: "A" }
-InternallyTaggedF: { type: "A" }
-InternallyTaggedH: { type: "A" }
-InternallyTaggedL: { type: "A" }
+InternallyTaggedF: { type: "A" } & InternallyTaggedFInner
+InternallyTaggedH: { type: "A" } & InternallyTaggedHInner
+InternallyTaggedL: { type: "A" } | { type: "B" }
 InternallyTaggedM: { type: "A" }
 StructWithAlias: {
 	field: string,

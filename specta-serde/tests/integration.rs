@@ -6,8 +6,9 @@
 use specta::datatype::{RuntimeAttribute, RuntimeLiteral, RuntimeMeta, RuntimeValue};
 use specta::{
     TypeCollection,
-    datatype::{DataType, Field, Primitive, Struct},
+    datatype::{DataType, Field, Primitive, Reference, Struct},
 };
+use specta_macros::Type as SpectaType;
 use specta_serde::{
     SerdeMode, apply_serde_transformations, process_for_deserialization, process_for_serialization,
 };
@@ -143,6 +144,40 @@ fn test_enum_transformation() {
     // Transform for deserialization
     let de_result = apply_serde_transformations(&enum_dt, SerdeMode::Deserialize);
     assert!(de_result.is_ok());
+}
+
+#[test]
+fn test_internal_tagged_tuple_payload_is_preserved() {
+    // Regression test for https://github.com/specta-rs/specta/issues/174
+    #[derive(SpectaType, serde::Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "type")]
+    enum InternalTaggedTuplePayload {
+        A(std::collections::HashMap<String, String>),
+    }
+
+    let mut types = TypeCollection::default();
+    let dt = <InternalTaggedTuplePayload as specta::Type>::definition(&mut types);
+    let DataType::Reference(Reference::Named(r)) = dt else {
+        panic!("Expected named reference");
+    };
+    let enum_ty = r
+        .get(&types)
+        .map(|ndt| ndt.ty().clone())
+        .expect("expected collected enum");
+
+    let transformed = apply_serde_transformations(&enum_ty, SerdeMode::Serialize)
+        .expect("internal enum should transform");
+
+    let DataType::Enum(transformed_enum) = transformed else {
+        panic!("Expected transformed enum");
+    };
+
+    let variant = &transformed_enum.variants()[0].1;
+    assert!(
+        matches!(variant.fields(), specta::datatype::Fields::Unnamed(_)),
+        "internally tagged tuple payload should remain tuple payload"
+    );
 }
 
 #[test]
