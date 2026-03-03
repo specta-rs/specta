@@ -35,10 +35,10 @@ macro_rules! _impl_passthrough {
 }
 
 macro_rules! _impl_ndt_as {
-    ( $($ty:ident $(<$($generic:ident),*>)? as $ty2:ident),* $(,)? ) => {
+    ( $($ty:ident <$($generic:ident),*> as $ty2:ident)* ) => {
         impl_ndt!(
             $(
-                impl $(<$($generic : Type),*>)? Type for $ty $(<$($generic),*>)? {
+                impl <$($generic : Type),*> Type for $ty <$($generic),*> {
                     inline: true;
                     build: |types, ndt| {
                         ndt.inner = $ty2::definition(types);
@@ -82,16 +82,6 @@ macro_rules! _impl_ndt {
 }
 
 // TODO: CLEANUP
-
-// macro_rules! _impl_containers {
-//     ($($container:ident)+) => {$(
-//         impl<T: Type> Type for $container<T> {
-//             fn definition(types: &mut TypeCollection) -> DataType {
-//                 <T as Type>::definition(types)
-//             }
-//         }
-//     )+}
-// }
 
 // macro_rules! _impl_as {
 //     ($($ty:path as $tty:ty)+) => {$(

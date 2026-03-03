@@ -11,10 +11,8 @@ impl_primitives!(
     u8 u16 u32 u64 u128 usize
     f32 f64
     bool char
-    String
+    str
 );
-
-// impl Type for String {} // TODO
 
 #[cfg(is_nightly)]
 impl Type for f16 {
@@ -59,28 +57,125 @@ const _: () = {
     };
 
     use crate::{
-        datatype::{Enum, EnumVariant, Field},
+        datatype::{Enum, EnumVariant, Field, List},
         internal,
     };
 
-    impl Type for str {
-        fn definition(types: &mut TypeCollection) -> DataType {
-            DataType::Primitive(Prim)
-        }
+    impl Type for String {
+        impl_passthrough!(str);
     }
 
     impl_ndt_as!(
-        Box<T> as T,
-        Rc<T> as T,
-        Arc<T> as T,
-        Cell<T> as T,
-        RefCell<T> as T,
+        // Non-unique sets
+        // Vec is the base impl
+        // VecDeque<T> as Vec<T>
+        // BinaryHeap<T> as Vec<T>
+        // LinkedList<T> as Vec<T>,
 
-        Mutex<T> as T,
-        RwLock<T> as T,
+        // // Unique sets
+        // // HashSet is the base impl
+        // BTreeSet<T> as HashSet<T>,
+
+        // // Maps
+        // // HashMap is the base impl
+        // BTreeMap<K, V> as HashMap<K, V>
+
+        // // Containers
+        Box<T> as T
+        // Rc<T> as T
+        // Arc<T> as T
+        // Cell<T> as T
+        // RefCell<T> as T
+
+        // Mutex<T> as T
+        // RwLock<T> as T
+
+        // CString<> as str
+        // CStr<> as String
+        // OsString<> as String
+        // OsStr<> as String
+
+        // Path<> as String
+        // PathBuf<> as String
+
+        // IpAddr<> as String
+        // Ipv4Addr<> as String
+        // Ipv6Addr<> as String
+
+        // SocketAddr<> as String
+        // SocketAddrV4<> as String
+        // SocketAddrV6<> as String
+
+        // AtomicBool<> as bool
+        // AtomicI8<> as i8
+        // AtomicI16<> as i16
+        // AtomicI32<> as i32
+        // AtomicIsize<> as isize
+        // AtomicU8<> as u8
+        // AtomicU16<> as u16
+        // AtomicU32<> as u32
+        // AtomicUsize<> as usize
+        // AtomicI64<> as i64
+        // AtomicU64<> as u64
+
+        // NonZeroU8<> as u8
+        // NonZeroU16<> as u16
+        // NonZeroU32<> as u32
+        // NonZeroU64<> as u64
+        // NonZeroUsize<> as usize
+        // NonZeroI8<> as i8
+        // NonZeroI16<> as i16
+        // NonZeroI32<> as i32
+        // NonZeroI64<> as i64
+        // NonZeroIsize<> as isize
+        // NonZeroU128<> as u128
+        // NonZeroI128<> as i128
+
+        // // Serde are cringe so this is how it is :(
+        // RangeInclusive<T> as Range<T>
     );
 
     impl_ndt!(
+        impl<T: Type> Type for Vec<T> {
+            inline: true;
+            build: |types, ndt| {
+                let mut l = List::new(
+                    <T as Type>::definition(types),
+                );
+                l.set_unique(false);
+                ndt.inner = DataType::List(l);
+            }
+        }
+
+        impl<T: Type> Type for HashSet<T> {
+            inline: true;
+            build: |types, ndt| {
+                let mut l = List::new(
+                    <T as Type>::definition(types),
+                );
+                l.set_unique(true);
+                ndt.inner = DataType::List(l);
+            }
+        }
+
+        impl<K: Type, V: Type> Type for HashMap<K, V> {
+            inline: true;
+            build: |types, ndt| {
+                ndt.inner = DataType::Map(crate::datatype::Map::new(
+                    K::definition(types),
+                    V::definition(types),
+                ));
+            }
+        }
+
+        impl<> Type for Infallible {
+            inline: true;
+            build: |types, ndt| {
+                // Serde does no support `Infallible` as it can't be constructed as a `&self` method is uncallable on it.
+                ndt.inner = DataType::Enum(Enum::default());
+            }
+        }
+
         impl<T: Type, E: Type> Type for Result<T, E> {
             inline: true;
             build: |types, ndt| {
@@ -100,181 +195,74 @@ const _: () = {
                 });
             }
         }
+
+        impl<T: Type> Type for Range<T> {
+            inline: true;
+            build: |types, ndt| {
+                let ty = T::definition(types);
+                let mut s = crate::datatype::Struct::unit();
+                s.set_fields(internal::construct::fields_named(
+                    vec![
+                        ("start".into(), Field::new(ty.clone())),
+                        ("end".into(), Field::new(ty)),
+                    ],
+                    vec![],
+                ));
+
+                ndt.inner = DataType::Struct(s);
+            }
+        }
+
+        impl<> Type for SystemTime {
+            inline: true;
+            build: |types, ndt| {
+                let mut s = crate::datatype::Struct::unit();
+                s.set_fields(internal::construct::fields_named(
+                    vec![
+                        (
+                            "duration_since_epoch".into(),
+                            Field::new(<i64 as crate::Type>::definition(types)),
+                        ),
+                        (
+                            "duration_since_unix_epoch".into(),
+                            Field::new(<u32 as crate::Type>::definition(types)),
+                        ),
+                    ],
+                    vec![],
+                ));
+
+                ndt.inner = DataType::Struct(s);
+            }
+        }
+
+        impl<> Type for Duration {
+            inline: true;
+            build: |types, ndt| {
+                let mut s = crate::datatype::Struct::unit();
+                s.set_fields(internal::construct::fields_named(
+                    vec![
+                        (
+                            "secs".into(),
+                            Field::new(<u64 as crate::Type>::definition(types)),
+                        ),
+                        (
+                            "nanos".into(),
+                            Field::new(<u32 as crate::Type>::definition(types)),
+                        ),
+                    ],
+                    vec![],
+                ));
+
+                ndt.inner = DataType::Struct(s);
+            }
+        }
+
+
     );
-
-    impl Type for Box<str> {
-        impl_passthrough!(String);
-    }
-
-    impl Type for Rc<str> {
-        impl_passthrough!(String);
-    }
-
-    impl Type for Arc<str> {
-        impl_passthrough!(String);
-    }
 
     // impl<'a, T: ?Sized + ToOwned + Type + 'a> Type for Cow<'a, T> {
     //     impl_passthrough!(T);
     // }
-
-    // impl<'a> Type for Cow<'a, str> {
-    //     impl_passthrough!(String);
-    // }
-
-    //     impl_as!(
-    //         CString as String
-    //         CStr as String
-    //         OsString as String
-    //         OsStr as String
-
-    //         Path as String
-    //         PathBuf as String
-
-    //         IpAddr as String
-    //         Ipv4Addr as String
-    //         Ipv6Addr as String
-
-    //         SocketAddr as String
-    //         SocketAddrV4 as String
-    //         SocketAddrV6 as String
-
-    //         AtomicBool as bool
-    //         AtomicI8 as i8
-    //         AtomicI16 as i16
-    //         AtomicI32 as i32
-    //         AtomicIsize as isize
-    //         AtomicU8 as u8
-    //         AtomicU16 as u16
-    //         AtomicU32 as u32
-    //         AtomicUsize as usize
-    //         AtomicI64 as i64
-    //         AtomicU64 as u64
-
-    //         NonZeroU8 as u8
-    //         NonZeroU16 as u16
-    //         NonZeroU32 as u32
-    //         NonZeroU64 as u64
-    //         NonZeroUsize as usize
-    //         NonZeroI8 as i8
-    //         NonZeroI16 as i16
-    //         NonZeroI32 as i32
-    //         NonZeroI64 as i64
-    //         NonZeroIsize as isize
-    //         NonZeroU128 as u128
-    //         NonZeroI128 as i128
-    //     );
-
-    //     impl_for_list!(
-    //         false; Vec<T>
-    //         false; VecDeque<T>
-    //         false; BinaryHeap<T>
-    //         false; LinkedList<T>
-    //         true; HashSet<T>
-    //         true; BTreeSet<T>
-    //     );
-
-    //     impl_for_map!(HashMap<K, V>);
-    //     impl_for_map!(BTreeMap<K, V>);
-
-    //     // Serde does no support `Infallible` as it can't be constructed as a `&self` method is uncallable on it.
-    //     impl Type for Infallible {
-    //         fn definition(_: &mut TypeCollection) -> DataType {
-    //             DataType::Enum(Enum::default())
-    //         }
-    //     }
-
-    //     impl<T: Type> Type for Range<T> {
-    //         fn definition(types: &mut TypeCollection) -> DataType {
-    //             // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
-    //             static SENTINEL: &str = concat!(module_path!(), "::Range");
-    //             DataType::Reference(NamedDataType::init_with_sentinel(
-    //                 vec![(Generic("T".into()), T::definition(types))],
-    //                 true,
-    //                 types,
-    //                 SENTINEL,
-    //                 |types, ndt| {
-    //                     let ty = T::definition(types);
-    //                     let mut s = crate::datatype::Struct::unit();
-    //                     s.set_fields(internal::construct::fields_named(
-    //                         vec![
-    //                             ("start".into(), Field::new(ty.clone())),
-    //                             ("end".into(), Field::new(ty)),
-    //                         ],
-    //                         vec![],
-    //                     ));
-
-    //                     ndt.inner = DataType::Struct(s);
-    //                 },
-    //             ))
-    //         }
-    //     }
-
-    //     impl<T: Type> Type for RangeInclusive<T> {
-    //         impl_passthrough!(Range<T>); // Yeah Serde are cringe
-    //     }
-
-    //     impl Type for SystemTime {
-    //         fn definition(types: &mut TypeCollection) -> DataType {
-    //             // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
-    //             static SENTINEL: &str = concat!(module_path!(), "::SystemTime");
-    //             DataType::Reference(NamedDataType::init_with_sentinel(
-    //                 vec![],
-    //                 true,
-    //                 types,
-    //                 SENTINEL,
-    //                 |types, ndt| {
-    //                     let mut s = crate::datatype::Struct::unit();
-    //                     s.set_fields(internal::construct::fields_named(
-    //                         vec![
-    //                             (
-    //                                 "duration_since_epoch".into(),
-    //                                 Field::new(<i64 as crate::Type>::definition(types)),
-    //                             ),
-    //                             (
-    //                                 "duration_since_unix_epoch".into(),
-    //                                 Field::new(<u32 as crate::Type>::definition(types)),
-    //                             ),
-    //                         ],
-    //                         vec![],
-    //                     ));
-
-    //                     ndt.inner = DataType::Struct(s);
-    //                 },
-    //             ))
-    //         }
-    //     }
-
-    //     impl Type for Duration {
-    //         fn definition(types: &mut TypeCollection) -> DataType {
-    //             // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
-    //             static SENTINEL: &str = concat!(module_path!(), "::Duration");
-    //             DataType::Reference(NamedDataType::init_with_sentinel(
-    //                 vec![],
-    //                 true,
-    //                 types,
-    //                 SENTINEL,
-    //                 |types, ndt| {
-    //                     let mut s = crate::datatype::Struct::unit();
-    //                     s.set_fields(internal::construct::fields_named(
-    //                         vec![
-    //                             (
-    //                                 "secs".into(),
-    //                                 Field::new(<u64 as crate::Type>::definition(types)),
-    //                             ),
-    //                             (
-    //                                 "nanos".into(),
-    //                                 Field::new(<u32 as crate::Type>::definition(types)),
-    //                             ),
-    //                         ],
-    //                         vec![],
-    //                     ));
-
-    //                     ndt.inner = DataType::Struct(s);
-    //                 },
-    //             ))
-    //         }
-    //     }
 };
 
 // #[cfg(feature = "tokio")]
@@ -283,21 +271,17 @@ const _: () = {
 //     impl_containers!(Mutex RwLock);
 // };
 
-// impl Type for &str {
-//     impl_passthrough!(String);
-// }
+impl<T: Type + 'static> Type for &T {
+    impl_passthrough!(T);
+}
 
-// impl<T: Type + 'static> Type for &T {
-//     impl_passthrough!(T);
-// }
+impl<T: Type> Type for [T] {
+    impl_passthrough!(Vec<T>);
+}
 
-// impl<T: Type> Type for [T] {
-//     impl_passthrough!(Vec<T>);
-// }
-
-// impl<T: Type> Type for &[T] {
-//     impl_passthrough!(Vec<T>);
-// }
+impl<T: Type> Type for &[T] {
+    impl_passthrough!(Vec<T>);
+}
 
 // impl<const N: usize, T: Type> Type for [T; N] {
 //     fn definition(types: &mut TypeCollection) -> DataType {
