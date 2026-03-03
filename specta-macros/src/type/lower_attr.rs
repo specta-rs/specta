@@ -1,5 +1,5 @@
 // Runtime attribute representation for syn 2.0 compatibility
-// These types mirror the runtime attribute types in specta/src/datatype/struct.rs
+// These types mirror the runtime attribute types in specta/src/datatype/attrs.rs
 // but use owned String data instead of static str references for macro parsing
 
 use quote::ToTokens;
@@ -152,18 +152,18 @@ impl RuntimeLiteralIR {
     pub fn to_tokens(&self) -> proc_macro2::TokenStream {
         match self {
             RuntimeLiteralIR::Str(s) => {
-                quote::quote!(datatype::RuntimeLiteral::Str(String::from(#s)))
+                quote::quote!(datatype::AttributeLiteral::Str(String::from(#s)))
             }
-            RuntimeLiteralIR::Int(i) => quote::quote!(datatype::RuntimeLiteral::Int(#i)),
-            RuntimeLiteralIR::Bool(b) => quote::quote!(datatype::RuntimeLiteral::Bool(#b)),
-            RuntimeLiteralIR::Float(f) => quote::quote!(datatype::RuntimeLiteral::Float(#f)),
-            RuntimeLiteralIR::Byte(b) => quote::quote!(datatype::RuntimeLiteral::Byte(#b)),
-            RuntimeLiteralIR::Char(c) => quote::quote!(datatype::RuntimeLiteral::Char(#c)),
+            RuntimeLiteralIR::Int(i) => quote::quote!(datatype::AttributeLiteral::Int(#i)),
+            RuntimeLiteralIR::Bool(b) => quote::quote!(datatype::AttributeLiteral::Bool(#b)),
+            RuntimeLiteralIR::Float(f) => quote::quote!(datatype::AttributeLiteral::Float(#f)),
+            RuntimeLiteralIR::Byte(b) => quote::quote!(datatype::AttributeLiteral::Byte(#b)),
+            RuntimeLiteralIR::Char(c) => quote::quote!(datatype::AttributeLiteral::Char(#c)),
             RuntimeLiteralIR::ByteStr(bs) => {
-                quote::quote!(datatype::RuntimeLiteral::ByteStr(vec![#(#bs),*]))
+                quote::quote!(datatype::AttributeLiteral::ByteStr(vec![#(#bs),*]))
             }
             RuntimeLiteralIR::CStr(cs) => {
-                quote::quote!(datatype::RuntimeLiteral::CStr(vec![#(#cs),*]))
+                quote::quote!(datatype::AttributeLiteral::CStr(vec![#(#cs),*]))
             }
         }
     }
@@ -174,14 +174,14 @@ impl RuntimeNestedMetaIR {
         match self {
             RuntimeNestedMetaIR::Meta(m) => {
                 let m = m.to_tokens();
-                quote::quote!(datatype::RuntimeNestedMeta::Meta(#m))
+                quote::quote!(datatype::AttributeNestedMeta::Meta(#m))
             }
             RuntimeNestedMetaIR::Literal(l) => {
                 let l = l.to_tokens();
-                quote::quote!(datatype::RuntimeNestedMeta::Literal(#l))
+                quote::quote!(datatype::AttributeNestedMeta::Literal(#l))
             }
             RuntimeNestedMetaIR::Expr(expr) => {
-                quote::quote!(datatype::RuntimeNestedMeta::Expr(String::from(#expr)))
+                quote::quote!(datatype::AttributeNestedMeta::Expr(String::from(#expr)))
             }
         }
     }
@@ -192,10 +192,10 @@ impl RuntimeValueIR {
         match self {
             RuntimeValueIR::Literal(lit) => {
                 let lit = lit.to_tokens();
-                quote::quote!(datatype::RuntimeValue::Literal(#lit))
+                quote::quote!(datatype::AttributeValue::Literal(#lit))
             }
             RuntimeValueIR::Expr(expr) => {
-                quote::quote!(datatype::RuntimeValue::Expr(String::from(#expr)))
+                quote::quote!(datatype::AttributeValue::Expr(String::from(#expr)))
             }
         }
     }
@@ -205,13 +205,13 @@ impl RuntimeMetaIR {
     pub fn to_tokens(&self) -> proc_macro2::TokenStream {
         match self {
             RuntimeMetaIR::Path(path) => {
-                quote::quote!(datatype::RuntimeMeta::Path(String::from(#path)))
+                quote::quote!(datatype::AttributeMeta::Path(String::from(#path)))
             }
 
             RuntimeMetaIR::NameValue { key, value } => {
                 let value = value.to_tokens();
                 quote::quote! {
-                    datatype::RuntimeMeta::NameValue {
+                    datatype::AttributeMeta::NameValue {
                         key: String::from(#key),
                         value: #value,
                     }
@@ -221,7 +221,7 @@ impl RuntimeMetaIR {
             RuntimeMetaIR::List(items) => {
                 let items = items.iter().map(|i| i.to_tokens());
                 quote::quote! {
-                    datatype::RuntimeMeta::List(vec![ #(#items),* ])
+                    datatype::AttributeMeta::List(vec![ #(#items),* ])
                 }
             }
         }
@@ -234,7 +234,7 @@ impl RuntimeAttributeIR {
         let kind = self.kind.to_tokens();
 
         quote::quote! {
-            datatype::RuntimeAttribute {
+            datatype::Attribute {
                 path: String::from(#path),
                 kind: #kind,
             }

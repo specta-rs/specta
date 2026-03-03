@@ -44,7 +44,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         ));
     }
 
-    // Lower the container attributes to RuntimeAttribute tokens
+    // Lower the container attributes to Attribute tokens
     // We use the raw attrs from DeriveInput, not the parsed ones
     // This follows the same pattern as variant attribute lowering in enum.rs:58-71
     let lowered_attrs = raw_attrs

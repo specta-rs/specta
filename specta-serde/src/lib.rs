@@ -66,8 +66,8 @@ pub use serde_attrs::{SerdeMode, apply_serde_transformations};
 
 use specta::TypeCollection;
 use specta::datatype::{
-    DataType, Enum, Fields, Generic, NamedReference, Primitive, Reference, RuntimeAttribute,
-    RuntimeMeta, RuntimeNestedMeta, skip_fields, skip_fields_named,
+    DataType, Enum, Fields, Generic, NamedReference, Primitive, Reference, Attribute,
+    AttributeMeta, AttributeNestedMeta, skip_fields, skip_fields_named,
 };
 use std::collections::HashSet;
 
@@ -471,18 +471,18 @@ fn validate_internally_tag_enum_datatype(
     }
 }
 
-fn is_transparent_struct(attributes: &[RuntimeAttribute]) -> bool {
+fn is_transparent_struct(attributes: &[Attribute]) -> bool {
     attributes.iter().any(|attr| {
         if attr.path != "serde" && attr.path != "specta" {
             return false;
         }
 
         match &attr.kind {
-            RuntimeMeta::Path(path) => path == "transparent",
-            RuntimeMeta::List(items) => items.iter().any(|item| {
-                matches!(item, RuntimeNestedMeta::Meta(RuntimeMeta::Path(path)) if path == "transparent")
+            AttributeMeta::Path(path) => path == "transparent",
+            AttributeMeta::List(items) => items.iter().any(|item| {
+                matches!(item, AttributeNestedMeta::Meta(AttributeMeta::Path(path)) if path == "transparent")
             }),
-            RuntimeMeta::NameValue { .. } => false,
+            AttributeMeta::NameValue { .. } => false,
         }
     })
 }
@@ -506,14 +506,14 @@ fn is_transparent_struct(attributes: &[RuntimeAttribute]) -> bool {
 /// }
 /// ```
 pub fn is_field_flattened(field: &specta::datatype::Field) -> bool {
-    use specta::datatype::{RuntimeMeta, RuntimeNestedMeta};
+    use specta::datatype::{AttributeMeta, AttributeNestedMeta};
 
     field.attributes().iter().any(|attr| {
         if attr.path == "serde" || attr.path == "specta" {
             match &attr.kind {
-                RuntimeMeta::Path(path) => path == "flatten",
-                RuntimeMeta::List(items) => items.iter().any(|item| {
-                    matches!(item, RuntimeNestedMeta::Meta(RuntimeMeta::Path(path)) if path == "flatten")
+                AttributeMeta::Path(path) => path == "flatten",
+                AttributeMeta::List(items) => items.iter().any(|item| {
+                    matches!(item, AttributeNestedMeta::Meta(AttributeMeta::Path(path)) if path == "flatten")
                 }),
                 _ => false,
             }
@@ -546,8 +546,8 @@ pub fn is_field_flattened(field: &specta::datatype::Field) -> bool {
 ///     }
 /// }
 /// ```
-pub fn get_enum_repr(attributes: &[specta::datatype::RuntimeAttribute]) -> EnumRepr {
-    use specta::datatype::{RuntimeLiteral, RuntimeMeta, RuntimeNestedMeta, RuntimeValue};
+pub fn get_enum_repr(attributes: &[specta::datatype::Attribute]) -> EnumRepr {
+    use specta::datatype::{AttributeLiteral, AttributeMeta, AttributeNestedMeta, AttributeValue};
     use std::borrow::Cow;
 
     let mut tag = None;
@@ -555,31 +555,31 @@ pub fn get_enum_repr(attributes: &[specta::datatype::RuntimeAttribute]) -> EnumR
     let mut untagged = false;
 
     fn parse_repr_from_meta(
-        meta: &RuntimeMeta,
+        meta: &AttributeMeta,
         tag: &mut Option<String>,
         content: &mut Option<String>,
         untagged: &mut bool,
     ) {
         match meta {
-            RuntimeMeta::Path(path) => {
+            AttributeMeta::Path(path) => {
                 if path == "untagged" {
                     *untagged = true;
                 }
             }
-            RuntimeMeta::NameValue { key, value } => {
+            AttributeMeta::NameValue { key, value } => {
                 if key == "tag" {
-                    if let RuntimeValue::Literal(RuntimeLiteral::Str(t)) = value {
+                    if let AttributeValue::Literal(AttributeLiteral::Str(t)) = value {
                         *tag = Some(t.clone());
                     }
                 } else if key == "content"
-                    && let RuntimeValue::Literal(RuntimeLiteral::Str(c)) = value
+                    && let AttributeValue::Literal(AttributeLiteral::Str(c)) = value
                 {
                     *content = Some(c.clone());
                 }
             }
-            RuntimeMeta::List(list) => {
+            AttributeMeta::List(list) => {
                 for nested in list {
-                    if let RuntimeNestedMeta::Meta(nested_meta) = nested {
+                    if let AttributeNestedMeta::Meta(nested_meta) = nested {
                         parse_repr_from_meta(nested_meta, tag, content, untagged);
                     }
                 }

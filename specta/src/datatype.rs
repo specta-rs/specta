@@ -14,7 +14,7 @@ mod reference;
 mod r#struct;
 mod tuple;
 
-pub use attrs::{RuntimeAttribute, RuntimeLiteral, RuntimeMeta, RuntimeNestedMeta, RuntimeValue};
+pub use attrs::{Attribute, AttributeLiteral, AttributeMeta, AttributeNestedMeta, AttributeValue};
 pub use builders::{NamedDataTypeBuilder, StructBuilder, VariantBuilder};
 pub use r#enum::{Enum, EnumVariant};
 pub use fields::{

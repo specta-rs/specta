@@ -7,8 +7,8 @@ use std::{borrow::Cow, fmt::Debug};
 use crate::{
     TypeCollection,
     datatype::{
-        DataType, DeprecatedType, EnumVariant, Field, Fields, Generic, NamedDataType, NamedFields,
-        RuntimeAttribute, Struct, UnnamedFields,
+        Attribute, DataType, DeprecatedType, EnumVariant, Field, Fields, Generic, NamedDataType,
+        NamedFields, Struct, UnnamedFields,
     },
 };
 
@@ -52,13 +52,13 @@ impl StructBuilder<UnnamedFields> {
     }
 
     /// Set runtime attributes for the unnamed fields collection.
-    pub fn attributes(mut self, attributes: Vec<RuntimeAttribute>) -> Self {
+    pub fn attributes(mut self, attributes: Vec<Attribute>) -> Self {
         self.fields.attributes = attributes;
         self
     }
 
     /// Set runtime attributes for the unnamed fields collection in-place.
-    pub fn attributes_mut(&mut self, attributes: Vec<RuntimeAttribute>) {
+    pub fn attributes_mut(&mut self, attributes: Vec<Attribute>) {
         self.fields.attributes = attributes;
     }
 
@@ -98,13 +98,13 @@ impl<T> VariantBuilder<T> {
     }
 
     /// Set runtime attributes on the variant.
-    pub fn attributes(mut self, attributes: Vec<RuntimeAttribute>) -> Self {
+    pub fn attributes(mut self, attributes: Vec<Attribute>) -> Self {
         self.v.attributes = attributes;
         self
     }
 
     /// Set runtime attributes on the variant in-place.
-    pub fn attributes_mut(&mut self, attributes: Vec<RuntimeAttribute>) {
+    pub fn attributes_mut(&mut self, attributes: Vec<Attribute>) {
         self.v.attributes = attributes;
     }
 }

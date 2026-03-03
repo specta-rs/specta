@@ -20,7 +20,7 @@ pub mod construct {
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
         inline: bool,
-        attributes: Vec<RuntimeAttribute>,
+        attributes: Vec<Attribute>,
         ty: Option<DataType>,
     ) -> Field {
         Field {
@@ -33,13 +33,13 @@ pub mod construct {
         }
     }
 
-    pub const fn fields_unnamed(fields: Vec<Field>, attributes: Vec<RuntimeAttribute>) -> Fields {
+    pub const fn fields_unnamed(fields: Vec<Field>, attributes: Vec<Attribute>) -> Fields {
         Fields::Unnamed(UnnamedFields { fields, attributes })
     }
 
     pub const fn fields_named(
         fields: Vec<(Cow<'static, str>, Field)>,
-        attributes: Vec<RuntimeAttribute>,
+        attributes: Vec<Attribute>,
     ) -> Fields {
         Fields::Named(NamedFields { fields, attributes })
     }
