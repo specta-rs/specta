@@ -9,7 +9,7 @@ mod specta_fn;
 pub use arg::FunctionArg;
 pub use result::FunctionResult;
 #[doc(hidden)]
-pub use result::{FunctionResultFutureMarker, FunctionResultMarker};
+pub use result::{FunctionFutureMarker, FunctionValueMarker};
 pub(crate) use specta_fn::SpectaFn;
 
 /// Returns a [`Function`](crate::datatype::Function) for a given function that has been annotated with
