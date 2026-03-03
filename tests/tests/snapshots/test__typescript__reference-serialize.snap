@@ -2,7 +2,7 @@
 source: tests/tests/typescript.rs
 expression: "dts.iter().filter_map(|(s, ty)| match ty\n{\n    DataType::Reference(r) => Some((s, r)), _ => None,\n}).map(|(s, ty)|\nprimitives::reference(&ts, &types,\nty).map(|ty| format!(\"{s}: {ty}\"))).collect::<Result<Vec<_>,\n_>>().unwrap().join(\"\\n\")"
 ---
-Result<String, i32>: number
+Result<String, i32>: ({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never }
 Unit1: Unit1
 Unit2: Unit2
 Unit3: Unit3

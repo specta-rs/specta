@@ -3,7 +3,9 @@ source: tests/tests/jsdoc.rs
 expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()"
 ---
 /**
-	* @typedef {number} <T, E>
+	* @typedef {({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never }} <T, E>
+	* @property {{ Ok: string }} Ok
+	* @property {{ Err: number }} Err
 	*
 	* @typedef {null} Unit1
 	*

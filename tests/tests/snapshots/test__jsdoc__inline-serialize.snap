@@ -786,7 +786,7 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		"Option<i32>": number | null,
 	*		"Option<()>": null,
 	*		"Option<Vec<i32>>": number[] | null,
-	*		"Result<String, i32>": number,
+	*		"Result<String, i32>": ({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never },
 	*		"Vec<Option<Cow<'static, i32>>>": (number | null)[],
 	*		"Option<Vec<Cow<'static, i32>>>": number[] | null,
 	*		"[Vec<String>; 3]": [string[], string[], string[]],
@@ -1047,7 +1047,7 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {number | null} "Option<i32>"
 	* @property {null} "Option<()>"
 	* @property {number[] | null} "Option<Vec<i32>>"
-	* @property {number} "Result<String, i32>"
+	* @property {({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never }} "Result<String, i32>"
 	* @property {(number | null)[]} "Vec<Option<Cow<'static, i32>>>"
 	* @property {number[] | null} "Option<Vec<Cow<'static, i32>>>"
 	* @property {[string[], string[], string[]]} "[Vec<String>; 3]"
