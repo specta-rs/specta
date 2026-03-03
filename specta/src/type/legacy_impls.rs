@@ -92,9 +92,9 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: vec![RuntimeAttribute {
+                attributes: vec![Attribute {
                     path: String::from("serde"),
-                    kind: RuntimeMeta::List(vec![RuntimeNestedMeta::Meta(RuntimeMeta::Path(
+                    kind: AttributeMeta::List(vec![AttributeNestedMeta::Meta(AttributeMeta::Path(
                         String::from("untagged"),
                     ))]),
                 }],
@@ -881,9 +881,9 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: vec![RuntimeAttribute {
+                attributes: vec![Attribute {
                     path: String::from("serde"),
-                    kind: RuntimeMeta::List(vec![RuntimeNestedMeta::Meta(RuntimeMeta::Path(
+                    kind: AttributeMeta::List(vec![AttributeNestedMeta::Meta(AttributeMeta::Path(
                         String::from("untagged"),
                     ))]),
                 }],
@@ -937,9 +937,9 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: vec![RuntimeAttribute {
+                attributes: vec![Attribute {
                     path: String::from("serde"),
-                    kind: RuntimeMeta::List(vec![RuntimeNestedMeta::Meta(RuntimeMeta::Path(
+                    kind: AttributeMeta::List(vec![AttributeNestedMeta::Meta(AttributeMeta::Path(
                         String::from("untagged"),
                     ))]),
                 }],

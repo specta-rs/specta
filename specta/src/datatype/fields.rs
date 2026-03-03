@@ -1,6 +1,6 @@
 //! Field types are used by both enums and structs.
 
-use super::{DataType, DeprecatedType, RuntimeAttribute};
+use super::{Attribute, DataType, DeprecatedType};
 use std::borrow::Cow;
 
 /// A non-skipped field with its type information.
@@ -57,7 +57,7 @@ pub struct Field {
     /// Should we inline the definition of this type.
     pub(crate) inline: bool,
     /// Runtime attributes for this field (e.g., serde attributes)
-    pub(crate) attributes: Vec<RuntimeAttribute>,
+    pub(crate) attributes: Vec<Attribute>,
     /// Type for the field. Is optional if `#[serde(skip)]` or `#[specta(skip)]` was applied.
     ///
     /// You might think, well why not apply this in the macro and just not emit the variant?
@@ -146,17 +146,17 @@ impl Field {
     }
 
     /// Get an immutable reference to the runtime attributes for this field.
-    pub fn attributes(&self) -> &Vec<RuntimeAttribute> {
+    pub fn attributes(&self) -> &Vec<Attribute> {
         &self.attributes
     }
 
     /// Mutable reference to the runtime attributes for this field.
-    pub fn attributes_mut(&mut self) -> &mut Vec<RuntimeAttribute> {
+    pub fn attributes_mut(&mut self) -> &mut Vec<Attribute> {
         &mut self.attributes
     }
 
     /// Set the runtime attributes for this field.
-    pub fn set_attributes(&mut self, attrs: Vec<RuntimeAttribute>) {
+    pub fn set_attributes(&mut self, attrs: Vec<Attribute>) {
         self.attributes = attrs;
     }
 }
@@ -165,7 +165,7 @@ impl Field {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UnnamedFields {
     pub(crate) fields: Vec<Field>,
-    pub(crate) attributes: Vec<RuntimeAttribute>,
+    pub(crate) attributes: Vec<Attribute>,
 }
 
 impl UnnamedFields {
@@ -180,17 +180,17 @@ impl UnnamedFields {
     }
 
     /// Get an immutable reference to the runtime attributes for this unnamed fields.
-    pub fn attributes(&self) -> &Vec<RuntimeAttribute> {
+    pub fn attributes(&self) -> &Vec<Attribute> {
         &self.attributes
     }
 
     /// Mutable reference to the runtime attributes for this unnamed fields.
-    pub fn attributes_mut(&mut self) -> &mut Vec<RuntimeAttribute> {
+    pub fn attributes_mut(&mut self) -> &mut Vec<Attribute> {
         &mut self.attributes
     }
 
     /// Set the runtime attributes for this unnamed fields.
-    pub fn set_attributes(&mut self, attrs: Vec<RuntimeAttribute>) {
+    pub fn set_attributes(&mut self, attrs: Vec<Attribute>) {
         self.attributes = attrs;
     }
 }
@@ -199,7 +199,7 @@ impl UnnamedFields {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NamedFields {
     pub(crate) fields: Vec<(Cow<'static, str>, Field)>,
-    pub(crate) attributes: Vec<RuntimeAttribute>,
+    pub(crate) attributes: Vec<Attribute>,
 }
 
 impl NamedFields {
@@ -214,17 +214,17 @@ impl NamedFields {
     }
 
     /// Get an immutable reference to the runtime attributes for this named fields.
-    pub fn attributes(&self) -> &Vec<RuntimeAttribute> {
+    pub fn attributes(&self) -> &Vec<Attribute> {
         &self.attributes
     }
 
     /// Mutable reference to the runtime attributes for this named fields.
-    pub fn attributes_mut(&mut self) -> &mut Vec<RuntimeAttribute> {
+    pub fn attributes_mut(&mut self) -> &mut Vec<Attribute> {
         &mut self.attributes
     }
 
     /// Set the runtime attributes for this named fields.
-    pub fn set_attributes(&mut self, attrs: Vec<RuntimeAttribute>) {
+    pub fn set_attributes(&mut self, attrs: Vec<Attribute>) {
         self.attributes = attrs;
     }
 }

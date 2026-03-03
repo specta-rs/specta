@@ -20,20 +20,20 @@ fn is_string_enum(e: &specta::datatype::Enum) -> bool {
 
 /// Helper function to get rename_all from serde attributes  
 fn get_rename_all_from_attributes(
-    attributes: &[specta::datatype::RuntimeAttribute],
+    attributes: &[specta::datatype::Attribute],
 ) -> Option<String> {
-    use specta::datatype::RuntimeMeta;
+    use specta::datatype::AttributeMeta;
 
     for attr in attributes {
         if attr.path == "serde"
-            && let RuntimeMeta::List(list) = &attr.kind
+            && let AttributeMeta::List(list) = &attr.kind
         {
             for nested in list {
-                if let specta::datatype::RuntimeNestedMeta::Meta(meta) = nested
-                    && let RuntimeMeta::NameValue { key, value } = meta
+                if let specta::datatype::AttributeNestedMeta::Meta(meta) = nested
+                    && let AttributeMeta::NameValue { key, value } = meta
                     && key == "rename_all"
-                    && let specta::datatype::RuntimeValue::Literal(
-                        specta::datatype::RuntimeLiteral::Str(s),
+                    && let specta::datatype::AttributeValue::Literal(
+                        specta::datatype::AttributeLiteral::Str(s),
                     ) = value
                 {
                     return Some(s.clone());
@@ -46,18 +46,18 @@ fn get_rename_all_from_attributes(
 
 /// Check if an enum is adjacently tagged
 fn is_adjacently_tagged_enum(e: &specta::datatype::Enum) -> bool {
-    use specta::datatype::RuntimeMeta;
+    use specta::datatype::AttributeMeta;
 
     let mut has_tag = false;
     let mut has_content = false;
 
     for attr in e.attributes() {
         if attr.path == "serde"
-            && let RuntimeMeta::List(list) = &attr.kind
+            && let AttributeMeta::List(list) = &attr.kind
         {
             for nested in list {
-                if let specta::datatype::RuntimeNestedMeta::Meta(meta) = nested
-                    && let RuntimeMeta::NameValue { key, .. } = meta
+                if let specta::datatype::AttributeNestedMeta::Meta(meta) = nested
+                    && let AttributeMeta::NameValue { key, .. } = meta
                 {
                     if key == "tag" {
                         has_tag = true;
@@ -74,29 +74,29 @@ fn is_adjacently_tagged_enum(e: &specta::datatype::Enum) -> bool {
 
 /// Get the tag and content field names for an adjacently tagged enum
 fn get_adjacent_tag_content(e: &specta::datatype::Enum) -> Option<(String, String)> {
-    use specta::datatype::RuntimeMeta;
+    use specta::datatype::AttributeMeta;
 
     let mut tag = None;
     let mut content = None;
 
     for attr in e.attributes() {
         if attr.path == "serde"
-            && let RuntimeMeta::List(list) = &attr.kind
+            && let AttributeMeta::List(list) = &attr.kind
         {
             for nested in list {
-                if let specta::datatype::RuntimeNestedMeta::Meta(meta) = nested
-                    && let RuntimeMeta::NameValue { key, value } = meta
+                if let specta::datatype::AttributeNestedMeta::Meta(meta) = nested
+                    && let AttributeMeta::NameValue { key, value } = meta
                 {
                     if key == "tag" {
-                        if let specta::datatype::RuntimeValue::Literal(
-                            specta::datatype::RuntimeLiteral::Str(s),
+                        if let specta::datatype::AttributeValue::Literal(
+                            specta::datatype::AttributeLiteral::Str(s),
                         ) = value
                         {
                             tag = Some(s.clone());
                         }
                     } else if key == "content"
-                        && let specta::datatype::RuntimeValue::Literal(
-                            specta::datatype::RuntimeLiteral::Str(s),
+                        && let specta::datatype::AttributeValue::Literal(
+                            specta::datatype::AttributeLiteral::Str(s),
                         ) = value
                     {
                         content = Some(s.clone());

@@ -1,6 +1,5 @@
 ---
 source: tests/tests/typescript.rs
-assertion_line: 381
 expression: "dts.iter().map(|(s, ty)|\nprimitives::inline(&ts, &types,\nty).map(|ty| format!(\"{s}: {ty}\"))).collect::<Result<Vec<_>,\n_>>().unwrap().join(\"\\n\")"
 ---
 i8: number
@@ -67,7 +66,7 @@ Vec<MyEnum>: MyEnum[]
 Option<i32>: number | null
 Option<()>: null
 Option<Vec<i32>>: number[] | null
-Result<String, i32>: { Ok: string } | { Err: number }
+Result<String, i32>: number
 Vec<Option<Cow<'static, i32>>>: (number | null)[]
 Option<Vec<Cow<'static, i32>>>: number[] | null
 [Vec<String>; 3]: [string[], string[], string[]]
@@ -92,7 +91,7 @@ SimpleStruct: {
 }
 TupleStruct1: number
 TupleStruct3: [number, boolean, string]
-TestEnum: "Unit" | { Single: number } | { Multiple: [number, number] } | { Struct: { a: number } }
+TestEnum: "Unit" | ({ Single: number }) & { Multiple?: never; Struct?: never } | ({ Multiple: [number, number] }) & { Single?: never; Struct?: never } | ({ Struct: { a: number } }) & { Multiple?: never; Single?: never }
 RefStruct: TestEnum
 InlinerStruct: {
 	inline_this: {
@@ -114,7 +113,7 @@ OverridenStruct: {
 	overriden_field: string,
 }
 HasGenericAlias: { [key in number]: string }
-EnumMacroAttributes: { A: string } | { B: number } | { C: number } | { D: { a: string; b: number } }
+EnumMacroAttributes: ({ A: string }) & { B?: never; C?: never; D?: never } | ({ B: number }) & { A?: never; C?: never; D?: never } | ({ C: number }) & { A?: never; B?: never; D?: never } | ({ D: { a: string; b: number } }) & { A?: never; B?: never; C?: never }
 InlineEnumField: { A: {
 	a: string,
 } }
@@ -166,7 +165,7 @@ LifetimeGenericStruct<'_, i32>: {
 	borrowed: number[],
 	owned: number[],
 }
-LifetimeGenericEnum<'_, i32>: { Borrowed: number } | { Owned: number }
+LifetimeGenericEnum<'_, i32>: ({ Borrowed: number }) & { Owned?: never } | ({ Owned: number }) & { Borrowed?: never }
 RenameWithWeirdCharsField: {
 	odata_context: string,
 }
@@ -228,7 +227,7 @@ OptionalOnNamedField: string | null
 OptionalOnTransparentNamedField: {
 	b: string | null,
 }
-OptionalInEnum: { A: string | null } | { B: { a: string | null } } | { C: { a?: string | null } }
+OptionalInEnum: ({ A: string | null }) & { B?: never; C?: never } | ({ B: { a: string | null } }) & { A?: never; C?: never } | ({ C: { a?: string | null } }) & { A?: never; B?: never }
 Optional: {
 	a: number | null,
 	b?: number | null,
@@ -248,7 +247,7 @@ MacroStruct: string
 MacroStruct2: {
 	demo: string,
 }
-MacroEnum: { Demo: string } | { Demo2: { demo2: string } }
+MacroEnum: ({ Demo: string }) & { Demo2?: never } | ({ Demo2: { demo2: string } }) & { Demo?: never }
 DeprecatedType: {
 	a: number,
 }
@@ -311,24 +310,24 @@ CommentedEnum:
  *  Some triple-slash comment
  *  Some more triple-slash comment
  */
-{ A: number } | 
+({ A: number }) & { B?: never } | 
 /**
  *  Some triple-slash comment
  *  Some more triple-slash comment
  */
-{ B: { 
+({ B: { 
 /**
  *  Some triple-slash comment
  *  Some more triple-slash comment
  */
-a: number } }
+a: number } }) & { A?: never }
 SingleLineComment: 
 // Some single-line comment
-{ A: number } | 
+({ A: number }) & { B?: never } | 
 // Some single-line comment
-{ B: { 
+({ B: { 
 // Some single-line comment
-a: number } }
+a: number } }) & { A?: never }
 NonGeneric: {
 	a: number,
 	b: boolean,
@@ -428,7 +427,8 @@ EmptyStruct: Record<string, never>
 EmptyStructWithTag: Record<string, never>
 AdjacentlyTagged: { t: "A" } | { t: "B"; c: { id: string; method: string } } | { t: "C"; c: string }
 LoadProjectEvent: { event: "Started"; data: { project_name: string } } | { event: "ProgressTest"; data: { project_name: string; status: string; progress: number } } | { event: "Finished"; data: { project_name: string } }
-ExternallyTagged: "A" | { B: { id: string; method: string } } | { C: string }
+ExternallyTagged: "A" | ({ B: { id: string; method: string } }) & { C?: never } | ({ C: string }) & { B?: never }
+Issue221External: ({ A: { a: string } }) & { B?: never } | ({ B: { b: string } }) & { A?: never }
 InternallyTaggedD: { type: "A" } & { [key in string]: string }
 InternallyTaggedE: { type: "A" }
 InternallyTaggedF: { type: "A" } & InternallyTaggedFInner
@@ -449,7 +449,9 @@ EnumWithMultipleVariantAliases: "Variant" | "Other"
 EnumWithVariantAliasAndRename: "Variant" | "Other"
 InternallyTaggedWithAlias: { type: "A" } & { field: string } | { type: "B" } & { other: number }
 AdjacentlyTaggedWithAlias: { type: "A"; data: { field: string } } | { type: "B"; data: { other: number } }
-UntaggedWithAlias: { field: string } | { other: number }
+UntaggedWithAlias: ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never }
+Issue221UntaggedSafe: ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never }
+Issue221UntaggedMixed: ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never } | ({ [key in string]: string })
 EmptyEnum: never
 EmptyEnumTagged: never
 EmptyEnumTaggedWContent: never
@@ -460,7 +462,7 @@ SkipField: {
 }
 SkipVariant: { A: string }
 SkipUnnamedFieldInVariant: "A" | { B: [number] }
-SkipNamedFieldInVariant: { A: Record<string, never> } | { B: { b: number } }
+SkipNamedFieldInVariant: ({ A: Record<string, never> }) & { B?: never } | ({ B: { b: number } }) & { A?: never }
 TransparentWithSkip: null
 TransparentWithSkip2: string
 TransparentWithSkip3: string
@@ -520,7 +522,7 @@ Container1: {
 	bar: Generic1<number>[],
 	baz: { [key in string]: Generic1<string> },
 }
-Generic2<(), String, i32>: { A: null } | { B: [string, string, string] } | { C: number[] } | { D: null[][][] } | { E: { a: null; b: string; c: number } } | { X: number[] } | { Y: number } | { Z: number[][] }
+Generic2<(), String, i32>: ({ A: null }) & { B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ B: [string, string, string] }) & { A?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ C: number[] }) & { A?: never; B?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ D: null[][][] }) & { A?: never; B?: never; C?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ E: { a: null; b: string; c: number } }) & { A?: never; B?: never; C?: never; D?: never; X?: never; Y?: never; Z?: never } | ({ X: number[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; Y?: never; Z?: never } | ({ Y: number }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Z?: never } | ({ Z: number[][] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never }
 GenericNewType1<()>: null[][]
 GenericTuple<()>: [null, null[], null[][]]
 GenericStruct2<()>: {
@@ -534,7 +536,7 @@ GenericStruct2<()>: {
 	h: ([([null, null]), ([null, null]), ([null, null])])[],
 }
 InlineGenericNewtype<String>: string
-InlineGenericNested<String>: [string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | { Unnamed: string } | { Named: { value: string } }]
+InlineGenericNested<String>: [string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | ({ Unnamed: string }) & { Named?: never } | ({ Named: { value: string } }) & { Unnamed?: never }]
 InlineFlattenGenericsG<()>: {
 	t: null,
 }

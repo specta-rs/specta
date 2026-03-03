@@ -2,6 +2,8 @@
 source: tests/tests/typescript.rs
 expression: "dts.iter().filter_map(|(s, ty)| match ty\n{\n    DataType::Reference(Reference::Named(r)) =>\n    r.get(&types).cloned().map(|ty| (s, ty)), _ => None,\n}).map(|(s, ty)|\nprimitives::export(&ts, &types, iter::once(&ty),\n\"\").map(|ty| format!(\"{s}: {ty}\"))).collect::<Result<Vec<_>,\n_>>().unwrap().join(\"\\n\")"
 ---
+Result<String, i32>: export type <T, E> = number;
+
 Unit1: export type Unit1 = null;
 
 Unit2: export type Unit2 = Record<string, never>;
@@ -28,7 +30,7 @@ TupleStruct1: export type TupleStruct1 = number;
 
 TupleStruct3: export type TupleStruct3 = [number, boolean, string];
 
-TestEnum: export type TestEnum = "Unit" | { Single: number } | { Multiple: [number, number] } | { Struct: { a: number } };
+TestEnum: export type TestEnum = "Unit" | ({ Single: number }) & { Multiple?: never; Struct?: never } | ({ Multiple: [number, number] }) & { Single?: never; Struct?: never } | ({ Struct: { a: number } }) & { Multiple?: never; Single?: never };
 
 RefStruct: export type RefStruct = TestEnum;
 
@@ -58,7 +60,7 @@ OverridenStruct: export type OverridenStruct = {
 
 HasGenericAlias: export type HasGenericAlias = { [key in number]: string };
 
-EnumMacroAttributes: export type EnumMacroAttributes = { A: string } | { B: number } | { C: number } | { D: { a: string; b: number } };
+EnumMacroAttributes: export type EnumMacroAttributes = ({ A: string }) & { B?: never; C?: never; D?: never } | ({ B: number }) & { A?: never; C?: never; D?: never } | ({ C: number }) & { A?: never; B?: never; D?: never } | ({ D: { a: string; b: number } }) & { A?: never; B?: never; C?: never };
 
 InlineEnumField: export type InlineEnumField = { A: {
 	a: string,
@@ -117,7 +119,7 @@ LifetimeGenericStruct<'_, i32>: export type LifetimeGenericStruct<T> = {
 	owned: T[],
 };
 
-LifetimeGenericEnum<'_, i32>: export type LifetimeGenericEnum<T> = { Borrowed: T } | { Owned: T };
+LifetimeGenericEnum<'_, i32>: export type LifetimeGenericEnum<T> = ({ Borrowed: T }) & { Owned?: never } | ({ Owned: T }) & { Borrowed?: never };
 
 RenameWithWeirdCharsField: export type RenameWithWeirdCharsField = {
 	odata_context: string,
@@ -159,7 +161,7 @@ ContainerTypeOverrideStruct: export type ContainerTypeOverrideStruct = string;
 
 ContainerTypeOverrideEnum: export type ContainerTypeOverrideEnum = string;
 
-ContainerTypeOverrideGeneric<Box<dyn Any>>: export type ContainerTypeOverrideGeneric<T> = string;
+ContainerTypeOverrideGeneric<Box<dyn Any>>: export type ContainerTypeOverrideGeneric = string;
 
 ContainerTypeOverrideToGeneric<i32>: export type ContainerTypeOverrideToGeneric<T> = T;
 
@@ -210,7 +212,7 @@ OptionalOnTransparentNamedField: export type OptionalOnTransparentNamedField = {
 	b: string | null,
 };
 
-OptionalInEnum: export type OptionalInEnum = { A: string | null } | { B: { a: string | null } } | { C: { a?: string | null } };
+OptionalInEnum: export type OptionalInEnum = ({ A: string | null }) & { B?: never; C?: never } | ({ B: { a: string | null } }) & { A?: never; C?: never } | ({ C: { a?: string | null } }) & { A?: never; B?: never };
 
 Optional: export type Optional = {
 	a: number | null,
@@ -233,7 +235,7 @@ MacroStruct2: export type MacroStruct2 = {
 	demo: string,
 };
 
-MacroEnum: export type MacroEnum = { Demo: string } | { Demo2: { demo2: string } };
+MacroEnum: export type MacroEnum = ({ Demo: string }) & { Demo2?: never } | ({ Demo2: { demo2: string } }) & { Demo?: never };
 
 DeprecatedType: /**
  * @deprecated
@@ -321,26 +323,26 @@ export type CommentedEnum =
  *  Some triple-slash comment
  *  Some more triple-slash comment
  */
-{ A: number } | 
+({ A: number }) & { B?: never } | 
 /**
  *  Some triple-slash comment
  *  Some more triple-slash comment
  */
-{ B: { 
+({ B: { 
 /**
  *  Some triple-slash comment
  *  Some more triple-slash comment
  */
-a: number } };
+a: number } }) & { A?: never };
 
 SingleLineComment: // Some single-line comment
 export type SingleLineComment = 
 // Some single-line comment
-{ A: number } | 
+({ A: number }) & { B?: never } | 
 // Some single-line comment
-{ B: { 
+({ B: { 
 // Some single-line comment
-a: number } };
+a: number } }) & { A?: never };
 
 NonGeneric: export type Demo<A, B> = {
 	a: A,
@@ -463,7 +465,9 @@ AdjacentlyTagged: export type AdjacentlyTagged = { t: "A" } | { t: "B"; c: { id:
 
 LoadProjectEvent: export type LoadProjectEvent = { event: "Started"; data: { project_name: string } } | { event: "ProgressTest"; data: { project_name: string; status: string; progress: number } } | { event: "Finished"; data: { project_name: string } };
 
-ExternallyTagged: export type ExternallyTagged = "A" | { B: { id: string; method: string } } | { C: string };
+ExternallyTagged: export type ExternallyTagged = "A" | ({ B: { id: string; method: string } }) & { C?: never } | ({ C: string }) & { B?: never };
+
+Issue221External: export type Issue221External = ({ A: { a: string } }) & { B?: never } | ({ B: { b: string } }) & { A?: never };
 
 InternallyTaggedD: export type InternallyTaggedD = { type: "A" } & { [key in string]: string };
 
@@ -499,7 +503,11 @@ InternallyTaggedWithAlias: export type InternallyTaggedWithAlias = { type: "A" }
 
 AdjacentlyTaggedWithAlias: export type AdjacentlyTaggedWithAlias = { type: "A"; data: { field: string } } | { type: "B"; data: { other: number } };
 
-UntaggedWithAlias: export type UntaggedWithAlias = { field: string } | { other: number };
+UntaggedWithAlias: export type UntaggedWithAlias = ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never };
+
+Issue221UntaggedSafe: export type Issue221UntaggedSafe = ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never };
+
+Issue221UntaggedMixed: export type Issue221UntaggedMixed = ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never } | ({ [key in string]: string });
 
 EmptyEnum: export type EmptyEnum = never;
 
@@ -519,7 +527,7 @@ SkipVariant: export type SkipVariant = { A: string };
 
 SkipUnnamedFieldInVariant: export type SkipUnnamedFieldInVariant = "A" | { B: [number] };
 
-SkipNamedFieldInVariant: export type SkipNamedFieldInVariant = { A: Record<string, never> } | { B: { b: number } };
+SkipNamedFieldInVariant: export type SkipNamedFieldInVariant = ({ A: Record<string, never> }) & { B?: never } | ({ B: { b: number } }) & { A?: never };
 
 TransparentWithSkip: export type TransparentWithSkip = null;
 
@@ -599,7 +607,7 @@ Container1: export type Container1 = {
 	baz: { [key in string]: Generic1<string> },
 };
 
-Generic2<(), String, i32>: export type Generic2<A, B, C> = { A: A } | { B: [B, B, B] } | { C: C[] } | { D: A[][][] } | { E: { a: A; b: B; c: C } } | { X: number[] } | { Y: number } | { Z: number[][] };
+Generic2<(), String, i32>: export type Generic2<A, B, C> = ({ A: A }) & { B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ B: [B, B, B] }) & { A?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ C: C[] }) & { A?: never; B?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ D: A[][][] }) & { A?: never; B?: never; C?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ E: { a: A; b: B; c: C } }) & { A?: never; B?: never; C?: never; D?: never; X?: never; Y?: never; Z?: never } | ({ X: number[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; Y?: never; Z?: never } | ({ Y: number }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Z?: never } | ({ Z: number[][] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never };
 
 GenericNewType1<()>: export type GenericNewType1<T> = T[][];
 
@@ -618,7 +626,7 @@ GenericStruct2<()>: export type GenericStruct2<T> = {
 
 InlineGenericNewtype<String>: export type InlineGenericNewtype<T> = T;
 
-InlineGenericNested<String>: export type InlineGenericNested<T> = [T, T[], [T, T], { [key in string]: T }, T | null, "Unit" | { Unnamed: T } | { Named: { value: T } }];
+InlineGenericNested<String>: export type InlineGenericNested<T> = [T, T[], [T, T], { [key in string]: T }, T | null, "Unit" | ({ Unnamed: T }) & { Named?: never } | ({ Named: { value: T } }) & { Unnamed?: never }];
 
 InlineFlattenGenericsG<()>: export type InlineFlattenGenericsG<T> = {
 	t: T,

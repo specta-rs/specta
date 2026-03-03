@@ -64,7 +64,7 @@ pub fn parse_enum(
                 }
             }
 
-            // Lower the variant attributes to RuntimeAttribute tokens
+            // Lower the variant attributes to Attribute tokens
             let lowered_variant_attrs = v
                 .attrs
                 .iter()

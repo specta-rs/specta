@@ -8,8 +8,8 @@ use std::{borrow::Cow, fmt};
 
 use specta::{
     datatype::{
-        DataType, Enum, Fields, RuntimeAttribute, RuntimeLiteral, RuntimeMeta, RuntimeNestedMeta,
-        RuntimeValue, Struct, Tuple,
+        DataType, Enum, Fields, Attribute, AttributeLiteral, AttributeMeta, AttributeNestedMeta,
+        AttributeValue, Struct, Tuple,
     },
     internal,
 };
@@ -775,8 +775,8 @@ impl SerdeTransformer {
     }
 }
 
-/// Parse serde attributes from a vector of RuntimeAttribute
-fn parse_serde_attributes(attributes: &[RuntimeAttribute]) -> Result<SerdeAttributes, Error> {
+/// Parse serde attributes from a vector of Attribute
+fn parse_serde_attributes(attributes: &[Attribute]) -> Result<SerdeAttributes, Error> {
     let mut attrs = SerdeAttributes::default();
 
     for attr in attributes {
@@ -790,23 +790,23 @@ fn parse_serde_attributes(attributes: &[RuntimeAttribute]) -> Result<SerdeAttrib
 
 /// Parse the content of a serde attribute
 fn parse_serde_attribute_content(
-    meta: &RuntimeMeta,
+    meta: &AttributeMeta,
     attrs: &mut SerdeAttributes,
 ) -> Result<(), Error> {
     match meta {
-        RuntimeMeta::Path(path) => {
+        AttributeMeta::Path(path) => {
             // Handle path-only attributes (e.g., #[serde(untagged)], #[serde(skip)])
             parse_serde_path_attribute(attrs, path);
         }
-        RuntimeMeta::NameValue { key, value } => {
+        AttributeMeta::NameValue { key, value } => {
             match key.as_str() {
                 "rename" => {
-                    if let RuntimeValue::Literal(RuntimeLiteral::Str(name)) = value {
+                    if let AttributeValue::Literal(AttributeLiteral::Str(name)) = value {
                         attrs.rename = Some(name.clone());
                     }
                 }
                 "rename_all" => {
-                    if let RuntimeValue::Literal(RuntimeLiteral::Str(rule_str)) = value {
+                    if let AttributeValue::Literal(AttributeLiteral::Str(rule_str)) = value {
                         attrs.rename_all = Some(
                             RenameRule::from_str(rule_str)
                                 .map_err(|_| Error::InvalidUsageOfSkip)?,
@@ -814,7 +814,7 @@ fn parse_serde_attribute_content(
                     }
                 }
                 "rename_all_fields" => {
-                    if let RuntimeValue::Literal(RuntimeLiteral::Str(rule_str)) = value {
+                    if let AttributeValue::Literal(AttributeLiteral::Str(rule_str)) = value {
                         attrs.rename_all_fields = Some(
                             RenameRule::from_str(rule_str)
                                 .map_err(|_| Error::InvalidUsageOfSkip)?,
@@ -822,7 +822,7 @@ fn parse_serde_attribute_content(
                     }
                 }
                 "tag" => {
-                    if let RuntimeValue::Literal(RuntimeLiteral::Str(tag_name)) = value {
+                    if let AttributeValue::Literal(AttributeLiteral::Str(tag_name)) = value {
                         attrs.tag = Some(tag_name.clone());
                         // If we have a tag, this is an internally tagged enum
                         if attrs.repr.is_none() {
@@ -833,56 +833,56 @@ fn parse_serde_attribute_content(
                     }
                 }
                 "content" => {
-                    if let RuntimeValue::Literal(RuntimeLiteral::Str(content_name)) = value {
+                    if let AttributeValue::Literal(AttributeLiteral::Str(content_name)) = value {
                         attrs.content = Some(content_name.clone());
                     }
                 }
                 "default" => match value {
-                    RuntimeValue::Literal(RuntimeLiteral::Bool(true)) => attrs.default = true,
-                    RuntimeValue::Literal(RuntimeLiteral::Str(func_path)) => {
+                    AttributeValue::Literal(AttributeLiteral::Bool(true)) => attrs.default = true,
+                    AttributeValue::Literal(AttributeLiteral::Str(func_path)) => {
                         attrs.default_with = Some(func_path.clone());
                     }
-                    RuntimeValue::Expr(func_path) => attrs.default_with = Some(func_path.clone()),
+                    AttributeValue::Expr(func_path) => attrs.default_with = Some(func_path.clone()),
                     _ => {}
                 },
                 "remote" => {
-                    if let RuntimeValue::Literal(RuntimeLiteral::Str(remote_type)) = value {
+                    if let AttributeValue::Literal(AttributeLiteral::Str(remote_type)) = value {
                         attrs.remote = Some(remote_type.clone());
                     }
                 }
                 "from" => {
-                    if let RuntimeValue::Literal(RuntimeLiteral::Str(from_type)) = value {
+                    if let AttributeValue::Literal(AttributeLiteral::Str(from_type)) = value {
                         attrs.from = Some(from_type.clone());
                     }
                 }
                 "try_from" => {
-                    if let RuntimeValue::Literal(RuntimeLiteral::Str(try_from_type)) = value {
+                    if let AttributeValue::Literal(AttributeLiteral::Str(try_from_type)) = value {
                         attrs.try_from = Some(try_from_type.clone());
                     }
                 }
                 "into" => {
-                    if let RuntimeValue::Literal(RuntimeLiteral::Str(into_type)) = value {
+                    if let AttributeValue::Literal(AttributeLiteral::Str(into_type)) = value {
                         attrs.into = Some(into_type.clone());
                     }
                 }
                 "alias" => {
-                    if let RuntimeValue::Literal(RuntimeLiteral::Str(alias_name)) = value {
+                    if let AttributeValue::Literal(AttributeLiteral::Str(alias_name)) = value {
                         attrs.alias.push(alias_name.clone());
                     }
                 }
                 "serialize_with" => {
-                    if let RuntimeValue::Literal(RuntimeLiteral::Str(serialize_fn)) = value {
+                    if let AttributeValue::Literal(AttributeLiteral::Str(serialize_fn)) = value {
                         attrs.serialize_with = Some(serialize_fn.clone());
                     }
                 }
                 "deserialize_with" => {
-                    if let RuntimeValue::Literal(RuntimeLiteral::Str(deserialize_fn)) = value {
+                    if let AttributeValue::Literal(AttributeLiteral::Str(deserialize_fn)) = value {
                         attrs.deserialize_with = Some(deserialize_fn.clone());
                     }
                 }
                 "with" => match value {
-                    RuntimeValue::Literal(RuntimeLiteral::Str(with_module))
-                    | RuntimeValue::Expr(with_module) => {
+                    AttributeValue::Literal(AttributeLiteral::Str(with_module))
+                    | AttributeValue::Expr(with_module) => {
                         attrs.with = Some(with_module.clone());
                     }
                     _ => {}
@@ -890,11 +890,11 @@ fn parse_serde_attribute_content(
                 _ => {}
             }
         }
-        RuntimeMeta::List(list) => {
+        AttributeMeta::List(list) => {
             // Check if this is a complex attribute with serialize/deserialize modifiers
             let mut has_serialize_deserialize = false;
             for nested in list {
-                if let RuntimeNestedMeta::Meta(RuntimeMeta::NameValue { key, .. }) = nested
+                if let AttributeNestedMeta::Meta(AttributeMeta::NameValue { key, .. }) = nested
                     && (key == "serialize" || key == "deserialize")
                 {
                     has_serialize_deserialize = true;
@@ -905,7 +905,7 @@ fn parse_serde_attribute_content(
             if has_serialize_deserialize {
                 // This is a complex attribute like rename(serialize="...", deserialize="...")
                 for nested in list {
-                    if let RuntimeNestedMeta::Meta(nested_meta) = nested {
+                    if let AttributeNestedMeta::Meta(nested_meta) = nested {
                         parse_complex_serde_attribute(nested_meta, attrs, "rename")?;
                     }
                 }
@@ -913,15 +913,15 @@ fn parse_serde_attribute_content(
                 // Regular list processing
                 for nested in list {
                     match nested {
-                        RuntimeNestedMeta::Meta(nested_meta) => {
+                        AttributeNestedMeta::Meta(nested_meta) => {
                             parse_serde_attribute_content(nested_meta, attrs)?;
                         }
-                        RuntimeNestedMeta::Literal(RuntimeLiteral::Str(s)) => {
+                        AttributeNestedMeta::Literal(AttributeLiteral::Str(s)) => {
                             // Handle string literals that might be path attributes
                             parse_serde_path_attribute(attrs, s);
                         }
-                        RuntimeNestedMeta::Expr(_) => {}
-                        RuntimeNestedMeta::Literal(_) => {
+                        AttributeNestedMeta::Expr(_) => {}
+                        AttributeNestedMeta::Literal(_) => {
                             // Handle other literal values in lists if needed
                         }
                     }
@@ -946,14 +946,14 @@ fn parse_serde_attribute_content(
 }
 
 fn parse_complex_serde_attribute(
-    meta: &RuntimeMeta,
+    meta: &AttributeMeta,
     attrs: &mut SerdeAttributes,
     parent_key: &str,
 ) -> Result<(), Error> {
     match meta {
-        RuntimeMeta::NameValue { key, value } => match key.as_str() {
+        AttributeMeta::NameValue { key, value } => match key.as_str() {
             "serialize" => {
-                if let RuntimeValue::Literal(RuntimeLiteral::Str(name)) = value {
+                if let AttributeValue::Literal(AttributeLiteral::Str(name)) = value {
                     match parent_key {
                         "rename" => attrs.rename_serialize = Some(name.clone()),
                         "rename_all" => {
@@ -971,7 +971,7 @@ fn parse_complex_serde_attribute(
                 }
             }
             "deserialize" => {
-                if let RuntimeValue::Literal(RuntimeLiteral::Str(name)) = value {
+                if let AttributeValue::Literal(AttributeLiteral::Str(name)) = value {
                     match parent_key {
                         "rename" => attrs.rename_deserialize = Some(name.clone()),
                         "rename_all" => {
@@ -990,10 +990,10 @@ fn parse_complex_serde_attribute(
             }
             _ => {}
         },
-        RuntimeMeta::List(list) => {
+        AttributeMeta::List(list) => {
             // Handle nested complex attributes
             for nested in list {
-                if let RuntimeNestedMeta::Meta(nested_meta) = nested {
+                if let AttributeNestedMeta::Meta(nested_meta) = nested {
                     parse_complex_serde_attribute(nested_meta, attrs, parent_key)?;
                 }
             }
@@ -1020,9 +1020,9 @@ fn parse_serde_path_attribute(attrs: &mut SerdeAttributes, attribute_name: &str)
     }
 }
 
-/// Parse serde field attributes from a vector of RuntimeAttribute
+/// Parse serde field attributes from a vector of Attribute
 #[allow(dead_code)]
-fn parse_serde_field_attributes(attrs: &[RuntimeAttribute]) -> Result<SerdeFieldAttributes, Error> {
+fn parse_serde_field_attributes(attrs: &[Attribute]) -> Result<SerdeFieldAttributes, Error> {
     let mut result = SerdeFieldAttributes {
         base: parse_serde_attributes(attrs)?,
         ..Default::default()
@@ -1040,7 +1040,7 @@ fn parse_serde_field_attributes(attrs: &[RuntimeAttribute]) -> Result<SerdeField
 /// Parse the content of a serde field attribute
 #[allow(dead_code)]
 fn parse_serde_field_attribute_content(
-    meta: &RuntimeMeta,
+    meta: &AttributeMeta,
     attrs: &mut SerdeFieldAttributes,
 ) -> Result<(), Error> {
     // First parse as base attributes
@@ -1048,42 +1048,42 @@ fn parse_serde_field_attribute_content(
 
     // Then parse field-specific attributes
     match meta {
-        RuntimeMeta::Path(_path) => {
+        AttributeMeta::Path(_path) => {
             // Path-only attributes are already handled by parse_serde_attribute_content above
         }
-        RuntimeMeta::NameValue { key, value } => match key.as_str() {
+        AttributeMeta::NameValue { key, value } => match key.as_str() {
             "alias" => {
-                if let RuntimeValue::Literal(RuntimeLiteral::Str(alias_name)) = value {
+                if let AttributeValue::Literal(AttributeLiteral::Str(alias_name)) = value {
                     attrs.alias.push(alias_name.clone());
                 }
             }
             "serialize_with" => {
-                if let RuntimeValue::Literal(RuntimeLiteral::Str(func_name)) = value {
+                if let AttributeValue::Literal(AttributeLiteral::Str(func_name)) = value {
                     attrs.serialize_with = Some(func_name.clone());
                 }
             }
             "deserialize_with" => {
-                if let RuntimeValue::Literal(RuntimeLiteral::Str(func_name)) = value {
+                if let AttributeValue::Literal(AttributeLiteral::Str(func_name)) = value {
                     attrs.deserialize_with = Some(func_name.clone());
                 }
             }
             "with" => match value {
-                RuntimeValue::Literal(RuntimeLiteral::Str(module_path))
-                | RuntimeValue::Expr(module_path) => {
+                AttributeValue::Literal(AttributeLiteral::Str(module_path))
+                | AttributeValue::Expr(module_path) => {
                     attrs.with = Some(module_path.clone());
                 }
                 _ => {}
             },
             "skip_serializing_if" => {
-                if let RuntimeValue::Literal(RuntimeLiteral::Str(func_name)) = value {
+                if let AttributeValue::Literal(AttributeLiteral::Str(func_name)) = value {
                     attrs.skip_serializing_if = Some(func_name.clone());
                 }
             }
             _ => {}
         },
-        RuntimeMeta::List(list) => {
+        AttributeMeta::List(list) => {
             for nested in list {
-                if let RuntimeNestedMeta::Meta(nested_meta) = nested {
+                if let AttributeNestedMeta::Meta(nested_meta) = nested {
                     parse_serde_field_attribute_content(nested_meta, attrs)?;
                 }
             }
@@ -1094,7 +1094,7 @@ fn parse_serde_field_attribute_content(
 }
 
 fn parse_field_serde_attributes(
-    attributes: &[specta::datatype::RuntimeAttribute],
+    attributes: &[specta::datatype::Attribute],
 ) -> Result<SerdeFieldAttributes, Error> {
     parse_serde_field_attributes(attributes)
 }
@@ -1107,9 +1107,9 @@ fn parse_field_serde_attributes(
 //     #[test]
 //     fn test_rename_rule_parsing() {
 //         let mut attrs = SerdeAttributes::default();
-//         let meta = RuntimeMeta::NameValue {
+//         let meta = AttributeMeta::NameValue {
 //             key: "rename_all".to_string(),
-//             value: RuntimeLiteral::Str("camelCase".to_string()),
+//             value: AttributeLiteral::Str("camelCase".to_string()),
 //         };
 
 //         parse_serde_attribute_content(&meta, &mut attrs).expect("Failed to parse serde attribute");
@@ -1119,9 +1119,9 @@ fn parse_field_serde_attributes(
 //     #[test]
 //     fn test_direct_rename() {
 //         let mut attrs = SerdeAttributes::default();
-//         let meta = RuntimeMeta::NameValue {
+//         let meta = AttributeMeta::NameValue {
 //             key: "rename".to_string(),
-//             value: RuntimeLiteral::Str("customName".to_string()),
+//             value: AttributeLiteral::Str("customName".to_string()),
 //         };
 
 //         parse_serde_attribute_content(&meta, &mut attrs).expect("Failed to parse serde attribute");
@@ -1160,9 +1160,9 @@ fn parse_field_serde_attributes(
 
 //         for (rule_str, expected_rule) in test_cases {
 //             let mut attrs = SerdeAttributes::default();
-//             let meta = RuntimeMeta::NameValue {
+//             let meta = AttributeMeta::NameValue {
 //                 key: "rename_all".to_string(),
-//                 value: RuntimeLiteral::Str(rule_str.to_string()),
+//                 value: AttributeLiteral::Str(rule_str.to_string()),
 //             };
 
 //             parse_serde_attribute_content(&meta, &mut attrs)
@@ -1220,9 +1220,9 @@ fn parse_field_serde_attributes(
 //     #[test]
 //     fn test_tag_parsing() {
 //         let mut attrs = SerdeAttributes::default();
-//         let meta = RuntimeMeta::NameValue {
+//         let meta = AttributeMeta::NameValue {
 //             key: "tag".to_string(),
-//             value: RuntimeLiteral::Str("type".to_string()),
+//             value: AttributeLiteral::Str("type".to_string()),
 //         };
 
 //         parse_serde_attribute_content(&meta, &mut attrs).expect("Failed to parse serde attribute");
@@ -1239,16 +1239,16 @@ fn parse_field_serde_attributes(
 //         let mut attrs = SerdeAttributes::default();
 
 //         // Set tag first
-//         let tag_meta = RuntimeMeta::NameValue {
+//         let tag_meta = AttributeMeta::NameValue {
 //             key: "tag".to_string(),
-//             value: RuntimeLiteral::Str("type".to_string()),
+//             value: AttributeLiteral::Str("type".to_string()),
 //         };
 //         parse_serde_attribute_content(&tag_meta, &mut attrs).expect("Failed to parse tag");
 
 //         // Set content second
-//         let content_meta = RuntimeMeta::NameValue {
+//         let content_meta = AttributeMeta::NameValue {
 //             key: "content".to_string(),
-//             value: RuntimeLiteral::Str("data".to_string()),
+//             value: AttributeLiteral::Str("data".to_string()),
 //         };
 //         parse_serde_attribute_content(&content_meta, &mut attrs).expect("Failed to parse content");
 
@@ -1265,9 +1265,9 @@ fn parse_field_serde_attributes(
 //     #[test]
 //     fn test_default_attribute() {
 //         let mut attrs = SerdeAttributes::default();
-//         let meta = RuntimeMeta::NameValue {
+//         let meta = AttributeMeta::NameValue {
 //             key: "default".to_string(),
-//             value: RuntimeLiteral::Bool(true),
+//             value: AttributeLiteral::Bool(true),
 //         };
 
 //         parse_serde_attribute_content(&meta, &mut attrs).expect("Failed to parse serde attribute");
@@ -1345,9 +1345,9 @@ fn parse_field_serde_attributes(
 //         let mut transformer = SerdeTransformer::new(SerdeMode::Serialize, None);
 
 //         // Create a transparent struct with single field using List format
-//         let transparent_attr = RuntimeAttribute {
+//         let transparent_attr = Attribute {
 //             path: "serde".to_string(),
-//             kind: RuntimeMeta::List(vec![RuntimeNestedMeta::Literal(RuntimeLiteral::Str(
+//             kind: AttributeMeta::List(vec![AttributeNestedMeta::Literal(AttributeLiteral::Str(
 //                 "transparent".to_string(),
 //             ))]),
 //         };
@@ -1368,11 +1368,11 @@ fn parse_field_serde_attributes(
 
 //     #[test]
 //     fn test_field_attributes_parsing() {
-//         let serialize_with_attr = RuntimeAttribute {
+//         let serialize_with_attr = Attribute {
 //             path: "serde".to_string(),
-//             kind: RuntimeMeta::NameValue {
+//             kind: AttributeMeta::NameValue {
 //                 key: "serialize_with".to_string(),
-//                 value: RuntimeLiteral::Str("custom_serialize".to_string()),
+//                 value: AttributeLiteral::Str("custom_serialize".to_string()),
 //             },
 //         };
 
@@ -1390,9 +1390,9 @@ fn parse_field_serde_attributes(
 //     #[test]
 //     fn test_alias_attribute() {
 //         let mut attrs = SerdeAttributes::default();
-//         let meta = RuntimeMeta::NameValue {
+//         let meta = AttributeMeta::NameValue {
 //             key: "alias".to_string(),
-//             value: RuntimeLiteral::Str("alternative_name".to_string()),
+//             value: AttributeLiteral::Str("alternative_name".to_string()),
 //         };
 
 //         parse_serde_attribute_content(&meta, &mut attrs).expect("Failed to parse serde attribute");
@@ -1402,9 +1402,9 @@ fn parse_field_serde_attributes(
 //     #[test]
 //     fn test_serialize_with_attribute() {
 //         let mut attrs = SerdeAttributes::default();
-//         let meta = RuntimeMeta::NameValue {
+//         let meta = AttributeMeta::NameValue {
 //             key: "serialize_with".to_string(),
-//             value: RuntimeLiteral::Str("custom_serialize".to_string()),
+//             value: AttributeLiteral::Str("custom_serialize".to_string()),
 //         };
 
 //         parse_serde_attribute_content(&meta, &mut attrs).expect("Failed to parse serde attribute");
@@ -1414,9 +1414,9 @@ fn parse_field_serde_attributes(
 //     #[test]
 //     fn test_with_attribute() {
 //         let mut attrs = SerdeAttributes::default();
-//         let meta = RuntimeMeta::NameValue {
+//         let meta = AttributeMeta::NameValue {
 //             key: "with".to_string(),
-//             value: RuntimeLiteral::Str("custom_module".to_string()),
+//             value: AttributeLiteral::Str("custom_module".to_string()),
 //         };
 
 //         parse_serde_attribute_content(&meta, &mut attrs).expect("Failed to parse serde attribute");
@@ -1428,13 +1428,13 @@ fn parse_field_serde_attributes(
 //         let mut attrs = SerdeAttributes::default();
 
 //         // Simulate parsing rename(serialize = "ser_name", deserialize = "de_name")
-//         let serialize_meta = RuntimeMeta::NameValue {
+//         let serialize_meta = AttributeMeta::NameValue {
 //             key: "serialize".to_string(),
-//             value: RuntimeLiteral::Str("ser_name".to_string()),
+//             value: AttributeLiteral::Str("ser_name".to_string()),
 //         };
-//         let deserialize_meta = RuntimeMeta::NameValue {
+//         let deserialize_meta = AttributeMeta::NameValue {
 //             key: "deserialize".to_string(),
-//             value: RuntimeLiteral::Str("de_name".to_string()),
+//             value: AttributeLiteral::Str("de_name".to_string()),
 //         };
 
 //         parse_complex_serde_attribute(&serialize_meta, &mut attrs, "rename")
@@ -1451,13 +1451,13 @@ fn parse_field_serde_attributes(
 //         let mut attrs = SerdeAttributes::default();
 
 //         // Simulate parsing rename_all(serialize = "camelCase", deserialize = "snake_case")
-//         let serialize_meta = RuntimeMeta::NameValue {
+//         let serialize_meta = AttributeMeta::NameValue {
 //             key: "serialize".to_string(),
-//             value: RuntimeLiteral::Str("camelCase".to_string()),
+//             value: AttributeLiteral::Str("camelCase".to_string()),
 //         };
-//         let deserialize_meta = RuntimeMeta::NameValue {
+//         let deserialize_meta = AttributeMeta::NameValue {
 //             key: "deserialize".to_string(),
-//             value: RuntimeLiteral::Str("snake_case".to_string()),
+//             value: AttributeLiteral::Str("snake_case".to_string()),
 //         };
 
 //         parse_complex_serde_attribute(&serialize_meta, &mut attrs, "rename_all")
@@ -1620,11 +1620,11 @@ fn parse_field_serde_attributes(
 //     #[test]
 //     fn test_variant_attribute_parsing() {
 //         // Test that variant attributes are parsed when transforming enums
-//         let variant_attr = RuntimeAttribute {
+//         let variant_attr = Attribute {
 //             path: "serde".to_string(),
-//             kind: RuntimeMeta::NameValue {
+//             kind: AttributeMeta::NameValue {
 //                 key: "rename".to_string(),
-//                 value: RuntimeLiteral::Str("custom_variant".to_string()),
+//                 value: AttributeLiteral::Str("custom_variant".to_string()),
 //             },
 //         };
 
@@ -1647,18 +1647,18 @@ fn parse_field_serde_attributes(
 
 //         // Add serde attributes for internal tagging + rename_all
 //         *test_enum.attributes_mut() = vec![
-//             RuntimeAttribute {
+//             Attribute {
 //                 path: "serde".to_string(),
-//                 kind: RuntimeMeta::NameValue {
+//                 kind: AttributeMeta::NameValue {
 //                     key: "tag".to_string(),
-//                     value: RuntimeLiteral::Str("phase".to_string()),
+//                     value: AttributeLiteral::Str("phase".to_string()),
 //                 },
 //             },
-//             RuntimeAttribute {
+//             Attribute {
 //                 path: "serde".to_string(),
-//                 kind: RuntimeMeta::NameValue {
+//                 kind: AttributeMeta::NameValue {
 //                     key: "rename_all".to_string(),
-//                     value: RuntimeLiteral::Str("snake_case".to_string()),
+//                     value: AttributeLiteral::Str("snake_case".to_string()),
 //                 },
 //             },
 //         ];
@@ -1704,25 +1704,25 @@ fn parse_field_serde_attributes(
 
 //         // Add serde attributes for adjacent tagging + rename_all
 //         *test_enum.attributes_mut() = vec![
-//             RuntimeAttribute {
+//             Attribute {
 //                 path: "serde".to_string(),
-//                 kind: RuntimeMeta::NameValue {
+//                 kind: AttributeMeta::NameValue {
 //                     key: "tag".to_string(),
-//                     value: RuntimeLiteral::Str("t".to_string()),
+//                     value: AttributeLiteral::Str("t".to_string()),
 //                 },
 //             },
-//             RuntimeAttribute {
+//             Attribute {
 //                 path: "serde".to_string(),
-//                 kind: RuntimeMeta::NameValue {
+//                 kind: AttributeMeta::NameValue {
 //                     key: "content".to_string(),
-//                     value: RuntimeLiteral::Str("c".to_string()),
+//                     value: AttributeLiteral::Str("c".to_string()),
 //                 },
 //             },
-//             RuntimeAttribute {
+//             Attribute {
 //                 path: "serde".to_string(),
-//                 kind: RuntimeMeta::NameValue {
+//                 kind: AttributeMeta::NameValue {
 //                     key: "rename_all".to_string(),
-//                     value: RuntimeLiteral::Str("snake_case".to_string()),
+//                     value: AttributeLiteral::Str("snake_case".to_string()),
 //                 },
 //             },
 //         ];
