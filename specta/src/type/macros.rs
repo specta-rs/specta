@@ -59,7 +59,7 @@ macro_rules! _impl_ndt {
         )+
     ) => {
         $(
-            impl$(<$( $generic : $($($bound)+ +)? Type ),*>)? Type for $ty $(where $($bounds)*)? {
+            impl$(<$( $generic : $($($bound)+)? ),*>)? Type for $ty $(where $($bounds)*)? {
                 fn definition(types: &mut TypeCollection) -> DataType {
                     // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
                     static SENTINEL: &str = concat!(module_path!(), "::", stringify!($ty));

@@ -279,7 +279,7 @@ impl_ndt_as!(
 );
 
 impl_ndt!(
-    impl<T, E> Type for Result<T, E> {
+    impl<T, E> Type for Result<T, E> where { T: Type, E: Type} {
         inline: true;
         build: |types, ndt| {
             let mut ok_variant = EnumVariant::unit();
