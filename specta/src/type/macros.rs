@@ -38,7 +38,10 @@ macro_rules! _impl_ndt_as {
     ( $($ty:ident $(<$($generic:ident),*>)? $( where { $($bounds:tt)* } )? as $ty2:ty )* ) => {
         impl_ndt!(
             $(
-                impl$(<$($generic),*>)? Type for $ty $(<$($generic),*>)? where { (): Sized $(, $($generic: Type),*)? $(, $($bounds)*)? } {
+                impl$(<$($generic),*>)? Type for $ty $(<$($generic),*>)? where {
+                    // `(): Sized` is meaningless and is used to add a base-condition to avoid branching in the macro.
+                    (): Sized $(, $($generic: Type),*)? $(, $($bounds)*)?
+                } {
                     inline: true;
                     build: |types, ndt| {
                         ndt.inner = <$ty2 as Type>::definition(types);
