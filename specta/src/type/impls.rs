@@ -14,6 +14,8 @@ impl_primitives!(
     String
 );
 
+// impl Type for String {} // TODO
+
 #[cfg(is_nightly)]
 impl Type for f16 {
     fn definition(_: &mut TypeCollection) -> DataType {
@@ -47,7 +49,7 @@ const _: () = {
         path::{Path, PathBuf},
         rc::Rc,
         sync::{
-            Arc,
+            Arc, Mutex, RwLock,
             atomic::{
                 AtomicBool, AtomicI8, AtomicI16, AtomicI32, AtomicI64, AtomicIsize, AtomicU8,
                 AtomicU16, AtomicU32, AtomicU64, AtomicUsize,
@@ -61,14 +63,24 @@ const _: () = {
         internal,
     };
 
-    impl_ndt!(
-        impl<T: Type> Type for Box<T> {
-            inline: true;
-            build: |types, ndt| {
-                ndt.inner = T::definition(types);
-            }
+    impl Type for str {
+        fn definition(types: &mut TypeCollection) -> DataType {
+            DataType::Primitive(Prim)
         }
+    }
 
+    impl_ndt_as!(
+        Box<T> as T,
+        Rc<T> as T,
+        Arc<T> as T,
+        Cell<T> as T,
+        RefCell<T> as T,
+
+        Mutex<T> as T,
+        RwLock<T> as T,
+    );
+
+    impl_ndt!(
         impl<T: Type, E: Type> Type for Result<T, E> {
             inline: true;
             build: |types, ndt| {
@@ -90,30 +102,25 @@ const _: () = {
         }
     );
 
-    //     impl_containers!(Box Rc Arc Cell RefCell);
+    impl Type for Box<str> {
+        impl_passthrough!(String);
+    }
 
-    //     use std::sync::{Mutex, RwLock};
-    //     impl_containers!(Mutex RwLock);
+    impl Type for Rc<str> {
+        impl_passthrough!(String);
+    }
 
-    //     impl Type for Box<str> {
-    //         impl_passthrough!(String);
-    //     }
+    impl Type for Arc<str> {
+        impl_passthrough!(String);
+    }
 
-    //     impl Type for Rc<str> {
-    //         impl_passthrough!(String);
-    //     }
+    // impl<'a, T: ?Sized + ToOwned + Type + 'a> Type for Cow<'a, T> {
+    //     impl_passthrough!(T);
+    // }
 
-    //     impl Type for Arc<str> {
-    //         impl_passthrough!(String);
-    //     }
-
-    //     impl<'a, T: ?Sized + ToOwned + Type + 'a> Type for Cow<'a, T> {
-    //         impl_passthrough!(T);
-    //     }
-
-    //     impl<'a> Type for Cow<'a, str> {
-    //         impl_passthrough!(String);
-    //     }
+    // impl<'a> Type for Cow<'a, str> {
+    //     impl_passthrough!(String);
+    // }
 
     //     impl_as!(
     //         CString as String

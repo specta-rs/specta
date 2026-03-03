@@ -26,6 +26,29 @@ macro_rules! _impl_tuple {
     () => {};
 }
 
+macro_rules! _impl_passthrough {
+    ($t:ty) => {
+        fn definition(types: &mut TypeCollection) -> DataType {
+            <$t>::definition(types)
+        }
+    };
+}
+
+macro_rules! _impl_ndt_as {
+    ( $($ty:ident $(<$($generic:ident),*>)? as $ty2:ident),* $(,)? ) => {
+        impl_ndt!(
+            $(
+                impl $(<$($generic : Type),*>)? Type for $ty $(<$($generic),*>)? {
+                    inline: true;
+                    build: |types, ndt| {
+                        ndt.inner = $ty2::definition(types);
+                    }
+                }
+            )*
+        )
+    };
+}
+
 macro_rules! _impl_ndt {
     (
         $(
@@ -59,14 +82,6 @@ macro_rules! _impl_ndt {
 }
 
 // TODO: CLEANUP
-
-// macro_rules! _impl_passthrough {
-//     ($t:ty) => {
-//         fn definition(types: &mut TypeCollection) -> DataType {
-//             <$t>::definition(types)
-//         }
-//     };
-// }
 
 // macro_rules! _impl_containers {
 //     ($($container:ident)+) => {$(
@@ -115,11 +130,8 @@ macro_rules! _impl_ndt {
 //     };
 // }
 
-// pub(crate) use _impl_as as impl_as;
-// pub(crate) use _impl_containers as impl_containers;
-// pub(crate) use _impl_for_list as impl_for_list;
-// pub(crate) use _impl_for_map as impl_for_map;
-// pub(crate) use _impl_passthrough as impl_passthrough;
 pub(crate) use _impl_ndt as impl_ndt;
+pub(crate) use _impl_ndt_as as impl_ndt_as;
+pub(crate) use _impl_passthrough as impl_passthrough;
 pub(crate) use _impl_primitives as impl_primitives;
 pub(crate) use _impl_tuple as impl_tuple;
