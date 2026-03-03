@@ -344,6 +344,7 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
 
         // Serde - Externally Tagged
         ExternallyTagged,
+        Issue221External,
 
         // Serde - Internally Tagged
         InternallyTaggedD,
@@ -365,6 +366,8 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         InternallyTaggedWithAlias,
         AdjacentlyTaggedWithAlias,
         UntaggedWithAlias,
+        Issue221UntaggedSafe,
+        Issue221UntaggedMixed,
 
         // https://github.com/specta-rs/specta/issues/174
         // `never & { tag = "a" }` would coalesce to `never` so we don't need to include it.
@@ -1603,6 +1606,14 @@ enum ExternallyTagged {
     C(String),
 }
 
+// https://github.com/specta-rs/specta/issues/221
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum Issue221External {
+    A { a: String },
+    B { b: String },
+}
+
 // Test struct with field alias
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
@@ -1693,6 +1704,32 @@ enum UntaggedWithAlias {
     },
     B {
         other: i32,
+    },
+}
+
+// https://github.com/specta-rs/specta/issues/221
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum Issue221UntaggedSafe {
+    A { a: String },
+    B { b: String },
+}
+
+// https://github.com/specta-rs/specta/issues/221
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum Issue221UntaggedMixed {
+    A {
+        a: String,
+    },
+    B {
+        b: String,
+    },
+    Unsafe {
+        #[serde(flatten)]
+        values: BTreeMap<String, String>,
     },
 }
 

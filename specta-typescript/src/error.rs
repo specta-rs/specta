@@ -169,10 +169,7 @@ impl Error {
         }
     }
 
-    pub(crate) fn forbidden_name_legacy(
-        path: ExportPath,
-        name: &'static str,
-    ) -> Self {
+    pub(crate) fn forbidden_name_legacy(path: ExportPath, name: &'static str) -> Self {
         Self {
             kind: ErrorKind::ForbiddenNameLegacy(path, name),
         }

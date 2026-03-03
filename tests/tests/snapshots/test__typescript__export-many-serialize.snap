@@ -28,7 +28,7 @@ export type TupleStruct1 = number;
 
 export type TupleStruct3 = [number, boolean, string];
 
-export type TestEnum = "Unit" | { Single: number } | { Multiple: [number, number] } | { Struct: { a: number } };
+export type TestEnum = "Unit" | ({ Single: number }) & { Multiple?: never; Struct?: never } | ({ Multiple: [number, number] }) & { Single?: never; Struct?: never } | ({ Struct: { a: number } }) & { Multiple?: never; Single?: never };
 
 export type RefStruct = TestEnum;
 
@@ -58,7 +58,7 @@ export type OverridenStruct = {
 
 export type HasGenericAlias = { [key in number]: string };
 
-export type EnumMacroAttributes = { A: string } | { B: number } | { C: number } | { D: { a: string; b: number } };
+export type EnumMacroAttributes = ({ A: string }) & { B?: never; C?: never; D?: never } | ({ B: number }) & { A?: never; C?: never; D?: never } | ({ C: number }) & { A?: never; B?: never; D?: never } | ({ D: { a: string; b: number } }) & { A?: never; B?: never; C?: never };
 
 export type InlineEnumField = { A: {
 	a: string,
@@ -117,7 +117,7 @@ export type LifetimeGenericStruct<T> = {
 	owned: T[],
 };
 
-export type LifetimeGenericEnum<T> = { Borrowed: T } | { Owned: T };
+export type LifetimeGenericEnum<T> = ({ Borrowed: T }) & { Owned?: never } | ({ Owned: T }) & { Borrowed?: never };
 
 export type RenameWithWeirdCharsField = {
 	odata_context: string,
@@ -210,7 +210,7 @@ export type OptionalOnTransparentNamedField = {
 	b: string | null,
 };
 
-export type OptionalInEnum = { A: string | null } | { B: { a: string | null } } | { C: { a?: string | null } };
+export type OptionalInEnum = ({ A: string | null }) & { B?: never; C?: never } | ({ B: { a: string | null } }) & { A?: never; C?: never } | ({ C: { a?: string | null } }) & { A?: never; B?: never };
 
 export type Optional = {
 	a: number | null,
@@ -233,7 +233,7 @@ export type MacroStruct2 = {
 	demo: string,
 };
 
-export type MacroEnum = { Demo: string } | { Demo2: { demo2: string } };
+export type MacroEnum = ({ Demo: string }) & { Demo2?: never } | ({ Demo2: { demo2: string } }) & { Demo?: never };
 
 /**
  * @deprecated
@@ -321,26 +321,26 @@ export type CommentedEnum =
  *  Some triple-slash comment
  *  Some more triple-slash comment
  */
-{ A: number } | 
+({ A: number }) & { B?: never } | 
 /**
  *  Some triple-slash comment
  *  Some more triple-slash comment
  */
-{ B: { 
+({ B: { 
 /**
  *  Some triple-slash comment
  *  Some more triple-slash comment
  */
-a: number } };
+a: number } }) & { A?: never };
 
 // Some single-line comment
 export type SingleLineComment = 
 // Some single-line comment
-{ A: number } | 
+({ A: number }) & { B?: never } | 
 // Some single-line comment
-{ B: { 
+({ B: { 
 // Some single-line comment
-a: number } };
+a: number } }) & { A?: never };
 
 export type Demo<A, B> = {
 	a: A,
@@ -463,7 +463,9 @@ export type AdjacentlyTagged = { t: "A" } | { t: "B"; c: { id: string; method: s
 
 export type LoadProjectEvent = { event: "Started"; data: { project_name: string } } | { event: "ProgressTest"; data: { project_name: string; status: string; progress: number } } | { event: "Finished"; data: { project_name: string } };
 
-export type ExternallyTagged = "A" | { B: { id: string; method: string } } | { C: string };
+export type ExternallyTagged = "A" | ({ B: { id: string; method: string } }) & { C?: never } | ({ C: string }) & { B?: never };
+
+export type Issue221External = ({ A: { a: string } }) & { B?: never } | ({ B: { b: string } }) & { A?: never };
 
 export type InternallyTaggedD = { type: "A" } & { [key in string]: string };
 
@@ -499,7 +501,11 @@ export type InternallyTaggedWithAlias = { type: "A" } & { field: string } | { ty
 
 export type AdjacentlyTaggedWithAlias = { type: "A"; data: { field: string } } | { type: "B"; data: { other: number } };
 
-export type UntaggedWithAlias = { field: string } | { other: number };
+export type UntaggedWithAlias = ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never };
+
+export type Issue221UntaggedSafe = ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never };
+
+export type Issue221UntaggedMixed = ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never } | ({ [key in string]: string });
 
 export type EmptyEnum = never;
 
@@ -519,7 +525,7 @@ export type SkipVariant = { A: string };
 
 export type SkipUnnamedFieldInVariant = "A" | { B: [number] };
 
-export type SkipNamedFieldInVariant = { A: Record<string, never> } | { B: { b: number } };
+export type SkipNamedFieldInVariant = ({ A: Record<string, never> }) & { B?: never } | ({ B: { b: number } }) & { A?: never };
 
 export type TransparentWithSkip = null;
 
@@ -599,7 +605,7 @@ export type Container1 = {
 	baz: { [key in string]: Generic1<string> },
 };
 
-export type Generic2<A, B, C> = { A: A } | { B: [B, B, B] } | { C: C[] } | { D: A[][][] } | { E: { a: A; b: B; c: C } } | { X: number[] } | { Y: number } | { Z: number[][] };
+export type Generic2<A, B, C> = ({ A: A }) & { B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ B: [B, B, B] }) & { A?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ C: C[] }) & { A?: never; B?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ D: A[][][] }) & { A?: never; B?: never; C?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ E: { a: A; b: B; c: C } }) & { A?: never; B?: never; C?: never; D?: never; X?: never; Y?: never; Z?: never } | ({ X: number[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; Y?: never; Z?: never } | ({ Y: number }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Z?: never } | ({ Z: number[][] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never };
 
 export type GenericNewType1<T> = T[][];
 
@@ -618,7 +624,7 @@ export type GenericStruct2<T> = {
 
 export type InlineGenericNewtype<T> = T;
 
-export type InlineGenericNested<T> = [T, T[], [T, T], { [key in string]: T }, T | null, "Unit" | { Unnamed: T } | { Named: { value: T } }];
+export type InlineGenericNested<T> = [T, T[], [T, T], { [key in string]: T }, T | null, "Unit" | ({ Unnamed: T }) & { Named?: never } | ({ Named: { value: T } }) & { Unnamed?: never }];
 
 export type InlineFlattenGenericsG<T> = {
 	t: T,

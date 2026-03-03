@@ -115,6 +115,7 @@ EmptyStructWithTag: EmptyStructWithTag
 AdjacentlyTagged: AdjacentlyTagged
 LoadProjectEvent: LoadProjectEvent
 ExternallyTagged: ExternallyTagged
+Issue221External: Issue221External
 InternallyTaggedD: InternallyTaggedD
 InternallyTaggedE: InternallyTaggedE
 InternallyTaggedF: InternallyTaggedF
@@ -130,6 +131,8 @@ EnumWithVariantAliasAndRename: EnumWithVariantAliasAndRename
 InternallyTaggedWithAlias: InternallyTaggedWithAlias
 AdjacentlyTaggedWithAlias: AdjacentlyTaggedWithAlias
 UntaggedWithAlias: UntaggedWithAlias
+Issue221UntaggedSafe: Issue221UntaggedSafe
+Issue221UntaggedMixed: Issue221UntaggedMixed
 EmptyEnum: EmptyEnum
 EmptyEnumTagged: EmptyEnumTagged
 EmptyEnumTaggedWContent: EmptyEnumTaggedWContent
@@ -163,7 +166,7 @@ GenericNewType1<()>: GenericNewType1<null>
 GenericTuple<()>: GenericTuple<null>
 GenericStruct2<()>: GenericStruct2<null>
 InlineGenericNewtype<String>: string
-InlineGenericNested<String>: [string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | { Unnamed: string } | { Named: { value: string } }]
+InlineGenericNested<String>: [string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | ({ Unnamed: string }) & { Named?: never } | ({ Named: { value: string } }) & { Unnamed?: never }]
 InlineFlattenGenericsG<()>: InlineFlattenGenericsG<null>
 InlineFlattenGenerics: InlineFlattenGenerics
 GenericParameterOrderPreserved: GenericParameterOrderPreserved

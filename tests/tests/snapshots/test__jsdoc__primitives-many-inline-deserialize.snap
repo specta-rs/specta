@@ -42,7 +42,7 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {boolean} "1"
 	* @property {string} "2"
 	*
-	* @typedef {"Unit" | { Single: number } | { Multiple: [number, number] } | { Struct: { a: number } }} TestEnum
+	* @typedef {"Unit" | ({ Single: number }) & { Multiple?: never; Struct?: never } | ({ Multiple: [number, number] }) & { Single?: never; Struct?: never } | ({ Struct: { a: number } }) & { Multiple?: never; Single?: never }} TestEnum
 	* @property {"Unit"} Unit
 	* @property {{ Single: number }} Single
 	* @property {{ Multiple: [number, number] }} Multiple
@@ -85,7 +85,7 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @typedef {{ [key in number]: string }} HasGenericAlias
 	* @property {{ [key in number]: string }} "0"
 	*
-	* @typedef {{ A: string } | { B: number } | { C: number } | { D: { a: string; b: number } }} EnumMacroAttributes
+	* @typedef {({ A: string }) & { B?: never; C?: never; D?: never } | ({ B: number }) & { A?: never; C?: never; D?: never } | ({ C: number }) & { A?: never; B?: never; D?: never } | ({ D: { a: string; b: number } }) & { A?: never; B?: never; C?: never }} EnumMacroAttributes
 	* @property {{ A: string }} A
 	* @property {{ B: number }} B
 	* @property {{ C: number }} C
@@ -170,7 +170,7 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {T[]} borrowed
 	* @property {T[]} owned
 	*
-	* @typedef {{ Borrowed: T } | { Owned: T }} LifetimeGenericEnum<T>
+	* @typedef {({ Borrowed: T }) & { Owned?: never } | ({ Owned: T }) & { Borrowed?: never }} LifetimeGenericEnum<T>
 	* @property {{ Borrowed: T }} Borrowed
 	* @property {{ Owned: T }} Owned
 	*
@@ -300,7 +300,7 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*	}} OptionalOnTransparentNamedField
 	* @property {string | null} b
 	*
-	* @typedef {{ A: string | null } | { B: { a: string | null } } | { C: { a?: string | null } }} OptionalInEnum
+	* @typedef {({ A: string | null }) & { B?: never; C?: never } | ({ B: { a: string | null } }) & { A?: never; C?: never } | ({ C: { a?: string | null } }) & { A?: never; B?: never }} OptionalInEnum
 	* @property {{ A: string | null }} A
 	* @property {{ B: { a: string | null } }} B
 	* @property {{ C: { a?: string | null } }} C
@@ -344,7 +344,7 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*	}} MacroStruct2
 	* @property {string} demo
 	*
-	* @typedef {{ Demo: string } | { Demo2: { demo2: string } }} MacroEnum
+	* @typedef {({ Demo: string }) & { Demo2?: never } | ({ Demo2: { demo2: string } }) & { Demo?: never }} MacroEnum
 	* @property {{ Demo: string }} Demo
 	* @property {{ Demo2: { demo2: string } }} Demo2
 	*
@@ -452,17 +452,17 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*	 *  Some triple-slash comment
 	*	 *  Some more triple-slash comment
 	*	 */
-	* { A: number } | 
+	* ({ A: number }) & { B?: never } | 
 	*	/**
 	*	 *  Some triple-slash comment
 	*	 *  Some more triple-slash comment
 	*	 */
-	* { B: { 
+	* ({ B: { 
 	*	/**
 	*	 *  Some triple-slash comment
 	*	 *  Some more triple-slash comment
 	*	 */
-	* a: number } }} CommentedEnum
+	* a: number } }) & { A?: never }} CommentedEnum
 	* @property {
 	* /**
 	*  *  Some triple-slash comment
@@ -487,15 +487,15 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*	/**
 	*	 *  Some single-line comment
 	*	 */
-	* { A: number } | 
+	* ({ A: number }) & { B?: never } | 
 	*	/**
 	*	 *  Some single-line comment
 	*	 */
-	* { B: { 
+	* ({ B: { 
 	*	/**
 	*	 *  Some single-line comment
 	*	 */
-	* a: number } }} SingleLineComment
+	* a: number } }) & { A?: never }} SingleLineComment
 	* @property {
 	* /**
 	*  *  Some single-line comment
@@ -684,10 +684,14 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {{ event: "ProgressTest"; data: { project_name: string; status: string; progress: number } }} ProgressTest
 	* @property {{ event: "Finished"; data: { project_name: string } }} Finished
 	*
-	* @typedef {"A" | { B: { id: string; method: string } } | { C: string }} ExternallyTagged
+	* @typedef {"A" | ({ B: { id: string; method: string } }) & { C?: never } | ({ C: string }) & { B?: never }} ExternallyTagged
 	* @property {"A"} A
 	* @property {{ B: { id: string; method: string } }} B
 	* @property {{ C: string }} C
+	*
+	* @typedef {({ A: { a: string } }) & { B?: never } | ({ B: { b: string } }) & { A?: never }} Issue221External
+	* @property {{ A: { a: string } }} A
+	* @property {{ B: { b: string } }} B
 	*
 	* @typedef {{ type: "A" } & { [key in string]: string }} InternallyTaggedD
 	* @property {{ type: "A" } & { [key in string]: string }} A
@@ -742,9 +746,18 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {{ type: "A"; data: { field: string } }} A
 	* @property {{ type: "B"; data: { other: number } }} B
 	*
-	* @typedef {{ field: string } | { other: number }} UntaggedWithAlias
+	* @typedef {({ field: string }) & { other?: never } | ({ other: number }) & { field?: never }} UntaggedWithAlias
 	* @property {{ field: string }} A
 	* @property {{ other: number }} B
+	*
+	* @typedef {({ a: string }) & { b?: never } | ({ b: string }) & { a?: never }} Issue221UntaggedSafe
+	* @property {{ a: string }} A
+	* @property {{ b: string }} B
+	*
+	* @typedef {({ a: string }) & { b?: never } | ({ b: string }) & { a?: never } | ({ [key in string]: string })} Issue221UntaggedMixed
+	* @property {{ a: string }} A
+	* @property {{ b: string }} B
+	* @property {({ [key in string]: string })} Unsafe
 	*
 	* @typedef {never} EmptyEnum
 	*
@@ -768,7 +781,7 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {"A"} A
 	* @property {{ B: [number] }} B
 	*
-	* @typedef {{ A: Record<string, never> } | { B: { b: number } }} SkipNamedFieldInVariant
+	* @typedef {({ A: Record<string, never> }) & { B?: never } | ({ B: { b: number } }) & { A?: never }} SkipNamedFieldInVariant
 	* @property {{ A: Record<string, never> }} A
 	* @property {{ B: { b: number } }} B
 	*
@@ -883,7 +896,7 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {Generic1<number>[]} bar
 	* @property {{ [key in string]: Generic1<string> }} baz
 	*
-	* @typedef {{ A: A } | { B: [B, B, B] } | { C: C[] } | { D: A[][][] } | { E: { a: A; b: B; c: C } } | { X: number[] } | { Y: number } | { Z: number[][] }} Generic2<A, B, C>
+	* @typedef {({ A: A }) & { B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ B: [B, B, B] }) & { A?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ C: C[] }) & { A?: never; B?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ D: A[][][] }) & { A?: never; B?: never; C?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ E: { a: A; b: B; c: C } }) & { A?: never; B?: never; C?: never; D?: never; X?: never; Y?: never; Z?: never } | ({ X: number[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; Y?: never; Z?: never } | ({ Y: number }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Z?: never } | ({ Z: number[][] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never }} Generic2<A, B, C>
 	* @property {{ A: A }} A
 	* @property {{ B: [B, B, B] }} B
 	* @property {{ C: C[] }} C
@@ -923,13 +936,13 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @typedef {T} InlineGenericNewtype<T>
 	* @property {T} "0"
 	*
-	* @typedef {[T, T[], [T, T], { [key in string]: T }, T | null, "Unit" | { Unnamed: T } | { Named: { value: T } }]} InlineGenericNested<T>
+	* @typedef {[T, T[], [T, T], { [key in string]: T }, T | null, "Unit" | ({ Unnamed: T }) & { Named?: never } | ({ Named: { value: T } }) & { Unnamed?: never }]} InlineGenericNested<T>
 	* @property {T} "0"
 	* @property {T[]} "1"
 	* @property {[T, T]} "2"
 	* @property {{ [key in string]: T }} "3"
 	* @property {T | null} "4"
-	* @property {"Unit" | { Unnamed: T } | { Named: { value: T } }} "5"
+	* @property {"Unit" | ({ Unnamed: T }) & { Named?: never } | ({ Named: { value: T } }) & { Unnamed?: never }} "5"
 	*
 	* @typedef {{
 	*		t: T,

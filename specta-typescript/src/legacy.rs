@@ -599,6 +599,63 @@ fn render_adjacent_variant(
     format!("{{ {tag}: {variant_name}; {content}: {payload} }}")
 }
 
+struct EnumVariantOutput {
+    value: String,
+    strict_keys: Option<BTreeSet<String>>,
+}
+
+fn untagged_strict_keys(variant: &EnumVariant) -> Option<BTreeSet<String>> {
+    match variant.fields() {
+        Fields::Named(obj) => {
+            let all_fields = skip_fields_named(obj.fields()).collect::<Vec<_>>();
+            if all_fields
+                .iter()
+                .any(|(_, (field, _))| specta_serde::is_field_flattened(field))
+            {
+                return None;
+            }
+
+            Some(
+                all_fields
+                    .into_iter()
+                    .map(|(name, _)| sanitise_key(name.clone(), false).to_string())
+                    .collect(),
+            )
+        }
+        _ => None,
+    }
+}
+
+fn strictify_enum_variants(variants: &mut [EnumVariantOutput]) {
+    let strict_key_universe = variants
+        .iter()
+        .filter_map(|variant| variant.strict_keys.as_ref())
+        .flat_map(|keys| keys.iter().cloned())
+        .collect::<BTreeSet<_>>();
+
+    if strict_key_universe.len() < 2 {
+        return;
+    }
+
+    for variant in variants {
+        let Some(keys) = variant.strict_keys.as_ref() else {
+            continue;
+        };
+
+        let missing_keys = strict_key_universe
+            .iter()
+            .filter(|key| !keys.contains(*key))
+            .map(|key| format!("{key}?: {NEVER}"))
+            .collect::<Vec<_>>();
+
+        if missing_keys.is_empty() {
+            continue;
+        }
+
+        variant.value = format!("({}) & {{ {} }}", variant.value, missing_keys.join("; "));
+    }
+}
+
 pub(crate) fn enum_datatype(
     ctx: ExportContext,
     e: &Enum,
@@ -613,103 +670,136 @@ pub(crate) fn enum_datatype(
 
     let repr = specta_serde::get_enum_repr(e.attributes());
 
-    let mut variants = e
+    let filtered_variants = e
         .variants()
         .iter()
         .filter(|(_, variant)| !variant.skip())
+        .collect::<Vec<_>>();
+
+    let mut rendered_variants = filtered_variants
+        .iter()
         .map(|(variant_name, variant)| {
-            Ok(inner_comments(
-                variant.deprecated(),
-                variant.docs(),
-                match &repr {
-                    // For External and Untagged, handle as before
-                    specta_serde::EnumRepr::External => match &variant.fields() {
-                        Fields::Unit => {
-                            let sanitised_name = sanitise_key(variant_name.clone(), true);
-                            sanitised_name.to_string()
-                        }
-                        _ => {
-                            let ts_values = enum_variant_datatype(
-                                ctx.with(PathItem::Variant(variant_name.clone())),
-                                types,
-                                variant_name.clone(),
-                                variant,
-                                prefix,
-                                generics,
-                            )?;
-                            let sanitised_name = sanitise_key(variant_name.clone(), false);
-
-                            match ts_values {
-                                Some(ts_values) => {
-                                    format!("{{ {sanitised_name}: {ts_values} }}")
-                                }
-                                None => sanitise_key(variant_name.clone(), true).to_string(),
-                            }
-                        }
+            Ok(match &repr {
+                // For External and Untagged, handle as before
+                specta_serde::EnumRepr::External => match &variant.fields() {
+                    Fields::Unit => EnumVariantOutput {
+                        value: sanitise_key(variant_name.clone(), true).to_string(),
+                        strict_keys: None,
                     },
-                    specta_serde::EnumRepr::Untagged => match &variant.fields() {
-                        Fields::Unit => NULL.to_string(),
-                        _ => {
-                            let ts_values = enum_variant_datatype(
-                                ctx.with(PathItem::Variant(variant_name.clone())),
-                                types,
-                                variant_name.clone(),
-                                variant,
-                                prefix,
-                                generics,
-                            )?;
+                    _ => {
+                        let ts_values = enum_variant_datatype(
+                            ctx.with(PathItem::Variant(variant_name.clone())),
+                            types,
+                            variant_name.clone(),
+                            variant,
+                            prefix,
+                            generics,
+                        )?;
+                        let sanitised_name = sanitise_key(variant_name.clone(), false);
 
-                            ts_values.unwrap_or_else(|| "never".to_string())
+                        match ts_values {
+                            Some(ts_values) => EnumVariantOutput {
+                                value: format!("{{ {sanitised_name}: {ts_values} }}"),
+                                strict_keys: Some(
+                                    [sanitised_name.to_string()].into_iter().collect(),
+                                ),
+                            },
+                            None => EnumVariantOutput {
+                                value: sanitise_key(variant_name.clone(), true).to_string(),
+                                strict_keys: None,
+                            },
                         }
+                    }
+                },
+                specta_serde::EnumRepr::Untagged => match &variant.fields() {
+                    Fields::Unit => EnumVariantOutput {
+                        value: NULL.to_string(),
+                        strict_keys: None,
                     },
-                    specta_serde::EnumRepr::String { .. } => {
-                        let sanitised_name = sanitise_key(variant_name.clone(), true);
-                        sanitised_name.to_string()
-                    }
-                    specta_serde::EnumRepr::Internal { tag } => {
-                        let payload = match variant.fields() {
-                            Fields::Unit => None,
-                            _ => Some(enum_variant_datatype(
-                                ctx.with(PathItem::Variant(variant_name.clone())),
-                                types,
-                                variant_name.clone(),
-                                variant,
-                                prefix,
-                                generics,
-                            )?),
-                        }
-                        .flatten();
+                    _ => {
+                        let ts_values = enum_variant_datatype(
+                            ctx.with(PathItem::Variant(variant_name.clone())),
+                            types,
+                            variant_name.clone(),
+                            variant,
+                            prefix,
+                            generics,
+                        )?;
 
-                        render_internal_variant(tag.clone(), variant_name.clone(), payload)
-                    }
-                    specta_serde::EnumRepr::Adjacent { tag, content } => {
-                        let payload = match variant.fields() {
-                            Fields::Unit => None,
-                            _ => Some(enum_variant_datatype(
-                                ctx.with(PathItem::Variant(variant_name.clone())),
-                                types,
-                                variant_name.clone(),
-                                variant,
-                                prefix,
-                                generics,
-                            )?),
+                        EnumVariantOutput {
+                            value: ts_values.unwrap_or_else(|| NEVER.to_string()),
+                            strict_keys: untagged_strict_keys(variant),
                         }
-                        .flatten();
+                    }
+                },
+                specta_serde::EnumRepr::String { .. } => EnumVariantOutput {
+                    value: sanitise_key(variant_name.clone(), true).to_string(),
+                    strict_keys: None,
+                },
+                specta_serde::EnumRepr::Internal { tag } => {
+                    let payload = match variant.fields() {
+                        Fields::Unit => None,
+                        _ => Some(enum_variant_datatype(
+                            ctx.with(PathItem::Variant(variant_name.clone())),
+                            types,
+                            variant_name.clone(),
+                            variant,
+                            prefix,
+                            generics,
+                        )?),
+                    }
+                    .flatten();
 
-                        render_adjacent_variant(
+                    EnumVariantOutput {
+                        value: render_internal_variant(tag.clone(), variant_name.clone(), payload),
+                        strict_keys: None,
+                    }
+                }
+                specta_serde::EnumRepr::Adjacent { tag, content } => {
+                    let payload = match variant.fields() {
+                        Fields::Unit => None,
+                        _ => Some(enum_variant_datatype(
+                            ctx.with(PathItem::Variant(variant_name.clone())),
+                            types,
+                            variant_name.clone(),
+                            variant,
+                            prefix,
+                            generics,
+                        )?),
+                    }
+                    .flatten();
+
+                    EnumVariantOutput {
+                        value: render_adjacent_variant(
                             tag.clone(),
                             content.clone(),
                             variant_name.clone(),
                             payload,
-                        )
+                        ),
+                        strict_keys: None,
                     }
-                },
+                }
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    strictify_enum_variants(&mut rendered_variants);
+
+    let mut variants = filtered_variants
+        .into_iter()
+        .zip(rendered_variants)
+        .map(|((_, variant), rendered)| {
+            inner_comments(
+                variant.deprecated(),
+                variant.docs(),
+                rendered.value,
                 true,
                 prefix,
                 !ctx.cfg.jsdoc,
-            ))
+            )
         })
-        .collect::<Result<Vec<_>>>()?;
+        .collect::<Vec<_>>();
+
     let mut seen = BTreeSet::new();
     variants.retain(|variant| seen.insert(variant.clone()));
 
