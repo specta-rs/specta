@@ -2,11 +2,18 @@ use std::fmt;
 
 use specta::{
     Type, TypeCollection,
-    datatype::{DataType, Function, FunctionReturnType},
+    datatype::{DataType, Function},
     function::{self, fn_datatype},
     specta,
 };
 use specta_typescript::{Typescript, primitives};
+
+fn render_datatype(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Option<String> {
+    match dt {
+        DataType::Reference(r) => primitives::reference(ts, types, r).ok(),
+        dt => primitives::inline(ts, types, dt).ok(),
+    }
+}
 
 /// Multiline
 /// Docs
@@ -181,25 +188,7 @@ fn test_function_exporting() {
         );
         insta::assert_snapshot!(
             def.result()
-                .and_then(|result| match result {
-                    FunctionReturnType::Value(dt) => match dt {
-                        DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                        dt => primitives::inline(&ts, &types, dt).ok(),
-                    }
-                    FunctionReturnType::Result(ok, err) => {
-                        let ok_str = match ok {
-                            DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                            dt => primitives::inline(&ts, &types, dt).ok(),
-                        }?;
-                        let err_str = match err {
-                            DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                            dt => primitives::inline(&ts, &types, dt).ok(),
-                        }?;
-                        let mut variants = vec![ok_str, err_str];
-                        variants.dedup();
-                        Some(variants.join(" | "))
-                    }
-                })
+                .and_then(|result| render_datatype(&ts, &types, result))
                 .as_deref()
                 .unwrap_or("None"),
             @"number"
@@ -239,25 +228,7 @@ fn test_function_exporting() {
         );
         insta::assert_snapshot!(
             def.result()
-                .and_then(|result| match result {
-                    FunctionReturnType::Value(dt) => match dt {
-                        DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                        dt => primitives::inline(&ts, &types, dt).ok(),
-                    }
-                    FunctionReturnType::Result(ok, err) => {
-                        let ok_str = match ok {
-                            DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                            dt => primitives::inline(&ts, &types, dt).ok(),
-                        }?;
-                        let err_str = match err {
-                            DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                            dt => primitives::inline(&ts, &types, dt).ok(),
-                        }?;
-                        let mut variants = vec![ok_str, err_str];
-                        variants.dedup();
-                        Some(variants.join(" | "))
-                    }
-                })
+                .and_then(|result| render_datatype(&ts, &types, result))
                 .as_deref()
                 .unwrap_or("None"),
             @"number"
@@ -307,28 +278,10 @@ fn test_function_exporting() {
         insta::assert_snapshot!(def.args().len(), @"0");
         insta::assert_snapshot!(
             def.result()
-                .and_then(|result| match result {
-                    FunctionReturnType::Value(dt) => match dt {
-                        DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                        dt => primitives::inline(&ts, &types, dt).ok(),
-                    }
-                    FunctionReturnType::Result(ok, err) => {
-                        let ok_str = match ok {
-                            DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                            dt => primitives::inline(&ts, &types, dt).ok(),
-                        }?;
-                        let err_str = match err {
-                            DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                            dt => primitives::inline(&ts, &types, dt).ok(),
-                        }?;
-                        let mut variants = vec![ok_str, err_str];
-                        variants.dedup();
-                        Some(variants.join(" | "))
-                    }
-                })
+                .and_then(|result| render_datatype(&ts, &types, result))
                 .as_deref()
                 .unwrap_or("None"),
-            @"number"
+            @"{ Ok: number } | { Err: number }"
         );
     }
 
@@ -341,28 +294,10 @@ fn test_function_exporting() {
         insta::assert_snapshot!(def.args().len(), @"0");
         insta::assert_snapshot!(
             def.result()
-                .and_then(|result| match result {
-                    FunctionReturnType::Value(dt) => match dt {
-                        DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                        dt => primitives::inline(&ts, &types, dt).ok(),
-                    }
-                    FunctionReturnType::Result(ok, err) => {
-                        let ok_str = match ok {
-                            DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                            dt => primitives::inline(&ts, &types, dt).ok(),
-                        }?;
-                        let err_str = match err {
-                            DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                            dt => primitives::inline(&ts, &types, dt).ok(),
-                        }?;
-                        let mut variants = vec![ok_str, err_str];
-                        variants.dedup();
-                        Some(variants.join(" | "))
-                    }
-                })
+                .and_then(|result| render_datatype(&ts, &types, result))
                 .as_deref()
                 .unwrap_or("None"),
-            @"string | number"
+            @"{ Ok: string } | { Err: number }"
         );
     }
 

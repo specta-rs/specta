@@ -244,21 +244,20 @@ impl<T> Type for std::marker::PhantomData<T> {
 
 impl<T: Type, E: Type> Type for Result<T, E> {
     fn definition(types: &mut TypeCollection) -> DataType {
+        let mut ok_variant = EnumVariant::unit();
+        ok_variant.set_fields(internal::construct::fields_unnamed(
+            vec![Field::new(T::definition(types))],
+            vec![],
+        ));
+
+        let mut err_variant = EnumVariant::unit();
+        err_variant.set_fields(internal::construct::fields_unnamed(
+            vec![Field::new(E::definition(types))],
+            vec![],
+        ));
+
         DataType::Enum(Enum {
-            variants: vec![
-                (
-                    "Ok".into(),
-                    EnumVariant::unnamed()
-                        .field(Field::new(T::definition(types)))
-                        .build(),
-                ),
-                (
-                    "Err".into(),
-                    EnumVariant::unnamed()
-                        .field(Field::new(E::definition(types)))
-                        .build(),
-                ),
-            ],
+            variants: vec![("Ok".into(), ok_variant), ("Err".into(), err_variant)],
             attributes: vec![],
         })
     }

@@ -3,13 +3,12 @@
 //! TODO: Docs. Talk about how Specta doesn't export functions but it helps you to.
 
 mod arg;
-// mod result;
+mod result;
 mod specta_fn;
 
 pub use arg::FunctionArg;
-// pub use result::FunctionResult;
-// #[doc(hidden)]
-// pub use result::{FunctionResultFutureMarker, FunctionResultMarker};
+#[doc(hidden)]
+pub use result::{FunctionFutureMarker, FunctionResult, FunctionValueMarker};
 pub(crate) use specta_fn::SpectaFn;
 
 /// Returns a [`Function`](crate::datatype::Function) for a given function that has been annotated with
@@ -30,7 +29,7 @@ pub(crate) use specta_fn::SpectaFn;
 ///
 ///     assert_eq!(typ.name(), "some_function");
 ///     assert_eq!(typ.args().len(), 2);
-///     assert_eq!(typ.result(), Some(&FunctionReturnType::Value(DataType::Primitive(Primitive::bool))));
+///     assert_eq!(typ.result(), Some(&DataType::Primitive(Primitive::bool)));
 /// }
 /// ```
 ///

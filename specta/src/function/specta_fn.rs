@@ -1,11 +1,11 @@
 use std::borrow::Cow;
 
 use crate::{
-    Type, TypeCollection,
+    TypeCollection,
     datatype::{DeprecatedType, Function},
 };
 
-use super::FunctionArg;
+use super::{FunctionArg, FunctionResult};
 
 /// Implemented by functions that can be annotated with [`specta`](crate::specta).
 ///
@@ -23,7 +23,10 @@ pub trait SpectaFn<TMarker> {
     ) -> Function;
 }
 
-impl<TResult: Type> SpectaFn<()> for fn() -> TResult {
+impl<TResult, TResultMarker> SpectaFn<TResultMarker> for fn() -> TResult
+where
+    TResult: FunctionResult<TResultMarker>,
+{
     fn to_datatype(
         asyncness: bool,
         name: Cow<'static, str>,
@@ -37,7 +40,7 @@ impl<TResult: Type> SpectaFn<()> for fn() -> TResult {
             asyncness,
             name,
             args: vec![],
-            result: (!no_return_type).then(|| TResult::definition(types)),
+            result: (!no_return_type).then(|| TResult::to_datatype(types)),
             docs,
             deprecated,
         }
@@ -48,9 +51,13 @@ macro_rules! impl_typed_command {
     ( impl $($i:ident),* ) => {
        paste::paste! {
             impl<
-                TResult: Type,
+                TResult,
+                TResultMarker,
                 $($i: FunctionArg),*
-            > SpectaFn<()> for fn($($i),*) -> TResult {
+            > SpectaFn<TResultMarker> for fn($($i),*) -> TResult
+            where
+                TResult: FunctionResult<TResultMarker>,
+            {
                 fn to_datatype(
                     asyncness: bool,
                     name: Cow<'static, str>,
@@ -78,7 +85,7 @@ macro_rules! impl_typed_command {
                             .into_iter()
                             .filter_map(|v| v)
                             .collect::<Vec<_>>(),
-                        result: (!no_return_type).then(|| TResult::definition(types)),
+                        result: (!no_return_type).then(|| TResult::to_datatype(types)),
                     }
                 }
             }
