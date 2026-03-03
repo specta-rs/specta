@@ -34,54 +34,18 @@ macro_rules! _impl_passthrough {
     };
 }
 
-macro_rules! _impl_ndt_as_item {
-    ( $ty:ident<$($generic:ident),*> where { $($bounds:tt)* } as $ty2:ty $(; where $($where:tt)* )? ) => {
-        impl_ndt!(
-            impl<$($generic),*> Type for $ty<$($generic),*> where { $($generic: Type,)* $($bounds)* } {
-                inline: true;
-                build: |types, ndt| {
-                    ndt.inner = <$ty2 as Type>::definition(types);
-                }
-            }
-        );
-    };
-    ( $ty:ident<$($generic:ident),*> as $ty2:ty $(; where $($where:tt)* )? ) => {
-        impl_ndt!(
-            impl<$($generic),*> Type for $ty<$($generic),*> where { $($generic: Type),* } {
-                inline: true;
-                build: |types, ndt| {
-                    ndt.inner = <$ty2 as Type>::definition(types);
-                }
-            }
-        );
-    };
-    ( $ty:ident where { $($bounds:tt)* } as $ty2:ty $(; where $($where:tt)* )? ) => {
-        impl_ndt!(
-            impl Type for $ty where { $($bounds)* } {
-                inline: true;
-                build: |types, ndt| {
-                    ndt.inner = <$ty2 as Type>::definition(types);
-                }
-            }
-        );
-    };
-    ( $ty:ident as $ty2:ty $(; where $($where:tt)* )? ) => {
-        impl_ndt!(
-            impl Type for $ty {
-                inline: true;
-                build: |types, ndt| {
-                    ndt.inner = <$ty2 as Type>::definition(types);
-                }
-            }
-        );
-    };
-}
-
 macro_rules! _impl_ndt_as {
-    ( $($ty:ident $(<$($generic:ident),*>)? $( where { $($bounds:tt)* } )? as $ty2:ty $(; where $($where:tt)* )? )* ) => {
-        $(
-            $crate::r#type::macros::impl_ndt_as_item!($ty $(<$($generic),*>)? $( where { $($bounds)* } )? as $ty2 $(; where $($where)* )?);
-        )*
+    ( $($ty:ident $(<$($generic:ident),*>)? $( where { $($bounds:tt)* } )? as $ty2:ty )* ) => {
+        impl_ndt!(
+            $(
+                impl$(<$($generic),*>)? Type for $ty $(<$($generic),*>)? where { (): Sized $(, $($generic: Type),*)? $(, $($bounds)*)? } {
+                    inline: true;
+                    build: |types, ndt| {
+                        ndt.inner = <$ty2 as Type>::definition(types);
+                    }
+                }
+            )*
+        );
     };
 }
 
@@ -119,7 +83,6 @@ macro_rules! _impl_ndt {
 
 pub(crate) use _impl_ndt as impl_ndt;
 pub(crate) use _impl_ndt_as as impl_ndt_as;
-pub(crate) use _impl_ndt_as_item as impl_ndt_as_item;
 pub(crate) use _impl_passthrough as impl_passthrough;
 pub(crate) use _impl_primitives as impl_primitives;
 pub(crate) use _impl_tuple as impl_tuple;
