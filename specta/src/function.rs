@@ -3,13 +3,13 @@
 //! TODO: Docs. Talk about how Specta doesn't export functions but it helps you to.
 
 mod arg;
-mod result;
+// mod result;
 mod specta_fn;
 
 pub use arg::FunctionArg;
-pub use result::FunctionResult;
-#[doc(hidden)]
-pub use result::{FunctionResultFutureMarker, FunctionResultMarker};
+// pub use result::FunctionResult;
+// #[doc(hidden)]
+// pub use result::{FunctionResultFutureMarker, FunctionResultMarker};
 pub(crate) use specta_fn::SpectaFn;
 
 /// Returns a [`Function`](crate::datatype::Function) for a given function that has been annotated with

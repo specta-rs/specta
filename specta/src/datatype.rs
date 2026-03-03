@@ -20,7 +20,7 @@ pub use r#enum::{Enum, EnumVariant};
 pub use fields::{
     Field, Fields, NamedFields, NonSkipField, UnnamedFields, skip_fields, skip_fields_named,
 };
-pub use function::{Function, FunctionReturnType};
+pub use function::Function;
 pub use generic::{ConstGenericPlaceholder, Generic, GenericPlaceholder};
 pub use list::List;
 pub use map::Map;

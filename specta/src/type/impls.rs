@@ -241,3 +241,9 @@ impl<T> Type for std::marker::PhantomData<T> {
         <() as Type>::definition(types)
     }
 }
+
+impl<T: Type, E: Type> Type for Result<T, E> {
+    fn definition(_types: &mut TypeCollection) -> DataType {
+        todo!()
+    }
+}

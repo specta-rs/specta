@@ -9,8 +9,8 @@ use std::{
 use specta::{
     TypeCollection,
     datatype::{
-        DataType, DeprecatedType, Enum, EnumVariant, Fields, FunctionReturnType, Generic,
-        NonSkipField, Reference, Struct, Tuple, skip_fields, skip_fields_named,
+        DataType, DeprecatedType, Enum, EnumVariant, Fields, Generic, NonSkipField, Reference,
+        Struct, Tuple, skip_fields, skip_fields_named,
     },
 };
 
@@ -130,45 +130,11 @@ fn inner_comments(
 
 pub(crate) fn datatype_inner(
     ctx: ExportContext,
-    typ: &FunctionReturnType,
+    typ: &DataType,
     types: &TypeCollection,
     s: &mut String,
     generics: &[(Generic, DataType)],
 ) -> Result<()> {
-    let typ = match typ {
-        FunctionReturnType::Value(t) => t,
-        FunctionReturnType::Result(t, e) => {
-            let mut variants = vec![
-                {
-                    let mut v = String::new();
-                    datatype_inner(
-                        ctx.clone(),
-                        &FunctionReturnType::Value(t.clone()),
-                        types,
-                        &mut v,
-                        generics,
-                    )?;
-                    v
-                },
-                {
-                    let mut v = String::new();
-                    datatype_inner(
-                        ctx,
-                        &FunctionReturnType::Value(e.clone()),
-                        types,
-                        &mut v,
-                        generics,
-                    )?;
-                    v
-                },
-            ];
-            let mut seen = BTreeSet::new();
-            variants.retain(|variant| seen.insert(variant.clone()));
-            s.push_str(&variants.join(" | "));
-            return Ok(());
-        }
-    };
-
     crate::primitives::datatype(s, ctx.cfg, types, typ, vec![], None, "", generics)
 }
 
@@ -255,14 +221,7 @@ pub(crate) fn tuple_datatype(
             tys.iter()
                 .map(|v| {
                     let mut s = String::new();
-                    datatype_inner(
-                        ctx.clone(),
-                        &FunctionReturnType::Value(v.clone()),
-                        types,
-                        &mut s,
-                        generics,
-                    )
-                    .map(|_| s)
+                    datatype_inner(ctx.clone(), v, types, &mut s, generics).map(|_| s)
                 })
                 .collect::<Result<Vec<_>>>()?
                 .join(", ")
