@@ -83,7 +83,7 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
             schema_data,
             schema_kind: SchemaKind::Type(Type::Number(NumberType::default())), // TODO: Configure number type. Ts: `bigint`
         }),
-        primitive_def!(String char) => ReferenceOr::Item(Schema {
+        primitive_def!(str char) => ReferenceOr::Item(Schema {
             schema_data,
             schema_kind: SchemaKind::Type(Type::String(StringType::default())), // TODO: Configure string type. Ts: `string`
         }),

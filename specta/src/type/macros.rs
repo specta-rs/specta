@@ -35,40 +35,40 @@ macro_rules! _impl_passthrough {
 }
 
 macro_rules! _impl_ndt_as {
-    ( $($ty:ident <$($generic:ident),*> as $ty2:ident)* ) => {
+    ( $($ty:ident $(<$($generic:ident),*>)? $( where { $($bounds:tt)* } )? as $ty2:ty $(; where $($where:tt)* )?)* ) => {
         impl_ndt!(
             $(
-                impl <$($generic : Type),*> Type for $ty <$($generic),*> {
+                impl <$($( $generic ),*)?> Type for $ty $(<$($generic),*>)? $(where { $($bounds)* })? {
                     inline: true;
                     build: |types, ndt| {
-                        ndt.inner = $ty2::definition(types);
+                        ndt.inner = <$ty2 as Type>::definition(types);
                     }
                 }
             )*
-        )
+        );
     };
 }
 
 macro_rules! _impl_ndt {
     (
         $(
-            impl<$($generic:ident : $($bound:ident)?),*> Type for $ty:ty {
+            impl $(<$($generic:ident),*>)? Type for $ty:ty $( where { $($bounds:tt)* } )? {
                 inline: $inline:expr;
                 build: |$types:ident, $ndt:ident| $build:block
             }
         )+
     ) => {
         $(
-            impl<$($generic : $($bound)?),*> Type for $ty {
+            impl<$($($generic: Type),*)?> Type for $ty $(where $($bounds)*)? {
                 fn definition(types: &mut TypeCollection) -> DataType {
                     // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
                     static SENTINEL: &str = concat!(module_path!(), "::", stringify!($ty));
                     println!("TODO: {SENTINEL:?}"); // TODO
                     DataType::Reference(datatype::NamedDataType::init_with_sentinel(
                         vec![
-                            $(
+                            $($(
                                 (datatype::Generic::new(stringify!($generic)), <$generic as Type>::definition(types))
-                            ),*
+                            ),*)?
                         ],
                         $inline,
                         types,
@@ -80,45 +80,6 @@ macro_rules! _impl_ndt {
         )+
     };
 }
-
-// TODO: CLEANUP
-
-// macro_rules! _impl_as {
-//     ($($ty:path as $tty:ty)+) => {$(
-//         impl Type for $ty {
-//             fn definition(types: &mut TypeCollection) -> DataType {
-//                 <$tty as Type>::definition(types)
-//             }
-//         }
-//     )+};
-// }
-
-// macro_rules! _impl_for_list {
-//     ($($unique:expr; $ty:path)+) => {$(
-//         impl<T: Type> Type for $ty {
-//             fn definition(types: &mut TypeCollection) -> DataType {
-//                 let mut l = List::new(
-//                     <T as Type>::definition(types),
-//                 );
-//                 l.set_unique($unique);
-//                 DataType::List(l)
-//             }
-//         }
-//     )+};
-// }
-
-// macro_rules! _impl_for_map {
-//     ($ty:path) => {
-//         impl<K: Type, V: Type> Type for $ty {
-//             fn definition(types: &mut TypeCollection) -> DataType {
-//                 DataType::Map(crate::datatype::Map::new(
-//                     K::definition(types),
-//                     V::definition(types),
-//                 ))
-//             }
-//         }
-//     };
-// }
 
 pub(crate) use _impl_ndt as impl_ndt;
 pub(crate) use _impl_ndt_as as impl_ndt_as;

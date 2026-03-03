@@ -1,371 +1,395 @@
-// #![allow(unused)]
+#![allow(unused)]
 
-// //! The plan is to try and move these into the ecosystem for the v2 release.
-// use super::macros::*;
-// use crate::{Type, TypeCollection, datatype::*};
+//! The plan is to try and move these into the ecosystem for the v2 release.
+use super::macros::{impl_ndt, impl_ndt_as};
+use crate::{
+    Type, TypeCollection,
+    datatype::{
+        self, Attribute, AttributeMeta, AttributeNestedMeta, DataType, Enum, EnumVariant, Field,
+        Fields, NamedFields, Primitive, Struct,
+    },
+    r#type::impls::*,
+};
 
-// use std::borrow::Cow;
+use std::borrow::Cow;
 
-// #[cfg(feature = "indexmap")]
-// const _: () = {
-//     impl_for_list!(true; indexmap::IndexSet<T>);
-//     impl_for_map!(indexmap::IndexMap<K, V>);
-// };
+#[cfg(feature = "indexmap")]
+const _: () = {
+    use indexmap::{IndexMap, IndexSet};
+    impl_ndt_as!(
+        IndexSet<T> as PrimitiveSet<T>
+        IndexMap<K, V> as PrimitiveMap<K, V>
+    );
+};
 
-// #[cfg(feature = "bytes")]
-// const _: () = {
-//     use bytes::{Bytes, BytesMut};
+#[cfg(feature = "bytes")]
+const _: () = {
+    use bytes::{Bytes, BytesMut};
+    impl_ndt_as!(
+        Bytes as [u8]
+        BytesMut as [u8]
+    );
+};
 
-//     impl_as!(
-//         Bytes as Vec<u8>
-//         BytesMut as Vec<u8>
-//     );
-// };
+#[cfg(feature = "serde_json")]
+const _: () = {
+    use serde_json::{Map, Number, Value};
 
-// #[cfg(feature = "serde_json")]
-// const _: () = {
-//     use serde_json::{Map, Number, Value};
+    impl_ndt_as!(
+        Map<K, V> as PrimitiveMap<K, V>
+    );
 
-//     impl_for_map!(Map<K, V>);
+    impl_ndt!(
+        impl Type for Value {
+            inline: true;
+            build: |types, ndt| {
+                ndt.inner = DataType::Enum(Enum {
+                    variants: vec![
+                        ("Null".into(), EnumVariant::unit()),
+                        (
+                            "Bool".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(bool::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Number".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(Number::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "String".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(String::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Array".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(Vec::<Value>::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Object".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(Map::<String, Value>::definition(types)))
+                                .build(),
+                        ),
+                    ],
+                    attributes: vec![],
+                })
+            }
+        }
 
-//     impl Type for Value {
-//         fn definition(types: &mut TypeCollection) -> DataType {
-//             DataType::Enum(Enum {
-//                 variants: vec![
-//                     ("Null".into(), EnumVariant::unit()),
-//                     (
-//                         "Bool".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(bool::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "Number".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(Number::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "String".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(String::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "Array".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(Vec::<Value>::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "Object".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(Map::<String, Value>::definition(types)))
-//                             .build(),
-//                     ),
-//                 ],
-//                 attributes: vec![],
-//             })
-//         }
-//     }
+        impl Type for Number {
+            inline: true;
+            build: |types, ndt| {
+                ndt.inner = DataType::Enum(Enum {
+                    variants: vec![
+                        (
+                            "f64".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(DataType::Primitive(Primitive::f64)))
+                                .build(),
+                        ),
+                        (
+                            "i64".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(DataType::Primitive(Primitive::i64)))
+                                .build(),
+                        ),
+                        (
+                            "u64".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(DataType::Primitive(Primitive::u64)))
+                                .build(),
+                        ),
+                    ],
+                    attributes: vec![Attribute {
+                        path: String::from("serde"),
+                        kind: AttributeMeta::List(vec![AttributeNestedMeta::Meta(AttributeMeta::Path(
+                            String::from("untagged"),
+                        ))]),
+                    }],
+                });
+            }
+        }
+    );
+};
 
-//     impl Type for Number {
-//         fn definition(_: &mut TypeCollection) -> DataType {
-//             DataType::Enum(Enum {
-//                 variants: vec![
-//                     (
-//                         "f64".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(DataType::Primitive(Primitive::f64)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "i64".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(DataType::Primitive(Primitive::i64)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "u64".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(DataType::Primitive(Primitive::u64)))
-//                             .build(),
-//                     ),
-//                 ],
-//                 attributes: vec![Attribute {
-//                     path: String::from("serde"),
-//                     kind: AttributeMeta::List(vec![AttributeNestedMeta::Meta(AttributeMeta::Path(
-//                         String::from("untagged"),
-//                     ))]),
-//                 }],
-//             })
-//         }
-//     }
-// };
+#[cfg(feature = "serde_yaml")]
+const _: () = {
+    use serde_yaml::{Mapping, Number, Value, value::TaggedValue};
 
-// #[cfg(feature = "serde_yaml")]
-// const _: () = {
-//     use serde_yaml::{Number, Value, value::TaggedValue};
+    impl_ndt_as!(
+        Mapping as PrimitiveMap<serde_yaml::Value, serde_yaml::Value>
+        TaggedValue as PrimitiveMap<String, serde_yaml::Value>
+    );
 
-//     impl Type for serde_yaml::Mapping {
-//         fn definition(types: &mut TypeCollection) -> DataType {
-//             DataType::Map(crate::datatype::Map::new(
-//                 serde_yaml::Value::definition(types),
-//                 serde_yaml::Value::definition(types),
-//             ))
-//         }
-//     }
+    impl_ndt!(
+        impl Type for Value {
+            inline: true;
+            build: |types, ndt| {
+                ndt.inner = DataType::Enum(Enum {
+                    variants: vec![
+                        ("Null".into(), EnumVariant::unit()),
+                        (
+                            "Bool".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(bool::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Number".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(Number::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "String".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(String::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Sequence".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(Vec::<Value>::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Mapping".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(std::collections::BTreeMap::<
+                                    serde_yaml::Value,
+                                    serde_yaml::Value,
+                                >::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Tagged".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(Box::<TaggedValue>::definition(types)))
+                                .build(),
+                        ),
+                    ],
+                    attributes: vec![],
+                })
+            }
+        }
 
-//     impl Type for serde_yaml::value::TaggedValue {
-//         fn definition(types: &mut TypeCollection) -> DataType {
-//             std::collections::HashMap::<String, serde_yaml::Value>::definition(types)
-//         }
-//     }
+        impl Type for serde_yaml::Number {
+            inline: true;
+            build: |types, ndt| {
+                ndt.inner = DataType::Enum(Enum {
+                    variants: vec![
+                        (
+                            "f64".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(DataType::Primitive(Primitive::f64)))
+                                .build(),
+                        ),
+                        (
+                            "i64".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(DataType::Primitive(Primitive::i64)))
+                                .build(),
+                        ),
+                        (
+                            "u64".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(DataType::Primitive(Primitive::u64)))
+                                .build(),
+                        ),
+                    ],
+                    attributes: vec![],
+                })
+            }
+        }
+    );
+};
 
-//     impl Type for Value {
-//         fn definition(types: &mut TypeCollection) -> DataType {
-//             DataType::Enum(Enum {
-//                 variants: vec![
-//                     ("Null".into(), EnumVariant::unit()),
-//                     (
-//                         "Bool".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(bool::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "Number".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(Number::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "String".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(String::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "Sequence".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(Vec::<Value>::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "Mapping".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(std::collections::BTreeMap::<
-//                                 serde_yaml::Value,
-//                                 serde_yaml::Value,
-//                             >::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "Tagged".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(Box::<TaggedValue>::definition(types)))
-//                             .build(),
-//                     ),
-//                 ],
-//                 attributes: vec![],
-//             })
-//         }
-//     }
+#[cfg(feature = "toml")]
+const _: () = {
+    use toml::{Value, map::Map, value};
 
-//     impl Type for serde_yaml::Number {
-//         fn definition(_: &mut TypeCollection) -> DataType {
-//             DataType::Enum(Enum {
-//                 variants: vec![
-//                     (
-//                         "f64".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(DataType::Primitive(Primitive::f64)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "i64".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(DataType::Primitive(Primitive::i64)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "u64".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(DataType::Primitive(Primitive::u64)))
-//                             .build(),
-//                     ),
-//                 ],
-//                 attributes: vec![],
-//             })
-//         }
-//     }
-// };
+    impl_ndt_as!(Map<K, V> as PrimitiveMap<K, V>);
 
-// #[cfg(feature = "toml")]
-// const _: () = {
-//     use toml::{Value, value};
+    impl_ndt!(
+        impl Type for value::Datetime {
+            inline: true;
+            build: |types, ndt| {
+                ndt.inner = DataType::Struct(Struct {
+                    fields: Fields::Named(NamedFields {
+                        fields: vec![(
+                            "v".into(),
+                            Field {
+                                optional: false,
 
-//     impl_for_map!(toml::map::Map<K, V>);
+                                inline: false,
+                                deprecated: None,
+                                docs: Cow::Borrowed(""),
+                                ty: Some(String::definition(types)),
+                                attributes: Vec::new(),
+                            },
+                        )],
+                        attributes: Vec::new(),
+                    }),
+                    attributes: Vec::new(),
+                })
+            }
+        }
 
-//     impl Type for value::Datetime {
-//         fn definition(types: &mut TypeCollection) -> DataType {
-//             DataType::Struct(Struct {
-//                 fields: Fields::Named(NamedFields {
-//                     fields: vec![(
-//                         "v".into(),
-//                         Field {
-//                             optional: false,
+        impl Type for Value {
+            inline: true;
+            build: |types, ndt| {
+                ndt.inner = DataType::Enum(Enum {
+                    variants: vec![
+                        (
+                            "String".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(String::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Integer".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(i64::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Float".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(f64::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Boolean".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(bool::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Datetime".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(value::Datetime::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Array".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(Vec::<Value>::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Table".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(
+                                    std::collections::BTreeMap::<String, Value>::definition(types),
+                                ))
+                                .build(),
+                        ),
+                    ],
+                    attributes: vec![],
+                })
+            }
+        }
+    );
+};
 
-//                             inline: false,
-//                             deprecated: None,
-//                             docs: Cow::Borrowed(""),
-//                             ty: Some(String::definition(types)),
-//                             attributes: Vec::new(),
-//                         },
-//                     )],
-//                     attributes: Vec::new(),
-//                 }),
-//                 attributes: Vec::new(),
-//             })
-//         }
-//     }
+#[cfg(feature = "ulid")]
+const _: () = {
+    use ulid::Ulid;
+    impl_ndt_as!(Ulid as str);
+};
 
-//     impl Type for Value {
-//         fn definition(types: &mut TypeCollection) -> DataType {
-//             DataType::Enum(Enum {
-//                 variants: vec![
-//                     (
-//                         "String".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(String::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "Integer".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(i64::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "Float".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(f64::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "Boolean".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(bool::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "Datetime".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(value::Datetime::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "Array".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(Vec::<Value>::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "Table".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(
-//                                 std::collections::BTreeMap::<String, Value>::definition(types),
-//                             ))
-//                             .build(),
-//                     ),
-//                 ],
-//                 attributes: vec![],
-//             })
-//         }
-//     }
-// };
+#[cfg(feature = "uuid")]
+const _: () = {
+    use uuid::{Uuid, fmt::Hyphenated};
+    impl_ndt_as!(
+        Uuid as str
+        Hyphenated as str
+    );
+};
 
-// #[cfg(feature = "ulid")]
-// impl_as!(ulid::Ulid as String);
+#[cfg(feature = "chrono")]
+const _: () = {
+    use chrono::{Date, DateTime, Duration, NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
 
-// #[cfg(feature = "uuid")]
+    impl_ndt_as!(
+        NaiveDateTime as str
+        NaiveDate as str
+        NaiveTime as str
+        Duration as str
+    );
+
+    // TODO: These are NDT's that shouldn't have `Type` added into generics
+
+    // impl<T: TimeZone> Type for DateTime<T> {
+    //     impl_passthrough!(str);
+    // }
+
+    // #[allow(deprecated)]
+    // impl<T: TimeZone> Type for Date<T> {
+    //     impl_passthrough!(str);
+    // }
+};
+
+#[cfg(feature = "time")]
+const _: () = {
+    use time::{Date, Duration, OffsetDateTime, PrimitiveDateTime, Time, Weekday};
+};
 // impl_as!(
-//     uuid::Uuid as String
-//     uuid::fmt::Hyphenated as String
-// );
-
-// #[cfg(feature = "chrono")]
-// const _: () = {
-//     use chrono::*;
-
-//     impl_as!(
-//         NaiveDateTime as String
-//         NaiveDate as String
-//         NaiveTime as String
-//         chrono::Duration as String
-//     );
-
-//     impl<T: TimeZone> Type for DateTime<T> {
-//         impl_passthrough!(String);
-//     }
-
-//     #[allow(deprecated)]
-//     impl<T: TimeZone> Type for Date<T> {
-//         impl_passthrough!(String);
-//     }
-// };
-
-// #[cfg(feature = "time")]
-// impl_as!(
-//     time::PrimitiveDateTime as String
-//     time::OffsetDateTime as String
-//     time::Date as String
-//     time::Time as String
-//     time::Duration as String
-//     time::Weekday as String
+//     time::PrimitiveDateTime as str
+//     time::OffsetDateTime as str
+//     time::Date as str
+//     time::Time as str
+//     time::Duration as str
+//     time::Weekday as str
 // );
 
 // #[cfg(feature = "jiff")]
 // impl_as!(
-//     jiff::Timestamp as String
-//     jiff::Zoned as String
-//     jiff::Span as String
-//     jiff::civil::Date as String
-//     jiff::civil::Time as String
-//     jiff::civil::DateTime as String
-//     jiff::tz::TimeZone as String
+//     jiff::Timestamp as str
+//     jiff::Zoned as str
+//     jiff::Span as str
+//     jiff::civil::Date as str
+//     jiff::civil::Time as str
+//     jiff::civil::DateTime as str
+//     jiff::tz::TimeZone as str
 // );
 
 // #[cfg(feature = "bigdecimal")]
-// impl_as!(bigdecimal::BigDecimal as String);
+// impl_as!(bigdecimal::BigDecimal as str);
 
 // // This assumes the `serde-with-str` feature is enabled. Check #26 for more info.
 // #[cfg(feature = "rust_decimal")]
-// impl_as!(rust_decimal::Decimal as String);
+// impl_as!(rust_decimal::Decimal as str);
 
 // #[cfg(feature = "ipnetwork")]
 // impl_as!(
-//     ipnetwork::IpNetwork as String
-//     ipnetwork::Ipv4Network as String
-//     ipnetwork::Ipv6Network as String
+//     ipnetwork::IpNetwork as str
+//     ipnetwork::Ipv4Network as str
+//     ipnetwork::Ipv6Network as str
 // );
 
 // #[cfg(feature = "mac_address")]
-// impl_as!(mac_address::MacAddress as String);
+// impl_as!(mac_address::MacAddress as str);
 
 // #[cfg(feature = "chrono")]
 // impl_as!(
-//     chrono::FixedOffset as String
-//     chrono::Utc as String
-//     chrono::Local as String
+//     chrono::FixedOffset as str
+//     chrono::Utc as str
+//     chrono::Local as str
 // );
 
 // #[cfg(feature = "bson")]
 // impl_as!(
-//     bson::oid::ObjectId as String
+//     bson::oid::ObjectId as str
 //     bson::Decimal128 as i128
-//     bson::DateTime as String
-//     bson::Uuid as String
+//     bson::DateTime as str
+//     bson::Uuid as str
 // );
 
 // // TODO: bson::bson
@@ -527,7 +551,7 @@
 // };
 
 // #[cfg(feature = "url")]
-// impl_as!(url::Url as String);
+// impl_as!(url::Url as str);
 
 // #[cfg(feature = "either")]
 // impl<L: Type, R: Type> Type for either::Either<L, R> {
@@ -649,10 +673,10 @@
 //         }
 //     }
 
-//     // Reduced KeyCode and Key to String to avoid redefining a quite large enum (for now)
+//     // Reduced KeyCode and Key to str to avoid redefining a quite large enum (for now)
 //     impl_as!(
-//         bevy_input::keyboard::KeyCode as String
-//         bevy_input::keyboard::Key as String
+//         bevy_input::keyboard::KeyCode as str
+//         bevy_input::keyboard::Key as str
 //     );
 
 //     impl Type for bevy_input::mouse::MouseButtonInput {
@@ -824,8 +848,8 @@
 
 // #[cfg(feature = "camino")]
 // impl_as!(
-//     camino::Utf8Path as String
-//     camino::Utf8PathBuf as String
+//     camino::Utf8Path as str
+//     camino::Utf8PathBuf as str
 // );
 
 // #[cfg(feature = "geojson")]
@@ -927,7 +951,7 @@
 //                     (
 //                         "String".into(),
 //                         EnumVariant::unnamed()
-//                             .field(Field::new(String::definition(types)))
+//                             .field(Field::new(str::definition(types)))
 //                             .build(),
 //                     ),
 //                     (
@@ -963,7 +987,7 @@
 //     #[specta(remote = tile::Value, crate = crate, collect = false)]
 //     #[allow(dead_code)]
 //     pub struct GeoZeroValue {
-//         pub string_value: Option<String>,
+//         pub string_value: Option<String>, // TODO: Use `str`?
 //         pub float_value: Option<f32>,
 //         pub double_value: Option<f64>,
 //         pub int_value: Option<i64>,
@@ -987,9 +1011,9 @@
 //     #[allow(dead_code)]
 //     pub struct GeoZeroLayer {
 //         pub version: u32,
-//         pub name: String,
+//         pub name: String, // TODO: Use `str`
 //         pub features: Vec<tile::Feature>,
-//         pub keys: Vec<String>,
+//         pub keys: Vec<String>, // TODO: Use `str`
 //         pub values: Vec<tile::Value>,
 //         pub extent: Option<u32>,
 //     }
