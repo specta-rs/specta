@@ -35,10 +35,10 @@ macro_rules! _impl_passthrough {
 }
 
 macro_rules! _impl_ndt_as {
-    ( $($ty:ident $(<$($generic:ident),*>)? $( where { $($bounds:tt)* } )? as $ty2:ty $(; where $($where:tt)* )?)* ) => {
+    ( $($ty:ident $(<$($generic:ident ),*>)? $( where { $($bounds:tt)* } )? as $ty2:ty $(; where $($where:tt)* )?)* ) => {
         impl_ndt!(
             $(
-                impl <$($( $generic ),*)?> Type for $ty $(<$($generic),*>)? $(where { $($bounds)* })? {
+                impl$(<$($generic : Type),*>)? Type for $ty $(<$($generic),*>)? $(where { $($bounds)* })? {
                     inline: true;
                     build: |types, ndt| {
                         ndt.inner = <$ty2 as Type>::definition(types);
@@ -52,14 +52,15 @@ macro_rules! _impl_ndt_as {
 macro_rules! _impl_ndt {
     (
         $(
-            impl $(<$($generic:ident),*>)? Type for $ty:ty $( where { $($bounds:tt)* } )? {
+            impl $(<$($generic:ident $(:)? $($bound:ident),* ),*>)? Type for $ty:ty $( where { $($bounds:tt)* } )? {
                 inline: $inline:expr;
                 build: |$types:ident, $ndt:ident| $build:block
             }
         )+
     ) => {
         $(
-            impl<$($($generic: Type),*)?> Type for $ty $(where $($bounds)*)? {
+            // : $($bound),*)?
+            impl<$($($generic),*)?> Type for $ty $(where $($bounds)*)? {
                 fn definition(types: &mut TypeCollection) -> DataType {
                     // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
                     static SENTINEL: &str = concat!(module_path!(), "::", stringify!($ty));
