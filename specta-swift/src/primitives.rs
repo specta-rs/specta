@@ -334,7 +334,7 @@ fn primitive_to_swift(primitive: &Primitive) -> Result<String> {
         Primitive::f64 => "Double".to_string(),
         Primitive::bool => "Bool".to_string(),
         Primitive::char => "Character".to_string(),
-        Primitive::String => "String".to_string(),
+        Primitive::str => "String".to_string(),
         Primitive::i128 | Primitive::u128 => {
             return Err(Error::UnsupportedType(
                 "Swift does not support 128-bit integers".to_string(),

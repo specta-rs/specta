@@ -32,7 +32,7 @@
 //! use specta::DataType;
 //! use specta_serde::{apply_to_dt, SerdeMode};
 //!
-//! let dt = DataType::Primitive(specta::datatype::Primitive::String);
+//! let dt = DataType::Primitive(specta::datatype::Primitive::str);
 //! let transformed = apply_to_dt(dt, SerdeMode::Serialize)?;
 //! ```
 //!
@@ -145,7 +145,7 @@ pub fn apply(types: &mut TypeCollection, mode: SerdeMode) -> Result<(), Error> {
 ///
 /// # Example
 /// ```ignore
-/// let dt = DataType::Primitive(Primitive::String);
+/// let dt = DataType::Primitive(Primitive::str);
 /// let transformed = specta_serde::apply_to_dt(dt, SerdeMode::Serialize)?;
 /// ```
 pub fn apply_to_dt(dt: DataType, mode: SerdeMode) -> Result<DataType, Error> {
@@ -303,7 +303,7 @@ fn is_valid_map_key(
             | Primitive::usize
             | Primitive::f32
             | Primitive::f64
-            | Primitive::String
+            | Primitive::str
             | Primitive::char,
         ) => Ok(()),
         DataType::Primitive(_) => Err(Error::InvalidMapKey),

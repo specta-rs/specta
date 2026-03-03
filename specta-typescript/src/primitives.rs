@@ -1121,7 +1121,7 @@ fn primitive_dt(
             }
         },
         Primitive::bool => "boolean",
-        String | char => "string",
+        str | char => "string",
     })
 }
 

@@ -1277,7 +1277,7 @@ fn parse_field_serde_attributes(
 //     #[test]
 //     fn test_primitive_type_passthrough() {
 //         let mut transformer = SerdeTransformer::new(SerdeMode::Serialize, None);
-//         let primitive = DataType::Primitive(Primitive::String);
+//         let primitive = DataType::Primitive(Primitive::str);
 
 //         let result = transformer.transform_datatype(&primitive).unwrap();
 //         assert_eq!(result, primitive);
@@ -1286,12 +1286,12 @@ fn parse_field_serde_attributes(
 //     #[test]
 //     fn test_nullable_type_transformation() {
 //         let mut transformer = SerdeTransformer::new(SerdeMode::Serialize, None);
-//         let nullable = DataType::Nullable(Box::new(DataType::Primitive(Primitive::String)));
+//         let nullable = DataType::Nullable(Box::new(DataType::Primitive(Primitive::str)));
 
 //         let result = transformer.transform_datatype(&nullable).unwrap();
 //         match result {
 //             DataType::Nullable(inner) => {
-//                 assert_eq!(*inner.as_ref(), DataType::Primitive(Primitive::String));
+//                 assert_eq!(*inner.as_ref(), DataType::Primitive(Primitive::str));
 //             }
 //             _ => panic!("Expected nullable type"),
 //         }
@@ -1301,13 +1301,13 @@ fn parse_field_serde_attributes(
 //     fn test_list_type_transformation() {
 //         let mut transformer = SerdeTransformer::new(SerdeMode::Serialize, None);
 //         let list = DataType::List(specta::datatype::List::new(DataType::Primitive(
-//             Primitive::String,
+//             Primitive::str,
 //         )));
 
 //         let result = transformer.transform_datatype(&list).unwrap();
 //         match result {
 //             DataType::List(list_result) => {
-//                 assert_eq!(*list_result.ty(), DataType::Primitive(Primitive::String));
+//                 assert_eq!(*list_result.ty(), DataType::Primitive(Primitive::str));
 //             }
 //             _ => panic!("Expected list type"),
 //         }
@@ -1352,7 +1352,7 @@ fn parse_field_serde_attributes(
 //             ))]),
 //         };
 
-//         let field = specta::datatype::Field::new(DataType::Primitive(Primitive::String));
+//         let field = specta::datatype::Field::new(DataType::Primitive(Primitive::str));
 //         let mut struct_dt = match Struct::unnamed().field(field).build() {
 //             DataType::Struct(s) => s,
 //             _ => unreachable!(),
@@ -1363,7 +1363,7 @@ fn parse_field_serde_attributes(
 //         let result = transformer.transform_datatype(&datatype).unwrap();
 
 //         // Should resolve to the inner type
-//         assert_eq!(result, DataType::Primitive(Primitive::String));
+//         assert_eq!(result, DataType::Primitive(Primitive::str));
 //     }
 
 //     #[test]
