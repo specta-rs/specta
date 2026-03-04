@@ -53,105 +53,82 @@ impl<K: Type, V: Type> Type for PrimitiveMap<K, V> {
 
 #[cfg(feature = "std")]
 const _: () = {
-    use std::{
-        borrow::Cow,
-        cell::{Cell, RefCell},
-        collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, LinkedList, VecDeque},
-        convert::Infallible,
-        ffi::{CStr, CString, OsStr, OsString},
-        net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
-        num::{
-            NonZeroI8, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI128, NonZeroIsize, NonZeroU8,
-            NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU128, NonZeroUsize,
-        },
-        ops::{Range, RangeInclusive},
-        path::{Path, PathBuf},
-        rc::Rc,
-        sync::{
-            Arc, Mutex, RwLock,
-            atomic::{
-                AtomicBool, AtomicI8, AtomicI16, AtomicI32, AtomicI64, AtomicIsize, AtomicU8,
-                AtomicU16, AtomicU32, AtomicU64, AtomicUsize,
-            },
-        },
-        time::{Duration, SystemTime},
-    };
-
     impl_ndt_as!(
-        String as str
+        std::string::String as str
 
         // Non-unique sets
-        Vec<T> as [T]
-        VecDeque<T> as [T]
-        BinaryHeap<T> as [T]
-        LinkedList<T> as [T]
+        std::vec::Vec<T> as [T]
+        std::collections::VecDeque<T> as [T]
+        std::collections::BinaryHeap<T> as [T]
+        std::collections::LinkedList<T> as [T]
 
         // Unique sets
-        HashSet<T> as PrimitiveSet<T>
-        BTreeSet<T> as PrimitiveSet<T>
+        std::collections::HashSet<T> as PrimitiveSet<T>
+        std::collections::BTreeSet<T> as PrimitiveSet<T>
 
         // Maps
-        HashMap<K, V> as PrimitiveMap<K, V>
-        BTreeMap<K, V> as PrimitiveMap<K, V>
+        std::collections::HashMap<K, V> as PrimitiveMap<K, V>
+        std::collections::BTreeMap<K, V> as PrimitiveMap<K, V>
 
         // Containers
-        Box<T> where { T: ?Sized } as T
-        Rc<T> where { T: ?Sized } as T
-        Arc<T> where { T: ?Sized } as T
-        Cell<T> where { T: ?Sized } as T
-        RefCell<T> where { T: ?Sized } as T
+        std::boxed::Box<T> where { T: ?Sized } as T
+        std::rc::Rc<T> where { T: ?Sized } as T
+        std::sync::Arc<T> where { T: ?Sized } as T
+        std::cell::Cell<T> where { T: ?Sized } as T
+        std::cell::RefCell<T> where { T: ?Sized } as T
 
-        Mutex<T> where { T: ?Sized } as T
-        RwLock<T> where { T: ?Sized } as T
+        std::sync::Mutex<T> where { T: ?Sized } as T
+        std::sync::RwLock<T> where { T: ?Sized } as T
 
-        CString as str
-        CStr as str
-        OsString as str
-        OsStr as str
+        std::ffi::CString as str
+        std::ffi::CStr as str
+        std::ffi::OsString as str
+        std::ffi::OsStr as str
 
-        Path as str
-        PathBuf as str
+        std::path::Path as str
+        std::path::PathBuf as str
 
-        IpAddr as str
-        Ipv4Addr as str
-        Ipv6Addr as str
+        std::net::IpAddr as str
+        std::net::Ipv4Addr as str
+        std::net::Ipv6Addr as str
 
-        SocketAddr as str
-        SocketAddrV4 as str
-        SocketAddrV6 as str
+        std::net::SocketAddr as str
+        std::net::SocketAddrV4 as str
+        std::net::SocketAddrV6 as str
 
-        AtomicBool as bool
-        AtomicI8 as i8
-        AtomicI16 as i16
-        AtomicI32 as i32
-        AtomicIsize as isize
-        AtomicU8 as u8
-        AtomicU16 as u16
-        AtomicU32 as u32
-        AtomicUsize as usize
-        AtomicI64 as i64
-        AtomicU64 as u64
+        std::sync::atomic::AtomicBool as bool
+        std::sync::atomic::AtomicI8 as i8
+        std::sync::atomic::AtomicI16 as i16
+        std::sync::atomic::AtomicI32 as i32
+        std::sync::atomic::AtomicIsize as isize
+        std::sync::atomic::AtomicU8 as u8
+        std::sync::atomic::AtomicU16 as u16
+        std::sync::atomic::AtomicU32 as u32
+        std::sync::atomic::AtomicUsize as usize
+        std::sync::atomic::AtomicI64 as i64
+        std::sync::atomic::AtomicU64 as u64
 
-        NonZeroU8 as u8
-        NonZeroU16 as u16
-        NonZeroU32 as u32
-        NonZeroU64 as u64
-        NonZeroUsize as usize
-        NonZeroI8 as i8
-        NonZeroI16 as i16
-        NonZeroI32 as i32
-        NonZeroI64 as i64
-        NonZeroIsize as isize
-        NonZeroU128 as u128
-        NonZeroI128 as i128
+        std::num::NonZeroU8 as u8
+        std::num::NonZeroU16 as u16
+        std::num::NonZeroU32 as u32
+        std::num::NonZeroU64 as u64
+        std::num::NonZeroUsize as usize
+        std::num::NonZeroI8 as i8
+        std::num::NonZeroI16 as i16
+        std::num::NonZeroI32 as i32
+        std::num::NonZeroI64 as i64
+        std::num::NonZeroIsize as isize
+        std::num::NonZeroU128 as u128
+        std::num::NonZeroI128 as i128
 
         // Serde are cringe so this is how it is :(
-        Range<T> as BaseRange<T>
-        RangeInclusive<T> as BaseRange<T>
+        std::ops::Range<T> as BaseRange<T>
+        std::ops::RangeInclusive<T> as BaseRange<T>
     );
 
     impl_ndt!(
-        impl Type for Infallible {
+        impl Type for std::convert::Infallible {
+            type_path: std::convert::Infallible;
             inline: true;
             build: |_types, ndt| {
                 // Serde does no support `Infallible` as it can't be constructed as a `&self` method is uncallable on it.
@@ -159,7 +136,8 @@ const _: () = {
             }
         }
 
-        impl Type for SystemTime {
+        impl Type for std::time::SystemTime {
+            type_path: std::time::SystemTime;
             inline: true;
             build: |types, ndt| {
                 let mut s = crate::datatype::Struct::unit();
@@ -181,7 +159,8 @@ const _: () = {
             }
         }
 
-        impl Type for Duration {
+        impl Type for std::time::Duration {
+            type_path: std::time::Duration;
             inline: true;
             build: |types, ndt| {
                 let mut s = crate::datatype::Struct::unit();
@@ -204,7 +183,7 @@ const _: () = {
         }
     );
 
-    impl<'a, T: ?Sized + ToOwned + Type + 'a> Type for Cow<'a, T> {
+    impl<'a, T: ?Sized + ToOwned + Type + 'a> Type for std::borrow::Cow<'a, T> {
         fn definition(types: &mut TypeCollection) -> DataType {
             // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
             static SENTINEL: &str = concat!(module_path!(), "::Cow<'a, T>");
@@ -214,6 +193,7 @@ const _: () = {
                 types,
                 SENTINEL,
                 |types, ndt| {
+                    *ndt.module_path_mut() = std::borrow::Cow::Borrowed("std::borrow");
                     ndt.inner = T::definition(types);
                 },
             ))
@@ -240,11 +220,9 @@ const _: () = {
 
 #[cfg(feature = "tokio")]
 const _: () = {
-    use tokio::sync::{Mutex, RwLock};
-
     impl_ndt_as!(
-        Mutex<T> where { T: ?Sized } as T
-        RwLock<T> where { T: ?Sized } as T
+        tokio::sync::Mutex<T> where { T: ?Sized } as T
+        tokio::sync::RwLock<T> where { T: ?Sized } as T
     );
 };
 
@@ -275,11 +253,12 @@ impl<T: Type> Type for Option<T> {
 }
 
 impl_ndt_as!(
-    PhantomData<T> as ()
+    std::marker::PhantomData<T> as ()
 );
 
 impl_ndt!(
     impl<T, E> Type for Result<T, E> where { T: Type, E: Type} {
+        type_path: std::result::Result;
         inline: true;
         build: |types, ndt| {
             let mut ok_variant = EnumVariant::unit();

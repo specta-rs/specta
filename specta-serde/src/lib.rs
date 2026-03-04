@@ -66,8 +66,8 @@ pub use serde_attrs::{SerdeMode, apply_serde_transformations};
 
 use specta::TypeCollection;
 use specta::datatype::{
-    DataType, Enum, Fields, Generic, NamedReference, Primitive, Reference, Attribute,
-    AttributeMeta, AttributeNestedMeta, skip_fields, skip_fields_named,
+    Attribute, AttributeMeta, AttributeNestedMeta, DataType, Enum, Fields, Generic, NamedReference,
+    Primitive, Reference, skip_fields, skip_fields_named,
 };
 use std::collections::HashSet;
 

@@ -19,9 +19,7 @@ fn is_string_enum(e: &specta::datatype::Enum) -> bool {
 }
 
 /// Helper function to get rename_all from serde attributes  
-fn get_rename_all_from_attributes(
-    attributes: &[specta::datatype::Attribute],
-) -> Option<String> {
+fn get_rename_all_from_attributes(attributes: &[specta::datatype::Attribute]) -> Option<String> {
     use specta::datatype::AttributeMeta;
 
     for attr in attributes {

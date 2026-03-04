@@ -15,19 +15,17 @@ use std::borrow::Cow;
 
 #[cfg(feature = "indexmap")]
 const _: () = {
-    use indexmap::{IndexMap, IndexSet};
     impl_ndt_as!(
-        IndexSet<T> as PrimitiveSet<T>
-        IndexMap<K, V> as PrimitiveMap<K, V>
+        indexmap::IndexSet<T> as PrimitiveSet<T>
+        indexmap::IndexMap<K, V> as PrimitiveMap<K, V>
     );
 };
 
 #[cfg(feature = "bytes")]
 const _: () = {
-    use bytes::{Bytes, BytesMut};
     impl_ndt_as!(
-        Bytes as [u8]
-        BytesMut as [u8]
+        bytes::Bytes as [u8]
+        bytes::BytesMut as [u8]
     );
 };
 
@@ -36,11 +34,12 @@ const _: () = {
     use serde_json::{Map, Number, Value};
 
     impl_ndt_as!(
-        Map<K, V> as PrimitiveMap<K, V>
+        serde_json::Map<K, V> as PrimitiveMap<K, V>
     );
 
     impl_ndt!(
         impl Type for Value {
+            type_path: serde_json::Value;
             inline: true;
             build: |types, ndt| {
                 ndt.inner = DataType::Enum(Enum {
@@ -83,6 +82,7 @@ const _: () = {
         }
 
         impl Type for Number {
+            type_path: serde_json::Number;
             inline: true;
             build: |types, ndt| {
                 ndt.inner = DataType::Enum(Enum {
@@ -120,15 +120,16 @@ const _: () = {
 
 #[cfg(feature = "serde_yaml")]
 const _: () = {
-    use serde_yaml::{Mapping, Number, Value, value::TaggedValue};
+    use serde_yaml::{Number, Value, value::TaggedValue};
 
     impl_ndt_as!(
-        Mapping as PrimitiveMap<serde_yaml::Value, serde_yaml::Value>
-        TaggedValue as PrimitiveMap<String, serde_yaml::Value>
+        serde_yaml::Mapping as PrimitiveMap<serde_yaml::Value, serde_yaml::Value>
+        serde_yaml::value::TaggedValue as PrimitiveMap<String, serde_yaml::Value>
     );
 
     impl_ndt!(
         impl Type for Value {
+            type_path: serde_yaml::Value;
             inline: true;
             build: |types, ndt| {
                 ndt.inner = DataType::Enum(Enum {
@@ -180,6 +181,7 @@ const _: () = {
         }
 
         impl Type for serde_yaml::Number {
+            type_path: serde_yaml::Number;
             inline: true;
             build: |types, ndt| {
                 ndt.inner = DataType::Enum(Enum {
@@ -212,12 +214,13 @@ const _: () = {
 
 #[cfg(feature = "toml")]
 const _: () = {
-    use toml::{Value, map::Map, value};
+    use toml::{Value, value};
 
-    impl_ndt_as!(Map<K, V> as PrimitiveMap<K, V>);
+    impl_ndt_as!(toml::map::Map<K, V> as PrimitiveMap<K, V>);
 
     impl_ndt!(
         impl Type for value::Datetime {
+            type_path: toml::value::Datetime;
             inline: true;
             build: |types, ndt| {
                 ndt.inner = DataType::Struct(Struct {
@@ -242,6 +245,7 @@ const _: () = {
         }
 
         impl Type for Value {
+            type_path: toml::Value;
             inline: true;
             build: |types, ndt| {
                 ndt.inner = DataType::Enum(Enum {
@@ -300,28 +304,26 @@ const _: () = {
 
 #[cfg(feature = "ulid")]
 const _: () = {
-    use ulid::Ulid;
-    impl_ndt_as!(Ulid as str);
+    impl_ndt_as!(ulid::Ulid as str);
 };
 
 #[cfg(feature = "uuid")]
 const _: () = {
-    use uuid::{Uuid, fmt::Hyphenated};
     impl_ndt_as!(
-        Uuid as str
-        Hyphenated as str
+        uuid::Uuid as str
+        uuid::fmt::Hyphenated as str
     );
 };
 
 #[cfg(feature = "chrono")]
 const _: () = {
-    use chrono::{Date, DateTime, Duration, NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
+    use chrono::{Date, DateTime, TimeZone};
 
     impl_ndt_as!(
-        NaiveDateTime as str
-        NaiveDate as str
-        NaiveTime as str
-        Duration as str
+        chrono::NaiveDateTime as str
+        chrono::NaiveDate as str
+        chrono::NaiveTime as str
+        chrono::Duration as str
     );
 
     // TODO: These are NDT's that shouldn't have `Type` added into generics

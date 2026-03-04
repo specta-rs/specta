@@ -5,12 +5,12 @@
 
 use specta::datatype::{Attribute, AttributeLiteral, AttributeMeta, AttributeValue};
 use specta::{
-    datatype::{DataType, Field, Primitive, Reference, Struct},
     TypeCollection,
+    datatype::{DataType, Field, Primitive, Reference, Struct},
 };
 use specta_macros::Type as SpectaType;
 use specta_serde::{
-    apply_serde_transformations, process_for_deserialization, process_for_serialization, SerdeMode,
+    SerdeMode, apply_serde_transformations, process_for_deserialization, process_for_serialization,
 };
 
 #[test]
@@ -33,7 +33,7 @@ fn test_optional_fields_with_skip_serializing_if_and_default() {
     use specta::datatype::{
         Attribute, AttributeLiteral, AttributeMeta, DataType, Field, Primitive, Struct,
     };
-    use specta_serde::{apply_serde_transformations, SerdeMode};
+    use specta_serde::{SerdeMode, apply_serde_transformations};
 
     // Test 1: Field with #[serde(skip_serializing_if = "Option::is_none")]
     let skip_if_attr = Attribute {

@@ -35,6 +35,22 @@ macro_rules! _impl_passthrough {
 }
 
 macro_rules! _impl_ndt_as {
+    ( $($head:ident :: $( $tail:ident )::+ $(<$($generic:ident),*>)? $( where { $($bounds:tt)* } )? as $ty2:ty )* ) => {
+        impl_ndt!(
+            $(
+                impl$(<$($generic),*>)? Type for $head::$( $tail )::+ $(<$($generic),*>)? where {
+                    // `(): Sized` is meaningless and is used to add a base-condition to avoid branching in the macro.
+                    (): Sized $(, $($generic: Type),*)? $(, $($bounds)*)?
+                } {
+                    type_path: $head::$( $tail )::+;
+                    inline: true;
+                    build: |types, ndt| {
+                        ndt.inner = <$ty2 as Type>::definition(types);
+                    }
+                }
+            )*
+        );
+    };
     ( $($ty:ident $(<$($generic:ident),*>)? $( where { $($bounds:tt)* } )? as $ty2:ty )* ) => {
         impl_ndt!(
             $(
@@ -56,6 +72,7 @@ macro_rules! _impl_ndt {
     (
         $(
             impl $(<$($generic:ident),*>)? Type for $ty:ty $( where { $($bounds:tt)* } )? {
+                type_path: $type_path:path;
                 inline: $inline:expr;
                 build: |$types:ident, $ndt:ident| $build:block
             }
@@ -66,7 +83,48 @@ macro_rules! _impl_ndt {
                 fn definition(types: &mut TypeCollection) -> DataType {
                     // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
                     static SENTINEL: &str = concat!(module_path!(), "::", stringify!($ty));
-                    println!("TODO: {SENTINEL:?}"); // TODO
+                    DataType::Reference(datatype::NamedDataType::init_with_sentinel(
+                        vec![
+                            $($(
+                                (datatype::Generic::new(stringify!($generic)), <$generic as Type>::definition(types))
+                            ),*)?
+                        ],
+                        $inline,
+                        types,
+                        SENTINEL,
+                        |$types, $ndt| {
+                            let type_path = stringify!($type_path)
+                                .chars()
+                                .filter(|c| !c.is_whitespace())
+                                .collect::<String>();
+                            let type_path = type_path
+                                .split_once('<')
+                                .map(|(path, _)| path)
+                                .unwrap_or(type_path.as_str());
+                            if let Some((module_path, _)) = type_path.rsplit_once("::") {
+                                $ndt.set_module_path(::std::borrow::Cow::Owned(module_path.to_owned()));
+                            }
+
+                            $build
+                        },
+                    ))
+                }
+            }
+        )+
+    };
+    (
+        $(
+            impl $(<$($generic:ident),*>)? Type for $ty:ty $( where { $($bounds:tt)* } )? {
+                inline: $inline:expr;
+                build: |$types:ident, $ndt:ident| $build:block
+            }
+        )+
+    ) => {
+        $(
+            impl$(<$($generic),*>)? Type for $ty $(where $($bounds)*)? {
+                fn definition(types: &mut TypeCollection) -> DataType {
+                    // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
+                    static SENTINEL: &str = concat!(module_path!(), "::", stringify!($ty));
                     DataType::Reference(datatype::NamedDataType::init_with_sentinel(
                         vec![
                             $($(

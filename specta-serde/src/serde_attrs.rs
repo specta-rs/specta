@@ -8,8 +8,8 @@ use std::{borrow::Cow, fmt};
 
 use specta::{
     datatype::{
-        DataType, Enum, Fields, Attribute, AttributeLiteral, AttributeMeta, AttributeNestedMeta,
-        AttributeValue, Struct, Tuple,
+        Attribute, AttributeLiteral, AttributeMeta, AttributeNestedMeta, AttributeValue, DataType,
+        Enum, Fields, Struct, Tuple,
     },
     internal,
 };
