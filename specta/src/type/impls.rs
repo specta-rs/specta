@@ -186,7 +186,7 @@ const _: () = {
     impl<'a, T: ?Sized + ToOwned + Type + 'a> Type for std::borrow::Cow<'a, T> {
         fn definition(types: &mut TypeCollection) -> DataType {
             // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
-            static SENTINEL: &str = concat!(module_path!(), "::Cow<'a, T>");
+            static SENTINEL: &str = "std::borrow::Cow<'a, T>";
             DataType::Reference(datatype::NamedDataType::init_with_sentinel(
                 vec![(datatype::Generic::new("T"), <T as Type>::definition(types))],
                 true,
