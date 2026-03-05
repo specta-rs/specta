@@ -159,4 +159,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 #[specta]
 pub fn testing() {}
 
+#[specta(rename_all = "camelCase123")]
+pub fn invalid_function_rename_all() {}
+
 // TODO: https://docs.rs/trybuild/latest/trybuild/#what-to-test

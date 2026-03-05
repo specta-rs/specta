@@ -63,8 +63,8 @@ pub fn derive_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 #[proc_macro_attribute]
 #[cfg(feature = "DO_NOT_USE_function")]
 pub fn specta(
-    _: proc_macro::TokenStream,
+    attr: proc_macro::TokenStream,
     item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    specta::attribute(item).unwrap_or_else(|err| err.into_compile_error().into())
+    specta::attribute(attr, item).unwrap_or_else(|err| err.into_compile_error().into())
 }
