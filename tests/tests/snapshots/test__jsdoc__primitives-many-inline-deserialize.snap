@@ -33,9 +33,9 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*
 	* @typedef {string} SocketAddrV6
 	*
-	* @typedef {T} <T>
+	* @typedef {T} Cow<T>
 	*
-	* @typedef {T} <T>
+	* @typedef {T} Cow<T>
 	*
 	* @typedef {{
 	*		duration_since_epoch: number,

@@ -86,7 +86,7 @@ macro_rules! _impl_ndt {
                                  if let Some((path, name)) = s.rsplit_once("::") {
                                      (name.to_string(), path.to_string())
                                  } else {
-                                     ("".to_string(), s.to_string())
+                                     (s.to_string(), String::new())
                                  }
                             };
 

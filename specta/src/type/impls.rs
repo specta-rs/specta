@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
 use crate::{
-    Type, TypeCollection,
     datatype::{self, DataType, Enum, EnumVariant, Field, Generic, List},
     internal,
     r#type::macros::*,
+    Type, TypeCollection,
 };
 
 impl_primitives!(
@@ -208,7 +208,8 @@ const _: () = {
                 true,
                 types,
                 SENTINEL,
-                |types, ndt| {
+                |_types, ndt| {
+                    *ndt.name_mut() = std::borrow::Cow::Borrowed("Cow");
                     *ndt.module_path_mut() = std::borrow::Cow::Borrowed("std::borrow");
                     ndt.inner = DataType::Generic(Generic::new("T"));
                 },

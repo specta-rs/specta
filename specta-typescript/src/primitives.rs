@@ -1289,7 +1289,8 @@ fn map_dt(
             }
         }
 
-        let is_exhaustive = is_exhaustive(m.key_ty(), types);
+        let resolved_key = resolve_generics_in_datatype(m.key_ty(), generics);
+        let is_exhaustive = is_exhaustive(&resolved_key, types);
 
         // We use `{ [key in K]: V }` instead of `Record<K, V>` to avoid issues with circular references.
         // Wrapped in Partial<> because otherwise TypeScript would enforce exhaustiveness.
@@ -1302,7 +1303,7 @@ fn map_dt(
                 cfg: exporter,
                 path: vec![],
             },
-            m.key_ty(),
+            &resolved_key,
             types,
             s,
             generics,

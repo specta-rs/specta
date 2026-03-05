@@ -28,9 +28,9 @@ export type SocketAddrV4 = string;
 
 export type SocketAddrV6 = string;
 
-export type <T> = T;
+export type Cow<T> = T;
 
-export type <T> = T;
+export type Cow<T> = T;
 
 export type SystemTime = {
 	duration_since_epoch: number,

@@ -28,9 +28,9 @@ SocketAddrV4: export type SocketAddrV4 = string;
 
 SocketAddrV6: export type SocketAddrV6 = string;
 
-Cow<'static, str>: export type <T> = T;
+Cow<'static, str>: export type Cow<T> = T;
 
-Cow<'static, i32>: export type <T> = T;
+Cow<'static, i32>: export type Cow<T> = T;
 
 SystemTime: export type SystemTime = {
 	duration_since_epoch: number,

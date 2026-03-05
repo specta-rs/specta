@@ -127,10 +127,10 @@ TransparentType: TransparentTypeInner
 TransparentType2: null
 TransparentTypeWithOverride: string
 [Option<u8>; 3]: [(number | null), (number | null), (number | null)]
-HashMap<BasicEnum, ()>: { [key in BasicEnum]: null }
+HashMap<BasicEnum, ()>: Partial<{ [key in BasicEnum]: null }>
 Option<Option<Option<Option<i32>>>>: number | null
 Vec<PlaceholderInnerField>: PlaceholderInnerField[]
-HashMap<BasicEnum, i32>: { [key in BasicEnum]: number }
+HashMap<BasicEnum, i32>: Partial<{ [key in BasicEnum]: number }>
 EnumReferenceRecordKey: {
 	a: Partial<{ [key in BasicEnum]: number }>,
 }
@@ -240,9 +240,9 @@ UntaggedVariantsWithDuplicateBranches: null | number
 HashMap<String, ()>: { [key in string]: null }
 Regular: { [key in string]: null }
 HashMap<Infallible, ()>: { [key in never]: null }
-HashMap<UnitVariants, ()>: { [key in UnitVariants]: null }
-HashMap<UntaggedVariantsKey, ()>: { [key in UntaggedVariantsKey]: null }
-HashMap<Variants, ()>: { [key in Variants]: null }
+HashMap<UnitVariants, ()>: Partial<{ [key in UnitVariants]: null }>
+HashMap<UntaggedVariantsKey, ()>: Partial<{ [key in UntaggedVariantsKey]: null }>
+HashMap<Variants, ()>: Partial<{ [key in Variants]: null }>
 MacroStruct: string
 MacroStruct2: {
 	demo: string,
