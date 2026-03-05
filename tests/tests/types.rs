@@ -116,6 +116,7 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         Vec<MyEnum>, &'static [MyEnum], &'static [MyEnum; 6], [MyEnum; 2],
         &'static [i32; 1], &'static [i32; 0],
         Option<i32>, Option<()>, Option<Vec<i32>>,
+        Result<String, i32>,
         Vec<Option<Cow<'static, i32>>>, Option<Vec<Cow<'static, i32>>>, [Vec<String>; 3],
 
         Option<Option<String>>,

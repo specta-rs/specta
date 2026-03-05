@@ -1,11 +1,3 @@
-macro_rules! _impl_passthrough {
-    ($t:ty) => {
-        fn definition(types: &mut TypeCollection) -> DataType {
-            <$t>::definition(types)
-        }
-    };
-}
-
 macro_rules! _impl_primitives {
     ($($i:ident)+) => {$(
         impl Type for $i {
@@ -34,57 +26,84 @@ macro_rules! _impl_tuple {
     () => {};
 }
 
-macro_rules! _impl_containers {
-    ($($container:ident)+) => {$(
-        impl<T: Type> Type for $container<T> {
-            fn definition(types: &mut TypeCollection) -> DataType {
-                <T as Type>::definition(types)
-            }
-        }
-    )+}
-}
-
-macro_rules! _impl_as {
-    ($($ty:path as $tty:ty)+) => {$(
-        impl Type for $ty {
-            fn definition(types: &mut TypeCollection) -> DataType {
-                <$tty as Type>::definition(types)
-            }
-        }
-    )+};
-}
-
-macro_rules! _impl_for_list {
-    ($($unique:expr; $ty:path)+) => {$(
-        impl<T: Type> Type for $ty {
-            fn definition(types: &mut TypeCollection) -> DataType {
-                let mut l = List::new(
-                    <T as Type>::definition(types),
-                );
-                l.set_unique($unique);
-                DataType::List(l)
-            }
-        }
-    )+};
-}
-
-macro_rules! _impl_for_map {
-    ($ty:path) => {
-        impl<K: Type, V: Type> Type for $ty {
-            fn definition(types: &mut TypeCollection) -> DataType {
-                DataType::Map(crate::datatype::Map::new(
-                    K::definition(types),
-                    V::definition(types),
-                ))
-            }
+macro_rules! _impl_passthrough {
+    ($t:ty) => {
+        fn definition(types: &mut TypeCollection) -> DataType {
+            <$t>::definition(types)
         }
     };
 }
 
-pub(crate) use _impl_as as impl_as;
-pub(crate) use _impl_containers as impl_containers;
-pub(crate) use _impl_for_list as impl_for_list;
-pub(crate) use _impl_for_map as impl_for_map;
+macro_rules! _impl_ndt_as {
+    ( $($head:ident :: $( $tail:ident )::+ $(<$($generic:ident),*>)? $( where { $($bounds:tt)* } )? as $ty2:ty )* ) => {
+        impl_ndt!(
+            $(
+                impl$(<$($generic),*>)? Type for $head::$( $tail )::+ $(<$($generic),*>)? where {
+                    // `(): Sized` is meaningless and is used to add a base-condition to avoid branching in the macro.
+                    (): Sized $(, $($generic: Type),*)? $(, $($bounds)*)?
+                } {
+                    inline: true;
+                    build: |types, ndt| {
+                        ndt.inner = <$ty2 as Type>::definition(types);
+                    }
+                }
+            )*
+        );
+    };
+}
+
+macro_rules! _impl_ndt {
+    (
+        $(
+            impl $(<$($generic:ident),*>)? Type for $type_path:path $( where { $($bounds:tt)* } )? {
+                inline: $inline:expr;
+                build: |$types:ident, $ndt:ident| $build:block
+            }
+        )+
+    ) => {
+        $(
+            impl$(<$($generic),*>)? Type for $type_path $(where $($bounds)*)? {
+                fn definition(types: &mut TypeCollection) -> DataType {
+                    // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
+                    static SENTINEL: &str = stringify!($type_path);
+                    DataType::Reference(datatype::NamedDataType::init_with_sentinel(
+                        vec![
+                            $($(
+                                (datatype::Generic::new(stringify!($generic)), <$generic as Type>::definition(types))
+                            ),*)?
+                        ],
+                        $inline,
+                        types,
+                        SENTINEL,
+                        |$types, $ndt| {
+                            let _ = &$types;
+
+                            // TODO: This should be doable in the macro instead of the runtime. This will do for now though.
+                            let (type_name, module_path) = {
+                                let s = stringify!($type_path);
+                                let cleaned: String = s.chars().filter(|c| !c.is_whitespace()).collect();
+                                 let s = cleaned.split('<').next().unwrap();
+                                 if let Some((path, name)) = s.rsplit_once("::") {
+                                     (name.to_string(), path.to_string())
+                                 } else {
+                                     ("".to_string(), s.to_string())
+                                 }
+                            };
+
+                            $ndt.set_name(::std::borrow::Cow::Owned(type_name));
+                            $ndt.set_module_path(::std::borrow::Cow::Owned(module_path));
+
+                            $build
+                        },
+                    ))
+                }
+            }
+        )+
+    };
+}
+
+pub(crate) use _impl_ndt as impl_ndt;
+pub(crate) use _impl_ndt_as as impl_ndt_as;
 pub(crate) use _impl_passthrough as impl_passthrough;
 pub(crate) use _impl_primitives as impl_primitives;
 pub(crate) use _impl_tuple as impl_tuple;

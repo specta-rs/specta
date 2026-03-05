@@ -54,7 +54,7 @@ impl NamedDataType {
                 docs: Cow::Borrowed(""),
                 deprecated: None,
                 module_path: Cow::Borrowed(""),
-                generics: vec![],
+                generics: generics.iter().map(|(v, _)| v.clone()).collect(),
                 inline,
                 inner: DataType::Primitive(super::Primitive::i8),
             };

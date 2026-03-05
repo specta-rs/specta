@@ -206,14 +206,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         }
     });
 
-    let definition_generics = generics.params.iter().filter_map(|p| match p {
-        GenericParam::Type(t) => {
-            let ident = t.ident.to_string();
-            Some(quote!(std::borrow::Cow::Borrowed(#ident).into()))
-        }
-        _ => None,
-    });
-
     Ok(quote! {
         #[allow(non_camel_case_types)]
         const _: () = {
@@ -237,7 +229,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                                 ndt.set_docs(Cow::Borrowed(#comments));
                                 ndt.set_deprecated(#deprecated);
                                 ndt.set_module_path(Cow::Borrowed(module_path!()));
-                                *ndt.generics_mut() = vec![#(#definition_generics),*];
                                 ndt.set_ty({
                                     #shadow_generics
 

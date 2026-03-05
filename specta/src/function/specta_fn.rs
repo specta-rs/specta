@@ -1,6 +1,9 @@
 use std::borrow::Cow;
 
-use crate::{TypeCollection, datatype::DeprecatedType, datatype::Function};
+use crate::{
+    TypeCollection,
+    datatype::{DeprecatedType, Function},
+};
 
 use super::{FunctionArg, FunctionResult};
 
@@ -20,8 +23,9 @@ pub trait SpectaFn<TMarker> {
     ) -> Function;
 }
 
-impl<TResultMarker, TResult: FunctionResult<TResultMarker>> SpectaFn<TResultMarker>
-    for fn() -> TResult
+impl<TResult, TResultMarker> SpectaFn<TResultMarker> for fn() -> TResult
+where
+    TResult: FunctionResult<TResultMarker>,
 {
     fn to_datatype(
         asyncness: bool,
@@ -47,10 +51,13 @@ macro_rules! impl_typed_command {
     ( impl $($i:ident),* ) => {
        paste::paste! {
             impl<
+                TResult,
                 TResultMarker,
-                TResult: FunctionResult<TResultMarker>,
                 $($i: FunctionArg),*
-            > SpectaFn<TResultMarker> for fn($($i),*) -> TResult {
+            > SpectaFn<TResultMarker> for fn($($i),*) -> TResult
+            where
+                TResult: FunctionResult<TResultMarker>,
+            {
                 fn to_datatype(
                     asyncness: bool,
                     name: Cow<'static, str>,

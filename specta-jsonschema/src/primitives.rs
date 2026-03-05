@@ -122,7 +122,7 @@ pub fn datatype_to_schema(
 fn primitive_to_schema(p: &Primitive) -> Value {
     match p {
         Primitive::bool => json!({"type": "boolean"}),
-        Primitive::String => json!({"type": "string"}),
+        Primitive::str => json!({"type": "string"}),
         Primitive::char => json!({"type": "string", "minLength": 1, "maxLength": 1}),
 
         // Integers
