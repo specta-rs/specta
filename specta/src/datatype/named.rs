@@ -27,7 +27,8 @@ impl NamedDataType {
     //
     // If a recursive type is being resolved it's possible the `init_with_sentinel` function will be called recursively.
     // To avoid this we avoid resolving a type that's already marked as being resolved but this means the [NamedDataType]'s [DataType] is unknown at this stage so we can't return it. Instead we always return [Reference]'s as they are always valid.
-    #[doc(hidden)] // This should not be used outside of `specta_macros` as it may have breaking changes.
+    // WARNING: This should not be used outside of `specta_macros` as it may have breaking changes in minor releases
+    #[doc(hidden)]
     #[track_caller]
     pub fn init_with_sentinel(
         generics: Vec<(Generic, DataType)>,

@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt};
 
-use crate::{export_config::ExportConfig, ImplLocation};
+use crate::{ImplLocation, export_config::ExportConfig};
 
 #[derive(Clone, Debug)]
 pub(crate) enum PathItem {
@@ -62,7 +62,6 @@ impl ExportPath {
         Self(s)
     }
 
-    #[doc(hidden)]
     pub fn new_unsafe(path: &str) -> Self {
         Self(path.to_string())
     }
