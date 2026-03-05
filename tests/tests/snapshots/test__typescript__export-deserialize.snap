@@ -2,59 +2,59 @@
 source: tests/tests/typescript.rs
 expression: "dts.iter().filter_map(|(s, ty)| match ty\n{\n    DataType::Reference(Reference::Named(r)) =>\n    r.get(&types).cloned().map(|ty| (s, ty)), _ => None,\n}).map(|(s, ty)|\nprimitives::export(&ts, &types, iter::once(&ty),\n\"\").map(|ty| format!(\"{s}: {ty}\"))).collect::<Result<Vec<_>,\n_>>().unwrap().join(\"\\n\")"
 ---
-Range<i32>: export type <T> = {
+Range<i32>: export type Range<T> = {
 	start: number,
 	end: number,
 };
 
-RangeInclusive<i32>: export type <T> = {
+RangeInclusive<i32>: export type RangeInclusive<T> = {
 	start: number,
 	end: number,
 };
 
-String: export type  = string;
+String: export type String = string;
 
-PathBuf: export type  = string;
+PathBuf: export type PathBuf = string;
 
-IpAddr: export type  = string;
+IpAddr: export type IpAddr = string;
 
-Ipv4Addr: export type  = string;
+Ipv4Addr: export type Ipv4Addr = string;
 
-Ipv6Addr: export type  = string;
+Ipv6Addr: export type Ipv6Addr = string;
 
-SocketAddr: export type  = string;
+SocketAddr: export type SocketAddr = string;
 
-SocketAddrV4: export type  = string;
+SocketAddrV4: export type SocketAddrV4 = string;
 
-SocketAddrV6: export type  = string;
+SocketAddrV6: export type SocketAddrV6 = string;
 
 Cow<'static, str>: export type <T> = string;
 
 Cow<'static, i32>: export type <T> = string;
 
-SystemTime: export type  = {
+SystemTime: export type SystemTime = {
 	duration_since_epoch: number,
 	duration_since_unix_epoch: number,
 };
 
-Duration: export type  = {
+Duration: export type Duration = {
 	secs: number,
 	nanos: number,
 };
 
-Vec<i32>: export type <T> = number[];
+Vec<i32>: export type Vec<T> = number[];
 
-Vec<MyEnum>: export type <T> = number[];
+Vec<MyEnum>: export type Vec<T> = number[];
 
-Result<String, i32>: export type <T, E> = ({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never };
+Result<String, i32>: export type Result<T, E> = ({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never };
 
-Vec<Option<Cow<'static, i32>>>: export type <T> = number[];
+Vec<Option<Cow<'static, i32>>>: export type Vec<T> = number[];
 
-PhantomData<()>: export type <T> = null;
+PhantomData<()>: export type PhantomData<T> = null;
 
-PhantomData<String>: export type <T> = null;
+PhantomData<String>: export type PhantomData<T> = null;
 
-Infallible: export type  = never;
+Infallible: export type Infallible = never;
 
 Unit1: export type Unit1 = null;
 
@@ -132,11 +132,11 @@ TransparentType2: export type TransparentType2 = null;
 
 TransparentTypeWithOverride: export type TransparentTypeWithOverride = string;
 
-HashMap<BasicEnum, ()>: export type <K, V> = { [key in number]: string };
+HashMap<BasicEnum, ()>: export type HashMap<K, V> = { [key in number]: string };
 
-Vec<PlaceholderInnerField>: export type <T> = number[];
+Vec<PlaceholderInnerField>: export type Vec<T> = number[];
 
-HashMap<BasicEnum, i32>: export type <K, V> = { [key in number]: string };
+HashMap<BasicEnum, i32>: export type HashMap<K, V> = { [key in number]: string };
 
 EnumReferenceRecordKey: export type EnumReferenceRecordKey = {
 	a: { [key in number]: string },
@@ -148,13 +148,13 @@ FlattenOnNestedEnum: export type FlattenOnNestedEnum = (NestedEnum) & {
 
 MyEmptyInput: export type MyEmptyInput = Record<string, never>;
 
-(String): export type  = string;
+(String): export type String = string;
 
 ExtraBracketsInTupleVariant: export type ExtraBracketsInTupleVariant = { A: string };
 
 ExtraBracketsInUnnamedStruct: export type ExtraBracketsInUnnamedStruct = string;
 
-Vec<MyEnum>: export type <T> = number[];
+Vec<MyEnum>: export type Vec<T> = number[];
 
 InlineTuple: export type InlineTuple = {
 	demo: [string, boolean],
@@ -166,9 +166,9 @@ InlineTuple2: export type InlineTuple2 = {
 	}, boolean],
 };
 
-Box<str>: export type <T> = string;
+Box<str>: export type Box<T> = string;
 
-Box<String>: export type <T> = string;
+Box<String>: export type Box<T> = string;
 
 SkippedFieldWithinVariant: export type SkippedFieldWithinVariant = { type: "A" } | { type: "B"; data: string };
 
@@ -293,17 +293,17 @@ UntaggedVariantsWithoutValue: export type UntaggedVariantsWithoutValue = string 
 
 UntaggedVariantsWithDuplicateBranches: export type UntaggedVariantsWithDuplicateBranches = null | number;
 
-HashMap<String, ()>: export type <K, V> = { [key in number]: string };
+HashMap<String, ()>: export type HashMap<K, V> = { [key in number]: string };
 
 Regular: export type Regular = { [key in number]: string };
 
-HashMap<Infallible, ()>: export type <K, V> = { [key in number]: string };
+HashMap<Infallible, ()>: export type HashMap<K, V> = { [key in number]: string };
 
-HashMap<UnitVariants, ()>: export type <K, V> = { [key in number]: string };
+HashMap<UnitVariants, ()>: export type HashMap<K, V> = { [key in number]: string };
 
-HashMap<UntaggedVariantsKey, ()>: export type <K, V> = { [key in number]: string };
+HashMap<UntaggedVariantsKey, ()>: export type HashMap<K, V> = { [key in number]: string };
 
-HashMap<Variants, ()>: export type <K, V> = { [key in number]: string };
+HashMap<Variants, ()>: export type HashMap<K, V> = { [key in number]: string };
 
 MacroStruct: export type MacroStruct = string;
 
@@ -445,11 +445,11 @@ Another<bool>: export type Demo<A, B> = {
 	b: B,
 };
 
-MapA<u32>: export type <K, V> = { [key in number]: string };
+MapA<u32>: export type HashMap<K, V> = { [key in number]: string };
 
-MapB<u32>: export type <K, V> = { [key in number]: string };
+MapB<u32>: export type HashMap<K, V> = { [key in number]: string };
 
-MapC<u32>: export type <K, V> = { [key in number]: string };
+MapC<u32>: export type HashMap<K, V> = { [key in number]: string };
 
 AGenericStruct<u32>: export type AGenericStruct<T> = {
 	field: Demo<T, boolean>,

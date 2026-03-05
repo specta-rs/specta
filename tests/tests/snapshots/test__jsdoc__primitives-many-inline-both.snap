@@ -6,32 +6,32 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @typedef {{
 	*		start: number,
 	*		end: number,
-	*	}} <T>
+	*	}} Range<T>
 	* @property {number} start
 	* @property {number} end
 	*
 	* @typedef {{
 	*		start: number,
 	*		end: number,
-	*	}} <T>
+	*	}} RangeInclusive<T>
 	* @property {number} start
 	* @property {number} end
 	*
-	* @typedef {string} 
+	* @typedef {string} String
 	*
-	* @typedef {string} 
+	* @typedef {string} PathBuf
 	*
-	* @typedef {string} 
+	* @typedef {string} IpAddr
 	*
-	* @typedef {string} 
+	* @typedef {string} Ipv4Addr
 	*
-	* @typedef {string} 
+	* @typedef {string} Ipv6Addr
 	*
-	* @typedef {string} 
+	* @typedef {string} SocketAddr
 	*
-	* @typedef {string} 
+	* @typedef {string} SocketAddrV4
 	*
-	* @typedef {string} 
+	* @typedef {string} SocketAddrV6
 	*
 	* @typedef {string} <T>
 	*
@@ -40,32 +40,32 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @typedef {{
 	*		duration_since_epoch: number,
 	*		duration_since_unix_epoch: number,
-	*	}} 
+	*	}} SystemTime
 	* @property {number} duration_since_epoch
 	* @property {number} duration_since_unix_epoch
 	*
 	* @typedef {{
 	*		secs: number,
 	*		nanos: number,
-	*	}} 
+	*	}} Duration
 	* @property {number} secs
 	* @property {number} nanos
 	*
-	* @typedef {number[]} <T>
+	* @typedef {number[]} Vec<T>
 	*
-	* @typedef {number[]} <T>
+	* @typedef {number[]} Vec<T>
 	*
-	* @typedef {({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never }} <T, E>
+	* @typedef {({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never }} Result<T, E>
 	* @property {{ Ok: string }} Ok
 	* @property {{ Err: number }} Err
 	*
-	* @typedef {number[]} <T>
+	* @typedef {number[]} Vec<T>
 	*
-	* @typedef {null} <T>
+	* @typedef {null} PhantomData<T>
 	*
-	* @typedef {null} <T>
+	* @typedef {null} PhantomData<T>
 	*
-	* @typedef {never} 
+	* @typedef {never} Infallible
 	*
 	* @typedef {null} Unit1
 	*
@@ -182,11 +182,11 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @typedef {string} TransparentTypeWithOverride
 	* @property {string} "0"
 	*
-	* @typedef {{ [key in number]: string }} <K, V>
+	* @typedef {{ [key in number]: string }} HashMap<K, V>
 	*
-	* @typedef {number[]} <T>
+	* @typedef {number[]} Vec<T>
 	*
-	* @typedef {{ [key in number]: string }} <K, V>
+	* @typedef {{ [key in number]: string }} HashMap<K, V>
 	*
 	* @typedef {{
 	*		a: { [key in number]: string },
@@ -201,7 +201,7 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*
 	* @typedef {Record<string, never>} MyEmptyInput
 	*
-	* @typedef {string} 
+	* @typedef {string} String
 	*
 	* @typedef {{ A: string }} ExtraBracketsInTupleVariant
 	* @property {{ A: string }} A
@@ -209,7 +209,7 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @typedef {string} ExtraBracketsInUnnamedStruct
 	* @property {string} "0"
 	*
-	* @typedef {number[]} <T>
+	* @typedef {number[]} Vec<T>
 	*
 	* @typedef {{
 	*		demo: [string, boolean],
@@ -223,9 +223,9 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*	}} InlineTuple2
 	* @property {[InlineTuple, boolean]} demo
 	*
-	* @typedef {string} <T>
+	* @typedef {string} Box<T>
 	*
-	* @typedef {string} <T>
+	* @typedef {string} Box<T>
 	*
 	* @typedef {{ type: "A" } | { type: "B"; data: string }} SkippedFieldWithinVariant
 	* @property {{ type: "A" }} A
@@ -411,18 +411,18 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {number} B
 	* @property {null} C
 	*
-	* @typedef {{ [key in number]: string }} <K, V>
+	* @typedef {{ [key in number]: string }} HashMap<K, V>
 	*
 	* @typedef {{ [key in number]: string }} Regular
 	* @property {{ [key in number]: string }} "0"
 	*
-	* @typedef {{ [key in number]: string }} <K, V>
+	* @typedef {{ [key in number]: string }} HashMap<K, V>
 	*
-	* @typedef {{ [key in number]: string }} <K, V>
+	* @typedef {{ [key in number]: string }} HashMap<K, V>
 	*
-	* @typedef {{ [key in number]: string }} <K, V>
+	* @typedef {{ [key in number]: string }} HashMap<K, V>
 	*
-	* @typedef {{ [key in number]: string }} <K, V>
+	* @typedef {{ [key in number]: string }} HashMap<K, V>
 	*
 	* @typedef {string} MacroStruct
 	* @property {string} "0"
@@ -634,11 +634,11 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {A} a
 	* @property {B} b
 	*
-	* @typedef {{ [key in number]: string }} <K, V>
+	* @typedef {{ [key in number]: string }} HashMap<K, V>
 	*
-	* @typedef {{ [key in number]: string }} <K, V>
+	* @typedef {{ [key in number]: string }} HashMap<K, V>
 	*
-	* @typedef {{ [key in number]: string }} <K, V>
+	* @typedef {{ [key in number]: string }} HashMap<K, V>
 	*
 	* @typedef {{
 	*		field: Demo<T, boolean>,

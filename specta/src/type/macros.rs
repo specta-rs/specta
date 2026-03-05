@@ -77,18 +77,19 @@ macro_rules! _impl_ndt {
                         SENTINEL,
                         |$types, $ndt| {
                             // TODO: This should be doable in the macro instead of the runtime. This will do for now though.
-                            let type_path = stringify!($type_path)
-                                .chars()
-                                .filter(|c| !c.is_whitespace())
-                                .collect::<String>();
-                            let type_path = type_path
-                                .split_once('<')
-                                .map(|(path, _)| path)
-                                .unwrap_or(type_path.as_str());
-                            let Some((module_path, _)) = type_path.rsplit_once("::") else {
-                                panic!("failed to parse module path");
+                            let (type_name, module_path) = {
+                                let s = stringify!($type_path);
+                                let cleaned: String = s.chars().filter(|c| !c.is_whitespace()).collect();
+                                 let s = cleaned.split('<').next().unwrap();
+                                 if let Some((path, name)) = s.rsplit_once("::") {
+                                     (name.to_string(), path.to_string())
+                                 } else {
+                                     ("".to_string(), s.to_string())
+                                 }
                             };
-                            $ndt.set_module_path(::std::borrow::Cow::Owned(module_path.to_owned()));
+
+                            $ndt.set_name(::std::borrow::Cow::Owned(type_name));
+                            $ndt.set_module_path(::std::borrow::Cow::Owned(module_path));
 
                             $build
                         },

@@ -3,12 +3,12 @@
 //! The plan is to try and move these into the ecosystem for the v2 release.
 use super::macros::{impl_ndt, impl_ndt_as};
 use crate::{
+    Type, TypeCollection,
     datatype::{
         self, Attribute, AttributeMeta, AttributeNestedMeta, DataType, Enum, EnumVariant, Field,
         Fields, NamedFields, Primitive, Struct,
     },
     r#type::impls::*,
-    Type, TypeCollection,
 };
 
 use std::borrow::Cow;
@@ -114,7 +114,7 @@ const _: () = {
 
 #[cfg(feature = "serde_yaml")]
 const _: () = {
-    use serde_yaml::{value::TaggedValue, Number, Value};
+    use serde_yaml::{Number, Value, value::TaggedValue};
 
     impl_ndt_as!(
         serde_yaml::Mapping as PrimitiveMap<serde_yaml::Value, serde_yaml::Value>
@@ -206,7 +206,7 @@ const _: () = {
 
 #[cfg(feature = "toml")]
 const _: () = {
-    use toml::{value, Value};
+    use toml::{Value, value};
 
     impl_ndt_as!(toml::map::Map<K, V> as PrimitiveMap<K, V>);
 
@@ -314,17 +314,18 @@ const _: () = {
     // This is special cause of how it ignores the `generics` param to `NamedDataType::init_with_sentinel`
     // These needs generics which also aren't `Type` & aren't in `References` param so `impl_ndt` doesn't work.
     macro_rules! impl_as_str {
-        ($module_path:path, $type_path:path) => {
+        ($module:ident :: $type_name:ident) => {
             fn definition(types: &mut TypeCollection) -> DataType {
                 // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
-                static SENTINEL: &str = stringify!($type_path);
+                static SENTINEL: &str = stringify!($module::$type_name);
                 DataType::Reference(datatype::NamedDataType::init_with_sentinel(
                     vec![],
                     true,
                     types,
                     SENTINEL,
                     |types, ndt| {
-                        ndt.set_module_path(::std::borrow::Cow::Borrowed(stringify!($module_path)));
+                        ndt.set_name(::std::borrow::Cow::Borrowed(stringify!($type_name)));
+                        ndt.set_module_path(::std::borrow::Cow::Borrowed(stringify!($module)));
                         ndt.inner = str::definition(types);
                     },
                 ))
@@ -333,10 +334,10 @@ const _: () = {
     }
 
     impl<T: chrono::TimeZone> Type for chrono::Date<T> {
-        impl_as_str!(chrono, chrono::Date);
+        impl_as_str!(chrono::Date);
     }
     impl<T: chrono::TimeZone> Type for chrono::DateTime<T> {
-        impl_as_str!(chrono, chrono::DateTime);
+        impl_as_str!(chrono::DateTime);
     }
 };
 

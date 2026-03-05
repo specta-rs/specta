@@ -2,59 +2,59 @@
 source: tests/tests/typescript.rs
 expression: "primitives::export(&ts, &types, ndts.into_iter(), \"\").unwrap()"
 ---
-export type <T> = {
+export type Range<T> = {
 	start: number,
 	end: number,
 };
 
-export type <T> = {
+export type RangeInclusive<T> = {
 	start: number,
 	end: number,
 };
 
-export type  = string;
+export type String = string;
 
-export type  = string;
+export type PathBuf = string;
 
-export type  = string;
+export type IpAddr = string;
 
-export type  = string;
+export type Ipv4Addr = string;
 
-export type  = string;
+export type Ipv6Addr = string;
 
-export type  = string;
+export type SocketAddr = string;
 
-export type  = string;
+export type SocketAddrV4 = string;
 
-export type  = string;
+export type SocketAddrV6 = string;
 
 export type <T> = string;
 
 export type <T> = string;
 
-export type  = {
+export type SystemTime = {
 	duration_since_epoch: number,
 	duration_since_unix_epoch: number,
 };
 
-export type  = {
+export type Duration = {
 	secs: number,
 	nanos: number,
 };
 
-export type <T> = number[];
+export type Vec<T> = number[];
 
-export type <T> = number[];
+export type Vec<T> = number[];
 
-export type <T, E> = ({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never };
+export type Result<T, E> = ({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never };
 
-export type <T> = number[];
+export type Vec<T> = number[];
 
-export type <T> = null;
+export type PhantomData<T> = null;
 
-export type <T> = null;
+export type PhantomData<T> = null;
 
-export type  = never;
+export type Infallible = never;
 
 export type Unit1 = null;
 
@@ -132,11 +132,11 @@ export type TransparentType2 = null;
 
 export type TransparentTypeWithOverride = string;
 
-export type <K, V> = { [key in number]: string };
+export type HashMap<K, V> = { [key in number]: string };
 
-export type <T> = number[];
+export type Vec<T> = number[];
 
-export type <K, V> = { [key in number]: string };
+export type HashMap<K, V> = { [key in number]: string };
 
 export type EnumReferenceRecordKey = {
 	a: { [key in number]: string },
@@ -148,13 +148,13 @@ export type FlattenOnNestedEnum = (NestedEnum) & {
 
 export type MyEmptyInput = Record<string, never>;
 
-export type  = string;
+export type String = string;
 
 export type ExtraBracketsInTupleVariant = { A: string };
 
 export type ExtraBracketsInUnnamedStruct = string;
 
-export type <T> = number[];
+export type Vec<T> = number[];
 
 export type InlineTuple = {
 	demo: [string, boolean],
@@ -166,9 +166,9 @@ export type InlineTuple2 = {
 	}, boolean],
 };
 
-export type <T> = string;
+export type Box<T> = string;
 
-export type <T> = string;
+export type Box<T> = string;
 
 export type SkippedFieldWithinVariant = { type: "A" } | { type: "B"; data: string };
 
@@ -293,17 +293,17 @@ export type UntaggedVariantsWithoutValue = string | [number, string] | number;
 
 export type UntaggedVariantsWithDuplicateBranches = null | number;
 
-export type <K, V> = { [key in number]: string };
+export type HashMap<K, V> = { [key in number]: string };
 
 export type Regular = { [key in number]: string };
 
-export type <K, V> = { [key in number]: string };
+export type HashMap<K, V> = { [key in number]: string };
 
-export type <K, V> = { [key in number]: string };
+export type HashMap<K, V> = { [key in number]: string };
 
-export type <K, V> = { [key in number]: string };
+export type HashMap<K, V> = { [key in number]: string };
 
-export type <K, V> = { [key in number]: string };
+export type HashMap<K, V> = { [key in number]: string };
 
 export type MacroStruct = string;
 
@@ -445,11 +445,11 @@ export type Demo<A, B> = {
 	b: B,
 };
 
-export type <K, V> = { [key in number]: string };
+export type HashMap<K, V> = { [key in number]: string };
 
-export type <K, V> = { [key in number]: string };
+export type HashMap<K, V> = { [key in number]: string };
 
-export type <K, V> = { [key in number]: string };
+export type HashMap<K, V> = { [key in number]: string };
 
 export type AGenericStruct<T> = {
 	field: Demo<T, boolean>,
