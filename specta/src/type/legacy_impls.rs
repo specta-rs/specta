@@ -448,100 +448,93 @@ const _: () = {
 };
 
 #[cfg(feature = "glam")]
-const _: () = {
-    impl_ndt_as!(
-        // Implementations for https://docs.rs/glam/latest/glam/f32/index.html
-        glam::Affine2 as [f32; 6]
-        glam::Affine3A as [f32; 12]
-    );
+impl_ndt_as!(
+    // Affines
+    glam::Affine2 as [f32; 6]
+    glam::Affine3A as [f32; 12]
 
-    //     // Affines
-    //     implement_specta_type_for_glam_type!(Affine2 as [f32; 6]);
-    //     implement_specta_type_for_glam_type!(Affine3A as [f32; 12]);
+    // Matrices
+    glam::Mat2 as [f32; 4]
+    glam::Mat3 as [f32; 9]
+    glam::Mat3A as [f32; 9]
+    glam::Mat4 as [f32; 16]
 
-    //     // Matrices
-    //     implement_specta_type_for_glam_type!(Mat2 as [f32; 4]);
-    //     implement_specta_type_for_glam_type!(Mat3 as [f32; 9]);
-    //     implement_specta_type_for_glam_type!(Mat3A as [f32; 9]);
-    //     implement_specta_type_for_glam_type!(Mat4 as [f32; 16]);
+    // Quaternions
+    glam::Quat as [f32; 4]
 
-    //     // Quaternions
-    //     implement_specta_type_for_glam_type!(Quat as [f32; 4]);
+    // Vectors
+    glam::Vec2 as [f32; 2]
+    glam::Vec3 as [f32; 3]
+    glam::Vec3A as [f32; 3]
+    glam::Vec4 as [f32; 4]
 
-    //     // Vectors
-    //     implement_specta_type_for_glam_type!(Vec2 as [f32; 2]);
-    //     implement_specta_type_for_glam_type!(Vec3 as [f32; 3]);
-    //     implement_specta_type_for_glam_type!(Vec3A as [f32; 3]);
-    //     implement_specta_type_for_glam_type!(Vec4 as [f32; 4]);
+    // Affines
+    glam::DAffine2 as [f64; 6]
+    glam::DAffine3 as [f64; 12]
 
-    //     // Implementations for https://docs.rs/glam/latest/glam/f64/index.html
-    //     // Affines
-    //     implement_specta_type_for_glam_type!(DAffine2 as [f64; 6]);
-    //     implement_specta_type_for_glam_type!(DAffine3 as [f64; 12]);
+    // Matrices
+    glam::DMat2 as [f64; 4]
+    glam::DMat3 as [f64; 9]
+    glam::DMat4 as [f64; 16]
 
-    //     // Matrices
-    //     implement_specta_type_for_glam_type!(DMat2 as [f64; 4]);
-    //     implement_specta_type_for_glam_type!(DMat3 as [f64; 9]);
-    //     implement_specta_type_for_glam_type!(DMat4 as [f64; 16]);
+    // Quaternions
+    glam::DQuat as [f64; 4]
 
-    //     // Quaternions
-    //     implement_specta_type_for_glam_type!(DQuat as [f64; 4]);
+    // Vectors
+    glam::DVec2 as [f64; 2]
+    glam::DVec3 as [f64; 3]
+    glam::DVec4 as [f64; 4]
 
-    //     // Vectors
-    //     implement_specta_type_for_glam_type!(DVec2 as [f64; 2]);
-    //     implement_specta_type_for_glam_type!(DVec3 as [f64; 3]);
-    //     implement_specta_type_for_glam_type!(DVec4 as [f64; 4]);
+    // Implementations for https://docs.rs/glam/latest/glam/i8/index.html
+    glam::I8Vec2 as [i8; 2]
+    glam::I8Vec3 as [i8; 3]
+    glam::I8Vec4 as [i8; 4]
 
-    //     // Implementations for https://docs.rs/glam/latest/glam/i8/index.html
-    //     implement_specta_type_for_glam_type!(I8Vec2 as [i8; 2]);
-    //     implement_specta_type_for_glam_type!(I8Vec3 as [i8; 3]);
-    //     implement_specta_type_for_glam_type!(I8Vec4 as [i8; 4]);
+    // Implementations for https://docs.rs/glam/latest/glam/u8/index.html
+    glam::U8Vec2 as [u8; 2]
+    glam::U8Vec3 as [u8; 3]
+    glam::U8Vec4 as [u8; 4]
 
-    //     // Implementations for https://docs.rs/glam/latest/glam/u8/index.html
-    //     implement_specta_type_for_glam_type!(U8Vec2 as [u8; 2]);
-    //     implement_specta_type_for_glam_type!(U8Vec3 as [u8; 3]);
-    //     implement_specta_type_for_glam_type!(U8Vec4 as [u8; 4]);
+    // Implementations for https://docs.rs/glam/latest/glam/i16/index.html
+    glam::I16Vec2 as [i16; 2]
+    glam::I16Vec3 as [i16; 3]
+    glam::I16Vec4 as [i16; 4]
 
-    //     // Implementations for https://docs.rs/glam/latest/glam/i16/index.html
-    //     implement_specta_type_for_glam_type!(I16Vec2 as [i16; 2]);
-    //     implement_specta_type_for_glam_type!(I16Vec3 as [i16; 3]);
-    //     implement_specta_type_for_glam_type!(I16Vec4 as [i16; 4]);
+    // Implementations for https://docs.rs/glam/latest/glam/u16/index.html
+    glam::U16Vec2 as [u16; 2]
+    glam::U16Vec3 as [u16; 3]
+    glam::U16Vec4 as [u16; 4]
 
-    //     // Implementations for https://docs.rs/glam/latest/glam/u16/index.html
-    //     implement_specta_type_for_glam_type!(U16Vec2 as [u16; 2]);
-    //     implement_specta_type_for_glam_type!(U16Vec3 as [u16; 3]);
-    //     implement_specta_type_for_glam_type!(U16Vec4 as [u16; 4]);
+    // Implementations for https://docs.rs/glam/latest/glam/i32/index.html
+    glam::IVec2 as [i32; 2]
+    glam::IVec3 as [i32; 3]
+    glam::IVec4 as [i32; 4]
 
-    //     // Implementations for https://docs.rs/glam/latest/glam/i32/index.html
-    //     implement_specta_type_for_glam_type!(IVec2 as [i32; 2]);
-    //     implement_specta_type_for_glam_type!(IVec3 as [i32; 3]);
-    //     implement_specta_type_for_glam_type!(IVec4 as [i32; 4]);
+    // Implementations for https://docs.rs/glam/latest/glam/u32/index.html
+    glam::UVec2 as [u32; 2]
+    glam::UVec3 as [u32; 3]
+    glam::UVec4 as [u32; 4]
 
-    //     // Implementations for https://docs.rs/glam/latest/glam/u32/index.html
-    //     implement_specta_type_for_glam_type!(UVec2 as [u32; 2]);
-    //     implement_specta_type_for_glam_type!(UVec3 as [u32; 3]);
-    //     implement_specta_type_for_glam_type!(UVec4 as [u32; 4]);
+    // Implementation for https://docs.rs/glam/latest/glam/i64/index.html
+    glam::I64Vec2 as [i64; 2]
+    glam::I64Vec3 as [i64; 3]
+    glam::I64Vec4 as [i64; 4]
 
-    //     // Implementation for https://docs.rs/glam/latest/glam/i64/index.html
-    //     implement_specta_type_for_glam_type!(I64Vec2 as [i64; 2]);
-    //     implement_specta_type_for_glam_type!(I64Vec3 as [i64; 3]);
-    //     implement_specta_type_for_glam_type!(I64Vec4 as [i64; 4]);
+    // Implementation for https://docs.rs/glam/latest/glam/u64/index.html
+    glam::U64Vec2 as [u64; 2]
+    glam::U64Vec3 as [u64; 3]
+    glam::U64Vec4 as [u64; 4]
 
-    //     // Implementation for https://docs.rs/glam/latest/glam/u64/index.html
-    //     implement_specta_type_for_glam_type!(U64Vec2 as [u64; 2]);
-    //     implement_specta_type_for_glam_type!(U64Vec3 as [u64; 3]);
-    //     implement_specta_type_for_glam_type!(U64Vec4 as [u64; 4]);
+    // implementation for https://docs.rs/glam/latest/glam/usize/index.html
+    glam::USizeVec2 as [usize; 2]
+    glam::USizeVec3 as [usize; 3]
+    glam::USizeVec4 as [usize; 4]
 
-    //     // implementation for https://docs.rs/glam/latest/glam/usize/index.html
-    //     implement_specta_type_for_glam_type!(USizeVec2 as [usize; 2]);
-    //     implement_specta_type_for_glam_type!(USizeVec3 as [usize; 3]);
-    //     implement_specta_type_for_glam_type!(USizeVec4 as [usize; 4]);
-
-    //     // Implementation for https://docs.rs/glam/latest/glam/bool/index.html
-    //     implement_specta_type_for_glam_type!(BVec2 as [bool; 2]);
-    //     implement_specta_type_for_glam_type!(BVec3 as [bool; 3]);
-    //     implement_specta_type_for_glam_type!(BVec4 as [bool; 4]);
-};
+    // Implementation for https://docs.rs/glam/latest/glam/bool/index.html
+    glam::BVec2 as [bool; 2]
+    glam::BVec3 as [bool; 3]
+    glam::BVec4 as [bool; 4]
+);
 
 #[cfg(feature = "url")]
 impl_ndt_as!(url::Url as str);
@@ -573,26 +566,28 @@ impl_ndt!(
 );
 
 #[cfg(feature = "bevy_ecs")]
-const _: () = {
-    impl_ndt!(
-        impl Type for bevy_ecs::entity::Entity {
-            inline: true;
-            build: |types, ndt| {
-                let mut s = Struct::unit();
-                s.set_fields(crate::internal::construct::fields_unnamed(
-                    vec![Field::new(u64::definition(types))],
-                    vec![],
-                ));
+impl_ndt!(
+    impl Type for bevy_ecs::entity::Entity {
+        inline: true;
+        build: |types, ndt| {
+            let mut s = Struct::unit();
+            s.set_fields(crate::internal::construct::fields_unnamed(
+                vec![Field::new(u64::definition(types))],
+                vec![],
+            ));
 
-                ndt.inner = DataType::Struct(s);
-            }
+            ndt.inner = DataType::Struct(s);
         }
-    );
-};
+    }
+);
 
 #[cfg(feature = "bevy_input")]
 const _: () = {
-    impl_ndt_as!(glam::Vec2 as [f32; 2]);
+    // Reduced KeyCode and Key to str to avoid redefining a quite large enum (for now)
+    impl_ndt_as!(
+        bevy_input::keyboard::KeyCode as str
+        bevy_input::keyboard::Key as str
+    );
 
     impl_ndt!(
         impl Type for bevy_input::ButtonState {
@@ -736,12 +731,6 @@ const _: () = {
             }
         }
     );
-
-    // Reduced KeyCode and Key to str to avoid redefining a quite large enum (for now)
-    impl_ndt_as!(
-        bevy_input::keyboard::KeyCode as str
-        bevy_input::keyboard::Key as str
-    );
 };
 
 #[cfg(feature = "camino")]
@@ -751,294 +740,286 @@ impl_ndt_as!(
 );
 
 #[cfg(feature = "geojson")]
-const _: () = {
-    use geojson::{Feature, FeatureCollection, Geometry, Value};
-
-    impl_ndt!(
-        impl Type for geojson::Value {
-            inline: true;
-            build: |types, ndt| {
-                ndt.inner = DataType::Enum(Enum {
-                    variants: vec![
-                        (
-                            "Point".into(),
-                            EnumVariant::unnamed()
-                                .field(Field::new(geojson::PointType::definition(types)))
-                                .build(),
-                        ),
-                        (
-                            "MultiPoint".into(),
-                            EnumVariant::unnamed()
-                                .field(Field::new(Vec::<geojson::PointType>::definition(types)))
-                                .build(),
-                        ),
-                        (
-                            "LineString".into(),
-                            EnumVariant::unnamed()
-                                .field(Field::new(geojson::LineStringType::definition(types)))
-                                .build(),
-                        ),
-                        (
-                            "MultiLineString".into(),
-                            EnumVariant::unnamed()
-                                .field(Field::new(Vec::<geojson::LineStringType>::definition(
-                                    types,
-                                )))
-                                .build(),
-                        ),
-                        (
-                            "Polygon".into(),
-                            EnumVariant::unnamed()
-                                .field(Field::new(geojson::PolygonType::definition(types)))
-                                .build(),
-                        ),
-                        (
-                            "MultiPolygon".into(),
-                            EnumVariant::unnamed()
-                                .field(Field::new(Vec::<geojson::PolygonType>::definition(types)))
-                                .build(),
-                        ),
-                        (
-                            "GeometryCollection".into(),
-                            EnumVariant::unnamed()
-                                .field(Field::new(Vec::<Geometry>::definition(types)))
-                                .build(),
-                        ),
-                    ],
-                    attributes: vec![Attribute {
-                        path: String::from("serde"),
-                        kind: AttributeMeta::List(vec![AttributeNestedMeta::Meta(AttributeMeta::Path(
-                            String::from("untagged"),
-                        ))]),
-                    }],
-                });
-            }
+impl_ndt!(
+    impl Type for geojson::Value {
+        inline: true;
+        build: |types, ndt| {
+            ndt.inner = DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "Point".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(geojson::PointType::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "MultiPoint".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(Vec::<geojson::PointType>::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "LineString".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(geojson::LineStringType::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "MultiLineString".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(Vec::<geojson::LineStringType>::definition(
+                                types,
+                            )))
+                            .build(),
+                    ),
+                    (
+                        "Polygon".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(geojson::PolygonType::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "MultiPolygon".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(Vec::<geojson::PolygonType>::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "GeometryCollection".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(Vec::<Geometry>::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: vec![Attribute {
+                    path: String::from("serde"),
+                    kind: AttributeMeta::List(vec![AttributeNestedMeta::Meta(AttributeMeta::Path(
+                        String::from("untagged"),
+                    ))]),
+                }],
+            });
         }
+    }
 
-        impl Type for Geometry {
-            inline: true;
-            build: |types, ndt| {
-                let mut s = Struct::unit();
-                s.set_fields(crate::internal::construct::fields_named(
-                    vec![
-                        (
-                            "bbox".into(),
-                            Field::new(Option::<geojson::Bbox>::definition(types)),
-                        ),
-                        ("value".into(), Field::new(Value::definition(types))),
-                        (
-                            "foreign_members".into(),
-                            Field::new(Option::<geojson::JsonObject>::definition(types)),
-                        ),
-                    ],
-                    vec![],
-                ));
+    impl Type for Geometry {
+        inline: true;
+        build: |types, ndt| {
+            let mut s = Struct::unit();
+            s.set_fields(crate::internal::construct::fields_named(
+                vec![
+                    (
+                        "bbox".into(),
+                        Field::new(Option::<geojson::Bbox>::definition(types)),
+                    ),
+                    ("value".into(), Field::new(Value::definition(types))),
+                    (
+                        "foreign_members".into(),
+                        Field::new(Option::<geojson::JsonObject>::definition(types)),
+                    ),
+                ],
+                vec![],
+            ));
 
-                ndt.inner = DataType::Struct(s);
-            }
+            ndt.inner = DataType::Struct(s);
         }
+    }
 
-        impl Type for Feature {
-            inline: true;
-            build: |types, ndt| {
-                let mut s = Struct::unit();
-                s.set_fields(crate::internal::construct::fields_named(
-                    vec![
-                        (
-                            "bbox".into(),
-                            Field::new(Option::<geojson::Bbox>::definition(types)),
-                        ),
-                        (
-                            "geometry".into(),
-                            Field::new(Option::<Geometry>::definition(types)),
-                        ),
-                        (
-                            "id".into(),
-                            Field::new(Option::<geojson::feature::Id>::definition(types)),
-                        ),
-                        (
-                            "properties".into(),
-                            Field::new(Option::<geojson::JsonObject>::definition(types)),
-                        ),
-                        (
-                            "foreign_members".into(),
-                            Field::new(Option::<geojson::JsonObject>::definition(types)),
-                        ),
-                    ],
-                    vec![],
-                ));
+    impl Type for Feature {
+        inline: true;
+        build: |types, ndt| {
+            let mut s = Struct::unit();
+            s.set_fields(crate::internal::construct::fields_named(
+                vec![
+                    (
+                        "bbox".into(),
+                        Field::new(Option::<geojson::Bbox>::definition(types)),
+                    ),
+                    (
+                        "geometry".into(),
+                        Field::new(Option::<Geometry>::definition(types)),
+                    ),
+                    (
+                        "id".into(),
+                        Field::new(Option::<geojson::feature::Id>::definition(types)),
+                    ),
+                    (
+                        "properties".into(),
+                        Field::new(Option::<geojson::JsonObject>::definition(types)),
+                    ),
+                    (
+                        "foreign_members".into(),
+                        Field::new(Option::<geojson::JsonObject>::definition(types)),
+                    ),
+                ],
+                vec![],
+            ));
 
-                ndt.inner = DataType::Struct(s);
-            }
+            ndt.inner = DataType::Struct(s);
         }
+    }
 
-        impl Type for FeatureCollection {
-            inline: true;
-            build: |types, ndt| {
-                let mut s = Struct::unit();
-                s.set_fields(crate::internal::construct::fields_named(
-                    vec![
-                        (
-                            "bbox".into(),
-                            Field::new(Option::<geojson::Bbox>::definition(types)),
-                        ),
-                        ("features".into(), Field::new(Vec::<Feature>::definition(types))),
-                        (
-                            "foreign_members".into(),
-                            Field::new(Option::<geojson::JsonObject>::definition(types)),
-                        ),
-                    ],
-                    vec![],
-                ));
+    impl Type for FeatureCollection {
+        inline: true;
+        build: |types, ndt| {
+            let mut s = Struct::unit();
+            s.set_fields(crate::internal::construct::fields_named(
+                vec![
+                    (
+                        "bbox".into(),
+                        Field::new(Option::<geojson::Bbox>::definition(types)),
+                    ),
+                    ("features".into(), Field::new(Vec::<Feature>::definition(types))),
+                    (
+                        "foreign_members".into(),
+                        Field::new(Option::<geojson::JsonObject>::definition(types)),
+                    ),
+                ],
+                vec![],
+            ));
 
-                ndt.inner = DataType::Struct(s);
-            }
+            ndt.inner = DataType::Struct(s);
         }
+    }
 
-        impl Type for geojson::feature::Id {
-            inline: true;
-            build: |types, ndt| {
-                ndt.inner = DataType::Enum(Enum {
-                    variants: vec![
-                        (
-                            "String".into(),
-                            EnumVariant::unnamed()
-                                .field(Field::new(str::definition(types)))
-                                .build(),
-                        ),
-                        (
-                            "Number".into(),
-                            EnumVariant::unnamed()
-                                .field(Field::new(serde_json::Number::definition(types)))
-                                .build(),
-                        ),
-                    ],
-                    attributes: vec![Attribute {
-                        path: String::from("serde"),
-                        kind: AttributeMeta::List(vec![AttributeNestedMeta::Meta(AttributeMeta::Path(
-                            String::from("untagged"),
-                        ))]),
-                    }],
-                });
-            }
+    impl Type for geojson::feature::Id {
+        inline: true;
+        build: |types, ndt| {
+            ndt.inner = DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "String".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(str::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Number".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(serde_json::Number::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: vec![Attribute {
+                    path: String::from("serde"),
+                    kind: AttributeMeta::List(vec![AttributeNestedMeta::Meta(AttributeMeta::Path(
+                        String::from("untagged"),
+                    ))]),
+                }],
+            });
         }
-    );
-};
+    }
+);
 
 #[cfg(feature = "geozero")]
-const _: () = {
-    use geozero::mvt::tile;
+impl_ndt!(
+    impl Type for geozero::mvt::Tile {
+        inline: true;
+        build: |types, ndt| {
+            let mut s = Struct::unit();
+            s.set_fields(crate::internal::construct::fields_named(
+                vec![("layers".into(), Field::new(Vec::<tile::Layer>::definition(types)))],
+                vec![],
+            ));
 
-    impl_ndt!(
-        impl Type for geozero::mvt::Tile {
-            inline: true;
-            build: |types, ndt| {
-                let mut s = Struct::unit();
-                s.set_fields(crate::internal::construct::fields_named(
-                    vec![("layers".into(), Field::new(Vec::<tile::Layer>::definition(types)))],
-                    vec![],
-                ));
-
-                ndt.inner = DataType::Struct(s);
-            }
+            ndt.inner = DataType::Struct(s);
         }
+    }
 
-        impl Type for tile::Value {
-            inline: true;
-            build: |types, ndt| {
-                let mut s = Struct::unit();
-                s.set_fields(crate::internal::construct::fields_named(
-                    vec![
-                        (
-                            "string_value".into(),
-                            Field::new(Option::<String>::definition(types)),
-                        ),
-                        (
-                            "float_value".into(),
-                            Field::new(Option::<f32>::definition(types)),
-                        ),
-                        (
-                            "double_value".into(),
-                            Field::new(Option::<f64>::definition(types)),
-                        ),
-                        ("int_value".into(), Field::new(Option::<i64>::definition(types))),
-                        (
-                            "uint_value".into(),
-                            Field::new(Option::<u64>::definition(types)),
-                        ),
-                        (
-                            "sint_value".into(),
-                            Field::new(Option::<i64>::definition(types)),
-                        ),
-                        (
-                            "bool_value".into(),
-                            Field::new(Option::<bool>::definition(types)),
-                        ),
-                    ],
-                    vec![],
-                ));
+    impl Type for tile::Value {
+        inline: true;
+        build: |types, ndt| {
+            let mut s = Struct::unit();
+            s.set_fields(crate::internal::construct::fields_named(
+                vec![
+                    (
+                        "string_value".into(),
+                        Field::new(Option::<String>::definition(types)),
+                    ),
+                    (
+                        "float_value".into(),
+                        Field::new(Option::<f32>::definition(types)),
+                    ),
+                    (
+                        "double_value".into(),
+                        Field::new(Option::<f64>::definition(types)),
+                    ),
+                    ("int_value".into(), Field::new(Option::<i64>::definition(types))),
+                    (
+                        "uint_value".into(),
+                        Field::new(Option::<u64>::definition(types)),
+                    ),
+                    (
+                        "sint_value".into(),
+                        Field::new(Option::<i64>::definition(types)),
+                    ),
+                    (
+                        "bool_value".into(),
+                        Field::new(Option::<bool>::definition(types)),
+                    ),
+                ],
+                vec![],
+            ));
 
-                ndt.inner = DataType::Struct(s);
-            }
+            ndt.inner = DataType::Struct(s);
         }
+    }
 
-        impl Type for tile::Feature {
-            inline: true;
-            build: |types, ndt| {
-                let mut s = Struct::unit();
-                s.set_fields(crate::internal::construct::fields_named(
-                    vec![
-                        ("id".into(), Field::new(Option::<u64>::definition(types))),
-                        ("tags".into(), Field::new(Vec::<u32>::definition(types))),
-                        ("type".into(), Field::new(Option::<i32>::definition(types))),
-                        ("geometry".into(), Field::new(Vec::<u32>::definition(types))),
-                    ],
-                    vec![],
-                ));
+    impl Type for tile::Feature {
+        inline: true;
+        build: |types, ndt| {
+            let mut s = Struct::unit();
+            s.set_fields(crate::internal::construct::fields_named(
+                vec![
+                    ("id".into(), Field::new(Option::<u64>::definition(types))),
+                    ("tags".into(), Field::new(Vec::<u32>::definition(types))),
+                    ("type".into(), Field::new(Option::<i32>::definition(types))),
+                    ("geometry".into(), Field::new(Vec::<u32>::definition(types))),
+                ],
+                vec![],
+            ));
 
-                ndt.inner = DataType::Struct(s);
-            }
+            ndt.inner = DataType::Struct(s);
         }
+    }
 
-        impl Type for tile::Layer {
-            inline: true;
-            build: |types, ndt| {
-                let mut s = Struct::unit();
-                s.set_fields(crate::internal::construct::fields_named(
-                    vec![
-                        ("version".into(), Field::new(u32::definition(types))),
-                        ("name".into(), Field::new(String::definition(types))),
-                        (
-                            "features".into(),
-                            Field::new(Vec::<tile::Feature>::definition(types)),
-                        ),
-                        ("keys".into(), Field::new(Vec::<String>::definition(types))),
-                        (
-                            "values".into(),
-                            Field::new(Vec::<tile::Value>::definition(types)),
-                        ),
-                        ("extent".into(), Field::new(Option::<u32>::definition(types))),
-                    ],
-                    vec![],
-                ));
+    impl Type for tile::Layer {
+        inline: true;
+        build: |types, ndt| {
+            let mut s = Struct::unit();
+            s.set_fields(crate::internal::construct::fields_named(
+                vec![
+                    ("version".into(), Field::new(u32::definition(types))),
+                    ("name".into(), Field::new(String::definition(types))),
+                    (
+                        "features".into(),
+                        Field::new(Vec::<tile::Feature>::definition(types)),
+                    ),
+                    ("keys".into(), Field::new(Vec::<String>::definition(types))),
+                    (
+                        "values".into(),
+                        Field::new(Vec::<tile::Value>::definition(types)),
+                    ),
+                    ("extent".into(), Field::new(Option::<u32>::definition(types))),
+                ],
+                vec![],
+            ));
 
-                ndt.inner = DataType::Struct(s);
-            }
+            ndt.inner = DataType::Struct(s);
         }
+    }
 
-        impl Type for tile::GeomType {
-            inline: true;
-            build: |_types, ndt| {
-                ndt.inner = DataType::Enum(Enum {
-                    variants: vec![
-                        ("Unknown".into(), EnumVariant::unit()),
-                        ("Point".into(), EnumVariant::unit()),
-                        ("Linestring".into(), EnumVariant::unit()),
-                        ("Polygon".into(), EnumVariant::unit()),
-                    ],
-                    attributes: vec![],
-                });
-            }
+    impl Type for tile::GeomType {
+        inline: true;
+        build: |_types, ndt| {
+            ndt.inner = DataType::Enum(Enum {
+                variants: vec![
+                    ("Unknown".into(), EnumVariant::unit()),
+                    ("Point".into(), EnumVariant::unit()),
+                    ("Linestring".into(), EnumVariant::unit()),
+                    ("Polygon".into(), EnumVariant::unit()),
+                ],
+                attributes: vec![],
+            });
         }
-    );
-};
+    }
+);

@@ -216,12 +216,10 @@ const _: () = {
 };
 
 #[cfg(feature = "tokio")]
-const _: () = {
-    impl_ndt_as!(
-        tokio::sync::Mutex<T> where { T: ?Sized } as T
-        tokio::sync::RwLock<T> where { T: ?Sized } as T
-    );
-};
+impl_ndt_as!(
+    tokio::sync::Mutex<T> where { T: ?Sized } as T
+    tokio::sync::RwLock<T> where { T: ?Sized } as T
+);
 
 impl<T: Type + ?Sized> Type for &T {
     impl_passthrough!(T);

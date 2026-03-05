@@ -50,9 +50,6 @@ macro_rules! _impl_ndt_as {
             )*
         );
     };
-    ( $($tt:tt)+ ) => {
-        compile_error!("impl_ndt_as! requires a fully-qualified path in `impl Type for ...` (for example: std::time::Duration)");
-    };
 }
 
 macro_rules! _impl_ndt {
