@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
 use crate::{
-    Type, TypeCollection,
     datatype::{self, DataType, Enum, EnumVariant, Field, List},
     internal,
     r#type::macros::*,
+    Type, TypeCollection,
 };
 
 impl_primitives!(
@@ -128,7 +128,6 @@ const _: () = {
 
     impl_ndt!(
         impl Type for std::convert::Infallible {
-            type_path: std::convert::Infallible;
             inline: true;
             build: |_types, ndt| {
                 // Serde does no support `Infallible` as it can't be constructed as a `&self` method is uncallable on it.
@@ -137,7 +136,6 @@ const _: () = {
         }
 
         impl Type for std::time::SystemTime {
-            type_path: std::time::SystemTime;
             inline: true;
             build: |types, ndt| {
                 let mut s = crate::datatype::Struct::unit();
@@ -160,7 +158,6 @@ const _: () = {
         }
 
         impl Type for std::time::Duration {
-            type_path: std::time::Duration;
             inline: true;
             build: |types, ndt| {
                 let mut s = crate::datatype::Struct::unit();
@@ -257,8 +254,7 @@ impl_ndt_as!(
 );
 
 impl_ndt!(
-    impl<T, E> Type for Result<T, E> where { T: Type, E: Type} {
-        type_path: std::result::Result;
+    impl<T, E> Type for std::result::Result<T, E> where { T: Type, E: Type} {
         inline: true;
         build: |types, ndt| {
             let mut ok_variant = EnumVariant::unit();

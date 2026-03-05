@@ -42,7 +42,6 @@ macro_rules! _impl_ndt_as {
                     // `(): Sized` is meaningless and is used to add a base-condition to avoid branching in the macro.
                     (): Sized $(, $($generic: Type),*)? $(, $($bounds)*)?
                 } {
-                    type_path: $head::$( $tail )::+;
                     inline: true;
                     build: |types, ndt| {
                         ndt.inner = <$ty2 as Type>::definition(types);
@@ -51,35 +50,22 @@ macro_rules! _impl_ndt_as {
             )*
         );
     };
-    ( $($ty:ident $(<$($generic:ident),*>)? $( where { $($bounds:tt)* } )? as $ty2:ty )* ) => {
-        impl_ndt!(
-            $(
-                impl$(<$($generic),*>)? Type for $ty $(<$($generic),*>)? where {
-                    // `(): Sized` is meaningless and is used to add a base-condition to avoid branching in the macro.
-                    (): Sized $(, $($generic: Type),*)? $(, $($bounds)*)?
-                } {
-                    inline: true;
-                    build: |types, ndt| {
-                        ndt.inner = <$ty2 as Type>::definition(types);
-                    }
-                }
-            )*
-        );
+    ( $($tt:tt)+ ) => {
+        compile_error!("impl_ndt_as! requires a fully-qualified path in `impl Type for ...` (for example: std::time::Duration)");
     };
 }
 
 macro_rules! _impl_ndt {
     (
         $(
-            impl $(<$($generic:ident),*>)? Type for $ty:ty $( where { $($bounds:tt)* } )? {
-                type_path: $type_path:path;
+            impl $(<$($generic:ident),*>)? Type for $type_path:path $( where { $($bounds:tt)* } )? {
                 inline: $inline:expr;
                 build: |$types:ident, $ndt:ident| $build:block
             }
         )+
     ) => {
         $(
-            impl$(<$($generic),*>)? Type for $ty $(where $($bounds)*)? {
+            impl$(<$($generic),*>)? Type for $type_path $(where $($bounds)*)? {
                 fn definition(types: &mut TypeCollection) -> DataType {
                     // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
                     static SENTINEL: &str = stringify!($type_path);

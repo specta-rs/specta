@@ -14,20 +14,16 @@ use crate::{
 use std::borrow::Cow;
 
 #[cfg(feature = "indexmap")]
-const _: () = {
-    impl_ndt_as!(
-        indexmap::IndexSet<T> as PrimitiveSet<T>
-        indexmap::IndexMap<K, V> as PrimitiveMap<K, V>
-    );
-};
+impl_ndt_as!(
+    indexmap::IndexSet<T> as PrimitiveSet<T>
+    indexmap::IndexMap<K, V> as PrimitiveMap<K, V>
+);
 
 #[cfg(feature = "bytes")]
-const _: () = {
-    impl_ndt_as!(
-        bytes::Bytes as [u8]
-        bytes::BytesMut as [u8]
-    );
-};
+impl_ndt_as!(
+    bytes::Bytes as [u8]
+    bytes::BytesMut as [u8]
+);
 
 #[cfg(feature = "serde_json")]
 const _: () = {
@@ -38,8 +34,7 @@ const _: () = {
     );
 
     impl_ndt!(
-        impl Type for Value {
-            type_path: serde_json::Value;
+        impl Type for serde_json::Value {
             inline: true;
             build: |types, ndt| {
                 ndt.inner = DataType::Enum(Enum {
@@ -81,8 +76,7 @@ const _: () = {
             }
         }
 
-        impl Type for Number {
-            type_path: serde_json::Number;
+        impl Type for serde_json::Number {
             inline: true;
             build: |types, ndt| {
                 ndt.inner = DataType::Enum(Enum {
@@ -128,8 +122,7 @@ const _: () = {
     );
 
     impl_ndt!(
-        impl Type for Value {
-            type_path: serde_yaml::Value;
+        impl Type for serde_yaml::Value {
             inline: true;
             build: |types, ndt| {
                 ndt.inner = DataType::Enum(Enum {
@@ -181,7 +174,6 @@ const _: () = {
         }
 
         impl Type for serde_yaml::Number {
-            type_path: serde_yaml::Number;
             inline: true;
             build: |types, ndt| {
                 ndt.inner = DataType::Enum(Enum {
@@ -219,8 +211,7 @@ const _: () = {
     impl_ndt_as!(toml::map::Map<K, V> as PrimitiveMap<K, V>);
 
     impl_ndt!(
-        impl Type for value::Datetime {
-            type_path: toml::value::Datetime;
+        impl Type for toml::value::Datetime {
             inline: true;
             build: |types, ndt| {
                 ndt.inner = DataType::Struct(Struct {
@@ -244,8 +235,7 @@ const _: () = {
             }
         }
 
-        impl Type for Value {
-            type_path: toml::Value;
+        impl Type for toml::Value {
             inline: true;
             build: |types, ndt| {
                 ndt.inner = DataType::Enum(Enum {
@@ -303,22 +293,16 @@ const _: () = {
 };
 
 #[cfg(feature = "ulid")]
-const _: () = {
-    impl_ndt_as!(ulid::Ulid as str);
-};
+impl_ndt_as!(ulid::Ulid as str);
 
 #[cfg(feature = "uuid")]
-const _: () = {
-    impl_ndt_as!(
-        uuid::Uuid as str
-        uuid::fmt::Hyphenated as str
-    );
-};
+impl_ndt_as!(
+    uuid::Uuid as str
+    uuid::fmt::Hyphenated as str
+);
 
 #[cfg(feature = "chrono")]
 const _: () = {
-    use chrono::{Date, DateTime, TimeZone};
-
     impl_ndt_as!(
         chrono::NaiveDateTime as str
         chrono::NaiveDate as str
@@ -326,234 +310,236 @@ const _: () = {
         chrono::Duration as str
     );
 
-    // TODO: These are NDT's that shouldn't have `Type` added into generics
+    impl_ndt!(
+        impl<T> Type for chrono::Date<T> where { T: chrono::TimeZone } {
+            inline: true;
+            build: |types, ndt| {
+                ndt.inner = str::definition(types);
+            }
+        }
 
-    // impl<T: TimeZone> Type for DateTime<T> {
-    //     impl_passthrough!(str);
-    // }
-
-    // #[allow(deprecated)]
-    // impl<T: TimeZone> Type for Date<T> {
-    //     impl_passthrough!(str);
-    // }
+        impl<T> Type for chrono::DateTime<T> where { T: chrono::TimeZone } {
+            inline: true;
+            build: |types, ndt| {
+                ndt.inner = str::definition(types);
+            }
+        }
+    );
 };
 
 #[cfg(feature = "time")]
+impl_ndt_as!(
+    time::PrimitiveDateTime as str
+    time::OffsetDateTime as str
+    time::Date as str
+    time::Time as str
+    time::Duration as str
+    time::Weekday as str
+);
+
+#[cfg(feature = "jiff")]
+impl_ndt_as!(
+    jiff::Timestamp as str
+    jiff::Zoned as str
+    jiff::Span as str
+    jiff::civil::Date as str
+    jiff::civil::Time as str
+    jiff::civil::DateTime as str
+    jiff::tz::TimeZone as str
+);
+
+#[cfg(feature = "bigdecimal")]
+impl_ndt_as!(bigdecimal::BigDecimal as str);
+
+// This assumes the `serde-with-str` feature is enabled. Check #26 for more info.
+#[cfg(feature = "rust_decimal")]
+impl_ndt_as!(rust_decimal::Decimal as str);
+
+#[cfg(feature = "ipnetwork")]
+impl_ndt_as!(
+    ipnetwork::IpNetwork as str
+    ipnetwork::Ipv4Network as str
+    ipnetwork::Ipv6Network as str
+);
+
+#[cfg(feature = "mac_address")]
+impl_ndt_as!(mac_address::MacAddress as str);
+
+#[cfg(feature = "chrono")]
+impl_ndt_as!(
+    chrono::FixedOffset as str
+    chrono::Utc as str
+    chrono::Local as str
+);
+
+#[cfg(feature = "bson")]
+impl_ndt_as!(
+    bson::oid::ObjectId as str
+    bson::Decimal128 as i128
+    bson::DateTime as str
+    bson::Uuid as str
+);
+
+// TODO: bson::bson
+// TODO: bson::Document
+
+#[cfg(feature = "bytesize")]
+impl_ndt_as!(bytesize::ByteSize as u64);
+
+#[cfg(feature = "uhlc")]
 const _: () = {
-    use time::{Date, Duration, OffsetDateTime, PrimitiveDateTime, Time, Weekday};
+    //     use std::num::NonZeroU128;
+
+    //     use uhlc::*;
+
+    //     impl_as!(
+    //         NTP64 as u64
+    //         ID as NonZeroU128
+    //     );
+
+    //     impl Type for Timestamp {
+    //         fn definition(types: &mut TypeCollection) -> DataType {
+    //             DataType::Struct(Struct {
+    //                 fields: Fields::Named(NamedFields {
+    //                     fields: vec![
+    //                         (
+    //                             "time".into(),
+    //                             Field {
+    //                                 optional: false,
+
+    //                                 inline: false,
+    //                                 deprecated: None,
+    //                                 docs: Cow::Borrowed(""),
+    //                                 ty: Some(NTP64::definition(types)),
+    //                                 attributes: Vec::new(),
+    //                             },
+    //                         ),
+    //                         (
+    //                             "id".into(),
+    //                             Field {
+    //                                 optional: false,
+
+    //                                 inline: false,
+    //                                 deprecated: None,
+    //                                 docs: Cow::Borrowed(""),
+    //                                 ty: Some(ID::definition(types)),
+    //                                 attributes: Vec::new(),
+    //                             },
+    //                         ),
+    //                     ],
+    //                     attributes: Vec::new(),
+    //                 }),
+    //                 attributes: Vec::new(),
+    //             })
+    //         }
+    //     }
+    // };
+
+    // #[cfg(feature = "glam")]
+    // const _: () = {
+    //     macro_rules! implement_specta_type_for_glam_type {
+    //         (
+    //             $name: ident as $representation: ty
+    //         ) => {
+    //             impl Type for glam::$name {
+    //                 fn definition(types: &mut TypeCollection) -> DataType {
+    //                     <$representation>::definition(types)
+    //                 }
+    //             }
+    //         };
+    //     }
+
+    //     // Implementations for https://docs.rs/glam/latest/glam/f32/index.html
+    //     // Affines
+    //     implement_specta_type_for_glam_type!(Affine2 as [f32; 6]);
+    //     implement_specta_type_for_glam_type!(Affine3A as [f32; 12]);
+
+    //     // Matrices
+    //     implement_specta_type_for_glam_type!(Mat2 as [f32; 4]);
+    //     implement_specta_type_for_glam_type!(Mat3 as [f32; 9]);
+    //     implement_specta_type_for_glam_type!(Mat3A as [f32; 9]);
+    //     implement_specta_type_for_glam_type!(Mat4 as [f32; 16]);
+
+    //     // Quaternions
+    //     implement_specta_type_for_glam_type!(Quat as [f32; 4]);
+
+    //     // Vectors
+    //     implement_specta_type_for_glam_type!(Vec2 as [f32; 2]);
+    //     implement_specta_type_for_glam_type!(Vec3 as [f32; 3]);
+    //     implement_specta_type_for_glam_type!(Vec3A as [f32; 3]);
+    //     implement_specta_type_for_glam_type!(Vec4 as [f32; 4]);
+
+    //     // Implementations for https://docs.rs/glam/latest/glam/f64/index.html
+    //     // Affines
+    //     implement_specta_type_for_glam_type!(DAffine2 as [f64; 6]);
+    //     implement_specta_type_for_glam_type!(DAffine3 as [f64; 12]);
+
+    //     // Matrices
+    //     implement_specta_type_for_glam_type!(DMat2 as [f64; 4]);
+    //     implement_specta_type_for_glam_type!(DMat3 as [f64; 9]);
+    //     implement_specta_type_for_glam_type!(DMat4 as [f64; 16]);
+
+    //     // Quaternions
+    //     implement_specta_type_for_glam_type!(DQuat as [f64; 4]);
+
+    //     // Vectors
+    //     implement_specta_type_for_glam_type!(DVec2 as [f64; 2]);
+    //     implement_specta_type_for_glam_type!(DVec3 as [f64; 3]);
+    //     implement_specta_type_for_glam_type!(DVec4 as [f64; 4]);
+
+    //     // Implementations for https://docs.rs/glam/latest/glam/i8/index.html
+    //     implement_specta_type_for_glam_type!(I8Vec2 as [i8; 2]);
+    //     implement_specta_type_for_glam_type!(I8Vec3 as [i8; 3]);
+    //     implement_specta_type_for_glam_type!(I8Vec4 as [i8; 4]);
+
+    //     // Implementations for https://docs.rs/glam/latest/glam/u8/index.html
+    //     implement_specta_type_for_glam_type!(U8Vec2 as [u8; 2]);
+    //     implement_specta_type_for_glam_type!(U8Vec3 as [u8; 3]);
+    //     implement_specta_type_for_glam_type!(U8Vec4 as [u8; 4]);
+
+    //     // Implementations for https://docs.rs/glam/latest/glam/i16/index.html
+    //     implement_specta_type_for_glam_type!(I16Vec2 as [i16; 2]);
+    //     implement_specta_type_for_glam_type!(I16Vec3 as [i16; 3]);
+    //     implement_specta_type_for_glam_type!(I16Vec4 as [i16; 4]);
+
+    //     // Implementations for https://docs.rs/glam/latest/glam/u16/index.html
+    //     implement_specta_type_for_glam_type!(U16Vec2 as [u16; 2]);
+    //     implement_specta_type_for_glam_type!(U16Vec3 as [u16; 3]);
+    //     implement_specta_type_for_glam_type!(U16Vec4 as [u16; 4]);
+
+    //     // Implementations for https://docs.rs/glam/latest/glam/i32/index.html
+    //     implement_specta_type_for_glam_type!(IVec2 as [i32; 2]);
+    //     implement_specta_type_for_glam_type!(IVec3 as [i32; 3]);
+    //     implement_specta_type_for_glam_type!(IVec4 as [i32; 4]);
+
+    //     // Implementations for https://docs.rs/glam/latest/glam/u32/index.html
+    //     implement_specta_type_for_glam_type!(UVec2 as [u32; 2]);
+    //     implement_specta_type_for_glam_type!(UVec3 as [u32; 3]);
+    //     implement_specta_type_for_glam_type!(UVec4 as [u32; 4]);
+
+    //     // Implementation for https://docs.rs/glam/latest/glam/i64/index.html
+    //     implement_specta_type_for_glam_type!(I64Vec2 as [i64; 2]);
+    //     implement_specta_type_for_glam_type!(I64Vec3 as [i64; 3]);
+    //     implement_specta_type_for_glam_type!(I64Vec4 as [i64; 4]);
+
+    //     // Implementation for https://docs.rs/glam/latest/glam/u64/index.html
+    //     implement_specta_type_for_glam_type!(U64Vec2 as [u64; 2]);
+    //     implement_specta_type_for_glam_type!(U64Vec3 as [u64; 3]);
+    //     implement_specta_type_for_glam_type!(U64Vec4 as [u64; 4]);
+
+    //     // implementation for https://docs.rs/glam/latest/glam/usize/index.html
+    //     implement_specta_type_for_glam_type!(USizeVec2 as [usize; 2]);
+    //     implement_specta_type_for_glam_type!(USizeVec3 as [usize; 3]);
+    //     implement_specta_type_for_glam_type!(USizeVec4 as [usize; 4]);
+
+    //     // Implementation for https://docs.rs/glam/latest/glam/bool/index.html
+    //     implement_specta_type_for_glam_type!(BVec2 as [bool; 2]);
+    //     implement_specta_type_for_glam_type!(BVec3 as [bool; 3]);
+    //     implement_specta_type_for_glam_type!(BVec4 as [bool; 4]);
 };
-// impl_as!(
-//     time::PrimitiveDateTime as str
-//     time::OffsetDateTime as str
-//     time::Date as str
-//     time::Time as str
-//     time::Duration as str
-//     time::Weekday as str
-// );
 
-// #[cfg(feature = "jiff")]
-// impl_as!(
-//     jiff::Timestamp as str
-//     jiff::Zoned as str
-//     jiff::Span as str
-//     jiff::civil::Date as str
-//     jiff::civil::Time as str
-//     jiff::civil::DateTime as str
-//     jiff::tz::TimeZone as str
-// );
-
-// #[cfg(feature = "bigdecimal")]
-// impl_as!(bigdecimal::BigDecimal as str);
-
-// // This assumes the `serde-with-str` feature is enabled. Check #26 for more info.
-// #[cfg(feature = "rust_decimal")]
-// impl_as!(rust_decimal::Decimal as str);
-
-// #[cfg(feature = "ipnetwork")]
-// impl_as!(
-//     ipnetwork::IpNetwork as str
-//     ipnetwork::Ipv4Network as str
-//     ipnetwork::Ipv6Network as str
-// );
-
-// #[cfg(feature = "mac_address")]
-// impl_as!(mac_address::MacAddress as str);
-
-// #[cfg(feature = "chrono")]
-// impl_as!(
-//     chrono::FixedOffset as str
-//     chrono::Utc as str
-//     chrono::Local as str
-// );
-
-// #[cfg(feature = "bson")]
-// impl_as!(
-//     bson::oid::ObjectId as str
-//     bson::Decimal128 as i128
-//     bson::DateTime as str
-//     bson::Uuid as str
-// );
-
-// // TODO: bson::bson
-// // TODO: bson::Document
-
-// #[cfg(feature = "bytesize")]
-// impl_as!(bytesize::ByteSize as u64);
-
-// #[cfg(feature = "uhlc")]
-// const _: () = {
-//     use std::num::NonZeroU128;
-
-//     use uhlc::*;
-
-//     impl_as!(
-//         NTP64 as u64
-//         ID as NonZeroU128
-//     );
-
-//     impl Type for Timestamp {
-//         fn definition(types: &mut TypeCollection) -> DataType {
-//             DataType::Struct(Struct {
-//                 fields: Fields::Named(NamedFields {
-//                     fields: vec![
-//                         (
-//                             "time".into(),
-//                             Field {
-//                                 optional: false,
-
-//                                 inline: false,
-//                                 deprecated: None,
-//                                 docs: Cow::Borrowed(""),
-//                                 ty: Some(NTP64::definition(types)),
-//                                 attributes: Vec::new(),
-//                             },
-//                         ),
-//                         (
-//                             "id".into(),
-//                             Field {
-//                                 optional: false,
-
-//                                 inline: false,
-//                                 deprecated: None,
-//                                 docs: Cow::Borrowed(""),
-//                                 ty: Some(ID::definition(types)),
-//                                 attributes: Vec::new(),
-//                             },
-//                         ),
-//                     ],
-//                     attributes: Vec::new(),
-//                 }),
-//                 attributes: Vec::new(),
-//             })
-//         }
-//     }
-// };
-
-// #[cfg(feature = "glam")]
-// const _: () = {
-//     macro_rules! implement_specta_type_for_glam_type {
-//         (
-//             $name: ident as $representation: ty
-//         ) => {
-//             impl Type for glam::$name {
-//                 fn definition(types: &mut TypeCollection) -> DataType {
-//                     <$representation>::definition(types)
-//                 }
-//             }
-//         };
-//     }
-
-//     // Implementations for https://docs.rs/glam/latest/glam/f32/index.html
-//     // Affines
-//     implement_specta_type_for_glam_type!(Affine2 as [f32; 6]);
-//     implement_specta_type_for_glam_type!(Affine3A as [f32; 12]);
-
-//     // Matrices
-//     implement_specta_type_for_glam_type!(Mat2 as [f32; 4]);
-//     implement_specta_type_for_glam_type!(Mat3 as [f32; 9]);
-//     implement_specta_type_for_glam_type!(Mat3A as [f32; 9]);
-//     implement_specta_type_for_glam_type!(Mat4 as [f32; 16]);
-
-//     // Quaternions
-//     implement_specta_type_for_glam_type!(Quat as [f32; 4]);
-
-//     // Vectors
-//     implement_specta_type_for_glam_type!(Vec2 as [f32; 2]);
-//     implement_specta_type_for_glam_type!(Vec3 as [f32; 3]);
-//     implement_specta_type_for_glam_type!(Vec3A as [f32; 3]);
-//     implement_specta_type_for_glam_type!(Vec4 as [f32; 4]);
-
-//     // Implementations for https://docs.rs/glam/latest/glam/f64/index.html
-//     // Affines
-//     implement_specta_type_for_glam_type!(DAffine2 as [f64; 6]);
-//     implement_specta_type_for_glam_type!(DAffine3 as [f64; 12]);
-
-//     // Matrices
-//     implement_specta_type_for_glam_type!(DMat2 as [f64; 4]);
-//     implement_specta_type_for_glam_type!(DMat3 as [f64; 9]);
-//     implement_specta_type_for_glam_type!(DMat4 as [f64; 16]);
-
-//     // Quaternions
-//     implement_specta_type_for_glam_type!(DQuat as [f64; 4]);
-
-//     // Vectors
-//     implement_specta_type_for_glam_type!(DVec2 as [f64; 2]);
-//     implement_specta_type_for_glam_type!(DVec3 as [f64; 3]);
-//     implement_specta_type_for_glam_type!(DVec4 as [f64; 4]);
-
-//     // Implementations for https://docs.rs/glam/latest/glam/i8/index.html
-//     implement_specta_type_for_glam_type!(I8Vec2 as [i8; 2]);
-//     implement_specta_type_for_glam_type!(I8Vec3 as [i8; 3]);
-//     implement_specta_type_for_glam_type!(I8Vec4 as [i8; 4]);
-
-//     // Implementations for https://docs.rs/glam/latest/glam/u8/index.html
-//     implement_specta_type_for_glam_type!(U8Vec2 as [u8; 2]);
-//     implement_specta_type_for_glam_type!(U8Vec3 as [u8; 3]);
-//     implement_specta_type_for_glam_type!(U8Vec4 as [u8; 4]);
-
-//     // Implementations for https://docs.rs/glam/latest/glam/i16/index.html
-//     implement_specta_type_for_glam_type!(I16Vec2 as [i16; 2]);
-//     implement_specta_type_for_glam_type!(I16Vec3 as [i16; 3]);
-//     implement_specta_type_for_glam_type!(I16Vec4 as [i16; 4]);
-
-//     // Implementations for https://docs.rs/glam/latest/glam/u16/index.html
-//     implement_specta_type_for_glam_type!(U16Vec2 as [u16; 2]);
-//     implement_specta_type_for_glam_type!(U16Vec3 as [u16; 3]);
-//     implement_specta_type_for_glam_type!(U16Vec4 as [u16; 4]);
-
-//     // Implementations for https://docs.rs/glam/latest/glam/i32/index.html
-//     implement_specta_type_for_glam_type!(IVec2 as [i32; 2]);
-//     implement_specta_type_for_glam_type!(IVec3 as [i32; 3]);
-//     implement_specta_type_for_glam_type!(IVec4 as [i32; 4]);
-
-//     // Implementations for https://docs.rs/glam/latest/glam/u32/index.html
-//     implement_specta_type_for_glam_type!(UVec2 as [u32; 2]);
-//     implement_specta_type_for_glam_type!(UVec3 as [u32; 3]);
-//     implement_specta_type_for_glam_type!(UVec4 as [u32; 4]);
-
-//     // Implementation for https://docs.rs/glam/latest/glam/i64/index.html
-//     implement_specta_type_for_glam_type!(I64Vec2 as [i64; 2]);
-//     implement_specta_type_for_glam_type!(I64Vec3 as [i64; 3]);
-//     implement_specta_type_for_glam_type!(I64Vec4 as [i64; 4]);
-
-//     // Implementation for https://docs.rs/glam/latest/glam/u64/index.html
-//     implement_specta_type_for_glam_type!(U64Vec2 as [u64; 2]);
-//     implement_specta_type_for_glam_type!(U64Vec3 as [u64; 3]);
-//     implement_specta_type_for_glam_type!(U64Vec4 as [u64; 4]);
-
-//     // implementation for https://docs.rs/glam/latest/glam/usize/index.html
-//     implement_specta_type_for_glam_type!(USizeVec2 as [usize; 2]);
-//     implement_specta_type_for_glam_type!(USizeVec3 as [usize; 3]);
-//     implement_specta_type_for_glam_type!(USizeVec4 as [usize; 4]);
-
-//     // Implementation for https://docs.rs/glam/latest/glam/bool/index.html
-//     implement_specta_type_for_glam_type!(BVec2 as [bool; 2]);
-//     implement_specta_type_for_glam_type!(BVec3 as [bool; 3]);
-//     implement_specta_type_for_glam_type!(BVec4 as [bool; 4]);
-// };
-
-// #[cfg(feature = "url")]
-// impl_as!(url::Url as str);
+#[cfg(feature = "url")]
+impl_ndt_as!(url::Url as str);
 
 // #[cfg(feature = "either")]
 // impl<L: Type, R: Type> Type for either::Either<L, R> {
