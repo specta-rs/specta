@@ -76,6 +76,8 @@ macro_rules! _impl_ndt {
                         types,
                         SENTINEL,
                         |$types, $ndt| {
+                            let _ = &$types;
+
                             // TODO: This should be doable in the macro instead of the runtime. This will do for now though.
                             let (type_name, module_path) = {
                                 let s = stringify!($type_path);

@@ -2,6 +2,8 @@
 
 //! The plan is to try and move these into the ecosystem for the v2 release.
 use super::macros::{impl_ndt, impl_ndt_as};
+#[cfg(feature = "either")]
+use crate::datatype::Generic;
 use crate::{
     Type, TypeCollection,
     datatype::{
@@ -15,8 +17,8 @@ use std::borrow::Cow;
 
 #[cfg(feature = "indexmap")]
 impl_ndt_as!(
-    indexmap::IndexSet<T> as PrimitiveSet<T>
-    indexmap::IndexMap<K, V> as PrimitiveMap<K, V>
+    indexmap::IndexSet<T> as PrimitiveSet<GenericT>
+    indexmap::IndexMap<K, V> as PrimitiveMap<GenericK, GenericV>
 );
 
 #[cfg(feature = "bytes")]
@@ -30,7 +32,7 @@ const _: () = {
     use serde_json::{Map, Number, Value};
 
     impl_ndt_as!(
-        serde_json::Map<K, V> as PrimitiveMap<K, V>
+        serde_json::Map<K, V> as PrimitiveMap<GenericK, GenericV>
     );
 
     impl_ndt!(
@@ -208,7 +210,7 @@ const _: () = {
 const _: () = {
     use toml::{Value, value};
 
-    impl_ndt_as!(toml::map::Map<K, V> as PrimitiveMap<K, V>);
+    impl_ndt_as!(toml::map::Map<K, V> as PrimitiveMap<GenericK, GenericV>);
 
     impl_ndt!(
         impl Type for toml::value::Datetime {
@@ -550,13 +552,13 @@ impl_ndt!(
                     (
                         "Left".into(),
                         EnumVariant::unnamed()
-                            .field(Field::new(L::definition(types)))
+                            .field(Field::new(DataType::Generic(Generic::new("L"))))
                             .build(),
                     ),
                     (
                         "Right".into(),
                         EnumVariant::unnamed()
-                            .field(Field::new(R::definition(types)))
+                            .field(Field::new(DataType::Generic(Generic::new("R"))))
                             .build(),
                     ),
                 ],

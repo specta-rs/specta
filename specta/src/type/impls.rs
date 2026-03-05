@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::{
     Type, TypeCollection,
-    datatype::{self, DataType, Enum, EnumVariant, Field, List},
+    datatype::{self, DataType, Enum, EnumVariant, Field, Generic, List},
     internal,
     r#type::macros::*,
 };
@@ -51,34 +51,53 @@ impl<K: Type, V: Type> Type for PrimitiveMap<K, V> {
     }
 }
 
+pub(crate) struct GenericT;
+impl Type for GenericT {
+    fn definition(_: &mut TypeCollection) -> DataType {
+        DataType::Generic(Generic::new("T"))
+    }
+}
+pub(crate) struct GenericK;
+impl Type for GenericK {
+    fn definition(_: &mut TypeCollection) -> DataType {
+        DataType::Generic(Generic::new("K"))
+    }
+}
+pub(crate) struct GenericV;
+impl Type for GenericV {
+    fn definition(_: &mut TypeCollection) -> DataType {
+        DataType::Generic(Generic::new("V"))
+    }
+}
+
 #[cfg(feature = "std")]
 const _: () = {
     impl_ndt_as!(
         std::string::String as str
 
         // Non-unique sets
-        std::vec::Vec<T> as [T]
-        std::collections::VecDeque<T> as [T]
-        std::collections::BinaryHeap<T> as [T]
-        std::collections::LinkedList<T> as [T]
+        std::vec::Vec<T> as [GenericT]
+        std::collections::VecDeque<T> as [GenericT]
+        std::collections::BinaryHeap<T> as [GenericT]
+        std::collections::LinkedList<T> as [GenericT]
 
         // Unique sets
-        std::collections::HashSet<T> as PrimitiveSet<T>
-        std::collections::BTreeSet<T> as PrimitiveSet<T>
+        std::collections::HashSet<T> as PrimitiveSet<GenericT>
+        std::collections::BTreeSet<T> as PrimitiveSet<GenericT>
 
         // Maps
-        std::collections::HashMap<K, V> as PrimitiveMap<K, V>
-        std::collections::BTreeMap<K, V> as PrimitiveMap<K, V>
+        std::collections::HashMap<K, V> as PrimitiveMap<GenericK, GenericV>
+        std::collections::BTreeMap<K, V> as PrimitiveMap<GenericK, GenericV>
 
         // Containers
-        std::boxed::Box<T> where { T: ?Sized } as T
-        std::rc::Rc<T> where { T: ?Sized } as T
-        std::sync::Arc<T> where { T: ?Sized } as T
-        std::cell::Cell<T> where { T: ?Sized } as T
-        std::cell::RefCell<T> where { T: ?Sized } as T
+        std::boxed::Box<T> where { T: ?Sized } as GenericT
+        std::rc::Rc<T> where { T: ?Sized } as GenericT
+        std::sync::Arc<T> where { T: ?Sized } as GenericT
+        std::cell::Cell<T> where { T: ?Sized } as GenericT
+        std::cell::RefCell<T> where { T: ?Sized } as GenericT
 
-        std::sync::Mutex<T> where { T: ?Sized } as T
-        std::sync::RwLock<T> where { T: ?Sized } as T
+        std::sync::Mutex<T> where { T: ?Sized } as GenericT
+        std::sync::RwLock<T> where { T: ?Sized } as GenericT
 
         std::ffi::CString as str
         std::ffi::CStr as str
@@ -122,8 +141,8 @@ const _: () = {
         std::num::NonZeroI128 as i128
 
         // Serde are cringe so this is how it is :(
-        std::ops::Range<T> as BaseRange<T>
-        std::ops::RangeInclusive<T> as BaseRange<T>
+        std::ops::Range<T> as BaseRange<GenericT>
+        std::ops::RangeInclusive<T> as BaseRange<GenericT>
     );
 
     impl_ndt!(
@@ -191,7 +210,7 @@ const _: () = {
                 SENTINEL,
                 |types, ndt| {
                     *ndt.module_path_mut() = std::borrow::Cow::Borrowed("std::borrow");
-                    ndt.inner = T::definition(types);
+                    ndt.inner = DataType::Generic(Generic::new("T"));
                 },
             ))
         }
@@ -217,8 +236,8 @@ const _: () = {
 
 #[cfg(feature = "tokio")]
 impl_ndt_as!(
-    tokio::sync::Mutex<T> where { T: ?Sized } as T
-    tokio::sync::RwLock<T> where { T: ?Sized } as T
+    tokio::sync::Mutex<T> where { T: ?Sized } as GenericT
+    tokio::sync::RwLock<T> where { T: ?Sized } as GenericT
 );
 
 impl<T: Type + ?Sized> Type for &T {
@@ -257,12 +276,12 @@ impl_ndt!(
         build: |types, ndt| {
             let mut ok_variant = EnumVariant::unit();
             ok_variant.set_fields(internal::construct::fields_unnamed(
-                vec![Field::new(T::definition(types))],
+                vec![Field::new(DataType::Generic(Generic::new("T")))],
                 vec![],
             ));
             let mut err_variant = EnumVariant::unit();
             err_variant.set_fields(internal::construct::fields_unnamed(
-                vec![Field::new(E::definition(types))],
+                vec![Field::new(DataType::Generic(Generic::new("E")))],
                 vec![],
             ));
             ndt.inner = DataType::Enum(Enum {
