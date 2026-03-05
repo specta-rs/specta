@@ -79,6 +79,7 @@ macro_rules! _impl_ndt {
                         types,
                         SENTINEL,
                         |$types, $ndt| {
+                            // TODO: This should be doable in the macro instead of the runtime. This will do for now though.
                             let type_path = stringify!($type_path)
                                 .chars()
                                 .filter(|c| !c.is_whitespace())

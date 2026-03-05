@@ -302,6 +302,7 @@ impl_ndt_as!(
 );
 
 #[cfg(feature = "chrono")]
+#[allow(deprecated)]
 const _: () = {
     impl_ndt_as!(
         chrono::NaiveDateTime as str
@@ -310,21 +311,33 @@ const _: () = {
         chrono::Duration as str
     );
 
-    impl_ndt!(
-        impl<T> Type for chrono::Date<T> where { T: chrono::TimeZone } {
-            inline: true;
-            build: |types, ndt| {
-                ndt.inner = str::definition(types);
+    // This is special cause of how it ignores the `generics` param to `NamedDataType::init_with_sentinel`
+    // These needs generics which also aren't `Type` & aren't in `References` param so `impl_ndt` doesn't work.
+    macro_rules! impl_as_str {
+        ($module_path:path, $type_path:path) => {
+            fn definition(types: &mut TypeCollection) -> DataType {
+                // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
+                static SENTINEL: &str = stringify!($type_path);
+                DataType::Reference(datatype::NamedDataType::init_with_sentinel(
+                    vec![],
+                    true,
+                    types,
+                    SENTINEL,
+                    |types, ndt| {
+                        ndt.set_module_path(::std::borrow::Cow::Borrowed(stringify!($module_path)));
+                        ndt.inner = str::definition(types);
+                    },
+                ))
             }
-        }
+        };
+    }
 
-        impl<T> Type for chrono::DateTime<T> where { T: chrono::TimeZone } {
-            inline: true;
-            build: |types, ndt| {
-                ndt.inner = str::definition(types);
-            }
-        }
-    );
+    impl<T: chrono::TimeZone> Type for chrono::Date<T> {
+        impl_as_str!(chrono, chrono::Date);
+    }
+    impl<T: chrono::TimeZone> Type for chrono::DateTime<T> {
+        impl_as_str!(chrono, chrono::DateTime);
+    }
 };
 
 #[cfg(feature = "time")]
@@ -388,68 +401,60 @@ impl_ndt_as!(bytesize::ByteSize as u64);
 
 #[cfg(feature = "uhlc")]
 const _: () = {
-    //     use std::num::NonZeroU128;
+    impl_ndt_as!(
+        uhlc::NTP64 as u64
+        uhlc::ID as std::num::NonZeroU128
+    );
 
-    //     use uhlc::*;
+    impl_ndt!(
+        impl Type for uhlc::Timestamp {
+            inline: true;
+            build: |types, ndt| {
+                ndt.inner = DataType::Struct(Struct {
+                    fields: Fields::Named(NamedFields {
+                        fields: vec![
+                            (
+                                "time".into(),
+                                Field {
+                                    optional: false,
 
-    //     impl_as!(
-    //         NTP64 as u64
-    //         ID as NonZeroU128
-    //     );
+                                    inline: false,
+                                    deprecated: None,
+                                    docs: Cow::Borrowed(""),
+                                    ty: Some(uhlc::NTP64::definition(types)),
+                                    attributes: Vec::new(),
+                                },
+                            ),
+                            (
+                                "id".into(),
+                                Field {
+                                    optional: false,
 
-    //     impl Type for Timestamp {
-    //         fn definition(types: &mut TypeCollection) -> DataType {
-    //             DataType::Struct(Struct {
-    //                 fields: Fields::Named(NamedFields {
-    //                     fields: vec![
-    //                         (
-    //                             "time".into(),
-    //                             Field {
-    //                                 optional: false,
+                                    inline: false,
+                                    deprecated: None,
+                                    docs: Cow::Borrowed(""),
+                                    ty: Some(uhlc::ID::definition(types)),
+                                    attributes: Vec::new(),
+                                },
+                            ),
+                        ],
+                        attributes: Vec::new(),
+                    }),
+                    attributes: Vec::new(),
+                });
+            }
+        }
+    );
+};
 
-    //                                 inline: false,
-    //                                 deprecated: None,
-    //                                 docs: Cow::Borrowed(""),
-    //                                 ty: Some(NTP64::definition(types)),
-    //                                 attributes: Vec::new(),
-    //                             },
-    //                         ),
-    //                         (
-    //                             "id".into(),
-    //                             Field {
-    //                                 optional: false,
+#[cfg(feature = "glam")]
+const _: () = {
+    impl_ndt_as!(
+        // Implementations for https://docs.rs/glam/latest/glam/f32/index.html
+        glam::Affine2 as [f32; 6]
+        glam::Affine3A as [f32; 12]
+    );
 
-    //                                 inline: false,
-    //                                 deprecated: None,
-    //                                 docs: Cow::Borrowed(""),
-    //                                 ty: Some(ID::definition(types)),
-    //                                 attributes: Vec::new(),
-    //                             },
-    //                         ),
-    //                     ],
-    //                     attributes: Vec::new(),
-    //                 }),
-    //                 attributes: Vec::new(),
-    //             })
-    //         }
-    //     }
-    // };
-
-    // #[cfg(feature = "glam")]
-    // const _: () = {
-    //     macro_rules! implement_specta_type_for_glam_type {
-    //         (
-    //             $name: ident as $representation: ty
-    //         ) => {
-    //             impl Type for glam::$name {
-    //                 fn definition(types: &mut TypeCollection) -> DataType {
-    //                     <$representation>::definition(types)
-    //                 }
-    //             }
-    //         };
-    //     }
-
-    //     // Implementations for https://docs.rs/glam/latest/glam/f32/index.html
     //     // Affines
     //     implement_specta_type_for_glam_type!(Affine2 as [f32; 6]);
     //     implement_specta_type_for_glam_type!(Affine3A as [f32; 12]);

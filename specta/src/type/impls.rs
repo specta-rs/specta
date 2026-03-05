@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
 use crate::{
+    Type, TypeCollection,
     datatype::{self, DataType, Enum, EnumVariant, Field, List},
     internal,
     r#type::macros::*,
-    Type, TypeCollection,
 };
 
 impl_primitives!(
@@ -254,7 +254,7 @@ impl_ndt_as!(
 );
 
 impl_ndt!(
-    impl<T, E> Type for std::result::Result<T, E> where { T: Type, E: Type} {
+    impl<T, E> Type for std::result::Result<T, E> where { T: Type, E: Type } {
         inline: true;
         build: |types, ndt| {
             let mut ok_variant = EnumVariant::unit();
