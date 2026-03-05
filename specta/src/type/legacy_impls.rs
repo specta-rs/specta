@@ -3,12 +3,12 @@
 //! The plan is to try and move these into the ecosystem for the v2 release.
 use super::macros::{impl_ndt, impl_ndt_as};
 use crate::{
-    Type, TypeCollection,
     datatype::{
         self, Attribute, AttributeMeta, AttributeNestedMeta, DataType, Enum, EnumVariant, Field,
         Fields, NamedFields, Primitive, Struct,
     },
     r#type::impls::*,
+    Type, TypeCollection,
 };
 
 use std::borrow::Cow;
@@ -114,7 +114,7 @@ const _: () = {
 
 #[cfg(feature = "serde_yaml")]
 const _: () = {
-    use serde_yaml::{Number, Value, value::TaggedValue};
+    use serde_yaml::{value::TaggedValue, Number, Value};
 
     impl_ndt_as!(
         serde_yaml::Mapping as PrimitiveMap<serde_yaml::Value, serde_yaml::Value>
@@ -206,7 +206,7 @@ const _: () = {
 
 #[cfg(feature = "toml")]
 const _: () = {
-    use toml::{Value, value};
+    use toml::{value, Value};
 
     impl_ndt_as!(toml::map::Map<K, V> as PrimitiveMap<K, V>);
 
@@ -787,7 +787,7 @@ impl_ndt!(
                     (
                         "GeometryCollection".into(),
                         EnumVariant::unnamed()
-                            .field(Field::new(Vec::<Geometry>::definition(types)))
+                            .field(Field::new(Vec::<geojson::Geometry>::definition(types)))
                             .build(),
                     ),
                 ],
@@ -801,7 +801,7 @@ impl_ndt!(
         }
     }
 
-    impl Type for Geometry {
+    impl Type for geojson::Geometry {
         inline: true;
         build: |types, ndt| {
             let mut s = Struct::unit();
@@ -811,7 +811,7 @@ impl_ndt!(
                         "bbox".into(),
                         Field::new(Option::<geojson::Bbox>::definition(types)),
                     ),
-                    ("value".into(), Field::new(Value::definition(types))),
+                    ("value".into(), Field::new(geojson::Value::definition(types))),
                     (
                         "foreign_members".into(),
                         Field::new(Option::<geojson::JsonObject>::definition(types)),
@@ -824,7 +824,7 @@ impl_ndt!(
         }
     }
 
-    impl Type for Feature {
+    impl Type for geojson::Feature {
         inline: true;
         build: |types, ndt| {
             let mut s = Struct::unit();
@@ -836,7 +836,7 @@ impl_ndt!(
                     ),
                     (
                         "geometry".into(),
-                        Field::new(Option::<Geometry>::definition(types)),
+                        Field::new(Option::<geojson::Geometry>::definition(types)),
                     ),
                     (
                         "id".into(),
@@ -858,7 +858,7 @@ impl_ndt!(
         }
     }
 
-    impl Type for FeatureCollection {
+    impl Type for geojson::FeatureCollection {
         inline: true;
         build: |types, ndt| {
             let mut s = Struct::unit();
@@ -868,7 +868,10 @@ impl_ndt!(
                         "bbox".into(),
                         Field::new(Option::<geojson::Bbox>::definition(types)),
                     ),
-                    ("features".into(), Field::new(Vec::<Feature>::definition(types))),
+                    (
+                        "features".into(),
+                        Field::new(Vec::<geojson::Feature>::definition(types)),
+                    ),
                     (
                         "foreign_members".into(),
                         Field::new(Option::<geojson::JsonObject>::definition(types)),
@@ -917,7 +920,10 @@ impl_ndt!(
         build: |types, ndt| {
             let mut s = Struct::unit();
             s.set_fields(crate::internal::construct::fields_named(
-                vec![("layers".into(), Field::new(Vec::<tile::Layer>::definition(types)))],
+                vec![(
+                    "layers".into(),
+                    Field::new(Vec::<geozero::mvt::tile::Layer>::definition(types)),
+                )],
                 vec![],
             ));
 
@@ -925,7 +931,7 @@ impl_ndt!(
         }
     }
 
-    impl Type for tile::Value {
+    impl Type for geozero::mvt::tile::Value {
         inline: true;
         build: |types, ndt| {
             let mut s = Struct::unit();
@@ -964,7 +970,7 @@ impl_ndt!(
         }
     }
 
-    impl Type for tile::Feature {
+    impl Type for geozero::mvt::tile::Feature {
         inline: true;
         build: |types, ndt| {
             let mut s = Struct::unit();
@@ -982,7 +988,7 @@ impl_ndt!(
         }
     }
 
-    impl Type for tile::Layer {
+    impl Type for geozero::mvt::tile::Layer {
         inline: true;
         build: |types, ndt| {
             let mut s = Struct::unit();
@@ -992,12 +998,12 @@ impl_ndt!(
                     ("name".into(), Field::new(String::definition(types))),
                     (
                         "features".into(),
-                        Field::new(Vec::<tile::Feature>::definition(types)),
+                        Field::new(Vec::<geozero::mvt::tile::Feature>::definition(types)),
                     ),
                     ("keys".into(), Field::new(Vec::<String>::definition(types))),
                     (
                         "values".into(),
-                        Field::new(Vec::<tile::Value>::definition(types)),
+                        Field::new(Vec::<geozero::mvt::tile::Value>::definition(types)),
                     ),
                     ("extent".into(), Field::new(Option::<u32>::definition(types))),
                 ],
@@ -1008,7 +1014,7 @@ impl_ndt!(
         }
     }
 
-    impl Type for tile::GeomType {
+    impl Type for geozero::mvt::tile::GeomType {
         inline: true;
         build: |_types, ndt| {
             ndt.inner = DataType::Enum(Enum {
