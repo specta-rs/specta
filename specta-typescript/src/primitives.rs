@@ -536,7 +536,7 @@ fn merged_generics(
 }
 
 thread_local! {
-    static INLINE_REFERENCE_STACK: RefCell<Vec<(Cow<'static, str>, Cow<'static, str>)>> = const { RefCell::new(Vec::new()) };
+    static INLINE_REFERENCE_STACK: RefCell<Vec<(Cow<'static, str>, Cow<'static, str>, Vec<(Generic, DataType)>)>> = const { RefCell::new(Vec::new()) };
     static RESOLVING_GENERICS: RefCell<Vec<Generic>> = const { RefCell::new(Vec::new()) };
 }
 
@@ -1889,7 +1889,11 @@ fn reference_named_dt(
 
         // Check if this reference should be inlined
         if r.inline() {
-            let inline_key = (ndt.module_path().clone(), ndt.name().clone());
+            let inline_key = (
+                ndt.module_path().clone(),
+                ndt.name().clone(),
+                r.generics().to_vec(),
+            );
             let already_inlining = INLINE_REFERENCE_STACK
                 .with(|stack| stack.borrow().iter().any(|key| key == &inline_key));
 

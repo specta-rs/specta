@@ -520,9 +520,9 @@ Container1: {
 	bar: Generic1<number>[],
 	baz: { [key in string]: Generic1<string> },
 }
-Generic2<(), String, i32>: ({ A: null }) & { B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ B: [string, string, string] }) & { A?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ C: number[] }) & { A?: never; B?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ D: Vec<Vec<null>>[] }) & { A?: never; B?: never; C?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ E: { a: null; b: string; c: number } }) & { A?: never; B?: never; C?: never; D?: never; X?: never; Y?: never; Z?: never } | ({ X: number[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; Y?: never; Z?: never } | ({ Y: number }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Z?: never } | ({ Z: Vec<number>[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never }
-GenericNewType1<()>: Vec<T>[]
-GenericTuple<()>: [null, null[], Vec<T>[]]
+Generic2<(), String, i32>: ({ A: null }) & { B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ B: [string, string, string] }) & { A?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ C: number[] }) & { A?: never; B?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ D: null[][][] }) & { A?: never; B?: never; C?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ E: { a: null; b: string; c: number } }) & { A?: never; B?: never; C?: never; D?: never; X?: never; Y?: never; Z?: never } | ({ X: number[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; Y?: never; Z?: never } | ({ Y: number }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Z?: never } | ({ Z: number[][] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never }
+GenericNewType1<()>: Vec<T>[][]
+GenericTuple<()>: [null, null[], Vec<T>[][]]
 GenericStruct2<()>: {
 	a: null,
 	b: [null, null],

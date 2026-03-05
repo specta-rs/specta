@@ -988,23 +988,23 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {Generic1<number>[]} bar
 	* @property {{ [key in string]: Generic1<string> }} baz
 	*
-	* @typedef {({ A: A }) & { B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ B: [B, B, B] }) & { A?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ C: C[] }) & { A?: never; B?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ D: Vec<Vec<A>>[] }) & { A?: never; B?: never; C?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ E: { a: A; b: B; c: C } }) & { A?: never; B?: never; C?: never; D?: never; X?: never; Y?: never; Z?: never } | ({ X: number[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; Y?: never; Z?: never } | ({ Y: number }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Z?: never } | ({ Z: Vec<number>[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never }} Generic2<A, B, C>
+	* @typedef {({ A: A }) & { B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ B: [B, B, B] }) & { A?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ C: C[] }) & { A?: never; B?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ D: A[][][] }) & { A?: never; B?: never; C?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ E: { a: A; b: B; c: C } }) & { A?: never; B?: never; C?: never; D?: never; X?: never; Y?: never; Z?: never } | ({ X: number[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; Y?: never; Z?: never } | ({ Y: number }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Z?: never } | ({ Z: number[][] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never }} Generic2<A, B, C>
 	* @property {{ A: A }} A
 	* @property {{ B: [B, B, B] }} B
 	* @property {{ C: C[] }} C
-	* @property {{ D: Vec<Vec<A>>[] }} D
+	* @property {{ D: A[][][] }} D
 	* @property {{ E: { a: A; b: B; c: C } }} E
 	* @property {{ X: number[] }} X
 	* @property {{ Y: number }} Y
-	* @property {{ Z: Vec<number>[] }} Z
+	* @property {{ Z: number[][] }} Z
 	*
-	* @typedef {Vec<T>[]} GenericNewType1<T>
-	* @property {Vec<T>[]} "0"
+	* @typedef {Vec<T>[][]} GenericNewType1<T>
+	* @property {Vec<T>[][]} "0"
 	*
-	* @typedef {[T, T[], Vec<T>[]]} GenericTuple<T>
+	* @typedef {[T, T[], Vec<T>[][]]} GenericTuple<T>
 	* @property {T} "0"
 	* @property {T[]} "1"
-	* @property {Vec<T>[]} "2"
+	* @property {Vec<T>[][]} "2"
 	*
 	* @typedef {{
 	*		a: T,
@@ -1013,7 +1013,7 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*		d: [T, T, T],
 	*		e: [([T, T]), ([T, T]), ([T, T])],
 	*		f: T[],
-	*		g: Vec<T>[],
+	*		g: Vec<T>[][],
 	*		h: ([([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]]), ([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]]), ([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]])])[],
 	*	}} GenericStruct2<T>
 	* @property {T} a
@@ -1022,7 +1022,7 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {[T, T, T]} d
 	* @property {[([T, T]), ([T, T]), ([T, T])]} e
 	* @property {T[]} f
-	* @property {Vec<T>[]} g
+	* @property {Vec<T>[][]} g
 	* @property {([([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]]), ([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]]), ([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]])])[]} h
 	*
 	* @typedef {T} InlineGenericNewtype<T>
