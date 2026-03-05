@@ -546,478 +546,499 @@ const _: () = {
 #[cfg(feature = "url")]
 impl_ndt_as!(url::Url as str);
 
-// #[cfg(feature = "either")]
-// impl<L: Type, R: Type> Type for either::Either<L, R> {
-//     fn definition(types: &mut TypeCollection) -> DataType {
-//         DataType::Enum(Enum {
-//             variants: vec![
-//                 (
-//                     "Left".into(),
-//                     EnumVariant::unnamed()
-//                         .field(Field::new(L::definition(types)))
-//                         .build(),
-//                 ),
-//                 (
-//                     "Right".into(),
-//                     EnumVariant::unnamed()
-//                         .field(Field::new(R::definition(types)))
-//                         .build(),
-//                 ),
-//             ],
-//             attributes: vec![],
-//         })
-//     }
-// }
+#[cfg(feature = "either")]
+impl_ndt!(
+    impl<L, R> Type for either::Either<L, R> where { L: Type, R: Type } {
+        inline: true;
+        build: |types, ndt| {
+            ndt.inner = DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "Left".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(L::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Right".into(),
+                        EnumVariant::unnamed()
+                            .field(Field::new(R::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: vec![],
+            });
+        }
+    }
+);
 
-// #[cfg(feature = "bevy_ecs")]
-// const _: () = {
-//     impl Type for bevy_ecs::entity::Entity {
-//         fn definition(types: &mut TypeCollection) -> DataType {
-//             DataType::Struct(Struct {
-//                 fields: Fields::Unnamed(UnnamedFields {
-//                     fields: vec![Field {
-//                         optional: false,
-//                         inline: false,
-//                         deprecated: None,
-//                         docs: Cow::Borrowed(""),
-//                         ty: Some(u64::definition(types)),
-//                         attributes: Vec::new(),
-//                     }],
-//                     attributes: Vec::new(),
-//                 }),
-//                 attributes: Vec::new(),
-//             })
-//         }
-//     }
-// };
+#[cfg(feature = "bevy_ecs")]
+const _: () = {
+    impl_ndt!(
+        impl Type for bevy_ecs::entity::Entity {
+            inline: true;
+            build: |types, ndt| {
+                let mut s = Struct::unit();
+                s.set_fields(crate::internal::construct::fields_unnamed(
+                    vec![Field::new(u64::definition(types))],
+                    vec![],
+                ));
 
-// #[cfg(feature = "bevy_input")]
-// const _: () = {
-//     impl Type for bevy_input::ButtonState {
-//         fn definition(_: &mut TypeCollection) -> DataType {
-//             DataType::Enum(Enum {
-//                 variants: vec![
-//                     ("Pressed".into(), EnumVariant::unit()),
-//                     ("Released".into(), EnumVariant::unit()),
-//                 ],
-//                 attributes: vec![],
-//             })
-//         }
-//     }
+                ndt.inner = DataType::Struct(s);
+            }
+        }
+    );
+};
 
-//     impl Type for bevy_input::keyboard::KeyboardInput {
-//         fn definition(types: &mut TypeCollection) -> DataType {
-//             DataType::Struct(Struct {
-//                 fields: Fields::Named(NamedFields {
-//                     fields: vec![
-//                         (
-//                             "key_code".into(),
-//                             Field {
-//                                 optional: false,
+#[cfg(feature = "bevy_input")]
+const _: () = {
+    impl_ndt_as!(glam::Vec2 as [f32; 2]);
 
-//                                 inline: false,
-//                                 deprecated: None,
-//                                 docs: Cow::Borrowed(""),
-//                                 ty: Some(bevy_input::keyboard::KeyCode::definition(types)),
-//                                 attributes: Vec::new(),
-//                             },
-//                         ),
-//                         (
-//                             "logical_key".into(),
-//                             Field {
-//                                 optional: false,
+    impl_ndt!(
+        impl Type for bevy_input::ButtonState {
+            inline: true;
+            build: |_types, ndt| {
+                ndt.inner = DataType::Enum(Enum {
+                    variants: vec![
+                        ("Pressed".into(), EnumVariant::unit()),
+                        ("Released".into(), EnumVariant::unit()),
+                    ],
+                    attributes: vec![],
+                });
+            }
+        }
 
-//                                 inline: false,
-//                                 deprecated: None,
-//                                 docs: Cow::Borrowed(""),
-//                                 ty: Some(bevy_input::keyboard::Key::definition(types)),
-//                                 attributes: Vec::new(),
-//                             },
-//                         ),
-//                         (
-//                             "state".into(),
-//                             Field {
-//                                 optional: false,
+        impl Type for bevy_input::keyboard::KeyboardInput {
+            inline: true;
+            build: |types, ndt| {
+                let mut s = Struct::unit();
+                s.set_fields(crate::internal::construct::fields_named(
+                    vec![
+                        (
+                            "key_code".into(),
+                            Field::new(bevy_input::keyboard::KeyCode::definition(types)),
+                        ),
+                        (
+                            "logical_key".into(),
+                            Field::new(bevy_input::keyboard::Key::definition(types)),
+                        ),
+                        (
+                            "state".into(),
+                            Field::new(bevy_input::ButtonState::definition(types)),
+                        ),
+                        (
+                            "window".into(),
+                            Field::new(bevy_ecs::entity::Entity::definition(types)),
+                        ),
+                    ],
+                    vec![],
+                ));
 
-//                                 inline: false,
-//                                 deprecated: None,
-//                                 docs: Cow::Borrowed(""),
-//                                 ty: Some(bevy_input::ButtonState::definition(types)),
-//                                 attributes: Vec::new(),
-//                             },
-//                         ),
-//                         (
-//                             "window".into(),
-//                             Field {
-//                                 optional: false,
+                ndt.inner = DataType::Struct(s);
+            }
+        }
 
-//                                 inline: false,
-//                                 deprecated: None,
-//                                 docs: Cow::Borrowed(""),
-//                                 ty: Some(bevy_ecs::entity::Entity::definition(types)),
-//                                 attributes: Vec::new(),
-//                             },
-//                         ),
-//                     ],
-//                     attributes: Vec::new(),
-//                 }),
-//                 attributes: Vec::new(),
-//             })
-//         }
-//     }
+        impl Type for bevy_input::mouse::MouseButtonInput {
+            inline: true;
+            build: |types, ndt| {
+                let mut s = Struct::unit();
+                s.set_fields(crate::internal::construct::fields_named(
+                    vec![
+                        (
+                            "button".into(),
+                            Field::new(bevy_input::mouse::MouseButton::definition(types)),
+                        ),
+                        (
+                            "state".into(),
+                            Field::new(bevy_input::ButtonState::definition(types)),
+                        ),
+                        (
+                            "window".into(),
+                            Field::new(bevy_ecs::entity::Entity::definition(types)),
+                        ),
+                    ],
+                    vec![],
+                ));
 
-//     // Reduced KeyCode and Key to str to avoid redefining a quite large enum (for now)
-//     impl_as!(
-//         bevy_input::keyboard::KeyCode as str
-//         bevy_input::keyboard::Key as str
-//     );
+                ndt.inner = DataType::Struct(s);
+            }
+        }
 
-//     impl Type for bevy_input::mouse::MouseButtonInput {
-//         fn definition(types: &mut TypeCollection) -> DataType {
-//             DataType::Struct(Struct {
-//                 fields: Fields::Named(NamedFields {
-//                     fields: vec![
-//                         (
-//                             "button".into(),
-//                             Field {
-//                                 optional: false,
+        impl Type for bevy_input::mouse::MouseButton {
+            inline: true;
+            build: |types, ndt| {
+                ndt.inner = DataType::Enum(Enum {
+                    variants: vec![
+                        ("Left".into(), EnumVariant::unit()),
+                        ("Right".into(), EnumVariant::unit()),
+                        ("Middle".into(), EnumVariant::unit()),
+                        ("Back".into(), EnumVariant::unit()),
+                        ("Forward".into(), EnumVariant::unit()),
+                        (
+                            "Other".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(u16::definition(types)))
+                                .build(),
+                        ),
+                    ],
+                    attributes: vec![],
+                });
+            }
+        }
 
-//                                 inline: false,
-//                                 deprecated: None,
-//                                 docs: Cow::Borrowed(""),
-//                                 ty: Some(bevy_input::mouse::MouseButton::definition(types)),
-//                                 attributes: Vec::new(),
-//                             },
-//                         ),
-//                         (
-//                             "state".into(),
-//                             Field {
-//                                 optional: false,
+        impl Type for bevy_input::mouse::MouseWheel {
+            inline: true;
+            build: |types, ndt| {
+                let mut s = Struct::unit();
+                s.set_fields(crate::internal::construct::fields_named(
+                    vec![
+                        (
+                            "unit".into(),
+                            Field::new(bevy_input::mouse::MouseScrollUnit::definition(types)),
+                        ),
+                        ("x".into(), Field::new(f32::definition(types))),
+                        ("y".into(), Field::new(f32::definition(types))),
+                        (
+                            "window".into(),
+                            Field::new(bevy_ecs::entity::Entity::definition(types)),
+                        ),
+                    ],
+                    vec![],
+                ));
 
-//                                 inline: false,
-//                                 deprecated: None,
-//                                 docs: Cow::Borrowed(""),
-//                                 ty: Some(bevy_input::ButtonState::definition(types)),
-//                                 attributes: Vec::new(),
-//                             },
-//                         ),
-//                         (
-//                             "window".into(),
-//                             Field {
-//                                 optional: false,
+                ndt.inner = DataType::Struct(s);
+            }
+        }
 
-//                                 inline: false,
-//                                 deprecated: None,
-//                                 docs: Cow::Borrowed(""),
-//                                 ty: Some(bevy_ecs::entity::Entity::definition(types)),
-//                                 attributes: Vec::new(),
-//                             },
-//                         ),
-//                     ],
-//                     attributes: Vec::new(),
-//                 }),
-//                 attributes: Vec::new(),
-//             })
-//         }
-//     }
+        impl Type for bevy_input::mouse::MouseScrollUnit {
+            inline: true;
+            build: |_types, ndt| {
+                ndt.inner = DataType::Enum(Enum {
+                    variants: vec![
+                        ("Line".into(), EnumVariant::unit()),
+                        ("Pixel".into(), EnumVariant::unit()),
+                    ],
+                    attributes: vec![],
+                });
+            }
+        }
 
-//     impl Type for bevy_input::mouse::MouseButton {
-//         fn definition(types: &mut TypeCollection) -> DataType {
-//             DataType::Enum(Enum {
-//                 variants: vec![
-//                     ("Left".into(), EnumVariant::unit()),
-//                     ("Right".into(), EnumVariant::unit()),
-//                     ("Middle".into(), EnumVariant::unit()),
-//                     ("Back".into(), EnumVariant::unit()),
-//                     ("Forward".into(), EnumVariant::unit()),
-//                     (
-//                         "Other".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(u16::definition(types)))
-//                             .build(),
-//                     ),
-//                 ],
-//                 attributes: vec![],
-//             })
-//         }
-//     }
+        impl Type for bevy_input::mouse::MouseMotion {
+            inline: true;
+            build: |types, ndt| {
+                let mut s = Struct::unit();
+                s.set_fields(crate::internal::construct::fields_named(
+                    vec![("delta".into(), Field::new(glam::Vec2::definition(types)))],
+                    vec![],
+                ));
 
-//     impl Type for bevy_input::mouse::MouseWheel {
-//         fn definition(types: &mut TypeCollection) -> DataType {
-//             DataType::Struct(Struct {
-//                 fields: Fields::Named(NamedFields {
-//                     fields: vec![
-//                         (
-//                             "unit".into(),
-//                             Field {
-//                                 optional: false,
+                ndt.inner = DataType::Struct(s);
+            }
+        }
+    );
 
-//                                 inline: false,
-//                                 deprecated: None,
-//                                 docs: Cow::Borrowed(""),
-//                                 ty: Some(bevy_input::mouse::MouseScrollUnit::definition(types)),
-//                                 attributes: Vec::new(),
-//                             },
-//                         ),
-//                         (
-//                             "x".into(),
-//                             Field {
-//                                 optional: false,
+    // Reduced KeyCode and Key to str to avoid redefining a quite large enum (for now)
+    impl_ndt_as!(
+        bevy_input::keyboard::KeyCode as str
+        bevy_input::keyboard::Key as str
+    );
+};
 
-//                                 inline: false,
-//                                 deprecated: None,
-//                                 docs: Cow::Borrowed(""),
-//                                 ty: Some(f32::definition(types)),
-//                                 attributes: Vec::new(),
-//                             },
-//                         ),
-//                         (
-//                             "y".into(),
-//                             Field {
-//                                 optional: false,
+#[cfg(feature = "camino")]
+impl_ndt_as!(
+    camino::Utf8Path as str
+    camino::Utf8PathBuf as str
+);
 
-//                                 inline: false,
-//                                 deprecated: None,
-//                                 docs: Cow::Borrowed(""),
-//                                 ty: Some(f32::definition(types)),
-//                                 attributes: Vec::new(),
-//                             },
-//                         ),
-//                         (
-//                             "window".into(),
-//                             Field {
-//                                 optional: false,
+#[cfg(feature = "geojson")]
+const _: () = {
+    use geojson::{Feature, FeatureCollection, Geometry, Value};
 
-//                                 inline: false,
-//                                 deprecated: None,
-//                                 docs: Cow::Borrowed(""),
-//                                 ty: Some(bevy_ecs::entity::Entity::definition(types)),
-//                                 attributes: Vec::new(),
-//                             },
-//                         ),
-//                     ],
-//                     attributes: Vec::new(),
-//                 }),
-//                 attributes: Vec::new(),
-//             })
-//         }
-//     }
+    impl_ndt!(
+        impl Type for geojson::Value {
+            inline: true;
+            build: |types, ndt| {
+                ndt.inner = DataType::Enum(Enum {
+                    variants: vec![
+                        (
+                            "Point".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(geojson::PointType::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "MultiPoint".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(Vec::<geojson::PointType>::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "LineString".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(geojson::LineStringType::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "MultiLineString".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(Vec::<geojson::LineStringType>::definition(
+                                    types,
+                                )))
+                                .build(),
+                        ),
+                        (
+                            "Polygon".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(geojson::PolygonType::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "MultiPolygon".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(Vec::<geojson::PolygonType>::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "GeometryCollection".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(Vec::<Geometry>::definition(types)))
+                                .build(),
+                        ),
+                    ],
+                    attributes: vec![Attribute {
+                        path: String::from("serde"),
+                        kind: AttributeMeta::List(vec![AttributeNestedMeta::Meta(AttributeMeta::Path(
+                            String::from("untagged"),
+                        ))]),
+                    }],
+                });
+            }
+        }
 
-//     impl Type for bevy_input::mouse::MouseScrollUnit {
-//         fn definition(_: &mut TypeCollection) -> DataType {
-//             DataType::Enum(Enum {
-//                 variants: vec![
-//                     ("Line".into(), EnumVariant::unit()),
-//                     ("Pixel".into(), EnumVariant::unit()),
-//                 ],
-//                 attributes: vec![],
-//             })
-//         }
-//     }
+        impl Type for Geometry {
+            inline: true;
+            build: |types, ndt| {
+                let mut s = Struct::unit();
+                s.set_fields(crate::internal::construct::fields_named(
+                    vec![
+                        (
+                            "bbox".into(),
+                            Field::new(Option::<geojson::Bbox>::definition(types)),
+                        ),
+                        ("value".into(), Field::new(Value::definition(types))),
+                        (
+                            "foreign_members".into(),
+                            Field::new(Option::<geojson::JsonObject>::definition(types)),
+                        ),
+                    ],
+                    vec![],
+                ));
 
-//     impl Type for bevy_input::mouse::MouseMotion {
-//         fn definition(types: &mut TypeCollection) -> DataType {
-//             DataType::Struct(Struct {
-//                 fields: Fields::Named(NamedFields {
-//                     fields: vec![(
-//                         "delta".into(),
-//                         Field {
-//                             optional: false,
+                ndt.inner = DataType::Struct(s);
+            }
+        }
 
-//                             inline: false,
-//                             deprecated: None,
-//                             docs: Cow::Borrowed(""),
-//                             ty: Some(glam::Vec2::definition(types)),
-//                             attributes: Vec::new(),
-//                         },
-//                     )],
-//                     attributes: Vec::new(),
-//                 }),
-//                 attributes: Vec::new(),
-//             })
-//         }
-//     }
-// };
+        impl Type for Feature {
+            inline: true;
+            build: |types, ndt| {
+                let mut s = Struct::unit();
+                s.set_fields(crate::internal::construct::fields_named(
+                    vec![
+                        (
+                            "bbox".into(),
+                            Field::new(Option::<geojson::Bbox>::definition(types)),
+                        ),
+                        (
+                            "geometry".into(),
+                            Field::new(Option::<Geometry>::definition(types)),
+                        ),
+                        (
+                            "id".into(),
+                            Field::new(Option::<geojson::feature::Id>::definition(types)),
+                        ),
+                        (
+                            "properties".into(),
+                            Field::new(Option::<geojson::JsonObject>::definition(types)),
+                        ),
+                        (
+                            "foreign_members".into(),
+                            Field::new(Option::<geojson::JsonObject>::definition(types)),
+                        ),
+                    ],
+                    vec![],
+                ));
 
-// #[cfg(feature = "camino")]
-// impl_as!(
-//     camino::Utf8Path as str
-//     camino::Utf8PathBuf as str
-// );
+                ndt.inner = DataType::Struct(s);
+            }
+        }
 
-// #[cfg(feature = "geojson")]
-// const _: () = {
-//     use geojson::{Feature, FeatureCollection, Geometry, Value};
+        impl Type for FeatureCollection {
+            inline: true;
+            build: |types, ndt| {
+                let mut s = Struct::unit();
+                s.set_fields(crate::internal::construct::fields_named(
+                    vec![
+                        (
+                            "bbox".into(),
+                            Field::new(Option::<geojson::Bbox>::definition(types)),
+                        ),
+                        ("features".into(), Field::new(Vec::<Feature>::definition(types))),
+                        (
+                            "foreign_members".into(),
+                            Field::new(Option::<geojson::JsonObject>::definition(types)),
+                        ),
+                    ],
+                    vec![],
+                ));
 
-//     impl Type for Value {
-//         fn definition(types: &mut TypeCollection) -> DataType {
-//             DataType::Enum(Enum {
-//                 variants: vec![
-//                     (
-//                         "Point".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(geojson::PointType::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "MultiPoint".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(Vec::<geojson::PointType>::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "LineString".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(geojson::LineStringType::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "MultiLineString".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(Vec::<geojson::LineStringType>::definition(
-//                                 types,
-//                             )))
-//                             .build(),
-//                     ),
-//                     (
-//                         "Polygon".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(geojson::PolygonType::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "MultiPolygon".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(Vec::<geojson::PolygonType>::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "GeometryCollection".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(Vec::<Geometry>::definition(types)))
-//                             .build(),
-//                     ),
-//                 ],
-//                 attributes: vec![Attribute {
-//                     path: String::from("serde"),
-//                     kind: AttributeMeta::List(vec![AttributeNestedMeta::Meta(AttributeMeta::Path(
-//                         String::from("untagged"),
-//                     ))]),
-//                 }],
-//             })
-//         }
-//     }
+                ndt.inner = DataType::Struct(s);
+            }
+        }
 
-//     #[derive(Type)]
-//     #[specta(remote = Geometry, crate = crate, collect = false)]
-//     #[allow(dead_code)]
-//     pub struct GeoJsonGeometry {
-//         pub bbox: Option<geojson::Bbox>,
-//         pub value: Value,
-//         pub foreign_members: Option<geojson::JsonObject>,
-//     }
+        impl Type for geojson::feature::Id {
+            inline: true;
+            build: |types, ndt| {
+                ndt.inner = DataType::Enum(Enum {
+                    variants: vec![
+                        (
+                            "String".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(str::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Number".into(),
+                            EnumVariant::unnamed()
+                                .field(Field::new(serde_json::Number::definition(types)))
+                                .build(),
+                        ),
+                    ],
+                    attributes: vec![Attribute {
+                        path: String::from("serde"),
+                        kind: AttributeMeta::List(vec![AttributeNestedMeta::Meta(AttributeMeta::Path(
+                            String::from("untagged"),
+                        ))]),
+                    }],
+                });
+            }
+        }
+    );
+};
 
-//     #[derive(Type)]
-//     #[specta(remote = Feature, crate = crate, collect = false)]
-//     #[allow(dead_code)]
-//     pub struct GeoJsonFeature {
-//         pub bbox: Option<geojson::Bbox>,
-//         pub geometry: Option<Geometry>,
-//         pub id: Option<geojson::feature::Id>,
-//         pub properties: Option<geojson::JsonObject>,
-//         pub foreign_members: Option<geojson::JsonObject>,
-//     }
+#[cfg(feature = "geozero")]
+const _: () = {
+    use geozero::mvt::tile;
 
-//     #[derive(Type)]
-//     #[specta(remote = FeatureCollection, crate = crate, collect = false)]
-//     #[allow(dead_code)]
-//     pub struct GeoJsonFeatureCollection {
-//         pub bbox: Option<geojson::Bbox>,
-//         pub features: Vec<Feature>,
-//         pub foreign_members: Option<geojson::JsonObject>,
-//     }
+    impl_ndt!(
+        impl Type for geozero::mvt::Tile {
+            inline: true;
+            build: |types, ndt| {
+                let mut s = Struct::unit();
+                s.set_fields(crate::internal::construct::fields_named(
+                    vec![("layers".into(), Field::new(Vec::<tile::Layer>::definition(types)))],
+                    vec![],
+                ));
 
-//     impl Type for geojson::feature::Id {
-//         fn definition(types: &mut TypeCollection) -> DataType {
-//             DataType::Enum(Enum {
-//                 variants: vec![
-//                     (
-//                         "String".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(str::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "Number".into(),
-//                         EnumVariant::unnamed()
-//                             .field(Field::new(serde_json::Number::definition(types)))
-//                             .build(),
-//                     ),
-//                 ],
-//                 attributes: vec![Attribute {
-//                     path: String::from("serde"),
-//                     kind: AttributeMeta::List(vec![AttributeNestedMeta::Meta(AttributeMeta::Path(
-//                         String::from("untagged"),
-//                     ))]),
-//                 }],
-//             })
-//         }
-//     }
-// };
+                ndt.inner = DataType::Struct(s);
+            }
+        }
 
-// #[cfg(feature = "geozero")]
-// const _: () = {
-//     use geozero::mvt::tile;
+        impl Type for tile::Value {
+            inline: true;
+            build: |types, ndt| {
+                let mut s = Struct::unit();
+                s.set_fields(crate::internal::construct::fields_named(
+                    vec![
+                        (
+                            "string_value".into(),
+                            Field::new(Option::<String>::definition(types)),
+                        ),
+                        (
+                            "float_value".into(),
+                            Field::new(Option::<f32>::definition(types)),
+                        ),
+                        (
+                            "double_value".into(),
+                            Field::new(Option::<f64>::definition(types)),
+                        ),
+                        ("int_value".into(), Field::new(Option::<i64>::definition(types))),
+                        (
+                            "uint_value".into(),
+                            Field::new(Option::<u64>::definition(types)),
+                        ),
+                        (
+                            "sint_value".into(),
+                            Field::new(Option::<i64>::definition(types)),
+                        ),
+                        (
+                            "bool_value".into(),
+                            Field::new(Option::<bool>::definition(types)),
+                        ),
+                    ],
+                    vec![],
+                ));
 
-//     #[derive(Type)]
-//     #[specta(remote = geozero::mvt::Tile, crate = crate, collect = false)]
-//     #[allow(dead_code)]
-//     pub struct GeoZeroTile {
-//         pub layers: Vec<tile::Layer>,
-//     }
+                ndt.inner = DataType::Struct(s);
+            }
+        }
 
-//     #[derive(Type)]
-//     #[specta(remote = tile::Value, crate = crate, collect = false)]
-//     #[allow(dead_code)]
-//     pub struct GeoZeroValue {
-//         pub string_value: Option<String>, // TODO: Use `str`?
-//         pub float_value: Option<f32>,
-//         pub double_value: Option<f64>,
-//         pub int_value: Option<i64>,
-//         pub uint_value: Option<u64>,
-//         pub sint_value: Option<i64>,
-//         pub bool_value: Option<bool>,
-//     }
+        impl Type for tile::Feature {
+            inline: true;
+            build: |types, ndt| {
+                let mut s = Struct::unit();
+                s.set_fields(crate::internal::construct::fields_named(
+                    vec![
+                        ("id".into(), Field::new(Option::<u64>::definition(types))),
+                        ("tags".into(), Field::new(Vec::<u32>::definition(types))),
+                        ("type".into(), Field::new(Option::<i32>::definition(types))),
+                        ("geometry".into(), Field::new(Vec::<u32>::definition(types))),
+                    ],
+                    vec![],
+                ));
 
-//     #[derive(Type)]
-//     #[specta(remote = tile::Feature, crate = crate, collect = false)]
-//     #[allow(dead_code)]
-//     pub struct GeoZeroFeature {
-//         pub id: Option<u64>,
-//         pub tags: Vec<u32>,
-//         pub r#type: Option<i32>,
-//         pub geometry: Vec<u32>,
-//     }
+                ndt.inner = DataType::Struct(s);
+            }
+        }
 
-//     #[derive(Type)]
-//     #[specta(remote = tile::Layer, crate = crate, collect = false)]
-//     #[allow(dead_code)]
-//     pub struct GeoZeroLayer {
-//         pub version: u32,
-//         pub name: String, // TODO: Use `str`
-//         pub features: Vec<tile::Feature>,
-//         pub keys: Vec<String>, // TODO: Use `str`
-//         pub values: Vec<tile::Value>,
-//         pub extent: Option<u32>,
-//     }
+        impl Type for tile::Layer {
+            inline: true;
+            build: |types, ndt| {
+                let mut s = Struct::unit();
+                s.set_fields(crate::internal::construct::fields_named(
+                    vec![
+                        ("version".into(), Field::new(u32::definition(types))),
+                        ("name".into(), Field::new(String::definition(types))),
+                        (
+                            "features".into(),
+                            Field::new(Vec::<tile::Feature>::definition(types)),
+                        ),
+                        ("keys".into(), Field::new(Vec::<String>::definition(types))),
+                        (
+                            "values".into(),
+                            Field::new(Vec::<tile::Value>::definition(types)),
+                        ),
+                        ("extent".into(), Field::new(Option::<u32>::definition(types))),
+                    ],
+                    vec![],
+                ));
 
-//     #[derive(Type)]
-//     #[specta(remote = tile::GeomType, crate = crate, collect = false)]
-//     #[allow(dead_code)]
-//     pub enum GeoZeroGeomType {
-//         Unknown = 0,
-//         Point = 1,
-//         Linestring = 2,
-//         Polygon = 3,
-//     }
-// };
+                ndt.inner = DataType::Struct(s);
+            }
+        }
+
+        impl Type for tile::GeomType {
+            inline: true;
+            build: |_types, ndt| {
+                ndt.inner = DataType::Enum(Enum {
+                    variants: vec![
+                        ("Unknown".into(), EnumVariant::unit()),
+                        ("Point".into(), EnumVariant::unit()),
+                        ("Linestring".into(), EnumVariant::unit()),
+                        ("Polygon".into(), EnumVariant::unit()),
+                    ],
+                    attributes: vec![],
+                });
+            }
+        }
+    );
+};
