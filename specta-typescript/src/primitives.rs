@@ -4,6 +4,7 @@
 
 use std::{
     borrow::{Borrow, Cow},
+    cell::RefCell,
     fmt::Write as _,
     iter,
 };
@@ -534,6 +535,11 @@ fn merged_generics(
         .collect()
 }
 
+thread_local! {
+    static INLINE_REFERENCE_STACK: RefCell<Vec<(Cow<'static, str>, Cow<'static, str>)>> = const { RefCell::new(Vec::new()) };
+    static RESOLVING_GENERICS: RefCell<Vec<Generic>> = const { RefCell::new(Vec::new()) };
+}
+
 fn shallow_inline_datatype(
     s: &mut String,
     exporter: &Exporter,
@@ -695,7 +701,7 @@ fn shallow_inline_datatype(
             }
         },
         DataType::Reference(r) => match r {
-            Reference::Named(r) if r.inline() => {
+            Reference::Named(r) => {
                 let ndt = r
                     .get(types)
                     .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
@@ -712,23 +718,34 @@ fn shallow_inline_datatype(
                     &combined_generics,
                 )
             }
-            _ => reference_dt(s, exporter, types, r, location, prefix, generics),
+            Reference::Opaque(_) => reference_dt(s, exporter, types, r, location, prefix, generics),
         }?,
         DataType::Generic(g) => {
             if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
                 if matches!(resolved_dt, DataType::Generic(inner) if inner == g) {
                     s.push_str(g.borrow());
                 } else {
-                    shallow_inline_datatype(
-                        s,
-                        exporter,
-                        types,
-                        resolved_dt,
-                        location,
-                        parent_name,
-                        prefix,
-                        generics,
-                    )?;
+                    let already_resolving =
+                        RESOLVING_GENERICS.with(|stack| stack.borrow().iter().any(|seen| seen == g));
+                    if already_resolving {
+                        s.push_str(g.borrow());
+                    } else {
+                        RESOLVING_GENERICS.with(|stack| stack.borrow_mut().push(g.clone()));
+                        let result = shallow_inline_datatype(
+                            s,
+                            exporter,
+                            types,
+                            resolved_dt,
+                            location,
+                            parent_name,
+                            prefix,
+                            generics,
+                        );
+                        RESOLVING_GENERICS.with(|stack| {
+                            stack.borrow_mut().pop();
+                        });
+                        result?;
+                    }
                 }
             } else {
                 s.push_str(g.borrow());
@@ -740,85 +757,94 @@ fn shallow_inline_datatype(
 }
 
 fn resolve_generics_in_datatype(dt: &DataType, generics: &[(Generic, DataType)]) -> DataType {
-    match dt {
-        DataType::Primitive(_) | DataType::Reference(_) => dt.clone(),
-        DataType::List(l) => {
-            let mut out = l.clone();
-            out.set_ty(resolve_generics_in_datatype(l.ty(), generics));
-            DataType::List(out)
-        }
-        DataType::Map(m) => {
-            let mut out = m.clone();
-            out.set_key_ty(resolve_generics_in_datatype(m.key_ty(), generics));
-            out.set_value_ty(resolve_generics_in_datatype(m.value_ty(), generics));
-            DataType::Map(out)
-        }
-        DataType::Nullable(def) => {
-            DataType::Nullable(Box::new(resolve_generics_in_datatype(def, generics)))
-        }
-        DataType::Struct(st) => {
-            let mut out = st.clone();
-            match out.fields_mut() {
-                specta::datatype::Fields::Unit => {}
-                specta::datatype::Fields::Unnamed(unnamed) => {
-                    for field in unnamed.fields_mut() {
-                        if let Some(ty) = field.ty_mut() {
-                            *ty = resolve_generics_in_datatype(ty, generics);
-                        }
-                    }
-                }
-                specta::datatype::Fields::Named(named) => {
-                    for (_, field) in named.fields_mut() {
-                        if let Some(ty) = field.ty_mut() {
-                            *ty = resolve_generics_in_datatype(ty, generics);
-                        }
-                    }
-                }
+    fn resolve(dt: &DataType, generics: &[(Generic, DataType)], visiting: &mut Vec<Generic>) -> DataType {
+        match dt {
+            DataType::Primitive(_) | DataType::Reference(_) => dt.clone(),
+            DataType::List(l) => {
+                let mut out = l.clone();
+                out.set_ty(resolve(l.ty(), generics, visiting));
+                DataType::List(out)
             }
-            DataType::Struct(out)
-        }
-        DataType::Enum(en) => {
-            let mut out = en.clone();
-            for (_, variant) in out.variants_mut() {
-                match variant.fields_mut() {
+            DataType::Map(m) => {
+                let mut out = m.clone();
+                out.set_key_ty(resolve(m.key_ty(), generics, visiting));
+                out.set_value_ty(resolve(m.value_ty(), generics, visiting));
+                DataType::Map(out)
+            }
+            DataType::Nullable(def) => DataType::Nullable(Box::new(resolve(def, generics, visiting))),
+            DataType::Struct(st) => {
+                let mut out = st.clone();
+                match out.fields_mut() {
                     specta::datatype::Fields::Unit => {}
                     specta::datatype::Fields::Unnamed(unnamed) => {
                         for field in unnamed.fields_mut() {
                             if let Some(ty) = field.ty_mut() {
-                                *ty = resolve_generics_in_datatype(ty, generics);
+                                *ty = resolve(ty, generics, visiting);
                             }
                         }
                     }
                     specta::datatype::Fields::Named(named) => {
                         for (_, field) in named.fields_mut() {
                             if let Some(ty) = field.ty_mut() {
-                                *ty = resolve_generics_in_datatype(ty, generics);
+                                *ty = resolve(ty, generics, visiting);
                             }
                         }
                     }
                 }
+                DataType::Struct(out)
             }
-            DataType::Enum(out)
-        }
-        DataType::Tuple(t) => {
-            let mut out = t.clone();
-            for element in out.elements_mut() {
-                *element = resolve_generics_in_datatype(element, generics);
-            }
-            DataType::Tuple(out)
-        }
-        DataType::Generic(g) => {
-            if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
-                if matches!(resolved_dt, DataType::Generic(inner) if inner == g) {
-                    dt.clone()
-                } else {
-                    resolve_generics_in_datatype(resolved_dt, generics)
+            DataType::Enum(en) => {
+                let mut out = en.clone();
+                for (_, variant) in out.variants_mut() {
+                    match variant.fields_mut() {
+                        specta::datatype::Fields::Unit => {}
+                        specta::datatype::Fields::Unnamed(unnamed) => {
+                            for field in unnamed.fields_mut() {
+                                if let Some(ty) = field.ty_mut() {
+                                    *ty = resolve(ty, generics, visiting);
+                                }
+                            }
+                        }
+                        specta::datatype::Fields::Named(named) => {
+                            for (_, field) in named.fields_mut() {
+                                if let Some(ty) = field.ty_mut() {
+                                    *ty = resolve(ty, generics, visiting);
+                                }
+                            }
+                        }
+                    }
                 }
-            } else {
-                dt.clone()
+                DataType::Enum(out)
+            }
+            DataType::Tuple(t) => {
+                let mut out = t.clone();
+                for element in out.elements_mut() {
+                    *element = resolve(element, generics, visiting);
+                }
+                DataType::Tuple(out)
+            }
+            DataType::Generic(g) => {
+                if visiting.iter().any(|seen| seen == g) {
+                    return dt.clone();
+                }
+
+                if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
+                    if matches!(resolved_dt, DataType::Generic(inner) if inner == g) {
+                        dt.clone()
+                    } else {
+                        visiting.push(g.clone());
+                        let out = resolve(resolved_dt, generics, visiting);
+                        visiting.pop();
+                        out
+                    }
+                } else {
+                    dt.clone()
+                }
             }
         }
     }
+
+    resolve(dt, generics, &mut Vec::new())
 }
 
 // Internal function to handle inlining without cloning DataType nodes
@@ -976,7 +1002,6 @@ fn inline_datatype(
         DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, generics)?,
         DataType::Reference(r) => {
             if let Reference::Named(r) = r
-                && r.inline()
                 && let Some(ndt) = r.get(types)
             {
                 let combined_generics = merged_generics(generics, r.generics());
@@ -1002,18 +1027,28 @@ fn inline_datatype(
                     s.push_str(<Generic as Borrow<str>>::borrow(g));
                     return Ok(());
                 }
-                // Recursively inline the resolved type
-                inline_datatype(
-                    s,
-                    exporter,
-                    types,
-                    resolved_dt,
-                    location,
-                    parent_name,
-                    prefix,
-                    depth + 1,
-                    generics,
-                )?;
+                let already_resolving =
+                    RESOLVING_GENERICS.with(|stack| stack.borrow().iter().any(|seen| seen == g));
+                if already_resolving {
+                    s.push_str(<Generic as Borrow<str>>::borrow(g));
+                } else {
+                    RESOLVING_GENERICS.with(|stack| stack.borrow_mut().push(g.clone()));
+                    let result = inline_datatype(
+                        s,
+                        exporter,
+                        types,
+                        resolved_dt,
+                        location,
+                        parent_name,
+                        prefix,
+                        depth + 1,
+                        generics,
+                    );
+                    RESOLVING_GENERICS.with(|stack| {
+                        stack.borrow_mut().pop();
+                    });
+                    result?;
+                }
             } else {
                 // Fallback to placeholder name if not found in the generics map
                 // This can happen for unsubstituted generic types
@@ -1092,16 +1127,27 @@ pub(crate) fn datatype(
                     s.push_str(g.borrow());
                     return Ok(());
                 }
-                datatype(
-                    s,
-                    exporter,
-                    types,
-                    resolved_dt,
-                    location,
-                    parent_name,
-                    prefix,
-                    generics,
-                )?;
+                let already_resolving =
+                    RESOLVING_GENERICS.with(|stack| stack.borrow().iter().any(|seen| seen == g));
+                if already_resolving {
+                    s.push_str(g.borrow());
+                } else {
+                    RESOLVING_GENERICS.with(|stack| stack.borrow_mut().push(g.clone()));
+                    let result = datatype(
+                        s,
+                        exporter,
+                        types,
+                        resolved_dt,
+                        location,
+                        parent_name,
+                        prefix,
+                        generics,
+                    );
+                    RESOLVING_GENERICS.with(|stack| {
+                        stack.borrow_mut().pop();
+                    });
+                    result?;
+                }
             } else {
                 s.push_str(g.borrow());
             }
@@ -1842,9 +1888,17 @@ fn reference_named_dt(
 
         // Check if this reference should be inlined
         if r.inline() {
+            let inline_key = (ndt.module_path().clone(), ndt.name().clone());
+            let already_inlining = INLINE_REFERENCE_STACK
+                .with(|stack| stack.borrow().iter().any(|key| key == &inline_key));
+
+            if already_inlining {
+                // Fall through and emit a named reference to break recursive inline expansions.
+            } else {
+                INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
             let combined_generics = merged_generics(generics, r.generics());
             let resolved = resolve_generics_in_datatype(ndt.ty(), &combined_generics);
-            return datatype(
+            let result = datatype(
                 s,
                 exporter,
                 types,
@@ -1854,6 +1908,11 @@ fn reference_named_dt(
                 prefix,
                 &combined_generics,
             );
+                INLINE_REFERENCE_STACK.with(|stack| {
+                    stack.borrow_mut().pop();
+                });
+                return result;
+            }
         }
 
         // We check it's valid before tracking

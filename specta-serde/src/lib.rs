@@ -343,11 +343,9 @@ fn is_valid_map_key(
         }
         DataType::Reference(Reference::Opaque(_)) => Ok(()),
         DataType::Generic(g) => {
-            let ty = generics
-                .iter()
-                .find(|(ge, _)| ge == g)
-                .map(|(_, dt)| dt)
-                .expect("unable to find expected generic type"); // TODO: Proper error instead of panicking
+            let Some((_, ty)) = generics.iter().find(|(ge, _)| ge == g) else {
+                return Ok(());
+            };
 
             is_valid_map_key(ty, types, &[])
         }

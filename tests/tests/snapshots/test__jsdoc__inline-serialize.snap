@@ -66,14 +66,14 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {"B"} B
 	*
 	* @typedef {{
-	*		b: string,
+	*		b: BoxedInner,
 	*	}} BoxFlattened
-	* @property {string} b
+	* @property {BoxedInner} b
 	*
 	* @typedef {{
-	*		c: string,
+	*		c: BoxedInner,
 	*	}} BoxInline
-	* @property {string} c
+	* @property {BoxedInner} c
 	*
 	* @typedef {{
 	*		a: number,
@@ -135,11 +135,11 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @typedef {{
 	*		foo: Generic1<number>,
 	*		bar: Generic1<number>[],
-	*		baz: { [key in string]: string },
+	*		baz: { [key in string]: Generic1<string> },
 	*	}} Container1
 	* @property {Generic1<number>} foo
 	* @property {Generic1<number>[]} bar
-	* @property {{ [key in string]: string }} baz
+	* @property {{ [key in string]: Generic1<string> }} baz
 	*
 	* @typedef {{
 	*		flattened: number,
@@ -270,9 +270,9 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {{ D: { a: string; bbbbbb: number } }} D
 	*
 	* @typedef {{
-	*		a: { [key in number]: string },
+	*		a: Partial<{ [key in BasicEnum]: number }>,
 	*	}} EnumReferenceRecordKey
-	* @property {{ [key in number]: string }} a
+	* @property {Partial<{ [key in BasicEnum]: number }>} a
 	*
 	* @typedef {"HELLOWORLD" | "VARIANTB" | "TESTINGWORDS"} EnumRenameAllUppercase
 	* @property {"HELLOWORLD"} HELLOWORLD
@@ -391,42 +391,42 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*
 	* @typedef {{
 	*		value: T,
-	*		values: number[],
+	*		values: T[],
 	*	}} Generic1<T>
 	* @property {T} value
-	* @property {number[]} values
+	* @property {T[]} values
 	*
-	* @typedef {({ A: A }) & { B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ B: [B, B, B] }) & { A?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ C: number[] }) & { A?: never; B?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ D: number[] }) & { A?: never; B?: never; C?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ E: { a: A; b: B; c: C } }) & { A?: never; B?: never; C?: never; D?: never; X?: never; Y?: never; Z?: never } | ({ X: number[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; Y?: never; Z?: never } | ({ Y: number }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Z?: never } | ({ Z: number[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never }} Generic2<A, B, C>
+	* @typedef {({ A: A }) & { B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ B: [B, B, B] }) & { A?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ C: C[] }) & { A?: never; B?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ D: Vec<Vec<A>>[] }) & { A?: never; B?: never; C?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ E: { a: A; b: B; c: C } }) & { A?: never; B?: never; C?: never; D?: never; X?: never; Y?: never; Z?: never } | ({ X: number[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; Y?: never; Z?: never } | ({ Y: number }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Z?: never } | ({ Z: Vec<number>[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never }} Generic2<A, B, C>
 	* @property {{ A: A }} A
 	* @property {{ B: [B, B, B] }} B
-	* @property {{ C: number[] }} C
-	* @property {{ D: number[] }} D
+	* @property {{ C: C[] }} C
+	* @property {{ D: Vec<Vec<A>>[] }} D
 	* @property {{ E: { a: A; b: B; c: C } }} E
 	* @property {{ X: number[] }} X
 	* @property {{ Y: number }} Y
-	* @property {{ Z: number[] }} Z
+	* @property {{ Z: Vec<number>[] }} Z
 	*
 	* @typedef {{
 	*		value: T,
-	*		values: number[],
+	*		values: T[],
 	*	}} GenericAutoBound<T>
 	* @property {T} value
-	* @property {number[]} values
+	* @property {T[]} values
 	*
 	* @typedef {{
 	*		value: T,
-	*		values: number[],
+	*		values: T[],
 	*	}} GenericAutoBound2<T>
 	* @property {T} value
-	* @property {number[]} values
+	* @property {T[]} values
 	*
 	* @typedef {{
 	*		generic_flattened: T,
 	*	}} GenericFlattened<T>
 	* @property {T} generic_flattened
 	*
-	* @typedef {number[]} GenericNewType1<T>
-	* @property {number[]} "0"
+	* @typedef {Vec<T>[]} GenericNewType1<T>
+	* @property {Vec<T>[]} "0"
 	*
 	* @typedef {{
 	*		pair: Pair<number, string>,
@@ -444,23 +444,23 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		c: [T, [T, T]],
 	*		d: [T, T, T],
 	*		e: [([T, T]), ([T, T]), ([T, T])],
-	*		f: number[],
-	*		g: number[],
-	*		h: number[],
+	*		f: T[],
+	*		g: Vec<T>[],
+	*		h: ([([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]]), ([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]]), ([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]])])[],
 	*	}} GenericStruct2<T>
 	* @property {T} a
 	* @property {[T, T]} b
 	* @property {[T, [T, T]]} c
 	* @property {[T, T, T]} d
 	* @property {[([T, T]), ([T, T]), ([T, T])]} e
-	* @property {number[]} f
-	* @property {number[]} g
-	* @property {number[]} h
+	* @property {T[]} f
+	* @property {Vec<T>[]} g
+	* @property {([([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]]), ([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]]), ([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]])])[]} h
 	*
-	* @typedef {[T, number[], number[]]} GenericTuple<T>
+	* @typedef {[T, T[], Vec<T>[]]} GenericTuple<T>
 	* @property {T} "0"
-	* @property {number[]} "1"
-	* @property {number[]} "2"
+	* @property {T[]} "1"
+	* @property {Vec<T>[]} "2"
 	*
 	* @typedef {T} GenericTupleStruct<T>
 	* @property {T} "0"
@@ -532,13 +532,13 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*
 	* @typedef {{
 	*		a: number,
-	*		b: string,
+	*		b: FlattenedInner,
 	*	}} Inner
 	* @property {number} a
-	* @property {string} b
+	* @property {FlattenedInner} b
 	*
-	* @typedef {{ type: "A" } & { [key in number]: string }} InternallyTaggedD
-	* @property {{ type: "A" } & { [key in number]: string }} A
+	* @typedef {{ type: "A" } & { [key in string]: string }} InternallyTaggedD
+	* @property {{ type: "A" } & { [key in string]: string }} A
 	*
 	* @typedef {{ type: "A" }} InternallyTaggedE
 	* @property {{ type: "A" }} A
@@ -615,10 +615,10 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*
 	* @typedef {{
 	*		borrowed: T[],
-	*		owned: number[],
+	*		owned: T[],
 	*	}} LifetimeGenericStruct<T>
 	* @property {T[]} borrowed
-	* @property {number[]} owned
+	* @property {T[]} owned
 	*
 	* @typedef {{ event: "started"; data: {
 	* 	projectName: string,
@@ -749,7 +749,7 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		"(String, i32, bool)": [string, number, boolean],
 	*		"((String, i32), (bool, char, bool), ())": [[string, number], [boolean, string, boolean], null],
 	*		"(bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool)": [boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean],
-	*		"(Vec<i32>, Vec<bool>)": [number[], number[]],
+	*		"(Vec<i32>, Vec<bool>)": [number[], boolean[]],
 	*		String: string,
 	*		PathBuf: string,
 	*		IpAddr: string,
@@ -759,7 +759,7 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		SocketAddrV4: string,
 	*		SocketAddrV6: string,
 	*		"Cow<'static, str>": string,
-	*		"Cow<'static, i32>": string,
+	*		"Cow<'static, i32>": number,
 	*		SystemTime: {
 	*			duration_since_epoch: number,
 	*			duration_since_unix_epoch: number,
@@ -775,7 +775,7 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		"&'static [i32]": number[],
 	*		"&'static [i32; 3]": [number, number, number],
 	*		"[i32; 3]": [number, number, number],
-	*		"Vec<MyEnum>": number[],
+	*		"Vec<MyEnum>": MyEnum[],
 	*		"&'static [MyEnum]": MyEnum[],
 	*		"&'static [MyEnum; 6]": [MyEnum, MyEnum, MyEnum, MyEnum, MyEnum, MyEnum],
 	*		"[MyEnum; 2]": [MyEnum, MyEnum],
@@ -785,9 +785,9 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		"Option<()>": null,
 	*		"Option<Vec<i32>>": number[] | null,
 	*		"Result<String, i32>": ({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never },
-	*		"Vec<Option<Cow<'static, i32>>>": number[],
+	*		"Vec<Option<Cow<'static, i32>>>": (number | null)[],
 	*		"Option<Vec<Cow<'static, i32>>>": number[] | null,
-	*		"[Vec<String>; 3]": [number[], number[], number[]],
+	*		"[Vec<String>; 3]": [string[], string[], string[]],
 	*		"Option<Option<String>>": string | null,
 	*		"Option<Option<Option<String>>>": string | null,
 	*		"PhantomData<()>": null,
@@ -819,10 +819,10 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		TransparentType2: TransparentType2,
 	*		TransparentTypeWithOverride: TransparentTypeWithOverride,
 	*		"[Option<u8>; 3]": [(number | null), (number | null), (number | null)],
-	*		"HashMap<BasicEnum, ()>": { [key in number]: string },
+	*		"HashMap<BasicEnum, ()>": Partial<{ [key in BasicEnum]: null }>,
 	*		"Option<Option<Option<Option<i32>>>>": number | null,
-	*		"Vec<PlaceholderInnerField>": number[],
-	*		"HashMap<BasicEnum, i32>": { [key in number]: string },
+	*		"Vec<PlaceholderInnerField>": PlaceholderInnerField[],
+	*		"HashMap<BasicEnum, i32>": Partial<{ [key in BasicEnum]: number }>,
 	*		EnumReferenceRecordKey: EnumReferenceRecordKey,
 	*		FlattenOnNestedEnum: FlattenOnNestedEnum,
 	*		MyEmptyInput: MyEmptyInput,
@@ -830,7 +830,7 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		"(String,)": [string],
 	*		ExtraBracketsInTupleVariant: ExtraBracketsInTupleVariant,
 	*		ExtraBracketsInUnnamedStruct: ExtraBracketsInUnnamedStruct,
-	*		"Vec<MyEnum>": number[],
+	*		"Vec<MyEnum>": MyEnum[],
 	*		InlineTuple: InlineTuple,
 	*		InlineTuple2: InlineTuple2,
 	*		"Box<str>": string,
@@ -875,12 +875,12 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		UntaggedVariants: UntaggedVariants,
 	*		UntaggedVariantsWithoutValue: UntaggedVariantsWithoutValue,
 	*		UntaggedVariantsWithDuplicateBranches: UntaggedVariantsWithDuplicateBranches,
-	*		"HashMap<String, ()>": { [key in number]: string },
+	*		"HashMap<String, ()>": { [key in string]: null },
 	*		Regular: Regular,
-	*		"HashMap<Infallible, ()>": { [key in number]: string },
-	*		"HashMap<UnitVariants, ()>": { [key in number]: string },
-	*		"HashMap<UntaggedVariantsKey, ()>": { [key in number]: string },
-	*		"HashMap<Variants, ()>": { [key in number]: string },
+	*		"HashMap<Infallible, ()>": { [key in never]: null },
+	*		"HashMap<UnitVariants, ()>": Partial<{ [key in UnitVariants]: null }>,
+	*		"HashMap<UntaggedVariantsKey, ()>": Partial<{ [key in UntaggedVariantsKey]: null }>,
+	*		"HashMap<Variants, ()>": Partial<{ [key in Variants]: null }>,
 	*		MacroStruct: MacroStruct,
 	*		MacroStruct2: MacroStruct2,
 	*		MacroEnum: MacroEnum,
@@ -898,9 +898,9 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		"HalfGenericB<bool>": Demo<number, boolean>,
 	*		"FullGeneric<u8, bool>": Demo<number, boolean>,
 	*		"Another<bool>": Demo<number, boolean>,
-	*		"MapA<u32>": { [key in number]: string },
+	*		"MapA<u32>": { [key in string]: number },
 	*		"MapB<u32>": { [key in number]: string },
-	*		"MapC<u32>": { [key in number]: string },
+	*		"MapC<u32>": { [key in string]: AGenericStruct<number> },
 	*		"AGenericStruct<u32>": AGenericStruct<number>,
 	*		A: A,
 	*		DoubleFlattened: DoubleFlattened,
@@ -976,7 +976,7 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		"GenericTuple<()>": GenericTuple<null>,
 	*		"GenericStruct2<()>": GenericStruct2<null>,
 	*		"InlineGenericNewtype<String>": string,
-	*		"InlineGenericNested<String>": [string, number[], [string, string], { [key in number]: string }, string | null, "Unit" | ({ Unnamed: string }) & { Named?: never } | ({ Named: { value: string } }) & { Unnamed?: never }],
+	*		"InlineGenericNested<String>": [string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | ({ Unnamed: string }) & { Named?: never } | ({ Named: { value: string } }) & { Unnamed?: never }],
 	*		"InlineFlattenGenericsG<()>": InlineFlattenGenericsG<null>,
 	*		InlineFlattenGenerics: InlineFlattenGenerics,
 	*		GenericParameterOrderPreserved: GenericParameterOrderPreserved,
@@ -1010,7 +1010,7 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {[string, number, boolean]} "(String, i32, bool)"
 	* @property {[[string, number], [boolean, string, boolean], null]} "((String, i32), (bool, char, bool), ())"
 	* @property {[boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean]} "(bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool)"
-	* @property {[number[], number[]]} "(Vec<i32>, Vec<bool>)"
+	* @property {[number[], boolean[]]} "(Vec<i32>, Vec<bool>)"
 	* @property {string} String
 	* @property {string} PathBuf
 	* @property {string} IpAddr
@@ -1020,7 +1020,7 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {string} SocketAddrV4
 	* @property {string} SocketAddrV6
 	* @property {string} "Cow<'static, str>"
-	* @property {string} "Cow<'static, i32>"
+	* @property {number} "Cow<'static, i32>"
 	* @property {{
 	*		duration_since_epoch: number,
 	*		duration_since_unix_epoch: number,
@@ -1036,7 +1036,7 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {number[]} "&'static [i32]"
 	* @property {[number, number, number]} "&'static [i32; 3]"
 	* @property {[number, number, number]} "[i32; 3]"
-	* @property {number[]} "Vec<MyEnum>"
+	* @property {MyEnum[]} "Vec<MyEnum>"
 	* @property {MyEnum[]} "&'static [MyEnum]"
 	* @property {[MyEnum, MyEnum, MyEnum, MyEnum, MyEnum, MyEnum]} "&'static [MyEnum; 6]"
 	* @property {[MyEnum, MyEnum]} "[MyEnum; 2]"
@@ -1046,9 +1046,9 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {null} "Option<()>"
 	* @property {number[] | null} "Option<Vec<i32>>"
 	* @property {({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never }} "Result<String, i32>"
-	* @property {number[]} "Vec<Option<Cow<'static, i32>>>"
+	* @property {(number | null)[]} "Vec<Option<Cow<'static, i32>>>"
 	* @property {number[] | null} "Option<Vec<Cow<'static, i32>>>"
-	* @property {[number[], number[], number[]]} "[Vec<String>; 3]"
+	* @property {[string[], string[], string[]]} "[Vec<String>; 3]"
 	* @property {string | null} "Option<Option<String>>"
 	* @property {string | null} "Option<Option<Option<String>>>"
 	* @property {null} "PhantomData<()>"
@@ -1080,10 +1080,10 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {TransparentType2} TransparentType2
 	* @property {TransparentTypeWithOverride} TransparentTypeWithOverride
 	* @property {[(number | null), (number | null), (number | null)]} "[Option<u8>; 3]"
-	* @property {{ [key in number]: string }} "HashMap<BasicEnum, ()>"
+	* @property {Partial<{ [key in BasicEnum]: null }>} "HashMap<BasicEnum, ()>"
 	* @property {number | null} "Option<Option<Option<Option<i32>>>>"
-	* @property {number[]} "Vec<PlaceholderInnerField>"
-	* @property {{ [key in number]: string }} "HashMap<BasicEnum, i32>"
+	* @property {PlaceholderInnerField[]} "Vec<PlaceholderInnerField>"
+	* @property {Partial<{ [key in BasicEnum]: number }>} "HashMap<BasicEnum, i32>"
 	* @property {EnumReferenceRecordKey} EnumReferenceRecordKey
 	* @property {FlattenOnNestedEnum} FlattenOnNestedEnum
 	* @property {MyEmptyInput} MyEmptyInput
@@ -1091,7 +1091,7 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {[string]} "(String,)"
 	* @property {ExtraBracketsInTupleVariant} ExtraBracketsInTupleVariant
 	* @property {ExtraBracketsInUnnamedStruct} ExtraBracketsInUnnamedStruct
-	* @property {number[]} "Vec<MyEnum>"
+	* @property {MyEnum[]} "Vec<MyEnum>"
 	* @property {InlineTuple} InlineTuple
 	* @property {InlineTuple2} InlineTuple2
 	* @property {string} "Box<str>"
@@ -1136,12 +1136,12 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {UntaggedVariants} UntaggedVariants
 	* @property {UntaggedVariantsWithoutValue} UntaggedVariantsWithoutValue
 	* @property {UntaggedVariantsWithDuplicateBranches} UntaggedVariantsWithDuplicateBranches
-	* @property {{ [key in number]: string }} "HashMap<String, ()>"
+	* @property {{ [key in string]: null }} "HashMap<String, ()>"
 	* @property {Regular} Regular
-	* @property {{ [key in number]: string }} "HashMap<Infallible, ()>"
-	* @property {{ [key in number]: string }} "HashMap<UnitVariants, ()>"
-	* @property {{ [key in number]: string }} "HashMap<UntaggedVariantsKey, ()>"
-	* @property {{ [key in number]: string }} "HashMap<Variants, ()>"
+	* @property {{ [key in never]: null }} "HashMap<Infallible, ()>"
+	* @property {Partial<{ [key in UnitVariants]: null }>} "HashMap<UnitVariants, ()>"
+	* @property {Partial<{ [key in UntaggedVariantsKey]: null }>} "HashMap<UntaggedVariantsKey, ()>"
+	* @property {Partial<{ [key in Variants]: null }>} "HashMap<Variants, ()>"
 	* @property {MacroStruct} MacroStruct
 	* @property {MacroStruct2} MacroStruct2
 	* @property {MacroEnum} MacroEnum
@@ -1159,9 +1159,9 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {Demo<number, boolean>} "HalfGenericB<bool>"
 	* @property {Demo<number, boolean>} "FullGeneric<u8, bool>"
 	* @property {Demo<number, boolean>} "Another<bool>"
-	* @property {{ [key in number]: string }} "MapA<u32>"
+	* @property {{ [key in string]: number }} "MapA<u32>"
 	* @property {{ [key in number]: string }} "MapB<u32>"
-	* @property {{ [key in number]: string }} "MapC<u32>"
+	* @property {{ [key in string]: AGenericStruct<number> }} "MapC<u32>"
 	* @property {AGenericStruct<number>} "AGenericStruct<u32>"
 	* @property {A} A
 	* @property {DoubleFlattened} DoubleFlattened
@@ -1237,35 +1237,35 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {GenericTuple<null>} "GenericTuple<()>"
 	* @property {GenericStruct2<null>} "GenericStruct2<()>"
 	* @property {string} "InlineGenericNewtype<String>"
-	* @property {[string, number[], [string, string], { [key in number]: string }, string | null, "Unit" | ({ Unnamed: string }) & { Named?: never } | ({ Named: { value: string } }) & { Unnamed?: never }]} "InlineGenericNested<String>"
+	* @property {[string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | ({ Unnamed: string }) & { Named?: never } | ({ Named: { value: string } }) & { Unnamed?: never }]} "InlineGenericNested<String>"
 	* @property {InlineFlattenGenericsG<null>} "InlineFlattenGenericsG<()>"
 	* @property {InlineFlattenGenerics} InlineFlattenGenerics
 	* @property {GenericParameterOrderPreserved} GenericParameterOrderPreserved
 	*
 	* @typedef {{
-	*		demo: string,
+	*		demo: Recursive,
 	*	}} Recursive
-	* @property {string} demo
+	* @property {Recursive} demo
 	*
-	* @typedef {{ A: (string) }} RecursiveInEnum
-	* @property {{ A: (string) }} A
+	* @typedef {{ A: (RecursiveInEnum) }} RecursiveInEnum
+	* @property {{ A: (RecursiveInEnum) }} A
 	*
-	* @typedef {(string)} RecursiveInline
-	* @property {string} demo
+	* @typedef {(RecursiveInline)} RecursiveInline
+	* @property {RecursiveInline} demo
 	*
 	* @typedef {{
-	*		demo: { [key in number]: string },
+	*		demo: { [key in string]: RecursiveMapValue },
 	*	}} RecursiveMapValue
-	* @property {{ [key in number]: string }} demo
+	* @property {{ [key in string]: RecursiveMapValue }} demo
 	*
-	* @typedef {string} RecursiveTransparent
-	* @property {string} "0"
+	* @typedef {RecursiveInline} RecursiveTransparent
+	* @property {RecursiveInline} "0"
 	*
 	* @typedef {TestEnum} RefStruct
 	* @property {TestEnum} "0"
 	*
-	* @typedef {{ [key in number]: string }} Regular
-	* @property {{ [key in number]: string }} "0"
+	* @typedef {{ [key in string]: null }} Regular
+	* @property {{ [key in string]: null }} "0"
 	*
 	* @typedef {"OneWord" | "Two words"} Rename
 	* @property {"OneWord"} OneWord
@@ -1318,13 +1318,13 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		a: number,
 	*		b: string,
 	*		c: [number, string, number],
-	*		d: number[],
+	*		d: string[],
 	*		e: string | null,
 	*	}} SimpleStruct
 	* @property {number} a
 	* @property {string} b
 	* @property {[number, string, number]} c
-	* @property {number[]} d
+	* @property {string[]} d
 	* @property {string | null} e
 	*
 	*  Some single-line comment
@@ -1463,12 +1463,12 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {{ Struct: { a: number } }} Struct
 	*
 	* @typedef {(First) & {
-	*		b: { [key in number]: string },
-	*		c: string,
+	*		b: { [key in string]: string },
+	*		c: First,
 	*	}} Third
 	* @property {First} a
-	* @property {{ [key in number]: string }} b
-	* @property {string} c
+	* @property {{ [key in string]: string }} b
+	* @property {First} c
 	*
 	* @typedef {{
 	*		a: string,

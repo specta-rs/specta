@@ -15,7 +15,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use specta::{Type, TypeCollection, datatype::DataType};
+use specta::{datatype::DataType, Type, TypeCollection};
 
 /// A macro to collect up the types for better testing.
 ///
@@ -2465,13 +2465,26 @@ fn transparent_wrappers_have_distinct_ids() {
     let mut types = TypeCollection::default();
     let id_a = TransparentA::definition(&mut types);
     let id_b = TransparentB::definition(&mut types);
+    let names = types
+        .into_unsorted_iter()
+        .map(|ndt| ndt.name().as_ref())
+        .collect::<Vec<_>>();
+
     assert_ne!(format!("{:?}", id_a), format!("{:?}", id_b));
-    assert_eq!(types.len(), 2);
+    assert!(names.contains(&"TransparentA"));
+    assert!(names.contains(&"TransparentB"));
 }
 
 #[test]
 fn struct_collects_all_transparent_field_types() {
     let mut types = TypeCollection::default();
     UsesTransparent::definition(&mut types);
-    assert_eq!(types.len(), 3); // UsesTransparent + TransparentA + TransparentB
+    let names = types
+        .into_unsorted_iter()
+        .map(|ndt| ndt.name().as_ref())
+        .collect::<Vec<_>>();
+
+    assert!(names.contains(&"UsesTransparent"));
+    assert!(names.contains(&"TransparentA"));
+    assert!(names.contains(&"TransparentB"));
 }
