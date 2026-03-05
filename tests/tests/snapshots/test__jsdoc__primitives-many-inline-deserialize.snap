@@ -3,9 +3,69 @@ source: tests/tests/jsdoc.rs
 expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()"
 ---
 /**
+	* @typedef {{
+	*		start: number,
+	*		end: number,
+	*	}} <T>
+	* @property {number} start
+	* @property {number} end
+	*
+	* @typedef {{
+	*		start: number,
+	*		end: number,
+	*	}} <T>
+	* @property {number} start
+	* @property {number} end
+	*
+	* @typedef {string} 
+	*
+	* @typedef {string} 
+	*
+	* @typedef {string} 
+	*
+	* @typedef {string} 
+	*
+	* @typedef {string} 
+	*
+	* @typedef {string} 
+	*
+	* @typedef {string} 
+	*
+	* @typedef {string} 
+	*
+	* @typedef {string} <T>
+	*
+	* @typedef {string} <T>
+	*
+	* @typedef {{
+	*		duration_since_epoch: number,
+	*		duration_since_unix_epoch: number,
+	*	}} 
+	* @property {number} duration_since_epoch
+	* @property {number} duration_since_unix_epoch
+	*
+	* @typedef {{
+	*		secs: number,
+	*		nanos: number,
+	*	}} 
+	* @property {number} secs
+	* @property {number} nanos
+	*
+	* @typedef {number[]} <T>
+	*
+	* @typedef {number[]} <T>
+	*
 	* @typedef {({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never }} <T, E>
 	* @property {{ Ok: string }} Ok
 	* @property {{ Err: number }} Err
+	*
+	* @typedef {number[]} <T>
+	*
+	* @typedef {null} <T>
+	*
+	* @typedef {null} <T>
+	*
+	* @typedef {never} 
 	*
 	* @typedef {null} Unit1
 	*
@@ -29,13 +89,13 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*		a: number,
 	*		b: string,
 	*		c: [number, string, number],
-	*		d: string[],
+	*		d: number[],
 	*		e: string | null,
 	*	}} SimpleStruct
 	* @property {number} a
 	* @property {string} b
 	* @property {[number, string, number]} c
-	* @property {string[]} d
+	* @property {number[]} d
 	* @property {string | null} e
 	*
 	* @typedef {number} TupleStruct1
@@ -122,10 +182,16 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @typedef {string} TransparentTypeWithOverride
 	* @property {string} "0"
 	*
+	* @typedef {{ [key in number]: string }} <K, V>
+	*
+	* @typedef {number[]} <T>
+	*
+	* @typedef {{ [key in number]: string }} <K, V>
+	*
 	* @typedef {{
-	*		a: Partial<{ [key in BasicEnum]: number }>,
+	*		a: { [key in number]: string },
 	*	}} EnumReferenceRecordKey
-	* @property {Partial<{ [key in BasicEnum]: number }>} a
+	* @property {{ [key in number]: string }} a
 	*
 	* @typedef {(NestedEnum) & {
 	*		id: string,
@@ -135,11 +201,15 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*
 	* @typedef {Record<string, never>} MyEmptyInput
 	*
+	* @typedef {string} 
+	*
 	* @typedef {{ A: string }} ExtraBracketsInTupleVariant
 	* @property {{ A: string }} A
 	*
 	* @typedef {string} ExtraBracketsInUnnamedStruct
 	* @property {string} "0"
+	*
+	* @typedef {number[]} <T>
 	*
 	* @typedef {{
 	*		demo: [string, boolean],
@@ -152,6 +222,10 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*		}, boolean],
 	*	}} InlineTuple2
 	* @property {[InlineTuple, boolean]} demo
+	*
+	* @typedef {string} <T>
+	*
+	* @typedef {string} <T>
 	*
 	* @typedef {{ type: "A" } | { type: "B"; data: string }} SkippedFieldWithinVariant
 	* @property {{ type: "A" }} A
@@ -169,10 +243,10 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*
 	* @typedef {{
 	*		borrowed: T[],
-	*		owned: T[],
+	*		owned: number[],
 	*	}} LifetimeGenericStruct<T>
 	* @property {T[]} borrowed
-	* @property {T[]} owned
+	* @property {number[]} owned
 	*
 	* @typedef {({ Borrowed: T }) & { Owned?: never } | ({ Owned: T }) & { Borrowed?: never }} LifetimeGenericEnum<T>
 	* @property {{ Borrowed: T }} Borrowed
@@ -278,20 +352,20 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {"TestingWords"} TestingWords
 	*
 	* @typedef {{
-	*		demo: Recursive,
+	*		demo: string,
 	*	}} Recursive
-	* @property {Recursive} demo
+	* @property {string} demo
 	*
 	* @typedef {{
-	*		demo: { [key in string]: RecursiveMapValue },
+	*		demo: { [key in number]: string },
 	*	}} RecursiveMapValue
-	* @property {{ [key in string]: RecursiveMapValue }} demo
+	* @property {{ [key in number]: string }} demo
 	*
-	* @typedef {RecursiveInline} RecursiveTransparent
-	* @property {RecursiveInline} "0"
+	* @typedef {string} RecursiveTransparent
+	* @property {string} "0"
 	*
-	* @typedef {{ A: (RecursiveInEnum) }} RecursiveInEnum
-	* @property {{ A: (RecursiveInEnum) }} A
+	* @typedef {{ A: (string) }} RecursiveInEnum
+	* @property {{ A: (string) }} A
 	*
 	* @typedef {string | null} NonOptional
 	* @property {string | null} "0"
@@ -337,8 +411,18 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {number} B
 	* @property {null} C
 	*
-	* @typedef {{ [key in string]: null }} Regular
-	* @property {{ [key in string]: null }} "0"
+	* @typedef {{ [key in number]: string }} <K, V>
+	*
+	* @typedef {{ [key in number]: string }} Regular
+	* @property {{ [key in number]: string }} "0"
+	*
+	* @typedef {{ [key in number]: string }} <K, V>
+	*
+	* @typedef {{ [key in number]: string }} <K, V>
+	*
+	* @typedef {{ [key in number]: string }} <K, V>
+	*
+	* @typedef {{ [key in number]: string }} <K, V>
 	*
 	* @typedef {string} MacroStruct
 	* @property {string} "0"
@@ -550,6 +634,12 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {A} a
 	* @property {B} b
 	*
+	* @typedef {{ [key in number]: string }} <K, V>
+	*
+	* @typedef {{ [key in number]: string }} <K, V>
+	*
+	* @typedef {{ [key in number]: string }} <K, V>
+	*
 	* @typedef {{
 	*		field: Demo<T, boolean>,
 	*	}} AGenericStruct<T>
@@ -587,16 +677,14 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {Inner} c
 	*
 	* @typedef {{
-	*		b: BoxedInner,
+	*		b: string,
 	*	}} BoxFlattened
-	* @property {BoxedInner} b
+	* @property {string} b
 	*
 	* @typedef {{
-	*		c: {
-	*			a: number,
-	*		},
+	*		c: string,
 	*	}} BoxInline
-	* @property {BoxedInner} c
+	* @property {string} c
 	*
 	* @typedef {{
 	*		a: string,
@@ -609,12 +697,12 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {number} a
 	*
 	* @typedef {(First) & {
-	*		b: { [key in string]: string },
-	*		c: First,
+	*		b: { [key in number]: string },
+	*		c: string,
 	*	}} Third
 	* @property {First} a
-	* @property {{ [key in string]: string }} b
-	* @property {First} c
+	* @property {{ [key in number]: string }} b
+	* @property {string} c
 	*
 	* @typedef {{
 	*		a: First,
@@ -697,8 +785,8 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {{ A: { a: string } }} A
 	* @property {{ B: { b: string } }} B
 	*
-	* @typedef {{ type: "A" } & { [key in string]: string }} InternallyTaggedD
-	* @property {{ type: "A" } & { [key in string]: string }} A
+	* @typedef {{ type: "A" } & { [key in number]: string }} InternallyTaggedD
+	* @property {{ type: "A" } & { [key in number]: string }} A
 	*
 	* @typedef {{ type: "A" }} InternallyTaggedE
 	* @property {{ type: "A" }} A
@@ -872,51 +960,51 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*
 	* @typedef {{
 	*		value: T,
-	*		values: T[],
+	*		values: number[],
 	*	}} Generic1<T>
 	* @property {T} value
-	* @property {T[]} values
+	* @property {number[]} values
 	*
 	* @typedef {{
 	*		value: T,
-	*		values: T[],
+	*		values: number[],
 	*	}} GenericAutoBound<T>
 	* @property {T} value
-	* @property {T[]} values
+	* @property {number[]} values
 	*
 	* @typedef {{
 	*		value: T,
-	*		values: T[],
+	*		values: number[],
 	*	}} GenericAutoBound2<T>
 	* @property {T} value
-	* @property {T[]} values
+	* @property {number[]} values
 	*
 	* @typedef {{
 	*		foo: Generic1<number>,
 	*		bar: Generic1<number>[],
-	*		baz: { [key in string]: Generic1<string> },
+	*		baz: { [key in string]: string },
 	*	}} Container1
 	* @property {Generic1<number>} foo
 	* @property {Generic1<number>[]} bar
-	* @property {{ [key in string]: Generic1<string> }} baz
+	* @property {{ [key in string]: string }} baz
 	*
-	* @typedef {({ A: A }) & { B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ B: [B, B, B] }) & { A?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ C: C[] }) & { A?: never; B?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ D: A[][][] }) & { A?: never; B?: never; C?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ E: { a: A; b: B; c: C } }) & { A?: never; B?: never; C?: never; D?: never; X?: never; Y?: never; Z?: never } | ({ X: number[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; Y?: never; Z?: never } | ({ Y: number }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Z?: never } | ({ Z: number[][] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never }} Generic2<A, B, C>
+	* @typedef {({ A: A }) & { B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ B: [B, B, B] }) & { A?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ C: number[] }) & { A?: never; B?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ D: number[] }) & { A?: never; B?: never; C?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ E: { a: A; b: B; c: C } }) & { A?: never; B?: never; C?: never; D?: never; X?: never; Y?: never; Z?: never } | ({ X: number[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; Y?: never; Z?: never } | ({ Y: number }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Z?: never } | ({ Z: number[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never }} Generic2<A, B, C>
 	* @property {{ A: A }} A
 	* @property {{ B: [B, B, B] }} B
-	* @property {{ C: C[] }} C
-	* @property {{ D: A[][][] }} D
+	* @property {{ C: number[] }} C
+	* @property {{ D: number[] }} D
 	* @property {{ E: { a: A; b: B; c: C } }} E
 	* @property {{ X: number[] }} X
 	* @property {{ Y: number }} Y
-	* @property {{ Z: number[][] }} Z
+	* @property {{ Z: number[] }} Z
 	*
-	* @typedef {T[][]} GenericNewType1<T>
-	* @property {T[][]} "0"
+	* @typedef {number[]} GenericNewType1<T>
+	* @property {number[]} "0"
 	*
-	* @typedef {[T, T[], T[][]]} GenericTuple<T>
+	* @typedef {[T, number[], number[]]} GenericTuple<T>
 	* @property {T} "0"
-	* @property {T[]} "1"
-	* @property {T[][]} "2"
+	* @property {number[]} "1"
+	* @property {number[]} "2"
 	*
 	* @typedef {{
 	*		a: T,
@@ -924,27 +1012,27 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*		c: [T, [T, T]],
 	*		d: [T, T, T],
 	*		e: [([T, T]), ([T, T]), ([T, T])],
-	*		f: T[],
-	*		g: T[][],
-	*		h: ([([T, T]), ([T, T]), ([T, T])])[],
+	*		f: number[],
+	*		g: number[],
+	*		h: number[],
 	*	}} GenericStruct2<T>
 	* @property {T} a
 	* @property {[T, T]} b
 	* @property {[T, [T, T]]} c
 	* @property {[T, T, T]} d
 	* @property {[([T, T]), ([T, T]), ([T, T])]} e
-	* @property {T[]} f
-	* @property {T[][]} g
-	* @property {([([T, T]), ([T, T]), ([T, T])])[]} h
+	* @property {number[]} f
+	* @property {number[]} g
+	* @property {number[]} h
 	*
 	* @typedef {T} InlineGenericNewtype<T>
 	* @property {T} "0"
 	*
-	* @typedef {[T, T[], [T, T], { [key in string]: T }, T | null, "Unit" | ({ Unnamed: T }) & { Named?: never } | ({ Named: { value: T } }) & { Unnamed?: never }]} InlineGenericNested<T>
+	* @typedef {[T, number[], [T, T], { [key in number]: string }, T | null, "Unit" | ({ Unnamed: T }) & { Named?: never } | ({ Named: { value: T } }) & { Unnamed?: never }]} InlineGenericNested<T>
 	* @property {T} "0"
-	* @property {T[]} "1"
+	* @property {number[]} "1"
 	* @property {[T, T]} "2"
-	* @property {{ [key in string]: T }} "3"
+	* @property {{ [key in number]: string }} "3"
 	* @property {T | null} "4"
 	* @property {"Unit" | ({ Unnamed: T }) & { Named?: never } | ({ Named: { value: T } }) & { Unnamed?: never }} "5"
 	*

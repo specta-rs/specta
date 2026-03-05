@@ -2,7 +2,59 @@
 source: tests/tests/typescript.rs
 expression: "dts.iter().filter_map(|(s, ty)| match ty\n{\n    DataType::Reference(Reference::Named(r)) =>\n    r.get(&types).cloned().map(|ty| (s, ty)), _ => None,\n}).map(|(s, ty)|\nprimitives::export(&ts, &types, iter::once(&ty),\n\"\").map(|ty| format!(\"{s}: {ty}\"))).collect::<Result<Vec<_>,\n_>>().unwrap().join(\"\\n\")"
 ---
+Range<i32>: export type <T> = {
+	start: number,
+	end: number,
+};
+
+RangeInclusive<i32>: export type <T> = {
+	start: number,
+	end: number,
+};
+
+String: export type  = string;
+
+PathBuf: export type  = string;
+
+IpAddr: export type  = string;
+
+Ipv4Addr: export type  = string;
+
+Ipv6Addr: export type  = string;
+
+SocketAddr: export type  = string;
+
+SocketAddrV4: export type  = string;
+
+SocketAddrV6: export type  = string;
+
+Cow<'static, str>: export type <T> = string;
+
+Cow<'static, i32>: export type <T> = string;
+
+SystemTime: export type  = {
+	duration_since_epoch: number,
+	duration_since_unix_epoch: number,
+};
+
+Duration: export type  = {
+	secs: number,
+	nanos: number,
+};
+
+Vec<i32>: export type <T> = number[];
+
+Vec<MyEnum>: export type <T> = number[];
+
 Result<String, i32>: export type <T, E> = ({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never };
+
+Vec<Option<Cow<'static, i32>>>: export type <T> = number[];
+
+PhantomData<()>: export type <T> = null;
+
+PhantomData<String>: export type <T> = null;
+
+Infallible: export type  = never;
 
 Unit1: export type Unit1 = null;
 
@@ -22,7 +74,7 @@ SimpleStruct: export type SimpleStruct = {
 	a: number,
 	b: string,
 	c: [number, string, number],
-	d: string[],
+	d: number[],
 	e: string | null,
 };
 
@@ -80,8 +132,14 @@ TransparentType2: export type TransparentType2 = null;
 
 TransparentTypeWithOverride: export type TransparentTypeWithOverride = string;
 
+HashMap<BasicEnum, ()>: export type <K, V> = { [key in number]: string };
+
+Vec<PlaceholderInnerField>: export type <T> = number[];
+
+HashMap<BasicEnum, i32>: export type <K, V> = { [key in number]: string };
+
 EnumReferenceRecordKey: export type EnumReferenceRecordKey = {
-	a: Partial<{ [key in BasicEnum]: number }>,
+	a: { [key in number]: string },
 };
 
 FlattenOnNestedEnum: export type FlattenOnNestedEnum = (NestedEnum) & {
@@ -90,9 +148,13 @@ FlattenOnNestedEnum: export type FlattenOnNestedEnum = (NestedEnum) & {
 
 MyEmptyInput: export type MyEmptyInput = Record<string, never>;
 
+(String): export type  = string;
+
 ExtraBracketsInTupleVariant: export type ExtraBracketsInTupleVariant = { A: string };
 
 ExtraBracketsInUnnamedStruct: export type ExtraBracketsInUnnamedStruct = string;
+
+Vec<MyEnum>: export type <T> = number[];
 
 InlineTuple: export type InlineTuple = {
 	demo: [string, boolean],
@@ -103,6 +165,10 @@ InlineTuple2: export type InlineTuple2 = {
 		demo: [string, boolean],
 	}, boolean],
 };
+
+Box<str>: export type <T> = string;
+
+Box<String>: export type <T> = string;
 
 SkippedFieldWithinVariant: export type SkippedFieldWithinVariant = { type: "A" } | { type: "B"; data: string };
 
@@ -116,7 +182,7 @@ Issue281<'_>: export type Issue281 = {
 
 LifetimeGenericStruct<'_, i32>: export type LifetimeGenericStruct<T> = {
 	borrowed: T[],
-	owned: T[],
+	owned: number[],
 };
 
 LifetimeGenericEnum<'_, i32>: export type LifetimeGenericEnum<T> = ({ Borrowed: T }) & { Owned?: never } | ({ Owned: T }) & { Borrowed?: never };
@@ -193,16 +259,16 @@ RenameSerdeSpecialChar: export type RenameSerdeSpecialChar = {
 EnumRenameAllUppercase: export type EnumRenameAllUppercase = "HelloWorld" | "VariantB" | "TestingWords";
 
 Recursive: export type Recursive = {
-	demo: Recursive,
+	demo: string,
 };
 
 RecursiveMapValue: export type RecursiveMapValue = {
-	demo: { [key in string]: RecursiveMapValue },
+	demo: { [key in number]: string },
 };
 
-RecursiveTransparent: export type RecursiveTransparent = RecursiveInline;
+RecursiveTransparent: export type RecursiveTransparent = string;
 
-RecursiveInEnum: export type RecursiveInEnum = { A: (RecursiveInEnum) };
+RecursiveInEnum: export type RecursiveInEnum = { A: (string) };
 
 NonOptional: export type NonOptional = string | null;
 
@@ -227,7 +293,17 @@ UntaggedVariantsWithoutValue: export type UntaggedVariantsWithoutValue = string 
 
 UntaggedVariantsWithDuplicateBranches: export type UntaggedVariantsWithDuplicateBranches = null | number;
 
-Regular: export type Regular = { [key in string]: null };
+HashMap<String, ()>: export type <K, V> = { [key in number]: string };
+
+Regular: export type Regular = { [key in number]: string };
+
+HashMap<Infallible, ()>: export type <K, V> = { [key in number]: string };
+
+HashMap<UnitVariants, ()>: export type <K, V> = { [key in number]: string };
+
+HashMap<UntaggedVariantsKey, ()>: export type <K, V> = { [key in number]: string };
+
+HashMap<Variants, ()>: export type <K, V> = { [key in number]: string };
 
 MacroStruct: export type MacroStruct = string;
 
@@ -369,6 +445,12 @@ Another<bool>: export type Demo<A, B> = {
 	b: B,
 };
 
+MapA<u32>: export type <K, V> = { [key in number]: string };
+
+MapB<u32>: export type <K, V> = { [key in number]: string };
+
+MapC<u32>: export type <K, V> = { [key in number]: string };
+
 AGenericStruct<u32>: export type AGenericStruct<T> = {
 	field: Demo<T, boolean>,
 };
@@ -397,13 +479,11 @@ FlattenedInner: export type FlattenedInner = {
 };
 
 BoxFlattened: export type BoxFlattened = {
-	b: BoxedInner,
+	b: string,
 };
 
 BoxInline: export type BoxInline = {
-	c: {
-		a: number,
-	},
+	c: string,
 };
 
 First: export type First = {
@@ -415,8 +495,8 @@ Second: export type Second = {
 };
 
 Third: export type Third = (First) & {
-	b: { [key in string]: string },
-	c: First,
+	b: { [key in number]: string },
+	c: string,
 };
 
 Fourth: export type Fourth = {
@@ -469,7 +549,7 @@ ExternallyTagged: export type ExternallyTagged = "A" | ({ B: { id: string; metho
 
 Issue221External: export type Issue221External = ({ A: { a: string } }) & { B?: never } | ({ B: { b: string } }) & { A?: never };
 
-InternallyTaggedD: export type InternallyTaggedD = { type: "A" } & { [key in string]: string };
+InternallyTaggedD: export type InternallyTaggedD = { type: "A" } & { [key in number]: string };
 
 InternallyTaggedE: export type InternallyTaggedE = { type: "A" };
 
@@ -588,30 +668,30 @@ TupleNested: export type TupleNested = [number[], [number[], number[]], [number[
 
 Generic1<()>: export type Generic1<T> = {
 	value: T,
-	values: T[],
+	values: number[],
 };
 
 GenericAutoBound<()>: export type GenericAutoBound<T> = {
 	value: T,
-	values: T[],
+	values: number[],
 };
 
 GenericAutoBound2<()>: export type GenericAutoBound2<T> = {
 	value: T,
-	values: T[],
+	values: number[],
 };
 
 Container1: export type Container1 = {
 	foo: Generic1<number>,
 	bar: Generic1<number>[],
-	baz: { [key in string]: Generic1<string> },
+	baz: { [key in string]: string },
 };
 
-Generic2<(), String, i32>: export type Generic2<A, B, C> = ({ A: A }) & { B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ B: [B, B, B] }) & { A?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ C: C[] }) & { A?: never; B?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ D: A[][][] }) & { A?: never; B?: never; C?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ E: { a: A; b: B; c: C } }) & { A?: never; B?: never; C?: never; D?: never; X?: never; Y?: never; Z?: never } | ({ X: number[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; Y?: never; Z?: never } | ({ Y: number }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Z?: never } | ({ Z: number[][] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never };
+Generic2<(), String, i32>: export type Generic2<A, B, C> = ({ A: A }) & { B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ B: [B, B, B] }) & { A?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ C: number[] }) & { A?: never; B?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ D: number[] }) & { A?: never; B?: never; C?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ E: { a: A; b: B; c: C } }) & { A?: never; B?: never; C?: never; D?: never; X?: never; Y?: never; Z?: never } | ({ X: number[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; Y?: never; Z?: never } | ({ Y: number }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Z?: never } | ({ Z: number[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never };
 
-GenericNewType1<()>: export type GenericNewType1<T> = T[][];
+GenericNewType1<()>: export type GenericNewType1<T> = number[];
 
-GenericTuple<()>: export type GenericTuple<T> = [T, T[], T[][]];
+GenericTuple<()>: export type GenericTuple<T> = [T, number[], number[]];
 
 GenericStruct2<()>: export type GenericStruct2<T> = {
 	a: T,
@@ -619,14 +699,14 @@ GenericStruct2<()>: export type GenericStruct2<T> = {
 	c: [T, [T, T]],
 	d: [T, T, T],
 	e: [([T, T]), ([T, T]), ([T, T])],
-	f: T[],
-	g: T[][],
-	h: ([([T, T]), ([T, T]), ([T, T])])[],
+	f: number[],
+	g: number[],
+	h: number[],
 };
 
 InlineGenericNewtype<String>: export type InlineGenericNewtype<T> = T;
 
-InlineGenericNested<String>: export type InlineGenericNested<T> = [T, T[], [T, T], { [key in string]: T }, T | null, "Unit" | ({ Unnamed: T }) & { Named?: never } | ({ Named: { value: T } }) & { Unnamed?: never }];
+InlineGenericNested<String>: export type InlineGenericNested<T> = [T, number[], [T, T], { [key in number]: string }, T | null, "Unit" | ({ Unnamed: T }) & { Named?: never } | ({ Named: { value: T } }) & { Unnamed?: never }];
 
 InlineFlattenGenericsG<()>: export type InlineFlattenGenericsG<T> = {
 	t: T,

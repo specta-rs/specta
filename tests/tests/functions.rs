@@ -281,7 +281,7 @@ fn test_function_exporting() {
                 .and_then(|result| render_datatype(&ts, &types, result))
                 .as_deref()
                 .unwrap_or("None"),
-            @"{ Ok: number } | { Err: number }"
+            @"({ Ok: number }) & { Err?: never } | ({ Err: number }) & { Ok?: never }"
         );
     }
 
