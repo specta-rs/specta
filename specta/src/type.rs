@@ -3,7 +3,6 @@ use crate::{TypeCollection, datatype::DataType};
 mod impls;
 mod macros;
 // TODO: We don't care much about these cause they are gonna go so this will do for now.
-#[cfg(feature = "derive")]
 mod legacy_impls;
 
 /// Provides runtime type information that can be fed into a language exporter to generate a type definition for another language.
