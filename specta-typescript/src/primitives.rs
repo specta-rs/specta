@@ -518,10 +518,19 @@ fn merged_generics(
     parent: &[(Generic, DataType)],
     child: &[(Generic, DataType)],
 ) -> Vec<(Generic, DataType)> {
+    let unshadowed_parent = parent
+        .iter()
+        .filter(|(parent_generic, _)| {
+            !child
+                .iter()
+                .any(|(child_generic, _)| child_generic == parent_generic)
+        })
+        .cloned();
+
     child
         .iter()
         .map(|(generic, dt)| (generic.clone(), resolve_generics_in_datatype(dt, parent)))
-        .chain(parent.iter().cloned())
+        .chain(unshadowed_parent)
         .collect()
 }
 
@@ -686,7 +695,7 @@ fn shallow_inline_datatype(
             }
         },
         DataType::Reference(r) => match r {
-            Reference::Named(r) => {
+            Reference::Named(r) if r.inline() => {
                 let ndt = r
                     .get(types)
                     .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
@@ -703,7 +712,7 @@ fn shallow_inline_datatype(
                     &combined_generics,
                 )
             }
-            Reference::Opaque(r) => reference_opaque_dt(s, exporter, types, r),
+            _ => reference_dt(s, exporter, types, r, location, prefix, generics),
         }?,
         DataType::Generic(g) => {
             if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
@@ -966,8 +975,8 @@ fn inline_datatype(
         DataType::Enum(e) => enum_dt(s, exporter, types, e, location, prefix, generics)?,
         DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, generics)?,
         DataType::Reference(r) => {
-            // Always inline references when in inline mode
             if let Reference::Named(r) = r
+                && r.inline()
                 && let Some(ndt) = r.get(types)
             {
                 let combined_generics = merged_generics(generics, r.generics());
@@ -983,7 +992,6 @@ fn inline_datatype(
                     &combined_generics,
                 )?;
             } else {
-                // Fallback to regular reference if type not found
                 reference_dt(s, exporter, types, r, location, prefix, generics)?;
             }
         }
@@ -1890,6 +1898,16 @@ fn reference_named_dt(
             _ => ndt.name().clone(),
         };
 
+        let scoped_generics = generics
+            .iter()
+            .filter(|(parent_generic, _)| {
+                !r.generics()
+                    .iter()
+                    .any(|(child_generic, _)| child_generic == parent_generic)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+
         s.push_str(&name);
         if !r.generics().is_empty() {
             s.push('<');
@@ -1907,7 +1925,7 @@ fn reference_named_dt(
                     v,
                     types,
                     s,
-                    generics,
+                    &scoped_generics,
                 )?;
             }
 
