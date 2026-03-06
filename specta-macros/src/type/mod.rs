@@ -13,6 +13,82 @@ use self::generics::{
     used_type_params,
 };
 
+#[derive(Debug, Default)]
+struct SpectaMetadata {
+    format: Vec<String>,
+}
+
+fn do_the_thing() -> SpectaMetadata {
+    // TODO: rerun if changed attribute on Cargo manifest
+
+    let Some(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR").ok() else {
+        eprintln!("[specta] CARGO_MANIFEST_DIR not set");
+        return SpectaMetadata::default();
+    };
+
+    let cargo_toml_path = format!("{manifest_dir}/Cargo.toml");
+    eprintln!("[specta] Reading Cargo.toml from: {}", cargo_toml_path);
+
+    let Ok(cargo_toml) = std::fs::read_to_string(&cargo_toml_path) else {
+        eprintln!("[specta] Failed to read Cargo.toml");
+        return SpectaMetadata::default();
+    };
+    println!("{:#?}", cargo_toml); // TODO
+
+    let Ok(value) = cargo_toml.parse::<toml::Value>() else {
+        eprintln!("[specta] Failed to parse Cargo.toml as TOML");
+        return SpectaMetadata::default();
+    };
+
+    let Some(table) = value.get("package") else {
+        eprintln!("[specta] No [package] section in Cargo.toml");
+        return SpectaMetadata::default();
+    };
+
+    let Some(table) = table.as_table() else {
+        eprintln!("[specta] [package] is not a table");
+        return SpectaMetadata::default();
+    };
+
+    let Some(metadata) = table.get("metadata") else {
+        eprintln!("[specta] No [package.metadata] section in Cargo.toml");
+        return SpectaMetadata::default();
+    };
+
+    let Some(table) = metadata.as_table() else {
+        eprintln!("[specta] [package.metadata] is not a table");
+        return SpectaMetadata::default();
+    };
+
+    let Some(specta) = table.get("specta") else {
+        eprintln!("[specta] No [package.metadata.specta] section in Cargo.toml");
+        return SpectaMetadata::default();
+    };
+
+    let specta_table = match specta.as_table() {
+        Some(t) => t,
+        None => {
+            eprintln!("[specta] [package.metadata.specta] is not a table");
+            return SpectaMetadata::default();
+        }
+    };
+
+    let mut metadata = SpectaMetadata::default();
+
+    if let Some(format_val) = specta_table.get("format") {
+        if let Some(arr) = format_val.as_array() {
+            metadata.format = arr
+                .iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect();
+        } else {
+            eprintln!("[specta] format in [package.metadata.specta] is not an array");
+        }
+    }
+
+    metadata
+}
+
 pub(crate) mod attr;
 mod r#enum;
 mod field;
@@ -21,6 +97,9 @@ mod lower_attr;
 mod r#struct;
 
 pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
+    let metadata = do_the_thing();
+    println!("{:?}", metadata);
+
     let DeriveInput {
         ident: raw_ident,
         generics,
