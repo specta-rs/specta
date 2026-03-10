@@ -9,8 +9,8 @@ use std::{
 use specta::{
     TypeCollection,
     datatype::{
-        DataType, DeprecatedType, Enum, EnumVariant, Fields, FunctionReturnType, Generic,
-        NonSkipField, Reference, Struct, Tuple, skip_fields, skip_fields_named,
+        DataType, DeprecatedType, Enum, EnumVariant, Fields, GenericReference, NonSkipField,
+        Reference, Struct, Tuple, skip_fields, skip_fields_named,
     },
 };
 
@@ -130,45 +130,11 @@ fn inner_comments(
 
 pub(crate) fn datatype_inner(
     ctx: ExportContext,
-    typ: &FunctionReturnType,
+    typ: &DataType,
     types: &TypeCollection,
     s: &mut String,
-    generics: &[(Generic, DataType)],
+    generics: &[(GenericReference, DataType)],
 ) -> Result<()> {
-    let typ = match typ {
-        FunctionReturnType::Value(t) => t,
-        FunctionReturnType::Result(t, e) => {
-            let mut variants = vec![
-                {
-                    let mut v = String::new();
-                    datatype_inner(
-                        ctx.clone(),
-                        &FunctionReturnType::Value(t.clone()),
-                        types,
-                        &mut v,
-                        generics,
-                    )?;
-                    v
-                },
-                {
-                    let mut v = String::new();
-                    datatype_inner(
-                        ctx,
-                        &FunctionReturnType::Value(e.clone()),
-                        types,
-                        &mut v,
-                        generics,
-                    )?;
-                    v
-                },
-            ];
-            let mut seen = BTreeSet::new();
-            variants.retain(|variant| seen.insert(variant.clone()));
-            s.push_str(&variants.join(" | "));
-            return Ok(());
-        }
-    };
-
     crate::primitives::datatype(s, ctx.cfg, types, typ, vec![], None, "", generics)
 }
 
@@ -179,7 +145,7 @@ fn unnamed_fields_datatype(
     types: &TypeCollection,
     s: &mut String,
     prefix: &str,
-    generics: &[(Generic, DataType)],
+    generics: &[(GenericReference, DataType)],
     force_inline: bool,
 ) -> Result<()> {
     match fields {
@@ -246,7 +212,7 @@ pub(crate) fn tuple_datatype(
     ctx: ExportContext,
     tuple: &Tuple,
     types: &TypeCollection,
-    generics: &[(Generic, DataType)],
+    generics: &[(GenericReference, DataType)],
 ) -> Output {
     match &tuple.elements() {
         [] => Ok(NULL.to_string()),
@@ -255,14 +221,7 @@ pub(crate) fn tuple_datatype(
             tys.iter()
                 .map(|v| {
                     let mut s = String::new();
-                    datatype_inner(
-                        ctx.clone(),
-                        &FunctionReturnType::Value(v.clone()),
-                        types,
-                        &mut s,
-                        generics,
-                    )
-                    .map(|_| s)
+                    datatype_inner(ctx.clone(), v, types, &mut s, generics).map(|_| s)
                 })
                 .collect::<Result<Vec<_>>>()?
                 .join(", ")
@@ -277,7 +236,7 @@ pub(crate) fn struct_datatype(
     types: &TypeCollection,
     s: &mut String,
     prefix: &str,
-    generics: &[(Generic, DataType)],
+    generics: &[(GenericReference, DataType)],
 ) -> Result<()> {
     match &strct.fields() {
         Fields::Unit => s.push_str(NULL),
@@ -412,7 +371,7 @@ fn enum_variant_datatype(
     name: Cow<'static, str>,
     variant: &EnumVariant,
     prefix: &str,
-    generics: &[(Generic, DataType)],
+    generics: &[(GenericReference, DataType)],
 ) -> Result<Option<String>> {
     match &variant.fields() {
         Fields::Unit => Ok(Some(sanitise_key(name, false).to_string())),
@@ -662,7 +621,7 @@ pub(crate) fn enum_datatype(
     types: &TypeCollection,
     s: &mut String,
     prefix: &str,
-    generics: &[(Generic, DataType)],
+    generics: &[(GenericReference, DataType)],
 ) -> Result<()> {
     if e.variants().is_empty() {
         return Ok(write!(s, "{NEVER}")?);
@@ -820,7 +779,7 @@ fn object_field_to_ts(
     field_ref: NonSkipField,
     types: &TypeCollection,
     s: &mut String,
-    generics: &[(Generic, DataType)],
+    generics: &[(GenericReference, DataType)],
     prefix: &str,
     force_inline: bool,
 ) -> Result<()> {
@@ -955,7 +914,7 @@ fn validate_type_for_tagged_intersection(
         | DataType::Nullable(_)
         | DataType::List(_)
         | DataType::Map(_)
-        | DataType::Generic(_) => Ok(false),
+        | DataType::Reference(Reference::Generic(_)) => Ok(false),
         // DataType::Literal(v) => match v {
         //     Literal::None => Ok(true),
         //     _ => Ok(false),

@@ -38,8 +38,8 @@ pub enum Primitive {
     bool,
     /// A `char` primitive.
     char,
-    /// A `String` primitive.
-    String,
+    /// A `str` primitive.
+    str,
 }
 
 impl From<Primitive> for DataType {

@@ -3,6 +3,70 @@ source: tests/tests/jsdoc.rs
 expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()"
 ---
 /**
+	* @typedef {{
+	*		start: T,
+	*		end: T,
+	*	}} Range<T>
+	* @property {T} start
+	* @property {T} end
+	*
+	* @typedef {{
+	*		start: T,
+	*		end: T,
+	*	}} RangeInclusive<T>
+	* @property {T} start
+	* @property {T} end
+	*
+	* @typedef {string} String
+	*
+	* @typedef {string} PathBuf
+	*
+	* @typedef {string} IpAddr
+	*
+	* @typedef {string} Ipv4Addr
+	*
+	* @typedef {string} Ipv6Addr
+	*
+	* @typedef {string} SocketAddr
+	*
+	* @typedef {string} SocketAddrV4
+	*
+	* @typedef {string} SocketAddrV6
+	*
+	* @typedef {T} Cow<T>
+	*
+	* @typedef {T} Cow<T>
+	*
+	* @typedef {{
+	*		duration_since_epoch: number,
+	*		duration_since_unix_epoch: number,
+	*	}} SystemTime
+	* @property {number} duration_since_epoch
+	* @property {number} duration_since_unix_epoch
+	*
+	* @typedef {{
+	*		secs: number,
+	*		nanos: number,
+	*	}} Duration
+	* @property {number} secs
+	* @property {number} nanos
+	*
+	* @typedef {T[]} Vec<T>
+	*
+	* @typedef {T[]} Vec<T>
+	*
+	* @typedef {({ Ok: T }) & { Err?: never } | ({ Err: E }) & { Ok?: never }} Result<T, E>
+	* @property {{ Ok: T }} Ok
+	* @property {{ Err: E }} Err
+	*
+	* @typedef {T[]} Vec<T>
+	*
+	* @typedef {null} PhantomData<T>
+	*
+	* @typedef {null} PhantomData<T>
+	*
+	* @typedef {never} Infallible
+	*
 	* @typedef {null} Unit1
 	*
 	* @typedef {Record<string, never>} Unit2
@@ -118,6 +182,12 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @typedef {string} TransparentTypeWithOverride
 	* @property {string} "0"
 	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
+	*
+	* @typedef {T[]} Vec<T>
+	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
+	*
 	* @typedef {{
 	*		a: Partial<{ [key in BasicEnum]: number }>,
 	*	}} EnumReferenceRecordKey
@@ -131,11 +201,15 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*
 	* @typedef {Record<string, never>} MyEmptyInput
 	*
+	* @typedef {string} String
+	*
 	* @typedef {{ A: string }} ExtraBracketsInTupleVariant
 	* @property {{ A: string }} A
 	*
 	* @typedef {string} ExtraBracketsInUnnamedStruct
 	* @property {string} "0"
+	*
+	* @typedef {T[]} Vec<T>
 	*
 	* @typedef {{
 	*		demo: [string, boolean],
@@ -148,6 +222,10 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*		}, boolean],
 	*	}} InlineTuple2
 	* @property {[InlineTuple, boolean]} demo
+	*
+	* @typedef {T} Box<T>
+	*
+	* @typedef {T} Box<T>
 	*
 	* @typedef {{ type: "A" } | { type: "B"; data: string }} SkippedFieldWithinVariant
 	* @property {{ type: "A" }} A
@@ -231,7 +309,7 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*
 	* @typedef {string} ContainerTypeOverrideEnum
 	*
-	* @typedef {string} ContainerTypeOverrideGeneric<T>
+	* @typedef {string} ContainerTypeOverrideGeneric
 	*
 	* @typedef {T} ContainerTypeOverrideToGeneric<T>
 	*
@@ -333,8 +411,18 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {number} B
 	* @property {null} C
 	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
+	*
 	* @typedef {{ [key in string]: null }} Regular
 	* @property {{ [key in string]: null }} "0"
+	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
+	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
+	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
+	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
 	*
 	* @typedef {string} MacroStruct
 	* @property {string} "0"
@@ -546,6 +634,12 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {A} a
 	* @property {B} b
 	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
+	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
+	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
+	*
 	* @typedef {{
 	*		field: Demo<T, boolean>,
 	*	}} AGenericStruct<T>
@@ -588,9 +682,7 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {BoxedInner} b
 	*
 	* @typedef {{
-	*		c: {
-	*			a: number,
-	*		},
+	*		c: BoxedInner,
 	*	}} BoxInline
 	* @property {BoxedInner} c
 	*

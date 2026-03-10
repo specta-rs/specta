@@ -2,6 +2,60 @@
 source: tests/tests/typescript.rs
 expression: "primitives::export(&ts, &types, ndts.into_iter(), \"\").unwrap()"
 ---
+export type Range<T> = {
+	start: T,
+	end: T,
+};
+
+export type RangeInclusive<T> = {
+	start: T,
+	end: T,
+};
+
+export type String = string;
+
+export type PathBuf = string;
+
+export type IpAddr = string;
+
+export type Ipv4Addr = string;
+
+export type Ipv6Addr = string;
+
+export type SocketAddr = string;
+
+export type SocketAddrV4 = string;
+
+export type SocketAddrV6 = string;
+
+export type Cow<T> = T;
+
+export type Cow<T> = T;
+
+export type SystemTime = {
+	duration_since_epoch: number,
+	duration_since_unix_epoch: number,
+};
+
+export type Duration = {
+	secs: number,
+	nanos: number,
+};
+
+export type Vec<T> = T[];
+
+export type Vec<T> = T[];
+
+export type Result<T, E> = ({ Ok: T }) & { Err?: never } | ({ Err: E }) & { Ok?: never };
+
+export type Vec<T> = T[];
+
+export type PhantomData<T> = null;
+
+export type PhantomData<T> = null;
+
+export type Infallible = never;
+
 export type Unit1 = null;
 
 export type Unit2 = Record<string, never>;
@@ -78,6 +132,12 @@ export type TransparentType2 = null;
 
 export type TransparentTypeWithOverride = string;
 
+export type HashMap<K, V> = { [key in K]: V };
+
+export type Vec<T> = T[];
+
+export type HashMap<K, V> = { [key in K]: V };
+
 export type EnumReferenceRecordKey = {
 	a: Partial<{ [key in BasicEnum]: number }>,
 };
@@ -88,9 +148,13 @@ export type FlattenOnNestedEnum = (NestedEnum) & {
 
 export type MyEmptyInput = Record<string, never>;
 
+export type String = string;
+
 export type ExtraBracketsInTupleVariant = { A: string };
 
 export type ExtraBracketsInUnnamedStruct = string;
+
+export type Vec<T> = T[];
 
 export type InlineTuple = {
 	demo: [string, boolean],
@@ -101,6 +165,10 @@ export type InlineTuple2 = {
 		demo: [string, boolean],
 	}, boolean],
 };
+
+export type Box<T> = T;
+
+export type Box<T> = T;
 
 export type SkippedFieldWithinVariant = { type: "A" } | { type: "B"; data: string };
 
@@ -159,7 +227,7 @@ export type ContainerTypeOverrideStruct = string;
 
 export type ContainerTypeOverrideEnum = string;
 
-export type ContainerTypeOverrideGeneric<T> = string;
+export type ContainerTypeOverrideGeneric = string;
 
 export type ContainerTypeOverrideToGeneric<T> = T;
 
@@ -225,7 +293,17 @@ export type UntaggedVariantsWithoutValue = string | [number, string] | number;
 
 export type UntaggedVariantsWithDuplicateBranches = null | number;
 
+export type HashMap<K, V> = { [key in K]: V };
+
 export type Regular = { [key in string]: null };
+
+export type HashMap<K, V> = { [key in K]: V };
+
+export type HashMap<K, V> = { [key in K]: V };
+
+export type HashMap<K, V> = { [key in K]: V };
+
+export type HashMap<K, V> = { [key in K]: V };
 
 export type MacroStruct = string;
 
@@ -367,6 +445,12 @@ export type Demo<A, B> = {
 	b: B,
 };
 
+export type HashMap<K, V> = { [key in K]: V };
+
+export type HashMap<K, V> = { [key in K]: V };
+
+export type HashMap<K, V> = { [key in K]: V };
+
 export type AGenericStruct<T> = {
 	field: Demo<T, boolean>,
 };
@@ -399,9 +483,7 @@ export type BoxFlattened = {
 };
 
 export type BoxInline = {
-	c: {
-		a: number,
-	},
+	c: BoxedInner,
 };
 
 export type First = {

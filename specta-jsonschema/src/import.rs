@@ -40,7 +40,7 @@ fn schema_object_to_datatype(obj: &JsonMap<String, Value>) -> Result<DataType, E
     // Handle const values (literals)
     if obj.get("const").is_some() {
         // Specta does not currently expose a direct literal DataType variant.
-        return Ok(DataType::Primitive(Primitive::String));
+        return Ok(DataType::Primitive(Primitive::str));
     }
 
     // Handle enum values (for string enums)
@@ -112,7 +112,7 @@ fn instance_type_name_to_datatype(
             Ok(DataType::Tuple(Tuple::new(vec![])))
         }
         "boolean" => Ok(DataType::Primitive(Primitive::bool)),
-        "string" => Ok(DataType::Primitive(Primitive::String)),
+        "string" => Ok(DataType::Primitive(Primitive::str)),
         "number" => {
             if let Some(format) = obj.get("format").and_then(Value::as_str) {
                 match format {
@@ -190,13 +190,13 @@ fn instance_type_name_to_datatype(
                     Value::Object(_) => {
                         let value_dt = value_to_datatype(additional)?;
                         return Ok(DataType::Map(Map::new(
-                            DataType::Primitive(Primitive::String),
+                            DataType::Primitive(Primitive::str),
                             value_dt,
                         )));
                     }
                     Value::Bool(true) => {
                         return Ok(DataType::Map(Map::new(
-                            DataType::Primitive(Primitive::String),
+                            DataType::Primitive(Primitive::str),
                             Struct::named().build(),
                         )));
                     }

@@ -26,7 +26,7 @@
 // fn datatype(t: &DataType) -> Result<String, String> {
 //     Ok(match t {
 //         DataType::Primitive(p) => match p {
-//             Primitive::String => "String",
+//             Primitive::str => "String",
 //             Primitive::char => "Char",
 //             Primitive::i8 => "Byte",
 //             Primitive::i16 => "Short",

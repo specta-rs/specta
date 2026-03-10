@@ -3,8 +3,8 @@ use std::{borrow::Cow, panic::Location, sync::Arc};
 use crate::{
     TypeCollection,
     datatype::{
-        DataType, Generic, NamedDataTypeBuilder, NamedReference, Reference,
-        reference::{self, NamedId},
+        DataType, NamedDataTypeBuilder, NamedReference, Reference,
+        reference::{self, GenericReference, NamedId},
     },
 };
 
@@ -17,7 +17,7 @@ pub struct NamedDataType {
     pub(crate) deprecated: Option<DeprecatedType>,
     pub(crate) module_path: Cow<'static, str>,
     pub(crate) location: Location<'static>,
-    pub(crate) generics: Vec<Generic>,
+    pub(crate) generics: Cow<'static, [(GenericReference, Cow<'static, str>)]>,
     pub(crate) inline: bool,
     pub(crate) inner: DataType,
 }
@@ -31,7 +31,8 @@ impl NamedDataType {
     #[doc(hidden)]
     #[track_caller]
     pub fn init_with_sentinel(
-        generics: Vec<(Generic, DataType)>,
+        generics_for_ndt: &'static [(GenericReference, Cow<'static, str>)],
+        generics_for_ref: Vec<(GenericReference, DataType)>,
         mut inline: bool,
         types: &mut TypeCollection,
         sentinel: &'static str,
@@ -55,7 +56,7 @@ impl NamedDataType {
                 docs: Cow::Borrowed(""),
                 deprecated: None,
                 module_path: Cow::Borrowed(""),
-                generics: vec![],
+                generics: Cow::Borrowed(generics_for_ndt),
                 inline,
                 inner: DataType::Primitive(super::Primitive::i8),
             };
@@ -79,7 +80,7 @@ impl NamedDataType {
 
         Reference::Named(NamedReference {
             id,
-            generics,
+            generics: generics_for_ref,
             inline,
         })
     }
@@ -103,7 +104,7 @@ impl NamedDataType {
             deprecated: builder.deprecated,
             module_path,
             location: location.to_owned(),
-            generics: builder.generics,
+            generics: Cow::Owned(builder.generics),
             inline: builder.inline,
             inner: builder.inner,
         };
@@ -117,7 +118,7 @@ impl NamedDataType {
     /// This can be included in a `DataType::Reference` within another type.
     ///
     /// This reference will be inlined if the type is inlined, otherwise you can inline it with [Reference::inline].
-    pub fn reference(&self, generics: Vec<(Generic, DataType)>) -> Reference {
+    pub fn reference(&self, generics: Vec<(GenericReference, DataType)>) -> Reference {
         // TODO: allow generics to be `Cow`
         // TODO: HashMap instead of array for better typesafety??
 
@@ -212,12 +213,12 @@ impl NamedDataType {
     }
 
     /// The generics that are defined on this type
-    pub fn generics(&self) -> &[Generic] {
+    pub fn generics(&self) -> &[(GenericReference, Cow<'static, str>)] {
         &self.generics
     }
 
     /// Get a mutable reference to the generics that are defined on this type
-    pub fn generics_mut(&mut self) -> &mut Vec<Generic> {
+    pub fn generics_mut(&mut self) -> &mut Cow<'static, [(GenericReference, Cow<'static, str>)]> {
         &mut self.generics
     }
 

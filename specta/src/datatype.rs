@@ -5,7 +5,6 @@ mod builders;
 mod r#enum;
 mod fields;
 mod function;
-mod generic;
 mod list;
 mod map;
 mod named;
@@ -20,13 +19,12 @@ pub use r#enum::{Enum, EnumVariant};
 pub use fields::{
     Field, Fields, NamedFields, NonSkipField, UnnamedFields, skip_fields, skip_fields_named,
 };
-pub use function::{Function, FunctionReturnType};
-pub use generic::{ConstGenericPlaceholder, Generic, GenericPlaceholder};
+pub use function::Function;
 pub use list::List;
 pub use map::Map;
 pub use named::{DeprecatedType, NamedDataType};
 pub use primitive::Primitive;
-pub use reference::{NamedReference, OpaqueReference, Reference};
+pub use reference::{GenericReference, NamedReference, OpaqueReference, Reference};
 pub use r#struct::Struct;
 pub use tuple::Tuple;
 
@@ -43,16 +41,14 @@ pub enum DataType {
     List(List),
     /// A map/dictionary type.
     Map(Map),
-    /// A nullable wrapper around another type.
-    Nullable(Box<DataType>),
     /// A struct type with named, unnamed, or unit fields.
     Struct(Struct),
     /// An enum type.
     Enum(Enum),
     /// A tuple type.
     Tuple(Tuple),
+    /// A nullable wrapper around another type.
+    Nullable(Box<DataType>),
     /// A reference to another named or opaque type.
     Reference(Reference),
-    /// A generic placeholder type parameter.
-    Generic(Generic),
 }

@@ -107,14 +107,10 @@ pub fn datatype_to_schema(
                 Reference::Opaque(_) => Err(Error::UnsupportedDataType(
                     "Opaque references are not supported by JSON Schema exporter".to_string(),
                 )),
+                // JsonSchema doesn't have generics, so we use a placeholder,
+                // This should typically be resolved before export.
+                Reference::Generic(_) => Ok(json!({})), // Empty schema accepts anything
             }
-        }
-
-        // Generic
-        DataType::Generic(_g) => {
-            // JSON Schema doesn't have generics, so we use a placeholder
-            // This should typically be resolved before export
-            Ok(json!({})) // Empty schema accepts anything
         }
     }
 }
@@ -122,7 +118,7 @@ pub fn datatype_to_schema(
 fn primitive_to_schema(p: &Primitive) -> Value {
     match p {
         Primitive::bool => json!({"type": "boolean"}),
-        Primitive::String => json!({"type": "string"}),
+        Primitive::str => json!({"type": "string"}),
         Primitive::char => json!({"type": "string", "minLength": 1, "maxLength": 1}),
 
         // Integers
