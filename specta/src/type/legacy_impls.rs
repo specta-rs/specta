@@ -8,15 +8,15 @@ use crate::{
         self, Attribute, AttributeMeta, AttributeNestedMeta, DataType, Enum, EnumVariant, Field,
         Fields, NamedFields, Primitive, Reference, Struct,
     },
-    r#type::impls::*,
+    r#type::{generics, impls::*},
 };
 
 use std::borrow::Cow;
 
 #[cfg(feature = "indexmap")]
 impl_ndt_as!(
-    indexmap::IndexSet<T> as PrimitiveSet<GenericT>
-    indexmap::IndexMap<K, V> as PrimitiveMap<GenericK, GenericV>
+    indexmap::IndexSet<T> as PrimitiveSet<generics::T>
+    indexmap::IndexMap<K, V> as PrimitiveMap<generics::K, generics::V>
 );
 
 #[cfg(feature = "bytes")]
@@ -30,7 +30,7 @@ const _: () = {
     use serde_json::{Map, Number, Value};
 
     impl_ndt_as!(
-        serde_json::Map<K, V> as PrimitiveMap<GenericK, GenericV>
+        serde_json::Map<K, V> as PrimitiveMap<generics::K, generics::V>
     );
 
     impl_ndt!(
@@ -208,7 +208,7 @@ const _: () = {
 const _: () = {
     use toml::{Value, value};
 
-    impl_ndt_as!(toml::map::Map<K, V> as PrimitiveMap<GenericK, GenericV>);
+    impl_ndt_as!(toml::map::Map<K, V> as PrimitiveMap<generics::K, generics::V>);
 
     impl_ndt!(
         impl Type for toml::value::Datetime {
@@ -553,7 +553,7 @@ impl_ndt!(
                         "Left".into(),
                         EnumVariant::unnamed()
                             .field(Field::new(
-                                datatype::GenericReference::new::<GenericL>().into(),
+                                datatype::GenericReference::new::<generics::L>().into(),
                             ))
                             .build(),
                     ),
@@ -561,7 +561,7 @@ impl_ndt!(
                         "Right".into(),
                         EnumVariant::unnamed()
                             .field(Field::new(
-                                datatype::GenericReference::new::<GenericR>().into(),
+                                datatype::GenericReference::new::<generics::R>().into(),
                             ))
                             .build(),
                     ),

@@ -34,30 +34,6 @@ macro_rules! _impl_passthrough {
     };
 }
 
-macro_rules! _generic_marker {
-    (T) => {
-        crate::r#type::impls::GenericT
-    };
-    (K) => {
-        crate::r#type::impls::GenericK
-    };
-    (V) => {
-        crate::r#type::impls::GenericV
-    };
-    (E) => {
-        crate::r#type::impls::GenericE
-    };
-    (L) => {
-        crate::r#type::impls::GenericL
-    };
-    (R) => {
-        crate::r#type::impls::GenericR
-    };
-    ($other:ident) => {
-        $other
-    };
-}
-
 macro_rules! _impl_ndt_as {
     ( $($head:ident :: $( $tail:ident )::+ $(<$($generic:ident),*>)? $( where { $($bounds:tt)* } )? as $ty2:ty )* ) => {
         impl_ndt!(
@@ -93,7 +69,7 @@ macro_rules! _impl_ndt {
                     static GENERICS: &[(datatype::GenericReference, ::std::borrow::Cow<'static, str>)] = &[
                         $($(
                             (
-                                datatype::GenericReference::new::<crate::r#type::macros::generic_marker!($generic)>(),
+                                datatype::GenericReference::new::<generics::$generic>(),
                                 ::std::borrow::Cow::Borrowed(stringify!($generic)),
                             )
                         ),*)?
@@ -103,7 +79,7 @@ macro_rules! _impl_ndt {
                         vec![
                             $($(
                                 (
-                                    datatype::GenericReference::new::<crate::r#type::macros::generic_marker!($generic)>(),
+                                    datatype::GenericReference::new::<generics::$generic>(),
                                     <$generic as Type>::definition(types),
                                 )
                             ),*)?
@@ -138,7 +114,6 @@ macro_rules! _impl_ndt {
     };
 }
 
-pub(crate) use _generic_marker as generic_marker;
 pub(crate) use _impl_ndt as impl_ndt;
 pub(crate) use _impl_ndt_as as impl_ndt_as;
 pub(crate) use _impl_passthrough as impl_passthrough;

@@ -4,7 +4,7 @@ use crate::{
     Type, TypeCollection,
     datatype::{self, DataType, Enum, EnumVariant, Field, List},
     internal,
-    r#type::macros::*,
+    r#type::{generics, macros::*},
 };
 
 impl_primitives!(
@@ -51,76 +51,34 @@ impl<K: Type, V: Type> Type for PrimitiveMap<K, V> {
     }
 }
 
-pub(crate) struct GenericT;
-impl Type for GenericT {
-    fn definition(_: &mut TypeCollection) -> DataType {
-        datatype::GenericReference::new::<Self>().into()
-    }
-}
-
-pub(crate) struct GenericK;
-impl Type for GenericK {
-    fn definition(_: &mut TypeCollection) -> DataType {
-        datatype::GenericReference::new::<Self>().into()
-    }
-}
-
-pub(crate) struct GenericV;
-impl Type for GenericV {
-    fn definition(_: &mut TypeCollection) -> DataType {
-        datatype::GenericReference::new::<Self>().into()
-    }
-}
-
-pub(crate) struct GenericE;
-impl Type for GenericE {
-    fn definition(_: &mut TypeCollection) -> DataType {
-        datatype::GenericReference::new::<Self>().into()
-    }
-}
-
-pub(crate) struct GenericL;
-impl Type for GenericL {
-    fn definition(_: &mut TypeCollection) -> DataType {
-        datatype::GenericReference::new::<Self>().into()
-    }
-}
-
-pub(crate) struct GenericR;
-impl Type for GenericR {
-    fn definition(_: &mut TypeCollection) -> DataType {
-        datatype::GenericReference::new::<Self>().into()
-    }
-}
-
 #[cfg(feature = "std")]
 const _: () = {
     impl_ndt_as!(
         std::string::String as str
 
         // Non-unique sets
-        std::vec::Vec<T> as [GenericT]
-        std::collections::VecDeque<T> as [GenericT]
-        std::collections::BinaryHeap<T> as [GenericT]
-        std::collections::LinkedList<T> as [GenericT]
+        std::vec::Vec<T> as [generics::T]
+        std::collections::VecDeque<T> as [generics::T]
+        std::collections::BinaryHeap<T> as [generics::T]
+        std::collections::LinkedList<T> as [generics::T]
 
         // Unique sets
-        std::collections::HashSet<T> as PrimitiveSet<GenericT>
-        std::collections::BTreeSet<T> as PrimitiveSet<GenericT>
+        std::collections::HashSet<T> as PrimitiveSet<generics::T>
+        std::collections::BTreeSet<T> as PrimitiveSet<generics::T>
 
         // Maps
-        std::collections::HashMap<K, V> as PrimitiveMap<GenericK, GenericV>
-        std::collections::BTreeMap<K, V> as PrimitiveMap<GenericK, GenericV>
+        std::collections::HashMap<K, V> as PrimitiveMap<generics::K, generics::V>
+        std::collections::BTreeMap<K, V> as PrimitiveMap<generics::K, generics::V>
 
         // Containers
-        std::boxed::Box<T> where { T: ?Sized } as GenericT
-        std::rc::Rc<T> where { T: ?Sized } as GenericT
-        std::sync::Arc<T> where { T: ?Sized } as GenericT
-        std::cell::Cell<T> where { T: ?Sized } as GenericT
-        std::cell::RefCell<T> where { T: ?Sized } as GenericT
+        std::boxed::Box<T> where { T: ?Sized } as generics::T
+        std::rc::Rc<T> where { T: ?Sized } as generics::T
+        std::sync::Arc<T> where { T: ?Sized } as generics::T
+        std::cell::Cell<T> where { T: ?Sized } as generics::T
+        std::cell::RefCell<T> where { T: ?Sized } as generics::T
 
-        std::sync::Mutex<T> where { T: ?Sized } as GenericT
-        std::sync::RwLock<T> where { T: ?Sized } as GenericT
+        std::sync::Mutex<T> where { T: ?Sized } as generics::T
+        std::sync::RwLock<T> where { T: ?Sized } as generics::T
 
         std::ffi::CString as str
         std::ffi::CStr as str
@@ -164,8 +122,8 @@ const _: () = {
         std::num::NonZeroI128 as i128
 
         // Serde are cringe so this is how it is :(
-        std::ops::Range<T> as BaseRange<GenericT>
-        std::ops::RangeInclusive<T> as BaseRange<GenericT>
+        std::ops::Range<T> as BaseRange<generics::T>
+        std::ops::RangeInclusive<T> as BaseRange<generics::T>
     );
 
     impl_ndt!(
@@ -231,14 +189,14 @@ const _: () = {
             // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
             static SENTINEL: &str = "std::borrow::Cow<'a, T>";
             static GENERICS: &[(GenericReference, Cow<'static, str>)] = &[(
-                datatype::GenericReference::new::<GenericT>(),
+                datatype::GenericReference::new::<generics::T>(),
                 std::borrow::Cow::Borrowed("T"),
             )];
 
             DataType::Reference(datatype::NamedDataType::init_with_sentinel(
                 GENERICS,
                 vec![(
-                    datatype::GenericReference::new::<GenericT>(),
+                    datatype::GenericReference::new::<generics::T>(),
                     <T as Type>::definition(types),
                 )],
                 true,
@@ -247,7 +205,7 @@ const _: () = {
                 |_types, ndt| {
                     *ndt.name_mut() = std::borrow::Cow::Borrowed("Cow");
                     *ndt.module_path_mut() = std::borrow::Cow::Borrowed("std::borrow");
-                    ndt.inner = datatype::GenericReference::new::<GenericT>().into();
+                    ndt.inner = datatype::GenericReference::new::<generics::T>().into();
                 },
             ))
         }
@@ -273,8 +231,8 @@ const _: () = {
 
 #[cfg(feature = "tokio")]
 impl_ndt_as!(
-    tokio::sync::Mutex<T> where { T: ?Sized } as GenericT
-    tokio::sync::RwLock<T> where { T: ?Sized } as GenericT
+    tokio::sync::Mutex<T> where { T: ?Sized } as generics::T
+    tokio::sync::RwLock<T> where { T: ?Sized } as generics::T
 );
 
 impl<T: Type + ?Sized> Type for &T {
@@ -314,14 +272,14 @@ impl_ndt!(
             let mut ok_variant = EnumVariant::unit();
             ok_variant.set_fields(internal::construct::fields_unnamed(
                 vec![Field::new(
-                    datatype::GenericReference::new::<GenericT>().into(),
+                    datatype::GenericReference::new::<generics::T>().into(),
                 )],
                 vec![],
             ));
             let mut err_variant = EnumVariant::unit();
             err_variant.set_fields(internal::construct::fields_unnamed(
                 vec![Field::new(
-                    datatype::GenericReference::new::<GenericE>().into(),
+                    datatype::GenericReference::new::<generics::E>().into(),
                 )],
                 vec![],
             ));
