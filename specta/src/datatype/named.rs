@@ -1,11 +1,11 @@
 use std::{borrow::Cow, collections::HashSet, panic::Location, sync::Arc};
 
 use crate::{
-    datatype::{
-        reference::{self, GenericReference, NamedId},
-        DataType, NamedDataTypeBuilder, NamedReference, Reference,
-    },
     TypeCollection,
+    datatype::{
+        DataType, NamedDataTypeBuilder, NamedReference, Reference,
+        reference::{self, GenericReference, NamedId},
+    },
 };
 
 /// A named type represents a non-primitive type capable of being exported as it's own named entity.
@@ -275,10 +275,17 @@ pub enum DeprecatedType {
     },
 }
 
+/// Semantic tags that exporters can use to produce richer target-language types.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum TypeTag {
+    /// Represents values that map naturally to JavaScript's `Date` type.
     Date,
+    /// Represents values that map naturally to JavaScript's `BigInt` type.
+    BigInt,
+    /// Represents values that map naturally to JavaScript's `Uint8Array` type.
+    UInt8Array,
+    /// A user-defined semantic tag.
     Custom(Cow<'static, str>),
 }
 
