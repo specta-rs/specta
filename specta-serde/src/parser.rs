@@ -2,14 +2,14 @@ pub use crate::inflection::RenameRule;
 
 /// Conversion metadata parsed from serde conversion attributes.
 #[allow(missing_docs)]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ConversionType {
     pub type_src: String,
 }
 
 /// Parsed serde container attributes.
 #[allow(missing_docs)]
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct SerdeContainerAttrs {
     pub rename_serialize: Option<String>,
     pub rename_deserialize: Option<String>,
@@ -35,7 +35,7 @@ pub struct SerdeContainerAttrs {
 
 /// Parsed serde variant attributes.
 #[allow(missing_docs)]
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct SerdeVariantAttrs {
     pub rename_serialize: Option<String>,
     pub rename_deserialize: Option<String>,
@@ -54,7 +54,7 @@ pub struct SerdeVariantAttrs {
 
 /// Parsed serde field attributes.
 #[allow(missing_docs)]
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct SerdeFieldAttrs {
     pub rename_serialize: Option<String>,
     pub rename_deserialize: Option<String>,
@@ -69,6 +69,128 @@ pub struct SerdeFieldAttrs {
     pub with: Option<String>,
     pub borrow: Option<String>,
     pub getter: Option<String>,
+}
+
+#[doc(hidden)]
+pub fn merge_container_attrs(target: &mut SerdeContainerAttrs, other: SerdeContainerAttrs) {
+    if other.rename_serialize.is_some() {
+        target.rename_serialize = other.rename_serialize;
+    }
+    if other.rename_deserialize.is_some() {
+        target.rename_deserialize = other.rename_deserialize;
+    }
+    if other.rename_all_serialize.is_some() {
+        target.rename_all_serialize = other.rename_all_serialize;
+    }
+    if other.rename_all_deserialize.is_some() {
+        target.rename_all_deserialize = other.rename_all_deserialize;
+    }
+    if other.rename_all_fields_serialize.is_some() {
+        target.rename_all_fields_serialize = other.rename_all_fields_serialize;
+    }
+    if other.rename_all_fields_deserialize.is_some() {
+        target.rename_all_fields_deserialize = other.rename_all_fields_deserialize;
+    }
+    target.deny_unknown_fields |= other.deny_unknown_fields;
+    if other.tag.is_some() {
+        target.tag = other.tag;
+    }
+    if other.content.is_some() {
+        target.content = other.content;
+    }
+    target.untagged |= other.untagged;
+    if other.default.is_some() {
+        target.default = other.default;
+    }
+    if other.remote.is_some() {
+        target.remote = other.remote;
+    }
+    target.transparent |= other.transparent;
+    if other.from.is_some() {
+        target.from = other.from;
+    }
+    if other.try_from.is_some() {
+        target.try_from = other.try_from;
+    }
+    if other.into.is_some() {
+        target.into = other.into;
+    }
+    if other.serde_crate.is_some() {
+        target.serde_crate = other.serde_crate;
+    }
+    if other.expecting.is_some() {
+        target.expecting = other.expecting;
+    }
+    target.variant_identifier |= other.variant_identifier;
+    target.field_identifier |= other.field_identifier;
+}
+
+#[doc(hidden)]
+pub fn merge_variant_attrs(target: &mut SerdeVariantAttrs, other: SerdeVariantAttrs) {
+    if other.rename_serialize.is_some() {
+        target.rename_serialize = other.rename_serialize;
+    }
+    if other.rename_deserialize.is_some() {
+        target.rename_deserialize = other.rename_deserialize;
+    }
+    target.aliases.extend(other.aliases);
+    if other.rename_all_serialize.is_some() {
+        target.rename_all_serialize = other.rename_all_serialize;
+    }
+    if other.rename_all_deserialize.is_some() {
+        target.rename_all_deserialize = other.rename_all_deserialize;
+    }
+    target.skip_serializing |= other.skip_serializing;
+    target.skip_deserializing |= other.skip_deserializing;
+    if other.serialize_with.is_some() {
+        target.serialize_with = other.serialize_with;
+    }
+    if other.deserialize_with.is_some() {
+        target.deserialize_with = other.deserialize_with;
+    }
+    if other.with.is_some() {
+        target.with = other.with;
+    }
+    if other.borrow.is_some() {
+        target.borrow = other.borrow;
+    }
+    target.other |= other.other;
+    target.untagged |= other.untagged;
+}
+
+#[doc(hidden)]
+pub fn merge_field_attrs(target: &mut SerdeFieldAttrs, other: SerdeFieldAttrs) {
+    if other.rename_serialize.is_some() {
+        target.rename_serialize = other.rename_serialize;
+    }
+    if other.rename_deserialize.is_some() {
+        target.rename_deserialize = other.rename_deserialize;
+    }
+    target.aliases.extend(other.aliases);
+    if other.default.is_some() {
+        target.default = other.default;
+    }
+    target.flatten |= other.flatten;
+    target.skip_serializing |= other.skip_serializing;
+    target.skip_deserializing |= other.skip_deserializing;
+    if other.skip_serializing_if.is_some() {
+        target.skip_serializing_if = other.skip_serializing_if;
+    }
+    if other.serialize_with.is_some() {
+        target.serialize_with = other.serialize_with;
+    }
+    if other.deserialize_with.is_some() {
+        target.deserialize_with = other.deserialize_with;
+    }
+    if other.with.is_some() {
+        target.with = other.with;
+    }
+    if other.borrow.is_some() {
+        target.borrow = other.borrow;
+    }
+    if other.getter.is_some() {
+        target.getter = other.getter;
+    }
 }
 
 #[doc(hidden)]
@@ -194,6 +316,12 @@ macro_rules! __specta_serde_parse_rename_all_fields_list {
 /// ```
 #[macro_export]
 macro_rules! parser {
+    (@container [$($attrs:tt)*]) => {{
+        let mut parsed = $crate::SerdeContainerAttrs::default();
+        $crate::__specta_serde_parse_container_attr_list!(parsed; $($attrs)*);
+        parsed
+    }};
+
     (@container #[serde($($items:tt)*)]) => {{
         let mut parsed = $crate::SerdeContainerAttrs::default();
         $crate::__specta_serde_parse_container_items!(parsed; $($items)*);
@@ -208,6 +336,12 @@ macro_rules! parser {
     (@container $($anything:tt)*) => {
         compile_error!("expected `@container #[serde(...)]`")
     };
+
+    (@variant [$($attrs:tt)*]) => {{
+        let mut parsed = $crate::SerdeVariantAttrs::default();
+        $crate::__specta_serde_parse_variant_attr_list!(parsed; $($attrs)*);
+        parsed
+    }};
 
     (@variant #[serde($($items:tt)*)]) => {{
         let mut parsed = $crate::SerdeVariantAttrs::default();
@@ -224,6 +358,12 @@ macro_rules! parser {
         compile_error!("expected `@variant #[serde(...)]`")
     };
 
+    (@field [$($attrs:tt)*]) => {{
+        let mut parsed = $crate::SerdeFieldAttrs::default();
+        $crate::__specta_serde_parse_field_attr_list!(parsed; $($attrs)*);
+        parsed
+    }};
+
     (@field #[serde($($items:tt)*)]) => {{
         let mut parsed = $crate::SerdeFieldAttrs::default();
         $crate::__specta_serde_parse_field_items!(parsed; $($items)*);
@@ -237,6 +377,45 @@ macro_rules! parser {
     };
     (@field $($anything:tt)*) => {
         compile_error!("expected `@field #[serde(...)]`")
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __specta_serde_parse_container_attr_list {
+    ($target:ident; ) => {};
+    ($target:ident; , $($rest:tt)*) => {
+        $crate::__specta_serde_parse_container_attr_list!($target; $($rest)*);
+    };
+    ($target:ident; #[$meta:meta] $($rest:tt)*) => {
+        $crate::merge_container_attrs(&mut $target, $crate::parser!(@container #[$meta]));
+        $crate::__specta_serde_parse_container_attr_list!($target; $($rest)*);
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __specta_serde_parse_variant_attr_list {
+    ($target:ident; ) => {};
+    ($target:ident; , $($rest:tt)*) => {
+        $crate::__specta_serde_parse_variant_attr_list!($target; $($rest)*);
+    };
+    ($target:ident; #[$meta:meta] $($rest:tt)*) => {
+        $crate::merge_variant_attrs(&mut $target, $crate::parser!(@variant #[$meta]));
+        $crate::__specta_serde_parse_variant_attr_list!($target; $($rest)*);
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __specta_serde_parse_field_attr_list {
+    ($target:ident; ) => {};
+    ($target:ident; , $($rest:tt)*) => {
+        $crate::__specta_serde_parse_field_attr_list!($target; $($rest)*);
+    };
+    ($target:ident; #[$meta:meta] $($rest:tt)*) => {
+        $crate::merge_field_attrs(&mut $target, $crate::parser!(@field #[$meta]));
+        $crate::__specta_serde_parse_field_attr_list!($target; $($rest)*);
     };
 }
 

@@ -1,4 +1,4 @@
-use super::{attr::*, r#struct::decode_field_attrs};
+use super::{attr::*, build_runtime_attributes, r#struct::decode_field_attrs, AttributeScope};
 use crate::{r#type::field::construct_field_with_variant_skip, utils::*};
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
@@ -64,11 +64,17 @@ pub fn parse_enum(
                 }
             }
 
-            Ok((v, variant_attrs))
+            let runtime_attrs = build_runtime_attributes(
+                AttributeScope::Variant,
+                &v.attrs,
+                &container_attrs.skip_attrs,
+            );
+
+            Ok((v, variant_attrs, runtime_attrs))
         })
         .collect::<syn::Result<Vec<_>>>()?
         .into_iter()
-        .map(|(variant, attrs)| {
+        .map(|(variant, attrs, runtime_attrs)| {
             let variant_ident_str = unraw_raw_ident(&variant.ident);
             let variant_name_str = variant_ident_str.to_token_stream();
             let variant_skip = attrs.skip;
@@ -151,7 +157,7 @@ pub fn parse_enum(
                 v.set_deprecated(#deprecated);
                 v.set_docs(#doc.into());
                 v.set_fields(#inner);
-                v.set_attributes(datatype::Attributes::default());
+                v.set_attributes(#runtime_attrs);
                 v
             })))
         })

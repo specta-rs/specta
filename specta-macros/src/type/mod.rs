@@ -1,4 +1,5 @@
 use attr::*;
+use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use r#enum::parse_enum;
 use r#struct::parse_struct;
@@ -15,11 +16,55 @@ pub(crate) mod attr;
 mod r#enum;
 mod field;
 mod generics;
-mod lower_attr;
 mod r#struct;
 
 // TODO: Remove this and make it dynamically discovered!
 const FORMAT_CRATES: &[&str] = &["specta_serde"];
+
+#[derive(Copy, Clone)]
+pub(super) enum AttributeScope {
+    Container,
+    Variant,
+    Field,
+}
+
+pub(super) fn build_runtime_attributes(
+    scope: AttributeScope,
+    raw_attrs: &[syn::Attribute],
+    skip_attrs: &[String],
+) -> TokenStream {
+    let attrs = raw_attrs
+        .iter()
+        .filter(|attr| {
+            let path = attr.path().to_token_stream().to_string();
+            !skip_attrs.contains(&path) && path != "specta"
+        })
+        .collect::<Vec<_>>();
+
+    if attrs.is_empty() {
+        return quote!(datatype::Attributes::default());
+    }
+
+    let scope = match scope {
+        AttributeScope::Container => quote!(@container),
+        AttributeScope::Variant => quote!(@variant),
+        AttributeScope::Field => quote!(@field),
+    };
+
+    let parser_calls = FORMAT_CRATES.iter().map(|name| {
+        let crate_ident = format_ident!("{name}");
+
+        quote! {
+            attrs.insert(#crate_ident::parser!(#scope [#(#attrs),*]));
+        }
+    });
+
+    quote!({
+        let mut attrs = datatype::Attributes::default();
+        #(#parser_calls)*
+        attrs
+    })
+}
 
 pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
     let DeriveInput {
@@ -99,6 +144,12 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         }
     }
 
+    let container_runtime_attrs = build_runtime_attributes(
+        AttributeScope::Container,
+        raw_attrs,
+        &container_attrs.skip_attrs,
+    );
+
     let dt_expr = if let Some(container_ty) = &container_attrs.r#type {
         quote!(<#container_ty as #crate_ref::Type>::definition(types))
     } else {
@@ -114,7 +165,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         quote!(
             datatype::DataType::#dt_type({
                 #dt_impl
-                *e.attributes_mut() = datatype::Attributes::default();
+                *e.attributes_mut() = #container_runtime_attrs;
                 e
             })
         )
