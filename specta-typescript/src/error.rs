@@ -20,8 +20,6 @@ enum ErrorKind {
     BigIntForbidden {
         path: String,
     },
-    /// Failed to validate a type is Serde compatible.
-    Serde(specta_serde::Error),
     /// A type's name conflicts with a reserved keyword in Typescript.
     ForbiddenName {
         path: String,
@@ -212,14 +210,6 @@ impl From<io::Error> for Error {
     }
 }
 
-impl From<specta_serde::Error> for Error {
-    fn from(error: specta_serde::Error) -> Self {
-        Self {
-            kind: ErrorKind::Serde(error),
-        }
-    }
-}
-
 impl From<std::fmt::Error> for Error {
     fn from(error: std::fmt::Error) -> Self {
         Self {
@@ -235,7 +225,6 @@ impl fmt::Display for Error {
                 f,
                 "Attempted to export {path:?} but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. If your using a serializer/deserializer that natively has support for BigInt types you can disable this warning by editing your `ExportConfiguration`!"
             ),
-            ErrorKind::Serde(err) => write!(f, "Detect invalid Serde type: {err}"),
             ErrorKind::ForbiddenName { path, name } => write!(
                 f,
                 "Attempted to export {path:?} but was unable to due toname {name:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`"
@@ -330,7 +319,6 @@ impl fmt::Debug for Error {
 impl error::Error for Error {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match &self.kind {
-            ErrorKind::Serde(error) => Some(error),
             ErrorKind::Io(error) => Some(error),
             ErrorKind::ReadDir { source, .. }
             | ErrorKind::Metadata { source, .. }

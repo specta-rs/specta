@@ -68,6 +68,3 @@ pub use opaque::define;
 pub use references::collect_references;
 pub use types::{Any, Never, Unknown};
 pub use typescript::Typescript;
-
-// Re-export SerdeMode from specta-serde for convenience
-pub use specta_serde::SerdeMode;

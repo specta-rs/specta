@@ -12,7 +12,6 @@ use specta::{
     TypeCollection,
     datatype::{DataType, NamedDataType, Reference},
 };
-use specta_serde::SerdeMode;
 
 use crate::{Branded, Error, primitives, references};
 
@@ -101,8 +100,6 @@ pub struct Exporter {
     pub bigint: BigIntExportBehavior,
     /// Output layout mode for generated TypeScript.
     pub layout: Layout,
-    /// Optional Serde compatibility processing mode.
-    pub serde: Option<SerdeMode>,
     pub(crate) jsdoc: bool,
 }
 
@@ -118,7 +115,6 @@ impl Exporter {
             ),
             bigint: Default::default(),
             layout: Default::default(),
-            serde: Some(SerdeMode::Both),
             jsdoc: false,
         }
     }
@@ -212,34 +208,10 @@ impl Exporter {
         self
     }
 
-    /// Configure the exporter to use specta-serde with the specified mode
-    pub fn with_serde(mut self, mode: SerdeMode) -> Self {
-        self.serde = Some(mode);
-        self
-    }
-
-    /// Configure the exporter to export the types for `#[derive(serde::Serialize)]`
-    pub fn with_serde_serialize(self) -> Self {
-        self.with_serde(SerdeMode::Serialize)
-    }
-
-    /// Configure the exporter to export the types for `#[derive(serde::Deserialize)]`
-    pub fn with_serde_deserialize(self) -> Self {
-        self.with_serde(SerdeMode::Deserialize)
-    }
-
     /// Export the files into a single string.
     ///
     /// Note: This returns an error if the format is `Format::Files`.
     pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
-        let types = if let Some(mode) = self.serde {
-            let mut types = types.clone(); // TODO: Can we avoid this?
-            specta_serde::apply(&mut types, mode)?;
-            Cow::Owned(types)
-        } else {
-            Cow::Borrowed(types)
-        };
-
         if let Layout::Files = self.layout {
             return Err(Error::unable_to_export(self.layout));
         }
@@ -296,14 +268,6 @@ impl Exporter {
             std::fs::write(path, result)?;
             return Ok(());
         }
-
-        let types = if let Some(mode) = self.serde {
-            let mut types = types.clone(); // TODO: Can we avoid this?
-            specta_serde::apply(&mut types, mode)?;
-            Cow::Owned(types)
-        } else {
-            Cow::Borrowed(types)
-        };
 
         fn export(
             exporter: &Exporter,
