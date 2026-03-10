@@ -15,25 +15,45 @@ pub struct HelloWorld {
 }
 
 fn main() {
-    let mut types = TypeCollection::default();
-    println!("{:#?}", HelloWorld::definition(&mut types));
-    println!(
-        "{:#?}",
-        match HelloWorld::definition(&mut types) {
-            DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
-            _ => unreachable!(),
-        }
-    );
+    {
+        let mut types = TypeCollection::default();
+        println!("{:#?}", HelloWorld::definition(&mut types));
+        println!(
+            "{:#?}",
+            match HelloWorld::definition(&mut types) {
+                DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
+                _ => unreachable!(),
+            }
+        );
+    }
 
-    let def = HelloWorld::definition(&mut types);
-    let types = specta_serde::apply(types);
-    println!(
-        "{:#?}",
-        match def {
-            DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
-            _ => unreachable!(),
-        }
-    );
+    {
+        let mut types = TypeCollection::default();
+        let def = HelloWorld::definition(&mut types);
+        let types = specta_serde::apply_phases(types);
+        // println!(
+        //     "{:#?}",
+        //     match def {
+        //         DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
+        //         _ => unreachable!(),
+        //     }
+        // );
+
+        println!("{:#?}", types);
+    }
+
+    // {
+    //     let mut types = TypeCollection::default();
+    //     let def = HelloWorld::definition(&mut types);
+    //     let types = specta_serde::apply(types);
+    //     println!(
+    //         "{:#?}",
+    //         match def {
+    //             DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
+    //             _ => unreachable!(),
+    //         }
+    //     );
+    // }
 
     // println!("{}", Typescript::default().export(&types).unwrap());
     // println!(
