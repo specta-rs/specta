@@ -19,10 +19,12 @@ use specta::{
     internal,
 };
 
+mod error;
 mod inflection;
 mod parser;
 mod repr;
 
+pub use error::{Error, Result};
 pub use inflection::RenameRule;
 pub use parser::{
     ConversionType, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs, merge_container_attrs,
@@ -30,14 +32,28 @@ pub use parser::{
 };
 use repr::EnumRepr;
 
-pub fn apply(types: TypeCollection) -> TypeCollection {
-    types.map(|mut ty| {
-        rename_datatype_fields(ty.ty_mut());
-        ty
-    })
+pub fn apply(types: TypeCollection) -> Result<TypeCollection> {
+    let mut out = types;
+    let mut rewrite_err = None;
+
+    out.iter_mut(|ndt| {
+        if rewrite_err.is_some() {
+            return;
+        }
+
+        if let Err(err) = rename_datatype_fields(ndt.ty_mut()) {
+            rewrite_err = Some(err);
+        }
+    });
+
+    if let Some(err) = rewrite_err {
+        return Err(err);
+    }
+
+    Ok(out)
 }
 
-pub fn apply_phases(types: TypeCollection) -> TypeCollection {
+pub fn apply_phases(types: TypeCollection) -> Result<TypeCollection> {
     let originals = types.into_unsorted_iter().cloned().collect::<Vec<_>>();
     let mut dependencies = HashMap::<TypeKey, HashSet<TypeKey>>::new();
     let mut reverse_dependencies = HashMap::<TypeKey, HashSet<TypeKey>>::new();
@@ -115,13 +131,26 @@ pub fn apply_phases(types: TypeCollection) -> TypeCollection {
         }
     }
 
+    let mut rewrite_err = None;
     out.iter_mut(|ndt| {
+        if rewrite_err.is_some() {
+            return;
+        }
+
         let Some(mode) = rewrite_plan.get(&TypeKey::from_ndt(ndt)).copied() else {
             return;
         };
 
-        rewrite_datatype_for_phase(ndt.ty_mut(), mode, &types, &generated, &split_types);
+        if let Err(err) =
+            rewrite_datatype_for_phase(ndt.ty_mut(), mode, &types, &generated, &split_types)
+        {
+            rewrite_err = Some(err);
+        }
     });
+
+    if let Some(err) = rewrite_err {
+        return Err(err);
+    }
 
     out.iter_mut(|ndt| {
         let key = TypeKey::from_ndt(ndt);
@@ -170,7 +199,7 @@ pub fn apply_phases(types: TypeCollection) -> TypeCollection {
 
     debug_assert_eq!(dependencies.len(), originals.len());
 
-    out
+    Ok(out)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -210,10 +239,10 @@ fn rewrite_datatype_for_phase(
     original_types: &TypeCollection,
     generated: &HashMap<TypeKey, GeneratedTypes>,
     split_types: &HashSet<TypeKey>,
-) {
+) -> Result<()> {
     match ty {
         DataType::Struct(s) => {
-            rewrite_fields_for_phase(s.fields_mut(), mode, original_types, generated, split_types)
+            rewrite_fields_for_phase(s.fields_mut(), mode, original_types, generated, split_types)?
         }
         DataType::Enum(e) => {
             for (_, variant) in e.variants_mut() {
@@ -223,18 +252,18 @@ fn rewrite_datatype_for_phase(
                     original_types,
                     generated,
                     split_types,
-                );
+                )?;
             }
 
-            rewrite_enum_repr_for_phase(e, mode, original_types);
+            rewrite_enum_repr_for_phase(e, mode, original_types)?;
         }
         DataType::Tuple(tuple) => {
             for ty in tuple.elements_mut() {
-                rewrite_datatype_for_phase(ty, mode, original_types, generated, split_types);
+                rewrite_datatype_for_phase(ty, mode, original_types, generated, split_types)?;
             }
         }
         DataType::List(list) => {
-            rewrite_datatype_for_phase(list.ty_mut(), mode, original_types, generated, split_types)
+            rewrite_datatype_for_phase(list.ty_mut(), mode, original_types, generated, split_types)?
         }
         DataType::Map(map) => {
             rewrite_datatype_for_phase(
@@ -243,42 +272,33 @@ fn rewrite_datatype_for_phase(
                 original_types,
                 generated,
                 split_types,
-            );
+            )?;
             rewrite_datatype_for_phase(
                 map.value_ty_mut(),
                 mode,
                 original_types,
                 generated,
                 split_types,
-            );
+            )?;
         }
         DataType::Nullable(inner) => {
-            rewrite_datatype_for_phase(inner, mode, original_types, generated, split_types)
+            rewrite_datatype_for_phase(inner, mode, original_types, generated, split_types)?
         }
         DataType::Reference(Reference::Named(reference)) => {
             let Some(referenced_ndt) = reference.get(original_types) else {
-                return;
+                return Ok(());
             };
             let key = TypeKey::from_ndt(referenced_ndt);
             let Some(target) = generated.get(&key) else {
-                return;
+                return Ok(());
             };
 
-            let generics = reference
-                .generics()
-                .iter()
-                .map(|(generic, dt)| {
-                    let mut dt = dt.clone();
-                    rewrite_datatype_for_phase(
-                        &mut dt,
-                        mode,
-                        original_types,
-                        generated,
-                        split_types,
-                    );
-                    (generic.clone(), dt)
-                })
-                .collect::<Vec<_>>();
+            let mut generics = Vec::with_capacity(reference.generics().len());
+            for (generic, dt) in reference.generics() {
+                let mut dt = dt.clone();
+                rewrite_datatype_for_phase(&mut dt, mode, original_types, generated, split_types)?;
+                generics.push((generic.clone(), dt));
+            }
 
             let mut new_reference = match (target, mode) {
                 (GeneratedTypes::Unified(target), _) => target.reference(generics),
@@ -307,6 +327,8 @@ fn rewrite_datatype_for_phase(
         | DataType::Reference(Reference::Opaque(_))
         | DataType::Primitive(_) => {}
     }
+
+    Ok(())
 }
 
 fn rewrite_fields_for_phase(
@@ -315,13 +337,13 @@ fn rewrite_fields_for_phase(
     original_types: &TypeCollection,
     generated: &HashMap<TypeKey, GeneratedTypes>,
     split_types: &HashSet<TypeKey>,
-) {
+) -> Result<()> {
     match fields {
         Fields::Unit => {}
         Fields::Unnamed(unnamed) => {
             for field in unnamed.fields_mut() {
                 apply_field_attrs(field);
-                rewrite_field_for_phase(field, mode, original_types, generated, split_types);
+                rewrite_field_for_phase(field, mode, original_types, generated, split_types)?;
             }
         }
         Fields::Named(named) => {
@@ -343,10 +365,12 @@ fn rewrite_fields_for_phase(
                     }
                 }
 
-                rewrite_field_for_phase(field, mode, original_types, generated, split_types);
+                rewrite_field_for_phase(field, mode, original_types, generated, split_types)?;
             }
         }
     }
+
+    Ok(())
 }
 
 fn rewrite_field_for_phase(
@@ -355,73 +379,92 @@ fn rewrite_field_for_phase(
     original_types: &TypeCollection,
     generated: &HashMap<TypeKey, GeneratedTypes>,
     split_types: &HashSet<TypeKey>,
-) {
+) -> Result<()> {
     if let Some(ty) = field.ty_mut() {
-        rewrite_datatype_for_phase(ty, mode, original_types, generated, split_types);
+        rewrite_datatype_for_phase(ty, mode, original_types, generated, split_types)?;
     }
+
+    Ok(())
 }
 
-fn rewrite_enum_repr_for_phase(e: &mut Enum, mode: PhaseRewrite, original_types: &TypeCollection) {
-    let repr = enum_repr_from_attrs(e.attributes());
+fn rewrite_enum_repr_for_phase(
+    e: &mut Enum,
+    mode: PhaseRewrite,
+    original_types: &TypeCollection,
+) -> Result<()> {
+    let repr = enum_repr_from_attrs(e.attributes())?;
     if matches!(repr, EnumRepr::Untagged) {
-        return;
+        return Ok(());
     }
 
     let container_attrs = e.attributes().get::<SerdeContainerAttrs>().cloned();
     let variants = std::mem::take(e.variants_mut());
-    let transformed = variants
-        .into_iter()
-        .map(|(variant_name, variant)| {
-            let serialized_name = serialized_variant_name(&variant_name, &variant, &container_attrs, mode);
-            let transformed = match &repr {
-                EnumRepr::External => transform_external_variant(serialized_name.clone(), &variant),
-                EnumRepr::Internal { tag } => {
-                    transform_internal_variant(serialized_name.clone(), tag.as_ref(), &variant, original_types)
+    let mut transformed = Vec::with_capacity(variants.len());
+    for (variant_name, variant) in variants {
+        let serialized_name =
+            serialized_variant_name(&variant_name, &variant, &container_attrs, mode)?;
+        let transformed_variant = match &repr {
+            EnumRepr::External => transform_external_variant(serialized_name.clone(), &variant)?,
+            EnumRepr::Internal { tag } => transform_internal_variant(
+                serialized_name.clone(),
+                tag.as_ref(),
+                &variant,
+                original_types,
+            )?,
+            EnumRepr::Adjacent { tag, content } => {
+                if tag == content {
+                    return Err(Error::invalid_enum_representation(
+                        "serde adjacent tagging requires distinct `tag` and `content` field names",
+                    ));
                 }
-                EnumRepr::Adjacent { tag, content } => {
-                    if tag == content {
-                        panic!(
-                            "specta-serde: serde adjacent tagging requires distinct `tag` and `content` field names"
-                        );
-                    }
 
-                    transform_adjacent_variant(serialized_name.clone(), tag.as_ref(), content.as_ref(), &variant)
-                }
-                EnumRepr::Untagged | EnumRepr::String { .. } => unreachable!(),
-            };
+                transform_adjacent_variant(
+                    serialized_name.clone(),
+                    tag.as_ref(),
+                    content.as_ref(),
+                    &variant,
+                )?
+            }
+            EnumRepr::Untagged => unreachable!(),
+        };
 
-            (Cow::Owned(serialized_name), transformed)
-        })
-        .collect::<Vec<_>>();
+        transformed.push((Cow::Owned(serialized_name), transformed_variant));
+    }
 
     *e.variants_mut() = transformed;
+
+    Ok(())
 }
 
-fn enum_repr_from_attrs(attrs: &specta::datatype::Attributes) -> EnumRepr {
+fn enum_repr_from_attrs(attrs: &specta::datatype::Attributes) -> Result<EnumRepr> {
     let Some(container_attrs) = attrs.get::<SerdeContainerAttrs>() else {
-        return EnumRepr::External;
+        return Ok(EnumRepr::External);
     };
 
     if container_attrs.untagged {
-        return EnumRepr::Untagged;
+        return Ok(EnumRepr::Untagged);
     }
 
-    match (
-        container_attrs.tag.as_deref(),
-        container_attrs.content.as_deref(),
-    ) {
-        (Some(tag), Some(content)) => EnumRepr::Adjacent {
-            tag: Cow::Owned(tag.to_string()),
-            content: Cow::Owned(content.to_string()),
+    Ok(
+        match (
+            container_attrs.tag.as_deref(),
+            container_attrs.content.as_deref(),
+        ) {
+            (Some(tag), Some(content)) => EnumRepr::Adjacent {
+                tag: Cow::Owned(tag.to_string()),
+                content: Cow::Owned(content.to_string()),
+            },
+            (Some(tag), None) => EnumRepr::Internal {
+                tag: Cow::Owned(tag.to_string()),
+            },
+            (None, Some(_)) => {
+                return Err(Error::invalid_enum_representation(
+                    "`content` is set without `tag`",
+                ));
+            }
+            (None, None) => EnumRepr::External,
         },
-        (Some(tag), None) => EnumRepr::Internal {
-            tag: Cow::Owned(tag.to_string()),
-        },
-        (None, Some(_)) => panic!(
-            "specta-serde: serde enum representation is invalid: `content` is set without `tag`"
-        ),
-        (None, None) => EnumRepr::External,
-    }
+    )
 }
 
 fn serialized_variant_name(
@@ -429,7 +472,7 @@ fn serialized_variant_name(
     variant: &EnumVariant,
     container_attrs: &Option<SerdeContainerAttrs>,
     mode: PhaseRewrite,
-) -> String {
+) -> Result<String> {
     let variant_attrs = variant.attributes().get::<SerdeVariantAttrs>();
 
     if let Some(rename) = select_phase_string(
@@ -438,11 +481,11 @@ fn serialized_variant_name(
         variant_attrs.and_then(|attrs| attrs.rename_deserialize.as_deref()),
         "enum variant rename",
         variant_name,
-    ) {
-        return rename.to_string();
+    )? {
+        return Ok(rename.to_string());
     }
 
-    select_phase_rule(
+    Ok(select_phase_rule(
         mode,
         container_attrs
             .as_ref()
@@ -452,11 +495,11 @@ fn serialized_variant_name(
             .and_then(|attrs| attrs.rename_all_deserialize),
         "enum rename_all",
         variant_name,
-    )
+    )?
     .map_or_else(
         || variant_name.to_string(),
         |rule| rule.apply_to_variant(variant_name),
-    )
+    ))
 }
 
 fn select_phase_string<'a>(
@@ -465,17 +508,22 @@ fn select_phase_string<'a>(
     deserialize: Option<&'a str>,
     context: &str,
     name: &str,
-) -> Option<&'a str> {
-    match mode {
+) -> Result<Option<&'a str>> {
+    Ok(match mode {
         PhaseRewrite::Serialize => serialize,
         PhaseRewrite::Deserialize => deserialize,
         PhaseRewrite::Unified => match (serialize, deserialize) {
-            (Some(serialize), Some(deserialize)) if serialize != deserialize => panic!(
-                "specta-serde: incompatible {context} for '{name}' in unified mode: serialize={serialize:?}, deserialize={deserialize:?}"
-            ),
+            (Some(serialize), Some(deserialize)) if serialize != deserialize => {
+                return Err(Error::incompatible_rename(
+                    context.to_string(),
+                    name,
+                    Some(serialize.to_string()),
+                    Some(deserialize.to_string()),
+                ));
+            }
             (serialize, deserialize) => serialize.or(deserialize),
         },
-    }
+    })
 }
 
 fn select_phase_rule(
@@ -484,38 +532,43 @@ fn select_phase_rule(
     deserialize: Option<RenameRule>,
     context: &str,
     name: &str,
-) -> Option<RenameRule> {
-    match mode {
+) -> Result<Option<RenameRule>> {
+    Ok(match mode {
         PhaseRewrite::Serialize => serialize,
         PhaseRewrite::Deserialize => deserialize,
         PhaseRewrite::Unified => match (serialize, deserialize) {
-            (Some(serialize), Some(deserialize)) if serialize != deserialize => panic!(
-                "specta-serde: incompatible {context} for '{name}' in unified mode: serialize={serialize:?}, deserialize={deserialize:?}"
-            ),
+            (Some(serialize), Some(deserialize)) if serialize != deserialize => {
+                return Err(Error::incompatible_rename(
+                    context.to_string(),
+                    name,
+                    Some(format!("{serialize:?}")),
+                    Some(format!("{deserialize:?}")),
+                ));
+            }
             (serialize, deserialize) => serialize.or(deserialize),
         },
-    }
+    })
 }
 
-fn transform_external_variant(serialized_name: String, variant: &EnumVariant) -> EnumVariant {
-    match variant.fields() {
+fn transform_external_variant(
+    serialized_name: String,
+    variant: &EnumVariant,
+) -> Result<EnumVariant> {
+    Ok(match variant.fields() {
         Fields::Unit => clone_variant_with_unnamed_fields(
             variant,
             vec![Field::new(string_literal_datatype(serialized_name))],
         ),
         _ => {
-            let payload = variant_payload_datatype(variant).unwrap_or_else(|| {
-                panic!(
-                    "specta-serde: invalid external enum variant '{serialized_name}': variant payload is fully skipped"
-                )
-            });
+            let payload = variant_payload_datatype(variant)
+                .ok_or_else(|| Error::invalid_external_tagged_variant(serialized_name.clone()))?;
 
             clone_variant_with_named_fields(
                 variant,
                 vec![(Cow::Owned(serialized_name), Field::new(payload))],
             )
         }
-    }
+    })
 }
 
 fn transform_adjacent_variant(
@@ -523,22 +576,19 @@ fn transform_adjacent_variant(
     tag: &str,
     content: &str,
     variant: &EnumVariant,
-) -> EnumVariant {
+) -> Result<EnumVariant> {
     let mut fields = vec![(
         Cow::Owned(tag.to_string()),
         Field::new(string_literal_datatype(serialized_name.clone())),
     )];
 
     if !matches!(variant.fields(), Fields::Unit) {
-        let payload = variant_payload_datatype(variant).unwrap_or_else(|| {
-            panic!(
-                "specta-serde: invalid adjacent enum variant '{serialized_name}': variant payload is fully skipped"
-            )
-        });
+        let payload = variant_payload_datatype(variant)
+            .ok_or_else(|| Error::invalid_adjacent_tagged_variant(serialized_name.clone()))?;
         fields.push((Cow::Owned(content.to_string()), Field::new(payload)));
     }
 
-    clone_variant_with_named_fields(variant, fields)
+    Ok(clone_variant_with_named_fields(variant, fields))
 }
 
 fn transform_internal_variant(
@@ -546,7 +596,7 @@ fn transform_internal_variant(
     tag: &str,
     variant: &EnumVariant,
     original_types: &TypeCollection,
-) -> EnumVariant {
+) -> Result<EnumVariant> {
     let mut fields = vec![(
         Cow::Owned(tag.to_string()),
         Field::new(string_literal_datatype(serialized_name.clone())),
@@ -565,16 +615,18 @@ fn transform_internal_variant(
                 .collect::<Vec<_>>();
 
             if unnamed.fields().len() != 1 || non_skipped.len() != 1 {
-                panic!(
-                    "specta-serde: invalid internally tagged enum variant '{serialized_name}': tuple variant must have exactly one non-skipped field"
-                );
+                return Err(Error::invalid_internally_tagged_variant(
+                    serialized_name,
+                    "tuple variant must have exactly one non-skipped field",
+                ));
             }
 
             let payload_ty = non_skipped.into_iter().next().expect("checked above");
             if !is_internal_tag_compatible(&payload_ty, original_types, &mut HashSet::new()) {
-                panic!(
-                    "specta-serde: invalid internally tagged enum variant '{serialized_name}': payload cannot be merged with a tag"
-                );
+                return Err(Error::invalid_internally_tagged_variant(
+                    serialized_name,
+                    "payload cannot be merged with a tag",
+                ));
             }
 
             if !matches!(&payload_ty, DataType::Tuple(tuple) if tuple.elements().is_empty()) {
@@ -585,7 +637,7 @@ fn transform_internal_variant(
         }
     }
 
-    clone_variant_with_named_fields(variant, fields)
+    Ok(clone_variant_with_named_fields(variant, fields))
 }
 
 fn string_literal_datatype(value: String) -> DataType {
@@ -819,36 +871,38 @@ fn build_from_original(
     builder.build(out)
 }
 
-fn rename_datatype_fields(ty: &mut DataType) {
+fn rename_datatype_fields(ty: &mut DataType) -> Result<()> {
     match ty {
-        DataType::Struct(s) => rename_fields(s.fields_mut()),
+        DataType::Struct(s) => rename_fields(s.fields_mut())?,
         DataType::Enum(e) => {
             for (_, variant) in e.variants_mut() {
-                rename_fields(variant.fields_mut());
+                rename_fields(variant.fields_mut())?;
             }
         }
         DataType::Tuple(tuple) => {
             for ty in tuple.elements_mut() {
-                rename_datatype_fields(ty);
+                rename_datatype_fields(ty)?;
             }
         }
-        DataType::List(list) => rename_datatype_fields(list.ty_mut()),
+        DataType::List(list) => rename_datatype_fields(list.ty_mut())?,
         DataType::Map(map) => {
-            rename_datatype_fields(map.key_ty_mut());
-            rename_datatype_fields(map.value_ty_mut());
+            rename_datatype_fields(map.key_ty_mut())?;
+            rename_datatype_fields(map.value_ty_mut())?;
         }
-        DataType::Nullable(inner) => rename_datatype_fields(inner),
+        DataType::Nullable(inner) => rename_datatype_fields(inner)?,
         DataType::Primitive(_) | DataType::Reference(_) => {}
     }
+
+    Ok(())
 }
 
-fn rename_fields(fields: &mut Fields) {
+fn rename_fields(fields: &mut Fields) -> Result<()> {
     match fields {
         Fields::Unit => {}
         Fields::Unnamed(unnamed) => {
             for field in unnamed.fields_mut() {
                 apply_field_attrs(field);
-                rename_field_type(field);
+                rename_field_type(field)?;
             }
         }
         Fields::Named(named) => {
@@ -865,23 +919,30 @@ fn rename_fields(fields: &mut Fields) {
                             *name = Cow::Owned(serialize.to_string());
                         }
                         (serialize, deserialize) => {
-                            panic!(
-                                "specta-serde: incompatible field rename for both-phase export on field '{name}': serialize={serialize:?}, deserialize={deserialize:?}",
-                            );
+                            return Err(Error::incompatible_rename(
+                                "field rename",
+                                name.to_string(),
+                                serialize.map(ToString::to_string),
+                                deserialize.map(ToString::to_string),
+                            ));
                         }
                     }
                 }
 
-                rename_field_type(field);
+                rename_field_type(field)?;
             }
         }
     }
+
+    Ok(())
 }
 
-fn rename_field_type(field: &mut Field) {
+fn rename_field_type(field: &mut Field) -> Result<()> {
     if let Some(ty) = field.ty_mut() {
-        rename_datatype_fields(ty);
+        rename_datatype_fields(ty)?;
     }
+
+    Ok(())
 }
 
 fn apply_field_attrs(field: &mut Field) {

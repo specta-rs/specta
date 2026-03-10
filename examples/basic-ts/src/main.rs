@@ -84,7 +84,7 @@ fn main() {
     {
         let mut types = TypeCollection::default().register::<NotPhaseSpecific>();
         let def = HelloWorld::definition(&mut types);
-        let types = specta_serde::apply_phases(types);
+        let types = specta_serde::apply_phases(types).unwrap();
         println!(
             "{:#?}",
             match def {
@@ -117,7 +117,7 @@ fn main() {
         println!(
             "specta_serde::apply_phases(...):\n{}",
             Typescript::default()
-                .export(&specta_serde::apply_phases(types))
+                .export(&specta_serde::apply_phases(types).unwrap())
                 .unwrap()
         );
     }
