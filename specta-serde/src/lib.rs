@@ -162,7 +162,6 @@ pub fn apply_to_dt(dt: DataType, mode: SerdeMode) -> Result<DataType, Error> {
 /// let types = specta::TypeCollection::default();
 /// let ser_types = specta_serde::process_for_serialization(&types)?;
 /// ```
-#[doc(hidden)]
 pub fn process_for_serialization(types: &TypeCollection) -> Result<TypeCollection, Error> {
     let mut cloned = types.clone();
     apply(&mut cloned, SerdeMode::Serialize)?;
@@ -179,7 +178,6 @@ pub fn process_for_serialization(types: &TypeCollection) -> Result<TypeCollectio
 /// let types = specta::TypeCollection::default();
 /// let de_types = specta_serde::process_for_deserialization(&types)?;
 /// ```
-#[doc(hidden)]
 pub fn process_for_deserialization(types: &TypeCollection) -> Result<TypeCollection, Error> {
     let mut cloned = types.clone();
     apply(&mut cloned, SerdeMode::Deserialize)?;
@@ -198,7 +196,6 @@ pub fn process_for_deserialization(types: &TypeCollection) -> Result<TypeCollect
 /// let types = specta::TypeCollection::default();
 /// let (ser_types, de_types) = specta_serde::process_for_both(&types)?;
 /// ```
-#[doc(hidden)]
 pub fn process_for_both(types: &TypeCollection) -> Result<(TypeCollection, TypeCollection), Error> {
     let ser_types = process_for_serialization(types)?;
     let de_types = process_for_deserialization(types)?;

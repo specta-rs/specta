@@ -32,7 +32,6 @@ pub mod internal {
     use super::*;
 
     // Called within ctor functions to register a type.
-    #[doc(hidden)]
     pub fn register<T: Type>() {
         TYPES
             .get_or_init(Default::default)
