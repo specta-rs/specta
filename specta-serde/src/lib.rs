@@ -22,7 +22,7 @@ pub use parser::{
     merge_field_attrs, merge_variant_attrs,
 };
 
-pub fn testing(types: TypeCollection) -> TypeCollection {
+pub fn apply(types: TypeCollection) -> TypeCollection {
     types.map(|mut ty| {
         rename_datatype_fields(ty.ty_mut());
         ty
@@ -63,13 +63,19 @@ fn rename_fields(fields: &mut Fields) {
         Fields::Named(named) => {
             for (name, field) in named.fields_mut() {
                 if let Some(serde_attrs) = field.attributes().get::<SerdeFieldAttrs>() {
-                    let renamed = serde_attrs
-                        .rename_serialize
-                        .as_deref()
-                        .or(serde_attrs.rename_deserialize.as_deref());
-
-                    if let Some(renamed) = renamed {
-                        *name = Cow::Owned(renamed.to_string());
+                    match (
+                        serde_attrs.rename_serialize.as_deref(),
+                        serde_attrs.rename_deserialize.as_deref(),
+                    ) {
+                        (None, None) => {}
+                        (Some(serialize), Some(deserialize)) if serialize == deserialize => {
+                            *name = Cow::Owned(serialize.to_string());
+                        }
+                        (serialize, deserialize) => {
+                            panic!(
+                                "specta-serde: incompatible field rename for both-phase export on field '{name}': serialize={serialize:?}, deserialize={deserialize:?}",
+                            );
+                        }
                     }
                 }
 
