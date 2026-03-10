@@ -316,63 +316,72 @@ macro_rules! __specta_serde_parse_rename_all_fields_list {
 /// ```
 #[macro_export]
 macro_rules! parser {
-    (@container [$($attrs:tt)*]) => {{
+    (@container [$($metas:tt)*]) => {{
         let mut parsed = $crate::SerdeContainerAttrs::default();
-        $crate::__specta_serde_parse_container_attr_list!(parsed; $($attrs)*);
+        $crate::__specta_serde_parse_container_meta_list!(parsed; $($metas)*);
         parsed
     }};
 
-    (@container #[serde($($items:tt)*)]) => {{
+    (@container serde($($items:tt)*)) => {{
         let mut parsed = $crate::SerdeContainerAttrs::default();
         $crate::__specta_serde_parse_container_items!(parsed; $($items)*);
         parsed
     }};
-    (@container #[serde]) => {
+    (@container serde) => {
         $crate::SerdeContainerAttrs::default()
     };
-    (@container #[$_meta:meta]) => {
+    (@container #[$meta:meta]) => {
+        $crate::parser!(@container $meta)
+    };
+    (@container $_meta:meta) => {
         $crate::SerdeContainerAttrs::default()
     };
     (@container $($anything:tt)*) => {
         compile_error!("expected `@container #[serde(...)]`")
     };
 
-    (@variant [$($attrs:tt)*]) => {{
+    (@variant [$($metas:tt)*]) => {{
         let mut parsed = $crate::SerdeVariantAttrs::default();
-        $crate::__specta_serde_parse_variant_attr_list!(parsed; $($attrs)*);
+        $crate::__specta_serde_parse_variant_meta_list!(parsed; $($metas)*);
         parsed
     }};
 
-    (@variant #[serde($($items:tt)*)]) => {{
+    (@variant serde($($items:tt)*)) => {{
         let mut parsed = $crate::SerdeVariantAttrs::default();
         $crate::__specta_serde_parse_variant_items!(parsed; $($items)*);
         parsed
     }};
-    (@variant #[serde]) => {
+    (@variant serde) => {
         $crate::SerdeVariantAttrs::default()
     };
-    (@variant #[$_meta:meta]) => {
+    (@variant #[$meta:meta]) => {
+        $crate::parser!(@variant $meta)
+    };
+    (@variant $_meta:meta) => {
         $crate::SerdeVariantAttrs::default()
     };
     (@variant $($anything:tt)*) => {
         compile_error!("expected `@variant #[serde(...)]`")
     };
 
-    (@field [$($attrs:tt)*]) => {{
+    (@field [$($metas:tt)*]) => {{
         let mut parsed = $crate::SerdeFieldAttrs::default();
-        $crate::__specta_serde_parse_field_attr_list!(parsed; $($attrs)*);
+        $crate::__specta_serde_parse_field_meta_list!(parsed; $($metas)*);
         parsed
     }};
 
-    (@field #[serde($($items:tt)*)]) => {{
+    (@field serde($($items:tt)*)) => {{
         let mut parsed = $crate::SerdeFieldAttrs::default();
         $crate::__specta_serde_parse_field_items!(parsed; $($items)*);
         parsed
     }};
-    (@field #[serde]) => {
+    (@field serde) => {
         $crate::SerdeFieldAttrs::default()
     };
-    (@field #[$_meta:meta]) => {
+    (@field #[$meta:meta]) => {
+        $crate::parser!(@field $meta)
+    };
+    (@field $_meta:meta) => {
         $crate::SerdeFieldAttrs::default()
     };
     (@field $($anything:tt)*) => {
@@ -382,41 +391,62 @@ macro_rules! parser {
 
 #[doc(hidden)]
 #[macro_export]
-macro_rules! __specta_serde_parse_container_attr_list {
+macro_rules! __specta_serde_parse_container_meta_list {
     ($target:ident; ) => {};
     ($target:ident; , $($rest:tt)*) => {
-        $crate::__specta_serde_parse_container_attr_list!($target; $($rest)*);
+        $crate::__specta_serde_parse_container_meta_list!($target; $($rest)*);
     };
-    ($target:ident; #[$meta:meta] $($rest:tt)*) => {
-        $crate::merge_container_attrs(&mut $target, $crate::parser!(@container #[$meta]));
-        $crate::__specta_serde_parse_container_attr_list!($target; $($rest)*);
+    ($target:ident; serde($($items:tt)*) , $($rest:tt)*) => {
+        $crate::merge_container_attrs(&mut $target, $crate::parser!(@container serde($($items)*)));
+        $crate::__specta_serde_parse_container_meta_list!($target; $($rest)*);
     };
+    ($target:ident; serde($($items:tt)*)) => {
+        $crate::merge_container_attrs(&mut $target, $crate::parser!(@container serde($($items)*)));
+    };
+    ($target:ident; $unknown:meta , $($rest:tt)*) => {
+        $crate::__specta_serde_parse_container_meta_list!($target; $($rest)*);
+    };
+    ($target:ident; $unknown:meta) => {};
 }
 
 #[doc(hidden)]
 #[macro_export]
-macro_rules! __specta_serde_parse_variant_attr_list {
+macro_rules! __specta_serde_parse_variant_meta_list {
     ($target:ident; ) => {};
     ($target:ident; , $($rest:tt)*) => {
-        $crate::__specta_serde_parse_variant_attr_list!($target; $($rest)*);
+        $crate::__specta_serde_parse_variant_meta_list!($target; $($rest)*);
     };
-    ($target:ident; #[$meta:meta] $($rest:tt)*) => {
-        $crate::merge_variant_attrs(&mut $target, $crate::parser!(@variant #[$meta]));
-        $crate::__specta_serde_parse_variant_attr_list!($target; $($rest)*);
+    ($target:ident; serde($($items:tt)*) , $($rest:tt)*) => {
+        $crate::merge_variant_attrs(&mut $target, $crate::parser!(@variant serde($($items)*)));
+        $crate::__specta_serde_parse_variant_meta_list!($target; $($rest)*);
     };
+    ($target:ident; serde($($items:tt)*)) => {
+        $crate::merge_variant_attrs(&mut $target, $crate::parser!(@variant serde($($items)*)));
+    };
+    ($target:ident; $unknown:meta , $($rest:tt)*) => {
+        $crate::__specta_serde_parse_variant_meta_list!($target; $($rest)*);
+    };
+    ($target:ident; $unknown:meta) => {};
 }
 
 #[doc(hidden)]
 #[macro_export]
-macro_rules! __specta_serde_parse_field_attr_list {
+macro_rules! __specta_serde_parse_field_meta_list {
     ($target:ident; ) => {};
     ($target:ident; , $($rest:tt)*) => {
-        $crate::__specta_serde_parse_field_attr_list!($target; $($rest)*);
+        $crate::__specta_serde_parse_field_meta_list!($target; $($rest)*);
     };
-    ($target:ident; #[$meta:meta] $($rest:tt)*) => {
-        $crate::merge_field_attrs(&mut $target, $crate::parser!(@field #[$meta]));
-        $crate::__specta_serde_parse_field_attr_list!($target; $($rest)*);
+    ($target:ident; serde($($items:tt)*) , $($rest:tt)*) => {
+        $crate::merge_field_attrs(&mut $target, $crate::parser!(@field serde($($items)*)));
+        $crate::__specta_serde_parse_field_meta_list!($target; $($rest)*);
     };
+    ($target:ident; serde($($items:tt)*)) => {
+        $crate::merge_field_attrs(&mut $target, $crate::parser!(@field serde($($items)*)));
+    };
+    ($target:ident; $unknown:meta , $($rest:tt)*) => {
+        $crate::__specta_serde_parse_field_meta_list!($target; $($rest)*);
+    };
+    ($target:ident; $unknown:meta) => {};
 }
 
 #[doc(hidden)]
