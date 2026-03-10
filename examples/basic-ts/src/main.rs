@@ -1,7 +1,7 @@
 use serde::Serialize;
 use specta::{
-    Type, TypeCollection,
     datatype::{DataType, Reference},
+    Type, TypeCollection,
 };
 
 #[derive(Serialize, Type)]
@@ -24,4 +24,6 @@ fn main() {
             _ => unreachable!(),
         }
     );
+
+    println!("{:?}", Typescript::default().export())
 }

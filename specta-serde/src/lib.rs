@@ -20,7 +20,7 @@ pub use parser::{
 /// TODO: Documentation
 ///
 // TODO: Change name of result type
-pub fn apply(types: TypeCollection) -> TypeCollection {
+
     // TODO:
     //  - Validate supported types w/ Serde
     //  - Apply attributes
@@ -37,4 +37,10 @@ pub fn apply_phases(types: TypeCollection) -> TypeCollection {
     // TODO: Same as `apply` but with phases applied by duplicating types
 
     types
+}
+
+pub fn testing(types: TypeCollection) -> TypeCollection {
+    types.map(|ty| {
+        ty
+    })
 }

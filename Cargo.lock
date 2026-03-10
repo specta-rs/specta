@@ -719,6 +719,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "example-basic-ts"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "specta",
+ "specta-typescript",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
