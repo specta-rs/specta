@@ -8,8 +8,11 @@
 use specta::TypeCollection;
 
 mod inflection;
-pub mod parser;
+mod parser;
 mod repr;
+
+pub use inflection::RenameRule;
+pub use parser::{ConversionType, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs};
 
 /// TODO: Documentation
 ///
