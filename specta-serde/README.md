@@ -1,4 +1,4 @@
-# specta-serde
+# Specta Serde
 
 A comprehensive serde attribute handling system for [Specta](https://github.com/specta-rs/specta). This crate provides functionality to parse and apply serde attributes like `#[serde(rename = "...")]`, `#[serde(rename_all = "...")]`, and enum representation attributes to `DataType` instances, with separate handling for serialization and deserialization phases.
 

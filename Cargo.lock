@@ -1927,7 +1927,6 @@ version = "0.0.10"
 dependencies = [
  "serde",
  "specta",
- "specta-serde",
  "specta-util",
 ]
 

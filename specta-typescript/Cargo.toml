@@ -22,12 +22,11 @@ workspace = true
 [features]
 default = []
 
-# TODO: Docs
+# Implement `serde::Serialize` and `serde::Deserialize` for Typescript-specific types (Any, Unknown, Never)
 serde = ["dep:serde"]
 
 [dependencies]
 specta = { version = "=2.0.0-rc.23", path = "../specta" }
-specta-serde = { version = "=0.0.10", path = "../specta-serde" }
 serde = { version = "1", default-features = false, optional = true }
 
 [dev-dependencies]
