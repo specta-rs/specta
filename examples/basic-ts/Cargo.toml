@@ -1,0 +1,13 @@
+[package]
+name = "example-basic-ts"
+version = "0.0.0"
+edition = "2024"
+private = true
+
+# [lints]
+# workspace = false
+
+[dependencies]
+specta = { path = "../../specta", features = ["derive"] }
+specta-typescript = { path = "../../specta-typescript" }
+serde = { version = "1", features = ["derive"] }
