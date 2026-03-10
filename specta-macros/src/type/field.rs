@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Type;
 
-use super::{build_runtime_attributes, AttributeScope, ContainerAttr, FieldAttr};
+use super::{AttributeScope, ContainerAttr, FieldAttr, build_runtime_attributes};
 
 pub fn construct_field(
     crate_ref: &TokenStream,
@@ -48,6 +48,7 @@ pub fn construct_field_with_variant_skip(
 
     Ok(quote!(internal::construct::field(
         #optional,
+        false,
         #deprecated,
         #doc.into(),
         #inline,

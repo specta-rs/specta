@@ -11,10 +11,10 @@ use std::{
 };
 
 use specta::{
+    TypeCollection,
     datatype::{
         DataType, Enum, EnumVariant, Field, Fields, NamedDataType, NamedDataTypeBuilder, Reference,
     },
-    TypeCollection,
 };
 
 mod inflection;
@@ -23,8 +23,8 @@ mod repr;
 
 pub use inflection::RenameRule;
 pub use parser::{
-    merge_container_attrs, merge_field_attrs, merge_variant_attrs, ConversionType,
-    SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs,
+    ConversionType, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs, merge_container_attrs,
+    merge_field_attrs, merge_variant_attrs,
 };
 
 pub fn apply(types: TypeCollection) -> TypeCollection {
@@ -315,11 +315,14 @@ fn rewrite_fields_for_phase(
         Fields::Unit => {}
         Fields::Unnamed(unnamed) => {
             for field in unnamed.fields_mut() {
+                apply_field_attrs(field);
                 rewrite_field_for_phase(field, mode, original_types, generated, split_types);
             }
         }
         Fields::Named(named) => {
             for (name, field) in named.fields_mut() {
+                apply_field_attrs(field);
+
                 if let Some(serde_attrs) = field.attributes().get::<SerdeFieldAttrs>() {
                     let rename = match mode {
                         PhaseRewrite::Serialize => serde_attrs.rename_serialize.as_deref(),
@@ -497,11 +500,14 @@ fn rename_fields(fields: &mut Fields) {
         Fields::Unit => {}
         Fields::Unnamed(unnamed) => {
             for field in unnamed.fields_mut() {
+                apply_field_attrs(field);
                 rename_field_type(field);
             }
         }
         Fields::Named(named) => {
             for (name, field) in named.fields_mut() {
+                apply_field_attrs(field);
+
                 if let Some(serde_attrs) = field.attributes().get::<SerdeFieldAttrs>() {
                     match (
                         serde_attrs.rename_serialize.as_deref(),
@@ -529,4 +535,12 @@ fn rename_field_type(field: &mut Field) {
     if let Some(ty) = field.ty_mut() {
         rename_datatype_fields(ty);
     }
+}
+
+fn apply_field_attrs(field: &mut Field) {
+    let flatten = field
+        .attributes()
+        .get::<SerdeFieldAttrs>()
+        .is_some_and(|attrs| attrs.flatten);
+    field.set_flatten(flatten);
 }

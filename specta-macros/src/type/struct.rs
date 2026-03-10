@@ -3,8 +3,8 @@ use crate::{
     utils::{parse_attrs_with_filter, unraw_raw_ident},
 };
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
-use syn::{spanned::Spanned, DataStruct, Field, Fields, Type};
+use quote::{ToTokens, quote};
+use syn::{DataStruct, Field, Fields, Type, spanned::Spanned};
 
 use super::attr::*;
 

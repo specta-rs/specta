@@ -262,9 +262,8 @@ pub(crate) fn struct_datatype(
                 return Ok(());
             }
 
-            let (flattened, non_flattened): (Vec<_>, Vec<_>) = fields
-                .iter()
-                .partition(|(_, (f, _))| specta_serde::is_field_flattened(f));
+            let (flattened, non_flattened): (Vec<_>, Vec<_>) =
+                fields.iter().partition(|(_, (f, _))| f.flatten());
 
             let mut field_sections = flattened
                 .into_iter()
@@ -378,9 +377,8 @@ fn enum_variant_datatype(
         Fields::Named(obj) => {
             let all_fields = skip_fields_named(obj.fields()).collect::<Vec<_>>();
 
-            let (flattened, non_flattened): (Vec<_>, Vec<_>) = all_fields
-                .iter()
-                .partition(|(_, (f, _))| specta_serde::is_field_flattened(f));
+            let (flattened, non_flattened): (Vec<_>, Vec<_>) =
+                all_fields.iter().partition(|(_, (f, _))| f.flatten());
 
             let mut field_sections = flattened
                 .into_iter()
@@ -513,10 +511,7 @@ fn untagged_strict_keys(variant: &EnumVariant) -> Option<BTreeSet<String>> {
     match variant.fields() {
         Fields::Named(obj) => {
             let all_fields = skip_fields_named(obj.fields()).collect::<Vec<_>>();
-            if all_fields
-                .iter()
-                .any(|(_, (field, _))| specta_serde::is_field_flattened(field))
-            {
+            if all_fields.iter().any(|(_, (field, _))| field.flatten()) {
                 return None;
             }
 

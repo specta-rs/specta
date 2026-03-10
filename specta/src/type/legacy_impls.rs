@@ -214,6 +214,7 @@ const _: () = {
                             "v".into(),
                             Field {
                                 optional: false,
+                                flatten: false,
 
                                 inline: false,
                                 deprecated: None,
@@ -414,6 +415,7 @@ const _: () = {
                                 "time".into(),
                                 Field {
                                     optional: false,
+                                    flatten: false,
 
                                     inline: false,
                                     deprecated: None,
@@ -426,6 +428,7 @@ const _: () = {
                                 "id".into(),
                                 Field {
                                     optional: false,
+                                    flatten: false,
 
                                     inline: false,
                                     deprecated: None,
