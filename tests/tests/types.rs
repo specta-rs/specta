@@ -15,7 +15,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use specta::{datatype::DataType, Type, TypeCollection};
+use specta::{Type, TypeCollection, datatype::DataType};
 
 /// A macro to collect up the types for better testing.
 ///

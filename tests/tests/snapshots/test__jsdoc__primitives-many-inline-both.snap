@@ -998,13 +998,13 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {{ Y: number }} Y
 	* @property {{ Z: number[][] }} Z
 	*
-	* @typedef {Vec<T>[][]} GenericNewType1<T>
-	* @property {Vec<T>[][]} "0"
+	* @typedef {T[][]} GenericNewType1<T>
+	* @property {T[][]} "0"
 	*
-	* @typedef {[T, T[], Vec<T>[][]]} GenericTuple<T>
+	* @typedef {[T, T[], T[][]]} GenericTuple<T>
 	* @property {T} "0"
 	* @property {T[]} "1"
-	* @property {Vec<T>[][]} "2"
+	* @property {T[][]} "2"
 	*
 	* @typedef {{
 	*		a: T,
@@ -1013,8 +1013,8 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	*		d: [T, T, T],
 	*		e: [([T, T]), ([T, T]), ([T, T])],
 	*		f: T[],
-	*		g: Vec<T>[][],
-	*		h: ([([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]]), ([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]]), ([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]])])[],
+	*		g: T[][],
+	*		h: ([([T, T]), ([T, T]), ([T, T])])[],
 	*	}} GenericStruct2<T>
 	* @property {T} a
 	* @property {[T, T]} b
@@ -1022,8 +1022,8 @@ expression: "primitives::export(&jsdoc, &types, ndts.into_iter(), \"\").unwrap()
 	* @property {[T, T, T]} d
 	* @property {[([T, T]), ([T, T]), ([T, T])]} e
 	* @property {T[]} f
-	* @property {Vec<T>[][]} g
-	* @property {([([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]]), ([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]]), ([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]])])[]} h
+	* @property {T[][]} g
+	* @property {([([T, T]), ([T, T]), ([T, T])])[]} h
 	*
 	* @typedef {T} InlineGenericNewtype<T>
 	* @property {T} "0"

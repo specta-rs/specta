@@ -34,6 +34,30 @@ macro_rules! _impl_passthrough {
     };
 }
 
+macro_rules! _generic_marker {
+    (T) => {
+        crate::r#type::impls::GenericT
+    };
+    (K) => {
+        crate::r#type::impls::GenericK
+    };
+    (V) => {
+        crate::r#type::impls::GenericV
+    };
+    (E) => {
+        crate::r#type::impls::GenericE
+    };
+    (L) => {
+        crate::r#type::impls::GenericL
+    };
+    (R) => {
+        crate::r#type::impls::GenericR
+    };
+    ($other:ident) => {
+        $other
+    };
+}
+
 macro_rules! _impl_ndt_as {
     ( $($head:ident :: $( $tail:ident )::+ $(<$($generic:ident),*>)? $( where { $($bounds:tt)* } )? as $ty2:ty )* ) => {
         impl_ndt!(
@@ -66,10 +90,22 @@ macro_rules! _impl_ndt {
                 fn definition(types: &mut TypeCollection) -> DataType {
                     // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
                     static SENTINEL: &str = stringify!($type_path);
+                    static GENERICS: &[(datatype::GenericReference, ::std::borrow::Cow<'static, str>)] = &[
+                        $($(
+                            (
+                                datatype::GenericReference::new::<crate::r#type::macros::generic_marker!($generic)>(),
+                                ::std::borrow::Cow::Borrowed(stringify!($generic)),
+                            )
+                        ),*)?
+                    ];
                     DataType::Reference(datatype::NamedDataType::init_with_sentinel(
+                        GENERICS,
                         vec![
                             $($(
-                                (datatype::Generic::new(stringify!($generic)), <$generic as Type>::definition(types))
+                                (
+                                    datatype::GenericReference::new::<crate::r#type::macros::generic_marker!($generic)>(),
+                                    <$generic as Type>::definition(types),
+                                )
                             ),*)?
                         ],
                         $inline,
@@ -102,6 +138,7 @@ macro_rules! _impl_ndt {
     };
 }
 
+pub(crate) use _generic_marker as generic_marker;
 pub(crate) use _impl_ndt as impl_ndt;
 pub(crate) use _impl_ndt_as as impl_ndt_as;
 pub(crate) use _impl_passthrough as impl_passthrough;

@@ -71,6 +71,10 @@ enum ErrorKind {
     DanglingNamedReference {
         reference: String,
     },
+    /// Found a generic reference that cannot be resolved to a declared generic name.
+    UnresolvedGenericReference {
+        reference: String,
+    },
     /// An error occurred in your exporter framework.
     Framework {
         message: Cow<'static, str>,
@@ -166,6 +170,12 @@ impl Error {
     pub(crate) fn dangling_named_reference(reference: String) -> Self {
         Self {
             kind: ErrorKind::DanglingNamedReference { reference },
+        }
+    }
+
+    pub(crate) fn unresolved_generic_reference(reference: String) -> Self {
+        Self {
+            kind: ErrorKind::UnresolvedGenericReference { reference },
         }
     }
 
@@ -271,6 +281,10 @@ impl fmt::Display for Error {
             ErrorKind::DanglingNamedReference { reference } => write!(
                 f,
                 "Found dangling named reference {reference}. The referenced type is missing from `TypeCollection`."
+            ),
+            ErrorKind::UnresolvedGenericReference { reference } => write!(
+                f,
+                "Found unresolved generic reference {reference}. The generic is missing from the active named type scope."
             ),
             ErrorKind::Framework { message, source } => {
                 let source = source.to_string();

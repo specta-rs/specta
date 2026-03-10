@@ -66,8 +66,8 @@ pub use serde_attrs::{SerdeMode, apply_serde_transformations};
 
 use specta::TypeCollection;
 use specta::datatype::{
-    Attribute, AttributeMeta, AttributeNestedMeta, DataType, Enum, Fields, Generic, NamedReference,
-    Primitive, Reference, skip_fields, skip_fields_named,
+    Attribute, AttributeMeta, AttributeNestedMeta, DataType, Enum, Fields, GenericReference,
+    NamedReference, Primitive, Reference, skip_fields, skip_fields_named,
 };
 use std::collections::HashSet;
 
@@ -206,7 +206,7 @@ pub fn process_for_both(types: &TypeCollection) -> Result<(TypeCollection, TypeC
 fn validate_type(
     dt: &DataType,
     types: &TypeCollection,
-    generics: &[(Generic, DataType)],
+    generics: &[(GenericReference, DataType)],
     checked_references: &mut HashSet<NamedReference>,
 ) -> Result<(), Error> {
     match dt {
@@ -271,6 +271,7 @@ fn validate_type(
                 }
             }
         }
+        DataType::Reference(Reference::Generic(_)) => {}
         DataType::Reference(Reference::Opaque(_)) => {}
         _ => {}
     }
@@ -282,7 +283,7 @@ fn validate_type(
 fn is_valid_map_key(
     key_ty: &DataType,
     types: &TypeCollection,
-    generics: &[(Generic, DataType)],
+    generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     match key_ty {
         DataType::Primitive(
@@ -338,14 +339,14 @@ fn is_valid_map_key(
             }
             Ok(())
         }
-        DataType::Reference(Reference::Opaque(_)) => Ok(()),
-        DataType::Generic(g) => {
+        DataType::Reference(Reference::Generic(g)) => {
             let Some((_, ty)) = generics.iter().find(|(ge, _)| ge == g) else {
                 return Ok(());
             };
 
             is_valid_map_key(ty, types, &[])
         }
+        DataType::Reference(Reference::Opaque(_)) => Ok(()),
         _ => Err(Error::InvalidMapKey),
     }
 }
@@ -461,7 +462,9 @@ fn validate_internally_tag_enum_datatype(
         DataType::Nullable(ty) => {
             validate_internally_tag_enum_datatype(ty, types, checked_references)
         }
-        DataType::Reference(Reference::Opaque(_)) | DataType::Generic(_) => Ok(()),
+        DataType::Reference(Reference::Opaque(_)) | DataType::Reference(Reference::Generic(_)) => {
+            Ok(())
+        }
         _ => Err(Error::InvalidInternallyTaggedEnum),
     }
 }

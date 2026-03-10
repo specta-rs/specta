@@ -1,6 +1,5 @@
 use std::{
     any::{Any, TypeId},
-    borrow::Cow,
     fmt, hash,
     sync::Arc,
 };
@@ -56,25 +55,25 @@ pub struct GenericReference {
     pub(crate) id: TypeId,
 }
 
-impl fmt::Display for GenericReference {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&format!("g:{:?}", self.id))
-    }
-}
-
 impl GenericReference {
-    /// Build a new [Reference] for a generic type parameter.
+    /// Build a new [GenericReference] for a generic type parameter marker.
     /// `T` should be a unique type which identifies the generic (Eg. `pub struct GenericT;`) and must be registered on the parent [`NamedDataType`].
-    pub const fn build<T: ?Sized + 'static>() -> Reference {
-        Reference::Generic(GenericReference {
+    pub const fn new<T: ?Sized + 'static>() -> Self {
+        Self {
             id: TypeId::of::<T>(),
-        })
+        }
     }
 
     /// Compare two [GenericReference]s for equality.
     /// If this returns true they are both a reference to the same generic type.
     pub fn eq<T: ?Sized + 'static>(&self) -> bool {
         self.id == TypeId::of::<T>()
+    }
+}
+
+impl From<GenericReference> for DataType {
+    fn from(v: GenericReference) -> Self {
+        DataType::Reference(Reference::Generic(v))
     }
 }
 

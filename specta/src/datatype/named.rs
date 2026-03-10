@@ -17,7 +17,7 @@ pub struct NamedDataType {
     pub(crate) deprecated: Option<DeprecatedType>,
     pub(crate) module_path: Cow<'static, str>,
     pub(crate) location: Location<'static>,
-    pub(crate) generics: Vec<(GenericReference, Cow<'static, str>)>,
+    pub(crate) generics: Cow<'static, [(GenericReference, Cow<'static, str>)]>,
     pub(crate) inline: bool,
     pub(crate) inner: DataType,
 }
@@ -34,7 +34,7 @@ impl NamedDataType {
     #[track_caller]
     pub fn init_with_sentinel(
         generics_for_ndt: &'static [(GenericReference, Cow<'static, str>)],
-        generics_for_ref: &'static [(GenericReference, DataType)],
+        generics_for_ref: Vec<(GenericReference, DataType)>,
         mut inline: bool,
         types: &mut TypeCollection,
         sentinel: &'static str,
@@ -82,7 +82,7 @@ impl NamedDataType {
 
         Reference::Named(NamedReference {
             id,
-            generics: Cow::Borrowed(generics_for_ref),
+            generics: generics_for_ref,
             inline,
         })
     }
@@ -215,12 +215,12 @@ impl NamedDataType {
     }
 
     /// The generics that are defined on this type
-    pub fn generics(&self) -> &[GenericReference] {
+    pub fn generics(&self) -> &[(GenericReference, Cow<'static, str>)] {
         &self.generics
     }
 
     /// Get a mutable reference to the generics that are defined on this type
-    pub fn generics_mut(&mut self) -> &mut Vec<GenericReference> {
+    pub fn generics_mut(&mut self) -> &mut Cow<'static, [(GenericReference, Cow<'static, str>)]> {
         &mut self.generics
     }
 

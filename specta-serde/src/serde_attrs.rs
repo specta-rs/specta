@@ -174,7 +174,6 @@ impl SerdeTransformer {
             DataType::Enum(e) => self.transform_enum(e),
             DataType::Tuple(t) => self.transform_tuple(t),
             DataType::Reference(r) => Ok(DataType::Reference(r.clone())),
-            DataType::Generic(g) => Ok(DataType::Generic(g.clone())),
         }
     }
 

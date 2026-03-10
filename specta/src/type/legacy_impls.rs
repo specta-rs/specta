@@ -2,13 +2,11 @@
 
 //! The plan is to try and move these into the ecosystem for the v2 release.
 use super::macros::{impl_ndt, impl_ndt_as};
-#[cfg(feature = "either")]
-use crate::datatype::Generic;
 use crate::{
     Type, TypeCollection,
     datatype::{
         self, Attribute, AttributeMeta, AttributeNestedMeta, DataType, Enum, EnumVariant, Field,
-        Fields, NamedFields, Primitive, Struct,
+        Fields, NamedFields, Primitive, Reference, Struct,
     },
     r#type::impls::*,
 };
@@ -320,7 +318,9 @@ const _: () = {
             fn definition(types: &mut TypeCollection) -> DataType {
                 // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
                 static SENTINEL: &str = stringify!($module::$type_name);
+                static GENERICS: &[(datatype::GenericReference, Cow<'static, str>)] = &[];
                 DataType::Reference(datatype::NamedDataType::init_with_sentinel(
+                    GENERICS,
                     vec![],
                     true,
                     types,
@@ -552,13 +552,17 @@ impl_ndt!(
                     (
                         "Left".into(),
                         EnumVariant::unnamed()
-                            .field(Field::new(DataType::Generic(Generic::new("L"))))
+                            .field(Field::new(
+                                datatype::GenericReference::new::<GenericL>().into(),
+                            ))
                             .build(),
                     ),
                     (
                         "Right".into(),
                         EnumVariant::unnamed()
-                            .field(Field::new(DataType::Generic(Generic::new("R"))))
+                            .field(Field::new(
+                                datatype::GenericReference::new::<GenericR>().into(),
+                            ))
                             .build(),
                     ),
                 ],

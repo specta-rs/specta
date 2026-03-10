@@ -157,7 +157,7 @@ pub fn export_type(
                     "<{}>",
                     ndt.generics()
                         .iter()
-                        .map(|g| g.to_string())
+                        .map(|(_, g)| g.as_ref().to_string())
                         .collect::<Vec<_>>()
                         .join(", ")
                 )
@@ -176,7 +176,7 @@ pub fn export_type(
                     "<{}>",
                     ndt.generics()
                         .iter()
-                        .map(|g| g.to_string())
+                        .map(|(_, g)| g.as_ref().to_string())
                         .collect::<Vec<_>>()
                         .join(", ")
                 )
@@ -273,7 +273,6 @@ pub fn datatype_to_swift(
         DataType::Enum(e) => enum_to_swift(swift, types, e, location, is_export, None, None),
         DataType::Tuple(t) => tuple_to_swift(swift, types, t),
         DataType::Reference(r) => reference_to_swift(swift, types, r),
-        DataType::Generic(g) => generic_to_swift(swift, g),
     }
 }
 
@@ -765,11 +764,12 @@ fn reference_to_swift(
         Reference::Opaque(_) => Err(Error::UnsupportedType(
             "Opaque references are not supported by Swift exporter".to_string(),
         )),
+        Reference::Generic(g) => generic_to_swift(swift, g),
     }
 }
 
 /// Convert generic types to Swift.
-fn generic_to_swift(_swift: &Swift, g: &specta::datatype::Generic) -> Result<String> {
+fn generic_to_swift(_swift: &Swift, g: &specta::datatype::GenericReference) -> Result<String> {
     Ok(g.to_string())
 }
 

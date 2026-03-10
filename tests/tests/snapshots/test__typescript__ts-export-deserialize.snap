@@ -293,7 +293,7 @@ export type GenericFlattened<T> = {
 	generic_flattened: T,
 };
 
-export type GenericNewType1<T> = Vec<T>[][];
+export type GenericNewType1<T> = T[][];
 
 export type GenericParameterOrderPreserved = {
 	pair: Pair<number, string>,
@@ -310,11 +310,11 @@ export type GenericStruct2<T> = {
 	d: [T, T, T],
 	e: [([T, T]), ([T, T]), ([T, T])],
 	f: T[],
-	g: Vec<T>[][],
-	h: ([([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]]), ([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]]), ([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]])])[],
+	g: T[][],
+	h: ([([T, T]), ([T, T]), ([T, T])])[],
 };
 
-export type GenericTuple<T> = [T, T[], Vec<T>[][]];
+export type GenericTuple<T> = [T, T[], T[][]];
 
 export type GenericTupleStruct<T> = T;
 

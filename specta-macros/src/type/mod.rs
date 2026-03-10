@@ -150,7 +150,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             GenericParam::Type(t) => {
                 let ident = &t.ident;
                 let placeholder_ident = format_ident!("PLACEHOLDER_{}", t.ident);
-                quote!(type #ident = datatype::GenericPlaceholder<#placeholder_ident>;)
+                quote!(type #ident = #placeholder_ident;)
             }
         });
 
@@ -161,13 +161,30 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
         GenericParam::Type(t) => {
             let ident = format_ident!("PLACEHOLDER_{}", t.ident);
-            let ident_str = t.ident.to_string();
             Some(quote!(
                 pub struct #ident;
-                impl datatype::ConstGenericPlaceholder for #ident {
-                    const PLACEHOLDER: &'static str = #ident_str;
+                impl #crate_ref::Type for #ident {
+                    fn definition(_: &mut #crate_ref::TypeCollection) -> datatype::DataType {
+                        datatype::GenericReference::new::<Self>().into()
+                    }
                 }
             ))
+        }
+    });
+
+    let ndt_generics = generics.params.iter().filter_map(|param| match param {
+        GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
+        GenericParam::Type(t) => {
+            let i = &t.ident;
+            let placeholder_ident = format_ident!("PLACEHOLDER_{}", t.ident);
+            if !used_generic_types.iter().any(|used| used == i) {
+                return None;
+            }
+            let i_str = i.to_string();
+            Some(quote!((
+                #crate_ref::datatype::GenericReference::new::<#placeholder_ident>(),
+                Cow::Borrowed(#i_str),
+            )))
         }
     });
 
@@ -198,11 +215,14 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
         GenericParam::Type(t) => {
             let i = &t.ident;
+            let placeholder_ident = format_ident!("PLACEHOLDER_{}", t.ident);
             if !used_generic_types.iter().any(|used| used == i) {
                 return None;
             }
-            let i_str = i.to_string();
-            Some(quote!((#crate_ref::datatype::Generic::new(#i_str), <#i as #crate_ref::Type>::definition(types))))
+            Some(quote!((
+                #crate_ref::datatype::GenericReference::new::<#placeholder_ident>(),
+                <#i as #crate_ref::Type>::definition(types),
+            )))
         }
     });
 
@@ -218,8 +238,10 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     #(#generic_placeholders)*
 
                     static SENTINEL: &str = concat!(module_path!(), "::", stringify!(#raw_ident));
+                    static GENERICS: &[(datatype::GenericReference, Cow<'static, str>)] = &[#(#ndt_generics),*];
                     datatype::DataType::Reference(
                         datatype::NamedDataType::init_with_sentinel(
+                            GENERICS,
                             vec![#(#reference_generics),*],
                             #inline,
                             types,

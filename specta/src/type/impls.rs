@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
 use crate::{
-    datatype::{self, DataType, Enum, EnumVariant, Field, Generic, List},
+    Type, TypeCollection,
+    datatype::{self, DataType, Enum, EnumVariant, Field, List},
     internal,
     r#type::macros::*,
-    Type, TypeCollection,
 };
 
 impl_primitives!(
@@ -54,19 +54,42 @@ impl<K: Type, V: Type> Type for PrimitiveMap<K, V> {
 pub(crate) struct GenericT;
 impl Type for GenericT {
     fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Generic(Generic::new("T"))
+        datatype::GenericReference::new::<Self>().into()
     }
 }
+
 pub(crate) struct GenericK;
 impl Type for GenericK {
     fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Generic(Generic::new("K"))
+        datatype::GenericReference::new::<Self>().into()
     }
 }
+
 pub(crate) struct GenericV;
 impl Type for GenericV {
     fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Generic(Generic::new("V"))
+        datatype::GenericReference::new::<Self>().into()
+    }
+}
+
+pub(crate) struct GenericE;
+impl Type for GenericE {
+    fn definition(_: &mut TypeCollection) -> DataType {
+        datatype::GenericReference::new::<Self>().into()
+    }
+}
+
+pub(crate) struct GenericL;
+impl Type for GenericL {
+    fn definition(_: &mut TypeCollection) -> DataType {
+        datatype::GenericReference::new::<Self>().into()
+    }
+}
+
+pub(crate) struct GenericR;
+impl Type for GenericR {
+    fn definition(_: &mut TypeCollection) -> DataType {
+        datatype::GenericReference::new::<Self>().into()
     }
 }
 
@@ -201,17 +224,30 @@ const _: () = {
 
     impl<'a, T: ?Sized + ToOwned + Type + 'a> Type for std::borrow::Cow<'a, T> {
         fn definition(types: &mut TypeCollection) -> DataType {
+            use std::borrow::Cow;
+
+            use crate::datatype::GenericReference;
+
             // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
             static SENTINEL: &str = "std::borrow::Cow<'a, T>";
+            static GENERICS: &[(GenericReference, Cow<'static, str>)] = &[(
+                datatype::GenericReference::new::<GenericT>(),
+                std::borrow::Cow::Borrowed("T"),
+            )];
+
             DataType::Reference(datatype::NamedDataType::init_with_sentinel(
-                vec![(datatype::Generic::new("T"), <T as Type>::definition(types))],
+                GENERICS,
+                vec![(
+                    datatype::GenericReference::new::<GenericT>(),
+                    <T as Type>::definition(types),
+                )],
                 true,
                 types,
                 SENTINEL,
                 |_types, ndt| {
                     *ndt.name_mut() = std::borrow::Cow::Borrowed("Cow");
                     *ndt.module_path_mut() = std::borrow::Cow::Borrowed("std::borrow");
-                    ndt.inner = DataType::Generic(Generic::new("T"));
+                    ndt.inner = datatype::GenericReference::new::<GenericT>().into();
                 },
             ))
         }
@@ -277,12 +313,16 @@ impl_ndt!(
         build: |types, ndt| {
             let mut ok_variant = EnumVariant::unit();
             ok_variant.set_fields(internal::construct::fields_unnamed(
-                vec![Field::new(DataType::Generic(Generic::new("T")))],
+                vec![Field::new(
+                    datatype::GenericReference::new::<GenericT>().into(),
+                )],
                 vec![],
             ));
             let mut err_variant = EnumVariant::unit();
             err_variant.set_fields(internal::construct::fields_unnamed(
-                vec![Field::new(DataType::Generic(Generic::new("E")))],
+                vec![Field::new(
+                    datatype::GenericReference::new::<GenericE>().into(),
+                )],
                 vec![],
             ));
             ndt.inner = DataType::Enum(Enum {

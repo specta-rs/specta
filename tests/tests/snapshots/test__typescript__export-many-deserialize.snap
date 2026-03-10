@@ -689,9 +689,9 @@ export type Container1 = {
 
 export type Generic2<A, B, C> = ({ A: A }) & { B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ B: [B, B, B] }) & { A?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ C: C[] }) & { A?: never; B?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ D: A[][][] }) & { A?: never; B?: never; C?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ E: { a: A; b: B; c: C } }) & { A?: never; B?: never; C?: never; D?: never; X?: never; Y?: never; Z?: never } | ({ X: number[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; Y?: never; Z?: never } | ({ Y: number }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Z?: never } | ({ Z: number[][] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never };
 
-export type GenericNewType1<T> = Vec<T>[][];
+export type GenericNewType1<T> = T[][];
 
-export type GenericTuple<T> = [T, T[], Vec<T>[][]];
+export type GenericTuple<T> = [T, T[], T[][]];
 
 export type GenericStruct2<T> = {
 	a: T,
@@ -700,8 +700,8 @@ export type GenericStruct2<T> = {
 	d: [T, T, T],
 	e: [([T, T]), ([T, T]), ([T, T])],
 	f: T[],
-	g: Vec<T>[][],
-	h: ([([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]]), ([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]]), ([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]])])[],
+	g: T[][],
+	h: ([([T, T]), ([T, T]), ([T, T])])[],
 };
 
 export type InlineGenericNewtype<T> = T;

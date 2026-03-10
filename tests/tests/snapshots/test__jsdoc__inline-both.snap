@@ -425,8 +425,8 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*	}} GenericFlattened<T>
 	* @property {T} generic_flattened
 	*
-	* @typedef {Vec<T>[][]} GenericNewType1<T>
-	* @property {Vec<T>[][]} "0"
+	* @typedef {T[][]} GenericNewType1<T>
+	* @property {T[][]} "0"
 	*
 	* @typedef {{
 	*		pair: Pair<number, string>,
@@ -445,8 +445,8 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	*		d: [T, T, T],
 	*		e: [([T, T]), ([T, T]), ([T, T])],
 	*		f: T[],
-	*		g: Vec<T>[][],
-	*		h: ([([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]]), ([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]]), ([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]])])[],
+	*		g: T[][],
+	*		h: ([([T, T]), ([T, T]), ([T, T])])[],
 	*	}} GenericStruct2<T>
 	* @property {T} a
 	* @property {[T, T]} b
@@ -454,13 +454,13 @@ expression: "JSDoc::default().with_serde(mode).bigint(BigIntExportBehavior::Numb
 	* @property {[T, T, T]} d
 	* @property {[([T, T]), ([T, T]), ([T, T])]} e
 	* @property {T[]} f
-	* @property {Vec<T>[][]} g
-	* @property {([([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]]), ([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]]), ([[([T, T]), ([T, T]), ([T, T])], [([T, T]), ([T, T]), ([T, T])]])])[]} h
+	* @property {T[][]} g
+	* @property {([([T, T]), ([T, T]), ([T, T])])[]} h
 	*
-	* @typedef {[T, T[], Vec<T>[][]]} GenericTuple<T>
+	* @typedef {[T, T[], T[][]]} GenericTuple<T>
 	* @property {T} "0"
 	* @property {T[]} "1"
-	* @property {Vec<T>[][]} "2"
+	* @property {T[][]} "2"
 	*
 	* @typedef {T} GenericTupleStruct<T>
 	* @property {T} "0"
