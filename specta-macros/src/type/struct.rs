@@ -3,8 +3,8 @@ use crate::{
     utils::{parse_attrs_with_filter, unraw_raw_ident},
 };
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
-use syn::{DataStruct, Field, Fields, Type, spanned::Spanned};
+use quote::{quote, ToTokens};
+use syn::{spanned::Spanned, DataStruct, Field, Fields, Type};
 
 use super::attr::*;
 
@@ -111,7 +111,10 @@ pub fn parse_struct(
             quote!(Struct),
             quote!(
                 let mut e = datatype::Struct::unit();
-                *e.fields_mut() = internal::construct::fields_unnamed(vec![#field], vec![]);
+                *e.fields_mut() = internal::construct::fields_unnamed(
+                    vec![#field],
+                    datatype::Attributes::default(),
+                );
             ),
         ));
     }
@@ -147,7 +150,7 @@ pub fn parse_struct(
 
             quote!(internal::construct::fields_named(
                 vec![#(#fields),*],
-                vec![]
+                datatype::Attributes::default()
             ))
         }
         Fields::Unnamed(_) => {
@@ -169,7 +172,7 @@ pub fn parse_struct(
 
             quote!(internal::construct::fields_unnamed(
                 vec![#(#fields),*],
-                vec![]
+                datatype::Attributes::default()
             ))
         }
         Fields::Unit => quote!(datatype::Fields::Unit),

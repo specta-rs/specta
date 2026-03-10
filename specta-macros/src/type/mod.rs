@@ -1,12 +1,10 @@
 use attr::*;
+use quote::{format_ident, quote, ToTokens};
 use r#enum::parse_enum;
-use quote::{ToTokens, format_ident, quote};
 use r#struct::parse_struct;
-use syn::{Data, DeriveInput, GenericParam, parse};
+use syn::{parse, Data, DeriveInput, GenericParam};
 
 use crate::utils::{parse_attrs, unraw_raw_ident};
-
-use self::lower_attr::lower_attribute;
 
 use self::generics::{
     add_type_to_where_clause, generics_with_ident_and_bounds_only, generics_with_ident_only,
@@ -19,6 +17,9 @@ mod field;
 mod generics;
 mod lower_attr;
 mod r#struct;
+
+// TODO: Remove this and make it dynamically discovered!
+const FORMAT_CRATES: &[&str] = &["specta_serde"];
 
 pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
     let DeriveInput {
@@ -43,19 +44,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             "specta: `#[specta(type = ...)]` cannot be combined with `#[specta(transparent)]`",
         ));
     }
-
-    // Lower the container attributes to Attribute tokens
-    // We use the raw attrs from DeriveInput, not the parsed ones
-    // This follows the same pattern as variant attribute lowering in enum.rs:58-71
-    let lowered_attrs = raw_attrs
-        .iter()
-        .filter(|attr| {
-            let path = attr.path().to_token_stream().to_string();
-            !container_attrs.skip_attrs.contains(&path) && path != "specta"
-        })
-        .filter_map(|attr| lower_attribute(attr).transpose())
-        .map(|result| result.map(|attr| attr.to_tokens()))
-        .collect::<Result<Vec<_>, _>>()?;
 
     let ident = container_attrs
         .remote
@@ -126,7 +114,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         quote!(
             datatype::DataType::#dt_type({
                 #dt_impl
-                *e.attributes_mut() = vec![#(#lowered_attrs),*];
+                *e.attributes_mut() = datatype::Attributes::default();
                 e
             })
         )

@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
 use crate::{
-    Type, TypeCollection,
     datatype::{self, DataType, Enum, EnumVariant, Field, List},
     internal,
     r#type::{generics, macros::*},
+    Type, TypeCollection,
 };
 
 impl_primitives!(
@@ -150,7 +150,7 @@ const _: () = {
                             Field::new(<u32 as crate::Type>::definition(types)),
                         ),
                     ],
-                    vec![],
+                    datatype::Attributes::default(),
                 ));
 
                 ndt.inner = DataType::Struct(s);
@@ -172,7 +172,7 @@ const _: () = {
                             Field::new(<u32 as crate::Type>::definition(types)),
                         ),
                     ],
-                    vec![],
+                    datatype::Attributes::default(),
                 ));
 
                 ndt.inner = DataType::Struct(s);
@@ -221,7 +221,7 @@ const _: () = {
                     ("start".into(), Field::new(ty.clone())),
                     ("end".into(), Field::new(ty)),
                 ],
-                vec![],
+                datatype::Attributes::default(),
             ));
 
             DataType::Struct(s)
@@ -274,18 +274,18 @@ impl_ndt!(
                 vec![Field::new(
                     datatype::GenericReference::new::<generics::T>().into(),
                 )],
-                vec![],
+                datatype::Attributes::default(),
             ));
             let mut err_variant = EnumVariant::unit();
             err_variant.set_fields(internal::construct::fields_unnamed(
                 vec![Field::new(
                     datatype::GenericReference::new::<generics::E>().into(),
                 )],
-                vec![],
+                datatype::Attributes::default(),
             ));
             ndt.inner = DataType::Enum(Enum {
                 variants: vec![("Ok".into(), ok_variant), ("Err".into(), err_variant)],
-                attributes: vec![],
+                attributes: datatype::Attributes::default(),
             });
         }
     }
