@@ -2,9 +2,8 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::HashSet;
 use syn::{
-    parse_quote,
+    ConstParam, GenericParam, Generics, LifetimeParam, Type, TypeParam, WhereClause, parse_quote,
     visit::{self, Visit},
-    ConstParam, GenericParam, Generics, LifetimeParam, Type, TypeParam, WhereClause,
 };
 
 pub fn generics_with_ident_and_bounds_only(generics: &Generics) -> Option<TokenStream> {

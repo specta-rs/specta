@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
 use crate::{
+    Type, TypeCollection,
     datatype::{self, DataType, Enum, EnumVariant, Field, List},
     internal,
     r#type::{generics, macros::*},
-    Type, TypeCollection,
 };
 
 impl_primitives!(

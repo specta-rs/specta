@@ -1,9 +1,9 @@
 use attr::*;
-use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens};
 use r#enum::parse_enum;
+use proc_macro2::TokenStream;
+use quote::{ToTokens, format_ident, quote};
 use r#struct::parse_struct;
-use syn::{parse, Data, DeriveInput, GenericParam};
+use syn::{Data, DeriveInput, GenericParam, parse};
 
 use crate::utils::{parse_attrs, unraw_raw_ident};
 
