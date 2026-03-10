@@ -10,6 +10,7 @@ use self::lower_attr::lower_attribute;
 
 use self::generics::{
     add_type_to_where_clause, generics_with_ident_and_bounds_only, generics_with_ident_only,
+    used_type_params,
 };
 
 pub(crate) mod attr;
@@ -36,7 +37,14 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let container_attrs = ContainerAttr::from_attrs(&mut attrs)?;
     let crate_ref = container_attrs.crate_name.clone().unwrap_or(quote!(specta));
 
-    // Lower the container attributes to RuntimeAttribute tokens
+    if container_attrs.r#type.is_some() && container_attrs.transparent {
+        return Err(syn::Error::new(
+            raw_ident.span(),
+            "specta: `#[specta(type = ...)]` cannot be combined with `#[specta(transparent)]`",
+        ));
+    }
+
+    // Lower the container attributes to Attribute tokens
     // We use the raw attrs from DeriveInput, not the parsed ones
     // This follows the same pattern as variant attribute lowering in enum.rs:58-71
     let lowered_attrs = raw_attrs
@@ -69,11 +77,23 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     "specta: invalid formatted attribute",
                 ));
             }
+            Some(crate::utils::AttributeValue::Expr(_)) => {
+                return Err(syn::Error::new(
+                    attr.key.span(),
+                    "specta: invalid formatted attribute",
+                ));
+            }
             Some(crate::utils::AttributeValue::Attribute {
                 attr: inner_attrs, ..
             }) => {
                 // If there are nested attributes remaining, report the first one
                 if let Some(inner_attr) = inner_attrs.first() {
+                    if let Some(message) =
+                        migration_hint(Scope::Container, &inner_attr.key.to_string())
+                    {
+                        return Err(syn::Error::new(inner_attr.key.span(), message));
+                    }
+
                     return Err(syn::Error::new(
                         inner_attr.key.span(),
                         format!(
@@ -91,51 +111,78 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         }
     }
 
-    let (dt_type, dt_impl) = match data {
-        Data::Struct(data) => parse_struct(&crate_ref, &container_attrs, data),
-        Data::Enum(data) => parse_enum(&crate_ref, &container_attrs, data),
-        Data::Union(data) => Err(syn::Error::new_spanned(
-            data.union_token,
-            "specta: Union types are not supported by Specta yet!",
-        )),
-    }?;
+    let dt_expr = if let Some(container_ty) = &container_attrs.r#type {
+        quote!(<#container_ty as #crate_ref::Type>::definition(types))
+    } else {
+        let (dt_type, dt_impl) = match data {
+            Data::Struct(data) => parse_struct(&crate_ref, &container_attrs, data),
+            Data::Enum(data) => parse_enum(&crate_ref, &container_attrs, data),
+            Data::Union(data) => Err(syn::Error::new_spanned(
+                data.union_token,
+                "specta: Union types are not supported by Specta yet!",
+            )),
+        }?;
+
+        quote!(
+            datatype::DataType::#dt_type({
+                #dt_impl
+                *e.attributes_mut() = vec![#(#lowered_attrs),*];
+                e
+            })
+        )
+    };
 
     let bounds = generics_with_ident_and_bounds_only(generics);
     let type_args = generics_with_ident_only(generics);
+    let used_generic_types = used_type_params(generics, container_attrs.r#type.as_ref());
     let where_bound = add_type_to_where_clause(
         &quote!(#crate_ref::Type),
         generics,
         container_attrs.bound.as_deref(),
+        &used_generic_types,
     );
 
-    let shadow_generics = {
-        let g = generics.params.iter().map(|param| match param {
-            // Pulled from outside
-            GenericParam::Lifetime(_) | GenericParam::Const(_) => quote!(),
-            // We shadow the generics to replace them.
-            GenericParam::Type(t) => {
-                let ident = &t.ident;
-                let placeholder_ident = format_ident!("PLACEHOLDER_{}", t.ident);
-                quote!(type #ident = datatype::GenericPlaceholder<#placeholder_ident>;)
-            }
-        });
-
-        quote!(#(#g)*)
-    };
-
-    let generic_placeholders = generics.params.iter().filter_map(|param| match param {
+    let (generic_placeholders, shadow_generics): (Vec<_>, Vec<_>) = generics.params.iter().filter_map(|param| match param {
         GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
         GenericParam::Type(t) => {
-            let ident = format_ident!("PLACEHOLDER_{}", t.ident);
-            let ident_str = t.ident.to_string();
-            Some(quote!(
-                pub struct #ident;
-                impl datatype::ConstGenericPlaceholder for #ident {
-                    const PLACEHOLDER: &'static str = #ident_str;
+            let ident = &t.ident;
+            let placeholder_ident = format_ident!("PLACEHOLDER_{ident}");
+            Some((quote!(
+                pub struct #placeholder_ident;
+                impl #crate_ref::Type for #placeholder_ident {
+                    fn definition(_: &mut #crate_ref::TypeCollection) -> datatype::DataType {
+                        datatype::GenericReference::new::<Self>().into()
+                    }
                 }
-            ))
+            ), quote!(type #ident = #placeholder_ident;)))
         }
-    });
+    }).unzip();
+
+    let (generics_for_ndt, generics_for_ref): (Vec<_>, Vec<_>) = generics
+        .params
+        .iter()
+        .filter_map(|param| match param {
+            GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
+            GenericParam::Type(t) => {
+                let i = &t.ident;
+                let placeholder_ident = format_ident!("PLACEHOLDER_{}", t.ident);
+                if !used_generic_types.iter().any(|used| used == i) {
+                    return None;
+                }
+                let i_str = i.to_string();
+                Some((
+                    quote!((
+                        #crate_ref::datatype::GenericReference::new::<#placeholder_ident>(),
+                        Cow::Borrowed(#i_str),
+                    )),
+                    quote!((
+                        #crate_ref::datatype::GenericReference::new::<#placeholder_ident>(),
+                        <#i as #crate_ref::Type>::definition(types),
+                    )),
+                ))
+            }
+        })
+        .unzip();
 
     let collect = (cfg!(feature = "DO_NOT_USE_collect") && container_attrs.collect.unwrap_or(true))
         .then(|| {
@@ -148,7 +195,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 .map(|_| quote! { () });
 
             quote! {
-                #[allow(non_snake_case)]
+                #[allow(unsafe_code, non_snake_case)]
                 #[#crate_ref::collect::internal::ctor::ctor(anonymous, crate_path = #crate_ref::collect::internal::ctor)]
                 unsafe fn #export_fn_name() {
                     #crate_ref::collect::internal::register::<#ident<#(#generic_params),*>>();
@@ -157,25 +204,8 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         });
 
     let comments = &container_attrs.common.doc;
-    let inline = container_attrs.inline;
+    let inline = container_attrs.inline || container_attrs.r#type.is_some();
     let deprecated = container_attrs.common.deprecated_as_tokens();
-
-    let reference_generics = generics.params.iter().filter_map(|param| match param {
-        GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
-        GenericParam::Type(t) => {
-            let i = &t.ident;
-            let i_str = i.to_string();
-            Some(quote!((#crate_ref::datatype::Generic::new(#i_str), <#i as #crate_ref::Type>::definition(types))))
-        }
-    });
-
-    let definition_generics = generics.params.iter().filter_map(|p| match p {
-        GenericParam::Type(t) => {
-            let ident = t.ident.to_string();
-            Some(quote!(std::borrow::Cow::Borrowed(#ident).into()))
-        }
-        _ => None,
-    });
 
     Ok(quote! {
         #[allow(non_camel_case_types)]
@@ -188,27 +218,24 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 fn definition(types: &mut #crate_ref::TypeCollection) -> datatype::DataType {
                     #(#generic_placeholders)*
 
-                    static SENTINEL: () = ();
+                    static SENTINEL: &str = concat!(module_path!(), "::", stringify!(#raw_ident));
+                    static GENERICS: &[(datatype::GenericReference, Cow<'static, str>)] = &[#(#generics_for_ndt),*];
                     datatype::DataType::Reference(
                         datatype::NamedDataType::init_with_sentinel(
-                            vec![#(#reference_generics),*],
+                            GENERICS,
+                            vec![#(#generics_for_ref),*],
                             #inline,
                             types,
-                            &SENTINEL,
+                            SENTINEL,
                             |types, ndt| {
                                 ndt.set_name(Cow::Borrowed(#name));
                                 ndt.set_docs(Cow::Borrowed(#comments));
                                 ndt.set_deprecated(#deprecated);
                                 ndt.set_module_path(Cow::Borrowed(module_path!()));
-                                *ndt.generics_mut() = vec![#(#definition_generics),*];
                                 ndt.set_ty({
-                                    #shadow_generics
+                                    #(#shadow_generics)*
 
-                                    datatype::DataType::#dt_type({
-                                        #dt_impl
-                                        *e.attributes_mut() = vec![#(#lowered_attrs),*];
-                                        e
-                                    })
+                                    #dt_expr
                                 });
                             }
                         )

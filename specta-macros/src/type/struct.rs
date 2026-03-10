@@ -30,10 +30,21 @@ pub fn decode_field_attrs<'a>(
                     "specta: invalid formatted attribute",
                 ));
             }
+            Some(crate::utils::AttributeValue::Expr(_)) => {
+                return Err(syn::Error::new(
+                    attr.key.span(),
+                    "specta: invalid formatted attribute",
+                ));
+            }
             Some(crate::utils::AttributeValue::Attribute {
                 attr: inner_attrs, ..
             }) => {
                 if let Some(inner_attr) = inner_attrs.first() {
+                    if let Some(message) = migration_hint(Scope::Field, &inner_attr.key.to_string())
+                    {
+                        return Err(syn::Error::new(inner_attr.key.span(), message));
+                    }
+
                     return Err(syn::Error::new(
                         inner_attr.key.span(),
                         format!(

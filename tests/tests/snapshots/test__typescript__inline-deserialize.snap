@@ -18,11 +18,11 @@ f32: number
 f64: number
 bool: boolean
 char: string
-Range<i32>: { 
+Range<i32>: {
 	start: number,
 	end: number,
 }
-RangeInclusive<i32>: { 
+RangeInclusive<i32>: {
 	start: number,
 	end: number,
 }
@@ -31,6 +31,7 @@ RangeInclusive<i32>: {
 (String, i32, bool): [string, number, boolean]
 ((String, i32), (bool, char, bool), ()): [[string, number], [boolean, string, boolean], null]
 (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool): [boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean]
+(Vec<i32>, Vec<bool>): [number[], boolean[]]
 String: string
 PathBuf: string
 IpAddr: string
@@ -39,11 +40,13 @@ Ipv6Addr: string
 SocketAddr: string
 SocketAddrV4: string
 SocketAddrV6: string
-SystemTime: { 
+Cow<'static, str>: string
+Cow<'static, i32>: number
+SystemTime: {
 	duration_since_epoch: number,
 	duration_since_unix_epoch: number,
 }
-Duration: { 
+Duration: {
 	secs: number,
 	nanos: number,
 }
@@ -61,10 +64,17 @@ Vec<MyEnum>: MyEnum[]
 &'static [i32; 1]: [number]
 &'static [i32; 0]: []
 Option<i32>: number | null
-Option<()>: null | null
+Option<()>: null
 Option<Vec<i32>>: number[] | null
+Result<String, i32>: ({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never }
+Vec<Option<Cow<'static, i32>>>: (number | null)[]
+Option<Vec<Cow<'static, i32>>>: number[] | null
+[Vec<String>; 3]: [string[], string[], string[]]
 Option<Option<String>>: string | null
 Option<Option<Option<String>>>: string | null
+PhantomData<()>: null
+PhantomData<String>: null
+Infallible: never
 Unit1: null
 Unit2: Record<string, never>
 Unit3: []
@@ -72,7 +82,7 @@ Unit4: null
 Unit5: "A"
 Unit6: { A: [] }
 Unit7: { A: Record<string, never> }
-SimpleStruct: { 
+SimpleStruct: {
 	a: number,
 	b: string,
 	c: [number, string, number],
@@ -81,38 +91,36 @@ SimpleStruct: {
 }
 TupleStruct1: number
 TupleStruct3: [number, boolean, string]
-TestEnum: "Unit" | { Single: number } | { Multiple: [number, number] } | { Struct: { a: number } }
+TestEnum: "Unit" | ({ Single: number }) & { Multiple?: never; Struct?: never } | ({ Multiple: [number, number] }) & { Single?: never; Struct?: never } | ({ Struct: { a: number } }) & { Multiple?: never; Single?: never }
 RefStruct: TestEnum
-InlinerStruct: { 
-	inline_this: InlineStruct,
+InlinerStruct: {
+	inline_this: {
+		ref_struct: SimpleStruct,
+		val: number,
+	},
 	dont_inline_this: RefStruct,
 }
-GenericStruct<i32>: { 
-	arg: T,
+GenericStruct<i32>: {
+	arg: number,
 }
-GenericStruct<String>: { 
-	arg: T,
+GenericStruct<String>: {
+	arg: string,
 }
-FlattenEnumStruct: (FlattenEnum) & { 
+FlattenEnumStruct: (FlattenEnum) & {
 	outer: string,
 }
-OverridenStruct: { 
+OverridenStruct: {
 	overriden_field: string,
 }
 HasGenericAlias: { [key in number]: string }
-SkipVariant: { A: string }
-SkipVariant2: string
-SkipVariant3: { A: { a: string } }
-SkipStructFields: { 
-	a: number,
-}
-SpectaSkipNonTypeField: { 
-	a: number,
-}
-EnumMacroAttributes: { A: string } | { B: number } | { C: number } | { D: { a: string; b: number } }
-InlineEnumField: { A: PlaceholderInnerField }
-InlineOptionalType: { 
-	optional_field: PlaceholderInnerField | null,
+EnumMacroAttributes: ({ A: string }) & { B?: never; C?: never; D?: never } | ({ B: number }) & { A?: never; C?: never; D?: never } | ({ C: number }) & { A?: never; B?: never; D?: never } | ({ D: { a: string; b: number } }) & { A?: never; B?: never; C?: never }
+InlineEnumField: { A: {
+	a: string,
+} }
+InlineOptionalType: {
+	optional_field: {
+		a: string,
+	} | null,
 }
 Rename: "OneWord" | "TwoWords"
 TransparentType: TransparentTypeInner
@@ -123,84 +131,104 @@ HashMap<BasicEnum, ()>: Partial<{ [key in BasicEnum]: null }>
 Option<Option<Option<Option<i32>>>>: number | null
 Vec<PlaceholderInnerField>: PlaceholderInnerField[]
 HashMap<BasicEnum, i32>: Partial<{ [key in BasicEnum]: number }>
-EnumReferenceRecordKey: { 
+EnumReferenceRecordKey: {
 	a: Partial<{ [key in BasicEnum]: number }>,
 }
-FlattenOnNestedEnum: (NestedEnum) & { 
+FlattenOnNestedEnum: (NestedEnum) & {
 	id: string,
 }
-PhantomData<()>: null
-PhantomData<String>: null
-Infallible: never
 MyEmptyInput: Record<string, never>
 (String): string
 (String,): [string]
 ExtraBracketsInTupleVariant: { A: string }
 ExtraBracketsInUnnamedStruct: string
 Vec<MyEnum>: MyEnum[]
-InlineTuple: { 
+InlineTuple: {
 	demo: [string, boolean],
 }
-InlineTuple2: { 
-	demo: [InlineTuple, boolean],
+InlineTuple2: {
+	demo: [{
+		demo: [string, boolean],
+	}, boolean],
 }
 Box<str>: string
 Box<String>: string
-SkippedFieldWithinVariant: never | string
-KebabCase: { 
+SkippedFieldWithinVariant: { type: "A" } | { type: "B"; data: string }
+KebabCase: {
 	test_ing: string,
 }
 &[&str]: string[]
-Issue281<'_>: { 
+Issue281<'_>: {
 	default_unity_arguments: string[],
 }
-RenameWithWeirdCharsField: { 
+LifetimeGenericStruct<'_, i32>: {
+	borrowed: number[],
+	owned: number[],
+}
+LifetimeGenericEnum<'_, i32>: ({ Borrowed: number }) & { Owned?: never } | ({ Owned: number }) & { Borrowed?: never }
+RenameWithWeirdCharsField: {
 	odata_context: string,
 }
 RenameWithWeirdCharsVariant: { A: string }
-Issue374: { 
+RenamedFieldKeys: {
+	empty: string,
+	quote: string,
+	backslash: string,
+	newline: string,
+	line_separator: string,
+	paragraph_separator: string,
+}
+RenamedVariantWithSkippedPayload: "A"
+Issue374: {
 	foo: boolean,
 	bar: boolean,
 }
 type_type::Type: never
-ActualType: { 
+ActualType: {
 	a: GenericType<string>,
 }
-SpectaTypeOverride: { 
+SpectaTypeOverride: {
 	string_ident: string,
 	u32_ident: number,
 	path: string,
+	tuple: [string, number],
 }
-InvalidToValidType: { 
-	cause: null | null,
+ContainerTypeOverrideStruct: string
+ContainerTypeOverrideEnum: string
+ContainerTypeOverrideGeneric<Box<dyn Any>>: string
+ContainerTypeOverrideToGeneric<i32>: number
+ContainerTypeOverrideTuple: [string, number]
+ContainerTypeOverrideTupleGeneric<i32>: [number, string]
+InvalidToValidType: {
+	cause: null,
 }
 TupleStruct: string
 TupleStructWithRep: string
-GenericTupleStruct<String>: T
+GenericTupleStruct<String>: string
 BracedStruct: string
-StructRenameAllUppercase: { 
+StructRenameAllUppercase: {
 	a: number,
 	b: number,
 }
-RenameSerdeSpecialChar: { 
+RenameSerdeSpecialChar: {
 	b: number,
 }
 EnumRenameAllUppercase: "HelloWorld" | "VariantB" | "TestingWords"
-Recursive: { 
+Recursive: {
 	demo: Recursive,
 }
-RecursiveMapValue: { 
+RecursiveMapValue: {
 	demo: { [key in string]: RecursiveMapValue },
 }
 RecursiveTransparent: RecursiveInline
 RecursiveInEnum: { A: (RecursiveInEnum) }
 NonOptional: string | null
 OptionalOnNamedField: string | null
-OptionalOnTransparentNamedField: { 
+OptionalOnTransparentNamedField: {
 	b: string | null,
 }
-OptionalInEnum: { A: string | null } | { B: { a: string | null } } | { C: { a?: string | null } }
-Optional: { 
+OptionalInEnum: ({ A: string | null }) & { B?: never; C?: never } | ({ B: { a: string | null } }) & { A?: never; C?: never } | ({ C: { a?: string | null } }) & { A?: never; B?: never }
+Optional: {
 	a: number | null,
 	b?: number | null,
 	c: string | null,
@@ -208,6 +236,7 @@ Optional: {
 }
 UntaggedVariants: string | number | { id: string } | [string, boolean]
 UntaggedVariantsWithoutValue: string | [number, string] | number
+UntaggedVariantsWithDuplicateBranches: null | number
 HashMap<String, ()>: { [key in string]: null }
 Regular: { [key in string]: null }
 HashMap<Infallible, ()>: { [key in never]: null }
@@ -215,107 +244,306 @@ HashMap<UnitVariants, ()>: Partial<{ [key in UnitVariants]: null }>
 HashMap<UntaggedVariantsKey, ()>: Partial<{ [key in UntaggedVariantsKey]: null }>
 HashMap<Variants, ()>: Partial<{ [key in Variants]: null }>
 MacroStruct: string
-MacroStruct2: { 
+MacroStruct2: {
 	demo: string,
 }
-MacroEnum: { Demo: string } | { Demo2: { demo2: string } }
-DeprecatedType: { 
+MacroEnum: ({ Demo: string }) & { Demo2?: never } | ({ Demo2: { demo2: string } }) & { Demo?: never }
+DeprecatedType: {
 	a: number,
 }
-DeprecatedTypeWithMsg: { 
+DeprecatedTypeWithMsg: {
 	a: number,
 }
-DeprecatedTypeWithMsg2: { 
+DeprecatedTypeWithMsg2: {
 	a: number,
 }
-DeprecatedFields: { 
+DeprecatedFields: {
 	a: number,
+	/**
+	 * @deprecated
+	 */
 	b: string,
+	/**
+	 * @deprecated This field is cringe!
+	 */
 	c: string,
+	/**
+	 * @deprecated This field is cringe!
+	 */
 	d: string,
 }
-DeprecatedTupleVariant: [string, string, number]
-DeprecatedEnumVariants: "A" | "B" | "C"
-CommentedStruct: { 
+DeprecatedTupleVariant: [
+/**
+ * @deprecated
+ */
+string, 
+/**
+ * @deprecated Nope
+ */
+string, 
+/**
+ * @deprecated Nope
+ */
+number]
+DeprecatedEnumVariants: 
+/**
+ * @deprecated
+ */
+"A" | 
+/**
+ * @deprecated Nope
+ */
+"B" | 
+/**
+ * @deprecated Nope
+ */
+"C"
+CommentedStruct: {
+	/**
+	 *  Some triple-slash comment
+	 *  Some more triple-slash comment
+	 */
 	a: number,
 }
-CommentedEnum: { A: number } | { B: { a: number } }
-SingleLineComment: { A: number } | { B: { a: number } }
-NonGeneric: { 
-	a: A,
-	b: B,
+CommentedEnum: 
+/**
+ *  Some triple-slash comment
+ *  Some more triple-slash comment
+ */
+({ A: number }) & { B?: never } | 
+/**
+ *  Some triple-slash comment
+ *  Some more triple-slash comment
+ */
+({ B: { 
+/**
+ *  Some triple-slash comment
+ *  Some more triple-slash comment
+ */
+a: number } }) & { A?: never }
+SingleLineComment: 
+// Some single-line comment
+({ A: number }) & { B?: never } | 
+// Some single-line comment
+({ B: { 
+// Some single-line comment
+a: number } }) & { A?: never }
+NonGeneric: {
+	a: number,
+	b: boolean,
 }
-HalfGenericA<u8>: { 
-	a: A,
-	b: B,
+HalfGenericA<u8>: {
+	a: number,
+	b: boolean,
 }
-HalfGenericB<bool>: { 
-	a: A,
-	b: B,
+HalfGenericB<bool>: {
+	a: number,
+	b: boolean,
 }
-FullGeneric<u8, bool>: { 
-	a: A,
-	b: B,
+FullGeneric<u8, bool>: {
+	a: number,
+	b: boolean,
 }
-Another<bool>: { 
-	a: A,
-	b: B,
+Another<bool>: {
+	a: number,
+	b: boolean,
 }
 MapA<u32>: { [key in string]: number }
 MapB<u32>: { [key in number]: string }
 MapC<u32>: { [key in string]: AGenericStruct<number> }
-AGenericStruct<u32>: { 
-	field: Demo<T, boolean>,
+AGenericStruct<u32>: {
+	field: {
+	a: number,
+	b: boolean,
+},
 }
-A: { 
+A: {
 	a: B,
-	b: B,
+	b: {
+		b: number,
+	},
 	c: B,
-	d: D,
-	e: GenericFlattened<number>,
+	d: {
+		flattened: number,
+	},
+	e: {
+		generic_flattened: number,
+	},
 }
-DoubleFlattened: { 
+DoubleFlattened: {
 	a: ToBeFlattened,
 	b: ToBeFlattened,
 }
-FlattenedInner: { 
+FlattenedInner: {
 	c: Inner,
 }
-BoxFlattened: { 
+BoxFlattened: {
 	b: BoxedInner,
 }
-BoxInline: { 
+BoxInline: {
 	c: BoxedInner,
 }
-First: { 
+First: {
 	a: string,
 }
-Second: { 
+Second: {
 	a: number,
 }
-Third: (First) & { 
+Third: (First) & {
 	b: { [key in string]: string },
 	c: First,
 }
-Fourth: { 
+Fourth: {
+	a: First,
+	b: {
+		a: string,
+	},
+}
+TagOnStructWithInline: {
+	a: First,
+	b: {
+		a: string,
+	},
+}
+Sixth: {
 	a: First,
 	b: First,
 }
-TagOnStructWithInline: { 
-	a: First,
-	b: First,
-}
-Sixth: { 
-	a: First,
-	b: First,
-}
-Seventh: { 
+Seventh: {
 	a: First,
 	b: Second,
 }
 Eight: { A: string } | "B"
-Tenth: string | "B" | First
-MyEnumTagged: (First)
+Tenth: string | null | {
+	a: string,
+} | First
+MyEnumTagged: { type: "Variant" } & (First)
 MyEnumExternal: { Variant: (First) }
-MyEnumAdjacent: (First)
+MyEnumAdjacent: { t: "Variant"; c: (First) }
 MyEnumUntagged: (First)
+EmptyStruct: Record<string, never>
+EmptyStructWithTag: Record<string, never>
+AdjacentlyTagged: { t: "A" } | { t: "B"; c: { id: string; method: string } } | { t: "C"; c: string }
+LoadProjectEvent: { event: "Started"; data: { project_name: string } } | { event: "ProgressTest"; data: { project_name: string; status: string; progress: number } } | { event: "Finished"; data: { project_name: string } }
+ExternallyTagged: "A" | ({ B: { id: string; method: string } }) & { C?: never } | ({ C: string }) & { B?: never }
+Issue221External: ({ A: { a: string } }) & { B?: never } | ({ B: { b: string } }) & { A?: never }
+InternallyTaggedD: { type: "A" } & { [key in string]: string }
+InternallyTaggedE: { type: "A" }
+InternallyTaggedF: { type: "A" } & InternallyTaggedFInner
+InternallyTaggedH: { type: "A" } & InternallyTaggedHInner
+InternallyTaggedL: { type: "A" } | { type: "B" }
+InternallyTaggedM: { type: "A" }
+StructWithAlias: {
+	field: string,
+}
+StructWithMultipleAliases: {
+	field: string,
+}
+StructWithAliasAndRename: {
+	field: string,
+}
+EnumWithVariantAlias: "Variant" | "Other"
+EnumWithMultipleVariantAliases: "Variant" | "Other"
+EnumWithVariantAliasAndRename: "Variant" | "Other"
+InternallyTaggedWithAlias: { type: "A" } & { field: string } | { type: "B" } & { other: number }
+AdjacentlyTaggedWithAlias: { type: "A"; data: { field: string } } | { type: "B"; data: { other: number } }
+UntaggedWithAlias: ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never }
+Issue221UntaggedSafe: ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never }
+Issue221UntaggedMixed: ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never } | ({ [key in string]: string })
+EmptyEnum: never
+EmptyEnumTagged: never
+EmptyEnumTaggedWContent: never
+EmptyEnumUntagged: never
+SkipOnlyField: Record<string, never>
+SkipField: {
+	b: number,
+}
+SkipVariant: { A: string }
+SkipUnnamedFieldInVariant: "A" | { B: [number] }
+SkipNamedFieldInVariant: ({ A: Record<string, never> }) & { B?: never } | ({ B: { b: number } }) & { A?: never }
+TransparentWithSkip: null
+TransparentWithSkip2: string
+TransparentWithSkip3: string
+SkipVariant2: { tag: "A"; data: string }
+SkipVariant3: { A: { a: string } }
+SkipStructFields: {
+	a: number,
+}
+SpectaSkipNonTypeField: {
+	a: number,
+}
+FlattenA: {
+	a: number,
+	b: number,
+}
+FlattenB: (FlattenA) & {
+	c: number,
+}
+FlattenC: (FlattenA) & {
+	c: number,
+}
+FlattenD: {
+	a: FlattenA,
+	c: number,
+}
+FlattenE: {
+	b: (FlattenA) & {
+		c: number,
+	},
+	d: number,
+}
+FlattenF: {
+	b: (FlattenA) & {
+		c: number,
+	},
+	d: number,
+}
+FlattenG: {
+	b: FlattenB,
+	d: number,
+}
+TupleNested: [number[], [number[], number[]], [number[], number[], number[]]]
+Generic1<()>: {
+	value: null,
+	values: null[],
+}
+GenericAutoBound<()>: {
+	value: null,
+	values: null[],
+}
+GenericAutoBound2<()>: {
+	value: null,
+	values: null[],
+}
+Container1: {
+	foo: Generic1<number>,
+	bar: Generic1<number>[],
+	baz: { [key in string]: Generic1<string> },
+}
+Generic2<(), String, i32>: ({ A: null }) & { B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ B: [string, string, string] }) & { A?: never; C?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ C: number[] }) & { A?: never; B?: never; D?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ D: null[][][] }) & { A?: never; B?: never; C?: never; E?: never; X?: never; Y?: never; Z?: never } | ({ E: { a: null; b: string; c: number } }) & { A?: never; B?: never; C?: never; D?: never; X?: never; Y?: never; Z?: never } | ({ X: number[] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; Y?: never; Z?: never } | ({ Y: number }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Z?: never } | ({ Z: number[][] }) & { A?: never; B?: never; C?: never; D?: never; E?: never; X?: never; Y?: never }
+GenericNewType1<()>: null[][]
+GenericTuple<()>: [null, null[], null[][]]
+GenericStruct2<()>: {
+	a: null,
+	b: [null, null],
+	c: [null, [null, null]],
+	d: [null, null, null],
+	e: [([null, null]), ([null, null]), ([null, null])],
+	f: null[],
+	g: null[][],
+	h: ([([null, null]), ([null, null]), ([null, null])])[],
+}
+InlineGenericNewtype<String>: string
+InlineGenericNested<String>: [string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | ({ Unnamed: string }) & { Named?: never } | ({ Named: { value: string } }) & { Unnamed?: never }]
+InlineFlattenGenericsG<()>: {
+	t: null,
+}
+InlineFlattenGenerics: (InlineFlattenGenericsG<string>) & {
+	g: InlineFlattenGenericsG<string>,
+	gi: {
+		t: string,
+	},
+}
+GenericParameterOrderPreserved: {
+	pair: Pair<number, string>,
+}

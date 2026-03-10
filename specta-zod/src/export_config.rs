@@ -1,6 +1,6 @@
 use std::{borrow::Cow, io, path::PathBuf};
 
-use specta_typescript::{comments, CommentFormatterFn};
+use specta_typescript::{CommentFormatterFn, comments};
 
 use crate::DeprecatedType;
 
@@ -105,6 +105,5 @@ pub enum BigIntExportBehavior {
     #[default]
     Fail,
     /// Same as `Self::Fail` but it allows a library to configure the message shown to the end user.
-    #[doc(hidden)]
     FailWithReason(&'static str),
 }

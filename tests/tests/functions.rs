@@ -2,11 +2,18 @@ use std::fmt;
 
 use specta::{
     Type, TypeCollection,
-    datatype::{Function, FunctionReturnType},
+    datatype::{DataType, Function},
     function::{self, fn_datatype},
     specta,
 };
 use specta_typescript::{Typescript, primitives};
+
+fn render_datatype(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Option<String> {
+    match dt {
+        DataType::Reference(r) => primitives::reference(ts, types, r).ok(),
+        dt => primitives::inline(ts, types, dt).ok(),
+    }
+}
 
 /// Multiline
 /// Docs
@@ -125,7 +132,10 @@ fn test_function_exporting() {
         insta::assert_snapshot!(def.name(), @"b");
         insta::assert_snapshot!(def.args().len(), @"1");
         insta::assert_snapshot!(
-            primitives::reference(&ts, &types, &def.args()[0].1).unwrap(),
+            match &def.args()[0].1 {
+                DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
+                dt => primitives::inline(&ts, &types, dt).ok(),
+            }.unwrap(),
             @"string"
         );
         insta::assert_snapshot!(format!("{:?}", def.result()), @"None");
@@ -139,15 +149,24 @@ fn test_function_exporting() {
         insta::assert_snapshot!(def.name(), @"c");
         insta::assert_snapshot!(def.args().len(), @"3");
         insta::assert_snapshot!(
-            primitives::reference(&ts, &types, &def.args()[0].1).unwrap(),
+            match &def.args()[0].1 {
+                DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
+                dt => primitives::inline(&ts, &types, dt).ok(),
+            }.unwrap(),
             @"string"
         );
         insta::assert_snapshot!(
-            primitives::reference(&ts, &types, &def.args()[1].1).unwrap(),
+            match &def.args()[1].1 {
+                DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
+                dt => primitives::inline(&ts, &types, dt).ok(),
+            }.unwrap(),
             @"number"
         );
         insta::assert_snapshot!(
-            primitives::reference(&ts, &types, &def.args()[2].1).unwrap(),
+            match &def.args()[2].1 {
+                DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
+                dt => primitives::inline(&ts, &types, dt).ok(),
+            }.unwrap(),
             @"boolean"
         );
         insta::assert_snapshot!(format!("{:?}", def.result()), @"None");
@@ -161,23 +180,15 @@ fn test_function_exporting() {
         insta::assert_snapshot!(def.name(), @"d");
         insta::assert_snapshot!(def.args().len(), @"1");
         insta::assert_snapshot!(
-            primitives::reference(&ts, &types, &def.args()[0].1).unwrap(),
+            match &def.args()[0].1 {
+                DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
+                dt => primitives::inline(&ts, &types, dt).ok(),
+            }.unwrap(),
             @"string"
         );
         insta::assert_snapshot!(
             def.result()
-                .and_then(|result| match result {
-                    FunctionReturnType::Value(dt) => {
-                        primitives::reference(&ts, &types, dt).ok()
-                    }
-                    FunctionReturnType::Result(ok, err) => {
-                        let ok_str = primitives::reference(&ts, &types, ok).ok()?;
-                        let err_str = primitives::reference(&ts, &types, err).ok()?;
-                        let mut variants = vec![ok_str, err_str];
-                        variants.dedup();
-                        Some(variants.join(" | "))
-                    }
-                })
+                .and_then(|result| render_datatype(&ts, &types, result))
                 .as_deref()
                 .unwrap_or("None"),
             @"number"
@@ -192,7 +203,10 @@ fn test_function_exporting() {
         insta::assert_snapshot!(def.name(), @"e");
         insta::assert_snapshot!(def.args().len(), @"1");
         insta::assert_snapshot!(
-            primitives::reference(&ts, &types, &def.args()[0].1).unwrap(),
+            match &def.args()[0].1 {
+                DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
+                dt => primitives::inline(&ts, &types, dt).ok(),
+            }.unwrap(),
             @"boolean"
         );
         insta::assert_snapshot!(format!("{:?}", def.result()), @"None");
@@ -206,23 +220,15 @@ fn test_function_exporting() {
         insta::assert_snapshot!(def.name(), @"f");
         insta::assert_snapshot!(def.args().len(), @"1");
         insta::assert_snapshot!(
-            primitives::reference(&ts, &types, &def.args()[0].1).unwrap(),
+            match &def.args()[0].1 {
+                DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
+                dt => primitives::inline(&ts, &types, dt).ok(),
+            }.unwrap(),
             @"string"
         );
         insta::assert_snapshot!(
             def.result()
-                .and_then(|result| match result {
-                    FunctionReturnType::Value(dt) => {
-                        primitives::reference(&ts, &types, dt).ok()
-                    }
-                    FunctionReturnType::Result(ok, err) => {
-                        let ok_str = primitives::reference(&ts, &types, ok).ok()?;
-                        let err_str = primitives::reference(&ts, &types, err).ok()?;
-                        let mut variants = vec![ok_str, err_str];
-                        variants.dedup();
-                        Some(variants.join(" | "))
-                    }
-                })
+                .and_then(|result| render_datatype(&ts, &types, result))
                 .as_deref()
                 .unwrap_or("None"),
             @"number"
@@ -237,7 +243,10 @@ fn test_function_exporting() {
         insta::assert_snapshot!(def.name(), @"g");
         insta::assert_snapshot!(def.args().len(), @"1");
         insta::assert_snapshot!(
-            primitives::reference(&ts, &type_map, &def.args()[0].1).unwrap(),
+            match &def.args()[0].1 {
+                DataType::Reference(r) => primitives::reference(&ts, &type_map, r).ok(),
+                dt => primitives::inline(&ts, &type_map, dt).ok(),
+            }.unwrap(),
             @"string"
         );
         insta::assert_snapshot!(format!("{:?}", def.result()), @"None");
@@ -251,7 +260,10 @@ fn test_function_exporting() {
         insta::assert_snapshot!(def.name(), @"h");
         insta::assert_snapshot!(def.args().len(), @"1");
         insta::assert_snapshot!(
-            primitives::reference(&ts, &type_map, &def.args()[0].1).unwrap(),
+            match &def.args()[0].1 {
+                DataType::Reference(r) => primitives::reference(&ts, &type_map, r).ok(),
+                dt => primitives::inline(&ts, &type_map, dt).ok(),
+            }.unwrap(),
             @"string"
         );
         insta::assert_snapshot!(format!("{:?}", def.result()), @"None");
@@ -266,21 +278,10 @@ fn test_function_exporting() {
         insta::assert_snapshot!(def.args().len(), @"0");
         insta::assert_snapshot!(
             def.result()
-                .and_then(|result| match result {
-                    FunctionReturnType::Value(dt) => {
-                        primitives::reference(&ts, &types, dt).ok()
-                    }
-                    FunctionReturnType::Result(ok, err) => {
-                        let ok_str = primitives::reference(&ts, &types, ok).ok()?;
-                        let err_str = primitives::reference(&ts, &types, err).ok()?;
-                        let mut variants = vec![ok_str, err_str];
-                        variants.dedup();
-                        Some(variants.join(" | "))
-                    }
-                })
+                .and_then(|result| render_datatype(&ts, &types, result))
                 .as_deref()
                 .unwrap_or("None"),
-            @"number"
+            @"({ Ok: number }) & { Err?: never } | ({ Err: number }) & { Ok?: never }"
         );
     }
 
@@ -293,21 +294,10 @@ fn test_function_exporting() {
         insta::assert_snapshot!(def.args().len(), @"0");
         insta::assert_snapshot!(
             def.result()
-                .and_then(|result| match result {
-                    FunctionReturnType::Value(dt) => {
-                        primitives::reference(&ts, &types, dt).ok()
-                    }
-                    FunctionReturnType::Result(ok, err) => {
-                        let ok_str = primitives::reference(&ts, &types, ok).ok()?;
-                        let err_str = primitives::reference(&ts, &types, err).ok()?;
-                        let mut variants = vec![ok_str, err_str];
-                        variants.dedup();
-                        Some(variants.join(" | "))
-                    }
-                })
+                .and_then(|result| render_datatype(&ts, &types, result))
                 .as_deref()
                 .unwrap_or("None"),
-            @"string | number"
+            @"({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never }"
         );
     }
 
@@ -319,11 +309,17 @@ fn test_function_exporting() {
         insta::assert_snapshot!(def.name(), @"l");
         insta::assert_snapshot!(def.args().len(), @"2");
         insta::assert_snapshot!(
-            primitives::reference(&ts, &types, &def.args()[0].1).unwrap(),
+            match &def.args()[0].1 {
+                DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
+                dt => primitives::inline(&ts, &types, dt).ok(),
+            }.unwrap(),
             @"Demo"
         );
         insta::assert_snapshot!(
-            primitives::reference(&ts, &types, &def.args()[1].1).unwrap(),
+            match &def.args()[1].1 {
+                DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
+                dt => primitives::inline(&ts, &types, dt).ok(),
+            }.unwrap(),
             @"[string, number]"
         );
         insta::assert_snapshot!(format!("{:?}", def.result()), @"None");
@@ -337,7 +333,10 @@ fn test_function_exporting() {
         insta::assert_snapshot!(def.name(), @"m");
         insta::assert_snapshot!(def.args().len(), @"1");
         insta::assert_snapshot!(
-            primitives::reference(&ts, &types, &def.args()[0].1).unwrap(),
+            match &def.args()[0].1 {
+                DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
+                dt => primitives::inline(&ts, &types, dt).ok(),
+            }.unwrap(),
             @"Demo"
         );
         insta::assert_snapshot!(format!("{:?}", def.result()), @"None");

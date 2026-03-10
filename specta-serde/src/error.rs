@@ -4,8 +4,11 @@ use std::{error, fmt};
 // TODO: The error should show a path to the type causing the issue like the BigInt error reporting.
 #[derive(Debug, PartialEq)]
 pub enum Error {
+    /// A map key uses a type that cannot be represented as a Serde map key.
     InvalidMapKey,
+    /// Internally tagged enum layout is invalid for the encountered enum shape.
     InvalidInternallyTaggedEnum,
+    /// `#[specta(skip)]` was used in a way that prevents valid serialization.
     InvalidUsageOfSkip,
 }
 

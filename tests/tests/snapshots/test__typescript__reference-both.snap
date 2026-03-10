@@ -1,36 +1,15 @@
 ---
 source: tests/tests/typescript.rs
-expression: "dts.iter().map(|(s, ty)|\nprimitives::reference(&ts, &types,\nty).map(|ty| format!(\"{s}: {ty}\"))).collect::<Result<Vec<_>,\n_>>().unwrap().join(\"\\n\")"
+expression: "dts.iter().filter_map(|(s, ty)| match ty\n{\n    DataType::Reference(r) => Some((s, r)), _ => None,\n}).map(|(s, ty)|\nprimitives::reference(&ts, &types,\nty).map(|ty| format!(\"{s}: {ty}\"))).collect::<Result<Vec<_>,\n_>>().unwrap().join(\"\\n\")"
 ---
-i8: number
-i16: number
-i32: number
-i64: number
-i128: number
-isize: number
-u8: number
-u16: number
-u32: number
-u64: number
-u128: number
-usize: number
-f32: number
-f64: number
-bool: boolean
-char: string
-Range<i32>: { 
+Range<i32>: {
 	start: number,
 	end: number,
 }
-RangeInclusive<i32>: { 
+RangeInclusive<i32>: {
 	start: number,
 	end: number,
 }
-(): null
-(String, i32): [string, number]
-(String, i32, bool): [string, number, boolean]
-((String, i32), (bool, char, bool), ()): [[string, number], [boolean, string, boolean], null]
-(bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool): [boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean]
 String: string
 PathBuf: string
 IpAddr: string
@@ -39,32 +18,23 @@ Ipv6Addr: string
 SocketAddr: string
 SocketAddrV4: string
 SocketAddrV6: string
-SystemTime: { 
+Cow<'static, str>: string
+Cow<'static, i32>: number
+SystemTime: {
 	duration_since_epoch: number,
 	duration_since_unix_epoch: number,
 }
-Duration: { 
+Duration: {
 	secs: number,
 	nanos: number,
 }
-&'static str: string
-&'static bool: boolean
-&'static i32: number
 Vec<i32>: number[]
-&'static [i32]: number[]
-&'static [i32; 3]: [number, number, number]
-[i32; 3]: [number, number, number]
 Vec<MyEnum>: MyEnum[]
-&'static [MyEnum]: MyEnum[]
-&'static [MyEnum; 6]: [MyEnum, MyEnum, MyEnum, MyEnum, MyEnum, MyEnum]
-[MyEnum; 2]: [MyEnum, MyEnum]
-&'static [i32; 1]: [number]
-&'static [i32; 0]: []
-Option<i32>: number | null
-Option<()>: null | null
-Option<Vec<i32>>: number[] | null
-Option<Option<String>>: string | null
-Option<Option<Option<String>>>: string | null
+Result<String, i32>: ({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never }
+Vec<Option<Cow<'static, i32>>>: (number | null)[]
+PhantomData<()>: null
+PhantomData<String>: null
+Infallible: never
 Unit1: Unit1
 Unit2: Unit2
 Unit3: Unit3
@@ -83,11 +53,6 @@ GenericStruct<String>: GenericStruct<string>
 FlattenEnumStruct: FlattenEnumStruct
 OverridenStruct: OverridenStruct
 HasGenericAlias: HasGenericAlias
-SkipVariant: SkipVariant
-SkipVariant2: SkipVariant2
-SkipVariant3: SkipVariant3
-SkipStructFields: SkipStructFields
-SpectaSkipNonTypeField: SpectaSkipNonTypeField
 EnumMacroAttributes: EnumMacroAttributes
 InlineEnumField: InlineEnumField
 InlineOptionalType: InlineOptionalType
@@ -95,19 +60,13 @@ Rename: Rename
 TransparentType: TransparentType
 TransparentType2: TransparentType2
 TransparentTypeWithOverride: TransparentTypeWithOverride
-[Option<u8>; 3]: [(number | null), (number | null), (number | null)]
 HashMap<BasicEnum, ()>: Partial<{ [key in BasicEnum]: null }>
-Option<Option<Option<Option<i32>>>>: number | null
 Vec<PlaceholderInnerField>: PlaceholderInnerField[]
 HashMap<BasicEnum, i32>: Partial<{ [key in BasicEnum]: number }>
 EnumReferenceRecordKey: EnumReferenceRecordKey
 FlattenOnNestedEnum: FlattenOnNestedEnum
-PhantomData<()>: null
-PhantomData<String>: null
-Infallible: never
 MyEmptyInput: MyEmptyInput
 (String): string
-(String,): [string]
 ExtraBracketsInTupleVariant: ExtraBracketsInTupleVariant
 ExtraBracketsInUnnamedStruct: ExtraBracketsInUnnamedStruct
 Vec<MyEnum>: MyEnum[]
@@ -117,14 +76,23 @@ Box<str>: string
 Box<String>: string
 SkippedFieldWithinVariant: SkippedFieldWithinVariant
 KebabCase: KebabCase
-&[&str]: string[]
 Issue281<'_>: Issue281
+LifetimeGenericStruct<'_, i32>: LifetimeGenericStruct<number>
+LifetimeGenericEnum<'_, i32>: LifetimeGenericEnum<number>
 RenameWithWeirdCharsField: RenameWithWeirdCharsField
 RenameWithWeirdCharsVariant: RenameWithWeirdCharsVariant
+RenamedFieldKeys: RenamedFieldKeys
+RenamedVariantWithSkippedPayload: RenamedVariantWithSkippedPayload
 Issue374: Issue374
 type_type::Type: Type
 ActualType: ActualType
 SpectaTypeOverride: SpectaTypeOverride
+ContainerTypeOverrideStruct: string
+ContainerTypeOverrideEnum: string
+ContainerTypeOverrideGeneric<Box<dyn Any>>: string
+ContainerTypeOverrideToGeneric<i32>: number
+ContainerTypeOverrideTuple: [string, number]
+ContainerTypeOverrideTupleGeneric<i32>: [number, string]
 InvalidToValidType: InvalidToValidType
 TupleStruct: TupleStruct
 TupleStructWithRep: TupleStructWithRep
@@ -144,6 +112,7 @@ OptionalInEnum: OptionalInEnum
 Optional: Optional
 UntaggedVariants: UntaggedVariants
 UntaggedVariantsWithoutValue: UntaggedVariantsWithoutValue
+UntaggedVariantsWithDuplicateBranches: UntaggedVariantsWithDuplicateBranches
 HashMap<String, ()>: { [key in string]: null }
 Regular: Regular
 HashMap<Infallible, ()>: { [key in never]: null }
@@ -189,3 +158,63 @@ MyEnumTagged: MyEnumTagged
 MyEnumExternal: MyEnumExternal
 MyEnumAdjacent: MyEnumAdjacent
 MyEnumUntagged: MyEnumUntagged
+EmptyStruct: EmptyStruct
+EmptyStructWithTag: EmptyStructWithTag
+AdjacentlyTagged: AdjacentlyTagged
+LoadProjectEvent: LoadProjectEvent
+ExternallyTagged: ExternallyTagged
+Issue221External: Issue221External
+InternallyTaggedD: InternallyTaggedD
+InternallyTaggedE: InternallyTaggedE
+InternallyTaggedF: InternallyTaggedF
+InternallyTaggedH: InternallyTaggedH
+InternallyTaggedL: InternallyTaggedL
+InternallyTaggedM: InternallyTaggedM
+StructWithAlias: StructWithAlias
+StructWithMultipleAliases: StructWithMultipleAliases
+StructWithAliasAndRename: StructWithAliasAndRename
+EnumWithVariantAlias: EnumWithVariantAlias
+EnumWithMultipleVariantAliases: EnumWithMultipleVariantAliases
+EnumWithVariantAliasAndRename: EnumWithVariantAliasAndRename
+InternallyTaggedWithAlias: InternallyTaggedWithAlias
+AdjacentlyTaggedWithAlias: AdjacentlyTaggedWithAlias
+UntaggedWithAlias: UntaggedWithAlias
+Issue221UntaggedSafe: Issue221UntaggedSafe
+Issue221UntaggedMixed: Issue221UntaggedMixed
+EmptyEnum: EmptyEnum
+EmptyEnumTagged: EmptyEnumTagged
+EmptyEnumTaggedWContent: EmptyEnumTaggedWContent
+EmptyEnumUntagged: EmptyEnumUntagged
+SkipOnlyField: SkipOnlyField
+SkipField: SkipField
+SkipVariant: SkipVariant
+SkipUnnamedFieldInVariant: SkipUnnamedFieldInVariant
+SkipNamedFieldInVariant: SkipNamedFieldInVariant
+TransparentWithSkip: TransparentWithSkip
+TransparentWithSkip2: TransparentWithSkip2
+TransparentWithSkip3: TransparentWithSkip3
+SkipVariant2: SkipVariant2
+SkipVariant3: SkipVariant3
+SkipStructFields: SkipStructFields
+SpectaSkipNonTypeField: SpectaSkipNonTypeField
+FlattenA: FlattenA
+FlattenB: FlattenB
+FlattenC: FlattenC
+FlattenD: FlattenD
+FlattenE: FlattenE
+FlattenF: FlattenF
+FlattenG: FlattenG
+TupleNested: TupleNested
+Generic1<()>: Generic1<null>
+GenericAutoBound<()>: GenericAutoBound<null>
+GenericAutoBound2<()>: GenericAutoBound2<null>
+Container1: Container1
+Generic2<(), String, i32>: Generic2<null, string, number>
+GenericNewType1<()>: GenericNewType1<null>
+GenericTuple<()>: GenericTuple<null>
+GenericStruct2<()>: GenericStruct2<null>
+InlineGenericNewtype<String>: string
+InlineGenericNested<String>: [string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | ({ Unnamed: string }) & { Named?: never } | ({ Named: { value: string } }) & { Unnamed?: never }]
+InlineFlattenGenericsG<()>: InlineFlattenGenericsG<null>
+InlineFlattenGenerics: InlineFlattenGenerics
+GenericParameterOrderPreserved: GenericParameterOrderPreserved

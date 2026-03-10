@@ -1,4 +1,4 @@
-use crate::datatype::{DataType, Fields, RuntimeAttribute};
+use crate::datatype::{Attribute, DataType, Fields};
 
 use super::StructBuilder;
 
@@ -8,7 +8,7 @@ use super::{NamedFields, UnnamedFields};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Struct {
     pub(crate) fields: Fields,
-    pub(crate) attributes: Vec<RuntimeAttribute>,
+    pub(crate) attributes: Vec<Attribute>,
 }
 
 // Do not implement `Default` for `Struct` as it's unclear what that would be. `Unit`, yes but still.
@@ -58,17 +58,17 @@ impl Struct {
     }
 
     /// Get a immutable reference to the attributes of the struct.
-    pub fn attributes(&self) -> &Vec<RuntimeAttribute> {
+    pub fn attributes(&self) -> &Vec<Attribute> {
         &self.attributes
     }
 
     /// Get a mutable reference to the attributes of the struct.
-    pub fn attributes_mut(&mut self) -> &mut Vec<RuntimeAttribute> {
+    pub fn attributes_mut(&mut self) -> &mut Vec<Attribute> {
         &mut self.attributes
     }
 
     /// Set the attributes of the struct.
-    pub fn set_attributes(&mut self, attributes: Vec<RuntimeAttribute>) {
+    pub fn set_attributes(&mut self, attributes: Vec<Attribute>) {
         self.attributes = attributes;
     }
 }

@@ -3,7 +3,7 @@ use std::{borrow::Cow, path::Path};
 use specta::TypeCollection;
 use specta_serde::SerdeMode;
 
-use crate::{BigIntExportBehavior, Error, Exporter, Layout};
+use crate::{BigIntExportBehavior, Branded, BrandedTypeExporter, Error, Exporter, Layout};
 
 /// JSDoc language exporter.
 #[derive(Debug, Clone)]
@@ -52,6 +52,19 @@ impl Typescript {
         Self(self.0.layout(layout))
     }
 
+    /// Configure how `specta_typescript::branded!` types are rendered.
+    ///
+    /// See [`Exporter::branded_type_impl`] for details.
+    pub fn branded_type_impl(
+        self,
+        builder: impl for<'a> Fn(BrandedTypeExporter<'a>, &Branded) -> Result<Cow<'static, str>, Error>
+        + Send
+        + Sync
+        + 'static,
+    ) -> Self {
+        Self(self.0.branded_type_impl(builder))
+    }
+
     /// Configure the exporter to use specta-serde with the specified mode
     pub fn with_serde(self, mode: SerdeMode) -> Self {
         Self(self.0.with_serde(mode))
@@ -69,7 +82,7 @@ impl Typescript {
 
     /// Export the files into a single string.
     ///
-    /// Note: This will return [`Error::UnableToExport`](crate::Error::UnableToExport) if the format is `Format::Files`.
+    /// Note: This returns an error if the format is `Format::Files`.
     pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
         self.0.export(types)
     }

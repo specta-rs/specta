@@ -33,7 +33,7 @@ pub fn construct_field_with_variant_skip(
     let deprecated = attrs.common.deprecated_as_tokens();
     let optional = attrs.optional;
     let doc = attrs.common.doc;
-    let inline = container_attrs.inline || attrs.inline;
+    let inline = attrs.inline;
 
     let lowered_field_attrs = raw_attrs
         .iter()

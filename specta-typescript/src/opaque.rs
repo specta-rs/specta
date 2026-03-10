@@ -5,6 +5,15 @@ use specta::datatype::Reference;
 #[derive(PartialEq, Eq, Hash)]
 pub(crate) struct Define(pub(crate) Cow<'static, str>);
 
+#[derive(PartialEq, Eq, Hash)]
+pub(crate) struct Any;
+
+#[derive(PartialEq, Eq, Hash)]
+pub(crate) struct Unknown;
+
+#[derive(PartialEq, Eq, Hash)]
+pub(crate) struct Never;
+
 /// Define a custom Typescript string which can be used as a `DataType::Reference`.
 ///
 /// This is an advanced feature which should be used with caution.

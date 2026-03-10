@@ -1,68 +1,12 @@
-use std::{
-    borrow::Cow,
-    cell::RefCell,
-    collections::{HashMap, HashSet},
-    panic::Location,
-    sync::Arc,
-};
+use std::{borrow::Cow, collections::HashSet, panic::Location, sync::Arc};
 
 use crate::{
     datatype::{
-        reference::NamedId, DataType, Generic, NamedDataTypeBuilder, NamedReference, Reference,
+        reference::{self, GenericReference, NamedId},
+        DataType, NamedDataTypeBuilder, NamedReference, Reference,
     },
     TypeCollection,
 };
-
-thread_local! {
-    static COLLECTED_TYPES: RefCell<Option<Vec<HashMap<NamedId, NamedDataType>>>> = const { RefCell::new(None) };
-}
-
-/// Collects all named data types constructed within the provided closure.
-///
-/// This is useful for collecting up the required imports when generating an output file.
-pub fn collect(func: impl FnOnce()) -> impl Iterator<Item = NamedDataType> {
-    struct Guard;
-    impl Drop for Guard {
-        fn drop(&mut self) {
-            COLLECTED_TYPES.with_borrow_mut(|types| {
-                if let Some(v) = types {
-                    // Last collection means we can drop all memory
-                    if v.len() == 1 {
-                        *types = None;
-                    } else {
-                        // Otherwise just remove the current collection.
-                        v.pop();
-                    }
-                }
-            })
-        }
-    }
-
-    // If we have no collection, register one
-    // If we already have one create a new context.
-    COLLECTED_TYPES.with_borrow_mut(|v| {
-        if let Some(v) = v {
-            v.push(Default::default());
-        } else {
-            *v = Some(vec![Default::default()]);
-        }
-    });
-
-    let guard = Guard;
-    func();
-    // We only use the guard when unwinding
-    std::mem::forget(guard);
-
-    COLLECTED_TYPES.with_borrow_mut(|types| {
-        types
-            .as_mut()
-            .expect("COLLECTED_TYPES is unset but it should be set")
-            .pop()
-            .expect("COLLECTED_TYPES is missing a valid collection context")
-            .into_iter()
-            .map(|v| v.1)
-    })
-}
 
 /// A named type represents a non-primitive type capable of being exported as it's own named entity.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -73,73 +17,37 @@ pub struct NamedDataType {
     pub(crate) deprecated: Option<DeprecatedType>,
     pub(crate) module_path: Cow<'static, str>,
     pub(crate) location: Location<'static>,
-    pub(crate) generics: Vec<Generic>,
+    pub(crate) generics: Cow<'static, [(GenericReference, Cow<'static, str>)]>,
+    pub(crate) inline: bool,
     pub(crate) tags: HashSet<TypeTag>,
     pub(crate) inner: DataType,
 }
 
 impl NamedDataType {
-    // ## Sentinel
-    //
-    // MUST point to a `static ...: () = ();`. This is used as a unique identifier for the type and `const` or `Box::leak` SHOULD NOT be used.
-    //
-    // If this invariant is violated you will see unexpected behavior.
-    //
     // ## Why return a reference?
     //
     // If a recursive type is being resolved it's possible the `init_with_sentinel` function will be called recursively.
     // To avoid this we avoid resolving a type that's already marked as being resolved but this means the [NamedDataType]'s [DataType] is unknown at this stage so we can't return it. Instead we always return [Reference]'s as they are always valid.
-    #[doc(hidden)] // This should not be used outside of `specta_macros` as it may have breaking changes.
+    // WARNING: This should not be used outside of `specta_macros` as it may have breaking changes in minor releases
+    #[doc(hidden)]
     #[track_caller]
     pub fn init_with_sentinel(
-        generics: Vec<(Generic, DataType)>,
-        inline: bool,
+        generics_for_ndt: &'static [(GenericReference, Cow<'static, str>)],
+        generics_for_ref: Vec<(GenericReference, DataType)>,
+        mut inline: bool,
         types: &mut TypeCollection,
-        sentinel: &'static (),
+        sentinel: &'static str,
         build_ndt: fn(&mut TypeCollection, &mut NamedDataType),
     ) -> Reference {
         let id = NamedId::Static(sentinel);
         let location = Location::caller().to_owned();
 
+        // We have never encountered this type. Start resolving it!
         if let Some(ndt) = types.0.get(&id) {
-            // If this is `None` we will add into the `COLLECTED_TYPES`,
-            // when resolution is finished.
             if let Some(ndt) = ndt {
-                let needs_references = COLLECTED_TYPES.with_borrow_mut(|ctxs| {
-                    if let Some(ctxs) = ctxs {
-                        for ctx in ctxs {
-                            ctx.insert(ndt.id.clone(), ndt.clone());
-                        }
-
-                        true
-                    } else {
-                        false
-                    }
-                });
-
-                // If a type has already been resolved we can just pull it's `NamedDataType` from the `TypeCollection`.
-                // However this means any dependent types are never registered as references are not created in this scope.
-                // We run the `build_ndt` function to resolve these dependent, even though we do just throw out the result.
-                if needs_references {
-                    build_ndt(
-                        types,
-                        &mut NamedDataType {
-                            id: id.clone(),
-                            location,
-                            // `build_ndt` will just override all of this
-                            name: Cow::Borrowed(""),
-                            docs: Cow::Borrowed(""),
-                            deprecated: None,
-                            module_path: Cow::Borrowed(""),
-                            generics: vec![],
-                            inner: DataType::Primitive(super::Primitive::i8),
-                        },
-                    );
-                }
+                inline = inline || ndt.inline;
             }
         } else {
-            // We have never encountered this type. Start resolving it!
-
             types.0.insert(id.clone(), None);
             let mut ndt = NamedDataType {
                 id: id.clone(),
@@ -149,64 +57,92 @@ impl NamedDataType {
                 docs: Cow::Borrowed(""),
                 deprecated: None,
                 module_path: Cow::Borrowed(""),
-                generics: vec![],
+                generics: Cow::Borrowed(generics_for_ndt),
+                inline,
+                tags: Default::default(),
                 inner: DataType::Primitive(super::Primitive::i8),
             };
             build_ndt(types, &mut ndt);
-            COLLECTED_TYPES.with_borrow_mut(|ctxs| {
-                if let Some(ctxs) = ctxs {
-                    for ctx in ctxs {
-                        ctx.insert(ndt.id.clone(), ndt.clone());
-                    }
-                }
-            });
+
+            // We patch the Tauri `Type` implementation.
+            if ndt.name() == "TAURI_CHANNEL" && ndt.module_path().starts_with("tauri::") {
+                // This causes an exporter that isn't aware of Tauri's channel to error.
+                // This is effectively `Reference::opaque(TauriChannel)` but we do some hackery for better errors.
+                ndt.inner = reference::tauri().into();
+
+                // This ensures that we never create a `export type Channel`,
+                // instead the definition gets inlined into each callsite.
+                inline = true;
+                ndt.inline = true;
+            }
+
             types.0.insert(id.clone(), Some(ndt));
+            types.1 += 1;
         }
 
         Reference::Named(NamedReference {
             id,
-            generics,
+            generics: generics_for_ref,
             inline,
         })
     }
 
     /// Register a runtime named datatype.
     /// This is exposed via [NamedDataTypeBuilder::build].
-    pub(crate) fn register(
-        builder: NamedDataTypeBuilder,
-        types: &mut TypeCollection,
-    ) -> NamedDataType {
-        let ndt = NamedDataType {
+    #[track_caller]
+    pub(crate) fn register(builder: NamedDataTypeBuilder, types: &mut TypeCollection) -> Self {
+        let location = Location::caller();
+
+        let module_path = builder.module_path.unwrap_or_else(|| {
+            file_path_to_module_path(location.file())
+                .map(Into::into)
+                .unwrap_or(Cow::Borrowed("virtual"))
+        });
+
+        let ndt = Self {
             id: NamedId::Dynamic(Arc::new(())),
             name: builder.name,
             docs: builder.docs,
             deprecated: builder.deprecated,
-            module_path: builder.module_path,
-            location: Location::caller().to_owned(),
-            generics: builder.generics,
+            module_path,
+            location: location.to_owned(),
+            generics: Cow::Owned(builder.generics),
+            inline: builder.inline,
+            tags: Default::default(),
             inner: builder.inner,
         };
 
         types.0.insert(ndt.id.clone(), Some(ndt.clone()));
-        COLLECTED_TYPES.with_borrow_mut(|ctxs| {
-            if let Some(ctxs) = ctxs {
-                for ctx in ctxs {
-                    ctx.insert(ndt.id.clone(), ndt.clone());
-                }
-            }
-        });
+        types.1 += 1;
         ndt
     }
 
-    /// TODO
-    // TODO: Problematic to seal + allow generics to be `Cow`
-    // TODO: HashMap instead of array for better typesafety??
-    pub fn reference(&self, generics: Vec<(Generic, DataType)>, inline: bool) -> Reference {
+    /// Construct a [Reference] to a [NamedDataType].
+    /// This can be included in a `DataType::Reference` within another type.
+    ///
+    /// This reference will be inlined if the type is inlined, otherwise you can inline it with [Reference::inline].
+    pub fn reference(&self, generics: Vec<(GenericReference, DataType)>) -> Reference {
+        // TODO: allow generics to be `Cow`
+        // TODO: HashMap instead of array for better typesafety??
+
         Reference::Named(NamedReference {
             id: self.id.clone(),
             generics,
-            inline,
+            inline: self.inline,
         })
+    }
+
+    /// Check whether a type requires a reference to be generated.
+    ///
+    /// This if `false` is all [Reference]'s created for the type are inlined,
+    /// in that case it doesn't need to be exported because it will never be
+    /// referenced.
+    pub fn requires_reference(&self, _types: &TypeCollection) -> bool {
+        // `TypeCollection` is unused but I wanna keep it for future flexibility.
+
+        // If a type is inlined, all it's references are,
+        // therefor we don't need to export a named version of it.
+        !self.inline
     }
 
     /// The name of the type
@@ -280,12 +216,12 @@ impl NamedDataType {
     }
 
     /// The generics that are defined on this type
-    pub fn generics(&self) -> &[Generic] {
+    pub fn generics(&self) -> &[(GenericReference, Cow<'static, str>)] {
         &self.generics
     }
 
     /// Get a mutable reference to the generics that are defined on this type
-    pub fn generics_mut(&mut self) -> &mut Vec<Generic> {
+    pub fn generics_mut(&mut self) -> &mut Cow<'static, [(GenericReference, Cow<'static, str>)]> {
         &mut self.generics
     }
 
@@ -322,6 +258,7 @@ impl NamedDataType {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
+/// Runtime representation of Rust's `#[deprecated]` metadata.
 pub enum DeprecatedType {
     /// A type that has been deprecated without a message.
     ///
@@ -331,7 +268,9 @@ pub enum DeprecatedType {
     ///
     /// Eg. `#[deprecated = "Use something else"]` or `#[deprecated(since = "1.0.0", message = "Use something else")]`
     DeprecatedWithSince {
+        /// Optional version string from `since = "..."`.
         since: Option<Cow<'static, str>>,
+        /// Deprecation note/message.
         note: Cow<'static, str>,
     },
 }
@@ -341,4 +280,52 @@ pub enum DeprecatedType {
 pub enum TypeTag {
     Date,
     Custom(Cow<'static, str>),
+}
+
+fn file_path_to_module_path(file_path: &str) -> Option<String> {
+    let normalized = file_path.replace('\\', "/");
+
+    // Try different prefixes
+    let (prefix, path) = if let Some(p) = normalized.strip_prefix("src/") {
+        ("crate", p)
+    } else if let Some(p) = normalized.strip_prefix("tests/") {
+        ("tests", p)
+    } else {
+        return None;
+    };
+
+    let path = path.strip_suffix(".rs")?;
+    let path = path.strip_suffix("/mod").unwrap_or(path);
+    let module_path = path.replace('/', "::");
+
+    if module_path.is_empty() {
+        Some(prefix.to_string())
+    } else {
+        Some(format!("{}::{}", prefix, module_path))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::file_path_to_module_path;
+
+    #[test]
+    fn file_path_to_module_path_supports_unix_and_windows_separators() {
+        assert_eq!(
+            file_path_to_module_path("src/datatype/named.rs"),
+            Some("crate::datatype::named".to_string())
+        );
+        assert_eq!(
+            file_path_to_module_path("src\\datatype\\named.rs"),
+            Some("crate::datatype::named".to_string())
+        );
+        assert_eq!(
+            file_path_to_module_path("tests/tests/types.rs"),
+            Some("tests::tests::types".to_string())
+        );
+        assert_eq!(
+            file_path_to_module_path("tests\\tests\\types.rs"),
+            Some("tests::tests::types".to_string())
+        );
+    }
 }

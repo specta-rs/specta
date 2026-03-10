@@ -4,6 +4,8 @@
     html_logo_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png",
     html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
+#![cfg_attr(is_nightly, feature(f16))]
+#![cfg_attr(is_nightly, feature(f128))]
 
 #[cfg(feature = "collect")]
 #[cfg_attr(docsrs, doc(cfg(feature = "collect")))]

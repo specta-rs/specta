@@ -20,10 +20,10 @@
 //! # Design
 //!
 //! The types mirror Rust's attribute syntax structure as parsed by `syn`:
-//! - [`RuntimeAttribute`] represents a complete attribute (e.g., `#[serde(rename = "foo")]`)
-//! - [`RuntimeMeta`] represents the metadata kind (path, name-value, or list)
-//! - [`RuntimeNestedMeta`] handles nested content within list-style attributes
-//! - [`RuntimeLiteral`] represents literal values (strings, integers, bools, floats)
+//! - [`Attribute`] represents a complete attribute (e.g., `#[serde(rename = "foo")]`)
+//! - [`AttributeMeta`] represents the metadata kind (path, name-value, or list)
+//! - [`AttributeNestedMeta`] handles nested content within list-style attributes
+//! - [`AttributeLiteral`] represents literal values (strings, integers, bools, floats)
 //!
 //! All types use owned `String` data rather than static references to support dynamic construction
 //! during macro expansion.
@@ -38,21 +38,21 @@ use std::hash::{Hash, Hasher};
 ///
 /// ```ignore
 /// // Parsed from: #[serde(rename = "userName")]
-/// RuntimeAttribute {
+/// Attribute {
 ///     path: "serde".to_string(),
-///     kind: RuntimeMeta::List(vec![
-///         RuntimeNestedMeta::Meta(RuntimeMeta::NameValue {
+///     kind: AttributeMeta::List(vec![
+///         AttributeNestedMeta::Meta(AttributeMeta::NameValue {
 ///             key: "rename".to_string(),
-///             value: RuntimeLiteral::Str("userName".to_string()),
+///             value: AttributeValue::Literal(AttributeLiteral::Str("userName".to_string())),
 ///         })
 ///     ])
 /// }
 ///
 /// // Parsed from: #[specta(skip)]
-/// RuntimeAttribute {
+/// Attribute {
 ///     path: "specta".to_string(),
-///     kind: RuntimeMeta::List(vec![
-///         RuntimeNestedMeta::Meta(RuntimeMeta::Path("skip".to_string()))
+///     kind: AttributeMeta::List(vec![
+///         AttributeNestedMeta::Meta(AttributeMeta::Path("skip".to_string()))
 ///     ])
 /// }
 /// ```
@@ -64,11 +64,11 @@ use std::hash::{Hash, Hasher};
 /// to generate the correct interface. By capturing attributes at compile time and making them available
 /// at runtime, exporters can make intelligent decisions about how to represent types.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct RuntimeAttribute {
+pub struct Attribute {
     /// The attribute path (e.g., `"serde"`, `"specta"`, `"doc"`).
     pub path: String,
     /// The kind of metadata this attribute contains.
-    pub kind: RuntimeMeta,
+    pub kind: AttributeMeta,
 }
 
 /// The kind of metadata contained in an attribute.
@@ -82,21 +82,21 @@ pub struct RuntimeAttribute {
 ///
 /// ```ignore
 /// // Path variant - parsed from: #[serde(untagged)]
-/// RuntimeMeta::Path("untagged".to_string())
+/// AttributeMeta::Path("untagged".to_string())
 ///
 /// // NameValue variant - parsed from: #[serde(rename = "userId")]
-/// RuntimeMeta::NameValue {
+/// AttributeMeta::NameValue {
 ///     key: "rename".to_string(),
-///     value: RuntimeLiteral::Str("userId".to_string()),
+///     value: AttributeValue::Literal(AttributeLiteral::Str("userId".to_string())),
 /// }
 ///
 /// // List variant - parsed from: #[serde(rename = "id", skip_serializing)]
-/// RuntimeMeta::List(vec![
-///     RuntimeNestedMeta::Meta(RuntimeMeta::NameValue {
+/// AttributeMeta::List(vec![
+///     AttributeNestedMeta::Meta(AttributeMeta::NameValue {
 ///         key: "rename".to_string(),
-///         value: RuntimeLiteral::Str("id".to_string()),
+///         value: AttributeValue::Literal(AttributeLiteral::Str("id".to_string())),
 ///     }),
-///     RuntimeNestedMeta::Meta(RuntimeMeta::Path("skip_serializing".to_string())),
+///     AttributeNestedMeta::Meta(AttributeMeta::Path("skip_serializing".to_string())),
 /// ])
 /// ```
 ///
@@ -106,21 +106,26 @@ pub struct RuntimeAttribute {
 /// relevant metadata. For instance, a TypeScript exporter might search through a `List` to find
 /// a `rename` key, extract its string value, and use that as the property name.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum RuntimeMeta {
+pub enum AttributeMeta {
     /// A simple path identifier (e.g., `untagged`, `skip`, `flatten`).
     ///
     /// Commonly used for boolean-like flags in attributes.
     Path(String),
 
-    /// A key-value pair (e.g., `rename = "value"`, `default = 42`).
+    /// A key-value pair (e.g., `rename = "value"`, `default = 42`, `with = module::path`).
     ///
     /// Used when an attribute option needs an associated value.
-    NameValue { key: String, value: RuntimeLiteral },
+    NameValue {
+        /// The option key (for example `rename` or `default`).
+        key: String,
+        /// The option value associated with [`Self::NameValue::key`].
+        value: AttributeValue,
+    },
 
     /// A list of nested metadata items (e.g., the contents of `#[serde(...)]`).
     ///
     /// Most attributes with parentheses parse as lists, even if they contain a single item.
-    List(Vec<RuntimeNestedMeta>),
+    List(Vec<AttributeNestedMeta>),
 }
 
 /// Nested metadata within a list-style attribute.
@@ -132,13 +137,13 @@ pub enum RuntimeMeta {
 ///
 /// ```ignore
 /// // Meta variant - parsed from: #[serde(rename = "value")]
-/// RuntimeNestedMeta::Meta(RuntimeMeta::NameValue {
+/// AttributeNestedMeta::Meta(AttributeMeta::NameValue {
 ///     key: "rename".to_string(),
-///     value: RuntimeLiteral::Str("value".to_string()),
+///     value: AttributeValue::Literal(AttributeLiteral::Str("value".to_string())),
 /// })
 ///
 /// // Literal variant - parsed from: #[custom("raw_string_value")]
-/// RuntimeNestedMeta::Literal(RuntimeLiteral::Str("raw_string_value".to_string()))
+/// AttributeNestedMeta::Literal(AttributeLiteral::Str("raw_string_value".to_string()))
 /// ```
 ///
 /// # Why It Exists
@@ -146,11 +151,26 @@ pub enum RuntimeMeta {
 /// Some attributes accept direct literal values (e.g., `#[doc = "..."]` or `#[test("name")]`),
 /// while others have structured metadata. This enum allows the runtime representation to handle both cases.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum RuntimeNestedMeta {
+pub enum AttributeNestedMeta {
     /// Structured metadata (path, name-value, or list).
-    Meta(RuntimeMeta),
+    Meta(AttributeMeta),
     /// A direct literal value.
-    Literal(RuntimeLiteral),
+    Literal(AttributeLiteral),
+    /// A non-literal expression captured from attribute syntax.
+    Expr(String),
+}
+
+/// A value in a name-value attribute pair.
+///
+/// Rust attributes permit both literals and non-literal expressions in `key = value` positions.
+/// This enum keeps those forms distinct so runtime consumers can avoid conflating tokenized
+/// expressions with string literals.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AttributeValue {
+    /// A literal value (e.g., `rename = "value"`, `default = true`).
+    Literal(AttributeLiteral),
+    /// A non-literal expression (e.g., `with = module::path`, `default = path::to::func`).
+    Expr(String),
 }
 
 /// A literal value that can appear in an attribute.
@@ -162,28 +182,28 @@ pub enum RuntimeNestedMeta {
 ///
 /// ```ignore
 /// // Parsed from: #[serde(rename = "userName")]
-/// RuntimeLiteral::Str("userName".to_string())
+/// AttributeLiteral::Str("userName".to_string())
 ///
 /// // Parsed from: #[custom(version = 2)]
-/// RuntimeLiteral::Int(2)
+/// AttributeLiteral::Int(2)
 ///
 /// // Parsed from: #[serde(skip_serializing = false)]
-/// RuntimeLiteral::Bool(false)
+/// AttributeLiteral::Bool(false)
 ///
 /// // Parsed from: #[custom(ratio = 3.14)]
-/// RuntimeLiteral::Float(3.14)
+/// AttributeLiteral::Float(3.14)
 ///
 /// // Parsed from: #[custom(byte_val = b'x')]
-/// RuntimeLiteral::Byte(b'x')
+/// AttributeLiteral::Byte(b'x')
 ///
 /// // Parsed from: #[custom(char_val = 'a')]
-/// RuntimeLiteral::Char('a')
+/// AttributeLiteral::Char('a')
 ///
 /// // Parsed from: #[custom(bytes = b"hello")]
-/// RuntimeLiteral::ByteStr(b"hello".to_vec())
+/// AttributeLiteral::ByteStr(b"hello".to_vec())
 ///
 /// // Parsed from: #[custom(cstr = c"hello")]
-/// RuntimeLiteral::CStr(b"hello\0".to_vec())
+/// AttributeLiteral::CStr(b"hello\0".to_vec())
 /// ```
 ///
 /// # Why It Exists
@@ -192,7 +212,7 @@ pub enum RuntimeNestedMeta {
 /// (for flags), or floats (for numeric configuration). Exporters need to access these values
 /// in their original type to make correct decisions.
 #[derive(Debug, Clone)]
-pub enum RuntimeLiteral {
+pub enum AttributeLiteral {
     /// A string literal (e.g., `"value"` in `rename = "value"`).
     Str(String),
     /// An integer literal (e.g., `42` in `version = 42`).
@@ -214,59 +234,59 @@ pub enum RuntimeLiteral {
     CStr(Vec<u8>),
 }
 
-// Manual implementation of PartialEq for RuntimeLiteral to handle f64
-impl PartialEq for RuntimeLiteral {
+// Manual implementation of PartialEq for AttributeLiteral to handle f64
+impl PartialEq for AttributeLiteral {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (RuntimeLiteral::Str(a), RuntimeLiteral::Str(b)) => a == b,
-            (RuntimeLiteral::Int(a), RuntimeLiteral::Int(b)) => a == b,
-            (RuntimeLiteral::Bool(a), RuntimeLiteral::Bool(b)) => a == b,
-            (RuntimeLiteral::Float(a), RuntimeLiteral::Float(b)) => a.to_bits() == b.to_bits(),
-            (RuntimeLiteral::Byte(a), RuntimeLiteral::Byte(b)) => a == b,
-            (RuntimeLiteral::Char(a), RuntimeLiteral::Char(b)) => a == b,
-            (RuntimeLiteral::ByteStr(a), RuntimeLiteral::ByteStr(b)) => a == b,
-            (RuntimeLiteral::CStr(a), RuntimeLiteral::CStr(b)) => a == b,
+            (AttributeLiteral::Str(a), AttributeLiteral::Str(b)) => a == b,
+            (AttributeLiteral::Int(a), AttributeLiteral::Int(b)) => a == b,
+            (AttributeLiteral::Bool(a), AttributeLiteral::Bool(b)) => a == b,
+            (AttributeLiteral::Float(a), AttributeLiteral::Float(b)) => a.to_bits() == b.to_bits(),
+            (AttributeLiteral::Byte(a), AttributeLiteral::Byte(b)) => a == b,
+            (AttributeLiteral::Char(a), AttributeLiteral::Char(b)) => a == b,
+            (AttributeLiteral::ByteStr(a), AttributeLiteral::ByteStr(b)) => a == b,
+            (AttributeLiteral::CStr(a), AttributeLiteral::CStr(b)) => a == b,
             _ => false,
         }
     }
 }
 
-// Manual implementation of Eq for RuntimeLiteral
-impl Eq for RuntimeLiteral {}
+// Manual implementation of Eq for AttributeLiteral
+impl Eq for AttributeLiteral {}
 
-// Manual implementation of Hash for RuntimeLiteral to handle f64
-impl Hash for RuntimeLiteral {
+// Manual implementation of Hash for AttributeLiteral to handle f64
+impl Hash for AttributeLiteral {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self {
-            RuntimeLiteral::Str(s) => {
+            AttributeLiteral::Str(s) => {
                 0u8.hash(state);
                 s.hash(state);
             }
-            RuntimeLiteral::Int(i) => {
+            AttributeLiteral::Int(i) => {
                 1u8.hash(state);
                 i.hash(state);
             }
-            RuntimeLiteral::Bool(b) => {
+            AttributeLiteral::Bool(b) => {
                 2u8.hash(state);
                 b.hash(state);
             }
-            RuntimeLiteral::Float(f) => {
+            AttributeLiteral::Float(f) => {
                 3u8.hash(state);
                 f.to_bits().hash(state);
             }
-            RuntimeLiteral::Byte(b) => {
+            AttributeLiteral::Byte(b) => {
                 4u8.hash(state);
                 b.hash(state);
             }
-            RuntimeLiteral::Char(c) => {
+            AttributeLiteral::Char(c) => {
                 5u8.hash(state);
                 c.hash(state);
             }
-            RuntimeLiteral::ByteStr(bs) => {
+            AttributeLiteral::ByteStr(bs) => {
                 6u8.hash(state);
                 bs.hash(state);
             }
-            RuntimeLiteral::CStr(cs) => {
+            AttributeLiteral::CStr(cs) => {
                 7u8.hash(state);
                 cs.hash(state);
             }

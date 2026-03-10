@@ -1,4 +1,4 @@
-//! [JSON Schema](https://json-schema.org) exporter and importer for Specta.
+//! [JSON Schema](https://json-schema.org) exporter and importer for [Specta](specta).
 //!
 //! This crate provides bidirectional conversion between Specta types and JSON Schema:
 //! - Export Specta types to JSON Schema (Draft 7, 2019-09, or 2020-12)
@@ -69,7 +69,7 @@
 //! ## Importing from JSON Schema
 //!
 //! ```ignore
-//! use schemars::schema::Schema;
+//! use schemars::Schema;
 //! use specta_jsonschema::import::from_schema;
 //!
 //! let schema: Schema = serde_json::from_str(r#"{
@@ -126,6 +126,6 @@ pub use specta_serde::SerdeMode;
 
 // Legacy function - kept for backward compatibility
 #[deprecated(note = "Use import::from_schema instead")]
-pub fn to_ast(schema: &schemars::schema::Schema) -> Result<specta::datatype::DataType, Error> {
+pub fn to_ast(schema: &schemars::Schema) -> Result<specta::datatype::DataType, Error> {
     import::from_schema(schema)
 }

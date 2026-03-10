@@ -6,9 +6,11 @@ use specta::{
 };
 
 #[derive(Type)]
+#[specta(collect = false)]
 struct GenericType<T>(T);
 
 #[derive(Type)]
+#[specta(collect = false)]
 struct AnotherOne;
 
 #[test]

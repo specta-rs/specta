@@ -1,4 +1,9 @@
-//! [OpenAPI](https://www.openapis.org) language exporter.
+//! [OpenAPI](https://www.openapis.org) language exporter for [Specta](specta).
+//!
+//! <div class="warning">
+//! This crate is still in active development and is not yet ready for general purpose use!
+//! </div>
+//!
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
     html_logo_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png",
@@ -78,7 +83,7 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
             schema_data,
             schema_kind: SchemaKind::Type(Type::Number(NumberType::default())), // TODO: Configure number type. Ts: `bigint`
         }),
-        primitive_def!(String char) => ReferenceOr::Item(Schema {
+        primitive_def!(str char) => ReferenceOr::Item(Schema {
             schema_data,
             schema_kind: SchemaKind::Type(Type::String(StringType::default())), // TODO: Configure string type. Ts: `string`
         }),

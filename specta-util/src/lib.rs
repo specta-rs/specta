@@ -1,4 +1,4 @@
-//! Extended functionality for Specta.
+//! Extended functionality for [Specta](specta).
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(

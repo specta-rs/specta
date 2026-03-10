@@ -5,9 +5,9 @@
 //! Add `specta` and `specta-typescript` to your project:
 //!
 //! ```bash
-//! cargo add specta@2.0.0-rc.22 --features derive,export
-//! cargo add specta-typescript@0.0.9
-//! cargo add specta-serde@0.0.9
+//! cargo add specta@2.0.0-rc.23 --features derive,export
+//! cargo add specta-typescript@0.0.10
+//! cargo add specta-serde@0.0.10
 //! ```
 //!
 //! Next copy the following into your `main.rs` file:
@@ -47,21 +47,25 @@
 )]
 
 mod branded;
-mod define;
 mod error;
 mod exporter;
 mod jsdoc;
 mod legacy; // TODO: Remove this
+mod opaque;
 pub mod primitives;
+mod references;
 pub(crate) mod reserved_names;
 mod types;
 mod typescript;
 
 pub use branded::Branded;
-pub use define::define;
 pub use error::Error;
-pub use exporter::{BigIntExportBehavior, Exporter, Layout};
+pub use exporter::{
+    BigIntExportBehavior, BrandedTypeExporter, Exporter, FrameworkExporter, Layout,
+};
 pub use jsdoc::JSDoc;
+pub use opaque::define;
+pub use references::collect_references;
 pub use types::{Any, Never, Unknown};
 pub use typescript::Typescript;
 

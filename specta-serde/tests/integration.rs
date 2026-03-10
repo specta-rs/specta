@@ -3,11 +3,12 @@
 //! These tests verify that the serde attribute parsing and transformation system
 //! works correctly with real DataType structures.
 
-use specta::datatype::{RuntimeAttribute, RuntimeLiteral, RuntimeMeta};
+use specta::datatype::{Attribute, AttributeLiteral, AttributeMeta, AttributeValue};
 use specta::{
-    DataType, TypeCollection,
-    datatype::{Field, Primitive, Struct},
+    TypeCollection,
+    datatype::{DataType, Field, Primitive, Reference, Struct},
 };
+use specta_macros::Type as SpectaType;
 use specta_serde::{
     SerdeMode, apply_serde_transformations, process_for_deserialization, process_for_serialization,
 };
@@ -15,7 +16,7 @@ use specta_serde::{
 #[test]
 fn test_basic_transformation() {
     // Create a simple struct DataType
-    let field = Field::new(DataType::Primitive(Primitive::String));
+    let field = Field::new(DataType::Primitive(Primitive::str));
     let struct_dt = Struct::named().field("user_name", field).build();
 
     // Transform for serialization
@@ -30,29 +31,28 @@ fn test_basic_transformation() {
 #[test]
 fn test_optional_fields_with_skip_serializing_if_and_default() {
     use specta::datatype::{
-        DataType, Field, Primitive, RuntimeAttribute, RuntimeLiteral, RuntimeMeta,
-        RuntimeNestedMeta, Struct,
+        Attribute, AttributeLiteral, AttributeMeta, DataType, Field, Primitive, Struct,
     };
     use specta_serde::{SerdeMode, apply_serde_transformations};
 
     // Test 1: Field with #[serde(skip_serializing_if = "Option::is_none")]
-    let skip_if_attr = RuntimeAttribute {
+    let skip_if_attr = Attribute {
         path: "serde".to_string(),
-        kind: RuntimeMeta::NameValue {
+        kind: AttributeMeta::NameValue {
             key: "skip_serializing_if".to_string(),
-            value: RuntimeLiteral::Str("Option::is_none".to_string()),
+            value: AttributeValue::Literal(AttributeLiteral::Str("Option::is_none".to_string())),
         },
     };
 
     let mut field_with_skip_if = Field::new(DataType::Nullable(Box::new(DataType::Primitive(
-        Primitive::String,
+        Primitive::str,
     ))));
     field_with_skip_if.set_attributes(vec![skip_if_attr]);
 
     // Test 2: Field with #[serde(default)]
-    let default_attr = RuntimeAttribute {
+    let default_attr = Attribute {
         path: "serde".to_string(),
-        kind: RuntimeMeta::Path("default".to_string()),
+        kind: AttributeMeta::Path("default".to_string()),
     };
 
     let mut field_with_default = Field::new(DataType::Primitive(Primitive::bool));
@@ -110,7 +110,7 @@ fn test_optional_fields_with_skip_serializing_if_and_default() {
 #[test]
 fn test_skip_serializing() {
     // Create a struct with skip_serializing on a field
-    let field_with_skip = Field::new(DataType::Primitive(Primitive::String));
+    let field_with_skip = Field::new(DataType::Primitive(Primitive::str));
     let normal_field = Field::new(DataType::Primitive(Primitive::u32));
 
     let struct_dt = Struct::named()
@@ -147,13 +147,47 @@ fn test_enum_transformation() {
 }
 
 #[test]
+fn test_internal_tagged_tuple_payload_is_preserved() {
+    // Regression test for https://github.com/specta-rs/specta/issues/174
+    #[derive(SpectaType, serde::Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "type")]
+    enum InternalTaggedTuplePayload {
+        A(std::collections::HashMap<String, String>),
+    }
+
+    let mut types = TypeCollection::default();
+    let dt = <InternalTaggedTuplePayload as specta::Type>::definition(&mut types);
+    let DataType::Reference(Reference::Named(r)) = dt else {
+        panic!("Expected named reference");
+    };
+    let enum_ty = r
+        .get(&types)
+        .map(|ndt| ndt.ty().clone())
+        .expect("expected collected enum");
+
+    let transformed = apply_serde_transformations(&enum_ty, SerdeMode::Serialize)
+        .expect("internal enum should transform");
+
+    let DataType::Enum(transformed_enum) = transformed else {
+        panic!("Expected transformed enum");
+    };
+
+    let variant = &transformed_enum.variants()[0].1;
+    assert!(
+        matches!(variant.fields(), specta::datatype::Fields::Unnamed(_)),
+        "internally tagged tuple payload should remain tuple payload"
+    );
+}
+
+#[test]
 fn test_string_enum_with_rename_all() {
     // Create a string enum with rename_all
-    let serde_attr = RuntimeAttribute {
+    let serde_attr = Attribute {
         path: "serde".to_string(),
-        kind: RuntimeMeta::NameValue {
+        kind: AttributeMeta::NameValue {
             key: "rename_all".to_string(),
-            value: RuntimeLiteral::Str("snake_case".to_string()),
+            value: AttributeValue::Literal(AttributeLiteral::Str("snake_case".to_string())),
         },
     };
 
@@ -176,11 +210,11 @@ fn test_string_enum_with_rename_all() {
 #[test]
 fn test_transparent_struct() {
     // Create a transparent wrapper struct
-    let transparent_attr = RuntimeAttribute {
+    let transparent_attr = Attribute {
         path: "serde".to_string(),
-        kind: RuntimeMeta::NameValue {
+        kind: AttributeMeta::NameValue {
             key: "transparent".to_string(),
-            value: RuntimeLiteral::Bool(true),
+            value: AttributeValue::Literal(AttributeLiteral::Bool(true)),
         },
     };
 
@@ -230,7 +264,7 @@ fn test_type_collection_processing() {
 #[test]
 fn test_nested_type_transformation() {
     // Create nested types - List of structs
-    let field = Field::new(DataType::Primitive(Primitive::String));
+    let field = Field::new(DataType::Primitive(Primitive::str));
     let inner_struct = Struct::named().field("name", field).build();
     let list_type = DataType::List(specta::datatype::List::new(inner_struct));
 
@@ -245,7 +279,7 @@ fn test_nested_type_transformation() {
 #[test]
 fn test_nullable_type_transformation() {
     // Create nullable type
-    let inner_type = DataType::Primitive(Primitive::String);
+    let inner_type = DataType::Primitive(Primitive::str);
     let nullable_type = DataType::Nullable(Box::new(inner_type));
 
     // Transform
@@ -259,30 +293,30 @@ fn test_nullable_type_transformation() {
 #[test]
 fn test_field_level_skip_attributes() {
     // Create fields with different skip attributes
-    let mut field_skip = Field::new(DataType::Primitive(Primitive::String));
-    field_skip.set_attributes(vec![RuntimeAttribute {
+    let mut field_skip = Field::new(DataType::Primitive(Primitive::str));
+    field_skip.set_attributes(vec![Attribute {
         path: "serde".to_string(),
-        kind: RuntimeMeta::NameValue {
+        kind: AttributeMeta::NameValue {
             key: "skip".to_string(),
-            value: RuntimeLiteral::Bool(true),
+            value: AttributeValue::Literal(AttributeLiteral::Bool(true)),
         },
     }]);
 
     let mut field_skip_ser = Field::new(DataType::Primitive(Primitive::u32));
-    field_skip_ser.set_attributes(vec![RuntimeAttribute {
+    field_skip_ser.set_attributes(vec![Attribute {
         path: "serde".to_string(),
-        kind: RuntimeMeta::NameValue {
+        kind: AttributeMeta::NameValue {
             key: "skip_serializing".to_string(),
-            value: RuntimeLiteral::Bool(true),
+            value: AttributeValue::Literal(AttributeLiteral::Bool(true)),
         },
     }]);
 
     let mut field_skip_de = Field::new(DataType::Primitive(Primitive::i32));
-    field_skip_de.set_attributes(vec![RuntimeAttribute {
+    field_skip_de.set_attributes(vec![Attribute {
         path: "serde".to_string(),
-        kind: RuntimeMeta::NameValue {
+        kind: AttributeMeta::NameValue {
             key: "skip_deserializing".to_string(),
-            value: RuntimeLiteral::Bool(true),
+            value: AttributeValue::Literal(AttributeLiteral::Bool(true)),
         },
     }]);
 
@@ -307,12 +341,12 @@ fn test_field_level_skip_attributes() {
 #[test]
 fn test_field_level_rename_attributes() {
     // Create a field with rename attribute
-    let mut field_renamed = Field::new(DataType::Primitive(Primitive::String));
-    field_renamed.set_attributes(vec![RuntimeAttribute {
+    let mut field_renamed = Field::new(DataType::Primitive(Primitive::str));
+    field_renamed.set_attributes(vec![Attribute {
         path: "serde".to_string(),
-        kind: RuntimeMeta::NameValue {
+        kind: AttributeMeta::NameValue {
             key: "rename".to_string(),
-            value: RuntimeLiteral::Str("customName".to_string()),
+            value: AttributeValue::Literal(AttributeLiteral::Str("customName".to_string())),
         },
     }]);
 
@@ -335,7 +369,6 @@ fn test_field_level_rename_attributes() {
 #[cfg(test)]
 mod derive_tests {
     use super::*;
-    use specta::Type;
     use specta_macros::Type as TypeDerive;
 
     #[derive(TypeDerive, serde::Serialize, serde::Deserialize)]
@@ -376,9 +409,17 @@ mod derive_tests {
         // Process for deserialization
         let de_types = process_for_deserialization(&types).unwrap();
 
-        // Both should succeed
-        assert_eq!(ser_types.len(), 1);
-        assert_eq!(de_types.len(), 1);
+        // Both should include the requested root type.
+        assert!(
+            ser_types
+                .into_unsorted_iter()
+                .any(|ty| ty.name() == "TestStruct")
+        );
+        assert!(
+            de_types
+                .into_unsorted_iter()
+                .any(|ty| ty.name() == "TestStruct")
+        );
     }
 
     #[test]
@@ -391,21 +432,29 @@ mod derive_tests {
         // Process for deserialization
         let de_types = process_for_deserialization(&types).unwrap();
 
-        // Both should succeed
-        assert_eq!(ser_types.len(), 1);
-        assert_eq!(de_types.len(), 1);
+        // Both should include the requested root type.
+        assert!(
+            ser_types
+                .into_unsorted_iter()
+                .any(|ty| ty.name() == "TestEnum")
+        );
+        assert!(
+            de_types
+                .into_unsorted_iter()
+                .any(|ty| ty.name() == "TestEnum")
+        );
     }
 }
 
 #[test]
 fn test_untagged_enum_path_attribute() {
-    use specta::datatype::RuntimeNestedMeta;
+    use specta::datatype::AttributeNestedMeta;
 
     // Test that #[serde(untagged)] is properly captured with path name
-    // This test verifies the fix for RuntimeMeta::Path now including the path string
-    let untagged_attr = RuntimeAttribute {
+    // This test verifies the fix for AttributeMeta::Path now including the path string
+    let untagged_attr = Attribute {
         path: "serde".to_string(),
-        kind: RuntimeMeta::List(vec![RuntimeNestedMeta::Meta(RuntimeMeta::Path(
+        kind: AttributeMeta::List(vec![AttributeNestedMeta::Meta(AttributeMeta::Path(
             "untagged".to_string(),
         ))]),
     };
@@ -439,17 +488,17 @@ fn test_untagged_enum_path_attribute() {
 
 #[test]
 fn test_skip_path_attribute() {
-    use specta::datatype::RuntimeNestedMeta;
+    use specta::datatype::AttributeNestedMeta;
 
     // Test that #[serde(skip)] path attribute is properly handled
-    let skip_attr = RuntimeAttribute {
+    let skip_attr = Attribute {
         path: "serde".to_string(),
-        kind: RuntimeMeta::List(vec![RuntimeNestedMeta::Meta(RuntimeMeta::Path(
+        kind: AttributeMeta::List(vec![AttributeNestedMeta::Meta(AttributeMeta::Path(
             "skip".to_string(),
         ))]),
     };
 
-    let field1 = Field::new(DataType::Primitive(Primitive::String));
+    let field1 = Field::new(DataType::Primitive(Primitive::str));
     let mut field2 = Field::new(DataType::Primitive(Primitive::u32));
     field2.set_attributes(vec![skip_attr]);
 
@@ -468,17 +517,17 @@ fn test_skip_path_attribute() {
 
 #[test]
 fn test_flatten_path_attribute() {
-    use specta::datatype::RuntimeNestedMeta;
+    use specta::datatype::AttributeNestedMeta;
 
     // Test that #[serde(flatten)] path attribute is properly handled
-    let flatten_attr = RuntimeAttribute {
+    let flatten_attr = Attribute {
         path: "serde".to_string(),
-        kind: RuntimeMeta::List(vec![RuntimeNestedMeta::Meta(RuntimeMeta::Path(
+        kind: AttributeMeta::List(vec![AttributeNestedMeta::Meta(AttributeMeta::Path(
             "flatten".to_string(),
         ))]),
     };
 
-    let field1 = Field::new(DataType::Primitive(Primitive::String));
+    let field1 = Field::new(DataType::Primitive(Primitive::str));
     let mut field2 = Field::new(DataType::Primitive(Primitive::u32));
     field2.set_attributes(vec![flatten_attr]);
 
@@ -498,15 +547,15 @@ fn test_flatten_path_attribute() {
 #[test]
 fn test_both_mode_with_common_attributes() {
     // Create a struct with rename_all that applies to both modes
-    let serde_attr = RuntimeAttribute {
+    let serde_attr = Attribute {
         path: "serde".to_string(),
-        kind: RuntimeMeta::NameValue {
+        kind: AttributeMeta::NameValue {
             key: "rename_all".to_string(),
-            value: RuntimeLiteral::Str("camelCase".to_string()),
+            value: AttributeValue::Literal(AttributeLiteral::Str("camelCase".to_string())),
         },
     };
 
-    let field1 = Field::new(DataType::Primitive(Primitive::String));
+    let field1 = Field::new(DataType::Primitive(Primitive::str));
     let field2 = Field::new(DataType::Primitive(Primitive::u32));
 
     let mut s = match Struct::named()
@@ -552,12 +601,12 @@ fn test_both_mode_with_common_attributes() {
 #[test]
 fn test_both_mode_skip_behavior() {
     // Create a struct with a field that has skip_serializing
-    let field1_attr = RuntimeAttribute {
+    let field1_attr = Attribute {
         path: "serde".to_string(),
-        kind: RuntimeMeta::Path("skip_serializing".to_string()),
+        kind: AttributeMeta::Path("skip_serializing".to_string()),
     };
 
-    let mut field1 = Field::new(DataType::Primitive(Primitive::String));
+    let mut field1 = Field::new(DataType::Primitive(Primitive::str));
     field1.set_attributes(vec![field1_attr]);
 
     let field2 = Field::new(DataType::Primitive(Primitive::u32));
@@ -603,12 +652,12 @@ fn test_both_mode_skip_behavior() {
 #[test]
 fn test_both_mode_with_universal_skip() {
     // Create a struct with a field that has universal skip
-    let field1_attr = RuntimeAttribute {
+    let field1_attr = Attribute {
         path: "serde".to_string(),
-        kind: RuntimeMeta::Path("skip".to_string()),
+        kind: AttributeMeta::Path("skip".to_string()),
     };
 
-    let mut field1 = Field::new(DataType::Primitive(Primitive::String));
+    let mut field1 = Field::new(DataType::Primitive(Primitive::str));
     field1.set_attributes(vec![field1_attr]);
 
     let field2 = Field::new(DataType::Primitive(Primitive::u32));

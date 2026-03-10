@@ -1,13 +1,11 @@
-use std::path::Path;
+use std::{iter, path::Path};
 
 use specta::{
     Type, TypeCollection,
     datatype::{DataType, Reference},
 };
 use specta_serde::SerdeMode;
-use specta_typescript::{
-    Any, BigIntExportBehavior, Layout, Never, Typescript, Unknown, primitives,
-};
+use specta_typescript::{BigIntExportBehavior, Layout, Typescript, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -27,11 +25,14 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
     // dts.push(value);
 
     // Test that the types don't get duplicated in the type map.
-    #[derive(Type)]
-    pub enum TestCollectionRegister {}
-    types = types
-        .register::<TestCollectionRegister>()
-        .register::<TestCollectionRegister>();
+    {
+        #[derive(Type)]
+        #[specta(collect = false)]
+        pub enum TestCollectionRegister {}
+        types = types
+            .register::<TestCollectionRegister>()
+            .register::<TestCollectionRegister>();
+    }
 
     (types, dts)
 }
@@ -52,6 +53,195 @@ fn typescript_export() {
                 .unwrap()
         );
     }
+}
+
+#[test]
+fn typescript_export_serde_errors() {
+    use std::error::Error as _;
+
+    fn assert_serde_error<T: Type>(
+        failures: &mut Vec<String>,
+        mode: SerdeMode,
+        name: &str,
+        expected_serde_error: specta_serde::Error,
+    ) {
+        let types = TypeCollection::default().register::<T>();
+        match Typescript::default().with_serde(mode).export(&types) {
+            Err(err) => {
+                let Some(serde_err) = err
+                    .source()
+                    .and_then(|err| err.downcast_ref::<specta_serde::Error>())
+                else {
+                    failures.push(format!(
+                        "{name}: ERROR: {err} (missing specta_serde::Error source)"
+                    ));
+                    return;
+                };
+
+                if serde_err != &expected_serde_error {
+                    failures.push(format!(
+                        "{name}: ERROR: expected serde error {expected_serde_error:?}, got {serde_err:?}"
+                    ));
+                }
+            }
+            Ok(output) => failures.push(format!(
+                "{name}: expected error in {mode:?} mode, got output: {output}"
+            )),
+        }
+    }
+
+    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "type")]
+    enum InternallyTaggedB {
+        A(String),
+    }
+
+    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "type")]
+    enum InternallyTaggedC {
+        A(Vec<String>),
+    }
+
+    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "type")]
+    enum InternallyTaggedG {
+        A(InternallyTaggedGInner),
+    }
+
+    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(untagged)]
+    enum InternallyTaggedGInner {
+        A(String),
+    }
+
+    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "type")]
+    enum InternallyTaggedI {
+        A(InternallyTaggedIInner),
+    }
+
+    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(transparent)]
+    struct InternallyTaggedIInner(String);
+
+    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "a")]
+    enum TaggedEnumOfEmptyTupleStruct {
+        A(EmptyTupleStruct),
+        B(EmptyTupleStruct),
+    }
+
+    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    struct EmptyTupleStruct();
+
+    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    enum SkipOnlyVariantExternallyTagged {
+        #[specta(skip)]
+        A(String),
+    }
+
+    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "t")]
+    enum SkipOnlyVariantInternallyTagged {
+        #[specta(skip)]
+        A(String),
+    }
+
+    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "t", content = "c")]
+    enum SkipOnlyVariantAdjacentlyTagged {
+        #[specta(skip)]
+        A(String),
+    }
+
+    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    #[serde(untagged)]
+    enum SkipOnlyVariantUntagged {
+        #[specta(skip)]
+        A(String),
+    }
+
+    let mut failures = Vec::new();
+
+    for mode in [
+        SerdeMode::Both,
+        SerdeMode::Serialize,
+        SerdeMode::Deserialize,
+    ] {
+        assert_serde_error::<InternallyTaggedB>(
+            &mut failures,
+            mode,
+            "InternallyTaggedB",
+            specta_serde::Error::InvalidInternallyTaggedEnum,
+        );
+        assert_serde_error::<InternallyTaggedC>(
+            &mut failures,
+            mode,
+            "InternallyTaggedC",
+            specta_serde::Error::InvalidInternallyTaggedEnum,
+        );
+        assert_serde_error::<InternallyTaggedG>(
+            &mut failures,
+            mode,
+            "InternallyTaggedG",
+            specta_serde::Error::InvalidInternallyTaggedEnum,
+        );
+        assert_serde_error::<InternallyTaggedI>(
+            &mut failures,
+            mode,
+            "InternallyTaggedI",
+            specta_serde::Error::InvalidInternallyTaggedEnum,
+        );
+
+        assert_serde_error::<TaggedEnumOfEmptyTupleStruct>(
+            &mut failures,
+            mode,
+            "TaggedEnumOfEmptyTupleStruct",
+            specta_serde::Error::InvalidInternallyTaggedEnum,
+        );
+        assert_serde_error::<SkipOnlyVariantExternallyTagged>(
+            &mut failures,
+            mode,
+            "SkipOnlyVariantExternallyTagged",
+            specta_serde::Error::InvalidUsageOfSkip,
+        );
+        assert_serde_error::<SkipOnlyVariantInternallyTagged>(
+            &mut failures,
+            mode,
+            "SkipOnlyVariantInternallyTagged",
+            specta_serde::Error::InvalidUsageOfSkip,
+        );
+        assert_serde_error::<SkipOnlyVariantAdjacentlyTagged>(
+            &mut failures,
+            mode,
+            "SkipOnlyVariantAdjacentlyTagged",
+            specta_serde::Error::InvalidUsageOfSkip,
+        );
+        assert_serde_error::<SkipOnlyVariantUntagged>(
+            &mut failures,
+            mode,
+            "SkipOnlyVariantUntagged",
+            specta_serde::Error::InvalidUsageOfSkip,
+        );
+    }
+
+    assert!(
+        failures.is_empty(),
+        "Unexpected TypeScript serde export behavior:\n{}",
+        failures.join("\n")
+    );
 }
 
 #[test]
@@ -96,11 +286,6 @@ fn typescript_export_to() {
 }
 
 #[test]
-fn primitives_typescript_framework_utils() {
-    // TODO
-}
-
-#[test]
 fn primitives_export() {
     for mode in [
         SerdeMode::Both,
@@ -119,10 +304,39 @@ fn primitives_export() {
                         r.get(&types).cloned().map(|ty| (s, ty)),
                     _ => None,
                 })
-                .map(|(s, ty)| primitives::export(&ts, &types, &ty).map(|ty| format!("{s}: {ty}")))
+                .map(
+                    |(s, ty)| primitives::export(&ts, &types, iter::once(&ty), "")
+                        .map(|ty| format!("{s}: {ty}"))
+                )
                 .collect::<Result<Vec<_>, _>>()
                 .unwrap()
                 .join("\n")
+        );
+    }
+}
+
+#[test]
+fn primitives_export_many() {
+    for mode in [
+        SerdeMode::Both,
+        SerdeMode::Serialize,
+        SerdeMode::Deserialize,
+    ] {
+        let ts = Typescript::default()
+            .with_serde(mode)
+            .bigint(BigIntExportBehavior::Number);
+        let (types, dts) = crate::types();
+        let ndts = dts
+            .iter()
+            .filter_map(|(_, ty)| match ty {
+                DataType::Reference(Reference::Named(r)) => r.get(&types),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        insta::assert_snapshot!(
+            format!("export-many-{}", mode.to_string().to_lowercase()),
+            primitives::export(&ts, &types, ndts.into_iter(), "").unwrap()
         );
     }
 }
@@ -141,6 +355,10 @@ fn primitives_reference() {
         insta::assert_snapshot!(
             format!("reference-{}", mode.to_string().to_lowercase()),
             dts.iter()
+                .filter_map(|(s, ty)| match ty {
+                    DataType::Reference(r) => Some((s, r)),
+                    _ => None,
+                })
                 .map(|(s, ty)| primitives::reference(&ts, &types, ty).map(|ty| format!("{s}: {ty}")))
                 .collect::<Result<Vec<_>, _>>()
                 .unwrap()
@@ -187,7 +405,7 @@ fn reserved_names() {
             _ => panic!("Failed to get reference"),
         };
 
-        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, ndt).unwrap_err().to_string(), @r#"Attempted to export Type but was unable to due to name  conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
     }
 
     {
@@ -202,7 +420,7 @@ fn reserved_names() {
             _ => panic!("Failed to get reference"),
         };
 
-        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, ndt).unwrap_err().to_string(), @r#"Attempted to export Type but was unable to due to name  conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
     }
 
     {
@@ -220,7 +438,7 @@ fn reserved_names() {
             _ => panic!("Failed to get reference"),
         };
 
-        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, ndt).unwrap_err().to_string(), @r#"Attempted to export Type but was unable to due to name  conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
     }
 }
 

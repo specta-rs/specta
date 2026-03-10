@@ -29,7 +29,10 @@ pub fn parse_enum(
             // but we only throw errors for Specta-specific attributes so we don't continually break other attributes.
             if let Some(attr) = attrs.iter().find(|attr| attr.source == "specta") {
                 match &attr.value {
-                    None | Some(AttributeValue::Lit(_)) | Some(AttributeValue::Path(_)) => {
+                    None
+                    | Some(AttributeValue::Lit(_))
+                    | Some(AttributeValue::Path(_))
+                    | Some(AttributeValue::Expr(_)) => {
                         return Err(syn::Error::new(
                             attr.key.span(),
                             "specta: invalid formatted attribute",
@@ -39,6 +42,12 @@ pub fn parse_enum(
                         attr: inner_attrs, ..
                     }) => {
                         if let Some(inner_attr) = inner_attrs.first() {
+                            if let Some(message) =
+                                migration_hint(Scope::Variant, &inner_attr.key.to_string())
+                            {
+                                return Err(syn::Error::new(inner_attr.key.span(), message));
+                            }
+
                             return Err(syn::Error::new(
                                 inner_attr.key.span(),
                                 format!(
@@ -55,7 +64,7 @@ pub fn parse_enum(
                 }
             }
 
-            // Lower the variant attributes to RuntimeAttribute tokens
+            // Lower the variant attributes to Attribute tokens
             let lowered_variant_attrs = v
                 .attrs
                 .iter()
@@ -65,7 +74,7 @@ pub fn parse_enum(
                     if container_attrs.skip_attrs.contains(&path) {
                         return false;
                     }
-                    path == "serde" || path == "specta"
+                    path != "specta"
                 })
                 .filter_map(|attr| lower_attribute(attr).transpose())
                 .map(|result| result.map(|attr| attr.to_tokens()))
@@ -79,6 +88,7 @@ pub fn parse_enum(
             let variant_ident_str = unraw_raw_ident(&variant.ident);
             let variant_name_str = variant_ident_str.to_token_stream();
             let variant_skip = attrs.skip;
+            let variant_inline = attrs.inline;
 
             let inner = match &variant.fields {
                 Fields::Unit => quote!(datatype::Fields::Unit),
@@ -86,9 +96,15 @@ pub fn parse_enum(
                     let fields = fields
                         .unnamed
                         .iter()
-                        .map(|field| {
-                            let (field_attrs, raw_attrs) =
+                        .enumerate()
+                        .map(|(idx, field)| {
+                            let (mut field_attrs, raw_attrs) =
                                 decode_field_attrs(field, &container_attrs.skip_attrs)?;
+
+                            if variant_inline && idx == 0 {
+                                field_attrs.inline = true;
+                            }
+
                             construct_field_with_variant_skip(
                                 crate_ref,
                                 container_attrs,
