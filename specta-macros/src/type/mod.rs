@@ -33,15 +33,16 @@ pub(super) fn build_runtime_attributes(
     raw_attrs: &[syn::Attribute],
     skip_attrs: &[String],
 ) -> TokenStream {
-    let attrs = raw_attrs
+    let metas = raw_attrs
         .iter()
         .filter(|attr| {
             let path = attr.path().to_token_stream().to_string();
             !skip_attrs.contains(&path) && path != "specta"
         })
+        .map(|attr| attr.meta.to_token_stream())
         .collect::<Vec<_>>();
 
-    if attrs.is_empty() {
+    if metas.is_empty() {
         return quote!(datatype::Attributes::default());
     }
 
@@ -55,7 +56,7 @@ pub(super) fn build_runtime_attributes(
         let crate_ident = format_ident!("{name}");
 
         quote! {
-            attrs.insert(#crate_ident::parser!(#scope [#(#attrs),*]));
+            attrs.insert(#crate_ident::parser!(#scope [#(#metas),*]));
         }
     });
 
