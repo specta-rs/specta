@@ -14,7 +14,9 @@ use specta::{
     TypeCollection,
     datatype::{
         DataType, Enum, EnumVariant, Field, Fields, NamedDataType, NamedDataTypeBuilder, Reference,
+        Struct, Tuple,
     },
+    internal,
 };
 
 mod inflection;
@@ -26,6 +28,7 @@ pub use parser::{
     ConversionType, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs, merge_container_attrs,
     merge_field_attrs, merge_variant_attrs,
 };
+use repr::EnumRepr;
 
 pub fn apply(types: TypeCollection) -> TypeCollection {
     types.map(|mut ty| {
@@ -222,6 +225,8 @@ fn rewrite_datatype_for_phase(
                     split_types,
                 );
             }
+
+            rewrite_enum_repr_for_phase(e, mode, original_types);
         }
         DataType::Tuple(tuple) => {
             for ty in tuple.elements_mut() {
@@ -353,6 +358,348 @@ fn rewrite_field_for_phase(
 ) {
     if let Some(ty) = field.ty_mut() {
         rewrite_datatype_for_phase(ty, mode, original_types, generated, split_types);
+    }
+}
+
+fn rewrite_enum_repr_for_phase(e: &mut Enum, mode: PhaseRewrite, original_types: &TypeCollection) {
+    let repr = enum_repr_from_attrs(e.attributes());
+    if matches!(repr, EnumRepr::Untagged) {
+        return;
+    }
+
+    let container_attrs = e.attributes().get::<SerdeContainerAttrs>().cloned();
+    let variants = std::mem::take(e.variants_mut());
+    let transformed = variants
+        .into_iter()
+        .map(|(variant_name, variant)| {
+            let serialized_name = serialized_variant_name(&variant_name, &variant, &container_attrs, mode);
+            let transformed = match &repr {
+                EnumRepr::External => transform_external_variant(serialized_name.clone(), &variant),
+                EnumRepr::Internal { tag } => {
+                    transform_internal_variant(serialized_name.clone(), tag.as_ref(), &variant, original_types)
+                }
+                EnumRepr::Adjacent { tag, content } => {
+                    if tag == content {
+                        panic!(
+                            "specta-serde: serde adjacent tagging requires distinct `tag` and `content` field names"
+                        );
+                    }
+
+                    transform_adjacent_variant(serialized_name.clone(), tag.as_ref(), content.as_ref(), &variant)
+                }
+                EnumRepr::Untagged | EnumRepr::String { .. } => unreachable!(),
+            };
+
+            (Cow::Owned(serialized_name), transformed)
+        })
+        .collect::<Vec<_>>();
+
+    *e.variants_mut() = transformed;
+}
+
+fn enum_repr_from_attrs(attrs: &specta::datatype::Attributes) -> EnumRepr {
+    let Some(container_attrs) = attrs.get::<SerdeContainerAttrs>() else {
+        return EnumRepr::External;
+    };
+
+    if container_attrs.untagged {
+        return EnumRepr::Untagged;
+    }
+
+    match (
+        container_attrs.tag.as_deref(),
+        container_attrs.content.as_deref(),
+    ) {
+        (Some(tag), Some(content)) => EnumRepr::Adjacent {
+            tag: Cow::Owned(tag.to_string()),
+            content: Cow::Owned(content.to_string()),
+        },
+        (Some(tag), None) => EnumRepr::Internal {
+            tag: Cow::Owned(tag.to_string()),
+        },
+        (None, Some(_)) => panic!(
+            "specta-serde: serde enum representation is invalid: `content` is set without `tag`"
+        ),
+        (None, None) => EnumRepr::External,
+    }
+}
+
+fn serialized_variant_name(
+    variant_name: &str,
+    variant: &EnumVariant,
+    container_attrs: &Option<SerdeContainerAttrs>,
+    mode: PhaseRewrite,
+) -> String {
+    let variant_attrs = variant.attributes().get::<SerdeVariantAttrs>();
+
+    if let Some(rename) = select_phase_string(
+        mode,
+        variant_attrs.and_then(|attrs| attrs.rename_serialize.as_deref()),
+        variant_attrs.and_then(|attrs| attrs.rename_deserialize.as_deref()),
+        "enum variant rename",
+        variant_name,
+    ) {
+        return rename.to_string();
+    }
+
+    select_phase_rule(
+        mode,
+        container_attrs
+            .as_ref()
+            .and_then(|attrs| attrs.rename_all_serialize),
+        container_attrs
+            .as_ref()
+            .and_then(|attrs| attrs.rename_all_deserialize),
+        "enum rename_all",
+        variant_name,
+    )
+    .map_or_else(
+        || variant_name.to_string(),
+        |rule| rule.apply_to_variant(variant_name),
+    )
+}
+
+fn select_phase_string<'a>(
+    mode: PhaseRewrite,
+    serialize: Option<&'a str>,
+    deserialize: Option<&'a str>,
+    context: &str,
+    name: &str,
+) -> Option<&'a str> {
+    match mode {
+        PhaseRewrite::Serialize => serialize,
+        PhaseRewrite::Deserialize => deserialize,
+        PhaseRewrite::Unified => match (serialize, deserialize) {
+            (Some(serialize), Some(deserialize)) if serialize != deserialize => panic!(
+                "specta-serde: incompatible {context} for '{name}' in unified mode: serialize={serialize:?}, deserialize={deserialize:?}"
+            ),
+            (serialize, deserialize) => serialize.or(deserialize),
+        },
+    }
+}
+
+fn select_phase_rule(
+    mode: PhaseRewrite,
+    serialize: Option<RenameRule>,
+    deserialize: Option<RenameRule>,
+    context: &str,
+    name: &str,
+) -> Option<RenameRule> {
+    match mode {
+        PhaseRewrite::Serialize => serialize,
+        PhaseRewrite::Deserialize => deserialize,
+        PhaseRewrite::Unified => match (serialize, deserialize) {
+            (Some(serialize), Some(deserialize)) if serialize != deserialize => panic!(
+                "specta-serde: incompatible {context} for '{name}' in unified mode: serialize={serialize:?}, deserialize={deserialize:?}"
+            ),
+            (serialize, deserialize) => serialize.or(deserialize),
+        },
+    }
+}
+
+fn transform_external_variant(serialized_name: String, variant: &EnumVariant) -> EnumVariant {
+    match variant.fields() {
+        Fields::Unit => clone_variant_with_unnamed_fields(
+            variant,
+            vec![Field::new(string_literal_datatype(serialized_name))],
+        ),
+        _ => {
+            let payload = variant_payload_datatype(variant).unwrap_or_else(|| {
+                panic!(
+                    "specta-serde: invalid external enum variant '{serialized_name}': variant payload is fully skipped"
+                )
+            });
+
+            clone_variant_with_named_fields(
+                variant,
+                vec![(Cow::Owned(serialized_name), Field::new(payload))],
+            )
+        }
+    }
+}
+
+fn transform_adjacent_variant(
+    serialized_name: String,
+    tag: &str,
+    content: &str,
+    variant: &EnumVariant,
+) -> EnumVariant {
+    let mut fields = vec![(
+        Cow::Owned(tag.to_string()),
+        Field::new(string_literal_datatype(serialized_name.clone())),
+    )];
+
+    if !matches!(variant.fields(), Fields::Unit) {
+        let payload = variant_payload_datatype(variant).unwrap_or_else(|| {
+            panic!(
+                "specta-serde: invalid adjacent enum variant '{serialized_name}': variant payload is fully skipped"
+            )
+        });
+        fields.push((Cow::Owned(content.to_string()), Field::new(payload)));
+    }
+
+    clone_variant_with_named_fields(variant, fields)
+}
+
+fn transform_internal_variant(
+    serialized_name: String,
+    tag: &str,
+    variant: &EnumVariant,
+    original_types: &TypeCollection,
+) -> EnumVariant {
+    let mut fields = vec![(
+        Cow::Owned(tag.to_string()),
+        Field::new(string_literal_datatype(serialized_name.clone())),
+    )];
+
+    match variant.fields() {
+        Fields::Unit => {}
+        Fields::Named(named) => {
+            fields.extend(named.fields().iter().cloned());
+        }
+        Fields::Unnamed(unnamed) => {
+            let non_skipped = unnamed
+                .fields()
+                .iter()
+                .filter_map(|field| field.ty().cloned())
+                .collect::<Vec<_>>();
+
+            if unnamed.fields().len() != 1 || non_skipped.len() != 1 {
+                panic!(
+                    "specta-serde: invalid internally tagged enum variant '{serialized_name}': tuple variant must have exactly one non-skipped field"
+                );
+            }
+
+            let payload_ty = non_skipped.into_iter().next().expect("checked above");
+            if !is_internal_tag_compatible(&payload_ty, original_types, &mut HashSet::new()) {
+                panic!(
+                    "specta-serde: invalid internally tagged enum variant '{serialized_name}': payload cannot be merged with a tag"
+                );
+            }
+
+            if !matches!(&payload_ty, DataType::Tuple(tuple) if tuple.elements().is_empty()) {
+                let mut flattened = Field::new(payload_ty);
+                flattened.set_flatten(true);
+                fields.push((Cow::Borrowed("__specta_internal_payload"), flattened));
+            }
+        }
+    }
+
+    clone_variant_with_named_fields(variant, fields)
+}
+
+fn string_literal_datatype(value: String) -> DataType {
+    let mut value_enum = Enum::new();
+    value_enum
+        .variants_mut()
+        .push((Cow::Owned(value), EnumVariant::unit()));
+    DataType::Enum(value_enum)
+}
+
+fn variant_payload_datatype(variant: &EnumVariant) -> Option<DataType> {
+    match variant.fields() {
+        Fields::Unit => Some(DataType::Tuple(Tuple::new(vec![]))),
+        Fields::Named(named) => {
+            let mut out = Struct::unit();
+            out.set_fields(Fields::Named(named.clone()));
+            Some(DataType::Struct(out))
+        }
+        Fields::Unnamed(unnamed) => {
+            let fields = unnamed
+                .fields()
+                .iter()
+                .filter_map(|field| field.ty().cloned())
+                .collect::<Vec<_>>();
+
+            match fields.as_slice() {
+                [] if unnamed.fields().is_empty() => Some(DataType::Tuple(Tuple::new(vec![]))),
+                [] => None,
+                [single] if unnamed.fields().len() == 1 => Some(single.clone()),
+                _ => Some(DataType::Tuple(Tuple::new(fields))),
+            }
+        }
+    }
+}
+
+fn clone_variant_with_named_fields(
+    original: &EnumVariant,
+    fields: Vec<(Cow<'static, str>, Field)>,
+) -> EnumVariant {
+    let mut transformed = original.clone();
+    transformed.set_fields(internal::construct::fields_named(
+        fields,
+        specta::datatype::Attributes::default(),
+    ));
+    transformed
+}
+
+fn clone_variant_with_unnamed_fields(original: &EnumVariant, fields: Vec<Field>) -> EnumVariant {
+    let mut transformed = original.clone();
+    transformed.set_fields(internal::construct::fields_unnamed(
+        fields,
+        specta::datatype::Attributes::default(),
+    ));
+    transformed
+}
+
+fn is_internal_tag_compatible(
+    ty: &DataType,
+    original_types: &TypeCollection,
+    seen: &mut HashSet<TypeKey>,
+) -> bool {
+    match ty {
+        DataType::Map(_) => true,
+        DataType::Struct(strct) => matches!(strct.fields(), Fields::Named(_)),
+        DataType::Tuple(tuple) => tuple.elements().is_empty(),
+        DataType::Reference(Reference::Named(reference)) => {
+            let Some(referenced) = reference.get(original_types) else {
+                return false;
+            };
+
+            let key = TypeKey::from_ndt(referenced);
+            if !seen.insert(key.clone()) {
+                return true;
+            }
+
+            let compatible = is_internal_tag_compatible(referenced.ty(), original_types, seen);
+            seen.remove(&key);
+            compatible
+        }
+        DataType::Enum(enm) => {
+            enm.attributes()
+                .get::<SerdeContainerAttrs>()
+                .is_some_and(|attrs| attrs.untagged)
+                && enm.variants().iter().all(|(_, variant)| {
+                    is_internal_variant_compatible(variant, original_types, seen)
+                })
+        }
+        DataType::Primitive(_)
+        | DataType::List(_)
+        | DataType::Nullable(_)
+        | DataType::Reference(Reference::Generic(_))
+        | DataType::Reference(Reference::Opaque(_)) => false,
+    }
+}
+
+fn is_internal_variant_compatible(
+    variant: &EnumVariant,
+    original_types: &TypeCollection,
+    seen: &mut HashSet<TypeKey>,
+) -> bool {
+    match variant.fields() {
+        Fields::Unit => true,
+        Fields::Named(_) => true,
+        Fields::Unnamed(unnamed) => {
+            if unnamed.fields().len() != 1 {
+                return false;
+            }
+
+            unnamed
+                .fields()
+                .iter()
+                .find_map(|field| field.ty())
+                .is_some_and(|ty| is_internal_tag_compatible(ty, original_types, seen))
+        }
     }
 }
 

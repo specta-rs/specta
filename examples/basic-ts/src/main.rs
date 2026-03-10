@@ -39,6 +39,35 @@ pub struct TestingFlattenFlattened {
     b: String,
 }
 
+#[derive(Serialize, Type)]
+pub enum SerdeExternalExample {
+    Unit,
+    Newtype(String),
+    Struct { value: String },
+}
+
+#[derive(Serialize, Type)]
+#[serde(tag = "type")]
+pub enum SerdeInternalExample {
+    Unit,
+    Struct { value: String },
+}
+
+#[derive(Serialize, Type)]
+#[serde(tag = "type", content = "data")]
+pub enum SerdeAdjacentExample {
+    Unit,
+    Newtype(String),
+    Struct { value: String },
+}
+
+#[derive(Serialize, Type)]
+#[serde(untagged)]
+pub enum SerdeUntaggedExample {
+    String(String),
+    Object { value: String },
+}
+
 fn main() {
     {
         let mut types = TypeCollection::default();
@@ -73,7 +102,11 @@ fn main() {
             .register::<NotPhaseSpecific>()
             .register::<NotPhaseSpecificButReferencing>()
             .register::<HelloWorld>()
-            .register::<TestingFlatten>();
+            .register::<TestingFlatten>()
+            .register::<SerdeExternalExample>()
+            .register::<SerdeInternalExample>()
+            .register::<SerdeAdjacentExample>()
+            .register::<SerdeUntaggedExample>();
         println!("RAW:\n{}", Typescript::default().export(&types).unwrap());
         // println!(
         //     "specta_serde::apply(...): `{}",
