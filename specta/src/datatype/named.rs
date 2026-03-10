@@ -22,8 +22,6 @@ pub struct NamedDataType {
     pub(crate) inner: DataType,
 }
 
-// pub struct GenericDef
-
 impl NamedDataType {
     // ## Why return a reference?
     //
