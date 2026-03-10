@@ -26,7 +26,7 @@ fn main() {
     );
 
     let def = HelloWorld::definition(&mut types);
-    let types = specta_serde::testing(types);
+    let types = specta_serde::apply(types);
     println!(
         "{:#?}",
         match def {
