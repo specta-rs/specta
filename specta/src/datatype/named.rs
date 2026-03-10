@@ -1,4 +1,4 @@
-use std::{borrow::Cow, panic::Location, sync::Arc};
+use std::{borrow::Cow, collections::HashSet, panic::Location, sync::Arc};
 
 use crate::{
     TypeCollection,
@@ -19,6 +19,7 @@ pub struct NamedDataType {
     pub(crate) location: Location<'static>,
     pub(crate) generics: Cow<'static, [(GenericReference, Cow<'static, str>)]>,
     pub(crate) inline: bool,
+    pub(crate) tags: HashSet<TypeTag>,
     pub(crate) inner: DataType,
 }
 
@@ -58,6 +59,7 @@ impl NamedDataType {
                 module_path: Cow::Borrowed(""),
                 generics: Cow::Borrowed(generics_for_ndt),
                 inline,
+                tags: Default::default(),
                 inner: DataType::Primitive(super::Primitive::i8),
             };
             build_ndt(types, &mut ndt);
@@ -106,6 +108,7 @@ impl NamedDataType {
             location: location.to_owned(),
             generics: Cow::Owned(builder.generics),
             inline: builder.inline,
+            tags: Default::default(),
             inner: builder.inner,
         };
 
@@ -236,6 +239,21 @@ impl NamedDataType {
     pub fn set_ty(&mut self, ty: DataType) {
         self.inner = ty;
     }
+
+    /// Get the tags associated with this type
+    pub fn tags(&self) -> &HashSet<TypeTag> {
+        &self.tags
+    }
+
+    /// Get a mutable reference to the tags associated with this type
+    pub fn tags_mut(&mut self) -> &mut HashSet<TypeTag> {
+        &mut self.tags
+    }
+
+    /// Set the tags associated with this type
+    pub fn set_tags(&mut self, tags: HashSet<TypeTag>) {
+        self.tags = tags;
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -255,6 +273,20 @@ pub enum DeprecatedType {
         /// Deprecation note/message.
         note: Cow<'static, str>,
     },
+}
+
+/// Semantic tags that exporters can use to produce richer target-language types.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum TypeTag {
+    /// Represents values that map naturally to JavaScript's `Date` type.
+    Date,
+    /// Represents values that map naturally to JavaScript's `BigInt` type.
+    BigInt,
+    /// Represents values that map naturally to JavaScript's `Uint8Array` type.
+    UInt8Array,
+    /// A user-defined semantic tag.
+    Custom(Cow<'static, str>),
 }
 
 fn file_path_to_module_path(file_path: &str) -> Option<String> {

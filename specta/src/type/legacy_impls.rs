@@ -20,9 +20,22 @@ impl_ndt_as!(
 );
 
 #[cfg(feature = "bytes")]
-impl_ndt_as!(
-    bytes::Bytes as [u8]
-    bytes::BytesMut as [u8]
+impl_ndt!(
+    impl Type for bytes::Bytes {
+        inline: true;
+        build: |types, ndt| {
+            ndt.inner = <[u8]>::definition(types);
+            ndt.tags_mut().insert(datatype::TypeTag::UInt8Array);
+        }
+    }
+
+    impl Type for bytes::BytesMut {
+        inline: true;
+        build: |types, ndt| {
+            ndt.inner = <[u8]>::definition(types);
+            ndt.tags_mut().insert(datatype::TypeTag::UInt8Array);
+        }
+    }
 );
 
 #[cfg(feature = "serde_json")]
@@ -231,7 +244,8 @@ const _: () = {
                         attributes: Vec::new(),
                     }),
                     attributes: Vec::new(),
-                })
+                });
+                ndt.tags_mut().insert(datatype::TypeTag::Date);
             }
         }
 
@@ -305,10 +319,26 @@ impl_ndt_as!(
 #[allow(deprecated)]
 const _: () = {
     impl_ndt_as!(
-        chrono::NaiveDateTime as str
-        chrono::NaiveDate as str
         chrono::NaiveTime as str
         chrono::Duration as str
+    );
+
+    impl_ndt!(
+        impl Type for chrono::NaiveDateTime {
+            inline: true;
+            build: |types, ndt| {
+                ndt.inner = str::definition(types);
+                ndt.tags_mut().insert(datatype::TypeTag::Date);
+            }
+        }
+
+        impl Type for chrono::NaiveDate {
+            inline: true;
+            build: |types, ndt| {
+                ndt.inner = str::definition(types);
+                ndt.tags_mut().insert(datatype::TypeTag::Date);
+            }
+        }
     );
 
     // This is special cause of how it ignores the `generics` param to `NamedDataType::init_with_sentinel`
@@ -329,6 +359,7 @@ const _: () = {
                         ndt.set_name(::std::borrow::Cow::Borrowed(stringify!($type_name)));
                         ndt.set_module_path(::std::borrow::Cow::Borrowed(stringify!($module)));
                         ndt.inner = str::definition(types);
+                        ndt.tags_mut().insert(datatype::TypeTag::Date);
                     },
                 ))
             }
@@ -345,23 +376,78 @@ const _: () = {
 
 #[cfg(feature = "time")]
 impl_ndt_as!(
-    time::PrimitiveDateTime as str
-    time::OffsetDateTime as str
-    time::Date as str
     time::Time as str
     time::Duration as str
     time::Weekday as str
 );
 
+#[cfg(feature = "time")]
+impl_ndt!(
+    impl Type for time::PrimitiveDateTime {
+        inline: true;
+        build: |types, ndt| {
+            ndt.inner = str::definition(types);
+            ndt.tags_mut().insert(datatype::TypeTag::Date);
+        }
+    }
+
+    impl Type for time::OffsetDateTime {
+        inline: true;
+        build: |types, ndt| {
+            ndt.inner = str::definition(types);
+            ndt.tags_mut().insert(datatype::TypeTag::Date);
+        }
+    }
+
+    impl Type for time::Date {
+        inline: true;
+        build: |types, ndt| {
+            ndt.inner = str::definition(types);
+            ndt.tags_mut().insert(datatype::TypeTag::Date);
+        }
+    }
+);
+
 #[cfg(feature = "jiff")]
 impl_ndt_as!(
-    jiff::Timestamp as str
-    jiff::Zoned as str
     jiff::Span as str
-    jiff::civil::Date as str
     jiff::civil::Time as str
-    jiff::civil::DateTime as str
     jiff::tz::TimeZone as str
+);
+
+#[cfg(feature = "jiff")]
+impl_ndt!(
+    impl Type for jiff::Timestamp {
+        inline: true;
+        build: |types, ndt| {
+            ndt.inner = str::definition(types);
+            ndt.tags_mut().insert(datatype::TypeTag::Date);
+        }
+    }
+
+    impl Type for jiff::Zoned {
+        inline: true;
+        build: |types, ndt| {
+            ndt.inner = str::definition(types);
+            ndt.tags_mut().insert(datatype::TypeTag::Date);
+        }
+    }
+
+    impl Type for jiff::civil::Date {
+        inline: true;
+        build: |types, ndt| {
+            ndt.inner = str::definition(types);
+            ndt.tags_mut().insert(datatype::TypeTag::Date);
+        }
+    }
+
+    impl Type for jiff::civil::DateTime {
+        inline: true;
+        build: |types, ndt| {
+            ndt.inner = str::definition(types);
+            ndt.tags_mut().insert(datatype::TypeTag::Date);
+        }
+    }
 );
 
 #[cfg(feature = "bigdecimal")]
@@ -392,8 +478,18 @@ impl_ndt_as!(
 impl_ndt_as!(
     bson::oid::ObjectId as str
     bson::Decimal128 as i128
-    bson::DateTime as str
     bson::Uuid as str
+);
+
+#[cfg(feature = "bson")]
+impl_ndt!(
+    impl Type for bson::DateTime {
+        inline: true;
+        build: |types, ndt| {
+            ndt.inner = str::definition(types);
+            ndt.tags_mut().insert(datatype::TypeTag::Date);
+        }
+    }
 );
 
 // TODO: bson::bson

@@ -154,6 +154,7 @@ const _: () = {
                 ));
 
                 ndt.inner = DataType::Struct(s);
+                ndt.tags_mut().insert(datatype::TypeTag::Date);
             }
         }
 
