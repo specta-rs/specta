@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use super::VariantBuilder;
 
-use super::{Attribute, DataType, DeprecatedType, Fields, NamedFields, UnnamedFields};
+use super::{Attributes, DataType, DeprecatedType, Fields, NamedFields, UnnamedFields};
 
 /// represents a Rust [enum](https://doc.rust-lang.org/std/keyword.enum.html).
 ///
@@ -13,7 +13,7 @@ use super::{Attribute, DataType, DeprecatedType, Fields, NamedFields, UnnamedFie
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Enum {
     pub(crate) variants: Vec<(Cow<'static, str>, EnumVariant)>,
-    pub(crate) attributes: Vec<Attribute>,
+    pub(crate) attributes: Attributes,
 }
 
 impl Enum {
@@ -33,12 +33,12 @@ impl Enum {
     }
 
     /// Get an immutable reference to the enum's attributes.
-    pub fn attributes(&self) -> &Vec<Attribute> {
+    pub fn attributes(&self) -> &Attributes {
         &self.attributes
     }
 
     /// Get a mutable reference to the enum's attributes.
-    pub fn attributes_mut(&mut self) -> &mut Vec<Attribute> {
+    pub fn attributes_mut(&mut self) -> &mut Attributes {
         &mut self.attributes
     }
 
@@ -72,7 +72,7 @@ pub struct EnumVariant {
     /// The type of the variant.
     pub(crate) fields: Fields,
     /// Runtime attributes for this variant
-    pub(crate) attributes: Vec<Attribute>,
+    pub(crate) attributes: Attributes,
 }
 
 impl EnumVariant {
@@ -83,7 +83,7 @@ impl EnumVariant {
             docs: "".into(),
             deprecated: None,
             fields: Fields::Unit,
-            attributes: Vec::new(),
+            attributes: Attributes::default(),
         }
     }
 
@@ -98,11 +98,11 @@ impl EnumVariant {
                     fields: Default::default(),
                     attributes: Default::default(),
                 }),
-                attributes: Vec::new(),
+                attributes: Attributes::default(),
             },
             variant: NamedFields {
                 fields: vec![],
-                attributes: vec![],
+                attributes: Attributes::default(),
             },
         }
     }
@@ -118,7 +118,7 @@ impl EnumVariant {
                     fields: Default::default(),
                     attributes: Default::default(),
                 }),
-                attributes: Vec::new(),
+                attributes: Attributes::default(),
             },
             variant: UnnamedFields {
                 fields: Default::default(),
@@ -183,17 +183,17 @@ impl EnumVariant {
     }
 
     /// Get an immutable reference to the runtime attributes for this variant.
-    pub fn attributes(&self) -> &Vec<Attribute> {
+    pub fn attributes(&self) -> &Attributes {
         &self.attributes
     }
 
     /// Mutable reference to the runtime attributes for this variant.
-    pub fn attributes_mut(&mut self) -> &mut Vec<Attribute> {
+    pub fn attributes_mut(&mut self) -> &mut Attributes {
         &mut self.attributes
     }
 
     /// Set the runtime attributes for this variant.
-    pub fn set_attributes(&mut self, attrs: Vec<Attribute>) {
+    pub fn set_attributes(&mut self, attrs: Attributes) {
         self.attributes = attrs;
     }
 }

@@ -1,8 +1,8 @@
-use super::{attr::*, lower_attr::lower_attribute, r#struct::decode_field_attrs};
+use super::{attr::*, r#struct::decode_field_attrs};
 use crate::{r#type::field::construct_field_with_variant_skip, utils::*};
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
-use syn::{DataEnum, Fields, spanned::Spanned};
+use quote::{quote, ToTokens};
+use syn::{spanned::Spanned, DataEnum, Fields};
 
 pub fn parse_enum(
     crate_ref: &TokenStream,
@@ -64,27 +64,11 @@ pub fn parse_enum(
                 }
             }
 
-            // Lower the variant attributes to Attribute tokens
-            let lowered_variant_attrs = v
-                .attrs
-                .iter()
-                .filter(|attr| {
-                    let path = attr.path().to_token_stream().to_string();
-                    // Skip attributes that are in the skip_attrs list
-                    if container_attrs.skip_attrs.contains(&path) {
-                        return false;
-                    }
-                    path != "specta"
-                })
-                .filter_map(|attr| lower_attribute(attr).transpose())
-                .map(|result| result.map(|attr| attr.to_tokens()))
-                .collect::<Result<Vec<_>, _>>()?;
-
-            Ok((v, variant_attrs, lowered_variant_attrs))
+            Ok((v, variant_attrs))
         })
         .collect::<syn::Result<Vec<_>>>()?
         .into_iter()
-        .map(|(variant, attrs, lowered_variant_attrs)| {
+        .map(|(variant, attrs)| {
             let variant_ident_str = unraw_raw_ident(&variant.ident);
             let variant_name_str = variant_ident_str.to_token_stream();
             let variant_skip = attrs.skip;
@@ -118,7 +102,7 @@ pub fn parse_enum(
 
                     quote!(internal::construct::fields_unnamed(
                         vec![#(#fields),*],
-                        vec![],
+                        datatype::Attributes::default(),
                     ))
                 }
                 Fields::Named(fields) => {
@@ -153,7 +137,7 @@ pub fn parse_enum(
 
                     quote!(internal::construct::fields_named(
                         vec![#(#fields),*],
-                        vec![]
+                        datatype::Attributes::default()
                     ))
                 }
             };
@@ -167,7 +151,7 @@ pub fn parse_enum(
                 v.set_deprecated(#deprecated);
                 v.set_docs(#doc.into());
                 v.set_fields(#inner);
-                v.set_attributes(vec![#(#lowered_variant_attrs),*]);
+                v.set_attributes(datatype::Attributes::default());
                 v
             })))
         })

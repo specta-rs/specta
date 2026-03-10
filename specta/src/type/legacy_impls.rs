@@ -3,12 +3,11 @@
 //! The plan is to try and move these into the ecosystem for the v2 release.
 use super::macros::{impl_ndt, impl_ndt_as};
 use crate::{
-    Type, TypeCollection,
     datatype::{
-        self, Attribute, AttributeMeta, AttributeNestedMeta, DataType, Enum, EnumVariant, Field,
-        Fields, NamedFields, Primitive, Reference, Struct,
+        self, DataType, Enum, EnumVariant, Field, Fields, NamedFields, Primitive, Reference, Struct,
     },
     r#type::{generics, impls::*},
+    Type, TypeCollection,
 };
 
 use std::borrow::Cow;
@@ -71,7 +70,7 @@ const _: () = {
                                 .build(),
                         ),
                     ],
-                    attributes: vec![],
+                    attributes: datatype::Attributes::default(),
                 })
             }
         }
@@ -100,12 +99,7 @@ const _: () = {
                                 .build(),
                         ),
                     ],
-                    attributes: vec![Attribute {
-                        path: String::from("serde"),
-                        kind: AttributeMeta::List(vec![AttributeNestedMeta::Meta(AttributeMeta::Path(
-                            String::from("untagged"),
-                        ))]),
-                    }],
+                    attributes: datatype::Attributes::default(),
                 });
             }
         }
@@ -114,7 +108,7 @@ const _: () = {
 
 #[cfg(feature = "serde_yaml")]
 const _: () = {
-    use serde_yaml::{Number, Value, value::TaggedValue};
+    use serde_yaml::{value::TaggedValue, Number, Value};
 
     impl_ndt_as!(
         serde_yaml::Mapping as PrimitiveMap<serde_yaml::Value, serde_yaml::Value>
@@ -168,7 +162,7 @@ const _: () = {
                                 .build(),
                         ),
                     ],
-                    attributes: vec![],
+                    attributes: datatype::Attributes::default(),
                 })
             }
         }
@@ -197,7 +191,7 @@ const _: () = {
                                 .build(),
                         ),
                     ],
-                    attributes: vec![],
+                    attributes: datatype::Attributes::default(),
                 })
             }
         }
@@ -206,7 +200,7 @@ const _: () = {
 
 #[cfg(feature = "toml")]
 const _: () = {
-    use toml::{Value, value};
+    use toml::{value, Value};
 
     impl_ndt_as!(toml::map::Map<K, V> as PrimitiveMap<generics::K, generics::V>);
 
@@ -225,12 +219,12 @@ const _: () = {
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
                                 ty: Some(String::definition(types)),
-                                attributes: Vec::new(),
+                                attributes: datatype::Attributes::default(),
                             },
                         )],
-                        attributes: Vec::new(),
+                        attributes: datatype::Attributes::default(),
                     }),
-                    attributes: Vec::new(),
+                    attributes: datatype::Attributes::default(),
                 })
             }
         }
@@ -285,7 +279,7 @@ const _: () = {
                                 .build(),
                         ),
                     ],
-                    attributes: vec![],
+                    attributes: datatype::Attributes::default(),
                 })
             }
         }
@@ -425,7 +419,7 @@ const _: () = {
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
                                     ty: Some(uhlc::NTP64::definition(types)),
-                                    attributes: Vec::new(),
+                                    attributes: datatype::Attributes::default(),
                                 },
                             ),
                             (
@@ -437,13 +431,13 @@ const _: () = {
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
                                     ty: Some(uhlc::ID::definition(types)),
-                                    attributes: Vec::new(),
+                                    attributes: datatype::Attributes::default(),
                                 },
                             ),
                         ],
-                        attributes: Vec::new(),
+                        attributes: datatype::Attributes::default(),
                     }),
-                    attributes: Vec::new(),
+                    attributes: datatype::Attributes::default(),
                 });
             }
         }
@@ -566,7 +560,7 @@ impl_ndt!(
                             .build(),
                     ),
                 ],
-                attributes: vec![],
+                attributes: datatype::Attributes::default(),
             });
         }
     }
@@ -580,7 +574,7 @@ impl_ndt!(
             let mut s = Struct::unit();
             s.set_fields(crate::internal::construct::fields_unnamed(
                 vec![Field::new(u64::definition(types))],
-                vec![],
+                datatype::Attributes::default(),
             ));
 
             ndt.inner = DataType::Struct(s);
@@ -605,7 +599,7 @@ const _: () = {
                         ("Pressed".into(), EnumVariant::unit()),
                         ("Released".into(), EnumVariant::unit()),
                     ],
-                    attributes: vec![],
+                    attributes: datatype::Attributes::default(),
                 });
             }
         }
@@ -633,7 +627,7 @@ const _: () = {
                             Field::new(bevy_ecs::entity::Entity::definition(types)),
                         ),
                     ],
-                    vec![],
+                    datatype::Attributes::default(),
                 ));
 
                 ndt.inner = DataType::Struct(s);
@@ -659,7 +653,7 @@ const _: () = {
                             Field::new(bevy_ecs::entity::Entity::definition(types)),
                         ),
                     ],
-                    vec![],
+                    datatype::Attributes::default(),
                 ));
 
                 ndt.inner = DataType::Struct(s);
@@ -683,7 +677,7 @@ const _: () = {
                                 .build(),
                         ),
                     ],
-                    attributes: vec![],
+                    attributes: datatype::Attributes::default(),
                 });
             }
         }
@@ -705,7 +699,7 @@ const _: () = {
                             Field::new(bevy_ecs::entity::Entity::definition(types)),
                         ),
                     ],
-                    vec![],
+                    datatype::Attributes::default(),
                 ));
 
                 ndt.inner = DataType::Struct(s);
@@ -720,7 +714,7 @@ const _: () = {
                         ("Line".into(), EnumVariant::unit()),
                         ("Pixel".into(), EnumVariant::unit()),
                     ],
-                    attributes: vec![],
+                    attributes: datatype::Attributes::default(),
                 });
             }
         }
@@ -731,7 +725,7 @@ const _: () = {
                 let mut s = Struct::unit();
                 s.set_fields(crate::internal::construct::fields_named(
                     vec![("delta".into(), Field::new(glam::Vec2::definition(types)))],
-                    vec![],
+                    datatype::Attributes::default(),
                 ));
 
                 ndt.inner = DataType::Struct(s);
@@ -798,12 +792,7 @@ impl_ndt!(
                             .build(),
                     ),
                 ],
-                attributes: vec![Attribute {
-                    path: String::from("serde"),
-                    kind: AttributeMeta::List(vec![AttributeNestedMeta::Meta(AttributeMeta::Path(
-                        String::from("untagged"),
-                    ))]),
-                }],
+                attributes: datatype::Attributes::default(),
             });
         }
     }
@@ -824,7 +813,7 @@ impl_ndt!(
                         Field::new(Option::<geojson::JsonObject>::definition(types)),
                     ),
                 ],
-                vec![],
+                datatype::Attributes::default(),
             ));
 
             ndt.inner = DataType::Struct(s);
@@ -858,7 +847,7 @@ impl_ndt!(
                         Field::new(Option::<geojson::JsonObject>::definition(types)),
                     ),
                 ],
-                vec![],
+                datatype::Attributes::default(),
             ));
 
             ndt.inner = DataType::Struct(s);
@@ -884,7 +873,7 @@ impl_ndt!(
                         Field::new(Option::<geojson::JsonObject>::definition(types)),
                     ),
                 ],
-                vec![],
+                datatype::Attributes::default(),
             ));
 
             ndt.inner = DataType::Struct(s);
@@ -909,12 +898,7 @@ impl_ndt!(
                             .build(),
                     ),
                 ],
-                attributes: vec![Attribute {
-                    path: String::from("serde"),
-                    kind: AttributeMeta::List(vec![AttributeNestedMeta::Meta(AttributeMeta::Path(
-                        String::from("untagged"),
-                    ))]),
-                }],
+                attributes: datatype::Attributes::default(),
             });
         }
     }
@@ -931,7 +915,7 @@ impl_ndt!(
                     "layers".into(),
                     Field::new(Vec::<geozero::mvt::tile::Layer>::definition(types)),
                 )],
-                vec![],
+                datatype::Attributes::default(),
             ));
 
             ndt.inner = DataType::Struct(s);
@@ -970,7 +954,7 @@ impl_ndt!(
                         Field::new(Option::<bool>::definition(types)),
                     ),
                 ],
-                vec![],
+                datatype::Attributes::default(),
             ));
 
             ndt.inner = DataType::Struct(s);
@@ -988,7 +972,7 @@ impl_ndt!(
                     ("type".into(), Field::new(Option::<i32>::definition(types))),
                     ("geometry".into(), Field::new(Vec::<u32>::definition(types))),
                 ],
-                vec![],
+                datatype::Attributes::default(),
             ));
 
             ndt.inner = DataType::Struct(s);
@@ -1014,7 +998,7 @@ impl_ndt!(
                     ),
                     ("extent".into(), Field::new(Option::<u32>::definition(types))),
                 ],
-                vec![],
+                datatype::Attributes::default(),
             ));
 
             ndt.inner = DataType::Struct(s);
@@ -1031,7 +1015,7 @@ impl_ndt!(
                     ("Linestring".into(), EnumVariant::unit()),
                     ("Polygon".into(), EnumVariant::unit()),
                 ],
-                attributes: vec![],
+                attributes: datatype::Attributes::default(),
             });
         }
     }

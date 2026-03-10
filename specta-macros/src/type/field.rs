@@ -1,8 +1,8 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::quote;
 use syn::Type;
 
-use super::{ContainerAttr, FieldAttr, lower_attr::lower_attribute};
+use super::{ContainerAttr, FieldAttr};
 
 pub fn construct_field(
     crate_ref: &TokenStream,
@@ -35,16 +35,6 @@ pub fn construct_field_with_variant_skip(
     let doc = attrs.common.doc;
     let inline = attrs.inline;
 
-    let lowered_field_attrs = raw_attrs
-        .iter()
-        .filter(|attr| {
-            let path = attr.path().to_token_stream().to_string();
-            !container_attrs.skip_attrs.contains(&path) && path != "specta"
-        })
-        .filter_map(|attr| lower_attribute(attr).transpose())
-        .map(|result| result.map(|attr| attr.to_tokens()))
-        .collect::<Result<Vec<_>, _>>()?;
-
     let ty = if attrs.skip || variant_skip {
         quote!(None)
     } else {
@@ -56,7 +46,7 @@ pub fn construct_field_with_variant_skip(
         #deprecated,
         #doc.into(),
         #inline,
-        vec![#(#lowered_field_attrs),*],
+        datatype::Attributes::default(),
         #ty
     )))
 }

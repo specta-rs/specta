@@ -20,7 +20,7 @@ pub mod construct {
         deprecated: Option<DeprecatedType>,
         docs: Cow<'static, str>,
         inline: bool,
-        attributes: Vec<Attribute>,
+        attributes: Attributes,
         ty: Option<DataType>,
     ) -> Field {
         Field {
@@ -33,13 +33,13 @@ pub mod construct {
         }
     }
 
-    pub const fn fields_unnamed(fields: Vec<Field>, attributes: Vec<Attribute>) -> Fields {
+    pub const fn fields_unnamed(fields: Vec<Field>, attributes: Attributes) -> Fields {
         Fields::Unnamed(UnnamedFields { fields, attributes })
     }
 
     pub const fn fields_named(
         fields: Vec<(Cow<'static, str>, Field)>,
-        attributes: Vec<Attribute>,
+        attributes: Attributes,
     ) -> Fields {
         Fields::Named(NamedFields { fields, attributes })
     }
@@ -49,7 +49,7 @@ pub mod construct {
 mod functions {
     use std::borrow::Cow;
 
-    use crate::{TypeCollection, datatype::DeprecatedType, datatype::Function, function::SpectaFn};
+    use crate::{datatype::DeprecatedType, datatype::Function, function::SpectaFn, TypeCollection};
 
     #[doc(hidden)]
     /// A helper for exporting a command to a [`CommandDataType`].
