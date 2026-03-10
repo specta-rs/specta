@@ -11,6 +11,23 @@ pub struct Error {
 
 #[derive(Debug)]
 enum ErrorKind {
+    InvalidMapKey {
+        path: String,
+        reason: Cow<'static, str>,
+    },
+    InvalidUsageOfSkip {
+        path: String,
+        reason: Cow<'static, str>,
+    },
+    InvalidInternallyTaggedEnum {
+        path: String,
+        variant: String,
+        reason: Cow<'static, str>,
+    },
+    UnresolvedGenericReference {
+        path: String,
+        generic: String,
+    },
     InvalidEnumRepresentation {
         reason: Cow<'static, str>,
     },
@@ -33,6 +50,56 @@ enum ErrorKind {
 }
 
 impl Error {
+    pub(crate) fn invalid_map_key(
+        path: impl Into<String>,
+        reason: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::InvalidMapKey {
+                path: path.into(),
+                reason: reason.into(),
+            },
+        }
+    }
+
+    pub(crate) fn invalid_usage_of_skip(
+        path: impl Into<String>,
+        reason: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::InvalidUsageOfSkip {
+                path: path.into(),
+                reason: reason.into(),
+            },
+        }
+    }
+
+    pub(crate) fn invalid_internally_tagged_enum(
+        path: impl Into<String>,
+        variant: impl Into<String>,
+        reason: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::InvalidInternallyTaggedEnum {
+                path: path.into(),
+                variant: variant.into(),
+                reason: reason.into(),
+            },
+        }
+    }
+
+    pub(crate) fn unresolved_generic_reference(
+        path: impl Into<String>,
+        generic: impl Into<String>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::UnresolvedGenericReference {
+                path: path.into(),
+                generic: generic.into(),
+            },
+        }
+    }
+
     pub(crate) fn invalid_enum_representation(reason: impl Into<Cow<'static, str>>) -> Self {
         Self {
             kind: ErrorKind::InvalidEnumRepresentation {
@@ -89,6 +156,24 @@ impl Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
+            ErrorKind::InvalidMapKey { path, reason } => {
+                write!(f, "Invalid map key at '{path}': {reason}")
+            }
+            ErrorKind::InvalidUsageOfSkip { path, reason } => {
+                write!(f, "Invalid usage of #[serde(skip)] at '{path}': {reason}")
+            }
+            ErrorKind::InvalidInternallyTaggedEnum {
+                path,
+                variant,
+                reason,
+            } => write!(
+                f,
+                "Invalid internally tagged enum at '{path}', variant '{variant}': {reason}"
+            ),
+            ErrorKind::UnresolvedGenericReference { path, generic } => write!(
+                f,
+                "Unresolved generic reference '{generic}' while validating '{path}'"
+            ),
             ErrorKind::InvalidEnumRepresentation { reason } => {
                 write!(f, "Invalid serde enum representation: {reason}")
             }

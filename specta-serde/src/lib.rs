@@ -23,6 +23,7 @@ mod error;
 mod inflection;
 mod parser;
 mod repr;
+mod validate;
 
 pub use error::{Error, Result};
 pub use inflection::RenameRule;
@@ -33,6 +34,8 @@ pub use parser::{
 use repr::EnumRepr;
 
 pub fn apply(types: TypeCollection) -> Result<TypeCollection> {
+    validate::validate(&types)?;
+
     let mut out = types;
     let mut rewrite_err = None;
 
@@ -54,6 +57,8 @@ pub fn apply(types: TypeCollection) -> Result<TypeCollection> {
 }
 
 pub fn apply_phases(types: TypeCollection) -> Result<TypeCollection> {
+    validate::validate(&types)?;
+
     let originals = types.into_unsorted_iter().cloned().collect::<Vec<_>>();
     let mut dependencies = HashMap::<TypeKey, HashSet<TypeKey>>::new();
     let mut reverse_dependencies = HashMap::<TypeKey, HashSet<TypeKey>>::new();

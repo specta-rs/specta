@@ -4,7 +4,6 @@ use specta::{
     Type, TypeCollection,
     datatype::{DataType, Reference},
 };
-use specta_serde::SerdeMode;
 use specta_typescript::{BigIntExportBehavior, Layout, Typescript, primitives};
 use tempfile::TempDir;
 
@@ -37,56 +36,80 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
     (types, dts)
 }
 
+fn phase_collections(
+    types: TypeCollection,
+) -> [(&'static str, Result<TypeCollection, specta_serde::Error>); 3] {
+    [
+        ("raw", Ok(types.clone())),
+        ("serde", specta_serde::apply(types.clone())),
+        ("serde_phases", specta_serde::apply_phases(types)),
+    ]
+}
+
 #[test]
 fn typescript_export() {
-    for mode in [
-        SerdeMode::Both,
-        SerdeMode::Serialize,
-        SerdeMode::Deserialize,
-    ] {
+    for (mode, types) in phase_collections(types().0) {
         insta::assert_snapshot!(
-            format!("ts-export-{}", mode.to_string().to_lowercase()),
-            Typescript::default()
-                .with_serde(mode)
-                .bigint(BigIntExportBehavior::Number)
-                .export(&types().0)
-                .unwrap()
+            format!("ts-export-{mode}"),
+            match types {
+                Ok(types) => Typescript::default()
+                    .bigint(BigIntExportBehavior::Number)
+                    .export(&types)
+                    .unwrap(),
+                Err(err) => format!("ERROR: {err}"),
+            }
         );
     }
 }
 
 #[test]
 fn typescript_export_serde_errors() {
-    use std::error::Error as _;
-
     fn assert_serde_error<T: Type>(
         failures: &mut Vec<String>,
-        mode: SerdeMode,
         name: &str,
-        expected_serde_error: specta_serde::Error,
+        expected_error: &str,
+        expect_apply_error: bool,
     ) {
         let types = TypeCollection::default().register::<T>();
-        match Typescript::default().with_serde(mode).export(&types) {
-            Err(err) => {
-                let Some(serde_err) = err
-                    .source()
-                    .and_then(|err| err.downcast_ref::<specta_serde::Error>())
-                else {
-                    failures.push(format!(
-                        "{name}: ERROR: {err} (missing specta_serde::Error source)"
-                    ));
-                    return;
-                };
-
-                if serde_err != &expected_serde_error {
-                    failures.push(format!(
-                        "{name}: ERROR: expected serde error {expected_serde_error:?}, got {serde_err:?}"
-                    ));
+        for (mode, output) in [
+            (
+                "serde",
+                specta_serde::apply(types.clone()).map(|types| {
+                    Typescript::default()
+                        .bigint(BigIntExportBehavior::Number)
+                        .export(&types)
+                }),
+            ),
+            (
+                "serde_phases",
+                specta_serde::apply_phases(types.clone()).map(|types| {
+                    Typescript::default()
+                        .bigint(BigIntExportBehavior::Number)
+                        .export(&types)
+                }),
+            ),
+        ] {
+            match output {
+                Err(err) => {
+                    if mode == "serde" && !expect_apply_error {
+                        failures.push(format!("{name} ({mode}): expected success, got '{err}'"));
+                    } else if !err.to_string().contains(expected_error) {
+                        failures.push(format!(
+                            "{name} ({mode}): expected error containing '{expected_error}', got '{err}'"
+                        ));
+                    }
                 }
+                Ok(Ok(_)) if mode == "serde" && !expect_apply_error => {}
+                Ok(Err(err)) => failures.push(format!(
+                    "{name} ({mode}): expected serde error but export failed with '{err}'"
+                )),
+                Ok(Ok(output)) if mode == "serde" && expect_apply_error => failures.push(format!(
+                    "{name} ({mode}): expected serde error, got output: {output}"
+                )),
+                Ok(Ok(output)) => failures.push(format!(
+                    "{name} ({mode}): expected serde error, got output: {output}"
+                )),
             }
-            Ok(output) => failures.push(format!(
-                "{name}: expected error in {mode:?} mode, got output: {output}"
-            )),
         }
     }
 
@@ -175,67 +198,61 @@ fn typescript_export_serde_errors() {
 
     let mut failures = Vec::new();
 
-    for mode in [
-        SerdeMode::Both,
-        SerdeMode::Serialize,
-        SerdeMode::Deserialize,
-    ] {
-        assert_serde_error::<InternallyTaggedB>(
-            &mut failures,
-            mode,
-            "InternallyTaggedB",
-            specta_serde::Error::InvalidInternallyTaggedEnum,
-        );
-        assert_serde_error::<InternallyTaggedC>(
-            &mut failures,
-            mode,
-            "InternallyTaggedC",
-            specta_serde::Error::InvalidInternallyTaggedEnum,
-        );
-        assert_serde_error::<InternallyTaggedG>(
-            &mut failures,
-            mode,
-            "InternallyTaggedG",
-            specta_serde::Error::InvalidInternallyTaggedEnum,
-        );
-        assert_serde_error::<InternallyTaggedI>(
-            &mut failures,
-            mode,
-            "InternallyTaggedI",
-            specta_serde::Error::InvalidInternallyTaggedEnum,
-        );
+    assert_serde_error::<InternallyTaggedB>(
+        &mut failures,
+        "InternallyTaggedB",
+        "Invalid internally tagged enum",
+        true,
+    );
+    assert_serde_error::<InternallyTaggedC>(
+        &mut failures,
+        "InternallyTaggedC",
+        "Invalid internally tagged enum",
+        true,
+    );
+    assert_serde_error::<InternallyTaggedG>(
+        &mut failures,
+        "InternallyTaggedG",
+        "Invalid internally tagged enum",
+        true,
+    );
+    assert_serde_error::<InternallyTaggedI>(
+        &mut failures,
+        "InternallyTaggedI",
+        "Invalid internally tagged enum",
+        false,
+    );
 
-        assert_serde_error::<TaggedEnumOfEmptyTupleStruct>(
-            &mut failures,
-            mode,
-            "TaggedEnumOfEmptyTupleStruct",
-            specta_serde::Error::InvalidInternallyTaggedEnum,
-        );
-        assert_serde_error::<SkipOnlyVariantExternallyTagged>(
-            &mut failures,
-            mode,
-            "SkipOnlyVariantExternallyTagged",
-            specta_serde::Error::InvalidUsageOfSkip,
-        );
-        assert_serde_error::<SkipOnlyVariantInternallyTagged>(
-            &mut failures,
-            mode,
-            "SkipOnlyVariantInternallyTagged",
-            specta_serde::Error::InvalidUsageOfSkip,
-        );
-        assert_serde_error::<SkipOnlyVariantAdjacentlyTagged>(
-            &mut failures,
-            mode,
-            "SkipOnlyVariantAdjacentlyTagged",
-            specta_serde::Error::InvalidUsageOfSkip,
-        );
-        assert_serde_error::<SkipOnlyVariantUntagged>(
-            &mut failures,
-            mode,
-            "SkipOnlyVariantUntagged",
-            specta_serde::Error::InvalidUsageOfSkip,
-        );
-    }
+    assert_serde_error::<TaggedEnumOfEmptyTupleStruct>(
+        &mut failures,
+        "TaggedEnumOfEmptyTupleStruct",
+        "Invalid internally tagged enum",
+        false,
+    );
+    assert_serde_error::<SkipOnlyVariantExternallyTagged>(
+        &mut failures,
+        "SkipOnlyVariantExternallyTagged",
+        "Invalid usage of #[serde(skip)]",
+        true,
+    );
+    assert_serde_error::<SkipOnlyVariantInternallyTagged>(
+        &mut failures,
+        "SkipOnlyVariantInternallyTagged",
+        "Invalid usage of #[serde(skip)]",
+        true,
+    );
+    assert_serde_error::<SkipOnlyVariantAdjacentlyTagged>(
+        &mut failures,
+        "SkipOnlyVariantAdjacentlyTagged",
+        "Invalid usage of #[serde(skip)]",
+        true,
+    );
+    assert_serde_error::<SkipOnlyVariantUntagged>(
+        &mut failures,
+        "SkipOnlyVariantUntagged",
+        "Invalid usage of #[serde(skip)]",
+        true,
+    );
 
     assert!(
         failures.is_empty(),
@@ -256,26 +273,22 @@ fn typescript_export_to() {
         Layout::ModulePrefixedName,
         Layout::Namespaces,
     ] {
-        for mode in [
-            SerdeMode::Both,
-            SerdeMode::Serialize,
-            SerdeMode::Deserialize,
-        ] {
-            let name = format!(
-                "ts-export-to-{}-{}",
-                layout.to_string().to_lowercase(),
-                mode.to_string().to_lowercase()
-            );
-            let path = temp.path().join(&name);
+        for (mode, types) in phase_collections(types().0) {
+            let name = format!("ts-export-to-{}-{mode}", layout.to_string().to_lowercase());
+            let output = match types {
+                Ok(types) => {
+                    let path = temp.path().join(&name);
+                    Typescript::default()
+                        .bigint(BigIntExportBehavior::Number)
+                        .layout(layout)
+                        .export_to(&path, &types)
+                        .unwrap();
+                    fs_to_string(&path).unwrap()
+                }
+                Err(err) => format!("ERROR: {err}"),
+            };
 
-            Typescript::default()
-                .with_serde(mode)
-                .bigint(BigIntExportBehavior::Number)
-                .layout(layout)
-                .export_to(&path, &types().0)
-                .unwrap();
-
-            insta::assert_snapshot!(name, fs_to_string(&path).unwrap());
+            insta::assert_snapshot!(name, output);
         }
     }
 
@@ -287,105 +300,102 @@ fn typescript_export_to() {
 
 #[test]
 fn primitives_export() {
-    for mode in [
-        SerdeMode::Both,
-        SerdeMode::Serialize,
-        SerdeMode::Deserialize,
-    ] {
-        let ts = Typescript::default()
-            .with_serde(mode)
-            .bigint(BigIntExportBehavior::Number);
-        let (types, dts) = crate::types();
-        insta::assert_snapshot!(
-            format!("export-{}", mode.to_string().to_lowercase()),
-            dts.iter()
-                .filter_map(|(s, ty)| match ty {
-                    DataType::Reference(Reference::Named(r)) =>
-                        r.get(&types).cloned().map(|ty| (s, ty)),
-                    _ => None,
-                })
-                .map(
-                    |(s, ty)| primitives::export(&ts, &types, iter::once(&ty), "")
-                        .map(|ty| format!("{s}: {ty}"))
-                )
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap()
-                .join("\n")
-        );
+    let (types, dts) = crate::types();
+    for (mode, types) in phase_collections(types) {
+        let output = match types {
+            Ok(types) => {
+                let ts = Typescript::default().bigint(BigIntExportBehavior::Number);
+                dts.iter()
+                    .filter_map(|(s, ty)| match ty {
+                        DataType::Reference(Reference::Named(r)) => {
+                            r.get(&types).cloned().map(|ty| (s, ty))
+                        }
+                        _ => None,
+                    })
+                    .map(|(s, ty)| {
+                        primitives::export(&ts, &types, iter::once(&ty), "")
+                            .map(|ty| format!("{s}: {ty}"))
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+                    .unwrap()
+                    .join("\n")
+            }
+            Err(err) => format!("ERROR: {err}"),
+        };
+
+        insta::assert_snapshot!(format!("export-{mode}"), output);
     }
 }
 
 #[test]
 fn primitives_export_many() {
-    for mode in [
-        SerdeMode::Both,
-        SerdeMode::Serialize,
-        SerdeMode::Deserialize,
-    ] {
-        let ts = Typescript::default()
-            .with_serde(mode)
-            .bigint(BigIntExportBehavior::Number);
-        let (types, dts) = crate::types();
-        let ndts = dts
-            .iter()
-            .filter_map(|(_, ty)| match ty {
-                DataType::Reference(Reference::Named(r)) => r.get(&types),
-                _ => None,
-            })
-            .collect::<Vec<_>>();
+    let (types, dts) = crate::types();
+    for (mode, types) in phase_collections(types) {
+        let output = match types {
+            Ok(types) => {
+                let ts = Typescript::default().bigint(BigIntExportBehavior::Number);
+                let ndts = dts
+                    .iter()
+                    .filter_map(|(_, ty)| match ty {
+                        DataType::Reference(Reference::Named(r)) => r.get(&types),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>();
 
-        insta::assert_snapshot!(
-            format!("export-many-{}", mode.to_string().to_lowercase()),
-            primitives::export(&ts, &types, ndts.into_iter(), "").unwrap()
-        );
+                primitives::export(&ts, &types, ndts.into_iter(), "").unwrap()
+            }
+            Err(err) => format!("ERROR: {err}"),
+        };
+
+        insta::assert_snapshot!(format!("export-many-{mode}"), output);
     }
 }
 
 #[test]
 fn primitives_reference() {
-    for mode in [
-        SerdeMode::Both,
-        SerdeMode::Serialize,
-        SerdeMode::Deserialize,
-    ] {
-        let ts = Typescript::default()
-            .with_serde(mode)
-            .bigint(BigIntExportBehavior::Number);
-        let (types, dts) = crate::types();
-        insta::assert_snapshot!(
-            format!("reference-{}", mode.to_string().to_lowercase()),
-            dts.iter()
-                .filter_map(|(s, ty)| match ty {
-                    DataType::Reference(r) => Some((s, r)),
-                    _ => None,
-                })
-                .map(|(s, ty)| primitives::reference(&ts, &types, ty).map(|ty| format!("{s}: {ty}")))
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap()
-                .join("\n")
-        );
+    let (types, dts) = crate::types();
+    for (mode, types) in phase_collections(types) {
+        let output = match types {
+            Ok(types) => {
+                let ts = Typescript::default().bigint(BigIntExportBehavior::Number);
+                dts.iter()
+                    .filter_map(|(s, ty)| match ty {
+                        DataType::Reference(r) => Some((s, r)),
+                        _ => None,
+                    })
+                    .map(|(s, ty)| {
+                        primitives::reference(&ts, &types, ty).map(|ty| format!("{s}: {ty}"))
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+                    .unwrap()
+                    .join("\n")
+            }
+            Err(err) => format!("ERROR: {err}"),
+        };
+
+        insta::assert_snapshot!(format!("reference-{mode}"), output);
     }
 }
 
 #[test]
 fn primitives_inline() {
-    for mode in [
-        SerdeMode::Both,
-        SerdeMode::Serialize,
-        SerdeMode::Deserialize,
-    ] {
-        let ts = Typescript::default()
-            .with_serde(mode)
-            .bigint(BigIntExportBehavior::Number);
-        let (types, dts) = crate::types();
-        insta::assert_snapshot!(
-            format!("inline-{}", mode.to_string().to_lowercase()),
-            dts.iter()
-                .map(|(s, ty)| primitives::inline(&ts, &types, ty).map(|ty| format!("{s}: {ty}")))
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap()
-                .join("\n")
-        );
+    let (types, dts) = crate::types();
+    for (mode, types) in phase_collections(types) {
+        let output = match types {
+            Ok(types) => {
+                let ts = Typescript::default().bigint(BigIntExportBehavior::Number);
+                dts.iter()
+                    .map(|(s, ty)| {
+                        primitives::inline(&ts, &types, ty).map(|ty| format!("{s}: {ty}"))
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+                    .unwrap()
+                    .join("\n")
+            }
+            Err(err) => format!("ERROR: {err}"),
+        };
+
+        insta::assert_snapshot!(format!("inline-{mode}"), output);
     }
 }
 
