@@ -724,7 +724,7 @@ version = "0.0.0"
 dependencies = [
  "serde",
  "specta",
- "specta-typescript",
+ "specta-serde",
 ]
 
 [[package]]
@@ -1887,8 +1887,6 @@ dependencies = [
 name = "specta-serde"
 version = "0.0.10"
 dependencies = [
- "serde",
- "serde_json",
  "specta",
 ]
 
