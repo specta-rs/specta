@@ -8,7 +8,6 @@
 use specta::TypeCollection;
 
 mod inflection;
-#[doc(hidden)]
 pub mod parser;
 mod repr;
 

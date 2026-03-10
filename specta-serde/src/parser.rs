@@ -1,383 +1,886 @@
-use std::borrow::Cow;
+pub use crate::inflection::RenameRule;
 
-use specta::datatype::{
-    Attribute, AttributeLiteral, AttributeMeta, AttributeNestedMeta, AttributeValue, DataType,
-};
-
-use crate::{inflection::RenameRule, repr::EnumRepr};
-
+/// Conversion metadata parsed from serde conversion attributes.
+#[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ParserError {
-    InvalidRenameRule(String),
-}
-
-#[derive(Debug, Clone)]
 pub struct ConversionType {
-    pub ty: DataType,
+    pub type_src: String,
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct SerdeAttributes {
-    pub rename: Option<String>,
+/// Parsed serde container attributes.
+#[allow(missing_docs)]
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct SerdeContainerAttrs {
     pub rename_serialize: Option<String>,
     pub rename_deserialize: Option<String>,
-    pub rename_all: Option<RenameRule>,
     pub rename_all_serialize: Option<RenameRule>,
     pub rename_all_deserialize: Option<RenameRule>,
-    pub rename_all_fields: Option<RenameRule>,
     pub rename_all_fields_serialize: Option<RenameRule>,
     pub rename_all_fields_deserialize: Option<RenameRule>,
-    pub skip_serializing: bool,
-    pub skip_deserializing: bool,
-    pub skip: bool,
-    pub flatten: bool,
-    pub default: bool,
-    pub default_with: Option<String>,
-    pub transparent: bool,
     pub deny_unknown_fields: bool,
-    pub repr: Option<EnumRepr>,
     pub tag: Option<String>,
     pub content: Option<String>,
     pub untagged: bool,
+    pub bound_serialize: Option<String>,
+    pub bound_deserialize: Option<String>,
+    pub default: Option<String>,
     pub remote: Option<String>,
+    pub transparent: bool,
     pub from: Option<ConversionType>,
     pub try_from: Option<ConversionType>,
     pub into: Option<ConversionType>,
+    pub serde_crate: Option<String>,
+    pub expecting: Option<String>,
+    pub variant_identifier: bool,
+    pub field_identifier: bool,
+}
+
+/// Parsed serde variant attributes.
+#[allow(missing_docs)]
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct SerdeVariantAttrs {
+    pub rename_serialize: Option<String>,
+    pub rename_deserialize: Option<String>,
+    pub aliases: Vec<String>,
+    pub rename_all_serialize: Option<RenameRule>,
+    pub rename_all_deserialize: Option<RenameRule>,
+    pub skip_serializing: bool,
+    pub skip_deserializing: bool,
+    pub serialize_with: Option<String>,
+    pub deserialize_with: Option<String>,
+    pub with: Option<String>,
+    pub bound_serialize: Option<String>,
+    pub bound_deserialize: Option<String>,
+    pub borrow: Option<String>,
     pub other: bool,
-    pub alias: Vec<String>,
-    pub serialize_with: Option<String>,
-    pub deserialize_with: Option<String>,
-    pub with: Option<String>,
+    pub untagged: bool,
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct SerdeFieldAttributes {
-    pub base: SerdeAttributes,
-    pub alias: Vec<String>,
-    pub serialize_with: Option<String>,
-    pub deserialize_with: Option<String>,
-    pub with: Option<String>,
+/// Parsed serde field attributes.
+#[allow(missing_docs)]
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct SerdeFieldAttrs {
+    pub rename_serialize: Option<String>,
+    pub rename_deserialize: Option<String>,
+    pub aliases: Vec<String>,
+    pub default: Option<String>,
+    pub flatten: bool,
+    pub skip_serializing: bool,
+    pub skip_deserializing: bool,
     pub skip_serializing_if: Option<String>,
+    pub serialize_with: Option<String>,
+    pub deserialize_with: Option<String>,
+    pub with: Option<String>,
+    pub borrow: Option<String>,
+    pub bound_serialize: Option<String>,
+    pub bound_deserialize: Option<String>,
+    pub getter: Option<String>,
 }
 
-pub fn parse_serde_attributes(attributes: &[Attribute]) -> Result<SerdeAttributes, ParserError> {
-    let mut attrs = SerdeAttributes::default();
-
-    for attr in attributes {
-        if attr.path == "serde" {
-            parse_serde_attribute_content(&attr.kind, &mut attrs)?;
-        }
-    }
-
-    finalize_enum_repr(&mut attrs);
-
-    Ok(attrs)
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __specta_serde_set_str {
+    ($target:expr, $field:ident, $value:literal) => {{
+        const _: &str = $value;
+        $target.$field = Some(String::from($value));
+    }};
 }
 
-pub fn parse_field_serde_attributes(
-    attrs: &[Attribute],
-) -> Result<SerdeFieldAttributes, ParserError> {
-    let mut result = SerdeFieldAttributes {
-        base: parse_serde_attributes(attrs)?,
-        ..Default::default()
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __specta_serde_set_case {
+    ($target:expr, $field:ident, "lowercase") => {{
+        $target.$field = Some($crate::parser::RenameRule::LowerCase);
+    }};
+    ($target:expr, $field:ident, "UPPERCASE") => {{
+        $target.$field = Some($crate::parser::RenameRule::UpperCase);
+    }};
+    ($target:expr, $field:ident, "PascalCase") => {{
+        $target.$field = Some($crate::parser::RenameRule::PascalCase);
+    }};
+    ($target:expr, $field:ident, "camelCase") => {{
+        $target.$field = Some($crate::parser::RenameRule::CamelCase);
+    }};
+    ($target:expr, $field:ident, "snake_case") => {{
+        $target.$field = Some($crate::parser::RenameRule::SnakeCase);
+    }};
+    ($target:expr, $field:ident, "SCREAMING_SNAKE_CASE") => {{
+        $target.$field = Some($crate::parser::RenameRule::ScreamingSnakeCase);
+    }};
+    ($target:expr, $field:ident, "kebab-case") => {{
+        $target.$field = Some($crate::parser::RenameRule::KebabCase);
+    }};
+    ($target:expr, $field:ident, "SCREAMING-KEBAB-CASE") => {{
+        $target.$field = Some($crate::parser::RenameRule::ScreamingKebabCase);
+    }};
+    ($target:expr, $field:ident, $value:tt) => {{
+        compile_error!(concat!(
+            "unsupported serde casing: `",
+            stringify!($value),
+            "`"
+        ));
+    }};
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __specta_serde_parse_rename_list {
+    ($target:expr; serialize = $value:literal $(, $($rest:tt)*)?) => {
+        $crate::__specta_serde_set_str!($target, rename_serialize, $value);
+        $( $crate::__specta_serde_parse_rename_list!($target; $($rest)*); )?
+    };
+    ($target:expr; deserialize = $value:literal $(, $($rest:tt)*)?) => {
+        $crate::__specta_serde_set_str!($target, rename_deserialize, $value);
+        $( $crate::__specta_serde_parse_rename_list!($target; $($rest)*); )?
+    };
+    ($target:expr; $unknown:ident $(= $value:expr)? $(, $($rest:tt)*)?) => {
+        $( $crate::__specta_serde_parse_rename_list!($target; $($rest)*); )?
+    };
+    ($target:expr; ) => {};
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __specta_serde_parse_rename_all_list {
+    ($target:expr; serialize = $value:tt $(, $($rest:tt)*)?) => {
+        $crate::__specta_serde_set_case!($target, rename_all_serialize, $value);
+        $( $crate::__specta_serde_parse_rename_all_list!($target; $($rest)*); )?
+    };
+    ($target:expr; deserialize = $value:tt $(, $($rest:tt)*)?) => {
+        $crate::__specta_serde_set_case!($target, rename_all_deserialize, $value);
+        $( $crate::__specta_serde_parse_rename_all_list!($target; $($rest)*); )?
+    };
+    ($target:expr; $unknown:ident $(= $value:expr)? $(, $($rest:tt)*)?) => {
+        $( $crate::__specta_serde_parse_rename_all_list!($target; $($rest)*); )?
+    };
+    ($target:expr; ) => {};
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __specta_serde_parse_rename_all_fields_list {
+    ($target:expr; serialize = $value:tt $(, $($rest:tt)*)?) => {
+        $crate::__specta_serde_set_case!($target, rename_all_fields_serialize, $value);
+        $( $crate::__specta_serde_parse_rename_all_fields_list!($target; $($rest)*); )?
+    };
+    ($target:expr; deserialize = $value:tt $(, $($rest:tt)*)?) => {
+        $crate::__specta_serde_set_case!($target, rename_all_fields_deserialize, $value);
+        $( $crate::__specta_serde_parse_rename_all_fields_list!($target; $($rest)*); )?
+    };
+    ($target:expr; $unknown:ident $(= $value:expr)? $(, $($rest:tt)*)?) => {
+        $( $crate::__specta_serde_parse_rename_all_fields_list!($target; $($rest)*); )?
+    };
+    ($target:expr; ) => {};
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __specta_serde_parse_bound_list {
+    ($target:expr; serialize = $value:literal $(, $($rest:tt)*)?) => {
+        $crate::__specta_serde_set_str!($target, bound_serialize, $value);
+        $( $crate::__specta_serde_parse_bound_list!($target; $($rest)*); )?
+    };
+    ($target:expr; deserialize = $value:literal $(, $($rest:tt)*)?) => {
+        $crate::__specta_serde_set_str!($target, bound_deserialize, $value);
+        $( $crate::__specta_serde_parse_bound_list!($target; $($rest)*); )?
+    };
+    ($target:expr; $unknown:ident $(= $value:expr)? $(, $($rest:tt)*)?) => {
+        $( $crate::__specta_serde_parse_bound_list!($target; $($rest)*); )?
+    };
+    ($target:expr; ) => {};
+}
+
+/// Parse `#[serde(...)]` container attributes into [`SerdeContainerAttrs`].
+///
+/// # Example
+///
+/// ```rust
+/// let parsed = specta_serde::parse_serde_container_attrs!(#[serde(
+///     rename_all = "camelCase",
+///     rename(serialize = "SerName", deserialize = "DeName"),
+///     tag = "kind",
+///     content = "data"
+/// )]);
+///
+/// assert!(parsed.rename_all_serialize.is_some());
+/// assert_eq!(parsed.rename_serialize.as_deref(), Some("SerName"));
+/// assert_eq!(parsed.tag.as_deref(), Some("kind"));
+/// ```
+///
+/// ```compile_fail
+/// let _ = specta_serde::parse_serde_container_attrs!(#[serde(rename_all = "camelCase123")]);
+/// ```
+#[macro_export]
+macro_rules! parse_serde_container_attrs {
+    (#[serde($($items:tt)*)]) => {{
+        let mut parsed = $crate::parser::SerdeContainerAttrs::default();
+        $crate::__specta_serde_parse_container_items!(parsed; $($items)*);
+        parsed
+    }};
+    ($($anything:tt)*) => {
+        compile_error!("expected `#[serde(...)]`")
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __specta_serde_parse_container_items {
+    ($target:ident; ) => {};
+    ($target:ident; ,) => {};
+
+    ($target:ident; rename = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, rename_serialize, $value);
+        $crate::__specta_serde_set_str!($target, rename_deserialize, $value);
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; rename = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, rename_serialize, $value);
+        $crate::__specta_serde_set_str!($target, rename_deserialize, $value);
+    };
+    ($target:ident; rename($($inner:tt)*), $($rest:tt)*) => {
+        $crate::__specta_serde_parse_rename_list!($target; $($inner)*);
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; rename($($inner:tt)*)) => {
+        $crate::__specta_serde_parse_rename_list!($target; $($inner)*);
     };
 
-    for attr in attrs {
-        if attr.path == "serde" {
-            parse_serde_field_attribute_content(&attr.kind, &mut result)?;
-        }
-    }
+    ($target:ident; rename_all = $value:tt, $($rest:tt)*) => {
+        $crate::__specta_serde_set_case!($target, rename_all_serialize, $value);
+        $crate::__specta_serde_set_case!($target, rename_all_deserialize, $value);
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; rename_all = $value:tt) => {
+        $crate::__specta_serde_set_case!($target, rename_all_serialize, $value);
+        $crate::__specta_serde_set_case!($target, rename_all_deserialize, $value);
+    };
+    ($target:ident; rename_all($($inner:tt)*), $($rest:tt)*) => {
+        $crate::__specta_serde_parse_rename_all_list!($target; $($inner)*);
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; rename_all($($inner:tt)*)) => {
+        $crate::__specta_serde_parse_rename_all_list!($target; $($inner)*);
+    };
 
-    Ok(result)
-}
+    ($target:ident; rename_all_fields = $value:tt, $($rest:tt)*) => {
+        $crate::__specta_serde_set_case!($target, rename_all_fields_serialize, $value);
+        $crate::__specta_serde_set_case!($target, rename_all_fields_deserialize, $value);
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; rename_all_fields = $value:tt) => {
+        $crate::__specta_serde_set_case!($target, rename_all_fields_serialize, $value);
+        $crate::__specta_serde_set_case!($target, rename_all_fields_deserialize, $value);
+    };
+    ($target:ident; rename_all_fields($($inner:tt)*), $($rest:tt)*) => {
+        $crate::__specta_serde_parse_rename_all_fields_list!($target; $($inner)*);
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; rename_all_fields($($inner:tt)*)) => {
+        $crate::__specta_serde_parse_rename_all_fields_list!($target; $($inner)*);
+    };
 
-fn parse_serde_field_attribute_content(
-    meta: &AttributeMeta,
-    attrs: &mut SerdeFieldAttributes,
-) -> Result<(), ParserError> {
-    parse_serde_attribute_content(meta, &mut attrs.base)?;
+    ($target:ident; bound = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, bound_serialize, $value);
+        $crate::__specta_serde_set_str!($target, bound_deserialize, $value);
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; bound = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, bound_serialize, $value);
+        $crate::__specta_serde_set_str!($target, bound_deserialize, $value);
+    };
+    ($target:ident; bound($($inner:tt)*), $($rest:tt)*) => {
+        $crate::__specta_serde_parse_bound_list!($target; $($inner)*);
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; bound($($inner:tt)*)) => {
+        $crate::__specta_serde_parse_bound_list!($target; $($inner)*);
+    };
 
-    match meta {
-        AttributeMeta::NameValue { key, value } => match key.as_str() {
-            "alias" => {
-                if let AttributeValue::Literal(AttributeLiteral::Str(alias_name)) = value {
-                    attrs.alias.push(alias_name.clone());
-                }
-            }
-            "serialize_with" => {
-                if let AttributeValue::Literal(AttributeLiteral::Str(func_name)) = value {
-                    attrs.serialize_with = Some(func_name.clone());
-                }
-            }
-            "deserialize_with" => {
-                if let AttributeValue::Literal(AttributeLiteral::Str(func_name)) = value {
-                    attrs.deserialize_with = Some(func_name.clone());
-                }
-            }
-            "with" => match value {
-                AttributeValue::Literal(AttributeLiteral::Str(module_path))
-                | AttributeValue::Expr(module_path) => {
-                    attrs.with = Some(module_path.clone());
-                }
-                _ => {}
-            },
-            "skip_serializing_if" => {
-                if let AttributeValue::Literal(AttributeLiteral::Str(func_name)) = value {
-                    attrs.skip_serializing_if = Some(func_name.clone());
-                }
-            }
-            _ => {}
-        },
-        AttributeMeta::List(list) => {
-            for nested in list {
-                if let AttributeNestedMeta::Meta(nested_meta) = nested {
-                    parse_serde_field_attribute_content(nested_meta, attrs)?;
-                }
-            }
-        }
-        _ => {}
-    }
+    ($target:ident; deny_unknown_fields, $($rest:tt)*) => {
+        $target.deny_unknown_fields = true;
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; deny_unknown_fields) => {
+        $target.deny_unknown_fields = true;
+    };
+    ($target:ident; untagged, $($rest:tt)*) => {
+        $target.untagged = true;
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; untagged) => {
+        $target.untagged = true;
+    };
+    ($target:ident; transparent, $($rest:tt)*) => {
+        $target.transparent = true;
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; transparent) => {
+        $target.transparent = true;
+    };
+    ($target:ident; variant_identifier, $($rest:tt)*) => {
+        $target.variant_identifier = true;
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; variant_identifier) => {
+        $target.variant_identifier = true;
+    };
+    ($target:ident; field_identifier, $($rest:tt)*) => {
+        $target.field_identifier = true;
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; field_identifier) => {
+        $target.field_identifier = true;
+    };
 
-    Ok(())
-}
-
-fn parse_serde_attribute_content(
-    meta: &AttributeMeta,
-    attrs: &mut SerdeAttributes,
-) -> Result<(), ParserError> {
-    match meta {
-        AttributeMeta::Path(path) => {
-            parse_serde_path_attribute(attrs, path);
-        }
-        AttributeMeta::NameValue { key, value } => {
-            parse_serde_name_value(attrs, key, value, None)?;
-        }
-        AttributeMeta::List(list) => {
-            let mut has_serialize_deserialize = false;
-            for nested in list {
-                if let AttributeNestedMeta::Meta(AttributeMeta::NameValue { key, .. }) = nested
-                    && (key == "serialize" || key == "deserialize")
-                {
-                    has_serialize_deserialize = true;
-                    break;
-                }
-            }
-
-            if has_serialize_deserialize {
-                for nested in list {
-                    if let AttributeNestedMeta::Meta(nested_meta) = nested {
-                        parse_complex_serde_attribute(nested_meta, attrs, "rename")?;
-                    }
-                }
-            } else {
-                for nested in list {
-                    match nested {
-                        AttributeNestedMeta::Meta(nested_meta) => {
-                            parse_serde_attribute_content(nested_meta, attrs)?;
-                        }
-                        AttributeNestedMeta::Literal(AttributeLiteral::Str(s)) => {
-                            parse_serde_path_attribute(attrs, s);
-                        }
-                        AttributeNestedMeta::Expr(_) | AttributeNestedMeta::Literal(_) => {}
-                    }
-                }
-            }
-        }
-    }
-
-    finalize_enum_repr(attrs);
-
-    Ok(())
-}
-
-fn parse_serde_name_value(
-    attrs: &mut SerdeAttributes,
-    key: &str,
-    value: &AttributeValue,
-    parent_key: Option<&str>,
-) -> Result<(), ParserError> {
-    if let Some(parent_key) = parent_key {
-        match key {
-            "serialize" => {
-                if let AttributeValue::Literal(AttributeLiteral::Str(name)) = value {
-                    match parent_key {
-                        "rename" => attrs.rename_serialize = Some(name.clone()),
-                        "rename_all" => {
-                            if let Ok(rule) = RenameRule::from_str(name) {
-                                attrs.rename_all_serialize = Some(rule);
-                            }
-                        }
-                        "rename_all_fields" => {
-                            if let Ok(rule) = RenameRule::from_str(name) {
-                                attrs.rename_all_fields_serialize = Some(rule);
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-                return Ok(());
-            }
-            "deserialize" => {
-                if let AttributeValue::Literal(AttributeLiteral::Str(name)) = value {
-                    match parent_key {
-                        "rename" => attrs.rename_deserialize = Some(name.clone()),
-                        "rename_all" => {
-                            if let Ok(rule) = RenameRule::from_str(name) {
-                                attrs.rename_all_deserialize = Some(rule);
-                            }
-                        }
-                        "rename_all_fields" => {
-                            if let Ok(rule) = RenameRule::from_str(name) {
-                                attrs.rename_all_fields_deserialize = Some(rule);
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-                return Ok(());
-            }
-            _ => {}
-        }
-    }
-
-    match key {
-        "rename" => {
-            if let AttributeValue::Literal(AttributeLiteral::Str(name)) = value {
-                attrs.rename = Some(name.clone());
-            }
-        }
-        "rename_all" => {
-            if let AttributeValue::Literal(AttributeLiteral::Str(rule_str)) = value {
-                attrs.rename_all = Some(
-                    RenameRule::from_str(rule_str)
-                        .map_err(|_| ParserError::InvalidRenameRule(rule_str.clone()))?,
-                );
-            }
-        }
-        "rename_all_fields" => {
-            if let AttributeValue::Literal(AttributeLiteral::Str(rule_str)) = value {
-                attrs.rename_all_fields = Some(
-                    RenameRule::from_str(rule_str)
-                        .map_err(|_| ParserError::InvalidRenameRule(rule_str.clone()))?,
-                );
-            }
-        }
-        "tag" => {
-            if let AttributeValue::Literal(AttributeLiteral::Str(tag_name)) = value {
-                attrs.tag = Some(tag_name.clone());
-                if attrs.repr.is_none() {
-                    attrs.repr = Some(EnumRepr::Internal {
-                        tag: Cow::Owned(tag_name.clone()),
-                    });
-                }
-            }
-        }
-        "content" => {
-            if let AttributeValue::Literal(AttributeLiteral::Str(content_name)) = value {
-                attrs.content = Some(content_name.clone());
-            }
-        }
-        "default" => match value {
-            AttributeValue::Literal(AttributeLiteral::Bool(true)) => attrs.default = true,
-            AttributeValue::Literal(AttributeLiteral::Str(func_path))
-            | AttributeValue::Expr(func_path) => {
-                attrs.default_with = Some(func_path.clone());
-            }
-            _ => {}
-        },
-        "remote" => {
-            if let AttributeValue::Literal(AttributeLiteral::Str(remote_type)) = value {
-                attrs.remote = Some(remote_type.clone());
-            }
-        }
-        "from" => {
-            if let AttributeValue::Type(ty) = value {
-                attrs.from = Some(ConversionType { ty: ty.clone() });
-            }
-        }
-        "try_from" => {
-            if let AttributeValue::Type(ty) = value {
-                attrs.try_from = Some(ConversionType { ty: ty.clone() });
-            }
-        }
-        "into" => {
-            if let AttributeValue::Type(ty) = value {
-                attrs.into = Some(ConversionType { ty: ty.clone() });
-            }
-        }
-        "alias" => {
-            if let AttributeValue::Literal(AttributeLiteral::Str(alias_name)) = value {
-                attrs.alias.push(alias_name.clone());
-            }
-        }
-        "serialize_with" => {
-            if let AttributeValue::Literal(AttributeLiteral::Str(serialize_fn)) = value {
-                attrs.serialize_with = Some(serialize_fn.clone());
-            }
-        }
-        "deserialize_with" => {
-            if let AttributeValue::Literal(AttributeLiteral::Str(deserialize_fn)) = value {
-                attrs.deserialize_with = Some(deserialize_fn.clone());
-            }
-        }
-        "with" => match value {
-            AttributeValue::Literal(AttributeLiteral::Str(with_module))
-            | AttributeValue::Expr(with_module) => {
-                attrs.with = Some(with_module.clone());
-            }
-            _ => {}
-        },
-        _ => {}
-    }
-
-    Ok(())
-}
-
-fn parse_complex_serde_attribute(
-    meta: &AttributeMeta,
-    attrs: &mut SerdeAttributes,
-    parent_key: &str,
-) -> Result<(), ParserError> {
-    match meta {
-        AttributeMeta::NameValue { key, value } => {
-            parse_serde_name_value(attrs, key, value, Some(parent_key))?;
-        }
-        AttributeMeta::List(list) => {
-            for nested in list {
-                if let AttributeNestedMeta::Meta(nested_meta) = nested {
-                    parse_complex_serde_attribute(nested_meta, attrs, parent_key)?;
-                }
-            }
-        }
-        _ => {}
-    }
-    Ok(())
-}
-
-fn parse_serde_path_attribute(attrs: &mut SerdeAttributes, attribute_name: &str) {
-    match attribute_name {
-        "skip" => attrs.skip = true,
-        "skip_serializing" => attrs.skip_serializing = true,
-        "skip_deserializing" => attrs.skip_deserializing = true,
-        "flatten" => attrs.flatten = true,
-        "default" => attrs.default = true,
-        "transparent" => attrs.transparent = true,
-        "untagged" => attrs.untagged = true,
-        "deny_unknown_fields" => attrs.deny_unknown_fields = true,
-        "other" => attrs.other = true,
-        _ => {}
-    }
-}
-
-fn finalize_enum_repr(attrs: &mut SerdeAttributes) {
-    if let (Some(tag), Some(content)) = (&attrs.tag, &attrs.content) {
-        attrs.repr = Some(EnumRepr::Adjacent {
-            tag: Cow::Owned(tag.clone()),
-            content: Cow::Owned(content.clone()),
+    ($target:ident; tag = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, tag, $value);
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; tag = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, tag, $value);
+    };
+    ($target:ident; content = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, content, $value);
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; content = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, content, $value);
+    };
+    ($target:ident; default = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, default, $value);
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; default = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, default, $value);
+    };
+    ($target:ident; default, $($rest:tt)*) => {
+        $target.default = Some(String::from("__default__"));
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; default) => {
+        $target.default = Some(String::from("__default__"));
+    };
+    ($target:ident; remote = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, remote, $value);
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; remote = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, remote, $value);
+    };
+    ($target:ident; from = $value:literal, $($rest:tt)*) => {
+        $target.from = Some($crate::parser::ConversionType {
+            type_src: String::from($value),
         });
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; from = $value:literal) => {
+        $target.from = Some($crate::parser::ConversionType {
+            type_src: String::from($value),
+        });
+    };
+    ($target:ident; try_from = $value:literal, $($rest:tt)*) => {
+        $target.try_from = Some($crate::parser::ConversionType {
+            type_src: String::from($value),
+        });
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; try_from = $value:literal) => {
+        $target.try_from = Some($crate::parser::ConversionType {
+            type_src: String::from($value),
+        });
+    };
+    ($target:ident; into = $value:literal, $($rest:tt)*) => {
+        $target.into = Some($crate::parser::ConversionType {
+            type_src: String::from($value),
+        });
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; into = $value:literal) => {
+        $target.into = Some($crate::parser::ConversionType {
+            type_src: String::from($value),
+        });
+    };
+    ($target:ident; crate = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, serde_crate, $value);
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; crate = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, serde_crate, $value);
+    };
+    ($target:ident; expecting = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, expecting, $value);
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; expecting = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, expecting, $value);
+    };
+
+    ($target:ident; $unknown:ident($($inner:tt)*), $($rest:tt)*) => {
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; $unknown:ident = $value:expr, $($rest:tt)*) => {
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; $unknown:ident, $($rest:tt)*) => {
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; $unknown:ident($($inner:tt)*)) => {};
+    ($target:ident; $unknown:ident = $value:expr) => {};
+    ($target:ident; $unknown:ident) => {};
+}
+
+/// Parse `#[serde(...)]` variant attributes into [`SerdeVariantAttrs`].
+#[macro_export]
+macro_rules! parse_serde_variant_attrs {
+    (#[serde($($items:tt)*)]) => {{
+        let mut parsed = $crate::parser::SerdeVariantAttrs::default();
+        $crate::__specta_serde_parse_variant_items!(parsed; $($items)*);
+        parsed
+    }};
+    ($($anything:tt)*) => {
+        compile_error!("expected `#[serde(...)]`")
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __specta_serde_parse_variant_items {
+    ($target:ident; ) => {};
+    ($target:ident; ,) => {};
+
+    ($target:ident; rename = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, rename_serialize, $value);
+        $crate::__specta_serde_set_str!($target, rename_deserialize, $value);
+        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
+    };
+    ($target:ident; rename = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, rename_serialize, $value);
+        $crate::__specta_serde_set_str!($target, rename_deserialize, $value);
+    };
+    ($target:ident; rename($($inner:tt)*), $($rest:tt)*) => {
+        $crate::__specta_serde_parse_rename_list!($target; $($inner)*);
+        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
+    };
+    ($target:ident; rename($($inner:tt)*)) => {
+        $crate::__specta_serde_parse_rename_list!($target; $($inner)*);
+    };
+    ($target:ident; alias = $value:literal, $($rest:tt)*) => {
+        const _: &str = $value;
+        $target.aliases.push(String::from($value));
+        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
+    };
+    ($target:ident; alias = $value:literal) => {
+        const _: &str = $value;
+        $target.aliases.push(String::from($value));
+    };
+    ($target:ident; rename_all = $value:tt, $($rest:tt)*) => {
+        $crate::__specta_serde_set_case!($target, rename_all_serialize, $value);
+        $crate::__specta_serde_set_case!($target, rename_all_deserialize, $value);
+        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
+    };
+    ($target:ident; rename_all = $value:tt) => {
+        $crate::__specta_serde_set_case!($target, rename_all_serialize, $value);
+        $crate::__specta_serde_set_case!($target, rename_all_deserialize, $value);
+    };
+    ($target:ident; rename_all($($inner:tt)*), $($rest:tt)*) => {
+        $crate::__specta_serde_parse_rename_all_list!($target; $($inner)*);
+        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
+    };
+    ($target:ident; rename_all($($inner:tt)*)) => {
+        $crate::__specta_serde_parse_rename_all_list!($target; $($inner)*);
+    };
+    ($target:ident; skip, $($rest:tt)*) => {
+        $target.skip_serializing = true;
+        $target.skip_deserializing = true;
+        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
+    };
+    ($target:ident; skip) => {
+        $target.skip_serializing = true;
+        $target.skip_deserializing = true;
+    };
+    ($target:ident; skip_serializing, $($rest:tt)*) => {
+        $target.skip_serializing = true;
+        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
+    };
+    ($target:ident; skip_serializing) => {
+        $target.skip_serializing = true;
+    };
+    ($target:ident; skip_deserializing, $($rest:tt)*) => {
+        $target.skip_deserializing = true;
+        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
+    };
+    ($target:ident; skip_deserializing) => {
+        $target.skip_deserializing = true;
+    };
+    ($target:ident; serialize_with = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, serialize_with, $value);
+        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
+    };
+    ($target:ident; serialize_with = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, serialize_with, $value);
+    };
+    ($target:ident; deserialize_with = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, deserialize_with, $value);
+        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
+    };
+    ($target:ident; deserialize_with = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, deserialize_with, $value);
+    };
+    ($target:ident; with = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, with, $value);
+        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
+    };
+    ($target:ident; with = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, with, $value);
+    };
+    ($target:ident; bound = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, bound_serialize, $value);
+        $crate::__specta_serde_set_str!($target, bound_deserialize, $value);
+        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
+    };
+    ($target:ident; bound = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, bound_serialize, $value);
+        $crate::__specta_serde_set_str!($target, bound_deserialize, $value);
+    };
+    ($target:ident; bound($($inner:tt)*), $($rest:tt)*) => {
+        $crate::__specta_serde_parse_bound_list!($target; $($inner)*);
+        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
+    };
+    ($target:ident; bound($($inner:tt)*)) => {
+        $crate::__specta_serde_parse_bound_list!($target; $($inner)*);
+    };
+    ($target:ident; borrow = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, borrow, $value);
+        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
+    };
+    ($target:ident; borrow = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, borrow, $value);
+    };
+    ($target:ident; borrow, $($rest:tt)*) => {
+        $target.borrow = Some(String::from("__borrow__"));
+        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
+    };
+    ($target:ident; borrow) => {
+        $target.borrow = Some(String::from("__borrow__"));
+    };
+    ($target:ident; other, $($rest:tt)*) => {
+        $target.other = true;
+        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
+    };
+    ($target:ident; other) => {
+        $target.other = true;
+    };
+    ($target:ident; untagged, $($rest:tt)*) => {
+        $target.untagged = true;
+        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
+    };
+    ($target:ident; untagged) => {
+        $target.untagged = true;
+    };
+
+    ($target:ident; $unknown:ident($($inner:tt)*), $($rest:tt)*) => {
+        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
+    };
+    ($target:ident; $unknown:ident = $value:expr, $($rest:tt)*) => {
+        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
+    };
+    ($target:ident; $unknown:ident, $($rest:tt)*) => {
+        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
+    };
+    ($target:ident; $unknown:ident($($inner:tt)*)) => {};
+    ($target:ident; $unknown:ident = $value:expr) => {};
+    ($target:ident; $unknown:ident) => {};
+}
+
+/// Parse `#[serde(...)]` field attributes into [`SerdeFieldAttrs`].
+#[macro_export]
+macro_rules! parse_serde_field_attrs {
+    (#[serde($($items:tt)*)]) => {{
+        let mut parsed = $crate::parser::SerdeFieldAttrs::default();
+        $crate::__specta_serde_parse_field_items!(parsed; $($items)*);
+        parsed
+    }};
+    ($($anything:tt)*) => {
+        compile_error!("expected `#[serde(...)]`")
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __specta_serde_parse_field_items {
+    ($target:ident; ) => {};
+    ($target:ident; ,) => {};
+
+    ($target:ident; rename = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, rename_serialize, $value);
+        $crate::__specta_serde_set_str!($target, rename_deserialize, $value);
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; rename = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, rename_serialize, $value);
+        $crate::__specta_serde_set_str!($target, rename_deserialize, $value);
+    };
+    ($target:ident; rename($($inner:tt)*), $($rest:tt)*) => {
+        $crate::__specta_serde_parse_rename_list!($target; $($inner)*);
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; rename($($inner:tt)*)) => {
+        $crate::__specta_serde_parse_rename_list!($target; $($inner)*);
+    };
+    ($target:ident; alias = $value:literal, $($rest:tt)*) => {
+        const _: &str = $value;
+        $target.aliases.push(String::from($value));
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; alias = $value:literal) => {
+        const _: &str = $value;
+        $target.aliases.push(String::from($value));
+    };
+    ($target:ident; default = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, default, $value);
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; default = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, default, $value);
+    };
+    ($target:ident; default, $($rest:tt)*) => {
+        $target.default = Some(String::from("__default__"));
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; default) => {
+        $target.default = Some(String::from("__default__"));
+    };
+    ($target:ident; flatten, $($rest:tt)*) => {
+        $target.flatten = true;
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; flatten) => {
+        $target.flatten = true;
+    };
+    ($target:ident; skip, $($rest:tt)*) => {
+        $target.skip_serializing = true;
+        $target.skip_deserializing = true;
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; skip) => {
+        $target.skip_serializing = true;
+        $target.skip_deserializing = true;
+    };
+    ($target:ident; skip_serializing, $($rest:tt)*) => {
+        $target.skip_serializing = true;
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; skip_serializing) => {
+        $target.skip_serializing = true;
+    };
+    ($target:ident; skip_deserializing, $($rest:tt)*) => {
+        $target.skip_deserializing = true;
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; skip_deserializing) => {
+        $target.skip_deserializing = true;
+    };
+    ($target:ident; skip_serializing_if = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, skip_serializing_if, $value);
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; skip_serializing_if = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, skip_serializing_if, $value);
+    };
+    ($target:ident; serialize_with = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, serialize_with, $value);
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; serialize_with = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, serialize_with, $value);
+    };
+    ($target:ident; deserialize_with = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, deserialize_with, $value);
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; deserialize_with = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, deserialize_with, $value);
+    };
+    ($target:ident; with = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, with, $value);
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; with = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, with, $value);
+    };
+    ($target:ident; borrow = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, borrow, $value);
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; borrow = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, borrow, $value);
+    };
+    ($target:ident; borrow, $($rest:tt)*) => {
+        $target.borrow = Some(String::from("__borrow__"));
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; borrow) => {
+        $target.borrow = Some(String::from("__borrow__"));
+    };
+    ($target:ident; bound = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, bound_serialize, $value);
+        $crate::__specta_serde_set_str!($target, bound_deserialize, $value);
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; bound = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, bound_serialize, $value);
+        $crate::__specta_serde_set_str!($target, bound_deserialize, $value);
+    };
+    ($target:ident; bound($($inner:tt)*), $($rest:tt)*) => {
+        $crate::__specta_serde_parse_bound_list!($target; $($inner)*);
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; bound($($inner:tt)*)) => {
+        $crate::__specta_serde_parse_bound_list!($target; $($inner)*);
+    };
+    ($target:ident; getter = $value:literal, $($rest:tt)*) => {
+        $crate::__specta_serde_set_str!($target, getter, $value);
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; getter = $value:literal) => {
+        $crate::__specta_serde_set_str!($target, getter, $value);
+    };
+
+    ($target:ident; $unknown:ident($($inner:tt)*), $($rest:tt)*) => {
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; $unknown:ident = $value:expr, $($rest:tt)*) => {
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; $unknown:ident, $($rest:tt)*) => {
+        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
+    };
+    ($target:ident; $unknown:ident($($inner:tt)*)) => {};
+    ($target:ident; $unknown:ident = $value:expr) => {};
+    ($target:ident; $unknown:ident) => {};
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::inflection::RenameRule;
+
+    #[test]
+    fn parses_container_attrs() {
+        let parsed = crate::parse_serde_container_attrs!(#[serde(
+            rename(serialize = "s_name", deserialize = "d_name"),
+            rename_all = "camelCase",
+            rename_all_fields(deserialize = "snake_case"),
+            deny_unknown_fields,
+            tag = "kind",
+            content = "data",
+            bound(serialize = "T: Copy", deserialize = "T: Clone"),
+            default,
+            remote = "crate::Remote",
+            transparent,
+            from = "FromType",
+            try_from = "TryFromType",
+            into = "IntoType",
+            crate = "serde",
+            expecting = "a valid payload",
+            variant_identifier,
+            field_identifier,
+            unknown_container_attr
+        )]);
+
+        assert_eq!(parsed.rename_serialize.as_deref(), Some("s_name"));
+        assert_eq!(parsed.rename_deserialize.as_deref(), Some("d_name"));
+        assert_eq!(parsed.rename_all_serialize, Some(RenameRule::CamelCase));
+        assert_eq!(parsed.rename_all_deserialize, Some(RenameRule::CamelCase));
+        assert_eq!(
+            parsed.rename_all_fields_deserialize,
+            Some(RenameRule::SnakeCase)
+        );
+        assert!(parsed.deny_unknown_fields);
+        assert_eq!(parsed.tag.as_deref(), Some("kind"));
+        assert_eq!(parsed.content.as_deref(), Some("data"));
+        assert_eq!(parsed.bound_serialize.as_deref(), Some("T: Copy"));
+        assert_eq!(parsed.bound_deserialize.as_deref(), Some("T: Clone"));
+        assert_eq!(parsed.default.as_deref(), Some("__default__"));
+        assert_eq!(parsed.remote.as_deref(), Some("crate::Remote"));
+        assert!(parsed.transparent);
+        assert_eq!(
+            parsed.from.as_ref().map(|v| v.type_src.as_str()),
+            Some("FromType")
+        );
+        assert_eq!(
+            parsed.try_from.as_ref().map(|v| v.type_src.as_str()),
+            Some("TryFromType")
+        );
+        assert_eq!(
+            parsed.into.as_ref().map(|v| v.type_src.as_str()),
+            Some("IntoType")
+        );
+        assert_eq!(parsed.serde_crate.as_deref(), Some("serde"));
+        assert_eq!(parsed.expecting.as_deref(), Some("a valid payload"));
+        assert!(parsed.variant_identifier);
+        assert!(parsed.field_identifier);
     }
 
-    if attrs.untagged {
-        attrs.repr = Some(EnumRepr::Untagged);
+    #[test]
+    fn parses_variant_attrs() {
+        let parsed = crate::parse_serde_variant_attrs!(#[serde(
+            rename = "V",
+            alias = "AliasA",
+            alias = "AliasB",
+            rename_all(deserialize = "UPPERCASE"),
+            skip_serializing,
+            with = "mod_path",
+            bound = "T: Copy",
+            borrow = "'a + 'b",
+            other,
+            untagged,
+            unknown_variant_attr
+        )]);
+
+        assert_eq!(parsed.rename_serialize.as_deref(), Some("V"));
+        assert_eq!(parsed.rename_deserialize.as_deref(), Some("V"));
+        assert_eq!(parsed.aliases, vec!["AliasA", "AliasB"]);
+        assert_eq!(parsed.rename_all_deserialize, Some(RenameRule::UpperCase));
+        assert!(parsed.skip_serializing);
+        assert!(!parsed.skip_deserializing);
+        assert_eq!(parsed.with.as_deref(), Some("mod_path"));
+        assert_eq!(parsed.bound_serialize.as_deref(), Some("T: Copy"));
+        assert_eq!(parsed.bound_deserialize.as_deref(), Some("T: Copy"));
+        assert_eq!(parsed.borrow.as_deref(), Some("'a + 'b"));
+        assert!(parsed.other);
+        assert!(parsed.untagged);
+    }
+
+    #[test]
+    fn parses_field_attrs() {
+        let parsed = crate::parse_serde_field_attrs!(#[serde(
+            rename(deserialize = "field_name"),
+            alias = "f_alias",
+            default = "default_fn",
+            flatten,
+            skip_serializing_if = "Option::is_none",
+            serialize_with = "ser_fn",
+            deserialize_with = "de_fn",
+            with = "mod_fns",
+            borrow,
+            bound(deserialize = "T: Clone"),
+            getter = "get_field",
+            unknown_field_attr
+        )]);
+
+        assert_eq!(parsed.rename_deserialize.as_deref(), Some("field_name"));
+        assert_eq!(parsed.aliases, vec!["f_alias"]);
+        assert_eq!(parsed.default.as_deref(), Some("default_fn"));
+        assert!(parsed.flatten);
+        assert_eq!(
+            parsed.skip_serializing_if.as_deref(),
+            Some("Option::is_none")
+        );
+        assert_eq!(parsed.serialize_with.as_deref(), Some("ser_fn"));
+        assert_eq!(parsed.deserialize_with.as_deref(), Some("de_fn"));
+        assert_eq!(parsed.with.as_deref(), Some("mod_fns"));
+        assert_eq!(parsed.borrow.as_deref(), Some("__borrow__"));
+        assert_eq!(parsed.bound_deserialize.as_deref(), Some("T: Clone"));
+        assert_eq!(parsed.getter.as_deref(), Some("get_field"));
     }
 }
