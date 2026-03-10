@@ -15,7 +15,10 @@ unwrap_used = { level = "warn", priority = -1 }
 panic = { level = "warn", priority = -1 }
 todo = { level = "warn", priority = -1 }
 panic_in_result_fn = { level = "warn", priority = -1 }
+
+# I hate these. For internal code I don't care.
 too_many_arguments = { level = "allow", priority = 0 }
+type_complexity = { level = "allow", priority = 0 }
 
 [profile.dev.package]
 insta.opt-level = 3
