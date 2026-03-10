@@ -12,7 +12,10 @@ mod parser;
 mod repr;
 
 pub use inflection::RenameRule;
-pub use parser::{ConversionType, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs};
+pub use parser::{
+    merge_container_attrs, merge_field_attrs, merge_variant_attrs, ConversionType,
+    SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs,
+};
 
 /// TODO: Documentation
 ///
