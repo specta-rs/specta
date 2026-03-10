@@ -6,7 +6,7 @@ A comprehensive serde attribute handling system for [Specta](https://github.com/
 
 - **Comprehensive Attribute Support**: Handles `rename`, `rename_all`, `skip`, `flatten`, `default`, `transparent`, and enum representation attributes
 - **Separate Processing Modes**: Distinct handling for serialization and deserialization transformations
-- **Enum Representations**: Full support for external, internal, adjacent, untagged, and string enum representations
+- **Enum Representations**: Full support for external, internal, adjacent, and untagged enum representations
 - **Type-Safe Transformations**: Apply serde semantics while maintaining type safety
 - **Integration Ready**: Works seamlessly with existing Specta workflows and TypeScript exports
 
@@ -208,9 +208,9 @@ pub enum Value {
 // Serializes as the inner value directly
 ```
 
-#### String Enums
+#### Unit Enums With Rename Rules
 
-Unit-only enums with `rename_all` become string enums:
+Unit-only enums with `rename_all` are transformed according to serde rename rules. Exporters may render these as string literal unions:
 
 ```rust
 #[derive(Type, Serialize)]

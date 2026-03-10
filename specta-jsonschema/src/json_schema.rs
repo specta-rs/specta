@@ -88,9 +88,8 @@ impl JsonSchema {
     pub fn export_as_value(&self, types: &TypeCollection) -> Result<Value, Error> {
         // Apply serde transformations if configured
         let processed_types = if let Some(mode) = self.serde {
-            let mut cloned = types.clone();
-            specta_serde::apply(&mut cloned, mode)?;
-            cloned
+            let _ = mode;
+            specta_serde::apply(types.clone())?
         } else {
             types.clone()
         };
@@ -109,9 +108,8 @@ impl JsonSchema {
 
         // Apply serde transformations if configured
         let processed_types = if let Some(mode) = self.serde {
-            let mut cloned = types.clone();
-            specta_serde::apply(&mut cloned, mode)?;
-            cloned
+            let _ = mode;
+            specta_serde::apply(types.clone())?
         } else {
             types.clone()
         };

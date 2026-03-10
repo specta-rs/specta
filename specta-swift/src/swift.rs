@@ -159,9 +159,8 @@ impl Swift {
     pub fn export(&self, types: &TypeCollection) -> Result<String> {
         // Apply Serde transformations if enabled
         let processed_types = if let Some(mode) = self.serde {
-            let mut types_clone = types.clone();
-            specta_serde::apply(&mut types_clone, mode)?;
-            types_clone
+            let _ = mode;
+            specta_serde::apply(types.clone())?
         } else {
             types.clone()
         };
