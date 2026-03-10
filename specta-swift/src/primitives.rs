@@ -116,6 +116,10 @@ pub fn export_type(
     types: &TypeCollection,
     ndt: &specta::datatype::NamedDataType,
 ) -> Result<String> {
+    if !matches!(ndt.ty(), DataType::Struct(_) | DataType::Enum(_)) {
+        return Ok(String::new());
+    }
+
     let mut result = String::new();
 
     // Add JSDoc-style comments if present
@@ -143,13 +147,13 @@ pub fn export_type(
         ));
     }
 
-    // Generate the type definition
     let generic_scope = ndt.generics().to_vec();
-    let type_def = datatype_to_swift(swift, types, ndt.ty(), generic_scope.clone(), false, None)?;
 
     // Format based on type
     match ndt.ty() {
         DataType::Struct(_) => {
+            let type_def =
+                datatype_to_swift(swift, types, ndt.ty(), generic_scope.clone(), false, None)?;
             let name = swift.naming.convert(ndt.name());
             let generics = if ndt.generics().is_empty() {
                 String::new()
@@ -238,8 +242,7 @@ pub fn export_type(
             }
         }
         _ => {
-            // For other types, just use the type definition
-            result.push_str(&type_def);
+            return Ok(String::new());
         }
     }
 
@@ -767,13 +770,29 @@ fn reference_to_swift(
 ) -> Result<String> {
     match r {
         Reference::Named(r) => {
-            let name = if let Some(ndt) = r.get(types) {
-                swift.naming.convert(ndt.name())
-            } else {
+            let Some(ndt) = r.get(types) else {
                 return Err(Error::InvalidIdentifier(
                     "Reference to unknown type".to_string(),
                 ));
             };
+
+            if ndt.name() == "String" {
+                return Ok("String".to_string());
+            }
+
+            if matches!(ndt.name().as_ref(), "Uuid" | "DateTime" | "NaiveDateTime") {
+                return Ok("String".to_string());
+            }
+
+            if ndt.name() == "Vec"
+                && let Some((_, inner_ty)) = r.generics().first()
+            {
+                let inner =
+                    datatype_to_swift(swift, types, inner_ty, generic_scope.to_vec(), false, None)?;
+                return Ok(format!("[{inner}]"));
+            }
+
+            let name = swift.naming.convert(ndt.name());
 
             if r.generics().is_empty() {
                 Ok(name)

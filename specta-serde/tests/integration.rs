@@ -369,7 +369,6 @@ fn test_field_level_rename_attributes() {
 #[cfg(test)]
 mod derive_tests {
     use super::*;
-    use specta::Type;
     use specta_macros::Type as TypeDerive;
 
     #[derive(TypeDerive, serde::Serialize, serde::Deserialize)]
@@ -410,9 +409,17 @@ mod derive_tests {
         // Process for deserialization
         let de_types = process_for_deserialization(&types).unwrap();
 
-        // Both should succeed
-        assert_eq!(ser_types.len(), 1);
-        assert_eq!(de_types.len(), 1);
+        // Both should include the requested root type.
+        assert!(
+            ser_types
+                .into_unsorted_iter()
+                .any(|ty| ty.name() == "TestStruct")
+        );
+        assert!(
+            de_types
+                .into_unsorted_iter()
+                .any(|ty| ty.name() == "TestStruct")
+        );
     }
 
     #[test]
@@ -425,9 +432,17 @@ mod derive_tests {
         // Process for deserialization
         let de_types = process_for_deserialization(&types).unwrap();
 
-        // Both should succeed
-        assert_eq!(ser_types.len(), 1);
-        assert_eq!(de_types.len(), 1);
+        // Both should include the requested root type.
+        assert!(
+            ser_types
+                .into_unsorted_iter()
+                .any(|ty| ty.name() == "TestEnum")
+        );
+        assert!(
+            de_types
+                .into_unsorted_iter()
+                .any(|ty| ty.name() == "TestEnum")
+        );
     }
 }
 
