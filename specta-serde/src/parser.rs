@@ -84,28 +84,28 @@ macro_rules! __specta_serde_set_str {
 #[macro_export]
 macro_rules! __specta_serde_set_case {
     ($target:expr, $field:ident, "lowercase") => {{
-        $target.$field = Some($crate::parser::RenameRule::LowerCase);
+        $target.$field = Some($crate::RenameRule::LowerCase);
     }};
     ($target:expr, $field:ident, "UPPERCASE") => {{
-        $target.$field = Some($crate::parser::RenameRule::UpperCase);
+        $target.$field = Some($crate::RenameRule::UpperCase);
     }};
     ($target:expr, $field:ident, "PascalCase") => {{
-        $target.$field = Some($crate::parser::RenameRule::PascalCase);
+        $target.$field = Some($crate::RenameRule::PascalCase);
     }};
     ($target:expr, $field:ident, "camelCase") => {{
-        $target.$field = Some($crate::parser::RenameRule::CamelCase);
+        $target.$field = Some($crate::RenameRule::CamelCase);
     }};
     ($target:expr, $field:ident, "snake_case") => {{
-        $target.$field = Some($crate::parser::RenameRule::SnakeCase);
+        $target.$field = Some($crate::RenameRule::SnakeCase);
     }};
     ($target:expr, $field:ident, "SCREAMING_SNAKE_CASE") => {{
-        $target.$field = Some($crate::parser::RenameRule::ScreamingSnakeCase);
+        $target.$field = Some($crate::RenameRule::ScreamingSnakeCase);
     }};
     ($target:expr, $field:ident, "kebab-case") => {{
-        $target.$field = Some($crate::parser::RenameRule::KebabCase);
+        $target.$field = Some($crate::RenameRule::KebabCase);
     }};
     ($target:expr, $field:ident, "SCREAMING-KEBAB-CASE") => {{
-        $target.$field = Some($crate::parser::RenameRule::ScreamingKebabCase);
+        $target.$field = Some($crate::RenameRule::ScreamingKebabCase);
     }};
     ($target:expr, $field:ident, $value:tt) => {{
         compile_error!(concat!(
@@ -167,12 +167,17 @@ macro_rules! __specta_serde_parse_rename_all_fields_list {
     ($target:expr; ) => {};
 }
 
-/// Parse `#[serde(...)]` container attributes into [`SerdeContainerAttrs`].
+/// Parse `#[serde(...)]` attributes into the corresponding serde parser type.
+///
+/// Supported entrypoints:
+/// - `@container` -> [`SerdeContainerAttrs`]
+/// - `@variant` -> [`SerdeVariantAttrs`]
+/// - `@field` -> [`SerdeFieldAttrs`]
 ///
 /// # Example
 ///
 /// ```rust
-/// let parsed = specta_serde::parse_serde_container_attrs!(#[serde(
+/// let parsed = specta_serde::parser!(@container #[serde(
 ///     rename_all = "camelCase",
 ///     rename(serialize = "SerName", deserialize = "DeName"),
 ///     tag = "kind",
@@ -185,23 +190,53 @@ macro_rules! __specta_serde_parse_rename_all_fields_list {
 /// ```
 ///
 /// ```compile_fail
-/// let _ = specta_serde::parse_serde_container_attrs!(#[serde(rename_all = "camelCase123")]);
+/// let _ = specta_serde::parser!(@container #[serde(rename_all = "camelCase123")]);
 /// ```
 #[macro_export]
-macro_rules! parse_serde_container_attrs {
-    (#[serde($($items:tt)*)]) => {{
-        let mut parsed = $crate::parser::SerdeContainerAttrs::default();
+macro_rules! parser {
+    (@container #[serde($($items:tt)*)]) => {{
+        let mut parsed = $crate::SerdeContainerAttrs::default();
         $crate::__specta_serde_parse_container_items!(parsed; $($items)*);
         parsed
     }};
-    (#[serde]) => {
-        $crate::parser::SerdeContainerAttrs::default()
+    (@container #[serde]) => {
+        $crate::SerdeContainerAttrs::default()
     };
-    (#[$_meta:meta]) => {
-        $crate::parser::SerdeContainerAttrs::default()
+    (@container #[$_meta:meta]) => {
+        $crate::SerdeContainerAttrs::default()
     };
-    ($($anything:tt)*) => {
-        compile_error!("expected `#[serde(...)]`")
+    (@container $($anything:tt)*) => {
+        compile_error!("expected `@container #[serde(...)]`")
+    };
+
+    (@variant #[serde($($items:tt)*)]) => {{
+        let mut parsed = $crate::SerdeVariantAttrs::default();
+        $crate::__specta_serde_parse_variant_items!(parsed; $($items)*);
+        parsed
+    }};
+    (@variant #[serde]) => {
+        $crate::SerdeVariantAttrs::default()
+    };
+    (@variant #[$_meta:meta]) => {
+        $crate::SerdeVariantAttrs::default()
+    };
+    (@variant $($anything:tt)*) => {
+        compile_error!("expected `@variant #[serde(...)]`")
+    };
+
+    (@field #[serde($($items:tt)*)]) => {{
+        let mut parsed = $crate::SerdeFieldAttrs::default();
+        $crate::__specta_serde_parse_field_items!(parsed; $($items)*);
+        parsed
+    }};
+    (@field #[serde]) => {
+        $crate::SerdeFieldAttrs::default()
+    };
+    (@field #[$_meta:meta]) => {
+        $crate::SerdeFieldAttrs::default()
+    };
+    (@field $($anything:tt)*) => {
+        compile_error!("expected `@field #[serde(...)]`")
     };
 }
 
@@ -334,35 +369,35 @@ macro_rules! __specta_serde_parse_container_items {
         $crate::__specta_serde_set_str!($target, remote, $value);
     };
     ($target:ident; from = $value:literal, $($rest:tt)*) => {
-        $target.from = Some($crate::parser::ConversionType {
+        $target.from = Some($crate::ConversionType {
             type_src: String::from($value),
         });
         $crate::__specta_serde_parse_container_items!($target; $($rest)*);
     };
     ($target:ident; from = $value:literal) => {
-        $target.from = Some($crate::parser::ConversionType {
+        $target.from = Some($crate::ConversionType {
             type_src: String::from($value),
         });
     };
     ($target:ident; try_from = $value:literal, $($rest:tt)*) => {
-        $target.try_from = Some($crate::parser::ConversionType {
+        $target.try_from = Some($crate::ConversionType {
             type_src: String::from($value),
         });
         $crate::__specta_serde_parse_container_items!($target; $($rest)*);
     };
     ($target:ident; try_from = $value:literal) => {
-        $target.try_from = Some($crate::parser::ConversionType {
+        $target.try_from = Some($crate::ConversionType {
             type_src: String::from($value),
         });
     };
     ($target:ident; into = $value:literal, $($rest:tt)*) => {
-        $target.into = Some($crate::parser::ConversionType {
+        $target.into = Some($crate::ConversionType {
             type_src: String::from($value),
         });
         $crate::__specta_serde_parse_container_items!($target; $($rest)*);
     };
     ($target:ident; into = $value:literal) => {
-        $target.into = Some($crate::parser::ConversionType {
+        $target.into = Some($crate::ConversionType {
             type_src: String::from($value),
         });
     };
@@ -393,25 +428,6 @@ macro_rules! __specta_serde_parse_container_items {
     ($target:ident; $unknown:ident($($inner:tt)*)) => {};
     ($target:ident; $unknown:ident = $value:expr) => {};
     ($target:ident; $unknown:ident) => {};
-}
-
-/// Parse `#[serde(...)]` variant attributes into [`SerdeVariantAttrs`].
-#[macro_export]
-macro_rules! parse_serde_variant_attrs {
-    (#[serde($($items:tt)*)]) => {{
-        let mut parsed = $crate::parser::SerdeVariantAttrs::default();
-        $crate::__specta_serde_parse_variant_items!(parsed; $($items)*);
-        parsed
-    }};
-    (#[serde]) => {
-        $crate::parser::SerdeVariantAttrs::default()
-    };
-    (#[$_meta:meta]) => {
-        $crate::parser::SerdeVariantAttrs::default()
-    };
-    ($($anything:tt)*) => {
-        compile_error!("expected `#[serde(...)]`")
-    };
 }
 
 #[doc(hidden)]
@@ -546,25 +562,6 @@ macro_rules! __specta_serde_parse_variant_items {
     ($target:ident; $unknown:ident($($inner:tt)*)) => {};
     ($target:ident; $unknown:ident = $value:expr) => {};
     ($target:ident; $unknown:ident) => {};
-}
-
-/// Parse `#[serde(...)]` field attributes into [`SerdeFieldAttrs`].
-#[macro_export]
-macro_rules! parse_serde_field_attrs {
-    (#[serde($($items:tt)*)]) => {{
-        let mut parsed = $crate::parser::SerdeFieldAttrs::default();
-        $crate::__specta_serde_parse_field_items!(parsed; $($items)*);
-        parsed
-    }};
-    (#[serde]) => {
-        $crate::parser::SerdeFieldAttrs::default()
-    };
-    (#[$_meta:meta]) => {
-        $crate::parser::SerdeFieldAttrs::default()
-    };
-    ($($anything:tt)*) => {
-        compile_error!("expected `#[serde(...)]`")
-    };
 }
 
 #[doc(hidden)]
@@ -712,7 +709,7 @@ mod tests {
 
     #[test]
     fn parses_container_attrs() {
-        let parsed = crate::parse_serde_container_attrs!(#[serde(
+        let parsed = crate::parser!(@container #[serde(
             rename(serialize = "s_name", deserialize = "d_name"),
             rename_all = "camelCase",
             rename_all_fields(deserialize = "snake_case"),
@@ -767,7 +764,7 @@ mod tests {
 
     #[test]
     fn parses_variant_attrs() {
-        let parsed = crate::parse_serde_variant_attrs!(#[serde(
+        let parsed = crate::parser!(@variant #[serde(
             rename = "V",
             alias = "AliasA",
             alias = "AliasB",
@@ -795,7 +792,7 @@ mod tests {
 
     #[test]
     fn parses_field_attrs() {
-        let parsed = crate::parse_serde_field_attrs!(#[serde(
+        let parsed = crate::parser!(@field #[serde(
             rename(deserialize = "field_name"),
             alias = "f_alias",
             default = "default_fn",
@@ -827,28 +824,28 @@ mod tests {
 
     #[test]
     fn ignores_non_serde_attrs() {
-        let c_error = crate::parse_serde_container_attrs!(#[error("boom")]);
-        let c_doc = crate::parse_serde_container_attrs!(#[doc = "hello"]);
-        let c_cfg = crate::parse_serde_container_attrs!(#[cfg(feature = "my_feature")]);
-        let c_bare_serde = crate::parse_serde_container_attrs!(#[serde]);
+        let c_error = crate::parser!(@container #[error("boom")]);
+        let c_doc = crate::parser!(@container #[doc = "hello"]);
+        let c_cfg = crate::parser!(@container #[cfg(feature = "my_feature")]);
+        let c_bare_serde = crate::parser!(@container #[serde]);
         assert_eq!(c_error, crate::parser::SerdeContainerAttrs::default());
         assert_eq!(c_doc, crate::parser::SerdeContainerAttrs::default());
         assert_eq!(c_cfg, crate::parser::SerdeContainerAttrs::default());
         assert_eq!(c_bare_serde, crate::parser::SerdeContainerAttrs::default());
 
-        let v_error = crate::parse_serde_variant_attrs!(#[error("boom")]);
-        let v_doc = crate::parse_serde_variant_attrs!(#[doc = "hello"]);
-        let v_cfg = crate::parse_serde_variant_attrs!(#[cfg(feature = "my_feature")]);
-        let v_bare_serde = crate::parse_serde_variant_attrs!(#[serde]);
+        let v_error = crate::parser!(@variant #[error("boom")]);
+        let v_doc = crate::parser!(@variant #[doc = "hello"]);
+        let v_cfg = crate::parser!(@variant #[cfg(feature = "my_feature")]);
+        let v_bare_serde = crate::parser!(@variant #[serde]);
         assert_eq!(v_error, crate::parser::SerdeVariantAttrs::default());
         assert_eq!(v_doc, crate::parser::SerdeVariantAttrs::default());
         assert_eq!(v_cfg, crate::parser::SerdeVariantAttrs::default());
         assert_eq!(v_bare_serde, crate::parser::SerdeVariantAttrs::default());
 
-        let f_error = crate::parse_serde_field_attrs!(#[error("boom")]);
-        let f_doc = crate::parse_serde_field_attrs!(#[doc = "hello"]);
-        let f_cfg = crate::parse_serde_field_attrs!(#[cfg(feature = "my_feature")]);
-        let f_bare_serde = crate::parse_serde_field_attrs!(#[serde]);
+        let f_error = crate::parser!(@field #[error("boom")]);
+        let f_doc = crate::parser!(@field #[doc = "hello"]);
+        let f_cfg = crate::parser!(@field #[cfg(feature = "my_feature")]);
+        let f_bare_serde = crate::parser!(@field #[serde]);
         assert_eq!(f_error, crate::parser::SerdeFieldAttrs::default());
         assert_eq!(f_doc, crate::parser::SerdeFieldAttrs::default());
         assert_eq!(f_cfg, crate::parser::SerdeFieldAttrs::default());
