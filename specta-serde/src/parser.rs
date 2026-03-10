@@ -194,6 +194,12 @@ macro_rules! parse_serde_container_attrs {
         $crate::__specta_serde_parse_container_items!(parsed; $($items)*);
         parsed
     }};
+    (#[serde]) => {
+        $crate::parser::SerdeContainerAttrs::default()
+    };
+    (#[$_meta:meta]) => {
+        $crate::parser::SerdeContainerAttrs::default()
+    };
     ($($anything:tt)*) => {
         compile_error!("expected `#[serde(...)]`")
     };
@@ -397,6 +403,12 @@ macro_rules! parse_serde_variant_attrs {
         $crate::__specta_serde_parse_variant_items!(parsed; $($items)*);
         parsed
     }};
+    (#[serde]) => {
+        $crate::parser::SerdeVariantAttrs::default()
+    };
+    (#[$_meta:meta]) => {
+        $crate::parser::SerdeVariantAttrs::default()
+    };
     ($($anything:tt)*) => {
         compile_error!("expected `#[serde(...)]`")
     };
@@ -544,6 +556,12 @@ macro_rules! parse_serde_field_attrs {
         $crate::__specta_serde_parse_field_items!(parsed; $($items)*);
         parsed
     }};
+    (#[serde]) => {
+        $crate::parser::SerdeFieldAttrs::default()
+    };
+    (#[$_meta:meta]) => {
+        $crate::parser::SerdeFieldAttrs::default()
+    };
     ($($anything:tt)*) => {
         compile_error!("expected `#[serde(...)]`")
     };
@@ -805,5 +823,35 @@ mod tests {
         assert_eq!(parsed.with.as_deref(), Some("mod_fns"));
         assert_eq!(parsed.borrow.as_deref(), Some("__borrow__"));
         assert_eq!(parsed.getter.as_deref(), Some("get_field"));
+    }
+
+    #[test]
+    fn ignores_non_serde_attrs() {
+        let c_error = crate::parse_serde_container_attrs!(#[error("boom")]);
+        let c_doc = crate::parse_serde_container_attrs!(#[doc = "hello"]);
+        let c_cfg = crate::parse_serde_container_attrs!(#[cfg(feature = "my_feature")]);
+        let c_bare_serde = crate::parse_serde_container_attrs!(#[serde]);
+        assert_eq!(c_error, crate::parser::SerdeContainerAttrs::default());
+        assert_eq!(c_doc, crate::parser::SerdeContainerAttrs::default());
+        assert_eq!(c_cfg, crate::parser::SerdeContainerAttrs::default());
+        assert_eq!(c_bare_serde, crate::parser::SerdeContainerAttrs::default());
+
+        let v_error = crate::parse_serde_variant_attrs!(#[error("boom")]);
+        let v_doc = crate::parse_serde_variant_attrs!(#[doc = "hello"]);
+        let v_cfg = crate::parse_serde_variant_attrs!(#[cfg(feature = "my_feature")]);
+        let v_bare_serde = crate::parse_serde_variant_attrs!(#[serde]);
+        assert_eq!(v_error, crate::parser::SerdeVariantAttrs::default());
+        assert_eq!(v_doc, crate::parser::SerdeVariantAttrs::default());
+        assert_eq!(v_cfg, crate::parser::SerdeVariantAttrs::default());
+        assert_eq!(v_bare_serde, crate::parser::SerdeVariantAttrs::default());
+
+        let f_error = crate::parse_serde_field_attrs!(#[error("boom")]);
+        let f_doc = crate::parse_serde_field_attrs!(#[doc = "hello"]);
+        let f_cfg = crate::parse_serde_field_attrs!(#[cfg(feature = "my_feature")]);
+        let f_bare_serde = crate::parse_serde_field_attrs!(#[serde]);
+        assert_eq!(f_error, crate::parser::SerdeFieldAttrs::default());
+        assert_eq!(f_doc, crate::parser::SerdeFieldAttrs::default());
+        assert_eq!(f_cfg, crate::parser::SerdeFieldAttrs::default());
+        assert_eq!(f_bare_serde, crate::parser::SerdeFieldAttrs::default());
     }
 }
