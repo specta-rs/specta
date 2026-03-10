@@ -369,7 +369,7 @@ fn enum_variant_datatype(
     generics: &[(GenericReference, DataType)],
 ) -> Result<Option<String>> {
     match &variant.fields() {
-        Fields::Unit => Ok(Some(sanitise_key(name, false).to_string())),
+        Fields::Unit => Ok(Some(sanitise_key(name, true).to_string())),
         Fields::Named(obj) => {
             let all_fields = skip_fields_named(obj.fields()).collect::<Vec<_>>();
 
@@ -574,26 +574,18 @@ pub(crate) fn enum_datatype(
     let mut rendered_variants = filtered_variants
         .iter()
         .map(|(variant_name, variant)| {
-            Ok(match &variant.fields() {
-                Fields::Unit => EnumVariantOutput {
-                    value: NULL.to_string(),
-                    strict_keys: None,
-                },
-                _ => {
-                    let ts_values = enum_variant_datatype(
-                        ctx.with(PathItem::Variant(variant_name.clone())),
-                        types,
-                        variant_name.clone(),
-                        variant,
-                        prefix,
-                        generics,
-                    )?;
+            let ts_values = enum_variant_datatype(
+                ctx.with(PathItem::Variant(variant_name.clone())),
+                types,
+                variant_name.clone(),
+                variant,
+                prefix,
+                generics,
+            )?;
 
-                    EnumVariantOutput {
-                        value: ts_values.unwrap_or_else(|| NEVER.to_string()),
-                        strict_keys: untagged_strict_keys(variant),
-                    }
-                }
+            Ok(EnumVariantOutput {
+                value: ts_values.unwrap_or_else(|| NEVER.to_string()),
+                strict_keys: untagged_strict_keys(variant),
             })
         })
         .collect::<Result<Vec<_>>>()?;
