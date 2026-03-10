@@ -17,7 +17,7 @@ pub struct NamedDataType {
     pub(crate) deprecated: Option<DeprecatedType>,
     pub(crate) module_path: Cow<'static, str>,
     pub(crate) location: Location<'static>,
-    pub(crate) generics: Cow<'static, [(GenericReference, Cow<'static, str>)]>,
+    pub(crate) generics: Vec<(GenericReference, Cow<'static, str>)>,
     pub(crate) inline: bool,
     pub(crate) inner: DataType,
 }

@@ -25,7 +25,7 @@ pub enum Reference {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NamedReference {
     pub(crate) id: NamedId,
-    pub(crate) generics: Cow<'static, [(GenericReference, DataType)]>,
+    pub(crate) generics: Vec<(GenericReference, DataType)>,
     pub(crate) inline: bool,
 }
 
