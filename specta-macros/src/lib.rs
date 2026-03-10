@@ -13,6 +13,9 @@ mod specta;
 mod r#type;
 mod utils;
 
+use quote::quote;
+use syn::{Error, LitStr, Type, parse_macro_input};
+
 /// Implements [`Type`] for a given struct or enum.
 ///
 /// # Attributes
@@ -48,6 +51,18 @@ mod utils;
 #[proc_macro_derive(Type, attributes(specta))]
 pub fn derive_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     r#type::derive(input).unwrap_or_else(|err| err.into_compile_error().into())
+}
+
+#[proc_macro]
+pub fn parse_type_from_lit(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let lit = parse_macro_input!(input as LitStr);
+
+    match syn::parse_str::<Type>(&lit.value()) {
+        Ok(ty) => quote!(#ty).into(),
+        Err(err) => Error::new_spanned(lit, format!("invalid type literal: {err}"))
+            .to_compile_error()
+            .into(),
+    }
 }
 
 /// Prepares a function to have its types extracted using [`fn_datatype!`](specta::fn_datatype)
