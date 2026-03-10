@@ -87,7 +87,6 @@ enum ErrorKind {
     BigIntForbiddenLegacy(ExportPath),
     ForbiddenNameLegacy(ExportPath, &'static str),
     InvalidNameLegacy(ExportPath, String),
-    InvalidTaggedVariantContainingTupleStructLegacy(ExportPath),
     FmtLegacy(std::fmt::Error),
     UnableToExport(Layout),
 }
@@ -186,12 +185,6 @@ impl Error {
     pub(crate) fn invalid_name_legacy(path: ExportPath, name: String) -> Self {
         Self {
             kind: ErrorKind::InvalidNameLegacy(path, name),
-        }
-    }
-
-    pub(crate) fn invalid_tagged_variant_containing_tuple_struct_legacy(path: ExportPath) -> Self {
-        Self {
-            kind: ErrorKind::InvalidTaggedVariantContainingTupleStructLegacy(path),
         }
     }
 
@@ -296,10 +289,6 @@ impl fmt::Display for Error {
             ErrorKind::InvalidNameLegacy(path, name) => write!(
                 f,
                 "Attempted to export {path:?} but was unable to due to name {name:?} containing an invalid character. Try renaming it or using `#[specta(rename = \"new name\")]`"
-            ),
-            ErrorKind::InvalidTaggedVariantContainingTupleStructLegacy(path) => write!(
-                f,
-                "Attempted to export {path:?} with tagging but the variant is a tuple struct."
             ),
             ErrorKind::FmtLegacy(err) => write!(f, "formatter: {err:?}"),
             ErrorKind::UnableToExport(layout) => write!(
