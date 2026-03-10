@@ -8,10 +8,10 @@ use specta_typescript::Typescript;
 #[derive(Serialize, Type)]
 #[serde(rename = "HelloWorld2")]
 pub struct HelloWorld {
-    #[serde(rename = "b")]
+    #[serde(rename = "a_renamed")]
     a: String,
 
-    #[serde(rename(serialize = "ser_name"))]
+    #[serde(rename(serialize = "b_serialize_name"))]
     b: String,
 }
 
