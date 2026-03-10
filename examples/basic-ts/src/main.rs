@@ -1,7 +1,7 @@
 use serde::Serialize;
 use specta::{
-    datatype::{DataType, Reference},
     Type, TypeCollection,
+    datatype::{DataType, Reference},
 };
 
 #[derive(Serialize, Type)]
@@ -25,5 +25,21 @@ fn main() {
         }
     );
 
-    println!("{:?}", Typescript::default().export())
+    let def = HelloWorld::definition(&mut types);
+    let types = specta_serde::testing(types);
+    println!(
+        "{:#?}",
+        match def {
+            DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
+            _ => unreachable!(),
+        }
+    );
+
+    // println!("{}", Typescript::default().export(&types).unwrap());
+    // println!(
+    //     "{}",
+    //     Typescript::default()
+    //         .export(&specta_serde::testing(types))
+    //         .unwrap()
+    // ); // TODO
 }

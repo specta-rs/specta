@@ -5,7 +5,12 @@
     html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
 
-use specta::TypeCollection;
+use std::borrow::Cow;
+
+use specta::{
+    TypeCollection,
+    datatype::{DataType, Field, Fields},
+};
 
 mod inflection;
 mod parser;
@@ -13,34 +18,69 @@ mod repr;
 
 pub use inflection::RenameRule;
 pub use parser::{
-    merge_container_attrs, merge_field_attrs, merge_variant_attrs, ConversionType,
-    SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs,
+    ConversionType, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs, merge_container_attrs,
+    merge_field_attrs, merge_variant_attrs,
 };
 
-/// TODO: Documentation
-///
-// TODO: Change name of result type
-
-    // TODO:
-    //  - Validate supported types w/ Serde
-    //  - Apply attributes
-    //  - Apply repr
-    //  - Apply flatten
-
-    types
-}
-
-/// TODO: Documentation
-///
-// TODO: Change name of result type
-pub fn apply_phases(types: TypeCollection) -> TypeCollection {
-    // TODO: Same as `apply` but with phases applied by duplicating types
-
-    types
-}
-
 pub fn testing(types: TypeCollection) -> TypeCollection {
-    types.map(|ty| {
+    types.map(|mut ty| {
+        rename_datatype_fields(ty.ty_mut());
         ty
     })
+}
+
+fn rename_datatype_fields(ty: &mut DataType) {
+    match ty {
+        DataType::Struct(s) => rename_fields(s.fields_mut()),
+        DataType::Enum(e) => {
+            for (_, variant) in e.variants_mut() {
+                rename_fields(variant.fields_mut());
+            }
+        }
+        DataType::Tuple(tuple) => {
+            for ty in tuple.elements_mut() {
+                rename_datatype_fields(ty);
+            }
+        }
+        DataType::List(list) => rename_datatype_fields(list.ty_mut()),
+        DataType::Map(map) => {
+            rename_datatype_fields(map.key_ty_mut());
+            rename_datatype_fields(map.value_ty_mut());
+        }
+        DataType::Nullable(inner) => rename_datatype_fields(inner),
+        DataType::Primitive(_) | DataType::Reference(_) => {}
+    }
+}
+
+fn rename_fields(fields: &mut Fields) {
+    match fields {
+        Fields::Unit => {}
+        Fields::Unnamed(unnamed) => {
+            for field in unnamed.fields_mut() {
+                rename_field_type(field);
+            }
+        }
+        Fields::Named(named) => {
+            for (name, field) in named.fields_mut() {
+                if let Some(serde_attrs) = field.attributes().get::<SerdeFieldAttrs>() {
+                    let renamed = serde_attrs
+                        .rename_serialize
+                        .as_deref()
+                        .or(serde_attrs.rename_deserialize.as_deref());
+
+                    if let Some(renamed) = renamed {
+                        *name = Cow::Owned(renamed.to_string());
+                    }
+                }
+
+                rename_field_type(field);
+            }
+        }
+    }
+}
+
+fn rename_field_type(field: &mut Field) {
+    if let Some(ty) = field.ty_mut() {
+        rename_datatype_fields(ty);
+    }
 }
