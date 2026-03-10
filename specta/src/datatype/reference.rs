@@ -7,7 +7,7 @@ use std::{
 
 use crate::{TypeCollection, datatype::NamedDataType};
 
-use super::{DataType, Generic};
+use super::DataType;
 
 /// A reference to another type.
 /// This can either an [NamedReference] or [OpaqueReference].
@@ -25,8 +25,7 @@ pub enum Reference {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NamedReference {
     pub(crate) id: NamedId,
-    // TODO: Should this be a map-type???
-    pub(crate) generics: Vec<(GenericReference, DataType)>, // TODO: Cow<'static, [(Generic, DataType)]>,
+    pub(crate) generics: Cow<'static, [(GenericReference, DataType)]>,
     pub(crate) inline: bool,
 }
 
@@ -55,20 +54,28 @@ impl NamedReference {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GenericReference {
     pub(crate) id: TypeId,
-    pub(crate) identity: Cow<'static, str>,
+}
+
+impl fmt::Display for GenericReference {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&format!("g:{:?}", self.id))
+    }
 }
 
 impl GenericReference {
     /// Build a new [Reference] for a generic type parameter.
-    /// `identity` should match the name of the argument (Eg. `T`), and `T` should be a unique type which represents that generic (Eg. `pub struct GenericT;`).
-    pub const fn build<T: ?Sized + 'static>(identity: Cow<'static, str>) -> Reference {
+    /// `T` should be a unique type which identifies the generic (Eg. `pub struct GenericT;`) and must be registered on the parent [`NamedDataType`].
+    pub const fn build<T: ?Sized + 'static>() -> Reference {
         Reference::Generic(GenericReference {
             id: TypeId::of::<T>(),
-            identity,
         })
     }
 
-    // TODO: Lookup method?
+    /// Compare two [GenericReference]s for equality.
+    /// If this returns true they are both a reference to the same generic type.
+    pub fn eq<T: ?Sized + 'static>(&self) -> bool {
+        self.id == TypeId::of::<T>()
+    }
 }
 
 /// A reference to an opaque type which is understood by the type exporter.
@@ -185,6 +192,7 @@ impl Reference {
     pub fn ty_eq(&self, other: &Reference) -> bool {
         match (self, other) {
             (Reference::Named(a), Reference::Named(b)) => a.id == b.id,
+            (Reference::Generic(a), Reference::Generic(b)) => a.id == b.id,
             (Reference::Opaque(a), Reference::Opaque(b)) => *a == *b,
             _ => false,
         }

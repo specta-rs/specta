@@ -7,8 +7,8 @@ use std::{borrow::Cow, fmt::Debug};
 use crate::{
     TypeCollection,
     datatype::{
-        Attribute, DataType, DeprecatedType, EnumVariant, Field, Fields, Generic, NamedDataType,
-        NamedFields, Struct, UnnamedFields,
+        Attribute, DataType, DeprecatedType, EnumVariant, Field, Fields, GenericReference,
+        NamedDataType, NamedFields, Struct, UnnamedFields,
     },
 };
 
@@ -180,14 +180,18 @@ pub struct NamedDataTypeBuilder {
     pub(crate) docs: Cow<'static, str>,
     pub(crate) deprecated: Option<DeprecatedType>,
     pub(crate) module_path: Option<Cow<'static, str>>,
-    pub(crate) generics: Vec<Generic>,
+    pub(crate) generics: Vec<(GenericReference, Cow<'static, str>)>,
     pub(crate) inline: bool,
     pub(crate) inner: DataType,
 }
 
 impl NamedDataTypeBuilder {
     /// Construct a new named datatype builder.
-    pub fn new(name: impl Into<Cow<'static, str>>, generics: Vec<Generic>, dt: DataType) -> Self {
+    pub fn new(
+        name: impl Into<Cow<'static, str>>,
+        generics: Vec<(GenericReference, Cow<'static, str>)>,
+        dt: DataType,
+    ) -> Self {
         Self {
             name: name.into(),
             docs: Cow::Borrowed(""),
