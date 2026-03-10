@@ -21,8 +21,6 @@ pub struct SerdeContainerAttrs {
     pub tag: Option<String>,
     pub content: Option<String>,
     pub untagged: bool,
-    pub bound_serialize: Option<String>,
-    pub bound_deserialize: Option<String>,
     pub default: Option<String>,
     pub remote: Option<String>,
     pub transparent: bool,
@@ -49,8 +47,6 @@ pub struct SerdeVariantAttrs {
     pub serialize_with: Option<String>,
     pub deserialize_with: Option<String>,
     pub with: Option<String>,
-    pub bound_serialize: Option<String>,
-    pub bound_deserialize: Option<String>,
     pub borrow: Option<String>,
     pub other: bool,
     pub untagged: bool,
@@ -72,8 +68,6 @@ pub struct SerdeFieldAttrs {
     pub deserialize_with: Option<String>,
     pub with: Option<String>,
     pub borrow: Option<String>,
-    pub bound_serialize: Option<String>,
-    pub bound_deserialize: Option<String>,
     pub getter: Option<String>,
 }
 
@@ -173,23 +167,6 @@ macro_rules! __specta_serde_parse_rename_all_fields_list {
     ($target:expr; ) => {};
 }
 
-#[doc(hidden)]
-#[macro_export]
-macro_rules! __specta_serde_parse_bound_list {
-    ($target:expr; serialize = $value:literal $(, $($rest:tt)*)?) => {
-        $crate::__specta_serde_set_str!($target, bound_serialize, $value);
-        $( $crate::__specta_serde_parse_bound_list!($target; $($rest)*); )?
-    };
-    ($target:expr; deserialize = $value:literal $(, $($rest:tt)*)?) => {
-        $crate::__specta_serde_set_str!($target, bound_deserialize, $value);
-        $( $crate::__specta_serde_parse_bound_list!($target; $($rest)*); )?
-    };
-    ($target:expr; $unknown:ident $(= $value:expr)? $(, $($rest:tt)*)?) => {
-        $( $crate::__specta_serde_parse_bound_list!($target; $($rest)*); )?
-    };
-    ($target:expr; ) => {};
-}
-
 /// Parse `#[serde(...)]` container attributes into [`SerdeContainerAttrs`].
 ///
 /// # Example
@@ -277,23 +254,6 @@ macro_rules! __specta_serde_parse_container_items {
     };
     ($target:ident; rename_all_fields($($inner:tt)*)) => {
         $crate::__specta_serde_parse_rename_all_fields_list!($target; $($inner)*);
-    };
-
-    ($target:ident; bound = $value:literal, $($rest:tt)*) => {
-        $crate::__specta_serde_set_str!($target, bound_serialize, $value);
-        $crate::__specta_serde_set_str!($target, bound_deserialize, $value);
-        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
-    };
-    ($target:ident; bound = $value:literal) => {
-        $crate::__specta_serde_set_str!($target, bound_serialize, $value);
-        $crate::__specta_serde_set_str!($target, bound_deserialize, $value);
-    };
-    ($target:ident; bound($($inner:tt)*), $($rest:tt)*) => {
-        $crate::__specta_serde_parse_bound_list!($target; $($inner)*);
-        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
-    };
-    ($target:ident; bound($($inner:tt)*)) => {
-        $crate::__specta_serde_parse_bound_list!($target; $($inner)*);
     };
 
     ($target:ident; deny_unknown_fields, $($rest:tt)*) => {
@@ -533,22 +493,6 @@ macro_rules! __specta_serde_parse_variant_items {
     ($target:ident; with = $value:literal) => {
         $crate::__specta_serde_set_str!($target, with, $value);
     };
-    ($target:ident; bound = $value:literal, $($rest:tt)*) => {
-        $crate::__specta_serde_set_str!($target, bound_serialize, $value);
-        $crate::__specta_serde_set_str!($target, bound_deserialize, $value);
-        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
-    };
-    ($target:ident; bound = $value:literal) => {
-        $crate::__specta_serde_set_str!($target, bound_serialize, $value);
-        $crate::__specta_serde_set_str!($target, bound_deserialize, $value);
-    };
-    ($target:ident; bound($($inner:tt)*), $($rest:tt)*) => {
-        $crate::__specta_serde_parse_bound_list!($target; $($inner)*);
-        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
-    };
-    ($target:ident; bound($($inner:tt)*)) => {
-        $crate::__specta_serde_parse_bound_list!($target; $($inner)*);
-    };
     ($target:ident; borrow = $value:literal, $($rest:tt)*) => {
         $crate::__specta_serde_set_str!($target, borrow, $value);
         $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
@@ -722,22 +666,6 @@ macro_rules! __specta_serde_parse_field_items {
     ($target:ident; borrow) => {
         $target.borrow = Some(String::from("__borrow__"));
     };
-    ($target:ident; bound = $value:literal, $($rest:tt)*) => {
-        $crate::__specta_serde_set_str!($target, bound_serialize, $value);
-        $crate::__specta_serde_set_str!($target, bound_deserialize, $value);
-        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
-    };
-    ($target:ident; bound = $value:literal) => {
-        $crate::__specta_serde_set_str!($target, bound_serialize, $value);
-        $crate::__specta_serde_set_str!($target, bound_deserialize, $value);
-    };
-    ($target:ident; bound($($inner:tt)*), $($rest:tt)*) => {
-        $crate::__specta_serde_parse_bound_list!($target; $($inner)*);
-        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
-    };
-    ($target:ident; bound($($inner:tt)*)) => {
-        $crate::__specta_serde_parse_bound_list!($target; $($inner)*);
-    };
     ($target:ident; getter = $value:literal, $($rest:tt)*) => {
         $crate::__specta_serde_set_str!($target, getter, $value);
         $crate::__specta_serde_parse_field_items!($target; $($rest)*);
@@ -798,8 +726,6 @@ mod tests {
         assert!(parsed.deny_unknown_fields);
         assert_eq!(parsed.tag.as_deref(), Some("kind"));
         assert_eq!(parsed.content.as_deref(), Some("data"));
-        assert_eq!(parsed.bound_serialize.as_deref(), Some("T: Copy"));
-        assert_eq!(parsed.bound_deserialize.as_deref(), Some("T: Clone"));
         assert_eq!(parsed.default.as_deref(), Some("__default__"));
         assert_eq!(parsed.remote.as_deref(), Some("crate::Remote"));
         assert!(parsed.transparent);
@@ -844,8 +770,6 @@ mod tests {
         assert!(parsed.skip_serializing);
         assert!(!parsed.skip_deserializing);
         assert_eq!(parsed.with.as_deref(), Some("mod_path"));
-        assert_eq!(parsed.bound_serialize.as_deref(), Some("T: Copy"));
-        assert_eq!(parsed.bound_deserialize.as_deref(), Some("T: Copy"));
         assert_eq!(parsed.borrow.as_deref(), Some("'a + 'b"));
         assert!(parsed.other);
         assert!(parsed.untagged);
@@ -880,7 +804,6 @@ mod tests {
         assert_eq!(parsed.deserialize_with.as_deref(), Some("de_fn"));
         assert_eq!(parsed.with.as_deref(), Some("mod_fns"));
         assert_eq!(parsed.borrow.as_deref(), Some("__borrow__"));
-        assert_eq!(parsed.bound_deserialize.as_deref(), Some("T: Clone"));
         assert_eq!(parsed.getter.as_deref(), Some("get_field"));
     }
 }
