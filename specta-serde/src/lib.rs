@@ -36,11 +36,6 @@ pub fn apply(types: TypeCollection) -> TypeCollection {
 
 pub fn apply_phases(types: TypeCollection) -> TypeCollection {
     let originals = types.into_unsorted_iter().cloned().collect::<Vec<_>>();
-    let original_map = originals
-        .iter()
-        .map(|ndt| (TypeKey::from_ndt(ndt), ndt.clone()))
-        .collect::<HashMap<_, _>>();
-
     let mut dependencies = HashMap::<TypeKey, HashSet<TypeKey>>::new();
     let mut reverse_dependencies = HashMap::<TypeKey, HashSet<TypeKey>>::new();
 
@@ -74,19 +69,18 @@ pub fn apply_phases(types: TypeCollection) -> TypeCollection {
         }
     }
 
-    let mut out = TypeCollection::default();
+    let mut out = types.clone();
     let mut generated = HashMap::<TypeKey, GeneratedTypes>::new();
     let mut rewrite_plan = HashMap::<TypeKey, PhaseRewrite>::new();
 
     for original in &originals {
         let key = TypeKey::from_ndt(original);
-        let generics = original.generics().to_vec();
 
         if split_types.contains(&key) {
             let serialize_ndt = build_from_original(
                 original,
                 format!("{}_Serialize", original.name()),
-                generics.clone(),
+                original.generics().to_vec(),
                 original.ty().clone(),
                 &types,
                 &mut out,
@@ -94,7 +88,7 @@ pub fn apply_phases(types: TypeCollection) -> TypeCollection {
             let deserialize_ndt = build_from_original(
                 original,
                 format!("{}_Deserialize", original.name()),
-                generics,
+                original.generics().to_vec(),
                 original.ty().clone(),
                 &types,
                 &mut out,
@@ -113,17 +107,8 @@ pub fn apply_phases(types: TypeCollection) -> TypeCollection {
                 },
             );
         } else {
-            let unified_ndt = build_from_original(
-                original,
-                original.name().to_string(),
-                generics,
-                original.ty().clone(),
-                &types,
-                &mut out,
-            );
-
-            rewrite_plan.insert(TypeKey::from_ndt(&unified_ndt), PhaseRewrite::Unified);
-            generated.insert(key, GeneratedTypes::Unified(unified_ndt));
+            rewrite_plan.insert(key.clone(), PhaseRewrite::Unified);
+            generated.insert(key, GeneratedTypes::Unified(original.clone()));
         }
     }
 
@@ -135,19 +120,21 @@ pub fn apply_phases(types: TypeCollection) -> TypeCollection {
         rewrite_datatype_for_phase(ndt.ty_mut(), mode, &types, &generated, &split_types);
     });
 
-    for key in &split_types {
-        let Some(original) = original_map.get(key) else {
-            continue;
-        };
+    out.iter_mut(|ndt| {
+        let key = TypeKey::from_ndt(ndt);
+        if !split_types.contains(&key) {
+            return;
+        }
+
         let Some(GeneratedTypes::Split {
             serialize,
             deserialize,
-        }) = generated.get(key)
+        }) = generated.get(&key)
         else {
-            continue;
+            return;
         };
 
-        let generic_args = original
+        let generic_args = ndt
             .generics()
             .iter()
             .map(|(generic, _)| (generic.clone(), generic.clone().into()))
@@ -175,22 +162,8 @@ pub fn apply_phases(types: TypeCollection) -> TypeCollection {
             .variants_mut()
             .push((Cow::Borrowed("Deserialize"), deserialize_variant));
 
-        let mut wrapper_builder = NamedDataTypeBuilder::new(
-            original.name().clone(),
-            original.generics().to_vec(),
-            DataType::Enum(wrapper),
-        )
-        .docs(original.docs().clone())
-        .module_path(original.module_path().clone());
-        if let Some(deprecated) = original.deprecated().cloned() {
-            wrapper_builder = wrapper_builder.deprecated(deprecated);
-        }
-        if !original.requires_reference(&types) {
-            wrapper_builder = wrapper_builder.inline();
-        }
-
-        let _ = wrapper_builder.build(&mut out);
-    }
+        ndt.set_ty(DataType::Enum(wrapper));
+    });
 
     debug_assert_eq!(dependencies.len(), originals.len());
 
