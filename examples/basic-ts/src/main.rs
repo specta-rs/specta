@@ -14,6 +14,13 @@ pub struct HelloWorld {
     b: String,
 }
 
+#[derive(Serialize, Type)]
+#[serde(rename = "HelloWorld2")]
+pub struct NotPhaseSpecific {
+    #[serde(rename = "b")]
+    a: String,
+}
+
 fn main() {
     {
         let mut types = TypeCollection::default();
@@ -28,18 +35,19 @@ fn main() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = TypeCollection::default().register::<NotPhaseSpecific>();
         let def = HelloWorld::definition(&mut types);
         let types = specta_serde::apply_phases(types);
-        // println!(
-        //     "{:#?}",
-        //     match def {
-        //         DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
-        //         _ => unreachable!(),
-        //     }
-        // );
+        println!(
+            "{:#?}",
+            match def {
+                DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
+                _ => unreachable!(),
+            }
+        ); // TODO: We need to solve referential integrity
 
         println!("{:#?}", types);
+        println!("Types Count: {}", types.len());
     }
 
     // {
