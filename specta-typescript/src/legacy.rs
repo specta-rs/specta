@@ -265,7 +265,7 @@ pub(crate) fn struct_datatype(
             let (flattened, non_flattened): (Vec<_>, Vec<_>) =
                 fields.iter().partition(|(_, (f, _))| f.flatten());
 
-            let mut field_sections = flattened
+            let mut flattened_sections = flattened
                 .into_iter()
                 .map(|(_key, (field, ty))| {
                     let mut s = String::new();
@@ -347,17 +347,13 @@ pub(crate) fn struct_datatype(
                 s.push('\n');
                 s.push_str(prefix);
                 s.push('}');
-                field_sections.push(s);
+                flattened_sections.insert(0, s);
             }
 
-            // TODO: Do this more efficiently
-            let field_sections = field_sections
-                .into_iter()
-                // Remove duplicates + sort
-                .collect::<BTreeSet<_>>()
-                .into_iter()
-                .collect::<Vec<_>>();
-            s.push_str(&field_sections.join(" & "));
+            // Remove duplicates while preserving source order.
+            let mut seen = BTreeSet::new();
+            flattened_sections.retain(|section| seen.insert(section.clone()));
+            s.push_str(&flattened_sections.join(" & "));
         }
     }
 
@@ -380,7 +376,7 @@ fn enum_variant_datatype(
             let (flattened, non_flattened): (Vec<_>, Vec<_>) =
                 all_fields.iter().partition(|(_, (f, _))| f.flatten());
 
-            let mut field_sections = flattened
+            let field_sections = flattened
                 .into_iter()
                 .map(|(_key, (field, ty))| {
                     let mut s = String::new();
@@ -460,8 +456,9 @@ fn enum_variant_datatype(
                 ([], fields) => format!("{{ {} }}", fields.join("; ")),
                 (_, []) => field_sections.join(" & "),
                 (_, _) => {
-                    field_sections.push(format!("{{ {} }}", regular_fields.join("; ")));
-                    field_sections.join(" & ")
+                    let mut sections = vec![format!("{{ {} }}", regular_fields.join("; "))];
+                    sections.extend(field_sections);
+                    sections.join(" & ")
                 }
             }))
         }
