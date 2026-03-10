@@ -725,8 +725,8 @@ fn shallow_inline_datatype(
                 if matches!(resolved_dt, DataType::Generic(inner) if inner == g) {
                     s.push_str(g.borrow());
                 } else {
-                    let already_resolving =
-                        RESOLVING_GENERICS.with(|stack| stack.borrow().iter().any(|seen| seen == g));
+                    let already_resolving = RESOLVING_GENERICS
+                        .with(|stack| stack.borrow().iter().any(|seen| seen == g));
                     if already_resolving {
                         s.push_str(g.borrow());
                     } else {
@@ -757,7 +757,11 @@ fn shallow_inline_datatype(
 }
 
 fn resolve_generics_in_datatype(dt: &DataType, generics: &[(Generic, DataType)]) -> DataType {
-    fn resolve(dt: &DataType, generics: &[(Generic, DataType)], visiting: &mut Vec<Generic>) -> DataType {
+    fn resolve(
+        dt: &DataType,
+        generics: &[(Generic, DataType)],
+        visiting: &mut Vec<Generic>,
+    ) -> DataType {
         match dt {
             DataType::Primitive(_) | DataType::Reference(_) => dt.clone(),
             DataType::List(l) => {
@@ -771,7 +775,9 @@ fn resolve_generics_in_datatype(dt: &DataType, generics: &[(Generic, DataType)])
                 out.set_value_ty(resolve(m.value_ty(), generics, visiting));
                 DataType::Map(out)
             }
-            DataType::Nullable(def) => DataType::Nullable(Box::new(resolve(def, generics, visiting))),
+            DataType::Nullable(def) => {
+                DataType::Nullable(Box::new(resolve(def, generics, visiting)))
+            }
             DataType::Struct(st) => {
                 let mut out = st.clone();
                 match out.fields_mut() {
@@ -1887,6 +1893,8 @@ fn reference_named_dt(
             .get(types)
             .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
 
+        println!("BUILDING REFERENCE FOR {:?} {:?}", ndt.name(), r.inline()); // TODO
+
         // Check if this reference should be inlined
         if r.inline() {
             let inline_key = (
@@ -1901,18 +1909,18 @@ fn reference_named_dt(
                 // Fall through and emit a named reference to break recursive inline expansions.
             } else {
                 INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
-            let combined_generics = merged_generics(generics, r.generics());
-            let resolved = resolve_generics_in_datatype(ndt.ty(), &combined_generics);
-            let result = datatype(
-                s,
-                exporter,
-                types,
-                &resolved,
-                location,
-                None,
-                prefix,
-                &combined_generics,
-            );
+                let combined_generics = merged_generics(generics, r.generics());
+                let resolved = resolve_generics_in_datatype(ndt.ty(), &combined_generics);
+                let result = datatype(
+                    s,
+                    exporter,
+                    types,
+                    &resolved,
+                    location,
+                    None,
+                    prefix,
+                    &combined_generics,
+                );
                 INLINE_REFERENCE_STACK.with(|stack| {
                     stack.borrow_mut().pop();
                 });

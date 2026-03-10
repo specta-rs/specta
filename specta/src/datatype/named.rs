@@ -3,8 +3,8 @@ use std::{borrow::Cow, panic::Location, sync::Arc};
 use crate::{
     TypeCollection,
     datatype::{
-        DataType, Generic, NamedDataTypeBuilder, NamedReference, Reference,
-        reference::{self, NamedId},
+        DataType, NamedDataTypeBuilder, NamedReference, Reference,
+        reference::{self, GenericReference, NamedId},
     },
 };
 
@@ -17,10 +17,12 @@ pub struct NamedDataType {
     pub(crate) deprecated: Option<DeprecatedType>,
     pub(crate) module_path: Cow<'static, str>,
     pub(crate) location: Location<'static>,
-    pub(crate) generics: Vec<Generic>,
+    pub(crate) generics: Vec<GenericReference>,
     pub(crate) inline: bool,
     pub(crate) inner: DataType,
 }
+
+// pub struct GenericDef
 
 impl NamedDataType {
     // ## Why return a reference?
@@ -31,7 +33,7 @@ impl NamedDataType {
     #[doc(hidden)]
     #[track_caller]
     pub fn init_with_sentinel(
-        generics: Vec<(Generic, DataType)>,
+        generics: Vec<(GenericReference, DataType)>,
         mut inline: bool,
         types: &mut TypeCollection,
         sentinel: &'static str,
@@ -117,7 +119,7 @@ impl NamedDataType {
     /// This can be included in a `DataType::Reference` within another type.
     ///
     /// This reference will be inlined if the type is inlined, otherwise you can inline it with [Reference::inline].
-    pub fn reference(&self, generics: Vec<(Generic, DataType)>) -> Reference {
+    pub fn reference(&self, generics: Vec<(GenericReference, DataType)>) -> Reference {
         // TODO: allow generics to be `Cow`
         // TODO: HashMap instead of array for better typesafety??
 

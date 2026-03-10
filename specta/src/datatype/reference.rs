@@ -1,5 +1,6 @@
 use std::{
     any::{Any, TypeId},
+    borrow::Cow,
     fmt, hash,
     sync::Arc,
 };
@@ -14,6 +15,8 @@ use super::{DataType, Generic};
 pub enum Reference {
     /// A reference to a named type collected in a [`TypeCollection`].
     Named(NamedReference),
+    /// A reference to a generic type parameter.
+    Generic(GenericReference),
     /// A reference to an opaque exporter-specific type.
     Opaque(OpaqueReference),
 }
@@ -23,7 +26,7 @@ pub enum Reference {
 pub struct NamedReference {
     pub(crate) id: NamedId,
     // TODO: Should this be a map-type???
-    pub(crate) generics: Vec<(Generic, DataType)>, // TODO: Cow<'static, [(Generic, DataType)]>,
+    pub(crate) generics: Vec<(GenericReference, DataType)>, // TODO: Cow<'static, [(Generic, DataType)]>,
     pub(crate) inline: bool,
 }
 
@@ -37,7 +40,7 @@ impl NamedReference {
     }
 
     /// Get the generic parameters set on this reference which will be filled in by the [NamedDataType].
-    pub fn generics(&self) -> &[(Generic, DataType)] {
+    pub fn generics(&self) -> &[(GenericReference, DataType)] {
         &self.generics
     }
 
@@ -45,6 +48,27 @@ impl NamedReference {
     pub fn inline(&self) -> bool {
         self.inline
     }
+}
+
+/// A reference to a generic type parameter.
+/// These are resolved in the exporter to the parent's [NamedDataType].
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct GenericReference {
+    pub(crate) id: TypeId,
+    pub(crate) identity: Cow<'static, str>,
+}
+
+impl GenericReference {
+    /// Build a new [Reference] for a generic type parameter.
+    /// `identity` should match the name of the argument (Eg. `T`), and `T` should be a unique type which represents that generic (Eg. `pub struct GenericT;`).
+    pub const fn build<T: ?Sized + 'static>(identity: Cow<'static, str>) -> Reference {
+        Reference::Generic(GenericReference {
+            id: TypeId::of::<T>(),
+            identity,
+        })
+    }
+
+    // TODO: Lookup method?
 }
 
 /// A reference to an opaque type which is understood by the type exporter.
