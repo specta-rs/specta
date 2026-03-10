@@ -2,8 +2,7 @@ use std::path::Path;
 
 use specta::datatype::{DataType, Reference};
 use specta::{Type, TypeCollection};
-use specta_serde::SerdeMode;
-use specta_typescript::{BigIntExportBehavior, JSDoc, Layout, primitives};
+use specta_typescript::{primitives, BigIntExportBehavior, JSDoc, Layout};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -43,47 +42,52 @@ mod jsdoc_export_to_files_runtime_imports_types {
     }
 }
 
+fn phase_collections(
+    types: TypeCollection,
+) -> [(&'static str, Result<TypeCollection, specta_serde::Error>); 3] {
+    [
+        ("raw", Ok(types.clone())),
+        ("serde", specta_serde::apply(types.clone())),
+        ("serde_phases", specta_serde::apply_phases(types)),
+    ]
+}
+
 #[test]
 fn export() {
-    for mode in [
-        SerdeMode::Both,
-        SerdeMode::Serialize,
-        SerdeMode::Deserialize,
-    ] {
-        insta::assert_snapshot!(
-            format!("inline-{}", mode.to_string().to_lowercase()),
-            JSDoc::default()
-                .with_serde(mode)
+    for (mode, types) in phase_collections(crate::types().0) {
+        let output = match types {
+            Ok(types) => JSDoc::default()
                 .bigint(BigIntExportBehavior::Number)
-                .export(&crate::types().0)
-                .unwrap()
-        );
+                .export(&types)
+                .unwrap(),
+            Err(err) => format!("ERROR: {err}"),
+        };
+
+        insta::assert_snapshot!(format!("inline-{mode}"), output);
     }
 }
 
 #[test]
 fn primitives_export_many() {
-    for mode in [
-        SerdeMode::Both,
-        SerdeMode::Serialize,
-        SerdeMode::Deserialize,
-    ] {
-        let jsdoc = JSDoc::default()
-            .with_serde(mode)
-            .bigint(BigIntExportBehavior::Number);
-        let (types, dts) = crate::types();
-        let ndts = dts
-            .iter()
-            .filter_map(|(_, ty)| match ty {
-                DataType::Reference(Reference::Named(r)) => r.get(&types),
-                _ => None,
-            })
-            .collect::<Vec<_>>();
+    let (types, dts) = crate::types();
+    for (mode, types) in phase_collections(types) {
+        let output = match types {
+            Ok(types) => {
+                let jsdoc = JSDoc::default().bigint(BigIntExportBehavior::Number);
+                let ndts = dts
+                    .iter()
+                    .filter_map(|(_, ty)| match ty {
+                        DataType::Reference(Reference::Named(r)) => r.get(&types),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>();
 
-        insta::assert_snapshot!(
-            format!("primitives-many-inline-{}", mode.to_string().to_lowercase()),
-            primitives::export(&jsdoc, &types, ndts.into_iter(), "").unwrap()
-        );
+                primitives::export(&jsdoc, &types, ndts.into_iter(), "").unwrap()
+            }
+            Err(err) => format!("ERROR: {err}"),
+        };
+
+        insta::assert_snapshot!(format!("primitives-many-inline-{mode}"), output);
     }
 }
 
