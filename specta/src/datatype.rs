@@ -18,7 +18,7 @@ pub use fields::{Field, Fields, NamedFields, StructBuilder, UnnamedFields};
 pub use function::Function;
 pub use list::List;
 pub use map::Map;
-pub use named::{DeprecatedAttribute, NamedDataType};
+pub use named::{Deprecated, NamedDataType};
 pub use primitive::Primitive;
 pub use reference::{GenericReference, NamedReference, OpaqueReference, Reference};
 pub use r#struct::Struct;

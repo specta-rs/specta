@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::{
     TypeCollection,
-    datatype::{DeprecatedAttribute, Function},
+    datatype::{Deprecated, Function},
 };
 
 use super::{FunctionArg, FunctionResult};
@@ -18,7 +18,7 @@ pub trait SpectaFn<TMarker> {
         types: &mut TypeCollection,
         fields: &[Cow<'static, str>],
         docs: Cow<'static, str>,
-        deprecated: Option<DeprecatedAttribute>,
+        deprecated: Option<Deprecated>,
         no_return_type: bool,
     ) -> Function;
 }
@@ -33,7 +33,7 @@ where
         types: &mut TypeCollection,
         _fields: &[Cow<'static, str>],
         docs: Cow<'static, str>,
-        deprecated: Option<DeprecatedAttribute>,
+        deprecated: Option<Deprecated>,
         no_return_type: bool,
     ) -> Function {
         Function {
@@ -64,7 +64,7 @@ macro_rules! impl_typed_command {
                     types: &mut TypeCollection,
                     fields: &[Cow<'static, str>],
                     docs: Cow<'static, str>,
-                    deprecated: Option<DeprecatedAttribute>,
+                    deprecated: Option<Deprecated>,
                     no_return_type: bool,
                 ) -> Function {
                     let mut fields = fields.into_iter();

@@ -103,7 +103,7 @@
 // #[allow(clippy::ptr_arg)]
 // fn inner_comments(
 //     ctx: ExportContext,
-//     _deprecated: Option<&DeprecatedAttribute>,
+//     _deprecated: Option<&Deprecated>,
 //     _docs: &Cow<'static, str>,
 //     other: String,
 //     start_with_newline: bool,

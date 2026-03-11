@@ -7,7 +7,7 @@ use std::{borrow::Cow, cell::RefCell, fmt::Write as _, iter};
 use specta::{
     TypeCollection,
     datatype::{
-        DataType, DeprecatedAttribute, Enum, Fields, GenericReference, List, Map, NamedDataType,
+        DataType, Deprecated, Enum, Fields, GenericReference, List, Map, NamedDataType,
         NamedReference, OpaqueReference, Primitive, Reference, Tuple,
     },
 };
@@ -320,7 +320,7 @@ fn push_jsdoc_property(
     name: &str,
     optional: bool,
     docs: &str,
-    deprecated: Option<&DeprecatedAttribute>,
+    deprecated: Option<&Deprecated>,
     indent: &str,
 ) {
     s.push_str(indent);
@@ -441,7 +441,7 @@ fn append_typedef_body(
     Ok(())
 }
 
-fn jsdoc_description(docs: &str, deprecated: Option<&DeprecatedAttribute>) -> Option<String> {
+fn jsdoc_description(docs: &str, deprecated: Option<&Deprecated>) -> Option<String> {
     let docs = docs
         .lines()
         .map(str::trim)

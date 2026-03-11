@@ -16,7 +16,7 @@ pub struct NamedDataType {
     pub(crate) id: NamedId,
     pub(crate) name: Cow<'static, str>,
     pub(crate) docs: Cow<'static, str>,
-    pub(crate) deprecated: Option<DeprecatedAttribute>,
+    pub(crate) deprecated: Option<Deprecated>,
     pub(crate) module_path: Cow<'static, str>,
     pub(crate) location: Location<'static>,
     pub(crate) generics: Cow<'static, [(GenericReference, Cow<'static, str>)]>,
@@ -202,17 +202,17 @@ impl NamedDataType {
     }
 
     /// The Rust deprecated comment if the type is deprecated.
-    pub fn deprecated(&self) -> Option<&DeprecatedAttribute> {
+    pub fn deprecated(&self) -> Option<&Deprecated> {
         self.deprecated.as_ref()
     }
 
     /// Get a mutable reference to the Rust deprecated comment if the type is deprecated.
-    pub fn deprecated_mut(&mut self) -> Option<&mut DeprecatedAttribute> {
+    pub fn deprecated_mut(&mut self) -> Option<&mut Deprecated> {
         self.deprecated.as_mut()
     }
 
     /// Set the Rust deprecated comment if the type is deprecated.
-    pub fn set_deprecated(&mut self, deprecated: Option<DeprecatedAttribute>) {
+    pub fn set_deprecated(&mut self, deprecated: Option<Deprecated>) {
         self.deprecated = deprecated;
     }
 
@@ -269,12 +269,12 @@ impl NamedDataType {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 /// Runtime representation of Rust's `#[deprecated]` metadata.
-pub struct DeprecatedAttribute {
+pub struct Deprecated {
     note: Option<Cow<'static, str>>,
     since: Option<Cow<'static, str>>,
 }
 
-impl DeprecatedAttribute {
+impl Deprecated {
     /// Construct deprecation metadata without details.
     ///
     /// Eg. `#[deprecated]`
