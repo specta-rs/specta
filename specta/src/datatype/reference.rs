@@ -9,7 +9,6 @@ use crate::{TypeCollection, datatype::NamedDataType};
 use super::DataType;
 
 /// Reference to another type.
-/// This could be a [NamedReference], [OpaqueReference], or [GenericReference].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Reference {
     /// Reference to a named type collected in a [`TypeCollection`].
