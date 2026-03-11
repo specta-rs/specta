@@ -8,7 +8,6 @@
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet, VecDeque},
-    marker::PhantomData,
 };
 
 use specta::{
@@ -30,16 +29,18 @@ mod validate;
 pub use error::{Error, Result};
 pub use inflection::RenameRule;
 pub use parser::{
-    ConversionType, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs, merge_container_attrs,
-    merge_field_attrs, merge_variant_attrs,
+    ConversionType, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs, SpectaTypeAttr,
+    merge_container_attrs, merge_field_attrs, merge_variant_attrs,
 };
 pub use phased::{Phased, Phased2};
 use repr::EnumRepr;
 
 pub fn apply(types: TypeCollection) -> Result<TypeCollection> {
-    validate::validate(&types)?;
+    validate::validate_for_mode(&types, validate::ApplyMode::Unified)?;
 
-    let mut out = types;
+    let mut out = types.clone();
+    let generated = HashMap::<TypeKey, GeneratedTypes>::new();
+    let split_types = HashSet::<TypeKey>::new();
     let mut rewrite_err = None;
 
     out.iter_mut(|ndt| {
@@ -47,7 +48,13 @@ pub fn apply(types: TypeCollection) -> Result<TypeCollection> {
             return;
         }
 
-        if let Err(err) = rename_datatype_fields(ndt.ty_mut()) {
+        if let Err(err) = rewrite_datatype_for_phase(
+            ndt.ty_mut(),
+            PhaseRewrite::Unified,
+            &types,
+            &generated,
+            &split_types,
+        ) {
             rewrite_err = Some(err);
         }
     });
@@ -60,7 +67,7 @@ pub fn apply(types: TypeCollection) -> Result<TypeCollection> {
 }
 
 pub fn apply_phases(types: TypeCollection) -> Result<TypeCollection> {
-    validate::validate(&types)?;
+    validate::validate_for_mode(&types, validate::ApplyMode::Phases)?;
 
     let originals = types.into_unsorted_iter().cloned().collect::<Vec<_>>();
     let mut dependencies = HashMap::<TypeKey, HashSet<TypeKey>>::new();
@@ -248,6 +255,10 @@ fn rewrite_datatype_for_phase(
     generated: &HashMap<TypeKey, GeneratedTypes>,
     split_types: &HashSet<TypeKey>,
 ) -> Result<()> {
+    if let Some(resolved) = resolve_phased_type(ty, original_types, mode, "type")? {
+        *ty = resolved;
+    }
+
     if let Some(converted) = conversion_datatype_for_mode(ty, mode)? {
         if converted != *ty {
             *ty = converted;
@@ -260,6 +271,7 @@ fn rewrite_datatype_for_phase(
             rewrite_fields_for_phase(s.fields_mut(), mode, original_types, generated, split_types)?
         }
         DataType::Enum(e) => {
+            filter_enum_variants_for_phase(e, mode);
             for (_, variant) in e.variants_mut() {
                 rewrite_fields_for_phase(
                     variant.fields_mut(),
@@ -356,12 +368,18 @@ fn rewrite_fields_for_phase(
     match fields {
         Fields::Unit => {}
         Fields::Unnamed(unnamed) => {
+            unnamed
+                .fields_mut()
+                .retain(|field| !should_skip_field_for_mode(field, mode));
             for field in unnamed.fields_mut() {
                 apply_field_attrs(field);
                 rewrite_field_for_phase(field, mode, original_types, generated, split_types)?;
             }
         }
         Fields::Named(named) => {
+            named
+                .fields_mut()
+                .retain(|(_, field)| !should_skip_field_for_mode(field, mode));
             for (name, field) in named.fields_mut() {
                 apply_field_attrs(field);
 
@@ -395,11 +413,37 @@ fn rewrite_field_for_phase(
     generated: &HashMap<TypeKey, GeneratedTypes>,
     split_types: &HashSet<TypeKey>,
 ) -> Result<()> {
+    if let Some(attrs) = field.attributes().get::<SerdeFieldAttrs>() {
+        if let PhaseRewrite::Serialize = mode
+            && attrs.skip_serializing_if.is_some()
+        {
+            field.set_optional(true);
+        }
+    }
+
+    if let Some(ty) = field.ty().cloned()
+        && let Some(resolved) = resolve_phased_type(&ty, original_types, mode, "field")?
+    {
+        field.set_ty(resolved);
+    }
+
     if let Some(ty) = field.ty_mut() {
         rewrite_datatype_for_phase(ty, mode, original_types, generated, split_types)?;
     }
 
     Ok(())
+}
+
+fn should_skip_field_for_mode(field: &Field, mode: PhaseRewrite) -> bool {
+    let Some(attrs) = field.attributes().get::<SerdeFieldAttrs>() else {
+        return false;
+    };
+
+    match mode {
+        PhaseRewrite::Serialize => attrs.skip_serializing,
+        PhaseRewrite::Deserialize => attrs.skip_deserializing,
+        PhaseRewrite::Unified => attrs.skip_serializing || attrs.skip_deserializing,
+    }
 }
 
 fn rewrite_enum_repr_for_phase(
@@ -416,6 +460,18 @@ fn rewrite_enum_repr_for_phase(
     let variants = std::mem::take(e.variants_mut());
     let mut transformed = Vec::with_capacity(variants.len());
     for (variant_name, variant) in variants {
+        if let Some(attrs) = variant.attributes().get::<SerdeVariantAttrs>() {
+            let skipped = match mode {
+                PhaseRewrite::Serialize => attrs.skip_serializing,
+                PhaseRewrite::Deserialize => attrs.skip_deserializing,
+                PhaseRewrite::Unified => attrs.skip_serializing || attrs.skip_deserializing,
+            };
+
+            if skipped {
+                continue;
+            }
+        }
+
         let serialized_name =
             serialized_variant_name(&variant_name, &variant, &container_attrs, mode)?;
         let transformed_variant = match &repr {
@@ -449,6 +505,20 @@ fn rewrite_enum_repr_for_phase(
     *e.variants_mut() = transformed;
 
     Ok(())
+}
+
+fn filter_enum_variants_for_phase(e: &mut Enum, mode: PhaseRewrite) {
+    e.variants_mut().retain(|(_, variant)| {
+        let Some(attrs) = variant.attributes().get::<SerdeVariantAttrs>() else {
+            return true;
+        };
+
+        !match mode {
+            PhaseRewrite::Serialize => attrs.skip_serializing,
+            PhaseRewrite::Deserialize => attrs.skip_deserializing,
+            PhaseRewrite::Unified => attrs.skip_serializing || attrs.skip_deserializing,
+        }
+    });
 }
 
 fn enum_repr_from_attrs(attrs: &specta::datatype::Attributes) -> Result<EnumRepr> {
@@ -562,6 +632,50 @@ fn select_phase_rule(
             }
             (serialize, deserialize) => serialize.or(deserialize),
         },
+    })
+}
+
+fn resolve_phased_type(
+    ty: &DataType,
+    original_types: &TypeCollection,
+    mode: PhaseRewrite,
+    path: &str,
+) -> Result<Option<DataType>> {
+    let DataType::Reference(Reference::Named(reference)) = ty else {
+        return Ok(None);
+    };
+
+    let Some(referenced) = reference.get(original_types) else {
+        return Ok(None);
+    };
+
+    if referenced.name() != "Phased" || referenced.module_path() != "specta_serde" {
+        return Ok(None);
+    }
+
+    let DataType::Tuple(payload) = referenced.ty() else {
+        return Err(Error::invalid_phased_type_usage(
+            path,
+            "`specta_serde::Phased` must resolve to a tuple payload",
+        ));
+    };
+
+    if payload.elements().len() != 2 {
+        return Err(Error::invalid_phased_type_usage(
+            path,
+            "`specta_serde::Phased` must have exactly two type phases",
+        ));
+    }
+
+    Ok(match mode {
+        PhaseRewrite::Unified => {
+            return Err(Error::invalid_phased_type_usage(
+                path,
+                "`specta_serde::Phased<Serialize, Deserialize>` requires `apply_phases`",
+            ));
+        }
+        PhaseRewrite::Serialize => Some(payload.elements()[0].clone()),
+        PhaseRewrite::Deserialize => Some(payload.elements()[1].clone()),
     })
 }
 
@@ -851,9 +965,10 @@ fn has_local_phase_difference(dt: &DataType) -> bool {
         }
         DataType::Enum(e) => {
             container_has_local_difference(e.attributes())
-                || e.variants()
-                    .iter()
-                    .any(|(_, variant)| fields_have_local_difference(variant.fields()))
+                || e.variants().iter().any(|(_, variant)| {
+                    variant_has_local_difference(variant)
+                        || fields_have_local_difference(variant.fields())
+                })
         }
         DataType::Tuple(tuple) => tuple.elements().iter().any(has_local_phase_difference),
         DataType::List(list) => has_local_phase_difference(list.ty()),
@@ -875,6 +990,9 @@ fn container_has_local_difference(attrs: &specta::datatype::Attributes) -> bool 
             .resolved_from
             .as_ref()
             .or(conversions.resolved_try_from.as_ref())
+        || conversions.rename_serialize != conversions.rename_deserialize
+        || conversions.rename_all_serialize != conversions.rename_all_deserialize
+        || conversions.rename_all_fields_serialize != conversions.rename_all_fields_deserialize
 }
 
 fn fields_have_local_difference(fields: &Fields) -> bool {
@@ -894,7 +1012,29 @@ fn field_has_local_difference(field: &Field) -> bool {
     field
         .attributes()
         .get::<SerdeFieldAttrs>()
-        .map(|attrs| attrs.rename_serialize.as_deref() != attrs.rename_deserialize.as_deref())
+        .map(|attrs| {
+            attrs.rename_serialize.as_deref() != attrs.rename_deserialize.as_deref()
+                || attrs.skip_serializing != attrs.skip_deserializing
+                || attrs.skip_serializing_if.is_some()
+                || attrs.has_serialize_with
+                || attrs.has_deserialize_with
+                || attrs.has_with
+        })
+        .unwrap_or_default()
+}
+
+fn variant_has_local_difference(variant: &EnumVariant) -> bool {
+    variant
+        .attributes()
+        .get::<SerdeVariantAttrs>()
+        .map(|attrs| {
+            attrs.rename_serialize.as_deref() != attrs.rename_deserialize.as_deref()
+                || attrs.rename_all_serialize != attrs.rename_all_deserialize
+                || attrs.skip_serializing != attrs.skip_deserializing
+                || attrs.has_serialize_with
+                || attrs.has_deserialize_with
+                || attrs.has_with
+        })
         .unwrap_or_default()
 }
 
@@ -1083,9 +1223,14 @@ fn rename_field_type(field: &mut Field) -> Result<()> {
 }
 
 fn apply_field_attrs(field: &mut Field) {
-    let flatten = field
-        .attributes()
-        .get::<SerdeFieldAttrs>()
-        .is_some_and(|attrs| attrs.flatten);
+    let mut flatten = false;
+    let mut optional = field.optional();
+    if let Some(attrs) = field.attributes().get::<SerdeFieldAttrs>() {
+        flatten = attrs.flatten;
+        if attrs.default.is_some() {
+            optional = true;
+        }
+    }
     field.set_flatten(flatten);
+    field.set_optional(optional);
 }

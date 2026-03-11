@@ -57,6 +57,14 @@ enum ErrorKind {
         path: String,
         reason: Cow<'static, str>,
     },
+    UnsupportedSerdeCustomCodec {
+        path: String,
+        attribute: Cow<'static, str>,
+    },
+    InvalidPhasedTypeUsage {
+        path: String,
+        reason: Cow<'static, str>,
+    },
 }
 
 impl Error {
@@ -189,6 +197,30 @@ impl Error {
             },
         }
     }
+
+    pub(crate) fn unsupported_serde_custom_codec(
+        path: impl Into<String>,
+        attribute: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::UnsupportedSerdeCustomCodec {
+                path: path.into(),
+                attribute: attribute.into(),
+            },
+        }
+    }
+
+    pub(crate) fn invalid_phased_type_usage(
+        path: impl Into<String>,
+        reason: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::InvalidPhasedTypeUsage {
+                path: path.into(),
+                reason: reason.into(),
+            },
+        }
+    }
 }
 
 impl fmt::Display for Error {
@@ -250,6 +282,13 @@ impl fmt::Display for Error {
                     f,
                     "Invalid usage of serde conversion attributes at '{path}': {reason}"
                 )
+            }
+            ErrorKind::UnsupportedSerdeCustomCodec { path, attribute } => write!(
+                f,
+                "Unsupported serde attribute at '{path}': #[serde({attribute})] changes the wire type. Add #[specta(type = ...)] (or #[specta(type = specta_serde::Phased<Serialize, Deserialize>)])"
+            ),
+            ErrorKind::InvalidPhasedTypeUsage { path, reason } => {
+                write!(f, "Invalid phased type usage at '{path}': {reason}")
             }
         }
     }

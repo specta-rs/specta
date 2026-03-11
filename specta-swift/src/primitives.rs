@@ -495,10 +495,7 @@ fn enum_to_swift(
             specta::datatype::Fields::Unit => {
                 if is_string_enum {
                     // For string enums, generate raw value assignments
-                    let raw_value = generate_raw_value(
-                        original_variant_name,
-                        None,
-                    );
+                    let raw_value = generate_raw_value(original_variant_name, None);
                     result.push_str(&format!("    case {} = \"{}\"\n", variant_name, raw_value));
                 } else {
                     result.push_str(&format!("    case {}\n", variant_name));
