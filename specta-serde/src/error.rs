@@ -47,6 +47,16 @@ enum ErrorKind {
         serialize: Option<String>,
         deserialize: Option<String>,
     },
+    IncompatibleConversion {
+        context: Cow<'static, str>,
+        name: String,
+        serialize: Option<String>,
+        deserialize: Option<String>,
+    },
+    InvalidConversionUsage {
+        path: String,
+        reason: Cow<'static, str>,
+    },
 }
 
 impl Error {
@@ -151,6 +161,34 @@ impl Error {
             },
         }
     }
+
+    pub(crate) fn incompatible_conversion(
+        context: impl Into<Cow<'static, str>>,
+        name: impl Into<String>,
+        serialize: Option<String>,
+        deserialize: Option<String>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::IncompatibleConversion {
+                context: context.into(),
+                name: name.into(),
+                serialize,
+                deserialize,
+            },
+        }
+    }
+
+    pub(crate) fn invalid_conversion_usage(
+        path: impl Into<String>,
+        reason: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::InvalidConversionUsage {
+                path: path.into(),
+                reason: reason.into(),
+            },
+        }
+    }
 }
 
 impl fmt::Display for Error {
@@ -198,6 +236,21 @@ impl fmt::Display for Error {
                 f,
                 "Incompatible {context} for '{name}' in unified mode: serialize={serialize:?}, deserialize={deserialize:?}"
             ),
+            ErrorKind::IncompatibleConversion {
+                context,
+                name,
+                serialize,
+                deserialize,
+            } => write!(
+                f,
+                "Incompatible {context} for '{name}' in unified mode: serialize={serialize:?}, deserialize={deserialize:?}. Use apply_phases for asymmetric serde conversions"
+            ),
+            ErrorKind::InvalidConversionUsage { path, reason } => {
+                write!(
+                    f,
+                    "Invalid usage of serde conversion attributes at '{path}': {reason}"
+                )
+            }
         }
     }
 }

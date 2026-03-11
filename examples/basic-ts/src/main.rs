@@ -1,9 +1,10 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use specta::{
     Type, TypeCollection,
     datatype::{DataType, Reference},
 };
 use specta_typescript::Typescript;
+use std::convert::TryFrom;
 
 #[derive(Serialize, Type)]
 #[serde(rename = "HelloWorld2")]
@@ -68,6 +69,56 @@ pub enum SerdeUntaggedExample {
     Object { value: String },
 }
 
+#[derive(Serialize, Deserialize, Type)]
+pub struct UserWire {
+    id: String,
+}
+
+#[derive(Clone, Serialize, Deserialize, Type)]
+#[serde(into = "UserWire")]
+pub struct UserInto {
+    id: String,
+}
+
+impl From<UserInto> for UserWire {
+    fn from(value: UserInto) -> Self {
+        Self { id: value.id }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Type)]
+#[serde(from = "UserWire")]
+pub struct UserFrom {
+    id: String,
+}
+
+impl From<UserWire> for UserFrom {
+    fn from(value: UserWire) -> Self {
+        Self { id: value.id }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Type)]
+#[serde(try_from = "UserWire")]
+pub struct UserTryFrom {
+    id: String,
+}
+
+impl TryFrom<UserWire> for UserTryFrom {
+    type Error = String;
+
+    fn try_from(value: UserWire) -> Result<Self, Self::Error> {
+        Ok(Self { id: value.id })
+    }
+}
+
+#[derive(Serialize, Deserialize, Type)]
+pub struct UsesSerdeConversions {
+    into_user: UserInto,
+    from_user: UserFrom,
+    try_from_user: UserTryFrom,
+}
+
 fn main() {
     {
         let mut types = TypeCollection::default();
@@ -106,14 +157,20 @@ fn main() {
             .register::<SerdeExternalExample>()
             .register::<SerdeInternalExample>()
             .register::<SerdeAdjacentExample>()
-            .register::<SerdeUntaggedExample>();
+            .register::<SerdeUntaggedExample>()
+            .register::<UserWire>()
+            .register::<UserInto>()
+            .register::<UserFrom>()
+            .register::<UserTryFrom>()
+            .register::<UsesSerdeConversions>();
         println!("RAW:\n{}", Typescript::default().export(&types).unwrap());
-        // println!(
-        //     "specta_serde::apply(...): `{}",
-        //     Typescript::default()
-        //         .export(&specta_serde::apply(types.clone()))
-        //         .unwrap()
-        // );
+        match specta_serde::apply(types.clone()) {
+            Ok(types) => println!(
+                "specta_serde::apply(...):\n{}",
+                Typescript::default().export(&types).unwrap()
+            ),
+            Err(err) => println!("specta_serde::apply(...) ERROR: {err}"),
+        }
         println!(
             "specta_serde::apply_phases(...):\n{}",
             Typescript::default()

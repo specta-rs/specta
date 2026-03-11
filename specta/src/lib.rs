@@ -34,6 +34,11 @@ pub use collect::collect;
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use specta_macros::Type;
 
+#[doc(hidden)]
+#[cfg(feature = "derive")]
+#[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
+pub use specta_macros::parse_type_from_lit;
+
 #[doc(inline)]
 #[cfg(all(feature = "derive", feature = "function"))]
 #[cfg_attr(docsrs, doc(cfg(all(feature = "derive", feature = "function"))))]

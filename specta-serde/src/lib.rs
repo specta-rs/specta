@@ -245,6 +245,13 @@ fn rewrite_datatype_for_phase(
     generated: &HashMap<TypeKey, GeneratedTypes>,
     split_types: &HashSet<TypeKey>,
 ) -> Result<()> {
+    if let Some(converted) = conversion_datatype_for_mode(ty, mode)? {
+        if converted != *ty {
+            *ty = converted;
+            return rewrite_datatype_for_phase(ty, mode, original_types, generated, split_types);
+        }
+    }
+
     match ty {
         DataType::Struct(s) => {
             rewrite_fields_for_phase(s.fields_mut(), mode, original_types, generated, split_types)?
@@ -555,6 +562,79 @@ fn select_phase_rule(
     })
 }
 
+fn conversion_datatype_for_mode(ty: &DataType, mode: PhaseRewrite) -> Result<Option<DataType>> {
+    let attrs = match ty {
+        DataType::Struct(s) => s.attributes(),
+        DataType::Enum(e) => e.attributes(),
+        _ => return Ok(None),
+    };
+
+    select_conversion_target(attrs, mode)
+}
+
+fn select_conversion_target(
+    attrs: &specta::datatype::Attributes,
+    mode: PhaseRewrite,
+) -> Result<Option<DataType>> {
+    let parsed = attrs.get::<SerdeContainerAttrs>();
+    let resolved = parsed;
+
+    let serialize_target = resolved.and_then(|v| v.resolved_into.as_ref());
+    let deserialize_target =
+        resolved.and_then(|v| v.resolved_from.as_ref().or(v.resolved_try_from.as_ref()));
+
+    match mode {
+        PhaseRewrite::Serialize => Ok(serialize_target.cloned()),
+        PhaseRewrite::Deserialize => Ok(deserialize_target.cloned()),
+        PhaseRewrite::Unified => match (serialize_target, deserialize_target) {
+            (None, None) => Ok(None),
+            (Some(serialize), Some(deserialize)) if serialize == deserialize => {
+                Ok(Some(serialize.clone()))
+            }
+            _ => Err(Error::incompatible_conversion(
+                "container conversion",
+                conversion_name(attrs),
+                serialize_conversion_name(parsed),
+                deserialize_conversion_name(parsed),
+            )),
+        },
+    }
+}
+
+fn conversion_name(attrs: &specta::datatype::Attributes) -> String {
+    attrs
+        .get::<SerdeContainerAttrs>()
+        .and_then(|attrs| {
+            attrs
+                .into
+                .as_ref()
+                .map(|v| format!("into({})", v.type_src))
+                .or_else(|| attrs.from.as_ref().map(|v| format!("from({})", v.type_src)))
+                .or_else(|| {
+                    attrs
+                        .try_from
+                        .as_ref()
+                        .map(|v| format!("try_from({})", v.type_src))
+                })
+        })
+        .unwrap_or_else(|| "<container>".to_string())
+}
+
+fn serialize_conversion_name(attrs: Option<&SerdeContainerAttrs>) -> Option<String> {
+    attrs.and_then(|attrs| attrs.into.as_ref().map(|v| v.type_src.clone()))
+}
+
+fn deserialize_conversion_name(attrs: Option<&SerdeContainerAttrs>) -> Option<String> {
+    attrs.and_then(|attrs| {
+        attrs.from.as_ref().map(|v| v.type_src.clone()).or_else(|| {
+            attrs
+                .try_from
+                .as_ref()
+                .map(|v| format!("try_from({})", v.type_src))
+        })
+    })
+}
+
 fn transform_external_variant(
     serialized_name: String,
     variant: &EnumVariant,
@@ -762,11 +842,16 @@ fn is_internal_variant_compatible(
 
 fn has_local_phase_difference(dt: &DataType) -> bool {
     match dt {
-        DataType::Struct(s) => fields_have_local_difference(s.fields()),
-        DataType::Enum(e) => e
-            .variants()
-            .iter()
-            .any(|(_, variant)| fields_have_local_difference(variant.fields())),
+        DataType::Struct(s) => {
+            container_has_local_difference(s.attributes())
+                || fields_have_local_difference(s.fields())
+        }
+        DataType::Enum(e) => {
+            container_has_local_difference(e.attributes())
+                || e.variants()
+                    .iter()
+                    .any(|(_, variant)| fields_have_local_difference(variant.fields()))
+        }
         DataType::Tuple(tuple) => tuple.elements().iter().any(has_local_phase_difference),
         DataType::List(list) => has_local_phase_difference(list.ty()),
         DataType::Map(map) => {
@@ -775,6 +860,18 @@ fn has_local_phase_difference(dt: &DataType) -> bool {
         DataType::Nullable(inner) => has_local_phase_difference(inner),
         DataType::Primitive(_) | DataType::Reference(_) => false,
     }
+}
+
+fn container_has_local_difference(attrs: &specta::datatype::Attributes) -> bool {
+    let Some(conversions) = attrs.get::<SerdeContainerAttrs>() else {
+        return false;
+    };
+
+    conversions.resolved_into.as_ref()
+        != conversions
+            .resolved_from
+            .as_ref()
+            .or(conversions.resolved_try_from.as_ref())
 }
 
 fn fields_have_local_difference(fields: &Fields) -> bool {
@@ -800,8 +897,12 @@ fn field_has_local_difference(field: &Field) -> bool {
 
 fn collect_dependencies(dt: &DataType, types: &TypeCollection, deps: &mut HashSet<TypeKey>) {
     match dt {
-        DataType::Struct(s) => collect_fields_dependencies(s.fields(), types, deps),
+        DataType::Struct(s) => {
+            collect_conversion_dependencies(s.attributes(), types, deps);
+            collect_fields_dependencies(s.fields(), types, deps);
+        }
         DataType::Enum(e) => {
+            collect_conversion_dependencies(e.attributes(), types, deps);
             for (_, variant) in e.variants() {
                 collect_fields_dependencies(variant.fields(), types, deps);
             }
@@ -829,6 +930,27 @@ fn collect_dependencies(dt: &DataType, types: &TypeCollection, deps: &mut HashSe
         DataType::Primitive(_)
         | DataType::Reference(Reference::Generic(_))
         | DataType::Reference(Reference::Opaque(_)) => {}
+    }
+}
+
+fn collect_conversion_dependencies(
+    attrs: &specta::datatype::Attributes,
+    types: &TypeCollection,
+    deps: &mut HashSet<TypeKey>,
+) {
+    let Some(conversions) = attrs.get::<SerdeContainerAttrs>() else {
+        return;
+    };
+
+    for conversion in [
+        conversions.resolved_into.as_ref(),
+        conversions.resolved_from.as_ref(),
+        conversions.resolved_try_from.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        collect_dependencies(conversion, types, deps);
     }
 }
 
@@ -877,6 +999,13 @@ fn build_from_original(
 }
 
 fn rename_datatype_fields(ty: &mut DataType) -> Result<()> {
+    if let Some(converted) = conversion_datatype_for_mode(ty, PhaseRewrite::Unified)? {
+        if converted != *ty {
+            *ty = converted;
+            return rename_datatype_fields(ty);
+        }
+    }
+
     match ty {
         DataType::Struct(s) => rename_fields(s.fields_mut())?,
         DataType::Enum(e) => {

@@ -27,6 +27,9 @@ pub struct SerdeContainerAttrs {
     pub from: Option<ConversionType>,
     pub try_from: Option<ConversionType>,
     pub into: Option<ConversionType>,
+    pub resolved_from: Option<specta::datatype::DataType>,
+    pub resolved_try_from: Option<specta::datatype::DataType>,
+    pub resolved_into: Option<specta::datatype::DataType>,
     pub serde_crate: Option<String>,
     pub expecting: Option<String>,
     pub variant_identifier: bool,
@@ -114,6 +117,15 @@ pub fn merge_container_attrs(target: &mut SerdeContainerAttrs, other: SerdeConta
     }
     if other.into.is_some() {
         target.into = other.into;
+    }
+    if other.resolved_from.is_some() {
+        target.resolved_from = other.resolved_from;
+    }
+    if other.resolved_try_from.is_some() {
+        target.resolved_try_from = other.resolved_try_from;
+    }
+    if other.resolved_into.is_some() {
+        target.resolved_into = other.resolved_into;
     }
     if other.serde_crate.is_some() {
         target.serde_crate = other.serde_crate;
@@ -330,8 +342,8 @@ macro_rules! parser {
     (@container serde) => {
         $crate::SerdeContainerAttrs::default()
     };
-    (@container #[$meta:meta]) => {
-        $crate::parser!(@container $meta)
+    (@container #[$($meta:tt)*]) => {
+        $crate::parser!(@container [$($meta)*])
     };
     (@container $_meta:meta) => {
         $crate::SerdeContainerAttrs::default()
@@ -354,8 +366,8 @@ macro_rules! parser {
     (@variant serde) => {
         $crate::SerdeVariantAttrs::default()
     };
-    (@variant #[$meta:meta]) => {
-        $crate::parser!(@variant $meta)
+    (@variant #[$($meta:tt)*]) => {
+        $crate::parser!(@variant [$($meta)*])
     };
     (@variant $_meta:meta) => {
         $crate::SerdeVariantAttrs::default()
@@ -378,8 +390,8 @@ macro_rules! parser {
     (@field serde) => {
         $crate::SerdeFieldAttrs::default()
     };
-    (@field #[$meta:meta]) => {
-        $crate::parser!(@field $meta)
+    (@field #[$($meta:tt)*]) => {
+        $crate::parser!(@field [$($meta)*])
     };
     (@field $_meta:meta) => {
         $crate::SerdeFieldAttrs::default()
@@ -581,16 +593,28 @@ macro_rules! __specta_serde_parse_container_items {
         $target.from = Some($crate::ConversionType {
             type_src: String::from($value),
         });
+        $target.resolved_from = Some({
+            let mut __types = specta::TypeCollection::default();
+            <specta::parse_type_from_lit!($value) as specta::Type>::definition(&mut __types)
+        });
         $crate::__specta_serde_parse_container_items!($target; $($rest)*);
     };
     ($target:ident; from = $value:literal) => {
         $target.from = Some($crate::ConversionType {
             type_src: String::from($value),
         });
+        $target.resolved_from = Some({
+            let mut __types = specta::TypeCollection::default();
+            <specta::parse_type_from_lit!($value) as specta::Type>::definition(&mut __types)
+        });
     };
     ($target:ident; try_from = $value:literal, $($rest:tt)*) => {
         $target.try_from = Some($crate::ConversionType {
             type_src: String::from($value),
+        });
+        $target.resolved_try_from = Some({
+            let mut __types = specta::TypeCollection::default();
+            <specta::parse_type_from_lit!($value) as specta::Type>::definition(&mut __types)
         });
         $crate::__specta_serde_parse_container_items!($target; $($rest)*);
     };
@@ -598,16 +622,28 @@ macro_rules! __specta_serde_parse_container_items {
         $target.try_from = Some($crate::ConversionType {
             type_src: String::from($value),
         });
+        $target.resolved_try_from = Some({
+            let mut __types = specta::TypeCollection::default();
+            <specta::parse_type_from_lit!($value) as specta::Type>::definition(&mut __types)
+        });
     };
     ($target:ident; into = $value:literal, $($rest:tt)*) => {
         $target.into = Some($crate::ConversionType {
             type_src: String::from($value),
+        });
+        $target.resolved_into = Some({
+            let mut __types = specta::TypeCollection::default();
+            <specta::parse_type_from_lit!($value) as specta::Type>::definition(&mut __types)
         });
         $crate::__specta_serde_parse_container_items!($target; $($rest)*);
     };
     ($target:ident; into = $value:literal) => {
         $target.into = Some($crate::ConversionType {
             type_src: String::from($value),
+        });
+        $target.resolved_into = Some({
+            let mut __types = specta::TypeCollection::default();
+            <specta::parse_type_from_lit!($value) as specta::Type>::definition(&mut __types)
         });
     };
     ($target:ident; crate = $value:literal, $($rest:tt)*) => {
@@ -929,9 +965,9 @@ mod tests {
             default,
             remote = "crate::Remote",
             transparent,
-            from = "FromType",
-            try_from = "TryFromType",
-            into = "IntoType",
+            from = "String",
+            try_from = "String",
+            into = "String",
             crate = "serde",
             expecting = "a valid payload",
             variant_identifier,
@@ -955,15 +991,15 @@ mod tests {
         assert!(parsed.transparent);
         assert_eq!(
             parsed.from.as_ref().map(|v| v.type_src.as_str()),
-            Some("FromType")
+            Some("String")
         );
         assert_eq!(
             parsed.try_from.as_ref().map(|v| v.type_src.as_str()),
-            Some("TryFromType")
+            Some("String")
         );
         assert_eq!(
             parsed.into.as_ref().map(|v| v.type_src.as_str()),
-            Some("IntoType")
+            Some("String")
         );
         assert_eq!(parsed.serde_crate.as_deref(), Some("serde"));
         assert_eq!(parsed.expecting.as_deref(), Some("a valid payload"));

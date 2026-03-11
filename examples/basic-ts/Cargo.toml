@@ -2,7 +2,7 @@
 name = "example-basic-ts"
 version = "0.0.0"
 edition = "2024"
-private = true
+publish = false
 
 [dependencies]
 specta = { path = "../../specta", features = ["derive"] }
