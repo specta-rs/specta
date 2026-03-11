@@ -3,43 +3,18 @@
 use super::{Attributes, DataType, DeprecatedType};
 use std::borrow::Cow;
 
-/// A non-skipped field with its type information.
-pub type NonSkipField<'a> = (&'a Field, &'a DataType);
-
-/// Filter out skipped fields from a collection of fields.
-///
-/// Returns an iterator of tuples containing the field and its type, excluding fields with `None` type.
-pub fn skip_fields<'a>(
-    fields: impl IntoIterator<Item = &'a Field>,
-) -> impl Iterator<Item = NonSkipField<'a>> {
-    fields
-        .into_iter()
-        .filter_map(|field| field.ty().map(|ty| (field, ty)))
-}
-
-/// Filter out skipped fields from a collection of named fields.
-///
-/// Returns an iterator of tuples containing the field name, the field, and its type, excluding fields with `None` type.
-pub fn skip_fields_named<'a>(
-    fields: impl IntoIterator<Item = &'a (Cow<'static, str>, Field)>,
-) -> impl Iterator<Item = (&'a Cow<'static, str>, NonSkipField<'a>)> {
-    fields
-        .into_iter()
-        .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
-}
-
 /// Data stored within an enum variant or struct.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Fields {
-    /// A unit struct.
+    /// Unit struct.
     ///
     /// Represented in Rust as `pub struct Unit;` and in TypeScript as `null`.
     Unit,
-    /// A struct with unnamed fields.
+    /// Struct with unnamed fields.
     ///
     /// Represented in Rust as `pub struct Unit();` and in TypeScript as `[]`.
     Unnamed(UnnamedFields),
-    /// A struct with named fields.
+    /// Struct with named fields.
     ///
     /// Represented in Rust as `pub struct Unit {}` and in TypeScript as `{}`.
     Named(NamedFields),

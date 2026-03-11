@@ -259,6 +259,11 @@ fn primitive_to_swift(primitive: &Primitive) -> Result<String> {
                 "Swift does not support f16".to_string(),
             ));
         }
+        Primitive::f128 => {
+            return Err(Error::UnsupportedType(
+                "Swift does not support f128".to_string(),
+            ));
+        }
     })
 }
 

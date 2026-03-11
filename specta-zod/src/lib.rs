@@ -15,11 +15,7 @@
 // mod export_config;
 
 // use context::{ExportContext, PathItem};
-// use specta::{
-//     datatype::*,
-//     internal::{detect_duplicate_type_names, skip_fields, skip_fields_named, NonSkipField},
-//     *,
-// };
+// use specta::{datatype::*, internal::detect_duplicate_type_names, *};
 // use std::{borrow::Cow, collections::VecDeque};
 
 // pub use context::*;
@@ -290,7 +286,7 @@
 // // Can be used with `StructUnnamedFields.fields` or `EnumNamedFields.fields`
 // fn unnamed_fields_datatype(
 //     ctx: ExportContext,
-//     fields: &[NonSkipField],
+//     fields: &[(&Field, &DataType)],
 //     types: &TypeCollection,
 // ) -> Output {
 //     match fields {
@@ -340,10 +336,21 @@
 //     match &s.fields() {
 //         Fields::Unit => Ok(NULL.into()),
 //         Fields::Unnamed(s) => {
-//             unnamed_fields_datatype(ctx, &skip_fields(s.fields()).collect::<Vec<_>>(), types)
+//             unnamed_fields_datatype(
+//                 ctx,
+//                 &s.fields()
+//                     .iter()
+//                     .filter_map(|field| field.ty().map(|ty| (field, ty)))
+//                     .collect::<Vec<_>>(),
+//                 types,
+//             )
 //         }
 //         Fields::Named(s) => {
-//             let fields = skip_fields_named(s.fields()).collect::<Vec<_>>();
+//             let fields = s
+//                 .fields()
+//                 .iter()
+//                 .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+//                 .collect::<Vec<_>>();
 
 //             if fields.is_empty() {
 //                 return Ok(s
@@ -441,7 +448,9 @@
 //             };
 
 //             fields.extend(
-//                 skip_fields_named(obj.fields())
+//                 obj.fields()
+//                     .iter()
+//                     .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
 //                     .map(|(name, field_ref)| {
 //                         let (field, _) = field_ref;
 
@@ -467,7 +476,10 @@
 //             }))
 //         }
 //         Fields::Unnamed(obj) => {
-//             let fields = skip_fields(obj.fields())
+//             let fields = obj
+//                 .fields()
+//                 .iter()
+//                 .filter_map(|field| field.ty().map(|ty| (field, ty)))
 //                 .map(|(_, ty)| datatype_inner(ctx.clone(), ty, types))
 //                 .collect::<Result<Vec<_>>>()?;
 
@@ -546,7 +558,11 @@
 //                             }
 //                             (EnumRepr::Internal { tag }, Fields::Unnamed(tuple)) => {
 //                            	 	let tag = sanitise_key(tag.clone(), false);
-//                                 let fields = skip_fields(tuple.fields()).collect::<Vec<_>>();
+//                                 let fields = tuple
+//                                     .fields()
+//                                     .iter()
+//                                     .filter_map(|field| field.ty().map(|ty| (field, ty)))
+//                                     .collect::<Vec<_>>();
 
 //                                 // This field is only required for `{ty}` not `[...]` so we only need to check when there one field
 //                                 let dont_join_ty = if tuple.fields().len() == 1 {
@@ -576,7 +592,11 @@
 //                                 let mut fields = vec![format!("{tag}: {sanitised_name}")];
 
 //                                 fields.extend(
-//                                     skip_fields_named(obj.fields())
+//                                     obj.fields()
+//                                         .iter()
+//                                         .filter_map(|(name, field)| {
+//                                             field.ty().map(|ty| (name, (field, ty)))
+//                                         })
 //                                         .map(|(name, field)| {
 //                                             object_field_to_ts(
 //                                                 ctx.with(PathItem::Field(name.clone())),
@@ -668,7 +688,7 @@
 // fn object_field_to_ts(
 //     ctx: ExportContext,
 //     key: Cow<'static, str>,
-//     (field, ty): NonSkipField,
+//     (field, ty): (&Field, &DataType),
 //     types: &TypeCollection,
 // ) -> Output {
 //     let field_name_safe = sanitise_key(key, false);

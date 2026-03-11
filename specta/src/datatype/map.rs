@@ -1,6 +1,6 @@
 use super::DataType;
 
-/// A map of items. This will be a [`HashMap`](https://doc.rust-lang.org/std/collections/struct.HashMap.html) or similar types.
+/// Map of items. This will be a [`HashMap`](https://doc.rust-lang.org/std/collections/struct.HashMap.html) or similar types.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Map(Box<(DataType, DataType)>);
 

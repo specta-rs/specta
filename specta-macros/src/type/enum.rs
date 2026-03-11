@@ -180,7 +180,7 @@ pub fn parse_enum(
                 v.set_deprecated(#deprecated);
                 v.set_docs(#doc.into());
                 v.set_fields(#inner);
-                v.set_attributes(#runtime_attrs);
+                *v.attributes_mut() = #runtime_attrs;
                 v
             })))
         })
