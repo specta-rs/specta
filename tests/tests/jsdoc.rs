@@ -2,7 +2,7 @@ use std::path::Path;
 
 use specta::datatype::{DataType, Reference};
 use specta::{Type, TypeCollection};
-use specta_typescript::{primitives, BigIntExportBehavior, JSDoc, Layout};
+use specta_typescript::{BigIntExportBehavior, JSDoc, Layout, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;

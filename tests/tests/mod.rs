@@ -10,6 +10,7 @@ mod functions;
 mod jsdoc;
 mod layouts;
 mod references;
+mod serde_conversions;
 mod types;
 mod typescript;
 mod utils;

@@ -1,14 +1,14 @@
 use std::collections::HashSet;
 
 use specta::{
-    datatype::{
-        skip_fields, skip_fields_named, DataType, Enum, EnumVariant, Fields, GenericReference,
-        Primitive, Reference,
-    },
     TypeCollection,
+    datatype::{
+        DataType, Enum, EnumVariant, Fields, GenericReference, Primitive, Reference, skip_fields,
+        skip_fields_named,
+    },
 };
 
-use crate::{repr::EnumRepr, Error, Result, SerdeContainerAttrs};
+use crate::{Error, Result, SerdeContainerAttrs, repr::EnumRepr};
 
 pub fn validate(types: &TypeCollection) -> Result<()> {
     for ndt in types.into_unsorted_iter() {
@@ -63,32 +63,49 @@ fn inner(
                 format!("{path}.<list_item>"),
             )?;
         }
-        DataType::Struct(strct) => match strct.fields() {
-            Fields::Unit => {}
-            Fields::Unnamed(unnamed) => {
-                for (idx, (_, ty)) in skip_fields(unnamed.fields()).enumerate() {
-                    inner(
-                        ty,
-                        types,
-                        generics,
-                        checked_references,
-                        format!("{path}[{idx}]"),
-                    )?;
+        DataType::Struct(strct) => {
+            validate_container_attributes(
+                strct.attributes(),
+                types,
+                generics,
+                checked_references,
+                &path,
+            )?;
+
+            match strct.fields() {
+                Fields::Unit => {}
+                Fields::Unnamed(unnamed) => {
+                    for (idx, (_, ty)) in skip_fields(unnamed.fields()).enumerate() {
+                        inner(
+                            ty,
+                            types,
+                            generics,
+                            checked_references,
+                            format!("{path}[{idx}]"),
+                        )?;
+                    }
+                }
+                Fields::Named(named) => {
+                    for (name, (_, ty)) in skip_fields_named(named.fields()) {
+                        inner(
+                            ty,
+                            types,
+                            generics,
+                            checked_references,
+                            format!("{path}.{name}"),
+                        )?;
+                    }
                 }
             }
-            Fields::Named(named) => {
-                for (name, (_, ty)) in skip_fields_named(named.fields()) {
-                    inner(
-                        ty,
-                        types,
-                        generics,
-                        checked_references,
-                        format!("{path}.{name}"),
-                    )?;
-                }
-            }
-        },
+        }
         DataType::Enum(enm) => {
+            validate_container_attributes(
+                enm.attributes(),
+                types,
+                generics,
+                checked_references,
+                &path,
+            )?;
             validate_enum(enm, types, path.clone())?;
 
             for (variant_name, variant) in enm.variants() {
@@ -181,6 +198,44 @@ fn inner(
             Reference::Opaque(_) => {}
         },
         DataType::Primitive(_) => {}
+    }
+
+    Ok(())
+}
+
+fn validate_container_attributes(
+    attrs: &specta::datatype::Attributes,
+    types: &TypeCollection,
+    generics: &[(GenericReference, DataType)],
+    checked_references: &mut HashSet<Reference>,
+    path: &str,
+) -> Result<()> {
+    if let Some(parsed) = attrs.get::<SerdeContainerAttrs>()
+        && parsed.from.is_some()
+        && parsed.try_from.is_some()
+    {
+        return Err(Error::invalid_conversion_usage(
+            path,
+            "`from` and `try_from` cannot be used together",
+        ));
+    }
+
+    if let Some(conversions) = attrs.get::<SerdeContainerAttrs>() {
+        for (suffix, target) in [
+            ("<serde_into>", conversions.resolved_into.as_ref()),
+            ("<serde_from>", conversions.resolved_from.as_ref()),
+            ("<serde_try_from>", conversions.resolved_try_from.as_ref()),
+        ] {
+            if let Some(target) = target {
+                inner(
+                    target,
+                    types,
+                    generics,
+                    checked_references,
+                    format!("{path}.{suffix}"),
+                )?;
+            }
+        }
     }
 
     Ok(())
