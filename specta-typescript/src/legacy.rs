@@ -9,7 +9,7 @@ use std::{
 use specta::{
     TypeCollection,
     datatype::{
-        DataType, DeprecatedType, Enum, EnumVariant, Field, Fields, GenericReference, Reference,
+        DataType, DeprecatedType, Enum, Variant, Field, Fields, GenericReference, Reference,
         Struct, Tuple,
     },
 };
@@ -372,7 +372,7 @@ fn enum_variant_datatype(
     ctx: ExportContext,
     types: &TypeCollection,
     name: Cow<'static, str>,
-    variant: &EnumVariant,
+    variant: &Variant,
     prefix: &str,
     generics: &[(GenericReference, DataType)],
 ) -> Result<Option<String>> {
@@ -519,7 +519,7 @@ struct EnumVariantOutput {
     strict_keys: Option<BTreeSet<String>>,
 }
 
-fn untagged_strict_keys(variant: &EnumVariant) -> Option<BTreeSet<String>> {
+fn untagged_strict_keys(variant: &Variant) -> Option<BTreeSet<String>> {
     match variant.fields() {
         Fields::Named(obj) => {
             let all_fields = obj

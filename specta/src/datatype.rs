@@ -15,7 +15,7 @@ mod tuple;
 
 pub use attributes::Attributes;
 pub use builders::{NamedDataTypeBuilder, StructBuilder, VariantBuilder};
-pub use r#enum::{Enum, EnumVariant};
+pub use r#enum::{Enum, Variant};
 pub use fields::{Field, Fields, NamedFields, UnnamedFields};
 pub use function::Function;
 pub use list::List;

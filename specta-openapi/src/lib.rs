@@ -184,22 +184,22 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
             //         //     let sanitised_name = sanitise_name(variant.name());
 
             //         //     match (repr, variant) {
-            //         //         (EnumRepr::Internal { tag }, EnumVariant::Unit(_)) => {
+            //         //         (EnumRepr::Internal { tag }, Variant::Unit(_)) => {
             //         //             format!("{{ {tag}: \"{sanitised_name}\" }}")
             //         //         }
-            //         //         (EnumRepr::Internal { tag }, EnumVariant::Unnamed(tuple)) => {
+            //         //         (EnumRepr::Internal { tag }, Variant::Unnamed(tuple)) => {
             //         //             let typ = to_openapi(&DataType::Tuple(tuple.clone()));
 
             //         //             format!("{{ {tag}: \"{sanitised_name}\" }} & {typ}")
             //         //         }
-            //         //         (EnumRepr::Internal { tag }, EnumVariant::Named(obj)) => {
+            //         //         (EnumRepr::Internal { tag }, Variant::Named(obj)) => {
             //         //             let mut fields = vec![format!("{tag}: \"{sanitised_name}\"")];
 
             //         //             fields.extend(object_fields(&obj.fields));
 
             //         //             format!("{{ {} }}", fields.join(", "))
             //         //         }
-            //         //         (EnumRepr::External, EnumVariant::Unit(_)) => {
+            //         //         (EnumRepr::External, Variant::Unit(_)) => {
             //         //             format!("\"{sanitised_name}\"")
             //         //         }
             //         //         (EnumRepr::External, v) => {
@@ -207,9 +207,9 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
 
             //         //             format!("{{ {sanitised_name}: {ts_values} }}")
             //         //         }
-            //         //         (EnumRepr::Untagged, EnumVariant::Unit(_)) => "null".to_string(),
+            //         //         (EnumRepr::Untagged, Variant::Unit(_)) => "null".to_string(),
             //         //         (EnumRepr::Untagged, v) => to_openapi(&v.data_type()),
-            //         //         (EnumRepr::Adjacent { tag, .. }, EnumVariant::Unit(_)) => {
+            //         //         (EnumRepr::Adjacent { tag, .. }, Variant::Unit(_)) => {
             //         //             format!("{{ {tag}: \"{sanitised_name}\" }}")
             //         //         }
             //         //         (EnumRepr::Adjacent { tag, content }, v) => {
@@ -237,7 +237,7 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
             //                         EnumVariants::Unnamed(tuple) => {
             //                             to_openapi(&DataType::Tuple(tuple.clone()))
             //                         }
-            //                         EnumVariant::Named(obj) => {
+            //                         Variant::Named(obj) => {
             //                             to_openapi(&DataType::Struct(obj.clone()))
             //                         }
             //                     })

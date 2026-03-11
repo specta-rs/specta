@@ -4,12 +4,9 @@
 
 use std::{borrow::Cow, fmt::Debug};
 
-use crate::{
-    TypeCollection,
-    datatype::{
-        Attributes, DataType, DeprecatedType, EnumVariant, Field, Fields, GenericReference,
-        NamedDataType, NamedFields, Struct, UnnamedFields,
-    },
+use crate::datatype::{
+    Attributes, DataType, DeprecatedType, Field, Fields, NamedDataType, NamedFields, Struct,
+    UnnamedFields, Variant,
 };
 
 #[derive(Debug, Clone)]
@@ -60,10 +57,10 @@ impl StructBuilder<UnnamedFields> {
     }
 }
 
-/// Builder for constructing [`EnumVariant`] values.
+/// Builder for constructing [`Variant`] values.
 #[derive(Debug, Clone)]
 pub struct VariantBuilder<V = ()> {
-    pub(crate) v: EnumVariant,
+    pub(crate) v: Variant,
     pub(crate) variant: V,
 }
 
@@ -112,13 +109,13 @@ impl VariantBuilder<NamedFields> {
     }
 
     /// Finalize this named variant builder.
-    pub fn build(mut self) -> EnumVariant {
+    pub fn build(mut self) -> Variant {
         self.v.fields = Fields::Named(self.variant);
         self.v
     }
 }
 
-impl From<VariantBuilder<NamedFields>> for EnumVariant {
+impl From<VariantBuilder<NamedFields>> for Variant {
     fn from(val: VariantBuilder<NamedFields>) -> Self {
         val.build()
     }
@@ -138,77 +135,14 @@ impl VariantBuilder<UnnamedFields> {
     }
 
     /// Finalize this unnamed variant builder.
-    pub fn build(mut self) -> EnumVariant {
+    pub fn build(mut self) -> Variant {
         self.v.fields = Fields::Unnamed(self.variant);
         self.v
     }
 }
 
-impl From<VariantBuilder<UnnamedFields>> for EnumVariant {
+impl From<VariantBuilder<UnnamedFields>> for Variant {
     fn from(val: VariantBuilder<UnnamedFields>) -> Self {
         val.build()
-    }
-}
-
-/// Builder for registering a runtime [`NamedDataType`].
-#[derive(Debug, Clone)]
-pub struct NamedDataTypeBuilder {
-    pub(crate) name: Cow<'static, str>,
-    pub(crate) docs: Cow<'static, str>,
-    pub(crate) deprecated: Option<DeprecatedType>,
-    pub(crate) module_path: Option<Cow<'static, str>>,
-    pub(crate) generics: Vec<(GenericReference, Cow<'static, str>)>,
-    pub(crate) inline: bool,
-    pub(crate) inner: DataType,
-}
-
-impl NamedDataTypeBuilder {
-    /// Construct a new named datatype builder.
-    pub fn new(
-        name: impl Into<Cow<'static, str>>,
-        generics: Vec<(GenericReference, Cow<'static, str>)>,
-        dt: DataType,
-    ) -> Self {
-        Self {
-            name: name.into(),
-            docs: Cow::Borrowed(""),
-            deprecated: None,
-            module_path: None,
-            generics,
-            inline: false,
-            inner: dt,
-        }
-    }
-
-    /// Set the module path that this type was defined in.
-    ///
-    /// The value for this is usually determined by [`module_path`](std::module_path). It's important you keep this in the form `edge::edge::edge::node` or `node`.
-    pub fn module_path(mut self, module_path: impl Into<Cow<'static, str>>) -> Self {
-        self.module_path = Some(module_path.into());
-        self
-    }
-
-    /// Set Rust doc comments for this type.
-    pub fn docs(mut self, docs: impl Into<Cow<'static, str>>) -> Self {
-        self.docs = docs.into();
-        self
-    }
-
-    /// Set deprecation metadata for this type.
-    pub fn deprecated(mut self, deprecated: DeprecatedType) -> Self {
-        self.deprecated = Some(deprecated);
-        self
-    }
-
-    /// Mark this named type as always inlined at call sites.
-    pub fn inline(mut self) -> Self {
-        self.inline = true;
-        self
-    }
-
-    /// Register the type in `types` and return the resulting [`NamedDataType`].
-    #[track_caller]
-    pub fn build(self, types: &mut TypeCollection) -> NamedDataType {
-        NamedDataType::register(self, types)
     }
 }

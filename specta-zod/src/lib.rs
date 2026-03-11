@@ -433,7 +433,7 @@
 //     ctx: ExportContext,
 //     types: &TypeCollection,
 //     name: Cow<'static, str>,
-//     variant: &EnumVariant,
+//     variant: &Variant,
 // ) -> Result<Option<String>> {
 //     match &variant.fields() {
 //         // TODO: Remove unreachable in type system

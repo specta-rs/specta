@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::{
     Type, TypeCollection,
-    datatype::{self, DataType, Enum, EnumVariant, Field, List},
+    datatype::{self, DataType, Enum, Variant, Field, List},
     internal,
     r#type::{generics, macros::*},
 };
@@ -264,13 +264,13 @@ impl_ndt!(
     impl<T, E> Type for std::result::Result<T, E> where { T: Type, E: Type } {
         inline: true;
         build: |types, ndt| {
-            let mut ok_variant = EnumVariant::unit();
+            let mut ok_variant = Variant::unit();
             ok_variant.set_fields(internal::construct::fields_unnamed(
                 vec![Field::new(
                     datatype::GenericReference::new::<generics::T>().into(),
                 )],
             ));
-            let mut err_variant = EnumVariant::unit();
+            let mut err_variant = Variant::unit();
             err_variant.set_fields(internal::construct::fields_unnamed(
                 vec![Field::new(
                     datatype::GenericReference::new::<generics::E>().into(),

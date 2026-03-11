@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use specta::{
     TypeCollection,
-    datatype::{DataType, Enum, EnumVariant, Fields, GenericReference, Primitive, Reference},
+    datatype::{DataType, Enum, Variant, Fields, GenericReference, Primitive, Reference},
 };
 
 use crate::{
@@ -601,7 +601,7 @@ fn validate_internally_tag_enum(enm: &Enum, types: &TypeCollection, path: String
 fn validate_internally_tag_variant(
     enm: &Enum,
     variant_name: &str,
-    variant: &EnumVariant,
+    variant: &Variant,
     types: &TypeCollection,
     path: &str,
 ) -> Result<()> {

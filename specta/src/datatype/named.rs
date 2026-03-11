@@ -25,6 +25,62 @@ pub struct NamedDataType {
 }
 
 impl NamedDataType {
+    /// Construct a new named datatype.
+    ///
+    /// Note: Ensure you call `Self::register` to register the type.
+    #[track_caller]
+    pub fn new(
+        name: impl Into<Cow<'static, str>>,
+        generics: Vec<(GenericReference, Cow<'static, str>)>,
+        dt: DataType,
+    ) -> Self {
+        let location = Location::caller();
+        Self {
+            id: NamedId::Dynamic(Arc::new(())),
+            name: name.into(),
+            docs: Cow::Borrowed(""),
+            deprecated: None,
+            module_path: file_path_to_module_path(location.file())
+                .map(Into::into)
+                .unwrap_or(Cow::Borrowed("virtual")),
+            location: location.to_owned(),
+            generics: Cow::Owned(generics),
+            inline: false,
+            inner: dt,
+        }
+    }
+
+    /// Construct a new inlined named datatype.
+    ///
+    /// Note: Ensure you call `Self::register` to register the type.
+    #[track_caller]
+    pub fn new_inline(
+        name: impl Into<Cow<'static, str>>,
+        generics: Vec<(GenericReference, Cow<'static, str>)>,
+        dt: DataType,
+    ) -> Self {
+        let location = Location::caller();
+        Self {
+            id: NamedId::Dynamic(Arc::new(())),
+            name: name.into(),
+            docs: Cow::Borrowed(""),
+            deprecated: None,
+            module_path: file_path_to_module_path(location.file())
+                .map(Into::into)
+                .unwrap_or(Cow::Borrowed("virtual")),
+            location: location.to_owned(),
+            generics: Cow::Owned(generics),
+            inline: true,
+            inner: dt,
+        }
+    }
+
+    /// Register the type into a [TypeCollection].
+    pub fn register(&self, types: &mut TypeCollection) {
+        types.0.insert(self.id.clone(), Some(self.clone()));
+        types.1 += 1;
+    }
+
     // ## Why return a reference?
     //
     // If a recursive type is being resolved it's possible the `init_with_sentinel` function will be called recursively.
@@ -85,35 +141,6 @@ impl NamedDataType {
             generics: generics_for_ref,
             inline,
         })
-    }
-
-    /// Register a runtime named datatype.
-    /// This is exposed via [NamedDataTypeBuilder::build].
-    #[track_caller]
-    pub(crate) fn register(builder: NamedDataTypeBuilder, types: &mut TypeCollection) -> Self {
-        let location = Location::caller();
-
-        let module_path = builder.module_path.unwrap_or_else(|| {
-            file_path_to_module_path(location.file())
-                .map(Into::into)
-                .unwrap_or(Cow::Borrowed("virtual"))
-        });
-
-        let ndt = Self {
-            id: NamedId::Dynamic(Arc::new(())),
-            name: builder.name,
-            docs: builder.docs,
-            deprecated: builder.deprecated,
-            module_path,
-            location: location.to_owned(),
-            generics: Cow::Owned(builder.generics),
-            inline: builder.inline,
-            inner: builder.inner,
-        };
-
-        types.0.insert(ndt.id.clone(), Some(ndt.clone()));
-        types.1 += 1;
-        ndt
     }
 
     /// Construct a [Reference] to a [NamedDataType].

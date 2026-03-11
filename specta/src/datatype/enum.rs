@@ -12,7 +12,7 @@ use super::{Attributes, DataType, DeprecatedType, Fields, NamedFields, UnnamedFi
 /// An enum is also assigned a repr which follows [Serde repr semantics](https://serde.rs/enum-representations.html).
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Enum {
-    pub(crate) variants: Vec<(Cow<'static, str>, EnumVariant)>,
+    pub(crate) variants: Vec<(Cow<'static, str>, Variant)>,
     pub(crate) attributes: Attributes,
 }
 
@@ -23,12 +23,12 @@ impl Enum {
     }
 
     /// Get an immutable reference to the enum's variants.
-    pub fn variants(&self) -> &[(Cow<'static, str>, EnumVariant)] {
+    pub fn variants(&self) -> &[(Cow<'static, str>, Variant)] {
         &self.variants
     }
 
     /// Get a mutable reference to the enum's variants.
-    pub fn variants_mut(&mut self) -> &mut Vec<(Cow<'static, str>, EnumVariant)> {
+    pub fn variants_mut(&mut self) -> &mut Vec<(Cow<'static, str>, Variant)> {
         &mut self.variants
     }
 
@@ -59,7 +59,7 @@ impl From<Enum> for DataType {
 
 /// represents a variant of an enum.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct EnumVariant {
+pub struct Variant {
     /// Did the user apply a `#[serde(skip)]` or `#[specta(skip)]` attribute.
     ///
     /// You might think, well why not apply this in the macro and just not emit the variant?
@@ -75,7 +75,7 @@ pub struct EnumVariant {
     pub(crate) attributes: Attributes,
 }
 
-impl EnumVariant {
+impl Variant {
     /// Construct a new unit enum variant.
     pub fn unit() -> Self {
         Self {
