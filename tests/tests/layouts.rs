@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use specta::{
+    datatype::{DataType, NamedDataType, Primitive},
     Type, TypeCollection,
-    datatype::{DataType, NamedDataTypeBuilder, Primitive},
 };
 use specta_typescript::{Layout, Typescript};
 use tempfile::TempDir;
@@ -146,8 +146,9 @@ fn non_duplicate_typenames_layouts() {
 fn empty_module_path_layouts() {
     let mut types = TypeCollection::default();
 
-    NamedDataTypeBuilder::new("testing", Vec::new(), DataType::Primitive(Primitive::i8))
-        .build(&mut types);
+    let mut testing = NamedDataType::new("testing", Vec::new(), DataType::Primitive(Primitive::i8));
+    testing.set_module_path("".into());
+    testing.register(&mut types);
 
     let flat = Typescript::default()
         .layout(Layout::FlatFile)

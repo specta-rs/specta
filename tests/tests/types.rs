@@ -15,7 +15,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use specta::{Type, TypeCollection, datatype::DataType};
+use specta::{datatype::DataType, Type, TypeCollection};
 
 /// A macro to collect up the types for better testing.
 ///
@@ -40,8 +40,7 @@ macro_rules! types {
 
         // This allows us to end-to-end test primitives.
         // Many types won't be directly added to the `TypeCollection`, as they are not named.
-        specta::datatype::NamedDataTypeBuilder::new("Primitives", vec![], s.build())
-            .build(&mut types);
+        specta::datatype::NamedDataType::new("Primitives", vec![], s.build()).register(&mut types);
 
         // Test `selection!`
         {

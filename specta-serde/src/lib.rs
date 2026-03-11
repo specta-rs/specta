@@ -12,7 +12,10 @@ use std::{
 
 use specta::{
     TypeCollection,
-    datatype::{DataType, Enum, Field, Fields, NamedDataType, Reference, Struct, Tuple, Variant},
+    datatype::{
+        DataType, Enum, Field, Fields, NamedDataType, Primitive, Reference, Struct, Tuple,
+        Variant,
+    },
     internal,
 };
 
@@ -461,7 +464,8 @@ fn rewrite_enum_repr_for_phase(
     let variants = std::mem::take(e.variants_mut());
     let mut transformed = Vec::with_capacity(variants.len());
     for (variant_name, variant) in variants {
-        if let Some(attrs) = variant.attributes().get::<SerdeVariantAttrs>() {
+        let variant_attrs = variant.attributes().get::<SerdeVariantAttrs>();
+        if let Some(attrs) = variant_attrs {
             let skipped = match mode {
                 PhaseRewrite::Serialize => attrs.skip_serializing,
                 PhaseRewrite::Deserialize => attrs.skip_deserializing,
@@ -475,6 +479,8 @@ fn rewrite_enum_repr_for_phase(
 
         let serialized_name =
             serialized_variant_name(&variant_name, &variant, &container_attrs, mode)?;
+        let widen_tag = mode == PhaseRewrite::Deserialize
+            && variant_attrs.is_some_and(|attrs| attrs.other);
         let transformed_variant = match &repr {
             EnumRepr::External => transform_external_variant(serialized_name.clone(), &variant)?,
             EnumRepr::Internal { tag } => transform_internal_variant(
@@ -482,6 +488,7 @@ fn rewrite_enum_repr_for_phase(
                 tag.as_ref(),
                 &variant,
                 original_types,
+                widen_tag,
             )?,
             EnumRepr::Adjacent { tag, content } => {
                 if tag == content {
@@ -495,6 +502,7 @@ fn rewrite_enum_repr_for_phase(
                     tag.as_ref(),
                     content.as_ref(),
                     &variant,
+                    widen_tag,
                 )?
             }
             EnumRepr::Untagged => unreachable!(),
@@ -863,10 +871,15 @@ fn transform_adjacent_variant(
     tag: &str,
     content: &str,
     variant: &Variant,
+    widen_tag: bool,
 ) -> Result<Variant> {
     let mut fields = vec![(
         Cow::Owned(tag.to_string()),
-        Field::new(string_literal_datatype(serialized_name.clone())),
+        Field::new(if widen_tag {
+            DataType::Primitive(Primitive::str)
+        } else {
+            string_literal_datatype(serialized_name.clone())
+        }),
     )];
 
     if !matches!(variant.fields(), Fields::Unit) {
@@ -883,10 +896,15 @@ fn transform_internal_variant(
     tag: &str,
     variant: &Variant,
     original_types: &TypeCollection,
+    widen_tag: bool,
 ) -> Result<Variant> {
     let mut fields = vec![(
         Cow::Owned(tag.to_string()),
-        Field::new(string_literal_datatype(serialized_name.clone())),
+        Field::new(if widen_tag {
+            DataType::Primitive(Primitive::str)
+        } else {
+            string_literal_datatype(serialized_name.clone())
+        }),
     )];
 
     match variant.fields() {
@@ -1115,6 +1133,7 @@ fn variant_has_local_difference(variant: &Variant) -> bool {
                 || attrs.has_serialize_with
                 || attrs.has_deserialize_with
                 || attrs.has_with
+                || attrs.other
         })
         .unwrap_or_default()
 }

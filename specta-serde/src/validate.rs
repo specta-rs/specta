@@ -155,7 +155,7 @@ fn inner(
                 mode,
             )?;
             validate_identifier_enum(enm, &path, mode)?;
-            validate_enum(enm, types, path.clone())?;
+            validate_enum(enm, types, path.clone(), mode)?;
 
             for (variant_name, variant) in enm.variants() {
                 validate_variant_attributes(
@@ -567,7 +567,7 @@ fn is_valid_map_key(
     }
 }
 
-fn validate_enum(enm: &Enum, types: &TypeCollection, path: String) -> Result<()> {
+fn validate_enum(enm: &Enum, types: &TypeCollection, path: String, mode: ApplyMode) -> Result<()> {
     let valid_variants = enm
         .variants()
         .iter()
@@ -580,11 +580,61 @@ fn validate_enum(enm: &Enum, types: &TypeCollection, path: String) -> Result<()>
         ));
     }
 
-    if matches!(
-        enum_repr_from_attrs(enm.attributes())?,
-        EnumRepr::Internal { .. }
-    ) {
+    let repr = enum_repr_from_attrs(enm.attributes())?;
+
+    validate_other_variant(enm, &path, &repr, mode)?;
+
+    if matches!(repr, EnumRepr::Internal { .. }) {
         validate_internally_tag_enum(enm, types, path)?;
+    }
+
+    Ok(())
+}
+
+fn validate_other_variant(enm: &Enum, path: &str, repr: &EnumRepr, mode: ApplyMode) -> Result<()> {
+    let other_variants = enm
+        .variants()
+        .iter()
+        .filter_map(|(name, variant)| {
+            variant
+                .attributes()
+                .get::<SerdeVariantAttrs>()
+                .is_some_and(|attrs| attrs.other)
+                .then_some((name, variant))
+        })
+        .collect::<Vec<_>>();
+
+    if other_variants.is_empty() {
+        return Ok(());
+    }
+
+    if mode == ApplyMode::Unified {
+        return Err(Error::invalid_phased_type_usage(
+            path,
+            "`#[serde(other)]` requires `apply_phases` because it widens deserialize-only input shape",
+        ));
+    }
+
+    if !matches!(repr, EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. }) {
+        return Err(Error::invalid_phased_type_usage(
+            path,
+            "`#[serde(other)]` requires a tagged enum representation (`tag` with optional `content`)",
+        ));
+    }
+
+    if other_variants.len() > 1 {
+        return Err(Error::invalid_phased_type_usage(
+            path,
+            "`#[serde(other)]` can only be used on a single enum variant",
+        ));
+    }
+
+    let (name, variant) = other_variants[0];
+    if !matches!(variant.fields(), Fields::Unit) {
+        return Err(Error::invalid_phased_type_usage(
+            path,
+            format!("`#[serde(other)]` variant `{name}` must be a unit variant"),
+        ));
     }
 
     Ok(())
