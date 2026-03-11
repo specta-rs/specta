@@ -2,7 +2,7 @@ use super::{AttributeScope, attr::*, build_runtime_attributes, r#struct::decode_
 use crate::{r#type::field::construct_field_with_variant_skip, utils::*};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use syn::{DataEnum, Fields, spanned::Spanned};
+use syn::{DataEnum, Fields, Type, spanned::Spanned};
 
 pub fn parse_enum(
     crate_ref: &TokenStream,
@@ -23,7 +23,12 @@ pub fn parse_enum(
             // We pass all the attributes at the start and when decoding them pop them off the list.
             // This means at the end we can check for any that weren't consumed and throw an error.
             let mut attrs = parse_attrs_with_filter(&v.attrs, &container_attrs.skip_attrs)?;
-            let variant_attrs = VariantAttr::from_attrs(&mut attrs)?;
+            let mut variant_attrs = VariantAttr::from_attrs(&mut attrs)?;
+            if variant_attrs.r#type.is_none() {
+                variant_attrs.r#type = parse_variant_type_override(&v.attrs)?;
+                let _ = attrs.extract("specta", "type");
+                let _ = attrs.extract("specta", "r#type");
+            }
 
             // The expectation is that when an attribute is processed it will be removed so if any are left over we know they are invalid
             // but we only throw errors for Specta-specific attributes so we don't continually break other attributes.
@@ -79,72 +84,97 @@ pub fn parse_enum(
             let variant_name_str = variant_ident_str.to_token_stream();
             let variant_skip = attrs.skip;
             let variant_inline = attrs.inline;
+            let variant_type = attrs.r#type.clone();
+            let runtime_attrs = if variant_type.is_some() {
+                quote!({
+                    let mut attrs = #runtime_attrs;
+                    attrs.insert(specta_serde::SpectaTypeAttr);
+                    attrs
+                })
+            } else {
+                runtime_attrs
+            };
 
-            let inner = match &variant.fields {
-                Fields::Unit => quote!(datatype::Fields::Unit),
-                Fields::Unnamed(fields) => {
-                    let fields = fields
-                        .unnamed
-                        .iter()
-                        .enumerate()
-                        .map(|(idx, field)| {
-                            let (mut field_attrs, raw_attrs) =
-                                decode_field_attrs(field, &container_attrs.skip_attrs)?;
-
-                            if variant_inline && idx == 0 {
-                                field_attrs.inline = true;
-                            }
-
-                            construct_field_with_variant_skip(
-                                crate_ref,
-                                container_attrs,
-                                field_attrs,
-                                &field.ty,
-                                raw_attrs,
-                                variant_skip,
-                            )
-                        })
-                        .collect::<syn::Result<Vec<TokenStream>>>()?;
-
-                    quote!(internal::construct::fields_unnamed(
-                        vec![#(#fields),*],
+            let inner = if let Some(variant_ty) = variant_type {
+                quote!(internal::construct::fields_unnamed(
+                    vec![internal::construct::field(
+                        false,
+                        false,
+                        None,
+                        "".into(),
+                        false,
                         datatype::Attributes::default(),
-                    ))
-                }
-                Fields::Named(fields) => {
-                    let fields = fields
-                        .named
-                        .iter()
-                        .map(|field| {
-                            let (field_attrs, raw_attrs) =
-                                decode_field_attrs(field, &container_attrs.skip_attrs)?;
+                        Some(<#variant_ty as #crate_ref::Type>::definition(types)),
+                    )],
+                    datatype::Attributes::default(),
+                ))
+            } else {
+                match &variant.fields {
+                    Fields::Unit => quote!(datatype::Fields::Unit),
+                    Fields::Unnamed(fields) => {
+                        let fields = fields
+                            .unnamed
+                            .iter()
+                            .enumerate()
+                            .map(|(idx, field)| {
+                                let (mut field_attrs, raw_attrs) =
+                                    decode_field_attrs(field, &container_attrs.skip_attrs)?;
 
-                            let field_ident_str =
-                                unraw_raw_ident(field.ident.as_ref().ok_or_else(|| {
-                                    syn::Error::new(
-                                        field.span(),
-                                        "specta: named field must have an identifier",
-                                    )
-                                })?);
+                                if variant_inline && idx == 0 {
+                                    field_attrs.inline = true;
+                                }
 
-                            let field_name = field_ident_str;
+                                construct_field_with_variant_skip(
+                                    crate_ref,
+                                    container_attrs,
+                                    field_attrs,
+                                    &field.ty,
+                                    raw_attrs,
+                                    variant_skip,
+                                )
+                            })
+                            .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                            let inner = construct_field_with_variant_skip(
-                                crate_ref,
-                                container_attrs,
-                                field_attrs,
-                                &field.ty,
-                                raw_attrs,
-                                variant_skip,
-                            )?;
-                            Ok(quote!((#field_name.into(), #inner)))
-                        })
-                        .collect::<syn::Result<Vec<TokenStream>>>()?;
+                        quote!(internal::construct::fields_unnamed(
+                            vec![#(#fields),*],
+                            datatype::Attributes::default(),
+                        ))
+                    }
+                    Fields::Named(fields) => {
+                        let fields = fields
+                            .named
+                            .iter()
+                            .map(|field| {
+                                let (field_attrs, raw_attrs) =
+                                    decode_field_attrs(field, &container_attrs.skip_attrs)?;
 
-                    quote!(internal::construct::fields_named(
-                        vec![#(#fields),*],
-                        datatype::Attributes::default()
-                    ))
+                                let field_ident_str =
+                                    unraw_raw_ident(field.ident.as_ref().ok_or_else(|| {
+                                        syn::Error::new(
+                                            field.span(),
+                                            "specta: named field must have an identifier",
+                                        )
+                                    })?);
+
+                                let field_name = field_ident_str;
+
+                                let inner = construct_field_with_variant_skip(
+                                    crate_ref,
+                                    container_attrs,
+                                    field_attrs,
+                                    &field.ty,
+                                    raw_attrs,
+                                    variant_skip,
+                                )?;
+                                Ok(quote!((#field_name.into(), #inner)))
+                            })
+                            .collect::<syn::Result<Vec<TokenStream>>>()?;
+
+                        quote!(internal::construct::fields_named(
+                            vec![#(#fields),*],
+                            datatype::Attributes::default()
+                        ))
+                    }
                 }
             };
 
@@ -170,4 +200,28 @@ pub fn parse_enum(
             *e.variants_mut() = vec![#(#variant_types),*];
         ),
     ))
+}
+
+fn parse_variant_type_override(attrs: &[syn::Attribute]) -> syn::Result<Option<Type>> {
+    let mut result = None;
+    for attr in attrs {
+        if !attr.path().is_ident("specta") {
+            continue;
+        }
+
+        let syn::Meta::List(list) = &attr.meta else {
+            continue;
+        };
+
+        list.parse_nested_meta(|meta| {
+            if meta.path.is_ident("type") || meta.path.is_ident("r#type") {
+                let value = meta.value()?;
+                result = Some(value.parse()?);
+            }
+
+            Ok(())
+        })?;
+    }
+
+    Ok(result)
 }

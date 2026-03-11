@@ -27,6 +27,93 @@ struct Parent {
     child: IntoOnly,
 }
 
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct CustomCodecNoOverride {
+    #[serde(with = "codec")]
+    value: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct CustomCodecWithOverride {
+    #[specta(type = String)]
+    #[serde(with = "codec")]
+    value: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct CustomCodecWithPhasedOverride {
+    #[specta(type = specta_serde::Phased<String, i32>)]
+    #[serde(with = "codec")]
+    value: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct SkipSerializingIfOnly {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    value: Option<String>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum VariantCodecNoOverride {
+    #[serde(
+        serialize_with = "codec_variant::serialize",
+        deserialize_with = "codec_variant::deserialize"
+    )]
+    A(String),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum VariantCodecWithOverride {
+    #[serde(
+        serialize_with = "codec_variant::serialize",
+        deserialize_with = "codec_variant::deserialize"
+    )]
+    #[specta(r#type = String)]
+    A(String),
+}
+
+mod codec {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(_value: &str, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str("codec")
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<String, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        String::deserialize(deserializer)
+    }
+}
+
+mod codec_variant {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(value: &str, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(value)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<String, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        String::deserialize(deserializer)
+    }
+}
+
 impl From<IntoOnly> for Wire {
     fn from(value: IntoOnly) -> Self {
         Self { value: value.value }
@@ -80,4 +167,48 @@ fn apply_phases_splits_container_and_dependents_for_conversions() {
 fn apply_accepts_symmetric_container_conversion() {
     specta_serde::apply(TypeCollection::default().register::<Symmetric>())
         .expect("apply should accept symmetric serde conversions");
+}
+
+#[test]
+fn custom_codec_requires_explicit_override() {
+    let err = specta_serde::apply(TypeCollection::default().register::<CustomCodecNoOverride>())
+        .expect_err("custom serde codecs should require #[specta(type = ...)]");
+
+    assert!(err.to_string().contains("Unsupported serde attribute"));
+
+    specta_serde::apply(TypeCollection::default().register::<CustomCodecWithOverride>())
+        .expect("override should satisfy custom serde codecs");
+}
+
+#[test]
+fn custom_codec_variant_requires_explicit_override() {
+    let err = specta_serde::apply(TypeCollection::default().register::<VariantCodecNoOverride>())
+        .expect_err("variant custom serde codecs should require #[specta(type = ...)]");
+    assert!(err.to_string().contains("Unsupported serde attribute"));
+
+    specta_serde::apply(TypeCollection::default().register::<VariantCodecWithOverride>())
+        .expect("variant override should satisfy custom serde codecs");
+}
+
+#[test]
+fn phased_override_requires_apply_phases() {
+    let err =
+        specta_serde::apply(TypeCollection::default().register::<CustomCodecWithPhasedOverride>())
+            .expect_err("apply should reject phased overrides");
+    assert!(err.to_string().contains("requires `apply_phases`"));
+
+    specta_serde::apply_phases(
+        TypeCollection::default().register::<CustomCodecWithPhasedOverride>(),
+    )
+    .expect("apply_phases should accept phased overrides");
+}
+
+#[test]
+fn skip_serializing_if_requires_phases() {
+    let err = specta_serde::apply(TypeCollection::default().register::<SkipSerializingIfOnly>())
+        .expect_err("skip_serializing_if should require apply_phases");
+    assert!(err.to_string().contains("skip_serializing_if"));
+
+    specta_serde::apply_phases(TypeCollection::default().register::<SkipSerializingIfOnly>())
+        .expect("apply_phases should accept skip_serializing_if");
 }

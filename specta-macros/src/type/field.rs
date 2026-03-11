@@ -34,11 +34,18 @@ pub fn construct_field_with_variant_skip(
     let optional = attrs.optional;
     let doc = attrs.common.doc;
     let inline = attrs.inline;
-    let runtime_attrs = build_runtime_attributes(
+    let mut runtime_attrs = build_runtime_attributes(
         AttributeScope::Field,
         raw_attrs,
         &container_attrs.skip_attrs,
     );
+    if attrs.r#type.is_some() {
+        runtime_attrs = quote!({
+            let mut attrs = #runtime_attrs;
+            attrs.insert(specta_serde::SpectaTypeAttr);
+            attrs
+        });
+    }
 
     let ty = if attrs.skip || variant_skip {
         quote!(None)

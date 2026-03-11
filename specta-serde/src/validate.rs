@@ -8,9 +8,22 @@ use specta::{
     },
 };
 
-use crate::{Error, Result, SerdeContainerAttrs, repr::EnumRepr};
+use crate::{
+    Error, Result, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs, SpectaTypeAttr,
+    repr::EnumRepr,
+};
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum ApplyMode {
+    Unified,
+    Phases,
+}
 
 pub fn validate(types: &TypeCollection) -> Result<()> {
+    validate_for_mode(types, ApplyMode::Unified)
+}
+
+pub fn validate_for_mode(types: &TypeCollection, mode: ApplyMode) -> Result<()> {
     for ndt in types.into_unsorted_iter() {
         let ndt_generics = ndt
             .generics()
@@ -29,6 +42,7 @@ pub fn validate(types: &TypeCollection) -> Result<()> {
             &ndt_generics,
             &mut HashSet::new(),
             ndt.name().to_string(),
+            mode,
         )?;
     }
 
@@ -41,9 +55,10 @@ fn inner(
     generics: &[(GenericReference, DataType)],
     checked_references: &mut HashSet<Reference>,
     path: String,
+    mode: ApplyMode,
 ) -> Result<()> {
     match dt {
-        DataType::Nullable(ty) => inner(ty, types, generics, checked_references, path)?,
+        DataType::Nullable(ty) => inner(ty, types, generics, checked_references, path, mode)?,
         DataType::Map(map) => {
             is_valid_map_key(map.key_ty(), types, generics, format!("{path}.<map_key>"))?;
             inner(
@@ -52,6 +67,7 @@ fn inner(
                 generics,
                 checked_references,
                 format!("{path}.<map_value>"),
+                mode,
             )?;
         }
         DataType::List(list) => {
@@ -61,6 +77,7 @@ fn inner(
                 generics,
                 checked_references,
                 format!("{path}.<list_item>"),
+                mode,
             )?;
         }
         DataType::Struct(strct) => {
@@ -70,6 +87,7 @@ fn inner(
                 generics,
                 checked_references,
                 &path,
+                mode,
             )?;
 
             match strct.fields() {
@@ -82,10 +100,18 @@ fn inner(
                             generics,
                             checked_references,
                             format!("{path}[{idx}]"),
+                            mode,
                         )?;
                     }
                 }
                 Fields::Named(named) => {
+                    for (name, (field, _)) in skip_fields_named(named.fields()) {
+                        validate_field_attributes(
+                            field.attributes(),
+                            format!("{path}.{name}"),
+                            mode,
+                        )?;
+                    }
                     for (name, (_, ty)) in skip_fields_named(named.fields()) {
                         inner(
                             ty,
@@ -93,6 +119,7 @@ fn inner(
                             generics,
                             checked_references,
                             format!("{path}.{name}"),
+                            mode,
                         )?;
                     }
                 }
@@ -105,13 +132,26 @@ fn inner(
                 generics,
                 checked_references,
                 &path,
+                mode,
             )?;
             validate_enum(enm, types, path.clone())?;
 
             for (variant_name, variant) in enm.variants() {
+                validate_variant_attributes(
+                    variant.attributes(),
+                    format!("{path}::{variant_name}"),
+                    mode,
+                )?;
                 match &variant.fields() {
                     Fields::Unit => {}
                     Fields::Named(named) => {
+                        for (name, (field, _)) in skip_fields_named(named.fields()) {
+                            validate_field_attributes(
+                                field.attributes(),
+                                format!("{path}::{variant_name}.{name}"),
+                                mode,
+                            )?;
+                        }
                         for (name, (_, ty)) in skip_fields_named(named.fields()) {
                             inner(
                                 ty,
@@ -119,10 +159,18 @@ fn inner(
                                 generics,
                                 checked_references,
                                 format!("{path}::{variant_name}.{name}"),
+                                mode,
                             )?;
                         }
                     }
                     Fields::Unnamed(unnamed) => {
+                        for (idx, (field, _)) in skip_fields(unnamed.fields()).enumerate() {
+                            validate_field_attributes(
+                                field.attributes(),
+                                format!("{path}::{variant_name}[{idx}]"),
+                                mode,
+                            )?;
+                        }
                         for (idx, (_, ty)) in skip_fields(unnamed.fields()).enumerate() {
                             inner(
                                 ty,
@@ -130,6 +178,7 @@ fn inner(
                                 generics,
                                 checked_references,
                                 format!("{path}::{variant_name}[{idx}]"),
+                                mode,
                             )?;
                         }
                     }
@@ -144,6 +193,7 @@ fn inner(
                     generics,
                     checked_references,
                     format!("{path}[{idx}]"),
+                    mode,
                 )?;
             }
         }
@@ -156,6 +206,7 @@ fn inner(
                         generics,
                         checked_references,
                         format!("{path}.<generic>"),
+                        mode,
                     )?;
                 }
 
@@ -169,6 +220,7 @@ fn inner(
                             reference.generics(),
                             checked_references,
                             ndt.name().to_string(),
+                            mode,
                         )?;
                     }
                 }
@@ -193,6 +245,7 @@ fn inner(
                     generics,
                     checked_references,
                     format!("{path}.<generic_ref>"),
+                    mode,
                 )?;
             }
             Reference::Opaque(_) => {}
@@ -209,6 +262,7 @@ fn validate_container_attributes(
     generics: &[(GenericReference, DataType)],
     checked_references: &mut HashSet<Reference>,
     path: &str,
+    mode: ApplyMode,
 ) -> Result<()> {
     if let Some(parsed) = attrs.get::<SerdeContainerAttrs>()
         && parsed.from.is_some()
@@ -233,12 +287,79 @@ fn validate_container_attributes(
                     generics,
                     checked_references,
                     format!("{path}.{suffix}"),
+                    mode,
                 )?;
             }
         }
     }
 
     Ok(())
+}
+
+fn validate_variant_attributes(
+    attrs: &specta::datatype::Attributes,
+    path: String,
+    _mode: ApplyMode,
+) -> Result<()> {
+    let Some(serde_attrs) = attrs.get::<SerdeVariantAttrs>() else {
+        return Ok(());
+    };
+
+    if serde_attrs.has_serialize_with {
+        ensure_codec_override(attrs, &path, "serialize_with")?;
+    }
+    if serde_attrs.has_deserialize_with {
+        ensure_codec_override(attrs, &path, "deserialize_with")?;
+    }
+    if serde_attrs.has_with {
+        ensure_codec_override(attrs, &path, "with")?;
+    }
+
+    Ok(())
+}
+
+fn validate_field_attributes(
+    attrs: &specta::datatype::Attributes,
+    path: String,
+    mode: ApplyMode,
+) -> Result<()> {
+    let Some(serde_attrs) = attrs.get::<SerdeFieldAttrs>() else {
+        return Ok(());
+    };
+
+    if serde_attrs.has_serialize_with {
+        ensure_codec_override(attrs, &path, "serialize_with")?;
+    }
+    if serde_attrs.has_deserialize_with {
+        ensure_codec_override(attrs, &path, "deserialize_with")?;
+    }
+    if serde_attrs.has_with {
+        ensure_codec_override(attrs, &path, "with")?;
+    }
+
+    if mode == ApplyMode::Unified && serde_attrs.skip_serializing_if.is_some() {
+        return Err(Error::invalid_phased_type_usage(
+            path,
+            "`skip_serializing_if` requires `apply_phases` because unified mode cannot represent conditional omission",
+        ));
+    }
+
+    Ok(())
+}
+
+fn ensure_codec_override(
+    attrs: &specta::datatype::Attributes,
+    path: &str,
+    attr: &'static str,
+) -> Result<()> {
+    if attrs.get::<SpectaTypeAttr>().is_some() {
+        return Ok(());
+    }
+
+    Err(Error::unsupported_serde_custom_codec(
+        path.to_string(),
+        attr,
+    ))
 }
 
 fn is_valid_map_key(

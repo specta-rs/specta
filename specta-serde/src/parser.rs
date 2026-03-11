@@ -22,7 +22,6 @@ pub struct SerdeContainerAttrs {
     pub content: Option<String>,
     pub untagged: bool,
     pub default: Option<String>,
-    pub remote: Option<String>,
     pub transparent: bool,
     pub from: Option<ConversionType>,
     pub try_from: Option<ConversionType>,
@@ -30,11 +29,11 @@ pub struct SerdeContainerAttrs {
     pub resolved_from: Option<specta::datatype::DataType>,
     pub resolved_try_from: Option<specta::datatype::DataType>,
     pub resolved_into: Option<specta::datatype::DataType>,
-    pub serde_crate: Option<String>,
-    pub expecting: Option<String>,
-    pub variant_identifier: bool,
-    pub field_identifier: bool,
 }
+
+/// Marker runtime attribute inserted when `#[specta(type = ...)]` is used.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+pub struct SpectaTypeAttr;
 
 /// Parsed serde variant attributes.
 #[allow(missing_docs)]
@@ -48,9 +47,11 @@ pub struct SerdeVariantAttrs {
     pub skip_serializing: bool,
     pub skip_deserializing: bool,
     pub serialize_with: Option<String>,
+    pub has_serialize_with: bool,
     pub deserialize_with: Option<String>,
+    pub has_deserialize_with: bool,
     pub with: Option<String>,
-    pub borrow: Option<String>,
+    pub has_with: bool,
     pub other: bool,
     pub untagged: bool,
 }
@@ -68,10 +69,11 @@ pub struct SerdeFieldAttrs {
     pub skip_deserializing: bool,
     pub skip_serializing_if: Option<String>,
     pub serialize_with: Option<String>,
+    pub has_serialize_with: bool,
     pub deserialize_with: Option<String>,
+    pub has_deserialize_with: bool,
     pub with: Option<String>,
-    pub borrow: Option<String>,
-    pub getter: Option<String>,
+    pub has_with: bool,
 }
 
 #[doc(hidden)]
@@ -105,9 +107,6 @@ pub fn merge_container_attrs(target: &mut SerdeContainerAttrs, other: SerdeConta
     if other.default.is_some() {
         target.default = other.default;
     }
-    if other.remote.is_some() {
-        target.remote = other.remote;
-    }
     target.transparent |= other.transparent;
     if other.from.is_some() {
         target.from = other.from;
@@ -127,14 +126,6 @@ pub fn merge_container_attrs(target: &mut SerdeContainerAttrs, other: SerdeConta
     if other.resolved_into.is_some() {
         target.resolved_into = other.resolved_into;
     }
-    if other.serde_crate.is_some() {
-        target.serde_crate = other.serde_crate;
-    }
-    if other.expecting.is_some() {
-        target.expecting = other.expecting;
-    }
-    target.variant_identifier |= other.variant_identifier;
-    target.field_identifier |= other.field_identifier;
 }
 
 #[doc(hidden)]
@@ -157,15 +148,15 @@ pub fn merge_variant_attrs(target: &mut SerdeVariantAttrs, other: SerdeVariantAt
     if other.serialize_with.is_some() {
         target.serialize_with = other.serialize_with;
     }
+    target.has_serialize_with |= other.has_serialize_with;
     if other.deserialize_with.is_some() {
         target.deserialize_with = other.deserialize_with;
     }
+    target.has_deserialize_with |= other.has_deserialize_with;
     if other.with.is_some() {
         target.with = other.with;
     }
-    if other.borrow.is_some() {
-        target.borrow = other.borrow;
-    }
+    target.has_with |= other.has_with;
     target.other |= other.other;
     target.untagged |= other.untagged;
 }
@@ -191,18 +182,15 @@ pub fn merge_field_attrs(target: &mut SerdeFieldAttrs, other: SerdeFieldAttrs) {
     if other.serialize_with.is_some() {
         target.serialize_with = other.serialize_with;
     }
+    target.has_serialize_with |= other.has_serialize_with;
     if other.deserialize_with.is_some() {
         target.deserialize_with = other.deserialize_with;
     }
+    target.has_deserialize_with |= other.has_deserialize_with;
     if other.with.is_some() {
         target.with = other.with;
     }
-    if other.borrow.is_some() {
-        target.borrow = other.borrow;
-    }
-    if other.getter.is_some() {
-        target.getter = other.getter;
-    }
+    target.has_with |= other.has_with;
 }
 
 #[doc(hidden)]
@@ -539,21 +527,6 @@ macro_rules! __specta_serde_parse_container_items {
     ($target:ident; transparent) => {
         $target.transparent = true;
     };
-    ($target:ident; variant_identifier, $($rest:tt)*) => {
-        $target.variant_identifier = true;
-        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
-    };
-    ($target:ident; variant_identifier) => {
-        $target.variant_identifier = true;
-    };
-    ($target:ident; field_identifier, $($rest:tt)*) => {
-        $target.field_identifier = true;
-        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
-    };
-    ($target:ident; field_identifier) => {
-        $target.field_identifier = true;
-    };
-
     ($target:ident; tag = $value:literal, $($rest:tt)*) => {
         $crate::__specta_serde_set_str!($target, tag, $value);
         $crate::__specta_serde_parse_container_items!($target; $($rest)*);
@@ -581,13 +554,6 @@ macro_rules! __specta_serde_parse_container_items {
     };
     ($target:ident; default) => {
         $target.default = Some(String::from("__default__"));
-    };
-    ($target:ident; remote = $value:literal, $($rest:tt)*) => {
-        $crate::__specta_serde_set_str!($target, remote, $value);
-        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
-    };
-    ($target:ident; remote = $value:literal) => {
-        $crate::__specta_serde_set_str!($target, remote, $value);
     };
     ($target:ident; from = $value:literal, $($rest:tt)*) => {
         $target.from = Some($crate::ConversionType {
@@ -646,21 +612,6 @@ macro_rules! __specta_serde_parse_container_items {
             <specta::parse_type_from_lit!($value) as specta::Type>::definition(&mut __types)
         });
     };
-    ($target:ident; crate = $value:literal, $($rest:tt)*) => {
-        $crate::__specta_serde_set_str!($target, serde_crate, $value);
-        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
-    };
-    ($target:ident; crate = $value:literal) => {
-        $crate::__specta_serde_set_str!($target, serde_crate, $value);
-    };
-    ($target:ident; expecting = $value:literal, $($rest:tt)*) => {
-        $crate::__specta_serde_set_str!($target, expecting, $value);
-        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
-    };
-    ($target:ident; expecting = $value:literal) => {
-        $crate::__specta_serde_set_str!($target, expecting, $value);
-    };
-
     ($target:ident; $unknown:ident($($inner:tt)*), $($rest:tt)*) => {
         $crate::__specta_serde_parse_container_items!($target; $($rest)*);
     };
@@ -746,39 +697,31 @@ macro_rules! __specta_serde_parse_variant_items {
         $target.skip_deserializing = true;
     };
     ($target:ident; serialize_with = $value:literal, $($rest:tt)*) => {
+        $target.has_serialize_with = true;
         $crate::__specta_serde_set_str!($target, serialize_with, $value);
         $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
     };
     ($target:ident; serialize_with = $value:literal) => {
+        $target.has_serialize_with = true;
         $crate::__specta_serde_set_str!($target, serialize_with, $value);
     };
     ($target:ident; deserialize_with = $value:literal, $($rest:tt)*) => {
+        $target.has_deserialize_with = true;
         $crate::__specta_serde_set_str!($target, deserialize_with, $value);
         $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
     };
     ($target:ident; deserialize_with = $value:literal) => {
+        $target.has_deserialize_with = true;
         $crate::__specta_serde_set_str!($target, deserialize_with, $value);
     };
     ($target:ident; with = $value:literal, $($rest:tt)*) => {
+        $target.has_with = true;
         $crate::__specta_serde_set_str!($target, with, $value);
         $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
     };
     ($target:ident; with = $value:literal) => {
+        $target.has_with = true;
         $crate::__specta_serde_set_str!($target, with, $value);
-    };
-    ($target:ident; borrow = $value:literal, $($rest:tt)*) => {
-        $crate::__specta_serde_set_str!($target, borrow, $value);
-        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
-    };
-    ($target:ident; borrow = $value:literal) => {
-        $crate::__specta_serde_set_str!($target, borrow, $value);
-    };
-    ($target:ident; borrow, $($rest:tt)*) => {
-        $target.borrow = Some(String::from("__borrow__"));
-        $crate::__specta_serde_parse_variant_items!($target; $($rest)*);
-    };
-    ($target:ident; borrow) => {
-        $target.borrow = Some(String::from("__borrow__"));
     };
     ($target:ident; other, $($rest:tt)*) => {
         $target.other = true;
@@ -892,46 +835,31 @@ macro_rules! __specta_serde_parse_field_items {
         $crate::__specta_serde_set_str!($target, skip_serializing_if, $value);
     };
     ($target:ident; serialize_with = $value:literal, $($rest:tt)*) => {
+        $target.has_serialize_with = true;
         $crate::__specta_serde_set_str!($target, serialize_with, $value);
         $crate::__specta_serde_parse_field_items!($target; $($rest)*);
     };
     ($target:ident; serialize_with = $value:literal) => {
+        $target.has_serialize_with = true;
         $crate::__specta_serde_set_str!($target, serialize_with, $value);
     };
     ($target:ident; deserialize_with = $value:literal, $($rest:tt)*) => {
+        $target.has_deserialize_with = true;
         $crate::__specta_serde_set_str!($target, deserialize_with, $value);
         $crate::__specta_serde_parse_field_items!($target; $($rest)*);
     };
     ($target:ident; deserialize_with = $value:literal) => {
+        $target.has_deserialize_with = true;
         $crate::__specta_serde_set_str!($target, deserialize_with, $value);
     };
     ($target:ident; with = $value:literal, $($rest:tt)*) => {
+        $target.has_with = true;
         $crate::__specta_serde_set_str!($target, with, $value);
         $crate::__specta_serde_parse_field_items!($target; $($rest)*);
     };
     ($target:ident; with = $value:literal) => {
+        $target.has_with = true;
         $crate::__specta_serde_set_str!($target, with, $value);
-    };
-    ($target:ident; borrow = $value:literal, $($rest:tt)*) => {
-        $crate::__specta_serde_set_str!($target, borrow, $value);
-        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
-    };
-    ($target:ident; borrow = $value:literal) => {
-        $crate::__specta_serde_set_str!($target, borrow, $value);
-    };
-    ($target:ident; borrow, $($rest:tt)*) => {
-        $target.borrow = Some(String::from("__borrow__"));
-        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
-    };
-    ($target:ident; borrow) => {
-        $target.borrow = Some(String::from("__borrow__"));
-    };
-    ($target:ident; getter = $value:literal, $($rest:tt)*) => {
-        $crate::__specta_serde_set_str!($target, getter, $value);
-        $crate::__specta_serde_parse_field_items!($target; $($rest)*);
-    };
-    ($target:ident; getter = $value:literal) => {
-        $crate::__specta_serde_set_str!($target, getter, $value);
     };
 
     ($target:ident; $unknown:ident($($inner:tt)*), $($rest:tt)*) => {
@@ -963,15 +891,10 @@ mod tests {
             content = "data",
             bound(serialize = "T: Copy", deserialize = "T: Clone"),
             default,
-            remote = "crate::Remote",
             transparent,
             from = "String",
             try_from = "String",
             into = "String",
-            crate = "serde",
-            expecting = "a valid payload",
-            variant_identifier,
-            field_identifier,
             unknown_container_attr
         )]);
 
@@ -987,7 +910,6 @@ mod tests {
         assert_eq!(parsed.tag.as_deref(), Some("kind"));
         assert_eq!(parsed.content.as_deref(), Some("data"));
         assert_eq!(parsed.default.as_deref(), Some("__default__"));
-        assert_eq!(parsed.remote.as_deref(), Some("crate::Remote"));
         assert!(parsed.transparent);
         assert_eq!(
             parsed.from.as_ref().map(|v| v.type_src.as_str()),
@@ -1001,10 +923,6 @@ mod tests {
             parsed.into.as_ref().map(|v| v.type_src.as_str()),
             Some("String")
         );
-        assert_eq!(parsed.serde_crate.as_deref(), Some("serde"));
-        assert_eq!(parsed.expecting.as_deref(), Some("a valid payload"));
-        assert!(parsed.variant_identifier);
-        assert!(parsed.field_identifier);
     }
 
     #[test]
@@ -1017,7 +935,6 @@ mod tests {
             skip_serializing,
             with = "mod_path",
             bound = "T: Copy",
-            borrow = "'a + 'b",
             other,
             untagged,
             unknown_variant_attr
@@ -1030,7 +947,7 @@ mod tests {
         assert!(parsed.skip_serializing);
         assert!(!parsed.skip_deserializing);
         assert_eq!(parsed.with.as_deref(), Some("mod_path"));
-        assert_eq!(parsed.borrow.as_deref(), Some("'a + 'b"));
+        assert!(parsed.has_with);
         assert!(parsed.other);
         assert!(parsed.untagged);
     }
@@ -1046,9 +963,7 @@ mod tests {
             serialize_with = "ser_fn",
             deserialize_with = "de_fn",
             with = "mod_fns",
-            borrow,
             bound(deserialize = "T: Clone"),
-            getter = "get_field",
             unknown_field_attr
         )]);
 
@@ -1061,10 +976,11 @@ mod tests {
             Some("Option::is_none")
         );
         assert_eq!(parsed.serialize_with.as_deref(), Some("ser_fn"));
+        assert!(parsed.has_serialize_with);
         assert_eq!(parsed.deserialize_with.as_deref(), Some("de_fn"));
+        assert!(parsed.has_deserialize_with);
         assert_eq!(parsed.with.as_deref(), Some("mod_fns"));
-        assert_eq!(parsed.borrow.as_deref(), Some("__borrow__"));
-        assert_eq!(parsed.getter.as_deref(), Some("get_field"));
+        assert!(parsed.has_with);
     }
 
     #[test]
