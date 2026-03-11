@@ -9,3 +9,4 @@ specta = { path = "../../specta", features = ["derive"] }
 specta-typescript = { path = "../../specta-typescript" }
 specta-serde = { path = "../../specta-serde" }
 serde = { version = "1", features = ["derive"] }
+serde_repr = "0.1.20"
