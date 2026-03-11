@@ -1,8 +1,8 @@
 use std::marker::PhantomData;
 
 use specta::{
+    datatype::{DataType, NamedDataType, Tuple},
     Type, TypeCollection,
-    datatype::{DataType, Tuple},
 };
 
 pub struct Phased<Serialize, Deserialize> {
@@ -25,10 +25,9 @@ impl<Serialize: Type, Deserialize: Type> Type for Phased<Serialize, Deserialize>
             Deserialize::definition(types),
         ]));
 
-        let ndt = NamedDataTypeBuilder::new("Phased", vec![], payload)
-            .module_path("specta_serde")
-            .inline()
-            .build(types);
+        let mut ndt = NamedDataType::new_inline("Phased", vec![], payload);
+        ndt.set_module_path("specta_serde".into());
+        ndt.register(types);
 
         DataType::Reference(ndt.reference(vec![]))
     }

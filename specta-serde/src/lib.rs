@@ -1210,16 +1210,18 @@ fn build_from_original(
     types: &TypeCollection,
     out: &mut TypeCollection,
 ) -> NamedDataType {
-    let mut builder = NamedDataTypeBuilder::new(name, generics, ty)
-        .docs(original.docs().clone())
-        .module_path(original.module_path().clone());
-    if let Some(deprecated) = original.deprecated().cloned() {
-        builder = builder.deprecated(deprecated);
-    }
-    if !original.requires_reference(types) {
-        builder = builder.inline();
-    }
-    builder.build(out)
+    let mut ndt = if original.requires_reference(types) {
+        NamedDataType::new(name, generics, ty)
+    } else {
+        NamedDataType::new_inline(name, generics, ty)
+    };
+
+    ndt.set_docs(original.docs().clone());
+    ndt.set_module_path(original.module_path().clone());
+    ndt.set_deprecated(original.deprecated().cloned());
+    ndt.register(out);
+
+    ndt
 }
 
 fn rename_datatype_fields(ty: &mut DataType) -> Result<()> {
