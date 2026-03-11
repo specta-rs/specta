@@ -6,12 +6,12 @@ use syn::{Lit, Result};
 use crate::utils::{Attribute, AttributeValue};
 
 // Copy of `specta/src/datatype/named.rs`
-pub struct DeprecatedAttribute {
+pub struct Deprecated {
     note: Option<Cow<'static, str>>,
     since: Option<Cow<'static, str>>,
 }
 
-impl DeprecatedAttribute {
+impl Deprecated {
     pub const fn new() -> Self {
         Self {
             note: None,
@@ -45,7 +45,7 @@ impl DeprecatedAttribute {
 #[derive(Default)]
 pub struct RustCAttr {
     pub doc: String,
-    pub deprecated: Option<DeprecatedAttribute>,
+    pub deprecated: Option<Deprecated>,
 }
 
 impl RustCAttr {
@@ -68,7 +68,7 @@ impl RustCAttr {
 
             match &attr_value.value {
                 Some(AttributeValue::Lit(lit)) => {
-                    deprecated = Some(DeprecatedAttribute::with_note(match lit {
+                    deprecated = Some(Deprecated::with_note(match lit {
                         Lit::Str(s) => s.value().into(),
                         _ => return Err(syn::Error::new_spanned(lit, "expected string")),
                     }));
@@ -106,13 +106,13 @@ impl RustCAttr {
                         })
                         .unwrap_or_default();
 
-                    deprecated = Some(DeprecatedAttribute::with_since_note(
+                    deprecated = Some(Deprecated::with_since_note(
                         // TODO: Use Cow's earlier rather than later
                         since.map(Into::into),
                         note.into(),
                     ));
                 }
-                None => deprecated = Some(DeprecatedAttribute::new()),
+                None => deprecated = Some(Deprecated::new()),
             }
 
             attrs.swap_remove(pos);
@@ -135,7 +135,7 @@ impl RustCAttr {
                 };
 
                 quote!({
-                    let mut deprecated = datatype::DeprecatedAttribute::new();
+                    let mut deprecated = datatype::Deprecated::new();
                     deprecated.set_since(#since);
                     deprecated.set_note(#note);
                     Some(deprecated)

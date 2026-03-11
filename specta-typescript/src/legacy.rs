@@ -9,8 +9,8 @@ use std::{
 use specta::{
     TypeCollection,
     datatype::{
-        DataType, DeprecatedAttribute, Enum, Field, Fields, GenericReference, Reference, Struct,
-        Tuple, Variant,
+        DataType, Deprecated, Enum, Field, Fields, GenericReference, Reference, Struct, Tuple,
+        Variant,
     },
 };
 
@@ -100,7 +100,7 @@ pub(crate) type Output = Result<String>;
 
 #[allow(clippy::ptr_arg)]
 fn inner_comments(
-    deprecated: Option<&DeprecatedAttribute>,
+    deprecated: Option<&Deprecated>,
     docs: &str,
     other: String,
     start_with_newline: bool,
@@ -777,7 +777,7 @@ const NEVER: &str = "never";
 pub(crate) fn js_doc(
     s: &mut String,
     docs: &str,
-    deprecated: Option<&DeprecatedAttribute>,
+    deprecated: Option<&Deprecated>,
     single_line_comment: bool,
 ) {
     // Early return - no-op if nothing to document
@@ -831,7 +831,7 @@ pub(crate) fn escape_jsdoc_text(text: &str) -> Cow<'_, str> {
     }
 }
 
-pub(crate) fn deprecated_details(typ: &DeprecatedAttribute) -> Option<String> {
+pub(crate) fn deprecated_details(typ: &Deprecated) -> Option<String> {
     let note = typ.note().map(|v| v.trim()).filter(|v| !v.is_empty());
     let since = typ.since().map(|v| v.trim()).filter(|v| !v.is_empty());
 
