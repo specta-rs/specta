@@ -6,7 +6,6 @@ use specta::{
     TypeCollection,
     datatype::{DataType, Fields, Reference},
 };
-use specta_serde::SerdeMode;
 
 use crate::error::Result;
 use crate::primitives::{export_type, is_duration_struct};
@@ -26,8 +25,6 @@ pub struct Swift {
     pub optionals: OptionalStyle,
     /// Additional protocols to conform to.
     pub protocols: Vec<Cow<'static, str>>,
-    /// Serde mode for type transformations.
-    pub serde: Option<SerdeMode>,
 }
 
 /// Indentation style for generated Swift code.
@@ -86,7 +83,6 @@ impl Default for Swift {
             generics: GenericStyle::default(),
             optionals: OptionalStyle::default(),
             protocols: vec![],
-            serde: Some(SerdeMode::Both),
         }
     }
 }
@@ -127,28 +123,6 @@ impl Swift {
         self
     }
 
-    /// Enable Serde validation with specified mode.
-    pub fn with_serde(mut self, mode: SerdeMode) -> Self {
-        self.serde = Some(mode);
-        self
-    }
-
-    /// Enable Serde validation for serialization only.
-    pub fn with_serde_serialize(self) -> Self {
-        self.with_serde(SerdeMode::Serialize)
-    }
-
-    /// Enable Serde validation for deserialization only.
-    pub fn with_serde_deserialize(self) -> Self {
-        self.with_serde(SerdeMode::Deserialize)
-    }
-
-    /// Disable Serde validation.
-    pub fn without_serde(mut self) -> Self {
-        self.serde = None;
-        self
-    }
-
     /// Add a protocol that all types should conform to.
     pub fn add_protocol(mut self, protocol: impl Into<Cow<'static, str>>) -> Self {
         self.protocols.push(protocol.into());
@@ -157,16 +131,6 @@ impl Swift {
 
     /// Export types to a Swift string.
     pub fn export(&self, types: &TypeCollection) -> Result<String> {
-        // Apply Serde transformations if enabled
-        let processed_types = if let Some(mode) = self.serde {
-            let _ = mode;
-            specta_serde::apply(types.clone())?
-        } else {
-            types.clone()
-        };
-
-        let types = &processed_types;
-
         let mut result = String::new();
 
         // Add header
@@ -177,9 +141,6 @@ impl Swift {
 
         // Add imports
         result.push_str("import Foundation\n");
-        if self.serde.is_some() {
-            result.push_str("import Codable\n");
-        }
         for protocol in &self.protocols {
             result.push_str(&format!("import {}\n", protocol));
         }

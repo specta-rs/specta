@@ -8,7 +8,7 @@
 //!
 //! - **Bidirectional conversion**: Export to JSON Schema and import from JSON Schema
 //! - **Multiple schema versions**: Support for Draft 7 (default), Draft 2019-09, and Draft 2020-12
-//! - **Serde integration**: Respect `#[serde(...)]` attributes via `specta-serde`
+//! - **Serde integration**: Use `specta-serde` in userspace before export
 //! - **Flexible layouts**: Single file with `$defs` or separate files per type
 //! - **schemars ecosystem**: Compatible with the schemars crate for interoperability
 //!
@@ -58,11 +58,9 @@
 //! fn main() {
 //!     let types = TypeCollection::default().register::<User>();
 //!
-//!     // Export with serde transformations
-//!     JsonSchema::default()
-//!         .with_serde_serialize()
-//!         .export_to("./schema.json", &types)
-//!         .unwrap();
+//!     // Apply serde transforms in userspace, then export
+//!     let types = specta_serde::apply(types).unwrap();
+//!     JsonSchema::default().export_to("./schema.json", &types).unwrap();
 //! }
 //! ```
 //!
@@ -120,9 +118,6 @@ pub use error::Error;
 pub use json_schema::JsonSchema;
 pub use layout::Layout;
 pub use schema_version::SchemaVersion;
-
-// Re-export commonly used types
-pub use specta_serde::SerdeMode;
 
 // Legacy function - kept for backward compatibility
 #[deprecated(note = "Use import::from_schema instead")]

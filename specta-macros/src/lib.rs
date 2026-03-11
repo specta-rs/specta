@@ -16,7 +16,7 @@ mod utils;
 use quote::quote;
 use syn::{Error, LitStr, Type, parse_macro_input};
 
-/// Implements [`Type`] for a given struct or enum.
+/// Implements `specta::Type` for a given struct or enum.
 ///
 /// # Attributes
 /// Attributes can be applied to modify Specta's behavior. Specta can natively read `#[serde(...)]` attributes so your generally recommend to [just use them](https://serde.rs/attributes.html).
@@ -65,7 +65,7 @@ pub fn parse_type_from_lit(input: proc_macro::TokenStream) -> proc_macro::TokenS
     }
 }
 
-/// Prepares a function to have its types extracted using [`fn_datatype!`](specta::fn_datatype)
+/// Prepares a function to have its types extracted using `specta::function::fn_datatype!`
 ///
 /// ## Example
 ///

@@ -12,102 +12,7 @@ use crate::swift::Swift;
 
 /// Check if an enum is a string enum (has String repr)
 fn is_string_enum(e: &specta::datatype::Enum) -> bool {
-    // For Swift, we only treat it as a string enum if:
-    // 1. All variants are unit variants
-    // 2. There's a serde rename_all attribute (which means we can generate raw values)
-    e.is_string_enum() && get_rename_all_from_attributes(e.attributes()).is_some()
-}
-
-/// Helper function to get rename_all from serde attributes  
-fn get_rename_all_from_attributes(attributes: &[specta::datatype::Attribute]) -> Option<String> {
-    use specta::datatype::AttributeMeta;
-
-    for attr in attributes {
-        if attr.path == "serde"
-            && let AttributeMeta::List(list) = &attr.kind
-        {
-            for nested in list {
-                if let specta::datatype::AttributeNestedMeta::Meta(meta) = nested
-                    && let AttributeMeta::NameValue { key, value } = meta
-                    && key == "rename_all"
-                    && let specta::datatype::AttributeValue::Literal(
-                        specta::datatype::AttributeLiteral::Str(s),
-                    ) = value
-                {
-                    return Some(s.clone());
-                }
-            }
-        }
-    }
-    None
-}
-
-/// Check if an enum is adjacently tagged
-fn is_adjacently_tagged_enum(e: &specta::datatype::Enum) -> bool {
-    use specta::datatype::AttributeMeta;
-
-    let mut has_tag = false;
-    let mut has_content = false;
-
-    for attr in e.attributes() {
-        if attr.path == "serde"
-            && let AttributeMeta::List(list) = &attr.kind
-        {
-            for nested in list {
-                if let specta::datatype::AttributeNestedMeta::Meta(meta) = nested
-                    && let AttributeMeta::NameValue { key, .. } = meta
-                {
-                    if key == "tag" {
-                        has_tag = true;
-                    } else if key == "content" {
-                        has_content = true;
-                    }
-                }
-            }
-        }
-    }
-
-    has_tag && has_content
-}
-
-/// Get the tag and content field names for an adjacently tagged enum
-fn get_adjacent_tag_content(e: &specta::datatype::Enum) -> Option<(String, String)> {
-    use specta::datatype::AttributeMeta;
-
-    let mut tag = None;
-    let mut content = None;
-
-    for attr in e.attributes() {
-        if attr.path == "serde"
-            && let AttributeMeta::List(list) = &attr.kind
-        {
-            for nested in list {
-                if let specta::datatype::AttributeNestedMeta::Meta(meta) = nested
-                    && let AttributeMeta::NameValue { key, value } = meta
-                {
-                    if key == "tag" {
-                        if let specta::datatype::AttributeValue::Literal(
-                            specta::datatype::AttributeLiteral::Str(s),
-                        ) = value
-                        {
-                            tag = Some(s.clone());
-                        }
-                    } else if key == "content"
-                        && let specta::datatype::AttributeValue::Literal(
-                            specta::datatype::AttributeLiteral::Str(s),
-                        ) = value
-                    {
-                        content = Some(s.clone());
-                    }
-                }
-            }
-        }
-    }
-
-    match (tag, content) {
-        (Some(t), Some(c)) => Some((t, c)),
-        _ => None,
-    }
+    e.is_string_enum()
 }
 
 /// Export a single type to Swift.
@@ -592,7 +497,7 @@ fn enum_to_swift(
                     // For string enums, generate raw value assignments
                     let raw_value = generate_raw_value(
                         original_variant_name,
-                        get_rename_all_from_attributes(e.attributes()).as_deref(),
+                        None,
                     );
                     result.push_str(&format!("    case {} = \"{}\"\n", variant_name, raw_value));
                 } else {
@@ -841,13 +746,6 @@ fn generate_enum_codable_impl(
     ));
     result.push_str(&format!("extension {}: Codable {{\n", enum_name));
 
-    // Check if this is an adjacently tagged enum
-    let is_adjacently_tagged = is_adjacently_tagged_enum(e);
-
-    if is_adjacently_tagged {
-        return generate_adjacently_tagged_codable(swift, e, enum_name);
-    }
-
     // Generate CodingKeys enum
     result.push_str("    private enum CodingKeys: String, CodingKey {\n");
     for (original_variant_name, variant) in e.variants() {
@@ -957,131 +855,6 @@ fn generate_enum_codable_impl(
                     "            try container.encode(data, forKey: .{})\n",
                     swift_case_name
                 ));
-            }
-        }
-    }
-
-    result.push_str("        }\n");
-    result.push_str("    }\n");
-    result.push_str("}\n");
-
-    Ok(result)
-}
-
-/// Generate custom Codable implementation for adjacently tagged enums
-fn generate_adjacently_tagged_codable(
-    swift: &Swift,
-    e: &specta::datatype::Enum,
-    enum_name: &str,
-) -> Result<String> {
-    let mut result = String::new();
-
-    // Get tag and content field names
-    let (tag_field, content_field) = get_adjacent_tag_content(e)
-        .ok_or_else(|| Error::UnsupportedType("Expected adjacently tagged enum".to_string()))?;
-
-    result.push_str(&format!(
-        "\n// MARK: - {} Adjacently Tagged Codable Implementation\n",
-        enum_name
-    ));
-    result.push_str(&format!("extension {}: Codable {{\n", enum_name));
-
-    // Generate TypeKeys enum for the tag and content fields
-    result.push_str("    private enum TypeKeys: String, CodingKey {\n");
-    result.push_str(&format!("        case tag = \"{}\"\n", tag_field));
-    result.push_str(&format!("        case content = \"{}\"\n", content_field));
-    result.push_str("    }\n\n");
-
-    // Generate VariantType enum for variant names
-    result.push_str("    private enum VariantType: String, Codable {\n");
-    for (original_variant_name, variant) in e.variants() {
-        if variant.skip() {
-            continue;
-        }
-        let swift_case_name = swift.naming.convert_enum_case(original_variant_name);
-        result.push_str(&format!(
-            "        case {} = \"{}\"\n",
-            swift_case_name, original_variant_name
-        ));
-    }
-    result.push_str("    }\n\n");
-
-    // Generate init(from decoder:)
-    result.push_str("    public init(from decoder: Decoder) throws {\n");
-    result.push_str("        let container = try decoder.container(keyedBy: TypeKeys.self)\n");
-    result.push_str(
-        "        let variantType = try container.decode(VariantType.self, forKey: .tag)\n",
-    );
-    result.push_str("        \n");
-    result.push_str("        switch variantType {\n");
-
-    for (original_variant_name, variant) in e.variants() {
-        if variant.skip() {
-            continue;
-        }
-
-        let swift_case_name = swift.naming.convert_enum_case(original_variant_name);
-
-        match variant.fields() {
-            specta::datatype::Fields::Unit => {
-                result.push_str(&format!("        case .{}:\n", swift_case_name));
-                result.push_str(&format!("            self = .{}\n", swift_case_name));
-            }
-            specta::datatype::Fields::Unnamed(_) => {
-                // TODO: Handle tuple variants for adjacently tagged
-                result.push_str(&format!("        case .{}:\n", swift_case_name));
-                result.push_str("            fatalError(\"Adjacently tagged tuple variants not implemented\")\n");
-            }
-            specta::datatype::Fields::Named(_) => {
-                let pascal_variant_name = to_pascal_case(original_variant_name);
-                let struct_name = format!("{}{}Data", enum_name, pascal_variant_name);
-
-                result.push_str(&format!("        case .{}:\n", swift_case_name));
-                result.push_str(&format!(
-                    "            let data = try container.decode({}.self, forKey: .content)\n",
-                    struct_name
-                ));
-                result.push_str(&format!("            self = .{}(data)\n", swift_case_name));
-            }
-        }
-    }
-
-    result.push_str("        }\n");
-    result.push_str("    }\n\n");
-
-    // Generate encode(to encoder:)
-    result.push_str("    public func encode(to encoder: Encoder) throws {\n");
-    result.push_str("        var container = encoder.container(keyedBy: TypeKeys.self)\n");
-    result.push_str("        \n");
-    result.push_str("        switch self {\n");
-
-    for (original_variant_name, variant) in e.variants() {
-        if variant.skip() {
-            continue;
-        }
-
-        let swift_case_name = swift.naming.convert_enum_case(original_variant_name);
-
-        match variant.fields() {
-            specta::datatype::Fields::Unit => {
-                result.push_str(&format!("        case .{}:\n", swift_case_name));
-                result.push_str(&format!(
-                    "            try container.encode(VariantType.{}, forKey: .tag)\n",
-                    swift_case_name
-                ));
-            }
-            specta::datatype::Fields::Unnamed(_) => {
-                // TODO: Handle tuple variants
-                result.push_str(&format!("        case .{}:\n", swift_case_name));
-                result.push_str("            fatalError(\"Adjacently tagged tuple variants not implemented\")\n");
-            }
-            specta::datatype::Fields::Named(_) => {
-                result.push_str(&format!("        case .{}(let data):\n", swift_case_name));
-                result.push_str(&format!(
-                    "            try container.encode(VariantType.{}, forKey: .tag)\n",
-                    swift_case_name
-                ));
-                result.push_str("            try container.encode(data, forKey: .content)\n");
             }
         }
     }
