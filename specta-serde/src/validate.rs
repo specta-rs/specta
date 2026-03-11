@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use specta::{
     TypeCollection,
-    datatype::{DataType, Enum, Variant, Fields, GenericReference, Primitive, Reference},
+    datatype::{DataType, Enum, Fields, GenericReference, Primitive, Reference, Variant},
 };
 
 use crate::{

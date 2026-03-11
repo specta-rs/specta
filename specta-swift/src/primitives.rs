@@ -41,11 +41,11 @@ pub fn export_type(
 
     // Add deprecated annotation if present
     if let Some(deprecated) = ndt.deprecated() {
-        let message = match deprecated {
-            specta::datatype::DeprecatedType::Deprecated => "This type is deprecated".to_string(),
-            specta::datatype::DeprecatedType::DeprecatedWithSince { note, .. } => note.to_string(),
-            _ => "This type is deprecated".to_string(),
-        };
+        let message = deprecated
+            .note()
+            .filter(|note| !note.trim().is_empty())
+            .map(ToString::to_string)
+            .unwrap_or_else(|| "This type is deprecated".to_string());
         result.push_str(&format!(
             "@available(*, deprecated, message: \"{}\")\n",
             message

@@ -2,7 +2,7 @@
 
 use crate::datatype::Struct;
 
-use super::{Attributes, DataType, DeprecatedType};
+use super::{Attributes, DataType, DeprecatedAttribute};
 use std::borrow::Cow;
 
 /// Data stored within an enum variant or struct.
@@ -30,7 +30,7 @@ pub struct Field {
     /// Did the user apply a `#[serde(flatten)]` attribute.
     pub(crate) flatten: bool,
     /// Deprecated attribute for the field.
-    pub(crate) deprecated: Option<DeprecatedType>,
+    pub(crate) deprecated: Option<DeprecatedAttribute>,
     /// Documentation comments for the field.
     pub(crate) docs: Cow<'static, str>,
     /// Should we inline the definition of this type.
@@ -91,17 +91,17 @@ impl Field {
     }
 
     /// Has the Rust deprecated attribute been applied to this field?
-    pub fn deprecated(&self) -> Option<&DeprecatedType> {
+    pub fn deprecated(&self) -> Option<&DeprecatedAttribute> {
         self.deprecated.as_ref()
     }
 
     /// Has the Rust deprecated attribute been applied to this field?
-    pub fn deprecated_mut(&mut self) -> Option<&mut DeprecatedType> {
+    pub fn deprecated_mut(&mut self) -> Option<&mut DeprecatedAttribute> {
         self.deprecated.as_mut()
     }
 
     /// Set the deprecated attribute for this field.
-    pub fn set_deprecated(&mut self, deprecated: Option<DeprecatedType>) {
+    pub fn set_deprecated(&mut self, deprecated: Option<DeprecatedAttribute>) {
         self.deprecated = deprecated;
     }
 

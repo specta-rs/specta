@@ -1,8 +1,8 @@
 use crate::{Error, JsonSchema};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use specta::{
-    datatype::{NamedDataType, *},
     TypeCollection,
+    datatype::{NamedDataType, *},
 };
 
 /// Convert a NamedDataType to a JSON Schema definition

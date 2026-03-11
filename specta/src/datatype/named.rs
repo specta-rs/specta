@@ -16,7 +16,7 @@ pub struct NamedDataType {
     pub(crate) id: NamedId,
     pub(crate) name: Cow<'static, str>,
     pub(crate) docs: Cow<'static, str>,
-    pub(crate) deprecated: Option<DeprecatedType>,
+    pub(crate) deprecated: Option<DeprecatedAttribute>,
     pub(crate) module_path: Cow<'static, str>,
     pub(crate) location: Location<'static>,
     pub(crate) generics: Cow<'static, [(GenericReference, Cow<'static, str>)]>,
@@ -202,17 +202,17 @@ impl NamedDataType {
     }
 
     /// The Rust deprecated comment if the type is deprecated.
-    pub fn deprecated(&self) -> Option<&DeprecatedType> {
+    pub fn deprecated(&self) -> Option<&DeprecatedAttribute> {
         self.deprecated.as_ref()
     }
 
     /// Get a mutable reference to the Rust deprecated comment if the type is deprecated.
-    pub fn deprecated_mut(&mut self) -> Option<&mut DeprecatedType> {
+    pub fn deprecated_mut(&mut self) -> Option<&mut DeprecatedAttribute> {
         self.deprecated.as_mut()
     }
 
     /// Set the Rust deprecated comment if the type is deprecated.
-    pub fn set_deprecated(&mut self, deprecated: Option<DeprecatedType>) {
+    pub fn set_deprecated(&mut self, deprecated: Option<DeprecatedAttribute>) {
         self.deprecated = deprecated;
     }
 
@@ -267,23 +267,73 @@ impl NamedDataType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[non_exhaustive]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 /// Runtime representation of Rust's `#[deprecated]` metadata.
-pub enum DeprecatedType {
-    /// Type that has been deprecated without a message.
+pub struct DeprecatedAttribute {
+    note: Option<Cow<'static, str>>,
+    since: Option<Cow<'static, str>>,
+}
+
+impl DeprecatedAttribute {
+    /// Construct deprecation metadata without details.
     ///
     /// Eg. `#[deprecated]`
-    Deprecated,
-    /// Type that has been deprecated with a message and an optional `since` version.
+    pub const fn new() -> Self {
+        Self {
+            note: None,
+            since: None,
+        }
+    }
+
+    /// Construct deprecation metadata with a note/message.
     ///
-    /// Eg. `#[deprecated = "Use something else"]` or `#[deprecated(since = "1.0.0", message = "Use something else")]`
-    DeprecatedWithSince {
-        /// Optional version string from `since = "..."`.
-        since: Option<Cow<'static, str>>,
-        /// Deprecation note/message.
-        note: Cow<'static, str>,
-    },
+    /// Eg. `#[deprecated = "Use something else"]`
+    pub fn with_note(note: Cow<'static, str>) -> Self {
+        Self {
+            note: Some(note),
+            since: None,
+        }
+    }
+
+    /// Construct deprecation metadata with a note/message and an optional `since` version.
+    ///
+    /// Eg. `#[deprecated(since = "1.0.0", note = "Use something else")]`
+    pub fn with_since_note(since: Option<Cow<'static, str>>, note: Cow<'static, str>) -> Self {
+        Self {
+            note: Some(note),
+            since,
+        }
+    }
+
+    /// Optional deprecation note/message.
+    pub fn note(&self) -> Option<&Cow<'static, str>> {
+        self.note.as_ref()
+    }
+
+    /// Mutable optional deprecation note/message.
+    pub fn note_mut(&mut self) -> Option<&mut Cow<'static, str>> {
+        self.note.as_mut()
+    }
+
+    /// Set the optional deprecation note/message.
+    pub fn set_note(&mut self, note: Option<Cow<'static, str>>) {
+        self.note = note;
+    }
+
+    /// Optional version string from `since = "..."`.
+    pub fn since(&self) -> Option<&Cow<'static, str>> {
+        self.since.as_ref()
+    }
+
+    /// Mutable optional version string from `since = "..."`.
+    pub fn since_mut(&mut self) -> Option<&mut Cow<'static, str>> {
+        self.since.as_mut()
+    }
+
+    /// Set the optional version string from `since = "..."`.
+    pub fn set_since(&mut self, since: Option<Cow<'static, str>>) {
+        self.since = since;
+    }
 }
 
 fn file_path_to_module_path(file_path: &str) -> Option<String> {

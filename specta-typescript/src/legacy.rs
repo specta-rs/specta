@@ -9,8 +9,8 @@ use std::{
 use specta::{
     TypeCollection,
     datatype::{
-        DataType, DeprecatedType, Enum, Variant, Field, Fields, GenericReference, Reference,
-        Struct, Tuple,
+        DataType, DeprecatedAttribute, Enum, Field, Fields, GenericReference, Reference, Struct,
+        Tuple, Variant,
     },
 };
 
@@ -100,7 +100,7 @@ pub(crate) type Output = Result<String>;
 
 #[allow(clippy::ptr_arg)]
 fn inner_comments(
-    deprecated: Option<&DeprecatedType>,
+    deprecated: Option<&DeprecatedAttribute>,
     docs: &str,
     other: String,
     start_with_newline: bool,
@@ -777,7 +777,7 @@ const NEVER: &str = "never";
 pub(crate) fn js_doc(
     s: &mut String,
     docs: &str,
-    deprecated: Option<&DeprecatedType>,
+    deprecated: Option<&DeprecatedAttribute>,
     single_line_comment: bool,
 ) {
     // Early return - no-op if nothing to document
@@ -831,21 +831,15 @@ pub(crate) fn escape_jsdoc_text(text: &str) -> Cow<'_, str> {
     }
 }
 
-pub(crate) fn deprecated_details(typ: &DeprecatedType) -> Option<String> {
-    match typ {
-        DeprecatedType::Deprecated => None,
-        DeprecatedType::DeprecatedWithSince { note, since } => {
-            let note = note.trim();
-            let since = since.as_ref().map(|v| v.trim()).filter(|v| !v.is_empty());
+pub(crate) fn deprecated_details(typ: &DeprecatedAttribute) -> Option<String> {
+    let note = typ.note().map(|v| v.trim()).filter(|v| !v.is_empty());
+    let since = typ.since().map(|v| v.trim()).filter(|v| !v.is_empty());
 
-            match (note.is_empty(), since) {
-                (false, Some(since)) => Some(format!("{note} since {since}")),
-                (false, None) => Some(note.to_string()),
-                (true, Some(since)) => Some(format!("since {since}")),
-                (true, None) => None,
-            }
-        }
-        _ => None,
+    match (note, since) {
+        (Some(note), Some(since)) => Some(format!("{note} since {since}")),
+        (Some(note), None) => Some(note.to_string()),
+        (None, Some(since)) => Some(format!("since {since}")),
+        (None, None) => None,
     }
 }
 
