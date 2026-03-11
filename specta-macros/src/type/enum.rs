@@ -175,7 +175,7 @@ pub fn parse_enum(
             let skip = variant_skip;
             let doc = attrs.common.doc;
             Ok(quote!((#variant_name_str.into(), {
-                let mut v = datatype::EnumVariant::unit();
+                let mut v = datatype::Variant::unit();
                 v.set_skip(#skip);
                 v.set_deprecated(#deprecated);
                 v.set_docs(#doc.into());

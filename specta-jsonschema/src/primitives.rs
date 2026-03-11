@@ -236,7 +236,7 @@ fn variant_to_schema(
     js: &JsonSchema,
     types: &TypeCollection,
     name: &str,
-    variant: &EnumVariant,
+    variant: &Variant,
 ) -> Result<Value, Error> {
     // Get enum representation from attributes
     // For now, default to external tagging

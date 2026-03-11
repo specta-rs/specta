@@ -13,7 +13,7 @@ use std::{
 use specta::{
     TypeCollection,
     datatype::{
-        DataType, Enum, EnumVariant, Field, Fields, NamedDataType, NamedDataTypeBuilder, Reference,
+        DataType, Enum, Variant, Field, Fields, NamedDataType, NamedDataTypeBuilder, Reference,
         Struct, Tuple,
     },
     internal,
@@ -187,14 +187,14 @@ pub fn apply_phases(types: TypeCollection) -> Result<TypeCollection> {
             .map(|(generic, _)| (generic.clone(), generic.clone().into()))
             .collect::<Vec<_>>();
 
-        let mut serialize_variant = EnumVariant::unnamed().build();
+        let mut serialize_variant = Variant::unnamed().build();
         if let Fields::Unnamed(fields) = serialize_variant.fields_mut() {
             fields
                 .fields_mut()
                 .push(Field::new(serialize.reference(generic_args.clone()).into()));
         }
 
-        let mut deserialize_variant = EnumVariant::unnamed().build();
+        let mut deserialize_variant = Variant::unnamed().build();
         if let Fields::Unnamed(fields) = deserialize_variant.fields_mut() {
             fields
                 .fields_mut()
@@ -590,8 +590,8 @@ fn rewrite_identifier_enum_for_phase(
     Ok(true)
 }
 
-fn identifier_union_variant(ty: DataType) -> EnumVariant {
-    let mut variant = EnumVariant::unnamed().build();
+fn identifier_union_variant(ty: DataType) -> Variant {
+    let mut variant = Variant::unnamed().build();
     if let Fields::Unnamed(fields) = variant.fields_mut() {
         fields.fields_mut().push(Field::new(ty));
     }
@@ -645,7 +645,7 @@ fn enum_repr_from_attrs(attrs: &specta::datatype::Attributes) -> Result<EnumRepr
 
 fn serialized_variant_name(
     variant_name: &str,
-    variant: &EnumVariant,
+    variant: &Variant,
     container_attrs: &Option<SerdeContainerAttrs>,
     mode: PhaseRewrite,
 ) -> Result<String> {
@@ -845,8 +845,8 @@ fn deserialize_conversion_name(attrs: Option<&SerdeContainerAttrs>) -> Option<St
 
 fn transform_external_variant(
     serialized_name: String,
-    variant: &EnumVariant,
-) -> Result<EnumVariant> {
+    variant: &Variant,
+) -> Result<Variant> {
     Ok(match variant.fields() {
         Fields::Unit => clone_variant_with_unnamed_fields(
             variant,
@@ -868,8 +868,8 @@ fn transform_adjacent_variant(
     serialized_name: String,
     tag: &str,
     content: &str,
-    variant: &EnumVariant,
-) -> Result<EnumVariant> {
+    variant: &Variant,
+) -> Result<Variant> {
     let mut fields = vec![(
         Cow::Owned(tag.to_string()),
         Field::new(string_literal_datatype(serialized_name.clone())),
@@ -887,9 +887,9 @@ fn transform_adjacent_variant(
 fn transform_internal_variant(
     serialized_name: String,
     tag: &str,
-    variant: &EnumVariant,
+    variant: &Variant,
     original_types: &TypeCollection,
-) -> Result<EnumVariant> {
+) -> Result<Variant> {
     let mut fields = vec![(
         Cow::Owned(tag.to_string()),
         Field::new(string_literal_datatype(serialized_name.clone())),
@@ -937,11 +937,11 @@ fn string_literal_datatype(value: String) -> DataType {
     let mut value_enum = Enum::new();
     value_enum
         .variants_mut()
-        .push((Cow::Owned(value), EnumVariant::unit()));
+        .push((Cow::Owned(value), Variant::unit()));
     DataType::Enum(value_enum)
 }
 
-fn variant_payload_datatype(variant: &EnumVariant) -> Option<DataType> {
+fn variant_payload_datatype(variant: &Variant) -> Option<DataType> {
     match variant.fields() {
         Fields::Unit => Some(DataType::Tuple(Tuple::new(vec![]))),
         Fields::Named(named) => {
@@ -967,15 +967,15 @@ fn variant_payload_datatype(variant: &EnumVariant) -> Option<DataType> {
 }
 
 fn clone_variant_with_named_fields(
-    original: &EnumVariant,
+    original: &Variant,
     fields: Vec<(Cow<'static, str>, Field)>,
-) -> EnumVariant {
+) -> Variant {
     let mut transformed = original.clone();
     transformed.set_fields(internal::construct::fields_named(fields));
     transformed
 }
 
-fn clone_variant_with_unnamed_fields(original: &EnumVariant, fields: Vec<Field>) -> EnumVariant {
+fn clone_variant_with_unnamed_fields(original: &Variant, fields: Vec<Field>) -> Variant {
     let mut transformed = original.clone();
     transformed.set_fields(internal::construct::fields_unnamed(fields));
     transformed
@@ -1021,7 +1021,7 @@ fn is_internal_tag_compatible(
 }
 
 fn is_internal_variant_compatible(
-    variant: &EnumVariant,
+    variant: &Variant,
     original_types: &TypeCollection,
     seen: &mut HashSet<TypeKey>,
 ) -> bool {
@@ -1110,7 +1110,7 @@ fn field_has_local_difference(field: &Field) -> bool {
         .unwrap_or_default()
 }
 
-fn variant_has_local_difference(variant: &EnumVariant) -> bool {
+fn variant_has_local_difference(variant: &Variant) -> bool {
     variant
         .attributes()
         .get::<SerdeVariantAttrs>()

@@ -5,7 +5,7 @@ use super::macros::{impl_ndt, impl_ndt_as};
 use crate::{
     Type, TypeCollection,
     datatype::{
-        self, DataType, Enum, EnumVariant, Field, Fields, NamedFields, Primitive, Reference, Struct,
+        self, DataType, Enum, Variant, Field, Fields, NamedFields, Primitive, Reference, Struct,
     },
     r#type::{generics, impls::*},
 };
@@ -38,34 +38,34 @@ const _: () = {
             build: |types, ndt| {
                 ndt.inner = DataType::Enum(Enum {
                     variants: vec![
-                        ("Null".into(), EnumVariant::unit()),
+                        ("Null".into(), Variant::unit()),
                         (
                             "Bool".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(bool::definition(types)))
                                 .build(),
                         ),
                         (
                             "Number".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(Number::definition(types)))
                                 .build(),
                         ),
                         (
                             "String".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(String::definition(types)))
                                 .build(),
                         ),
                         (
                             "Array".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(Vec::<Value>::definition(types)))
                                 .build(),
                         ),
                         (
                             "Object".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(Map::<String, Value>::definition(types)))
                                 .build(),
                         ),
@@ -82,19 +82,19 @@ const _: () = {
                     variants: vec![
                         (
                             "f64".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(DataType::Primitive(Primitive::f64)))
                                 .build(),
                         ),
                         (
                             "i64".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(DataType::Primitive(Primitive::i64)))
                                 .build(),
                         ),
                         (
                             "u64".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(DataType::Primitive(Primitive::u64)))
                                 .build(),
                         ),
@@ -121,34 +121,34 @@ const _: () = {
             build: |types, ndt| {
                 ndt.inner = DataType::Enum(Enum {
                     variants: vec![
-                        ("Null".into(), EnumVariant::unit()),
+                        ("Null".into(), Variant::unit()),
                         (
                             "Bool".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(bool::definition(types)))
                                 .build(),
                         ),
                         (
                             "Number".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(Number::definition(types)))
                                 .build(),
                         ),
                         (
                             "String".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(String::definition(types)))
                                 .build(),
                         ),
                         (
                             "Sequence".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(Vec::<Value>::definition(types)))
                                 .build(),
                         ),
                         (
                             "Mapping".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(std::collections::BTreeMap::<
                                     serde_yaml::Value,
                                     serde_yaml::Value,
@@ -157,7 +157,7 @@ const _: () = {
                         ),
                         (
                             "Tagged".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(Box::<TaggedValue>::definition(types)))
                                 .build(),
                         ),
@@ -174,19 +174,19 @@ const _: () = {
                     variants: vec![
                         (
                             "f64".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(DataType::Primitive(Primitive::f64)))
                                 .build(),
                         ),
                         (
                             "i64".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(DataType::Primitive(Primitive::i64)))
                                 .build(),
                         ),
                         (
                             "u64".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(DataType::Primitive(Primitive::u64)))
                                 .build(),
                         ),
@@ -236,43 +236,43 @@ const _: () = {
                     variants: vec![
                         (
                             "String".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(String::definition(types)))
                                 .build(),
                         ),
                         (
                             "Integer".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(i64::definition(types)))
                                 .build(),
                         ),
                         (
                             "Float".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(f64::definition(types)))
                                 .build(),
                         ),
                         (
                             "Boolean".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(bool::definition(types)))
                                 .build(),
                         ),
                         (
                             "Datetime".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(value::Datetime::definition(types)))
                                 .build(),
                         ),
                         (
                             "Array".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(Vec::<Value>::definition(types)))
                                 .build(),
                         ),
                         (
                             "Table".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(
                                     std::collections::BTreeMap::<String, Value>::definition(types),
                                 ))
@@ -546,7 +546,7 @@ impl_ndt!(
                 variants: vec![
                     (
                         "Left".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(
                                 datatype::GenericReference::new::<generics::L>().into(),
                             ))
@@ -554,7 +554,7 @@ impl_ndt!(
                     ),
                     (
                         "Right".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(
                                 datatype::GenericReference::new::<generics::R>().into(),
                             ))
@@ -596,8 +596,8 @@ const _: () = {
             build: |_types, ndt| {
                 ndt.inner = DataType::Enum(Enum {
                     variants: vec![
-                        ("Pressed".into(), EnumVariant::unit()),
-                        ("Released".into(), EnumVariant::unit()),
+                        ("Pressed".into(), Variant::unit()),
+                        ("Released".into(), Variant::unit()),
                     ],
                     attributes: datatype::Attributes::default(),
                 });
@@ -663,14 +663,14 @@ const _: () = {
             build: |types, ndt| {
                 ndt.inner = DataType::Enum(Enum {
                     variants: vec![
-                        ("Left".into(), EnumVariant::unit()),
-                        ("Right".into(), EnumVariant::unit()),
-                        ("Middle".into(), EnumVariant::unit()),
-                        ("Back".into(), EnumVariant::unit()),
-                        ("Forward".into(), EnumVariant::unit()),
+                        ("Left".into(), Variant::unit()),
+                        ("Right".into(), Variant::unit()),
+                        ("Middle".into(), Variant::unit()),
+                        ("Back".into(), Variant::unit()),
+                        ("Forward".into(), Variant::unit()),
                         (
                             "Other".into(),
-                            EnumVariant::unnamed()
+                            Variant::unnamed()
                                 .field(Field::new(u16::definition(types)))
                                 .build(),
                         ),
@@ -708,8 +708,8 @@ const _: () = {
             build: |_types, ndt| {
                 ndt.inner = DataType::Enum(Enum {
                     variants: vec![
-                        ("Line".into(), EnumVariant::unit()),
-                        ("Pixel".into(), EnumVariant::unit()),
+                        ("Line".into(), Variant::unit()),
+                        ("Pixel".into(), Variant::unit()),
                     ],
                     attributes: datatype::Attributes::default(),
                 });
@@ -745,25 +745,25 @@ impl_ndt!(
                 variants: vec![
                     (
                         "Point".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(geojson::PointType::definition(types)))
                             .build(),
                     ),
                     (
                         "MultiPoint".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(Vec::<geojson::PointType>::definition(types)))
                             .build(),
                     ),
                     (
                         "LineString".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(geojson::LineStringType::definition(types)))
                             .build(),
                     ),
                     (
                         "MultiLineString".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(Vec::<geojson::LineStringType>::definition(
                                 types,
                             )))
@@ -771,19 +771,19 @@ impl_ndt!(
                     ),
                     (
                         "Polygon".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(geojson::PolygonType::definition(types)))
                             .build(),
                     ),
                     (
                         "MultiPolygon".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(Vec::<geojson::PolygonType>::definition(types)))
                             .build(),
                     ),
                     (
                         "GeometryCollection".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(Vec::<geojson::Geometry>::definition(types)))
                             .build(),
                     ),
@@ -880,13 +880,13 @@ impl_ndt!(
                 variants: vec![
                     (
                         "String".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(str::definition(types)))
                             .build(),
                     ),
                     (
                         "Number".into(),
-                        EnumVariant::unnamed()
+                        Variant::unnamed()
                             .field(Field::new(serde_json::Number::definition(types)))
                             .build(),
                     ),
@@ -999,10 +999,10 @@ impl_ndt!(
         build: |_types, ndt| {
             ndt.inner = DataType::Enum(Enum {
                 variants: vec![
-                    ("Unknown".into(), EnumVariant::unit()),
-                    ("Point".into(), EnumVariant::unit()),
-                    ("Linestring".into(), EnumVariant::unit()),
-                    ("Polygon".into(), EnumVariant::unit()),
+                    ("Unknown".into(), Variant::unit()),
+                    ("Point".into(), Variant::unit()),
+                    ("Linestring".into(), Variant::unit()),
+                    ("Polygon".into(), Variant::unit()),
                 ],
                 attributes: datatype::Attributes::default(),
             });
