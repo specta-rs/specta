@@ -2,4 +2,4 @@
 source: tests/tests/typescript.rs
 expression: output
 ---
-ERROR: Unresolved generic reference 'GenericReference { id: TypeId(0xc21aa7a8f1e92856284279305e1ba96a) }' while validating 'Vec.<list_item>.<generic_ref>'
+ERROR: Unresolved generic reference 'GenericReference { id: TypeId(0xf2e47dd919459f1933193ce0fdd9d7e7) }' while validating 'Vec.<list_item>.<generic_ref>'

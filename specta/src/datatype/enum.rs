@@ -96,14 +96,10 @@ impl EnumVariant {
                 deprecated: None,
                 fields: Fields::Named(NamedFields {
                     fields: Default::default(),
-                    attributes: Default::default(),
                 }),
                 attributes: Attributes::default(),
             },
-            variant: NamedFields {
-                fields: vec![],
-                attributes: Attributes::default(),
-            },
+            variant: NamedFields { fields: vec![] },
         }
     }
 
@@ -116,13 +112,11 @@ impl EnumVariant {
                 deprecated: None,
                 fields: Fields::Unnamed(UnnamedFields {
                     fields: Default::default(),
-                    attributes: Default::default(),
                 }),
                 attributes: Attributes::default(),
             },
             variant: UnnamedFields {
                 fields: Default::default(),
-                attributes: Default::default(),
             },
         }
     }

@@ -178,7 +178,6 @@ impl Field {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UnnamedFields {
     pub(crate) fields: Vec<Field>,
-    pub(crate) attributes: Attributes,
 }
 
 impl UnnamedFields {
@@ -191,28 +190,12 @@ impl UnnamedFields {
     pub fn fields_mut(&mut self) -> &mut Vec<Field> {
         &mut self.fields
     }
-
-    /// Get an immutable reference to the runtime attributes for this unnamed fields.
-    pub fn attributes(&self) -> &Attributes {
-        &self.attributes
-    }
-
-    /// Mutable reference to the runtime attributes for this unnamed fields.
-    pub fn attributes_mut(&mut self) -> &mut Attributes {
-        &mut self.attributes
-    }
-
-    /// Set the runtime attributes for this unnamed fields.
-    pub fn set_attributes(&mut self, attrs: Attributes) {
-        self.attributes = attrs;
-    }
 }
 
 /// The fields of an named enum variant or a struct.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NamedFields {
     pub(crate) fields: Vec<(Cow<'static, str>, Field)>,
-    pub(crate) attributes: Attributes,
 }
 
 impl NamedFields {
@@ -224,20 +207,5 @@ impl NamedFields {
     /// Mutable reference to the fields.
     pub fn fields_mut(&mut self) -> &mut Vec<(Cow<'static, str>, Field)> {
         &mut self.fields
-    }
-
-    /// Get an immutable reference to the runtime attributes for this named fields.
-    pub fn attributes(&self) -> &Attributes {
-        &self.attributes
-    }
-
-    /// Mutable reference to the runtime attributes for this named fields.
-    pub fn attributes_mut(&mut self) -> &mut Attributes {
-        &mut self.attributes
-    }
-
-    /// Set the runtime attributes for this named fields.
-    pub fn set_attributes(&mut self, attrs: Attributes) {
-        self.attributes = attrs;
     }
 }

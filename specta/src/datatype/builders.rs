@@ -51,17 +51,6 @@ impl StructBuilder<UnnamedFields> {
         self.fields.fields.push(field);
     }
 
-    /// Set runtime attributes for the unnamed fields collection.
-    pub fn attributes(mut self, attributes: Attributes) -> Self {
-        self.fields.attributes = attributes;
-        self
-    }
-
-    /// Set runtime attributes for the unnamed fields collection in-place.
-    pub fn attributes_mut(&mut self, attributes: Attributes) {
-        self.fields.attributes = attributes;
-    }
-
     /// Finalize this builder into a [`DataType`].
     pub fn build(self) -> DataType {
         DataType::Struct(Struct {
@@ -112,19 +101,13 @@ impl<T> VariantBuilder<T> {
 impl VariantBuilder<NamedFields> {
     /// Add a named field to the variant.
     pub fn field(mut self, name: impl Into<Cow<'static, str>>, field: Field) -> Self {
-        match &mut self.v.fields {
-            Fields::Named(f) => f.fields.push((name.into(), field)),
-            _ => unreachable!(),
-        }
+        self.variant.fields.push((name.into(), field));
         self
     }
 
     /// Add a named field to the variant and return the updated builder.
     pub fn field_mut(mut self, name: impl Into<Cow<'static, str>>, field: Field) -> Self {
-        match &mut self.v.fields {
-            Fields::Named(f) => f.fields.push((name.into(), field)),
-            _ => unreachable!(),
-        }
+        self.variant.fields.push((name.into(), field));
         self
     }
 
@@ -144,19 +127,13 @@ impl From<VariantBuilder<NamedFields>> for EnumVariant {
 impl VariantBuilder<UnnamedFields> {
     /// Add an unnamed field to the variant.
     pub fn field(mut self, field: Field) -> Self {
-        match &mut self.v.fields {
-            Fields::Unnamed(f) => f.fields.push(field),
-            _ => unreachable!(),
-        }
+        self.variant.fields.push(field);
         self
     }
 
     /// Add an unnamed field to the variant and return the updated builder.
     pub fn field_mut(mut self, field: Field) -> Self {
-        match &mut self.v.fields {
-            Fields::Unnamed(f) => f.fields.push(field),
-            _ => unreachable!(),
-        }
+        self.variant.fields.push(field);
         self
     }
 

@@ -971,19 +971,13 @@ fn clone_variant_with_named_fields(
     fields: Vec<(Cow<'static, str>, Field)>,
 ) -> EnumVariant {
     let mut transformed = original.clone();
-    transformed.set_fields(internal::construct::fields_named(
-        fields,
-        specta::datatype::Attributes::default(),
-    ));
+    transformed.set_fields(internal::construct::fields_named(fields));
     transformed
 }
 
 fn clone_variant_with_unnamed_fields(original: &EnumVariant, fields: Vec<Field>) -> EnumVariant {
     let mut transformed = original.clone();
-    transformed.set_fields(internal::construct::fields_unnamed(
-        fields,
-        specta::datatype::Attributes::default(),
-    ));
+    transformed.set_fields(internal::construct::fields_unnamed(fields));
     transformed
 }
 

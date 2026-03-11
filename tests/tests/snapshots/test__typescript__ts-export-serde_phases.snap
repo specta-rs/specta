@@ -2,4 +2,4 @@
 source: tests/tests/typescript.rs
 expression: "match types\n{\n    Ok(types) =>\n    Typescript::default().bigint(BigIntExportBehavior::Number).export(&types).unwrap(),\n    Err(err) => format!(\"ERROR: {err}\"),\n}"
 ---
-ERROR: Unresolved generic reference 'GenericReference { id: TypeId(0x77038a860d3226a3fb98d149413e9643) }' while validating 'Vec.<list_item>.<generic_ref>'
+ERROR: Unresolved generic reference 'GenericReference { id: TypeId(0x622d0b2d9a0f6c961b062d8c76911a16) }' while validating 'Vec.<list_item>.<generic_ref>'
