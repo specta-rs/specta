@@ -78,6 +78,23 @@ enum VariantCodecWithOverride {
     A(String),
 }
 
+#[derive(Type, Deserialize)]
+#[specta(collect = false)]
+#[serde(variant_identifier)]
+enum VariantIdentifierValid {
+    Alpha,
+    Beta,
+}
+
+#[derive(Type, Deserialize)]
+#[specta(collect = false)]
+#[serde(field_identifier)]
+enum FieldIdentifierValid {
+    Alpha,
+    Beta,
+    Other(String),
+}
+
 mod codec {
     use serde::{Deserialize, Deserializer, Serializer};
 
@@ -211,4 +228,19 @@ fn skip_serializing_if_requires_phases() {
 
     specta_serde::apply_phases(TypeCollection::default().register::<SkipSerializingIfOnly>())
         .expect("apply_phases should accept skip_serializing_if");
+}
+
+#[test]
+fn identifier_enums_require_phases() {
+    let err = specta_serde::apply(TypeCollection::default().register::<VariantIdentifierValid>())
+        .expect_err("identifier enums should require apply_phases");
+    assert!(
+        err.to_string()
+            .contains("identifier enums require `apply_phases`")
+    );
+
+    specta_serde::apply_phases(TypeCollection::default().register::<VariantIdentifierValid>())
+        .expect("valid variant_identifier enum should pass in apply_phases");
+    specta_serde::apply_phases(TypeCollection::default().register::<FieldIdentifierValid>())
+        .expect("valid field_identifier enum should pass in apply_phases");
 }

@@ -217,7 +217,7 @@ pub fn apply_phases(types: TypeCollection) -> Result<TypeCollection> {
     Ok(out)
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PhaseRewrite {
     Unified,
     Serialize,
@@ -280,6 +280,10 @@ fn rewrite_datatype_for_phase(
                     generated,
                     split_types,
                 )?;
+            }
+
+            if rewrite_identifier_enum_for_phase(e, mode, original_types, generated, split_types)? {
+                return Ok(());
             }
 
             rewrite_enum_repr_for_phase(e, mode, original_types)?;
@@ -505,6 +509,93 @@ fn rewrite_enum_repr_for_phase(
     *e.variants_mut() = transformed;
 
     Ok(())
+}
+
+fn rewrite_identifier_enum_for_phase(
+    e: &mut Enum,
+    mode: PhaseRewrite,
+    original_types: &TypeCollection,
+    generated: &HashMap<TypeKey, GeneratedTypes>,
+    split_types: &HashSet<TypeKey>,
+) -> Result<bool> {
+    let Some(attrs) = e.attributes().get::<SerdeContainerAttrs>() else {
+        return Ok(false);
+    };
+
+    if !attrs.variant_identifier && !attrs.field_identifier {
+        return Ok(false);
+    }
+
+    if mode != PhaseRewrite::Deserialize {
+        return Ok(false);
+    }
+
+    let container_attrs = e.attributes().get::<SerdeContainerAttrs>().cloned();
+    let mut variants = Vec::new();
+    let mut seen = HashSet::new();
+
+    for (variant_name, variant) in e.variants().iter() {
+        let serialized_name = serialized_variant_name(
+            variant_name,
+            variant,
+            &container_attrs,
+            PhaseRewrite::Deserialize,
+        )?;
+
+        if seen.insert(serialized_name.clone()) {
+            variants.push((
+                Cow::Owned(serialized_name.clone()),
+                identifier_union_variant(string_literal_datatype(serialized_name)),
+            ));
+        }
+
+        if let Some(variant_attrs) = variant.attributes().get::<SerdeVariantAttrs>() {
+            for alias in &variant_attrs.aliases {
+                if seen.insert(alias.clone()) {
+                    variants.push((
+                        Cow::Owned(alias.clone()),
+                        identifier_union_variant(string_literal_datatype(alias.clone())),
+                    ));
+                }
+            }
+        }
+    }
+
+    variants.push((
+        Cow::Borrowed("__specta_identifier_index"),
+        identifier_union_variant(DataType::Primitive(specta::datatype::Primitive::usize)),
+    ));
+
+    if attrs.field_identifier
+        && let Some((_, fallback)) = e.variants().last()
+        && let Fields::Unnamed(unnamed) = fallback.fields()
+        && let Some(field) = unnamed.fields().first()
+        && let Some(ty) = field.ty()
+    {
+        let mut fallback_ty = ty.clone();
+        rewrite_datatype_for_phase(
+            &mut fallback_ty,
+            mode,
+            original_types,
+            generated,
+            split_types,
+        )?;
+        variants.push((
+            Cow::Borrowed("__specta_identifier_other"),
+            identifier_union_variant(fallback_ty),
+        ));
+    }
+
+    *e.variants_mut() = variants;
+    Ok(true)
+}
+
+fn identifier_union_variant(ty: DataType) -> EnumVariant {
+    let mut variant = EnumVariant::unnamed().build();
+    if let Fields::Unnamed(fields) = variant.fields_mut() {
+        fields.fields_mut().push(Field::new(ty));
+    }
+    variant
 }
 
 fn filter_enum_variants_for_phase(e: &mut Enum, mode: PhaseRewrite) {
@@ -993,6 +1084,8 @@ fn container_has_local_difference(attrs: &specta::datatype::Attributes) -> bool 
         || conversions.rename_serialize != conversions.rename_deserialize
         || conversions.rename_all_serialize != conversions.rename_all_deserialize
         || conversions.rename_all_fields_serialize != conversions.rename_all_fields_deserialize
+        || conversions.variant_identifier
+        || conversions.field_identifier
 }
 
 fn fields_have_local_difference(fields: &Fields) -> bool {
