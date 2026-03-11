@@ -8,6 +8,7 @@
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet, VecDeque},
+    marker::PhantomData,
 };
 
 use specta::{
@@ -22,6 +23,7 @@ use specta::{
 mod error;
 mod inflection;
 mod parser;
+mod phased;
 mod repr;
 mod validate;
 
@@ -31,6 +33,7 @@ pub use parser::{
     ConversionType, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs, merge_container_attrs,
     merge_field_attrs, merge_variant_attrs,
 };
+pub use phased::{Phased, Phased2};
 use repr::EnumRepr;
 
 pub fn apply(types: TypeCollection) -> Result<TypeCollection> {
