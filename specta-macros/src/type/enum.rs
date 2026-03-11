@@ -106,7 +106,6 @@ pub fn parse_enum(
                         datatype::Attributes::default(),
                         Some(<#variant_ty as #crate_ref::Type>::definition(types)),
                     )],
-                    datatype::Attributes::default(),
                 ))
             } else {
                 match &variant.fields {
@@ -135,10 +134,7 @@ pub fn parse_enum(
                             })
                             .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                        quote!(internal::construct::fields_unnamed(
-                            vec![#(#fields),*],
-                            datatype::Attributes::default(),
-                        ))
+                        quote!(internal::construct::fields_unnamed(vec![#(#fields),*]))
                     }
                     Fields::Named(fields) => {
                         let fields = fields
@@ -170,10 +166,7 @@ pub fn parse_enum(
                             })
                             .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                        quote!(internal::construct::fields_named(
-                            vec![#(#fields),*],
-                            datatype::Attributes::default()
-                        ))
+                        quote!(internal::construct::fields_named(vec![#(#fields),*]))
                     }
                 }
             };

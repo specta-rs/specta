@@ -35,15 +35,12 @@ pub mod construct {
         }
     }
 
-    pub const fn fields_unnamed(fields: Vec<Field>, attributes: Attributes) -> Fields {
-        Fields::Unnamed(UnnamedFields { fields, attributes })
+    pub const fn fields_unnamed(fields: Vec<Field>) -> Fields {
+        Fields::Unnamed(UnnamedFields { fields })
     }
 
-    pub const fn fields_named(
-        fields: Vec<(Cow<'static, str>, Field)>,
-        attributes: Attributes,
-    ) -> Fields {
-        Fields::Named(NamedFields { fields, attributes })
+    pub const fn fields_named(fields: Vec<(Cow<'static, str>, Field)>) -> Fields {
+        Fields::Named(NamedFields { fields })
     }
 }
 

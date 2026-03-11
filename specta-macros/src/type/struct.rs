@@ -113,7 +113,6 @@ pub fn parse_struct(
                 let mut e = datatype::Struct::unit();
                 *e.fields_mut() = internal::construct::fields_unnamed(
                     vec![#field],
-                    datatype::Attributes::default(),
                 );
             ),
         ));
@@ -148,10 +147,7 @@ pub fn parse_struct(
                 })
                 .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-            quote!(internal::construct::fields_named(
-                vec![#(#fields),*],
-                datatype::Attributes::default()
-            ))
+            quote!(internal::construct::fields_named(vec![#(#fields),*]))
         }
         Fields::Unnamed(_) => {
             let fields = data
@@ -170,10 +166,7 @@ pub fn parse_struct(
                 })
                 .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-            quote!(internal::construct::fields_unnamed(
-                vec![#(#fields),*],
-                datatype::Attributes::default()
-            ))
+            quote!(internal::construct::fields_unnamed(vec![#(#fields),*]))
         }
         Fields::Unit => quote!(datatype::Fields::Unit),
     };

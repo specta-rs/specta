@@ -223,7 +223,6 @@ const _: () = {
                                 attributes: datatype::Attributes::default(),
                             },
                         )],
-                        attributes: datatype::Attributes::default(),
                     }),
                     attributes: datatype::Attributes::default(),
                 })
@@ -438,7 +437,6 @@ const _: () = {
                                 },
                             ),
                         ],
-                        attributes: datatype::Attributes::default(),
                     }),
                     attributes: datatype::Attributes::default(),
                 });
@@ -577,7 +575,6 @@ impl_ndt!(
             let mut s = Struct::unit();
             s.set_fields(crate::internal::construct::fields_unnamed(
                 vec![Field::new(u64::definition(types))],
-                datatype::Attributes::default(),
             ));
 
             ndt.inner = DataType::Struct(s);
@@ -630,7 +627,6 @@ const _: () = {
                             Field::new(bevy_ecs::entity::Entity::definition(types)),
                         ),
                     ],
-                    datatype::Attributes::default(),
                 ));
 
                 ndt.inner = DataType::Struct(s);
@@ -656,7 +652,6 @@ const _: () = {
                             Field::new(bevy_ecs::entity::Entity::definition(types)),
                         ),
                     ],
-                    datatype::Attributes::default(),
                 ));
 
                 ndt.inner = DataType::Struct(s);
@@ -702,7 +697,6 @@ const _: () = {
                             Field::new(bevy_ecs::entity::Entity::definition(types)),
                         ),
                     ],
-                    datatype::Attributes::default(),
                 ));
 
                 ndt.inner = DataType::Struct(s);
@@ -728,7 +722,6 @@ const _: () = {
                 let mut s = Struct::unit();
                 s.set_fields(crate::internal::construct::fields_named(
                     vec![("delta".into(), Field::new(glam::Vec2::definition(types)))],
-                    datatype::Attributes::default(),
                 ));
 
                 ndt.inner = DataType::Struct(s);
@@ -816,7 +809,6 @@ impl_ndt!(
                         Field::new(Option::<geojson::JsonObject>::definition(types)),
                     ),
                 ],
-                datatype::Attributes::default(),
             ));
 
             ndt.inner = DataType::Struct(s);
@@ -850,7 +842,6 @@ impl_ndt!(
                         Field::new(Option::<geojson::JsonObject>::definition(types)),
                     ),
                 ],
-                datatype::Attributes::default(),
             ));
 
             ndt.inner = DataType::Struct(s);
@@ -876,7 +867,6 @@ impl_ndt!(
                         Field::new(Option::<geojson::JsonObject>::definition(types)),
                     ),
                 ],
-                datatype::Attributes::default(),
             ));
 
             ndt.inner = DataType::Struct(s);
@@ -918,7 +908,6 @@ impl_ndt!(
                     "layers".into(),
                     Field::new(Vec::<geozero::mvt::tile::Layer>::definition(types)),
                 )],
-                datatype::Attributes::default(),
             ));
 
             ndt.inner = DataType::Struct(s);
@@ -957,7 +946,6 @@ impl_ndt!(
                         Field::new(Option::<bool>::definition(types)),
                     ),
                 ],
-                datatype::Attributes::default(),
             ));
 
             ndt.inner = DataType::Struct(s);
@@ -975,7 +963,6 @@ impl_ndt!(
                     ("type".into(), Field::new(Option::<i32>::definition(types))),
                     ("geometry".into(), Field::new(Vec::<u32>::definition(types))),
                 ],
-                datatype::Attributes::default(),
             ));
 
             ndt.inner = DataType::Struct(s);
@@ -1001,7 +988,6 @@ impl_ndt!(
                     ),
                     ("extent".into(), Field::new(Option::<u32>::definition(types))),
                 ],
-                datatype::Attributes::default(),
             ));
 
             ndt.inner = DataType::Struct(s);

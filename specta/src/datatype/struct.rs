@@ -27,7 +27,6 @@ impl Struct {
         StructBuilder {
             fields: NamedFields {
                 fields: Default::default(),
-                attributes: Default::default(),
             },
         }
     }
@@ -37,7 +36,6 @@ impl Struct {
         StructBuilder {
             fields: UnnamedFields {
                 fields: Default::default(),
-                attributes: Default::default(),
             },
         }
     }

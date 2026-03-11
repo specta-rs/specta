@@ -24,15 +24,17 @@ enum FieldIdentifier {
 fn identifier_apply_requires_phases() {
     let err = specta_serde::apply(TypeCollection::default().register::<VariantIdentifier>())
         .expect_err("variant_identifier should require apply_phases");
-    assert!(err
-        .to_string()
-        .contains("identifier enums require `apply_phases`"));
+    assert!(
+        err.to_string()
+            .contains("identifier enums require `apply_phases`")
+    );
 
     let err = specta_serde::apply(TypeCollection::default().register::<FieldIdentifier>())
         .expect_err("field_identifier should require apply_phases");
-    assert!(err
-        .to_string()
-        .contains("identifier enums require `apply_phases`"));
+    assert!(
+        err.to_string()
+            .contains("identifier enums require `apply_phases`")
+    );
 }
 
 #[test]

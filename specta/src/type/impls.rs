@@ -150,7 +150,6 @@ const _: () = {
                             Field::new(<u32 as crate::Type>::definition(types)),
                         ),
                     ],
-                    datatype::Attributes::default(),
                 ));
 
                 ndt.inner = DataType::Struct(s);
@@ -172,7 +171,6 @@ const _: () = {
                             Field::new(<u32 as crate::Type>::definition(types)),
                         ),
                     ],
-                    datatype::Attributes::default(),
                 ));
 
                 ndt.inner = DataType::Struct(s);
@@ -216,13 +214,10 @@ const _: () = {
         fn definition(types: &mut TypeCollection) -> DataType {
             let ty = T::definition(types);
             let mut s = crate::datatype::Struct::unit();
-            s.set_fields(internal::construct::fields_named(
-                vec![
-                    ("start".into(), Field::new(ty.clone())),
-                    ("end".into(), Field::new(ty)),
-                ],
-                datatype::Attributes::default(),
-            ));
+            s.set_fields(internal::construct::fields_named(vec![
+                ("start".into(), Field::new(ty.clone())),
+                ("end".into(), Field::new(ty)),
+            ]));
 
             DataType::Struct(s)
         }
@@ -274,14 +269,12 @@ impl_ndt!(
                 vec![Field::new(
                     datatype::GenericReference::new::<generics::T>().into(),
                 )],
-                datatype::Attributes::default(),
             ));
             let mut err_variant = EnumVariant::unit();
             err_variant.set_fields(internal::construct::fields_unnamed(
                 vec![Field::new(
                     datatype::GenericReference::new::<generics::E>().into(),
                 )],
-                datatype::Attributes::default(),
             ));
             ndt.inner = DataType::Enum(Enum {
                 variants: vec![("Ok".into(), ok_variant), ("Err".into(), err_variant)],
