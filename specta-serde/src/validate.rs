@@ -89,6 +89,16 @@ fn inner(
                 &path,
                 mode,
             )?;
+            if strct
+                .attributes()
+                .get::<SerdeContainerAttrs>()
+                .is_some_and(|attrs| attrs.variant_identifier || attrs.field_identifier)
+            {
+                return Err(Error::invalid_phased_type_usage(
+                    path,
+                    "`#[serde(variant_identifier)]` and `#[serde(field_identifier)]` are only valid on enums",
+                ));
+            }
 
             match strct.fields() {
                 Fields::Unit => {}
@@ -134,6 +144,7 @@ fn inner(
                 &path,
                 mode,
             )?;
+            validate_identifier_enum(enm, &path, mode)?;
             validate_enum(enm, types, path.clone())?;
 
             for (variant_name, variant) in enm.variants() {
@@ -251,6 +262,66 @@ fn inner(
             Reference::Opaque(_) => {}
         },
         DataType::Primitive(_) => {}
+    }
+
+    Ok(())
+}
+
+fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<()> {
+    let Some(attrs) = enm.attributes().get::<SerdeContainerAttrs>() else {
+        return Ok(());
+    };
+
+    if !attrs.variant_identifier && !attrs.field_identifier {
+        return Ok(());
+    }
+
+    if attrs.variant_identifier && attrs.field_identifier {
+        return Err(Error::invalid_phased_type_usage(
+            path,
+            "`variant_identifier` and `field_identifier` cannot be used together",
+        ));
+    }
+
+    if mode == ApplyMode::Unified {
+        return Err(Error::invalid_phased_type_usage(
+            path,
+            "identifier enums require `apply_phases` because they widen deserialize-only input shape",
+        ));
+    }
+
+    if attrs.variant_identifier {
+        if let Some((name, _)) = enm
+            .variants()
+            .iter()
+            .find(|(_, variant)| !matches!(variant.fields(), Fields::Unit))
+        {
+            return Err(Error::invalid_phased_type_usage(
+                path,
+                format!(
+                    "`variant_identifier` requires all unit variants, but variant `{name}` is not unit"
+                ),
+            ));
+        }
+    }
+
+    if attrs.field_identifier {
+        let variants = enm.variants();
+        for (idx, (name, variant)) in variants.iter().enumerate() {
+            let is_last = idx + 1 == variants.len();
+            match variant.fields() {
+                Fields::Unit => {}
+                Fields::Unnamed(unnamed) if is_last && unnamed.fields().len() == 1 => {}
+                _ => {
+                    return Err(Error::invalid_phased_type_usage(
+                        path,
+                        format!(
+                            "`field_identifier` requires unit variants and an optional final newtype fallback; invalid variant `{name}`"
+                        ),
+                    ));
+                }
+            }
+        }
     }
 
     Ok(())

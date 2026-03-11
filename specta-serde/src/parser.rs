@@ -29,6 +29,8 @@ pub struct SerdeContainerAttrs {
     pub resolved_from: Option<specta::datatype::DataType>,
     pub resolved_try_from: Option<specta::datatype::DataType>,
     pub resolved_into: Option<specta::datatype::DataType>,
+    pub variant_identifier: bool,
+    pub field_identifier: bool,
 }
 
 /// Marker runtime attribute inserted when `#[specta(type = ...)]` is used.
@@ -126,6 +128,8 @@ pub fn merge_container_attrs(target: &mut SerdeContainerAttrs, other: SerdeConta
     if other.resolved_into.is_some() {
         target.resolved_into = other.resolved_into;
     }
+    target.variant_identifier |= other.variant_identifier;
+    target.field_identifier |= other.field_identifier;
 }
 
 #[doc(hidden)]
@@ -527,6 +531,20 @@ macro_rules! __specta_serde_parse_container_items {
     ($target:ident; transparent) => {
         $target.transparent = true;
     };
+    ($target:ident; variant_identifier, $($rest:tt)*) => {
+        $target.variant_identifier = true;
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; variant_identifier) => {
+        $target.variant_identifier = true;
+    };
+    ($target:ident; field_identifier, $($rest:tt)*) => {
+        $target.field_identifier = true;
+        $crate::__specta_serde_parse_container_items!($target; $($rest)*);
+    };
+    ($target:ident; field_identifier) => {
+        $target.field_identifier = true;
+    };
     ($target:ident; tag = $value:literal, $($rest:tt)*) => {
         $crate::__specta_serde_set_str!($target, tag, $value);
         $crate::__specta_serde_parse_container_items!($target; $($rest)*);
@@ -895,6 +913,8 @@ mod tests {
             from = "String",
             try_from = "String",
             into = "String",
+            variant_identifier,
+            field_identifier,
             unknown_container_attr
         )]);
 
@@ -923,6 +943,8 @@ mod tests {
             parsed.into.as_ref().map(|v| v.type_src.as_str()),
             Some("String")
         );
+        assert!(parsed.variant_identifier);
+        assert!(parsed.field_identifier);
     }
 
     #[test]
