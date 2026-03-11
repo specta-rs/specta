@@ -9,7 +9,6 @@
 //! ```bash
 //! cargo add specta@2.0.0-rc.23 --features derive,export
 //! cargo add specta-swift@0.0.1
-//! cargo add specta-serde@0.0.10
 //! ```
 //!
 //! Next copy the following into your `main.rs` file:
@@ -52,6 +51,3 @@ mod swift;
 
 pub use error::Error;
 pub use swift::{GenericStyle, IndentStyle, NamingConvention, OptionalStyle, Swift};
-
-// Re-export SerdeMode from specta-serde for convenience
-pub use specta_serde::SerdeMode;

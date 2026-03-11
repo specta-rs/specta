@@ -25,10 +25,6 @@ pub enum Error {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
-    /// Serde validation error.
-    #[error("Serde validation error: {0}")]
-    SerdeValidation(#[from] specta_serde::Error),
-
     /// Invalid configuration.
     #[error("Configuration error: {0}")]
     Configuration(String),

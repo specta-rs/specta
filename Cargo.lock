@@ -1860,7 +1860,6 @@ dependencies = [
  "serde",
  "serde_json",
  "specta",
- "specta-serde",
  "specta-util",
  "thiserror",
 ]
@@ -1905,7 +1904,6 @@ dependencies = [
  "insta",
  "serde",
  "specta",
- "specta-serde",
  "thiserror",
  "trybuild",
  "uuid",

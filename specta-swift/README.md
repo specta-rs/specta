@@ -242,8 +242,9 @@ let swift = Swift::new()
 ### Serde Integration
 
 ```rust
+let types = specta_serde::apply(types).unwrap();
+
 let swift = Swift::new()
-    .with_serde()  // Adds import Codable and validation
     .add_protocol("CustomDebugStringConvertible");
 ```
 

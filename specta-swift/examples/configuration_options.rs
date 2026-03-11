@@ -175,16 +175,17 @@ fn main() {
         .unwrap();
     println!("✅ Additional protocols exported to WithProtocols.swift");
 
-    // 8. SERDE VALIDATION
-    println!("\n📋 8. SERDE VALIDATION");
+    // 8. USERSPACE SERDE TRANSFORMS
+    println!("\n📋 8. USERSPACE SERDE TRANSFORMS");
     println!("{}", "-".repeat(40));
-    let with_serde = Swift::new().with_serde(specta_serde::SerdeMode::Both);
-    let serde_output = with_serde.export(&types).unwrap();
-    println!("With Serde validation:\n{}", serde_output);
+    let transformed_types = types.clone();
+    let with_serde = Swift::new();
+    let serde_output = with_serde.export(&transformed_types).unwrap();
+    println!("With userspace Serde transforms:\n{}", serde_output);
     with_serde
-        .export_to("./examples/generated/WithSerde.swift", &types)
+        .export_to("./examples/generated/WithSerde.swift", &transformed_types)
         .unwrap();
-    println!("✅ Serde validation exported to WithSerde.swift");
+    println!("✅ Userspace Serde transform example exported to WithSerde.swift");
 
     // 9. COMBINED CUSTOM CONFIGURATION
     println!("\n📋 9. COMBINED CUSTOM CONFIGURATION");
@@ -196,8 +197,7 @@ fn main() {
         .generics(GenericStyle::Typealias)
         .optionals(OptionalStyle::Optional)
         .add_protocol("Equatable")
-        .add_protocol("Hashable")
-        .with_serde(specta_serde::SerdeMode::Both);
+        .add_protocol("Hashable");
 
     let combined_output = combined.export(&types).unwrap();
     println!("Combined custom configuration:\n{}", combined_output);
