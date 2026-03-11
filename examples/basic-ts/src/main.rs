@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use specta::{
     Type, TypeCollection,
     datatype::{DataType, Reference},
@@ -119,6 +120,16 @@ pub struct UsesSerdeConversions {
     try_from_user: UserTryFrom,
 }
 
+#[derive(Serialize_repr, Deserialize_repr, Type, PartialEq, Debug)]
+#[specta(type = u8)]
+#[repr(u8)]
+enum SmallPrime {
+    Two = 2,
+    Three = 3,
+    Five = 5,
+    Seven = 7,
+}
+
 fn main() {
     {
         let mut types = TypeCollection::default();
@@ -162,7 +173,8 @@ fn main() {
             .register::<UserInto>()
             .register::<UserFrom>()
             .register::<UserTryFrom>()
-            .register::<UsesSerdeConversions>();
+            .register::<UsesSerdeConversions>()
+            .register::<SmallPrime>();
         println!("RAW:\n{}", Typescript::default().export(&types).unwrap());
         match specta_serde::apply(types.clone()) {
             Ok(types) => println!(

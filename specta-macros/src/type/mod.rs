@@ -244,7 +244,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         });
 
     let comments = &container_attrs.common.doc;
-    let inline = container_attrs.inline || container_attrs.r#type.is_some();
+    let inline = container_attrs.inline;
     let deprecated = container_attrs.common.deprecated_as_tokens();
 
     Ok(quote! {
