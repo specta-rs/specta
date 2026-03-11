@@ -11,6 +11,7 @@ mod jsdoc;
 mod layouts;
 mod references;
 mod serde_conversions;
+mod serde_identifiers;
 mod types;
 mod typescript;
 mod utils;
