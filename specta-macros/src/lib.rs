@@ -53,6 +53,10 @@ pub fn derive_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     r#type::derive(input).unwrap_or_else(|err| err.into_compile_error().into())
 }
 
+/// Parses a string literal into a Rust type token stream.
+///
+/// This is an internal helper proc macro used by Specta macros to turn a
+/// literal like `"Option<String>"` into a Rust type at compile time.
 #[proc_macro]
 pub fn parse_type_from_lit(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let lit = parse_macro_input!(input as LitStr);
