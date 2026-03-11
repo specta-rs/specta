@@ -18,7 +18,7 @@ pub mod construct {
     pub const fn field(
         optional: bool,
         flatten: bool,
-        deprecated: Option<DeprecatedType>,
+        deprecated: Option<DeprecatedAttribute>,
         docs: Cow<'static, str>,
         inline: bool,
         attributes: Attributes,
@@ -48,7 +48,9 @@ pub mod construct {
 mod functions {
     use std::borrow::Cow;
 
-    use crate::{TypeCollection, datatype::DeprecatedType, datatype::Function, function::SpectaFn};
+    use crate::{
+        TypeCollection, datatype::DeprecatedAttribute, datatype::Function, function::SpectaFn,
+    };
 
     #[doc(hidden)]
     /// A helper for exporting a command to a [`CommandDataType`].
@@ -60,7 +62,7 @@ mod functions {
         types: &mut TypeCollection,
         fields: &[Cow<'static, str>],
         docs: Cow<'static, str>,
-        deprecated: Option<DeprecatedType>,
+        deprecated: Option<DeprecatedAttribute>,
         no_return_type: bool,
     ) -> Function {
         T::to_datatype(

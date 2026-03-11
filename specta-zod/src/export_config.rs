@@ -1,14 +1,14 @@
 use std::{borrow::Cow, io, path::PathBuf};
 
-use specta_typescript::{CommentFormatterFn, comments};
+use specta_typescript::{comments, CommentFormatterFn};
 
-use crate::DeprecatedType;
+use crate::DeprecatedAttribute;
 
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct CommentFormatterArgs<'a> {
     pub docs: &'a Cow<'static, str>,
-    pub deprecated: Option<&'a DeprecatedType>,
+    pub deprecated: Option<&'a DeprecatedAttribute>,
 }
 
 /// The signature for a function responsible for exporting Typescript comments.

@@ -1,8 +1,8 @@
 use std::marker::PhantomData;
 
 use specta::{
-    datatype::{DataType, NamedDataType, Tuple},
     Type, TypeCollection,
+    datatype::{DataType, NamedDataType, Tuple},
 };
 
 pub struct Phased<Serialize, Deserialize> {

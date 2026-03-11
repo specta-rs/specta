@@ -5,7 +5,7 @@ use super::macros::{impl_ndt, impl_ndt_as};
 use crate::{
     Type, TypeCollection,
     datatype::{
-        self, DataType, Enum, Variant, Field, Fields, NamedFields, Primitive, Reference, Struct,
+        self, DataType, Enum, Field, Fields, NamedFields, Primitive, Reference, Struct, Variant,
     },
     r#type::{generics, impls::*},
 };

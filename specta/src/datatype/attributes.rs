@@ -1,6 +1,6 @@
 use std::{
     any::{Any, TypeId},
-    collections::{hash_map::DefaultHasher, HashMap},
+    collections::{HashMap, hash_map::DefaultHasher},
     fmt,
     hash::{Hash, Hasher},
     sync::Arc,

@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use super::{DataType, DeprecatedType};
+use super::{DataType, DeprecatedAttribute};
 
 /// Contains type information about a function annotated with the `#[specta]` attribute.
 /// Returned by the `fn_datatype!` macro.
@@ -17,7 +17,7 @@ pub struct Function {
     /// The function's documentation. Detects both `///` and `#[doc = ...]` style documentation.
     pub(crate) docs: Cow<'static, str>,
     /// The deprecated status of the function.
-    pub(crate) deprecated: Option<DeprecatedType>,
+    pub(crate) deprecated: Option<DeprecatedAttribute>,
 }
 
 impl Function {
@@ -87,17 +87,17 @@ impl Function {
     }
 
     /// Get the deprecated status of the function.
-    pub fn deprecated(&self) -> Option<&DeprecatedType> {
+    pub fn deprecated(&self) -> Option<&DeprecatedAttribute> {
         self.deprecated.as_ref()
     }
 
     /// Get the deprecated status of the function as mutable reference.
-    pub fn deprecated_mut(&mut self) -> Option<&mut DeprecatedType> {
+    pub fn deprecated_mut(&mut self) -> Option<&mut DeprecatedAttribute> {
         self.deprecated.as_mut()
     }
 
     /// Set the deprecated status of the function.
-    pub fn set_deprecated(&mut self, deprecated: DeprecatedType) {
+    pub fn set_deprecated(&mut self, deprecated: DeprecatedAttribute) {
         self.deprecated = Some(deprecated);
     }
 }

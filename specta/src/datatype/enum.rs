@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::datatype::Field;
 
-use super::{Attributes, DataType, DeprecatedType, Fields, NamedFields, UnnamedFields};
+use super::{Attributes, DataType, DeprecatedAttribute, Fields, NamedFields, UnnamedFields};
 
 /// represents a Rust [enum](https://doc.rust-lang.org/std/keyword.enum.html).
 ///
@@ -68,7 +68,7 @@ pub struct Variant {
     /// Documentation comments for the field.
     pub(crate) docs: Cow<'static, str>,
     /// Deprecated attribute for the field.
-    pub(crate) deprecated: Option<DeprecatedType>,
+    pub(crate) deprecated: Option<DeprecatedAttribute>,
     /// The type of the variant.
     pub(crate) fields: Fields,
     /// Runtime attributes for this variant
@@ -147,17 +147,17 @@ impl Variant {
     }
 
     /// Get an immutable reference to the deprecated attribute for the field.
-    pub fn deprecated(&self) -> Option<&DeprecatedType> {
+    pub fn deprecated(&self) -> Option<&DeprecatedAttribute> {
         self.deprecated.as_ref()
     }
 
     /// Get a mutable reference to the deprecated attribute for the field.
-    pub fn deprecated_mut(&mut self) -> Option<&mut DeprecatedType> {
+    pub fn deprecated_mut(&mut self) -> Option<&mut DeprecatedAttribute> {
         self.deprecated.as_mut()
     }
 
     /// Set the deprecated attribute for the field.
-    pub fn set_deprecated(&mut self, deprecated: Option<DeprecatedType>) {
+    pub fn set_deprecated(&mut self, deprecated: Option<DeprecatedAttribute>) {
         self.deprecated = deprecated;
     }
 
@@ -208,7 +208,7 @@ impl<T> VariantBuilder<T> {
     }
 
     /// Set deprecation metadata for the variant.
-    pub fn deprecated(mut self, reason: DeprecatedType) -> Self {
+    pub fn deprecated(mut self, reason: DeprecatedAttribute) -> Self {
         self.v.deprecated = Some(reason);
         self
     }
