@@ -2,10 +2,7 @@ use std::collections::HashSet;
 
 use specta::{
     TypeCollection,
-    datatype::{
-        DataType, Enum, EnumVariant, Fields, GenericReference, Primitive, Reference, skip_fields,
-        skip_fields_named,
-    },
+    datatype::{DataType, Enum, EnumVariant, Fields, GenericReference, Primitive, Reference},
 };
 
 use crate::{
@@ -103,7 +100,12 @@ fn inner(
             match strct.fields() {
                 Fields::Unit => {}
                 Fields::Unnamed(unnamed) => {
-                    for (idx, (_, ty)) in skip_fields(unnamed.fields()).enumerate() {
+                    for (idx, (_, ty)) in unnamed
+                        .fields()
+                        .iter()
+                        .filter_map(|field| field.ty().map(|ty| (field, ty)))
+                        .enumerate()
+                    {
                         inner(
                             ty,
                             types,
@@ -115,14 +117,22 @@ fn inner(
                     }
                 }
                 Fields::Named(named) => {
-                    for (name, (field, _)) in skip_fields_named(named.fields()) {
+                    for (name, (field, _)) in named
+                        .fields()
+                        .iter()
+                        .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+                    {
                         validate_field_attributes(
                             field.attributes(),
                             format!("{path}.{name}"),
                             mode,
                         )?;
                     }
-                    for (name, (_, ty)) in skip_fields_named(named.fields()) {
+                    for (name, (_, ty)) in named
+                        .fields()
+                        .iter()
+                        .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+                    {
                         inner(
                             ty,
                             types,
@@ -156,14 +166,22 @@ fn inner(
                 match &variant.fields() {
                     Fields::Unit => {}
                     Fields::Named(named) => {
-                        for (name, (field, _)) in skip_fields_named(named.fields()) {
+                        for (name, (field, _)) in named
+                            .fields()
+                            .iter()
+                            .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+                        {
                             validate_field_attributes(
                                 field.attributes(),
                                 format!("{path}::{variant_name}.{name}"),
                                 mode,
                             )?;
                         }
-                        for (name, (_, ty)) in skip_fields_named(named.fields()) {
+                        for (name, (_, ty)) in named
+                            .fields()
+                            .iter()
+                            .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+                        {
                             inner(
                                 ty,
                                 types,
@@ -175,14 +193,24 @@ fn inner(
                         }
                     }
                     Fields::Unnamed(unnamed) => {
-                        for (idx, (field, _)) in skip_fields(unnamed.fields()).enumerate() {
+                        for (idx, (field, _)) in unnamed
+                            .fields()
+                            .iter()
+                            .filter_map(|field| field.ty().map(|ty| (field, ty)))
+                            .enumerate()
+                        {
                             validate_field_attributes(
                                 field.attributes(),
                                 format!("{path}::{variant_name}[{idx}]"),
                                 mode,
                             )?;
                         }
-                        for (idx, (_, ty)) in skip_fields(unnamed.fields()).enumerate() {
+                        for (idx, (_, ty)) in unnamed
+                            .fields()
+                            .iter()
+                            .filter_map(|field| field.ty().map(|ty| (field, ty)))
+                            .enumerate()
+                        {
                             inner(
                                 ty,
                                 types,
@@ -581,7 +609,10 @@ fn validate_internally_tag_variant(
     match &variant.fields() {
         Fields::Unit | Fields::Named(_) => Ok(()),
         Fields::Unnamed(unnamed) => {
-            let mut fields = skip_fields(unnamed.fields());
+            let mut fields = unnamed
+                .fields()
+                .iter()
+                .filter_map(|field| field.ty().map(|ty| (field, ty)));
             let Some((_, first_field)) = fields.next() else {
                 return Ok(());
             };

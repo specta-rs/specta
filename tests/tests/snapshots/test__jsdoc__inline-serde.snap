@@ -2,4 +2,4 @@
 source: tests/tests/jsdoc.rs
 expression: output
 ---
-ERROR: Invalid phased type usage at 'Issue374.foo': `skip_serializing_if` requires `apply_phases` because unified mode cannot represent conditional omission
+ERROR: Unresolved generic reference 'GenericReference { id: TypeId(0x61656fbb22c52095872877222920ea6f) }' while validating 'Demo.a.<generic_ref>'

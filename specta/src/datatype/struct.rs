@@ -64,11 +64,6 @@ impl Struct {
     pub fn attributes_mut(&mut self) -> &mut Attributes {
         &mut self.attributes
     }
-
-    /// Set the attributes of the struct.
-    pub fn set_attributes(&mut self, attributes: Attributes) {
-        self.attributes = attributes;
-    }
 }
 
 impl From<Struct> for DataType {

@@ -9,8 +9,8 @@ use std::{
 use specta::{
     TypeCollection,
     datatype::{
-        DataType, DeprecatedType, Enum, EnumVariant, Fields, GenericReference, NonSkipField,
-        Reference, Struct, Tuple, skip_fields, skip_fields_named,
+        DataType, DeprecatedType, Enum, EnumVariant, Field, Fields, GenericReference, Reference,
+        Struct, Tuple,
     },
 };
 
@@ -141,7 +141,7 @@ pub(crate) fn datatype_inner(
 // Can be used with `StructUnnamedFields.fields` or `EnumNamedFields.fields`
 fn unnamed_fields_datatype(
     ctx: ExportContext,
-    fields: &[NonSkipField],
+    fields: &[(&Field, &DataType)],
     types: &TypeCollection,
     s: &mut String,
     prefix: &str,
@@ -242,7 +242,11 @@ pub(crate) fn struct_datatype(
         Fields::Unit => s.push_str(NULL),
         Fields::Unnamed(unnamed) => unnamed_fields_datatype(
             ctx,
-            &skip_fields(unnamed.fields()).collect::<Vec<_>>(),
+            &unnamed
+                .fields()
+                .iter()
+                .filter_map(|field| field.ty().map(|ty| (field, ty)))
+                .collect::<Vec<_>>(),
             types,
             s,
             prefix,
@@ -250,7 +254,11 @@ pub(crate) fn struct_datatype(
             false,
         )?,
         Fields::Named(named) => {
-            let fields = skip_fields_named(named.fields()).collect::<Vec<_>>();
+            let fields = named
+                .fields()
+                .iter()
+                .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+                .collect::<Vec<_>>();
 
             if fields.is_empty() {
                 // TODO: Handle this
@@ -371,7 +379,11 @@ fn enum_variant_datatype(
     match &variant.fields() {
         Fields::Unit => Ok(Some(sanitise_key(name, true).to_string())),
         Fields::Named(obj) => {
-            let all_fields = skip_fields_named(obj.fields()).collect::<Vec<_>>();
+            let all_fields = obj
+                .fields()
+                .iter()
+                .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+                .collect::<Vec<_>>();
 
             let (flattened, non_flattened): (Vec<_>, Vec<_>) =
                 all_fields.iter().partition(|(_, (f, _))| f.flatten());
@@ -463,7 +475,10 @@ fn enum_variant_datatype(
             }))
         }
         Fields::Unnamed(obj) => {
-            let fields = skip_fields(obj.fields())
+            let fields = obj
+                .fields()
+                .iter()
+                .filter_map(|field| field.ty().map(|ty| (field, ty)))
                 .map(|(field, ty)| {
                     let mut s = String::new();
                     crate::primitives::datatype_with_inline_attr(
@@ -507,7 +522,11 @@ struct EnumVariantOutput {
 fn untagged_strict_keys(variant: &EnumVariant) -> Option<BTreeSet<String>> {
     match variant.fields() {
         Fields::Named(obj) => {
-            let all_fields = skip_fields_named(obj.fields()).collect::<Vec<_>>();
+            let all_fields = obj
+                .fields()
+                .iter()
+                .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+                .collect::<Vec<_>>();
             if all_fields.iter().any(|(_, (field, _))| field.flatten()) {
                 return None;
             }
@@ -624,7 +643,7 @@ pub(crate) fn enum_datatype(
 fn object_field_to_ts(
     ctx: ExportContext,
     key: Cow<'static, str>,
-    field_ref: NonSkipField,
+    field_ref: (&Field, &DataType),
     types: &TypeCollection,
     s: &mut String,
     generics: &[(GenericReference, DataType)],
@@ -658,7 +677,7 @@ fn object_field_to_ts(
 
 fn inline_reference_docs<'a>(
     types: &'a TypeCollection,
-    (field, ty): NonSkipField,
+    (field, ty): (&Field, &'a DataType),
     force_inline: bool,
 ) -> Option<&'a str> {
     let DataType::Reference(Reference::Named(r)) = ty else {

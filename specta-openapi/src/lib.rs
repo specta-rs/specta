@@ -75,10 +75,12 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
         //     schema_data,
         //     schema_kind: SchemaKind::Type(Type::Object(openapiv3::ObjectType::default())), // TODO: Use official "Any Type"
         // }),
-        primitive_def!(i8 i16 i32 isize u8 u16 u32 usize f32 f64) => ReferenceOr::Item(Schema {
-            schema_data,
-            schema_kind: SchemaKind::Type(Type::Number(NumberType::default())), // TODO: Configure number type. Ts: `number`
-        }),
+        primitive_def!(i8 i16 i32 isize u8 u16 u32 usize f16 f32 f64 f128) => {
+            ReferenceOr::Item(Schema {
+                schema_data,
+                schema_kind: SchemaKind::Type(Type::Number(NumberType::default())), // TODO: Configure number type. Ts: `number`
+            })
+        }
         primitive_def!(i64 u64 i128 u128) => ReferenceOr::Item(Schema {
             schema_data,
             schema_kind: SchemaKind::Type(Type::Number(NumberType::default())), // TODO: Configure number type. Ts: `bigint`

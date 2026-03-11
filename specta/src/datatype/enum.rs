@@ -185,9 +185,4 @@ impl EnumVariant {
     pub fn attributes_mut(&mut self) -> &mut Attributes {
         &mut self.attributes
     }
-
-    /// Set the runtime attributes for this variant.
-    pub fn set_attributes(&mut self, attrs: Attributes) {
-        self.attributes = attrs;
-    }
 }

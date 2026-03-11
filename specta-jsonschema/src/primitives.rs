@@ -1,8 +1,8 @@
 use crate::{Error, JsonSchema};
-use serde_json::{Map, Value, json};
+use serde_json::{json, Map, Value};
 use specta::{
+    datatype::{NamedDataType, *},
     TypeCollection,
-    datatype::{NamedDataType, skip_fields, skip_fields_named, *},
 };
 
 /// Convert a NamedDataType to a JSON Schema definition
@@ -140,6 +140,7 @@ fn primitive_to_schema(p: &Primitive) -> Value {
         Primitive::f16 => json!({"type": "number", "format": "float16"}),
         Primitive::f32 => json!({"type": "number", "format": "float"}),
         Primitive::f64 => json!({"type": "number", "format": "double"}),
+        Primitive::f128 => json!({"type": "number", "format": "float128"}),
     }
 }
 
@@ -156,7 +157,10 @@ fn struct_to_schema(
         }
         Fields::Unnamed(fields) => {
             // Tuple struct - represent as array
-            let items: Result<Vec<_>, _> = skip_fields(fields.fields())
+            let items: Result<Vec<_>, _> = fields
+                .fields()
+                .iter()
+                .filter_map(|field| field.ty().map(|ty| (field, ty)))
                 .map(|(_, ty)| datatype_to_schema(js, types, ty, false))
                 .collect();
 
@@ -174,7 +178,11 @@ fn struct_to_schema(
             let mut properties = Map::new();
             let mut required = Vec::new();
 
-            for (name, (field, ty)) in skip_fields_named(fields.fields()) {
+            for (name, (field, ty)) in fields
+                .fields()
+                .iter()
+                .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+            {
                 let schema = datatype_to_schema(js, types, ty, false)?;
                 properties.insert(name.clone().into_owned(), schema);
 
@@ -240,7 +248,10 @@ fn variant_to_schema(
         }
         Fields::Unnamed(fields) => {
             // Tuple variant with external tagging: { "VariantName": [...] }
-            let items: Result<Vec<_>, _> = skip_fields(fields.fields())
+            let items: Result<Vec<_>, _> = fields
+                .fields()
+                .iter()
+                .filter_map(|field| field.ty().map(|ty| (field, ty)))
                 .map(|(_, ty)| datatype_to_schema(js, types, ty, false))
                 .collect();
 
@@ -278,7 +289,11 @@ fn variant_to_schema(
             let mut properties = Map::new();
             let mut required = Vec::new();
 
-            for (field_name, (field, ty)) in skip_fields_named(fields.fields()) {
+            for (field_name, (field, ty)) in fields
+                .fields()
+                .iter()
+                .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+            {
                 let schema = datatype_to_schema(js, types, ty, false)?;
                 properties.insert(field_name.clone().into_owned(), schema);
 

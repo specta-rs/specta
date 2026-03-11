@@ -8,7 +8,9 @@ use crate::{
     },
 };
 
-/// A named type represents a non-primitive type capable of being exported as it's own named entity.
+/// Named type represents any type with it's own unique name and identity.
+///
+/// These can become `export MyNamedType = ...` in Typescript can we be referenced in types like `{ field: MyNamedType }`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NamedDataType {
     pub(crate) id: NamedId,
@@ -242,11 +244,11 @@ impl NamedDataType {
 #[non_exhaustive]
 /// Runtime representation of Rust's `#[deprecated]` metadata.
 pub enum DeprecatedType {
-    /// A type that has been deprecated without a message.
+    /// Type that has been deprecated without a message.
     ///
     /// Eg. `#[deprecated]`
     Deprecated,
-    /// A type that has been deprecated with a message and an optional `since` version.
+    /// Type that has been deprecated with a message and an optional `since` version.
     ///
     /// Eg. `#[deprecated = "Use something else"]` or `#[deprecated(since = "1.0.0", message = "Use something else")]`
     DeprecatedWithSince {

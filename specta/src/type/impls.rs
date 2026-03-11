@@ -25,7 +25,7 @@ impl Type for f16 {
 #[cfg(is_nightly)]
 impl Type for f128 {
     fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Primitive(datatype::Primitive::f16)
+        DataType::Primitive(datatype::Primitive::f128)
     }
 }
 

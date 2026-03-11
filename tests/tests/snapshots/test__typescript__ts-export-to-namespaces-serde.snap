@@ -2,4 +2,4 @@
 source: tests/tests/typescript.rs
 expression: output
 ---
-ERROR: Unresolved generic reference 'GenericReference { id: TypeId(0xf2e47dd919459f1933193ce0fdd9d7e7) }' while validating 'Vec.<list_item>.<generic_ref>'
+ERROR: Invalid phased type usage at 'Issue374.foo': `skip_serializing_if` requires `apply_phases` because unified mode cannot represent conditional omission
