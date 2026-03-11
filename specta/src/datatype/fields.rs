@@ -1,5 +1,7 @@
 //! Field types are used by both enums and structs.
 
+use crate::datatype::Struct;
+
 use super::{Attributes, DataType, DeprecatedType};
 use std::borrow::Cow;
 
@@ -182,5 +184,53 @@ impl NamedFields {
     /// Mutable reference to the fields.
     pub fn fields_mut(&mut self) -> &mut Vec<(Cow<'static, str>, Field)> {
         &mut self.fields
+    }
+}
+
+#[derive(Debug, Clone)]
+/// Builder for constructing [`DataType::Struct`] values.
+pub struct StructBuilder<F = ()> {
+    pub(crate) fields: F,
+}
+
+impl StructBuilder<NamedFields> {
+    /// Add a named field.
+    pub fn field(mut self, name: impl Into<Cow<'static, str>>, field: Field) -> Self {
+        self.fields.fields.push((name.into(), field));
+        self
+    }
+
+    /// Add a named field in-place.
+    pub fn field_mut(&mut self, name: impl Into<Cow<'static, str>>, field: Field) {
+        self.fields.fields.push((name.into(), field));
+    }
+
+    /// Finalize this builder into a [`DataType`].
+    pub fn build(self) -> DataType {
+        DataType::Struct(Struct {
+            fields: Fields::Named(self.fields),
+            attributes: Default::default(),
+        })
+    }
+}
+
+impl StructBuilder<UnnamedFields> {
+    /// Add an unnamed field.
+    pub fn field(mut self, field: Field) -> Self {
+        self.fields.fields.push(field);
+        self
+    }
+
+    /// Add an unnamed field in-place.
+    pub fn field_mut(&mut self, field: Field) {
+        self.fields.fields.push(field);
+    }
+
+    /// Finalize this builder into a [`DataType`].
+    pub fn build(self) -> DataType {
+        DataType::Struct(Struct {
+            fields: Fields::Unnamed(self.fields),
+            attributes: Default::default(),
+        })
     }
 }

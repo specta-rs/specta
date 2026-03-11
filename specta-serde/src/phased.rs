@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use specta::{
     Type, TypeCollection,
-    datatype::{DataType, NamedDataTypeBuilder, Tuple},
+    datatype::{DataType, Tuple},
 };
 
 pub struct Phased<Serialize, Deserialize> {

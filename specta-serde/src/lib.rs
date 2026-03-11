@@ -12,10 +12,7 @@ use std::{
 
 use specta::{
     TypeCollection,
-    datatype::{
-        DataType, Enum, Variant, Field, Fields, NamedDataType, NamedDataTypeBuilder, Reference,
-        Struct, Tuple,
-    },
+    datatype::{DataType, Enum, Field, Fields, NamedDataType, Reference, Struct, Tuple, Variant},
     internal,
 };
 
@@ -843,10 +840,7 @@ fn deserialize_conversion_name(attrs: Option<&SerdeContainerAttrs>) -> Option<St
     })
 }
 
-fn transform_external_variant(
-    serialized_name: String,
-    variant: &Variant,
-) -> Result<Variant> {
+fn transform_external_variant(serialized_name: String, variant: &Variant) -> Result<Variant> {
     Ok(match variant.fields() {
         Fields::Unit => clone_variant_with_unnamed_fields(
             variant,

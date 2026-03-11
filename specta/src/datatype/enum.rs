@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use super::VariantBuilder;
+use crate::datatype::Field;
 
 use super::{Attributes, DataType, DeprecatedType, Fields, NamedFields, UnnamedFields};
 
@@ -184,5 +184,89 @@ impl Variant {
     /// Mutable reference to the runtime attributes for this variant.
     pub fn attributes_mut(&mut self) -> &mut Attributes {
         &mut self.attributes
+    }
+}
+
+/// Builder for constructing [`Variant`] values.
+#[derive(Debug, Clone)]
+pub struct VariantBuilder<V = ()> {
+    pub(crate) v: Variant,
+    pub(crate) variant: V,
+}
+
+impl<T> VariantBuilder<T> {
+    /// Mark the variant as skipped.
+    pub fn skip(mut self) -> Self {
+        self.v.skip = true;
+        self
+    }
+
+    /// Set documentation for the variant.
+    pub fn docs(mut self, docs: Cow<'static, str>) -> Self {
+        self.v.docs = docs;
+        self
+    }
+
+    /// Set deprecation metadata for the variant.
+    pub fn deprecated(mut self, reason: DeprecatedType) -> Self {
+        self.v.deprecated = Some(reason);
+        self
+    }
+
+    /// Set runtime attributes on the variant.
+    pub fn attributes(mut self, attributes: Attributes) -> Self {
+        self.v.attributes = attributes;
+        self
+    }
+
+    /// Set runtime attributes on the variant in-place.
+    pub fn attributes_mut(&mut self, attributes: Attributes) {
+        self.v.attributes = attributes;
+    }
+}
+
+impl VariantBuilder<UnnamedFields> {
+    /// Add an unnamed field to the variant.
+    pub fn field(mut self, field: Field) -> Self {
+        self.variant.fields.push(field);
+        self
+    }
+
+    /// Add an unnamed field to the variant and return the updated builder.
+    pub fn field_mut(mut self, field: Field) -> Self {
+        self.variant.fields.push(field);
+        self
+    }
+
+    /// Finalize unnamed variant builder into [Variant].
+    pub fn build(mut self) -> Variant {
+        self.v.fields = Fields::Unnamed(self.variant);
+        self.v
+    }
+}
+
+impl VariantBuilder<NamedFields> {
+    /// Add a named field to the variant.
+    pub fn field(mut self, name: impl Into<Cow<'static, str>>, field: Field) -> Self {
+        self.variant.fields.push((name.into(), field));
+        self
+    }
+
+    /// Add a named field to the variant and return the updated builder.
+    pub fn field_mut(mut self, name: impl Into<Cow<'static, str>>, field: Field) -> Self {
+        self.variant.fields.push((name.into(), field));
+        self
+    }
+
+    /// Finalize named variant builder into [Variant].
+    pub fn build(mut self) -> Variant {
+        self.v.fields = Fields::Named(self.variant);
+        self.v
+    }
+}
+
+impl From<VariantBuilder<NamedFields>> for Variant {
+    fn from(val: VariantBuilder<NamedFields>) -> Self {
+        val.build()
     }
 }

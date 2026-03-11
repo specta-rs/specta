@@ -3,7 +3,7 @@ use std::{borrow::Cow, panic::Location, sync::Arc};
 use crate::{
     TypeCollection,
     datatype::{
-        DataType, NamedDataTypeBuilder, NamedReference, Reference,
+        DataType, NamedReference, Reference,
         reference::{self, GenericReference, NamedId},
     },
 };
