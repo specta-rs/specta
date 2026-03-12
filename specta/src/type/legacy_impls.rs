@@ -5,7 +5,8 @@ use super::macros::{impl_ndt, impl_ndt_as};
 use crate::{
     Type, Types,
     datatype::{
-        self, DataType, Enum, Field, Fields, NamedFields, Primitive, Reference, Struct, Variant,
+        self, DataType, Enum, Field, Fields, List, NamedFields, Primitive, Reference, Struct,
+        Variant,
     },
     r#type::{generics, impls::*},
 };
@@ -629,6 +630,73 @@ impl_ndt!(
         }
     }
 );
+
+#[cfg(feature = "error-stack")]
+#[cfg_attr(docsrs, doc(cfg(feature = "error-stack")))]
+const _: () = {
+    struct ErrorStackContext;
+
+    impl Type for ErrorStackContext {
+        fn definition(types: &mut Types) -> DataType {
+            static SENTINEL: &str = "error_stack::ErrorStackContext";
+            static GENERICS: &[(datatype::GenericReference, Cow<'static, str>)] = &[];
+
+            DataType::Reference(datatype::NamedDataType::init_with_sentinel(
+                GENERICS,
+                vec![],
+                false,
+                types,
+                SENTINEL,
+                |types, ndt| {
+                    ndt.set_name(Cow::Borrowed("ErrorStackContext"));
+                    ndt.set_module_path(Cow::Borrowed("error_stack"));
+
+                    let mut s = Struct::unit();
+                    let attachments = DataType::List(List::new(String::definition(types)));
+                    let sources = DataType::List(List::new(ErrorStackContext::definition(types)));
+
+                    s.set_fields(crate::internal::construct::fields_named(vec![
+                        ("context".into(), Field::new(String::definition(types))),
+                        ("attachments".into(), Field::new(attachments)),
+                        ("sources".into(), Field::new(sources)),
+                    ]));
+
+                    ndt.inner = DataType::Struct(s);
+                },
+            ))
+        }
+    }
+
+    fn report_definition(types: &mut Types) -> DataType {
+        static SENTINEL: &str = "error_stack::Report";
+        static GENERICS: &[(datatype::GenericReference, Cow<'static, str>)] = &[];
+
+        DataType::Reference(datatype::NamedDataType::init_with_sentinel(
+            GENERICS,
+            vec![],
+            false,
+            types,
+            SENTINEL,
+            |types, ndt| {
+                ndt.set_name(Cow::Borrowed("Report"));
+                ndt.set_module_path(Cow::Borrowed("error_stack"));
+                ndt.inner = DataType::List(List::new(ErrorStackContext::definition(types)));
+            },
+        ))
+    }
+
+    impl<C: std::error::Error + Send + Sync + 'static> Type for error_stack::Report<C> {
+        fn definition(types: &mut Types) -> DataType {
+            report_definition(types)
+        }
+    }
+
+    impl<C: std::error::Error + Send + Sync + 'static> Type for error_stack::Report<[C]> {
+        fn definition(types: &mut Types) -> DataType {
+            report_definition(types)
+        }
+    }
+};
 
 #[cfg(feature = "bevy_ecs")]
 #[cfg_attr(docsrs, doc(cfg(feature = "bevy_ecs")))]

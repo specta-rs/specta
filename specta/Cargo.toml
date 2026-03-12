@@ -94,6 +94,8 @@ tokio = ["dep:tokio"]
 url = ["dep:url"]
 ## [either](https://docs.rs/either) crate
 either = ["dep:either"]
+## [error-stack](https://docs.rs/error-stack) crate
+error-stack = ["dep:error-stack"]
 # [bevy_ecs](https://docs.rs/bevy_ecs) crate
 bevy_ecs = ["dep:bevy_ecs"]
 # [bevy_input](https://docs.rs/bevy_input) crate
@@ -142,6 +144,7 @@ glam = { version = "0.32", optional = true, default-features = false, features =
 tokio = { version = "1", optional = true, default-features = false, features = ["sync"] }
 url = { version = "2", optional = true, default-features = false }
 either = { version = "1", optional = true, default-features = false }
+error-stack = { version = "0.6", optional = true, default-features = false }
 bevy_ecs = { version = "0.18", optional = true, default-features = false, features = ["std"] }
 bevy_input = { version = "0.18", optional = true, default-features = false, features = ["std", "bevy_reflect", "keyboard", "mouse"] }
 jiff = { version = "0.2", optional = true, default-features = false }
