@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 
 /// Example showcasing ReScript's built-in `result<ok, err>` type.
 ///
@@ -69,8 +69,8 @@ struct SearchResult {
     total_count: u32,
 }
 
-pub fn types() -> TypeCollection {
-    TypeCollection::default()
+pub fn types() -> Types {
+    Types::default()
         .register::<MyResult<String, String>>()
         .register::<UserData>()
         .register::<AppError>()

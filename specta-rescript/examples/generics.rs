@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 
 /// Example showcasing generic types in ReScript.
 ///
@@ -70,9 +70,9 @@ struct ValidationError {
     message: String,
 }
 
-pub fn types() -> TypeCollection {
+pub fn types() -> Types {
     // Register with concrete type arguments so all referenced types are included
-    TypeCollection::default()
+    Types::default()
         .register::<Wrapper<String>>()
         .register::<Pair<String, i32>>()
         .register::<ApiResponse<Article, ValidationError>>()

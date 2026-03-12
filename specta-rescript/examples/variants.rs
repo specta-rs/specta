@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 
 /// Example showcasing ReScript's enum/variant representation.
 ///
@@ -108,8 +108,8 @@ enum DrawCommand {
     Close,
 }
 
-pub fn types() -> TypeCollection {
-    TypeCollection::default()
+pub fn types() -> Types {
+    Types::default()
         .register::<Status>()
         .register::<HttpMethod>()
         .register::<LogLevel>()

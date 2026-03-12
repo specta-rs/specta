@@ -309,14 +309,12 @@ mod tests {
     fn named_fields(pairs: Vec<(&'static str, DataType)>) -> Fields {
         Fields::Named(NamedFields {
             fields: pairs.into_iter().map(|(k, ty)| (k.into(), Field::new(ty))).collect(),
-            attributes: vec![],
         })
     }
 
     fn unnamed_fields(tys: Vec<DataType>) -> Fields {
         Fields::Unnamed(UnnamedFields {
             fields: tys.into_iter().map(Field::new).collect(),
-            attributes: vec![],
         })
     }
 
@@ -329,13 +327,13 @@ mod tests {
 
     #[test]
     fn unnamed_keys_are_none() {
-        let fields = unnamed_fields(vec![DataType::Primitive(Primitive::String)]);
+        let fields = unnamed_fields(vec![DataType::Primitive(Primitive::str)]);
         assert!(fields.keys().all(|k| k.is_none()));
     }
 
     #[test]
     fn named_keys_are_some() {
-        let fields = named_fields(vec![("foo", DataType::Primitive(Primitive::String))]);
+        let fields = named_fields(vec![("foo", DataType::Primitive(Primitive::str))]);
         assert!(fields.keys().all(|k| k.is_some()));
         assert_eq!(fields.keys().next().unwrap().unwrap().as_ref(), "foo");
     }
@@ -350,7 +348,7 @@ mod tests {
     #[test]
     fn iter_exact_size() {
         let fields = named_fields(vec![
-            ("a", DataType::Primitive(Primitive::String)),
+            ("a", DataType::Primitive(Primitive::str)),
             ("b", DataType::Primitive(Primitive::bool)),
         ]);
         let it = fields.iter();

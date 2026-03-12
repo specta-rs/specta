@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 
 /// A response returned by API commands.
 ///
@@ -79,8 +79,8 @@ enum Severity {
     Error,
 }
 
-pub fn types() -> TypeCollection {
-    TypeCollection::default()
+pub fn types() -> Types {
+    Types::default()
         .register::<ApiResponse<String>>()
         .register::<User>()
         .register::<Severity>()

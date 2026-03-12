@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 
 /// Comprehensive demonstration of all specta-rescript functionality.
 ///
@@ -287,8 +287,8 @@ struct SystemHealth {
     memory_usage: f64,
 }
 
-pub fn types() -> TypeCollection {
-    TypeCollection::default()
+pub fn types() -> Types {
+    Types::default()
         // Enums
         .register::<TaskStatus>()
         .register::<Priority>()

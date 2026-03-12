@@ -137,11 +137,11 @@ impl Types {
         &self,
     ) -> Result<impl ExactSizeIterator<Item = &'_ NamedDataType>, CircularReference> {
         // Walk a DataType and collect every directly-referenced named type into `out`.
-        fn deps<'a>(dt: &'a DataType, types: &'a TypeCollection, res: &mut Vec<&'a NamedDataType>) {
+        fn deps<'a>(dt: &'a DataType, types: &'a Types, res: &mut Vec<&'a NamedDataType>) {
             let field_ty = |fields: &'a Fields| fields.values().flat_map(|f| f.ty());
 
             match dt {
-                DataType::Primitive(_) | DataType::Generic(_) => {}
+                DataType::Primitive(_) => {}
                 DataType::Nullable(val) => deps(val, types, res),
                 DataType::List(l) => deps(l.ty(), types, res),
                 DataType::Tuple(t) => t.elements().iter().for_each(|e| deps(e, types, res)),
@@ -165,7 +165,7 @@ impl Types {
 
         fn visit<'a>(
             curr: &'a NamedDataType,
-            types: &'a TypeCollection,
+            types: &'a Types,
             visited: &mut HashSet<&'a str>,
             path: &mut Vec<&'a str>,
             res: &mut Vec<&'a NamedDataType>,
@@ -297,15 +297,17 @@ impl ExactSizeIterator for UnsortedIter<'_> {}
 mod tests {
     use super::*;
     use crate::datatype::{
-        DataType, Field, NamedDataTypeBuilder, NamedFields, Primitive, StructBuilder,
+        DataType, Field, NamedDataType, NamedFields, Primitive, StructBuilder,
     };
 
     fn prim() -> DataType {
-        DataType::Primitive(Primitive::String)
+        DataType::Primitive(Primitive::str)
     }
 
-    fn named(name: &'static str, ty: DataType, types: &mut TypeCollection) -> NamedDataType {
-        NamedDataTypeBuilder::new(name, vec![], ty).build(types)
+    fn named(name: &'static str, ty: DataType, types: &mut Types) -> NamedDataType {
+        let ndt = NamedDataType::new(name, vec![], ty);
+        ndt.register(types);
+        ndt
     }
 
     fn names<'a>(result: impl Iterator<Item = &'a NamedDataType>) -> Vec<&'a str> {
@@ -318,13 +320,13 @@ mod tests {
 
     #[test]
     fn empty_collection() {
-        let types = TypeCollection::default();
+        let types = Types::default();
         assert_eq!(types.into_topological_iter().unwrap().len(), 0);
     }
 
     #[test]
     fn single_type_no_deps() {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         named("Standalone", prim(), &mut types);
         assert_eq!(names(types.into_topological_iter().unwrap()), [
             "Standalone"
@@ -334,7 +336,7 @@ mod tests {
     #[test]
     fn linear_chain() {
         // Leaf <- Mid <- Root; expected: Leaf before Mid before Root.
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let leaf = named("Leaf", prim(), &mut types);
         let mid = named("Mid", leaf.reference(vec![]).into(), &mut types);
         named("Root", mid.reference(vec![]).into(), &mut types);
@@ -346,14 +348,13 @@ mod tests {
     #[test]
     fn diamond_dependency() {
         // Bottom <- Left, Right <- Top; Bottom must be first, Top last.
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let bottom = named("Bottom", prim(), &mut types);
         let left = named("Left", bottom.reference(vec![]).into(), &mut types);
         let right = named("Right", bottom.reference(vec![]).into(), &mut types);
         let top_ty = StructBuilder {
             fields: NamedFields {
                 fields: vec![],
-                attributes: vec![],
             },
         }
         .field("a", Field::new(left.reference(vec![]).into()))
@@ -372,7 +373,7 @@ mod tests {
         // Left and Right both depend on Base but not on each other.
         // [Base, Left, Right] and [Base, Right, Left] are both valid; we only
         // assert the ordering constraint, not the exact sequence.
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let base = named("Base", prim(), &mut types);
         named("Left", base.reference(vec![]).into(), &mut types);
         named("Right", base.reference(vec![]).into(), &mut types);
@@ -385,7 +386,7 @@ mod tests {
     #[test]
     fn disconnected_types_both_present() {
         // Two unrelated types: both must appear regardless of iteration order.
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         named("A", prim(), &mut types);
         named("B", prim(), &mut types);
         let ns = names(types.into_topological_iter().unwrap());
@@ -398,7 +399,7 @@ mod tests {
     fn zero_in_degree_sources_included() {
         // Sources (in-degree 0, i.e. nothing depends on them) must still appear.
         // Root and Orphan are both sources; Leaf is a sink.
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let leaf = named("Leaf", prim(), &mut types);
         named("Root", leaf.reference(vec![]).into(), &mut types);
         named("Orphan", prim(), &mut types); // source with no relations at all
@@ -412,13 +413,12 @@ mod tests {
     #[test]
     fn zero_out_degree_sinks_come_first() {
         // Sinks (out-degree 0, i.e. no dependencies) must precede their dependents.
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let sink_a = named("SinkA", prim(), &mut types);
         let sink_b = named("SinkB", prim(), &mut types);
         let top_ty = StructBuilder {
             fields: NamedFields {
                 fields: vec![],
-                attributes: vec![],
             },
         }
         .field("a", Field::new(sink_a.reference(vec![]).into()))
@@ -432,7 +432,7 @@ mod tests {
 
     #[test]
     fn self_cycle_returns_err() {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let srt = named("SelfRef", prim(), &mut types);
         types.0.get_mut(&srt.id).unwrap().as_mut().unwrap().inner = srt.reference(vec![]).into();
         let Err(err) = types.into_topological_iter() else {
@@ -449,7 +449,7 @@ mod tests {
     #[test]
     fn multi_step_cycle_returns_err() {
         // A -> B -> C -> A
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let a = named("A", prim(), &mut types);
         let b = named("B", prim(), &mut types);
         let c = named("C", prim(), &mut types);

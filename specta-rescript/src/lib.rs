@@ -12,7 +12,7 @@
 //! ```
 //!
 //! ```rust
-//! use specta::{Type, TypeCollection};
+//! use specta::{Type, Types};
 //! use specta_rescript::ReScript;
 //!
 //! #[derive(Type)]
@@ -20,7 +20,7 @@
 //!     pub field: String,
 //! }
 //!
-//! let types = TypeCollection::default().register::<MyType>();
+//! let types = Types::default().register::<MyType>();
 //! ReScript::default().export_to("./Types.res", &types).unwrap();
 //! ```
 #![cfg_attr(docsrs, feature(doc_cfg))]
@@ -35,4 +35,3 @@ mod rescript;
 
 pub use error::Error;
 pub use rescript::ReScript;
-pub use specta_serde::SerdeMode;

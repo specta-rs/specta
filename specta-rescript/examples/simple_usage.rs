@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 
 // Simple user management types
 
@@ -30,8 +30,8 @@ enum ApiResponse<T> {
     Err(String),
 }
 
-pub fn types() -> TypeCollection {
-    TypeCollection::default()
+pub fn types() -> Types {
+    Types::default()
         .register::<User>()
         .register::<UserRole>()
         .register::<CreateUserRequest>()

@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use std::collections::HashMap;
 
 /// Comprehensive example showcasing basic Rust types and their ReScript equivalents.
@@ -100,8 +100,8 @@ struct User {
     tags: Vec<String>,
 }
 
-pub fn types() -> TypeCollection {
-    TypeCollection::default()
+pub fn types() -> Types {
+    Types::default()
         .register::<Primitives>()
         .register::<WithOptionals>()
         .register::<Collections>()
