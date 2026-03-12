@@ -21,6 +21,7 @@ pub mod construct {
         deprecated: Option<Deprecated>,
         docs: Cow<'static, str>,
         inline: bool,
+        type_overridden: bool,
         attributes: Attributes,
         ty: Option<DataType>,
     ) -> Field {
@@ -30,6 +31,7 @@ pub mod construct {
             deprecated,
             docs,
             inline,
+            type_overridden,
             attributes,
             ty,
         }

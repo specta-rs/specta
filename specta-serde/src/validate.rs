@@ -2,12 +2,12 @@ use std::collections::HashSet;
 
 use specta::{
     Types,
-    datatype::{DataType, Enum, Fields, GenericReference, Primitive, Reference, Variant},
+    datatype::{DataType, Enum, Field, Fields, GenericReference, Primitive, Reference, Variant},
 };
 
 use crate::{
     Error,
-    internal::{Result, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs, SpectaTypeAttr},
+    internal::{Result, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs},
     phased::PhasedTy,
     repr::EnumRepr,
 };
@@ -120,11 +120,7 @@ fn inner(
                         .iter()
                         .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
                     {
-                        validate_field_attributes(
-                            field.attributes(),
-                            format!("{path}.{name}"),
-                            mode,
-                        )?;
+                        validate_field_attributes(field, format!("{path}.{name}"), mode)?;
                     }
                     for (name, (_, ty)) in named
                         .fields()
@@ -156,11 +152,7 @@ fn inner(
             validate_enum(enm, types, path.clone(), mode)?;
 
             for (variant_name, variant) in enm.variants() {
-                validate_variant_attributes(
-                    variant.attributes(),
-                    format!("{path}::{variant_name}"),
-                    mode,
-                )?;
+                validate_variant_attributes(variant, format!("{path}::{variant_name}"), mode)?;
                 match &variant.fields() {
                     Fields::Unit => {}
                     Fields::Named(named) => {
@@ -170,7 +162,7 @@ fn inner(
                             .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
                         {
                             validate_field_attributes(
-                                field.attributes(),
+                                field,
                                 format!("{path}::{variant_name}.{name}"),
                                 mode,
                             )?;
@@ -198,7 +190,7 @@ fn inner(
                             .enumerate()
                         {
                             validate_field_attributes(
-                                field.attributes(),
+                                field,
                                 format!("{path}::{variant_name}[{idx}]"),
                                 mode,
                             )?;
@@ -412,45 +404,37 @@ fn validate_container_attributes(
     Ok(())
 }
 
-fn validate_variant_attributes(
-    attrs: &specta::datatype::Attributes,
-    path: String,
-    _mode: ApplyMode,
-) -> Result<()> {
-    let Some(serde_attrs) = attrs.get::<SerdeVariantAttrs>() else {
+fn validate_variant_attributes(variant: &Variant, path: String, _mode: ApplyMode) -> Result<()> {
+    let Some(serde_attrs) = variant.attributes().get::<SerdeVariantAttrs>() else {
         return Ok(());
     };
 
     if serde_attrs.has_serialize_with {
-        ensure_codec_override(attrs, &path, "serialize_with")?;
+        ensure_codec_override(variant.type_overridden(), &path, "serialize_with")?;
     }
     if serde_attrs.has_deserialize_with {
-        ensure_codec_override(attrs, &path, "deserialize_with")?;
+        ensure_codec_override(variant.type_overridden(), &path, "deserialize_with")?;
     }
     if serde_attrs.has_with {
-        ensure_codec_override(attrs, &path, "with")?;
+        ensure_codec_override(variant.type_overridden(), &path, "with")?;
     }
 
     Ok(())
 }
 
-fn validate_field_attributes(
-    attrs: &specta::datatype::Attributes,
-    path: String,
-    mode: ApplyMode,
-) -> Result<()> {
-    let Some(serde_attrs) = attrs.get::<SerdeFieldAttrs>() else {
+fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Result<()> {
+    let Some(serde_attrs) = field.attributes().get::<SerdeFieldAttrs>() else {
         return Ok(());
     };
 
     if serde_attrs.has_serialize_with {
-        ensure_codec_override(attrs, &path, "serialize_with")?;
+        ensure_codec_override(field.type_overridden(), &path, "serialize_with")?;
     }
     if serde_attrs.has_deserialize_with {
-        ensure_codec_override(attrs, &path, "deserialize_with")?;
+        ensure_codec_override(field.type_overridden(), &path, "deserialize_with")?;
     }
     if serde_attrs.has_with {
-        ensure_codec_override(attrs, &path, "with")?;
+        ensure_codec_override(field.type_overridden(), &path, "with")?;
     }
 
     if mode == ApplyMode::Unified && serde_attrs.skip_serializing_if.is_some() {
@@ -463,12 +447,8 @@ fn validate_field_attributes(
     Ok(())
 }
 
-fn ensure_codec_override(
-    attrs: &specta::datatype::Attributes,
-    path: &str,
-    attr: &'static str,
-) -> Result<()> {
-    if attrs.get::<SpectaTypeAttr>().is_some() {
+fn ensure_codec_override(has_type_overridden: bool, path: &str, attr: &'static str) -> Result<()> {
+    if has_type_overridden {
         return Ok(());
     }
 

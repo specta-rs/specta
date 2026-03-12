@@ -73,6 +73,8 @@ pub struct Variant {
     pub(crate) fields: Fields,
     /// Runtime attributes for this variant
     pub(crate) attributes: Attributes,
+    /// Did the user apply a `#[specta(type = ...)]` or `#[specta(r#type = ...)]` attribute.
+    pub(crate) type_overridden: bool,
 }
 
 impl Variant {
@@ -84,6 +86,7 @@ impl Variant {
             deprecated: None,
             fields: Fields::Unit,
             attributes: Attributes::default(),
+            type_overridden: false,
         }
     }
 
@@ -98,6 +101,7 @@ impl Variant {
                     fields: Default::default(),
                 }),
                 attributes: Attributes::default(),
+                type_overridden: false,
             },
             variant: NamedFields { fields: vec![] },
         }
@@ -114,6 +118,7 @@ impl Variant {
                     fields: Default::default(),
                 }),
                 attributes: Attributes::default(),
+                type_overridden: false,
             },
             variant: UnnamedFields {
                 fields: Default::default(),
@@ -185,6 +190,16 @@ impl Variant {
     pub fn attributes_mut(&mut self) -> &mut Attributes {
         &mut self.attributes
     }
+
+    /// Has the Specta type override attribute been applied to this variant?
+    pub fn type_overridden(&self) -> bool {
+        self.type_overridden
+    }
+
+    /// Set whether a Specta type override attribute was applied to this variant.
+    pub fn set_type_overridden(&mut self, type_overridden: bool) {
+        self.type_overridden = type_overridden;
+    }
 }
 
 /// Builder for constructing [`Variant`] values.
@@ -222,6 +237,17 @@ impl<T> VariantBuilder<T> {
     /// Set runtime attributes on the variant in-place.
     pub fn attributes_mut(&mut self, attributes: Attributes) {
         self.v.attributes = attributes;
+    }
+
+    /// Set whether the variant has a Specta type override.
+    pub fn type_overridden(mut self, type_overridden: bool) -> Self {
+        self.v.type_overridden = type_overridden;
+        self
+    }
+
+    /// Set whether the variant has a Specta type override in-place.
+    pub fn type_overridden_mut(&mut self, type_overridden: bool) {
+        self.v.type_overridden = type_overridden;
     }
 }
 
