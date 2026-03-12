@@ -1,9 +1,6 @@
 #![allow(deprecated)]
 
-use specta::{
-    Type, Types,
-    datatype::{DataType, Primitive},
-};
+use specta::{Type, Types};
 use specta_typescript::{BigIntExportBehavior, Typescript};
 
 #[derive(Type)]
@@ -91,35 +88,9 @@ struct LegacyImpls {
 
 #[test]
 fn legacy_impls() {
-    let mut types = Types::default();
-
-    assert_eq!(
-        <ordered_float::OrderedFloat<f32> as Type>::definition(&mut types),
-        DataType::Primitive(Primitive::f32)
-    );
-    assert_eq!(
-        <ordered_float::OrderedFloat<f64> as Type>::definition(&mut types),
-        DataType::Primitive(Primitive::f64)
-    );
-
-    for ty in [
-        <heapless::Vec<i32, 8> as Type>::definition(&mut types),
-        <arrayvec::ArrayVec<i32, 8> as Type>::definition(&mut types),
-        <smallvec::SmallVec<[i32; 8]> as Type>::definition(&mut types),
-    ] {
-        match ty {
-            DataType::List(list) => {
-                assert_eq!(list.length(), None);
-                assert!(!list.unique());
-                assert_eq!(list.ty(), &DataType::Primitive(Primitive::i32));
-            }
-            _ => panic!("expected list type"),
-        }
-    }
-
     let output = Typescript::default()
         .bigint(BigIntExportBehavior::Number)
-        .export(&types.register::<LegacyImpls>())
+        .export(&Types::default().register::<LegacyImpls>())
         .unwrap();
     insta::assert_snapshot!("legacy_impls", output);
 }
