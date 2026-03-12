@@ -280,15 +280,6 @@ expression: output
 	* @typedef {never} RenamedVariantWithSkippedPayload
 	* @property {never} A
 	*
-	*  https://github.com/specta-rs/specta/issues/374
-	*
-	* @typedef {{
-	*		foo: boolean,
-	*		bar: boolean,
-	*	}} Issue374
-	* @property {boolean} foo
-	* @property {boolean} bar
-	*
 	* @typedef {never} Type
 	*
 	* @typedef {{

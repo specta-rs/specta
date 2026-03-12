@@ -243,10 +243,11 @@ fn inner(
                     let reference_key = Reference::Named(reference.clone());
                     checked_references.insert(reference_key);
                     if let Some(ndt) = reference.get(types) {
+                        let merged_generics = merged_generics(generics, reference.generics());
                         inner(
                             ndt.ty(),
                             types,
-                            reference.generics(),
+                            &merged_generics,
                             checked_references,
                             ndt.name().to_string(),
                             mode,
@@ -457,6 +458,26 @@ fn ensure_codec_override(has_type_overridden: bool, path: &str, attr: &'static s
     ))
 }
 
+fn merged_generics(
+    parent: &[(GenericReference, DataType)],
+    child: &[(GenericReference, DataType)],
+) -> Vec<(GenericReference, DataType)> {
+    let unshadowed_parent = parent
+        .iter()
+        .filter(|(parent_generic, _)| {
+            !child
+                .iter()
+                .any(|(child_generic, _)| child_generic == parent_generic)
+        })
+        .cloned();
+
+    child
+        .iter()
+        .cloned()
+        .chain(unshadowed_parent)
+        .collect()
+}
+
 fn is_valid_map_key(
     key_ty: &DataType,
     types: &Types,
@@ -531,7 +552,8 @@ fn is_valid_map_key(
         }
         DataType::Reference(Reference::Named(reference)) => {
             if let Some(ndt) = reference.get(types) {
-                is_valid_map_key(ndt.ty(), types, reference.generics(), path)?;
+                let merged_generics = merged_generics(generics, reference.generics());
+                is_valid_map_key(ndt.ty(), types, &merged_generics, path)?;
             }
 
             Ok(())

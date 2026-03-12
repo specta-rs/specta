@@ -290,7 +290,7 @@ fn test_function_exporting() {
                 .and_then(|result| render_datatype(&ts, &types, result))
                 .as_deref()
                 .unwrap_or("None"),
-            @"number"
+            @"({ Ok: number }) & { Err?: never } | ({ Err: number }) & { Ok?: never }"
         );
     }
 
@@ -307,7 +307,7 @@ fn test_function_exporting() {
                 .and_then(|result| render_datatype(&ts, &types, result))
                 .as_deref()
                 .unwrap_or("None"),
-            @"string | number"
+            @"({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never }"
         );
     }
 

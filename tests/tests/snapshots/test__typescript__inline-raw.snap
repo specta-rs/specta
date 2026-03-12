@@ -181,10 +181,6 @@ RenamedFieldKeys: {
 	paragraph_separator: string,
 }
 RenamedVariantWithSkippedPayload: never
-Issue374: {
-	foo: boolean,
-	bar: boolean,
-}
 type_type::Type: never
 ActualType: {
 	a: GenericType<string>,
