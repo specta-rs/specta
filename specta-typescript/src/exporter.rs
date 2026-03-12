@@ -9,7 +9,7 @@ use std::{
 };
 
 use specta::{
-    TypeCollection,
+    Types,
     datatype::{DataType, NamedDataType, Reference},
 };
 
@@ -211,7 +211,7 @@ impl Exporter {
     /// Export the files into a single string.
     ///
     /// Note: This returns an error if the format is `Format::Files`.
-    pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
+    pub fn export(&self, types: &Types) -> Result<String, Error> {
         if let Layout::Files = self.layout {
             return Err(Error::unable_to_export(self.layout));
         }
@@ -257,7 +257,7 @@ impl Exporter {
     /// When configured when `format` is `Format::Files`, you must provide a directory path.
     /// Otherwise, you must provide the path of a single file.
     ///
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
+    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types) -> Result<(), Error> {
         let path = path.as_ref();
 
         if self.layout != Layout::Files {
@@ -271,7 +271,7 @@ impl Exporter {
 
         fn export(
             exporter: &Exporter,
-            types: &TypeCollection,
+            types: &Types,
             module: &mut Module,
             s: &mut String,
             path: &Path,
@@ -473,7 +473,7 @@ impl AsMut<Exporter> for Exporter {
 pub struct BrandedTypeExporter<'a> {
     pub(crate) exporter: &'a Exporter,
     /// Collected types currently being exported.
-    pub types: &'a TypeCollection,
+    pub types: &'a Types,
 }
 
 impl fmt::Debug for BrandedTypeExporter<'_> {
@@ -515,7 +515,7 @@ pub struct FrameworkExporter<'a> {
     // For `Layout::Files` we need to inject the value
     files_root_types: &'a str,
     /// Collected types currently being exported.
-    pub types: &'a TypeCollection,
+    pub types: &'a Types,
 }
 
 impl fmt::Debug for FrameworkExporter<'_> {
@@ -539,7 +539,7 @@ impl Deref for FrameworkExporter<'_> {
 }
 
 impl FrameworkExporter<'_> {
-    /// Render the types within the [TypeCollection].
+    /// Render the types within the [Types].
     ///
     /// This will only work if used within [Self::framework_runtime] function.
     /// It allows frameworks to intersperse their user types into their runtime code.
@@ -576,7 +576,7 @@ struct Module<'a> {
     module_path: Cow<'static, str>,
 }
 
-fn build_module_graph(types: &TypeCollection) -> Module<'_> {
+fn build_module_graph(types: &Types) -> Module<'_> {
     types.into_unsorted_iter().fold(
         Module {
             types: Default::default(),
@@ -629,12 +629,12 @@ fn render_file_header(exporter: &Exporter) -> Result<String, Error> {
 fn render_types(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     files_user_types: &str,
 ) -> Result<(), Error> {
     match exporter.layout {
         Layout::Namespaces => {
-            fn has_renderable_content(module: &Module<'_>, types: &TypeCollection) -> bool {
+            fn has_renderable_content(module: &Module<'_>, types: &Types) -> bool {
                 module.types.iter().any(|ndt| ndt.requires_reference(types))
                     || module
                         .children
@@ -644,7 +644,7 @@ fn render_types(
 
             fn export<'a>(
                 exporter: &Exporter,
-                types: &TypeCollection,
+                types: &Types,
                 s: &mut String,
                 module: impl ExactSizeIterator<Item = (&'a &'a str, &'a mut Module<'a>)>,
                 depth: usize,
@@ -741,7 +741,7 @@ fn render_types(
 fn render_flat_types<'a>(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     ndts: impl ExactSizeIterator<Item = &'a NamedDataType>,
     indent: &str,
 ) -> Result<HashMap<String, Location<'static>>, Error> {

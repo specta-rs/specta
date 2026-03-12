@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 /// A comprehensive example demonstrating multi-line comment support
@@ -103,7 +103,7 @@ struct User {
 }
 
 fn main() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<ApiResponse<String>>()
         .register::<User>();
 

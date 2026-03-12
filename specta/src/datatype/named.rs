@@ -1,7 +1,7 @@
 use std::{borrow::Cow, panic::Location, sync::Arc};
 
 use crate::{
-    TypeCollection,
+    Types,
     datatype::{
         DataType, NamedReference, Reference,
         reference::{self, GenericReference, NamedId},
@@ -75,8 +75,8 @@ impl NamedDataType {
         }
     }
 
-    /// Register the type into a [TypeCollection].
-    pub fn register(&self, types: &mut TypeCollection) {
+    /// Register the type into a [Types].
+    pub fn register(&self, types: &mut Types) {
         types.0.insert(self.id.clone(), Some(self.clone()));
         types.1 += 1;
     }
@@ -92,9 +92,9 @@ impl NamedDataType {
         generics_for_ndt: &'static [(GenericReference, Cow<'static, str>)],
         generics_for_ref: Vec<(GenericReference, DataType)>,
         mut inline: bool,
-        types: &mut TypeCollection,
+        types: &mut Types,
         sentinel: &'static str,
-        build_ndt: fn(&mut TypeCollection, &mut NamedDataType),
+        build_ndt: fn(&mut Types, &mut NamedDataType),
     ) -> Reference {
         let id = NamedId::Static(sentinel);
         let location = Location::caller().to_owned();
@@ -163,8 +163,8 @@ impl NamedDataType {
     /// This if `false` is all [Reference]'s created for the type are inlined,
     /// in that case it doesn't need to be exported because it will never be
     /// referenced.
-    pub fn requires_reference(&self, _types: &TypeCollection) -> bool {
-        // `TypeCollection` is unused but I wanna keep it for future flexibility.
+    pub fn requires_reference(&self, _types: &Types) -> bool {
+        // `Types` is unused but I wanna keep it for future flexibility.
 
         // If a type is inlined, all it's references are,
         // therefor we don't need to export a named version of it.

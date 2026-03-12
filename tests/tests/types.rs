@@ -15,23 +15,23 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use specta::{datatype::DataType, Type, TypeCollection};
+use specta::{Type, Types, datatype::DataType};
 
 /// A macro to collect up the types for better testing.
 ///
-/// In a real-world application you should prefer the `TypeCollection::register` method instead of this.
+/// In a real-world application you should prefer the `Types::register` method instead of this.
 /// In this case we can't use it because we intent to test `NamedDataType` and `DataType`'s.
-/// `TypeCollection` only registers `NamedDataType` as those are the only types that aren't built-in.
+/// `Types` only registers `NamedDataType` as those are the only types that aren't built-in.
 macro_rules! types {
     ($($t:ty),* $(,)?) => {{
-        let mut types = specta::TypeCollection::default();
+        let mut types = specta::Types::default();
         let mut dts = Vec::new();
         let mut s = specta::datatype::Struct::named();
 
         $({
             let ty = <$t as specta::Type>::definition(&mut types);
 
-            // Like `TypeCollection::register` we are relying on the side-effect of `definition`.
+            // Like `Types::register` we are relying on the side-effect of `definition`.
             // but unlike it also storing the resulting `DataType` for testing the primitives.
             dts.push((stringify!($t), ty.clone()));
 
@@ -39,7 +39,7 @@ macro_rules! types {
         })*
 
         // This allows us to end-to-end test primitives.
-        // Many types won't be directly added to the `TypeCollection`, as they are not named.
+        // Many types won't be directly added to the `Types`, as they are not named.
         specta::datatype::NamedDataType::new("Primitives", vec![], s.build()).register(&mut types);
 
         // Test `selection!`
@@ -54,7 +54,7 @@ macro_rules! types {
                 password: &'static str,
             }
 
-            fn register<T: specta::Type>(types: &mut specta::TypeCollection, _: T) {
+            fn register<T: specta::Type>(types: &mut specta::Types, _: T) {
                 types.register_mut::<T>();
             }
             let user = User {
@@ -81,7 +81,7 @@ macro_rules! types {
 }
 
 #[rustfmt::skip]
-pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
+pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
     types!(
         i8, i16, i32, i64, i128, isize,
         u8, u16, u32, u64, u128, usize,
@@ -2461,7 +2461,7 @@ struct UsesTransparent {
 
 #[test]
 fn transparent_wrappers_have_distinct_ids() {
-    let mut types = TypeCollection::default();
+    let mut types = Types::default();
     let id_a = TransparentA::definition(&mut types);
     let id_b = TransparentB::definition(&mut types);
     let names = types
@@ -2476,7 +2476,7 @@ fn transparent_wrappers_have_distinct_ids() {
 
 #[test]
 fn struct_collects_all_transparent_field_types() {
-    let mut types = TypeCollection::default();
+    let mut types = Types::default();
     UsesTransparent::definition(&mut types);
     let names = types
         .into_unsorted_iter()

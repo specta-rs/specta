@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_jsonschema::{JsonSchema, SchemaVersion};
 
 #[derive(Type)]
@@ -27,7 +27,7 @@ pub struct Post {
 
 fn main() {
     // Create a type collection with all the types we want to export
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<User>()
         .register::<Role>()
         .register::<Post>();

@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 #[derive(Type)]
@@ -116,7 +116,7 @@ enum DatabaseResult<T, E> {
 
 #[test]
 fn test_complex_unions() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<Point>()
         .register::<Circle>()
         .register::<Rectangle>()
@@ -170,7 +170,7 @@ fn test_complex_unions() {
 
 #[test]
 fn test_union_with_generics() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<ApiResponse<String>>()
         .register::<DatabaseResult<i32, String>>();
 
@@ -195,7 +195,7 @@ fn test_union_with_generics() {
 
 #[test]
 fn test_union_naming_conventions() {
-    let types = TypeCollection::default().register::<Shape>();
+    let types = Types::default().register::<Shape>();
 
     // Test with different naming conventions
     let swift_pascal = Swift::new().naming(specta_swift::NamingConvention::PascalCase);

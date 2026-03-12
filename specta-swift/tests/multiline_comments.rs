@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 /// A path within the Spacedrive Virtual Distributed File System
@@ -37,7 +37,7 @@ struct SimpleStruct {
 
 #[test]
 fn test_multiline_comments() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<SdPath>()
         .register::<SimpleStruct>();
 

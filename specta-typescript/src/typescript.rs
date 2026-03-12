@@ -1,6 +1,6 @@
 use std::{borrow::Cow, path::Path};
 
-use specta::TypeCollection;
+use specta::Types;
 
 use crate::{BigIntExportBehavior, Branded, BrandedTypeExporter, Error, Exporter, Layout};
 
@@ -67,7 +67,7 @@ impl Typescript {
     /// Export the files into a single string.
     ///
     /// Note: This returns an error if the format is `Format::Files`.
-    pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
+    pub fn export(&self, types: &Types) -> Result<String, Error> {
         self.0.export(types)
     }
 
@@ -76,7 +76,7 @@ impl Typescript {
     /// When configured when `format` is `Format::Files`, you must provide a directory path.
     /// Otherwise, you must provide the path of a single file.
     ///
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
+    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types) -> Result<(), Error> {
         self.0.export_to(path, types)
     }
 }

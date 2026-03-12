@@ -7,7 +7,7 @@ use std::{
 };
 
 use specta::{
-    TypeCollection,
+    Types,
     datatype::{
         DataType, Deprecated, Enum, Field, Fields, GenericReference, Reference, Struct, Tuple,
         Variant,
@@ -131,7 +131,7 @@ fn inner_comments(
 pub(crate) fn datatype_inner(
     ctx: ExportContext,
     typ: &DataType,
-    types: &TypeCollection,
+    types: &Types,
     s: &mut String,
     generics: &[(GenericReference, DataType)],
 ) -> Result<()> {
@@ -142,7 +142,7 @@ pub(crate) fn datatype_inner(
 fn unnamed_fields_datatype(
     ctx: ExportContext,
     fields: &[(&Field, &DataType)],
-    types: &TypeCollection,
+    types: &Types,
     s: &mut String,
     prefix: &str,
     generics: &[(GenericReference, DataType)],
@@ -211,7 +211,7 @@ fn unnamed_fields_datatype(
 pub(crate) fn tuple_datatype(
     ctx: ExportContext,
     tuple: &Tuple,
-    types: &TypeCollection,
+    types: &Types,
     generics: &[(GenericReference, DataType)],
 ) -> Output {
     match &tuple.elements() {
@@ -233,7 +233,7 @@ pub(crate) fn struct_datatype(
     ctx: ExportContext,
     _parent_name: Option<&str>,
     strct: &Struct,
-    types: &TypeCollection,
+    types: &Types,
     s: &mut String,
     prefix: &str,
     generics: &[(GenericReference, DataType)],
@@ -370,7 +370,7 @@ pub(crate) fn struct_datatype(
 
 fn enum_variant_datatype(
     ctx: ExportContext,
-    types: &TypeCollection,
+    types: &Types,
     name: Cow<'static, str>,
     variant: &Variant,
     prefix: &str,
@@ -575,7 +575,7 @@ fn strictify_enum_variants(variants: &mut [EnumVariantOutput]) {
 pub(crate) fn enum_datatype(
     ctx: ExportContext,
     e: &Enum,
-    types: &TypeCollection,
+    types: &Types,
     s: &mut String,
     prefix: &str,
     generics: &[(GenericReference, DataType)],
@@ -644,7 +644,7 @@ fn object_field_to_ts(
     ctx: ExportContext,
     key: Cow<'static, str>,
     field_ref: (&Field, &DataType),
-    types: &TypeCollection,
+    types: &Types,
     s: &mut String,
     generics: &[(GenericReference, DataType)],
     prefix: &str,
@@ -676,7 +676,7 @@ fn object_field_to_ts(
 }
 
 fn inline_reference_docs<'a>(
-    types: &'a TypeCollection,
+    types: &'a Types,
     (field, ty): (&Field, &'a DataType),
     force_inline: bool,
 ) -> Option<&'a str> {
@@ -846,7 +846,7 @@ pub(crate) fn deprecated_details(typ: &Deprecated) -> Option<String> {
 // pub fn typedef_named_datatype(
 //     cfg: &Typescript,
 //     typ: &NamedDataType,
-//     types: &TypeCollection,
+//     types: &Types,
 // ) -> Output {
 //     typedef_named_datatype_inner(
 //         &ExportContext {
@@ -861,7 +861,7 @@ pub(crate) fn deprecated_details(typ: &Deprecated) -> Option<String> {
 // fn typedef_named_datatype_inner(
 //     ctx: &ExportContext,
 //     typ: &NamedDataType,
-//     types: &TypeCollection,
+//     types: &Types,
 // ) -> Output {
 //     let name = typ.name();
 //     let docs = typ.docs();

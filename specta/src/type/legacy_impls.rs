@@ -3,7 +3,7 @@
 //! The plan is to try and move these into the ecosystem for the v2 release.
 use super::macros::{impl_ndt, impl_ndt_as};
 use crate::{
-    Type, TypeCollection,
+    Type, Types,
     datatype::{
         self, DataType, Enum, Field, Fields, NamedFields, Primitive, Reference, Struct, Variant,
     },
@@ -309,7 +309,7 @@ const _: () = {
     // These needs generics which also aren't `Type` & aren't in `References` param so `impl_ndt` doesn't work.
     macro_rules! impl_as_str {
         ($module:ident :: $type_name:ident) => {
-            fn definition(types: &mut TypeCollection) -> DataType {
+            fn definition(types: &mut Types) -> DataType {
                 // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
                 static SENTINEL: &str = stringify!($module::$type_name);
                 static GENERICS: &[(datatype::GenericReference, Cow<'static, str>)] = &[];

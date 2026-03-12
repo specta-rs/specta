@@ -1,23 +1,19 @@
 use crate::{Error, JsonSchema};
 use serde_json::{Map, Value, json};
 use specta::{
-    TypeCollection,
+    Types,
     datatype::{NamedDataType, *},
 };
 
 /// Convert a NamedDataType to a JSON Schema definition
-pub fn export(
-    js: &JsonSchema,
-    types: &TypeCollection,
-    ndt: &NamedDataType,
-) -> Result<Value, Error> {
+pub fn export(js: &JsonSchema, types: &Types, ndt: &NamedDataType) -> Result<Value, Error> {
     datatype_to_schema(js, types, ndt.ty(), true)
 }
 
 /// Convert a DataType to a JSON Schema, optionally as a reference
 pub fn datatype_to_schema(
     js: &JsonSchema,
-    types: &TypeCollection,
+    types: &Types,
     dt: &DataType,
     is_definition: bool,
 ) -> Result<Value, Error> {
@@ -87,7 +83,7 @@ pub fn datatype_to_schema(
                             datatype_to_schema(js, types, referenced_ndt.ty(), true)
                         } else {
                             Err(Error::InvalidReference(
-                                "Reference not found in TypeCollection".to_string(),
+                                "Reference not found in Types".to_string(),
                             ))
                         }
                     } else {
@@ -99,7 +95,7 @@ pub fn datatype_to_schema(
                             }))
                         } else {
                             Err(Error::InvalidReference(
-                                "Reference not found in TypeCollection".to_string(),
+                                "Reference not found in Types".to_string(),
                             ))
                         }
                     }
@@ -146,7 +142,7 @@ fn primitive_to_schema(p: &Primitive) -> Value {
 
 fn struct_to_schema(
     js: &JsonSchema,
-    types: &TypeCollection,
+    types: &Types,
     s: &Struct,
     _is_definition: bool,
 ) -> Result<Value, Error> {
@@ -207,7 +203,7 @@ fn struct_to_schema(
     }
 }
 
-fn enum_to_schema(js: &JsonSchema, types: &TypeCollection, e: &Enum) -> Result<Value, Error> {
+fn enum_to_schema(js: &JsonSchema, types: &Types, e: &Enum) -> Result<Value, Error> {
     let variants: Result<Vec<_>, _> = e
         .variants()
         .iter()
@@ -234,7 +230,7 @@ fn enum_to_schema(js: &JsonSchema, types: &TypeCollection, e: &Enum) -> Result<V
 
 fn variant_to_schema(
     js: &JsonSchema,
-    types: &TypeCollection,
+    types: &Types,
     name: &str,
     variant: &Variant,
 ) -> Result<Value, Error> {
@@ -326,7 +322,7 @@ fn variant_to_schema(
     }
 }
 
-fn tuple_to_schema(js: &JsonSchema, types: &TypeCollection, t: &Tuple) -> Result<Value, Error> {
+fn tuple_to_schema(js: &JsonSchema, types: &Types, t: &Tuple) -> Result<Value, Error> {
     if t.elements().is_empty() {
         // Empty tuple = null
         return Ok(json!({"type": "null"}));

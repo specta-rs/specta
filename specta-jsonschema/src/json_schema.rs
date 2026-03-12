@@ -1,6 +1,6 @@
 use crate::{Error, Layout, SchemaVersion, primitives};
 use serde_json::Value;
-use specta::{TypeCollection, datatype::NamedDataType};
+use specta::{Types, datatype::NamedDataType};
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -59,13 +59,13 @@ impl JsonSchema {
     }
 
     /// Export types to JSON Schema as a JSON string
-    pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
+    pub fn export(&self, types: &Types) -> Result<String, Error> {
         let value = self.export_as_value(types)?;
         Ok(serde_json::to_string_pretty(&value)?)
     }
 
     /// Export types to JSON Schema as serde_json::Value
-    pub fn export_as_value(&self, types: &TypeCollection) -> Result<Value, Error> {
+    pub fn export_as_value(&self, types: &Types) -> Result<Value, Error> {
         match self.layout {
             Layout::SingleFile => self.export_single_file(types),
             Layout::Files => Err(Error::ConversionError(
@@ -75,7 +75,7 @@ impl JsonSchema {
     }
 
     /// Export to file or directory
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
+    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types) -> Result<(), Error> {
         let path = path.as_ref();
 
         match self.layout {
@@ -88,7 +88,7 @@ impl JsonSchema {
         }
     }
 
-    fn export_single_file(&self, types: &TypeCollection) -> Result<Value, Error> {
+    fn export_single_file(&self, types: &Types) -> Result<Value, Error> {
         let mut definitions = BTreeMap::new();
 
         // Convert each type to a schema
@@ -121,7 +121,7 @@ impl JsonSchema {
         Ok(root)
     }
 
-    fn export_files(&self, base_path: &Path, types: &TypeCollection) -> Result<(), Error> {
+    fn export_files(&self, base_path: &Path, types: &Types) -> Result<(), Error> {
         // Create base directory
         std::fs::create_dir_all(base_path)?;
 

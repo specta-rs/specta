@@ -5,7 +5,7 @@
 use std::{borrow::Cow, cell::RefCell, fmt::Write as _, iter};
 
 use specta::{
-    TypeCollection,
+    Types,
     datatype::{
         DataType, Deprecated, Enum, Fields, GenericReference, List, Map, NamedDataType,
         NamedReference, OpaqueReference, Primitive, Reference, Tuple,
@@ -32,7 +32,7 @@ use crate::{
 ///
 pub fn export<'a>(
     exporter: &dyn AsRef<Exporter>,
-    types: &TypeCollection,
+    types: &Types,
     ndts: impl Iterator<Item = &'a NamedDataType>,
     indent: &str,
 ) -> Result<String, Error> {
@@ -44,7 +44,7 @@ pub fn export<'a>(
 pub(crate) fn export_internal<'a>(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     ndts: impl Iterator<Item = &'a NamedDataType>,
     indent: &str,
 ) -> Result<(), Error> {
@@ -85,7 +85,7 @@ pub(crate) fn export_internal<'a>(
 fn export_single_internal(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     ndt: &NamedDataType,
     indent: &str,
 ) -> Result<(), Error> {
@@ -172,7 +172,7 @@ fn export_single_internal(
 ///
 pub fn inline(
     exporter: &dyn AsRef<Exporter>,
-    types: &TypeCollection,
+    types: &Types,
     dt: &DataType,
 ) -> Result<String, Error> {
     let mut s = String::new();
@@ -195,7 +195,7 @@ pub fn inline(
 pub(crate) fn typedef_internal(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     dt: &NamedDataType,
 ) -> Result<(), Error> {
     s.push_str("/**\n");
@@ -209,7 +209,7 @@ pub(crate) fn typedef_internal(
 fn append_jsdoc_properties(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     dt: &NamedDataType,
     indent: &str,
 ) -> Result<(), Error> {
@@ -372,7 +372,7 @@ fn jsdoc_property_name(name: &str, optional: bool) -> String {
 fn append_typedef_body(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     dt: &NamedDataType,
     indent: &str,
 ) -> Result<(), Error> {
@@ -474,7 +474,7 @@ fn jsdoc_description(docs: &str, deprecated: Option<&Deprecated>) -> Option<Stri
 /// See [`export`] for the list of things to consider when using this.
 pub fn reference(
     exporter: &dyn AsRef<Exporter>,
-    types: &TypeCollection,
+    types: &Types,
     r: &Reference,
 ) -> Result<String, Error> {
     let mut s = String::new();
@@ -485,7 +485,7 @@ pub fn reference(
 pub(crate) fn datatype_with_inline_attr(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
     parent_name: Option<&str>,
@@ -582,7 +582,7 @@ fn write_generic_reference(s: &mut String, generic: &GenericReference) -> Result
 fn shallow_inline_datatype(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
     parent_name: Option<&str>,
@@ -626,7 +626,7 @@ fn shallow_inline_datatype(
             }
         }
         DataType::Map(map) => {
-            fn is_exhaustive(dt: &DataType, types: &TypeCollection) -> bool {
+            fn is_exhaustive(dt: &DataType, types: &Types) -> bool {
                 match dt {
                     DataType::Enum(e) => {
                         e.variants().iter().filter(|(_, v)| !v.skip()).count() == 0
@@ -903,7 +903,7 @@ fn resolve_generics_in_datatype(
 fn inline_datatype(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
     parent_name: Option<&str>,
@@ -1080,7 +1080,7 @@ fn inline_datatype(
 pub(crate) fn datatype(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
     parent_name: Option<&str>,
@@ -1168,7 +1168,7 @@ fn primitive_dt(
 fn list_dt(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     l: &List,
     _location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
@@ -1254,13 +1254,13 @@ fn list_dt(
 fn map_dt(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     m: &Map,
     _location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     {
-        fn is_exhaustive(dt: &DataType, types: &TypeCollection) -> bool {
+        fn is_exhaustive(dt: &DataType, types: &Types) -> bool {
             match dt {
                 DataType::Enum(e) => e.variants().iter().filter(|(_, v)| !v.skip()).count() == 0,
                 DataType::Reference(Reference::Named(r)) => {
@@ -1325,7 +1325,7 @@ fn map_dt(
 fn enum_dt(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     e: &Enum,
     _location: Vec<Cow<'static, str>>,
     prefix: &str,
@@ -1508,7 +1508,7 @@ fn enum_dt(
 // fn fields_dt(
 //     s: &mut String,
 //     ts: &Typescript,
-//     types: &TypeCollection,
+//     types: &Types,
 //     name: &Cow<'static, str>,
 //     f: &Fields,
 //     location: Vec<Cow<'static, str>>,
@@ -1599,7 +1599,7 @@ fn enum_dt(
 // fn flattened_fields_dt(
 //     s: &mut String,
 //     ts: &Typescript,
-//     types: &TypeCollection,
+//     types: &Types,
 //     name: &Cow<'static, str>,
 //     f: &Fields,
 //     location: Vec<Cow<'static, str>>,
@@ -1679,7 +1679,7 @@ fn enum_dt(
 // fn field_dt(
 //     s: &mut String,
 //     ts: &Typescript,
-//     types: &TypeCollection,
+//     types: &Types,
 //     key: Option<&Cow<'static, str>>,
 //     f: &Field,
 //     location: Vec<Cow<'static, str>>,
@@ -1760,7 +1760,7 @@ fn enum_dt(
 fn tuple_dt(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     t: &Tuple,
     _location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
@@ -1801,7 +1801,7 @@ fn tuple_dt(
 fn reference_dt(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     r: &Reference,
     location: Vec<Cow<'static, str>>,
     prefix: &str,
@@ -1841,7 +1841,7 @@ fn reference_dt(
 fn reference_opaque_dt(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     r: &OpaqueReference,
 ) -> Result<(), Error> {
     if let Some(def) = r.downcast_ref::<opaque::Define>() {
@@ -1884,7 +1884,7 @@ fn reference_opaque_dt(
 fn reference_named_dt(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     r: &NamedReference,
     location: Vec<Cow<'static, str>>,
     prefix: &str,
@@ -2010,7 +2010,7 @@ fn reference_named_dt(
     //     let ndt = types
     //         .get(r.sid())
     //         // Should be impossible without a bug in Specta.
-    //         .unwrap_or_else(|| panic!("Missing {:?} in `TypeCollection`", r.sid()));
+    //         .unwrap_or_else(|| panic!("Missing {:?} in `Types`", r.sid()));
 
     //     if r.inline() {
     //         todo!("inline reference!");

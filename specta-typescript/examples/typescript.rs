@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_typescript::Typescript;
 
 #[derive(Type)]
@@ -89,14 +89,14 @@ fn main() {
     // todo(&s1);
     // return;
 
-    // println!("{:#?}", <[String; 5] as Type>::definition(&mut TypeCollection::default()));
-    // println!("{:#?}", datatype::inline::<[String; 5]>(&mut TypeCollection::default()));
+    // println!("{:#?}", <[String; 5] as Type>::definition(&mut Types::default()));
+    // println!("{:#?}", datatype::inline::<[String; 5]>(&mut Types::default()));
     // println!("{:?}", specta_typescript::legacy::inline::<[String; 5]>(&Default::default()));
 
     // println!("{:?}", specta_typescript::legacy::inline::<A>(&Default::default()));
     // println!("{:?}", specta_typescript::export::<A>(&Default::default()));
 
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<TypeOne>()
         // notice how we don't list `TypeTwo`. It's a dependency of `TypeOne` and will be exported automatically.
         .register::<TransparentWithSkip>()

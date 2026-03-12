@@ -23,10 +23,10 @@ serde = { version = "1.0", features = ["derive"] }
 
 ## Basic Usage
 
-### Processing Type Collections
+### Processing Types
 
 ```rust
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_serde::{process_for_serialization, process_for_deserialization};
 use serde::{Serialize, Deserialize};
 
@@ -40,7 +40,7 @@ pub struct UserProfile {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<UserProfile>();
 
     // Transform for serialization (Rust -> JSON)
@@ -255,7 +255,7 @@ This allows different behavior based on direction:
 use specta_typescript::Typescript;
 use specta_serde::process_for_serialization;
 
-let types = TypeCollection::default()
+let types = Types::default()
     .register::<MyType>();
 
 // Transform for serialization before export
@@ -273,7 +273,7 @@ The crate includes validation to ensure serde attributes are used correctly:
 ```rust
 use specta_serde::validate;
 
-let types = TypeCollection::default()
+let types = Types::default()
     .register::<MyType>();
 
 // Validate serde usage

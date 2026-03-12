@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::{
-    Type, TypeCollection,
+    Type, Types,
     datatype::{self, DataType, Enum, Field, List, Variant},
     internal,
     r#type::{generics, macros::*},
@@ -17,14 +17,14 @@ impl_primitives!(
 
 #[cfg(is_nightly)]
 impl Type for f16 {
-    fn definition(_: &mut TypeCollection) -> DataType {
+    fn definition(_: &mut Types) -> DataType {
         DataType::Primitive(datatype::Primitive::f16)
     }
 }
 
 #[cfg(is_nightly)]
 impl Type for f128 {
-    fn definition(_: &mut TypeCollection) -> DataType {
+    fn definition(_: &mut Types) -> DataType {
         DataType::Primitive(datatype::Primitive::f128)
     }
 }
@@ -34,7 +34,7 @@ impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13);
 
 pub(crate) struct PrimitiveSet<T>(PhantomData<T>);
 impl<T: Type> Type for PrimitiveSet<T> {
-    fn definition(types: &mut TypeCollection) -> DataType {
+    fn definition(types: &mut Types) -> DataType {
         let mut l = List::new(<T as Type>::definition(types));
         l.set_unique(true);
         DataType::List(l)
@@ -43,7 +43,7 @@ impl<T: Type> Type for PrimitiveSet<T> {
 
 pub(crate) struct PrimitiveMap<K, V>(PhantomData<K>, PhantomData<V>);
 impl<K: Type, V: Type> Type for PrimitiveMap<K, V> {
-    fn definition(types: &mut TypeCollection) -> DataType {
+    fn definition(types: &mut Types) -> DataType {
         DataType::Map(crate::datatype::Map::new(
             K::definition(types),
             V::definition(types),
@@ -179,7 +179,7 @@ const _: () = {
     );
 
     impl<'a, T: ?Sized + ToOwned + Type + 'a> Type for std::borrow::Cow<'a, T> {
-        fn definition(types: &mut TypeCollection) -> DataType {
+        fn definition(types: &mut Types) -> DataType {
             use std::borrow::Cow;
 
             use crate::datatype::GenericReference;
@@ -211,7 +211,7 @@ const _: () = {
 
     struct BaseRange<T>(PhantomData<T>);
     impl<T: Type> Type for BaseRange<T> {
-        fn definition(types: &mut TypeCollection) -> DataType {
+        fn definition(types: &mut Types) -> DataType {
             let ty = T::definition(types);
             let mut s = crate::datatype::Struct::unit();
             s.set_fields(internal::construct::fields_named(vec![
@@ -235,7 +235,7 @@ impl<T: Type + ?Sized> Type for &T {
 }
 
 impl<T: Type> Type for [T] {
-    fn definition(types: &mut TypeCollection) -> DataType {
+    fn definition(types: &mut Types) -> DataType {
         let mut l = List::new(<T as Type>::definition(types));
         l.set_unique(false);
         DataType::List(l)
@@ -243,7 +243,7 @@ impl<T: Type> Type for [T] {
 }
 
 impl<const N: usize, T: Type> Type for [T; N] {
-    fn definition(types: &mut TypeCollection) -> DataType {
+    fn definition(types: &mut Types) -> DataType {
         let mut l = List::new(T::definition(types));
         l.set_length(Some(N));
         DataType::List(l)
@@ -251,7 +251,7 @@ impl<const N: usize, T: Type> Type for [T; N] {
 }
 
 impl<T: Type> Type for Option<T> {
-    fn definition(types: &mut TypeCollection) -> DataType {
+    fn definition(types: &mut Types) -> DataType {
         DataType::Nullable(Box::new(T::definition(types)))
     }
 }

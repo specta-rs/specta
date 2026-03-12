@@ -41,7 +41,7 @@ struct WithVariousAttributes {
 #[test]
 fn test_attribute_parsing() {
     // Just ensure these types can be derived without parse errors
-    let mut types = specta::TypeCollection::default();
+    let mut types = specta::Types::default();
     let _ = WithDocAttributes::definition(&mut types);
     let _ = WithVariousAttributes::definition(&mut types);
 }

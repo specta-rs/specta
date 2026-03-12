@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 /// Advanced example showcasing complex enum unions and their Swift representations
@@ -165,7 +165,7 @@ fn main() {
     println!("{}", "=".repeat(60));
 
     // Create type collection
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<ApiResult<String, String>>()
         .register::<Shape>()
         .register::<Point>()

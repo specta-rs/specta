@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use specta::{
-    TypeCollection,
+    Types,
     datatype::{DataType, Enum, Fields, GenericReference, Primitive, Reference, Variant},
 };
 
@@ -16,11 +16,11 @@ pub enum ApplyMode {
     Phases,
 }
 
-pub fn validate(types: &TypeCollection) -> Result<()> {
+pub fn validate(types: &Types) -> Result<()> {
     validate_for_mode(types, ApplyMode::Unified)
 }
 
-pub fn validate_for_mode(types: &TypeCollection, mode: ApplyMode) -> Result<()> {
+pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<()> {
     for ndt in types.into_unsorted_iter() {
         let ndt_generics = ndt
             .generics()
@@ -48,7 +48,7 @@ pub fn validate_for_mode(types: &TypeCollection, mode: ApplyMode) -> Result<()> 
 
 fn inner(
     dt: &DataType,
-    types: &TypeCollection,
+    types: &Types,
     generics: &[(GenericReference, DataType)],
     checked_references: &mut HashSet<Reference>,
     path: String,
@@ -357,7 +357,7 @@ fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<(
 
 fn validate_container_attributes(
     attrs: &specta::datatype::Attributes,
-    types: &TypeCollection,
+    types: &Types,
     generics: &[(GenericReference, DataType)],
     checked_references: &mut HashSet<Reference>,
     path: &str,
@@ -463,7 +463,7 @@ fn ensure_codec_override(
 
 fn is_valid_map_key(
     key_ty: &DataType,
-    types: &TypeCollection,
+    types: &Types,
     generics: &[(GenericReference, DataType)],
     path: String,
 ) -> Result<()> {
@@ -567,7 +567,7 @@ fn is_valid_map_key(
     }
 }
 
-fn validate_enum(enm: &Enum, types: &TypeCollection, path: String, mode: ApplyMode) -> Result<()> {
+fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Result<()> {
     let valid_variants = enm
         .variants()
         .iter()
@@ -640,7 +640,7 @@ fn validate_other_variant(enm: &Enum, path: &str, repr: &EnumRepr, mode: ApplyMo
     Ok(())
 }
 
-fn validate_internally_tag_enum(enm: &Enum, types: &TypeCollection, path: String) -> Result<()> {
+fn validate_internally_tag_enum(enm: &Enum, types: &Types, path: String) -> Result<()> {
     for (variant_name, variant) in enm.variants() {
         validate_internally_tag_variant(enm, variant_name, variant, types, &path)?;
     }
@@ -652,7 +652,7 @@ fn validate_internally_tag_variant(
     enm: &Enum,
     variant_name: &str,
     variant: &Variant,
-    types: &TypeCollection,
+    types: &Types,
     path: &str,
 ) -> Result<()> {
     let _ = enm;
@@ -682,7 +682,7 @@ fn validate_internally_tag_variant(
 
 fn validate_internally_tag_enum_datatype(
     ty: &DataType,
-    types: &TypeCollection,
+    types: &Types,
     path: &str,
     variant_name: &str,
 ) -> Result<()> {

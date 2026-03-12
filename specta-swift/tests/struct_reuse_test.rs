@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 #[derive(Type)]
@@ -23,7 +23,7 @@ struct ApiRequest {
 
 #[test]
 fn test_struct_reuse_between_standalone_and_enum() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<UserData>()
         .register::<ApiResponse>()
         .register::<ApiRequest>();
@@ -62,7 +62,7 @@ fn test_struct_reuse_between_standalone_and_enum() {
 #[test]
 fn test_struct_reuse_with_different_ordering() {
     // Test with different ordering - enum first, then standalone struct
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<ApiResponse>()
         .register::<UserData>()
         .register::<ApiRequest>();

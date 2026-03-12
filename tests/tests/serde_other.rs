@@ -1,7 +1,7 @@
 // Regression test for https://github.com/specta-rs/specta/issues/131
 
 use serde::Deserialize;
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_typescript::{BigIntExportBehavior, Typescript};
 
 #[derive(Type, Deserialize)]
@@ -26,17 +26,18 @@ enum AdjacentOther {
 
 #[test]
 fn serde_other_requires_apply_phases() {
-    let err = specta_serde::apply(TypeCollection::default().register::<InternalOther>())
+    let err = specta_serde::apply(Types::default().register::<InternalOther>())
         .expect_err("#[serde(other)] should require apply_phases");
 
-    assert!(err
-        .to_string()
-        .contains("`#[serde(other)]` requires `apply_phases`"));
+    assert!(
+        err.to_string()
+            .contains("`#[serde(other)]` requires `apply_phases`")
+    );
 }
 
 #[test]
 fn serde_other_internal_tag_widens_deserialize_tag_to_string() {
-    let types = specta_serde::apply_phases(TypeCollection::default().register::<InternalOther>())
+    let types = specta_serde::apply_phases(Types::default().register::<InternalOther>())
         .expect("apply_phases should support internally tagged #[serde(other)] enums");
     let ts = Typescript::default()
         .bigint(BigIntExportBehavior::Number)
@@ -51,7 +52,7 @@ fn serde_other_internal_tag_widens_deserialize_tag_to_string() {
 
 #[test]
 fn serde_other_adjacent_tag_widens_deserialize_tag_to_string() {
-    let types = specta_serde::apply_phases(TypeCollection::default().register::<AdjacentOther>())
+    let types = specta_serde::apply_phases(Types::default().register::<AdjacentOther>())
         .expect("apply_phases should support adjacently tagged #[serde(other)] enums");
     let ts = Typescript::default()
         .bigint(BigIntExportBehavior::Number)

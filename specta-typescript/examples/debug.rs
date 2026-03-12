@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use serde::Serialize;
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
@@ -21,7 +21,7 @@ pub struct B {
 }
 
 fn main() {
-    let mut types = TypeCollection::default().register::<B>();
+    let mut types = Types::default().register::<B>();
     // .register::<Testing>()
     // .register::<serde_yaml::Value>();
     // println!("{:#?}", types.get(Testing::ID).unwrap());

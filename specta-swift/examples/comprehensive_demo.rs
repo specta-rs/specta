@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::Swift;
 use std::time::Duration;
 
@@ -351,7 +351,7 @@ fn main() {
     println!("{}", "=".repeat(80));
 
     // Create comprehensive type collection
-    let types = TypeCollection::default()
+    let types = Types::default()
         // Core types
         .register::<Task>()
         .register::<TaskStatus>()

@@ -1,14 +1,14 @@
 use std::fmt;
 
 use specta::{
-    Type, TypeCollection,
+    Type, Types,
     datatype::{DataType, Function},
     function::{self, fn_datatype},
     specta,
 };
 use specta_typescript::{Typescript, primitives};
 
-fn render_datatype(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Option<String> {
+fn render_datatype(ts: &Typescript, types: &Types, dt: &DataType) -> Option<String> {
     match dt {
         DataType::Reference(r) => primitives::reference(ts, types, r).ok(),
         dt => primitives::inline(ts, types, dt).ok(),
@@ -115,7 +115,7 @@ fn test_trailing_comma() {
 #[test]
 fn test_function_exporting() {
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![a](&mut types);
         let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
@@ -126,7 +126,7 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![b](&mut types);
         let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
@@ -144,7 +144,7 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![c](&mut types);
         let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
@@ -176,7 +176,7 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![d](&mut types);
         let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
@@ -200,7 +200,7 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![e::<bool>](&mut types);
         let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
@@ -218,7 +218,7 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![f](&mut types);
         let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
@@ -242,7 +242,7 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: specta::datatype::Function = fn_datatype![g](&mut types);
         let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
@@ -260,7 +260,7 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: specta::datatype::Function = fn_datatype![h](&mut types);
         let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
@@ -278,7 +278,7 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![i](&mut types);
         let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
@@ -295,7 +295,7 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![k](&mut types);
         let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
@@ -312,7 +312,7 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![l](&mut types);
         let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
@@ -337,7 +337,7 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![m](&mut types);
         let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
@@ -355,7 +355,7 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![async_fn](&mut types);
         let types = specta_serde::apply(types).unwrap();
         insta::assert_snapshot!(def.asyncness(), @"true");
@@ -365,7 +365,7 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![with_docs](&mut types);
         let types = specta_serde::apply(types).unwrap();
         insta::assert_snapshot!(def.asyncness(), @"false");
@@ -376,7 +376,7 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![raw](&mut types);
         let types = specta_serde::apply(types).unwrap();
         insta::assert_snapshot!(def.args()[0].0, @"type");

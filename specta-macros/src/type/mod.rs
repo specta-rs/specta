@@ -182,21 +182,28 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         &used_generic_types,
     );
 
-    let (generic_placeholders, shadow_generics): (Vec<_>, Vec<_>) = generics.params.iter().filter_map(|param| match param {
-        GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
-        GenericParam::Type(t) => {
-            let ident = &t.ident;
-            let placeholder_ident = format_ident!("PLACEHOLDER_{ident}");
-            Some((quote!(
-                pub struct #placeholder_ident;
-                impl #crate_ref::Type for #placeholder_ident {
-                    fn definition(_: &mut #crate_ref::TypeCollection) -> datatype::DataType {
-                        datatype::GenericReference::new::<Self>().into()
-                    }
-                }
-            ), quote!(type #ident = #placeholder_ident;)))
-        }
-    }).unzip();
+    let (generic_placeholders, shadow_generics): (Vec<_>, Vec<_>) = generics
+        .params
+        .iter()
+        .filter_map(|param| match param {
+            GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
+            GenericParam::Type(t) => {
+                let ident = &t.ident;
+                let placeholder_ident = format_ident!("PLACEHOLDER_{ident}");
+                Some((
+                    quote!(
+                        pub struct #placeholder_ident;
+                        impl #crate_ref::Type for #placeholder_ident {
+                            fn definition(_: &mut #crate_ref::Types) -> datatype::DataType {
+                                datatype::GenericReference::new::<Self>().into()
+                            }
+                        }
+                    ),
+                    quote!(type #ident = #placeholder_ident;),
+                ))
+            }
+        })
+        .unzip();
 
     let (generics_for_ndt, generics_for_ref): (Vec<_>, Vec<_>) = generics
         .params
@@ -255,7 +262,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
             #[automatically_derived]
             impl #bounds #crate_ref::Type for #ident #type_args #where_bound {
-                fn definition(types: &mut #crate_ref::TypeCollection) -> datatype::DataType {
+                fn definition(types: &mut #crate_ref::Types) -> datatype::DataType {
                     #(#generic_placeholders)*
 
                     static SENTINEL: &str = concat!(module_path!(), "::", stringify!(#raw_ident));

@@ -578,7 +578,7 @@ macro_rules! __specta_serde_parse_container_items {
             type_src: String::from($value),
         });
         $target.resolved_from = Some({
-            let mut __types = specta::TypeCollection::default();
+            let mut __types = specta::Types::default();
             <specta::parse_type_from_lit!($value) as specta::Type>::definition(&mut __types)
         });
         $crate::__specta_serde_parse_container_items!($target; $($rest)*);
@@ -588,7 +588,7 @@ macro_rules! __specta_serde_parse_container_items {
             type_src: String::from($value),
         });
         $target.resolved_from = Some({
-            let mut __types = specta::TypeCollection::default();
+            let mut __types = specta::Types::default();
             <specta::parse_type_from_lit!($value) as specta::Type>::definition(&mut __types)
         });
     };
@@ -597,7 +597,7 @@ macro_rules! __specta_serde_parse_container_items {
             type_src: String::from($value),
         });
         $target.resolved_try_from = Some({
-            let mut __types = specta::TypeCollection::default();
+            let mut __types = specta::Types::default();
             <specta::parse_type_from_lit!($value) as specta::Type>::definition(&mut __types)
         });
         $crate::__specta_serde_parse_container_items!($target; $($rest)*);
@@ -607,7 +607,7 @@ macro_rules! __specta_serde_parse_container_items {
             type_src: String::from($value),
         });
         $target.resolved_try_from = Some({
-            let mut __types = specta::TypeCollection::default();
+            let mut __types = specta::Types::default();
             <specta::parse_type_from_lit!($value) as specta::Type>::definition(&mut __types)
         });
     };
@@ -616,7 +616,7 @@ macro_rules! __specta_serde_parse_container_items {
             type_src: String::from($value),
         });
         $target.resolved_into = Some({
-            let mut __types = specta::TypeCollection::default();
+            let mut __types = specta::Types::default();
             <specta::parse_type_from_lit!($value) as specta::Type>::definition(&mut __types)
         });
         $crate::__specta_serde_parse_container_items!($target; $($rest)*);
@@ -626,7 +626,7 @@ macro_rules! __specta_serde_parse_container_items {
             type_src: String::from($value),
         });
         $target.resolved_into = Some({
-            let mut __types = specta::TypeCollection::default();
+            let mut __types = specta::Types::default();
             <specta::parse_type_from_lit!($value) as specta::Type>::definition(&mut __types)
         });
     };

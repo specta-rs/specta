@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 /// Test enum with struct-like variants (named fields)
@@ -37,7 +37,7 @@ pub enum ApiResponse {
 
 #[test]
 fn test_struct_variants_generation() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<Event>()
         .register::<ApiResponse>();
 

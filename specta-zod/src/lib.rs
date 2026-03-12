@@ -43,7 +43,7 @@
 // ///
 // /// Eg. `export const Foo = z.object({ demo: string; });`
 // pub fn export<T: Type>(conf: &ExportConfig) -> Output {
-//     let mut types = TypeCollection::default();
+//     let mut types = Types::default();
 //     let named_data_type = T::definition_named_data_type(&mut types);
 //     // is_valid_ty(&named_data_type.inner, &types)?;
 //     let result = export_named_datatype(conf, &named_data_type, &types);
@@ -66,7 +66,7 @@
 // ///
 // /// Eg. `z.object({ demo: z.string() });`
 // pub fn inline<T: Type>(conf: &ExportConfig) -> Output {
-//     let mut types = TypeCollection::default();
+//     let mut types = Types::default();
 //     let ty = T::inline(&mut types, specta::Generics::Definition);
 //     // is_valid_ty(&ty, &types)?;
 //     let result = datatype(conf, &ty, &types);
@@ -84,7 +84,7 @@
 // pub fn export_named_datatype(
 //     conf: &ExportConfig,
 //     typ: &NamedDataType,
-//     types: &TypeCollection,
+//     types: &Types,
 // ) -> Output {
 //     // TODO: Duplicate type name detection?
 
@@ -130,7 +130,7 @@
 // fn export_datatype_inner(
 //     ctx: ExportContext,
 //     typ: &NamedDataType,
-//     types: &TypeCollection,
+//     types: &Types,
 // ) -> Output {
 //     let ctx = ctx.with(
 //         typ.ext()
@@ -161,7 +161,7 @@
 // /// Convert a DataType to a Zod validator
 // ///
 // /// Eg. `z.object({ demo: z.string(); })`
-// pub fn datatype(conf: &ExportConfig, typ: &DataType, types: &TypeCollection) -> Output {
+// pub fn datatype(conf: &ExportConfig, typ: &DataType, types: &Types) -> Output {
 //     // TODO: Duplicate type name detection?
 
 //     datatype_inner(
@@ -178,7 +178,7 @@
 // pub(crate) fn datatype_inner(
 //     ctx: ExportContext,
 //     typ: &DataType,
-//     types: &TypeCollection,
+//     types: &Types,
 // ) -> Output {
 //     Ok(match &typ {
 //         DataType::Any => ANY.into(),
@@ -287,7 +287,7 @@
 // fn unnamed_fields_datatype(
 //     ctx: ExportContext,
 //     fields: &[(&Field, &DataType)],
-//     types: &TypeCollection,
+//     types: &Types,
 // ) -> Output {
 //     match fields {
 //         [(field, ty)] => Ok(inner_comments(
@@ -314,7 +314,7 @@
 //     }
 // }
 
-// fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, types: &TypeCollection) -> Output {
+// fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, types: &Types) -> Output {
 //     match &tuple.elements()[..] {
 //         [] => Ok(NULL.into()),
 //         tys => Ok(format!(
@@ -331,7 +331,7 @@
 //     ctx: ExportContext,
 //     key: &str,
 //     s: &StructType,
-//     types: &TypeCollection,
+//     types: &Types,
 // ) -> Output {
 //     match &s.fields() {
 //         Fields::Unit => Ok(NULL.into()),
@@ -431,7 +431,7 @@
 
 // fn enum_variant_datatype(
 //     ctx: ExportContext,
-//     types: &TypeCollection,
+//     types: &Types,
 //     name: Cow<'static, str>,
 //     variant: &Variant,
 // ) -> Result<Option<String>> {
@@ -501,7 +501,7 @@
 //     }
 // }
 
-// fn enum_datatype(ctx: ExportContext, e: &EnumType, types: &TypeCollection) -> Output {
+// fn enum_datatype(ctx: ExportContext, e: &EnumType, types: &Types) -> Output {
 //     if e.variants().is_empty() {
 //         return Ok(NEVER.to_string());
 //     }
@@ -689,7 +689,7 @@
 //     ctx: ExportContext,
 //     key: Cow<'static, str>,
 //     (field, ty): (&Field, &DataType),
-//     types: &TypeCollection,
+//     types: &Types,
 // ) -> Output {
 //     let field_name_safe = sanitise_key(key, false);
 
@@ -752,7 +752,7 @@
 // fn validate_type_for_tagged_intersection(
 //     ctx: ExportContext,
 //     ty: DataType,
-//     types: &TypeCollection,
+//     types: &Types,
 // ) -> Result<bool> {
 //     match ty {
 //         DataType::Any
@@ -810,7 +810,7 @@
 //             ctx,
 //             types
 //                 .get(r.sid())
-//                 .expect("TypeCollection should have been populated by now")
+//                 .expect("Types should have been populated by now")
 //                 .inner
 //                 .clone(),
 //             types,

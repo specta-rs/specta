@@ -1,5 +1,5 @@
 use specta::{
-    Type, TypeCollection,
+    Type, Types,
     datatype::{DataType, Reference},
 };
 use specta_typescript::{Typescript, branded};
@@ -17,7 +17,7 @@ fn main() {
     println!(
         "{}",
         Typescript::default()
-            .export(&TypeCollection::default().register::<Account>())
+            .export(&Types::default().register::<Account>())
             .unwrap()
     )
 }

@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 
 use specta::{
-    TypeCollection,
+    Types,
     datatype::{DataType, GenericReference, Primitive, Reference},
 };
 
@@ -18,7 +18,7 @@ fn is_string_enum(e: &specta::datatype::Enum) -> bool {
 /// Export a single type to Swift.
 pub fn export_type(
     swift: &Swift,
-    types: &TypeCollection,
+    types: &Types,
     ndt: &specta::datatype::NamedDataType,
 ) -> Result<String> {
     if !matches!(ndt.ty(), DataType::Struct(_) | DataType::Enum(_)) {
@@ -157,7 +157,7 @@ pub fn export_type(
 /// Convert a DataType to Swift syntax.
 pub fn datatype_to_swift(
     swift: &Swift,
-    types: &TypeCollection,
+    types: &Types,
     dt: &DataType,
     generic_scope: Vec<(GenericReference, Cow<'static, str>)>,
     is_export: bool,
@@ -213,7 +213,7 @@ pub fn is_duration_struct(s: &specta::datatype::Struct) -> bool {
 
 /// Check if a type is a special standard library type that needs special handling
 fn is_special_std_type(
-    types: &TypeCollection,
+    types: &Types,
     reference: Option<&specta::datatype::Reference>,
 ) -> Option<String> {
     if let Some(Reference::Named(r)) = reference
@@ -293,7 +293,7 @@ fn primitive_to_swift(primitive: &Primitive) -> Result<String> {
 /// Convert list types to Swift arrays.
 fn list_to_swift(
     swift: &Swift,
-    types: &TypeCollection,
+    types: &Types,
     list: &specta::datatype::List,
     generic_scope: Vec<(GenericReference, Cow<'static, str>)>,
 ) -> Result<String> {
@@ -304,7 +304,7 @@ fn list_to_swift(
 /// Convert map types to Swift dictionaries.
 fn map_to_swift(
     swift: &Swift,
-    types: &TypeCollection,
+    types: &Types,
     map: &specta::datatype::Map,
     generic_scope: Vec<(GenericReference, Cow<'static, str>)>,
 ) -> Result<String> {
@@ -323,7 +323,7 @@ fn map_to_swift(
 /// Convert struct types to Swift.
 fn struct_to_swift(
     swift: &Swift,
-    types: &TypeCollection,
+    types: &Types,
     s: &specta::datatype::Struct,
     generic_scope: Vec<(GenericReference, Cow<'static, str>)>,
     is_export: bool,
@@ -477,7 +477,7 @@ fn generate_raw_value(variant_name: &str, rename_all: Option<&str>) -> String {
 /// Convert enum types to Swift.
 fn enum_to_swift(
     swift: &Swift,
-    types: &TypeCollection,
+    types: &Types,
     e: &specta::datatype::Enum,
     generic_scope: Vec<(GenericReference, Cow<'static, str>)>,
     is_export: bool,
@@ -554,7 +554,7 @@ fn enum_to_swift(
 /// Generate struct definitions for enum variants with named fields
 fn generate_enum_structs(
     swift: &Swift,
-    types: &TypeCollection,
+    types: &Types,
     e: &specta::datatype::Enum,
     generic_scope: Vec<(GenericReference, Cow<'static, str>)>,
     is_export: bool,
@@ -649,7 +649,7 @@ fn to_pascal_case(s: &str) -> String {
 /// Convert tuple types to Swift.
 fn tuple_to_swift(
     swift: &Swift,
-    types: &TypeCollection,
+    types: &Types,
     t: &specta::datatype::Tuple,
     generic_scope: Vec<(GenericReference, Cow<'static, str>)>,
 ) -> Result<String> {
@@ -671,7 +671,7 @@ fn tuple_to_swift(
 /// Convert reference types to Swift.
 fn reference_to_swift(
     swift: &Swift,
-    types: &TypeCollection,
+    types: &Types,
     r: &specta::datatype::Reference,
     generic_scope: &[(GenericReference, Cow<'static, str>)],
 ) -> Result<String> {

@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use specta::datatype::{DataType, Reference};
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_typescript::{BigIntExportBehavior, JSDoc, Layout, primitives};
 use tempfile::TempDir;
 
@@ -42,9 +42,7 @@ mod jsdoc_export_to_files_runtime_imports_types {
     }
 }
 
-fn phase_collections(
-    types: TypeCollection,
-) -> [(&'static str, Result<TypeCollection, specta_serde::Error>); 3] {
+fn phase_collections(types: Types) -> [(&'static str, Result<Types, specta_serde::Error>); 3] {
     [
         ("raw", Ok(types.clone())),
         ("serde", specta_serde::apply(types.clone())),
@@ -98,7 +96,7 @@ fn jsdoc_export_to_files_uses_jsdoc_import_typedefs() {
     let temp = TempDir::new_in(temp).unwrap();
 
     let path = temp.path().join("jsdoc-export-to-files-both");
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<jsdoc_export_to_files_runtime_imports_types::one::One>()
         .register::<jsdoc_export_to_files_runtime_imports_types::two::Two>()
         .register::<jsdoc_export_to_files_runtime_imports_types::three::Three>();

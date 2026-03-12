@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 /// Comprehensive example showcasing basic Rust types and their Swift equivalents
@@ -108,7 +108,7 @@ fn main() {
     println!("{}", "=".repeat(60));
 
     // Create type collection with all our types
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<Primitives>()
         .register::<Status>()
         .register::<ApiResponse<String, String>>()

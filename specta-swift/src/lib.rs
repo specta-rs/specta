@@ -14,7 +14,7 @@
 //! Next copy the following into your `main.rs` file:
 //!
 //! ```rust
-//! use specta::{Type, TypeCollection};
+//! use specta::{Type, Types};
 //! use specta_swift::Swift;
 //!
 //! #[derive(Type)]
@@ -27,7 +27,7 @@
 //!     pub other_field: String,
 //! }
 //!
-//! let mut types = TypeCollection::default()
+//! let mut types = Types::default()
 //!     // We don't need to specify `MyOtherType` because it's referenced by `MyType`
 //!     .register::<MyType>();
 //!

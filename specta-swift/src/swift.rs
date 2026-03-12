@@ -3,7 +3,7 @@
 use std::{borrow::Cow, path::Path};
 
 use specta::{
-    TypeCollection,
+    Types,
     datatype::{DataType, Fields, Reference},
 };
 
@@ -130,7 +130,7 @@ impl Swift {
     }
 
     /// Export types to a Swift string.
-    pub fn export(&self, types: &TypeCollection) -> Result<String> {
+    pub fn export(&self, types: &Types) -> Result<String> {
         let mut result = String::new();
 
         // Add header
@@ -164,7 +164,7 @@ impl Swift {
     }
 
     /// Export types to a file.
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<()> {
+    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types) -> Result<()> {
         let content = self.export(types)?;
         std::fs::write(path, content)?;
         Ok(())
@@ -281,7 +281,7 @@ impl NamingConvention {
 }
 
 /// Check if the type collection contains any Duration types that need the helper
-fn needs_duration_helper(types: &TypeCollection) -> bool {
+fn needs_duration_helper(types: &Types) -> bool {
     for ndt in types.into_sorted_iter() {
         if ndt.name() == "Duration" {
             return true;

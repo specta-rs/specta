@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::{NamingConvention, Swift};
 
 #[derive(Type, Serialize, Deserialize)]
@@ -74,7 +74,7 @@ pub enum RegularEnum {
 
 #[test]
 fn test_string_enum_snake_case() {
-    let types = TypeCollection::default().register::<JobStatus>();
+    let types = Types::default().register::<JobStatus>();
 
     let swift = Swift::default();
     let result = swift.export(&types).unwrap();
@@ -93,7 +93,7 @@ fn test_string_enum_snake_case() {
 
 #[test]
 fn test_string_enum_uppercase() {
-    let types = TypeCollection::default().register::<Priority>();
+    let types = Types::default().register::<Priority>();
 
     let swift = Swift::default();
     let result = swift.export(&types).unwrap();
@@ -110,7 +110,7 @@ fn test_string_enum_uppercase() {
 
 #[test]
 fn test_string_enum_camel_case() {
-    let types = TypeCollection::default().register::<LogLevel>();
+    let types = Types::default().register::<LogLevel>();
 
     let swift = Swift::default();
     let result = swift.export(&types).unwrap();
@@ -128,7 +128,7 @@ fn test_string_enum_camel_case() {
 
 #[test]
 fn test_string_enum_pascal_case() {
-    let types = TypeCollection::default().register::<UserRole>();
+    let types = Types::default().register::<UserRole>();
 
     let swift = Swift::default();
     let result = swift.export(&types).unwrap();
@@ -146,7 +146,7 @@ fn test_string_enum_pascal_case() {
 
 #[test]
 fn test_string_enum_kebab_case() {
-    let types = TypeCollection::default().register::<ApiStatus>();
+    let types = Types::default().register::<ApiStatus>();
 
     let swift = Swift::default();
     let result = swift.export(&types).unwrap();
@@ -163,7 +163,7 @@ fn test_string_enum_kebab_case() {
 
 #[test]
 fn test_string_enum_screaming_kebab_case() {
-    let types = TypeCollection::default().register::<DatabaseStatus>();
+    let types = Types::default().register::<DatabaseStatus>();
 
     let swift = Swift::default();
     let result = swift.export(&types).unwrap();
@@ -180,7 +180,7 @@ fn test_string_enum_screaming_kebab_case() {
 
 #[test]
 fn test_mixed_enum_not_string() {
-    let types = TypeCollection::default().register::<MixedEnum>();
+    let types = Types::default().register::<MixedEnum>();
 
     let swift = Swift::default();
     let result = swift.export(&types).unwrap();
@@ -205,7 +205,7 @@ fn test_mixed_enum_not_string() {
 
 #[test]
 fn test_regular_enum_not_string() {
-    let types = TypeCollection::default().register::<RegularEnum>();
+    let types = Types::default().register::<RegularEnum>();
 
     let swift = Swift::default();
     let result = swift.export(&types).unwrap();
@@ -223,7 +223,7 @@ fn test_regular_enum_not_string() {
 
 #[test]
 fn test_all_string_enums_together() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<JobStatus>()
         .register::<Priority>()
         .register::<LogLevel>()

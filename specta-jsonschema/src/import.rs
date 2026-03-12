@@ -33,7 +33,7 @@ fn value_to_datatype(value: &Value) -> Result<DataType, Error> {
 fn schema_object_to_datatype(obj: &JsonMap<String, Value>) -> Result<DataType, Error> {
     // Handle $ref
     if let Some(reference) = obj.get("$ref").and_then(Value::as_str) {
-        // We use an opaque reference since we do not have a TypeCollection context here.
+        // We use an opaque reference since we do not have a Types context here.
         return Ok(DataType::Reference(Reference::opaque(reference.to_owned())));
     }
 

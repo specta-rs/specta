@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::Swift;
 use std::time::Duration;
 
@@ -132,7 +132,7 @@ fn main() {
     println!("{}", "=".repeat(60));
 
     // Create type collection with all our special types
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<IndexerMetrics>()
         .register::<EventLog>()
         .register::<TaskConfig>()

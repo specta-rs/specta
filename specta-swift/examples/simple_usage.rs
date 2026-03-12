@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 // Simple user management types
@@ -27,7 +27,7 @@ enum ApiResult<T> {
 
 fn main() {
     // Create a type collection
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<User>()
         .register::<UserRole>()
         .register::<ApiResult<String>>();

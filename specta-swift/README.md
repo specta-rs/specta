@@ -35,7 +35,7 @@ specta-swift = "0.1"
 Define your Rust types:
 
 ```rust
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 #[derive(Type)]
@@ -65,7 +65,7 @@ Generate Swift code:
 
 ```rust
 fn main() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<User>()
         .register::<UserRole>()
         .register::<ApiResult<String>>();
