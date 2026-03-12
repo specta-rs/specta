@@ -5,11 +5,11 @@
 use std::{borrow::Cow, fmt::Debug};
 
 use crate::{
-    TypeCollection,
     datatype::{
         Attribute, DataType, DeprecatedType, EnumVariant, Field, Fields, GenericReference,
         NamedDataType, NamedFields, Struct, UnnamedFields,
     },
+    TypeCollection,
 };
 
 #[derive(Debug, Clone)]
@@ -112,19 +112,13 @@ impl<T> VariantBuilder<T> {
 impl VariantBuilder<NamedFields> {
     /// Add a named field to the variant.
     pub fn field(mut self, name: impl Into<Cow<'static, str>>, field: Field) -> Self {
-        match &mut self.v.fields {
-            Fields::Named(f) => f.fields.push((name.into(), field)),
-            _ => unreachable!(),
-        }
+        self.variant.fields.push((name.into(), field));
         self
     }
 
     /// Add a named field to the variant and return the updated builder.
     pub fn field_mut(mut self, name: impl Into<Cow<'static, str>>, field: Field) -> Self {
-        match &mut self.v.fields {
-            Fields::Named(f) => f.fields.push((name.into(), field)),
-            _ => unreachable!(),
-        }
+        self.variant.fields.push((name.into(), field));
         self
     }
 
@@ -144,19 +138,13 @@ impl From<VariantBuilder<NamedFields>> for EnumVariant {
 impl VariantBuilder<UnnamedFields> {
     /// Add an unnamed field to the variant.
     pub fn field(mut self, field: Field) -> Self {
-        match &mut self.v.fields {
-            Fields::Unnamed(f) => f.fields.push(field),
-            _ => unreachable!(),
-        }
+        self.variant.fields.push(field);
         self
     }
 
     /// Add an unnamed field to the variant and return the updated builder.
     pub fn field_mut(mut self, field: Field) -> Self {
-        match &mut self.v.fields {
-            Fields::Unnamed(f) => f.fields.push(field),
-            _ => unreachable!(),
-        }
+        self.variant.fields.push(field);
         self
     }
 
