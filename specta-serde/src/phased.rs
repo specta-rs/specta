@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use specta::{
     Type, Types,
-    datatype::{DataType, NamedDataType, Tuple},
+    datatype::{DataType, NamedDataType, OpaqueReference, Tuple},
 };
 
 pub struct Phased<Serialize, Deserialize> {
@@ -20,15 +20,22 @@ impl<Serialize, Deserialize> Phased2 for Phased<Serialize, Deserialize> {
 
 impl<Serialize: Type, Deserialize: Type> Type for Phased<Serialize, Deserialize> {
     fn definition(types: &mut Types) -> DataType {
-        let payload = DataType::Tuple(Tuple::new(vec![
-            Serialize::definition(types),
-            Deserialize::definition(types),
-        ]));
+        let ser = Serialize::definition(types);
+        let der = Deserialize::definition(types);
 
-        let mut ndt = NamedDataType::new_inline("Phased", vec![], payload);
-        ndt.set_module_path("specta_serde".into());
-        ndt.register(types);
+        if ser == der {
+            ser
+        } else {
+            let payload = DataType::Tuple(Tuple::new(vec![
+                Serialize::definition(types),
+                Deserialize::definition(types),
+            ]));
 
-        DataType::Reference(ndt.reference(vec![]))
+            let mut ndt = NamedDataType::new_inline("Phased", vec![], payload);
+            ndt.set_module_path("specta_serde".into());
+            ndt.register(types);
+
+            DataType::Reference(ndt.reference(vec![]))
+        }
     }
 }

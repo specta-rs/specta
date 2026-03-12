@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+use serde_with::{DisplayFromStr, OneOrMany, serde_as};
 use specta::{
     Type, Types,
     datatype::{DataType, Reference},
@@ -130,6 +131,29 @@ enum SmallPrime {
     Seven = 7,
 }
 
+#[serde_as]
+#[derive(Serialize, Deserialize, Type)]
+pub struct SerdeWithDisplayFromStr {
+    #[serde_as(as = "DisplayFromStr")]
+    #[specta(type = String)]
+    build_number: u64,
+}
+
+#[derive(Serialize, Deserialize, Type)]
+#[serde(untagged)]
+pub enum OneOrManyString {
+    One(String),
+    Many(Vec<String>),
+}
+
+#[serde_as]
+#[derive(Serialize, Deserialize, Type)]
+pub struct SerdeWithOneOrMany {
+    #[serde_as(as = "OneOrMany<_>")]
+    #[specta(type = specta_serde::Phased<Vec<String>, OneOrManyString>)]
+    tags: Vec<String>,
+}
+
 fn main() {
     {
         let mut types = Types::default();
@@ -174,7 +198,9 @@ fn main() {
             .register::<UserFrom>()
             .register::<UserTryFrom>()
             .register::<UsesSerdeConversions>()
-            .register::<SmallPrime>();
+            .register::<SmallPrime>()
+            .register::<SerdeWithDisplayFromStr>()
+            .register::<SerdeWithOneOrMany>();
         println!("RAW:\n{}", Typescript::default().export(&types).unwrap());
         match specta_serde::apply(types.clone()) {
             Ok(types) => println!(
@@ -187,6 +213,18 @@ fn main() {
             "specta_serde::apply_phases(...):\n{}",
             Typescript::default()
                 .export(&specta_serde::apply_phases(types).unwrap())
+                .unwrap()
+        );
+    }
+
+    {
+        let serde_with_types = Types::default()
+            .register::<SerdeWithDisplayFromStr>()
+            .register::<SerdeWithOneOrMany>();
+        println!(
+            "serde_with + specta_serde::apply_phases(...):\n{}",
+            Typescript::default()
+                .export(&specta_serde::apply_phases(serde_with_types).unwrap())
                 .unwrap()
         );
     }
