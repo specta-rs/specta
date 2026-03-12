@@ -143,7 +143,7 @@ use repr::EnumRepr;
 /// serialization and deserialization behavior. This is the simplest mode and is
 /// usually what exporters want when serde behavior is symmetric.
 ///
-/// Returns [`ResolvedTypes`](specta::ResolvedTypes) because serde rewrites may
+/// Returns [`ResolvedTypes`] because serde rewrites may
 /// alter type shapes.
 ///
 /// Returns an [`Error`] when serde metadata introduces phase-only differences
@@ -190,7 +190,7 @@ pub fn apply(types: Types) -> Result<ResolvedTypes> {
 /// references accordingly. This allows exporters to represent serde behavior
 /// that is asymmetric between serialization and deserialization.
 ///
-/// Returns [`ResolvedTypes`](specta::ResolvedTypes) because serde rewrites may
+/// Returns [`ResolvedTypes`] because serde rewrites may
 /// alter type shapes.
 ///
 /// Use this when working with deserialize-widening attributes like
@@ -267,7 +267,7 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
                 key,
                 GeneratedTypes::Split {
                     serialize: serialize_ndt,
-                    deserialize: deserialize_ndt,
+                    deserialize: Box::new(deserialize_ndt),
                 },
             );
         } else {
@@ -359,7 +359,7 @@ enum GeneratedTypes {
     Unified(NamedDataType),
     Split {
         serialize: NamedDataType,
-        deserialize: NamedDataType,
+        deserialize: Box<NamedDataType>,
     },
 }
 
@@ -389,12 +389,11 @@ fn rewrite_datatype_for_phase(
         *ty = resolved;
     }
 
-    if let Some(converted) = conversion_datatype_for_mode(ty, mode)? {
-        if converted != *ty {
+    if let Some(converted) = conversion_datatype_for_mode(ty, mode)?
+        && converted != *ty {
             *ty = converted;
             return rewrite_datatype_for_phase(ty, mode, original_types, generated, split_types);
         }
-    }
 
     match ty {
         DataType::Struct(s) => {
@@ -547,13 +546,12 @@ fn rewrite_field_for_phase(
     generated: &HashMap<TypeKey, GeneratedTypes>,
     split_types: &HashSet<TypeKey>,
 ) -> Result<()> {
-    if let Some(attrs) = field.attributes().get::<SerdeFieldAttrs>() {
-        if let PhaseRewrite::Serialize = mode
+    if let Some(attrs) = field.attributes().get::<SerdeFieldAttrs>()
+        && let PhaseRewrite::Serialize = mode
             && attrs.skip_serializing_if.is_some()
         {
             field.set_optional(true);
         }
-    }
 
     if let Some(ty) = field.ty().cloned()
         && let Some(resolved) = resolve_phased_type(&ty, mode, "field")?

@@ -407,7 +407,7 @@ impl Exporter {
                     let import_paths = runtime_references
                         .into_iter()
                         .filter_map(|r| {
-                            r.get(&types)
+                            r.get(types)
                                 .map(|ndt| ndt.module_path().as_ref().to_string())
                         })
                         .filter(|module_path| !module_path.is_empty())
