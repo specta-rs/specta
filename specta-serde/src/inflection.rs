@@ -45,6 +45,7 @@ static RENAME_RULES: &[(&str, RenameRule)] = &[
 ];
 
 impl RenameRule {
+    /// Parse serde's `rename_all` / `rename_all_fields` rule string.
     pub fn from_str(rename_all_str: &str) -> Result<Self, ParseError<'_>> {
         for (name, rule) in RENAME_RULES {
             if rename_all_str == *name {
