@@ -8,8 +8,9 @@ use syn::{Data, DeriveInput, GenericParam, parse};
 use crate::utils::{parse_attrs, unraw_raw_ident};
 
 use self::generics::{
-    add_type_to_where_clause, generics_with_ident_and_bounds_only, generics_with_ident_only,
-    used_type_params,
+    add_type_to_where_clause, all_type_param_idents, generics_with_ident_and_bounds_only,
+    generics_with_ident_only, has_associated_type_usage, used_associated_type_paths,
+    used_direct_type_params, used_type_params,
 };
 
 pub(crate) mod attr;
@@ -174,12 +175,17 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let bounds = generics_with_ident_and_bounds_only(generics);
     let type_args = generics_with_ident_only(generics);
-    let used_generic_types = used_type_params(generics, container_attrs.r#type.as_ref());
+    let used_generic_types = used_type_params(generics, data, container_attrs.r#type.as_ref());
+    let all_generic_type_idents = all_type_param_idents(generics);
+    let used_direct_generics =
+        used_direct_type_params(&used_generic_types, &all_generic_type_idents);
+    let used_associated_paths = used_associated_type_paths(&used_generic_types);
     let where_bound = add_type_to_where_clause(
         &quote!(#crate_ref::Type),
         generics,
         container_attrs.bound.as_deref(),
-        &used_generic_types,
+        used_direct_generics,
+        used_associated_paths,
     );
 
     let (generic_placeholders, shadow_generics): (Vec<_>, Vec<_>) = generics
@@ -213,7 +219,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             GenericParam::Type(t) => {
                 let i = &t.ident;
                 let placeholder_ident = format_ident!("PLACEHOLDER_{}", t.ident);
-                if !used_generic_types.iter().any(|used| used == i) {
+                if !used_direct_generics.iter().any(|used| used == i) {
                     return None;
                 }
                 let i_str = i.to_string();
@@ -254,6 +260,12 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let inline = container_attrs.inline;
     let deprecated = container_attrs.common.deprecated_as_tokens();
 
+    let shadow_generic_aliases = if has_associated_type_usage(&used_generic_types) {
+        quote!()
+    } else {
+        quote!(#(#shadow_generics)*)
+    };
+
     Ok(quote! {
         #[allow(non_camel_case_types)]
         const _: () = {
@@ -280,7 +292,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                                 ndt.set_deprecated(#deprecated);
                                 ndt.set_module_path(Cow::Borrowed(module_path!()));
                                 ndt.set_ty({
-                                    #(#shadow_generics)*
+                                    #shadow_generic_aliases
 
                                     #dt_expr
                                 });
