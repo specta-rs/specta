@@ -30,7 +30,7 @@
 )]
 
 mod error;
-mod primitives;
+pub mod primitives;
 mod rescript;
 
 pub use error::Error;
