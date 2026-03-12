@@ -11,7 +11,7 @@ path = "tests/mod.rs"
 harness = true
 
 [dependencies]
-specta = { path = "../specta", features = ["function", "std", "derive", "serde_json", "serde_yaml", "toml", "chrono", "either", "ulid", "glam"] }
+specta = { path = "../specta", features = ["function", "std", "derive", "serde_json", "serde_yaml", "toml", "chrono", "either", "ulid", "glam", "ordered-float", "heapless", "semver", "smol_str", "arrayvec", "smallvec"] }
 specta-serde = { path = "../specta-serde" }
 specta-typescript = { path = "../specta-typescript" }
 specta-util = { path = "../specta-util", features = ["serde"] }                # TODO: Remove `serde` feature
@@ -27,5 +27,11 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 either = { version = "1.15", default-features = false }
 ulid = { version = "1.2", default-features = false, features = [] }
 glam = { version = "0.32", default-features = false, features = ["std"] }
+ordered-float = { version = ">=3, <6", default-features = false }
+heapless = { version = ">=0.7, <0.9", default-features = false }
+semver = { version = "1", default-features = false }
+smol_str = { version = "0.3", default-features = false }
+arrayvec = { version = ">=0.6, <0.8", default-features = false }
+smallvec = { version = "1", default-features = false }
 tempfile = "3.26.0"
 thiserror = "2.0.18"

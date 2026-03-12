@@ -66,6 +66,12 @@ External types
 - `bigdecimal` - [bigdecimal](https://docs.rs/bigdecimal) crate
 - `rust_decimal` - [rust_decimal](https://docs.rs/rust_decimal) crate
 - `indexmap` - [indexmap](https://docs.rs/indexmap) crate
+- `ordered-float` - [ordered-float](https://docs.rs/ordered-float) crate
+- `heapless` - [heapless](https://docs.rs/heapless) crate
+- `semver` - [semver](https://docs.rs/semver) crate
+- `smol_str` - [smol_str](https://docs.rs/smol_str) crate
+- `arrayvec` - [arrayvec](https://docs.rs/arrayvec) crate
+- `smallvec` - [smallvec](https://docs.rs/smallvec) crate
 - `ipnetwork` - [ipnetwork](https://docs.rs/ipnetwork) crate
 - `mac_address` - [mac_address](https://docs.rs/mac_address) crate
 - `bit-vec` - [bit-vec](https://docs.rs/bit-vec) crate
