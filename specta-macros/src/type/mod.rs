@@ -68,22 +68,6 @@ pub(super) fn build_runtime_attributes(
     })
 }
 
-pub(super) fn build_type_override_runtime_attributes(runtime_attrs: TokenStream) -> TokenStream {
-    let marker_calls = FORMATS.iter().map(|name| {
-        let crate_ident = format_ident!("{name}");
-
-        quote! {
-            attrs.insert(#crate_ident::internal::SpectaTypeAttr);
-        }
-    });
-
-    quote!({
-        let mut attrs = #runtime_attrs;
-        #(#marker_calls)*
-        attrs
-    })
-}
-
 pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
     let DeriveInput {
         ident: raw_ident,

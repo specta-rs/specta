@@ -129,7 +129,7 @@ pub mod internal {
     pub use crate::error::Result;
     pub use crate::inflection::RenameRule;
     pub use crate::parser::{
-        ConversionType, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs, SpectaTypeAttr,
+        ConversionType, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs,
         merge_container_attrs, merge_field_attrs, merge_variant_attrs,
     };
 }

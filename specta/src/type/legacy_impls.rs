@@ -265,6 +265,7 @@ const _: () = {
                                 flatten: false,
 
                                 inline: false,
+                                type_overridden: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
                                 ty: Some(String::definition(types)),
@@ -478,6 +479,7 @@ const _: () = {
                                     flatten: false,
 
                                     inline: false,
+                                    type_overridden: false,
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
                                     ty: Some(uhlc::NTP64::definition(types)),
@@ -491,6 +493,7 @@ const _: () = {
                                     flatten: false,
 
                                     inline: false,
+                                    type_overridden: false,
                                     deprecated: None,
                                     docs: Cow::Borrowed(""),
                                     ty: Some(uhlc::ID::definition(types)),

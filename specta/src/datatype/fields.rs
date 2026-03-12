@@ -35,6 +35,8 @@ pub struct Field {
     pub(crate) docs: Cow<'static, str>,
     /// Should we inline the definition of this type.
     pub(crate) inline: bool,
+    /// Did the user apply a `#[specta(type = ...)]` or `#[specta(r#type = ...)]` attribute.
+    pub(crate) type_overridden: bool,
     /// Runtime attributes for this field.
     pub(crate) attributes: Attributes,
     /// Type for the field. Is optional if `#[serde(skip)]` or `#[specta(skip)]` was applied.
@@ -55,6 +57,7 @@ impl Field {
             deprecated: None,
             docs: "".into(),
             inline: false,
+            type_overridden: false,
             ty: Some(ty),
             attributes: Attributes::default(),
         }
@@ -88,6 +91,16 @@ impl Field {
     /// Set the inline attribute for this field.
     pub fn set_inline(&mut self, inline: bool) {
         self.inline = inline;
+    }
+
+    /// Has the Specta type override attribute been applied to this field?
+    pub fn type_overridden(&self) -> bool {
+        self.type_overridden
+    }
+
+    /// Set whether a Specta type override attribute was applied to this field.
+    pub fn set_type_overridden(&mut self, type_overridden: bool) {
+        self.type_overridden = type_overridden;
     }
 
     /// Has the Rust deprecated attribute been applied to this field?

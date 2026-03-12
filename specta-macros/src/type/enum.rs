@@ -1,7 +1,4 @@
-use super::{
-    AttributeScope, attr::*, build_runtime_attributes, build_type_override_runtime_attributes,
-    r#struct::decode_field_attrs,
-};
+use super::{AttributeScope, attr::*, build_runtime_attributes, r#struct::decode_field_attrs};
 use crate::{r#type::field::construct_field_with_variant_skip, utils::*};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
@@ -88,11 +85,7 @@ pub fn parse_enum(
             let variant_skip = attrs.skip;
             let variant_inline = attrs.inline;
             let variant_type = attrs.r#type.clone();
-            let runtime_attrs = if variant_type.is_some() {
-                build_type_override_runtime_attributes(runtime_attrs)
-            } else {
-                runtime_attrs
-            };
+            let variant_type_overridden = variant_type.is_some();
 
             let inner = if let Some(variant_ty) = variant_type {
                 quote!(internal::construct::fields_unnamed(
@@ -102,6 +95,7 @@ pub fn parse_enum(
                         None,
                         "".into(),
                         false,
+                        true,
                         datatype::Attributes::default(),
                         Some(<#variant_ty as #crate_ref::Type>::definition(types)),
                     )],
@@ -179,6 +173,7 @@ pub fn parse_enum(
                 v.set_deprecated(#deprecated);
                 v.set_docs(#doc.into());
                 v.set_fields(#inner);
+                v.set_type_overridden(#variant_type_overridden);
                 *v.attributes_mut() = #runtime_attrs;
                 v
             })))

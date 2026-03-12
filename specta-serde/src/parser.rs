@@ -33,10 +33,6 @@ pub struct SerdeContainerAttrs {
     pub field_identifier: bool,
 }
 
-/// Marker runtime attribute inserted when `#[specta(type = ...)]` is used.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
-pub struct SpectaTypeAttr;
-
 /// Parsed serde variant attributes.
 #[allow(missing_docs)]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]

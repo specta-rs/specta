@@ -2,10 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Type;
 
-use super::{
-    AttributeScope, ContainerAttr, FieldAttr, build_runtime_attributes,
-    build_type_override_runtime_attributes,
-};
+use super::{AttributeScope, ContainerAttr, FieldAttr, build_runtime_attributes};
 
 pub fn construct_field(
     crate_ref: &TokenStream,
@@ -37,14 +34,12 @@ pub fn construct_field_with_variant_skip(
     let optional = attrs.optional;
     let doc = attrs.common.doc;
     let inline = attrs.inline;
-    let mut runtime_attrs = build_runtime_attributes(
+    let runtime_attrs = build_runtime_attributes(
         AttributeScope::Field,
         raw_attrs,
         &container_attrs.skip_attrs,
     );
-    if attrs.r#type.is_some() {
-        runtime_attrs = build_type_override_runtime_attributes(runtime_attrs);
-    }
+    let type_overridden = attrs.r#type.is_some();
 
     let ty = if attrs.skip || variant_skip {
         quote!(None)
@@ -58,6 +53,7 @@ pub fn construct_field_with_variant_skip(
         #deprecated,
         #doc.into(),
         #inline,
+        #type_overridden,
         #runtime_attrs,
         #ty
     )))
