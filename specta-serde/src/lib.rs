@@ -779,6 +779,7 @@ fn resolve_phased_type(ty: &DataType, mode: PhaseRewrite, path: &str) -> Result<
     };
 
     Ok(match mode {
+        // Note that we won't hit this if `TSerialize == TDeserialize` because it will just return `T` directly in the `impl Type for Phased<...>`
         PhaseRewrite::Unified => {
             return Err(Error::invalid_phased_type_usage(
                 path,
