@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use specta::{Type, Types};
+use specta::{ResolvedTypes, Type, Types};
 use specta_typescript::Typescript;
 
 #[derive(Type)]
@@ -118,7 +118,7 @@ fn main() {
     // }
 
     Typescript::default()
-        .export_to("./bindings.ts", &types)
+        .export_to("./bindings.ts", &ResolvedTypes::from_resolved_types(types))
         .unwrap();
 
     let result = std::fs::read_to_string("./bindings.ts").unwrap();

@@ -13,7 +13,7 @@
 //! Next copy the following into your `main.rs` file:
 //!
 //! ```rust
-//! use specta::{Type, Types};
+//! use specta::{ResolvedTypes, Type, Types};
 //! use specta_typescript::Typescript;
 //!
 //! #[derive(Type)]
@@ -30,9 +30,10 @@
 //! let mut types = Types::default()
 //!     // We don't need to specify `MyOtherType` because it's referenced by `MyType`
 //!     .register::<MyType>();
+//! let resolved_types = ResolvedTypes::from_resolved_types(types);
 //!
 //! Typescript::default()
-//!     .export_to("./bindings.ts", &types)
+//!     .export_to("./bindings.ts", &resolved_types)
 //!     .unwrap();
 //! ```
 //!

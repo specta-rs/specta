@@ -1,7 +1,7 @@
 use std::{iter, path::Path};
 
 use specta::{
-    Type, Types,
+    ResolvedTypes, Type, Types,
     datatype::{DataType, Reference},
 };
 use specta_typescript::{BigIntExportBehavior, Layout, Typescript, primitives};
@@ -36,9 +36,11 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
     (types, dts)
 }
 
-fn phase_collections(types: Types) -> [(&'static str, Result<Types, specta_serde::Error>); 3] {
+fn phase_collections(
+    types: Types,
+) -> [(&'static str, Result<ResolvedTypes, specta_serde::Error>); 3] {
     [
-        ("raw", Ok(types.clone())),
+        ("raw", Ok(ResolvedTypes::from_resolved_types(types.clone()))),
         ("serde", specta_serde::apply(types.clone())),
         ("serde_phases", specta_serde::apply_phases(types)),
     ]
@@ -306,7 +308,7 @@ fn primitives_export() {
                 dts.iter()
                     .filter_map(|(s, ty)| match ty {
                         DataType::Reference(Reference::Named(r)) => {
-                            r.get(&types).cloned().map(|ty| (s, ty))
+                            r.get(types.as_types()).cloned().map(|ty| (s, ty))
                         }
                         _ => None,
                     })
@@ -335,7 +337,7 @@ fn primitives_export_many() {
                 let ndts = dts
                     .iter()
                     .filter_map(|(_, ty)| match ty {
-                        DataType::Reference(Reference::Named(r)) => r.get(&types),
+                        DataType::Reference(Reference::Named(r)) => r.get(types.as_types()),
                         _ => None,
                     })
                     .collect::<Vec<_>>();
@@ -412,8 +414,9 @@ fn reserved_names() {
             DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
             _ => panic!("Failed to get reference"),
         };
+        let resolved = ResolvedTypes::from_resolved_types(types.clone());
 
-        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+        insta::assert_snapshot!(primitives::export(&Typescript::default(), &resolved, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
     }
 
     {
@@ -427,8 +430,9 @@ fn reserved_names() {
             DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
             _ => panic!("Failed to get reference"),
         };
+        let resolved = ResolvedTypes::from_resolved_types(types.clone());
 
-        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+        insta::assert_snapshot!(primitives::export(&Typescript::default(), &resolved, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
     }
 
     {
@@ -445,8 +449,9 @@ fn reserved_names() {
             DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
             _ => panic!("Failed to get reference"),
         };
+        let resolved = ResolvedTypes::from_resolved_types(types.clone());
 
-        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+        insta::assert_snapshot!(primitives::export(&Typescript::default(), &resolved, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
     }
 }
 

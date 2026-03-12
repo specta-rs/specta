@@ -1,4 +1,4 @@
-use specta::{Type, Types};
+use specta::{ResolvedTypes, Type, Types};
 use specta_typescript::{Any, Layout, Typescript, primitives};
 
 #[derive(Type)]
@@ -61,7 +61,10 @@ fn main() {
     // println!("{:?}", primitives::inline(&Default::default(), &Default::default(), &DataType::String));
 
     ts.layout(Layout::Namespaces)
-        .export_to("demo.ts", &Types::default().register::<nested::Another>())
+        .export_to(
+            "demo.ts",
+            &ResolvedTypes::from_resolved_types(Types::default().register::<nested::Another>()),
+        )
         .unwrap();
 
     // println!("PTR EQ: {:?}", std::ptr::eq(&ANY, &ANY));

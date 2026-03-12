@@ -65,7 +65,8 @@ enum ErrorKind {
     /// Found an opaque reference which the Typescript exporter doesn't know how to handle.
     /// You may be referencing a type which is not supported by the Typescript exporter.
     UnsupportedOpaqueReference(OpaqueReference),
-    /// Found a named reference that cannot be resolved from the provided [`Types`](specta::Types).
+    /// Found a named reference that cannot be resolved from the provided
+    /// [`ResolvedTypes`](specta::ResolvedTypes).
     DanglingNamedReference {
         reference: String,
     },
@@ -262,7 +263,7 @@ impl fmt::Display for Error {
             ),
             ErrorKind::DanglingNamedReference { reference } => write!(
                 f,
-                "Found dangling named reference {reference}. The referenced type is missing from `Types`."
+                "Found dangling named reference {reference}. The referenced type is missing from the resolved type collection."
             ),
             ErrorKind::UnresolvedGenericReference { reference } => write!(
                 f,

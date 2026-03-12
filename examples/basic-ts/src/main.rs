@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::{DisplayFromStr, OneOrMany, serde_as};
 use specta::{
-    Type, Types,
+    ResolvedTypes, Type, Types,
     datatype::{DataType, Reference},
 };
 use specta_typescript::Typescript;
@@ -174,13 +174,13 @@ fn main() {
         println!(
             "{:#?}",
             match def {
-                DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
+                DataType::Reference(Reference::Named(r)) => r.get(types.as_types()).unwrap(),
                 _ => unreachable!(),
             }
         );
 
         println!("{:#?}", types);
-        println!("Types Count: {}", types.len());
+        println!("Types Count: {}", types.as_types().len());
     }
 
     {
@@ -201,7 +201,12 @@ fn main() {
             .register::<SmallPrime>()
             .register::<SerdeWithDisplayFromStr>()
             .register::<SerdeWithOneOrMany>();
-        println!("RAW:\n{}", Typescript::default().export(&types).unwrap());
+        println!(
+            "RAW:\n{}",
+            Typescript::default()
+                .export(&ResolvedTypes::from_resolved_types(types.clone()))
+                .unwrap()
+        );
         match specta_serde::apply(types.clone()) {
             Ok(types) => println!(
                 "specta_serde::apply(...):\n{}",

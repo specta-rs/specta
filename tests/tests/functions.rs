@@ -1,14 +1,14 @@
 use std::fmt;
 
 use specta::{
-    Type, Types,
+    ResolvedTypes, Type, Types,
     datatype::{DataType, Function},
     function::{self, fn_datatype},
     specta,
 };
 use specta_typescript::{Typescript, primitives};
 
-fn render_datatype(ts: &Typescript, types: &Types, dt: &DataType) -> Option<String> {
+fn render_datatype(ts: &Typescript, types: &ResolvedTypes, dt: &DataType) -> Option<String> {
     match dt {
         DataType::Reference(r) => primitives::reference(ts, types, r).ok(),
         dt => primitives::inline(ts, types, dt).ok(),

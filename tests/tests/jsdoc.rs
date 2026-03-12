@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use specta::datatype::{DataType, Reference};
-use specta::{Type, Types};
+use specta::{ResolvedTypes, Type, Types};
 use specta_typescript::{BigIntExportBehavior, JSDoc, Layout, primitives};
 use tempfile::TempDir;
 
@@ -42,9 +42,11 @@ mod jsdoc_export_to_files_runtime_imports_types {
     }
 }
 
-fn phase_collections(types: Types) -> [(&'static str, Result<Types, specta_serde::Error>); 3] {
+fn phase_collections(
+    types: Types,
+) -> [(&'static str, Result<ResolvedTypes, specta_serde::Error>); 3] {
     [
-        ("raw", Ok(types.clone())),
+        ("raw", Ok(ResolvedTypes::from_resolved_types(types.clone()))),
         ("serde", specta_serde::apply(types.clone())),
         ("serde_phases", specta_serde::apply_phases(types)),
     ]
@@ -75,7 +77,7 @@ fn primitives_export_many() {
                 let ndts = dts
                     .iter()
                     .filter_map(|(_, ty)| match ty {
-                        DataType::Reference(Reference::Named(r)) => r.get(&types),
+                        DataType::Reference(Reference::Named(r)) => r.get(types.as_types()),
                         _ => None,
                     })
                     .collect::<Vec<_>>();
@@ -103,7 +105,7 @@ fn jsdoc_export_to_files_uses_jsdoc_import_typedefs() {
 
     JSDoc::default()
         .layout(Layout::Files)
-        .export_to(&path, &types)
+        .export_to(&path, &ResolvedTypes::from_resolved_types(types))
         .unwrap();
 
     let output = fs_to_string(&path).unwrap();
