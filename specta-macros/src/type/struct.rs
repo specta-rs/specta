@@ -68,6 +68,7 @@ pub fn parse_struct(
     crate_ref: &TokenStream,
     container_attrs: &ContainerAttr,
     data: &DataStruct,
+    format_crates: &[syn::Path],
 ) -> syn::Result<(TokenStream, TokenStream)> {
     if container_attrs.transparent {
         if let Fields::Unit = data.fields {
@@ -105,6 +106,7 @@ pub fn parse_struct(
             field_attrs,
             &field_ty,
             raw_attrs,
+            format_crates,
         )?;
 
         return Ok((
@@ -142,6 +144,7 @@ pub fn parse_struct(
                         field_attrs,
                         &field.ty,
                         raw_attrs,
+                        format_crates,
                     )?;
                     Ok(quote!((#field_name.into(), #inner)))
                 })
@@ -162,6 +165,7 @@ pub fn parse_struct(
                         field_attrs,
                         &field.ty,
                         raw_attrs,
+                        format_crates,
                     )
                 })
                 .collect::<syn::Result<Vec<TokenStream>>>()?;

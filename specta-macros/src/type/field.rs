@@ -10,6 +10,7 @@ pub fn construct_field(
     attrs: FieldAttr,
     field_ty: &Type,
     raw_attrs: &[syn::Attribute],
+    format_crates: &[syn::Path],
 ) -> syn::Result<TokenStream> {
     construct_field_with_variant_skip(
         crate_ref,
@@ -18,6 +19,7 @@ pub fn construct_field(
         field_ty,
         raw_attrs,
         false,
+        format_crates,
     )
 }
 
@@ -28,6 +30,7 @@ pub fn construct_field_with_variant_skip(
     field_ty: &Type,
     raw_attrs: &[syn::Attribute],
     variant_skip: bool,
+    format_crates: &[syn::Path],
 ) -> syn::Result<TokenStream> {
     let field_ty = attrs.r#type.as_ref().unwrap_or(field_ty);
     let deprecated = attrs.common.deprecated_as_tokens();
@@ -38,6 +41,7 @@ pub fn construct_field_with_variant_skip(
         AttributeScope::Field,
         raw_attrs,
         &container_attrs.skip_attrs,
+        format_crates,
     );
     let type_overridden = attrs.r#type.is_some();
 
