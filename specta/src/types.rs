@@ -137,27 +137,27 @@ impl Types {
         &self,
     ) -> Result<impl ExactSizeIterator<Item = &'_ NamedDataType>, CircularReference> {
         // Walk a DataType and collect every directly-referenced named type into `out`.
-        fn deps<'a>(dt: &'a DataType, types: &'a TypeCollection, out: &mut Vec<&'a NamedDataType>) {
+        fn deps<'a>(dt: &'a DataType, types: &'a TypeCollection, res: &mut Vec<&'a NamedDataType>) {
             let field_ty = |fields: &'a Fields| fields.values().flat_map(|f| f.ty());
 
             match dt {
                 DataType::Primitive(_) | DataType::Generic(_) => {}
-                DataType::Nullable(val) => deps(val, types, out),
-                DataType::List(l) => deps(l.ty(), types, out),
-                DataType::Tuple(t) => t.elements().iter().for_each(|e| deps(e, types, out)),
-                DataType::Struct(s) => field_ty(s.fields()).for_each(|ty| deps(ty, types, out)),
+                DataType::Nullable(val) => deps(val, types, res),
+                DataType::List(l) => deps(l.ty(), types, res),
+                DataType::Tuple(t) => t.elements().iter().for_each(|e| deps(e, types, res)),
+                DataType::Struct(s) => field_ty(s.fields()).for_each(|ty| deps(ty, types, res)),
                 DataType::Map(m) => {
-                    deps(m.key_ty(), types, out);
-                    deps(m.value_ty(), types, out);
+                    deps(m.key_ty(), types, res);
+                    deps(m.value_ty(), types, res);
                 }
                 DataType::Enum(e) => e
                     .variants()
                     .iter()
                     .flat_map(|(_, v)| field_ty(v.fields()))
-                    .for_each(|ty| deps(ty, types, out)),
+                    .for_each(|ty| deps(ty, types, res)),
                 DataType::Reference(Reference::Named(n)) => {
-                    out.extend(n.get(types));
-                    n.generics().iter().for_each(|(_, g)| deps(g, types, out));
+                    res.extend(n.get(types));
+                    n.generics().iter().for_each(|(_, g)| deps(g, types, res));
                 }
                 DataType::Reference(_) => {}
             }
@@ -166,59 +166,50 @@ impl Types {
         fn visit<'a>(
             curr: &'a NamedDataType,
             types: &'a TypeCollection,
-            active: &mut HashSet<&'a str>,
-            done: &mut HashSet<&'a str>,
+            visited: &mut HashSet<&'a str>,
             path: &mut Vec<&'a str>,
-        ) -> Result<Vec<&'a NamedDataType>, CircularReference> {
+            res: &mut Vec<&'a NamedDataType>,
+        ) -> Result<(), CircularReference> {
             let name: &'a str = curr.name().as_ref();
 
             // Early exit if we've already processed this node
-            if done.contains(name) {
-                return Ok(vec![]);
+            if visited.contains(name) {
+                return Ok(());
             }
 
             // Detect and extract cycle paths for clear error message
-            if active.contains(name) {
+            if path.contains(&name) {
                 let i = path.iter().position(|&n| n == name).unwrap_or(0);
                 let last = std::iter::once(name.to_string());
                 let cycle = path[i..].iter().map(|s| s.to_string()).chain(last);
                 return Err(CircularReference::new(cycle.collect()));
             }
 
-            // Activate this node
-            active.insert(name);
+            // Add curr to path and process dependencies
             path.push(name);
-
-            // Process all deps first, accumulating directly into a flat Vec.
             let mut dependencies = Vec::new();
             deps(curr.ty(), types, &mut dependencies);
-            let mut result = dependencies
+            dependencies
                 .into_iter()
-                .try_fold(Vec::new(), |mut acc, dep| {
-                    acc.extend(visit(dep, types, active, done, path)?);
-                    Ok(acc)
-                })?;
+                .try_for_each(|dep| visit(dep, types, visited, path, res))?;
 
-            // Deactivate node, then append self
+            // Remove curr from path, mark it as visited and add it to the result
             path.pop();
-            active.remove(name);
-            done.insert(name);
-            result.push(curr);
+            visited.insert(name);
+            res.push(curr);
 
-            Ok(result)
+            Ok(())
         }
 
-        let mut active: HashSet<&str> = HashSet::new();
-        let mut done: HashSet<&str> = HashSet::new();
+        let mut visited: HashSet<&str> = HashSet::new();
         let mut path: Vec<&str> = Vec::new();
+        let mut res = Vec::with_capacity(self.len());
 
         // Need to pre-sort collection for deterministic output.
         self.into_sorted_iter()
-            .try_fold(Vec::with_capacity(self.len()), |mut acc, n| {
-                acc.extend(visit(n, self, &mut active, &mut done, &mut path)?);
-                Ok(acc)
-            })
-            .map(Vec::into_iter)
+            .try_for_each(|n| visit(n, self, &mut visited, &mut path, &mut res))?;
+
+        Ok(res.into_iter())
     }
 
     /// Return an mutable iterator over the type collection.
