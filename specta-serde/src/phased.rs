@@ -2,20 +2,31 @@ use std::marker::PhantomData;
 
 use specta::{
     Type, Types,
-    datatype::{DataType, NamedDataType, OpaqueReference, Tuple},
+    datatype::{DataType, NamedDataType, Tuple},
 };
 
+/// Declares an explicit serialize/deserialize type pair for Specta output.
+///
+/// This is primarily used with `#[specta(type = ...)]` when serde attributes
+/// cause the wire shape to differ by direction.
+///
+/// - `Serialize` is the type used for serialization output.
+/// - `Deserialize` is the type accepted for deserialization input.
+///
+/// When both phases resolve to the same Specta datatype, this collapses to that
+/// single type. When they differ, `apply_phases` can split the graph into
+/// `*_Serialize` and `*_Deserialize` variants.
+///
+/// ```rust
+/// # use specta::Type;
+/// #[derive(Type)]
+/// struct OneOrMany {
+///     #[specta(type = specta_serde::Phased<Vec<String>, String>)]
+///     value: Vec<String>,
+/// }
+/// ```
 pub struct Phased<Serialize, Deserialize> {
     phantom: PhantomData<(Serialize, Deserialize)>,
-}
-
-pub trait Phased2 {
-    type Serialize;
-    type Deserialize;
-}
-impl<Serialize, Deserialize> Phased2 for Phased<Serialize, Deserialize> {
-    type Serialize = Serialize;
-    type Deserialize = Deserialize;
 }
 
 impl<Serialize: Type, Deserialize: Type> Type for Phased<Serialize, Deserialize> {

@@ -1,4 +1,12 @@
-//! [Serde](https://serde.rs) support for Specta
+//! [Serde](https://serde.rs) support for Specta.
+//!
+//! # Choosing a mode
+//!
+//! - Use [`apply`] when serde behavior is symmetric and a single exported shape
+//!   should work for both serialization and deserialization.
+//! - Use [`apply_phases`] when serde behavior differs by direction (for example
+//!   deserialize-widening enums, asymmetric conversion attributes, or explicit
+//!   [`Phased`] overrides).
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
     html_logo_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png",
@@ -15,7 +23,7 @@ use specta::{
     datatype::{
         DataType, Enum, Field, Fields, NamedDataType, Primitive, Reference, Struct, Tuple, Variant,
     },
-    internal,
+    internal as specta_internal,
 };
 
 mod error;
@@ -25,15 +33,36 @@ mod phased;
 mod repr;
 mod validate;
 
-pub use error::{Error, Result};
-pub use inflection::RenameRule;
-pub use parser::{
-    ConversionType, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs, SpectaTypeAttr,
-    merge_container_attrs, merge_field_attrs, merge_variant_attrs,
-};
-pub use phased::{Phased, Phased2};
+use inflection::RenameRule;
+use parser::{SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs};
+
+pub use error::Error;
+pub use phased::Phased;
+#[doc(hidden)]
+pub mod internal {
+    pub use crate::error::Result;
+    pub use crate::inflection::RenameRule;
+    pub use crate::parser::{
+        ConversionType, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs, SpectaTypeAttr,
+        merge_container_attrs, merge_field_attrs, merge_variant_attrs,
+    };
+}
+
+use error::Result;
 use repr::EnumRepr;
 
+/// Applies serde transformations in unified mode.
+///
+/// Unified mode produces a single transformed type graph that must satisfy both
+/// serialization and deserialization behavior. This is the simplest mode and is
+/// usually what exporters want when serde behavior is symmetric.
+///
+/// Returns an [`Error`] when serde metadata introduces phase-only differences
+/// that cannot be represented as one shape (for example `#[serde(other)]`,
+/// identifier enums, asymmetric conversion attributes, `skip_serializing_if`,
+/// or explicit [`Phased`] overrides).
+///
+/// Use [`apply_phases`] when your serialize and deserialize wire shapes differ.
 pub fn apply(types: Types) -> Result<Types> {
     validate::validate_for_mode(&types, validate::ApplyMode::Unified)?;
 
@@ -65,6 +94,16 @@ pub fn apply(types: Types) -> Result<Types> {
     Ok(out)
 }
 
+/// Applies serde transformations in split-phase mode.
+///
+/// Phase mode preserves directional differences by rewriting affected named
+/// types into paired `*_Serialize` and `*_Deserialize` types and then updating
+/// references accordingly. This allows exporters to represent serde behavior
+/// that is asymmetric between serialization and deserialization.
+///
+/// Use this when working with deserialize-widening attributes like
+/// `#[serde(other)]`/identifier enums, asymmetric conversion attributes, or
+/// explicit [`Phased`] overrides.
 pub fn apply_phases(types: Types) -> Result<Types> {
     validate::validate_for_mode(&types, validate::ApplyMode::Phases)?;
 
@@ -982,13 +1021,13 @@ fn clone_variant_with_named_fields(
     fields: Vec<(Cow<'static, str>, Field)>,
 ) -> Variant {
     let mut transformed = original.clone();
-    transformed.set_fields(internal::construct::fields_named(fields));
+    transformed.set_fields(specta_internal::construct::fields_named(fields));
     transformed
 }
 
 fn clone_variant_with_unnamed_fields(original: &Variant, fields: Vec<Field>) -> Variant {
     let mut transformed = original.clone();
-    transformed.set_fields(internal::construct::fields_unnamed(fields));
+    transformed.set_fields(specta_internal::construct::fields_unnamed(fields));
     transformed
 }
 

@@ -88,7 +88,7 @@ pub fn parse_enum(
             let runtime_attrs = if variant_type.is_some() {
                 quote!({
                     let mut attrs = #runtime_attrs;
-                    attrs.insert(specta_serde::SpectaTypeAttr);
+                    attrs.insert(specta_serde::internal::SpectaTypeAttr);
                     attrs
                 })
             } else {
