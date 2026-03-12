@@ -1,0 +1,55 @@
+[package]
+name = "specta-rescript"
+description = "Export your Rust types to ReScript"
+version = "0.0.1"
+authors = ["Rory Finnegan <rory@rofinn.dev>", "Oscar Beaumont <oscar@otbeaumont.me>"]
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/specta-rs/specta"
+documentation = "https://docs.rs/specta-rescript/latest/specta-rescript"
+keywords = ["specta", "rescript", "typesafe"]
+categories = ["web-programming"]
+readme = "../README.md"
+
+# /bin/sh RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
+[package.metadata."docs.rs"]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true
+
+[dependencies]
+specta = { version = "=2.0.0-rc.23", path = "../specta", features = ["derive"]}
+specta-serde = { version = "=0.0.10", path = "../specta-serde" }
+thiserror = "2.0"
+
+[[example]]
+name = "simple_usage"
+path = "examples/simple_usage.rs"
+
+[[example]]
+name = "basic_types"
+path = "examples/basic_types.rs"
+
+[[example]]
+name = "variants"
+path = "examples/variants.rs"
+
+
+[[example]]
+name = "result_types"
+path = "examples/result_types.rs"
+
+
+[[example]]
+name = "generics"
+path = "examples/generics.rs"
+
+[[example]]
+name = "comments_example"
+path = "examples/comments_example.rs"
+
+[[example]]
+name = "comprehensive_demo"
+path = "examples/comprehensive_demo.rs"
