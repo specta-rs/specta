@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use specta::{
-    Type, Types,
+    ResolvedTypes, Type, Types,
     datatype::{DataType, NamedDataType, Primitive},
 };
 use specta_typescript::{Layout, Typescript};
@@ -46,22 +46,23 @@ fn duplicate_typenames_layouts() {
         .register::<Testing>()
         .register::<Another>()
         .register::<MoreType>();
+    let resolved = ResolvedTypes::from_resolved_types(types.clone());
 
     assert_error_contains(
-        Typescript::default().export(&types),
+        Typescript::default().export(&resolved),
         "Detected multiple types",
     );
 
     assert_error_contains(
         Typescript::default()
             .layout(Layout::FlatFile)
-            .export(&types),
+            .export(&resolved),
         "Detected multiple types",
     );
 
     let module_prefixed = Typescript::default()
         .layout(Layout::ModulePrefixedName)
-        .export(&types)
+        .export(&resolved)
         .unwrap();
     assert!(module_prefixed.contains("Another"));
     assert!(module_prefixed.contains("MoreType"));
@@ -69,13 +70,15 @@ fn duplicate_typenames_layouts() {
 
     let namespaces = Typescript::default()
         .layout(Layout::Namespaces)
-        .export(&types)
+        .export(&resolved)
         .unwrap();
     assert!(namespaces.contains("export namespace"));
     assert!(namespaces.contains("testing2"));
 
     assert_error_contains(
-        Typescript::default().layout(Layout::Files).export(&types),
+        Typescript::default()
+            .layout(Layout::Files)
+            .export(&resolved),
         "Unable to export layout Files",
     );
 
@@ -83,7 +86,7 @@ fn duplicate_typenames_layouts() {
     let path = temp.path().join("duplicate-layout");
     Typescript::default()
         .layout(Layout::Files)
-        .export_to(&path, &types)
+        .export_to(&path, &resolved)
         .unwrap();
 
     let output = crate::fs_to_string(&path).unwrap();
@@ -97,35 +100,38 @@ fn non_duplicate_typenames_layouts() {
     let types = Types::default()
         .register::<Another>()
         .register::<MoreType>();
+    let resolved = ResolvedTypes::from_resolved_types(types.clone());
 
-    let default_output = Typescript::default().export(&types).unwrap();
+    let default_output = Typescript::default().export(&resolved).unwrap();
     assert!(default_output.contains("export type Another"));
     assert!(default_output.contains("export type MoreType"));
 
     let flat = Typescript::default()
         .layout(Layout::FlatFile)
-        .export(&types)
+        .export(&resolved)
         .unwrap();
     assert!(flat.contains("export type Another"));
     assert!(flat.contains("export type MoreType"));
 
     let module_prefixed = Typescript::default()
         .layout(Layout::ModulePrefixedName)
-        .export(&types)
+        .export(&resolved)
         .unwrap();
     assert!(module_prefixed.contains("Another"));
     assert!(module_prefixed.contains("MoreType"));
 
     let namespaces = Typescript::default()
         .layout(Layout::Namespaces)
-        .export(&types)
+        .export(&resolved)
         .unwrap();
     assert!(namespaces.contains("export namespace"));
     assert!(namespaces.contains("Another"));
     assert!(namespaces.contains("MoreType"));
 
     assert_error_contains(
-        Typescript::default().layout(Layout::Files).export(&types),
+        Typescript::default()
+            .layout(Layout::Files)
+            .export(&resolved),
         "Unable to export layout Files",
     );
 
@@ -133,7 +139,7 @@ fn non_duplicate_typenames_layouts() {
     let path = temp.path().join("no-duplicate-layout");
     Typescript::default()
         .layout(Layout::Files)
-        .export_to(&path, &types)
+        .export_to(&path, &resolved)
         .unwrap();
 
     let output = crate::fs_to_string(&path).unwrap();
@@ -149,22 +155,23 @@ fn empty_module_path_layouts() {
     let mut testing = NamedDataType::new("testing", Vec::new(), DataType::Primitive(Primitive::i8));
     testing.set_module_path("".into());
     testing.register(&mut types);
+    let resolved = ResolvedTypes::from_resolved_types(types.clone());
 
     let flat = Typescript::default()
         .layout(Layout::FlatFile)
-        .export(&types)
+        .export(&resolved)
         .unwrap();
     assert!(flat.contains("export type testing = number"));
 
     let module_prefixed = Typescript::default()
         .layout(Layout::ModulePrefixedName)
-        .export(&types)
+        .export(&resolved)
         .unwrap();
     assert!(module_prefixed.contains("testing"));
 
     let namespaces = Typescript::default()
         .layout(Layout::Namespaces)
-        .export(&types)
+        .export(&resolved)
         .unwrap();
     assert!(namespaces.contains("export namespace"));
     assert!(namespaces.contains("testing = number"));
@@ -173,7 +180,7 @@ fn empty_module_path_layouts() {
     let path = temp.path().join("empty-module-path-layout");
     Typescript::default()
         .layout(Layout::Files)
-        .export_to(&path, &types)
+        .export_to(&path, &resolved)
         .unwrap();
 
     let output = crate::fs_to_string(Path::new(&path)).unwrap();

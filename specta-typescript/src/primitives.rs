@@ -6,7 +6,7 @@
 use std::{borrow::Cow, cell::RefCell, fmt::Write as _, iter};
 
 use specta::{
-    Types,
+    ResolvedTypes, Types,
     datatype::{
         DataType, Deprecated, Enum, Fields, GenericReference, List, Map, NamedDataType,
         NamedReference, OpaqueReference, Primitive, Reference, Tuple,
@@ -33,12 +33,12 @@ use crate::{
 ///
 pub fn export<'a>(
     exporter: &dyn AsRef<Exporter>,
-    types: &Types,
+    types: &ResolvedTypes,
     ndts: impl Iterator<Item = &'a NamedDataType>,
     indent: &str,
 ) -> Result<String, Error> {
     let mut s = String::new();
-    export_internal(&mut s, exporter.as_ref(), types, ndts, indent)?;
+    export_internal(&mut s, exporter.as_ref(), types.as_types(), ndts, indent)?;
     Ok(s)
 }
 
@@ -173,14 +173,14 @@ fn export_single_internal(
 ///
 pub fn inline(
     exporter: &dyn AsRef<Exporter>,
-    types: &Types,
+    types: &ResolvedTypes,
     dt: &DataType,
 ) -> Result<String, Error> {
     let mut s = String::new();
     inline_datatype(
         &mut s,
         exporter.as_ref(),
-        types,
+        types.as_types(),
         dt,
         vec![],
         None,
@@ -475,11 +475,19 @@ fn jsdoc_description(docs: &str, deprecated: Option<&Deprecated>) -> Option<Stri
 /// See [`export`] for the list of things to consider when using this.
 pub fn reference(
     exporter: &dyn AsRef<Exporter>,
-    types: &Types,
+    types: &ResolvedTypes,
     r: &Reference,
 ) -> Result<String, Error> {
     let mut s = String::new();
-    reference_dt(&mut s, exporter.as_ref(), types, r, vec![], "", &[])?;
+    reference_dt(
+        &mut s,
+        exporter.as_ref(),
+        types.as_types(),
+        r,
+        vec![],
+        "",
+        &[],
+    )?;
     Ok(s)
 }
 
@@ -1858,10 +1866,20 @@ fn reference_opaque_dt(
         s.push_str("never");
         return Ok(());
     } else if let Some(def) = r.downcast_ref::<Branded>() {
+        let resolved_types = ResolvedTypes::from_resolved_types(types.clone());
+
         if let Some(branded_type) = exporter
             .branded_type_impl
             .as_ref()
-            .map(|builder| (builder.0)(BrandedTypeExporter { exporter, types }, def))
+            .map(|builder| {
+                (builder.0)(
+                    BrandedTypeExporter {
+                        exporter,
+                        types: &resolved_types,
+                    },
+                    def,
+                )
+            })
             .transpose()?
         {
             s.push_str(branded_type.as_ref());
@@ -1869,10 +1887,10 @@ fn reference_opaque_dt(
         }
 
         // TODO: Build onto `s` instead of appending a separate string
-        s.push_str(&match def.ty() {
-            DataType::Reference(r) => reference(exporter, types, r),
-            ty => inline(exporter, types, ty),
-        }?);
+        match def.ty() {
+            DataType::Reference(r) => reference_dt(s, exporter, types, r, vec![], "", &[])?,
+            ty => inline_datatype(s, exporter, types, ty, vec![], None, "", 0, &[])?,
+        }
         s.push_str(r#" & { { readonly __brand: ""#);
         s.push_str(def.brand());
         s.push_str("\" }");

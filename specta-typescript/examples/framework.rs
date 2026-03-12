@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use specta::{Type, Types, datatype::NamedDataType};
+use specta::{ResolvedTypes, Type, Types, datatype::NamedDataType};
 use specta_typescript::{Exporter, JSDoc, Layout, Typescript, primitives};
 use specta_util::selection;
 
@@ -140,6 +140,7 @@ fn main() {
     }
 
     let dt = One::definition(&mut types);
+    let resolved_types = ResolvedTypes::from_resolved_types(types);
 
     let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("out");
     std::fs::create_dir_all(&base).unwrap();
@@ -176,24 +177,24 @@ fn main() {
         // });
 
         exporter
-            .export_to(base.join("framework.ts"), &types)
+            .export_to(base.join("framework.ts"), &resolved_types)
             .unwrap();
 
         exporter
             .clone()
             .layout(Layout::ModulePrefixedName)
-            .export_to(base.join("framework-prefixed.ts"), &types)
+            .export_to(base.join("framework-prefixed.ts"), &resolved_types)
             .unwrap();
 
         exporter
             .clone()
             .layout(Layout::Namespaces)
-            .export_to(base.join("framework-namespaces.ts"), &types)
+            .export_to(base.join("framework-namespaces.ts"), &resolved_types)
             .unwrap();
 
         exporter
             .layout(Layout::Files)
-            .export_to(base.join("framework-output"), &types)
+            .export_to(base.join("framework-output"), &resolved_types)
             .unwrap();
     }
 
@@ -203,18 +204,18 @@ fn main() {
         exporter
             .clone()
             .layout(Layout::Files)
-            .export_to(base.join("framework-output-js"), &types)
+            .export_to(base.join("framework-output-js"), &resolved_types)
             .unwrap();
 
         exporter
             .clone()
-            .export_to(base.join("framework.js"), &types)
+            .export_to(base.join("framework.js"), &resolved_types)
             .unwrap();
 
         exporter
             .clone()
             .layout(Layout::ModulePrefixedName)
-            .export_to(base.join("framework-prefixed.js"), &types)
+            .export_to(base.join("framework-prefixed.js"), &resolved_types)
             .unwrap();
     }
 }

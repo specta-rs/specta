@@ -1,7 +1,7 @@
 use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
-use specta::{Type, Types};
+use specta::{ResolvedTypes, Type, Types};
 use specta_typescript::{BigIntExportBehavior, Typescript};
 use tempfile::TempDir;
 
@@ -53,7 +53,7 @@ fn typescript_export_collection() {
 
     let output = Typescript::default()
         .bigint(BigIntExportBehavior::Number)
-        .export(&types)
+        .export(&ResolvedTypes::from_resolved_types(types))
         .unwrap();
 
     assert!(output.contains("export type TypeOne"));
@@ -74,7 +74,7 @@ fn typescript_export_collection_to_file() {
 
     Typescript::default()
         .bigint(BigIntExportBehavior::Number)
-        .export_to(&path, &types)
+        .export_to(&path, &ResolvedTypes::from_resolved_types(types))
         .unwrap();
 
     let output = crate::fs_to_string(&path).unwrap();

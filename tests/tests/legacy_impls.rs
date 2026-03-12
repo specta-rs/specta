@@ -1,6 +1,6 @@
 #![allow(deprecated)]
 
-use specta::{Type, Types};
+use specta::{ResolvedTypes, Type, Types};
 use specta_typescript::{BigIntExportBehavior, Typescript};
 
 #[derive(Debug)]
@@ -103,7 +103,9 @@ struct LegacyImpls {
 fn legacy_impls() {
     let output = Typescript::default()
         .bigint(BigIntExportBehavior::Number)
-        .export(&Types::default().register::<LegacyImpls>())
+        .export(&ResolvedTypes::from_resolved_types(
+            Types::default().register::<LegacyImpls>(),
+        ))
         .unwrap();
     insta::assert_snapshot!("legacy_impls", output);
 }

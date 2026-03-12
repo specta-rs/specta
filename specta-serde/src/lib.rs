@@ -104,7 +104,7 @@ use std::{
 };
 
 use specta::{
-    Types,
+    ResolvedTypes, Types,
     datatype::{
         DataType, Enum, Field, Fields, NamedDataType, Primitive, Reference, Struct, Tuple, Variant,
     },
@@ -143,13 +143,16 @@ use repr::EnumRepr;
 /// serialization and deserialization behavior. This is the simplest mode and is
 /// usually what exporters want when serde behavior is symmetric.
 ///
+/// Returns [`ResolvedTypes`](specta::ResolvedTypes) because serde rewrites may
+/// alter type shapes.
+///
 /// Returns an [`Error`] when serde metadata introduces phase-only differences
 /// that cannot be represented as one shape (for example `#[serde(other)]`,
 /// identifier enums, asymmetric conversion attributes, `skip_serializing_if`,
 /// or explicit [`Phased`] overrides).
 ///
 /// Use [`apply_phases`] when your serialize and deserialize wire shapes differ.
-pub fn apply(types: Types) -> Result<Types> {
+pub fn apply(types: Types) -> Result<ResolvedTypes> {
     validate::validate_for_mode(&types, validate::ApplyMode::Unified)?;
 
     let mut out = types.clone();
@@ -177,7 +180,7 @@ pub fn apply(types: Types) -> Result<Types> {
         return Err(err);
     }
 
-    Ok(out)
+    Ok(ResolvedTypes::from_resolved_types(out))
 }
 
 /// Applies serde transformations in split-phase mode.
@@ -187,10 +190,13 @@ pub fn apply(types: Types) -> Result<Types> {
 /// references accordingly. This allows exporters to represent serde behavior
 /// that is asymmetric between serialization and deserialization.
 ///
+/// Returns [`ResolvedTypes`](specta::ResolvedTypes) because serde rewrites may
+/// alter type shapes.
+///
 /// Use this when working with deserialize-widening attributes like
 /// `#[serde(other)]`/identifier enums, asymmetric conversion attributes, or
 /// explicit [`Phased`] overrides.
-pub fn apply_phases(types: Types) -> Result<Types> {
+pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
     validate::validate_for_mode(&types, validate::ApplyMode::Phases)?;
 
     let originals = types.into_unsorted_iter().cloned().collect::<Vec<_>>();
@@ -338,7 +344,7 @@ pub fn apply_phases(types: Types) -> Result<Types> {
 
     debug_assert_eq!(dependencies.len(), originals.len());
 
-    Ok(out)
+    Ok(ResolvedTypes::from_resolved_types(out))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

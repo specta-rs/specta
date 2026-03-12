@@ -22,7 +22,7 @@ mod types;
 
 // TODO: Can we just move the trait here or `#[doc(inline)]`
 pub use r#type::Type;
-pub use types::Types;
+pub use types::{ResolvedTypes, Types};
 
 #[doc(inline)]
 #[cfg(feature = "collect")]

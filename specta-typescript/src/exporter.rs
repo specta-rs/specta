@@ -9,7 +9,7 @@ use std::{
 };
 
 use specta::{
-    Types,
+    ResolvedTypes, Types,
     datatype::{DataType, NamedDataType, Reference},
 };
 
@@ -211,7 +211,9 @@ impl Exporter {
     /// Export the files into a single string.
     ///
     /// Note: This returns an error if the format is `Format::Files`.
-    pub fn export(&self, types: &Types) -> Result<String, Error> {
+    pub fn export(&self, resolved_types: &ResolvedTypes) -> Result<String, Error> {
+        let types = resolved_types.as_types();
+
         if let Layout::Files = self.layout {
             return Err(Error::unable_to_export(self.layout));
         }
@@ -230,7 +232,7 @@ impl Exporter {
                 exporter: self,
                 has_manually_exported_user_types: &mut has_manually_exported_user_types,
                 files_root_types: "",
-                types: &types,
+                types: resolved_types,
             });
         }
         let runtime = runtime?;
@@ -246,7 +248,7 @@ impl Exporter {
 
         // User types (if not included in framework runtime)
         if !has_manually_exported_user_types {
-            render_types(&mut out, self, &types, "")?;
+            render_types(&mut out, self, types, "")?;
         }
 
         Ok(out)
@@ -257,11 +259,16 @@ impl Exporter {
     /// When configured when `format` is `Format::Files`, you must provide a directory path.
     /// Otherwise, you must provide the path of a single file.
     ///
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types) -> Result<(), Error> {
+    pub fn export_to(
+        &self,
+        path: impl AsRef<Path>,
+        resolved_types: &ResolvedTypes,
+    ) -> Result<(), Error> {
+        let types = resolved_types.as_types();
         let path = path.as_ref();
 
         if self.layout != Layout::Files {
-            let result = self.export(types)?;
+            let result = self.export(resolved_types)?;
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)?;
             };
@@ -349,8 +356,8 @@ impl Exporter {
         let mut root_types = String::new();
         export(
             self,
-            &types,
-            &mut build_module_graph(&types),
+            types,
+            &mut build_module_graph(types),
             &mut root_types,
             path,
             &mut files,
@@ -367,7 +374,7 @@ impl Exporter {
                             exporter: self,
                             has_manually_exported_user_types: &mut has_manually_exported_user_types,
                             files_root_types: &root_types,
-                            types: &types,
+                            types: resolved_types,
                         })
                     })
                 });
@@ -473,7 +480,7 @@ impl AsMut<Exporter> for Exporter {
 pub struct BrandedTypeExporter<'a> {
     pub(crate) exporter: &'a Exporter,
     /// Collected types currently being exported.
-    pub types: &'a Types,
+    pub types: &'a ResolvedTypes,
 }
 
 impl fmt::Debug for BrandedTypeExporter<'_> {
@@ -515,7 +522,7 @@ pub struct FrameworkExporter<'a> {
     // For `Layout::Files` we need to inject the value
     files_root_types: &'a str,
     /// Collected types currently being exported.
-    pub types: &'a Types,
+    pub types: &'a ResolvedTypes,
 }
 
 impl fmt::Debug for FrameworkExporter<'_> {
@@ -539,13 +546,18 @@ impl Deref for FrameworkExporter<'_> {
 }
 
 impl FrameworkExporter<'_> {
-    /// Render the types within the [Types].
+    /// Render the types within the [`ResolvedTypes`](specta::ResolvedTypes).
     ///
     /// This will only work if used within [`Exporter::framework_runtime`].
     /// It allows frameworks to intersperse their user types into their runtime code.
     pub fn render_types(&mut self) -> Result<Cow<'static, str>, Error> {
         let mut s = String::new();
-        render_types(&mut s, self.exporter, self.types, self.files_root_types)?;
+        render_types(
+            &mut s,
+            self.exporter,
+            self.types.as_types(),
+            self.files_root_types,
+        )?;
         *self.has_manually_exported_user_types = true;
         Ok(Cow::Owned(s))
     }

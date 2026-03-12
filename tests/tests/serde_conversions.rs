@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use specta::{Type, Types};
+use specta::{ResolvedTypes, Type, Types};
 use specta_typescript::Typescript;
 
 #[derive(Type, Serialize, Deserialize)]
@@ -157,8 +157,9 @@ impl From<Wire> for Symmetric {
     }
 }
 
-fn type_names(types: &Types) -> Vec<String> {
+fn type_names(types: &ResolvedTypes) -> Vec<String> {
     types
+        .as_types()
         .into_unsorted_iter()
         .map(|ndt| ndt.name().to_string())
         .collect()
@@ -232,7 +233,9 @@ fn field_only_phased_override_requires_apply_phases() {
     assert!(err.to_string().contains("requires `apply_phases`"));
 
     let raw_err = Typescript::default()
-        .export(&Types::default().register::<FieldOnlyPhasedOverride>())
+        .export(&ResolvedTypes::from_resolved_types(
+            Types::default().register::<FieldOnlyPhasedOverride>(),
+        ))
         .expect_err("raw export should fail on unresolved phased opaque reference");
     assert!(raw_err.to_string().contains("unsupported opaque reference"));
 

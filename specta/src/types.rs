@@ -22,6 +22,19 @@ pub struct Types(
     pub(crate) usize,
 );
 
+/// A wrapper around [`Types`] indicating the type graph has already been
+/// transformed for a specific export format.
+///
+/// This is generally constructed by a format crate (for example
+/// [`specta-serde`](https://docs.rs/specta-serde)) after applying
+/// format-specific rewrites.
+///
+/// Constructing this wrapper from plain [`Types`] is explicit because the
+/// conversion may change type shapes. Prefer using your format crate's
+/// conversion entry points when possible.
+#[derive(Debug, Clone)]
+pub struct ResolvedTypes(Types);
+
 impl fmt::Debug for Types {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Types").field(&self.0).finish()
@@ -135,6 +148,40 @@ impl Types {
             }
         }
         self
+    }
+}
+
+impl ResolvedTypes {
+    /// Wrap already-resolved [`Types`] as [`ResolvedTypes`].
+    ///
+    /// This should generally be called by format crates after they finish their
+    /// own transformation pass (for example `specta_serde::apply` or
+    /// `specta_serde::apply_phases`).
+    ///
+    /// If you call this in end-user code your types may not look how you expect!
+    pub fn from_resolved_types(types: Types) -> Self {
+        Self(types)
+    }
+
+    /// Borrow the underlying [`Types`] collection.
+    ///
+    /// # Notes
+    ///
+    /// This does not undo format-specific resolution. If a format crate already
+    /// rewrote type shapes, this still returns those rewritten shapes. It is your
+    /// responsibility to ensure consumers treat these as already-resolved types.
+    pub fn as_types(&self) -> &Types {
+        &self.0
+    }
+
+    /// Consume [`ResolvedTypes`] and return the underlying [`Types`].
+    ///
+    /// # Notes
+    ///
+    /// This does not undo format-specific resolution. The returned [`Types`]
+    /// remain whatever shape they were resolved into.
+    pub fn into_types(self) -> Types {
+        self.0
     }
 }
 

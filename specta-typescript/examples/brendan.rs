@@ -1,4 +1,4 @@
-use specta::{Type, Types};
+use specta::{ResolvedTypes, Type, Types};
 use specta_typescript::Typescript;
 
 #[derive(Clone, serde::Serialize, Type)]
@@ -11,7 +11,9 @@ enum Testing {
 
 fn main() {
     let result = Typescript::default()
-        .export(&Types::default().register::<Testing>())
+        .export(&ResolvedTypes::from_resolved_types(
+            Types::default().register::<Testing>(),
+        ))
         .unwrap();
     println!("{}", result);
 }
