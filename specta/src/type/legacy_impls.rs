@@ -1,7 +1,7 @@
 #![allow(unused)]
 
 //! The plan is to try and move these into the ecosystem for the v2 release.
-use super::macros::{impl_ndt, impl_ndt_as, impl_passthrough};
+use super::macros::{impl_ndt, impl_ndt_as};
 use crate::{
     Type, Types,
     datatype::{
@@ -21,21 +21,25 @@ impl_ndt_as!(
 
 #[cfg(feature = "ordered-float")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ordered-float")))]
-impl Type for ordered_float::OrderedFloat<f32> {
-    impl_passthrough!(f32);
-}
+impl_ndt!(
+    impl Type for ordered_float::OrderedFloat<f32> {
+        inline: true;
+        build: |types, ndt| {
+            ndt.inner = f32::definition(types);
+        }
+    }
 
-#[cfg(feature = "ordered-float")]
-#[cfg_attr(docsrs, doc(cfg(feature = "ordered-float")))]
-impl Type for ordered_float::OrderedFloat<f64> {
-    impl_passthrough!(f64);
-}
+    impl Type for ordered_float::OrderedFloat<f64> {
+        inline: true;
+        build: |types, ndt| {
+            ndt.inner = f64::definition(types);
+        }
+    }
+);
 
 #[cfg(feature = "heapless")]
 #[cfg_attr(docsrs, doc(cfg(feature = "heapless")))]
-impl<T: Type, const N: usize> Type for heapless::Vec<T, N> {
-    impl_passthrough!([T]);
-}
+impl_ndt_as!(heapless::Vec<T, const N: usize> as [T]);
 
 #[cfg(feature = "semver")]
 #[cfg_attr(docsrs, doc(cfg(feature = "semver")))]
@@ -47,25 +51,15 @@ impl_ndt_as!(smol_str::SmolStr as str);
 
 #[cfg(feature = "arrayvec")]
 #[cfg_attr(docsrs, doc(cfg(feature = "arrayvec")))]
-impl<T: Type, const N: usize> Type for arrayvec::ArrayVec<T, N> {
-    impl_passthrough!([T]);
-}
+impl_ndt_as!(arrayvec::ArrayVec<T, const N: usize> as [T]);
 
 #[cfg(feature = "arrayvec")]
 #[cfg_attr(docsrs, doc(cfg(feature = "arrayvec")))]
-impl<const N: usize> Type for arrayvec::ArrayString<N> {
-    impl_passthrough!(str);
-}
+impl_ndt_as!(arrayvec::ArrayString<const N: usize> as str);
 
 #[cfg(feature = "smallvec")]
 #[cfg_attr(docsrs, doc(cfg(feature = "smallvec")))]
-impl<A> Type for smallvec::SmallVec<A>
-where
-    A: smallvec::Array,
-    A::Item: Type,
-{
-    impl_passthrough!([A::Item]);
-}
+impl_ndt_as!(smallvec::SmallVec<[T; N]> where { [T; N]: smallvec::Array } as [T]);
 
 #[cfg(feature = "bytes")]
 #[cfg_attr(docsrs, doc(cfg(feature = "bytes")))]

@@ -2,4 +2,4 @@
 source: tests/tests/jsdoc.rs
 expression: output
 ---
-ERROR: Unresolved generic reference 'GenericReference { id: TypeId(0x61656fbb22c52095872877222920ea6f) }' while validating 'Demo.a.<generic_ref>'
+ERROR: Unresolved generic reference 'GenericReference { id: TypeId(0x993d20f44bf38b57ea4cc3595fd6922c) }' while validating 'Vec.<list_item>.<generic_ref>'

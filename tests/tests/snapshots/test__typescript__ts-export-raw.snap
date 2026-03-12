@@ -88,6 +88,18 @@ export type Container1 = {
 	baz: { [key in string]: Generic1<string> },
 };
 
+export type ContainerTypeOverrideEnum = string;
+
+export type ContainerTypeOverrideGeneric = string;
+
+export type ContainerTypeOverrideStruct = string;
+
+export type ContainerTypeOverrideToGeneric<T> = T;
+
+export type ContainerTypeOverrideTuple = [string, number];
+
+export type ContainerTypeOverrideTupleGeneric<T> = [T, string];
+
 export type D = {
 	flattened: number,
 };
@@ -606,12 +618,12 @@ export type Primitives = {
 	"type_type::Type": Type,
 	ActualType: ActualType,
 	SpectaTypeOverride: SpectaTypeOverride,
-	ContainerTypeOverrideStruct: string,
-	ContainerTypeOverrideEnum: string,
-	"ContainerTypeOverrideGeneric<Box<dyn Any>>": string,
-	"ContainerTypeOverrideToGeneric<i32>": number,
-	ContainerTypeOverrideTuple: [string, number],
-	"ContainerTypeOverrideTupleGeneric<i32>": [number, string],
+	ContainerTypeOverrideStruct: ContainerTypeOverrideStruct,
+	ContainerTypeOverrideEnum: ContainerTypeOverrideEnum,
+	"ContainerTypeOverrideGeneric<Box<dyn Any>>": ContainerTypeOverrideGeneric,
+	"ContainerTypeOverrideToGeneric<i32>": ContainerTypeOverrideToGeneric<number>,
+	ContainerTypeOverrideTuple: ContainerTypeOverrideTuple,
+	"ContainerTypeOverrideTupleGeneric<i32>": ContainerTypeOverrideTupleGeneric<number>,
 	InvalidToValidType: InvalidToValidType,
 	TupleStruct: TupleStruct,
 	TupleStructWithRep: TupleStructWithRep,
