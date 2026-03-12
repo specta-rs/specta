@@ -3,6 +3,17 @@
 use specta::{Type, Types};
 use specta_typescript::{BigIntExportBehavior, Typescript};
 
+#[derive(Debug)]
+struct ErrorStackRootError;
+
+impl std::fmt::Display for ErrorStackRootError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("error stack root error")
+    }
+}
+
+impl std::error::Error for ErrorStackRootError {}
+
 #[derive(Type)]
 struct LegacyImpls {
     ordered_f32: ordered_float::OrderedFloat<f32>,
@@ -34,6 +45,8 @@ struct LegacyImpls {
     chrono_utc: chrono::Utc,
     chrono_local: chrono::Local,
     either: either::Either<i32, String>,
+    error_stack_report: error_stack::Report<ErrorStackRootError>,
+    error_stack_multi_report: error_stack::Report<[ErrorStackRootError]>,
     glam_affine2: glam::Affine2,
     glam_affine3a: glam::Affine3A,
     glam_mat2: glam::Mat2,
