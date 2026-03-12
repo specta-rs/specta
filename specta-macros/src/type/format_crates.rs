@@ -99,10 +99,7 @@ fn cached_format_crate_strings() -> syn::Result<Vec<String>> {
     }
 
     let computed = compute_format_crate_strings();
-    let cache_entry = computed
-        .as_ref()
-        .map(Clone::clone)
-        .map_err(ToString::to_string);
+    let cache_entry = computed.clone().map_err(|err| err.to_string());
 
     cache
         .lock()

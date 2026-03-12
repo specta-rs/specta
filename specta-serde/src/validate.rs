@@ -327,8 +327,8 @@ fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<(
         ));
     }
 
-    if attrs.variant_identifier {
-        if let Some((name, _)) = enm
+    if attrs.variant_identifier
+        && let Some((name, _)) = enm
             .variants()
             .iter()
             .find(|(_, variant)| !matches!(variant.fields(), Fields::Unit))
@@ -340,7 +340,6 @@ fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<(
                 ),
             ));
         }
-    }
 
     if attrs.field_identifier {
         let variants = enm.variants();
