@@ -2082,6 +2082,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "specta-tags"
+version = "0.0.0"
+dependencies = [
+ "specta",
+]
+
+[[package]]
 name = "specta-tests"
 version = "0.0.0"
 dependencies = [

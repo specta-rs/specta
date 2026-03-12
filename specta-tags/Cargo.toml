@@ -1,0 +1,17 @@
+[package]
+name = "specta-tags"
+version = "0.0.0"
+edition = "2024"
+# TODO: Publishing metadata
+publish = false
+
+# /bin/sh RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
+[package.metadata."docs.rs"]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true
+
+[dependencies]
+specta = { version = "=2.0.0-rc.23", path = "../specta" }
