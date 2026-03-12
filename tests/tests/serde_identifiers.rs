@@ -47,10 +47,7 @@ fn identifier_apply_phases_exports_deserialize_union() {
         .export(&variant_types)
         .expect("typescript export should succeed");
 
-    assert!(variant_ts.contains("VariantIdentifier_Deserialize"));
-    assert!(variant_ts.contains("\"http_status\""));
-    assert!(variant_ts.contains("\"legacy\""));
-    assert!(variant_ts.contains("number"));
+    insta::assert_snapshot!("serde-identifiers-variant-typescript", variant_ts);
 
     let field_types = specta_serde::apply_phases(Types::default().register::<FieldIdentifier>())
         .expect("field_identifier should be supported by apply_phases");
@@ -59,9 +56,5 @@ fn identifier_apply_phases_exports_deserialize_union() {
         .export(&field_types)
         .expect("typescript export should succeed");
 
-    assert!(field_ts.contains("FieldIdentifier_Deserialize"));
-    assert!(field_ts.contains("\"first_name\""));
-    assert!(field_ts.contains("\"last_name\""));
-    assert!(field_ts.contains("number"));
-    assert!(field_ts.contains("boolean"));
+    insta::assert_snapshot!("serde-identifiers-field-typescript", field_ts);
 }

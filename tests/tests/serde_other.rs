@@ -44,10 +44,7 @@ fn serde_other_internal_tag_widens_deserialize_tag_to_string() {
         .export(&types)
         .expect("typescript export should succeed");
 
-    assert!(ts.contains("InternalOther_Serialize"));
-    assert!(ts.contains("InternalOther_Deserialize"));
-    assert!(ts.contains("kind: string"));
-    assert!(ts.contains("kind: \"known\""));
+    insta::assert_snapshot!("serde-other-internal-tag-typescript", ts);
 }
 
 #[test]
@@ -59,8 +56,5 @@ fn serde_other_adjacent_tag_widens_deserialize_tag_to_string() {
         .export(&types)
         .expect("typescript export should succeed");
 
-    assert!(ts.contains("AdjacentOther_Serialize"));
-    assert!(ts.contains("AdjacentOther_Deserialize"));
-    assert!(ts.contains("kind: string"));
-    assert!(ts.contains("data: string"));
+    insta::assert_snapshot!("serde-other-adjacent-tag-typescript", ts);
 }
