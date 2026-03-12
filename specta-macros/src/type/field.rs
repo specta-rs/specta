@@ -42,7 +42,7 @@ pub fn construct_field_with_variant_skip(
     if attrs.r#type.is_some() {
         runtime_attrs = quote!({
             let mut attrs = #runtime_attrs;
-            attrs.insert(specta_serde::SpectaTypeAttr);
+            attrs.insert(specta_serde::internal::SpectaTypeAttr);
             attrs
         });
     }

@@ -6,7 +6,8 @@ use specta::{
 };
 
 use crate::{
-    Error, Result, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs, SpectaTypeAttr,
+    Error,
+    internal::{Result, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs, SpectaTypeAttr},
     repr::EnumRepr,
 };
 
