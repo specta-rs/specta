@@ -232,13 +232,13 @@ impl Exporter {
     ///
     /// Note: This returns an error if the format is `Format::Files`.
     pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
-        // let types = if let Some(mode) = self.serde {
-        //     let mut types = types.clone(); // TODO: Can we avoid this?
-        //     specta_serde::apply(&mut types, mode)?;
-        //     Cow::Owned(types)
-        // } else {
-        //     Cow::Borrowed(types)
-        // };
+        let types = if let Some(mode) = self.serde {
+            let mut types = types.clone(); // TODO: Can we avoid this?
+            specta_serde::apply(&mut types, mode)?;
+            Cow::Owned(types)
+        } else {
+            Cow::Borrowed(types)
+        };
 
         if let Layout::Files = self.layout {
             return Err(Error::unable_to_export(self.layout));
