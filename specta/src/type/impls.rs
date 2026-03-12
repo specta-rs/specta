@@ -16,6 +16,7 @@ impl_primitives!(
 );
 
 #[cfg(is_nightly)]
+#[cfg_attr(docsrs, doc(cfg(is_nightly)))]
 impl Type for f16 {
     fn definition(_: &mut Types) -> DataType {
         DataType::Primitive(datatype::Primitive::f16)
@@ -23,6 +24,7 @@ impl Type for f16 {
 }
 
 #[cfg(is_nightly)]
+#[cfg_attr(docsrs, doc(cfg(is_nightly)))]
 impl Type for f128 {
     fn definition(_: &mut Types) -> DataType {
         DataType::Primitive(datatype::Primitive::f128)
@@ -52,6 +54,7 @@ impl<K: Type, V: Type> Type for PrimitiveMap<K, V> {
 }
 
 #[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 const _: () = {
     impl_ndt_as!(
         std::string::String as str
@@ -225,6 +228,7 @@ const _: () = {
 };
 
 #[cfg(feature = "tokio")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 impl_ndt_as!(
     tokio::sync::Mutex<T> where { T: ?Sized } as generics::T
     tokio::sync::RwLock<T> where { T: ?Sized } as generics::T
