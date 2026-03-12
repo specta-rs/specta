@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use specta::{
     Type, Types,
-    datatype::{DataType, NamedDataType, Tuple},
+    datatype::{DataType, Reference},
 };
 
 /// Declares an explicit serialize/deserialize type pair for Specta output.
@@ -25,28 +25,26 @@ use specta::{
 ///     value: Vec<String>,
 /// }
 /// ```
-pub struct Phased<Serialize, Deserialize> {
-    phantom: PhantomData<(Serialize, Deserialize)>,
+pub struct Phased<Serialize, Deserialize>(PhantomData<(Serialize, Deserialize)>);
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) struct PhasedTy {
+    pub(crate) serialize: DataType,
+    pub(crate) deserialize: DataType,
 }
 
 impl<Serialize: Type, Deserialize: Type> Type for Phased<Serialize, Deserialize> {
     fn definition(types: &mut Types) -> DataType {
-        let ser = Serialize::definition(types);
-        let der = Deserialize::definition(types);
+        let serialize = Serialize::definition(types);
+        let deserialize = Deserialize::definition(types);
 
-        if ser == der {
-            ser
+        if serialize == deserialize {
+            serialize
         } else {
-            let payload = DataType::Tuple(Tuple::new(vec![
-                Serialize::definition(types),
-                Deserialize::definition(types),
-            ]));
-
-            let mut ndt = NamedDataType::new_inline("Phased", vec![], payload);
-            ndt.set_module_path("specta_serde".into());
-            ndt.register(types);
-
-            DataType::Reference(ndt.reference(vec![]))
+            DataType::Reference(Reference::opaque(PhasedTy {
+                serialize,
+                deserialize,
+            }))
         }
     }
 }

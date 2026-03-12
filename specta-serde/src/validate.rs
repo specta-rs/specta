@@ -8,6 +8,7 @@ use specta::{
 use crate::{
     Error,
     internal::{Result, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs, SpectaTypeAttr},
+    phased::PhasedTy,
     repr::EnumRepr,
 };
 
@@ -288,7 +289,26 @@ fn inner(
                     mode,
                 )?;
             }
-            Reference::Opaque(_) => {}
+            Reference::Opaque(reference) => {
+                if let Some(phased) = reference.downcast_ref::<PhasedTy>() {
+                    inner(
+                        &phased.serialize,
+                        types,
+                        generics,
+                        checked_references,
+                        format!("{path}.<phased_serialize>"),
+                        mode,
+                    )?;
+                    inner(
+                        &phased.deserialize,
+                        types,
+                        generics,
+                        checked_references,
+                        format!("{path}.<phased_deserialize>"),
+                        mode,
+                    )?;
+                }
+            }
         },
         DataType::Primitive(_) => {}
     }
