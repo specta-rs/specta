@@ -64,16 +64,13 @@ fn duplicate_typenames_layouts() {
         .layout(Layout::ModulePrefixedName)
         .export(&resolved)
         .unwrap();
-    assert!(module_prefixed.contains("Another"));
-    assert!(module_prefixed.contains("MoreType"));
-    assert!(module_prefixed.contains("testing2"));
+    insta::assert_snapshot!("layouts-duplicate-module-prefixed", module_prefixed);
 
     let namespaces = Typescript::default()
         .layout(Layout::Namespaces)
         .export(&resolved)
         .unwrap();
-    assert!(namespaces.contains("export namespace"));
-    assert!(namespaces.contains("testing2"));
+    insta::assert_snapshot!("layouts-duplicate-namespaces", namespaces);
 
     assert_error_contains(
         Typescript::default()
@@ -90,9 +87,7 @@ fn duplicate_typenames_layouts() {
         .unwrap();
 
     let output = crate::fs_to_string(&path).unwrap();
-    assert!(output.contains(".ts"));
-    assert!(output.contains("testing.ts"));
-    assert!(output.contains("testing2.ts"));
+    insta::assert_snapshot!("layouts-duplicate-files", output);
 }
 
 #[test]
@@ -103,30 +98,25 @@ fn non_duplicate_typenames_layouts() {
     let resolved = ResolvedTypes::from_resolved_types(types.clone());
 
     let default_output = Typescript::default().export(&resolved).unwrap();
-    assert!(default_output.contains("export type Another"));
-    assert!(default_output.contains("export type MoreType"));
+    insta::assert_snapshot!("layouts-non-duplicate-default", default_output);
 
     let flat = Typescript::default()
         .layout(Layout::FlatFile)
         .export(&resolved)
         .unwrap();
-    assert!(flat.contains("export type Another"));
-    assert!(flat.contains("export type MoreType"));
+    insta::assert_snapshot!("layouts-non-duplicate-flat", flat);
 
     let module_prefixed = Typescript::default()
         .layout(Layout::ModulePrefixedName)
         .export(&resolved)
         .unwrap();
-    assert!(module_prefixed.contains("Another"));
-    assert!(module_prefixed.contains("MoreType"));
+    insta::assert_snapshot!("layouts-non-duplicate-module-prefixed", module_prefixed);
 
     let namespaces = Typescript::default()
         .layout(Layout::Namespaces)
         .export(&resolved)
         .unwrap();
-    assert!(namespaces.contains("export namespace"));
-    assert!(namespaces.contains("Another"));
-    assert!(namespaces.contains("MoreType"));
+    insta::assert_snapshot!("layouts-non-duplicate-namespaces", namespaces);
 
     assert_error_contains(
         Typescript::default()
@@ -143,9 +133,7 @@ fn non_duplicate_typenames_layouts() {
         .unwrap();
 
     let output = crate::fs_to_string(&path).unwrap();
-    assert!(output.contains("layouts.ts"));
-    assert!(output.contains("export type Another"));
-    assert!(output.contains("export type MoreType"));
+    insta::assert_snapshot!("layouts-non-duplicate-files", output);
 }
 
 #[test]
@@ -161,20 +149,19 @@ fn empty_module_path_layouts() {
         .layout(Layout::FlatFile)
         .export(&resolved)
         .unwrap();
-    assert!(flat.contains("export type testing = number"));
+    insta::assert_snapshot!("layouts-empty-module-path-flat", flat);
 
     let module_prefixed = Typescript::default()
         .layout(Layout::ModulePrefixedName)
         .export(&resolved)
         .unwrap();
-    assert!(module_prefixed.contains("testing"));
+    insta::assert_snapshot!("layouts-empty-module-path-module-prefixed", module_prefixed);
 
     let namespaces = Typescript::default()
         .layout(Layout::Namespaces)
         .export(&resolved)
         .unwrap();
-    assert!(namespaces.contains("export namespace"));
-    assert!(namespaces.contains("testing = number"));
+    insta::assert_snapshot!("layouts-empty-module-path-namespaces", namespaces);
 
     let temp = temp_dir();
     let path = temp.path().join("empty-module-path-layout");
@@ -184,8 +171,7 @@ fn empty_module_path_layouts() {
         .unwrap();
 
     let output = crate::fs_to_string(Path::new(&path)).unwrap();
-    assert!(output.contains(".ts"));
-    assert!(output.contains("export type testing = number"));
+    insta::assert_snapshot!("layouts-empty-module-path-files", output);
 }
 
 fn temp_dir() -> TempDir {

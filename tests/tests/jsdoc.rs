@@ -109,9 +109,6 @@ fn jsdoc_export_to_files_uses_jsdoc_import_typedefs() {
         .unwrap();
 
     let output = fs_to_string(&path).unwrap();
-    assert!(!output.contains("import type"));
-    assert!(!output.contains("import * as"));
-    assert!(output.contains("@typedef {import(\""));
     insta::assert_snapshot!("jsdoc-export-to-files-both", output);
 
     temp.close().unwrap();

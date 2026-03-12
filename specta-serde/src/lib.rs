@@ -390,10 +390,11 @@ fn rewrite_datatype_for_phase(
     }
 
     if let Some(converted) = conversion_datatype_for_mode(ty, mode)?
-        && converted != *ty {
-            *ty = converted;
-            return rewrite_datatype_for_phase(ty, mode, original_types, generated, split_types);
-        }
+        && converted != *ty
+    {
+        *ty = converted;
+        return rewrite_datatype_for_phase(ty, mode, original_types, generated, split_types);
+    }
 
     match ty {
         DataType::Struct(s) => {
@@ -548,10 +549,10 @@ fn rewrite_field_for_phase(
 ) -> Result<()> {
     if let Some(attrs) = field.attributes().get::<SerdeFieldAttrs>()
         && let PhaseRewrite::Serialize = mode
-            && attrs.skip_serializing_if.is_some()
-        {
-            field.set_optional(true);
-        }
+        && attrs.skip_serializing_if.is_some()
+    {
+        field.set_optional(true);
+    }
 
     if let Some(ty) = field.ty().cloned()
         && let Some(resolved) = resolve_phased_type(&ty, mode, "field")?

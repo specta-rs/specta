@@ -141,5 +141,5 @@ fn associated_type_bound_issue_138() {
     let output = Typescript::default()
         .export(&ResolvedTypes::from_resolved_types(types))
         .unwrap();
-    assert!(output.contains("value: number"));
+    insta::assert_snapshot!("bound-associated-type-issue-138", output);
 }

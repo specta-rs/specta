@@ -34,8 +34,8 @@ use std::{
     sync::{Mutex, OnceLock},
 };
 
+use proc_macro_crate::{FoundCrate, crate_name};
 use proc_macro2::Span;
-use proc_macro_crate::{crate_name, FoundCrate};
 use quote::ToTokens;
 
 const FORMAT_CRATES_ENV_VAR: &str = "SPECTA_FORMAT_CRATES";

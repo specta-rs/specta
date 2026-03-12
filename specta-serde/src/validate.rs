@@ -333,14 +333,14 @@ fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<(
             .variants()
             .iter()
             .find(|(_, variant)| !matches!(variant.fields(), Fields::Unit))
-        {
-            return Err(Error::invalid_phased_type_usage(
-                path,
-                format!(
-                    "`variant_identifier` requires all unit variants, but variant `{name}` is not unit"
-                ),
-            ));
-        }
+    {
+        return Err(Error::invalid_phased_type_usage(
+            path,
+            format!(
+                "`variant_identifier` requires all unit variants, but variant `{name}` is not unit"
+            ),
+        ));
+    }
 
     if attrs.field_identifier {
         let variants = enm.variants();
@@ -471,11 +471,7 @@ fn merged_generics(
         })
         .cloned();
 
-    child
-        .iter()
-        .cloned()
-        .chain(unshadowed_parent)
-        .collect()
+    child.iter().cloned().chain(unshadowed_parent).collect()
 }
 
 fn is_valid_map_key(
