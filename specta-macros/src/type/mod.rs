@@ -20,7 +20,7 @@ mod generics;
 mod r#struct;
 
 // TODO: Remove this and make it dynamically discovered!
-const FORMAT_CRATES: &[&str] = &["specta_serde"];
+const FORMATS: &[&str] = &["specta_serde"];
 
 #[derive(Copy, Clone)]
 pub(super) enum AttributeScope {
@@ -53,7 +53,7 @@ pub(super) fn build_runtime_attributes(
         AttributeScope::Field => quote!(@field),
     };
 
-    let parser_calls = FORMAT_CRATES.iter().map(|name| {
+    let parser_calls = FORMATS.iter().map(|name| {
         let crate_ident = format_ident!("{name}");
 
         quote! {
@@ -64,6 +64,22 @@ pub(super) fn build_runtime_attributes(
     quote!({
         let mut attrs = datatype::Attributes::default();
         #(#parser_calls)*
+        attrs
+    })
+}
+
+pub(super) fn build_type_override_runtime_attributes(runtime_attrs: TokenStream) -> TokenStream {
+    let marker_calls = FORMATS.iter().map(|name| {
+        let crate_ident = format_ident!("{name}");
+
+        quote! {
+            attrs.insert(#crate_ident::internal::SpectaTypeAttr);
+        }
+    });
+
+    quote!({
+        let mut attrs = #runtime_attrs;
+        #(#marker_calls)*
         attrs
     })
 }

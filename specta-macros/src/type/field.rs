@@ -2,7 +2,10 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Type;
 
-use super::{AttributeScope, ContainerAttr, FieldAttr, build_runtime_attributes};
+use super::{
+    AttributeScope, ContainerAttr, FieldAttr, build_runtime_attributes,
+    build_type_override_runtime_attributes,
+};
 
 pub fn construct_field(
     crate_ref: &TokenStream,
@@ -40,11 +43,7 @@ pub fn construct_field_with_variant_skip(
         &container_attrs.skip_attrs,
     );
     if attrs.r#type.is_some() {
-        runtime_attrs = quote!({
-            let mut attrs = #runtime_attrs;
-            attrs.insert(specta_serde::internal::SpectaTypeAttr);
-            attrs
-        });
+        runtime_attrs = build_type_override_runtime_attributes(runtime_attrs);
     }
 
     let ty = if attrs.skip || variant_skip {
