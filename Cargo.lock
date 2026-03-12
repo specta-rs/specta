@@ -2134,10 +2134,8 @@ name = "specta-zod"
 version = "0.0.1"
 dependencies = [
  "specta",
- "specta-serde",
  "specta-typescript",
  "specta-util",
- "thiserror",
 ]
 
 [[package]]

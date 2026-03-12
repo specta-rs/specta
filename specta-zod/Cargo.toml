@@ -22,9 +22,6 @@ workspace = true
 [dependencies]
 specta = { version = "=2.0.0-rc.23", path = "../specta" }
 specta-typescript = { version = "=0.0.10", path = "../specta-typescript" }
-# TODO: Don't depend on serde
-specta-serde = { version = "=0.0.10", path = "../specta-serde" }
-thiserror = "2" # TODO: Remove this
 
 [dev-dependencies]
 specta-util = { path = "../specta-util" }
