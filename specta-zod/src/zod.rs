@@ -31,15 +31,13 @@ pub enum BigIntExportBehavior {
 /// Allows configuring the format of generated output.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Layout {
-    /// Keep all output in one file while prefixing names by module path.
-    Namespaces,
-    /// Emit one file per Rust module path.
-    Files,
-    /// Flatten into one file with module prefixes added to each type name.
-    ModulePrefixedName,
     /// Flatten all types into one file with unmodified names.
     #[default]
     FlatFile,
+    /// Flatten into one file with module prefixes added to each type name.
+    ModulePrefixedName,
+    /// Emit one file per Rust module path.
+    Files,
 }
 
 impl fmt::Display for Layout {
@@ -70,7 +68,7 @@ pub struct Zod {
     framework_prelude: Cow<'static, str>,
     /// Strategy for exporting Rust bigint-compatible primitives.
     pub bigint: BigIntExportBehavior,
-    /// Output layout mode for generated TypeScript.
+    /// Output layout mode for generated Zod TypeScript.
     pub layout: Layout,
 }
 
@@ -498,13 +496,13 @@ fn render_types(
     files_user_types: &str,
 ) -> Result<(), Error> {
     match exporter.layout {
+        Layout::FlatFile | Layout::ModulePrefixedName => {
+            render_flat_types(s, exporter, types, types.into_sorted_iter(), "")?;
+        }
         Layout::Files => {
             if !files_user_types.is_empty() {
                 s.push_str(files_user_types);
             }
-        }
-        _ => {
-            render_flat_types(s, exporter, types, types.into_sorted_iter(), "")?;
         }
     }
 
@@ -625,6 +623,7 @@ fn cleanup_stale_files(root: &Path, current_files: &HashMap<PathBuf, String>) ->
 
 fn exported_type_name(exporter: &Zod, ndt: &NamedDataType) -> Cow<'static, str> {
     match exporter.layout {
+        Layout::FlatFile | Layout::Files => ndt.name().clone(),
         Layout::ModulePrefixedName => {
             let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
             if !s.is_empty() {
@@ -633,7 +632,6 @@ fn exported_type_name(exporter: &Zod, ndt: &NamedDataType) -> Cow<'static, str> 
             s.push_str(ndt.name());
             Cow::Owned(s)
         }
-        _ => ndt.name().clone(),
     }
 }
 

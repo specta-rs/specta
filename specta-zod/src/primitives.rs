@@ -1,6 +1,6 @@
 //! Primitives provide building blocks for Specta-based libraries.
 
-use std::{borrow::Cow, cell::RefCell, collections::BTreeSet, fmt::Write as _, iter};
+use std::{borrow::Cow, cell::RefCell, fmt::Write as _};
 
 use specta::{
     ResolvedTypes, Types,
@@ -121,7 +121,12 @@ fn export_single_internal(
     indent: &str,
 ) -> Result<(), Error> {
     let base_name = exported_type_name(exporter, ndt);
-    validate_type_name(&base_name)?;
+    let name_path = if ndt.module_path().is_empty() {
+        ndt.name().to_string()
+    } else {
+        format!("{}::{}", ndt.module_path(), ndt.name())
+    };
+    validate_type_name(&base_name, name_path)?;
     let schema_name = format!("{base_name}Schema");
 
     let _guard = push_type_render_stack(ndt.module_path().clone(), ndt.name().clone());
@@ -300,8 +305,8 @@ fn primitive_dt(
     use Primitive::*;
 
     Ok(match p {
-        i8 | i16 | i32 | u8 | u16 | u32 | f16 | f32 | f64 | f128 | usize | isize => "z.number()",
-        i64 | u64 | i128 | u128 => match b {
+        i8 | i16 | i32 | u8 | u16 | u32 | f16 | f32 | f64 | f128 => "z.number()",
+        usize | isize | i64 | u64 | i128 | u128 => match b {
             BigIntExportBehavior::String => "z.string()",
             BigIntExportBehavior::Number => "z.number()",
             BigIntExportBehavior::BigInt => "z.bigint()",
@@ -775,6 +780,7 @@ fn reference_named_dt(
     crate::references::track_nr(r);
 
     let schema_name = match exporter.layout {
+        Layout::FlatFile => format!("{}Schema", ndt.name()),
         Layout::ModulePrefixedName => {
             let mut name = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
             if !name.is_empty() {
@@ -793,7 +799,6 @@ fn reference_named_dt(
                 format!("{}.{}", crate::zod::module_alias(ndt.module_path()), base)
             }
         }
-        _ => format!("{}Schema", ndt.name()),
     };
 
     let should_lazy = TYPE_RENDER_STACK.with(|stack| {
@@ -846,6 +851,7 @@ fn reference_named_dt(
 
 fn exported_type_name(exporter: &Zod, ndt: &NamedDataType) -> Cow<'static, str> {
     match exporter.layout {
+        Layout::FlatFile | Layout::Files => ndt.name().clone(),
         Layout::ModulePrefixedName => {
             let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
             if !s.is_empty() {
@@ -854,25 +860,24 @@ fn exported_type_name(exporter: &Zod, ndt: &NamedDataType) -> Cow<'static, str> 
             s.push_str(ndt.name());
             Cow::Owned(s)
         }
-        _ => ndt.name().clone(),
     }
 }
 
-fn validate_type_name(name: &str) -> Result<(), Error> {
+fn validate_type_name(name: &str, path: String) -> Result<(), Error> {
     if RESERVED_TYPE_NAMES.contains(&name) {
-        return Err(Error::invalid_name("".to_string(), name.to_string()));
+        return Err(Error::forbidden_name(path, name.to_string()));
     }
 
     let mut chars = name.chars();
     let Some(first) = chars.next() else {
-        return Err(Error::invalid_name("".to_string(), name.to_string()));
+        return Err(Error::invalid_name(path, name.to_string()));
     };
 
     if !(first.is_ascii_alphabetic() || first == '_' || first == '$') {
-        return Err(Error::invalid_name("".to_string(), name.to_string()));
+        return Err(Error::invalid_name(path, name.to_string()));
     }
     if chars.any(|ch| !(ch.is_ascii_alphanumeric() || ch == '_' || ch == '$')) {
-        return Err(Error::invalid_name("".to_string(), name.to_string()));
+        return Err(Error::invalid_name(path, name.to_string()));
     }
 
     Ok(())
@@ -917,34 +922,4 @@ fn escape_string(value: &str) -> Cow<'_, str> {
     }
 
     Cow::Owned(escaped)
-}
-
-fn _join_with_sep<'a>(parts: impl Iterator<Item = &'a str>, sep: &str) -> String {
-    parts.collect::<Vec<_>>().join(sep)
-}
-
-fn _generic_header(names: &[String]) -> String {
-    if names.is_empty() {
-        return String::new();
-    }
-
-    let content = names
-        .iter()
-        .map(|n| format!("{n} extends z.ZodTypeAny"))
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect::<Vec<_>>()
-        .join(", ");
-
-    format!("<{content}>")
-}
-
-fn _generic_args(names: &[String]) -> String {
-    if names.is_empty() {
-        return String::new();
-    }
-    iter::once("(".to_string())
-        .chain(iter::once(names.join(", ")))
-        .chain(iter::once(")".to_string()))
-        .collect()
 }

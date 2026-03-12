@@ -21,6 +21,10 @@ enum ErrorKind {
         path: String,
         name: Cow<'static, str>,
     },
+    ForbiddenName {
+        path: String,
+        name: Cow<'static, str>,
+    },
     DuplicateTypeName {
         name: Cow<'static, str>,
         first: String,
@@ -80,6 +84,15 @@ impl Error {
     pub(crate) fn invalid_name(path: String, name: impl Into<Cow<'static, str>>) -> Self {
         Self {
             kind: ErrorKind::InvalidName {
+                path,
+                name: name.into(),
+            },
+        }
+    }
+
+    pub(crate) fn forbidden_name(path: String, name: impl Into<Cow<'static, str>>) -> Self {
+        Self {
+            kind: ErrorKind::ForbiddenName {
                 path,
                 name: name.into(),
             },
@@ -178,6 +191,10 @@ impl fmt::Display for Error {
             ErrorKind::InvalidName { path, name } => write!(
                 f,
                 "Attempted to export {path:?} but was unable to due to name {name:?} containing an invalid character. Try renaming it or using `#[specta(rename = \"new_name\")]`"
+            ),
+            ErrorKind::ForbiddenName { path, name } => write!(
+                f,
+                "Attempted to export {path:?} but was unable to due to name {name:?} being a reserved keyword in TypeScript. Try renaming it or using `#[specta(rename = \"new_name\")]`"
             ),
             ErrorKind::DuplicateTypeName {
                 name,
