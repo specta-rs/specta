@@ -6,7 +6,7 @@ use std::{
     sync::Arc,
 };
 
-trait DynAttributeValue {
+trait DynAttributeValue: Send + Sync {
     fn value_any(&self) -> &dyn Any;
     fn eq_dyn(&self, other: &dyn DynAttributeValue) -> bool;
     fn hash_dyn(&self, state: &mut dyn Hasher);
@@ -18,7 +18,7 @@ struct TypedAttributeValue<T>(T);
 
 impl<T> DynAttributeValue for TypedAttributeValue<T>
 where
-    T: Any + Eq + Hash + fmt::Debug + 'static,
+    T: Any + Eq + Hash + fmt::Debug + Send + Sync + 'static,
 {
     fn value_any(&self) -> &dyn Any {
         &self.0
@@ -149,7 +149,7 @@ impl Attributes {
     /// ```
     pub fn insert<T>(&mut self, value: T)
     where
-        T: Any + Eq + Hash + fmt::Debug + 'static,
+        T: Any + Eq + Hash + fmt::Debug + Send + Sync + 'static,
     {
         self.0
             .insert(TypeId::of::<T>(), Arc::new(TypedAttributeValue(value)));

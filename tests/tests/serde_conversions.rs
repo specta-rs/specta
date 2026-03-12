@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use specta::{Type, Types};
+use specta_typescript::Typescript;
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
@@ -47,6 +48,13 @@ struct CustomCodecWithOverride {
 struct CustomCodecWithPhasedOverride {
     #[specta(type = specta_serde::Phased<String, i32>)]
     #[serde(with = "codec")]
+    value: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FieldOnlyPhasedOverride {
+    #[specta(type = specta_serde::Phased<String, i32>)]
     value: String,
 }
 
@@ -215,6 +223,25 @@ fn phased_override_requires_apply_phases() {
 
     specta_serde::apply_phases(Types::default().register::<CustomCodecWithPhasedOverride>())
         .expect("apply_phases should accept phased overrides");
+}
+
+#[test]
+fn field_only_phased_override_requires_apply_phases() {
+    let err = specta_serde::apply(Types::default().register::<FieldOnlyPhasedOverride>())
+        .expect_err("apply should reject phased field overrides");
+    assert!(err.to_string().contains("requires `apply_phases`"));
+
+    let raw_err = Typescript::default()
+        .export(&Types::default().register::<FieldOnlyPhasedOverride>())
+        .expect_err("raw export should fail on unresolved phased opaque reference");
+    assert!(raw_err.to_string().contains("unsupported opaque reference"));
+
+    let phased_types =
+        specta_serde::apply_phases(Types::default().register::<FieldOnlyPhasedOverride>())
+            .expect("apply_phases should accept phased field overrides");
+    Typescript::default()
+        .export(&phased_types)
+        .expect("phased export should remove phased opaque references");
 }
 
 #[test]

@@ -35,6 +35,7 @@ mod validate;
 
 use inflection::RenameRule;
 use parser::{SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs};
+use phased::PhasedTy;
 
 pub use error::Error;
 pub use phased::Phased;
@@ -293,7 +294,7 @@ fn rewrite_datatype_for_phase(
     generated: &HashMap<TypeKey, GeneratedTypes>,
     split_types: &HashSet<TypeKey>,
 ) -> Result<()> {
-    if let Some(resolved) = resolve_phased_type(ty, original_types, mode, "type")? {
+    if let Some(resolved) = resolve_phased_type(ty, mode, "type")? {
         *ty = resolved;
     }
 
@@ -464,7 +465,7 @@ fn rewrite_field_for_phase(
     }
 
     if let Some(ty) = field.ty().cloned()
-        && let Some(resolved) = resolve_phased_type(&ty, original_types, mode, "field")?
+        && let Some(resolved) = resolve_phased_type(&ty, mode, "field")?
     {
         field.set_ty(resolved);
     }
@@ -769,37 +770,13 @@ fn select_phase_rule(
     })
 }
 
-fn resolve_phased_type(
-    ty: &DataType,
-    original_types: &Types,
-    mode: PhaseRewrite,
-    path: &str,
-) -> Result<Option<DataType>> {
-    let DataType::Reference(Reference::Named(reference)) = ty else {
+fn resolve_phased_type(ty: &DataType, mode: PhaseRewrite, path: &str) -> Result<Option<DataType>> {
+    let DataType::Reference(Reference::Opaque(reference)) = ty else {
         return Ok(None);
     };
-
-    let Some(referenced) = reference.get(original_types) else {
+    let Some(phased) = reference.downcast_ref::<PhasedTy>() else {
         return Ok(None);
     };
-
-    if referenced.name() != "Phased" || referenced.module_path() != "specta_serde" {
-        return Ok(None);
-    }
-
-    let DataType::Tuple(payload) = referenced.ty() else {
-        return Err(Error::invalid_phased_type_usage(
-            path,
-            "`specta_serde::Phased` must resolve to a tuple payload",
-        ));
-    };
-
-    if payload.elements().len() != 2 {
-        return Err(Error::invalid_phased_type_usage(
-            path,
-            "`specta_serde::Phased` must have exactly two type phases",
-        ));
-    }
 
     Ok(match mode {
         PhaseRewrite::Unified => {
@@ -808,8 +785,8 @@ fn resolve_phased_type(
                 "`specta_serde::Phased<Serialize, Deserialize>` requires `apply_phases`",
             ));
         }
-        PhaseRewrite::Serialize => Some(payload.elements()[0].clone()),
-        PhaseRewrite::Deserialize => Some(payload.elements()[1].clone()),
+        PhaseRewrite::Serialize => Some(phased.serialize.clone()),
+        PhaseRewrite::Deserialize => Some(phased.deserialize.clone()),
     })
 }
 
@@ -1111,7 +1088,12 @@ fn has_local_phase_difference(dt: &DataType) -> bool {
             has_local_phase_difference(map.key_ty()) || has_local_phase_difference(map.value_ty())
         }
         DataType::Nullable(inner) => has_local_phase_difference(inner),
-        DataType::Primitive(_) | DataType::Reference(_) => false,
+        DataType::Reference(Reference::Opaque(reference)) => {
+            reference.downcast_ref::<PhasedTy>().is_some()
+        }
+        DataType::Primitive(_)
+        | DataType::Reference(Reference::Named(_))
+        | DataType::Reference(Reference::Generic(_)) => false,
     }
 }
 
@@ -1208,9 +1190,15 @@ fn collect_dependencies(dt: &DataType, types: &Types, deps: &mut HashSet<TypeKey
                 collect_dependencies(generic, types, deps);
             }
         }
-        DataType::Primitive(_)
-        | DataType::Reference(Reference::Generic(_))
-        | DataType::Reference(Reference::Opaque(_)) => {}
+        DataType::Reference(Reference::Opaque(_)) => {
+            if let DataType::Reference(Reference::Opaque(reference)) = dt
+                && let Some(phased) = reference.downcast_ref::<PhasedTy>()
+            {
+                collect_dependencies(&phased.serialize, types, deps);
+                collect_dependencies(&phased.deserialize, types, deps);
+            }
+        }
+        DataType::Primitive(_) | DataType::Reference(Reference::Generic(_)) => {}
     }
 }
 
