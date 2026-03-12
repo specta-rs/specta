@@ -1,0 +1,7 @@
+{
+  "name": "specta-rescript-generated",
+  "version": "0.0.1",
+  "scripts": {
+    "check": "rescript build"
+  }
+}

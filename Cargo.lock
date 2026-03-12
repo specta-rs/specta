@@ -2062,6 +2062,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "specta-rescript"
+version = "0.0.1"
+dependencies = [
+ "specta",
+ "specta-serde",
+ "thiserror",
+]
+
+[[package]]
 name = "specta-serde"
 version = "0.0.10"
 dependencies = [
