@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 #[derive(Type)]
@@ -52,7 +52,7 @@ struct ApiResult<T, E> {
 
 #[test]
 fn test_comprehensive_export() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<User>()
         .register::<UserMetadata>()
         .register::<UserPreferences>()
@@ -110,7 +110,7 @@ fn test_comprehensive_export() {
 
 #[test]
 fn test_naming_conventions() {
-    let types = TypeCollection::default().register::<User>();
+    let types = Types::default().register::<User>();
 
     let swift = Swift::default();
     let output = swift.export(&types).unwrap();
@@ -125,7 +125,7 @@ fn test_naming_conventions() {
 
 #[test]
 fn test_swift_configuration() {
-    let types = TypeCollection::default().register::<User>();
+    let types = Types::default().register::<User>();
 
     // Test with custom configuration
     let swift = Swift::new()

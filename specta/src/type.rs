@@ -1,4 +1,4 @@
-use crate::{TypeCollection, datatype::DataType};
+use crate::{Types, datatype::DataType};
 
 pub(crate) mod generics;
 mod impls;
@@ -22,6 +22,6 @@ mod legacy_impls;
 )]
 pub trait Type {
     /// returns a [`DataType`](crate::datatype::DataType) that represents the type.
-    /// This will also register this and any dependent types into the [`TypeCollection`].
-    fn definition(types: &mut TypeCollection) -> DataType;
+    /// This will also register this and any dependent types into the [`Types`].
+    fn definition(types: &mut Types) -> DataType;
 }

@@ -4,14 +4,14 @@ use std::{
     sync::Arc,
 };
 
-use crate::{TypeCollection, datatype::NamedDataType};
+use crate::{Types, datatype::NamedDataType};
 
 use super::DataType;
 
 /// Reference to another type.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Reference {
-    /// Reference to a named type collected in a [`TypeCollection`].
+    /// Reference to a named type collected in a [`Types`].
     Named(NamedReference),
     /// Reference to a generic type parameter.
     Generic(GenericReference),
@@ -28,11 +28,11 @@ pub struct NamedReference {
 }
 
 impl NamedReference {
-    /// Get a reference to a [NamedDataType] from a [TypeCollection].
+    /// Get a reference to a [NamedDataType] from a [Types].
     ///
-    /// This is guaranteed to return a [NamedDataType] if the [TypeCollection] matches,
+    /// This is guaranteed to return a [NamedDataType] if the [Types] matches,
     /// what was used to get the original [Reference].
-    pub fn get<'a>(&self, types: &'a TypeCollection) -> Option<&'a NamedDataType> {
+    pub fn get<'a>(&self, types: &'a Types) -> Option<&'a NamedDataType> {
         types.0.get(&self.id)?.as_ref()
     }
 

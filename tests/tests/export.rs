@@ -1,7 +1,7 @@
 use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_typescript::{BigIntExportBehavior, Typescript};
 use tempfile::TempDir;
 
@@ -45,7 +45,7 @@ enum NestedEnum {
 
 #[test]
 fn typescript_export_collection() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<TypeOne>()
         .register::<TypeTwo>()
         .register::<FlattenOnNestedEnum>()
@@ -67,7 +67,7 @@ fn typescript_export_collection() {
 fn typescript_export_collection_to_file() {
     let temp = TempDir::new().unwrap();
     let path = temp.path().join("bindings.ts");
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<TypeOne>()
         .register::<TypeTwo>()
         .register::<FlattenOnNestedEnum>();

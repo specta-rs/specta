@@ -18,11 +18,11 @@ pub mod function;
 #[doc(hidden)]
 pub mod internal;
 mod r#type;
-mod type_collection;
+mod types;
 
 // TODO: Can we just move the trait here or `#[doc(inline)]`
 pub use r#type::Type;
-pub use type_collection::TypeCollection;
+pub use types::Types;
 
 #[doc(inline)]
 #[cfg(feature = "collect")]
@@ -46,5 +46,5 @@ pub use specta_macros::specta;
 
 // TODO(v2): Remove this. This must be kept for Specta v1 as Tauri v2 depends on it.
 #[doc(hidden)]
-#[deprecated(note = "Migrate from `TypeMap` to `TypeCollection`")]
-pub type TypeMap = TypeCollection;
+#[deprecated(note = "Migrate from `TypeMap` to `Types`")]
+pub type TypeMap = Types;

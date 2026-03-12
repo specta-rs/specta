@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 /// Test enum with snake_case rename_all - should generate string enum
@@ -22,7 +22,7 @@ enum RegularEnum {
 
 #[test]
 fn test_string_enum_generation() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<JobStatus>()
         .register::<RegularEnum>();
 

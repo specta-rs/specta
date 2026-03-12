@@ -1,7 +1,7 @@
 use std::{collections::HashMap, iter};
 
 use specta::{
-    Type, TypeCollection,
+    Type, Types,
     datatype::{DataType, Reference},
 };
 use specta_typescript::{Typescript, primitives};
@@ -11,7 +11,7 @@ use specta_typescript::{Typescript, primitives};
 pub struct Bruh<T>(T);
 
 fn main() {
-    let mut types = TypeCollection::default();
+    let mut types = Types::default();
     let ty = Bruh::<HashMap<String, String>>::definition(&mut types);
 
     println!(

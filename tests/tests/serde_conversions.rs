@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
@@ -149,7 +149,7 @@ impl From<Wire> for Symmetric {
     }
 }
 
-fn type_names(types: &TypeCollection) -> Vec<String> {
+fn type_names(types: &Types) -> Vec<String> {
     types
         .into_unsorted_iter()
         .map(|ndt| ndt.name().to_string())
@@ -158,7 +158,7 @@ fn type_names(types: &TypeCollection) -> Vec<String> {
 
 #[test]
 fn apply_rejects_asymmetric_container_conversion() {
-    let err = specta_serde::apply(TypeCollection::default().register::<IntoOnly>())
+    let err = specta_serde::apply(Types::default().register::<IntoOnly>())
         .expect_err("apply should reject asymmetric serde conversions");
 
     assert!(
@@ -170,7 +170,7 @@ fn apply_rejects_asymmetric_container_conversion() {
 
 #[test]
 fn apply_phases_splits_container_and_dependents_for_conversions() {
-    let types = specta_serde::apply_phases(TypeCollection::default().register::<Parent>())
+    let types = specta_serde::apply_phases(Types::default().register::<Parent>())
         .expect("apply_phases should support asymmetric serde conversions");
     let names = type_names(&types);
 
@@ -182,65 +182,62 @@ fn apply_phases_splits_container_and_dependents_for_conversions() {
 
 #[test]
 fn apply_accepts_symmetric_container_conversion() {
-    specta_serde::apply(TypeCollection::default().register::<Symmetric>())
+    specta_serde::apply(Types::default().register::<Symmetric>())
         .expect("apply should accept symmetric serde conversions");
 }
 
 #[test]
 fn custom_codec_requires_explicit_override() {
-    let err = specta_serde::apply(TypeCollection::default().register::<CustomCodecNoOverride>())
+    let err = specta_serde::apply(Types::default().register::<CustomCodecNoOverride>())
         .expect_err("custom serde codecs should require #[specta(type = ...)]");
 
     assert!(err.to_string().contains("Unsupported serde attribute"));
 
-    specta_serde::apply(TypeCollection::default().register::<CustomCodecWithOverride>())
+    specta_serde::apply(Types::default().register::<CustomCodecWithOverride>())
         .expect("override should satisfy custom serde codecs");
 }
 
 #[test]
 fn custom_codec_variant_requires_explicit_override() {
-    let err = specta_serde::apply(TypeCollection::default().register::<VariantCodecNoOverride>())
+    let err = specta_serde::apply(Types::default().register::<VariantCodecNoOverride>())
         .expect_err("variant custom serde codecs should require #[specta(type = ...)]");
     assert!(err.to_string().contains("Unsupported serde attribute"));
 
-    specta_serde::apply(TypeCollection::default().register::<VariantCodecWithOverride>())
+    specta_serde::apply(Types::default().register::<VariantCodecWithOverride>())
         .expect("variant override should satisfy custom serde codecs");
 }
 
 #[test]
 fn phased_override_requires_apply_phases() {
-    let err =
-        specta_serde::apply(TypeCollection::default().register::<CustomCodecWithPhasedOverride>())
-            .expect_err("apply should reject phased overrides");
+    let err = specta_serde::apply(Types::default().register::<CustomCodecWithPhasedOverride>())
+        .expect_err("apply should reject phased overrides");
     assert!(err.to_string().contains("requires `apply_phases`"));
 
-    specta_serde::apply_phases(
-        TypeCollection::default().register::<CustomCodecWithPhasedOverride>(),
-    )
-    .expect("apply_phases should accept phased overrides");
+    specta_serde::apply_phases(Types::default().register::<CustomCodecWithPhasedOverride>())
+        .expect("apply_phases should accept phased overrides");
 }
 
 #[test]
 fn skip_serializing_if_requires_phases() {
-    let err = specta_serde::apply(TypeCollection::default().register::<SkipSerializingIfOnly>())
+    let err = specta_serde::apply(Types::default().register::<SkipSerializingIfOnly>())
         .expect_err("skip_serializing_if should require apply_phases");
     assert!(err.to_string().contains("skip_serializing_if"));
 
-    specta_serde::apply_phases(TypeCollection::default().register::<SkipSerializingIfOnly>())
+    specta_serde::apply_phases(Types::default().register::<SkipSerializingIfOnly>())
         .expect("apply_phases should accept skip_serializing_if");
 }
 
 #[test]
 fn identifier_enums_require_phases() {
-    let err = specta_serde::apply(TypeCollection::default().register::<VariantIdentifierValid>())
+    let err = specta_serde::apply(Types::default().register::<VariantIdentifierValid>())
         .expect_err("identifier enums should require apply_phases");
     assert!(
         err.to_string()
             .contains("identifier enums require `apply_phases`")
     );
 
-    specta_serde::apply_phases(TypeCollection::default().register::<VariantIdentifierValid>())
+    specta_serde::apply_phases(Types::default().register::<VariantIdentifierValid>())
         .expect("valid variant_identifier enum should pass in apply_phases");
-    specta_serde::apply_phases(TypeCollection::default().register::<FieldIdentifierValid>())
+    specta_serde::apply_phases(Types::default().register::<FieldIdentifierValid>())
         .expect("valid field_identifier enum should pass in apply_phases");
 }

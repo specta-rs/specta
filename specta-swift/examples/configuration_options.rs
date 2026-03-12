@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::{GenericStyle, IndentStyle, NamingConvention, OptionalStyle, Swift};
 
 /// Comprehensive example showcasing ALL configuration options for specta-swift
@@ -34,7 +34,7 @@ fn main() {
     println!("{}", "=".repeat(70));
 
     // Sample types for all examples
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<User>()
         .register::<ApiResponse<String>>()
         .register::<GenericContainer<String, u32>>();

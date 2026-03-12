@@ -2,7 +2,7 @@
 //! These allow us to transform the properly support generics.
 
 use crate::{
-    Type, TypeCollection,
+    Type, Types,
     datatype::{self, DataType},
 };
 
@@ -13,7 +13,7 @@ macro_rules! impl_generic {
             pub(crate) struct $ident;
 
             impl Type for $ident {
-                fn definition(_: &mut TypeCollection) -> DataType {
+                fn definition(_: &mut Types) -> DataType {
                     datatype::GenericReference::new::<Self>().into()
                 }
             }

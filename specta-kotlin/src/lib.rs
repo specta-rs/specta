@@ -12,13 +12,13 @@
 
 // use specta::{
 //     datatype::{DataType, Primitive},
-//     Type, TypeCollection,
+//     Type, Types,
 // };
 
 // /// TODO
 // pub fn export<T: Type>() -> Result<String, String> {
 //     datatype(&T::definition(
-//         &mut TypeCollection::default(),
+//         &mut Types::default(),
 //         Generics::Definition,
 //     ))
 // }

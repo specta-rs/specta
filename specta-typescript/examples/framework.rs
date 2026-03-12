@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use specta::{datatype::NamedDataType, Type, TypeCollection};
-use specta_typescript::{primitives, Exporter, JSDoc, Layout, Typescript};
+use specta::{Type, Types, datatype::NamedDataType};
+use specta_typescript::{Exporter, JSDoc, Layout, Typescript, primitives};
 use specta_util::selection;
 
 // #[derive(Type)]
@@ -90,7 +90,7 @@ pub struct AnotherOne {
 }
 
 fn main() {
-    let mut types = TypeCollection::default()
+    let mut types = Types::default()
         .register::<One>()
         .register::<MyChannel>()
         .register::<RecursiveMe>();
@@ -148,7 +148,7 @@ fn main() {
         let exporter = Exporter::from(Typescript::default());
 
         let exporter = exporter.framework_runtime(move |exporter| {
-            // `TypeCollection`
+            // `Types`
             // exporter.types;
 
             // Can access any `Exporter` properties via `Deref`
@@ -157,7 +157,7 @@ fn main() {
             // `exporter.render_types()` allows rendering types within your runtime code,
             // if not called `Exporter` will append it.
 
-            // `exporter.inline`, `exporter.reference` are helpers which passthrough the `TypeCollection` for you.
+            // `exporter.inline`, `exporter.reference` are helpers which passthrough the `Types` for you.
 
             Ok(format!(
                 "// Runtime\nexport function testing(_: {}) {{}}",

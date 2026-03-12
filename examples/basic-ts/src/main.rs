@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use specta::{
-    Type, TypeCollection,
+    Type, Types,
     datatype::{DataType, Reference},
 };
 use specta_typescript::Typescript;
@@ -132,7 +132,7 @@ enum SmallPrime {
 
 fn main() {
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         println!("{:#?}", HelloWorld::definition(&mut types));
         println!(
             "{:#?}",
@@ -144,7 +144,7 @@ fn main() {
     }
 
     {
-        let mut types = TypeCollection::default().register::<NotPhaseSpecific>();
+        let mut types = Types::default().register::<NotPhaseSpecific>();
         let def = HelloWorld::definition(&mut types);
         let types = specta_serde::apply_phases(types).unwrap();
         println!(
@@ -160,7 +160,7 @@ fn main() {
     }
 
     {
-        let types = TypeCollection::default()
+        let types = Types::default()
             .register::<NotPhaseSpecific>()
             .register::<NotPhaseSpecificButReferencing>()
             .register::<HelloWorld>()

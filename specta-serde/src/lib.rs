@@ -11,10 +11,9 @@ use std::{
 };
 
 use specta::{
-    TypeCollection,
+    Types,
     datatype::{
-        DataType, Enum, Field, Fields, NamedDataType, Primitive, Reference, Struct, Tuple,
-        Variant,
+        DataType, Enum, Field, Fields, NamedDataType, Primitive, Reference, Struct, Tuple, Variant,
     },
     internal,
 };
@@ -35,7 +34,7 @@ pub use parser::{
 pub use phased::{Phased, Phased2};
 use repr::EnumRepr;
 
-pub fn apply(types: TypeCollection) -> Result<TypeCollection> {
+pub fn apply(types: Types) -> Result<Types> {
     validate::validate_for_mode(&types, validate::ApplyMode::Unified)?;
 
     let mut out = types.clone();
@@ -66,7 +65,7 @@ pub fn apply(types: TypeCollection) -> Result<TypeCollection> {
     Ok(out)
 }
 
-pub fn apply_phases(types: TypeCollection) -> Result<TypeCollection> {
+pub fn apply_phases(types: Types) -> Result<Types> {
     validate::validate_for_mode(&types, validate::ApplyMode::Phases)?;
 
     let originals = types.into_unsorted_iter().cloned().collect::<Vec<_>>();
@@ -251,7 +250,7 @@ impl TypeKey {
 fn rewrite_datatype_for_phase(
     ty: &mut DataType,
     mode: PhaseRewrite,
-    original_types: &TypeCollection,
+    original_types: &Types,
     generated: &HashMap<TypeKey, GeneratedTypes>,
     split_types: &HashSet<TypeKey>,
 ) -> Result<()> {
@@ -365,7 +364,7 @@ fn rewrite_datatype_for_phase(
 fn rewrite_fields_for_phase(
     fields: &mut Fields,
     mode: PhaseRewrite,
-    original_types: &TypeCollection,
+    original_types: &Types,
     generated: &HashMap<TypeKey, GeneratedTypes>,
     split_types: &HashSet<TypeKey>,
 ) -> Result<()> {
@@ -413,7 +412,7 @@ fn rewrite_fields_for_phase(
 fn rewrite_field_for_phase(
     field: &mut Field,
     mode: PhaseRewrite,
-    original_types: &TypeCollection,
+    original_types: &Types,
     generated: &HashMap<TypeKey, GeneratedTypes>,
     split_types: &HashSet<TypeKey>,
 ) -> Result<()> {
@@ -453,7 +452,7 @@ fn should_skip_field_for_mode(field: &Field, mode: PhaseRewrite) -> bool {
 fn rewrite_enum_repr_for_phase(
     e: &mut Enum,
     mode: PhaseRewrite,
-    original_types: &TypeCollection,
+    original_types: &Types,
 ) -> Result<()> {
     let repr = enum_repr_from_attrs(e.attributes())?;
     if matches!(repr, EnumRepr::Untagged) {
@@ -479,8 +478,8 @@ fn rewrite_enum_repr_for_phase(
 
         let serialized_name =
             serialized_variant_name(&variant_name, &variant, &container_attrs, mode)?;
-        let widen_tag = mode == PhaseRewrite::Deserialize
-            && variant_attrs.is_some_and(|attrs| attrs.other);
+        let widen_tag =
+            mode == PhaseRewrite::Deserialize && variant_attrs.is_some_and(|attrs| attrs.other);
         let transformed_variant = match &repr {
             EnumRepr::External => transform_external_variant(serialized_name.clone(), &variant)?,
             EnumRepr::Internal { tag } => transform_internal_variant(
@@ -519,7 +518,7 @@ fn rewrite_enum_repr_for_phase(
 fn rewrite_identifier_enum_for_phase(
     e: &mut Enum,
     mode: PhaseRewrite,
-    original_types: &TypeCollection,
+    original_types: &Types,
     generated: &HashMap<TypeKey, GeneratedTypes>,
     split_types: &HashSet<TypeKey>,
 ) -> Result<bool> {
@@ -733,7 +732,7 @@ fn select_phase_rule(
 
 fn resolve_phased_type(
     ty: &DataType,
-    original_types: &TypeCollection,
+    original_types: &Types,
     mode: PhaseRewrite,
     path: &str,
 ) -> Result<Option<DataType>> {
@@ -895,7 +894,7 @@ fn transform_internal_variant(
     serialized_name: String,
     tag: &str,
     variant: &Variant,
-    original_types: &TypeCollection,
+    original_types: &Types,
     widen_tag: bool,
 ) -> Result<Variant> {
     let mut fields = vec![(
@@ -995,7 +994,7 @@ fn clone_variant_with_unnamed_fields(original: &Variant, fields: Vec<Field>) -> 
 
 fn is_internal_tag_compatible(
     ty: &DataType,
-    original_types: &TypeCollection,
+    original_types: &Types,
     seen: &mut HashSet<TypeKey>,
 ) -> bool {
     match ty {
@@ -1034,7 +1033,7 @@ fn is_internal_tag_compatible(
 
 fn is_internal_variant_compatible(
     variant: &Variant,
-    original_types: &TypeCollection,
+    original_types: &Types,
     seen: &mut HashSet<TypeKey>,
 ) -> bool {
     match variant.fields() {
@@ -1138,7 +1137,7 @@ fn variant_has_local_difference(variant: &Variant) -> bool {
         .unwrap_or_default()
 }
 
-fn collect_dependencies(dt: &DataType, types: &TypeCollection, deps: &mut HashSet<TypeKey>) {
+fn collect_dependencies(dt: &DataType, types: &Types, deps: &mut HashSet<TypeKey>) {
     match dt {
         DataType::Struct(s) => {
             collect_conversion_dependencies(s.attributes(), types, deps);
@@ -1178,7 +1177,7 @@ fn collect_dependencies(dt: &DataType, types: &TypeCollection, deps: &mut HashSe
 
 fn collect_conversion_dependencies(
     attrs: &specta::datatype::Attributes,
-    types: &TypeCollection,
+    types: &Types,
     deps: &mut HashSet<TypeKey>,
 ) {
     let Some(conversions) = attrs.get::<SerdeContainerAttrs>() else {
@@ -1197,11 +1196,7 @@ fn collect_conversion_dependencies(
     }
 }
 
-fn collect_fields_dependencies(
-    fields: &Fields,
-    types: &TypeCollection,
-    deps: &mut HashSet<TypeKey>,
-) {
+fn collect_fields_dependencies(fields: &Fields, types: &Types, deps: &mut HashSet<TypeKey>) {
     match fields {
         Fields::Unit => {}
         Fields::Unnamed(unnamed) => {
@@ -1226,8 +1221,8 @@ fn build_from_original(
     name: impl Into<Cow<'static, str>>,
     generics: Vec<(specta::datatype::GenericReference, Cow<'static, str>)>,
     ty: DataType,
-    types: &TypeCollection,
-    out: &mut TypeCollection,
+    types: &Types,
+    out: &mut Types,
 ) -> NamedDataType {
     let mut ndt = if original.requires_reference(types) {
         NamedDataType::new(name, generics, ty)

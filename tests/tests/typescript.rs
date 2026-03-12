@@ -1,7 +1,7 @@
 use std::{iter, path::Path};
 
 use specta::{
-    Type, TypeCollection,
+    Type, Types,
     datatype::{DataType, Reference},
 };
 use specta_typescript::{BigIntExportBehavior, Layout, Typescript, primitives};
@@ -9,7 +9,7 @@ use tempfile::TempDir;
 
 use crate::fs_to_string;
 
-pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
+pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
     let (mut types, dts) = crate::types();
 
     // Test ts-specific types
@@ -36,9 +36,7 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
     (types, dts)
 }
 
-fn phase_collections(
-    types: TypeCollection,
-) -> [(&'static str, Result<TypeCollection, specta_serde::Error>); 3] {
+fn phase_collections(types: Types) -> [(&'static str, Result<Types, specta_serde::Error>); 3] {
     [
         ("raw", Ok(types.clone())),
         ("serde", specta_serde::apply(types.clone())),
@@ -70,7 +68,7 @@ fn typescript_export_serde_errors() {
         expected_error: &str,
         expect_apply_error: bool,
     ) {
-        let types = TypeCollection::default().register::<T>();
+        let types = Types::default().register::<T>();
         for (mode, output) in [
             (
                 "serde",
@@ -409,7 +407,7 @@ fn reserved_names() {
             a: String,
         }
 
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let ndt = match r#enum::definition(&mut types) {
             DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
             _ => panic!("Failed to get reference"),
@@ -424,7 +422,7 @@ fn reserved_names() {
         #[allow(non_camel_case_types)]
         pub struct r#enum(String);
 
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let ndt = match r#enum::definition(&mut types) {
             DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
             _ => panic!("Failed to get reference"),
@@ -442,7 +440,7 @@ fn reserved_names() {
             A(String),
         }
 
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let ndt = match r#enum::definition(&mut types) {
             DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
             _ => panic!("Failed to get reference"),
@@ -472,7 +470,7 @@ fn reserved_names() {
 
 //     assert!(
 //         Typescript::default()
-//             .export(&TypeCollection::default().register::<Demo>())
+//             .export(&Types::default().register::<Demo>())
 //             .is_err_and(|err| err
 //                 .to_string()
 //                 .starts_with("Detected multiple types with the same name:"))

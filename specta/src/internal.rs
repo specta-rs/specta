@@ -48,7 +48,7 @@ pub mod construct {
 mod functions {
     use std::borrow::Cow;
 
-    use crate::{TypeCollection, datatype::Deprecated, datatype::Function, function::SpectaFn};
+    use crate::{Types, datatype::Deprecated, datatype::Function, function::SpectaFn};
 
     #[doc(hidden)]
     /// A helper for exporting a command to a [`CommandDataType`].
@@ -57,7 +57,7 @@ mod functions {
         _: T,
         asyncness: bool,
         name: Cow<'static, str>,
-        types: &mut TypeCollection,
+        types: &mut Types,
         fields: &[Cow<'static, str>],
         docs: Cow<'static, str>,
         deprecated: Option<Deprecated>,

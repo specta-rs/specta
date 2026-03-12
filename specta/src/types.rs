@@ -13,7 +13,7 @@ use crate::{
 /// While exporting a type will add all of the types it depends on to the collection.
 /// You can also construct your own collection to easily export a set of types together.
 #[derive(Default, Clone)]
-pub struct TypeCollection(
+pub struct Types(
     // `None` indicates that the entry is a placeholder.
     // It is a reference and we are currently resolving it's definition.
     pub(crate) HashMap<NamedId, Option<NamedDataType>>,
@@ -22,13 +22,13 @@ pub struct TypeCollection(
     pub(crate) usize,
 );
 
-impl fmt::Debug for TypeCollection {
+impl fmt::Debug for Types {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("TypeCollection").field(&self.0).finish()
+        f.debug_tuple("Types").field(&self.0).finish()
     }
 }
 
-impl TypeCollection {
+impl Types {
     /// Register a [`Type`] with the collection.
     pub fn register<T: Type>(mut self) -> Self {
         T::definition(&mut self);
@@ -46,7 +46,7 @@ impl TypeCollection {
         debug_assert_eq!(
             self.1,
             self.0.iter().filter_map(|(_, ndt)| ndt.as_ref()).count(),
-            "TypeCollection count logic mismatch"
+            "Types count logic mismatch"
         );
 
         self.1
@@ -92,7 +92,7 @@ impl TypeCollection {
             .iter()
             .filter_map(|(_, ndt)| ndt.as_ref())
             .collect::<Vec<_>>();
-        assert_eq!(v.len(), self.1, "TypeCollection count logic mismatch");
+        assert_eq!(v.len(), self.1, "Types count logic mismatch");
         v.sort_by(|a, b| {
             a.name
                 .cmp(&b.name)

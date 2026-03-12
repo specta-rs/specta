@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 /// Comprehensive example showcasing string enums and custom Codable implementations
@@ -166,7 +166,7 @@ fn main() {
     println!("{}", "=".repeat(60));
 
     // Create type collection with all our enum types
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<HttpStatus>()
         .register::<Environment>()
         .register::<ApiResult>()

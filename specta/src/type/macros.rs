@@ -1,7 +1,7 @@
 macro_rules! _impl_primitives {
     ($($i:ident)+) => {$(
         impl Type for $i {
-            fn definition(_: &mut TypeCollection) -> DataType {
+            fn definition(_: &mut Types) -> DataType {
                 DataType::Primitive(datatype::Primitive::$i)
             }
         }
@@ -12,7 +12,7 @@ macro_rules! _impl_tuple {
     ( impl $($i:ident),* ) => {
         #[allow(non_snake_case)]
         impl<$($i: Type),*> Type for ($($i,)*) {
-            fn definition(_types: &mut TypeCollection) -> DataType {
+            fn definition(_types: &mut Types) -> DataType {
                 DataType::Tuple(datatype::Tuple {
                     elements: vec![$(<$i as Type>::definition(_types)),*],
                 })
@@ -28,7 +28,7 @@ macro_rules! _impl_tuple {
 
 macro_rules! _impl_passthrough {
     ($t:ty) => {
-        fn definition(types: &mut TypeCollection) -> DataType {
+        fn definition(types: &mut Types) -> DataType {
             <$t>::definition(types)
         }
     };
@@ -63,7 +63,7 @@ macro_rules! _impl_ndt {
     ) => {
         $(
             impl$(<$($generic),*>)? Type for $type_path $(where $($bounds)*)? {
-                fn definition(types: &mut TypeCollection) -> DataType {
+                fn definition(types: &mut Types) -> DataType {
                     // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
                     static SENTINEL: &str = stringify!($type_path);
                     static GENERICS: &[(datatype::GenericReference, ::std::borrow::Cow<'static, str>)] = &[

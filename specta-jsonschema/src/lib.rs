@@ -17,7 +17,7 @@
 //! ## Exporting to JSON Schema
 //!
 //! ```ignore
-//! use specta::{Type, TypeCollection};
+//! use specta::{Type, Types};
 //! use specta_jsonschema::{JsonSchema, SchemaVersion};
 //!
 //! #[derive(Type)]
@@ -28,7 +28,7 @@
 //! }
 //!
 //! fn main() {
-//!     let types = TypeCollection::default()
+//!     let types = Types::default()
 //!         .register::<User>();
 //!
 //!     // Export to JSON Schema
@@ -44,7 +44,7 @@
 //! ## With Serde Integration
 //!
 //! ```ignore
-//! use specta::{Type, TypeCollection};
+//! use specta::{Type, Types};
 //! use specta_jsonschema::JsonSchema;
 //!
 //! #[derive(Type, serde::Serialize)]
@@ -56,7 +56,7 @@
 //! }
 //!
 //! fn main() {
-//!     let types = TypeCollection::default().register::<User>();
+//!     let types = Types::default().register::<User>();
 //!
 //!     // Apply serde transforms in userspace, then export
 //!     let types = specta_serde::apply(types).unwrap();

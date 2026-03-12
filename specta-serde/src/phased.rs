@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use specta::{
-    Type, TypeCollection,
+    Type, Types,
     datatype::{DataType, NamedDataType, Tuple},
 };
 
@@ -19,7 +19,7 @@ impl<Serialize, Deserialize> Phased2 for Phased<Serialize, Deserialize> {
 }
 
 impl<Serialize: Type, Deserialize: Type> Type for Phased<Serialize, Deserialize> {
-    fn definition(types: &mut TypeCollection) -> DataType {
+    fn definition(types: &mut Types) -> DataType {
         let payload = DataType::Tuple(Tuple::new(vec![
             Serialize::definition(types),
             Deserialize::definition(types),
