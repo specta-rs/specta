@@ -1,7 +1,9 @@
 use attr::*;
 use r#enum::parse_enum;
+use proc_macro_crate::{FoundCrate, crate_name};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
+use std::collections::HashSet;
 use r#struct::parse_struct;
 use syn::{Data, DeriveInput, GenericParam, parse};
 
@@ -19,8 +21,7 @@ mod field;
 mod generics;
 mod r#struct;
 
-// TODO: Remove this and make it dynamically discovered!
-const FORMATS: &[&str] = &["specta_serde"];
+const FORMAT_CRATES_ENV_VAR: &str = "SPECTA_FORMAT_CRATES";
 
 #[derive(Copy, Clone)]
 pub(super) enum AttributeScope {
@@ -33,6 +34,7 @@ pub(super) fn build_runtime_attributes(
     scope: AttributeScope,
     raw_attrs: &[syn::Attribute],
     skip_attrs: &[String],
+    format_crates: &[syn::Path],
 ) -> TokenStream {
     let metas = raw_attrs
         .iter()
@@ -53,11 +55,9 @@ pub(super) fn build_runtime_attributes(
         AttributeScope::Field => quote!(@field),
     };
 
-    let parser_calls = FORMATS.iter().map(|name| {
-        let crate_ident = format_ident!("{name}");
-
+    let parser_calls = format_crates.iter().map(|crate_path| {
         quote! {
-            attrs.insert(#crate_ident::parser!(#scope [#(#metas),*]));
+            attrs.insert(#crate_path::parser!(#scope [#(#metas),*]));
         }
     });
 
@@ -66,6 +66,79 @@ pub(super) fn build_runtime_attributes(
         #(#parser_calls)*
         attrs
     })
+}
+
+/// Discovers format parser crates for this derive expansion.
+///
+/// Sources, in order:
+/// 1. Built-in auto-detection (`specta-serde`) for out-of-box support.
+/// 2. `SPECTA_FORMAT_CRATES`, a comma-separated list supplied by the build
+///    environment (for example via `build.rs`).
+///
+/// Entries are resolved as Cargo package names first (rename-safe via
+/// `proc_macro_crate`), then as raw Rust paths. Duplicate entries are removed
+/// while preserving insertion order.
+fn discover_format_crates() -> syn::Result<Vec<syn::Path>> {
+    let mut crates = Vec::new();
+
+    if let Some(specta_serde) = resolve_package_crate_path("specta-serde")? {
+        crates.push(specta_serde);
+    }
+
+    if let Some(raw_entries) = std::env::var_os(FORMAT_CRATES_ENV_VAR) {
+        let raw_entries = raw_entries.to_string_lossy();
+        for raw_entry in raw_entries.split(',') {
+            let entry = raw_entry.trim();
+            if entry.is_empty() {
+                continue;
+            }
+
+            let crate_path = match resolve_package_crate_path(entry)? {
+                Some(path) => path,
+                None => syn::parse_str::<syn::Path>(entry).map_err(|_| {
+                    syn::Error::new(
+                        proc_macro2::Span::call_site(),
+                        format!(
+                            "specta: invalid crate entry `{entry}` in ${FORMAT_CRATES_ENV_VAR}. \
+                             Use a package name or a valid Rust path.",
+                        ),
+                    )
+                })?,
+            };
+
+            crates.push(crate_path);
+        }
+    }
+
+    let mut seen = HashSet::new();
+    crates.retain(|path| seen.insert(path.to_token_stream().to_string()));
+
+    Ok(crates)
+}
+
+fn resolve_package_crate_path(package_name: &str) -> syn::Result<Option<syn::Path>> {
+    let resolved = match crate_name(package_name) {
+        Ok(resolved) => resolved,
+        Err(proc_macro_crate::Error::CrateNotFound { .. }) => return Ok(None),
+        Err(err) => {
+            return Err(syn::Error::new(
+                proc_macro2::Span::call_site(),
+                format!("specta: failed to resolve crate `{package_name}`: {err}"),
+            ));
+        }
+    };
+
+    let path = match resolved {
+        FoundCrate::Itself => syn::parse_quote!(crate),
+        FoundCrate::Name(name) => syn::parse_str(&name).map_err(|_| {
+            syn::Error::new(
+                proc_macro2::Span::call_site(),
+                format!("specta: resolved crate name `{name}` is not a valid Rust path"),
+            )
+        })?,
+    };
+
+    Ok(Some(path))
 }
 
 pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
@@ -84,6 +157,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let container_attrs = ContainerAttr::from_attrs(&mut attrs)?;
     let crate_ref = container_attrs.crate_name.clone().unwrap_or(quote!(specta));
+    let format_crates = discover_format_crates()?;
 
     if container_attrs.r#type.is_some() && container_attrs.transparent {
         return Err(syn::Error::new(
@@ -150,14 +224,15 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         AttributeScope::Container,
         raw_attrs,
         &container_attrs.skip_attrs,
+        &format_crates,
     );
 
     let dt_expr = if let Some(container_ty) = &container_attrs.r#type {
         quote!(<#container_ty as #crate_ref::Type>::definition(types))
     } else {
         let (dt_type, dt_impl) = match data {
-            Data::Struct(data) => parse_struct(&crate_ref, &container_attrs, data),
-            Data::Enum(data) => parse_enum(&crate_ref, &container_attrs, data),
+            Data::Struct(data) => parse_struct(&crate_ref, &container_attrs, data, &format_crates),
+            Data::Enum(data) => parse_enum(&crate_ref, &container_attrs, data, &format_crates),
             Data::Union(data) => Err(syn::Error::new_spanned(
                 data.union_token,
                 "specta: Union types are not supported by Specta yet!",

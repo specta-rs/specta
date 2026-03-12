@@ -8,6 +8,7 @@ pub fn parse_enum(
     crate_ref: &TokenStream,
     container_attrs: &ContainerAttr,
     data: &DataEnum,
+    format_crates: &[syn::Path],
 ) -> syn::Result<(TokenStream, TokenStream)> {
     if container_attrs.transparent {
         return Err(syn::Error::new(
@@ -73,6 +74,7 @@ pub fn parse_enum(
                 AttributeScope::Variant,
                 &v.attrs,
                 &container_attrs.skip_attrs,
+                format_crates,
             );
 
             Ok((v, variant_attrs, runtime_attrs))
@@ -123,6 +125,7 @@ pub fn parse_enum(
                                     &field.ty,
                                     raw_attrs,
                                     variant_skip,
+                                    format_crates,
                                 )
                             })
                             .collect::<syn::Result<Vec<TokenStream>>>()?;
@@ -154,6 +157,7 @@ pub fn parse_enum(
                                     &field.ty,
                                     raw_attrs,
                                     variant_skip,
+                                    format_crates,
                                 )?;
                                 Ok(quote!((#field_name.into(), #inner)))
                             })
