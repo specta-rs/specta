@@ -10,7 +10,7 @@ static TYPES: OnceLock<Mutex<Vec<fn(&mut Types)>>> = OnceLock::new();
 
 /// Get the global type store containing all automatically collected types.
 ///
-/// All types with the [`Type`](macro@specta::Type) macro will automatically be registered here unless they have been explicitly disabled with `#[specta(collect = false)]`.
+/// All types with the [`Type`](macro@crate::Type) macro will automatically be registered here unless they have been explicitly disabled with `#[specta(collect = false)]`.
 ///
 /// Note that when enabling the `export` feature, you will not be able to enable the `unsafe_code` lint as [`ctor`] (which is used internally) is marked unsafe.
 ///
@@ -45,5 +45,5 @@ pub mod internal {
 
     // We expose this for the macros
     #[cfg(feature = "collect")]
-    pub use ::ctor;
+    pub use ctor;
 }

@@ -128,7 +128,7 @@ impl Exporter {
     /// Add some custom Typescript or Javascript code that is exported as part of the bindings.
     /// It's appending to the types file for single-file layouts or put in a root `index.{ts/js}` for multi-file.
     ///
-    /// The closure is wrapped in [`specta::datatype::collect()`] to capture any referenced types.
+    /// The closure is wrapped in [`specta::collect()`] to capture any referenced types.
     /// Ensure you call `T::reference()` within the closure if you want an import to be created.
     pub fn framework_runtime(
         mut self,
@@ -541,7 +541,7 @@ impl Deref for FrameworkExporter<'_> {
 impl FrameworkExporter<'_> {
     /// Render the types within the [Types].
     ///
-    /// This will only work if used within [Self::framework_runtime] function.
+    /// This will only work if used within [`Exporter::framework_runtime`].
     /// It allows frameworks to intersperse their user types into their runtime code.
     pub fn render_types(&mut self) -> Result<Cow<'static, str>, Error> {
         let mut s = String::new();

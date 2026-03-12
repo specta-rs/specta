@@ -78,7 +78,9 @@ impl From<GenericReference> for DataType {
 
 /// Reference to a type not understood by Specta's core.
 ///
-/// These are implemented by the language exporter to implement cool features like [specta_typescript::branded], [specta_typescript::define] and more.
+/// These are implemented by the language exporter to implement cool features like
+/// [`specta_typescript::branded!`](https://docs.rs/specta-typescript/latest/specta_typescript/macro.branded.html),
+/// [`specta_typescript::define`](https://docs.rs/specta-typescript/latest/specta_typescript/fn.define.html), and more.
 ///
 /// This is an advanced feature designed for language exporters so should generally be avoided and is not intended to be generally useful unless your in control of the language exporter.
 #[derive(Clone)]

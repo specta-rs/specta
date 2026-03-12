@@ -18,10 +18,6 @@ pub enum ApplyMode {
     Phases,
 }
 
-pub fn validate(types: &Types) -> Result<()> {
-    validate_for_mode(types, ApplyMode::Unified)
-}
-
 pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<()> {
     for ndt in types.into_unsorted_iter() {
         let ndt_generics = ndt

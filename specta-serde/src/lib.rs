@@ -7,6 +7,91 @@
 //! - Use [`apply_phases`] when serde behavior differs by direction (for example
 //!   deserialize-widening enums, asymmetric conversion attributes, or explicit
 //!   [`Phased`] overrides).
+//!
+//! # `serde_with` and `#[serde(with = ...)]`
+//!
+//! `serde_with` is supported through the same mechanism as raw serde codec
+//! attributes because it expands to serde metadata (`with`, `serialize_with`,
+//! `deserialize_with`).
+//!
+//! When codecs change the wire type, add an explicit Specta override:
+//!
+//! ```rust,ignore
+//! use serde::{Deserialize, Serialize};
+//! use specta::Type;
+//!
+//! #[derive(Type, Serialize, Deserialize)]
+//! struct Digest {
+//!     #[serde(with = "hex_bytes")]
+//!     #[specta(type = String)]
+//!     value: Vec<u8>,
+//! }
+//! ```
+//!
+//! If serialize and deserialize shapes are different, use [`Phased`] and
+//! [`apply_phases`].
+//!
+//! This is required because a single unified type graph cannot represent two
+//! different directional wire shapes at once.
+//!
+//! ```rust,ignore
+//! use serde::{Deserialize, Serialize};
+//! use serde_with::{OneOrMany, serde_as};
+//! use specta::{Type, Types};
+//!
+//! #[derive(Type, Serialize, Deserialize)]
+//! #[serde(untagged)]
+//! enum OneOrManyString {
+//!     One(String),
+//!     Many(Vec<String>),
+//! }
+//!
+//! #[serde_as]
+//! #[derive(Type, Serialize, Deserialize)]
+//! struct Filters {
+//!     #[serde_as(as = "OneOrMany<_>")]
+//!     #[specta(type = specta_serde::Phased<Vec<String>, OneOrManyString>)]
+//!     tags: Vec<String>,
+//! }
+//!
+//! let types = Types::default().register::<Filters>();
+//! let phased_types = specta_serde::apply_phases(types)?;
+//! ```
+//!
+//! As an alternative to codec attributes, `#[serde(into = ...)]`,
+//! `#[serde(from = ...)]`, and `#[serde(try_from = ...)]` often produce better
+//! type inference because the wire type is modeled as an explicit Rust type:
+//!
+//! ```rust,ignore
+//! use serde::{Deserialize, Serialize};
+//! use specta::Type;
+//!
+//! #[derive(Type, Serialize, Deserialize)]
+//! struct UserWire {
+//!     id: String,
+//! }
+//!
+//! #[derive(Type, Clone, Serialize, Deserialize)]
+//! #[serde(into = "UserWire")]
+//! struct UserInto {
+//!     id: String,
+//! }
+//!
+//! #[derive(Type, Clone, Serialize, Deserialize)]
+//! #[serde(from = "UserWire")]
+//! struct UserFrom {
+//!     id: String,
+//! }
+//!
+//! #[derive(Type, Clone, Serialize, Deserialize)]
+//! #[serde(try_from = "UserWire")]
+//! struct UserTryFrom {
+//!     id: String,
+//! }
+//! ```
+//!
+//! See `examples/basic-ts/src/main.rs` for a complete exporter example using
+//! [`apply`] and [`apply_phases`].
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
     html_logo_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png",
@@ -1264,87 +1349,6 @@ fn build_from_original(
     ndt.register(out);
 
     ndt
-}
-
-fn rename_datatype_fields(ty: &mut DataType) -> Result<()> {
-    if let Some(converted) = conversion_datatype_for_mode(ty, PhaseRewrite::Unified)? {
-        if converted != *ty {
-            *ty = converted;
-            return rename_datatype_fields(ty);
-        }
-    }
-
-    match ty {
-        DataType::Struct(s) => rename_fields(s.fields_mut())?,
-        DataType::Enum(e) => {
-            for (_, variant) in e.variants_mut() {
-                rename_fields(variant.fields_mut())?;
-            }
-        }
-        DataType::Tuple(tuple) => {
-            for ty in tuple.elements_mut() {
-                rename_datatype_fields(ty)?;
-            }
-        }
-        DataType::List(list) => rename_datatype_fields(list.ty_mut())?,
-        DataType::Map(map) => {
-            rename_datatype_fields(map.key_ty_mut())?;
-            rename_datatype_fields(map.value_ty_mut())?;
-        }
-        DataType::Nullable(inner) => rename_datatype_fields(inner)?,
-        DataType::Primitive(_) | DataType::Reference(_) => {}
-    }
-
-    Ok(())
-}
-
-fn rename_fields(fields: &mut Fields) -> Result<()> {
-    match fields {
-        Fields::Unit => {}
-        Fields::Unnamed(unnamed) => {
-            for field in unnamed.fields_mut() {
-                apply_field_attrs(field);
-                rename_field_type(field)?;
-            }
-        }
-        Fields::Named(named) => {
-            for (name, field) in named.fields_mut() {
-                apply_field_attrs(field);
-
-                if let Some(serde_attrs) = field.attributes().get::<SerdeFieldAttrs>() {
-                    match (
-                        serde_attrs.rename_serialize.as_deref(),
-                        serde_attrs.rename_deserialize.as_deref(),
-                    ) {
-                        (None, None) => {}
-                        (Some(serialize), Some(deserialize)) if serialize == deserialize => {
-                            *name = Cow::Owned(serialize.to_string());
-                        }
-                        (serialize, deserialize) => {
-                            return Err(Error::incompatible_rename(
-                                "field rename",
-                                name.to_string(),
-                                serialize.map(ToString::to_string),
-                                deserialize.map(ToString::to_string),
-                            ));
-                        }
-                    }
-                }
-
-                rename_field_type(field)?;
-            }
-        }
-    }
-
-    Ok(())
-}
-
-fn rename_field_type(field: &mut Field) -> Result<()> {
-    if let Some(ty) = field.ty_mut() {
-        rename_datatype_fields(ty)?;
-    }
-
-    Ok(())
 }
 
 fn apply_field_attrs(field: &mut Field) {

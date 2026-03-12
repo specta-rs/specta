@@ -1,6 +1,7 @@
 //! Primitives provide building blocks for Specta-based libraries.
 //!
-//! These are for advanced usecases, you should generally use [Typescript] or [JSDoc] in end-user applications.
+//! These are for advanced usecases, you should generally use [crate::Typescript] or
+//! [crate::JSDoc] in end-user applications.
 
 use std::{borrow::Cow, cell::RefCell, fmt::Write as _, iter};
 
