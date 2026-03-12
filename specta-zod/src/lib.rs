@@ -9,3 +9,16 @@
     html_logo_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png",
     html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
+
+mod error;
+mod opaque;
+pub mod primitives;
+mod references;
+mod reserved_names;
+mod types;
+mod zod;
+
+pub use error::Error;
+pub use opaque::define;
+pub use types::{Any, Never, Unknown};
+pub use zod::{BigIntExportBehavior, FrameworkExporter, Layout, Zod};
