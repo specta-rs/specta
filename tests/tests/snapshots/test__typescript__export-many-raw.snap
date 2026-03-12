@@ -206,12 +206,6 @@ export type RenamedFieldKeys = {
 
 export type RenamedVariantWithSkippedPayload = never;
 
-// https://github.com/specta-rs/specta/issues/374
-export type Issue374 = {
-	foo: boolean,
-	bar: boolean,
-};
-
 export type Type = never;
 
 export type ActualType = {

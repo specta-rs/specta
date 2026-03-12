@@ -417,12 +417,6 @@ export type Issue281 = {
 	default_unity_arguments: string[],
 };
 
-// https://github.com/specta-rs/specta/issues/374
-export type Issue374 = {
-	foo: boolean,
-	bar: boolean,
-};
-
 export type KebabCase = {
 	test_ing: string,
 };
@@ -614,7 +608,6 @@ export type Primitives = {
 	RenameWithWeirdCharsVariant: RenameWithWeirdCharsVariant,
 	RenamedFieldKeys: RenamedFieldKeys,
 	RenamedVariantWithSkippedPayload: RenamedVariantWithSkippedPayload,
-	Issue374: Issue374,
 	"type_type::Type": Type,
 	ActualType: ActualType,
 	SpectaTypeOverride: SpectaTypeOverride,

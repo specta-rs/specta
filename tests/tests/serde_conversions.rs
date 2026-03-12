@@ -22,6 +22,25 @@ struct Symmetric {
     value: i32,
 }
 
+#[derive(Clone, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct GenericWire<T> {
+    values: Vec<T>,
+}
+
+#[derive(Clone, Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(try_from = "GenericWire<T>")]
+struct GenericTryFrom<T> {
+    values: Vec<T>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct GenericParent<T> {
+    child: GenericTryFrom<T>,
+}
+
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct Parent {
@@ -157,6 +176,16 @@ impl From<Wire> for Symmetric {
     }
 }
 
+impl<T> TryFrom<GenericWire<T>> for GenericTryFrom<T> {
+    type Error = std::convert::Infallible;
+
+    fn try_from(value: GenericWire<T>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            values: value.values,
+        })
+    }
+}
+
 fn type_names(types: &ResolvedTypes) -> Vec<String> {
     types
         .as_types()
@@ -193,6 +222,18 @@ fn apply_phases_splits_container_and_dependents_for_conversions() {
 fn apply_accepts_symmetric_container_conversion() {
     specta_serde::apply(Types::default().register::<Symmetric>())
         .expect("apply should accept symmetric serde conversions");
+}
+
+#[test]
+fn apply_phases_accepts_generic_try_from_container_conversion() {
+    let err = specta_serde::apply(Types::default().register::<GenericParent<String>>())
+        .expect_err("apply should reject deserialize-only container conversions");
+    assert!(err
+        .to_string()
+        .contains("Incompatible container conversion"));
+
+    specta_serde::apply_phases(Types::default().register::<GenericParent<String>>())
+        .expect("apply_phases should resolve nested generic references from container conversions");
 }
 
 #[test]
@@ -261,10 +302,9 @@ fn skip_serializing_if_requires_phases() {
 fn identifier_enums_require_phases() {
     let err = specta_serde::apply(Types::default().register::<VariantIdentifierValid>())
         .expect_err("identifier enums should require apply_phases");
-    assert!(
-        err.to_string()
-            .contains("identifier enums require `apply_phases`")
-    );
+    assert!(err
+        .to_string()
+        .contains("identifier enums require `apply_phases`"));
 
     specta_serde::apply_phases(Types::default().register::<VariantIdentifierValid>())
         .expect("valid variant_identifier enum should pass in apply_phases");

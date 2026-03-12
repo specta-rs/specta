@@ -2,4 +2,4 @@
 source: tests/tests/jsdoc.rs
 expression: output
 ---
-ERROR: Unresolved generic reference 'GenericReference { id: TypeId(0x560fcb1a07ec75ea4cadc5334598cff9) }' while validating 'Vec.<list_item>.<generic_ref>'
+ERROR: Invalid map key at 'HashMap.<map_key>': enum key with tuple variants must be #[serde(untagged)]

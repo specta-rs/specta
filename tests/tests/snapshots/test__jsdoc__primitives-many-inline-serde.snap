@@ -2,4 +2,4 @@
 source: tests/tests/jsdoc.rs
 expression: output
 ---
-ERROR: Unresolved generic reference 'GenericReference { id: TypeId(0x17177485ba968fa4b446f08c808dbecb) }' while validating 'Vec.<list_item>.<generic_ref>'
+ERROR: Invalid phased type usage at 'Optional.c': `skip_serializing_if` requires `apply_phases` because unified mode cannot represent conditional omission

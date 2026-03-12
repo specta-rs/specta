@@ -2,4 +2,4 @@
 source: tests/tests/typescript.rs
 expression: output
 ---
-ERROR: Unresolved generic reference 'GenericReference { id: TypeId(0xde8c631eb7525ff124d09a452075fc14) }' while validating 'Vec.<list_item>.<generic_ref>'
+ERROR: Invalid map key at 'HashMap.<map_key>': enum key with tuple variants must be #[serde(untagged)]

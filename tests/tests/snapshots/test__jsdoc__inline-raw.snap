@@ -598,15 +598,6 @@ expression: output
 	*	}} Issue281
 	* @property {string[]} default_unity_arguments
 	*
-	*  https://github.com/specta-rs/specta/issues/374
-	*
-	* @typedef {{
-	*		foo: boolean,
-	*		bar: boolean,
-	*	}} Issue374
-	* @property {boolean} foo
-	* @property {boolean} bar
-	*
 	* @typedef {{
 	*		test_ing: string,
 	*	}} KebabCase
@@ -832,7 +823,6 @@ expression: output
 	*		RenameWithWeirdCharsVariant: RenameWithWeirdCharsVariant,
 	*		RenamedFieldKeys: RenamedFieldKeys,
 	*		RenamedVariantWithSkippedPayload: RenamedVariantWithSkippedPayload,
-	*		Issue374: Issue374,
 	*		"type_type::Type": Type,
 	*		ActualType: ActualType,
 	*		SpectaTypeOverride: SpectaTypeOverride,
@@ -1093,7 +1083,6 @@ expression: output
 	* @property {RenameWithWeirdCharsVariant} RenameWithWeirdCharsVariant
 	* @property {RenamedFieldKeys} RenamedFieldKeys
 	* @property {RenamedVariantWithSkippedPayload} RenamedVariantWithSkippedPayload
-	* @property {Issue374} Issue374
 	* @property {Type} "type_type::Type"
 	* @property {ActualType} ActualType
 	* @property {SpectaTypeOverride} SpectaTypeOverride
