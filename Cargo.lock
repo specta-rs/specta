@@ -2103,6 +2103,7 @@ dependencies = [
  "specta-serde",
  "specta-typescript",
  "specta-util",
+ "specta-zod",
  "tempfile",
  "thiserror",
  "toml",
@@ -2133,11 +2134,9 @@ dependencies = [
 name = "specta-zod"
 version = "0.0.1"
 dependencies = [
+ "serde",
  "specta",
- "specta-serde",
- "specta-typescript",
  "specta-util",
- "thiserror",
 ]
 
 [[package]]

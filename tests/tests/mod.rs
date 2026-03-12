@@ -15,6 +15,7 @@ mod serde_other;
 mod types;
 mod typescript;
 mod utils;
+mod zod;
 
 pub use types::types;
 pub use utils::fs_to_string;
