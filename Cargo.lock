@@ -1902,6 +1902,8 @@ dependencies = [
 name = "specta-tags"
 version = "0.0.0"
 dependencies = [
+ "bytes",
+ "chrono",
  "serde",
  "serde_json",
  "specta",
