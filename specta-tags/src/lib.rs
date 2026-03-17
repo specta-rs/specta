@@ -7,13 +7,13 @@
 
 use std::borrow::Cow;
 
-use serde::Serialize;
+use serde::{Serialize, Serializer, ser::SerializeSeq};
 use specta::{
-    datatype::{
-        skip_fields, skip_fields_named, DataType, Fields, GenericReference, NamedReference,
-        Primitive, Reference,
-    },
     TypeCollection,
+    datatype::{
+        DataType, Fields, GenericReference, NamedReference, Primitive, Reference, skip_fields,
+        skip_fields_named,
+    },
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -237,8 +237,7 @@ const BUILTIN_MATCHERS: &[(&str, &str, SemanticKind)] = &[
     ("bytes", "BytesMut", SemanticKind::Bytes),
 ];
 
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(tag = "t", content = "v", rename_all = "snake_case")]
+#[derive(Debug, Clone, Default)]
 pub enum TransformSpec {
     #[default]
     Identity,
@@ -251,6 +250,56 @@ pub enum TransformSpec {
     Object(Vec<(String, TransformSpec)>),
     Map(Box<TransformSpec>),
     Enum(Vec<EnumVariantTransformSpec>),
+}
+
+impl Serialize for TransformSpec {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::Identity => serializer.serialize_u8(0),
+            Self::BigInt => serializer.serialize_u8(1),
+            Self::Date => serializer.serialize_u8(2),
+            Self::Bytes => serializer.serialize_u8(3),
+            Self::Nullable(inner) => {
+                let mut seq = serializer.serialize_seq(Some(2))?;
+                seq.serialize_element(&4u8)?;
+                seq.serialize_element(inner)?;
+                seq.end()
+            }
+            Self::List(inner) => {
+                let mut seq = serializer.serialize_seq(Some(2))?;
+                seq.serialize_element(&5u8)?;
+                seq.serialize_element(inner)?;
+                seq.end()
+            }
+            Self::Tuple(items) => {
+                let mut seq = serializer.serialize_seq(Some(2))?;
+                seq.serialize_element(&6u8)?;
+                seq.serialize_element(items)?;
+                seq.end()
+            }
+            Self::Object(fields) => {
+                let mut seq = serializer.serialize_seq(Some(2))?;
+                seq.serialize_element(&7u8)?;
+                seq.serialize_element(fields)?;
+                seq.end()
+            }
+            Self::Map(inner) => {
+                let mut seq = serializer.serialize_seq(Some(2))?;
+                seq.serialize_element(&8u8)?;
+                seq.serialize_element(inner)?;
+                seq.end()
+            }
+            Self::Enum(variants) => {
+                let mut seq = serializer.serialize_seq(Some(2))?;
+                seq.serialize_element(&9u8)?;
+                seq.serialize_element(variants)?;
+                seq.end()
+            }
+        }
+    }
 }
 
 impl TransformSpec {
@@ -317,19 +366,41 @@ impl From<SemanticKind> for TransformSpec {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub struct EnumVariantTransformSpec {
     pub name: String,
     pub kind: EnumVariantTransformKind,
     pub spec: TransformSpec,
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "snake_case")]
+impl Serialize for EnumVariantTransformSpec {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(3))?;
+        seq.serialize_element(&self.name)?;
+        seq.serialize_element(&self.kind.code())?;
+        seq.serialize_element(&self.spec)?;
+        seq.end()
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum EnumVariantTransformKind {
     Unit,
     Named,
     Unnamed,
+}
+
+impl EnumVariantTransformKind {
+    const fn code(&self) -> u8 {
+        match self {
+            Self::Unit => 0,
+            Self::Named => 1,
+            Self::Unnamed => 2,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -439,28 +510,28 @@ pub fn render_runtime(target: RuntimeTarget, req: &RuntimeRequirements) -> Cow<'
 }
 
 const TRANSFORM_SPEC_TS: &str = r#"type __TS_TransformSpec =
-    | { t: "identity" }
-    | { t: "big_int" }
-    | { t: "date" }
-    | { t: "bytes" }
-    | { t: "nullable"; v: __TS_TransformSpec }
-    | { t: "list"; v: __TS_TransformSpec }
-    | { t: "tuple"; v: __TS_TransformSpec[] }
-    | { t: "object"; v: [string, __TS_TransformSpec][] }
-    | { t: "map"; v: __TS_TransformSpec }
-    | { t: "enum"; v: __TS_EnumVariantTransformSpec[] };
+    | 0
+    | 1
+    | 2
+    | 3
+    | [4, __TS_TransformSpec]
+    | [5, __TS_TransformSpec]
+    | [6, __TS_TransformSpec[]]
+    | [7, [string, __TS_TransformSpec][]]
+    | [8, __TS_TransformSpec]
+    | [9, __TS_EnumVariantTransformSpec[]];
 
-type __TS_EnumVariantTransformSpec = {
-    name: string;
-    kind: "unit" | "named" | "unnamed";
-    spec: __TS_TransformSpec;
-};
+type __TS_EnumVariantTransformSpec = [
+    name: string,
+    kind: 0 | 1 | 2,
+    spec: __TS_TransformSpec,
+];
 "#;
 
-const TRANSFORM_FN_PREFIX_TS: &str = "function __TS_transform<T>(value: T, spec: __TS_TransformSpec): T {\n    if (!spec || spec.t === \"identity\") return value;\n\n    const rawValue = value as any;\n\n    switch (spec.t) {\n";
-const TRANSFORM_FN_PREFIX_JS: &str = "function __TS_transform(value, spec) {\n    if (!spec || spec.t === \"identity\") return value;\n\n    switch (spec.t) {\n";
+const TRANSFORM_FN_PREFIX_TS: &str = "function __TS_transform<T>(value: T, spec: __TS_TransformSpec): T {\n    if (spec == null || spec === 0) return value;\n\n    const rawValue = value as any;\n    const op = Array.isArray(spec) ? spec[0] : spec;\n\n    switch (op) {\n";
+const TRANSFORM_FN_PREFIX_JS: &str = "function __TS_transform(value, spec) {\n    if (spec == null || spec === 0) return value;\n\n    const rawValue = value;\n    const op = Array.isArray(spec) ? spec[0] : spec;\n\n    switch (op) {\n";
 
-const CASE_BIGINT: &str = r#"        case "big_int":
+const CASE_BIGINT: &str = r#"        case 1:
             if (typeof rawValue === "bigint") return value;
             if (typeof rawValue === "number" && Number.isInteger(rawValue)) return BigInt(rawValue);
             if (typeof rawValue === "string") {
@@ -473,16 +544,17 @@ const CASE_BIGINT: &str = r#"        case "big_int":
             return value;
 "#;
 
-const CASE_DATE: &str = "        case \"date\":\n            return (typeof rawValue === \"string\" ? new Date(rawValue) : value);\n";
-const CASE_BYTES: &str = "        case \"bytes\":\n            return (Array.isArray(rawValue) && rawValue.every((v) => typeof v === \"number\") ? Uint8Array.from(rawValue) : value);\n";
-const CASE_NULLABLE: &str = "        case \"nullable\":\n            return rawValue == null ? value : __TS_transform(value, spec.v);\n";
-const CASE_LIST: &str = "        case \"list\":\n            return (Array.isArray(rawValue) ? rawValue.map((item) => __TS_transform(item, spec.v)) : value);\n";
-const CASE_TUPLE: &str = "        case \"tuple\":\n            return (Array.isArray(rawValue)\n                ? rawValue.map((item, index) => __TS_transform(item, spec.v[index] || { t: \"identity\" }))\n                : value);\n";
-const CASE_OBJECT: &str = r#"        case "object": {
+const CASE_DATE: &str = "        case 2:\n            return (typeof rawValue === \"string\" ? new Date(rawValue) : value);\n";
+const CASE_BYTES: &str = "        case 3:\n            return (Array.isArray(rawValue) && rawValue.every((v) => typeof v === \"number\") ? Uint8Array.from(rawValue) : value);\n";
+const CASE_NULLABLE: &str = "        case 4:\n            return (Array.isArray(spec) ? (rawValue == null ? value : __TS_transform(value, spec[1])) : value);\n";
+const CASE_LIST: &str = "        case 5:\n            return (Array.isArray(spec) && Array.isArray(rawValue) ? rawValue.map((item) => __TS_transform(item, spec[1])) : value);\n";
+const CASE_TUPLE: &str = "        case 6:\n            return (Array.isArray(spec) && Array.isArray(spec[1]) && Array.isArray(rawValue)\n                ? rawValue.map((item, index) => __TS_transform(item, spec[1][index] ?? 0))\n                : value);\n";
+const CASE_OBJECT: &str = r#"        case 7: {
+            if (!Array.isArray(spec) || !Array.isArray(spec[1])) return value;
             if (rawValue == null || typeof rawValue !== "object" || Array.isArray(rawValue)) return value;
 
             let out = rawValue;
-            for (const [key, nested] of spec.v) {
+            for (const [key, nested] of spec[1]) {
                 if (!Object.prototype.hasOwnProperty.call(rawValue, key)) continue;
                 const next = __TS_transform(rawValue[key], nested);
                 if (next !== rawValue[key]) {
@@ -493,12 +565,13 @@ const CASE_OBJECT: &str = r#"        case "object": {
             return out;
         }
 "#;
-const CASE_MAP: &str = r#"        case "map": {
+const CASE_MAP: &str = r#"        case 8: {
+            if (!Array.isArray(spec)) return value;
             if (rawValue == null || typeof rawValue !== "object" || Array.isArray(rawValue)) return value;
 
             let out = rawValue;
             for (const key of Object.keys(rawValue)) {
-                const next = __TS_transform(rawValue[key], spec.v);
+                const next = __TS_transform(rawValue[key], spec[1]);
                 if (next !== rawValue[key]) {
                     if (out === rawValue) out = { ...rawValue };
                     out[key] = next;
@@ -507,87 +580,71 @@ const CASE_MAP: &str = r#"        case "map": {
             return out;
         }
 "#;
-const CASE_ENUM: &str =
-    "        case \"enum\":\n            return __TS_transformEnum(value, spec.v);\n";
+const CASE_ENUM: &str = "        case 9:\n            return (Array.isArray(spec) && Array.isArray(spec[1]) ? __TS_transformEnum(value, spec[1]) : value);\n";
 
 const TRANSFORM_FN_SUFFIX: &str = "        default:\n            return value;\n    }\n}\n\n";
 
 const ENUM_HELPERS_TS: &str = r#"function __TS_transformEnum<T>(value: T, variants: __TS_EnumVariantTransformSpec[]): T {
+    const rawValue = value as any;
     for (const variant of variants) {
-        const transformed = __TS_transformEnumVariant(value, variant);
-        if (transformed !== undefined) return transformed;
+        if (variant[1] === 0) continue;
+
+        if (rawValue != null && typeof rawValue === "object" && !Array.isArray(rawValue)) {
+            if (Object.prototype.hasOwnProperty.call(rawValue, variant[0])) {
+                const next = __TS_transform(rawValue[variant[0]], variant[2]);
+                if (next === rawValue[variant[0]]) return value;
+                return { ...rawValue, [variant[0]]: next } as T;
+            }
+
+            if (rawValue.type === variant[0] && Object.prototype.hasOwnProperty.call(rawValue, "data")) {
+                const next = __TS_transform(rawValue.data, variant[2]);
+                if (next === rawValue.data) return value;
+                return { ...rawValue, data: next } as T;
+            }
+
+            if (rawValue.tag === variant[0] && Object.prototype.hasOwnProperty.call(rawValue, "content")) {
+                const next = __TS_transform(rawValue.content, variant[2]);
+                if (next === rawValue.content) return value;
+                return { ...rawValue, content: next } as T;
+            }
+        }
+
+        const direct = __TS_transform(value, variant[2]);
+        if (direct !== value) return direct;
     }
     return value;
-}
-
-function __TS_transformEnumVariant<T>(value: T, variant: __TS_EnumVariantTransformSpec): T | undefined {
-    const rawValue = value as any;
-
-    if (variant.kind === "unit") return undefined;
-
-    if (rawValue != null && typeof rawValue === "object" && !Array.isArray(rawValue)) {
-        if (Object.prototype.hasOwnProperty.call(rawValue, variant.name)) {
-            const next = __TS_transform(rawValue[variant.name], variant.spec);
-            if (next === rawValue[variant.name]) return value;
-            return { ...rawValue, [variant.name]: next } as T;
-        }
-
-        if (rawValue.type === variant.name && Object.prototype.hasOwnProperty.call(rawValue, "data")) {
-            const next = __TS_transform(rawValue.data, variant.spec);
-            if (next === rawValue.data) return value;
-            return { ...rawValue, data: next } as T;
-        }
-
-        if (rawValue.tag === variant.name && Object.prototype.hasOwnProperty.call(rawValue, "content")) {
-            const next = __TS_transform(rawValue.content, variant.spec);
-            if (next === rawValue.content) return value;
-            return { ...rawValue, content: next } as T;
-        }
-    }
-
-    const direct = __TS_transform(value, variant.spec);
-    if (direct !== value) return direct;
-
-    return undefined;
 }
 
 "#;
 
 const ENUM_HELPERS_JS: &str = r#"function __TS_transformEnum(value, variants) {
     for (const variant of variants) {
-        const transformed = __TS_transformEnumVariant(value, variant);
-        if (transformed !== undefined) return transformed;
+        if (variant[1] === 0) continue;
+
+        if (value != null && typeof value === "object" && !Array.isArray(value)) {
+            if (Object.prototype.hasOwnProperty.call(value, variant[0])) {
+                const next = __TS_transform(value[variant[0]], variant[2]);
+                if (next === value[variant[0]]) return value;
+                return { ...value, [variant[0]]: next };
+            }
+
+            if (value.type === variant[0] && Object.prototype.hasOwnProperty.call(value, "data")) {
+                const next = __TS_transform(value.data, variant[2]);
+                if (next === value.data) return value;
+                return { ...value, data: next };
+            }
+
+            if (value.tag === variant[0] && Object.prototype.hasOwnProperty.call(value, "content")) {
+                const next = __TS_transform(value.content, variant[2]);
+                if (next === value.content) return value;
+                return { ...value, content: next };
+            }
+        }
+
+        const direct = __TS_transform(value, variant[2]);
+        if (direct !== value) return direct;
     }
     return value;
-}
-
-function __TS_transformEnumVariant(value, variant) {
-    if (variant.kind === "unit") return undefined;
-
-    if (value != null && typeof value === "object" && !Array.isArray(value)) {
-        if (Object.prototype.hasOwnProperty.call(value, variant.name)) {
-            const next = __TS_transform(value[variant.name], variant.spec);
-            if (next === value[variant.name]) return value;
-            return { ...value, [variant.name]: next };
-        }
-
-        if (value.type === variant.name && Object.prototype.hasOwnProperty.call(value, "data")) {
-            const next = __TS_transform(value.data, variant.spec);
-            if (next === value.data) return value;
-            return { ...value, data: next };
-        }
-
-        if (value.tag === variant.name && Object.prototype.hasOwnProperty.call(value, "content")) {
-            const next = __TS_transform(value.content, variant.spec);
-            if (next === value.content) return value;
-            return { ...value, content: next };
-        }
-    }
-
-    const direct = __TS_transform(value, variant.spec);
-    if (direct !== value) return direct;
-
-    return undefined;
 }
 
 "#;
@@ -662,9 +719,33 @@ mod tests {
         let req = RuntimeRequirements::from_specs([&TransformSpec::BigInt]);
         let runtime = render_runtime(RuntimeTarget::JavaScript, &req);
 
-        assert!(runtime.contains("case \"big_int\""));
-        assert!(!runtime.contains("case \"date\""));
-        assert!(!runtime.contains("case \"enum\""));
+        assert!(runtime.contains("case 1"));
+        assert!(!runtime.contains("case 2"));
+        assert!(!runtime.contains("case 9"));
         assert!(!runtime.contains("function __TS_transformEnum"));
+    }
+
+    #[test]
+    fn serializes_compact_leaf_opcodes() {
+        assert_eq!(TransformSpec::Identity.to_json(), "0");
+        assert_eq!(TransformSpec::BigInt.to_json(), "1");
+        assert_eq!(TransformSpec::Date.to_json(), "2");
+        assert_eq!(TransformSpec::Bytes.to_json(), "3");
+    }
+
+    #[test]
+    fn serializes_compact_composite_shapes() {
+        let object = TransformSpec::Object(vec![(
+            "created_at".to_string(),
+            TransformSpec::Nullable(Box::new(TransformSpec::Date)),
+        )]);
+        assert_eq!(object.to_json(), r#"[7,[["created_at",[4,2]]]]"#);
+
+        let en = TransformSpec::Enum(vec![EnumVariantTransformSpec {
+            name: "Created".to_string(),
+            kind: EnumVariantTransformKind::Named,
+            spec: TransformSpec::Tuple(vec![TransformSpec::BigInt]),
+        }]);
+        assert_eq!(en.to_json(), r#"[9,[["Created",1,[6,[1]]]]]"#);
     }
 }

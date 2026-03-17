@@ -6,10 +6,10 @@ use std::{
 };
 
 use specta::{
-    datatype::{DataType, List, Primitive},
     Type, TypeCollection,
+    datatype::{DataType, List, Primitive},
 };
-use specta_tags::{render_runtime, Analyzer, RuntimeRequirements, RuntimeTarget};
+use specta_tags::{Analyzer, RuntimeRequirements, RuntimeTarget, render_runtime};
 
 #[allow(dead_code)]
 #[derive(Type)]
