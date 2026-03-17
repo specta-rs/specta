@@ -42,14 +42,3 @@ impl Tags {
         todo!();
     }
 }
-
-// // TODO: Features
-// pub mod typescript {
-//     use super::*;
-
-//     // pub const RUNTIME: &str = ""; // TODO
-
-//
-
-//     // pub fn todo() {}
-// }
