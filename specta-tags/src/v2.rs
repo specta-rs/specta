@@ -1,7 +1,8 @@
 use std::borrow::Cow;
 
-use specta::datatype::DataType;
+use specta::{TypeCollection, datatype::DataType};
 
+// TODO: Allow configuring custom named types via NDT name and module path using config params.
 // TODO: Tagging-style system for `rspc` w/ runtime
 
 // TODO: Core changes to `BigInt` handling with Typescript exporter???
@@ -26,19 +27,35 @@ pub enum Tag {
 }
 
 /// TODO
-#[derive(Clone, Debug)] // TODO: Maybe other stuff???
+#[derive(Clone, Debug)] // TODO: Maybe other stuff, `Default`???
 pub struct Tags {
-    todo: Vec<()>,
+    tagged: Vec<()>,
 }
 
 impl Tags {
     /// TODO
-    pub fn analyze(dt: DataType) -> Self {
+    pub fn analyze(dt: DataType, types: &TypeCollection) -> Self {
+        // Scan all `DataType` references, etc. and collect tags and their object location for `Self::map` to use.
+        //
+        // You should match on `NamedDataType`'s name and module path to determine known named types.
+
         todo!();
     }
 
     /// TODO
-    pub fn map(&self, t: &str) -> String {
-        todo!();
+    ///
+    /// This should produce something like
+    pub fn map<'a>(&self, t: &'a str) -> Cow<'a, str> {
+        // If `t` is a struct and has tags we wanna decompose it to something like:
+        // `{ ...t, field_with_override: { nested_override: new Date(t.field_with_override.nested_override) } }`
+        //
+        // If a nested tag doesn't have tags we should just return it to avoid deconstructing it.
+        //
+        // Otherwise we need to traverse the structure to apply the tags inline.
+        // This should just be plain JS code so should work in Typescript (via inference) and in JS.
+        //
+        // If it has no tags we can just return `t` as is.
+
+        t.into()
     }
 }

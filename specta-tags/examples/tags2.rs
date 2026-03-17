@@ -19,6 +19,8 @@ fn main() {
     let mut types = TypeCollection::default();
     let dt = A::definition(&mut types);
 
-    let tags = specta_tags::v2::Tags::analyze(dt);
-    println!("PLAN: {tags:?}");
+    let tags = specta_tags::v2::Tags::analyze(dt, &types);
+    println!("--- PLAN ---\n{tags:?}");
+    // This would be emitted for each Tauri Specta command.
+    println!("--- RESULT ---\n result.then((v) => {})", tags.map("v"));
 }
