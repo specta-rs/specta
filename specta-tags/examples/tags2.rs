@@ -1,5 +1,8 @@
 use specta::{Type, TypeCollection};
 
+// TODO: Handle arrays
+// TODO: Handle enums
+
 #[derive(Type)]
 pub struct A {
     bigint: u128,

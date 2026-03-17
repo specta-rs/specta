@@ -23,7 +23,7 @@ pub enum Tag {
     /// A custom tag.
     ///
     /// TODO: Document this
-    Custom(Cow<'static, str>),
+    Custom(Box<dyn Fn(&str) -> Cow<'static, str> + Send + Sync>),
 }
 
 /// TODO
