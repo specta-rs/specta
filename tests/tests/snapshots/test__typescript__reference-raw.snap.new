@@ -1,5 +1,6 @@
 ---
 source: tests/tests/typescript.rs
+assertion_line: 376
 expression: output
 ---
 Range<i32>: {
