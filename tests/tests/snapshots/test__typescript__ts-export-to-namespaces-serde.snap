@@ -2,4 +2,4 @@
 source: tests/tests/typescript.rs
 expression: output
 ---
-ERROR: Invalid phased type usage at 'Optional.c': `skip_serializing_if` requires `apply_phases` because unified mode cannot represent conditional omission
+ERROR: Invalid phased type usage at 'Issue374.foo': `skip_serializing_if` requires `apply_phases` because unified mode cannot represent conditional omission
