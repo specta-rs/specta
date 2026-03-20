@@ -15,7 +15,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use specta::{Type, Types, datatype::DataType};
+use specta::{datatype::DataType, Type, Types};
 
 /// A macro to collect up the types for better testing.
 ///
@@ -235,7 +235,7 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         BracedStruct,
 
         // `#[serde(rename)]`
-        // Struct,
+        Struct,
         // Struct2,
         // Enum,
         // Enum2,
@@ -421,6 +421,8 @@ pub fn types_phased() -> (Types, Vec<(&'static str, DataType)>) {
     types!(
         // https://github.com/specta-rs/specta/issues/374
         Issue374,
+
+        StructPhaseSpecificRename,
     )
 }
 
@@ -987,6 +989,18 @@ enum EnumRenameAllUppercase {
     HelloWorld,
     VariantB,
     TestingWords,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+#[serde(rename(
+    serialize = "StructPhaseSpecificRenameSerialize",
+    deserialize = "StructPhaseSpecificRenameDeserialize"
+))]
+struct StructPhaseSpecificRename {
+    #[serde(rename(serialize = "ser", deserialize = "der"))]
+    a: String,
 }
 
 #[derive(serde::Serialize, Type)]

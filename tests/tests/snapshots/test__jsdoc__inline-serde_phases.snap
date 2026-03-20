@@ -272,7 +272,10 @@ expression: output
 	*
 	* @typedef {Record<string, never>} EmptyStruct
 	*
-	* @typedef {Record<string, never>} EmptyStructWithTag
+	* @typedef {{
+	*		a: "EmptyStructWithTag",
+	*	}} EmptyStructWithTag
+	* @property {"EmptyStructWithTag"} a
 	*
 	* @typedef {({ A: string }) & { D?: never; bbb?: never; cccc?: never } | ({ bbb: number }) & { A?: never; D?: never; cccc?: never } | ({ cccc: number }) & { A?: never; D?: never; bbb?: never } | ({ D: {
 	* 	a: string,
@@ -855,6 +858,7 @@ expression: output
 	*		TupleStructWithRep: TupleStructWithRep,
 	*		"GenericTupleStruct<String>": GenericTupleStruct<string>,
 	*		BracedStruct: BracedStruct,
+	*		Struct: Struct,
 	*		StructRenameAllUppercase: StructRenameAllUppercase,
 	*		RenameSerdeSpecialChar: RenameSerdeSpecialChar,
 	*		EnumRenameAllUppercase: EnumRenameAllUppercase,
@@ -1104,6 +1108,7 @@ expression: output
 	* @property {TupleStructWithRep} TupleStructWithRep
 	* @property {GenericTupleStruct<string>} "GenericTupleStruct<String>"
 	* @property {BracedStruct} BracedStruct
+	* @property {Struct} Struct
 	* @property {StructRenameAllUppercase} StructRenameAllUppercase
 	* @property {RenameSerdeSpecialChar} RenameSerdeSpecialChar
 	* @property {EnumRenameAllUppercase} EnumRenameAllUppercase
@@ -1371,6 +1376,13 @@ expression: output
 	* @property {[string, number]} tuple
 	*
 	* @typedef {{
+	*		t: "StructNew",
+	*		a: string,
+	*	}} Struct
+	* @property {"StructNew"} t
+	* @property {string} a
+	*
+	* @typedef {{
 	*		a: number,
 	*		b: number,
 	*	}} StructRenameAllUppercase
@@ -1393,11 +1405,13 @@ expression: output
 	* @property {string} field
 	*
 	* @typedef {{
+	*		type: "TagOnStructWithInline",
 	*		a: First,
 	*		b: {
 	*			a: string,
 	*		},
 	*	}} TagOnStructWithInline
+	* @property {"TagOnStructWithInline"} type
 	* @property {First} a
 	* @property {First} b
 	*

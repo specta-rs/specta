@@ -95,6 +95,29 @@ fn inner(
                 ));
             }
 
+            if let Some(attrs) = strct.attributes().get::<SerdeContainerAttrs>() {
+                if attrs.untagged {
+                    return Err(Error::invalid_phased_type_usage(
+                        path,
+                        "`#[serde(untagged)]` is only valid on enums",
+                    ));
+                }
+
+                if attrs.content.is_some() {
+                    return Err(Error::invalid_phased_type_usage(
+                        path,
+                        "`#[serde(content = ...)]` is only valid on enums",
+                    ));
+                }
+
+                if attrs.tag.is_some() && !matches!(strct.fields(), Fields::Named(_)) {
+                    return Err(Error::invalid_phased_type_usage(
+                        path,
+                        "`#[serde(tag = ...)]` on structs requires named fields",
+                    ));
+                }
+            }
+
             match strct.fields() {
                 Fields::Unit => {}
                 Fields::Unnamed(unnamed) => {

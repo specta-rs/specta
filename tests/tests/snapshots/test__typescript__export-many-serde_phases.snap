@@ -244,6 +244,11 @@ export type GenericTupleStruct<T> = T;
 
 export type BracedStruct = string;
 
+export type Struct = {
+	t: "StructNew",
+	a: string,
+};
+
 export type StructRenameAllUppercase = {
 	a: number,
 	b: number,
@@ -503,6 +508,7 @@ export type Fourth = {
 };
 
 export type TagOnStructWithInline = {
+	type: "TagOnStructWithInline",
 	a: First,
 	b: {
 		a: string,
@@ -535,7 +541,9 @@ export type MyEnumUntagged = (First);
 
 export type EmptyStruct = Record<string, never>;
 
-export type EmptyStructWithTag = Record<string, never>;
+export type EmptyStructWithTag = {
+	a: "EmptyStructWithTag",
+};
 
 export type AdjacentlyTagged = ({ t: "A" }) & { c?: never } | { t: "B"; c: {
 	id: string,

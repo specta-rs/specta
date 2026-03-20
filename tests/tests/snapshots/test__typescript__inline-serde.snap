@@ -205,6 +205,10 @@ TupleStruct: string
 TupleStructWithRep: string
 GenericTupleStruct<String>: string
 BracedStruct: string
+Struct: {
+	t: "StructNew",
+	a: string,
+}
 StructRenameAllUppercase: {
 	a: number,
 	b: number,
@@ -400,6 +404,7 @@ Fourth: {
 	},
 }
 TagOnStructWithInline: {
+	type: "TagOnStructWithInline",
 	a: First,
 	b: {
 		a: string,
@@ -422,7 +427,9 @@ MyEnumExternal: { Variant: (First) }
 MyEnumAdjacent: { t: "Variant"; c: (First) }
 MyEnumUntagged: (First)
 EmptyStruct: Record<string, never>
-EmptyStructWithTag: Record<string, never>
+EmptyStructWithTag: {
+	a: "EmptyStructWithTag",
+}
 AdjacentlyTagged: ({ t: "A" }) & { c?: never } | { t: "B"; c: {
 	id: string,
 	method: string,

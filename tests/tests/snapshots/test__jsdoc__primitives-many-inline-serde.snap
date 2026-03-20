@@ -332,6 +332,13 @@ expression: output
 	* @property {string} "0"
 	*
 	* @typedef {{
+	*		t: "StructNew",
+	*		a: string,
+	*	}} Struct
+	* @property {"StructNew"} t
+	* @property {string} a
+	*
+	* @typedef {{
 	*		a: number,
 	*		b: number,
 	*	}} StructRenameAllUppercase
@@ -714,11 +721,13 @@ expression: output
 	* @property {First} b
 	*
 	* @typedef {{
+	*		type: "TagOnStructWithInline",
 	*		a: First,
 	*		b: {
 	*			a: string,
 	*		},
 	*	}} TagOnStructWithInline
+	* @property {"TagOnStructWithInline"} type
 	* @property {First} a
 	* @property {First} b
 	*
@@ -764,7 +773,10 @@ expression: output
 	*
 	* @typedef {Record<string, never>} EmptyStruct
 	*
-	* @typedef {Record<string, never>} EmptyStructWithTag
+	* @typedef {{
+	*		a: "EmptyStructWithTag",
+	*	}} EmptyStructWithTag
+	* @property {"EmptyStructWithTag"} a
 	*
 	* @typedef {({ t: "A" }) & { c?: never } | { t: "B"; c: {
 	* 	id: string,
