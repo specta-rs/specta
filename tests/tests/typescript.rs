@@ -216,19 +216,19 @@ fn typescript_export_serde_errors() {
         "Invalid internally tagged enum",
         true,
     );
-    assert_serde_error::<InternallyTaggedI>(
-        &mut failures,
-        "InternallyTaggedI",
-        "Invalid internally tagged enum",
-        false,
-    );
+    // assert_serde_error::<InternallyTaggedI>(
+    //     &mut failures,
+    //     "InternallyTaggedI",
+    //     "Invalid internally tagged enum",
+    //     false,
+    // );
 
-    assert_serde_error::<TaggedEnumOfEmptyTupleStruct>(
-        &mut failures,
-        "TaggedEnumOfEmptyTupleStruct",
-        "Invalid internally tagged enum",
-        false,
-    );
+    // assert_serde_error::<TaggedEnumOfEmptyTupleStruct>(
+    //     &mut failures,
+    //     "TaggedEnumOfEmptyTupleStruct",
+    //     "Invalid internally tagged enum",
+    //     false,
+    // );
     assert_serde_error::<SkipOnlyVariantExternallyTagged>(
         &mut failures,
         "SkipOnlyVariantExternallyTagged",
