@@ -238,9 +238,9 @@ expression: output
 	* @property {{ type: "B"; data: string }} B
 	*
 	* @typedef {{
-	*		test_ing: string,
+	*		"test-ing": string,
 	*	}} KebabCase
-	* @property {string} test_ing
+	* @property {string} "test-ing"
 	*
 	* @typedef {{
 	*		default_unity_arguments: string[],
@@ -347,20 +347,20 @@ expression: output
 	* @property {{ t: "A" }} A
 	* @property {{ t: "B" }} B
 	*
-	* @typedef {({ t: "C" }) & { enum_field?: never } | ({ t: "B" }) & { enum_field?: never } | { t: "D"; enum_field: null }} Enum2
+	* @typedef {({ t: "C" }) & { enumField?: never } | ({ t: "B" }) & { enumField?: never } | { t: "D"; enumField: null }} Enum2
 	* @property {{ t: "C" }} C
 	* @property {{ t: "B" }} B
-	* @property {{ t: "D"; enum_field: null }} D
+	* @property {{ t: "D"; enumField: null }} D
 	*
 	* @typedef {{ t: "A"; b: string }} Enum3
 	* @property {{ t: "A"; b: string }} A
 	*
 	* @typedef {{
-	*		a: number,
-	*		b: number,
+	*		A: number,
+	*		B: number,
 	*	}} StructRenameAllUppercase
-	* @property {number} a
-	* @property {number} b
+	* @property {number} A
+	* @property {number} B
 	*
 	* @typedef {{
 	*		"a/b": number,
@@ -807,24 +807,24 @@ expression: output
 	* @property {{ t: "C"; c: string }} C
 	*
 	* @typedef {{ event: "started"; data: {
-	* 	project_name: string,
+	* 	projectName: string,
 	* } } | { event: "progressTest"; data: {
-	* 	project_name: string,
+	* 	projectName: string,
 	* 	status: string,
 	* 	progress: number,
 	* } } | { event: "finished"; data: {
-	* 	project_name: string,
+	* 	projectName: string,
 	* } }} LoadProjectEvent
 	* @property {{ event: "started"; data: {
-	* 	project_name: string,
+	* 	projectName: string,
 	* } }} started
 	* @property {{ event: "progressTest"; data: {
-	* 	project_name: string,
+	* 	projectName: string,
 	* 	status: string,
 	* 	progress: number,
 	* } }} progressTest
 	* @property {{ event: "finished"; data: {
-	* 	project_name: string,
+	* 	projectName: string,
 	* } }} finished
 	*
 	* @typedef {"A" | ({ B: {

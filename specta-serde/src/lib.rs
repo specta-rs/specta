@@ -418,18 +418,42 @@ fn rewrite_datatype_for_phase(
 
     match ty {
         DataType::Struct(s) => {
+            let container_rename_all = container_rename_all_rule(
+                s.attributes(),
+                mode,
+                "struct rename_all",
+                container_name.unwrap_or("<anonymous struct>"),
+            )?;
+
+            rewrite_fields_for_phase(
+                s.fields_mut(),
+                mode,
+                original_types,
+                generated,
+                split_types,
+                container_rename_all,
+            )?;
             rewrite_struct_repr_for_phase(s, mode, container_name)?;
-            rewrite_fields_for_phase(s.fields_mut(), mode, original_types, generated, split_types)?
         }
         DataType::Enum(e) => {
             filter_enum_variants_for_phase(e, mode);
-            for (_, variant) in e.variants_mut() {
+            let container_attrs = e.attributes().get::<SerdeContainerAttrs>().cloned();
+
+            for (variant_name, variant) in e.variants_mut() {
+                let rename_rule = enum_variant_field_rename_rule(
+                    &container_attrs,
+                    variant,
+                    mode,
+                    variant_name,
+                )?;
+
                 rewrite_fields_for_phase(
                     variant.fields_mut(),
                     mode,
                     original_types,
                     generated,
                     split_types,
+                    rename_rule,
                 )?;
             }
 
@@ -535,6 +559,7 @@ fn rewrite_fields_for_phase(
     original_types: &Types,
     generated: &HashMap<TypeKey, GeneratedTypes>,
     split_types: &HashSet<TypeKey>,
+    rename_all_rule: Option<RenameRule>,
 ) -> Result<()> {
     match fields {
         Fields::Unit => {}
@@ -566,7 +591,11 @@ fn rewrite_fields_for_phase(
 
                     if let Some(rename) = rename {
                         *name = Cow::Owned(rename.to_string());
+                    } else if let Some(rule) = rename_all_rule {
+                        *name = Cow::Owned(rule.apply_to_field(name));
                     }
+                } else if let Some(rule) = rename_all_rule {
+                    *name = Cow::Owned(rule.apply_to_field(name));
                 }
 
                 rewrite_field_for_phase(field, mode, original_types, generated, split_types)?;
@@ -816,6 +845,62 @@ fn rewrite_identifier_enum_for_phase(
 
     *e.variants_mut() = variants;
     Ok(true)
+}
+
+fn container_rename_all_rule(
+    attrs: &specta::datatype::Attributes,
+    mode: PhaseRewrite,
+    context: &str,
+    container_name: &str,
+) -> Result<Option<RenameRule>> {
+    select_phase_rule(
+        mode,
+        attrs
+            .get::<SerdeContainerAttrs>()
+            .and_then(|container_attrs| container_attrs.rename_all_serialize),
+        attrs
+            .get::<SerdeContainerAttrs>()
+            .and_then(|container_attrs| container_attrs.rename_all_deserialize),
+        context,
+        container_name,
+    )
+}
+
+fn enum_variant_field_rename_rule(
+    container_attrs: &Option<SerdeContainerAttrs>,
+    variant: &Variant,
+    mode: PhaseRewrite,
+    variant_name: &str,
+) -> Result<Option<RenameRule>> {
+    let variant_rule = select_phase_rule(
+        mode,
+        variant
+            .attributes()
+            .get::<SerdeVariantAttrs>()
+            .and_then(|attrs| attrs.rename_all_serialize),
+        variant
+            .attributes()
+            .get::<SerdeVariantAttrs>()
+            .and_then(|attrs| attrs.rename_all_deserialize),
+        "enum variant rename_all",
+        variant_name,
+    )?;
+
+    if variant_rule.is_some() {
+        return Ok(variant_rule);
+    }
+
+    select_phase_rule(
+        mode,
+        container_attrs
+            .as_ref()
+            .and_then(|attrs| attrs.rename_all_fields_serialize),
+        container_attrs
+            .as_ref()
+            .and_then(|attrs| attrs.rename_all_fields_deserialize),
+        "enum rename_all_fields",
+        variant_name,
+    )
 }
 
 fn identifier_union_variant(ty: DataType) -> Variant {

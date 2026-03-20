@@ -176,7 +176,7 @@ Box<String>: export type Box<T> = T;
 SkippedFieldWithinVariant: export type SkippedFieldWithinVariant = { type: "A"; data: null } | { type: "B"; data: string };
 
 KebabCase: export type KebabCase = {
-	test_ing: string,
+	"test-ing": string,
 };
 
 Issue281<'_>: export type Issue281 = {
@@ -255,13 +255,13 @@ Struct2: export type Struct2 = {
 
 Enum: export type Enum = { t: "A" } | { t: "B" };
 
-Enum2: export type Enum2 = ({ t: "C" }) & { enum_field?: never } | ({ t: "B" }) & { enum_field?: never } | { t: "D"; enum_field: null };
+Enum2: export type Enum2 = ({ t: "C" }) & { enumField?: never } | ({ t: "B" }) & { enumField?: never } | { t: "D"; enumField: null };
 
 Enum3: export type Enum3 = { t: "A"; b: string };
 
 StructRenameAllUppercase: export type StructRenameAllUppercase = {
-	a: number,
-	b: number,
+	A: number,
+	B: number,
 };
 
 RenameSerdeSpecialChar: export type RenameSerdeSpecialChar = {
@@ -561,13 +561,13 @@ AdjacentlyTagged: export type AdjacentlyTagged = ({ t: "A" }) & { c?: never } | 
 } } | { t: "C"; c: string };
 
 LoadProjectEvent: export type LoadProjectEvent = { event: "started"; data: {
-	project_name: string,
+	projectName: string,
 } } | { event: "progressTest"; data: {
-	project_name: string,
+	projectName: string,
 	status: string,
 	progress: number,
 } } | { event: "finished"; data: {
-	project_name: string,
+	projectName: string,
 } };
 
 ExternallyTagged: export type ExternallyTagged = "A" | ({ B: {
