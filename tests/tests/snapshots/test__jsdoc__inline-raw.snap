@@ -258,6 +258,18 @@ expression: output
 	*
 	* @typedef {Record<string, never>} EmptyStructWithTag
 	*
+	* @typedef {"A" | "B"} Enum
+	* @property {"A"} A
+	* @property {"B"} B
+	*
+	* @typedef {"A" | "B" | { enum_field: null }} Enum2
+	* @property {"A"} A
+	* @property {"B"} B
+	* @property {{ enum_field: null }} D
+	*
+	* @typedef {{ a: string }} Enum3
+	* @property {{ a: string }} A
+	*
 	* @typedef {string | number | { a: string; b: number }} EnumMacroAttributes
 	* @property {string} A
 	* @property {number} B
@@ -795,6 +807,10 @@ expression: output
 	*		"GenericTupleStruct<String>": GenericTupleStruct<string>,
 	*		BracedStruct: BracedStruct,
 	*		Struct: Struct,
+	*		Struct2: Struct2,
+	*		Enum: Enum,
+	*		Enum2: Enum2,
+	*		Enum3: Enum3,
 	*		StructRenameAllUppercase: StructRenameAllUppercase,
 	*		RenameSerdeSpecialChar: RenameSerdeSpecialChar,
 	*		EnumRenameAllUppercase: EnumRenameAllUppercase,
@@ -1043,6 +1059,10 @@ expression: output
 	* @property {GenericTupleStruct<string>} "GenericTupleStruct<String>"
 	* @property {BracedStruct} BracedStruct
 	* @property {Struct} Struct
+	* @property {Struct2} Struct2
+	* @property {Enum} Enum
+	* @property {Enum2} Enum2
+	* @property {Enum3} Enum3
 	* @property {StructRenameAllUppercase} StructRenameAllUppercase
 	* @property {RenameSerdeSpecialChar} RenameSerdeSpecialChar
 	* @property {EnumRenameAllUppercase} EnumRenameAllUppercase
@@ -1310,6 +1330,11 @@ expression: output
 	* @typedef {{
 	*		a: string,
 	*	}} Struct
+	* @property {string} a
+	*
+	* @typedef {{
+	*		a: string,
+	*	}} Struct2
 	* @property {string} a
 	*
 	* @typedef {{

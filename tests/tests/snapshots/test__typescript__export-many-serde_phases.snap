@@ -249,6 +249,16 @@ export type Struct = {
 	a: string,
 };
 
+export type Struct2 = {
+	b: string,
+};
+
+export type Enum = { t: "A" } | { t: "B" };
+
+export type Enum2 = ({ t: "C" }) & { enum_field?: never } | ({ t: "B" }) & { enum_field?: never } | { t: "D"; enum_field: null };
+
+export type Enum3 = { t: "A"; b: string };
+
 export type StructRenameAllUppercase = {
 	a: number,
 	b: number,

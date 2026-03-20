@@ -209,6 +209,12 @@ Struct: {
 	t: "StructNew",
 	a: string,
 }
+Struct2: {
+	b: string,
+}
+Enum: { t: "A" } | { t: "B" }
+Enum2: ({ t: "C" }) & { enum_field?: never } | ({ t: "B" }) & { enum_field?: never } | { t: "D"; enum_field: null }
+Enum3: { t: "A"; b: string }
 StructRenameAllUppercase: {
 	a: number,
 	b: number,
