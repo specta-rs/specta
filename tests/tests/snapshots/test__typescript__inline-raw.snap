@@ -204,6 +204,9 @@ TupleStruct: string
 TupleStructWithRep: string
 GenericTupleStruct<String>: string
 BracedStruct: string
+Struct: {
+	a: string,
+}
 StructRenameAllUppercase: {
 	a: number,
 	b: number,

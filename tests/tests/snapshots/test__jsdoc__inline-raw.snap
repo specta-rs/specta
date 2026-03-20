@@ -794,6 +794,7 @@ expression: output
 	*		TupleStructWithRep: TupleStructWithRep,
 	*		"GenericTupleStruct<String>": GenericTupleStruct<string>,
 	*		BracedStruct: BracedStruct,
+	*		Struct: Struct,
 	*		StructRenameAllUppercase: StructRenameAllUppercase,
 	*		RenameSerdeSpecialChar: RenameSerdeSpecialChar,
 	*		EnumRenameAllUppercase: EnumRenameAllUppercase,
@@ -1041,6 +1042,7 @@ expression: output
 	* @property {TupleStructWithRep} TupleStructWithRep
 	* @property {GenericTupleStruct<string>} "GenericTupleStruct<String>"
 	* @property {BracedStruct} BracedStruct
+	* @property {Struct} Struct
 	* @property {StructRenameAllUppercase} StructRenameAllUppercase
 	* @property {RenameSerdeSpecialChar} RenameSerdeSpecialChar
 	* @property {EnumRenameAllUppercase} EnumRenameAllUppercase
@@ -1304,6 +1306,11 @@ expression: output
 	* @property {number} u32_ident
 	* @property {string} path
 	* @property {[string, number]} tuple
+	*
+	* @typedef {{
+	*		a: string,
+	*	}} Struct
+	* @property {string} a
 	*
 	* @typedef {{
 	*		a: number,

@@ -243,6 +243,10 @@ export type GenericTupleStruct<T> = T;
 
 export type BracedStruct = string;
 
+export type Struct = {
+	a: string,
+};
+
 export type StructRenameAllUppercase = {
 	a: number,
 	b: number,

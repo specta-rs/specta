@@ -165,12 +165,15 @@ pub fn apply(types: Types) -> Result<ResolvedTypes> {
             return;
         }
 
+        let ndt_name = ndt.name().to_string();
+
         if let Err(err) = rewrite_datatype_for_phase(
             ndt.ty_mut(),
             PhaseRewrite::Unified,
             &types,
             &generated,
             &split_types,
+            Some(ndt_name.as_str()),
         ) {
             rewrite_err = Some(err);
         }
@@ -282,12 +285,21 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
             return;
         }
 
+        let ndt_name = ndt.name().to_string();
+
         let Some(mode) = rewrite_plan.get(&TypeKey::from_ndt(ndt)).copied() else {
             return;
         };
 
         if let Err(err) =
-            rewrite_datatype_for_phase(ndt.ty_mut(), mode, &types, &generated, &split_types)
+            rewrite_datatype_for_phase(
+                ndt.ty_mut(),
+                mode,
+                &types,
+                &generated,
+                &split_types,
+                Some(ndt_name.as_str()),
+            )
         {
             rewrite_err = Some(err);
         }
@@ -384,6 +396,7 @@ fn rewrite_datatype_for_phase(
     original_types: &Types,
     generated: &HashMap<TypeKey, GeneratedTypes>,
     split_types: &HashSet<TypeKey>,
+    container_name: Option<&str>,
 ) -> Result<()> {
     if let Some(resolved) = resolve_phased_type(ty, mode, "type")? {
         *ty = resolved;
@@ -393,11 +406,19 @@ fn rewrite_datatype_for_phase(
         && converted != *ty
     {
         *ty = converted;
-        return rewrite_datatype_for_phase(ty, mode, original_types, generated, split_types);
+        return rewrite_datatype_for_phase(
+            ty,
+            mode,
+            original_types,
+            generated,
+            split_types,
+            container_name,
+        );
     }
 
     match ty {
         DataType::Struct(s) => {
+            rewrite_struct_repr_for_phase(s, mode, container_name)?;
             rewrite_fields_for_phase(s.fields_mut(), mode, original_types, generated, split_types)?
         }
         DataType::Enum(e) => {
@@ -420,11 +441,18 @@ fn rewrite_datatype_for_phase(
         }
         DataType::Tuple(tuple) => {
             for ty in tuple.elements_mut() {
-                rewrite_datatype_for_phase(ty, mode, original_types, generated, split_types)?;
+                rewrite_datatype_for_phase(ty, mode, original_types, generated, split_types, None)?;
             }
         }
         DataType::List(list) => {
-            rewrite_datatype_for_phase(list.ty_mut(), mode, original_types, generated, split_types)?
+            rewrite_datatype_for_phase(
+                list.ty_mut(),
+                mode,
+                original_types,
+                generated,
+                split_types,
+                None,
+            )?
         }
         DataType::Map(map) => {
             rewrite_datatype_for_phase(
@@ -433,6 +461,7 @@ fn rewrite_datatype_for_phase(
                 original_types,
                 generated,
                 split_types,
+                None,
             )?;
             rewrite_datatype_for_phase(
                 map.value_ty_mut(),
@@ -440,10 +469,11 @@ fn rewrite_datatype_for_phase(
                 original_types,
                 generated,
                 split_types,
+                None,
             )?;
         }
         DataType::Nullable(inner) => {
-            rewrite_datatype_for_phase(inner, mode, original_types, generated, split_types)?
+            rewrite_datatype_for_phase(inner, mode, original_types, generated, split_types, None)?
         }
         DataType::Reference(Reference::Named(reference)) => {
             let Some(referenced_ndt) = reference.get(original_types) else {
@@ -457,7 +487,14 @@ fn rewrite_datatype_for_phase(
             let mut generics = Vec::with_capacity(reference.generics().len());
             for (generic, dt) in reference.generics() {
                 let mut dt = dt.clone();
-                rewrite_datatype_for_phase(&mut dt, mode, original_types, generated, split_types)?;
+                rewrite_datatype_for_phase(
+                    &mut dt,
+                    mode,
+                    original_types,
+                    generated,
+                    split_types,
+                    None,
+                )?;
                 generics.push((generic.clone(), dt));
             }
 
@@ -561,8 +598,64 @@ fn rewrite_field_for_phase(
     }
 
     if let Some(ty) = field.ty_mut() {
-        rewrite_datatype_for_phase(ty, mode, original_types, generated, split_types)?;
+        rewrite_datatype_for_phase(ty, mode, original_types, generated, split_types, None)?;
     }
+
+    Ok(())
+}
+
+fn rewrite_struct_repr_for_phase(
+    strct: &mut Struct,
+    mode: PhaseRewrite,
+    container_name: Option<&str>,
+) -> Result<()> {
+    let Some((tag, rename_serialize, rename_deserialize)) = strct
+        .attributes()
+        .get::<SerdeContainerAttrs>()
+        .map(|attrs| {
+            (
+                attrs.tag.clone(),
+                attrs.rename_serialize.clone(),
+                attrs.rename_deserialize.clone(),
+            )
+        })
+    else {
+        return Ok(());
+    };
+
+    let Some(tag) = tag.as_deref() else {
+        return Ok(());
+    };
+
+    let serialized_name = match select_phase_string(
+        mode,
+        rename_serialize.as_deref(),
+        rename_deserialize.as_deref(),
+        "struct rename",
+        container_name.unwrap_or("<anonymous struct>"),
+    )? {
+        Some(rename) => rename.to_string(),
+        None => container_name
+            .map(str::to_owned)
+            .ok_or_else(|| {
+                Error::invalid_phased_type_usage(
+                    "<anonymous struct>",
+                    "`#[serde(tag = ...)]` on structs requires either a named type or `#[serde(rename = ...)]`",
+                )
+            })?,
+    };
+
+    let Fields::Named(named) = strct.fields_mut() else {
+        return Ok(());
+    };
+
+    named.fields_mut().insert(
+        0,
+        (
+            Cow::Owned(tag.to_string()),
+            Field::new(string_literal_datatype(serialized_name)),
+        ),
+    );
 
     Ok(())
 }
@@ -713,6 +806,7 @@ fn rewrite_identifier_enum_for_phase(
             original_types,
             generated,
             split_types,
+            None,
         )?;
         variants.push((
             Cow::Borrowed("__specta_identifier_other"),

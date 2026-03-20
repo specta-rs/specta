@@ -328,6 +328,11 @@ expression: output
 	* @property {string} "0"
 	*
 	* @typedef {{
+	*		a: string,
+	*	}} Struct
+	* @property {string} a
+	*
+	* @typedef {{
 	*		a: number,
 	*		b: number,
 	*	}} StructRenameAllUppercase
