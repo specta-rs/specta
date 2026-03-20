@@ -2,7 +2,9 @@ use std::collections::HashSet;
 
 use specta::{
     Types,
-    datatype::{DataType, Enum, Field, Fields, GenericReference, Primitive, Reference, Variant},
+    datatype::{
+        DataType, Enum, Field, Fields, GenericReference, Primitive, Reference, Struct, Variant,
+    },
 };
 
 use crate::{
@@ -503,6 +505,16 @@ fn is_valid_map_key(
     generics: &[(GenericReference, DataType)],
     path: String,
 ) -> Result<()> {
+    is_valid_map_key_inner(key_ty, types, generics, path, &mut HashSet::new())
+}
+
+fn is_valid_map_key_inner(
+    key_ty: &DataType,
+    types: &Types,
+    generics: &[(GenericReference, DataType)],
+    path: String,
+    visiting_named_refs: &mut HashSet<Reference>,
+) -> Result<()> {
     match key_ty {
         DataType::Primitive(
             Primitive::i8
@@ -569,13 +581,35 @@ fn is_valid_map_key(
 
             Ok(())
         }
-        DataType::Reference(Reference::Named(reference)) => {
-            if let Some(ndt) = reference.get(types) {
-                let merged_generics = merged_generics(generics, reference.generics());
-                is_valid_map_key(ndt.ty(), types, &merged_generics, path)?;
+        DataType::Struct(strct) => {
+            if !is_transparent_struct(strct) {
+                return Err(Error::invalid_map_key(
+                    path,
+                    "key type is not supported by legacy map-key validation rules",
+                ));
             }
 
-            Ok(())
+            let inner_ty = transparent_struct_inner_map_key_ty(strct, &path)?;
+            is_valid_map_key_inner(inner_ty, types, generics, path, visiting_named_refs)
+        }
+        DataType::Reference(Reference::Named(reference)) => {
+            let reference_key = Reference::Named(reference.clone());
+            if !visiting_named_refs.insert(reference_key.clone()) {
+                return Err(Error::invalid_map_key(
+                    path,
+                    "recursive map key reference cycle detected",
+                ));
+            }
+
+            let result = if let Some(ndt) = reference.get(types) {
+                let merged_generics = merged_generics(generics, reference.generics());
+                is_valid_map_key_inner(ndt.ty(), types, &merged_generics, path, visiting_named_refs)
+            } else {
+                Ok(())
+            };
+
+            visiting_named_refs.remove(&reference_key);
+            result
         }
         DataType::Reference(Reference::Generic(generic)) => {
             let Some((_, ty)) = generics.iter().find(|(candidate, _)| candidate == generic) else {
@@ -589,19 +623,61 @@ fn is_valid_map_key(
                 return Ok(());
             }
 
-            is_valid_map_key(ty, types, generics, path)
+            is_valid_map_key_inner(ty, types, generics, path, visiting_named_refs)
         }
         DataType::Reference(Reference::Opaque(_)) => Err(Error::invalid_map_key(
             path,
             "opaque references cannot be map keys",
         )),
-        DataType::List(_) | DataType::Map(_) | DataType::Struct(_) | DataType::Nullable(_) => {
+        DataType::List(_) | DataType::Map(_) | DataType::Nullable(_) => {
             Err(Error::invalid_map_key(
                 path,
                 "key type is not supported by legacy map-key validation rules",
             ))
         }
     }
+}
+
+fn is_transparent_struct(strct: &Struct) -> bool {
+    strct
+        .attributes()
+        .get::<SerdeContainerAttrs>()
+        .is_some_and(|attrs| attrs.transparent)
+}
+
+fn transparent_struct_inner_map_key_ty<'a>(strct: &'a Struct, path: &str) -> Result<&'a DataType> {
+    let mut field_tys = match strct.fields() {
+        Fields::Unit => Vec::new(),
+        Fields::Unnamed(unnamed) => unnamed.fields().iter().filter_map(Field::ty).collect(),
+        Fields::Named(named) => named
+            .fields()
+            .iter()
+            .filter_map(|(_, field)| field.ty())
+            .collect(),
+    };
+
+    if field_tys.is_empty() {
+        return Err(Error::invalid_map_key(
+            path,
+            "transparent map key has no usable field type",
+        ));
+    }
+
+    if field_tys.len() > 1 {
+        return Err(Error::invalid_map_key(
+            path,
+            "transparent map key must resolve to exactly one non-skipped field",
+        ));
+    }
+
+    let Some(field_ty) = field_tys.pop() else {
+        return Err(Error::invalid_map_key(
+            path,
+            "transparent map key must resolve to exactly one non-skipped field",
+        ));
+    };
+
+    Ok(field_ty)
 }
 
 fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Result<()> {

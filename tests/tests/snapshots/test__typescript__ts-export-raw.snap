@@ -389,6 +389,8 @@ export type Inner = {
 
 export type InternallyTaggedWithAlias = ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never };
 
+export type InvalidMaybeValidKey = { [key in MaybeValidKey<null>]: null };
+
 export type InvalidToValidType = {
 	cause: null,
 };
@@ -423,6 +425,8 @@ export type MacroStruct = string;
 export type MacroStruct2 = {
 	demo: string,
 };
+
+export type MaybeValidKey<T> = T;
 
 export type MyEmptyInput = Record<string, never>;
 
@@ -623,8 +627,12 @@ export type Primitives = {
 	"HashMap<String, ()>": { [key in string]: null },
 	Regular: Regular,
 	"HashMap<Infallible, ()>": { [key in never]: null },
+	"HashMap<TransparentStruct, ()>": { [key in TransparentStruct]: null },
 	"HashMap<UnitVariants, ()>": Partial<{ [key in UnitVariants]: null }>,
 	"HashMap<UntaggedVariantsKey, ()>": Partial<{ [key in UntaggedVariantsKey]: null }>,
+	ValidMaybeValidKey: ValidMaybeValidKey,
+	ValidMaybeValidKeyNested: ValidMaybeValidKeyNested,
+	InvalidMaybeValidKey: InvalidMaybeValidKey,
 	MacroStruct: MacroStruct,
 	MacroStruct2: MacroStruct2,
 	MacroEnum: MacroEnum,
@@ -862,6 +870,8 @@ export type ToBeFlattened = {
 	a: string,
 };
 
+export type TransparentStruct = string;
+
 export type TransparentType = TransparentTypeInner;
 
 export type TransparentType2 = null;
@@ -915,3 +925,7 @@ export type UntaggedVariantsWithDuplicateBranches = null | number;
 export type UntaggedVariantsWithoutValue = string | [number, string] | number;
 
 export type UntaggedWithAlias = ({ field: string }) & { other?: never } | ({ other: number }) & { field?: never };
+
+export type ValidMaybeValidKey = { [key in MaybeValidKey<string>]: null };
+
+export type ValidMaybeValidKeyNested = { [key in MaybeValidKey<MaybeValidKey<string>>]: null };

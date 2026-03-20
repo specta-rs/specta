@@ -241,8 +241,12 @@ UntaggedVariantsWithDuplicateBranches: null | number
 HashMap<String, ()>: { [key in string]: null }
 Regular: { [key in string]: null }
 HashMap<Infallible, ()>: { [key in never]: null }
+HashMap<TransparentStruct, ()>: { [key in TransparentStruct]: null }
 HashMap<UnitVariants, ()>: Partial<{ [key in UnitVariants]: null }>
 HashMap<UntaggedVariantsKey, ()>: Partial<{ [key in UntaggedVariantsKey]: null }>
+ValidMaybeValidKey: { [key in MaybeValidKey<string>]: null }
+ValidMaybeValidKeyNested: { [key in MaybeValidKey<MaybeValidKey<string>>]: null }
+InvalidMaybeValidKey: { [key in MaybeValidKey<null>]: null }
 MacroStruct: string
 MacroStruct2: {
 	demo: string,

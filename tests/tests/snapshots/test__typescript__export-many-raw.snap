@@ -306,6 +306,14 @@ export type HashMap<K, V> = { [key in K]: V };
 
 export type HashMap<K, V> = { [key in K]: V };
 
+export type HashMap<K, V> = { [key in K]: V };
+
+export type ValidMaybeValidKey = { [key in MaybeValidKey<string>]: null };
+
+export type ValidMaybeValidKeyNested = { [key in MaybeValidKey<MaybeValidKey<string>>]: null };
+
+export type InvalidMaybeValidKey = { [key in MaybeValidKey<null>]: null };
+
 export type MacroStruct = string;
 
 export type MacroStruct2 = {

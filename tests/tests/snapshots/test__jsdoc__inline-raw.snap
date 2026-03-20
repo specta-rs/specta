@@ -555,6 +555,9 @@ expression: output
 	* @property {{ field: string }} A
 	* @property {{ other: number }} B
 	*
+	* @typedef {{ [key in MaybeValidKey<null>]: null }} InvalidMaybeValidKey
+	* @property {{ [key in MaybeValidKey<null>]: null }} "0"
+	*
 	* @typedef {{
 	*		cause: null,
 	*	}} InvalidToValidType
@@ -610,6 +613,9 @@ expression: output
 	*		demo: string,
 	*	}} MacroStruct2
 	* @property {string} demo
+	*
+	* @typedef {T} MaybeValidKey<T>
+	* @property {T} "0"
 	*
 	* @typedef {Record<string, never>} MyEmptyInput
 	*
@@ -828,8 +834,12 @@ expression: output
 	*		"HashMap<String, ()>": { [key in string]: null },
 	*		Regular: Regular,
 	*		"HashMap<Infallible, ()>": { [key in never]: null },
+	*		"HashMap<TransparentStruct, ()>": { [key in TransparentStruct]: null },
 	*		"HashMap<UnitVariants, ()>": Partial<{ [key in UnitVariants]: null }>,
 	*		"HashMap<UntaggedVariantsKey, ()>": Partial<{ [key in UntaggedVariantsKey]: null }>,
+	*		ValidMaybeValidKey: ValidMaybeValidKey,
+	*		ValidMaybeValidKeyNested: ValidMaybeValidKeyNested,
+	*		InvalidMaybeValidKey: InvalidMaybeValidKey,
 	*		MacroStruct: MacroStruct,
 	*		MacroStruct2: MacroStruct2,
 	*		MacroEnum: MacroEnum,
@@ -1080,8 +1090,12 @@ expression: output
 	* @property {{ [key in string]: null }} "HashMap<String, ()>"
 	* @property {Regular} Regular
 	* @property {{ [key in never]: null }} "HashMap<Infallible, ()>"
+	* @property {{ [key in TransparentStruct]: null }} "HashMap<TransparentStruct, ()>"
 	* @property {Partial<{ [key in UnitVariants]: null }>} "HashMap<UnitVariants, ()>"
 	* @property {Partial<{ [key in UntaggedVariantsKey]: null }>} "HashMap<UntaggedVariantsKey, ()>"
+	* @property {ValidMaybeValidKey} ValidMaybeValidKey
+	* @property {ValidMaybeValidKeyNested} ValidMaybeValidKeyNested
+	* @property {InvalidMaybeValidKey} InvalidMaybeValidKey
 	* @property {MacroStruct} MacroStruct
 	* @property {MacroStruct2} MacroStruct2
 	* @property {MacroEnum} MacroEnum
@@ -1398,6 +1412,9 @@ expression: output
 	*	}} ToBeFlattened
 	* @property {string} a
 	*
+	* @typedef {string} TransparentStruct
+	* @property {string} "0"
+	*
 	* @typedef {TransparentTypeInner} TransparentType
 	* @property {TransparentTypeInner} "0"
 	*
@@ -1490,4 +1507,10 @@ expression: output
 	* @typedef {({ field: string }) & { other?: never } | ({ other: number }) & { field?: never }} UntaggedWithAlias
 	* @property {{ field: string }} A
 	* @property {{ other: number }} B
+	*
+	* @typedef {{ [key in MaybeValidKey<string>]: null }} ValidMaybeValidKey
+	* @property {{ [key in MaybeValidKey<string>]: null }} "0"
+	*
+	* @typedef {{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }} ValidMaybeValidKeyNested
+	* @property {{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }} "0"
 	*/

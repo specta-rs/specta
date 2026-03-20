@@ -119,8 +119,12 @@ UntaggedVariantsWithDuplicateBranches: UntaggedVariantsWithDuplicateBranches
 HashMap<String, ()>: { [key in string]: null }
 Regular: Regular
 HashMap<Infallible, ()>: { [key in never]: null }
+HashMap<TransparentStruct, ()>: { [key in TransparentStruct]: null }
 HashMap<UnitVariants, ()>: Partial<{ [key in UnitVariants]: null }>
 HashMap<UntaggedVariantsKey, ()>: Partial<{ [key in UntaggedVariantsKey]: null }>
+ValidMaybeValidKey: ValidMaybeValidKey
+ValidMaybeValidKeyNested: ValidMaybeValidKeyNested
+InvalidMaybeValidKey: InvalidMaybeValidKey
 MacroStruct: MacroStruct
 MacroStruct2: MacroStruct2
 MacroEnum: MacroEnum

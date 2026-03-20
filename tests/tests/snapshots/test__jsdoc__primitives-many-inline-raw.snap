@@ -426,6 +426,17 @@ expression: output
 	*
 	* @typedef {{ [key in K]: V }} HashMap<K, V>
 	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
+	*
+	* @typedef {{ [key in MaybeValidKey<string>]: null }} ValidMaybeValidKey
+	* @property {{ [key in MaybeValidKey<string>]: null }} "0"
+	*
+	* @typedef {{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }} ValidMaybeValidKeyNested
+	* @property {{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }} "0"
+	*
+	* @typedef {{ [key in MaybeValidKey<null>]: null }} InvalidMaybeValidKey
+	* @property {{ [key in MaybeValidKey<null>]: null }} "0"
+	*
 	* @typedef {string} MacroStruct
 	* @property {string} "0"
 	*

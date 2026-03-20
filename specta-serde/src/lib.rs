@@ -291,16 +291,14 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
             return;
         };
 
-        if let Err(err) =
-            rewrite_datatype_for_phase(
-                ndt.ty_mut(),
-                mode,
-                &types,
-                &generated,
-                &split_types,
-                Some(ndt_name.as_str()),
-            )
-        {
+        if let Err(err) = rewrite_datatype_for_phase(
+            ndt.ty_mut(),
+            mode,
+            &types,
+            &generated,
+            &split_types,
+            Some(ndt_name.as_str()),
+        ) {
             rewrite_err = Some(err);
         }
     });
@@ -440,12 +438,8 @@ fn rewrite_datatype_for_phase(
             let container_attrs = e.attributes().get::<SerdeContainerAttrs>().cloned();
 
             for (variant_name, variant) in e.variants_mut() {
-                let rename_rule = enum_variant_field_rename_rule(
-                    &container_attrs,
-                    variant,
-                    mode,
-                    variant_name,
-                )?;
+                let rename_rule =
+                    enum_variant_field_rename_rule(&container_attrs, variant, mode, variant_name)?;
 
                 rewrite_fields_for_phase(
                     variant.fields_mut(),
@@ -468,16 +462,14 @@ fn rewrite_datatype_for_phase(
                 rewrite_datatype_for_phase(ty, mode, original_types, generated, split_types, None)?;
             }
         }
-        DataType::List(list) => {
-            rewrite_datatype_for_phase(
-                list.ty_mut(),
-                mode,
-                original_types,
-                generated,
-                split_types,
-                None,
-            )?
-        }
+        DataType::List(list) => rewrite_datatype_for_phase(
+            list.ty_mut(),
+            mode,
+            original_types,
+            generated,
+            split_types,
+            None,
+        )?,
         DataType::Map(map) => {
             rewrite_datatype_for_phase(
                 map.key_ty_mut(),
