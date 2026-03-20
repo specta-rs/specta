@@ -1,12 +1,12 @@
 use std::borrow::Cow;
 
 use specta::{
-    datatype::{
-        skip_fields, skip_fields_named, Attribute, AttributeLiteral, AttributeMeta,
-        AttributeNestedMeta, AttributeValue, DataType, Fields, GenericReference, NamedReference,
-        Primitive, Reference,
-    },
     TypeCollection,
+    datatype::{
+        Attribute, AttributeLiteral, AttributeMeta, AttributeNestedMeta, AttributeValue, DataType,
+        Fields, GenericReference, NamedReference, Primitive, Reference, skip_fields,
+        skip_fields_named,
+    },
 };
 
 // TODO: Allow configuring custom named types via NDT name and module path using config params.
@@ -370,7 +370,7 @@ impl Renderer {
             PlanNode::List(inner) => {
                 let item = self.next_ident("item");
                 let inner = self.render(inner, &item);
-                format!("(Array.isArray({input}) ? {input}.map(({item}) => {inner}) : {input})")
+                format!("{input}.map(({item}) => {inner})")
             }
             PlanNode::Tuple(items) => {
                 let rendered = items
@@ -383,7 +383,7 @@ impl Renderer {
                     .collect::<Vec<_>>()
                     .join(", ");
 
-                format!("(Array.isArray({input}) ? [{rendered}] : {input})")
+                format!("[{rendered}]")
             }
             PlanNode::Object(fields) => {
                 let updates = fields
@@ -397,9 +397,7 @@ impl Renderer {
                     .collect::<Vec<_>>()
                     .join(", ");
 
-                format!(
-                    "({input} != null && typeof {input} === \"object\" && !Array.isArray({input}) ? {{ ...{input}, {updates} }} : {input})"
-                )
+                format!("{{ ...{input}, {updates} }}")
             }
             PlanNode::Map(inner) => {
                 let key = self.next_ident("key");
@@ -407,7 +405,7 @@ impl Renderer {
                 let inner = self.render(inner, &value);
 
                 format!(
-                    "({input} != null && typeof {input} === \"object\" && !Array.isArray({input}) ? Object.fromEntries(Object.entries({input}).map(([{key}, {value}]) => [{key}, {inner}])) : {input})"
+                    "Object.fromEntries(Object.entries({input}).map(([{key}, {value}]) => [{key}, {inner}]))"
                 )
             }
             PlanNode::Enum { repr, variants } => self.render_enum(repr, variants, input),
@@ -416,16 +414,9 @@ impl Renderer {
 
     fn render_leaf(&mut self, tag: &Tag, input: &str) -> String {
         match tag {
-            Tag::BigInt => {
-                let raw = self.next_ident("raw");
-                format!(
-                    "(() => {{ const {raw} = {input}; if (typeof {raw} === \"bigint\") return {raw}; if (typeof {raw} === \"number\" && Number.isInteger({raw})) return BigInt({raw}); if (typeof {raw} === \"string\") {{ try {{ return BigInt({raw}); }} catch {{ return {raw}; }} }} return {raw}; }})()"
-                )
-            }
-            Tag::Uint8Array => format!(
-                "(Array.isArray({input}) && {input}.every((v) => typeof v === \"number\") ? Uint8Array.from({input}) : {input})"
-            ),
-            Tag::Date => format!("(typeof {input} === \"string\" ? new Date({input}) : {input})"),
+            Tag::BigInt => format!("BigInt({input})"),
+            Tag::Uint8Array => format!("Uint8Array.from({input})"),
+            Tag::Date => format!("new Date({input})"),
             Tag::Custom(handler) => handler(input).into_owned(),
         }
     }
@@ -622,5 +613,56 @@ fn attribute_value_to_string(value: &AttributeValue) -> Option<String> {
         AttributeValue::Literal(AttributeLiteral::Str(value)) => Some(value.clone()),
         AttributeValue::Expr(value) => Some(value.clone()),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use specta::{Type, TypeCollection};
+
+    use super::TransformPlan;
+
+    #[derive(Type)]
+    struct Inner {
+        bigint: u128,
+        date: chrono::DateTime<chrono::Utc>,
+        bytes: bytes::Bytes,
+    }
+
+    #[derive(Type)]
+    struct Root {
+        bigint: u128,
+        date: chrono::DateTime<chrono::Utc>,
+        bytes: bytes::Bytes,
+        nested: Inner,
+        list: Vec<u128>,
+    }
+
+    #[test]
+    fn map_renders_trusting_transforms() {
+        let mut types = TypeCollection::default();
+        let dt = Root::definition(&mut types);
+        let plan = TransformPlan::analyze(dt, &types);
+        let js = plan.map("v");
+
+        assert!(
+            js.contains("BigInt(v[\"bigint\"])")
+                && js.contains("BigInt(v[\"nested\"][\"bigint\"])")
+        );
+        assert!(
+            js.contains("new Date(v[\"date\"])")
+                && js.contains("new Date(v[\"nested\"][\"date\"])")
+        );
+        assert!(
+            js.contains("Uint8Array.from(v[\"bytes\"])")
+                && js.contains("Uint8Array.from(v[\"nested\"][\"bytes\"])")
+        );
+        assert!(js.contains("v[\"list\"].map((__item"));
+
+        assert!(!js.contains("typeof "));
+        assert!(!js.contains("Array.isArray("));
+        assert!(!js.contains("Number.isInteger("));
+        assert!(!js.contains("try {"));
+        assert!(!js.contains(" catch "));
     }
 }
