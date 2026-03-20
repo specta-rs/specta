@@ -158,7 +158,7 @@ Box<str>: string
 Box<String>: string
 SkippedFieldWithinVariant: { type: "A"; data: null } | { type: "B"; data: string }
 KebabCase: {
-	test_ing: string,
+	"test-ing": string,
 }
 &[&str]: string[]
 Issue281<'_>: {
@@ -213,11 +213,11 @@ Struct2: {
 	b: string,
 }
 Enum: { t: "A" } | { t: "B" }
-Enum2: ({ t: "C" }) & { enum_field?: never } | ({ t: "B" }) & { enum_field?: never } | { t: "D"; enum_field: null }
+Enum2: ({ t: "C" }) & { enumField?: never } | ({ t: "B" }) & { enumField?: never } | { t: "D"; enumField: null }
 Enum3: { t: "A"; b: string }
 StructRenameAllUppercase: {
-	a: number,
-	b: number,
+	A: number,
+	B: number,
 }
 RenameSerdeSpecialChar: {
 	"a/b": number,
@@ -441,13 +441,13 @@ AdjacentlyTagged: ({ t: "A" }) & { c?: never } | { t: "B"; c: {
 	method: string,
 } } | { t: "C"; c: string }
 LoadProjectEvent: { event: "started"; data: {
-	project_name: string,
+	projectName: string,
 } } | { event: "progressTest"; data: {
-	project_name: string,
+	projectName: string,
 	status: string,
 	progress: number,
 } } | { event: "finished"; data: {
-	project_name: string,
+	projectName: string,
 } }
 ExternallyTagged: "A" | ({ B: {
 	id: string,

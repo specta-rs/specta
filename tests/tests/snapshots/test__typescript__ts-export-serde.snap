@@ -205,7 +205,7 @@ export type EmptyStructWithTag = {
 
 export type Enum = { t: "A" } | { t: "B" };
 
-export type Enum2 = ({ t: "C" }) & { enum_field?: never } | ({ t: "B" }) & { enum_field?: never } | { t: "D"; enum_field: null };
+export type Enum2 = ({ t: "C" }) & { enumField?: never } | ({ t: "B" }) & { enumField?: never } | { t: "D"; enumField: null };
 
 export type Enum3 = { t: "A"; b: string };
 
@@ -419,7 +419,7 @@ export type Issue281 = {
 };
 
 export type KebabCase = {
-	test_ing: string,
+	"test-ing": string,
 };
 
 export type LifetimeGenericEnum<T> = ({ Borrowed: T }) & { Owned?: never } | ({ Owned: T }) & { Borrowed?: never };
@@ -430,13 +430,13 @@ export type LifetimeGenericStruct<T> = {
 };
 
 export type LoadProjectEvent = { event: "started"; data: {
-	project_name: string,
+	projectName: string,
 } } | { event: "progressTest"; data: {
-	project_name: string,
+	projectName: string,
 	status: string,
 	progress: number,
 } } | { event: "finished"; data: {
-	project_name: string,
+	projectName: string,
 } };
 
 export type MacroEnum = ({ Demo: string }) & { Demo2?: never } | ({ Demo2: {
@@ -852,8 +852,8 @@ export type Struct2 = {
 };
 
 export type StructRenameAllUppercase = {
-	a: number,
-	b: number,
+	A: number,
+	B: number,
 };
 
 export type StructWithAlias = {
