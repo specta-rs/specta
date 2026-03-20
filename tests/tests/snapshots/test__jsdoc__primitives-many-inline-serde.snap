@@ -339,6 +339,23 @@ expression: output
 	* @property {string} a
 	*
 	* @typedef {{
+	*		b: string,
+	*	}} Struct2
+	* @property {string} b
+	*
+	* @typedef {{ t: "A" } | { t: "B" }} Enum
+	* @property {{ t: "A" }} A
+	* @property {{ t: "B" }} B
+	*
+	* @typedef {({ t: "C" }) & { enum_field?: never } | ({ t: "B" }) & { enum_field?: never } | { t: "D"; enum_field: null }} Enum2
+	* @property {{ t: "C" }} C
+	* @property {{ t: "B" }} B
+	* @property {{ t: "D"; enum_field: null }} D
+	*
+	* @typedef {{ t: "A"; b: string }} Enum3
+	* @property {{ t: "A"; b: string }} A
+	*
+	* @typedef {{
 	*		a: number,
 	*		b: number,
 	*	}} StructRenameAllUppercase

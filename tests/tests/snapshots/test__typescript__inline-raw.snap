@@ -207,6 +207,12 @@ BracedStruct: string
 Struct: {
 	a: string,
 }
+Struct2: {
+	a: string,
+}
+Enum: "A" | "B"
+Enum2: "A" | "B" | { enum_field: null }
+Enum3: { a: string }
 StructRenameAllUppercase: {
 	a: number,
 	b: number,

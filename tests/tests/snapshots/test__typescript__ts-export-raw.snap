@@ -193,6 +193,12 @@ export type EmptyStruct = Record<string, never>;
 
 export type EmptyStructWithTag = Record<string, never>;
 
+export type Enum = "A" | "B";
+
+export type Enum2 = "A" | "B" | { enum_field: null };
+
+export type Enum3 = { a: string };
+
 export type EnumMacroAttributes = string | number | { a: string; b: number };
 
 export type EnumReferenceRecordKey = {
@@ -596,6 +602,10 @@ export type Primitives = {
 	"GenericTupleStruct<String>": GenericTupleStruct<string>,
 	BracedStruct: BracedStruct,
 	Struct: Struct,
+	Struct2: Struct2,
+	Enum: Enum,
+	Enum2: Enum2,
+	Enum3: Enum3,
 	StructRenameAllUppercase: StructRenameAllUppercase,
 	RenameSerdeSpecialChar: RenameSerdeSpecialChar,
 	EnumRenameAllUppercase: EnumRenameAllUppercase,
@@ -803,6 +813,10 @@ export type SpectaTypeOverride = {
 };
 
 export type Struct = {
+	a: string,
+};
+
+export type Struct2 = {
 	a: string,
 };
 

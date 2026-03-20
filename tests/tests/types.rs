@@ -15,7 +15,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use specta::{datatype::DataType, Type, Types};
+use specta::{Type, Types, datatype::DataType};
 
 /// A macro to collect up the types for better testing.
 ///
@@ -236,10 +236,10 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
 
         // `#[serde(rename)]`
         Struct,
-        // Struct2,
-        // Enum,
-        // Enum2,
-        // Enum3, // TODO: Fix these
+        Struct2,
+        Enum,
+        Enum2,
+        Enum3,
         StructRenameAllUppercase,
         RenameSerdeSpecialChar,
         EnumRenameAllUppercase,

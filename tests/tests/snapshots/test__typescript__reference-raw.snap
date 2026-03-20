@@ -98,6 +98,10 @@ TupleStructWithRep: TupleStructWithRep
 GenericTupleStruct<String>: GenericTupleStruct<string>
 BracedStruct: BracedStruct
 Struct: Struct
+Struct2: Struct2
+Enum: Enum
+Enum2: Enum2
+Enum3: Enum3
 StructRenameAllUppercase: StructRenameAllUppercase
 RenameSerdeSpecialChar: RenameSerdeSpecialChar
 EnumRenameAllUppercase: EnumRenameAllUppercase
