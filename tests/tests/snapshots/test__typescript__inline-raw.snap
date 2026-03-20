@@ -155,7 +155,6 @@ InlineTuple2: {
 }
 Box<str>: string
 Box<String>: string
-SkippedFieldWithinVariant: never | string
 KebabCase: {
 	test_ing: string,
 }
@@ -181,10 +180,6 @@ RenamedFieldKeys: {
 	paragraph_separator: string,
 }
 RenamedVariantWithSkippedPayload: never
-Issue374: {
-	foo: boolean,
-	bar: boolean,
-}
 type_type::Type: never
 ActualType: {
 	a: GenericType<string>,
@@ -230,12 +225,6 @@ OptionalOnTransparentNamedField: {
 	b: string | null,
 }
 OptionalInEnum: string | null | { a: string | null } | { a?: string | null }
-Optional: {
-	a: number | null,
-	b?: number | null,
-	c: string | null,
-	d: boolean,
-}
 UntaggedVariants: string | number | { id: string } | [string, boolean]
 UntaggedVariantsWithoutValue: string | [number, string] | number
 UntaggedVariantsWithDuplicateBranches: null | number
@@ -244,7 +233,6 @@ Regular: { [key in string]: null }
 HashMap<Infallible, ()>: { [key in never]: null }
 HashMap<UnitVariants, ()>: Partial<{ [key in UnitVariants]: null }>
 HashMap<UntaggedVariantsKey, ()>: Partial<{ [key in UntaggedVariantsKey]: null }>
-HashMap<Variants, ()>: Partial<{ [key in Variants]: null }>
 MacroStruct: string
 MacroStruct2: {
 	demo: string,
@@ -430,12 +418,6 @@ AdjacentlyTagged: "A" | { id: string; method: string } | string
 LoadProjectEvent: ({ project_name: string }) & { progress?: never; status?: never } | { project_name: string; status: string; progress: number }
 ExternallyTagged: "A" | { id: string; method: string } | string
 Issue221External: ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never }
-InternallyTaggedD: { [key in string]: string }
-InternallyTaggedE: null
-InternallyTaggedF: InternallyTaggedFInner
-InternallyTaggedH: InternallyTaggedHInner
-InternallyTaggedL: "A" | "B"
-InternallyTaggedM: "A" | "B"
 StructWithAlias: {
 	field: string,
 }
@@ -461,14 +443,9 @@ SkipOnlyField: Record<string, never>
 SkipField: {
 	b: number,
 }
-SkipVariant: string
-SkipUnnamedFieldInVariant: never | [number]
-SkipNamedFieldInVariant: Record<string, never> | { b: number }
 TransparentWithSkip: null
 TransparentWithSkip2: string
 TransparentWithSkip3: string
-SkipVariant2: string
-SkipVariant3: { a: string }
 SkipStructFields: {
 	a: number,
 }

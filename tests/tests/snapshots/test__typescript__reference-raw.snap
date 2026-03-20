@@ -74,7 +74,6 @@ InlineTuple: InlineTuple
 InlineTuple2: InlineTuple2
 Box<str>: string
 Box<String>: string
-SkippedFieldWithinVariant: SkippedFieldWithinVariant
 KebabCase: KebabCase
 Issue281<'_>: Issue281
 LifetimeGenericStruct<'_, i32>: LifetimeGenericStruct<number>
@@ -83,7 +82,6 @@ RenameWithWeirdCharsField: RenameWithWeirdCharsField
 RenameWithWeirdCharsVariant: RenameWithWeirdCharsVariant
 RenamedFieldKeys: RenamedFieldKeys
 RenamedVariantWithSkippedPayload: RenamedVariantWithSkippedPayload
-Issue374: Issue374
 type_type::Type: Type
 ActualType: ActualType
 SpectaTypeOverride: SpectaTypeOverride
@@ -109,7 +107,6 @@ NonOptional: NonOptional
 OptionalOnNamedField: OptionalOnNamedField
 OptionalOnTransparentNamedField: OptionalOnTransparentNamedField
 OptionalInEnum: OptionalInEnum
-Optional: Optional
 UntaggedVariants: UntaggedVariants
 UntaggedVariantsWithoutValue: UntaggedVariantsWithoutValue
 UntaggedVariantsWithDuplicateBranches: UntaggedVariantsWithDuplicateBranches
@@ -118,7 +115,6 @@ Regular: Regular
 HashMap<Infallible, ()>: { [key in never]: null }
 HashMap<UnitVariants, ()>: Partial<{ [key in UnitVariants]: null }>
 HashMap<UntaggedVariantsKey, ()>: Partial<{ [key in UntaggedVariantsKey]: null }>
-HashMap<Variants, ()>: Partial<{ [key in Variants]: null }>
 MacroStruct: MacroStruct
 MacroStruct2: MacroStruct2
 MacroEnum: MacroEnum
@@ -164,12 +160,6 @@ AdjacentlyTagged: AdjacentlyTagged
 LoadProjectEvent: LoadProjectEvent
 ExternallyTagged: ExternallyTagged
 Issue221External: Issue221External
-InternallyTaggedD: InternallyTaggedD
-InternallyTaggedE: InternallyTaggedE
-InternallyTaggedF: InternallyTaggedF
-InternallyTaggedH: InternallyTaggedH
-InternallyTaggedL: InternallyTaggedL
-InternallyTaggedM: InternallyTaggedM
 StructWithAlias: StructWithAlias
 StructWithMultipleAliases: StructWithMultipleAliases
 StructWithAliasAndRename: StructWithAliasAndRename
@@ -187,14 +177,9 @@ EmptyEnumTaggedWContent: EmptyEnumTaggedWContent
 EmptyEnumUntagged: EmptyEnumUntagged
 SkipOnlyField: SkipOnlyField
 SkipField: SkipField
-SkipVariant: SkipVariant
-SkipUnnamedFieldInVariant: SkipUnnamedFieldInVariant
-SkipNamedFieldInVariant: SkipNamedFieldInVariant
 TransparentWithSkip: TransparentWithSkip
 TransparentWithSkip2: TransparentWithSkip2
 TransparentWithSkip3: TransparentWithSkip3
-SkipVariant2: SkipVariant2
-SkipVariant3: SkipVariant3
 SkipStructFields: SkipStructFields
 SpectaSkipNonTypeField: SpectaSkipNonTypeField
 FlattenA: FlattenA

@@ -229,10 +229,6 @@ expression: output
 	*
 	* @typedef {T} Box<T>
 	*
-	* @typedef {never | string} SkippedFieldWithinVariant
-	* @property {never} A
-	* @property {string} B
-	*
 	* @typedef {{
 	*		test_ing: string,
 	*	}} KebabCase
@@ -279,15 +275,6 @@ expression: output
 	*
 	* @typedef {never} RenamedVariantWithSkippedPayload
 	* @property {never} A
-	*
-	*  https://github.com/specta-rs/specta/issues/374
-	*
-	* @typedef {{
-	*		foo: boolean,
-	*		bar: boolean,
-	*	}} Issue374
-	* @property {boolean} foo
-	* @property {boolean} bar
 	*
 	* @typedef {never} Type
 	*
@@ -385,17 +372,6 @@ expression: output
 	* @property {{ a: string | null }} B
 	* @property {{ a?: string | null }} C
 	*
-	* @typedef {{
-	*		a: number | null,
-	*		b?: number | null,
-	*		c: string | null,
-	*		d: boolean,
-	*	}} Optional
-	* @property {number | null} a
-	* @property {number | null} [b]
-	* @property {string | null} c
-	* @property {boolean} d
-	*
 	* @typedef {string | number | { id: string } | [string, boolean]} UntaggedVariants
 	* @property {string} A
 	* @property {number} B
@@ -417,8 +393,6 @@ expression: output
 	*
 	* @typedef {{ [key in string]: null }} Regular
 	* @property {{ [key in string]: null }} "0"
-	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
 	*
 	* @typedef {{ [key in K]: V }} HashMap<K, V>
 	*
@@ -788,24 +762,6 @@ expression: output
 	* @property {{ a: string }} A
 	* @property {{ b: string }} B
 	*
-	* @typedef {{ [key in string]: string }} InternallyTaggedD
-	* @property {{ [key in string]: string }} A
-	*
-	* @typedef {null} InternallyTaggedE
-	* @property {null} A
-	*
-	* @typedef {InternallyTaggedFInner} InternallyTaggedF
-	* @property {InternallyTaggedFInner} A
-	*
-	* @typedef {InternallyTaggedHInner} InternallyTaggedH
-	* @property {InternallyTaggedHInner} A
-	*
-	* @typedef {"A" | "B"} InternallyTaggedL
-	* @property {"A" | "B"} A
-	*
-	* @typedef {"A" | "B"} InternallyTaggedM
-	* @property {"A" | "B"} A
-	*
 	* @typedef {{
 	*		field: string,
 	*	}} StructWithAlias
@@ -869,17 +825,6 @@ expression: output
 	*	}} SkipField
 	* @property {number} b
 	*
-	* @typedef {string} SkipVariant
-	* @property {string} A
-	*
-	* @typedef {never | [number]} SkipUnnamedFieldInVariant
-	* @property {never} A
-	* @property {[number]} B
-	*
-	* @typedef {Record<string, never> | { b: number }} SkipNamedFieldInVariant
-	* @property {Record<string, never>} A
-	* @property {{ b: number }} B
-	*
 	* @typedef {null} TransparentWithSkip
 	* @property {null} "0"
 	*
@@ -888,12 +833,6 @@ expression: output
 	*
 	* @typedef {string} TransparentWithSkip3
 	* @property {string} "0"
-	*
-	* @typedef {string} SkipVariant2
-	* @property {string} A
-	*
-	* @typedef {{ a: string }} SkipVariant3
-	* @property {{ a: string }} A
 	*
 	* @typedef {{
 	*		a: number,

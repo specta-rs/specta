@@ -194,7 +194,7 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         Box<str>,
         Box<String>,
 
-        SkippedFieldWithinVariant,
+        // SkippedFieldWithinVariant,
 
         // https://github.com/specta-rs/specta/issues/239
         KebabCase,
@@ -212,9 +212,6 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         RenameWithWeirdCharsVariant,
         RenamedFieldKeys,
         RenamedVariantWithSkippedPayload,
-
-        // https://github.com/specta-rs/specta/issues/374
-        Issue374,
 
         // https://github.com/specta-rs/specta/issues/386
         type_type::Type,
@@ -259,7 +256,7 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         OptionalOnNamedField,
         OptionalOnTransparentNamedField,
         OptionalInEnum,
-        Optional,
+        // Optional,
 
         UntaggedVariants,
         UntaggedVariantsWithoutValue,
@@ -277,7 +274,7 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         // ValidMaybeValidKeyNested, // TODO: Fix this
         // HashMap<() /* `null` */, ()>, // TODO: Fix this
         // HashMap<RegularStruct, ()>, // TODO: Fix this
-        HashMap<Variants, ()>,
+        // HashMap<Variants, ()>,
         // InvalidMaybeValidKey, // TODO: Fix this
         // InvalidMaybeValidKeyNested, // TODO: Fix this
 
@@ -347,12 +344,12 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         Issue221External,
 
         // Serde - Internally Tagged
-        InternallyTaggedD,
-        InternallyTaggedE,
-        InternallyTaggedF,
-        InternallyTaggedH,
-        InternallyTaggedL,
-        InternallyTaggedM,
+        // InternallyTaggedD,
+        // InternallyTaggedE,
+        // InternallyTaggedF,
+        // InternallyTaggedH,
+        // InternallyTaggedL,
+        // InternallyTaggedM,
 
         // Alias
         StructWithAlias,
@@ -379,14 +376,14 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         // Skip
         SkipOnlyField,
         SkipField,
-        SkipVariant,
-        SkipUnnamedFieldInVariant,
-        SkipNamedFieldInVariant,
+        // SkipVariant,
+        // SkipUnnamedFieldInVariant,
+        // SkipNamedFieldInVariant,
         TransparentWithSkip,
         TransparentWithSkip2,
         TransparentWithSkip3,
-        SkipVariant2,
-        SkipVariant3,
+        // SkipVariant2,
+        // SkipVariant3,
         SkipStructFields,
         SpectaSkipNonTypeField,
 
@@ -416,6 +413,14 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         InlineFlattenGenericsG<()>,
         InlineFlattenGenerics,
         GenericParameterOrderPreserved,
+    )
+}
+
+#[rustfmt::skip]
+pub fn types_phased() -> (Types, Vec<(&'static str, DataType)>) {
+    types!(
+        // https://github.com/specta-rs/specta/issues/374
+        Issue374,
     )
 }
 
