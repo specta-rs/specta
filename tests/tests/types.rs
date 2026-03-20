@@ -194,7 +194,7 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         Box<str>,
         Box<String>,
 
-        // SkippedFieldWithinVariant,
+        SkippedFieldWithinVariant,
 
         // https://github.com/specta-rs/specta/issues/239
         KebabCase,

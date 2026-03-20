@@ -173,6 +173,8 @@ export type Box<T> = T;
 
 export type Box<T> = T;
 
+export type SkippedFieldWithinVariant = { type: "A"; data: null } | { type: "B"; data: string };
+
 export type KebabCase = {
 	test_ing: string,
 };

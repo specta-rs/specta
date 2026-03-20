@@ -770,6 +770,7 @@ expression: output
 	*		InlineTuple2: InlineTuple2,
 	*		"Box<str>": string,
 	*		"Box<String>": string,
+	*		SkippedFieldWithinVariant: SkippedFieldWithinVariant,
 	*		KebabCase: KebabCase,
 	*		"&[&str]": string[],
 	*		"Issue281<'_>": Issue281,
@@ -1016,6 +1017,7 @@ expression: output
 	* @property {InlineTuple2} InlineTuple2
 	* @property {string} "Box<str>"
 	* @property {string} "Box<String>"
+	* @property {SkippedFieldWithinVariant} SkippedFieldWithinVariant
 	* @property {KebabCase} KebabCase
 	* @property {string[]} "&[&str]"
 	* @property {Issue281} "Issue281<'_>"
@@ -1282,6 +1284,10 @@ expression: output
 	*		a: number,
 	*	}} SkipStructFields
 	* @property {number} a
+	*
+	* @typedef {never | string} SkippedFieldWithinVariant
+	* @property {never} A
+	* @property {string} B
 	*
 	* @typedef {{
 	*		a: number,

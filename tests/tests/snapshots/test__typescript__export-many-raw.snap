@@ -172,6 +172,8 @@ export type Box<T> = T;
 
 export type Box<T> = T;
 
+export type SkippedFieldWithinVariant = never | string;
+
 export type KebabCase = {
 	test_ing: string,
 };

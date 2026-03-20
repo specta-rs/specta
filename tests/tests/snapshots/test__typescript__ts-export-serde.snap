@@ -598,6 +598,7 @@ export type Primitives = {
 	InlineTuple2: InlineTuple2,
 	"Box<str>": string,
 	"Box<String>": string,
+	SkippedFieldWithinVariant: SkippedFieldWithinVariant,
 	KebabCase: KebabCase,
 	"&[&str]": string[],
 	"Issue281<'_>": Issue281,
@@ -814,6 +815,8 @@ export type SkipOnlyField = Record<string, never>;
 export type SkipStructFields = {
 	a: number,
 };
+
+export type SkippedFieldWithinVariant = { type: "A"; data: null } | { type: "B"; data: string };
 
 export type SpectaSkipNonTypeField = {
 	a: number,
