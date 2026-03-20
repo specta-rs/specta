@@ -256,7 +256,7 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         OptionalOnNamedField,
         OptionalOnTransparentNamedField,
         OptionalInEnum,
-        // Optional,
+        // Optional, // TODO: Fix this
 
         UntaggedVariants,
         UntaggedVariantsWithoutValue,
@@ -266,17 +266,13 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         HashMap<String, ()>,
         Regular,
         HashMap<Infallible, ()>,
-        // HashMap<Any, ()>, // TODO: Fix this
-        // HashMap<TransparentStruct, ()>, // TODO: Fix this
+        HashMap<TransparentStruct, ()>,
         HashMap<UnitVariants, ()>,
         HashMap<UntaggedVariantsKey, ()>,
-        // ValidMaybeValidKey, // TODO: Fix this
-        // ValidMaybeValidKeyNested, // TODO: Fix this
-        // HashMap<() /* `null` */, ()>, // TODO: Fix this
-        // HashMap<RegularStruct, ()>, // TODO: Fix this
-        // HashMap<Variants, ()>,
-        // InvalidMaybeValidKey, // TODO: Fix this
-        // InvalidMaybeValidKeyNested, // TODO: Fix this
+        ValidMaybeValidKey,
+        ValidMaybeValidKeyNested,
+        InvalidMaybeValidKey, // TODO: Fix these
+        InvalidMaybeValidKeyNested,
 
         // `macro_rules!` in decl
         MacroStruct,
