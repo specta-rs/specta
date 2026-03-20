@@ -1,8 +1,5 @@
 use specta::{Type, TypeCollection};
 
-// TODO: Handle arrays
-// TODO: Handle enums
-
 #[derive(Type)]
 pub struct A {
     bigint: u128,
@@ -22,7 +19,7 @@ fn main() {
     let mut types = TypeCollection::default();
     let dt = A::definition(&mut types);
 
-    let tags = specta_tags::v2::Tags::analyze(dt, &types);
+    let tags = specta_tags::v2::TransformPlan::analyze(dt, &types);
     println!("--- PLAN ---\n{tags:?}");
     // This would be emitted for each Tauri Specta command.
     println!("--- RESULT ---\n result.then((v) => {})", tags.map("v"));
