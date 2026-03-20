@@ -539,38 +539,6 @@ expression: output
 	* @property {number} a
 	* @property {FlattenedInner} b
 	*
-	* @typedef {{ [key in string]: string }} InternallyTaggedD
-	* @property {{ [key in string]: string }} A
-	*
-	* @typedef {null} InternallyTaggedE
-	* @property {null} A
-	*
-	* @typedef {InternallyTaggedFInner} InternallyTaggedF
-	* @property {InternallyTaggedFInner} A
-	*
-	* @typedef {null} InternallyTaggedFInner
-	* @property {null} A
-	*
-	* @typedef {InternallyTaggedHInner} InternallyTaggedH
-	* @property {InternallyTaggedHInner} A
-	*
-	* @typedef {null} InternallyTaggedHInner
-	* @property {null} "0"
-	*
-	* @typedef {"A" | "B"} InternallyTaggedL
-	* @property {"A" | "B"} A
-	*
-	* @typedef {"A" | "B"} InternallyTaggedLInner
-	* @property {"A"} A
-	* @property {"B"} B
-	*
-	* @typedef {"A" | "B"} InternallyTaggedM
-	* @property {"A" | "B"} A
-	*
-	* @typedef {"A" | "B"} InternallyTaggedMInner
-	* @property {"A"} A
-	* @property {"B"} B
-	*
 	* @typedef {({ field: string }) & { other?: never } | ({ other: number }) & { field?: never }} InternallyTaggedWithAlias
 	* @property {{ field: string }} A
 	* @property {{ other: number }} B
@@ -597,15 +565,6 @@ expression: output
 	*		default_unity_arguments: string[],
 	*	}} Issue281
 	* @property {string[]} default_unity_arguments
-	*
-	*  https://github.com/specta-rs/specta/issues/374
-	*
-	* @typedef {{
-	*		foo: boolean,
-	*		bar: boolean,
-	*	}} Issue374
-	* @property {boolean} foo
-	* @property {boolean} bar
 	*
 	* @typedef {{
 	*		test_ing: string,
@@ -664,17 +623,6 @@ expression: output
 	*
 	* @typedef {string | null} NonOptional
 	* @property {string | null} "0"
-	*
-	* @typedef {{
-	*		a: number | null,
-	*		b?: number | null,
-	*		c: string | null,
-	*		d: boolean,
-	*	}} Optional
-	* @property {number | null} a
-	* @property {number | null} [b]
-	* @property {string | null} c
-	* @property {boolean} d
 	*
 	* @typedef {string | null | { a: string | null } | { a?: string | null }} OptionalInEnum
 	* @property {string | null} A
@@ -822,7 +770,6 @@ expression: output
 	*		InlineTuple2: InlineTuple2,
 	*		"Box<str>": string,
 	*		"Box<String>": string,
-	*		SkippedFieldWithinVariant: SkippedFieldWithinVariant,
 	*		KebabCase: KebabCase,
 	*		"&[&str]": string[],
 	*		"Issue281<'_>": Issue281,
@@ -832,7 +779,6 @@ expression: output
 	*		RenameWithWeirdCharsVariant: RenameWithWeirdCharsVariant,
 	*		RenamedFieldKeys: RenamedFieldKeys,
 	*		RenamedVariantWithSkippedPayload: RenamedVariantWithSkippedPayload,
-	*		Issue374: Issue374,
 	*		"type_type::Type": Type,
 	*		ActualType: ActualType,
 	*		SpectaTypeOverride: SpectaTypeOverride,
@@ -858,7 +804,6 @@ expression: output
 	*		OptionalOnNamedField: OptionalOnNamedField,
 	*		OptionalOnTransparentNamedField: OptionalOnTransparentNamedField,
 	*		OptionalInEnum: OptionalInEnum,
-	*		Optional: Optional,
 	*		UntaggedVariants: UntaggedVariants,
 	*		UntaggedVariantsWithoutValue: UntaggedVariantsWithoutValue,
 	*		UntaggedVariantsWithDuplicateBranches: UntaggedVariantsWithDuplicateBranches,
@@ -867,7 +812,6 @@ expression: output
 	*		"HashMap<Infallible, ()>": { [key in never]: null },
 	*		"HashMap<UnitVariants, ()>": Partial<{ [key in UnitVariants]: null }>,
 	*		"HashMap<UntaggedVariantsKey, ()>": Partial<{ [key in UntaggedVariantsKey]: null }>,
-	*		"HashMap<Variants, ()>": Partial<{ [key in Variants]: null }>,
 	*		MacroStruct: MacroStruct,
 	*		MacroStruct2: MacroStruct2,
 	*		MacroEnum: MacroEnum,
@@ -913,12 +857,6 @@ expression: output
 	*		LoadProjectEvent: LoadProjectEvent,
 	*		ExternallyTagged: ExternallyTagged,
 	*		Issue221External: Issue221External,
-	*		InternallyTaggedD: InternallyTaggedD,
-	*		InternallyTaggedE: InternallyTaggedE,
-	*		InternallyTaggedF: InternallyTaggedF,
-	*		InternallyTaggedH: InternallyTaggedH,
-	*		InternallyTaggedL: InternallyTaggedL,
-	*		InternallyTaggedM: InternallyTaggedM,
 	*		StructWithAlias: StructWithAlias,
 	*		StructWithMultipleAliases: StructWithMultipleAliases,
 	*		StructWithAliasAndRename: StructWithAliasAndRename,
@@ -936,14 +874,9 @@ expression: output
 	*		EmptyEnumUntagged: EmptyEnumUntagged,
 	*		SkipOnlyField: SkipOnlyField,
 	*		SkipField: SkipField,
-	*		SkipVariant: SkipVariant,
-	*		SkipUnnamedFieldInVariant: SkipUnnamedFieldInVariant,
-	*		SkipNamedFieldInVariant: SkipNamedFieldInVariant,
 	*		TransparentWithSkip: TransparentWithSkip,
 	*		TransparentWithSkip2: TransparentWithSkip2,
 	*		TransparentWithSkip3: TransparentWithSkip3,
-	*		SkipVariant2: SkipVariant2,
-	*		SkipVariant3: SkipVariant3,
 	*		SkipStructFields: SkipStructFields,
 	*		SpectaSkipNonTypeField: SpectaSkipNonTypeField,
 	*		FlattenA: FlattenA,
@@ -1083,7 +1016,6 @@ expression: output
 	* @property {InlineTuple2} InlineTuple2
 	* @property {string} "Box<str>"
 	* @property {string} "Box<String>"
-	* @property {SkippedFieldWithinVariant} SkippedFieldWithinVariant
 	* @property {KebabCase} KebabCase
 	* @property {string[]} "&[&str]"
 	* @property {Issue281} "Issue281<'_>"
@@ -1093,7 +1025,6 @@ expression: output
 	* @property {RenameWithWeirdCharsVariant} RenameWithWeirdCharsVariant
 	* @property {RenamedFieldKeys} RenamedFieldKeys
 	* @property {RenamedVariantWithSkippedPayload} RenamedVariantWithSkippedPayload
-	* @property {Issue374} Issue374
 	* @property {Type} "type_type::Type"
 	* @property {ActualType} ActualType
 	* @property {SpectaTypeOverride} SpectaTypeOverride
@@ -1119,7 +1050,6 @@ expression: output
 	* @property {OptionalOnNamedField} OptionalOnNamedField
 	* @property {OptionalOnTransparentNamedField} OptionalOnTransparentNamedField
 	* @property {OptionalInEnum} OptionalInEnum
-	* @property {Optional} Optional
 	* @property {UntaggedVariants} UntaggedVariants
 	* @property {UntaggedVariantsWithoutValue} UntaggedVariantsWithoutValue
 	* @property {UntaggedVariantsWithDuplicateBranches} UntaggedVariantsWithDuplicateBranches
@@ -1128,7 +1058,6 @@ expression: output
 	* @property {{ [key in never]: null }} "HashMap<Infallible, ()>"
 	* @property {Partial<{ [key in UnitVariants]: null }>} "HashMap<UnitVariants, ()>"
 	* @property {Partial<{ [key in UntaggedVariantsKey]: null }>} "HashMap<UntaggedVariantsKey, ()>"
-	* @property {Partial<{ [key in Variants]: null }>} "HashMap<Variants, ()>"
 	* @property {MacroStruct} MacroStruct
 	* @property {MacroStruct2} MacroStruct2
 	* @property {MacroEnum} MacroEnum
@@ -1174,12 +1103,6 @@ expression: output
 	* @property {LoadProjectEvent} LoadProjectEvent
 	* @property {ExternallyTagged} ExternallyTagged
 	* @property {Issue221External} Issue221External
-	* @property {InternallyTaggedD} InternallyTaggedD
-	* @property {InternallyTaggedE} InternallyTaggedE
-	* @property {InternallyTaggedF} InternallyTaggedF
-	* @property {InternallyTaggedH} InternallyTaggedH
-	* @property {InternallyTaggedL} InternallyTaggedL
-	* @property {InternallyTaggedM} InternallyTaggedM
 	* @property {StructWithAlias} StructWithAlias
 	* @property {StructWithMultipleAliases} StructWithMultipleAliases
 	* @property {StructWithAliasAndRename} StructWithAliasAndRename
@@ -1197,14 +1120,9 @@ expression: output
 	* @property {EmptyEnumUntagged} EmptyEnumUntagged
 	* @property {SkipOnlyField} SkipOnlyField
 	* @property {SkipField} SkipField
-	* @property {SkipVariant} SkipVariant
-	* @property {SkipUnnamedFieldInVariant} SkipUnnamedFieldInVariant
-	* @property {SkipNamedFieldInVariant} SkipNamedFieldInVariant
 	* @property {TransparentWithSkip} TransparentWithSkip
 	* @property {TransparentWithSkip2} TransparentWithSkip2
 	* @property {TransparentWithSkip3} TransparentWithSkip3
-	* @property {SkipVariant2} SkipVariant2
-	* @property {SkipVariant3} SkipVariant3
 	* @property {SkipStructFields} SkipStructFields
 	* @property {SpectaSkipNonTypeField} SpectaSkipNonTypeField
 	* @property {FlattenA} FlattenA
@@ -1358,33 +1276,12 @@ expression: output
 	*	}} SkipField
 	* @property {number} b
 	*
-	* @typedef {Record<string, never> | { b: number }} SkipNamedFieldInVariant
-	* @property {Record<string, never>} A
-	* @property {{ b: number }} B
-	*
 	* @typedef {Record<string, never>} SkipOnlyField
 	*
 	* @typedef {{
 	*		a: number,
 	*	}} SkipStructFields
 	* @property {number} a
-	*
-	* @typedef {never | [number]} SkipUnnamedFieldInVariant
-	* @property {never} A
-	* @property {[number]} B
-	*
-	* @typedef {string} SkipVariant
-	* @property {string} A
-	*
-	* @typedef {string} SkipVariant2
-	* @property {string} A
-	*
-	* @typedef {{ a: string }} SkipVariant3
-	* @property {{ a: string }} A
-	*
-	* @typedef {never | string} SkippedFieldWithinVariant
-	* @property {never} A
-	* @property {string} B
 	*
 	* @typedef {{
 	*		a: number,
@@ -1555,9 +1452,4 @@ expression: output
 	* @typedef {({ field: string }) & { other?: never } | ({ other: number }) & { field?: never }} UntaggedWithAlias
 	* @property {{ field: string }} A
 	* @property {{ other: number }} B
-	*
-	* @typedef {string | number} Variants
-	* @property {string} A
-	* @property {number} B
-	* @property {number} C
 	*/

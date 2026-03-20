@@ -172,8 +172,6 @@ Box<str>: export type Box<T> = T;
 
 Box<String>: export type Box<T> = T;
 
-SkippedFieldWithinVariant: export type SkippedFieldWithinVariant = never | string;
-
 KebabCase: export type KebabCase = {
 	test_ing: string,
 };
@@ -205,12 +203,6 @@ RenamedFieldKeys: export type RenamedFieldKeys = {
 };
 
 RenamedVariantWithSkippedPayload: export type RenamedVariantWithSkippedPayload = never;
-
-Issue374: // https://github.com/specta-rs/specta/issues/374
-export type Issue374 = {
-	foo: boolean,
-	bar: boolean,
-};
 
 type_type::Type: export type Type = never;
 
@@ -282,13 +274,6 @@ OptionalOnTransparentNamedField: export type OptionalOnTransparentNamedField = {
 
 OptionalInEnum: export type OptionalInEnum = string | null | { a: string | null } | { a?: string | null };
 
-Optional: export type Optional = {
-	a: number | null,
-	b?: number | null,
-	c: string | null,
-	d: boolean,
-};
-
 UntaggedVariants: export type UntaggedVariants = string | number | { id: string } | [string, boolean];
 
 UntaggedVariantsWithoutValue: export type UntaggedVariantsWithoutValue = string | [number, string] | number;
@@ -304,8 +289,6 @@ HashMap<Infallible, ()>: export type HashMap<K, V> = { [key in K]: V };
 HashMap<UnitVariants, ()>: export type HashMap<K, V> = { [key in K]: V };
 
 HashMap<UntaggedVariantsKey, ()>: export type HashMap<K, V> = { [key in K]: V };
-
-HashMap<Variants, ()>: export type HashMap<K, V> = { [key in K]: V };
 
 MacroStruct: export type MacroStruct = string;
 
@@ -552,18 +535,6 @@ ExternallyTagged: export type ExternallyTagged = "A" | { id: string; method: str
 
 Issue221External: export type Issue221External = ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never };
 
-InternallyTaggedD: export type InternallyTaggedD = { [key in string]: string };
-
-InternallyTaggedE: export type InternallyTaggedE = null;
-
-InternallyTaggedF: export type InternallyTaggedF = InternallyTaggedFInner;
-
-InternallyTaggedH: export type InternallyTaggedH = InternallyTaggedHInner;
-
-InternallyTaggedL: export type InternallyTaggedL = "A" | "B";
-
-InternallyTaggedM: export type InternallyTaggedM = "A" | "B";
-
 StructWithAlias: export type StructWithAlias = {
 	field: string,
 };
@@ -606,21 +577,11 @@ SkipField: export type SkipField = {
 	b: number,
 };
 
-SkipVariant: export type SkipVariant = string;
-
-SkipUnnamedFieldInVariant: export type SkipUnnamedFieldInVariant = never | [number];
-
-SkipNamedFieldInVariant: export type SkipNamedFieldInVariant = Record<string, never> | { b: number };
-
 TransparentWithSkip: export type TransparentWithSkip = null;
 
 TransparentWithSkip2: export type TransparentWithSkip2 = string;
 
 TransparentWithSkip3: export type TransparentWithSkip3 = string;
-
-SkipVariant2: export type SkipVariant2 = string;
-
-SkipVariant3: export type SkipVariant3 = { a: string };
 
 SkipStructFields: export type SkipStructFields = {
 	a: number,
