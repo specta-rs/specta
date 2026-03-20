@@ -155,6 +155,7 @@ InlineTuple2: {
 }
 Box<str>: string
 Box<String>: string
+SkippedFieldWithinVariant: never | string
 KebabCase: {
 	test_ing: string,
 }

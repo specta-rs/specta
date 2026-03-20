@@ -229,6 +229,10 @@ expression: output
 	*
 	* @typedef {T} Box<T>
 	*
+	* @typedef {never | string} SkippedFieldWithinVariant
+	* @property {never} A
+	* @property {string} B
+	*
 	* @typedef {{
 	*		test_ing: string,
 	*	}} KebabCase

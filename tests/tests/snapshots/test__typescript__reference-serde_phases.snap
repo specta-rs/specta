@@ -74,6 +74,7 @@ InlineTuple: InlineTuple
 InlineTuple2: InlineTuple2
 Box<str>: string
 Box<String>: string
+SkippedFieldWithinVariant: SkippedFieldWithinVariant
 KebabCase: KebabCase
 Issue281<'_>: Issue281
 LifetimeGenericStruct<'_, i32>: LifetimeGenericStruct<number>

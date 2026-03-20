@@ -233,6 +233,10 @@ expression: output
 	*
 	* @typedef {T} Box<T>
 	*
+	* @typedef {{ type: "A"; data: null } | { type: "B"; data: string }} SkippedFieldWithinVariant
+	* @property {{ type: "A"; data: null }} A
+	* @property {{ type: "B"; data: string }} B
+	*
 	* @typedef {{
 	*		test_ing: string,
 	*	}} KebabCase
