@@ -1,10 +1,10 @@
 use std::{iter, path::Path};
 
 use specta::{
-    ResolvedTypes, Type, Types,
     datatype::{DataType, Reference},
+    ResolvedTypes, Type, Types,
 };
-use specta_typescript::{BigIntExportBehavior, Layout, Typescript, primitives};
+use specta_typescript::{primitives, BigIntExportBehavior, Layout, Typescript};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -216,19 +216,19 @@ fn typescript_export_serde_errors() {
         "Invalid internally tagged enum",
         true,
     );
-    // assert_serde_error::<InternallyTaggedI>(
-    //     &mut failures,
-    //     "InternallyTaggedI",
-    //     "Invalid internally tagged enum",
-    //     false,
-    // );
+    assert_serde_error::<InternallyTaggedI>(
+        &mut failures,
+        "InternallyTaggedI",
+        "Invalid internally tagged enum",
+        true,
+    );
 
-    // assert_serde_error::<TaggedEnumOfEmptyTupleStruct>(
-    //     &mut failures,
-    //     "TaggedEnumOfEmptyTupleStruct",
-    //     "Invalid internally tagged enum",
-    //     false,
-    // );
+    assert_serde_error::<TaggedEnumOfEmptyTupleStruct>(
+        &mut failures,
+        "TaggedEnumOfEmptyTupleStruct",
+        "Invalid internally tagged enum",
+        true,
+    );
     assert_serde_error::<SkipOnlyVariantExternallyTagged>(
         &mut failures,
         "SkipOnlyVariantExternallyTagged",
