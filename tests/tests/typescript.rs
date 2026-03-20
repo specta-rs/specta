@@ -64,12 +64,7 @@ fn typescript_export() {
 
 #[test]
 fn typescript_export_serde_errors() {
-    fn assert_serde_error<T: Type>(
-        failures: &mut Vec<String>,
-        name: &str,
-        expected_error: &str,
-        expect_apply_error: bool,
-    ) {
+    fn assert_serde_error<T: Type>(failures: &mut Vec<String>, name: &str, expected_error: &str) {
         let types = Types::default().register::<T>();
         for (mode, output) in [
             (
@@ -90,21 +85,12 @@ fn typescript_export_serde_errors() {
             ),
         ] {
             match output {
-                Err(err) => {
-                    if mode == "serde" && !expect_apply_error {
-                        failures.push(format!("{name} ({mode}): expected success, got '{err}'"));
-                    } else if !err.to_string().contains(expected_error) {
-                        failures.push(format!(
-                            "{name} ({mode}): expected error containing '{expected_error}', got '{err}'"
-                        ));
-                    }
-                }
-                Ok(Ok(_)) if mode == "serde" && !expect_apply_error => {}
+                Err(err) if !err.to_string().contains(expected_error) => failures.push(format!(
+                    "{name} ({mode}): expected error containing '{expected_error}', got '{err}'"
+                )),
+                Err(_) => {}
                 Ok(Err(err)) => failures.push(format!(
                     "{name} ({mode}): expected serde error but export failed with '{err}'"
-                )),
-                Ok(Ok(output)) if mode == "serde" && expect_apply_error => failures.push(format!(
-                    "{name} ({mode}): expected serde error, got output: {output}"
                 )),
                 Ok(Ok(output)) => failures.push(format!(
                     "{name} ({mode}): expected serde error, got output: {output}"
@@ -202,56 +188,47 @@ fn typescript_export_serde_errors() {
         &mut failures,
         "InternallyTaggedB",
         "Invalid internally tagged enum",
-        true,
     );
     assert_serde_error::<InternallyTaggedC>(
         &mut failures,
         "InternallyTaggedC",
         "Invalid internally tagged enum",
-        true,
     );
     assert_serde_error::<InternallyTaggedG>(
         &mut failures,
         "InternallyTaggedG",
         "Invalid internally tagged enum",
-        true,
     );
     assert_serde_error::<InternallyTaggedI>(
         &mut failures,
         "InternallyTaggedI",
         "Invalid internally tagged enum",
-        true,
     );
 
     assert_serde_error::<TaggedEnumOfEmptyTupleStruct>(
         &mut failures,
         "TaggedEnumOfEmptyTupleStruct",
         "Invalid internally tagged enum",
-        true,
     );
     assert_serde_error::<SkipOnlyVariantExternallyTagged>(
         &mut failures,
         "SkipOnlyVariantExternallyTagged",
         "Invalid usage of #[serde(skip)]",
-        true,
     );
     assert_serde_error::<SkipOnlyVariantInternallyTagged>(
         &mut failures,
         "SkipOnlyVariantInternallyTagged",
         "Invalid usage of #[serde(skip)]",
-        true,
     );
     assert_serde_error::<SkipOnlyVariantAdjacentlyTagged>(
         &mut failures,
         "SkipOnlyVariantAdjacentlyTagged",
         "Invalid usage of #[serde(skip)]",
-        true,
     );
     assert_serde_error::<SkipOnlyVariantUntagged>(
         &mut failures,
         "SkipOnlyVariantUntagged",
         "Invalid usage of #[serde(skip)]",
-        true,
     );
 
     assert!(
