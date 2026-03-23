@@ -11,7 +11,7 @@ path = "tests/mod.rs"
 harness = true
 
 [dependencies]
-specta = { path = "../specta", features = ["function", "std", "derive", "serde_json", "serde_yaml", "toml", "chrono", "either", "error-stack", "ulid", "glam", "ordered-float", "heapless", "semver", "smol_str", "arrayvec", "smallvec"] }
+specta = { path = "../specta", features = ["function", "std", "derive", "serde_json", "serde_yaml", "toml", "chrono", "either", "error-stack", "ulid", "glam", "ordered-float", "heapless", "semver", "smol_str", "arrayvec", "smallvec", "geojson"] }
 specta-serde = { path = "../specta-serde" }
 specta-typescript = { path = "../specta-typescript" }
 specta-util = { path = "../specta-util", features = ["serde"] }                # TODO: Remove `serde` feature
@@ -33,6 +33,7 @@ semver = { version = "1", default-features = false }
 smol_str = { version = "0.3", default-features = false }
 arrayvec = { version = ">=0.6, <0.8", default-features = false }
 smallvec = { version = "1", default-features = false }
+geojson = { version = "1.0", default-features = false }
 tempfile = "3.27.0"
 thiserror = "2.0.18"
 error-stack = { version = "0.6", default-features = false }

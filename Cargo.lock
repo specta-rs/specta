@@ -2011,6 +2011,7 @@ dependencies = [
  "chrono",
  "either",
  "error-stack",
+ "geojson",
  "glam 0.32.1",
  "heapless",
  "insta",

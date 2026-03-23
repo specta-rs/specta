@@ -875,8 +875,12 @@ impl_ndt_as!(
 
 #[cfg(feature = "geojson")]
 #[cfg_attr(docsrs, doc(cfg(feature = "geojson")))]
+impl_ndt_as!(geojson::Position as [f64]);
+
+#[cfg(feature = "geojson")]
+#[cfg_attr(docsrs, doc(cfg(feature = "geojson")))]
 impl_ndt!(
-    impl Type for geojson::Value {
+    impl Type for geojson::GeometryValue {
         inline: true;
         build: |types, ndt| {
             ndt.inner = DataType::Enum(Enum {
@@ -941,7 +945,7 @@ impl_ndt!(
                         "bbox".into(),
                         Field::new(Option::<geojson::Bbox>::definition(types)),
                     ),
-                    ("value".into(), Field::new(geojson::Value::definition(types))),
+                    ("value".into(), Field::new(geojson::GeometryValue::definition(types))),
                     (
                         "foreign_members".into(),
                         Field::new(Option::<geojson::JsonObject>::definition(types)),
