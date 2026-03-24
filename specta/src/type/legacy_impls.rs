@@ -3,12 +3,12 @@
 //! The plan is to try and move these into the ecosystem for the v2 release.
 use super::macros::{impl_ndt, impl_ndt_as};
 use crate::{
-    Type, Types,
     datatype::{
         self, DataType, Enum, Field, Fields, List, NamedFields, Primitive, Reference, Struct,
         Variant,
     },
     r#type::{generics, impls::*},
+    Type, Types,
 };
 
 use std::borrow::Cow;
@@ -155,7 +155,7 @@ const _: () = {
 #[cfg(feature = "serde_yaml")]
 #[cfg_attr(docsrs, doc(cfg(feature = "serde_yaml")))]
 const _: () = {
-    use serde_yaml::{Number, Value, value::TaggedValue};
+    use serde_yaml::{value::TaggedValue, Number, Value};
 
     impl_ndt_as!(
         serde_yaml::Mapping as PrimitiveMap<serde_yaml::Value, serde_yaml::Value>
@@ -248,7 +248,7 @@ const _: () = {
 #[cfg(feature = "toml")]
 #[cfg_attr(docsrs, doc(cfg(feature = "toml")))]
 const _: () = {
-    use toml::{Value, value};
+    use toml::{value, Value};
 
     impl_ndt_as!(toml::map::Map<K, V> as PrimitiveMap<generics::K, generics::V>);
 
@@ -654,17 +654,14 @@ const _: () = {
                     ndt.set_name(Cow::Borrowed("ErrorStackContext"));
                     ndt.set_module_path(Cow::Borrowed("error_stack"));
 
-                    let mut s = Struct::unit();
                     let attachments = DataType::List(List::new(String::definition(types)));
                     let sources = DataType::List(List::new(ErrorStackContext::definition(types)));
 
-                    s.set_fields(crate::internal::construct::fields_named(vec![
-                        ("context".into(), Field::new(String::definition(types))),
-                        ("attachments".into(), Field::new(attachments)),
-                        ("sources".into(), Field::new(sources)),
-                    ]));
-
-                    ndt.inner = DataType::Struct(s);
+                    ndt.inner = Struct::named()
+                        .field("context", Field::new(String::definition(types)))
+                        .field("attachments", Field::new(attachments))
+                        .field("sources", Field::new(sources))
+                        .build();
                 },
             ))
         }
@@ -707,12 +704,7 @@ impl_ndt!(
     impl Type for bevy_ecs::entity::Entity {
         inline: true;
         build: |types, ndt| {
-            let mut s = Struct::unit();
-            s.set_fields(crate::internal::construct::fields_unnamed(
-                vec![Field::new(u64::definition(types))],
-            ));
-
-            ndt.inner = DataType::Struct(s);
+            ndt.inner = Struct::unnamed().field(Field::new(u64::definition(types))).build();
         }
     }
 );
@@ -743,54 +735,44 @@ const _: () = {
         impl Type for bevy_input::keyboard::KeyboardInput {
             inline: true;
             build: |types, ndt| {
-                let mut s = Struct::unit();
-                s.set_fields(crate::internal::construct::fields_named(
-                    vec![
-                        (
-                            "key_code".into(),
-                            Field::new(bevy_input::keyboard::KeyCode::definition(types)),
-                        ),
-                        (
-                            "logical_key".into(),
-                            Field::new(bevy_input::keyboard::Key::definition(types)),
-                        ),
-                        (
-                            "state".into(),
-                            Field::new(bevy_input::ButtonState::definition(types)),
-                        ),
-                        (
-                            "window".into(),
-                            Field::new(bevy_ecs::entity::Entity::definition(types)),
-                        ),
-                    ],
-                ));
-
-                ndt.inner = DataType::Struct(s);
+                ndt.inner = Struct::named()
+                    .field(
+                        "key_code",
+                        Field::new(bevy_input::keyboard::KeyCode::definition(types)),
+                    )
+                    .field(
+                        "logical_key",
+                        Field::new(bevy_input::keyboard::Key::definition(types)),
+                    )
+                    .field(
+                        "state",
+                        Field::new(bevy_input::ButtonState::definition(types)),
+                    )
+                    .field(
+                        "window",
+                        Field::new(bevy_ecs::entity::Entity::definition(types)),
+                    )
+                    .build();
             }
         }
 
         impl Type for bevy_input::mouse::MouseButtonInput {
             inline: true;
             build: |types, ndt| {
-                let mut s = Struct::unit();
-                s.set_fields(crate::internal::construct::fields_named(
-                    vec![
-                        (
-                            "button".into(),
-                            Field::new(bevy_input::mouse::MouseButton::definition(types)),
-                        ),
-                        (
-                            "state".into(),
-                            Field::new(bevy_input::ButtonState::definition(types)),
-                        ),
-                        (
-                            "window".into(),
-                            Field::new(bevy_ecs::entity::Entity::definition(types)),
-                        ),
-                    ],
-                ));
-
-                ndt.inner = DataType::Struct(s);
+                ndt.inner = Struct::named()
+                    .field(
+                        "button",
+                        Field::new(bevy_input::mouse::MouseButton::definition(types)),
+                    )
+                    .field(
+                        "state",
+                        Field::new(bevy_input::ButtonState::definition(types)),
+                    )
+                    .field(
+                        "window",
+                        Field::new(bevy_ecs::entity::Entity::definition(types)),
+                    )
+                    .build();
             }
         }
 
@@ -819,23 +801,18 @@ const _: () = {
         impl Type for bevy_input::mouse::MouseWheel {
             inline: true;
             build: |types, ndt| {
-                let mut s = Struct::unit();
-                s.set_fields(crate::internal::construct::fields_named(
-                    vec![
-                        (
-                            "unit".into(),
-                            Field::new(bevy_input::mouse::MouseScrollUnit::definition(types)),
-                        ),
-                        ("x".into(), Field::new(f32::definition(types))),
-                        ("y".into(), Field::new(f32::definition(types))),
-                        (
-                            "window".into(),
-                            Field::new(bevy_ecs::entity::Entity::definition(types)),
-                        ),
-                    ],
-                ));
-
-                ndt.inner = DataType::Struct(s);
+                ndt.inner = Struct::named()
+                    .field(
+                        "unit",
+                        Field::new(bevy_input::mouse::MouseScrollUnit::definition(types)),
+                    )
+                    .field("x", Field::new(f32::definition(types)))
+                    .field("y", Field::new(f32::definition(types)))
+                    .field(
+                        "window",
+                        Field::new(bevy_ecs::entity::Entity::definition(types)),
+                    )
+                    .build();
             }
         }
 
@@ -855,12 +832,9 @@ const _: () = {
         impl Type for bevy_input::mouse::MouseMotion {
             inline: true;
             build: |types, ndt| {
-                let mut s = Struct::unit();
-                s.set_fields(crate::internal::construct::fields_named(
-                    vec![("delta".into(), Field::new(glam::Vec2::definition(types)))],
-                ));
-
-                ndt.inner = DataType::Struct(s);
+                ndt.inner = Struct::named()
+                    .field("delta", Field::new(glam::Vec2::definition(types)))
+                    .build();
             }
         }
     );
@@ -938,80 +912,56 @@ impl_ndt!(
     impl Type for geojson::Geometry {
         inline: true;
         build: |types, ndt| {
-            let mut s = Struct::unit();
-            s.set_fields(crate::internal::construct::fields_named(
-                vec![
-                    (
-                        "bbox".into(),
-                        Field::new(Option::<geojson::Bbox>::definition(types)),
-                    ),
-                    ("value".into(), Field::new(geojson::GeometryValue::definition(types))),
-                    (
-                        "foreign_members".into(),
-                        Field::new(Option::<geojson::JsonObject>::definition(types)),
-                    ),
-                ],
-            ));
-
-            ndt.inner = DataType::Struct(s);
+            ndt.inner = Struct::named()
+                .field("bbox", Field::new(Option::<geojson::Bbox>::definition(types)))
+                .field("value", Field::new(geojson::GeometryValue::definition(types)))
+                .field(
+                    "foreign_members",
+                    Field::new(Option::<geojson::JsonObject>::definition(types)),
+                )
+                .build();
         }
     }
 
     impl Type for geojson::Feature {
         inline: true;
         build: |types, ndt| {
-            let mut s = Struct::unit();
-            s.set_fields(crate::internal::construct::fields_named(
-                vec![
-                    (
-                        "bbox".into(),
-                        Field::new(Option::<geojson::Bbox>::definition(types)),
-                    ),
-                    (
-                        "geometry".into(),
-                        Field::new(Option::<geojson::Geometry>::definition(types)),
-                    ),
-                    (
-                        "id".into(),
-                        Field::new(Option::<geojson::feature::Id>::definition(types)),
-                    ),
-                    (
-                        "properties".into(),
-                        Field::new(Option::<geojson::JsonObject>::definition(types)),
-                    ),
-                    (
-                        "foreign_members".into(),
-                        Field::new(Option::<geojson::JsonObject>::definition(types)),
-                    ),
-                ],
-            ));
-
-            ndt.inner = DataType::Struct(s);
+            ndt.inner = Struct::named()
+                .field("bbox", Field::new(Option::<geojson::Bbox>::definition(types)))
+                .field(
+                    "geometry",
+                    Field::new(Option::<geojson::Geometry>::definition(types)),
+                )
+                .field(
+                    "id",
+                    Field::new(Option::<geojson::feature::Id>::definition(types)),
+                )
+                .field(
+                    "properties",
+                    Field::new(Option::<geojson::JsonObject>::definition(types)),
+                )
+                .field(
+                    "foreign_members",
+                    Field::new(Option::<geojson::JsonObject>::definition(types)),
+                )
+                .build();
         }
     }
 
     impl Type for geojson::FeatureCollection {
         inline: true;
         build: |types, ndt| {
-            let mut s = Struct::unit();
-            s.set_fields(crate::internal::construct::fields_named(
-                vec![
-                    (
-                        "bbox".into(),
-                        Field::new(Option::<geojson::Bbox>::definition(types)),
-                    ),
-                    (
-                        "features".into(),
-                        Field::new(Vec::<geojson::Feature>::definition(types)),
-                    ),
-                    (
-                        "foreign_members".into(),
-                        Field::new(Option::<geojson::JsonObject>::definition(types)),
-                    ),
-                ],
-            ));
-
-            ndt.inner = DataType::Struct(s);
+            ndt.inner = Struct::named()
+                .field("bbox", Field::new(Option::<geojson::Bbox>::definition(types)))
+                .field(
+                    "features",
+                    Field::new(Vec::<geojson::Feature>::definition(types)),
+                )
+                .field(
+                    "foreign_members",
+                    Field::new(Option::<geojson::JsonObject>::definition(types)),
+                )
+                .build();
         }
     }
 
@@ -1045,95 +995,59 @@ impl_ndt!(
     impl Type for geozero::mvt::Tile {
         inline: true;
         build: |types, ndt| {
-            let mut s = Struct::unit();
-            s.set_fields(crate::internal::construct::fields_named(
-                vec![(
-                    "layers".into(),
+            ndt.inner = Struct::named()
+                .field(
+                    "layers",
                     Field::new(Vec::<geozero::mvt::tile::Layer>::definition(types)),
-                )],
-            ));
-
-            ndt.inner = DataType::Struct(s);
+                )
+                .build();
         }
     }
 
     impl Type for geozero::mvt::tile::Value {
         inline: true;
         build: |types, ndt| {
-            let mut s = Struct::unit();
-            s.set_fields(crate::internal::construct::fields_named(
-                vec![
-                    (
-                        "string_value".into(),
-                        Field::new(Option::<String>::definition(types)),
-                    ),
-                    (
-                        "float_value".into(),
-                        Field::new(Option::<f32>::definition(types)),
-                    ),
-                    (
-                        "double_value".into(),
-                        Field::new(Option::<f64>::definition(types)),
-                    ),
-                    ("int_value".into(), Field::new(Option::<i64>::definition(types))),
-                    (
-                        "uint_value".into(),
-                        Field::new(Option::<u64>::definition(types)),
-                    ),
-                    (
-                        "sint_value".into(),
-                        Field::new(Option::<i64>::definition(types)),
-                    ),
-                    (
-                        "bool_value".into(),
-                        Field::new(Option::<bool>::definition(types)),
-                    ),
-                ],
-            ));
-
-            ndt.inner = DataType::Struct(s);
+            ndt.inner = Struct::named()
+                .field("string_value", Field::new(Option::<String>::definition(types)))
+                .field("float_value", Field::new(Option::<f32>::definition(types)))
+                .field("double_value", Field::new(Option::<f64>::definition(types)))
+                .field("int_value", Field::new(Option::<i64>::definition(types)))
+                .field("uint_value", Field::new(Option::<u64>::definition(types)))
+                .field("sint_value", Field::new(Option::<i64>::definition(types)))
+                .field("bool_value", Field::new(Option::<bool>::definition(types)))
+                .build();
         }
     }
 
     impl Type for geozero::mvt::tile::Feature {
         inline: true;
         build: |types, ndt| {
-            let mut s = Struct::unit();
-            s.set_fields(crate::internal::construct::fields_named(
-                vec![
-                    ("id".into(), Field::new(Option::<u64>::definition(types))),
-                    ("tags".into(), Field::new(Vec::<u32>::definition(types))),
-                    ("type".into(), Field::new(Option::<i32>::definition(types))),
-                    ("geometry".into(), Field::new(Vec::<u32>::definition(types))),
-                ],
-            ));
-
-            ndt.inner = DataType::Struct(s);
+            ndt.inner = Struct::named()
+                .field("id", Field::new(Option::<u64>::definition(types)))
+                .field("tags", Field::new(Vec::<u32>::definition(types)))
+                .field("type", Field::new(Option::<i32>::definition(types)))
+                .field("geometry", Field::new(Vec::<u32>::definition(types)))
+                .build();
         }
     }
 
     impl Type for geozero::mvt::tile::Layer {
         inline: true;
         build: |types, ndt| {
-            let mut s = Struct::unit();
-            s.set_fields(crate::internal::construct::fields_named(
-                vec![
-                    ("version".into(), Field::new(u32::definition(types))),
-                    ("name".into(), Field::new(String::definition(types))),
-                    (
-                        "features".into(),
-                        Field::new(Vec::<geozero::mvt::tile::Feature>::definition(types)),
-                    ),
-                    ("keys".into(), Field::new(Vec::<String>::definition(types))),
-                    (
-                        "values".into(),
-                        Field::new(Vec::<geozero::mvt::tile::Value>::definition(types)),
-                    ),
-                    ("extent".into(), Field::new(Option::<u32>::definition(types))),
-                ],
-            ));
-
-            ndt.inner = DataType::Struct(s);
+            ndt.inner = Struct::named()
+                .field("version", Field::new(u32::definition(types)))
+                .field("name", Field::new(String::definition(types)))
+                .field(
+                    "features",
+                    Field::new(Vec::<geozero::mvt::tile::Feature>::definition(types)),
+                )
+                .field("keys", Field::new(Vec::<String>::definition(types)))
+                .field(
+                    "values",
+                    Field::new(Vec::<geozero::mvt::tile::Value>::definition(types)),
+                )
+                .field("extent", Field::new(Option::<u32>::definition(types)))
+                .build();
         }
     }
 

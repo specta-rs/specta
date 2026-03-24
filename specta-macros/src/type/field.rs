@@ -2,7 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Type;
 
-use super::{AttributeScope, ContainerAttr, FieldAttr, build_runtime_attributes};
+use super::{build_runtime_attributes, AttributeScope, ContainerAttr, FieldAttr};
 
 pub fn construct_field(
     crate_ref: &TokenStream,
@@ -51,14 +51,17 @@ pub fn construct_field_with_variant_skip(
         quote!(Some(<#field_ty as #crate_ref::Type>::definition(types)))
     };
 
-    Ok(quote!(internal::construct::field(
-        #optional,
-        false,
-        #deprecated,
-        #doc.into(),
-        #inline,
-        #type_overridden,
-        #runtime_attrs,
-        #ty
-    )))
+    Ok(quote!({
+        let mut field = datatype::Field::default();
+        field.set_optional(#optional);
+        field.set_deprecated(#deprecated);
+        field.set_docs(#doc.into());
+        field.set_inline(#inline);
+        field.set_type_overridden(#type_overridden);
+        field.set_attributes(#runtime_attrs);
+        if let Some(ty) = #ty {
+            field.set_ty(ty);
+        }
+        field
+    }))
 }

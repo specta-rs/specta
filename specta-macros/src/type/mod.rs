@@ -154,7 +154,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let dt_expr = if let Some(container_ty) = &container_attrs.r#type {
         quote!(<#container_ty as #crate_ref::Type>::definition(types))
     } else {
-        let (dt_type, dt_impl) = match data {
+        let dt_expr = match data {
             Data::Struct(data) => parse_struct(&crate_ref, &container_attrs, data, &format_crates),
             Data::Enum(data) => parse_enum(&crate_ref, &container_attrs, data, &format_crates),
             Data::Union(data) => Err(syn::Error::new_spanned(
@@ -164,11 +164,15 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         }?;
 
         quote!(
-            datatype::DataType::#dt_type({
-                #dt_impl
-                *e.attributes_mut() = #container_runtime_attrs;
+            {
+                let mut e = #dt_expr;
+                match &mut e {
+                    datatype::DataType::Struct(s) => *s.attributes_mut() = #container_runtime_attrs,
+                    datatype::DataType::Enum(en) => *en.attributes_mut() = #container_runtime_attrs,
+                    _ => unreachable!("specta derive generated non-container datatype"),
+                }
                 e
-            })
+            }
         )
     };
 
@@ -269,7 +273,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         #[allow(non_camel_case_types)]
         const _: () = {
             use std::borrow::Cow;
-            use #crate_ref::{datatype, internal};
+            use #crate_ref::datatype;
 
             #[automatically_derived]
             impl #bounds #crate_ref::Type for #ident #type_args #where_bound {

@@ -108,7 +108,6 @@ use specta::{
     datatype::{
         DataType, Enum, Field, Fields, NamedDataType, Primitive, Reference, Struct, Tuple, Variant,
     },
-    internal as specta_internal,
 };
 
 mod error;
@@ -1245,9 +1244,11 @@ fn variant_payload_datatype(variant: &Variant) -> Option<DataType> {
     match variant.fields() {
         Fields::Unit => Some(DataType::Tuple(Tuple::new(vec![]))),
         Fields::Named(named) => {
-            let mut out = Struct::unit();
-            out.set_fields(Fields::Named(named.clone()));
-            Some(DataType::Struct(out))
+            let mut out = Struct::named();
+            for (name, field) in named.fields().iter().cloned() {
+                out.field_mut(name, field);
+            }
+            Some(out.build())
         }
         Fields::Unnamed(unnamed) => {
             let fields = unnamed
@@ -1270,14 +1271,32 @@ fn clone_variant_with_named_fields(
     original: &Variant,
     fields: Vec<(Cow<'static, str>, Field)>,
 ) -> Variant {
-    let mut transformed = original.clone();
-    transformed.set_fields(specta_internal::construct::fields_named(fields));
+    let mut builder = Variant::named();
+    for (name, field) in fields {
+        builder = builder.field(name, field);
+    }
+
+    let mut transformed = builder.build();
+    transformed.set_skip(original.skip());
+    transformed.set_docs(original.docs().clone());
+    transformed.set_deprecated(original.deprecated().cloned());
+    transformed.set_type_overridden(original.type_overridden());
+    *transformed.attributes_mut() = original.attributes().clone();
     transformed
 }
 
 fn clone_variant_with_unnamed_fields(original: &Variant, fields: Vec<Field>) -> Variant {
-    let mut transformed = original.clone();
-    transformed.set_fields(specta_internal::construct::fields_unnamed(fields));
+    let mut builder = Variant::unnamed();
+    for field in fields {
+        builder = builder.field(field);
+    }
+
+    let mut transformed = builder.build();
+    transformed.set_skip(original.skip());
+    transformed.set_docs(original.docs().clone());
+    transformed.set_deprecated(original.deprecated().cloned());
+    transformed.set_type_overridden(original.type_overridden());
+    *transformed.attributes_mut() = original.attributes().clone();
     transformed
 }
 
