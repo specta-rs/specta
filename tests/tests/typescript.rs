@@ -1,4 +1,4 @@
-use std::{iter, path::Path};
+use std::{collections::HashMap, iter, path::Path};
 
 use specta::{
     ResolvedTypes, Type, Types,
@@ -182,6 +182,20 @@ fn typescript_export_serde_errors() {
         A(String),
     }
 
+    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    struct RegularStruct {
+        a: String,
+    }
+
+    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[specta(collect = false)]
+    enum Variants {
+        A(String),
+        B(i32),
+        C(u8),
+    }
+
     let mut failures = Vec::new();
 
     assert_serde_error::<InternallyTaggedB>(
@@ -229,6 +243,21 @@ fn typescript_export_serde_errors() {
         &mut failures,
         "SkipOnlyVariantUntagged",
         "Invalid usage of #[serde(skip)]",
+    );
+    assert_serde_error::<HashMap<(), ()>>(
+        &mut failures,
+        "HashMap<() /* `null` */, ()>",
+        "empty tuple key is unsupported",
+    );
+    assert_serde_error::<HashMap<RegularStruct, ()>>(
+        &mut failures,
+        "HashMap<RegularStruct, ()>",
+        "key type is not supported by legacy map-key validation rules",
+    );
+    assert_serde_error::<HashMap<Variants, ()>>(
+        &mut failures,
+        "HashMap<Variants, ()>",
+        "enum key with tuple variants must be #[serde(untagged)]",
     );
 
     assert!(
