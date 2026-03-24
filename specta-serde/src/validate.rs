@@ -2,9 +2,7 @@ use std::collections::HashSet;
 
 use specta::{
     Types,
-    datatype::{
-        DataType, Enum, Field, Fields, GenericReference, Primitive, Reference, Struct, Variant,
-    },
+    datatype::{DataType, Enum, Field, Fields, GenericReference, Reference, Variant},
 };
 
 use crate::{
@@ -57,7 +55,6 @@ fn inner(
     match dt {
         DataType::Nullable(ty) => inner(ty, types, generics, checked_references, path, mode)?,
         DataType::Map(map) => {
-            is_valid_map_key(map.key_ty(), types, generics, format!("{path}.<map_key>"))?;
             inner(
                 map.value_ty(),
                 types,
@@ -497,187 +494,6 @@ fn merged_generics(
         .cloned();
 
     child.iter().cloned().chain(unshadowed_parent).collect()
-}
-
-fn is_valid_map_key(
-    key_ty: &DataType,
-    types: &Types,
-    generics: &[(GenericReference, DataType)],
-    path: String,
-) -> Result<()> {
-    is_valid_map_key_inner(key_ty, types, generics, path, &mut HashSet::new())
-}
-
-fn is_valid_map_key_inner(
-    key_ty: &DataType,
-    types: &Types,
-    generics: &[(GenericReference, DataType)],
-    path: String,
-    visiting_named_refs: &mut HashSet<Reference>,
-) -> Result<()> {
-    match key_ty {
-        DataType::Primitive(
-            Primitive::i8
-            | Primitive::i16
-            | Primitive::i32
-            | Primitive::i64
-            | Primitive::i128
-            | Primitive::isize
-            | Primitive::u8
-            | Primitive::u16
-            | Primitive::u32
-            | Primitive::u64
-            | Primitive::u128
-            | Primitive::usize
-            | Primitive::f32
-            | Primitive::f64
-            | Primitive::str
-            | Primitive::char,
-        ) => Ok(()),
-        DataType::Primitive(other) => Err(Error::invalid_map_key(
-            path,
-            format!("unsupported primitive key type {other:?}"),
-        )),
-        DataType::Enum(enm) => {
-            let repr = enum_repr_from_attrs(enm.attributes())?;
-            for (variant_name, variant) in enm.variants() {
-                match &variant.fields() {
-                    Fields::Unit => {}
-                    Fields::Unnamed(item) => {
-                        if item.fields().len() > 1 {
-                            return Err(Error::invalid_map_key(
-                                &path,
-                                format!(
-                                    "enum key variant '{variant_name}' has more than one tuple field"
-                                ),
-                            ));
-                        }
-
-                        if repr != EnumRepr::Untagged {
-                            return Err(Error::invalid_map_key(
-                                &path,
-                                "enum key with tuple variants must be #[serde(untagged)]",
-                            ));
-                        }
-                    }
-                    Fields::Named(_) => {
-                        return Err(Error::invalid_map_key(
-                            &path,
-                            format!("enum key variant '{variant_name}' uses named fields"),
-                        ));
-                    }
-                }
-            }
-
-            Ok(())
-        }
-        DataType::Tuple(tuple) => {
-            if tuple.elements().is_empty() {
-                return Err(Error::invalid_map_key(
-                    path,
-                    "empty tuple key is unsupported",
-                ));
-            }
-
-            Ok(())
-        }
-        DataType::Struct(strct) => {
-            if !is_transparent_struct(strct) {
-                return Err(Error::invalid_map_key(
-                    path,
-                    "key type is not supported by legacy map-key validation rules",
-                ));
-            }
-
-            let inner_ty = transparent_struct_inner_map_key_ty(strct, &path)?;
-            is_valid_map_key_inner(inner_ty, types, generics, path, visiting_named_refs)
-        }
-        DataType::Reference(Reference::Named(reference)) => {
-            let reference_key = Reference::Named(reference.clone());
-            if !visiting_named_refs.insert(reference_key.clone()) {
-                return Err(Error::invalid_map_key(
-                    path,
-                    "recursive map key reference cycle detected",
-                ));
-            }
-
-            let result = if let Some(ndt) = reference.get(types) {
-                let merged_generics = merged_generics(generics, reference.generics());
-                is_valid_map_key_inner(ndt.ty(), types, &merged_generics, path, visiting_named_refs)
-            } else {
-                Ok(())
-            };
-
-            visiting_named_refs.remove(&reference_key);
-            result
-        }
-        DataType::Reference(Reference::Generic(generic)) => {
-            let Some((_, ty)) = generics.iter().find(|(candidate, _)| candidate == generic) else {
-                return Err(Error::unresolved_generic_reference(
-                    path,
-                    format!("{generic:?}"),
-                ));
-            };
-
-            if matches!(ty, DataType::Reference(Reference::Generic(inner)) if inner == generic) {
-                return Ok(());
-            }
-
-            is_valid_map_key_inner(ty, types, generics, path, visiting_named_refs)
-        }
-        DataType::Reference(Reference::Opaque(_)) => Err(Error::invalid_map_key(
-            path,
-            "opaque references cannot be map keys",
-        )),
-        DataType::List(_) | DataType::Map(_) | DataType::Nullable(_) => {
-            Err(Error::invalid_map_key(
-                path,
-                "key type is not supported by legacy map-key validation rules",
-            ))
-        }
-    }
-}
-
-fn is_transparent_struct(strct: &Struct) -> bool {
-    strct
-        .attributes()
-        .get::<SerdeContainerAttrs>()
-        .is_some_and(|attrs| attrs.transparent)
-}
-
-fn transparent_struct_inner_map_key_ty<'a>(strct: &'a Struct, path: &str) -> Result<&'a DataType> {
-    let mut field_tys = match strct.fields() {
-        Fields::Unit => Vec::new(),
-        Fields::Unnamed(unnamed) => unnamed.fields().iter().filter_map(Field::ty).collect(),
-        Fields::Named(named) => named
-            .fields()
-            .iter()
-            .filter_map(|(_, field)| field.ty())
-            .collect(),
-    };
-
-    if field_tys.is_empty() {
-        return Err(Error::invalid_map_key(
-            path,
-            "transparent map key has no usable field type",
-        ));
-    }
-
-    if field_tys.len() > 1 {
-        return Err(Error::invalid_map_key(
-            path,
-            "transparent map key must resolve to exactly one non-skipped field",
-        ));
-    }
-
-    let Some(field_ty) = field_tys.pop() else {
-        return Err(Error::invalid_map_key(
-            path,
-            "transparent map key must resolve to exactly one non-skipped field",
-        ));
-    };
-
-    Ok(field_ty)
 }
 
 fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Result<()> {

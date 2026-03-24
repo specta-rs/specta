@@ -137,6 +137,17 @@ pub mod internal {
 use error::Result;
 use repr::EnumRepr;
 
+/// Validates whether a given [`DataType`] is a valid Serde-type.
+///
+/// When using [`apply`]/[`apply_phases`] all [`NamedDataType`]s are validated automatically, however if you need to export a [`DataType`] directly this is required to validate the top-level type.
+///
+/// For example if you try and export `HashMap<InvalidKey, MyGenericType<()>>`, [`apply`]/[`apply_phases`] can validate `MyGenericType` but it doesn't see the top-level `HashMap`'s generics so it can't validate them.
+///
+/// This is *only* required if your using the primitives from your language exporter.
+pub fn validate(dt: &DataType, types: ResolvedTypes) -> Result<()> {
+    todo!();
+}
+
 /// Applies serde transformations in unified mode.
 ///
 /// Unified mode produces a single transformed type graph that must satisfy both
