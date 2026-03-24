@@ -125,6 +125,7 @@ HashMap<UntaggedVariantsKey, ()>: Partial<{ [key in UntaggedVariantsKey]: null }
 ValidMaybeValidKey: ValidMaybeValidKey
 ValidMaybeValidKeyNested: ValidMaybeValidKeyNested
 InvalidMaybeValidKey: InvalidMaybeValidKey
+InvalidMaybeValidKeyNested: InvalidMaybeValidKeyNested
 MacroStruct: MacroStruct
 MacroStruct2: MacroStruct2
 MacroEnum: MacroEnum
