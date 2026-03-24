@@ -739,6 +739,7 @@ expression: output
 	*		TransparentType2: TransparentType2,
 	*		TransparentTypeWithOverride: TransparentTypeWithOverride,
 	*		"[Option<u8>; 3]": [(number | null), (number | null), (number | null)],
+	*		"HashMap<BasicEnum, ()>": Partial<{ [key in BasicEnum]: null }>,
 	*		"Option<Option<Option<Option<i32>>>>": number | null,
 	*		"Vec<PlaceholderInnerField>": PlaceholderInnerField[],
 	*		EnumReferenceRecordKey: EnumReferenceRecordKey,
@@ -978,6 +979,7 @@ expression: output
 	* @property {TransparentType2} TransparentType2
 	* @property {TransparentTypeWithOverride} TransparentTypeWithOverride
 	* @property {[(number | null), (number | null), (number | null)]} "[Option<u8>; 3]"
+	* @property {Partial<{ [key in BasicEnum]: null }>} "HashMap<BasicEnum, ()>"
 	* @property {number | null} "Option<Option<Option<Option<i32>>>>"
 	* @property {PlaceholderInnerField[]} "Vec<PlaceholderInnerField>"
 	* @property {EnumReferenceRecordKey} EnumReferenceRecordKey

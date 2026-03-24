@@ -540,6 +540,7 @@ export type Primitives = {
 	TransparentType2: TransparentType2,
 	TransparentTypeWithOverride: TransparentTypeWithOverride,
 	"[Option<u8>; 3]": [(number | null), (number | null), (number | null)],
+	"HashMap<BasicEnum, ()>": Partial<{ [key in BasicEnum]: null }>,
 	"Option<Option<Option<Option<i32>>>>": number | null,
 	"Vec<PlaceholderInnerField>": PlaceholderInnerField[],
 	EnumReferenceRecordKey: EnumReferenceRecordKey,

@@ -188,6 +188,8 @@ expression: output
 	* @typedef {string} TransparentTypeWithOverride
 	* @property {string} "0"
 	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
+	*
 	* @typedef {T[]} Vec<T>
 	*
 	* @typedef {{
