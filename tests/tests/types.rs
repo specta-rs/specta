@@ -161,7 +161,7 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         [Option<u8>; 3],
 
         // https://github.com/specta-rs/specta/issues/65
-        // HashMap<BasicEnum, ()>, // TODO
+        HashMap<BasicEnum, ()>,
         // HashMap<BasicEnum, i32>, // TODO
 
         // https://github.com/specta-rs/specta/issues/60

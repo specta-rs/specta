@@ -60,6 +60,7 @@ Rename: Rename
 TransparentType: TransparentType
 TransparentType2: TransparentType2
 TransparentTypeWithOverride: TransparentTypeWithOverride
+HashMap<BasicEnum, ()>: Partial<{ [key in BasicEnum]: null }>
 Vec<PlaceholderInnerField>: PlaceholderInnerField[]
 EnumReferenceRecordKey: EnumReferenceRecordKey
 FlattenOnNestedEnum: FlattenOnNestedEnum
