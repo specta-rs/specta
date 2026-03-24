@@ -183,11 +183,7 @@ expression: output
 	* @typedef {string} TransparentTypeWithOverride
 	* @property {string} "0"
 	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
-	*
 	* @typedef {T[]} Vec<T>
-	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
 	*
 	* @typedef {{
 	*		a: Partial<{ [key in BasicEnum]: number }>,
@@ -415,28 +411,6 @@ expression: output
 	* @property {number} B
 	* @property {null} C
 	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
-	*
-	* @typedef {{ [key in string]: null }} Regular
-	* @property {{ [key in string]: null }} "0"
-	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
-	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
-	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
-	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
-	*
-	* @typedef {{ [key in MaybeValidKey<string>]: null }} ValidMaybeValidKey
-	* @property {{ [key in MaybeValidKey<string>]: null }} "0"
-	*
-	* @typedef {{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }} ValidMaybeValidKeyNested
-	* @property {{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }} "0"
-	*
-	* @typedef {{ [key in MaybeValidKey<null>]: null }} InvalidMaybeValidKey
-	* @property {{ [key in MaybeValidKey<null>]: null }} "0"
-	*
 	* @typedef {string} MacroStruct
 	* @property {string} "0"
 	*
@@ -647,12 +621,6 @@ expression: output
 	* @property {A} a
 	* @property {B} b
 	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
-	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
-	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
-	*
 	* @typedef {{
 	*		field: Demo<T, boolean>,
 	*	}} AGenericStruct<T>
@@ -683,21 +651,6 @@ expression: output
 	*	}} DoubleFlattened
 	* @property {ToBeFlattened} a
 	* @property {ToBeFlattened} b
-	*
-	* @typedef {{
-	*		c: Inner,
-	*	}} FlattenedInner
-	* @property {Inner} c
-	*
-	* @typedef {{
-	*		b: BoxedInner,
-	*	}} BoxFlattened
-	* @property {BoxedInner} b
-	*
-	* @typedef {{
-	*		c: BoxedInner,
-	*	}} BoxInline
-	* @property {BoxedInner} c
 	*
 	* @typedef {{
 	*		a: string,

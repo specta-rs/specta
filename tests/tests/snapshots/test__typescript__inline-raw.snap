@@ -128,10 +128,8 @@ TransparentType: TransparentTypeInner
 TransparentType2: null
 TransparentTypeWithOverride: string
 [Option<u8>; 3]: [(number | null), (number | null), (number | null)]
-HashMap<BasicEnum, ()>: Partial<{ [key in BasicEnum]: null }>
 Option<Option<Option<Option<i32>>>>: number | null
 Vec<PlaceholderInnerField>: PlaceholderInnerField[]
-HashMap<BasicEnum, i32>: Partial<{ [key in BasicEnum]: number }>
 EnumReferenceRecordKey: {
 	a: Partial<{ [key in BasicEnum]: number }>,
 }
@@ -238,15 +236,6 @@ OptionalInEnum: string | null | { a: string | null } | { a?: string | null }
 UntaggedVariants: string | number | { id: string } | [string, boolean]
 UntaggedVariantsWithoutValue: string | [number, string] | number
 UntaggedVariantsWithDuplicateBranches: null | number
-HashMap<String, ()>: { [key in string]: null }
-Regular: { [key in string]: null }
-HashMap<Infallible, ()>: { [key in never]: null }
-HashMap<TransparentStruct, ()>: { [key in TransparentStruct]: null }
-HashMap<UnitVariants, ()>: Partial<{ [key in UnitVariants]: null }>
-HashMap<UntaggedVariantsKey, ()>: Partial<{ [key in UntaggedVariantsKey]: null }>
-ValidMaybeValidKey: { [key in MaybeValidKey<string>]: null }
-ValidMaybeValidKeyNested: { [key in MaybeValidKey<MaybeValidKey<string>>]: null }
-InvalidMaybeValidKey: { [key in MaybeValidKey<null>]: null }
 MacroStruct: string
 MacroStruct2: {
 	demo: string,
@@ -352,9 +341,6 @@ Another<bool>: {
 	a: number,
 	b: boolean,
 }
-MapA<u32>: { [key in string]: number }
-MapB<u32>: { [key in number]: string }
-MapC<u32>: { [key in string]: AGenericStruct<number> }
 AGenericStruct<u32>: {
 	field: {
 	a: number,
@@ -377,15 +363,6 @@ A: {
 DoubleFlattened: {
 	a: ToBeFlattened,
 	b: ToBeFlattened,
-}
-FlattenedInner: {
-	c: Inner,
-}
-BoxFlattened: {
-	b: BoxedInner,
-}
-BoxInline: {
-	c: BoxedInner,
 }
 First: {
 	a: string,

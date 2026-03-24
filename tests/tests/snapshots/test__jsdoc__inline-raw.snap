@@ -51,21 +51,6 @@ expression: output
 	* @property {"A"} A
 	* @property {"B"} B
 	*
-	* @typedef {{
-	*		b: BoxedInner,
-	*	}} BoxFlattened
-	* @property {BoxedInner} b
-	*
-	* @typedef {{
-	*		c: BoxedInner,
-	*	}} BoxInline
-	* @property {BoxedInner} c
-	*
-	* @typedef {{
-	*		a: number,
-	*	}} BoxedInner
-	* @property {number} a
-	*
 	* @typedef {string} BracedStruct
 	* @property {string} "0"
 	*
@@ -389,11 +374,6 @@ expression: output
 	* @property {NestedEnum} result
 	*
 	* @typedef {{
-	*		c: Inner,
-	*	}} FlattenedInner
-	* @property {Inner} c
-	*
-	* @typedef {{
 	*		a: First,
 	*		b: {
 	*			a: string,
@@ -544,19 +524,9 @@ expression: output
 	* @property {InlineStruct} inline_this
 	* @property {RefStruct} dont_inline_this
 	*
-	* @typedef {{
-	*		a: number,
-	*		b: FlattenedInner,
-	*	}} Inner
-	* @property {number} a
-	* @property {FlattenedInner} b
-	*
 	* @typedef {({ field: string }) & { other?: never } | ({ other: number }) & { field?: never }} InternallyTaggedWithAlias
 	* @property {{ field: string }} A
 	* @property {{ other: number }} B
-	*
-	* @typedef {{ [key in MaybeValidKey<null>]: null }} InvalidMaybeValidKey
-	* @property {{ [key in MaybeValidKey<null>]: null }} "0"
 	*
 	* @typedef {{
 	*		cause: null,
@@ -613,9 +583,6 @@ expression: output
 	*		demo: string,
 	*	}} MacroStruct2
 	* @property {string} demo
-	*
-	* @typedef {T} MaybeValidKey<T>
-	* @property {T} "0"
 	*
 	* @typedef {Record<string, never>} MyEmptyInput
 	*
@@ -772,10 +739,8 @@ expression: output
 	*		TransparentType2: TransparentType2,
 	*		TransparentTypeWithOverride: TransparentTypeWithOverride,
 	*		"[Option<u8>; 3]": [(number | null), (number | null), (number | null)],
-	*		"HashMap<BasicEnum, ()>": Partial<{ [key in BasicEnum]: null }>,
 	*		"Option<Option<Option<Option<i32>>>>": number | null,
 	*		"Vec<PlaceholderInnerField>": PlaceholderInnerField[],
-	*		"HashMap<BasicEnum, i32>": Partial<{ [key in BasicEnum]: number }>,
 	*		EnumReferenceRecordKey: EnumReferenceRecordKey,
 	*		FlattenOnNestedEnum: FlattenOnNestedEnum,
 	*		MyEmptyInput: MyEmptyInput,
@@ -831,15 +796,6 @@ expression: output
 	*		UntaggedVariants: UntaggedVariants,
 	*		UntaggedVariantsWithoutValue: UntaggedVariantsWithoutValue,
 	*		UntaggedVariantsWithDuplicateBranches: UntaggedVariantsWithDuplicateBranches,
-	*		"HashMap<String, ()>": { [key in string]: null },
-	*		Regular: Regular,
-	*		"HashMap<Infallible, ()>": { [key in never]: null },
-	*		"HashMap<TransparentStruct, ()>": { [key in TransparentStruct]: null },
-	*		"HashMap<UnitVariants, ()>": Partial<{ [key in UnitVariants]: null }>,
-	*		"HashMap<UntaggedVariantsKey, ()>": Partial<{ [key in UntaggedVariantsKey]: null }>,
-	*		ValidMaybeValidKey: ValidMaybeValidKey,
-	*		ValidMaybeValidKeyNested: ValidMaybeValidKeyNested,
-	*		InvalidMaybeValidKey: InvalidMaybeValidKey,
 	*		MacroStruct: MacroStruct,
 	*		MacroStruct2: MacroStruct2,
 	*		MacroEnum: MacroEnum,
@@ -857,15 +813,9 @@ expression: output
 	*		"HalfGenericB<bool>": Demo<number, boolean>,
 	*		"FullGeneric<u8, bool>": Demo<number, boolean>,
 	*		"Another<bool>": Demo<number, boolean>,
-	*		"MapA<u32>": { [key in string]: number },
-	*		"MapB<u32>": { [key in number]: string },
-	*		"MapC<u32>": { [key in string]: AGenericStruct<number> },
 	*		"AGenericStruct<u32>": AGenericStruct<number>,
 	*		A: A,
 	*		DoubleFlattened: DoubleFlattened,
-	*		FlattenedInner: FlattenedInner,
-	*		BoxFlattened: BoxFlattened,
-	*		BoxInline: BoxInline,
 	*		First: First,
 	*		Second: Second,
 	*		Third: Third,
@@ -1028,10 +978,8 @@ expression: output
 	* @property {TransparentType2} TransparentType2
 	* @property {TransparentTypeWithOverride} TransparentTypeWithOverride
 	* @property {[(number | null), (number | null), (number | null)]} "[Option<u8>; 3]"
-	* @property {Partial<{ [key in BasicEnum]: null }>} "HashMap<BasicEnum, ()>"
 	* @property {number | null} "Option<Option<Option<Option<i32>>>>"
 	* @property {PlaceholderInnerField[]} "Vec<PlaceholderInnerField>"
-	* @property {Partial<{ [key in BasicEnum]: number }>} "HashMap<BasicEnum, i32>"
 	* @property {EnumReferenceRecordKey} EnumReferenceRecordKey
 	* @property {FlattenOnNestedEnum} FlattenOnNestedEnum
 	* @property {MyEmptyInput} MyEmptyInput
@@ -1087,15 +1035,6 @@ expression: output
 	* @property {UntaggedVariants} UntaggedVariants
 	* @property {UntaggedVariantsWithoutValue} UntaggedVariantsWithoutValue
 	* @property {UntaggedVariantsWithDuplicateBranches} UntaggedVariantsWithDuplicateBranches
-	* @property {{ [key in string]: null }} "HashMap<String, ()>"
-	* @property {Regular} Regular
-	* @property {{ [key in never]: null }} "HashMap<Infallible, ()>"
-	* @property {{ [key in TransparentStruct]: null }} "HashMap<TransparentStruct, ()>"
-	* @property {Partial<{ [key in UnitVariants]: null }>} "HashMap<UnitVariants, ()>"
-	* @property {Partial<{ [key in UntaggedVariantsKey]: null }>} "HashMap<UntaggedVariantsKey, ()>"
-	* @property {ValidMaybeValidKey} ValidMaybeValidKey
-	* @property {ValidMaybeValidKeyNested} ValidMaybeValidKeyNested
-	* @property {InvalidMaybeValidKey} InvalidMaybeValidKey
 	* @property {MacroStruct} MacroStruct
 	* @property {MacroStruct2} MacroStruct2
 	* @property {MacroEnum} MacroEnum
@@ -1113,15 +1052,9 @@ expression: output
 	* @property {Demo<number, boolean>} "HalfGenericB<bool>"
 	* @property {Demo<number, boolean>} "FullGeneric<u8, bool>"
 	* @property {Demo<number, boolean>} "Another<bool>"
-	* @property {{ [key in string]: number }} "MapA<u32>"
-	* @property {{ [key in number]: string }} "MapB<u32>"
-	* @property {{ [key in string]: AGenericStruct<number> }} "MapC<u32>"
 	* @property {AGenericStruct<number>} "AGenericStruct<u32>"
 	* @property {A} A
 	* @property {DoubleFlattened} DoubleFlattened
-	* @property {FlattenedInner} FlattenedInner
-	* @property {BoxFlattened} BoxFlattened
-	* @property {BoxInline} BoxInline
 	* @property {First} First
 	* @property {Second} Second
 	* @property {Third} Third
@@ -1208,9 +1141,6 @@ expression: output
 	*
 	* @typedef {TestEnum} RefStruct
 	* @property {TestEnum} "0"
-	*
-	* @typedef {{ [key in string]: null }} Regular
-	* @property {{ [key in string]: null }} "0"
 	*
 	* @typedef {"OneWord" | "TwoWords"} Rename
 	* @property {"OneWord"} OneWord
@@ -1412,9 +1342,6 @@ expression: output
 	*	}} ToBeFlattened
 	* @property {string} a
 	*
-	* @typedef {string} TransparentStruct
-	* @property {string} "0"
-	*
 	* @typedef {TransparentTypeInner} TransparentType
 	* @property {TransparentTypeInner} "0"
 	*
@@ -1477,22 +1404,12 @@ expression: output
 	* @typedef {Record<string, never>} Unit7
 	* @property {Record<string, never>} A
 	*
-	* @typedef {"A" | "B" | "C"} UnitVariants
-	* @property {"A"} A
-	* @property {"B"} B
-	* @property {"C"} C
-	*
 	* @typedef {string | number | { id: string } | [string, boolean]} UntaggedVariants
 	* @property {string} A
 	* @property {number} B
 	* @property {number} C
 	* @property {{ id: string }} D
 	* @property {[string, boolean]} E
-	*
-	* @typedef {string | number} UntaggedVariantsKey
-	* @property {string} A
-	* @property {number} B
-	* @property {number} C
 	*
 	* @typedef {null | number} UntaggedVariantsWithDuplicateBranches
 	* @property {null} A
@@ -1507,10 +1424,4 @@ expression: output
 	* @typedef {({ field: string }) & { other?: never } | ({ other: number }) & { field?: never }} UntaggedWithAlias
 	* @property {{ field: string }} A
 	* @property {{ other: number }} B
-	*
-	* @typedef {{ [key in MaybeValidKey<string>]: null }} ValidMaybeValidKey
-	* @property {{ [key in MaybeValidKey<string>]: null }} "0"
-	*
-	* @typedef {{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }} ValidMaybeValidKeyNested
-	* @property {{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }} "0"
 	*/
