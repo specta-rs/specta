@@ -16,6 +16,10 @@ type FrameworkSource = Box<dyn error::Error + Send + Sync + 'static>;
 
 #[allow(dead_code)]
 enum ErrorKind {
+    InvalidMapKey {
+        path: String,
+        reason: Cow<'static, str>,
+    },
     /// Attempted to export a bigint type but the configuration forbids it.
     BigIntForbidden {
         path: String,
@@ -93,6 +97,18 @@ enum ErrorKind {
 }
 
 impl Error {
+    pub(crate) fn invalid_map_key(
+        path: impl Into<String>,
+        reason: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::InvalidMapKey {
+                path: path.into(),
+                reason: reason.into(),
+            },
+        }
+    }
+
     /// Construct an error for framework-specific logic.
     pub fn framework(
         message: impl Into<Cow<'static, str>>,
@@ -215,6 +231,9 @@ impl From<std::fmt::Error> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
+            ErrorKind::InvalidMapKey { path, reason } => {
+                write!(f, "Invalid map key at '{path}': {reason}")
+            }
             ErrorKind::BigIntForbidden { path } => write!(
                 f,
                 "Attempted to export {path:?} but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. If your using a serializer/deserializer that natively has support for BigInt types you can disable this warning by editing your `ExportConfiguration`!"
