@@ -20,28 +20,40 @@ pub enum ApplyMode {
 
 pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<()> {
     for ndt in types.into_unsorted_iter() {
-        let ndt_generics = ndt
-            .generics()
-            .iter()
-            .map(|(generic, _)| {
-                (
-                    generic.clone(),
-                    DataType::Reference(Reference::Generic(generic.clone())),
-                )
-            })
-            .collect::<Vec<_>>();
-
-        inner(
+        validate_datatype_with_generics_for_mode(
             ndt.ty(),
             types,
-            &ndt_generics,
-            &mut HashSet::new(),
+            ndt.generics(),
             ndt.name().to_string(),
             mode,
         )?;
     }
 
     Ok(())
+}
+
+pub(crate) fn validate_datatype_for_mode(dt: &DataType, types: &Types, mode: ApplyMode) -> Result<()> {
+    validate_datatype_with_generics_for_mode(dt, types, &[], "<top-level>".to_string(), mode)
+}
+
+fn validate_datatype_with_generics_for_mode(
+    dt: &DataType,
+    types: &Types,
+    generics: &[(GenericReference, std::borrow::Cow<'static, str>)],
+    path: String,
+    mode: ApplyMode,
+) -> Result<()> {
+    let generics = generics
+        .iter()
+        .map(|(generic, _)| {
+            (
+                generic.clone(),
+                DataType::Reference(Reference::Generic(generic.clone())),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    inner(dt, types, &generics, &mut HashSet::new(), path, mode)
 }
 
 fn inner(
@@ -302,6 +314,13 @@ fn inner(
             }
             Reference::Opaque(reference) => {
                 if let Some(phased) = reference.downcast_ref::<PhasedTy>() {
+                    if mode == ApplyMode::Unified {
+                        return Err(Error::invalid_phased_type_usage(
+                            path,
+                            "`specta_serde::Phased<Serialize, Deserialize>` requires `apply_phases`",
+                        ));
+                    }
+
                     inner(
                         &phased.serialize,
                         types,

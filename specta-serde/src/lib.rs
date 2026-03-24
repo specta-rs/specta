@@ -144,7 +144,7 @@ use repr::EnumRepr;
 ///
 /// This is *only* required if your using the primitives from your language exporter.
 pub fn validate(dt: &DataType, types: ResolvedTypes) -> Result<()> {
-    todo!();
+    validate::validate_datatype_for_mode(dt, types.as_types(), validate::ApplyMode::Unified)
 }
 
 /// Applies serde transformations in unified mode.
