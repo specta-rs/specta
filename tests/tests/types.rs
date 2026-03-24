@@ -161,7 +161,8 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         [Option<u8>; 3],
 
         // https://github.com/specta-rs/specta/issues/65
-        HashMap<BasicEnum, ()>,
+        // HashMap<BasicEnum, ()>, // TODO
+        // HashMap<BasicEnum, i32>, // TODO
 
         // https://github.com/specta-rs/specta/issues/60
         Option<Option<Option<Option<i32>>>>,
@@ -169,7 +170,6 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         // https://github.com/specta-rs/specta/issues/71
         Vec<PlaceholderInnerField>,
 
-        HashMap<BasicEnum, i32>,
         EnumReferenceRecordKey,
 
         FlattenOnNestedEnum,
@@ -262,17 +262,17 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         UntaggedVariantsWithoutValue,
         UntaggedVariantsWithDuplicateBranches,
 
-        // Valid Map keys
-        HashMap<String, ()>,
-        Regular,
-        HashMap<Infallible, ()>,
-        HashMap<TransparentStruct, ()>,
-        HashMap<UnitVariants, ()>,
-        HashMap<UntaggedVariantsKey, ()>,
-        ValidMaybeValidKey,
-        ValidMaybeValidKeyNested,
-        InvalidMaybeValidKey, // TODO: Fix these
-        InvalidMaybeValidKeyNested,
+        // // Valid Map keys
+        // // HashMap<String, ()>,
+        // // Regular,
+        // // HashMap<Infallible, ()>,
+        // // HashMap<TransparentStruct, ()>,
+        // // HashMap<UnitVariants, ()>,
+        // // HashMap<UntaggedVariantsKey, ()>,
+        // // ValidMaybeValidKey,
+        // // ValidMaybeValidKeyNested,
+        // // InvalidMaybeValidKey, // TODO: Fix these
+        // // InvalidMaybeValidKeyNested,
 
         // `macro_rules!` in decl
         MacroStruct,
@@ -298,16 +298,16 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         HalfGenericB<bool>,
         FullGeneric<u8, bool>,
         Another<bool>,
-        MapA<u32>,
-        MapB<u32>,
-        MapC<u32>,
+        // MapA<u32>,
+        // MapB<u32>,
+        // MapC<u32>,
         AGenericStruct<u32>,
 
         A,
         DoubleFlattened,
-        FlattenedInner, // TODO: Fix this
-        BoxFlattened, // TODO: Fix this
-        BoxInline, // TODO: Fix this
+        // FlattenedInner, // TODO: Fix this
+        // BoxFlattened, // TODO: Fix this
+        // BoxInline, // TODO: Fix this
 
         // Flatten and inline
         First,

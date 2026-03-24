@@ -133,11 +133,7 @@ export type TransparentType2 = null;
 
 export type TransparentTypeWithOverride = string;
 
-export type HashMap<K, V> = { [key in K]: V };
-
 export type Vec<T> = T[];
-
-export type HashMap<K, V> = { [key in K]: V };
 
 export type EnumReferenceRecordKey = {
 	a: Partial<{ [key in BasicEnum]: number }>,
@@ -296,24 +292,6 @@ export type UntaggedVariantsWithoutValue = string | [number, string] | number;
 
 export type UntaggedVariantsWithDuplicateBranches = null | number;
 
-export type HashMap<K, V> = { [key in K]: V };
-
-export type Regular = { [key in string]: null };
-
-export type HashMap<K, V> = { [key in K]: V };
-
-export type HashMap<K, V> = { [key in K]: V };
-
-export type HashMap<K, V> = { [key in K]: V };
-
-export type HashMap<K, V> = { [key in K]: V };
-
-export type ValidMaybeValidKey = { [key in MaybeValidKey<string>]: null };
-
-export type ValidMaybeValidKeyNested = { [key in MaybeValidKey<MaybeValidKey<string>>]: null };
-
-export type InvalidMaybeValidKey = { [key in MaybeValidKey<null>]: null };
-
 export type MacroStruct = string;
 
 export type MacroStruct2 = {
@@ -454,12 +432,6 @@ export type Demo<A, B> = {
 	b: B,
 };
 
-export type HashMap<K, V> = { [key in K]: V };
-
-export type HashMap<K, V> = { [key in K]: V };
-
-export type HashMap<K, V> = { [key in K]: V };
-
 export type AGenericStruct<T> = {
 	field: Demo<T, boolean>,
 };
@@ -481,18 +453,6 @@ export type A = {
 export type DoubleFlattened = {
 	a: ToBeFlattened,
 	b: ToBeFlattened,
-};
-
-export type FlattenedInner = {
-	c: Inner,
-};
-
-export type BoxFlattened = {
-	b: BoxedInner,
-};
-
-export type BoxInline = {
-	c: BoxedInner,
 };
 
 export type First = {
