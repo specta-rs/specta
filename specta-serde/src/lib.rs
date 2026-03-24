@@ -143,7 +143,7 @@ use repr::EnumRepr;
 /// For example if you try and export `HashMap<InvalidKey, MyGenericType<()>>`, [`apply`]/[`apply_phases`] can validate `MyGenericType` but it doesn't see the top-level `HashMap`'s generics so it can't validate them.
 ///
 /// This is *only* required if your using the primitives from your language exporter.
-pub fn validate(dt: &DataType, types: ResolvedTypes) -> Result<()> {
+pub fn validate(dt: &DataType, types: &ResolvedTypes) -> Result<()> {
     validate::validate_datatype_for_mode(dt, types.as_types(), validate::ApplyMode::Unified)
 }
 

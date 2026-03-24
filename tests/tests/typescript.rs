@@ -1,10 +1,10 @@
 use std::{collections::HashMap, iter, path::Path};
 
 use specta::{
-    ResolvedTypes, Type, Types,
     datatype::{DataType, Reference},
+    ResolvedTypes, Type, Types,
 };
-use specta_typescript::{BigIntExportBehavior, Layout, Typescript, primitives};
+use specta_typescript::{primitives, BigIntExportBehavior, Layout, Typescript};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -65,36 +65,53 @@ fn typescript_export() {
 #[test]
 fn typescript_export_serde_errors() {
     fn assert_serde_error<T: Type>(failures: &mut Vec<String>, name: &str, expected_error: &str) {
-        let types = Types::default().register::<T>();
-        for (mode, output) in [
-            (
-                "serde",
-                specta_serde::apply(types.clone()).map(|types| {
-                    Typescript::default()
-                        .bigint(BigIntExportBehavior::Number)
-                        .export(&types)
-                }),
-            ),
-            (
-                "serde_phases",
-                specta_serde::apply_phases(types.clone()).map(|types| {
-                    Typescript::default()
-                        .bigint(BigIntExportBehavior::Number)
-                        .export(&types)
-                }),
-            ),
-        ] {
-            match output {
+        let mut types = Types::default();
+        let dt = T::definition(&mut types);
+
+        let tests: &[(
+            &str,
+            fn(Types) -> Result<ResolvedTypes, specta_serde::Error>,
+        )] = &[
+            ("serde", |types| specta_serde::apply(types)),
+            ("serde_phases", |types| specta_serde::apply_phases(types)),
+        ];
+
+        for &(mode, map_types) in tests {
+            let types = match map_types(types.clone()) {
+                Ok(types) => types,
+                Err(err) => {
+                    if !err.to_string().contains(expected_error) {
+                        failures.push(format!(
+                            "{name} ({mode}) [apply]: expected error containing '{expected_error}', got '{err}'"
+                        ));
+                    }
+                    continue;
+                }
+            };
+
+            match specta_serde::validate(&dt, &types) {
+                Ok(()) => {}
+                Err(err) => {
+                    if !err.to_string().contains(expected_error) {
+                        failures.push(format!(
+                            "{name} ({mode}) [validate]: expected error containing '{expected_error}', got '{err}'"
+                        ));
+                    }
+                    continue;
+                }
+            }
+
+            match Typescript::default()
+                .bigint(BigIntExportBehavior::Number)
+                .export(&types)
+            {
+                Ok(_) => failures.push(format!(
+                    "{name} ({mode}) [export]: expected error containing '{expected_error}', but export succeeded"
+                )),
                 Err(err) if !err.to_string().contains(expected_error) => failures.push(format!(
-                    "{name} ({mode}): expected error containing '{expected_error}', got '{err}'"
+                    "{name} ({mode}) [export]: expected error containing '{expected_error}', got '{err}'"
                 )),
                 Err(_) => {}
-                Ok(Err(err)) => failures.push(format!(
-                    "{name} ({mode}): expected serde error but export failed with '{err}'"
-                )),
-                Ok(Ok(output)) => failures.push(format!(
-                    "{name} ({mode}): expected serde error, got output: {output}"
-                )),
             }
         }
     }
