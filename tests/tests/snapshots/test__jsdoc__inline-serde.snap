@@ -1045,6 +1045,8 @@ expression: output
 	*		"InlineFlattenGenericsG<()>": InlineFlattenGenericsG<null>,
 	*		InlineFlattenGenerics: InlineFlattenGenerics,
 	*		GenericParameterOrderPreserved: GenericParameterOrderPreserved,
+	*		TestCollectionRegister: TestCollectionRegister,
+	*		TestCollectionRegister: TestCollectionRegister,
 	*	}} Primitives
 	* @property {number} i8
 	* @property {number} i16
@@ -1314,6 +1316,8 @@ expression: output
 	* @property {InlineFlattenGenericsG<null>} "InlineFlattenGenericsG<()>"
 	* @property {InlineFlattenGenerics} InlineFlattenGenerics
 	* @property {GenericParameterOrderPreserved} GenericParameterOrderPreserved
+	* @property {TestCollectionRegister} TestCollectionRegister
+	* @property {TestCollectionRegister} TestCollectionRegister
 	*
 	* @typedef {{
 	*		demo: Recursive,
@@ -1550,6 +1554,8 @@ expression: output
 	* 	a: string,
 	* }} C
 	* @property {First} D
+	*
+	* @typedef {never} TestCollectionRegister
 	*
 	* @typedef {"Unit" | ({ Single: number }) & { Multiple?: never; Struct?: never } | ({ Multiple: [number, number] }) & { Single?: never; Struct?: never } | ({ Struct: {
 	* 	a: number,

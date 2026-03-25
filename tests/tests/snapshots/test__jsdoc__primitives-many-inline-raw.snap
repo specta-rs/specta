@@ -1083,4 +1083,8 @@ expression: output
 	*		pair: Pair<number, string>,
 	*	}} GenericParameterOrderPreserved
 	* @property {Pair<number, string>} pair
+	*
+	* @typedef {never} TestCollectionRegister
+	*
+	* @typedef {never} TestCollectionRegister
 	*/

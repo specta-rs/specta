@@ -71,7 +71,7 @@ impl Types {
     }
 
     /// Merge types from another collection into this one.
-    pub fn merge(&mut self, other: &Self) {
+    pub fn extend(&mut self, other: &Self) {
         for (id, other) in &other.0 {
             match self.0.get(id) {
                 // Key doesn't exist - insert from other

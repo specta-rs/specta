@@ -22,6 +22,7 @@ use specta::{Type, Types, datatype::DataType};
 /// In a real-world application you should prefer the `Types::register` method instead of this.
 /// In this case we can't use it because we intent to test `NamedDataType` and `DataType`'s.
 /// `Types` only registers `NamedDataType` as those are the only types that aren't built-in.
+#[macro_export]
 macro_rules! types {
     ($($t:ty),* $(,)?) => {{
         let mut types = specta::Types::default();
@@ -405,6 +406,11 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         InlineFlattenGenericsG<()>,
         InlineFlattenGenerics,
         GenericParameterOrderPreserved,
+
+        // Test that the types don't get duplicated in the type map.
+        // (these will be duplicated in dts tests as that doesn't use the typemap)
+        TestCollectionRegister,
+        TestCollectionRegister,
     )
 }
 
@@ -418,6 +424,10 @@ pub fn types_phased() -> (Types, Vec<(&'static str, DataType)>) {
         StructPhaseSpecificRename,
     )
 }
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub enum TestCollectionRegister {}
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
