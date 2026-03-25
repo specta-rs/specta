@@ -193,6 +193,7 @@ EmptyEnumTaggedWContent: EmptyEnumTaggedWContent
 EmptyEnumUntagged: EmptyEnumUntagged
 SkipOnlyField: SkipOnlyField
 SkipField: SkipField
+SkipVariant: SkipVariant
 TransparentWithSkip: TransparentWithSkip
 TransparentWithSkip2: TransparentWithSkip2
 TransparentWithSkip3: TransparentWithSkip3

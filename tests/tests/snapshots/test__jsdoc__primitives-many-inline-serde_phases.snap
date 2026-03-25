@@ -959,6 +959,9 @@ expression: output
 	*	}} SkipField
 	* @property {number} b
 	*
+	* @typedef {{ A: string }} SkipVariant
+	* @property {{ A: string }} A
+	*
 	* @typedef {null} TransparentWithSkip
 	* @property {null} "0"
 	*

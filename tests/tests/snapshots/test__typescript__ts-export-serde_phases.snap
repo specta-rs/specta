@@ -751,6 +751,7 @@ export type Primitives = {
 	EmptyEnumUntagged: EmptyEnumUntagged,
 	SkipOnlyField: SkipOnlyField,
 	SkipField: SkipField,
+	SkipVariant: SkipVariant,
 	TransparentWithSkip: TransparentWithSkip,
 	TransparentWithSkip2: TransparentWithSkip2,
 	TransparentWithSkip3: TransparentWithSkip3,
@@ -863,6 +864,8 @@ export type SkipOnlyField = Record<string, never>;
 export type SkipStructFields = {
 	a: number,
 };
+
+export type SkipVariant = { A: string };
 
 export type SkippedFieldWithinVariant = { type: "A" } | { type: "B"; data: string };
 

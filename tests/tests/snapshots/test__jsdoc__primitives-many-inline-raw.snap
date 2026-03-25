@@ -889,6 +889,9 @@ expression: output
 	*	}} SkipField
 	* @property {number} b
 	*
+	* @typedef {string} SkipVariant
+	* @property {string} A
+	*
 	* @typedef {null} TransparentWithSkip
 	* @property {null} "0"
 	*
