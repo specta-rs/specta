@@ -1,10 +1,10 @@
 use std::{collections::HashMap, iter, path::Path};
 
 use specta::{
-    ResolvedTypes, Type, Types,
     datatype::{DataType, Reference},
+    ResolvedTypes, Type, Types,
 };
-use specta_typescript::{BigIntExportBehavior, Layout, Typescript, primitives};
+use specta_typescript::{primitives, BigIntExportBehavior, Layout, Typescript};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -281,7 +281,7 @@ fn typescript_export_serde_errors() {
         assert_serde_error::<A>(
             &mut failures,
             "A(HashMap<() /* `null` */, ()>)",
-            "empty tuple key is unsupported",
+            "tuple keys are not supported by serde_json map key serialization",
         );
     }
     {
@@ -292,7 +292,7 @@ fn typescript_export_serde_errors() {
         assert_serde_error::<B>(
             &mut failures,
             "B(HashMap<RegularStruct, ()>)",
-            "key type is not supported by legacy map-key validation rules",
+            "struct keys must serialize as a newtype struct to be valid serde_json map keys",
         );
     }
     {
@@ -303,7 +303,7 @@ fn typescript_export_serde_errors() {
         assert_serde_error::<C>(
             &mut failures,
             "C(HashMap<Variants, ()>)",
-            "key type is not supported by legacy map-key validation rules",
+            "enum key variant 'A' serializes as a struct variant, which serde_json rejects",
         );
     }
 
