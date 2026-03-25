@@ -35,6 +35,18 @@ export type B = {
 
 export type BasicEnum = "A" | "B";
 
+export type BoxFlattened = {
+	b: BoxedInner,
+};
+
+export type BoxInline = {
+	c: BoxedInner,
+};
+
+export type BoxedInner = {
+	a: number,
+};
+
 export type BracedStruct = string;
 
 /**
@@ -428,6 +440,10 @@ export type MyEnumUntagged = { inner: First };
 
 export type NestedEnum = string | number;
 
+export type Ninth = string | "B" | {
+	a: string,
+} | First;
+
 export type NonOptional = string | null;
 
 export type OptionalInEnum = string | null | { a: string | null } | { a?: string | null };
@@ -641,6 +657,8 @@ export type Primitives = {
 	A: A,
 	DoubleFlattened: DoubleFlattened,
 	FlattenedInner: FlattenedInner,
+	BoxFlattened: BoxFlattened,
+	BoxInline: BoxInline,
 	First: First,
 	Second: Second,
 	Third: Third,
@@ -649,6 +667,7 @@ export type Primitives = {
 	Sixth: Sixth,
 	Seventh: Seventh,
 	Eight: Eight,
+	Ninth: Ninth,
 	Tenth: Tenth,
 	MyEnumTagged: MyEnumTagged,
 	MyEnumExternal: MyEnumExternal,

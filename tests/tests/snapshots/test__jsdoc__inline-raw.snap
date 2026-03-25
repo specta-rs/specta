@@ -51,6 +51,21 @@ expression: output
 	* @property {"A"} A
 	* @property {"B"} B
 	*
+	* @typedef {{
+	*		b: BoxedInner,
+	*	}} BoxFlattened
+	* @property {BoxedInner} b
+	*
+	* @typedef {{
+	*		c: BoxedInner,
+	*	}} BoxInline
+	* @property {BoxedInner} c
+	*
+	* @typedef {{
+	*		a: number,
+	*	}} BoxedInner
+	* @property {number} a
+	*
 	* @typedef {string} BracedStruct
 	* @property {string} "0"
 	*
@@ -621,6 +636,16 @@ expression: output
 	* @property {string} A
 	* @property {number} B
 	*
+	* @typedef {string | "B" | {
+	* 	a: string,
+	* } | First} Ninth
+	* @property {string} A
+	* @property {"B"} B
+	* @property {{
+	* 	a: string,
+	* }} C
+	* @property {First} D
+	*
 	* @typedef {string | null} NonOptional
 	* @property {string | null} "0"
 	*
@@ -844,6 +869,8 @@ expression: output
 	*		A: A,
 	*		DoubleFlattened: DoubleFlattened,
 	*		FlattenedInner: FlattenedInner,
+	*		BoxFlattened: BoxFlattened,
+	*		BoxInline: BoxInline,
 	*		First: First,
 	*		Second: Second,
 	*		Third: Third,
@@ -852,6 +879,7 @@ expression: output
 	*		Sixth: Sixth,
 	*		Seventh: Seventh,
 	*		Eight: Eight,
+	*		Ninth: Ninth,
 	*		Tenth: Tenth,
 	*		MyEnumTagged: MyEnumTagged,
 	*		MyEnumExternal: MyEnumExternal,
@@ -1096,6 +1124,8 @@ expression: output
 	* @property {A} A
 	* @property {DoubleFlattened} DoubleFlattened
 	* @property {FlattenedInner} FlattenedInner
+	* @property {BoxFlattened} BoxFlattened
+	* @property {BoxInline} BoxInline
 	* @property {First} First
 	* @property {Second} Second
 	* @property {Third} Third
@@ -1104,6 +1134,7 @@ expression: output
 	* @property {Sixth} Sixth
 	* @property {Seventh} Seventh
 	* @property {Eight} Eight
+	* @property {Ninth} Ninth
 	* @property {Tenth} Tenth
 	* @property {MyEnumTagged} MyEnumTagged
 	* @property {MyEnumExternal} MyEnumExternal

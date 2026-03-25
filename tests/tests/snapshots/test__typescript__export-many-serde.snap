@@ -491,6 +491,12 @@ export type DoubleFlattened = {
 
 export type FlattenedInner = (Inner);
 
+export type BoxFlattened = (BoxedInner);
+
+export type BoxInline = {
+	c: BoxedInner,
+};
+
 export type First = {
 	a: string,
 };
@@ -530,6 +536,8 @@ export type Seventh = {
 };
 
 export type Eight = { A: string } | "B";
+
+export type Ninth = { t: "A"; c: string } | { t: "B" } | { t: "C"; c: First } | { t: "D"; c: First };
 
 export type Tenth = string | "B" | {
 	a: string,

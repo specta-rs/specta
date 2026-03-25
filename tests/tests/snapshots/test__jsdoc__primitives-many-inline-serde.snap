@@ -704,6 +704,14 @@ expression: output
 	* @typedef {(Inner)} FlattenedInner
 	* @property {Inner} c
 	*
+	* @typedef {(BoxedInner)} BoxFlattened
+	* @property {BoxedInner} b
+	*
+	* @typedef {{
+	*		c: BoxedInner,
+	*	}} BoxInline
+	* @property {BoxedInner} c
+	*
 	* @typedef {{
 	*		a: string,
 	*	}} First
@@ -759,6 +767,12 @@ expression: output
 	* @typedef {{ A: string } | "B"} Eight
 	* @property {{ A: string }} A
 	* @property {"B"} B
+	*
+	* @typedef {{ t: "A"; c: string } | { t: "B" } | { t: "C"; c: First } | { t: "D"; c: First }} Ninth
+	* @property {{ t: "A"; c: string }} A
+	* @property {{ t: "B" }} B
+	* @property {{ t: "C"; c: First }} C
+	* @property {{ t: "D"; c: First }} D
 	*
 	* @typedef {string | "B" | {
 	* 	a: string,
