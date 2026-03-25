@@ -67,12 +67,11 @@ fn inner(
     match dt {
         DataType::Nullable(ty) => inner(ty, types, generics, checked_references, path, mode)?,
         DataType::Map(map) => {
-            let mut checked_map_key_references = HashSet::new();
-            validate_map_key_legacy(
+            inner(
                 map.key_ty(),
                 types,
                 generics,
-                &mut checked_map_key_references,
+                checked_references,
                 format!("{path}.<map_key>"),
                 mode,
             )?;
@@ -522,146 +521,6 @@ fn merged_generics(
         .cloned();
 
     child.iter().cloned().chain(unshadowed_parent).collect()
-}
-
-fn validate_map_key_legacy(
-    key_ty: &DataType,
-    types: &Types,
-    generics: &[(GenericReference, DataType)],
-    checked_references: &mut HashSet<Reference>,
-    path: String,
-    mode: ApplyMode,
-) -> Result<()> {
-    match key_ty {
-        DataType::Primitive(_) => Ok(()),
-        DataType::Tuple(tuple) if tuple.elements().is_empty() => Err(Error::invalid_phased_type_usage(
-            path,
-            "empty tuple key is unsupported",
-        )),
-        DataType::Tuple(_) => Err(Error::invalid_phased_type_usage(
-            path,
-            "key type is not supported by legacy map-key validation rules",
-        )),
-        DataType::Struct(strct) => {
-            if let Fields::Unnamed(unnamed) = strct.fields() {
-                let mut serializable_fields = unnamed.fields().iter().filter_map(|field| field.ty());
-                if let Some(inner) = serializable_fields.next()
-                    && serializable_fields.next().is_none()
-                {
-                    return validate_map_key_legacy(
-                        inner,
-                        types,
-                        generics,
-                        checked_references,
-                        path,
-                        mode,
-                    );
-                }
-            }
-
-            Err(Error::invalid_phased_type_usage(
-                path,
-                "key type is not supported by legacy map-key validation rules",
-            ))
-        }
-        DataType::Enum(enm) => {
-            let repr = enum_repr_from_attrs(enm.attributes())?;
-            if !matches!(repr, EnumRepr::Untagged)
-                && enm
-                    .variants()
-                    .iter()
-                    .any(|(_, variant)| matches!(variant.fields(), Fields::Unnamed(_)))
-            {
-                return Err(Error::invalid_phased_type_usage(
-                    path,
-                    "enum key with tuple variants must be #[serde(untagged)]",
-                ));
-            }
-
-            for (variant_name, variant) in enm.variants() {
-                match variant.fields() {
-                    Fields::Unit => {}
-                    Fields::Unnamed(unnamed) => {
-                        let mut serializable_fields =
-                            unnamed.fields().iter().filter_map(|field| field.ty());
-                        let Some(inner) = serializable_fields.next() else {
-                            continue;
-                        };
-
-                        if serializable_fields.next().is_some() {
-                            return Err(Error::invalid_phased_type_usage(
-                                path,
-                                format!(
-                                    "enum key variant '{variant_name}' has multiple fields and cannot be a map key"
-                                ),
-                            ));
-                        }
-
-                        validate_map_key_legacy(
-                            inner,
-                            types,
-                            generics,
-                            checked_references,
-                            path.clone(),
-                            mode,
-                        )?;
-                    }
-                    Fields::Named(_) => {
-                        return Err(Error::invalid_phased_type_usage(
-                            path,
-                            "key type is not supported by legacy map-key validation rules",
-                        ));
-                    }
-                }
-            }
-
-            Ok(())
-        }
-        DataType::Reference(Reference::Named(reference)) => {
-            let reference_key = Reference::Named(reference.clone());
-            if checked_references.contains(&reference_key) {
-                return Ok(());
-            }
-
-            checked_references.insert(reference_key.clone());
-            let result = if let Some(ndt) = reference.get(types) {
-                let merged_generics = merged_generics(generics, reference.generics());
-                validate_map_key_legacy(
-                    ndt.ty(),
-                    types,
-                    &merged_generics,
-                    checked_references,
-                    path,
-                    mode,
-                )
-            } else {
-                Err(Error::invalid_phased_type_usage(
-                    path,
-                    "key type is not supported by legacy map-key validation rules",
-                ))
-            };
-            checked_references.remove(&reference_key);
-            result
-        }
-        DataType::Reference(Reference::Generic(generic)) => {
-            let Some((_, ty)) = generics.iter().find(|(candidate, _)| candidate == generic) else {
-                return Ok(());
-            };
-
-            if matches!(ty, DataType::Reference(Reference::Generic(inner)) if inner == generic) {
-                return Ok(());
-            }
-
-            validate_map_key_legacy(ty, types, generics, checked_references, path, mode)
-        }
-        DataType::Reference(Reference::Opaque(_))
-        | DataType::List(_)
-        | DataType::Map(_)
-        | DataType::Nullable(_) => Err(Error::invalid_phased_type_usage(
-            path,
-            "key type is not supported by legacy map-key validation rules",
-        )),
-    }
 }
 
 fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Result<()> {
