@@ -571,6 +571,13 @@ expression: output
 	* @typedef {null} InternallyTaggedHInner
 	* @property {null} "0"
 	*
+	* @typedef {"A" | "B"} InternallyTaggedL
+	* @property {"A" | "B"} A
+	*
+	* @typedef {"A" | "B"} InternallyTaggedLInner
+	* @property {"A"} A
+	* @property {"B"} B
+	*
 	* @typedef {"A" | "B"} InternallyTaggedM
 	* @property {"A" | "B"} A
 	*
@@ -923,6 +930,7 @@ expression: output
 	*		InternallyTaggedE: InternallyTaggedE,
 	*		InternallyTaggedF: InternallyTaggedF,
 	*		InternallyTaggedH: InternallyTaggedH,
+	*		InternallyTaggedL: InternallyTaggedL,
 	*		InternallyTaggedM: InternallyTaggedM,
 	*		StructWithAlias: StructWithAlias,
 	*		StructWithMultipleAliases: StructWithMultipleAliases,
@@ -1184,6 +1192,7 @@ expression: output
 	* @property {InternallyTaggedE} InternallyTaggedE
 	* @property {InternallyTaggedF} InternallyTaggedF
 	* @property {InternallyTaggedH} InternallyTaggedH
+	* @property {InternallyTaggedL} InternallyTaggedL
 	* @property {InternallyTaggedM} InternallyTaggedM
 	* @property {StructWithAlias} StructWithAlias
 	* @property {StructWithMultipleAliases} StructWithMultipleAliases

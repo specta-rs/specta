@@ -1379,23 +1379,25 @@ fn internal_tag_payload_compatibility(
             compatible
         }
         DataType::Enum(enm) => {
-            enm.attributes()
-                .get::<SerdeContainerAttrs>()
-                .is_some_and(|attrs| attrs.untagged)
-                .then_some(())?;
+            match enum_repr_from_attrs(enm.attributes()).ok()? {
+                EnumRepr::Untagged => {
+                    let mut is_effectively_empty = true;
+                    for (_, variant) in enm.variants() {
+                        let Some(variant_empty) =
+                            internal_tag_variant_payload_compatibility(variant, original_types, seen)
+                        else {
+                            return None;
+                        };
 
-            let mut is_effectively_empty = true;
-            for (_, variant) in enm.variants() {
-                let Some(variant_empty) =
-                    internal_tag_variant_payload_compatibility(variant, original_types, seen)
-                else {
-                    return None;
-                };
+                        is_effectively_empty &= variant_empty;
+                    }
 
-                is_effectively_empty &= variant_empty;
+                    Some(is_effectively_empty)
+                }
+                EnumRepr::External | EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. } => {
+                    Some(false)
+                }
             }
-
-            Some(is_effectively_empty)
         }
         DataType::Primitive(_)
         | DataType::List(_)

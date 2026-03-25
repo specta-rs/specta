@@ -409,6 +409,10 @@ export type InternallyTaggedH = { type: "A" };
 
 export type InternallyTaggedHInner = null;
 
+export type InternallyTaggedL = { type: "A" } & ({ type: "A" } | { type: "B" });
+
+export type InternallyTaggedLInner = { type: "A" } | { type: "B" };
+
 export type InternallyTaggedM = { type: "A" };
 
 export type InternallyTaggedMInner = "A" | "B";
@@ -728,6 +732,7 @@ export type Primitives = {
 	InternallyTaggedE: InternallyTaggedE,
 	InternallyTaggedF: InternallyTaggedF,
 	InternallyTaggedH: InternallyTaggedH,
+	InternallyTaggedL: InternallyTaggedL,
 	InternallyTaggedM: InternallyTaggedM,
 	StructWithAlias: StructWithAlias,
 	StructWithMultipleAliases: StructWithMultipleAliases,

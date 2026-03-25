@@ -174,6 +174,7 @@ InternallyTaggedD: InternallyTaggedD
 InternallyTaggedE: InternallyTaggedE
 InternallyTaggedF: InternallyTaggedF
 InternallyTaggedH: InternallyTaggedH
+InternallyTaggedL: InternallyTaggedL
 InternallyTaggedM: InternallyTaggedM
 StructWithAlias: StructWithAlias
 StructWithMultipleAliases: StructWithMultipleAliases
