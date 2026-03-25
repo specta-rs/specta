@@ -10,15 +10,20 @@ use tempfile::TempDir;
 use crate::fs_to_string;
 
 fn typescript_types() -> (Types, Vec<(&'static str, DataType)>) {
-    crate::types!(
+    let mut types = Types::default();
+    let mut dts = Vec::new();
+
+    register!(types, dts;
         specta_typescript::Any,
         specta_typescript::Any<String>,
         specta_typescript::Unknown,
         specta_typescript::Unknown<String>,
         specta_typescript::Never,
         specta_typescript::Never<String>,
-        HashMap<specta_typescript::Any, ()>,
-    )
+    );
+    let _ = <HashMap<specta_typescript::Any, ()> as Type>::definition(&mut types);
+
+    (types, dts)
 }
 
 fn phase_collections() -> [(

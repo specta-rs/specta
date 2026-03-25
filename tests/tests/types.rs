@@ -15,7 +15,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use specta::{Type, Types, datatype::DataType};
+use specta::{datatype::DataType, Type, Types};
 
 /// A macro to collect up the types for better testing.
 ///
@@ -416,13 +416,17 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
 
 #[rustfmt::skip]
 pub fn types_phased() -> (Types, Vec<(&'static str, DataType)>) {
-    types!(
-        // https://github.com/specta-rs/specta/issues/374
-        Issue374,
+    let mut types = Types::default();
+    let mut dts = Vec::new();
 
+    // https://github.com/specta-rs/specta/issues/374
+    register!(types, dts;
+        Issue374,
         Optional,
         StructPhaseSpecificRename,
-    )
+    );
+
+    (types, dts)
 }
 
 #[derive(Type)]
