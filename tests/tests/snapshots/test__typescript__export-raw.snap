@@ -294,6 +294,22 @@ UntaggedVariantsWithoutValue: export type UntaggedVariantsWithoutValue = string 
 
 UntaggedVariantsWithDuplicateBranches: export type UntaggedVariantsWithDuplicateBranches = null | number;
 
+HashMap<String, ()>: export type HashMap<K, V> = { [key in K]: V };
+
+Regular: export type Regular = { [key in string]: null };
+
+HashMap<Infallible, ()>: export type HashMap<K, V> = { [key in K]: V };
+
+HashMap<TransparentStruct, ()>: export type HashMap<K, V> = { [key in K]: V };
+
+HashMap<UnitVariants, ()>: export type HashMap<K, V> = { [key in K]: V };
+
+HashMap<UntaggedVariantsKey, ()>: export type HashMap<K, V> = { [key in K]: V };
+
+ValidMaybeValidKey: export type ValidMaybeValidKey = { [key in MaybeValidKey<string>]: null };
+
+ValidMaybeValidKeyNested: export type ValidMaybeValidKeyNested = { [key in MaybeValidKey<MaybeValidKey<string>>]: null };
+
 MacroStruct: export type MacroStruct = string;
 
 MacroStruct2: export type MacroStruct2 = {

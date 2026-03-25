@@ -1,10 +1,10 @@
 use std::{collections::HashMap, iter, path::Path};
 
 use specta::{
-    datatype::{DataType, Reference},
     ResolvedTypes, Type, Types,
+    datatype::{DataType, Reference},
 };
-use specta_typescript::{primitives, BigIntExportBehavior, Layout, Typescript};
+use specta_typescript::{BigIntExportBehavior, Layout, Typescript, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -117,47 +117,47 @@ fn typescript_export_serde_errors() {
         }
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(tag = "type")]
     enum InternallyTaggedB {
         A(String),
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(tag = "type")]
     enum InternallyTaggedC {
         A(Vec<String>),
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(tag = "type")]
     enum InternallyTaggedG {
         A(InternallyTaggedGInner),
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(untagged)]
     enum InternallyTaggedGInner {
         A(String),
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(tag = "type")]
     enum InternallyTaggedI {
         A(InternallyTaggedIInner),
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(transparent)]
     struct InternallyTaggedIInner(String);
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(tag = "a")]
     enum TaggedEnumOfEmptyTupleStruct {
@@ -165,18 +165,18 @@ fn typescript_export_serde_errors() {
         B(EmptyTupleStruct),
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     struct EmptyTupleStruct();
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     enum SkipOnlyVariantExternallyTagged {
         #[serde(skip)]
         A(String),
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(tag = "t")]
     enum SkipOnlyVariantInternallyTagged {
@@ -184,7 +184,7 @@ fn typescript_export_serde_errors() {
         A(String),
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(tag = "t", content = "c")]
     enum SkipOnlyVariantAdjacentlyTagged {
@@ -192,7 +192,7 @@ fn typescript_export_serde_errors() {
         A(String),
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(untagged)]
     enum SkipOnlyVariantUntagged {
@@ -200,18 +200,43 @@ fn typescript_export_serde_errors() {
         A(String),
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     struct RegularStruct {
         a: String,
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     enum Variants {
         A(String),
         B(i32),
         C(u8),
+    }
+
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    #[serde(transparent)]
+    struct MaybeValidKey<T>(T);
+
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    #[serde(transparent)]
+    struct InvalidMaybeValidKey(HashMap<MaybeValidKey<()>, ()>);
+
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    #[serde(transparent)]
+    struct InvalidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<()>>, ()>);
+
+    #[derive(Type)]
+    #[specta(transparent, collect = false)]
+    struct RecursiveMapKeyTrick(RecursiveMapKey);
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct RecursiveMapKey {
+        demo: HashMap<RecursiveMapKeyTrick, String>,
     }
 
     let mut failures = Vec::new();
@@ -306,6 +331,14 @@ fn typescript_export_serde_errors() {
             "enum key variant 'A' serializes as a struct variant, which serde_json rejects",
         );
     }
+    assert_serde_error::<InvalidMaybeValidKey>(&mut failures, "InvalidMaybeValidKey", "");
+    assert_serde_error::<InvalidMaybeValidKeyNested>(
+        &mut failures,
+        "InvalidMaybeValidKeyNested",
+        "",
+    );
+
+    assert_serde_error::<RecursiveMapKey>(&mut failures, "RecursiveMapKey", "");
 
     assert!(
         failures.is_empty(),
