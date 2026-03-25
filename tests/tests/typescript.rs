@@ -1,10 +1,10 @@
 use std::{collections::HashMap, iter, path::Path};
 
 use specta::{
-    datatype::{DataType, Reference},
     ResolvedTypes, Type, Types,
+    datatype::{DataType, Reference},
 };
-use specta_typescript::{primitives, BigIntExportBehavior, Layout, Typescript};
+use specta_typescript::{BigIntExportBehavior, Layout, Typescript, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -64,6 +64,7 @@ fn typescript_export() {
 
 #[test]
 fn typescript_export_serde_errors() {
+    #[allow(clippy::type_complexity)]
     fn assert_serde_error<T: Type>(failures: &mut Vec<String>, name: &str, expected_error: &str) {
         let mut types = Types::default();
         let dt = T::definition(&mut types);
@@ -171,7 +172,7 @@ fn typescript_export_serde_errors() {
     #[derive(Type, serde::Serialize, serde::Deserialize)]
     #[specta(collect = false)]
     enum SkipOnlyVariantExternallyTagged {
-        #[specta(skip)]
+        #[serde(skip)]
         A(String),
     }
 
@@ -179,7 +180,7 @@ fn typescript_export_serde_errors() {
     #[specta(collect = false)]
     #[serde(tag = "t")]
     enum SkipOnlyVariantInternallyTagged {
-        #[specta(skip)]
+        #[serde(skip)]
         A(String),
     }
 
@@ -187,7 +188,7 @@ fn typescript_export_serde_errors() {
     #[specta(collect = false)]
     #[serde(tag = "t", content = "c")]
     enum SkipOnlyVariantAdjacentlyTagged {
-        #[specta(skip)]
+        #[serde(skip)]
         A(String),
     }
 
@@ -195,7 +196,7 @@ fn typescript_export_serde_errors() {
     #[specta(collect = false)]
     #[serde(untagged)]
     enum SkipOnlyVariantUntagged {
-        #[specta(skip)]
+        #[serde(skip)]
         A(String),
     }
 
@@ -215,52 +216,62 @@ fn typescript_export_serde_errors() {
 
     let mut failures = Vec::new();
 
+    // Serde Error: "cannot serialize tagged newtype variant InternallyTaggedB::A containing a string"
     assert_serde_error::<InternallyTaggedB>(
         &mut failures,
         "InternallyTaggedB",
         "Invalid internally tagged enum",
     );
+    // Serde Error: "cannot serialize tagged newtype variant InternallyTaggedC::A containing a sequence"
     assert_serde_error::<InternallyTaggedC>(
         &mut failures,
         "InternallyTaggedC",
         "Invalid internally tagged enum",
     );
+    // Serde Error: "cannot serialize tagged newtype variant InternallyTaggedG::A containing a string"
     assert_serde_error::<InternallyTaggedG>(
         &mut failures,
         "InternallyTaggedG",
         "Invalid internally tagged enum",
     );
+    // Serde Error: "cannot serialize tagged newtype variant InternallyTaggedI::A containing a string"
     assert_serde_error::<InternallyTaggedI>(
         &mut failures,
         "InternallyTaggedI",
         "Invalid internally tagged enum",
     );
 
+    // Serde Error: "cannot serialize tagged newtype variant TaggedEnumOfEmptyTupleStruct::A containing a tuple struct"
     assert_serde_error::<TaggedEnumOfEmptyTupleStruct>(
         &mut failures,
         "TaggedEnumOfEmptyTupleStruct",
         "Invalid internally tagged enum",
     );
+    // Serde Error: "the enum variant SkipOnlyVariantExternallyTagged::A cannot be serialized"
     assert_serde_error::<SkipOnlyVariantExternallyTagged>(
         &mut failures,
         "SkipOnlyVariantExternallyTagged",
         "Invalid usage of #[serde(skip)]",
     );
+    // Serde Error: "the enum variant SkipOnlyVariantInternallyTagged::A cannot be serialized"
     assert_serde_error::<SkipOnlyVariantInternallyTagged>(
         &mut failures,
         "SkipOnlyVariantInternallyTagged",
         "Invalid usage of #[serde(skip)]",
     );
+    // Serde Error: "the enum variant SkipOnlyVariantAdjacentlyTagged::A cannot be serialized"
     assert_serde_error::<SkipOnlyVariantAdjacentlyTagged>(
         &mut failures,
         "SkipOnlyVariantAdjacentlyTagged",
         "Invalid usage of #[serde(skip)]",
     );
+    // Serde Error: "the enum variant SkipOnlyVariantUntagged::A cannot be serialized"
     assert_serde_error::<SkipOnlyVariantUntagged>(
         &mut failures,
         "SkipOnlyVariantUntagged",
         "Invalid usage of #[serde(skip)]",
     );
+
     assert_serde_error::<HashMap<(), ()>>(
         &mut failures,
         "HashMap<() /* `null` */, ()>",
