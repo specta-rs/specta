@@ -16,7 +16,7 @@ mod types;
 mod typescript;
 mod utils;
 
-pub use types::types;
+pub use types::{types, types_phased};
 pub use utils::fs_to_string;
 
 #[test]

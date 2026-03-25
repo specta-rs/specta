@@ -598,3 +598,5 @@ InlineFlattenGenerics: {
 GenericParameterOrderPreserved: {
 	pair: Pair<number, string>,
 }
+TestCollectionRegister: never
+TestCollectionRegister: never

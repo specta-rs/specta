@@ -741,3 +741,7 @@ InlineFlattenGenerics: export type InlineFlattenGenerics = {
 GenericParameterOrderPreserved: export type GenericParameterOrderPreserved = {
 	pair: Pair<number, string>,
 };
+
+TestCollectionRegister: export type TestCollectionRegister = never;
+
+TestCollectionRegister: export type TestCollectionRegister = never;

@@ -9,50 +9,62 @@ use tempfile::TempDir;
 
 use crate::fs_to_string;
 
-pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
-    let (mut types, dts) = crate::types();
-
-    // Test ts-specific types
-    // types = types
-    //     .register::<Any>()
-    //     .register::<Any<String>>()
-    //     .register::<Unknown>()
-    //     .register::<Unknown<String>>()
-    //     .register::<Never>()
-    //     .register::<Never<String>>();
-
-    // dts.push(value);
-
-    // Test that the types don't get duplicated in the type map.
-    {
-        #[derive(Type)]
-        #[specta(collect = false)]
-        pub enum TestCollectionRegister {}
-        types = types
-            .register::<TestCollectionRegister>()
-            .register::<TestCollectionRegister>();
-    }
-
-    (types, dts)
+fn typescript_types() -> (Types, Vec<(&'static str, DataType)>) {
+    crate::types!(
+        specta_typescript::Any,
+        specta_typescript::Any<String>,
+        specta_typescript::Unknown,
+        specta_typescript::Unknown<String>,
+        specta_typescript::Never,
+        specta_typescript::Never<String>,
+        HashMap<specta_typescript::Any, ()>,
+    )
 }
 
-fn phase_collections(
-    types: Types,
-) -> [(&'static str, Result<ResolvedTypes, specta_serde::Error>); 3] {
+fn phase_collections() -> [(
+    &'static str,
+    Result<(Vec<(&'static str, DataType)>, ResolvedTypes), specta_serde::Error>,
+); 3] {
+    let (types, dts) = {
+        let (mut types, mut dts) = crate::types();
+        let (types2, dts2) = typescript_types();
+        types.extend(&types2);
+        dts.extend(dts2);
+        (types, dts)
+    };
+    let (phased_types, phased_dts) = {
+        let (mut types2, mut dts2) = crate::types_phased();
+        types2.extend(&types);
+        dts2.extend(dts.iter().cloned());
+        (types2, dts2)
+    };
+
     [
-        ("raw", Ok(ResolvedTypes::from_resolved_types(types.clone()))),
-        ("serde", specta_serde::apply(types.clone())),
-        ("serde_phases", specta_serde::apply_phases(types)),
+        (
+            "raw",
+            Ok((
+                dts.clone(),
+                ResolvedTypes::from_resolved_types(types.clone()),
+            )),
+        ),
+        (
+            "serde",
+            specta_serde::apply(types).map(|types| (dts, types)),
+        ),
+        (
+            "serde_phases",
+            specta_serde::apply_phases(phased_types).map(|types| (phased_dts, types)),
+        ),
     ]
 }
 
 #[test]
 fn typescript_export() {
-    for (mode, types) in phase_collections(types().0) {
+    for (mode, types) in phase_collections() {
         insta::assert_snapshot!(
             format!("ts-export-{mode}"),
             match types {
-                Ok(types) => Typescript::default()
+                Ok((_, types)) => Typescript::default()
                     .bigint(BigIntExportBehavior::Number)
                     .export(&types)
                     .unwrap(),
@@ -367,10 +379,10 @@ fn typescript_export_to() {
         Layout::ModulePrefixedName,
         Layout::Namespaces,
     ] {
-        for (mode, types) in phase_collections(types().0) {
+        for (mode, types) in phase_collections() {
             let name = format!("ts-export-to-{}-{mode}", layout.to_string().to_lowercase());
             let output = match types {
-                Ok(types) => {
+                Ok((_, types)) => {
                     let path = temp.path().join(&name);
                     Typescript::default()
                         .bigint(BigIntExportBehavior::Number)
@@ -394,28 +406,27 @@ fn typescript_export_to() {
 
 #[test]
 fn primitives_export() {
-    let (types, dts) = crate::types();
-    for (mode, types) in phase_collections(types) {
-        let output = match types {
-            Ok(types) => {
+    for (mode, result) in phase_collections() {
+        let output = result.map_or_else(
+            |err| format!("ERROR: {err}"),
+            |(dts, types)| {
                 let ts = Typescript::default().bigint(BigIntExportBehavior::Number);
                 dts.iter()
-                    .filter_map(|(s, ty)| match ty {
-                        DataType::Reference(Reference::Named(r)) => {
-                            r.get(types.as_types()).cloned().map(|ty| (s, ty))
+                    .filter_map(|(name, ty)| match ty {
+                        DataType::Reference(Reference::Named(reference)) => {
+                            reference.get(types.as_types()).map(|ty| (name, ty))
                         }
                         _ => None,
                     })
-                    .map(|(s, ty)| {
-                        primitives::export(&ts, &types, iter::once(&ty), "")
-                            .map(|ty| format!("{s}: {ty}"))
+                    .map(|(name, ty)| {
+                        primitives::export(&ts, &types, iter::once(ty), "")
+                            .map(|ty| format!("{name}: {ty}"))
                     })
                     .collect::<Result<Vec<_>, _>>()
-                    .unwrap()
-                    .join("\n")
-            }
-            Err(err) => format!("ERROR: {err}"),
-        };
+                    .map(|exports| exports.join("\n"))
+                    .unwrap_or_else(|err| format!("ERROR: {err}"))
+            },
+        );
 
         insta::assert_snapshot!(format!("export-{mode}"), output);
     }
@@ -423,10 +434,9 @@ fn primitives_export() {
 
 #[test]
 fn primitives_export_many() {
-    let (types, dts) = crate::types();
-    for (mode, types) in phase_collections(types) {
+    for (mode, types) in phase_collections() {
         let output = match types {
-            Ok(types) => {
+            Ok((dts, types)) => {
                 let ts = Typescript::default().bigint(BigIntExportBehavior::Number);
                 let ndts = dts
                     .iter()
@@ -447,11 +457,9 @@ fn primitives_export_many() {
 
 #[test]
 fn primitives_export_allows_generic_hashmap_definition() {
-    let (types, dts) = crate::types();
-
-    for (mode, types) in phase_collections(types) {
+    for (mode, types) in phase_collections() {
         let output = match types {
-            Ok(types) => {
+            Ok((dts, types)) => {
                 let ts = Typescript::default().bigint(BigIntExportBehavior::Number);
                 let hash_map = dts
                     .iter()
@@ -478,10 +486,9 @@ fn primitives_export_allows_generic_hashmap_definition() {
 
 #[test]
 fn primitives_reference() {
-    let (types, dts) = crate::types();
-    for (mode, types) in phase_collections(types) {
+    for (mode, types) in phase_collections() {
         let output = match types {
-            Ok(types) => {
+            Ok((dts, types)) => {
                 let ts = Typescript::default().bigint(BigIntExportBehavior::Number);
                 dts.iter()
                     .filter_map(|(s, ty)| match ty {
@@ -504,10 +511,9 @@ fn primitives_reference() {
 
 #[test]
 fn primitives_inline() {
-    let (types, dts) = crate::types();
-    for (mode, types) in phase_collections(types) {
+    for (mode, types) in phase_collections() {
         let output = match types {
-            Ok(types) => {
+            Ok((dts, types)) => {
                 let ts = Typescript::default().bigint(BigIntExportBehavior::Number);
                 dts.iter()
                     .map(|(s, ty)| {
