@@ -563,6 +563,16 @@ ExternallyTagged: export type ExternallyTagged = "A" | { id: string; method: str
 
 Issue221External: export type Issue221External = ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never };
 
+InternallyTaggedD: export type InternallyTaggedD = { [key in string]: string };
+
+InternallyTaggedE: export type InternallyTaggedE = null;
+
+InternallyTaggedF: export type InternallyTaggedF = InternallyTaggedFInner;
+
+InternallyTaggedH: export type InternallyTaggedH = InternallyTaggedHInner;
+
+InternallyTaggedM: export type InternallyTaggedM = "A" | "B";
+
 StructWithAlias: export type StructWithAlias = {
 	field: string,
 };

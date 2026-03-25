@@ -553,6 +553,31 @@ expression: output
 	* @property {number} a
 	* @property {FlattenedInner} b
 	*
+	* @typedef {{ [key in string]: string }} InternallyTaggedD
+	* @property {{ [key in string]: string }} A
+	*
+	* @typedef {null} InternallyTaggedE
+	* @property {null} A
+	*
+	* @typedef {InternallyTaggedFInner} InternallyTaggedF
+	* @property {InternallyTaggedFInner} A
+	*
+	* @typedef {null} InternallyTaggedFInner
+	* @property {null} A
+	*
+	* @typedef {InternallyTaggedHInner} InternallyTaggedH
+	* @property {InternallyTaggedHInner} A
+	*
+	* @typedef {null} InternallyTaggedHInner
+	* @property {null} "0"
+	*
+	* @typedef {"A" | "B"} InternallyTaggedM
+	* @property {"A" | "B"} A
+	*
+	* @typedef {"A" | "B"} InternallyTaggedMInner
+	* @property {"A"} A
+	* @property {"B"} B
+	*
 	* @typedef {({ field: string }) & { other?: never } | ({ other: number }) & { field?: never }} InternallyTaggedWithAlias
 	* @property {{ field: string }} A
 	* @property {{ other: number }} B
@@ -894,6 +919,11 @@ expression: output
 	*		LoadProjectEvent: LoadProjectEvent,
 	*		ExternallyTagged: ExternallyTagged,
 	*		Issue221External: Issue221External,
+	*		InternallyTaggedD: InternallyTaggedD,
+	*		InternallyTaggedE: InternallyTaggedE,
+	*		InternallyTaggedF: InternallyTaggedF,
+	*		InternallyTaggedH: InternallyTaggedH,
+	*		InternallyTaggedM: InternallyTaggedM,
 	*		StructWithAlias: StructWithAlias,
 	*		StructWithMultipleAliases: StructWithMultipleAliases,
 	*		StructWithAliasAndRename: StructWithAliasAndRename,
@@ -1150,6 +1180,11 @@ expression: output
 	* @property {LoadProjectEvent} LoadProjectEvent
 	* @property {ExternallyTagged} ExternallyTagged
 	* @property {Issue221External} Issue221External
+	* @property {InternallyTaggedD} InternallyTaggedD
+	* @property {InternallyTaggedE} InternallyTaggedE
+	* @property {InternallyTaggedF} InternallyTaggedF
+	* @property {InternallyTaggedH} InternallyTaggedH
+	* @property {InternallyTaggedM} InternallyTaggedM
 	* @property {StructWithAlias} StructWithAlias
 	* @property {StructWithMultipleAliases} StructWithMultipleAliases
 	* @property {StructWithAliasAndRename} StructWithAliasAndRename

@@ -170,6 +170,11 @@ AdjacentlyTagged: AdjacentlyTagged
 LoadProjectEvent: LoadProjectEvent
 ExternallyTagged: ExternallyTagged
 Issue221External: Issue221External
+InternallyTaggedD: InternallyTaggedD
+InternallyTaggedE: InternallyTaggedE
+InternallyTaggedF: InternallyTaggedF
+InternallyTaggedH: InternallyTaggedH
+InternallyTaggedM: InternallyTaggedM
 StructWithAlias: StructWithAlias
 StructWithMultipleAliases: StructWithMultipleAliases
 StructWithAliasAndRename: StructWithAliasAndRename

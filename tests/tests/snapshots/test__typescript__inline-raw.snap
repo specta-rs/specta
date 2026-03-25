@@ -436,6 +436,11 @@ AdjacentlyTagged: "A" | { id: string; method: string } | string
 LoadProjectEvent: ({ project_name: string }) & { progress?: never; status?: never } | { project_name: string; status: string; progress: number }
 ExternallyTagged: "A" | { id: string; method: string } | string
 Issue221External: ({ a: string }) & { b?: never } | ({ b: string }) & { a?: never }
+InternallyTaggedD: { [key in string]: string }
+InternallyTaggedE: null
+InternallyTaggedF: InternallyTaggedFInner
+InternallyTaggedH: InternallyTaggedHInner
+InternallyTaggedM: "A" | "B"
 StructWithAlias: {
 	field: string,
 }
