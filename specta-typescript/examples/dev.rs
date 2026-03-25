@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{ResolvedTypes, Type, Types};
 use specta_typescript::{Any, Layout, Typescript, primitives};
 
 #[derive(Type)]
@@ -63,7 +63,7 @@ fn main() {
     ts.layout(Layout::Namespaces)
         .export_to(
             "demo.ts",
-            &TypeCollection::default().register::<nested::Another>(),
+            &ResolvedTypes::from_resolved_types(Types::default().register::<nested::Another>()),
         )
         .unwrap();
 

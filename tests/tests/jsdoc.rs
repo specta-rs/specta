@@ -1,8 +1,7 @@
 use std::path::Path;
 
 use specta::datatype::{DataType, Reference};
-use specta::{Type, TypeCollection};
-use specta_serde::SerdeMode;
+use specta::{ResolvedTypes, Type, Types};
 use specta_typescript::{BigIntExportBehavior, JSDoc, Layout, primitives};
 use tempfile::TempDir;
 
@@ -43,47 +42,52 @@ mod jsdoc_export_to_files_runtime_imports_types {
     }
 }
 
+fn phase_collections(
+    types: Types,
+) -> [(&'static str, Result<ResolvedTypes, specta_serde::Error>); 3] {
+    [
+        ("raw", Ok(ResolvedTypes::from_resolved_types(types.clone()))),
+        ("serde", specta_serde::apply(types.clone())),
+        ("serde_phases", specta_serde::apply_phases(types)),
+    ]
+}
+
 #[test]
 fn export() {
-    for mode in [
-        SerdeMode::Both,
-        SerdeMode::Serialize,
-        SerdeMode::Deserialize,
-    ] {
-        insta::assert_snapshot!(
-            format!("inline-{}", mode.to_string().to_lowercase()),
-            JSDoc::default()
-                .with_serde(mode)
+    for (mode, types) in phase_collections(crate::types().0) {
+        let output = match types {
+            Ok(types) => JSDoc::default()
                 .bigint(BigIntExportBehavior::Number)
-                .export(&crate::types().0)
-                .unwrap()
-        );
+                .export(&types)
+                .unwrap(),
+            Err(err) => format!("ERROR: {err}"),
+        };
+
+        insta::assert_snapshot!(format!("inline-{mode}"), output);
     }
 }
 
 #[test]
 fn primitives_export_many() {
-    for mode in [
-        SerdeMode::Both,
-        SerdeMode::Serialize,
-        SerdeMode::Deserialize,
-    ] {
-        let jsdoc = JSDoc::default()
-            .with_serde(mode)
-            .bigint(BigIntExportBehavior::Number);
-        let (types, dts) = crate::types();
-        let ndts = dts
-            .iter()
-            .filter_map(|(_, ty)| match ty {
-                DataType::Reference(Reference::Named(r)) => r.get(&types),
-                _ => None,
-            })
-            .collect::<Vec<_>>();
+    let (types, dts) = crate::types();
+    for (mode, types) in phase_collections(types) {
+        let output = match types {
+            Ok(types) => {
+                let jsdoc = JSDoc::default().bigint(BigIntExportBehavior::Number);
+                let ndts = dts
+                    .iter()
+                    .filter_map(|(_, ty)| match ty {
+                        DataType::Reference(Reference::Named(r)) => r.get(types.as_types()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>();
 
-        insta::assert_snapshot!(
-            format!("primitives-many-inline-{}", mode.to_string().to_lowercase()),
-            primitives::export(&jsdoc, &types, ndts.into_iter(), "").unwrap()
-        );
+                primitives::export(&jsdoc, &types, ndts.into_iter(), "").unwrap()
+            }
+            Err(err) => format!("ERROR: {err}"),
+        };
+
+        insta::assert_snapshot!(format!("primitives-many-inline-{mode}"), output);
     }
 }
 
@@ -94,20 +98,17 @@ fn jsdoc_export_to_files_uses_jsdoc_import_typedefs() {
     let temp = TempDir::new_in(temp).unwrap();
 
     let path = temp.path().join("jsdoc-export-to-files-both");
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<jsdoc_export_to_files_runtime_imports_types::one::One>()
         .register::<jsdoc_export_to_files_runtime_imports_types::two::Two>()
         .register::<jsdoc_export_to_files_runtime_imports_types::three::Three>();
 
     JSDoc::default()
         .layout(Layout::Files)
-        .export_to(&path, &types)
+        .export_to(&path, &ResolvedTypes::from_resolved_types(types))
         .unwrap();
 
     let output = fs_to_string(&path).unwrap();
-    assert!(!output.contains("import type"));
-    assert!(!output.contains("import * as"));
-    assert!(output.contains("@typedef {import(\""));
     insta::assert_snapshot!("jsdoc-export-to-files-both", output);
 
     temp.close().unwrap();

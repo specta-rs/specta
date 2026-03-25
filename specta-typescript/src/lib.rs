@@ -13,7 +13,7 @@
 //! Next copy the following into your `main.rs` file:
 //!
 //! ```rust
-//! use specta::{Type, TypeCollection};
+//! use specta::{ResolvedTypes, Type, Types};
 //! use specta_typescript::Typescript;
 //!
 //! #[derive(Type)]
@@ -27,12 +27,13 @@
 //!     pub other_field: String,
 //! }
 //!
-//! let mut types = TypeCollection::default()
+//! let mut types = Types::default()
 //!     // We don't need to specify `MyOtherType` because it's referenced by `MyType`
 //!     .register::<MyType>();
+//! let resolved_types = ResolvedTypes::from_resolved_types(types);
 //!
 //! Typescript::default()
-//!     .export_to("./bindings.ts", &types)
+//!     .export_to("./bindings.ts", &resolved_types)
 //!     .unwrap();
 //! ```
 //!
@@ -51,6 +52,7 @@ mod error;
 mod exporter;
 mod jsdoc;
 mod legacy; // TODO: Remove this
+mod map_keys;
 mod opaque;
 pub mod primitives;
 mod references;
@@ -68,6 +70,3 @@ pub use opaque::define;
 pub use references::collect_references;
 pub use types::{Any, Never, Unknown};
 pub use typescript::Typescript;
-
-// Re-export SerdeMode from specta-serde for convenience
-pub use specta_serde::SerdeMode;

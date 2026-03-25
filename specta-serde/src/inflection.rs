@@ -7,7 +7,7 @@ use self::RenameRule::*;
 use std::fmt::{self, Debug, Display};
 
 /// The different possible ways to change case of fields in a struct, or variants in an enum.
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum RenameRule {
     /// Don't apply a default rename rule.
     #[allow(dead_code)]
@@ -45,6 +45,8 @@ static RENAME_RULES: &[(&str, RenameRule)] = &[
 ];
 
 impl RenameRule {
+    /// Parse serde's `rename_all` / `rename_all_fields` rule string.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(rename_all_str: &str) -> Result<Self, ParseError<'_>> {
         for (name, rule) in RENAME_RULES {
             if rename_all_str == *name {

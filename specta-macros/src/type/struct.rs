@@ -68,7 +68,8 @@ pub fn parse_struct(
     crate_ref: &TokenStream,
     container_attrs: &ContainerAttr,
     data: &DataStruct,
-) -> syn::Result<(TokenStream, TokenStream)> {
+    format_crates: &[syn::Path],
+) -> syn::Result<TokenStream> {
     if container_attrs.transparent {
         if let Fields::Unit = data.fields {
             return Err(syn::Error::new(
@@ -105,15 +106,10 @@ pub fn parse_struct(
             field_attrs,
             &field_ty,
             raw_attrs,
+            format_crates,
         )?;
 
-        return Ok((
-            quote!(Struct),
-            quote!(
-                let mut e = datatype::Struct::unit();
-                *e.fields_mut() = internal::construct::fields_unnamed(vec![#field], vec![]);
-            ),
-        ));
+        return Ok(quote!(datatype::Struct::unnamed().field(#field).build()));
     }
 
     let fields = match &data.fields {
@@ -140,15 +136,17 @@ pub fn parse_struct(
                         field_attrs,
                         &field.ty,
                         raw_attrs,
+                        format_crates,
                     )?;
-                    Ok(quote!((#field_name.into(), #inner)))
+                    Ok(quote!(builder.field_mut(#field_name, #inner);))
                 })
                 .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-            quote!(internal::construct::fields_named(
-                vec![#(#fields),*],
-                vec![]
-            ))
+            quote!({
+                let mut builder = datatype::Struct::named();
+                #(#fields)*
+                builder.build()
+            })
         }
         Fields::Unnamed(_) => {
             let fields = data
@@ -163,23 +161,20 @@ pub fn parse_struct(
                         field_attrs,
                         &field.ty,
                         raw_attrs,
+                        format_crates,
                     )
+                    .map(|inner| quote!(builder.field_mut(#inner);))
                 })
                 .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-            quote!(internal::construct::fields_unnamed(
-                vec![#(#fields),*],
-                vec![]
-            ))
+            quote!({
+                let mut builder = datatype::Struct::unnamed();
+                #(#fields)*
+                builder.build()
+            })
         }
-        Fields::Unit => quote!(datatype::Fields::Unit),
+        Fields::Unit => quote!(datatype::Struct::unit().into()),
     };
 
-    Ok((
-        quote!(Struct),
-        quote!(
-            let mut e = datatype::Struct::unit();
-            *e.fields_mut() = #fields;
-        ),
-    ))
+    Ok(fields)
 }

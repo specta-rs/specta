@@ -1,4 +1,4 @@
-use crate::{TypeCollection, datatype::DataType};
+use crate::{Types, datatype::DataType};
 
 pub(crate) mod generics;
 mod impls;
@@ -16,12 +16,12 @@ mod legacy_impls;
     label = "`{Self}` must implement `Type`",
     note = "Depending on your use case, this can be fixed in multiple ways:
  - If your using an type defined in one of your own crates, ensure you have `#[derive(specta::Type)]` on it.
- - If your using a crate with official Specta support enable the feature flag on the 'specta' crate, refer to the documentation at https://docs.rs/specta/latest/specta/#feature-flags.
- - If your using an external crate without Specta support, you may need to wrap your type in a new-type wrapper, refer to the examples at https://docs.rs/specta/latest/specta/trait.Type.html
+ - If your using a crate with official Specta support, enable the matching feature flag on the `specta` crate.
+ - If your using an external crate without Specta support, you may need to wrap your type in a new-type wrapper.
 "
 )]
 pub trait Type {
     /// returns a [`DataType`](crate::datatype::DataType) that represents the type.
-    /// This will also register this and any dependent types into the [`TypeCollection`].
-    fn definition(types: &mut TypeCollection) -> DataType;
+    /// This will also register this and any dependent types into the [`Types`].
+    fn definition(types: &mut Types) -> DataType;
 }

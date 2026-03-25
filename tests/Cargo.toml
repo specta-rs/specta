@@ -11,8 +11,9 @@ path = "tests/mod.rs"
 harness = true
 
 [dependencies]
-specta = { path = "../specta", features = ["function", "std", "derive", "serde_json", "serde_yaml", "toml", "chrono", "either", "ulid", "glam"] }
+specta = { path = "../specta", features = ["function", "std", "derive", "serde_json", "serde_yaml", "toml", "chrono", "either", "error-stack", "ulid", "glam", "ordered-float", "heapless", "semver", "smol_str", "arrayvec", "smallvec", "geojson"] }
 specta-serde = { path = "../specta-serde" }
+specta-swift = { path = "../specta-swift" }
 specta-typescript = { path = "../specta-typescript" }
 specta-util = { path = "../specta-util", features = ["serde"] }                # TODO: Remove `serde` feature
 
@@ -21,11 +22,19 @@ trybuild = "1.0.116"
 wasm-bindgen = "0.2.114"
 serde_json = "1.0.149"
 serde_yaml = "0.9.34"
-toml = "1.0.6"
+toml = "1.1.0"
 insta = "1.46.3"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 either = { version = "1.15", default-features = false }
 ulid = { version = "1.2", default-features = false, features = [] }
 glam = { version = "0.32", default-features = false, features = ["std"] }
-tempfile = "3.26.0"
+ordered-float = { version = ">=3, <6", default-features = false }
+heapless = { version = ">=0.7, <0.10", default-features = false }
+semver = { version = "1", default-features = false }
+smol_str = { version = "0.3", default-features = false }
+arrayvec = { version = ">=0.6, <0.8", default-features = false }
+smallvec = { version = "1", default-features = false }
+geojson = { version = "1.0", default-features = false }
+tempfile = "3.27.0"
 thiserror = "2.0.18"
+error-stack = { version = "0.6", default-features = false }

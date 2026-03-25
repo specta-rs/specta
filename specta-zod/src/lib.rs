@@ -15,11 +15,7 @@
 // mod export_config;
 
 // use context::{ExportContext, PathItem};
-// use specta::{
-//     datatype::*,
-//     internal::{detect_duplicate_type_names, skip_fields, skip_fields_named, NonSkipField},
-//     *,
-// };
+// use specta::{datatype::*, internal::detect_duplicate_type_names, *};
 // use std::{borrow::Cow, collections::VecDeque};
 
 // pub use context::*;
@@ -47,7 +43,7 @@
 // ///
 // /// Eg. `export const Foo = z.object({ demo: string; });`
 // pub fn export<T: Type>(conf: &ExportConfig) -> Output {
-//     let mut types = TypeCollection::default();
+//     let mut types = Types::default();
 //     let named_data_type = T::definition_named_data_type(&mut types);
 //     // is_valid_ty(&named_data_type.inner, &types)?;
 //     let result = export_named_datatype(conf, &named_data_type, &types);
@@ -70,7 +66,7 @@
 // ///
 // /// Eg. `z.object({ demo: z.string() });`
 // pub fn inline<T: Type>(conf: &ExportConfig) -> Output {
-//     let mut types = TypeCollection::default();
+//     let mut types = Types::default();
 //     let ty = T::inline(&mut types, specta::Generics::Definition);
 //     // is_valid_ty(&ty, &types)?;
 //     let result = datatype(conf, &ty, &types);
@@ -88,7 +84,7 @@
 // pub fn export_named_datatype(
 //     conf: &ExportConfig,
 //     typ: &NamedDataType,
-//     types: &TypeCollection,
+//     types: &Types,
 // ) -> Output {
 //     // TODO: Duplicate type name detection?
 
@@ -107,7 +103,7 @@
 // #[allow(clippy::ptr_arg)]
 // fn inner_comments(
 //     ctx: ExportContext,
-//     _deprecated: Option<&DeprecatedType>,
+//     _deprecated: Option<&Deprecated>,
 //     _docs: &Cow<'static, str>,
 //     other: String,
 //     start_with_newline: bool,
@@ -134,7 +130,7 @@
 // fn export_datatype_inner(
 //     ctx: ExportContext,
 //     typ: &NamedDataType,
-//     types: &TypeCollection,
+//     types: &Types,
 // ) -> Output {
 //     let ctx = ctx.with(
 //         typ.ext()
@@ -165,7 +161,7 @@
 // /// Convert a DataType to a Zod validator
 // ///
 // /// Eg. `z.object({ demo: z.string(); })`
-// pub fn datatype(conf: &ExportConfig, typ: &DataType, types: &TypeCollection) -> Output {
+// pub fn datatype(conf: &ExportConfig, typ: &DataType, types: &Types) -> Output {
 //     // TODO: Duplicate type name detection?
 
 //     datatype_inner(
@@ -182,7 +178,7 @@
 // pub(crate) fn datatype_inner(
 //     ctx: ExportContext,
 //     typ: &DataType,
-//     types: &TypeCollection,
+//     types: &Types,
 // ) -> Output {
 //     Ok(match &typ {
 //         DataType::Any => ANY.into(),
@@ -290,8 +286,8 @@
 // // Can be used with `StructUnnamedFields.fields` or `EnumNamedFields.fields`
 // fn unnamed_fields_datatype(
 //     ctx: ExportContext,
-//     fields: &[NonSkipField],
-//     types: &TypeCollection,
+//     fields: &[(&Field, &DataType)],
+//     types: &Types,
 // ) -> Output {
 //     match fields {
 //         [(field, ty)] => Ok(inner_comments(
@@ -318,7 +314,7 @@
 //     }
 // }
 
-// fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, types: &TypeCollection) -> Output {
+// fn tuple_datatype(ctx: ExportContext, tuple: &TupleType, types: &Types) -> Output {
 //     match &tuple.elements()[..] {
 //         [] => Ok(NULL.into()),
 //         tys => Ok(format!(
@@ -335,15 +331,26 @@
 //     ctx: ExportContext,
 //     key: &str,
 //     s: &StructType,
-//     types: &TypeCollection,
+//     types: &Types,
 // ) -> Output {
 //     match &s.fields() {
 //         Fields::Unit => Ok(NULL.into()),
 //         Fields::Unnamed(s) => {
-//             unnamed_fields_datatype(ctx, &skip_fields(s.fields()).collect::<Vec<_>>(), types)
+//             unnamed_fields_datatype(
+//                 ctx,
+//                 &s.fields()
+//                     .iter()
+//                     .filter_map(|field| field.ty().map(|ty| (field, ty)))
+//                     .collect::<Vec<_>>(),
+//                 types,
+//             )
 //         }
 //         Fields::Named(s) => {
-//             let fields = skip_fields_named(s.fields()).collect::<Vec<_>>();
+//             let fields = s
+//                 .fields()
+//                 .iter()
+//                 .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+//                 .collect::<Vec<_>>();
 
 //             if fields.is_empty() {
 //                 return Ok(s
@@ -424,9 +431,9 @@
 
 // fn enum_variant_datatype(
 //     ctx: ExportContext,
-//     types: &TypeCollection,
+//     types: &Types,
 //     name: Cow<'static, str>,
-//     variant: &EnumVariant,
+//     variant: &Variant,
 // ) -> Result<Option<String>> {
 //     match &variant.fields() {
 //         // TODO: Remove unreachable in type system
@@ -441,7 +448,9 @@
 //             };
 
 //             fields.extend(
-//                 skip_fields_named(obj.fields())
+//                 obj.fields()
+//                     .iter()
+//                     .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
 //                     .map(|(name, field_ref)| {
 //                         let (field, _) = field_ref;
 
@@ -467,7 +476,10 @@
 //             }))
 //         }
 //         Fields::Unnamed(obj) => {
-//             let fields = skip_fields(obj.fields())
+//             let fields = obj
+//                 .fields()
+//                 .iter()
+//                 .filter_map(|field| field.ty().map(|ty| (field, ty)))
 //                 .map(|(_, ty)| datatype_inner(ctx.clone(), ty, types))
 //                 .collect::<Result<Vec<_>>>()?;
 
@@ -489,7 +501,7 @@
 //     }
 // }
 
-// fn enum_datatype(ctx: ExportContext, e: &EnumType, types: &TypeCollection) -> Output {
+// fn enum_datatype(ctx: ExportContext, e: &EnumType, types: &Types) -> Output {
 //     if e.variants().is_empty() {
 //         return Ok(NEVER.to_string());
 //     }
@@ -546,7 +558,11 @@
 //                             }
 //                             (EnumRepr::Internal { tag }, Fields::Unnamed(tuple)) => {
 //                            	 	let tag = sanitise_key(tag.clone(), false);
-//                                 let fields = skip_fields(tuple.fields()).collect::<Vec<_>>();
+//                                 let fields = tuple
+//                                     .fields()
+//                                     .iter()
+//                                     .filter_map(|field| field.ty().map(|ty| (field, ty)))
+//                                     .collect::<Vec<_>>();
 
 //                                 // This field is only required for `{ty}` not `[...]` so we only need to check when there one field
 //                                 let dont_join_ty = if tuple.fields().len() == 1 {
@@ -576,7 +592,11 @@
 //                                 let mut fields = vec![format!("{tag}: {sanitised_name}")];
 
 //                                 fields.extend(
-//                                     skip_fields_named(obj.fields())
+//                                     obj.fields()
+//                                         .iter()
+//                                         .filter_map(|(name, field)| {
+//                                             field.ty().map(|ty| (name, (field, ty)))
+//                                         })
 //                                         .map(|(name, field)| {
 //                                             object_field_to_ts(
 //                                                 ctx.with(PathItem::Field(name.clone())),
@@ -668,8 +688,8 @@
 // fn object_field_to_ts(
 //     ctx: ExportContext,
 //     key: Cow<'static, str>,
-//     (field, ty): NonSkipField,
-//     types: &TypeCollection,
+//     (field, ty): (&Field, &DataType),
+//     types: &Types,
 // ) -> Output {
 //     let field_name_safe = sanitise_key(key, false);
 
@@ -732,7 +752,7 @@
 // fn validate_type_for_tagged_intersection(
 //     ctx: ExportContext,
 //     ty: DataType,
-//     types: &TypeCollection,
+//     types: &Types,
 // ) -> Result<bool> {
 //     match ty {
 //         DataType::Any
@@ -790,7 +810,7 @@
 //             ctx,
 //             types
 //                 .get(r.sid())
-//                 .expect("TypeCollection should have been populated by now")
+//                 .expect("Types should have been populated by now")
 //                 .inner
 //                 .clone(),
 //             types,

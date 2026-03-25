@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 /// Comprehensive example showcasing string enums and custom Codable implementations
@@ -166,7 +166,7 @@ fn main() {
     println!("{}", "=".repeat(60));
 
     // Create type collection with all our enum types
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<HttpStatus>()
         .register::<Environment>()
         .register::<ApiResult>()
@@ -176,17 +176,18 @@ fn main() {
         .register::<Result<String, String>>()
         .register::<EventType>()
         .register::<FileType>();
+    let resolved = specta_serde::apply(types).unwrap();
 
     // Export with default settings
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&resolved).unwrap();
 
     println!("📝 Generated Swift code:\n");
     println!("{}", output);
 
     // Write to file for inspection
     swift
-        .export_to("./examples/generated/StringEnums.swift", &types)
+        .export_to("./examples/generated/StringEnums.swift", &resolved)
         .unwrap();
     println!("✅ String enums exported to StringEnums.swift");
 

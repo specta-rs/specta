@@ -1,7 +1,6 @@
 use std::{borrow::Cow, path::Path};
 
-use specta::TypeCollection;
-use specta_serde::SerdeMode;
+use specta::ResolvedTypes;
 
 use crate::{BigIntExportBehavior, Branded, BrandedTypeExporter, Error, Exporter, Layout};
 
@@ -65,25 +64,10 @@ impl Typescript {
         Self(self.0.branded_type_impl(builder))
     }
 
-    /// Configure the exporter to use specta-serde with the specified mode
-    pub fn with_serde(self, mode: SerdeMode) -> Self {
-        Self(self.0.with_serde(mode))
-    }
-
-    /// Configure the exporter to export the types for `#[derive(serde::Serialize)]`
-    pub fn with_serde_serialize(self) -> Self {
-        Self(self.0.with_serde_serialize())
-    }
-
-    /// Configure the exporter to export the types for `#[derive(serde::Deserialize)]`
-    pub fn with_serde_deserialize(self) -> Self {
-        Self(self.0.with_serde_deserialize())
-    }
-
     /// Export the files into a single string.
     ///
     /// Note: This returns an error if the format is `Format::Files`.
-    pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
+    pub fn export(&self, types: &ResolvedTypes) -> Result<String, Error> {
         self.0.export(types)
     }
 
@@ -92,7 +76,7 @@ impl Typescript {
     /// When configured when `format` is `Format::Files`, you must provide a directory path.
     /// Otherwise, you must provide the path of a single file.
     ///
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
+    pub fn export_to(&self, path: impl AsRef<Path>, types: &ResolvedTypes) -> Result<(), Error> {
         self.0.export_to(path, types)
     }
 }

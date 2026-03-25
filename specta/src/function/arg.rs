@@ -1,4 +1,4 @@
-use crate::{Type, TypeCollection, datatype::DataType};
+use crate::{Type, Types, datatype::DataType};
 
 /// Implemented by types that can be used as an argument in a function annotated with
 /// [`specta`](crate::specta).
@@ -7,11 +7,11 @@ pub trait FunctionArg {
     ///
     /// Some argument types should be ignored (eg. when doing dependency injection),
     /// so the value is optional.
-    fn to_datatype(types: &mut TypeCollection) -> Option<DataType>;
+    fn to_datatype(types: &mut Types) -> Option<DataType>;
 }
 
 impl<T: Type> FunctionArg for T {
-    fn to_datatype(types: &mut TypeCollection) -> Option<DataType> {
+    fn to_datatype(types: &mut Types) -> Option<DataType> {
         Some(T::definition(types))
     }
 }

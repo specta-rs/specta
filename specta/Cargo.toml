@@ -60,6 +60,18 @@ bigdecimal = ["dep:bigdecimal"]
 rust_decimal = ["dep:rust_decimal"]
 ## [indexmap](https://docs.rs/indexmap) crate
 indexmap = ["dep:indexmap"]
+## [ordered-float](https://docs.rs/ordered-float) crate
+ordered-float = ["dep:ordered-float"]
+## [heapless](https://docs.rs/heapless) crate
+heapless = ["dep:heapless"]
+## [semver](https://docs.rs/semver) crate
+semver = ["dep:semver"]
+## [smol_str](https://docs.rs/smol_str) crate
+smol_str = ["dep:smol_str"]
+## [arrayvec](https://docs.rs/arrayvec) crate
+arrayvec = ["dep:arrayvec"]
+## [smallvec](https://docs.rs/smallvec) crate
+smallvec = ["dep:smallvec"]
 ## [ipnetwork](https://docs.rs/ipnetwork) crate
 ipnetwork = ["dep:ipnetwork"]
 ## [mac_address](https://docs.rs/mac_address) crate
@@ -82,6 +94,8 @@ tokio = ["dep:tokio"]
 url = ["dep:url"]
 ## [either](https://docs.rs/either) crate
 either = ["dep:either"]
+## [error-stack](https://docs.rs/error-stack) crate
+error-stack = ["dep:error-stack"]
 # [bevy_ecs](https://docs.rs/bevy_ecs) crate
 bevy_ecs = ["dep:bevy_ecs"]
 # [bevy_input](https://docs.rs/bevy_input) crate
@@ -105,7 +119,7 @@ ctor = { version = "0.6.3", default-features = false, optional = true, features 
 # TODO: To be deprecated
 serde_json = { version = "1", optional = true, default-features = false, features = ["std"] }
 serde_yaml = { version = "0.9", optional = true, default-features = false, features = [] }
-toml = { version = "1.0", optional = true, default-features = false, features = ["serde"] }
+toml = { version = "1.1", optional = true, default-features = false, features = ["serde"] }
 ulid = { version = "1", optional = true, default-features = false, features = [] }
 uuid = { version = "1", optional = true, default-features = false, features = [] } # TODO: Downgraded for Bevy (argh)
 chrono = { version = "0.4", optional = true, default-features = false, features = ["clock"] }
@@ -113,9 +127,15 @@ time = { version = "0.3", optional = true, default-features = false, features = 
 bigdecimal = { version = "0.4", optional = true, default-features = false, features = [] }
 rust_decimal = { version = "1", optional = true, default-features = false, features = [] }
 indexmap = { version = "2", optional = true, default-features = false, features = ["std"] }     # TODO: Don't require `std`
+ordered-float = { version = ">=3, <6", optional = true, default-features = false }
+heapless = { version = ">=0.7, <0.10", optional = true, default-features = false, features = [] }
+semver = { version = "1", optional = true, default-features = false, features = [] }
+smol_str = { version = "0.3", optional = true, default-features = false, features = [] }
+arrayvec = { version = ">=0.6, <0.8", optional = true, default-features = false, features = [] }
+smallvec = { version = "1", optional = true, default-features = false, features = [] }
 ipnetwork = { version = "0.21", optional = true, default-features = false, features = [] }
 mac_address = { version = "1", optional = true, default-features = false, features = [] }
-bit-vec = { version = "0.8", optional = true, default-features = false, features = [] }
+bit-vec = { version = "0.9", optional = true, default-features = false, features = [] }
 bson = { version = "3", optional = true, default-features = false, features = ["compat-3-0-0"] }
 bytes = { version = "1", optional = true, default-features = false, features = [] }
 uhlc = { version = "0.9", optional = true, default-features = false, features = [] }
@@ -124,11 +144,12 @@ glam = { version = "0.32", optional = true, default-features = false, features =
 tokio = { version = "1", optional = true, default-features = false, features = ["sync"] }
 url = { version = "2", optional = true, default-features = false }
 either = { version = "1", optional = true, default-features = false }
+error-stack = { version = "0.6", optional = true, default-features = false }
 bevy_ecs = { version = "0.18", optional = true, default-features = false, features = ["std"] }
 bevy_input = { version = "0.18", optional = true, default-features = false, features = ["std", "bevy_reflect", "keyboard", "mouse"] }
 jiff = { version = "0.2", optional = true, default-features = false }
 camino = { version = "1", optional = true, default-features = false }
-geojson = { version = "0.24", optional = true, default-features = false }
+geojson = { version = "1.0", optional = true, default-features = false }
 geozero = { version = "0.15", optional = true, default-features = false, features = ["with-mvt"] }
 
 [dev-dependencies]

@@ -1,9 +1,6 @@
 use std::path::PathBuf;
 
-use specta::{
-    Type, TypeCollection,
-    datatype::{DataType, NamedDataTypeBuilder},
-};
+use specta::{ResolvedTypes, Type, Types, datatype::NamedDataType};
 use specta_typescript::{Exporter, JSDoc, Layout, Typescript, primitives};
 use specta_util::selection;
 
@@ -93,27 +90,26 @@ pub struct AnotherOne {
 }
 
 fn main() {
-    let mut types = TypeCollection::default()
+    let mut types = Types::default()
         .register::<One>()
         .register::<MyChannel>()
         .register::<RecursiveMe>();
 
-    NamedDataTypeBuilder::new("VirtualOne", vec![], i32::definition(&mut types)).build(&mut types);
-    let ndt = NamedDataTypeBuilder::new("VirtualTwo", vec![], i32::definition(&mut types))
-        .module_path("")
-        .build(&mut types);
+    NamedDataType::new("VirtualOne", vec![], i32::definition(&mut types)).register(&mut types);
+    let mut ndt = NamedDataType::new("VirtualTwo", vec![], i32::definition(&mut types));
+    ndt.set_module_path("".into());
+    ndt.register(&mut types);
 
     let r = ndt.reference(vec![]);
     // let r_inlined = ndt.reference(vec![]).inline(&mut types);
 
-    NamedDataTypeBuilder::new("VirtualThree", vec![], r.into())
-        .module_path("")
-        .build(&mut types);
+    let mut virtual_three = NamedDataType::new("VirtualThree", vec![], r.into());
+    virtual_three.set_module_path("".into());
+    virtual_three.register(&mut types);
 
-    let ndt = NamedDataTypeBuilder::new("AnotherOne", vec![], i32::definition(&mut types))
-        .inline()
-        .module_path("dontcreateme")
-        .build(&mut types);
+    let mut ndt = NamedDataType::new_inline("AnotherOne", vec![], i32::definition(&mut types));
+    ndt.set_module_path("dontcreateme".into());
+    ndt.register(&mut types);
 
     // ndt.reference(vec![]); // TODO: This is required, I think, maybe be smarter???
 
@@ -144,6 +140,7 @@ fn main() {
     }
 
     let dt = One::definition(&mut types);
+    let resolved_types = ResolvedTypes::from_resolved_types(types);
 
     let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("out");
     std::fs::create_dir_all(&base).unwrap();
@@ -152,7 +149,7 @@ fn main() {
         let exporter = Exporter::from(Typescript::default());
 
         let exporter = exporter.framework_runtime(move |exporter| {
-            // `TypeCollection`
+            // `Types`
             // exporter.types;
 
             // Can access any `Exporter` properties via `Deref`
@@ -161,7 +158,7 @@ fn main() {
             // `exporter.render_types()` allows rendering types within your runtime code,
             // if not called `Exporter` will append it.
 
-            // `exporter.inline`, `exporter.reference` are helpers which passthrough the `TypeCollection` for you.
+            // `exporter.inline`, `exporter.reference` are helpers which passthrough the `Types` for you.
 
             Ok(format!(
                 "// Runtime\nexport function testing(_: {}) {{}}",
@@ -180,24 +177,24 @@ fn main() {
         // });
 
         exporter
-            .export_to(base.join("framework.ts"), &types)
+            .export_to(base.join("framework.ts"), &resolved_types)
             .unwrap();
 
         exporter
             .clone()
             .layout(Layout::ModulePrefixedName)
-            .export_to(base.join("framework-prefixed.ts"), &types)
+            .export_to(base.join("framework-prefixed.ts"), &resolved_types)
             .unwrap();
 
         exporter
             .clone()
             .layout(Layout::Namespaces)
-            .export_to(base.join("framework-namespaces.ts"), &types)
+            .export_to(base.join("framework-namespaces.ts"), &resolved_types)
             .unwrap();
 
         exporter
             .layout(Layout::Files)
-            .export_to(base.join("framework-output"), &types)
+            .export_to(base.join("framework-output"), &resolved_types)
             .unwrap();
     }
 
@@ -207,18 +204,18 @@ fn main() {
         exporter
             .clone()
             .layout(Layout::Files)
-            .export_to(base.join("framework-output-js"), &types)
+            .export_to(base.join("framework-output-js"), &resolved_types)
             .unwrap();
 
         exporter
             .clone()
-            .export_to(base.join("framework.js"), &types)
+            .export_to(base.join("framework.js"), &resolved_types)
             .unwrap();
 
         exporter
             .clone()
             .layout(Layout::ModulePrefixedName)
-            .export_to(base.join("framework-prefixed.js"), &types)
+            .export_to(base.join("framework-prefixed.js"), &resolved_types)
             .unwrap();
     }
 }

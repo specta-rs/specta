@@ -83,7 +83,7 @@ Then you can use Specta like following:
 ### TypeScript Example
 
 ```rust
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_typescript::Typescript;
 
 #[derive(Type)]
@@ -108,7 +108,7 @@ pub enum MyEnum {
 }
 
 fn main() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         // You don't need to specify `GenericType` or `MyEnum` because they are referenced by `TypeOne`
         .register::<TypeOne>();
 
@@ -138,7 +138,7 @@ export type TypeOne = { a: string; b: GenericType<number>; cccccc: MyEnum };
 You can export the same types to multiple languages:
 
 ```rust
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_typescript::Typescript;
 use specta_swift::Swift;
 
@@ -150,7 +150,7 @@ pub struct User {
 }
 
 fn main() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<User>();
 
     // Export to TypeScript (stable)

@@ -1,7 +1,6 @@
 use crate::{Error, Layout, SchemaVersion, primitives};
 use serde_json::Value;
-use specta::{TypeCollection, datatype::NamedDataType};
-use specta_serde::SerdeMode;
+use specta::{Types, datatype::NamedDataType};
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -10,8 +9,6 @@ use std::path::Path;
 pub struct JsonSchema {
     /// JSON Schema version to use
     pub schema_version: SchemaVersion,
-    /// Optional serde mode for transformations
-    pub serde: Option<SerdeMode>,
     /// Layout for output organization
     pub layout: Layout,
     /// Optional title for the root schema
@@ -24,7 +21,6 @@ impl Default for JsonSchema {
     fn default() -> Self {
         Self {
             schema_version: SchemaVersion::default(),
-            serde: None,
             layout: Layout::default(),
             title: None,
             description: None,
@@ -42,22 +38,6 @@ impl JsonSchema {
     pub fn schema_version(mut self, version: SchemaVersion) -> Self {
         self.schema_version = version;
         self
-    }
-
-    /// Enable serde transformations with specific mode
-    pub fn with_serde(mut self, mode: SerdeMode) -> Self {
-        self.serde = Some(mode);
-        self
-    }
-
-    /// Enable serde transformations for serialization
-    pub fn with_serde_serialize(self) -> Self {
-        self.with_serde(SerdeMode::Serialize)
-    }
-
-    /// Enable serde transformations for deserialization
-    pub fn with_serde_deserialize(self) -> Self {
-        self.with_serde(SerdeMode::Deserialize)
     }
 
     /// Set output layout
@@ -79,24 +59,15 @@ impl JsonSchema {
     }
 
     /// Export types to JSON Schema as a JSON string
-    pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
+    pub fn export(&self, types: &Types) -> Result<String, Error> {
         let value = self.export_as_value(types)?;
         Ok(serde_json::to_string_pretty(&value)?)
     }
 
     /// Export types to JSON Schema as serde_json::Value
-    pub fn export_as_value(&self, types: &TypeCollection) -> Result<Value, Error> {
-        // Apply serde transformations if configured
-        let processed_types = if let Some(mode) = self.serde {
-            let mut cloned = types.clone();
-            specta_serde::apply(&mut cloned, mode)?;
-            cloned
-        } else {
-            types.clone()
-        };
-
+    pub fn export_as_value(&self, types: &Types) -> Result<Value, Error> {
         match self.layout {
-            Layout::SingleFile => self.export_single_file(&processed_types),
+            Layout::SingleFile => self.export_single_file(types),
             Layout::Files => Err(Error::ConversionError(
                 "Use export_to() for Files layout".to_string(),
             )),
@@ -104,29 +75,20 @@ impl JsonSchema {
     }
 
     /// Export to file or directory
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
+    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types) -> Result<(), Error> {
         let path = path.as_ref();
-
-        // Apply serde transformations if configured
-        let processed_types = if let Some(mode) = self.serde {
-            let mut cloned = types.clone();
-            specta_serde::apply(&mut cloned, mode)?;
-            cloned
-        } else {
-            types.clone()
-        };
 
         match self.layout {
             Layout::SingleFile => {
-                let json = self.export_single_file(&processed_types)?;
+                let json = self.export_single_file(types)?;
                 std::fs::write(path, serde_json::to_string_pretty(&json)?)?;
                 Ok(())
             }
-            Layout::Files => self.export_files(path, &processed_types),
+            Layout::Files => self.export_files(path, types),
         }
     }
 
-    fn export_single_file(&self, types: &TypeCollection) -> Result<Value, Error> {
+    fn export_single_file(&self, types: &Types) -> Result<Value, Error> {
         let mut definitions = BTreeMap::new();
 
         // Convert each type to a schema
@@ -159,7 +121,7 @@ impl JsonSchema {
         Ok(root)
     }
 
-    fn export_files(&self, base_path: &Path, types: &TypeCollection) -> Result<(), Error> {
+    fn export_files(&self, base_path: &Path, types: &Types) -> Result<(), Error> {
         // Create base directory
         std::fs::create_dir_all(base_path)?;
 

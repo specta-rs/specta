@@ -1,4 +1,4 @@
-# specta-serde
+# Specta Serde
 
 A comprehensive serde attribute handling system for [Specta](https://github.com/specta-rs/specta). This crate provides functionality to parse and apply serde attributes like `#[serde(rename = "...")]`, `#[serde(rename_all = "...")]`, and enum representation attributes to `DataType` instances, with separate handling for serialization and deserialization phases.
 
@@ -6,7 +6,7 @@ A comprehensive serde attribute handling system for [Specta](https://github.com/
 
 - **Comprehensive Attribute Support**: Handles `rename`, `rename_all`, `skip`, `flatten`, `default`, `transparent`, and enum representation attributes
 - **Separate Processing Modes**: Distinct handling for serialization and deserialization transformations
-- **Enum Representations**: Full support for external, internal, adjacent, untagged, and string enum representations
+- **Enum Representations**: Full support for external, internal, adjacent, and untagged enum representations
 - **Type-Safe Transformations**: Apply serde semantics while maintaining type safety
 - **Integration Ready**: Works seamlessly with existing Specta workflows and TypeScript exports
 
@@ -23,10 +23,10 @@ serde = { version = "1.0", features = ["derive"] }
 
 ## Basic Usage
 
-### Processing Type Collections
+### Processing Types
 
 ```rust
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_serde::{process_for_serialization, process_for_deserialization};
 use serde::{Serialize, Deserialize};
 
@@ -40,7 +40,7 @@ pub struct UserProfile {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<UserProfile>();
 
     // Transform for serialization (Rust -> JSON)
@@ -208,9 +208,9 @@ pub enum Value {
 // Serializes as the inner value directly
 ```
 
-#### String Enums
+#### Unit Enums With Rename Rules
 
-Unit-only enums with `rename_all` become string enums:
+Unit-only enums with `rename_all` are transformed according to serde rename rules. Exporters may render these as string literal unions:
 
 ```rust
 #[derive(Type, Serialize)]
@@ -255,7 +255,7 @@ This allows different behavior based on direction:
 use specta_typescript::Typescript;
 use specta_serde::process_for_serialization;
 
-let types = TypeCollection::default()
+let types = Types::default()
     .register::<MyType>();
 
 // Transform for serialization before export
@@ -273,7 +273,7 @@ The crate includes validation to ensure serde attributes are used correctly:
 ```rust
 use specta_serde::validate;
 
-let types = TypeCollection::default()
+let types = Types::default()
     .register::<MyType>();
 
 // Validate serde usage

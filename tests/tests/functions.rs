@@ -1,14 +1,14 @@
 use std::fmt;
 
 use specta::{
-    Type, TypeCollection,
+    ResolvedTypes, Type, Types,
     datatype::{DataType, Function},
     function::{self, fn_datatype},
     specta,
 };
 use specta_typescript::{Typescript, primitives};
 
-fn render_datatype(ts: &Typescript, types: &TypeCollection, dt: &DataType) -> Option<String> {
+fn render_datatype(ts: &Typescript, types: &ResolvedTypes, dt: &DataType) -> Option<String> {
     match dt {
         DataType::Reference(r) => primitives::reference(ts, types, r).ok(),
         dt => primitives::inline(ts, types, dt).ok(),
@@ -115,8 +115,9 @@ fn test_trailing_comma() {
 #[test]
 fn test_function_exporting() {
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![a](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"a");
@@ -125,8 +126,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![b](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"b");
@@ -142,8 +144,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![c](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"c");
@@ -173,8 +176,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![d](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"d");
@@ -196,8 +200,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![e::<bool>](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"e");
@@ -213,8 +218,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![f](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"f");
@@ -236,16 +242,17 @@ fn test_function_exporting() {
     }
 
     {
-        let mut type_map = TypeCollection::default();
-        let def: specta::datatype::Function = fn_datatype![g](&mut type_map);
+        let mut types = Types::default();
+        let def: specta::datatype::Function = fn_datatype![g](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"g");
         insta::assert_snapshot!(def.args().len(), @"1");
         insta::assert_snapshot!(
             match &def.args()[0].1 {
-                DataType::Reference(r) => primitives::reference(&ts, &type_map, r).ok(),
-                dt => primitives::inline(&ts, &type_map, dt).ok(),
+                DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
+                dt => primitives::inline(&ts, &types, dt).ok(),
             }.unwrap(),
             @"string"
         );
@@ -253,16 +260,17 @@ fn test_function_exporting() {
     }
 
     {
-        let mut type_map = TypeCollection::default();
-        let def: specta::datatype::Function = fn_datatype![h](&mut type_map);
+        let mut types = Types::default();
+        let def: specta::datatype::Function = fn_datatype![h](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"h");
         insta::assert_snapshot!(def.args().len(), @"1");
         insta::assert_snapshot!(
             match &def.args()[0].1 {
-                DataType::Reference(r) => primitives::reference(&ts, &type_map, r).ok(),
-                dt => primitives::inline(&ts, &type_map, dt).ok(),
+                DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
+                dt => primitives::inline(&ts, &types, dt).ok(),
             }.unwrap(),
             @"string"
         );
@@ -270,8 +278,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![i](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"i");
@@ -286,8 +295,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![k](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"k");
@@ -302,8 +312,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![l](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"l");
@@ -326,8 +337,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![m](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"m");
@@ -343,8 +355,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![async_fn](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         insta::assert_snapshot!(def.asyncness(), @"true");
         insta::assert_snapshot!(def.name(), @"async_fn");
         insta::assert_snapshot!(def.args().len(), @"0");
@@ -352,8 +365,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![with_docs](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"with_docs");
         insta::assert_snapshot!(def.args().len(), @"0");
@@ -362,8 +376,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![raw](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         insta::assert_snapshot!(def.args()[0].0, @"type");
     }
 }

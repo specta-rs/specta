@@ -1,7 +1,7 @@
 use std::any::TypeId;
 
 use specta::{
-    Type, TypeCollection,
+    Type, Types,
     datatype::{DataType, Reference},
 };
 
@@ -33,7 +33,7 @@ fn references() {
         assert_eq!(r.downcast_ref(), Some(&()));
     }
 
-    let mut types = TypeCollection::default();
+    let mut types = Types::default();
 
     // Named references `PartialEq` are compared by type, generics, inline,
     // however `Reference::ty_eq` compares by just type.

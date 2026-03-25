@@ -16,12 +16,14 @@ type FrameworkSource = Box<dyn error::Error + Send + Sync + 'static>;
 
 #[allow(dead_code)]
 enum ErrorKind {
+    InvalidMapKey {
+        path: String,
+        reason: Cow<'static, str>,
+    },
     /// Attempted to export a bigint type but the configuration forbids it.
     BigIntForbidden {
         path: String,
     },
-    /// Failed to validate a type is Serde compatible.
-    Serde(specta_serde::Error),
     /// A type's name conflicts with a reserved keyword in Typescript.
     ForbiddenName {
         path: String,
@@ -67,7 +69,8 @@ enum ErrorKind {
     /// Found an opaque reference which the Typescript exporter doesn't know how to handle.
     /// You may be referencing a type which is not supported by the Typescript exporter.
     UnsupportedOpaqueReference(OpaqueReference),
-    /// Found a named reference that cannot be resolved from the provided [`TypeCollection`](specta::TypeCollection).
+    /// Found a named reference that cannot be resolved from the provided
+    /// [`ResolvedTypes`](specta::ResolvedTypes).
     DanglingNamedReference {
         reference: String,
     },
@@ -89,12 +92,23 @@ enum ErrorKind {
     BigIntForbiddenLegacy(ExportPath),
     ForbiddenNameLegacy(ExportPath, &'static str),
     InvalidNameLegacy(ExportPath, String),
-    InvalidTaggedVariantContainingTupleStructLegacy(ExportPath),
     FmtLegacy(std::fmt::Error),
     UnableToExport(Layout),
 }
 
 impl Error {
+    pub(crate) fn invalid_map_key(
+        path: impl Into<String>,
+        reason: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::InvalidMapKey {
+                path: path.into(),
+                reason: reason.into(),
+            },
+        }
+    }
+
     /// Construct an error for framework-specific logic.
     pub fn framework(
         message: impl Into<Cow<'static, str>>,
@@ -191,12 +205,6 @@ impl Error {
         }
     }
 
-    pub(crate) fn invalid_tagged_variant_containing_tuple_struct_legacy(path: ExportPath) -> Self {
-        Self {
-            kind: ErrorKind::InvalidTaggedVariantContainingTupleStructLegacy(path),
-        }
-    }
-
     pub(crate) fn unable_to_export(layout: Layout) -> Self {
         Self {
             kind: ErrorKind::UnableToExport(layout),
@@ -212,14 +220,6 @@ impl From<io::Error> for Error {
     }
 }
 
-impl From<specta_serde::Error> for Error {
-    fn from(error: specta_serde::Error) -> Self {
-        Self {
-            kind: ErrorKind::Serde(error),
-        }
-    }
-}
-
 impl From<std::fmt::Error> for Error {
     fn from(error: std::fmt::Error) -> Self {
         Self {
@@ -231,11 +231,13 @@ impl From<std::fmt::Error> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
+            ErrorKind::InvalidMapKey { path, reason } => {
+                write!(f, "Invalid map key at '{path}': {reason}")
+            }
             ErrorKind::BigIntForbidden { path } => write!(
                 f,
                 "Attempted to export {path:?} but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. If your using a serializer/deserializer that natively has support for BigInt types you can disable this warning by editing your `ExportConfiguration`!"
             ),
-            ErrorKind::Serde(err) => write!(f, "Detect invalid Serde type: {err}"),
             ErrorKind::ForbiddenName { path, name } => write!(
                 f,
                 "Attempted to export {path:?} but was unable to due toname {name:?} conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = \"new name\")]`"
@@ -280,7 +282,7 @@ impl fmt::Display for Error {
             ),
             ErrorKind::DanglingNamedReference { reference } => write!(
                 f,
-                "Found dangling named reference {reference}. The referenced type is missing from `TypeCollection`."
+                "Found dangling named reference {reference}. The referenced type is missing from the resolved type collection."
             ),
             ErrorKind::UnresolvedGenericReference { reference } => write!(
                 f,
@@ -308,10 +310,6 @@ impl fmt::Display for Error {
                 f,
                 "Attempted to export {path:?} but was unable to due to name {name:?} containing an invalid character. Try renaming it or using `#[specta(rename = \"new name\")]`"
             ),
-            ErrorKind::InvalidTaggedVariantContainingTupleStructLegacy(path) => write!(
-                f,
-                "Attempted to export {path:?} with tagging but the variant is a tuple struct."
-            ),
             ErrorKind::FmtLegacy(err) => write!(f, "formatter: {err:?}"),
             ErrorKind::UnableToExport(layout) => write!(
                 f,
@@ -330,7 +328,6 @@ impl fmt::Debug for Error {
 impl error::Error for Error {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match &self.kind {
-            ErrorKind::Serde(error) => Some(error),
             ErrorKind::Io(error) => Some(error),
             ErrorKind::ReadDir { source, .. }
             | ErrorKind::Metadata { source, .. }

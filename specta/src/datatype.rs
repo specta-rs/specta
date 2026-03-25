@@ -1,7 +1,6 @@
 //! Types related to working with [`DataType`]. Exposed for advanced users.
 
-mod attrs;
-mod builders;
+mod attributes;
 mod r#enum;
 mod fields;
 mod function;
@@ -13,16 +12,13 @@ mod reference;
 mod r#struct;
 mod tuple;
 
-pub use attrs::{Attribute, AttributeLiteral, AttributeMeta, AttributeNestedMeta, AttributeValue};
-pub use builders::{NamedDataTypeBuilder, StructBuilder, VariantBuilder};
-pub use r#enum::{Enum, EnumVariant};
-pub use fields::{
-    Field, Fields, NamedFields, NonSkipField, UnnamedFields, skip_fields, skip_fields_named,
-};
+pub use attributes::Attributes;
+pub use r#enum::{Enum, Variant, VariantBuilder};
+pub use fields::{Field, Fields, NamedFields, StructBuilder, UnnamedFields};
 pub use function::Function;
 pub use list::List;
 pub use map::Map;
-pub use named::{DeprecatedType, NamedDataType};
+pub use named::{Deprecated, NamedDataType};
 pub use primitive::Primitive;
 pub use reference::{GenericReference, NamedReference, OpaqueReference, Reference};
 pub use r#struct::Struct;

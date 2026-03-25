@@ -1,4 +1,4 @@
-use syn::Result;
+use syn::{Result, Type};
 
 use crate::utils::{AttrExtract, Attribute};
 
@@ -6,6 +6,7 @@ use super::RustCAttr;
 
 #[derive(Default)]
 pub struct VariantAttr {
+    pub r#type: Option<Type>,
     pub skip: bool,
     pub inline: bool,
     pub common: RustCAttr,
@@ -29,6 +30,13 @@ impl VariantAttr {
 
         if let Some(attr) = attrs.extract("specta", "inline") {
             result.inline = attr.parse_bool().unwrap_or(true);
+        }
+
+        if let Some(attr) = attrs
+            .extract("specta", "type")
+            .or_else(|| attrs.extract("specta", "r#type"))
+        {
+            result.r#type = result.r#type.take().or(Some(attr.parse_type()?));
         }
 
         Ok(result)

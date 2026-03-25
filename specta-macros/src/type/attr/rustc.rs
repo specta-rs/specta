@@ -6,18 +6,46 @@ use syn::{Lit, Result};
 use crate::utils::{Attribute, AttributeValue};
 
 // Copy of `specta/src/datatype/named.rs`
-pub enum DeprecatedType {
-    Deprecated,
-    DeprecatedWithSince {
-        since: Option<Cow<'static, str>>,
-        note: Cow<'static, str>,
-    },
+pub struct Deprecated {
+    note: Option<Cow<'static, str>>,
+    since: Option<Cow<'static, str>>,
+}
+
+impl Deprecated {
+    pub const fn new() -> Self {
+        Self {
+            note: None,
+            since: None,
+        }
+    }
+
+    pub fn with_note(note: Cow<'static, str>) -> Self {
+        Self {
+            note: Some(note),
+            since: None,
+        }
+    }
+
+    pub fn with_since_note(since: Option<Cow<'static, str>>, note: Cow<'static, str>) -> Self {
+        Self {
+            note: Some(note),
+            since,
+        }
+    }
+
+    pub fn note(&self) -> Option<&Cow<'static, str>> {
+        self.note.as_ref()
+    }
+
+    pub fn since(&self) -> Option<&Cow<'static, str>> {
+        self.since.as_ref()
+    }
 }
 
 #[derive(Default)]
 pub struct RustCAttr {
     pub doc: String,
-    pub deprecated: Option<DeprecatedType>,
+    pub deprecated: Option<Deprecated>,
 }
 
 impl RustCAttr {
@@ -40,13 +68,10 @@ impl RustCAttr {
 
             match &attr_value.value {
                 Some(AttributeValue::Lit(lit)) => {
-                    deprecated = Some(DeprecatedType::DeprecatedWithSince {
-                        since: None,
-                        note: match lit {
-                            Lit::Str(s) => s.value().into(),
-                            _ => return Err(syn::Error::new_spanned(lit, "expected string")),
-                        },
-                    });
+                    deprecated = Some(Deprecated::with_note(match lit {
+                        Lit::Str(s) => s.value().into(),
+                        _ => return Err(syn::Error::new_spanned(lit, "expected string")),
+                    }));
                 }
                 Some(AttributeValue::Path(_)) => {
                     unreachable!("deprecated attribute can't be a path!")
@@ -81,13 +106,13 @@ impl RustCAttr {
                         })
                         .unwrap_or_default();
 
-                    deprecated = Some(DeprecatedType::DeprecatedWithSince {
+                    deprecated = Some(Deprecated::with_since_note(
                         // TODO: Use Cow's earlier rather than later
-                        since: since.map(Into::into),
-                        note: note.into(),
-                    });
+                        since.map(Into::into),
+                        note.into(),
+                    ));
                 }
-                None => deprecated = Some(DeprecatedType::Deprecated),
+                None => deprecated = Some(Deprecated::new()),
             }
 
             attrs.swap_remove(pos);
@@ -98,19 +123,23 @@ impl RustCAttr {
 
     pub fn deprecated_as_tokens(&self) -> proc_macro2::TokenStream {
         match &self.deprecated {
-            Some(DeprecatedType::Deprecated) => {
-                quote!(Some(datatype::DeprecatedType::Deprecated))
-            }
-            Some(DeprecatedType::DeprecatedWithSince { since, note }) => {
-                let since = since
-                    .as_ref()
+            Some(deprecated) => {
+                let since = deprecated
+                    .since()
                     .map(|v| quote!(#v.into()))
                     .unwrap_or(quote!(None));
 
-                quote!(Some(datatype::DeprecatedType::DeprecatedWithSince {
-                    since: #since,
-                    note: #note.into(),
-                }))
+                let note = match deprecated.note() {
+                    Some(note) => quote!(Some(#note.into())),
+                    None => quote!(None),
+                };
+
+                quote!({
+                    let mut deprecated = datatype::Deprecated::new();
+                    deprecated.set_since(#since);
+                    deprecated.set_note(#note);
+                    Some(deprecated)
+                })
             }
             None => quote!(None),
         }

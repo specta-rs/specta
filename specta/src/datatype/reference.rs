@@ -4,23 +4,22 @@ use std::{
     sync::Arc,
 };
 
-use crate::{TypeCollection, datatype::NamedDataType};
+use crate::{Types, datatype::NamedDataType};
 
 use super::DataType;
 
-/// A reference to another type.
-/// This can either an [NamedReference] or [OpaqueReference].
+/// Reference to another type.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Reference {
-    /// A reference to a named type collected in a [`TypeCollection`].
+    /// Reference to a named type collected in a [`Types`].
     Named(NamedReference),
-    /// A reference to a generic type parameter.
+    /// Reference to a generic type parameter.
     Generic(GenericReference),
-    /// A reference to an opaque exporter-specific type.
+    /// Reference to an opaque exporter-specific type.
     Opaque(OpaqueReference),
 }
 
-/// A reference to a [NamedDataType].
+/// Reference to a [NamedDataType].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NamedReference {
     pub(crate) id: NamedId,
@@ -29,11 +28,11 @@ pub struct NamedReference {
 }
 
 impl NamedReference {
-    /// Get a reference to a [NamedDataType] from a [TypeCollection].
+    /// Get a reference to a [NamedDataType] from a [Types].
     ///
-    /// This is guaranteed to return a [NamedDataType] if the [TypeCollection] matches,
+    /// This is guaranteed to return a [NamedDataType] if the [Types] matches,
     /// what was used to get the original [Reference].
-    pub fn get<'a>(&self, types: &'a TypeCollection) -> Option<&'a NamedDataType> {
+    pub fn get<'a>(&self, types: &'a Types) -> Option<&'a NamedDataType> {
         types.0.get(&self.id)?.as_ref()
     }
 
@@ -48,8 +47,8 @@ impl NamedReference {
     }
 }
 
-/// A reference to a generic type parameter.
-/// These are resolved in the exporter to the parent's [NamedDataType].
+/// Reference to a generic parameter a parent [NamedDataType].
+/// This is resolved to a concrete type by the language exporter.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GenericReference {
     pub(crate) id: TypeId,
@@ -77,10 +76,13 @@ impl From<GenericReference> for DataType {
     }
 }
 
-/// A reference to an opaque type which is understood by the type exporter.
-/// This powers [specta_typescript::branded], [specta_typescript::define] and more.
+/// Reference to a type not understood by Specta's core.
 ///
-/// This is an advanced feature designed for language exporters so should generally be avoided.
+/// These are implemented by the language exporter to implement cool features like
+/// [`specta_typescript::branded!`](https://docs.rs/specta-typescript/latest/specta_typescript/macro.branded.html),
+/// [`specta_typescript::define`](https://docs.rs/specta-typescript/latest/specta_typescript/fn.define.html), and more.
+///
+/// This is an advanced feature designed for language exporters so should generally be avoided and is not intended to be generally useful unless your in control of the language exporter.
 #[derive(Clone)]
 pub struct OpaqueReference(Arc<dyn DynOpaqueReference>);
 
@@ -214,7 +216,7 @@ impl From<Reference> for DataType {
     }
 }
 
-/// A unique identifier for a [NamedDataType].
+/// Unique identifier for a [NamedDataType].
 ///
 /// For static types (from derive macros), we use a unique string based on the
 /// type's module path and name. For dynamic types, we use an Arc pointer.

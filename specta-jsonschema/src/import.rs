@@ -33,7 +33,7 @@ fn value_to_datatype(value: &Value) -> Result<DataType, Error> {
 fn schema_object_to_datatype(obj: &JsonMap<String, Value>) -> Result<DataType, Error> {
     // Handle $ref
     if let Some(reference) = obj.get("$ref").and_then(Value::as_str) {
-        // We use an opaque reference since we do not have a TypeCollection context here.
+        // We use an opaque reference since we do not have a Types context here.
         return Ok(DataType::Reference(Reference::opaque(reference.to_owned())));
     }
 
@@ -50,7 +50,7 @@ fn schema_object_to_datatype(obj: &JsonMap<String, Value>) -> Result<DataType, E
         let mut e = Enum::new();
         for value in enum_values {
             if let Some(s) = value.as_str() {
-                let variant = EnumVariant::unit();
+                let variant = Variant::unit();
                 e.variants_mut().push((Cow::Owned(s.to_string()), variant));
             }
         }
@@ -88,7 +88,7 @@ fn instance_type_to_datatype(
             for (i, item) in types.iter().enumerate() {
                 if let Value::String(t) = item {
                     let dt = instance_type_name_to_datatype(t, obj)?;
-                    let variant = EnumVariant::unnamed().field(Field::new(dt)).build();
+                    let variant = Variant::unnamed().field(Field::new(dt)).build();
                     e.variants_mut()
                         .push((Cow::Owned(format!("Variant{}", i)), variant));
                 }
@@ -241,7 +241,7 @@ fn handle_any_of(schemas: &[Value]) -> Result<DataType, Error> {
     let mut e = Enum::new();
     for (i, schema) in schemas.iter().enumerate() {
         let dt = value_to_datatype(schema)?;
-        let variant = EnumVariant::unnamed().field(Field::new(dt)).build();
+        let variant = Variant::unnamed().field(Field::new(dt)).build();
         e.variants_mut()
             .push((Cow::Owned(format!("Variant{}", i)), variant));
     }

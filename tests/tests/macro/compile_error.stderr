@@ -1,3 +1,19 @@
+error: unsupported serde casing: `"camelCase123"`
+ --> tests/macro/compile_error.rs:6:10
+  |
+6 | #[derive(Type)]
+  |          ^^^^
+  |
+  = note: this error originates in the macro `$crate::__specta_serde_set_case` which comes from the expansion of the derive macro `Type` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: unsupported serde casing: `"camelCase123"`
+ --> tests/macro/compile_error.rs:6:10
+  |
+6 | #[derive(Type)]
+  |          ^^^^
+  |
+  = note: this error originates in the macro `$crate::__specta_serde_set_case` which comes from the expansion of the derive macro `Type` (in Nightly builds, run with -Z macro-backtrace for more info)
+
 error: specta: Found unsupported container attribute 'noshot'
   --> tests/macro/compile_error.rs:86:10
    |
@@ -34,11 +50,11 @@ error: specta: `#[specta(rename ...)]` is no longer supported on fields. Use `#[
 117 |     #[specta(rename = "renamed")]
     |              ^^^^^^
 
-error: specta: `#[specta(rename ...)]` is no longer supported on variants. Use `#[serde(rename = "...")]` instead.
-   --> tests/macro/compile_error.rs:124:14
+error: expected `,`
+   --> tests/macro/compile_error.rs:124:21
     |
 124 |     #[specta(rename = "renamed")]
-    |              ^^^^^^
+    |                     ^
 
 error: specta: Found unsupported field attribute 'rename_from_path'
    --> tests/macro/compile_error.rs:133:14
@@ -200,8 +216,8 @@ error[E0277]: the trait `specta::Type` is not implemented for `dyn std::error::E
    = help: the trait `specta::Type` is not implemented for `dyn std::error::Error + Send + Sync`
    = note: Depending on your use case, this can be fixed in multiple ways:
             - If your using an type defined in one of your own crates, ensure you have `#[derive(specta::Type)]` on it.
-            - If your using a crate with official Specta support enable the feature flag on the 'specta' crate, refer to the documentation at https://docs.rs/specta/latest/specta/#feature-flags.
-            - If your using an external crate without Specta support, you may need to wrap your type in a new-type wrapper, refer to the examples at https://docs.rs/specta/latest/specta/trait.Type.html
+            - If your using a crate with official Specta support, enable the matching feature flag on the `specta` crate.
+            - If your using an external crate without Specta support, you may need to wrap your type in a new-type wrapper.
 
    = help: the following other types implement trait `specta::Type`:
              &T

@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{ResolvedTypes, Type, Types};
 use specta_swift::Swift;
 
 #[derive(Type)]
@@ -18,12 +18,11 @@ enum Status {
 
 #[test]
 fn test_basic_export() {
-    let types = TypeCollection::default()
-        .register::<User>()
-        .register::<Status>();
+    let types = Types::default().register::<User>().register::<Status>();
+    let resolved = ResolvedTypes::from_resolved_types(types);
 
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&resolved).unwrap();
 
     println!("Generated Swift code:\n{}", output);
 

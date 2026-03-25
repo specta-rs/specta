@@ -1,9 +1,8 @@
 use std::marker::PhantomData;
 
 use crate::{
-    Type, TypeCollection,
-    datatype::{self, DataType, Enum, EnumVariant, Field, List},
-    internal,
+    Type, Types,
+    datatype::{self, DataType, Enum, Field, List, Variant},
     r#type::{generics, macros::*},
 };
 
@@ -16,16 +15,18 @@ impl_primitives!(
 );
 
 #[cfg(is_nightly)]
+#[cfg_attr(docsrs, doc(cfg(is_nightly)))]
 impl Type for f16 {
-    fn definition(_: &mut TypeCollection) -> DataType {
+    fn definition(_: &mut Types) -> DataType {
         DataType::Primitive(datatype::Primitive::f16)
     }
 }
 
 #[cfg(is_nightly)]
+#[cfg_attr(docsrs, doc(cfg(is_nightly)))]
 impl Type for f128 {
-    fn definition(_: &mut TypeCollection) -> DataType {
-        DataType::Primitive(datatype::Primitive::f16)
+    fn definition(_: &mut Types) -> DataType {
+        DataType::Primitive(datatype::Primitive::f128)
     }
 }
 
@@ -34,7 +35,7 @@ impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13);
 
 pub(crate) struct PrimitiveSet<T>(PhantomData<T>);
 impl<T: Type> Type for PrimitiveSet<T> {
-    fn definition(types: &mut TypeCollection) -> DataType {
+    fn definition(types: &mut Types) -> DataType {
         let mut l = List::new(<T as Type>::definition(types));
         l.set_unique(true);
         DataType::List(l)
@@ -43,7 +44,7 @@ impl<T: Type> Type for PrimitiveSet<T> {
 
 pub(crate) struct PrimitiveMap<K, V>(PhantomData<K>, PhantomData<V>);
 impl<K: Type, V: Type> Type for PrimitiveMap<K, V> {
-    fn definition(types: &mut TypeCollection) -> DataType {
+    fn definition(types: &mut Types) -> DataType {
         DataType::Map(crate::datatype::Map::new(
             K::definition(types),
             V::definition(types),
@@ -52,6 +53,7 @@ impl<K: Type, V: Type> Type for PrimitiveMap<K, V> {
 }
 
 #[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 const _: () = {
     impl_ndt_as!(
         std::string::String as str
@@ -138,50 +140,32 @@ const _: () = {
         impl Type for std::time::SystemTime {
             inline: true;
             build: |types, ndt| {
-                let mut s = crate::datatype::Struct::unit();
-                s.set_fields(internal::construct::fields_named(
-                    vec![
-                        (
-                            "duration_since_epoch".into(),
-                            Field::new(<i64 as crate::Type>::definition(types)),
-                        ),
-                        (
-                            "duration_since_unix_epoch".into(),
-                            Field::new(<u32 as crate::Type>::definition(types)),
-                        ),
-                    ],
-                    vec![],
-                ));
-
-                ndt.inner = DataType::Struct(s);
+                ndt.inner = datatype::Struct::named()
+                    .field(
+                        "duration_since_epoch",
+                        Field::new(<i64 as crate::Type>::definition(types)),
+                    )
+                    .field(
+                        "duration_since_unix_epoch",
+                        Field::new(<u32 as crate::Type>::definition(types)),
+                    )
+                    .build();
             }
         }
 
         impl Type for std::time::Duration {
             inline: true;
             build: |types, ndt| {
-                let mut s = crate::datatype::Struct::unit();
-                s.set_fields(internal::construct::fields_named(
-                    vec![
-                        (
-                            "secs".into(),
-                            Field::new(<u64 as crate::Type>::definition(types)),
-                        ),
-                        (
-                            "nanos".into(),
-                            Field::new(<u32 as crate::Type>::definition(types)),
-                        ),
-                    ],
-                    vec![],
-                ));
-
-                ndt.inner = DataType::Struct(s);
+                ndt.inner = datatype::Struct::named()
+                    .field("secs", Field::new(<u64 as crate::Type>::definition(types)))
+                    .field("nanos", Field::new(<u32 as crate::Type>::definition(types)))
+                    .build();
             }
         }
     );
 
     impl<'a, T: ?Sized + ToOwned + Type + 'a> Type for std::borrow::Cow<'a, T> {
-        fn definition(types: &mut TypeCollection) -> DataType {
+        fn definition(types: &mut Types) -> DataType {
             use std::borrow::Cow;
 
             use crate::datatype::GenericReference;
@@ -213,23 +197,18 @@ const _: () = {
 
     struct BaseRange<T>(PhantomData<T>);
     impl<T: Type> Type for BaseRange<T> {
-        fn definition(types: &mut TypeCollection) -> DataType {
+        fn definition(types: &mut Types) -> DataType {
             let ty = T::definition(types);
-            let mut s = crate::datatype::Struct::unit();
-            s.set_fields(internal::construct::fields_named(
-                vec![
-                    ("start".into(), Field::new(ty.clone())),
-                    ("end".into(), Field::new(ty)),
-                ],
-                vec![],
-            ));
-
-            DataType::Struct(s)
+            datatype::Struct::named()
+                .field("start", Field::new(ty.clone()))
+                .field("end", Field::new(ty))
+                .build()
         }
     }
 };
 
 #[cfg(feature = "tokio")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 impl_ndt_as!(
     tokio::sync::Mutex<T> where { T: ?Sized } as generics::T
     tokio::sync::RwLock<T> where { T: ?Sized } as generics::T
@@ -240,7 +219,7 @@ impl<T: Type + ?Sized> Type for &T {
 }
 
 impl<T: Type> Type for [T] {
-    fn definition(types: &mut TypeCollection) -> DataType {
+    fn definition(types: &mut Types) -> DataType {
         let mut l = List::new(<T as Type>::definition(types));
         l.set_unique(false);
         DataType::List(l)
@@ -248,7 +227,7 @@ impl<T: Type> Type for [T] {
 }
 
 impl<const N: usize, T: Type> Type for [T; N] {
-    fn definition(types: &mut TypeCollection) -> DataType {
+    fn definition(types: &mut Types) -> DataType {
         let mut l = List::new(T::definition(types));
         l.set_length(Some(N));
         DataType::List(l)
@@ -256,7 +235,7 @@ impl<const N: usize, T: Type> Type for [T; N] {
 }
 
 impl<T: Type> Type for Option<T> {
-    fn definition(types: &mut TypeCollection) -> DataType {
+    fn definition(types: &mut Types) -> DataType {
         DataType::Nullable(Box::new(T::definition(types)))
     }
 }
@@ -269,23 +248,15 @@ impl_ndt!(
     impl<T, E> Type for std::result::Result<T, E> where { T: Type, E: Type } {
         inline: true;
         build: |types, ndt| {
-            let mut ok_variant = EnumVariant::unit();
-            ok_variant.set_fields(internal::construct::fields_unnamed(
-                vec![Field::new(
-                    datatype::GenericReference::new::<generics::T>().into(),
-                )],
-                vec![],
-            ));
-            let mut err_variant = EnumVariant::unit();
-            err_variant.set_fields(internal::construct::fields_unnamed(
-                vec![Field::new(
-                    datatype::GenericReference::new::<generics::E>().into(),
-                )],
-                vec![],
-            ));
+            let ok_variant = Variant::unnamed()
+                .field(Field::new(datatype::GenericReference::new::<generics::T>().into()))
+                .build();
+            let err_variant = Variant::unnamed()
+                .field(Field::new(datatype::GenericReference::new::<generics::E>().into()))
+                .build();
             ndt.inner = DataType::Enum(Enum {
                 variants: vec![("Ok".into(), ok_variant), ("Err".into(), err_variant)],
-                attributes: vec![],
+                attributes: datatype::Attributes::default(),
             });
         }
     }

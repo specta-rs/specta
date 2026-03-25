@@ -9,10 +9,9 @@ use std::{
 };
 
 use specta::{
-    TypeCollection,
+    ResolvedTypes, Types,
     datatype::{DataType, NamedDataType, Reference},
 };
-use specta_serde::SerdeMode;
 
 use crate::{Branded, Error, primitives, references};
 
@@ -101,8 +100,6 @@ pub struct Exporter {
     pub bigint: BigIntExportBehavior,
     /// Output layout mode for generated TypeScript.
     pub layout: Layout,
-    /// Optional Serde compatibility processing mode.
-    pub serde: Option<SerdeMode>,
     pub(crate) jsdoc: bool,
 }
 
@@ -118,7 +115,6 @@ impl Exporter {
             ),
             bigint: Default::default(),
             layout: Default::default(),
-            serde: Some(SerdeMode::Both),
             jsdoc: false,
         }
     }
@@ -132,7 +128,7 @@ impl Exporter {
     /// Add some custom Typescript or Javascript code that is exported as part of the bindings.
     /// It's appending to the types file for single-file layouts or put in a root `index.{ts/js}` for multi-file.
     ///
-    /// The closure is wrapped in [`specta::datatype::collect()`] to capture any referenced types.
+    /// The closure is wrapped in [`specta::collect()`] to capture any referenced types.
     /// Ensure you call `T::reference()` within the closure if you want an import to be created.
     pub fn framework_runtime(
         mut self,
@@ -212,33 +208,11 @@ impl Exporter {
         self
     }
 
-    /// Configure the exporter to use specta-serde with the specified mode
-    pub fn with_serde(mut self, mode: SerdeMode) -> Self {
-        self.serde = Some(mode);
-        self
-    }
-
-    /// Configure the exporter to export the types for `#[derive(serde::Serialize)]`
-    pub fn with_serde_serialize(self) -> Self {
-        self.with_serde(SerdeMode::Serialize)
-    }
-
-    /// Configure the exporter to export the types for `#[derive(serde::Deserialize)]`
-    pub fn with_serde_deserialize(self) -> Self {
-        self.with_serde(SerdeMode::Deserialize)
-    }
-
     /// Export the files into a single string.
     ///
     /// Note: This returns an error if the format is `Format::Files`.
-    pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
-        let types = if let Some(mode) = self.serde {
-            let mut types = types.clone(); // TODO: Can we avoid this?
-            specta_serde::apply(&mut types, mode)?;
-            Cow::Owned(types)
-        } else {
-            Cow::Borrowed(types)
-        };
+    pub fn export(&self, resolved_types: &ResolvedTypes) -> Result<String, Error> {
+        let types = resolved_types.as_types();
 
         if let Layout::Files = self.layout {
             return Err(Error::unable_to_export(self.layout));
@@ -258,7 +232,7 @@ impl Exporter {
                 exporter: self,
                 has_manually_exported_user_types: &mut has_manually_exported_user_types,
                 files_root_types: "",
-                types: &types,
+                types: resolved_types,
             });
         }
         let runtime = runtime?;
@@ -274,7 +248,7 @@ impl Exporter {
 
         // User types (if not included in framework runtime)
         if !has_manually_exported_user_types {
-            render_types(&mut out, self, &types, "")?;
+            render_types(&mut out, self, types, "")?;
         }
 
         Ok(out)
@@ -285,11 +259,16 @@ impl Exporter {
     /// When configured when `format` is `Format::Files`, you must provide a directory path.
     /// Otherwise, you must provide the path of a single file.
     ///
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
+    pub fn export_to(
+        &self,
+        path: impl AsRef<Path>,
+        resolved_types: &ResolvedTypes,
+    ) -> Result<(), Error> {
+        let types = resolved_types.as_types();
         let path = path.as_ref();
 
         if self.layout != Layout::Files {
-            let result = self.export(types)?;
+            let result = self.export(resolved_types)?;
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)?;
             };
@@ -297,17 +276,9 @@ impl Exporter {
             return Ok(());
         }
 
-        let types = if let Some(mode) = self.serde {
-            let mut types = types.clone(); // TODO: Can we avoid this?
-            specta_serde::apply(&mut types, mode)?;
-            Cow::Owned(types)
-        } else {
-            Cow::Borrowed(types)
-        };
-
         fn export(
             exporter: &Exporter,
-            types: &TypeCollection,
+            types: &Types,
             module: &mut Module,
             s: &mut String,
             path: &Path,
@@ -385,8 +356,8 @@ impl Exporter {
         let mut root_types = String::new();
         export(
             self,
-            &types,
-            &mut build_module_graph(&types),
+            types,
+            &mut build_module_graph(types),
             &mut root_types,
             path,
             &mut files,
@@ -403,7 +374,7 @@ impl Exporter {
                             exporter: self,
                             has_manually_exported_user_types: &mut has_manually_exported_user_types,
                             files_root_types: &root_types,
-                            types: &types,
+                            types: resolved_types,
                         })
                     })
                 });
@@ -436,7 +407,7 @@ impl Exporter {
                     let import_paths = runtime_references
                         .into_iter()
                         .filter_map(|r| {
-                            r.get(&types)
+                            r.get(types)
                                 .map(|ndt| ndt.module_path().as_ref().to_string())
                         })
                         .filter(|module_path| !module_path.is_empty())
@@ -509,7 +480,7 @@ impl AsMut<Exporter> for Exporter {
 pub struct BrandedTypeExporter<'a> {
     pub(crate) exporter: &'a Exporter,
     /// Collected types currently being exported.
-    pub types: &'a TypeCollection,
+    pub types: &'a ResolvedTypes,
 }
 
 impl fmt::Debug for BrandedTypeExporter<'_> {
@@ -551,7 +522,7 @@ pub struct FrameworkExporter<'a> {
     // For `Layout::Files` we need to inject the value
     files_root_types: &'a str,
     /// Collected types currently being exported.
-    pub types: &'a TypeCollection,
+    pub types: &'a ResolvedTypes,
 }
 
 impl fmt::Debug for FrameworkExporter<'_> {
@@ -575,13 +546,18 @@ impl Deref for FrameworkExporter<'_> {
 }
 
 impl FrameworkExporter<'_> {
-    /// Render the types within the [TypeCollection].
+    /// Render the types within the [`ResolvedTypes`](specta::ResolvedTypes).
     ///
-    /// This will only work if used within [Self::framework_runtime] function.
+    /// This will only work if used within [`Exporter::framework_runtime`].
     /// It allows frameworks to intersperse their user types into their runtime code.
     pub fn render_types(&mut self) -> Result<Cow<'static, str>, Error> {
         let mut s = String::new();
-        render_types(&mut s, self.exporter, self.types, self.files_root_types)?;
+        render_types(
+            &mut s,
+            self.exporter,
+            self.types.as_types(),
+            self.files_root_types,
+        )?;
         *self.has_manually_exported_user_types = true;
         Ok(Cow::Owned(s))
     }
@@ -612,7 +588,7 @@ struct Module<'a> {
     module_path: Cow<'static, str>,
 }
 
-fn build_module_graph(types: &TypeCollection) -> Module<'_> {
+fn build_module_graph(types: &Types) -> Module<'_> {
     types.into_unsorted_iter().fold(
         Module {
             types: Default::default(),
@@ -665,12 +641,12 @@ fn render_file_header(exporter: &Exporter) -> Result<String, Error> {
 fn render_types(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     files_user_types: &str,
 ) -> Result<(), Error> {
     match exporter.layout {
         Layout::Namespaces => {
-            fn has_renderable_content(module: &Module<'_>, types: &TypeCollection) -> bool {
+            fn has_renderable_content(module: &Module<'_>, types: &Types) -> bool {
                 module.types.iter().any(|ndt| ndt.requires_reference(types))
                     || module
                         .children
@@ -680,7 +656,7 @@ fn render_types(
 
             fn export<'a>(
                 exporter: &Exporter,
-                types: &TypeCollection,
+                types: &Types,
                 s: &mut String,
                 module: impl ExactSizeIterator<Item = (&'a &'a str, &'a mut Module<'a>)>,
                 depth: usize,
@@ -777,7 +753,7 @@ fn render_types(
 fn render_flat_types<'a>(
     s: &mut String,
     exporter: &Exporter,
-    types: &TypeCollection,
+    types: &Types,
     ndts: impl ExactSizeIterator<Item = &'a NamedDataType>,
     indent: &str,
 ) -> Result<HashMap<String, Location<'static>>, Error> {

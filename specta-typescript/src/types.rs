@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use specta::{
-    Type, TypeCollection,
+    Type, Types,
     datatype::{DataType, Reference},
 };
 
@@ -42,7 +42,7 @@ use crate::opaque;
 pub struct Any<T = ()>(T);
 
 impl<T> Type for Any<T> {
-    fn definition(_: &mut TypeCollection) -> DataType {
+    fn definition(_: &mut Types) -> DataType {
         DataType::Reference(Reference::opaque(opaque::Any))
     }
 }
@@ -109,7 +109,7 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
 pub struct Unknown<T = ()>(T);
 
 impl<T> Type for Unknown<T> {
-    fn definition(_: &mut TypeCollection) -> DataType {
+    fn definition(_: &mut Types) -> DataType {
         DataType::Reference(Reference::opaque(opaque::Unknown))
     }
 }
@@ -176,7 +176,7 @@ impl<T: serde::Serialize> serde::Serialize for Unknown<T> {
 pub struct Never<T = ()>(T);
 
 impl<T> Type for Never<T> {
-    fn definition(_: &mut TypeCollection) -> DataType {
+    fn definition(_: &mut Types) -> DataType {
         DataType::Reference(Reference::opaque(opaque::Never))
     }
 }

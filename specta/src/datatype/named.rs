@@ -1,20 +1,22 @@
 use std::{borrow::Cow, panic::Location, sync::Arc};
 
 use crate::{
-    TypeCollection,
+    Types,
     datatype::{
-        DataType, NamedDataTypeBuilder, NamedReference, Reference,
+        DataType, NamedReference, Reference,
         reference::{self, GenericReference, NamedId},
     },
 };
 
-/// A named type represents a non-primitive type capable of being exported as it's own named entity.
+/// Named type represents any type with it's own unique name and identity.
+///
+/// These can become `export MyNamedType = ...` in Typescript can we be referenced in types like `{ field: MyNamedType }`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NamedDataType {
     pub(crate) id: NamedId,
     pub(crate) name: Cow<'static, str>,
     pub(crate) docs: Cow<'static, str>,
-    pub(crate) deprecated: Option<DeprecatedType>,
+    pub(crate) deprecated: Option<Deprecated>,
     pub(crate) module_path: Cow<'static, str>,
     pub(crate) location: Location<'static>,
     pub(crate) generics: Cow<'static, [(GenericReference, Cow<'static, str>)]>,
@@ -23,6 +25,62 @@ pub struct NamedDataType {
 }
 
 impl NamedDataType {
+    /// Construct a new named datatype.
+    ///
+    /// Note: Ensure you call `Self::register` to register the type.
+    #[track_caller]
+    pub fn new(
+        name: impl Into<Cow<'static, str>>,
+        generics: Vec<(GenericReference, Cow<'static, str>)>,
+        dt: DataType,
+    ) -> Self {
+        let location = Location::caller();
+        Self {
+            id: NamedId::Dynamic(Arc::new(())),
+            name: name.into(),
+            docs: Cow::Borrowed(""),
+            deprecated: None,
+            module_path: file_path_to_module_path(location.file())
+                .map(Into::into)
+                .unwrap_or(Cow::Borrowed("virtual")),
+            location: location.to_owned(),
+            generics: Cow::Owned(generics),
+            inline: false,
+            inner: dt,
+        }
+    }
+
+    /// Construct a new inlined named datatype.
+    ///
+    /// Note: Ensure you call `Self::register` to register the type.
+    #[track_caller]
+    pub fn new_inline(
+        name: impl Into<Cow<'static, str>>,
+        generics: Vec<(GenericReference, Cow<'static, str>)>,
+        dt: DataType,
+    ) -> Self {
+        let location = Location::caller();
+        Self {
+            id: NamedId::Dynamic(Arc::new(())),
+            name: name.into(),
+            docs: Cow::Borrowed(""),
+            deprecated: None,
+            module_path: file_path_to_module_path(location.file())
+                .map(Into::into)
+                .unwrap_or(Cow::Borrowed("virtual")),
+            location: location.to_owned(),
+            generics: Cow::Owned(generics),
+            inline: true,
+            inner: dt,
+        }
+    }
+
+    /// Register the type into a [Types].
+    pub fn register(&self, types: &mut Types) {
+        types.0.insert(self.id.clone(), Some(self.clone()));
+        types.1 += 1;
+    }
+
     // ## Why return a reference?
     //
     // If a recursive type is being resolved it's possible the `init_with_sentinel` function will be called recursively.
@@ -34,9 +92,9 @@ impl NamedDataType {
         generics_for_ndt: &'static [(GenericReference, Cow<'static, str>)],
         generics_for_ref: Vec<(GenericReference, DataType)>,
         mut inline: bool,
-        types: &mut TypeCollection,
+        types: &mut Types,
         sentinel: &'static str,
-        build_ndt: fn(&mut TypeCollection, &mut NamedDataType),
+        build_ndt: fn(&mut Types, &mut NamedDataType),
     ) -> Reference {
         let id = NamedId::Static(sentinel);
         let location = Location::caller().to_owned();
@@ -85,35 +143,6 @@ impl NamedDataType {
         })
     }
 
-    /// Register a runtime named datatype.
-    /// This is exposed via [NamedDataTypeBuilder::build].
-    #[track_caller]
-    pub(crate) fn register(builder: NamedDataTypeBuilder, types: &mut TypeCollection) -> Self {
-        let location = Location::caller();
-
-        let module_path = builder.module_path.unwrap_or_else(|| {
-            file_path_to_module_path(location.file())
-                .map(Into::into)
-                .unwrap_or(Cow::Borrowed("virtual"))
-        });
-
-        let ndt = Self {
-            id: NamedId::Dynamic(Arc::new(())),
-            name: builder.name,
-            docs: builder.docs,
-            deprecated: builder.deprecated,
-            module_path,
-            location: location.to_owned(),
-            generics: Cow::Owned(builder.generics),
-            inline: builder.inline,
-            inner: builder.inner,
-        };
-
-        types.0.insert(ndt.id.clone(), Some(ndt.clone()));
-        types.1 += 1;
-        ndt
-    }
-
     /// Construct a [Reference] to a [NamedDataType].
     /// This can be included in a `DataType::Reference` within another type.
     ///
@@ -134,8 +163,8 @@ impl NamedDataType {
     /// This if `false` is all [Reference]'s created for the type are inlined,
     /// in that case it doesn't need to be exported because it will never be
     /// referenced.
-    pub fn requires_reference(&self, _types: &TypeCollection) -> bool {
-        // `TypeCollection` is unused but I wanna keep it for future flexibility.
+    pub fn requires_reference(&self, _types: &Types) -> bool {
+        // `Types` is unused but I wanna keep it for future flexibility.
 
         // If a type is inlined, all it's references are,
         // therefor we don't need to export a named version of it.
@@ -173,17 +202,17 @@ impl NamedDataType {
     }
 
     /// The Rust deprecated comment if the type is deprecated.
-    pub fn deprecated(&self) -> Option<&DeprecatedType> {
+    pub fn deprecated(&self) -> Option<&Deprecated> {
         self.deprecated.as_ref()
     }
 
     /// Get a mutable reference to the Rust deprecated comment if the type is deprecated.
-    pub fn deprecated_mut(&mut self) -> Option<&mut DeprecatedType> {
+    pub fn deprecated_mut(&mut self) -> Option<&mut Deprecated> {
         self.deprecated.as_mut()
     }
 
     /// Set the Rust deprecated comment if the type is deprecated.
-    pub fn set_deprecated(&mut self, deprecated: Option<DeprecatedType>) {
+    pub fn set_deprecated(&mut self, deprecated: Option<Deprecated>) {
         self.deprecated = deprecated;
     }
 
@@ -238,23 +267,73 @@ impl NamedDataType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[non_exhaustive]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 /// Runtime representation of Rust's `#[deprecated]` metadata.
-pub enum DeprecatedType {
-    /// A type that has been deprecated without a message.
+pub struct Deprecated {
+    note: Option<Cow<'static, str>>,
+    since: Option<Cow<'static, str>>,
+}
+
+impl Deprecated {
+    /// Construct deprecation metadata without details.
     ///
     /// Eg. `#[deprecated]`
-    Deprecated,
-    /// A type that has been deprecated with a message and an optional `since` version.
+    pub const fn new() -> Self {
+        Self {
+            note: None,
+            since: None,
+        }
+    }
+
+    /// Construct deprecation metadata with a note/message.
     ///
-    /// Eg. `#[deprecated = "Use something else"]` or `#[deprecated(since = "1.0.0", message = "Use something else")]`
-    DeprecatedWithSince {
-        /// Optional version string from `since = "..."`.
-        since: Option<Cow<'static, str>>,
-        /// Deprecation note/message.
-        note: Cow<'static, str>,
-    },
+    /// Eg. `#[deprecated = "Use something else"]`
+    pub fn with_note(note: Cow<'static, str>) -> Self {
+        Self {
+            note: Some(note),
+            since: None,
+        }
+    }
+
+    /// Construct deprecation metadata with a note/message and an optional `since` version.
+    ///
+    /// Eg. `#[deprecated(since = "1.0.0", note = "Use something else")]`
+    pub fn with_since_note(since: Option<Cow<'static, str>>, note: Cow<'static, str>) -> Self {
+        Self {
+            note: Some(note),
+            since,
+        }
+    }
+
+    /// Optional deprecation note/message.
+    pub fn note(&self) -> Option<&Cow<'static, str>> {
+        self.note.as_ref()
+    }
+
+    /// Mutable optional deprecation note/message.
+    pub fn note_mut(&mut self) -> Option<&mut Cow<'static, str>> {
+        self.note.as_mut()
+    }
+
+    /// Set the optional deprecation note/message.
+    pub fn set_note(&mut self, note: Option<Cow<'static, str>>) {
+        self.note = note;
+    }
+
+    /// Optional version string from `since = "..."`.
+    pub fn since(&self) -> Option<&Cow<'static, str>> {
+        self.since.as_ref()
+    }
+
+    /// Mutable optional version string from `since = "..."`.
+    pub fn since_mut(&mut self) -> Option<&mut Cow<'static, str>> {
+        self.since.as_mut()
+    }
+
+    /// Set the optional version string from `since = "..."`.
+    pub fn set_since(&mut self, since: Option<Cow<'static, str>>) {
+        self.since = since;
+    }
 }
 
 fn file_path_to_module_path(file_path: &str) -> Option<String> {

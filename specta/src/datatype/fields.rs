@@ -1,45 +1,22 @@
 //! Field types are used by both enums and structs.
 
-use super::{Attribute, DataType, DeprecatedType};
+use crate::datatype::Struct;
+
+use super::{Attributes, DataType, Deprecated};
 use std::borrow::Cow;
-
-/// A non-skipped field with its type information.
-pub type NonSkipField<'a> = (&'a Field, &'a DataType);
-
-/// Filter out skipped fields from a collection of fields.
-///
-/// Returns an iterator of tuples containing the field and its type, excluding fields with `None` type.
-pub fn skip_fields<'a>(
-    fields: impl IntoIterator<Item = &'a Field>,
-) -> impl Iterator<Item = NonSkipField<'a>> {
-    fields
-        .into_iter()
-        .filter_map(|field| field.ty().map(|ty| (field, ty)))
-}
-
-/// Filter out skipped fields from a collection of named fields.
-///
-/// Returns an iterator of tuples containing the field name, the field, and its type, excluding fields with `None` type.
-pub fn skip_fields_named<'a>(
-    fields: impl IntoIterator<Item = &'a (Cow<'static, str>, Field)>,
-) -> impl Iterator<Item = (&'a Cow<'static, str>, NonSkipField<'a>)> {
-    fields
-        .into_iter()
-        .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
-}
 
 /// Data stored within an enum variant or struct.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Fields {
-    /// A unit struct.
+    /// Unit struct.
     ///
     /// Represented in Rust as `pub struct Unit;` and in TypeScript as `null`.
     Unit,
-    /// A struct with unnamed fields.
+    /// Struct with unnamed fields.
     ///
     /// Represented in Rust as `pub struct Unit();` and in TypeScript as `[]`.
     Unnamed(UnnamedFields),
-    /// A struct with named fields.
+    /// Struct with named fields.
     ///
     /// Represented in Rust as `pub struct Unit {}` and in TypeScript as `{}`.
     Named(NamedFields),
@@ -50,14 +27,18 @@ pub enum Fields {
 pub struct Field {
     /// Did the user apply a `#[specta(optional)]` attribute.
     pub(crate) optional: bool,
+    /// Did the user apply a `#[serde(flatten)]` attribute.
+    pub(crate) flatten: bool,
     /// Deprecated attribute for the field.
-    pub(crate) deprecated: Option<DeprecatedType>,
+    pub(crate) deprecated: Option<Deprecated>,
     /// Documentation comments for the field.
     pub(crate) docs: Cow<'static, str>,
     /// Should we inline the definition of this type.
     pub(crate) inline: bool,
-    /// Runtime attributes for this field (e.g., serde attributes)
-    pub(crate) attributes: Vec<Attribute>,
+    /// Did the user apply a `#[specta(type = ...)]` or `#[specta(r#type = ...)]` attribute.
+    pub(crate) type_overridden: bool,
+    /// Runtime attributes for this field.
+    pub(crate) attributes: Attributes,
     /// Type for the field. Is optional if `#[serde(skip)]` or `#[specta(skip)]` was applied.
     ///
     /// You might think, well why not apply this in the macro and just not emit the variant?
@@ -72,11 +53,13 @@ impl Field {
     pub fn new(ty: DataType) -> Self {
         Field {
             optional: false,
+            flatten: false,
             deprecated: None,
             docs: "".into(),
             inline: false,
+            type_overridden: false,
             ty: Some(ty),
-            attributes: Vec::new(),
+            attributes: Attributes::default(),
         }
     }
 
@@ -90,6 +73,16 @@ impl Field {
         self.optional = optional;
     }
 
+    /// Has the Serde flatten attribute been applied to this field?
+    pub fn flatten(&self) -> bool {
+        self.flatten
+    }
+
+    /// Set the flatten attribute for this field.
+    pub fn set_flatten(&mut self, flatten: bool) {
+        self.flatten = flatten;
+    }
+
     /// Has the Serde inline attribute been applied to this field?
     pub fn inline(&self) -> bool {
         self.inline
@@ -100,18 +93,28 @@ impl Field {
         self.inline = inline;
     }
 
+    /// Has the Specta type override attribute been applied to this field?
+    pub fn type_overridden(&self) -> bool {
+        self.type_overridden
+    }
+
+    /// Set whether a Specta type override attribute was applied to this field.
+    pub fn set_type_overridden(&mut self, type_overridden: bool) {
+        self.type_overridden = type_overridden;
+    }
+
     /// Has the Rust deprecated attribute been applied to this field?
-    pub fn deprecated(&self) -> Option<&DeprecatedType> {
+    pub fn deprecated(&self) -> Option<&Deprecated> {
         self.deprecated.as_ref()
     }
 
     /// Has the Rust deprecated attribute been applied to this field?
-    pub fn deprecated_mut(&mut self) -> Option<&mut DeprecatedType> {
+    pub fn deprecated_mut(&mut self) -> Option<&mut Deprecated> {
         self.deprecated.as_mut()
     }
 
     /// Set the deprecated attribute for this field.
-    pub fn set_deprecated(&mut self, deprecated: Option<DeprecatedType>) {
+    pub fn set_deprecated(&mut self, deprecated: Option<Deprecated>) {
         self.deprecated = deprecated;
     }
 
@@ -146,17 +149,17 @@ impl Field {
     }
 
     /// Get an immutable reference to the runtime attributes for this field.
-    pub fn attributes(&self) -> &Vec<Attribute> {
+    pub fn attributes(&self) -> &Attributes {
         &self.attributes
     }
 
     /// Mutable reference to the runtime attributes for this field.
-    pub fn attributes_mut(&mut self) -> &mut Vec<Attribute> {
+    pub fn attributes_mut(&mut self) -> &mut Attributes {
         &mut self.attributes
     }
 
     /// Set the runtime attributes for this field.
-    pub fn set_attributes(&mut self, attrs: Vec<Attribute>) {
+    pub fn set_attributes(&mut self, attrs: Attributes) {
         self.attributes = attrs;
     }
 }
@@ -165,7 +168,6 @@ impl Field {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct UnnamedFields {
     pub(crate) fields: Vec<Field>,
-    pub(crate) attributes: Vec<Attribute>,
 }
 
 impl UnnamedFields {
@@ -178,28 +180,12 @@ impl UnnamedFields {
     pub fn fields_mut(&mut self) -> &mut Vec<Field> {
         &mut self.fields
     }
-
-    /// Get an immutable reference to the runtime attributes for this unnamed fields.
-    pub fn attributes(&self) -> &Vec<Attribute> {
-        &self.attributes
-    }
-
-    /// Mutable reference to the runtime attributes for this unnamed fields.
-    pub fn attributes_mut(&mut self) -> &mut Vec<Attribute> {
-        &mut self.attributes
-    }
-
-    /// Set the runtime attributes for this unnamed fields.
-    pub fn set_attributes(&mut self, attrs: Vec<Attribute>) {
-        self.attributes = attrs;
-    }
 }
 
 /// The fields of an named enum variant or a struct.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NamedFields {
     pub(crate) fields: Vec<(Cow<'static, str>, Field)>,
-    pub(crate) attributes: Vec<Attribute>,
 }
 
 impl NamedFields {
@@ -212,19 +198,52 @@ impl NamedFields {
     pub fn fields_mut(&mut self) -> &mut Vec<(Cow<'static, str>, Field)> {
         &mut self.fields
     }
+}
 
-    /// Get an immutable reference to the runtime attributes for this named fields.
-    pub fn attributes(&self) -> &Vec<Attribute> {
-        &self.attributes
+#[derive(Debug, Clone)]
+/// Builder for constructing [`DataType::Struct`] values.
+pub struct StructBuilder<F = ()> {
+    pub(crate) fields: F,
+}
+
+impl StructBuilder<NamedFields> {
+    /// Add a named field.
+    pub fn field(mut self, name: impl Into<Cow<'static, str>>, field: Field) -> Self {
+        self.fields.fields.push((name.into(), field));
+        self
     }
 
-    /// Mutable reference to the runtime attributes for this named fields.
-    pub fn attributes_mut(&mut self) -> &mut Vec<Attribute> {
-        &mut self.attributes
+    /// Add a named field in-place.
+    pub fn field_mut(&mut self, name: impl Into<Cow<'static, str>>, field: Field) {
+        self.fields.fields.push((name.into(), field));
     }
 
-    /// Set the runtime attributes for this named fields.
-    pub fn set_attributes(&mut self, attrs: Vec<Attribute>) {
-        self.attributes = attrs;
+    /// Finalize this builder into a [`DataType`].
+    pub fn build(self) -> DataType {
+        DataType::Struct(Struct {
+            fields: Fields::Named(self.fields),
+            attributes: Default::default(),
+        })
+    }
+}
+
+impl StructBuilder<UnnamedFields> {
+    /// Add an unnamed field.
+    pub fn field(mut self, field: Field) -> Self {
+        self.fields.fields.push(field);
+        self
+    }
+
+    /// Add an unnamed field in-place.
+    pub fn field_mut(&mut self, field: Field) {
+        self.fields.fields.push(field);
+    }
+
+    /// Finalize this builder into a [`DataType`].
+    pub fn build(self) -> DataType {
+        DataType::Struct(Struct {
+            fields: Fields::Unnamed(self.fields),
+            attributes: Default::default(),
+        })
     }
 }

@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{ResolvedTypes, Type, Types};
 use specta_typescript::{BigIntExportBehavior, Typescript, primitives};
 
 macro_rules! for_bigint_types {
@@ -55,9 +55,9 @@ enum EnumWithInlineStructWithBigInt {
 }
 
 fn inline_for<T: Type>(ts: &Typescript) -> Result<String, specta_typescript::Error> {
-    let mut types = TypeCollection::default();
+    let mut types = Types::default();
     let dt = T::definition(&mut types);
-    primitives::inline(ts, &types, &dt)
+    primitives::inline(ts, &ResolvedTypes::from_resolved_types(types), &dt)
 }
 
 #[test]

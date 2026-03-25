@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use specta::{
-    Type, TypeCollection,
-    datatype::{DataType, NamedDataTypeBuilder, Primitive},
+    ResolvedTypes, Type, Types,
+    datatype::{DataType, NamedDataType, Primitive},
 };
 use specta_typescript::{Layout, Typescript};
 use tempfile::TempDir;
@@ -42,40 +42,40 @@ mod testing {
 
 #[test]
 fn duplicate_typenames_layouts() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<Testing>()
         .register::<Another>()
         .register::<MoreType>();
+    let resolved = ResolvedTypes::from_resolved_types(types.clone());
 
     assert_error_contains(
-        Typescript::default().export(&types),
+        Typescript::default().export(&resolved),
         "Detected multiple types",
     );
 
     assert_error_contains(
         Typescript::default()
             .layout(Layout::FlatFile)
-            .export(&types),
+            .export(&resolved),
         "Detected multiple types",
     );
 
     let module_prefixed = Typescript::default()
         .layout(Layout::ModulePrefixedName)
-        .export(&types)
+        .export(&resolved)
         .unwrap();
-    assert!(module_prefixed.contains("Another"));
-    assert!(module_prefixed.contains("MoreType"));
-    assert!(module_prefixed.contains("testing2"));
+    insta::assert_snapshot!("layouts-duplicate-module-prefixed", module_prefixed);
 
     let namespaces = Typescript::default()
         .layout(Layout::Namespaces)
-        .export(&types)
+        .export(&resolved)
         .unwrap();
-    assert!(namespaces.contains("export namespace"));
-    assert!(namespaces.contains("testing2"));
+    insta::assert_snapshot!("layouts-duplicate-namespaces", namespaces);
 
     assert_error_contains(
-        Typescript::default().layout(Layout::Files).export(&types),
+        Typescript::default()
+            .layout(Layout::Files)
+            .export(&resolved),
         "Unable to export layout Files",
     );
 
@@ -83,49 +83,45 @@ fn duplicate_typenames_layouts() {
     let path = temp.path().join("duplicate-layout");
     Typescript::default()
         .layout(Layout::Files)
-        .export_to(&path, &types)
+        .export_to(&path, &resolved)
         .unwrap();
 
     let output = crate::fs_to_string(&path).unwrap();
-    assert!(output.contains(".ts"));
-    assert!(output.contains("testing.ts"));
-    assert!(output.contains("testing2.ts"));
+    insta::assert_snapshot!("layouts-duplicate-files", output);
 }
 
 #[test]
 fn non_duplicate_typenames_layouts() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<Another>()
         .register::<MoreType>();
+    let resolved = ResolvedTypes::from_resolved_types(types.clone());
 
-    let default_output = Typescript::default().export(&types).unwrap();
-    assert!(default_output.contains("export type Another"));
-    assert!(default_output.contains("export type MoreType"));
+    let default_output = Typescript::default().export(&resolved).unwrap();
+    insta::assert_snapshot!("layouts-non-duplicate-default", default_output);
 
     let flat = Typescript::default()
         .layout(Layout::FlatFile)
-        .export(&types)
+        .export(&resolved)
         .unwrap();
-    assert!(flat.contains("export type Another"));
-    assert!(flat.contains("export type MoreType"));
+    insta::assert_snapshot!("layouts-non-duplicate-flat", flat);
 
     let module_prefixed = Typescript::default()
         .layout(Layout::ModulePrefixedName)
-        .export(&types)
+        .export(&resolved)
         .unwrap();
-    assert!(module_prefixed.contains("Another"));
-    assert!(module_prefixed.contains("MoreType"));
+    insta::assert_snapshot!("layouts-non-duplicate-module-prefixed", module_prefixed);
 
     let namespaces = Typescript::default()
         .layout(Layout::Namespaces)
-        .export(&types)
+        .export(&resolved)
         .unwrap();
-    assert!(namespaces.contains("export namespace"));
-    assert!(namespaces.contains("Another"));
-    assert!(namespaces.contains("MoreType"));
+    insta::assert_snapshot!("layouts-non-duplicate-namespaces", namespaces);
 
     assert_error_contains(
-        Typescript::default().layout(Layout::Files).export(&types),
+        Typescript::default()
+            .layout(Layout::Files)
+            .export(&resolved),
         "Unable to export layout Files",
     );
 
@@ -133,51 +129,49 @@ fn non_duplicate_typenames_layouts() {
     let path = temp.path().join("no-duplicate-layout");
     Typescript::default()
         .layout(Layout::Files)
-        .export_to(&path, &types)
+        .export_to(&path, &resolved)
         .unwrap();
 
     let output = crate::fs_to_string(&path).unwrap();
-    assert!(output.contains("layouts.ts"));
-    assert!(output.contains("export type Another"));
-    assert!(output.contains("export type MoreType"));
+    insta::assert_snapshot!("layouts-non-duplicate-files", output);
 }
 
 #[test]
 fn empty_module_path_layouts() {
-    let mut types = TypeCollection::default();
+    let mut types = Types::default();
 
-    NamedDataTypeBuilder::new("testing", Vec::new(), DataType::Primitive(Primitive::i8))
-        .build(&mut types);
+    let mut testing = NamedDataType::new("testing", Vec::new(), DataType::Primitive(Primitive::i8));
+    testing.set_module_path("".into());
+    testing.register(&mut types);
+    let resolved = ResolvedTypes::from_resolved_types(types.clone());
 
     let flat = Typescript::default()
         .layout(Layout::FlatFile)
-        .export(&types)
+        .export(&resolved)
         .unwrap();
-    assert!(flat.contains("export type testing = number"));
+    insta::assert_snapshot!("layouts-empty-module-path-flat", flat);
 
     let module_prefixed = Typescript::default()
         .layout(Layout::ModulePrefixedName)
-        .export(&types)
+        .export(&resolved)
         .unwrap();
-    assert!(module_prefixed.contains("testing"));
+    insta::assert_snapshot!("layouts-empty-module-path-module-prefixed", module_prefixed);
 
     let namespaces = Typescript::default()
         .layout(Layout::Namespaces)
-        .export(&types)
+        .export(&resolved)
         .unwrap();
-    assert!(namespaces.contains("export namespace"));
-    assert!(namespaces.contains("testing = number"));
+    insta::assert_snapshot!("layouts-empty-module-path-namespaces", namespaces);
 
     let temp = temp_dir();
     let path = temp.path().join("empty-module-path-layout");
     Typescript::default()
         .layout(Layout::Files)
-        .export_to(&path, &types)
+        .export_to(&path, &resolved)
         .unwrap();
 
     let output = crate::fs_to_string(Path::new(&path)).unwrap();
-    assert!(output.contains(".ts"));
-    assert!(output.contains("export type testing = number"));
+    insta::assert_snapshot!("layouts-empty-module-path-files", output);
 }
 
 fn temp_dir() -> TempDir {

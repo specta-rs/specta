@@ -1,4 +1,4 @@
-use specta::Type;
+use specta::{ResolvedTypes, Type};
 use specta_typescript::{JSDoc, Typescript};
 
 /// Hello World
@@ -31,15 +31,17 @@ mod another {
 }
 
 fn main() {
+    let resolved_types = ResolvedTypes::from_resolved_types(specta::collect());
+
     Typescript::default()
         .layout(specta_typescript::Layout::Files)
         // This requires the `export` feature to be enabled on Specta
-        .export_to("./bindings", &specta::collect())
+        .export_to("./bindings", &resolved_types)
         .unwrap();
 
     JSDoc::default()
         .layout(specta_typescript::Layout::Files)
         // This requires the `export` feature to be enabled on Specta
-        .export_to("./bindings2", &specta::collect())
+        .export_to("./bindings2", &resolved_types)
         .unwrap();
 }
