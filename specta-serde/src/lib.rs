@@ -1219,14 +1219,16 @@ fn transform_internal_variant(
 
             let payload_field = non_skipped.into_iter().next().expect("checked above").clone();
             let payload_ty = payload_field.ty().cloned().expect("checked above");
-            if !is_internal_tag_compatible(&payload_ty, original_types, &mut HashSet::new()) {
+            let Some(payload_is_effectively_empty) =
+                internal_tag_payload_compatibility(&payload_ty, original_types, &mut HashSet::new())
+            else {
                 return Err(Error::invalid_internally_tagged_variant(
                     serialized_name,
                     "payload cannot be merged with a tag",
                 ));
-            }
+            };
 
-            if !matches!(&payload_ty, DataType::Tuple(tuple) if tuple.elements().is_empty()) {
+            if !payload_is_effectively_empty {
                 let mut flattened = payload_field;
                 flattened.set_flatten(true);
                 fields.push((Cow::Borrowed("__specta_internal_payload"), flattened));
@@ -1320,26 +1322,59 @@ fn clone_variant_with_unnamed_fields(original: &Variant, fields: Vec<Field>) -> 
     transformed
 }
 
-fn is_internal_tag_compatible(
+fn internal_tag_payload_compatibility(
     ty: &DataType,
     original_types: &Types,
     seen: &mut HashSet<TypeKey>,
-) -> bool {
+) -> Option<bool> {
     match ty {
-        DataType::Map(_) => true,
-        DataType::Struct(strct) => matches!(strct.fields(), Fields::Named(_)),
-        DataType::Tuple(tuple) => tuple.elements().is_empty(),
+        DataType::Map(_) => Some(false),
+        DataType::Struct(strct) => {
+            if strct
+                .attributes()
+                .get::<SerdeContainerAttrs>()
+                .is_some_and(|attrs| attrs.transparent)
+            {
+                let payload_fields = match strct.fields() {
+                    Fields::Unit => return Some(true),
+                    Fields::Unnamed(unnamed) => {
+                        unnamed.fields().iter().filter_map(Field::ty).collect::<Vec<_>>()
+                    }
+                    Fields::Named(named) => named
+                        .fields()
+                        .iter()
+                        .filter_map(|(_, field)| field.ty())
+                        .collect::<Vec<_>>(),
+                };
+
+                let [inner_ty] = payload_fields.as_slice() else {
+                    if payload_fields.is_empty() {
+                        return Some(true);
+                    }
+
+                    return None;
+                };
+
+                return internal_tag_payload_compatibility(inner_ty, original_types, seen);
+            }
+
+            match strct.fields() {
+                Fields::Named(named) => Some(named.fields().iter().all(|(_, field)| field.ty().is_none())),
+                Fields::Unit | Fields::Unnamed(_) => None,
+            }
+        }
+        DataType::Tuple(tuple) => tuple.elements().is_empty().then_some(true),
         DataType::Reference(Reference::Named(reference)) => {
             let Some(referenced) = reference.get(original_types) else {
-                return false;
+                return None;
             };
 
             let key = TypeKey::from_ndt(referenced);
             if !seen.insert(key.clone()) {
-                return true;
+                return Some(false);
             }
 
-            let compatible = is_internal_tag_compatible(referenced.ty(), original_types, seen);
+            let compatible = internal_tag_payload_compatibility(referenced.ty(), original_types, seen);
             seen.remove(&key);
             compatible
         }
@@ -1347,36 +1382,47 @@ fn is_internal_tag_compatible(
             enm.attributes()
                 .get::<SerdeContainerAttrs>()
                 .is_some_and(|attrs| attrs.untagged)
-                && enm.variants().iter().all(|(_, variant)| {
-                    is_internal_variant_compatible(variant, original_types, seen)
-                })
+                .then_some(())?;
+
+            let mut is_effectively_empty = true;
+            for (_, variant) in enm.variants() {
+                let Some(variant_empty) =
+                    internal_tag_variant_payload_compatibility(variant, original_types, seen)
+                else {
+                    return None;
+                };
+
+                is_effectively_empty &= variant_empty;
+            }
+
+            Some(is_effectively_empty)
         }
         DataType::Primitive(_)
         | DataType::List(_)
         | DataType::Nullable(_)
         | DataType::Reference(Reference::Generic(_))
-        | DataType::Reference(Reference::Opaque(_)) => false,
+        | DataType::Reference(Reference::Opaque(_)) => None,
     }
 }
 
-fn is_internal_variant_compatible(
+fn internal_tag_variant_payload_compatibility(
     variant: &Variant,
     original_types: &Types,
     seen: &mut HashSet<TypeKey>,
-) -> bool {
+) -> Option<bool> {
     match variant.fields() {
-        Fields::Unit => true,
-        Fields::Named(_) => true,
+        Fields::Unit => Some(true),
+        Fields::Named(named) => Some(named.fields().iter().all(|(_, field)| field.ty().is_none())),
         Fields::Unnamed(unnamed) => {
             if unnamed.fields().len() != 1 {
-                return false;
+                return None;
             }
 
             unnamed
                 .fields()
                 .iter()
                 .find_map(|field| field.ty())
-                .is_some_and(|ty| is_internal_tag_compatible(ty, original_types, seen))
+                .and_then(|ty| internal_tag_payload_compatibility(ty, original_types, seen))
         }
     }
 }
