@@ -119,7 +119,9 @@ export type EnumMacroAttributes = ({ A: string }) & { D?: never; bbb?: never; cc
 	bbbbbb: number,
 } }) & { A?: never; bbb?: never; cccc?: never };
 
-export type InlineEnumField = { A: PlaceholderInnerField };
+export type InlineEnumField = { A: {
+	a: string,
+} };
 
 export type InlineOptionalType = {
 	optional_field: {
@@ -288,7 +290,7 @@ export type OptionalOnTransparentNamedField = {
 	b: string | null,
 };
 
-export type OptionalInEnum = ({ A: string | null }) & { B?: never; C?: never } | ({ B: {
+export type OptionalInEnum = ({ A?: string | null }) & { B?: never; C?: never } | ({ B: {
 	a: string | null,
 } }) & { A?: never; C?: never } | ({ C: {
 	a?: string | null,
@@ -539,7 +541,9 @@ export type Seventh = {
 
 export type Eight = { A: string } | "B";
 
-export type Ninth = { t: "A"; c: string } | { t: "B" } | { t: "C"; c: First } | { t: "D"; c: First };
+export type Ninth = { t: "A"; c: string } | { t: "B" } | { t: "C"; c: {
+	a: string,
+} } | { t: "D"; c: First };
 
 export type Tenth = string | "B" | {
 	a: string,

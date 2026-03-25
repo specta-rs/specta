@@ -516,8 +516,12 @@ expression: output
 	* @typedef {{ [key in number]: string }} HasGenericAlias
 	* @property {{ [key in number]: string }} "0"
 	*
-	* @typedef {{ A: PlaceholderInnerField }} InlineEnumField
-	* @property {{ A: PlaceholderInnerField }} A
+	* @typedef {{ A: {
+	* 	a: string,
+	* } }} InlineEnumField
+	* @property {{ A: {
+	* 	a: string,
+	* } }} A
 	*
 	* @typedef {{
 	*		g: InlineFlattenGenericsG<string>,
@@ -689,21 +693,25 @@ expression: output
 	* @property {{ type: "a"; value: string }} a
 	* @property {{ type: "b"; value: number }} b
 	*
-	* @typedef {{ t: "A"; c: string } | { t: "B" } | { t: "C"; c: First } | { t: "D"; c: First }} Ninth
+	* @typedef {{ t: "A"; c: string } | { t: "B" } | { t: "C"; c: {
+	* 	a: string,
+	* } } | { t: "D"; c: First }} Ninth
 	* @property {{ t: "A"; c: string }} A
 	* @property {{ t: "B" }} B
-	* @property {{ t: "C"; c: First }} C
+	* @property {{ t: "C"; c: {
+	* 	a: string,
+	* } }} C
 	* @property {{ t: "D"; c: First }} D
 	*
 	* @typedef {string | null} NonOptional
 	* @property {string | null} "0"
 	*
-	* @typedef {({ A: string | null }) & { B?: never; C?: never } | ({ B: {
+	* @typedef {({ A?: string | null }) & { B?: never; C?: never } | ({ B: {
 	* 	a: string | null,
 	* } }) & { A?: never; C?: never } | ({ C: {
 	* 	a?: string | null,
 	* } }) & { A?: never; B?: never }} OptionalInEnum
-	* @property {{ A: string | null }} A
+	* @property {{ A?: string | null }} A
 	* @property {{ B: {
 	* 	a: string | null,
 	* } }} B
