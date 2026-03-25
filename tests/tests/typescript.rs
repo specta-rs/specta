@@ -1,10 +1,10 @@
-use std::{iter, path::Path};
+use std::{collections::HashMap, iter, path::Path};
 
 use specta::{
-    datatype::{DataType, Reference},
     ResolvedTypes, Type, Types,
+    datatype::{DataType, Reference},
 };
-use specta_typescript::{primitives, BigIntExportBehavior, Layout, Typescript};
+use specta_typescript::{BigIntExportBehavior, Layout, Typescript, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -272,21 +272,21 @@ fn typescript_export_serde_errors() {
         "Invalid usage of #[serde(skip)]",
     );
 
-    // assert_serde_error::<HashMap<(), ()>>(
-    //     &mut failures,
-    //     "HashMap<() /* `null` */, ()>",
-    //     "empty tuple key is unsupported",
-    // );
-    // assert_serde_error::<HashMap<RegularStruct, ()>>(
-    //     &mut failures,
-    //     "HashMap<RegularStruct, ()>",
-    //     "key type is not supported by legacy map-key validation rules",
-    // );
-    // assert_serde_error::<HashMap<Variants, ()>>(
-    //     &mut failures,
-    //     "HashMap<Variants, ()>",
-    //     "enum key with tuple variants must be #[serde(untagged)]",
-    // );
+    assert_serde_error::<HashMap<(), ()>>(
+        &mut failures,
+        "HashMap<() /* `null` */, ()>",
+        "empty tuple key is unsupported",
+    );
+    assert_serde_error::<HashMap<RegularStruct, ()>>(
+        &mut failures,
+        "HashMap<RegularStruct, ()>",
+        "key type is not supported by legacy map-key validation rules",
+    );
+    assert_serde_error::<HashMap<Variants, ()>>(
+        &mut failures,
+        "HashMap<Variants, ()>",
+        "enum key with tuple variants must be #[serde(untagged)]",
+    );
 
     assert!(
         failures.is_empty(),
