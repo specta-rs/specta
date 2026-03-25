@@ -274,6 +274,8 @@ export type FlattenOnNestedEnum = {
 	id: string,
 } & (NestedEnum);
 
+export type FlattenedInner = (Inner);
+
 export type Fourth = {
 	a: First,
 	b: {
@@ -376,6 +378,10 @@ export type InlinerStruct = {
 	},
 	dont_inline_this: RefStruct,
 };
+
+export type Inner = {
+	a: number,
+} & (FlattenedInner);
 
 export type InternallyTaggedWithAlias = { type: "A"; field: string } | { type: "B"; other: number };
 
@@ -654,9 +660,13 @@ export type Primitives = {
 	"HalfGenericB<bool>": Demo<number, boolean>,
 	"FullGeneric<u8, bool>": Demo<number, boolean>,
 	"Another<bool>": Demo<number, boolean>,
+	"MapA<u32>": { [key in string]: number },
+	"MapB<u32>": { [key in number]: string },
+	"MapC<u32>": { [key in string]: AGenericStruct<number> },
 	"AGenericStruct<u32>": AGenericStruct<number>,
 	A: A,
 	DoubleFlattened: DoubleFlattened,
+	FlattenedInner: FlattenedInner,
 	First: First,
 	Second: Second,
 	Third: Third,

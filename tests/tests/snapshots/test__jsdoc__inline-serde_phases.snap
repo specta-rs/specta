@@ -398,6 +398,9 @@ expression: output
 	* @property {string} id
 	* @property {NestedEnum} result
 	*
+	* @typedef {(Inner)} FlattenedInner
+	* @property {Inner} c
+	*
 	* @typedef {{
 	*		a: First,
 	*		b: {
@@ -551,6 +554,12 @@ expression: output
 	*	}} InlinerStruct
 	* @property {InlineStruct} inline_this
 	* @property {RefStruct} dont_inline_this
+	*
+	* @typedef {{
+	*		a: number,
+	*	} & (FlattenedInner)} Inner
+	* @property {number} a
+	* @property {FlattenedInner} b
 	*
 	* @typedef {{ type: "A"; field: string } | { type: "B"; other: number }} InternallyTaggedWithAlias
 	* @property {{ type: "A"; field: string }} A
@@ -889,9 +898,13 @@ expression: output
 	*		"HalfGenericB<bool>": Demo<number, boolean>,
 	*		"FullGeneric<u8, bool>": Demo<number, boolean>,
 	*		"Another<bool>": Demo<number, boolean>,
+	*		"MapA<u32>": { [key in string]: number },
+	*		"MapB<u32>": { [key in number]: string },
+	*		"MapC<u32>": { [key in string]: AGenericStruct<number> },
 	*		"AGenericStruct<u32>": AGenericStruct<number>,
 	*		A: A,
 	*		DoubleFlattened: DoubleFlattened,
+	*		FlattenedInner: FlattenedInner,
 	*		First: First,
 	*		Second: Second,
 	*		Third: Third,
@@ -1139,9 +1152,13 @@ expression: output
 	* @property {Demo<number, boolean>} "HalfGenericB<bool>"
 	* @property {Demo<number, boolean>} "FullGeneric<u8, bool>"
 	* @property {Demo<number, boolean>} "Another<bool>"
+	* @property {{ [key in string]: number }} "MapA<u32>"
+	* @property {{ [key in number]: string }} "MapB<u32>"
+	* @property {{ [key in string]: AGenericStruct<number> }} "MapC<u32>"
 	* @property {AGenericStruct<number>} "AGenericStruct<u32>"
 	* @property {A} A
 	* @property {DoubleFlattened} DoubleFlattened
+	* @property {FlattenedInner} FlattenedInner
 	* @property {First} First
 	* @property {Second} Second
 	* @property {Third} Third

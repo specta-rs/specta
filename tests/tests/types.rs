@@ -294,14 +294,14 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         HalfGenericB<bool>,
         FullGeneric<u8, bool>,
         Another<bool>,
-        // MapA<u32>,
-        // MapB<u32>,
-        // MapC<u32>,
+        MapA<u32>,
+        MapB<u32>,
+        MapC<u32>,
         AGenericStruct<u32>,
 
         A,
         DoubleFlattened,
-        // FlattenedInner, // TODO: Fix this
+        FlattenedInner,
         // BoxFlattened, // TODO: Fix this
         // BoxInline, // TODO: Fix this
 
@@ -1375,12 +1375,14 @@ struct DoubleFlattened {
 #[specta(collect = false)]
 struct Inner {
     a: i32,
+    #[serde(flatten)]
     b: Box<FlattenedInner>,
 }
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct FlattenedInner {
+    #[serde(flatten)]
     c: Inner,
 }
 

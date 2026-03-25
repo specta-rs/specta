@@ -360,6 +360,9 @@ Another<bool>: {
 	a: number,
 	b: boolean,
 }
+MapA<u32>: { [key in string]: number }
+MapB<u32>: { [key in number]: string }
+MapC<u32>: { [key in string]: AGenericStruct<number> }
 AGenericStruct<u32>: {
 	field: {
 	a: number,
@@ -383,6 +386,7 @@ DoubleFlattened: {
 	a: ToBeFlattened,
 	b: ToBeFlattened,
 }
+FlattenedInner: (Inner)
 First: {
 	a: string,
 }

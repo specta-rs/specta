@@ -450,6 +450,12 @@ export type Demo<A, B> = {
 	b: B,
 };
 
+export type HashMap<K, V> = { [key in K]: V };
+
+export type HashMap<K, V> = { [key in K]: V };
+
+export type HashMap<K, V> = { [key in K]: V };
+
 export type AGenericStruct<T> = {
 	field: Demo<T, boolean>,
 };
@@ -471,6 +477,10 @@ export type A = {
 export type DoubleFlattened = {
 	a: ToBeFlattened,
 	b: ToBeFlattened,
+};
+
+export type FlattenedInner = {
+	c: Inner,
 };
 
 export type First = {
