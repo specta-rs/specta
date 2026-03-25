@@ -147,6 +147,8 @@ AGenericStruct<u32>: AGenericStruct<number>
 A: A
 DoubleFlattened: DoubleFlattened
 FlattenedInner: FlattenedInner
+BoxFlattened: BoxFlattened
+BoxInline: BoxInline
 First: First
 Second: Second
 Third: Third
@@ -155,6 +157,7 @@ TagOnStructWithInline: TagOnStructWithInline
 Sixth: Sixth
 Seventh: Seventh
 Eight: Eight
+Ninth: Ninth
 Tenth: Tenth
 MyEnumTagged: MyEnumTagged
 MyEnumExternal: MyEnumExternal

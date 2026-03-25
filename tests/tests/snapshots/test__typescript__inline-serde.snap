@@ -387,6 +387,10 @@ DoubleFlattened: {
 	b: ToBeFlattened,
 }
 FlattenedInner: (Inner)
+BoxFlattened: (BoxedInner)
+BoxInline: {
+	c: BoxedInner,
+}
 First: {
 	a: string,
 }
@@ -419,6 +423,7 @@ Seventh: {
 	b: Second,
 }
 Eight: { A: string } | "B"
+Ninth: { t: "A"; c: string } | { t: "B" } | { t: "C"; c: First } | { t: "D"; c: First }
 Tenth: string | "B" | {
 	a: string,
 } | First

@@ -302,8 +302,8 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         A,
         DoubleFlattened,
         FlattenedInner,
-        // BoxFlattened, // TODO: Fix this
-        // BoxInline, // TODO: Fix this
+        BoxFlattened,
+        BoxInline, // TODO: This is wrong
 
         // Flatten and inline
         First,
@@ -314,7 +314,7 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         Sixth,
         Seventh,
         Eight,
-        // Ninth, // TODO: Fix this
+        Ninth,
         Tenth,
 
         // Test for issue #393 - flatten in enum variants
@@ -1395,6 +1395,7 @@ struct BoxedInner {
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct BoxFlattened {
+    #[serde(flatten)]
     b: Box<BoxedInner>,
 }
 

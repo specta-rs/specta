@@ -483,6 +483,14 @@ export type FlattenedInner = {
 	c: Inner,
 };
 
+export type BoxFlattened = {
+	b: BoxedInner,
+};
+
+export type BoxInline = {
+	c: BoxedInner,
+};
+
 export type First = {
 	a: string,
 };
@@ -522,6 +530,10 @@ export type Seventh = {
 };
 
 export type Eight = string | "B";
+
+export type Ninth = string | "B" | {
+	a: string,
+} | First;
 
 export type Tenth = string | "B" | {
 	a: string,
