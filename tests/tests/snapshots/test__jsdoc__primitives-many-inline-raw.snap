@@ -642,6 +642,12 @@ expression: output
 	* @property {A} a
 	* @property {B} b
 	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
+	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
+	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
+	*
 	* @typedef {{
 	*		field: Demo<T, boolean>,
 	*	}} AGenericStruct<T>
@@ -672,6 +678,11 @@ expression: output
 	*	}} DoubleFlattened
 	* @property {ToBeFlattened} a
 	* @property {ToBeFlattened} b
+	*
+	* @typedef {{
+	*		c: Inner,
+	*	}} FlattenedInner
+	* @property {Inner} c
 	*
 	* @typedef {{
 	*		a: string,

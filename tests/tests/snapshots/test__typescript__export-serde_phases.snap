@@ -460,6 +460,12 @@ Another<bool>: export type Demo<A, B> = {
 	b: B,
 };
 
+MapA<u32>: export type HashMap<K, V> = { [key in K]: V };
+
+MapB<u32>: export type HashMap<K, V> = { [key in K]: V };
+
+MapC<u32>: export type HashMap<K, V> = { [key in K]: V };
+
 AGenericStruct<u32>: export type AGenericStruct<T> = {
 	field: Demo<T, boolean>,
 };
@@ -482,6 +488,8 @@ DoubleFlattened: export type DoubleFlattened = {
 	a: ToBeFlattened,
 	b: ToBeFlattened,
 };
+
+FlattenedInner: export type FlattenedInner = (Inner);
 
 First: export type First = {
 	a: string,
