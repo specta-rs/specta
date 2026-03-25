@@ -167,8 +167,8 @@ pub fn apply(types: Types) -> Result<ResolvedTypes> {
     validate::validate_for_mode(&types, validate::ApplyMode::Unified)?;
 
     let mut out = types.clone();
-    let generated = HashMap::<TypeKey, GeneratedTypes>::new();
-    let split_types = HashSet::<TypeKey>::new();
+    let generated = HashMap::<TypeIdentity, SplitGeneratedTypes>::new();
+    let split_types = HashSet::<TypeIdentity>::new();
     let mut rewrite_err = None;
 
     out.iter_mut(|ndt| {
@@ -213,12 +213,12 @@ pub fn apply(types: Types) -> Result<ResolvedTypes> {
 pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
     validate::validate_for_mode(&types, validate::ApplyMode::Phases)?;
 
-    let originals = types.into_unsorted_iter().cloned().collect::<Vec<_>>();
-    let mut dependencies = HashMap::<TypeKey, HashSet<TypeKey>>::new();
-    let mut reverse_dependencies = HashMap::<TypeKey, HashSet<TypeKey>>::new();
+    let originals = types.into_unsorted_iter().collect::<Vec<_>>();
+    let mut dependencies = HashMap::<TypeIdentity, HashSet<TypeIdentity>>::new();
+    let mut reverse_dependencies = HashMap::<TypeIdentity, HashSet<TypeIdentity>>::new();
 
     for original in &originals {
-        let key = TypeKey::from_ndt(original);
+        let key = TypeIdentity::from_ndt(original);
         let mut deps = HashSet::new();
         collect_dependencies(original.ty(), &types, &mut deps);
         for dep in &deps {
@@ -233,7 +233,7 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
     let mut split_types = originals
         .iter()
         .filter(|ndt| has_local_phase_difference(ndt.ty()))
-        .map(TypeKey::from_ndt)
+        .map(|ndt| TypeIdentity::from_ndt(ndt))
         .collect::<HashSet<_>>();
 
     let mut queue = VecDeque::from_iter(split_types.iter().cloned());
@@ -248,45 +248,56 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
     }
 
     let mut out = types.clone();
-    let mut generated = HashMap::<TypeKey, GeneratedTypes>::new();
-    let mut rewrite_plan = HashMap::<TypeKey, PhaseRewrite>::new();
+    let mut generated = HashMap::<TypeIdentity, SplitGeneratedTypes>::new();
+    let mut generated_types = HashSet::<TypeIdentity>::new();
 
     for original in &originals {
-        let key = TypeKey::from_ndt(original);
+        let key = TypeIdentity::from_ndt(original);
 
         if split_types.contains(&key) {
-            let serialize_ndt = build_from_original(
+            let mut serialize_ndt = build_from_original(
                 original,
                 format!("{}_Serialize", original.name()),
                 original.generics().to_vec(),
                 original.ty().clone(),
                 &types,
-                &mut out,
             );
-            let deserialize_ndt = build_from_original(
+            rewrite_datatype_for_phase(
+                serialize_ndt.ty_mut(),
+                PhaseRewrite::Serialize,
+                &types,
+                &generated,
+                &split_types,
+                Some(original.name().as_ref()),
+            )?;
+
+            let mut deserialize_ndt = build_from_original(
                 original,
                 format!("{}_Deserialize", original.name()),
                 original.generics().to_vec(),
                 original.ty().clone(),
                 &types,
-                &mut out,
             );
-
-            rewrite_plan.insert(TypeKey::from_ndt(&serialize_ndt), PhaseRewrite::Serialize);
-            rewrite_plan.insert(
-                TypeKey::from_ndt(&deserialize_ndt),
+            rewrite_datatype_for_phase(
+                deserialize_ndt.ty_mut(),
                 PhaseRewrite::Deserialize,
-            );
+                &types,
+                &generated,
+                &split_types,
+                Some(original.name().as_ref()),
+            )?;
+
+            generated_types.insert(TypeIdentity::from_ndt(&serialize_ndt));
+            generated_types.insert(TypeIdentity::from_ndt(&deserialize_ndt));
+            serialize_ndt.register(&mut out);
+            deserialize_ndt.register(&mut out);
             generated.insert(
                 key,
-                GeneratedTypes::Split {
+                SplitGeneratedTypes {
                     serialize: serialize_ndt,
                     deserialize: Box::new(deserialize_ndt),
                 },
             );
-        } else {
-            rewrite_plan.insert(key.clone(), PhaseRewrite::Unified);
-            generated.insert(key, GeneratedTypes::Unified(original.clone()));
         }
     }
 
@@ -297,14 +308,15 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
         }
 
         let ndt_name = ndt.name().to_string();
+        let key = TypeIdentity::from_ndt(ndt);
 
-        let Some(mode) = rewrite_plan.get(&TypeKey::from_ndt(ndt)).copied() else {
+        if split_types.contains(&key) || generated_types.contains(&key) {
             return;
-        };
+        }
 
         if let Err(err) = rewrite_datatype_for_phase(
             ndt.ty_mut(),
-            mode,
+            PhaseRewrite::Unified,
             &types,
             &generated,
             &split_types,
@@ -319,12 +331,12 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
     }
 
     out.iter_mut(|ndt| {
-        let key = TypeKey::from_ndt(ndt);
+        let key = TypeIdentity::from_ndt(ndt);
         if !split_types.contains(&key) {
             return;
         }
 
-        let Some(GeneratedTypes::Split {
+        let Some(SplitGeneratedTypes {
             serialize,
             deserialize,
         }) = generated.get(&key)
@@ -362,9 +374,6 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
 
         ndt.set_ty(DataType::Enum(wrapper));
     });
-
-    debug_assert_eq!(dependencies.len(), originals.len());
-
     Ok(ResolvedTypes::from_resolved_types(out))
 }
 
@@ -376,25 +385,29 @@ enum PhaseRewrite {
 }
 
 #[derive(Debug, Clone)]
-enum GeneratedTypes {
-    Unified(NamedDataType),
-    Split {
-        serialize: NamedDataType,
-        deserialize: Box<NamedDataType>,
-    },
+struct SplitGeneratedTypes {
+    serialize: NamedDataType,
+    deserialize: Box<NamedDataType>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct TypeKey {
+struct TypeIdentity {
     name: String,
     module_path: String,
+    file: &'static str,
+    line: u32,
+    column: u32,
 }
 
-impl TypeKey {
+impl TypeIdentity {
     fn from_ndt(ty: &specta::datatype::NamedDataType) -> Self {
+        let location = ty.location();
         Self {
             name: ty.name().to_string(),
             module_path: ty.module_path().to_string(),
+            file: location.file(),
+            line: location.line(),
+            column: location.column(),
         }
     }
 }
@@ -403,8 +416,8 @@ fn rewrite_datatype_for_phase(
     ty: &mut DataType,
     mode: PhaseRewrite,
     original_types: &Types,
-    generated: &HashMap<TypeKey, GeneratedTypes>,
-    split_types: &HashSet<TypeKey>,
+    generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
+    split_types: &HashSet<TypeIdentity>,
     container_name: Option<&str>,
 ) -> Result<()> {
     if let Some(resolved) = resolve_phased_type(ty, mode, "type")? {
@@ -508,10 +521,7 @@ fn rewrite_datatype_for_phase(
             let Some(referenced_ndt) = reference.get(original_types) else {
                 return Ok(());
             };
-            let key = TypeKey::from_ndt(referenced_ndt);
-            let Some(target) = generated.get(&key) else {
-                return Ok(());
-            };
+            let key = TypeIdentity::from_ndt(referenced_ndt);
 
             let mut generics = Vec::with_capacity(reference.generics().len());
             for (generic, dt) in reference.generics() {
@@ -527,21 +537,23 @@ fn rewrite_datatype_for_phase(
                 generics.push((generic.clone(), dt));
             }
 
-            let mut new_reference = match (target, mode) {
-                (GeneratedTypes::Unified(target), _) => target.reference(generics),
-                (GeneratedTypes::Split { serialize, .. }, PhaseRewrite::Unified) => {
-                    debug_assert!(
-                        !split_types.contains(&key),
-                        "Unified mode should not reference split types"
-                    );
-                    serialize.reference(generics)
+            if !split_types.contains(&key) {
+                let mut new_reference = referenced_ndt.reference(generics);
+                if reference.inline() {
+                    new_reference = new_reference.inline();
                 }
-                (GeneratedTypes::Split { serialize, .. }, PhaseRewrite::Serialize) => {
-                    serialize.reference(generics)
-                }
-                (GeneratedTypes::Split { deserialize, .. }, PhaseRewrite::Deserialize) => {
-                    deserialize.reference(generics)
-                }
+                *ty = DataType::Reference(new_reference);
+                return Ok(());
+            }
+
+            let Some(target) = generated.get(&key) else {
+                return Ok(());
+            };
+
+            let mut new_reference = match mode {
+                PhaseRewrite::Unified => unreachable!("unified mode should not reference split types"),
+                PhaseRewrite::Serialize => target.serialize.reference(generics),
+                PhaseRewrite::Deserialize => target.deserialize.reference(generics),
             };
 
             if reference.inline() {
@@ -562,8 +574,8 @@ fn rewrite_fields_for_phase(
     fields: &mut Fields,
     mode: PhaseRewrite,
     original_types: &Types,
-    generated: &HashMap<TypeKey, GeneratedTypes>,
-    split_types: &HashSet<TypeKey>,
+    generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
+    split_types: &HashSet<TypeIdentity>,
     rename_all_rule: Option<RenameRule>,
     preserve_skipped_unnamed_fields: bool,
 ) -> Result<()> {
@@ -625,8 +637,8 @@ fn rewrite_field_for_phase(
     field: &mut Field,
     mode: PhaseRewrite,
     original_types: &Types,
-    generated: &HashMap<TypeKey, GeneratedTypes>,
-    split_types: &HashSet<TypeKey>,
+    generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
+    split_types: &HashSet<TypeIdentity>,
 ) -> Result<()> {
     if let Some(attrs) = field.attributes().get::<SerdeFieldAttrs>()
         && let PhaseRewrite::Serialize = mode
@@ -818,8 +830,8 @@ fn rewrite_identifier_enum_for_phase(
     e: &mut Enum,
     mode: PhaseRewrite,
     original_types: &Types,
-    generated: &HashMap<TypeKey, GeneratedTypes>,
-    split_types: &HashSet<TypeKey>,
+    generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
+    split_types: &HashSet<TypeIdentity>,
 ) -> Result<bool> {
     let Some(attrs) = e.attributes().get::<SerdeContainerAttrs>() else {
         return Ok(false);
@@ -1379,7 +1391,7 @@ fn clone_variant_with_unnamed_fields(original: &Variant, fields: Vec<Field>) -> 
 fn internal_tag_payload_compatibility(
     ty: &DataType,
     original_types: &Types,
-    seen: &mut HashSet<TypeKey>,
+    seen: &mut HashSet<TypeIdentity>,
 ) -> Option<bool> {
     match ty {
         DataType::Map(_) => Some(false),
@@ -1427,7 +1439,7 @@ fn internal_tag_payload_compatibility(
                 return None;
             };
 
-            let key = TypeKey::from_ndt(referenced);
+            let key = TypeIdentity::from_ndt(referenced);
             if !seen.insert(key.clone()) {
                 return Some(false);
             }
@@ -1467,7 +1479,7 @@ fn internal_tag_payload_compatibility(
 fn internal_tag_variant_payload_compatibility(
     variant: &Variant,
     original_types: &Types,
-    seen: &mut HashSet<TypeKey>,
+    seen: &mut HashSet<TypeIdentity>,
 ) -> Option<bool> {
     match variant.fields() {
         Fields::Unit => Some(true),
@@ -1575,7 +1587,7 @@ fn variant_has_local_difference(variant: &Variant) -> bool {
         .unwrap_or_default()
 }
 
-fn collect_dependencies(dt: &DataType, types: &Types, deps: &mut HashSet<TypeKey>) {
+fn collect_dependencies(dt: &DataType, types: &Types, deps: &mut HashSet<TypeIdentity>) {
     match dt {
         DataType::Struct(s) => {
             collect_conversion_dependencies(s.attributes(), types, deps);
@@ -1600,7 +1612,7 @@ fn collect_dependencies(dt: &DataType, types: &Types, deps: &mut HashSet<TypeKey
         DataType::Nullable(inner) => collect_dependencies(inner, types, deps),
         DataType::Reference(Reference::Named(reference)) => {
             if let Some(referenced) = reference.get(types) {
-                deps.insert(TypeKey::from_ndt(referenced));
+                deps.insert(TypeIdentity::from_ndt(referenced));
             }
 
             for (_, generic) in reference.generics() {
@@ -1622,7 +1634,7 @@ fn collect_dependencies(dt: &DataType, types: &Types, deps: &mut HashSet<TypeKey
 fn collect_conversion_dependencies(
     attrs: &specta::datatype::Attributes,
     types: &Types,
-    deps: &mut HashSet<TypeKey>,
+    deps: &mut HashSet<TypeIdentity>,
 ) {
     let Some(conversions) = attrs.get::<SerdeContainerAttrs>() else {
         return;
@@ -1640,7 +1652,7 @@ fn collect_conversion_dependencies(
     }
 }
 
-fn collect_fields_dependencies(fields: &Fields, types: &Types, deps: &mut HashSet<TypeKey>) {
+fn collect_fields_dependencies(fields: &Fields, types: &Types, deps: &mut HashSet<TypeIdentity>) {
     match fields {
         Fields::Unit => {}
         Fields::Unnamed(unnamed) => {
@@ -1666,7 +1678,6 @@ fn build_from_original(
     generics: Vec<(specta::datatype::GenericReference, Cow<'static, str>)>,
     ty: DataType,
     types: &Types,
-    out: &mut Types,
 ) -> NamedDataType {
     let mut ndt = if original.requires_reference(types) {
         NamedDataType::new(name, generics, ty)
@@ -1675,9 +1686,9 @@ fn build_from_original(
     };
 
     ndt.set_docs(original.docs().clone());
+    ndt.set_location(original.location());
     ndt.set_module_path(original.module_path().clone());
     ndt.set_deprecated(original.deprecated().cloned());
-    ndt.register(out);
 
     ndt
 }

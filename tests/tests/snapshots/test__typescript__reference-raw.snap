@@ -226,3 +226,9 @@ InlineFlattenGenerics: InlineFlattenGenerics
 GenericParameterOrderPreserved: GenericParameterOrderPreserved
 TestCollectionRegister: TestCollectionRegister
 TestCollectionRegister: TestCollectionRegister
+specta_typescript::Any: any
+specta_typescript::Any<String>: any
+specta_typescript::Unknown: unknown
+specta_typescript::Unknown<String>: unknown
+specta_typescript::Never: never
+specta_typescript::Never<String>: never

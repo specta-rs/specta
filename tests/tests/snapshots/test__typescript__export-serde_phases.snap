@@ -2,6 +2,13 @@
 source: tests/tests/typescript.rs
 expression: output
 ---
+Issue374: // https://github.com/specta-rs/specta/issues/374
+export type Issue374 = Issue374_Serialize | Issue374_Deserialize;
+
+Optional: export type Optional = Optional_Serialize | Optional_Deserialize;
+
+StructPhaseSpecificRename: export type StructPhaseSpecificRename = StructPhaseSpecificRename_Serialize | StructPhaseSpecificRename_Deserialize;
+
 Range<i32>: export type Range<T> = {
 	start: T,
 	end: T,
