@@ -1012,6 +1012,7 @@ expression: output
 	*		EmptyEnumUntagged: EmptyEnumUntagged,
 	*		SkipOnlyField: SkipOnlyField,
 	*		SkipField: SkipField,
+	*		SkipVariant: SkipVariant,
 	*		TransparentWithSkip: TransparentWithSkip,
 	*		TransparentWithSkip2: TransparentWithSkip2,
 	*		TransparentWithSkip3: TransparentWithSkip3,
@@ -1276,6 +1277,7 @@ expression: output
 	* @property {EmptyEnumUntagged} EmptyEnumUntagged
 	* @property {SkipOnlyField} SkipOnlyField
 	* @property {SkipField} SkipField
+	* @property {SkipVariant} SkipVariant
 	* @property {TransparentWithSkip} TransparentWithSkip
 	* @property {TransparentWithSkip2} TransparentWithSkip2
 	* @property {TransparentWithSkip3} TransparentWithSkip3
@@ -1440,6 +1442,9 @@ expression: output
 	*		a: number,
 	*	}} SkipStructFields
 	* @property {number} a
+	*
+	* @typedef {{ A: string }} SkipVariant
+	* @property {{ A: string }} A
 	*
 	* @typedef {{ type: "A" } | { type: "B"; data: string }} SkippedFieldWithinVariant
 	* @property {{ type: "A" }} A

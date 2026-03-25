@@ -717,6 +717,10 @@ fn rewrite_enum_repr_for_phase(
     let variants = std::mem::take(e.variants_mut());
     let mut transformed = Vec::with_capacity(variants.len());
     for (variant_name, variant) in variants {
+        if variant.skip() {
+            continue;
+        }
+
         let variant_attrs = variant.attributes().get::<SerdeVariantAttrs>();
         if let Some(attrs) = variant_attrs {
             let skipped = match mode {
@@ -915,6 +919,10 @@ fn identifier_union_variant(ty: DataType) -> Variant {
 
 fn filter_enum_variants_for_phase(e: &mut Enum, mode: PhaseRewrite) {
     e.variants_mut().retain(|(_, variant)| {
+        if variant.skip() {
+            return false;
+        }
+
         let Some(attrs) = variant.attributes().get::<SerdeVariantAttrs>() else {
             return true;
         };

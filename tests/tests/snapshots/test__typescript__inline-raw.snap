@@ -467,6 +467,7 @@ SkipOnlyField: Record<string, never>
 SkipField: {
 	b: number,
 }
+SkipVariant: string
 TransparentWithSkip: null
 TransparentWithSkip2: string
 TransparentWithSkip3: string

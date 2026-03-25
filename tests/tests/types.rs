@@ -368,7 +368,7 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         // Skip
         SkipOnlyField,
         SkipField,
-        // SkipVariant,
+        SkipVariant,
         // SkipUnnamedFieldInVariant,
         // SkipNamedFieldInVariant,
         TransparentWithSkip,

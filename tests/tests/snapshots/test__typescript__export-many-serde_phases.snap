@@ -649,6 +649,8 @@ export type SkipField = {
 	b: number,
 };
 
+export type SkipVariant = { A: string };
+
 export type TransparentWithSkip = null;
 
 export type TransparentWithSkip2 = string;
