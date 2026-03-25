@@ -246,7 +246,6 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
 
         // Recursive types
         Recursive,
-        // RecursiveMapKey, // TODO: Fix this
         RecursiveMapValue,
         RecursiveTransparent,
         RecursiveInEnum,
@@ -256,23 +255,20 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         OptionalOnNamedField,
         OptionalOnTransparentNamedField,
         OptionalInEnum,
-        // Optional, // TODO: Fix this
 
         UntaggedVariants,
         UntaggedVariantsWithoutValue,
         UntaggedVariantsWithDuplicateBranches,
 
-        // // Valid Map keys
-        // // HashMap<String, ()>,
-        // // Regular,
-        // // HashMap<Infallible, ()>,
-        // // HashMap<TransparentStruct, ()>,
-        // // HashMap<UnitVariants, ()>,
-        // // HashMap<UntaggedVariantsKey, ()>,
-        // // ValidMaybeValidKey,
-        // // ValidMaybeValidKeyNested,
-        // // InvalidMaybeValidKey, // TODO: Fix these
-        // // InvalidMaybeValidKeyNested,
+        // Valid Map keys
+        HashMap<String, ()>,
+        Regular,
+        HashMap<Infallible, ()>,
+        HashMap<TransparentStruct, ()>,
+        HashMap<UnitVariants, ()>,
+        HashMap<UntaggedVariantsKey, ()>,
+        ValidMaybeValidKey,
+        ValidMaybeValidKeyNested,
 
         // `macro_rules!` in decl
         MacroStruct,
@@ -418,6 +414,7 @@ pub fn types_phased() -> (Types, Vec<(&'static str, DataType)>) {
         // https://github.com/specta-rs/specta/issues/374
         Issue374,
 
+        Optional,
         StructPhaseSpecificRename,
     )
 }
@@ -1023,16 +1020,6 @@ struct Recursive {
 }
 
 #[derive(Type)]
-#[specta(transparent, collect = false)]
-struct RecursiveMapKeyTrick(RecursiveMapKey);
-
-#[derive(Type)]
-#[specta(collect = false)]
-struct RecursiveMapKey {
-    demo: HashMap<RecursiveMapKeyTrick, String>,
-}
-
-#[derive(Type)]
 #[specta(collect = false)]
 struct RecursiveMapValue {
     demo: HashMap<String, RecursiveMapValue>,
@@ -1186,16 +1173,6 @@ struct ValidMaybeValidKey(HashMap<MaybeValidKey<String>, ()>);
 #[specta(collect = false)]
 #[serde(transparent)]
 struct ValidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<String>>, ()>);
-
-#[derive(Type, Serialize)]
-#[specta(collect = false)]
-#[serde(transparent)]
-struct InvalidMaybeValidKey(HashMap<MaybeValidKey<()>, ()>);
-
-#[derive(Type, Serialize)]
-#[specta(collect = false)]
-#[serde(transparent)]
-struct InvalidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<()>>, ()>);
 
 macro_rules! field_ty_macro {
     () => {

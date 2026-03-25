@@ -413,6 +413,25 @@ expression: output
 	* @property {number} B
 	* @property {null} C
 	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
+	*
+	* @typedef {{ [key in string]: null }} Regular
+	* @property {{ [key in string]: null }} "0"
+	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
+	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
+	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
+	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
+	*
+	* @typedef {{ [key in MaybeValidKey<string>]: null }} ValidMaybeValidKey
+	* @property {{ [key in MaybeValidKey<string>]: null }} "0"
+	*
+	* @typedef {{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }} ValidMaybeValidKeyNested
+	* @property {{ [key in MaybeValidKey<MaybeValidKey<string>>]: null }} "0"
+	*
 	* @typedef {string} MacroStruct
 	* @property {string} "0"
 	*
