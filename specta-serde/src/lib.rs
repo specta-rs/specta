@@ -1142,12 +1142,12 @@ fn transform_external_variant(serialized_name: String, variant: &Variant) -> Res
             vec![Field::new(string_literal_datatype(serialized_name))],
         ),
         _ => {
-            let payload = variant_payload_datatype(variant)
+            let payload = variant_payload_field(variant)
                 .ok_or_else(|| Error::invalid_external_tagged_variant(serialized_name.clone()))?;
 
             clone_variant_with_named_fields(
                 variant,
-                vec![(Cow::Owned(serialized_name), Field::new(payload))],
+                vec![(Cow::Owned(serialized_name), payload)],
             )
         }
     })
@@ -1170,9 +1170,9 @@ fn transform_adjacent_variant(
     )];
 
     if variant_has_effective_payload(variant) {
-        let payload = variant_payload_datatype(variant)
+        let payload = variant_payload_field(variant)
             .ok_or_else(|| Error::invalid_adjacent_tagged_variant(serialized_name.clone()))?;
-        fields.push((Cow::Owned(content.to_string()), Field::new(payload)));
+        fields.push((Cow::Owned(content.to_string()), payload));
     }
 
     Ok(clone_variant_with_named_fields(variant, fields))
@@ -1207,7 +1207,7 @@ fn transform_internal_variant(
             let non_skipped = unnamed
                 .fields()
                 .iter()
-                .filter_map(|field| field.ty().cloned())
+                .filter(|field| field.ty().is_some())
                 .collect::<Vec<_>>();
 
             if unnamed.fields().len() != 1 || non_skipped.len() != 1 {
@@ -1217,7 +1217,8 @@ fn transform_internal_variant(
                 ));
             }
 
-            let payload_ty = non_skipped.into_iter().next().expect("checked above");
+            let payload_field = non_skipped.into_iter().next().expect("checked above").clone();
+            let payload_ty = payload_field.ty().cloned().expect("checked above");
             if !is_internal_tag_compatible(&payload_ty, original_types, &mut HashSet::new()) {
                 return Err(Error::invalid_internally_tagged_variant(
                     serialized_name,
@@ -1226,7 +1227,7 @@ fn transform_internal_variant(
             }
 
             if !matches!(&payload_ty, DataType::Tuple(tuple) if tuple.elements().is_empty()) {
-                let mut flattened = Field::new(payload_ty);
+                let mut flattened = payload_field;
                 flattened.set_flatten(true);
                 fields.push((Cow::Borrowed("__specta_internal_payload"), flattened));
             }
@@ -1252,28 +1253,35 @@ fn variant_has_effective_payload(variant: &Variant) -> bool {
     }
 }
 
-fn variant_payload_datatype(variant: &Variant) -> Option<DataType> {
+fn variant_payload_field(variant: &Variant) -> Option<Field> {
     match variant.fields() {
-        Fields::Unit => Some(DataType::Tuple(Tuple::new(vec![]))),
+        Fields::Unit => Some(Field::new(DataType::Tuple(Tuple::new(vec![])))),
         Fields::Named(named) => {
             let mut out = Struct::named();
             for (name, field) in named.fields().iter().cloned() {
                 out.field_mut(name, field);
             }
-            Some(out.build())
+            Some(Field::new(out.build()))
         }
         Fields::Unnamed(unnamed) => {
-            let fields = unnamed
+            let non_skipped = unnamed
                 .fields()
                 .iter()
-                .filter_map(|field| field.ty().cloned())
+                .filter(|field| field.ty().is_some())
                 .collect::<Vec<_>>();
 
-            match fields.as_slice() {
-                [] if unnamed.fields().is_empty() => Some(DataType::Tuple(Tuple::new(vec![]))),
+            match non_skipped.as_slice() {
+                [] if unnamed.fields().is_empty() => {
+                    Some(Field::new(DataType::Tuple(Tuple::new(vec![]))))
+                }
                 [] => None,
-                [single] if unnamed.fields().len() == 1 => Some(single.clone()),
-                _ => Some(DataType::Tuple(Tuple::new(fields))),
+                [single] if unnamed.fields().len() == 1 => Some((*single).clone()),
+                _ => Some(Field::new(DataType::Tuple(Tuple::new(
+                    non_skipped
+                        .iter()
+                        .filter_map(|field| field.ty().cloned())
+                        .collect(),
+                )))),
             }
         }
     }

@@ -165,8 +165,12 @@ expression: output
 	* 	bbbbbb: number,
 	* } }} D
 	*
-	* @typedef {{ A: PlaceholderInnerField }} InlineEnumField
-	* @property {{ A: PlaceholderInnerField }} A
+	* @typedef {{ A: {
+	* 	a: string,
+	* } }} InlineEnumField
+	* @property {{ A: {
+	* 	a: string,
+	* } }} A
 	*
 	* @typedef {{
 	*		optional_field: {
@@ -397,12 +401,12 @@ expression: output
 	*	}} OptionalOnTransparentNamedField
 	* @property {string | null} b
 	*
-	* @typedef {({ A: string | null }) & { B?: never; C?: never } | ({ B: {
+	* @typedef {({ A?: string | null }) & { B?: never; C?: never } | ({ B: {
 	* 	a: string | null,
 	* } }) & { A?: never; C?: never } | ({ C: {
 	* 	a?: string | null,
 	* } }) & { A?: never; B?: never }} OptionalInEnum
-	* @property {{ A: string | null }} A
+	* @property {{ A?: string | null }} A
 	* @property {{ B: {
 	* 	a: string | null,
 	* } }} B
@@ -770,10 +774,14 @@ expression: output
 	* @property {{ A: string }} A
 	* @property {"B"} B
 	*
-	* @typedef {{ t: "A"; c: string } | { t: "B" } | { t: "C"; c: First } | { t: "D"; c: First }} Ninth
+	* @typedef {{ t: "A"; c: string } | { t: "B" } | { t: "C"; c: {
+	* 	a: string,
+	* } } | { t: "D"; c: First }} Ninth
 	* @property {{ t: "A"; c: string }} A
 	* @property {{ t: "B" }} B
-	* @property {{ t: "C"; c: First }} C
+	* @property {{ t: "C"; c: {
+	* 	a: string,
+	* } }} C
 	* @property {{ t: "D"; c: First }} D
 	*
 	* @typedef {string | "B" | {
