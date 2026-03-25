@@ -1,4 +1,4 @@
-use specta::{Type, Types};
+use specta::{ResolvedTypes, Type, Types};
 use specta_swift::Swift;
 
 // Simple user management types
@@ -31,11 +31,12 @@ fn main() {
         .register::<User>()
         .register::<UserRole>()
         .register::<ApiResult<String>>();
+    let resolved = ResolvedTypes::from_resolved_types(types);
 
     // Export to Swift with default settings
     let swift = Swift::default();
     swift
-        .export_to("./examples/generated/SimpleTypes.swift", &types)
+        .export_to("./examples/generated/SimpleTypes.swift", &resolved)
         .unwrap();
 
     println!("Simple types exported to SimpleTypes.swift");
@@ -47,7 +48,7 @@ fn main() {
         .optionals(specta_swift::OptionalStyle::Optional);
 
     custom_swift
-        .export_to("./examples/generated/CustomTypes.swift", &types)
+        .export_to("./examples/generated/CustomTypes.swift", &resolved)
         .unwrap();
 
     println!("Custom types exported to CustomTypes.swift");

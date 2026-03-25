@@ -23,6 +23,7 @@ mod references;
 mod serde_conversions;
 mod serde_identifiers;
 mod serde_other;
+mod swift;
 mod types;
 mod typescript;
 mod utils;
