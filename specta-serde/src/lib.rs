@@ -1169,7 +1169,7 @@ fn transform_adjacent_variant(
         }),
     )];
 
-    if !matches!(variant.fields(), Fields::Unit) {
+    if variant_has_effective_payload(variant) {
         let payload = variant_payload_datatype(variant)
             .ok_or_else(|| Error::invalid_adjacent_tagged_variant(serialized_name.clone()))?;
         fields.push((Cow::Owned(content.to_string()), Field::new(payload)));
@@ -1200,6 +1200,10 @@ fn transform_internal_variant(
             fields.extend(named.fields().iter().cloned());
         }
         Fields::Unnamed(unnamed) => {
+            if unnamed.fields().is_empty() {
+                return Ok(clone_variant_with_named_fields(variant, fields));
+            }
+
             let non_skipped = unnamed
                 .fields()
                 .iter()
@@ -1238,6 +1242,14 @@ fn string_literal_datatype(value: String) -> DataType {
         .variants_mut()
         .push((Cow::Owned(value), Variant::unit()));
     DataType::Enum(value_enum)
+}
+
+fn variant_has_effective_payload(variant: &Variant) -> bool {
+    match variant.fields() {
+        Fields::Unit => false,
+        Fields::Named(named) => !named.fields().is_empty(),
+        Fields::Unnamed(unnamed) => !unnamed.fields().is_empty(),
+    }
 }
 
 fn variant_payload_datatype(variant: &Variant) -> Option<DataType> {

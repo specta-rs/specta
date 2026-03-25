@@ -794,7 +794,7 @@ export type SkipStructFields = {
 	a: number,
 };
 
-export type SkippedFieldWithinVariant = { type: "A"; data: null } | { type: "B"; data: string };
+export type SkippedFieldWithinVariant = { type: "A" } | { type: "B"; data: string };
 
 export type SpectaSkipNonTypeField = {
 	a: number,

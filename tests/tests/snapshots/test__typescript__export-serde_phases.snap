@@ -171,7 +171,7 @@ Box<str>: export type Box<T> = T;
 
 Box<String>: export type Box<T> = T;
 
-SkippedFieldWithinVariant: export type SkippedFieldWithinVariant = { type: "A"; data: null } | { type: "B"; data: string };
+SkippedFieldWithinVariant: export type SkippedFieldWithinVariant = { type: "A" } | { type: "B"; data: string };
 
 KebabCase: export type KebabCase = {
 	"test-ing": string,
