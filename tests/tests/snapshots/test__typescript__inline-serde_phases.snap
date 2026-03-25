@@ -2,6 +2,9 @@
 source: tests/tests/typescript.rs
 expression: output
 ---
+Issue374: Issue374_Serialize | Issue374_Deserialize
+Optional: Optional_Serialize | Optional_Deserialize
+StructPhaseSpecificRename: StructPhaseSpecificRename_Serialize | StructPhaseSpecificRename_Deserialize
 i8: number
 i16: number
 i32: number
@@ -600,3 +603,9 @@ GenericParameterOrderPreserved: {
 }
 TestCollectionRegister: never
 TestCollectionRegister: never
+specta_typescript::Any: any
+specta_typescript::Any<String>: any
+specta_typescript::Unknown: unknown
+specta_typescript::Unknown<String>: unknown
+specta_typescript::Never: never
+specta_typescript::Never<String>: never

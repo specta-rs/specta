@@ -20,3 +20,6 @@ workspace = true
 
 [dependencies]
 specta = { version = "=2.0.0-rc.23", path = "../specta" }
+
+[dev-dependencies]
+specta = { version = "=2.0.0-rc.23", path = "../specta", features = ["derive"] }
