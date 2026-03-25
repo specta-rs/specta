@@ -162,7 +162,7 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
 
         // https://github.com/specta-rs/specta/issues/65
         HashMap<BasicEnum, ()>,
-        // HashMap<BasicEnum, i32>, // TODO
+        HashMap<BasicEnum, i32>,
 
         // https://github.com/specta-rs/specta/issues/60
         Option<Option<Option<Option<i32>>>>,
@@ -303,7 +303,7 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         DoubleFlattened,
         FlattenedInner,
         BoxFlattened,
-        BoxInline, // TODO: This is wrong
+        BoxInline,
 
         // Flatten and inline
         First,
@@ -336,12 +336,12 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         Issue221External,
 
         // Serde - Internally Tagged
-        // InternallyTaggedD,
-        // InternallyTaggedE,
-        // InternallyTaggedF,
-        // InternallyTaggedH,
-        // InternallyTaggedL,
-        // InternallyTaggedM,
+        InternallyTaggedD,
+        InternallyTaggedE,
+        InternallyTaggedF,
+        InternallyTaggedH,
+        InternallyTaggedL,
+        InternallyTaggedM,
 
         // Alias
         StructWithAlias,

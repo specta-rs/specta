@@ -135,6 +135,8 @@ export type TransparentTypeWithOverride = string;
 
 export type HashMap<K, V> = { [key in K]: V };
 
+export type HashMap<K, V> = { [key in K]: V };
+
 export type Vec<T> = T[];
 
 export type EnumReferenceRecordKey = {
