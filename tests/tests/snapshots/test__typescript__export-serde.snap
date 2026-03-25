@@ -494,7 +494,9 @@ FlattenedInner: export type FlattenedInner = (Inner);
 BoxFlattened: export type BoxFlattened = (BoxedInner);
 
 BoxInline: export type BoxInline = {
-	c: BoxedInner,
+	c: {
+		a: number,
+	},
 };
 
 First: export type First = {

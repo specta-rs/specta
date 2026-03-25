@@ -57,7 +57,9 @@ expression: output
 	* @property {BoxedInner} b
 	*
 	* @typedef {{
-	*		c: BoxedInner,
+	*		c: {
+	*			a: number,
+	*		},
 	*	}} BoxInline
 	* @property {BoxedInner} c
 	*

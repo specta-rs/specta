@@ -40,7 +40,9 @@ export type BoxFlattened = {
 };
 
 export type BoxInline = {
-	c: BoxedInner,
+	c: {
+		a: number,
+	},
 };
 
 export type BoxedInner = {

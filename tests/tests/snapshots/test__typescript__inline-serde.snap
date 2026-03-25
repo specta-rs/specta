@@ -389,7 +389,9 @@ DoubleFlattened: {
 FlattenedInner: (Inner)
 BoxFlattened: (BoxedInner)
 BoxInline: {
-	c: BoxedInner,
+	c: {
+		a: number,
+	},
 }
 First: {
 	a: string,

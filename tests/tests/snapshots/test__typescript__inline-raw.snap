@@ -383,7 +383,9 @@ BoxFlattened: {
 	b: BoxedInner,
 }
 BoxInline: {
-	c: BoxedInner,
+	c: {
+		a: number,
+	},
 }
 First: {
 	a: string,
