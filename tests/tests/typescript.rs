@@ -1,4 +1,4 @@
-use std::{iter, path::Path};
+use std::{collections::HashMap, iter, path::Path};
 
 use specta::{
     ResolvedTypes, Type, Types,
@@ -9,142 +9,177 @@ use tempfile::TempDir;
 
 use crate::fs_to_string;
 
-pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
-    let (mut types, dts) = crate::types();
+fn typescript_types() -> (Types, Vec<(&'static str, DataType)>) {
+    let mut types = Types::default();
+    let mut dts = Vec::new();
 
-    // Test ts-specific types
-    // types = types
-    //     .register::<Any>()
-    //     .register::<Any<String>>()
-    //     .register::<Unknown>()
-    //     .register::<Unknown<String>>()
-    //     .register::<Never>()
-    //     .register::<Never<String>>();
-
-    // dts.push(value);
-
-    // Test that the types don't get duplicated in the type map.
-    {
-        #[derive(Type)]
-        #[specta(collect = false)]
-        pub enum TestCollectionRegister {}
-        types = types
-            .register::<TestCollectionRegister>()
-            .register::<TestCollectionRegister>();
-    }
+    register!(types, dts;
+        specta_typescript::Any,
+        specta_typescript::Any<String>,
+        specta_typescript::Unknown,
+        specta_typescript::Unknown<String>,
+        specta_typescript::Never,
+        specta_typescript::Never<String>,
+    );
+    let _ = <HashMap<specta_typescript::Any, ()> as Type>::definition(&mut types);
 
     (types, dts)
 }
 
-fn phase_collections(
-    types: Types,
-) -> [(&'static str, Result<ResolvedTypes, specta_serde::Error>); 3] {
+fn phase_collections() -> [(
+    &'static str,
+    Result<(Vec<(&'static str, DataType)>, ResolvedTypes), specta_serde::Error>,
+); 3] {
+    let (types, dts) = {
+        let (mut types, mut dts) = crate::types();
+        let (types2, dts2) = typescript_types();
+        types.extend(&types2);
+        dts.extend(dts2);
+        (types, dts)
+    };
+    let (phased_types, phased_dts) = {
+        let (mut types2, mut dts2) = crate::types_phased();
+        types2.extend(&types);
+        dts2.extend(dts.iter().cloned());
+        (types2, dts2)
+    };
+
     [
-        ("raw", Ok(ResolvedTypes::from_resolved_types(types.clone()))),
-        ("serde", specta_serde::apply(types.clone())),
-        ("serde_phases", specta_serde::apply_phases(types)),
+        (
+            "raw",
+            Ok((
+                dts.clone(),
+                ResolvedTypes::from_resolved_types(types.clone()),
+            )),
+        ),
+        (
+            "serde",
+            specta_serde::apply(types).map(|types| (dts, types)),
+        ),
+        (
+            "serde_phases",
+            specta_serde::apply_phases(phased_types).map(|types| (phased_dts, types)),
+        ),
     ]
+}
+
+fn phase_output(
+    result: Result<(Vec<(&'static str, DataType)>, ResolvedTypes), specta_serde::Error>,
+    f: impl FnOnce(&[(&'static str, DataType)], &ResolvedTypes) -> Result<String, String>,
+) -> String {
+    result.map_or_else(
+        |err| format!("ERROR: {err}"),
+        |(dts, types)| f(&dts, &types).unwrap_or_else(|err| format!("ERROR: {err}")),
+    )
 }
 
 #[test]
 fn typescript_export() {
-    for (mode, types) in phase_collections(types().0) {
+    for (mode, result) in phase_collections() {
         insta::assert_snapshot!(
             format!("ts-export-{mode}"),
-            match types {
-                Ok(types) => Typescript::default().export(&types).unwrap(),
-                Err(err) => format!("ERROR: {err}"),
-            }
+            phase_output(result, |_, types| {
+                Typescript::default()
+                    .export(&types)
+                    .map_err(|err| err.to_string())
+            })
         );
     }
 }
 
 #[test]
 fn typescript_export_serde_errors() {
-    fn assert_serde_error<T: Type>(
-        failures: &mut Vec<String>,
-        name: &str,
-        expected_error: &str,
-        expect_apply_error: bool,
-    ) {
-        let types = Types::default().register::<T>();
-        for (mode, output) in [
-            (
-                "serde",
-                specta_serde::apply(types.clone())
-                    .map(|types| Typescript::default().export(&types)),
-            ),
-            (
-                "serde_phases",
-                specta_serde::apply_phases(types.clone())
-                    .map(|types| Typescript::default().export(&types)),
-            ),
-        ] {
-            match output {
+    fn assert_serde_error<T: Type>(failures: &mut Vec<String>, name: &str, expected_error: &str) {
+        fn assert_expected_error(
+            failures: &mut Vec<String>,
+            name: &str,
+            mode: &str,
+            stage: &str,
+            expected_error: &str,
+            err: impl std::fmt::Display,
+        ) {
+            let err = err.to_string();
+            if !err.contains(expected_error) {
+                failures.push(format!(
+                    "{name} ({mode}) [{stage}]: expected error containing '{expected_error}', got '{err}'"
+                ));
+            }
+        }
+
+        let mut types = Types::default();
+        let dt = T::definition(&mut types);
+
+        for mode in ["serde", "serde_phases"] {
+            let types = match mode {
+                "serde" => specta_serde::apply(types.clone()),
+                _ => specta_serde::apply_phases(types.clone()),
+            };
+
+            let types = match types {
+                Ok(types) => types,
                 Err(err) => {
-                    if mode == "serde" && !expect_apply_error {
-                        failures.push(format!("{name} ({mode}): expected success, got '{err}'"));
-                    } else if !err.to_string().contains(expected_error) {
-                        failures.push(format!(
-                            "{name} ({mode}): expected error containing '{expected_error}', got '{err}'"
-                        ));
-                    }
+                    assert_expected_error(failures, name, mode, "apply", expected_error, err);
+                    continue;
                 }
-                Ok(Ok(_)) if mode == "serde" && !expect_apply_error => {}
-                Ok(Err(err)) => failures.push(format!(
-                    "{name} ({mode}): expected serde error but export failed with '{err}'"
+            };
+
+            if let Err(err) = specta_serde::validate(&dt, &types) {
+                assert_expected_error(failures, name, mode, "validate", expected_error, err);
+                continue;
+            }
+
+            match Typescript::default().export(&types) {
+                Ok(_) => failures.push(format!(
+                    "{name} ({mode}) [export]: expected error containing '{expected_error}', but export succeeded"
                 )),
-                Ok(Ok(output)) if mode == "serde" && expect_apply_error => failures.push(format!(
-                    "{name} ({mode}): expected serde error, got output: {output}"
-                )),
-                Ok(Ok(output)) => failures.push(format!(
-                    "{name} ({mode}): expected serde error, got output: {output}"
-                )),
+                Err(err) => {
+                    assert_expected_error(failures, name, mode, "export", expected_error, err)
+                }
             }
         }
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(tag = "type")]
     enum InternallyTaggedB {
         A(String),
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(tag = "type")]
     enum InternallyTaggedC {
         A(Vec<String>),
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(tag = "type")]
     enum InternallyTaggedG {
         A(InternallyTaggedGInner),
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(untagged)]
     enum InternallyTaggedGInner {
         A(String),
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(tag = "type")]
     enum InternallyTaggedI {
         A(InternallyTaggedIInner),
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(transparent)]
     struct InternallyTaggedIInner(String);
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(tag = "a")]
     enum TaggedEnumOfEmptyTupleStruct {
@@ -152,97 +187,187 @@ fn typescript_export_serde_errors() {
         B(EmptyTupleStruct),
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     struct EmptyTupleStruct();
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     enum SkipOnlyVariantExternallyTagged {
-        #[specta(skip)]
+        #[serde(skip)]
         A(String),
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(tag = "t")]
     enum SkipOnlyVariantInternallyTagged {
-        #[specta(skip)]
+        #[serde(skip)]
         A(String),
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(tag = "t", content = "c")]
     enum SkipOnlyVariantAdjacentlyTagged {
-        #[specta(skip)]
+        #[serde(skip)]
         A(String),
     }
 
-    #[derive(Type, serde::Serialize, serde::Deserialize)]
+    #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(untagged)]
     enum SkipOnlyVariantUntagged {
-        #[specta(skip)]
+        #[serde(skip)]
         A(String),
+    }
+
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    struct RegularStruct {
+        a: String,
+    }
+
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    enum Variants {
+        A(String),
+        B(i32),
+        C(u8),
+    }
+
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    #[serde(transparent)]
+    struct MaybeValidKey<T>(T);
+
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    #[serde(transparent)]
+    struct InvalidMaybeValidKey(HashMap<MaybeValidKey<()>, ()>);
+
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    #[serde(transparent)]
+    struct InvalidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<()>>, ()>);
+
+    #[derive(Type)]
+    #[specta(transparent, collect = false)]
+    struct RecursiveMapKeyTrick(RecursiveMapKey);
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct RecursiveMapKey {
+        demo: HashMap<RecursiveMapKeyTrick, String>,
     }
 
     let mut failures = Vec::new();
 
+    // Serde Error: "cannot serialize tagged newtype variant InternallyTaggedB::A containing a string"
     assert_serde_error::<InternallyTaggedB>(
         &mut failures,
         "InternallyTaggedB",
         "Invalid internally tagged enum",
-        true,
     );
+    // Serde Error: "cannot serialize tagged newtype variant InternallyTaggedC::A containing a sequence"
     assert_serde_error::<InternallyTaggedC>(
         &mut failures,
         "InternallyTaggedC",
         "Invalid internally tagged enum",
-        true,
     );
+    // Serde Error: "cannot serialize tagged newtype variant InternallyTaggedG::A containing a string"
     assert_serde_error::<InternallyTaggedG>(
         &mut failures,
         "InternallyTaggedG",
         "Invalid internally tagged enum",
-        true,
     );
+    // Serde Error: "cannot serialize tagged newtype variant InternallyTaggedI::A containing a string"
     assert_serde_error::<InternallyTaggedI>(
         &mut failures,
         "InternallyTaggedI",
         "Invalid internally tagged enum",
-        false,
     );
 
+    // Serde Error: "cannot serialize tagged newtype variant TaggedEnumOfEmptyTupleStruct::A containing a tuple struct"
     assert_serde_error::<TaggedEnumOfEmptyTupleStruct>(
         &mut failures,
         "TaggedEnumOfEmptyTupleStruct",
         "Invalid internally tagged enum",
-        false,
     );
+    // Serde Error: "the enum variant SkipOnlyVariantExternallyTagged::A cannot be serialized"
     assert_serde_error::<SkipOnlyVariantExternallyTagged>(
         &mut failures,
         "SkipOnlyVariantExternallyTagged",
         "Invalid usage of #[serde(skip)]",
-        true,
     );
+    // Serde Error: "the enum variant SkipOnlyVariantInternallyTagged::A cannot be serialized"
     assert_serde_error::<SkipOnlyVariantInternallyTagged>(
         &mut failures,
         "SkipOnlyVariantInternallyTagged",
         "Invalid usage of #[serde(skip)]",
-        true,
     );
+    // Serde Error: "the enum variant SkipOnlyVariantAdjacentlyTagged::A cannot be serialized"
     assert_serde_error::<SkipOnlyVariantAdjacentlyTagged>(
         &mut failures,
         "SkipOnlyVariantAdjacentlyTagged",
         "Invalid usage of #[serde(skip)]",
-        true,
     );
+    // Serde Error: "the enum variant SkipOnlyVariantUntagged::A cannot be serialized"
     assert_serde_error::<SkipOnlyVariantUntagged>(
         &mut failures,
         "SkipOnlyVariantUntagged",
         "Invalid usage of #[serde(skip)]",
-        true,
+    );
+
+    // These need to be named data types so they are exported by `Typescript::export`
+    {
+        #[derive(Type)]
+        #[specta(collect = false)]
+        pub struct A(HashMap<(), ()>);
+
+        assert_serde_error::<A>(
+            &mut failures,
+            "A(HashMap<() /* `null` */, ()>)",
+            "tuple keys are not supported by serde_json map key serialization",
+        );
+    }
+    {
+        #[derive(Type)]
+        #[specta(collect = false)]
+        pub struct B(HashMap<RegularStruct, ()>);
+
+        assert_serde_error::<B>(
+            &mut failures,
+            "B(HashMap<RegularStruct, ()>)",
+            "struct keys must serialize as a newtype struct to be valid serde_json map keys",
+        );
+    }
+    {
+        #[derive(Type)]
+        #[specta(collect = false)]
+        pub struct C(HashMap<Variants, ()>);
+
+        assert_serde_error::<C>(
+            &mut failures,
+            "C(HashMap<Variants, ()>)",
+            "enum key variant 'A' serializes as a struct variant, which serde_json rejects",
+        );
+    }
+    assert_serde_error::<InvalidMaybeValidKey>(
+        &mut failures,
+        "InvalidMaybeValidKey",
+        "tuple keys are not supported by serde_json map key serialization",
+    );
+    assert_serde_error::<InvalidMaybeValidKeyNested>(
+        &mut failures,
+        "InvalidMaybeValidKeyNested",
+        "tuple keys are not supported by serde_json map key serialization",
+    );
+
+    assert_serde_error::<RecursiveMapKey>(
+        &mut failures,
+        "RecursiveMapKey",
+        "struct keys must serialize as a newtype struct to be valid serde_json map keys",
     );
 
     assert!(
@@ -264,19 +389,16 @@ fn typescript_export_to() {
         Layout::ModulePrefixedName,
         Layout::Namespaces,
     ] {
-        for (mode, types) in phase_collections(types().0) {
+        for (mode, result) in phase_collections() {
             let name = format!("ts-export-to-{}-{mode}", layout.to_string().to_lowercase());
-            let output = match types {
-                Ok(types) => {
-                    let path = temp.path().join(&name);
-                    Typescript::default()
-                        .layout(layout)
-                        .export_to(&path, &types)
-                        .unwrap();
-                    fs_to_string(&path).unwrap()
-                }
-                Err(err) => format!("ERROR: {err}"),
-            };
+            let output = phase_output(result, |_, types| {
+                let path = temp.path().join(&name);
+                Typescript::default()
+                    .layout(layout)
+                    .export_to(&path, &types)
+                    .map_err(|err| err.to_string())?;
+                fs_to_string(&path).map_err(|err| err.to_string())
+            });
 
             insta::assert_snapshot!(name, output);
         }
@@ -290,28 +412,25 @@ fn typescript_export_to() {
 
 #[test]
 fn primitives_export() {
-    let (types, dts) = crate::types();
-    for (mode, types) in phase_collections(types) {
-        let output = match types {
-            Ok(types) => {
-                let ts = Typescript::default();
-                dts.iter()
-                    .filter_map(|(s, ty)| match ty {
-                        DataType::Reference(Reference::Named(r)) => {
-                            r.get(types.as_types()).cloned().map(|ty| (s, ty))
-                        }
-                        _ => None,
-                    })
-                    .map(|(s, ty)| {
-                        primitives::export(&ts, &types, iter::once(&ty), "")
-                            .map(|ty| format!("{s}: {ty}"))
-                    })
-                    .collect::<Result<Vec<_>, _>>()
-                    .unwrap()
-                    .join("\n")
-            }
-            Err(err) => format!("ERROR: {err}"),
-        };
+    for (mode, result) in phase_collections() {
+        let output = phase_output(result, |dts, types| {
+            let ts = Typescript::default();
+
+            dts.iter()
+                .filter_map(|(name, ty)| match ty {
+                    DataType::Reference(Reference::Named(reference)) => {
+                        reference.get(types.as_types()).map(|ty| (name, ty))
+                    }
+                    _ => None,
+                })
+                .map(|(name, ty)| {
+                    primitives::export(&ts, types, iter::once(ty), "")
+                        .map(|ty| format!("{name}: {ty}"))
+                })
+                .collect::<Result<Vec<_>, _>>()
+                .map(|exports| exports.join("\n"))
+                .map_err(|err| err.to_string())
+        });
 
         insta::assert_snapshot!(format!("export-{mode}"), output);
     }
@@ -319,49 +438,65 @@ fn primitives_export() {
 
 #[test]
 fn primitives_export_many() {
-    let (types, dts) = crate::types();
-    for (mode, types) in phase_collections(types) {
-        let output = match types {
-            Ok(types) => {
-                let ts = Typescript::default();
-                let ndts = dts
-                    .iter()
-                    .filter_map(|(_, ty)| match ty {
-                        DataType::Reference(Reference::Named(r)) => r.get(types.as_types()),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>();
+    for (mode, result) in phase_collections() {
+        let output = phase_output(result, |dts, types| {
+            let ts = Typescript::default();
+            let ndts = dts
+                .iter()
+                .filter_map(|(_, ty)| match ty {
+                    DataType::Reference(Reference::Named(r)) => r.get(types.as_types()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
 
-                primitives::export(&ts, &types, ndts.into_iter(), "").unwrap()
-            }
-            Err(err) => format!("ERROR: {err}"),
-        };
+            primitives::export(&ts, types, ndts.into_iter(), "").map_err(|err| err.to_string())
+        });
 
         insta::assert_snapshot!(format!("export-many-{mode}"), output);
     }
 }
 
 #[test]
+fn primitives_export_allows_generic_hashmap_definition() {
+    for (mode, result) in phase_collections() {
+        let output = phase_output(result, |dts, types| {
+            let ts = Typescript::default();
+            let hash_map = dts
+                .iter()
+                .find_map(|(_, ty)| match ty {
+                    DataType::Reference(Reference::Named(r)) => r
+                        .get(types.as_types())
+                        .filter(|ndt| ndt.name() == "HashMap"),
+                    _ => None,
+                })
+                .expect("HashMap should be registered in shared test fixtures");
+
+            primitives::export(&ts, types, iter::once(hash_map), "").map_err(|err| err.to_string())
+        });
+
+        assert!(
+            !output.starts_with("ERROR:"),
+            "unexpected error while exporting generic HashMap in {mode}: {output}"
+        );
+        assert!(output.contains("export type HashMap<K, V> = { [key in K]: V };"));
+    }
+}
+
+#[test]
 fn primitives_reference() {
-    let (types, dts) = crate::types();
-    for (mode, types) in phase_collections(types) {
-        let output = match types {
-            Ok(types) => {
-                let ts = Typescript::default();
-                dts.iter()
-                    .filter_map(|(s, ty)| match ty {
-                        DataType::Reference(r) => Some((s, r)),
-                        _ => None,
-                    })
-                    .map(|(s, ty)| {
-                        primitives::reference(&ts, &types, ty).map(|ty| format!("{s}: {ty}"))
-                    })
-                    .collect::<Result<Vec<_>, _>>()
-                    .unwrap()
-                    .join("\n")
-            }
-            Err(err) => format!("ERROR: {err}"),
-        };
+    for (mode, result) in phase_collections() {
+        let output = phase_output(result, |dts, types| {
+            let ts = Typescript::default();
+            dts.iter()
+                .filter_map(|(s, ty)| match ty {
+                    DataType::Reference(r) => Some((s, r)),
+                    _ => None,
+                })
+                .map(|(s, ty)| primitives::reference(&ts, types, ty).map(|ty| format!("{s}: {ty}")))
+                .collect::<Result<Vec<_>, _>>()
+                .map(|exports| exports.join("\n"))
+                .map_err(|err| err.to_string())
+        });
 
         insta::assert_snapshot!(format!("reference-{mode}"), output);
     }
@@ -369,21 +504,15 @@ fn primitives_reference() {
 
 #[test]
 fn primitives_inline() {
-    let (types, dts) = crate::types();
-    for (mode, types) in phase_collections(types) {
-        let output = match types {
-            Ok(types) => {
-                let ts = Typescript::default();
-                dts.iter()
-                    .map(|(s, ty)| {
-                        primitives::inline(&ts, &types, ty).map(|ty| format!("{s}: {ty}"))
-                    })
-                    .collect::<Result<Vec<_>, _>>()
-                    .unwrap()
-                    .join("\n")
-            }
-            Err(err) => format!("ERROR: {err}"),
-        };
+    for (mode, result) in phase_collections() {
+        let output = phase_output(result, |dts, types| {
+            let ts = Typescript::default();
+            dts.iter()
+                .map(|(s, ty)| primitives::inline(&ts, types, ty).map(|ty| format!("{s}: {ty}")))
+                .collect::<Result<Vec<_>, _>>()
+                .map(|exports| exports.join("\n"))
+                .map_err(|err| err.to_string())
+        });
 
         insta::assert_snapshot!(format!("inline-{mode}"), output);
     }

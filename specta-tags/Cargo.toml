@@ -1,0 +1,25 @@
+[package]
+name = "specta-tags"
+version = "0.0.0"
+edition = "2024"
+# TODO: Publishing metadata
+publish = false
+
+# /bin/sh RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
+[package.metadata."docs.rs"]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true
+
+[dependencies]
+specta = { version = "=2.0.0-rc.23", path = "../specta" }
+specta-serde = { version = "0.0.10", path = "../specta-serde" }
+serde = { version = "1", features = ["derive"] } # TODO: Drop `derive` feature???
+serde_json = "1"
+
+[dev-dependencies]
+bytes = "1.11.1"
+chrono = "0.4.44"
+specta = { version = "=2.0.0-rc.23", path = "../specta", features = ["derive", "chrono", "bytes"] }

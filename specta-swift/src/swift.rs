@@ -3,7 +3,7 @@
 use std::{borrow::Cow, path::Path};
 
 use specta::{
-    Types,
+    ResolvedTypes, Types,
     datatype::{DataType, Fields, Reference},
 };
 
@@ -130,8 +130,9 @@ impl Swift {
     }
 
     /// Export types to a Swift string.
-    pub fn export(&self, types: &Types) -> Result<String> {
+    pub fn export(&self, types: &ResolvedTypes) -> Result<String> {
         let mut result = String::new();
+        let raw_types = types.as_types();
 
         // Add header
         if !self.header.is_empty() {
@@ -147,13 +148,13 @@ impl Swift {
         result.push('\n');
 
         // Check if we need to inject Duration helper
-        if needs_duration_helper(types) {
+        if needs_duration_helper(raw_types) {
             result.push_str(&generate_duration_helper());
         }
 
         // Export types
-        for ndt in types.into_sorted_iter() {
-            let exported = export_type(self, types, ndt)?;
+        for ndt in raw_types.into_sorted_iter() {
+            let exported = export_type(self, raw_types, ndt)?;
             if !exported.is_empty() {
                 result.push_str(&exported);
                 result.push_str("\n\n");
@@ -164,7 +165,7 @@ impl Swift {
     }
 
     /// Export types to a file.
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types) -> Result<()> {
+    pub fn export_to(&self, path: impl AsRef<Path>, types: &ResolvedTypes) -> Result<()> {
         let content = self.export(types)?;
         std::fs::write(path, content)?;
         Ok(())
@@ -233,6 +234,14 @@ impl NamingConvention {
             }
             result
         } else {
+            if name.chars().any(|c| c.is_ascii_alphabetic())
+                && name
+                    .chars()
+                    .all(|c| !c.is_ascii_alphabetic() || c.is_ascii_uppercase())
+            {
+                return name.to_ascii_lowercase();
+            }
+
             // Handle PascalCase - convert to camelCase
             let mut chars = name.chars();
             match chars.next() {

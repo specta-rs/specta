@@ -737,7 +737,8 @@ dependencies = [
 [[package]]
 name = "error-stack"
 version = "0.6.0"
-source = "git+https://github.com/hashintel/hash?rev=da576c7564b27247fd11c2cdae6ca1d2c8e01800#da576c7564b27247fd11c2cdae6ca1d2c8e01800"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b878b3fac9613c3c7f22eb70bc8a3c6ebdc03cc11479ee60fde1692d747fd45f"
 dependencies = [
  "rustc_version",
 ]
@@ -2060,9 +2061,22 @@ dependencies = [
  "insta",
  "serde",
  "specta",
+ "specta-serde",
  "thiserror",
  "trybuild",
  "uuid",
+]
+
+[[package]]
+name = "specta-tags"
+version = "0.0.0"
+dependencies = [
+ "bytes",
+ "chrono",
+ "serde",
+ "serde_json",
+ "specta",
+ "specta-serde",
 ]
 
 [[package]]
@@ -2073,6 +2087,7 @@ dependencies = [
  "chrono",
  "either",
  "error-stack",
+ "geojson",
  "glam 0.32.1",
  "heapless",
  "insta",
@@ -2085,6 +2100,7 @@ dependencies = [
  "smol_str 0.3.6",
  "specta",
  "specta-serde",
+ "specta-swift",
  "specta-typescript",
  "specta-util",
  "tempfile",

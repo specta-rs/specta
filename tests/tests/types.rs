@@ -22,6 +22,7 @@ use specta::{Type, Types, datatype::DataType};
 /// In a real-world application you should prefer the `Types::register` method instead of this.
 /// In this case we can't use it because we intent to test `NamedDataType` and `DataType`'s.
 /// `Types` only registers `NamedDataType` as those are the only types that aren't built-in.
+#[macro_export]
 macro_rules! types {
     ($($t:ty),* $(,)?) => {{
         let mut types = specta::Types::default();
@@ -162,6 +163,7 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
 
         // https://github.com/specta-rs/specta/issues/65
         HashMap<BasicEnum, ()>,
+        HashMap<BasicEnum, i32>,
 
         // https://github.com/specta-rs/specta/issues/60
         Option<Option<Option<Option<i32>>>>,
@@ -169,7 +171,6 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         // https://github.com/specta-rs/specta/issues/71
         Vec<PlaceholderInnerField>,
 
-        HashMap<BasicEnum, i32>,
         EnumReferenceRecordKey,
 
         FlattenOnNestedEnum,
@@ -213,9 +214,6 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         RenamedFieldKeys,
         RenamedVariantWithSkippedPayload,
 
-        // https://github.com/specta-rs/specta/issues/374
-        Issue374,
-
         // https://github.com/specta-rs/specta/issues/386
         type_type::Type,
 
@@ -238,18 +236,17 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         BracedStruct,
 
         // `#[serde(rename)]`
-        // Struct,
-        // Struct2,
-        // Enum,
-        // Enum2,
-        // Enum3, // TODO: Fix these
+        Struct,
+        Struct2,
+        Enum,
+        Enum2,
+        Enum3,
         StructRenameAllUppercase,
         RenameSerdeSpecialChar,
         EnumRenameAllUppercase,
 
         // Recursive types
         Recursive,
-        // RecursiveMapKey, // TODO: Fix this
         RecursiveMapValue,
         RecursiveTransparent,
         RecursiveInEnum,
@@ -259,7 +256,6 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         OptionalOnNamedField,
         OptionalOnTransparentNamedField,
         OptionalInEnum,
-        Optional,
 
         UntaggedVariants,
         UntaggedVariantsWithoutValue,
@@ -269,17 +265,11 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         HashMap<String, ()>,
         Regular,
         HashMap<Infallible, ()>,
-        // HashMap<Any, ()>, // TODO: Fix this
-        // HashMap<TransparentStruct, ()>, // TODO: Fix this
+        HashMap<TransparentStruct, ()>,
         HashMap<UnitVariants, ()>,
         HashMap<UntaggedVariantsKey, ()>,
-        // ValidMaybeValidKey, // TODO: Fix this
-        // ValidMaybeValidKeyNested, // TODO: Fix this
-        // HashMap<() /* `null` */, ()>, // TODO: Fix this
-        // HashMap<RegularStruct, ()>, // TODO: Fix this
-        HashMap<Variants, ()>,
-        // InvalidMaybeValidKey, // TODO: Fix this
-        // InvalidMaybeValidKeyNested, // TODO: Fix this
+        ValidMaybeValidKey,
+        ValidMaybeValidKeyNested,
 
         // `macro_rules!` in decl
         MacroStruct,
@@ -312,9 +302,9 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
 
         A,
         DoubleFlattened,
-        FlattenedInner, // TODO: Fix this
-        BoxFlattened, // TODO: Fix this
-        BoxInline, // TODO: Fix this
+        FlattenedInner,
+        BoxFlattened,
+        BoxInline,
 
         // Flatten and inline
         First,
@@ -325,7 +315,7 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         Sixth,
         Seventh,
         Eight,
-        // Ninth, // TODO: Fix this
+        Ninth,
         Tenth,
 
         // Test for issue #393 - flatten in enum variants
@@ -416,8 +406,32 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         InlineFlattenGenericsG<()>,
         InlineFlattenGenerics,
         GenericParameterOrderPreserved,
+
+        // Test that the types don't get duplicated in the type map.
+        // (these will be duplicated in dts tests as that doesn't use the typemap)
+        TestCollectionRegister,
+        TestCollectionRegister,
     )
 }
+
+#[rustfmt::skip]
+pub fn types_phased() -> (Types, Vec<(&'static str, DataType)>) {
+    let mut types = Types::default();
+    let mut dts = Vec::new();
+
+    // https://github.com/specta-rs/specta/issues/374
+    register!(types, dts;
+        Issue374,
+        Optional,
+        StructPhaseSpecificRename,
+    );
+
+    (types, dts)
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub enum TestCollectionRegister {}
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
@@ -984,6 +998,18 @@ enum EnumRenameAllUppercase {
     TestingWords,
 }
 
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+#[serde(rename(
+    serialize = "StructPhaseSpecificRenameSerialize",
+    deserialize = "StructPhaseSpecificRenameDeserialize"
+))]
+struct StructPhaseSpecificRename {
+    #[serde(rename(serialize = "ser", deserialize = "der"))]
+    a: String,
+}
+
 #[derive(serde::Serialize, Type)]
 #[specta(collect = false)]
 struct RenameSerdeSpecialChar {
@@ -1005,16 +1031,6 @@ enum Enum3 {
 #[specta(collect = false)]
 struct Recursive {
     demo: Box<Recursive>,
-}
-
-#[derive(Type)]
-#[specta(transparent, collect = false)]
-struct RecursiveMapKeyTrick(RecursiveMapKey);
-
-#[derive(Type)]
-#[specta(collect = false)]
-struct RecursiveMapKey {
-    demo: HashMap<RecursiveMapKeyTrick, String>,
 }
 
 #[derive(Type)]
@@ -1171,16 +1187,6 @@ struct ValidMaybeValidKey(HashMap<MaybeValidKey<String>, ()>);
 #[specta(collect = false)]
 #[serde(transparent)]
 struct ValidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<String>>, ()>);
-
-#[derive(Type, Serialize)]
-#[specta(collect = false)]
-#[serde(transparent)]
-struct InvalidMaybeValidKey(HashMap<MaybeValidKey<()>, ()>);
-
-#[derive(Type, Serialize)]
-#[specta(collect = false)]
-#[serde(transparent)]
-struct InvalidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<()>>, ()>);
 
 macro_rules! field_ty_macro {
     () => {
@@ -1383,12 +1389,14 @@ struct DoubleFlattened {
 #[specta(collect = false)]
 struct Inner {
     a: i32,
+    #[serde(flatten)]
     b: Box<FlattenedInner>,
 }
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct FlattenedInner {
+    #[serde(flatten)]
     c: Inner,
 }
 
@@ -1401,6 +1409,7 @@ struct BoxedInner {
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct BoxFlattened {
+    #[serde(flatten)]
     b: Box<BoxedInner>,
 }
 
@@ -1982,11 +1991,11 @@ enum SkipOnlyVariantUntagged {
 #[specta(collect = false)]
 enum SkipUnnamedFieldInVariant {
     // only field
-    A(#[specta(skip)] String),
+    A(#[serde(skip)] String),
     // not only field
     //
     // This will `B(String)` == `String` in TS whether this will be `[String]`. This is why `#[serde(skip)]` is processed at runtime not in the macro.
-    B(#[specta(skip)] String, i32),
+    B(#[serde(skip)] String, i32),
 }
 
 #[derive(Type, Serialize, Deserialize)]

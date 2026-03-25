@@ -1,4 +1,4 @@
-use specta::{Type, Types};
+use specta::{ResolvedTypes, Type, Types};
 use specta_swift::Swift;
 
 #[derive(Type)]
@@ -124,9 +124,10 @@ fn test_complex_unions() {
         .register::<Shape>()
         .register::<ApiResponse<String>>()
         .register::<DatabaseResult<String, String>>();
+    let resolved = ResolvedTypes::from_resolved_types(types);
 
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&resolved).unwrap();
 
     println!("Complex unions Swift code:\n{}", output);
 
@@ -173,9 +174,10 @@ fn test_union_with_generics() {
     let types = Types::default()
         .register::<ApiResponse<String>>()
         .register::<DatabaseResult<i32, String>>();
+    let resolved = ResolvedTypes::from_resolved_types(types);
 
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&resolved).unwrap();
 
     println!("Generic unions Swift code:\n{}", output);
 
@@ -196,13 +198,14 @@ fn test_union_with_generics() {
 #[test]
 fn test_union_naming_conventions() {
     let types = Types::default().register::<Shape>();
+    let resolved = ResolvedTypes::from_resolved_types(types);
 
     // Test with different naming conventions
     let swift_pascal = Swift::new().naming(specta_swift::NamingConvention::PascalCase);
     let swift_snake = Swift::new().naming(specta_swift::NamingConvention::SnakeCase);
 
-    let output_pascal = swift_pascal.export(&types).unwrap();
-    let output_snake = swift_snake.export(&types).unwrap();
+    let output_pascal = swift_pascal.export(&resolved).unwrap();
+    let output_snake = swift_snake.export(&resolved).unwrap();
 
     println!("PascalCase output:\n{}", output_pascal);
     println!("SnakeCase output:\n{}", output_snake);

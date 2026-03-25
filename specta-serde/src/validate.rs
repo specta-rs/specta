@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use specta::{
     Types,
-    datatype::{DataType, Enum, Field, Fields, GenericReference, Primitive, Reference, Variant},
+    datatype::{DataType, Enum, Field, Fields, GenericReference, Reference, Variant},
 };
 
 use crate::{
@@ -20,28 +20,44 @@ pub enum ApplyMode {
 
 pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<()> {
     for ndt in types.into_unsorted_iter() {
-        let ndt_generics = ndt
-            .generics()
-            .iter()
-            .map(|(generic, _)| {
-                (
-                    generic.clone(),
-                    DataType::Reference(Reference::Generic(generic.clone())),
-                )
-            })
-            .collect::<Vec<_>>();
-
-        inner(
+        validate_datatype_with_generics_for_mode(
             ndt.ty(),
             types,
-            &ndt_generics,
-            &mut HashSet::new(),
+            ndt.generics(),
             ndt.name().to_string(),
             mode,
         )?;
     }
 
     Ok(())
+}
+
+pub(crate) fn validate_datatype_for_mode(
+    dt: &DataType,
+    types: &Types,
+    mode: ApplyMode,
+) -> Result<()> {
+    validate_datatype_with_generics_for_mode(dt, types, &[], "<top-level>".to_string(), mode)
+}
+
+fn validate_datatype_with_generics_for_mode(
+    dt: &DataType,
+    types: &Types,
+    generics: &[(GenericReference, std::borrow::Cow<'static, str>)],
+    path: String,
+    mode: ApplyMode,
+) -> Result<()> {
+    let generics = generics
+        .iter()
+        .map(|(generic, _)| {
+            (
+                generic.clone(),
+                DataType::Reference(Reference::Generic(generic.clone())),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    inner(dt, types, &generics, &mut HashSet::new(), path, mode)
 }
 
 fn inner(
@@ -55,7 +71,14 @@ fn inner(
     match dt {
         DataType::Nullable(ty) => inner(ty, types, generics, checked_references, path, mode)?,
         DataType::Map(map) => {
-            is_valid_map_key(map.key_ty(), types, generics, format!("{path}.<map_key>"))?;
+            inner(
+                map.key_ty(),
+                types,
+                generics,
+                checked_references,
+                format!("{path}.<map_key>"),
+                mode,
+            )?;
             inner(
                 map.value_ty(),
                 types,
@@ -93,6 +116,29 @@ fn inner(
                     path,
                     "`#[serde(variant_identifier)]` and `#[serde(field_identifier)]` are only valid on enums",
                 ));
+            }
+
+            if let Some(attrs) = strct.attributes().get::<SerdeContainerAttrs>() {
+                if attrs.untagged {
+                    return Err(Error::invalid_phased_type_usage(
+                        path,
+                        "`#[serde(untagged)]` is only valid on enums",
+                    ));
+                }
+
+                if attrs.content.is_some() {
+                    return Err(Error::invalid_phased_type_usage(
+                        path,
+                        "`#[serde(content = ...)]` is only valid on enums",
+                    ));
+                }
+
+                if attrs.tag.is_some() && !matches!(strct.fields(), Fields::Named(_)) {
+                    return Err(Error::invalid_phased_type_usage(
+                        path,
+                        "`#[serde(tag = ...)]` on structs requires named fields",
+                    ));
+                }
             }
 
             match strct.fields() {
@@ -280,6 +326,13 @@ fn inner(
             }
             Reference::Opaque(reference) => {
                 if let Some(phased) = reference.downcast_ref::<PhasedTy>() {
+                    if mode == ApplyMode::Unified {
+                        return Err(Error::invalid_phased_type_usage(
+                            path,
+                            "`specta_serde::Phased<Serialize, Deserialize>` requires `apply_phases`",
+                        ));
+                    }
+
                     inner(
                         &phased.serialize,
                         types,
@@ -472,113 +525,6 @@ fn merged_generics(
         .cloned();
 
     child.iter().cloned().chain(unshadowed_parent).collect()
-}
-
-fn is_valid_map_key(
-    key_ty: &DataType,
-    types: &Types,
-    generics: &[(GenericReference, DataType)],
-    path: String,
-) -> Result<()> {
-    match key_ty {
-        DataType::Primitive(
-            Primitive::i8
-            | Primitive::i16
-            | Primitive::i32
-            | Primitive::i64
-            | Primitive::i128
-            | Primitive::isize
-            | Primitive::u8
-            | Primitive::u16
-            | Primitive::u32
-            | Primitive::u64
-            | Primitive::u128
-            | Primitive::usize
-            | Primitive::f32
-            | Primitive::f64
-            | Primitive::str
-            | Primitive::char,
-        ) => Ok(()),
-        DataType::Primitive(other) => Err(Error::invalid_map_key(
-            path,
-            format!("unsupported primitive key type {other:?}"),
-        )),
-        DataType::Enum(enm) => {
-            let repr = enum_repr_from_attrs(enm.attributes())?;
-            for (variant_name, variant) in enm.variants() {
-                match &variant.fields() {
-                    Fields::Unit => {}
-                    Fields::Unnamed(item) => {
-                        if item.fields().len() > 1 {
-                            return Err(Error::invalid_map_key(
-                                &path,
-                                format!(
-                                    "enum key variant '{variant_name}' has more than one tuple field"
-                                ),
-                            ));
-                        }
-
-                        if repr != EnumRepr::Untagged {
-                            return Err(Error::invalid_map_key(
-                                &path,
-                                "enum key with tuple variants must be #[serde(untagged)]",
-                            ));
-                        }
-                    }
-                    Fields::Named(_) => {
-                        return Err(Error::invalid_map_key(
-                            &path,
-                            format!("enum key variant '{variant_name}' uses named fields"),
-                        ));
-                    }
-                }
-            }
-
-            Ok(())
-        }
-        DataType::Tuple(tuple) => {
-            if tuple.elements().is_empty() {
-                return Err(Error::invalid_map_key(
-                    path,
-                    "empty tuple key is unsupported",
-                ));
-            }
-
-            Ok(())
-        }
-        DataType::Reference(Reference::Named(reference)) => {
-            if let Some(ndt) = reference.get(types) {
-                let merged_generics = merged_generics(generics, reference.generics());
-                is_valid_map_key(ndt.ty(), types, &merged_generics, path)?;
-            }
-
-            Ok(())
-        }
-        DataType::Reference(Reference::Generic(generic)) => {
-            let Some((_, ty)) = generics.iter().find(|(candidate, _)| candidate == generic) else {
-                return Err(Error::unresolved_generic_reference(
-                    path,
-                    format!("{generic:?}"),
-                ));
-            };
-
-            if matches!(ty, DataType::Reference(Reference::Generic(inner)) if inner == generic) {
-                return Ok(());
-            }
-
-            is_valid_map_key(ty, types, generics, path)
-        }
-        DataType::Reference(Reference::Opaque(_)) => Err(Error::invalid_map_key(
-            path,
-            "opaque references cannot be map keys",
-        )),
-        DataType::List(_) | DataType::Map(_) | DataType::Struct(_) | DataType::Nullable(_) => {
-            Err(Error::invalid_map_key(
-                path,
-                "key type is not supported by legacy map-key validation rules",
-            ))
-        }
-    }
 }
 
 fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Result<()> {

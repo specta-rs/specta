@@ -3,7 +3,6 @@ use std::marker::PhantomData;
 use crate::{
     Type, Types,
     datatype::{self, DataType, Enum, Field, List, Variant},
-    internal,
     r#type::{generics, macros::*},
 };
 
@@ -141,42 +140,26 @@ const _: () = {
         impl Type for std::time::SystemTime {
             inline: true;
             build: |types, ndt| {
-                let mut s = crate::datatype::Struct::unit();
-                s.set_fields(internal::construct::fields_named(
-                    vec![
-                        (
-                            "duration_since_epoch".into(),
-                            Field::new(<i64 as crate::Type>::definition(types)),
-                        ),
-                        (
-                            "duration_since_unix_epoch".into(),
-                            Field::new(<u32 as crate::Type>::definition(types)),
-                        ),
-                    ],
-                ));
-
-                ndt.inner = DataType::Struct(s);
+                ndt.inner = datatype::Struct::named()
+                    .field(
+                        "duration_since_epoch",
+                        Field::new(<i64 as crate::Type>::definition(types)),
+                    )
+                    .field(
+                        "duration_since_unix_epoch",
+                        Field::new(<u32 as crate::Type>::definition(types)),
+                    )
+                    .build();
             }
         }
 
         impl Type for std::time::Duration {
             inline: true;
             build: |types, ndt| {
-                let mut s = crate::datatype::Struct::unit();
-                s.set_fields(internal::construct::fields_named(
-                    vec![
-                        (
-                            "secs".into(),
-                            Field::new(<u64 as crate::Type>::definition(types)),
-                        ),
-                        (
-                            "nanos".into(),
-                            Field::new(<u32 as crate::Type>::definition(types)),
-                        ),
-                    ],
-                ));
-
-                ndt.inner = DataType::Struct(s);
+                ndt.inner = datatype::Struct::named()
+                    .field("secs", Field::new(<u64 as crate::Type>::definition(types)))
+                    .field("nanos", Field::new(<u32 as crate::Type>::definition(types)))
+                    .build();
             }
         }
     );
@@ -216,13 +199,10 @@ const _: () = {
     impl<T: Type> Type for BaseRange<T> {
         fn definition(types: &mut Types) -> DataType {
             let ty = T::definition(types);
-            let mut s = crate::datatype::Struct::unit();
-            s.set_fields(internal::construct::fields_named(vec![
-                ("start".into(), Field::new(ty.clone())),
-                ("end".into(), Field::new(ty)),
-            ]));
-
-            DataType::Struct(s)
+            datatype::Struct::named()
+                .field("start", Field::new(ty.clone()))
+                .field("end", Field::new(ty))
+                .build()
         }
     }
 };
@@ -268,18 +248,12 @@ impl_ndt!(
     impl<T, E> Type for std::result::Result<T, E> where { T: Type, E: Type } {
         inline: true;
         build: |types, ndt| {
-            let mut ok_variant = Variant::unit();
-            ok_variant.set_fields(internal::construct::fields_unnamed(
-                vec![Field::new(
-                    datatype::GenericReference::new::<generics::T>().into(),
-                )],
-            ));
-            let mut err_variant = Variant::unit();
-            err_variant.set_fields(internal::construct::fields_unnamed(
-                vec![Field::new(
-                    datatype::GenericReference::new::<generics::E>().into(),
-                )],
-            ));
+            let ok_variant = Variant::unnamed()
+                .field(Field::new(datatype::GenericReference::new::<generics::T>().into()))
+                .build();
+            let err_variant = Variant::unnamed()
+                .field(Field::new(datatype::GenericReference::new::<generics::E>().into()))
+                .build();
             ndt.inner = DataType::Enum(Enum {
                 variants: vec![("Ok".into(), ok_variant), ("Err".into(), err_variant)],
                 attributes: datatype::Attributes::default(),

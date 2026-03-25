@@ -9,7 +9,7 @@ use specta::{
     ResolvedTypes, Types,
     datatype::{
         DataType, Deprecated, Enum, Fields, GenericReference, List, Map, NamedDataType,
-        NamedReference, OpaqueReference, Primitive, Reference, Tuple,
+        NamedReference, OpaqueReference, Primitive, Reference, Tuple, Variant,
     },
 };
 
@@ -19,7 +19,7 @@ use crate::{
         ExportContext, deprecated_details, escape_jsdoc_text, escape_typescript_string_literal,
         is_identifier, js_doc,
     },
-    opaque,
+    map_keys, opaque,
 };
 
 /// Generate a group of `export Type = ...` Typescript string for a specific [`NamedDataType`].
@@ -635,6 +635,11 @@ fn shallow_inline_datatype(
             }
         }
         DataType::Map(map) => {
+            let path = map_key_path(&location);
+            map_keys::validate_map_key(map.key_ty(), types, generics, format!("{path}.<map_key>"))?;
+            let rendered_key =
+                map_key_render_type(resolve_generics_in_datatype(map.key_ty(), generics));
+
             fn is_exhaustive(dt: &DataType, types: &Types) -> bool {
                 match dt {
                     DataType::Enum(e) => {
@@ -648,7 +653,7 @@ fn shallow_inline_datatype(
                 }
             }
 
-            let exhaustive = is_exhaustive(map.key_ty(), types);
+            let exhaustive = is_exhaustive(&rendered_key, types);
             if !exhaustive {
                 s.push_str("Partial<");
             }
@@ -658,7 +663,7 @@ fn shallow_inline_datatype(
                 s,
                 exporter,
                 types,
-                map.key_ty(),
+                &rendered_key,
                 location.clone(),
                 parent_name,
                 prefix,
@@ -753,9 +758,22 @@ fn shallow_inline_datatype(
                 let ndt = r
                     .get(types)
                     .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
+                let inline_key = (
+                    ndt.module_path().clone(),
+                    ndt.name().clone(),
+                    r.generics().to_vec(),
+                );
+                let already_inlining = INLINE_REFERENCE_STACK
+                    .with(|stack| stack.borrow().iter().any(|key| key == &inline_key));
+
+                if already_inlining {
+                    return reference_named_dt(s, exporter, types, r, location, prefix, generics);
+                }
+
+                INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
                 let combined_generics = merged_generics(generics, r.generics());
                 let resolved = resolve_generics_in_datatype(ndt.ty(), &combined_generics);
-                datatype(
+                let result = shallow_inline_datatype(
                     s,
                     exporter,
                     types,
@@ -764,7 +782,12 @@ fn shallow_inline_datatype(
                     parent_name,
                     prefix,
                     &combined_generics,
-                )
+                );
+                INLINE_REFERENCE_STACK.with(|stack| {
+                    stack.borrow_mut().pop();
+                });
+
+                result
             }
             Reference::Generic(g) => {
                 if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
@@ -1256,9 +1279,12 @@ fn map_dt(
     exporter: &Exporter,
     types: &Types,
     m: &Map,
-    _location: Vec<Cow<'static, str>>,
+    location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
+    let path = map_key_path(&location);
+    map_keys::validate_map_key(m.key_ty(), types, generics, format!("{path}.<map_key>"))?;
+
     {
         fn is_exhaustive(dt: &DataType, types: &Types) -> bool {
             match dt {
@@ -1275,7 +1301,7 @@ fn map_dt(
             }
         }
 
-        let resolved_key = resolve_generics_in_datatype(m.key_ty(), generics);
+        let resolved_key = map_key_render_type(resolve_generics_in_datatype(m.key_ty(), generics));
         let is_exhaustive = is_exhaustive(&resolved_key, types);
 
         // We use `{ [key in K]: V }` instead of `Record<K, V>` to avoid issues with circular references.
@@ -1320,6 +1346,33 @@ fn map_dt(
     // datatype(s, ts, types, m.value_ty(), location, state)?;
     // s.push_str(" }>");
     Ok(())
+}
+
+fn map_key_path(location: &[Cow<'static, str>]) -> String {
+    if location.is_empty() {
+        return "HashMap".to_string();
+    }
+
+    location.join(".")
+}
+
+fn map_key_render_type(dt: DataType) -> DataType {
+    if matches!(dt, DataType::Primitive(Primitive::bool)) {
+        return bool_key_literal_datatype();
+    }
+
+    dt
+}
+
+fn bool_key_literal_datatype() -> DataType {
+    let mut bool_enum = Enum::new();
+    bool_enum
+        .variants_mut()
+        .push((Cow::Borrowed("true"), Variant::unit()));
+    bool_enum
+        .variants_mut()
+        .push((Cow::Borrowed("false"), Variant::unit()));
+    DataType::Enum(bool_enum)
 }
 
 fn enum_dt(
