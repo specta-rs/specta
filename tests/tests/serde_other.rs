@@ -2,7 +2,7 @@
 
 use serde::Deserialize;
 use specta::{Type, Types};
-use specta_typescript::{BigIntExportBehavior, Typescript};
+use specta_typescript::Typescript;
 
 #[derive(Type, Deserialize)]
 #[specta(collect = false)]
@@ -40,7 +40,6 @@ fn serde_other_internal_tag_widens_deserialize_tag_to_string() {
     let types = specta_serde::apply_phases(Types::default().register::<InternalOther>())
         .expect("apply_phases should support internally tagged #[serde(other)] enums");
     let ts = Typescript::default()
-        .bigint(BigIntExportBehavior::Number)
         .export(&types)
         .expect("typescript export should succeed");
 
@@ -52,7 +51,6 @@ fn serde_other_adjacent_tag_widens_deserialize_tag_to_string() {
     let types = specta_serde::apply_phases(Types::default().register::<AdjacentOther>())
         .expect("apply_phases should support adjacently tagged #[serde(other)] enums");
     let ts = Typescript::default()
-        .bigint(BigIntExportBehavior::Number)
         .export(&types)
         .expect("typescript export should succeed");
 

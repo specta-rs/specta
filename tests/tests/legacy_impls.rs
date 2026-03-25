@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 
 use specta::{ResolvedTypes, Type, Types};
-use specta_typescript::{BigIntExportBehavior, Typescript};
+use specta_typescript::Typescript;
 
 #[derive(Debug)]
 struct ErrorStackRootError;
@@ -102,7 +102,6 @@ struct LegacyImpls {
 #[test]
 fn legacy_impls() {
     let output = Typescript::default()
-        .bigint(BigIntExportBehavior::Number)
         .export(&ResolvedTypes::from_resolved_types(
             Types::default().register::<LegacyImpls>(),
         ))

@@ -1,9 +1,7 @@
 use std::borrow::Cow;
 
 use specta::{ResolvedTypes, Type, Types};
-use specta_typescript::{
-    BigIntExportBehavior, Branded, BrandedTypeExporter, Error, Typescript, branded,
-};
+use specta_typescript::{Branded, BrandedTypeExporter, Error, Typescript, branded};
 
 branded!(pub struct UserId(String) as "UserId");
 
@@ -39,13 +37,11 @@ fn main() {
     let resolved_types = ResolvedTypes::from_resolved_types(types);
 
     let ts_brand = Typescript::default()
-        .bigint(BigIntExportBehavior::Number)
         .branded_type_impl(ts_brand_impl)
         .export(&resolved_types)
         .unwrap();
 
     let effect_brand = Typescript::default()
-        .bigint(BigIntExportBehavior::Number)
         .branded_type_impl(effect_brand_impl)
         .export(&resolved_types)
         .unwrap();

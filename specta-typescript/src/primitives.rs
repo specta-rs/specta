@@ -14,7 +14,7 @@ use specta::{
 };
 
 use crate::{
-    BigIntExportBehavior, Branded, BrandedTypeExporter, Error, Exporter, Layout,
+    Branded, BrandedTypeExporter, Error, Exporter, Layout,
     legacy::{
         ExportContext, deprecated_details, escape_jsdoc_text, escape_typescript_string_literal,
         is_identifier, js_doc,
@@ -599,7 +599,7 @@ fn shallow_inline_datatype(
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     match dt {
-        DataType::Primitive(p) => s.push_str(primitive_dt(&exporter.bigint, p, location)?),
+        DataType::Primitive(p) => s.push_str(primitive_dt(p, location)?),
         DataType::List(list) => {
             let mut inner = String::new();
             shallow_inline_datatype(
@@ -929,7 +929,7 @@ fn inline_datatype(
     }
 
     match dt {
-        DataType::Primitive(p) => s.push_str(primitive_dt(&exporter.bigint, p, location)?),
+        DataType::Primitive(p) => s.push_str(primitive_dt(p, location)?),
         DataType::List(l) => {
             // Inline the list element type
             let mut dt_str = String::new();
@@ -1099,7 +1099,7 @@ pub(crate) fn datatype(
     // TODO: Validating the variant from `dt` can be flattened
 
     match dt {
-        DataType::Primitive(p) => s.push_str(primitive_dt(&exporter.bigint, p, location)?),
+        DataType::Primitive(p) => s.push_str(primitive_dt(p, location)?),
         DataType::List(l) => list_dt(s, exporter, types, l, location, generics)?,
         DataType::Map(m) => map_dt(s, exporter, types, m, location, generics)?,
         DataType::Nullable(def) => {
@@ -1152,23 +1152,14 @@ pub(crate) fn datatype(
     Ok(())
 }
 
-fn primitive_dt(
-    b: &BigIntExportBehavior,
-    p: &Primitive,
-    location: Vec<Cow<'static, str>>,
-) -> Result<&'static str, Error> {
+fn primitive_dt(p: &Primitive, location: Vec<Cow<'static, str>>) -> Result<&'static str, Error> {
     use Primitive::*;
 
     Ok(match p {
-        i8 | i16 | i32 | u8 | u16 | u32 | f16 | f32 | f64 | f128 => "number",
-        usize | isize | i64 | u64 | i128 | u128 => match b {
-            BigIntExportBehavior::String => "string",
-            BigIntExportBehavior::Number => "number",
-            BigIntExportBehavior::BigInt => "bigint",
-            BigIntExportBehavior::Fail => {
-                return Err(Error::bigint_forbidden(location.join(".")));
-            }
-        },
+        i8 | i16 | i32 | u8 | u16 | u32 | f16 | f32 | f64 /* this looks wrong but `f64` is the direct equivalent of `number` */ => "number",
+        usize | isize | i64 | u64 | i128 | u128 | f128 => {
+            return Err(Error::bigint_forbidden(location.join(".")));
+        }
         Primitive::bool => "boolean",
         str | char => "string",
     })
@@ -1358,17 +1349,6 @@ fn enum_dt(
     //     assert!(!state.flattening, "todo: support for flattening enums"); // TODO
 
     //     location.push(e.name().clone());
-
-    //     let mut _ts = None;
-    //     if e.skip_bigint_checks() {
-    //         _ts = Some(Typescript {
-    //             bigint: BigIntExportBehavior::Number,
-    //             ..ts.clone()
-    //         });
-    //         _ts.as_ref().expect("set above")
-    //     } else {
-    //         ts
-    //     };
 
     //     let variants = e.variants().iter().filter(|(_, variant)| !variant.skip());
 

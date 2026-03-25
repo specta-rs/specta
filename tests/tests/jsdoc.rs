@@ -2,7 +2,7 @@ use std::path::Path;
 
 use specta::datatype::{DataType, Reference};
 use specta::{ResolvedTypes, Type, Types};
-use specta_typescript::{BigIntExportBehavior, JSDoc, Layout, primitives};
+use specta_typescript::{JSDoc, Layout, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -56,10 +56,7 @@ fn phase_collections(
 fn export() {
     for (mode, types) in phase_collections(crate::types().0) {
         let output = match types {
-            Ok(types) => JSDoc::default()
-                .bigint(BigIntExportBehavior::Number)
-                .export(&types)
-                .unwrap(),
+            Ok(types) => JSDoc::default().export(&types).unwrap(),
             Err(err) => format!("ERROR: {err}"),
         };
 
@@ -73,7 +70,7 @@ fn primitives_export_many() {
     for (mode, types) in phase_collections(types) {
         let output = match types {
             Ok(types) => {
-                let jsdoc = JSDoc::default().bigint(BigIntExportBehavior::Number);
+                let jsdoc = JSDoc::default();
                 let ndts = dts
                     .iter()
                     .filter_map(|(_, ty)| match ty {

@@ -1,5 +1,5 @@
 use specta::{ResolvedTypes, Type, Types};
-use specta_typescript::{BigIntExportBehavior, Typescript, primitives};
+use specta_typescript::{Typescript, primitives};
 
 macro_rules! for_bigint_types {
     (T -> $s:expr) => {{
@@ -61,25 +61,9 @@ fn inline_for<T: Type>(ts: &Typescript) -> Result<String, specta_typescript::Err
 }
 
 #[test]
-fn bigint_export_behaviors() {
+fn bigint_export_is_forbidden() {
     for_bigint_types!(T -> |_| {
         assert!(inline_for::<T>(&Typescript::default()).is_err());
-        assert!(
-            inline_for::<T>(&Typescript::default().bigint(BigIntExportBehavior::Fail)).is_err()
-        );
-
-        assert_eq!(
-            inline_for::<T>(&Typescript::default().bigint(BigIntExportBehavior::String)).unwrap(),
-            "string"
-        );
-        assert_eq!(
-            inline_for::<T>(&Typescript::default().bigint(BigIntExportBehavior::Number)).unwrap(),
-            "number"
-        );
-        assert_eq!(
-            inline_for::<T>(&Typescript::default().bigint(BigIntExportBehavior::BigInt)).unwrap(),
-            "bigint"
-        );
     });
 }
 

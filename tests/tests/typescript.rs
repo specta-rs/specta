@@ -4,7 +4,7 @@ use specta::{
     ResolvedTypes, Type, Types,
     datatype::{DataType, Reference},
 };
-use specta_typescript::{BigIntExportBehavior, Layout, Typescript, primitives};
+use specta_typescript::{Layout, Typescript, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -52,10 +52,7 @@ fn typescript_export() {
         insta::assert_snapshot!(
             format!("ts-export-{mode}"),
             match types {
-                Ok(types) => Typescript::default()
-                    .bigint(BigIntExportBehavior::Number)
-                    .export(&types)
-                    .unwrap(),
+                Ok(types) => Typescript::default().export(&types).unwrap(),
                 Err(err) => format!("ERROR: {err}"),
             }
         );
@@ -74,19 +71,13 @@ fn typescript_export_serde_errors() {
         for (mode, output) in [
             (
                 "serde",
-                specta_serde::apply(types.clone()).map(|types| {
-                    Typescript::default()
-                        .bigint(BigIntExportBehavior::Number)
-                        .export(&types)
-                }),
+                specta_serde::apply(types.clone())
+                    .map(|types| Typescript::default().export(&types)),
             ),
             (
                 "serde_phases",
-                specta_serde::apply_phases(types.clone()).map(|types| {
-                    Typescript::default()
-                        .bigint(BigIntExportBehavior::Number)
-                        .export(&types)
-                }),
+                specta_serde::apply_phases(types.clone())
+                    .map(|types| Typescript::default().export(&types)),
             ),
         ] {
             match output {
@@ -279,7 +270,6 @@ fn typescript_export_to() {
                 Ok(types) => {
                     let path = temp.path().join(&name);
                     Typescript::default()
-                        .bigint(BigIntExportBehavior::Number)
                         .layout(layout)
                         .export_to(&path, &types)
                         .unwrap();
@@ -304,7 +294,7 @@ fn primitives_export() {
     for (mode, types) in phase_collections(types) {
         let output = match types {
             Ok(types) => {
-                let ts = Typescript::default().bigint(BigIntExportBehavior::Number);
+                let ts = Typescript::default();
                 dts.iter()
                     .filter_map(|(s, ty)| match ty {
                         DataType::Reference(Reference::Named(r)) => {
@@ -333,7 +323,7 @@ fn primitives_export_many() {
     for (mode, types) in phase_collections(types) {
         let output = match types {
             Ok(types) => {
-                let ts = Typescript::default().bigint(BigIntExportBehavior::Number);
+                let ts = Typescript::default();
                 let ndts = dts
                     .iter()
                     .filter_map(|(_, ty)| match ty {
@@ -357,7 +347,7 @@ fn primitives_reference() {
     for (mode, types) in phase_collections(types) {
         let output = match types {
             Ok(types) => {
-                let ts = Typescript::default().bigint(BigIntExportBehavior::Number);
+                let ts = Typescript::default();
                 dts.iter()
                     .filter_map(|(s, ty)| match ty {
                         DataType::Reference(r) => Some((s, r)),
@@ -383,7 +373,7 @@ fn primitives_inline() {
     for (mode, types) in phase_collections(types) {
         let output = match types {
             Ok(types) => {
-                let ts = Typescript::default().bigint(BigIntExportBehavior::Number);
+                let ts = Typescript::default();
                 dts.iter()
                     .map(|(s, ty)| {
                         primitives::inline(&ts, &types, ty).map(|ty| format!("{s}: {ty}"))

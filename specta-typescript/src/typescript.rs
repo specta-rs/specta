@@ -2,7 +2,7 @@ use std::{borrow::Cow, path::Path};
 
 use specta::ResolvedTypes;
 
-use crate::{BigIntExportBehavior, Branded, BrandedTypeExporter, Error, Exporter, Layout};
+use crate::{Branded, BrandedTypeExporter, Error, Exporter, Layout};
 
 /// JSDoc language exporter.
 #[derive(Debug, Clone)]
@@ -39,11 +39,6 @@ impl Typescript {
     /// This is perfect for configuring lint ignore rules or other file-level comments.
     pub fn header(self, header: impl Into<Cow<'static, str>>) -> Self {
         Self(self.0.header(header))
-    }
-
-    /// Configure the BigInt handling behaviour
-    pub fn bigint(self, bigint: BigIntExportBehavior) -> Self {
-        Self(self.0.bigint(bigint))
     }
 
     /// Configure the layout of the generated file
