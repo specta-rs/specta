@@ -1,10 +1,10 @@
 use std::{collections::HashMap, iter, path::Path};
 
 use specta::{
-    datatype::{DataType, Reference},
     ResolvedTypes, Type, Types,
+    datatype::{DataType, Reference},
 };
-use specta_typescript::{primitives, BigIntExportBehavior, Layout, Typescript};
+use specta_typescript::{BigIntExportBehavior, Layout, Typescript, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -272,21 +272,40 @@ fn typescript_export_serde_errors() {
         "Invalid usage of #[serde(skip)]",
     );
 
-    assert_serde_error::<HashMap<(), ()>>(
-        &mut failures,
-        "HashMap<() /* `null` */, ()>",
-        "empty tuple key is unsupported",
-    );
-    assert_serde_error::<HashMap<RegularStruct, ()>>(
-        &mut failures,
-        "HashMap<RegularStruct, ()>",
-        "key type is not supported by legacy map-key validation rules",
-    );
-    assert_serde_error::<HashMap<Variants, ()>>(
-        &mut failures,
-        "HashMap<Variants, ()>",
-        "key type is not supported by legacy map-key validation rules",
-    );
+    // These need to be named data types so they are exported by `Typescript::export`
+    {
+        #[derive(Type)]
+        #[specta(collect = false)]
+        pub struct A(HashMap<(), ()>);
+
+        assert_serde_error::<A>(
+            &mut failures,
+            "A(HashMap<() /* `null` */, ()>)",
+            "empty tuple key is unsupported",
+        );
+    }
+    {
+        #[derive(Type)]
+        #[specta(collect = false)]
+        pub struct B(HashMap<RegularStruct, ()>);
+
+        assert_serde_error::<B>(
+            &mut failures,
+            "B(HashMap<RegularStruct, ()>)",
+            "key type is not supported by legacy map-key validation rules",
+        );
+    }
+    {
+        #[derive(Type)]
+        #[specta(collect = false)]
+        pub struct C(HashMap<Variants, ()>);
+
+        assert_serde_error::<C>(
+            &mut failures,
+            "C(HashMap<Variants, ()>)",
+            "key type is not supported by legacy map-key validation rules",
+        );
+    }
 
     assert!(
         failures.is_empty(),
