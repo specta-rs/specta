@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 
 #[derive(Type)]
 pub struct A {
@@ -16,7 +16,7 @@ pub struct B {
 }
 
 fn main() {
-    let mut types = TypeCollection::default();
+    let mut types = Types::default();
     let dt = A::definition(&mut types);
 
     let tags = specta_tags::v2::TransformPlan::analyze(dt, &types);

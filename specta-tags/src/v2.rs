@@ -1,13 +1,10 @@
 use std::borrow::Cow;
 
 use specta::{
-    TypeCollection,
-    datatype::{
-        Attribute, AttributeLiteral, AttributeMeta, AttributeNestedMeta, AttributeValue, DataType,
-        Fields, GenericReference, NamedReference, Primitive, Reference, skip_fields,
-        skip_fields_named,
-    },
+    Types,
+    datatype::{DataType, Fields, GenericReference, NamedReference, Primitive, Reference},
 };
+use specta_serde::internal::SerdeContainerAttrs;
 
 // TODO: Allow configuring custom named types via NDT name and module path using config params.
 // TODO: Tagging-style system for `rspc` w/ runtime
@@ -51,7 +48,7 @@ pub struct TransformPlan {
 
 impl TransformPlan {
     /// TODO
-    pub fn analyze(dt: DataType, types: &TypeCollection) -> Self {
+    pub fn analyze(dt: DataType, types: &Types) -> Self {
         // Scan all `DataType` references, etc. and collect tags and their object location for `Self::map` to use.
         //
         // You should match on `NamedDataType`'s name and module path to determine known named types.
@@ -173,7 +170,7 @@ impl Analyzer {
     fn analyze(
         &self,
         dt: &DataType,
-        types: &TypeCollection,
+        types: &Types,
         generics: &[(GenericReference, DataType)],
         stack: &mut Vec<NamedReference>,
     ) -> PlanNode {
@@ -207,8 +204,11 @@ impl Analyzer {
                     let (kind, plan) = match variant.fields() {
                         Fields::Unit => (EnumVariantKind::Unit, PlanNode::Identity),
                         Fields::Unnamed(fields) => {
-                            let mut items = skip_fields(fields.fields())
-                                .map(|(_, ty)| self.analyze(ty, types, generics, stack))
+                            let mut items = fields
+                                .fields()
+                                .iter()
+                                .filter_map(|field| field.ty())
+                                .map(|ty| self.analyze(ty, types, generics, stack))
                                 .collect::<Vec<_>>();
 
                             let plan = if items.is_empty() {
@@ -222,8 +222,11 @@ impl Analyzer {
                             (EnumVariantKind::Unnamed, plan)
                         }
                         Fields::Named(fields) => {
-                            let object = skip_fields_named(fields.fields())
-                                .filter_map(|(field_name, (_, ty))| {
+                            let object = fields
+                                .fields()
+                                .iter()
+                                .filter_map(|(field_name, field)| {
+                                    let ty = field.ty()?;
                                     let plan = self.analyze(ty, types, generics, stack);
                                     (!plan.is_identity()).then(|| (field_name.to_string(), plan))
                                 })
@@ -311,15 +314,18 @@ impl Analyzer {
     fn analyze_fields(
         &self,
         fields: &Fields,
-        types: &TypeCollection,
+        types: &Types,
         generics: &[(GenericReference, DataType)],
         stack: &mut Vec<NamedReference>,
     ) -> PlanNode {
         match fields {
             Fields::Unit => PlanNode::Identity,
             Fields::Unnamed(fields) => {
-                let items = skip_fields(fields.fields())
-                    .map(|(_, ty)| self.analyze(ty, types, generics, stack))
+                let items = fields
+                    .fields()
+                    .iter()
+                    .filter_map(|field| field.ty())
+                    .map(|ty| self.analyze(ty, types, generics, stack))
                     .collect::<Vec<_>>();
 
                 if items.iter().all(PlanNode::is_identity) {
@@ -329,8 +335,11 @@ impl Analyzer {
                 }
             }
             Fields::Named(fields) => {
-                let object = skip_fields_named(fields.fields())
-                    .filter_map(|(name, (_, ty))| {
+                let object = fields
+                    .fields()
+                    .iter()
+                    .filter_map(|(name, field)| {
+                        let ty = field.ty()?;
                         let plan = self.analyze(ty, types, generics, stack);
                         (!plan.is_identity()).then(|| (name.to_string(), plan))
                     })
@@ -545,80 +554,28 @@ fn js_string(value: &str) -> String {
     serde_json::to_string(value).expect("failed to encode JavaScript string")
 }
 
-#[derive(Default)]
-struct RawEnumRepr {
-    untagged: bool,
-    tag: Option<String>,
-    content: Option<String>,
-}
+fn parse_enum_repr(attributes: &specta::datatype::Attributes) -> EnumRepr {
+    let Some(attrs) = attributes.get::<SerdeContainerAttrs>() else {
+        return EnumRepr::External;
+    };
 
-fn parse_enum_repr(attributes: &[Attribute]) -> EnumRepr {
-    let mut raw = RawEnumRepr::default();
-
-    for attr in attributes {
-        if attr.path == "serde" {
-            visit_attribute_meta(&attr.kind, &mut raw);
-        }
-    }
-
-    if raw.untagged {
+    if attrs.untagged {
         EnumRepr::Untagged
     } else {
-        match (raw.tag, raw.content) {
-            (Some(tag), Some(content)) => EnumRepr::Adjacent { tag, content },
-            (Some(tag), None) => EnumRepr::Internal { tag },
+        match (&attrs.tag, &attrs.content) {
+            (Some(tag), Some(content)) => EnumRepr::Adjacent {
+                tag: tag.clone(),
+                content: content.clone(),
+            },
+            (Some(tag), None) => EnumRepr::Internal { tag: tag.clone() },
             _ => EnumRepr::External,
         }
     }
 }
 
-fn visit_attribute_meta(meta: &AttributeMeta, raw: &mut RawEnumRepr) {
-    match meta {
-        AttributeMeta::Path(path) => {
-            if path == "untagged" {
-                raw.untagged = true;
-            }
-        }
-        AttributeMeta::NameValue { key, value } => match key.as_str() {
-            "tag" => {
-                if let Some(value) = attribute_value_to_string(value) {
-                    raw.tag = Some(value);
-                }
-            }
-            "content" => {
-                if let Some(value) = attribute_value_to_string(value) {
-                    raw.content = Some(value);
-                }
-            }
-            _ => {}
-        },
-        AttributeMeta::List(list) => {
-            for item in list {
-                match item {
-                    AttributeNestedMeta::Meta(meta) => visit_attribute_meta(meta, raw),
-                    AttributeNestedMeta::Literal(AttributeLiteral::Str(path)) => {
-                        if path == "untagged" {
-                            raw.untagged = true;
-                        }
-                    }
-                    AttributeNestedMeta::Literal(_) | AttributeNestedMeta::Expr(_) => {}
-                }
-            }
-        }
-    }
-}
-
-fn attribute_value_to_string(value: &AttributeValue) -> Option<String> {
-    match value {
-        AttributeValue::Literal(AttributeLiteral::Str(value)) => Some(value.clone()),
-        AttributeValue::Expr(value) => Some(value.clone()),
-        _ => None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use specta::{Type, TypeCollection};
+    use specta::{Type, Types};
 
     use super::TransformPlan;
 
@@ -640,7 +597,7 @@ mod tests {
 
     #[test]
     fn map_renders_trusting_transforms() {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let dt = Root::definition(&mut types);
         let plan = TransformPlan::analyze(dt, &types);
         let js = plan.map("v");

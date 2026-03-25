@@ -6,7 +6,7 @@ use std::{
 };
 
 use specta::{
-    Type, TypeCollection,
+    Type, Types,
     datatype::{DataType, List, Primitive},
 };
 use specta_tags::{Analyzer, RuntimeRequirements, RuntimeTarget, render_runtime};
@@ -34,7 +34,7 @@ fn main() -> Result<(), serde_json::Error> {
 
     let bigint_spec = analyzer.analyze(
         &DataType::Primitive(Primitive::u128),
-        &TypeCollection::default(),
+        &Types::default(),
         &[],
     );
     println!(
@@ -44,7 +44,7 @@ fn main() -> Result<(), serde_json::Error> {
 
     let uint8_array_spec = analyzer.analyze(
         &DataType::List(List::new(DataType::Primitive(Primitive::u8))),
-        &TypeCollection::default(),
+        &Types::default(),
         &[],
     );
     println!(
@@ -52,7 +52,7 @@ fn main() -> Result<(), serde_json::Error> {
         serde_json::to_string_pretty(&uint8_array_spec)?
     );
 
-    let mut date_types = TypeCollection::default();
+    let mut date_types = Types::default();
     let date_datatype = SystemTime::definition(&mut date_types);
     let date_spec = analyzer.analyze(&date_datatype, &date_types, &[]);
     println!(
@@ -60,7 +60,7 @@ fn main() -> Result<(), serde_json::Error> {
         serde_json::to_string_pretty(&date_spec)?
     );
 
-    let mut types = TypeCollection::default();
+    let mut types = Types::default();
     let datatype = TransferEvent::definition(&mut types);
 
     let spec = analyzer.analyze(&datatype, &types, &[]);

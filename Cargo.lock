@@ -2076,6 +2076,7 @@ dependencies = [
  "serde",
  "serde_json",
  "specta",
+ "specta-serde",
 ]
 
 [[package]]

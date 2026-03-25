@@ -551,7 +551,9 @@ fn rewrite_datatype_for_phase(
             };
 
             let mut new_reference = match mode {
-                PhaseRewrite::Unified => unreachable!("unified mode should not reference split types"),
+                PhaseRewrite::Unified => {
+                    unreachable!("unified mode should not reference split types")
+                }
                 PhaseRewrite::Serialize => target.serialize.reference(generics),
                 PhaseRewrite::Deserialize => target.deserialize.reference(generics),
             };

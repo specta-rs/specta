@@ -33,7 +33,9 @@ fn enum_string_raw_value(variant: &Variant) -> Option<&str> {
 fn resolved_string_enum(e: &Enum) -> Option<Vec<(&str, &str)>> {
     e.variants()
         .iter()
-        .map(|(variant_name, variant)| enum_string_raw_value(variant).map(|raw| (variant_name.as_ref(), raw)))
+        .map(|(variant_name, variant)| {
+            enum_string_raw_value(variant).map(|raw| (variant_name.as_ref(), raw))
+        })
         .collect()
 }
 
@@ -453,7 +455,8 @@ fn enum_to_swift(
         match variant.fields() {
             specta::datatype::Fields::Unit => {
                 if is_string_enum {
-                    let raw_value = enum_string_raw_value(variant).expect("string enum variants should have string literal payloads");
+                    let raw_value = enum_string_raw_value(variant)
+                        .expect("string enum variants should have string literal payloads");
                     result.push_str(&format!("    case {} = \"{}\"\n", variant_name, raw_value));
                 } else {
                     result.push_str(&format!("    case {}\n", variant_name));

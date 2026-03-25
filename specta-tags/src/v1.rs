@@ -2,11 +2,8 @@ use std::borrow::Cow;
 
 use serde::{Serialize, Serializer, ser::SerializeSeq};
 use specta::{
-    TypeCollection,
-    datatype::{
-        DataType, Fields, GenericReference, NamedReference, Primitive, Reference, skip_fields,
-        skip_fields_named,
-    },
+    Types,
+    datatype::{DataType, Fields, GenericReference, NamedReference, Primitive, Reference},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,7 +62,7 @@ impl Analyzer {
     pub fn analyze(
         &self,
         dt: &DataType,
-        types: &TypeCollection,
+        types: &Types,
         generics: &[(GenericReference, DataType)],
     ) -> TransformSpec {
         self.analyze_inner(dt, types, generics, &mut Vec::new())
@@ -74,7 +71,7 @@ impl Analyzer {
     fn analyze_inner(
         &self,
         dt: &DataType,
-        types: &TypeCollection,
+        types: &Types,
         generics: &[(GenericReference, DataType)],
         stack: &mut Vec<NamedReference>,
     ) -> TransformSpec {
@@ -106,13 +103,19 @@ impl Analyzer {
             DataType::Struct(st) => match st.fields() {
                 Fields::Unit => TransformSpec::Identity,
                 Fields::Unnamed(fields) => TransformSpec::Tuple(
-                    skip_fields(fields.fields())
-                        .map(|(_, ty)| self.analyze_inner(ty, types, generics, stack))
+                    fields
+                        .fields()
+                        .iter()
+                        .filter_map(|field| field.ty())
+                        .map(|ty| self.analyze_inner(ty, types, generics, stack))
                         .collect(),
                 ),
                 Fields::Named(fields) => TransformSpec::Object(
-                    skip_fields_named(fields.fields())
-                        .map(|(name, (_, ty))| {
+                    fields
+                        .fields()
+                        .iter()
+                        .filter_map(|(name, field)| field.ty().map(|ty| (name, ty)))
+                        .map(|(name, ty)| {
                             (
                                 name.to_string(),
                                 self.analyze_inner(ty, types, generics, stack),
@@ -131,8 +134,11 @@ impl Analyzer {
                                 (EnumVariantTransformKind::Unit, TransformSpec::Identity)
                             }
                             Fields::Unnamed(fields) => {
-                                let fields = skip_fields(fields.fields())
-                                    .map(|(_, ty)| self.analyze_inner(ty, types, generics, stack))
+                                let fields = fields
+                                    .fields()
+                                    .iter()
+                                    .filter_map(|field| field.ty())
+                                    .map(|ty| self.analyze_inner(ty, types, generics, stack))
                                     .collect::<Vec<_>>();
                                 let spec = if fields.len() == 1 {
                                     fields.into_iter().next().unwrap_or_default()
@@ -143,8 +149,11 @@ impl Analyzer {
                             }
                             Fields::Named(fields) => {
                                 let spec = TransformSpec::Object(
-                                    skip_fields_named(fields.fields())
-                                        .map(|(name, (_, ty))| {
+                                    fields
+                                        .fields()
+                                        .iter()
+                                        .filter_map(|(name, field)| field.ty().map(|ty| (name, ty)))
+                                        .map(|(name, ty)| {
                                             (
                                                 name.to_string(),
                                                 self.analyze_inner(ty, types, generics, stack),
@@ -685,7 +694,7 @@ mod tests {
         let analyzer = Analyzer::with_builtins();
         let spec = analyzer.analyze(
             &DataType::Primitive(Primitive::u128),
-            &TypeCollection::default(),
+            &Types::default(),
             &[],
         );
 
@@ -698,12 +707,12 @@ mod tests {
             Primitive::u8,
         )));
 
-        let default_spec = Analyzer::with_builtins().analyze(&dt, &TypeCollection::default(), &[]);
+        let default_spec = Analyzer::with_builtins().analyze(&dt, &Types::default(), &[]);
         assert!(!matches!(default_spec, TransformSpec::Bytes));
 
         let bytes_spec = Analyzer::with_builtins()
             .with_list_u8_is_bytes(true)
-            .analyze(&dt, &TypeCollection::default(), &[]);
+            .analyze(&dt, &Types::default(), &[]);
         assert!(matches!(bytes_spec, TransformSpec::Bytes));
     }
 
