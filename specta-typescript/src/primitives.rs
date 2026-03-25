@@ -19,8 +19,7 @@ use crate::{
         ExportContext, deprecated_details, escape_jsdoc_text, escape_typescript_string_literal,
         is_identifier, js_doc,
     },
-    map_keys,
-    opaque,
+    map_keys, opaque,
 };
 
 /// Generate a group of `export Type = ...` Typescript string for a specific [`NamedDataType`].
@@ -638,7 +637,8 @@ fn shallow_inline_datatype(
         DataType::Map(map) => {
             let path = map_key_path(&location);
             map_keys::validate_map_key(map.key_ty(), types, generics, format!("{path}.<map_key>"))?;
-            let rendered_key = map_key_render_type(resolve_generics_in_datatype(map.key_ty(), generics));
+            let rendered_key =
+                map_key_render_type(resolve_generics_in_datatype(map.key_ty(), generics));
 
             fn is_exhaustive(dt: &DataType, types: &Types) -> bool {
                 match dt {

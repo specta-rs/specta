@@ -11,7 +11,7 @@ pub use paste::paste;
 mod functions {
     use std::borrow::Cow;
 
-    use crate::{datatype::Deprecated, datatype::Function, function::SpectaFn, Types};
+    use crate::{Types, datatype::Deprecated, datatype::Function, function::SpectaFn};
 
     #[doc(hidden)]
     /// A helper for exporting a command to a [`CommandDataType`].

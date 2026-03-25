@@ -106,7 +106,8 @@ use std::{
 use specta::{
     ResolvedTypes, Types,
     datatype::{
-        DataType, Enum, Field, Fields, NamedDataType, Primitive, Reference, Struct, Tuple, Variant,
+        DataType, Enum, Field, Fields, NamedDataType, Primitive, Reference, Struct, Tuple,
+        UnnamedFields, Variant,
     },
 };
 
@@ -135,12 +136,6 @@ pub mod internal {
 
 use error::Result;
 use repr::EnumRepr;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct OriginalUnnamedFieldLayout {
-    len: usize,
-    all_skipped: bool,
-}
 
 /// Validates whether a given [`DataType`] is a valid Serde-type.
 ///
@@ -446,6 +441,7 @@ fn rewrite_datatype_for_phase(
                 generated,
                 split_types,
                 container_rename_all,
+                false,
             )?;
             rewrite_struct_repr_for_phase(s, mode, container_name)?;
         }
@@ -454,22 +450,6 @@ fn rewrite_datatype_for_phase(
             let container_attrs = e.attributes().get::<SerdeContainerAttrs>().cloned();
 
             for (variant_name, variant) in e.variants_mut() {
-                let original_unnamed_layout = match variant.fields() {
-                    Fields::Unnamed(unnamed) => Some(OriginalUnnamedFieldLayout {
-                        len: unnamed.fields().len(),
-                        all_skipped: !unnamed.fields().is_empty()
-                            && unnamed
-                                .fields()
-                                .iter()
-                                .all(|field| should_skip_field_for_mode(field, mode)),
-                    }),
-                    _ => None,
-                };
-
-                if let Some(layout) = original_unnamed_layout {
-                    variant.attributes_mut().insert(layout);
-                }
-
                 let rename_rule =
                     enum_variant_field_rename_rule(&container_attrs, variant, mode, variant_name)?;
 
@@ -480,6 +460,7 @@ fn rewrite_datatype_for_phase(
                     generated,
                     split_types,
                     rename_rule,
+                    true,
                 )?;
             }
 
@@ -584,16 +565,26 @@ fn rewrite_fields_for_phase(
     generated: &HashMap<TypeKey, GeneratedTypes>,
     split_types: &HashSet<TypeKey>,
     rename_all_rule: Option<RenameRule>,
+    preserve_skipped_unnamed_fields: bool,
 ) -> Result<()> {
     match fields {
         Fields::Unit => {}
         Fields::Unnamed(unnamed) => {
-            unnamed
-                .fields_mut()
-                .retain(|field| !should_skip_field_for_mode(field, mode));
             for field in unnamed.fields_mut() {
+                if should_skip_field_for_mode(field, mode) {
+                    if preserve_skipped_unnamed_fields {
+                        *field = skipped_field_marker(field);
+                    }
+
+                    continue;
+                }
+
                 apply_field_attrs(field);
                 rewrite_field_for_phase(field, mode, original_types, generated, split_types)?;
+            }
+
+            if !preserve_skipped_unnamed_fields {
+                unnamed.fields_mut().retain(|field| field.ty().is_some());
             }
         }
         Fields::Named(named) => {
@@ -723,6 +714,34 @@ fn should_skip_field_for_mode(field: &Field, mode: PhaseRewrite) -> bool {
         PhaseRewrite::Deserialize => attrs.skip_deserializing,
         PhaseRewrite::Unified => attrs.skip_serializing || attrs.skip_deserializing,
     }
+}
+
+fn skipped_field_marker(field: &Field) -> Field {
+    let mut skipped = Field::default();
+    skipped.set_optional(field.optional());
+    skipped.set_flatten(field.flatten());
+    skipped.set_deprecated(field.deprecated().cloned());
+    skipped.set_docs(field.docs().clone());
+    skipped.set_inline(field.inline());
+    skipped.set_type_overridden(field.type_overridden());
+    skipped.set_attributes(field.attributes().clone());
+    skipped
+}
+
+fn unnamed_live_fields(unnamed: &UnnamedFields) -> impl Iterator<Item = &Field> {
+    unnamed.fields().iter().filter(|field| field.ty().is_some())
+}
+
+fn unnamed_live_field_count(unnamed: &UnnamedFields) -> usize {
+    unnamed_live_fields(unnamed).count()
+}
+
+fn unnamed_has_effective_payload(unnamed: &UnnamedFields) -> bool {
+    unnamed_live_field_count(unnamed) != 0
+}
+
+fn unnamed_fields_all_skipped(unnamed: &UnnamedFields) -> bool {
+    !unnamed.fields().is_empty() && !unnamed_has_effective_payload(unnamed)
 }
 
 fn rewrite_enum_repr_for_phase(
@@ -1166,10 +1185,10 @@ fn deserialize_conversion_name(attrs: Option<&SerdeContainerAttrs>) -> Option<St
 }
 
 fn transform_external_variant(serialized_name: String, variant: &Variant) -> Result<Variant> {
-    let skipped_only_unnamed = variant
-        .attributes()
-        .get::<OriginalUnnamedFieldLayout>()
-        .is_some_and(|layout| layout.all_skipped);
+    let skipped_only_unnamed = match variant.fields() {
+        Fields::Unnamed(unnamed) => unnamed_fields_all_skipped(unnamed),
+        Fields::Unit | Fields::Named(_) => false,
+    };
 
     Ok(match variant.fields() {
         Fields::Unit => clone_variant_with_unnamed_fields(
@@ -1184,10 +1203,7 @@ fn transform_external_variant(serialized_name: String, variant: &Variant) -> Res
             let payload = variant_payload_field(variant)
                 .ok_or_else(|| Error::invalid_external_tagged_variant(serialized_name.clone()))?;
 
-            clone_variant_with_named_fields(
-                variant,
-                vec![(Cow::Owned(serialized_name), payload)],
-            )
+            clone_variant_with_named_fields(variant, vec![(Cow::Owned(serialized_name), payload)])
         }
     })
 }
@@ -1239,28 +1255,32 @@ fn transform_internal_variant(
             fields.extend(named.fields().iter().cloned());
         }
         Fields::Unnamed(unnamed) => {
-            if unnamed.fields().is_empty() {
+            let live_field_count = unnamed_live_field_count(unnamed);
+
+            if live_field_count == 0 {
                 return Ok(clone_variant_with_named_fields(variant, fields));
             }
 
-            let non_skipped = unnamed
-                .fields()
-                .iter()
-                .filter(|field| field.ty().is_some())
-                .collect::<Vec<_>>();
+            let non_skipped = unnamed_live_fields(unnamed).collect::<Vec<_>>();
 
-            if unnamed.fields().len() != 1 || non_skipped.len() != 1 {
+            if live_field_count != 1 {
                 return Err(Error::invalid_internally_tagged_variant(
                     serialized_name,
                     "tuple variant must have exactly one non-skipped field",
                 ));
             }
 
-            let payload_field = non_skipped.into_iter().next().expect("checked above").clone();
+            let payload_field = non_skipped
+                .into_iter()
+                .next()
+                .expect("checked above")
+                .clone();
             let payload_ty = payload_field.ty().cloned().expect("checked above");
-            let Some(payload_is_effectively_empty) =
-                internal_tag_payload_compatibility(&payload_ty, original_types, &mut HashSet::new())
-            else {
+            let Some(payload_is_effectively_empty) = internal_tag_payload_compatibility(
+                &payload_ty,
+                original_types,
+                &mut HashSet::new(),
+            ) else {
                 return Err(Error::invalid_internally_tagged_variant(
                     serialized_name,
                     "payload cannot be merged with a tag",
@@ -1290,7 +1310,7 @@ fn variant_has_effective_payload(variant: &Variant) -> bool {
     match variant.fields() {
         Fields::Unit => false,
         Fields::Named(named) => !named.fields().is_empty(),
-        Fields::Unnamed(unnamed) => !unnamed.fields().is_empty(),
+        Fields::Unnamed(unnamed) => unnamed_has_effective_payload(unnamed),
     }
 }
 
@@ -1305,17 +1325,9 @@ fn variant_payload_field(variant: &Variant) -> Option<Field> {
             Some(Field::new(out.build()))
         }
         Fields::Unnamed(unnamed) => {
-            let original_unnamed_len = variant
-                .attributes()
-                .get::<OriginalUnnamedFieldLayout>()
-                .map(|layout| layout.len)
-                .unwrap_or_else(|| unnamed.fields().len());
+            let original_unnamed_len = unnamed.fields().len();
 
-            let non_skipped = unnamed
-                .fields()
-                .iter()
-                .filter(|field| field.ty().is_some())
-                .collect::<Vec<_>>();
+            let non_skipped = unnamed_live_fields(unnamed).collect::<Vec<_>>();
 
             match non_skipped.as_slice() {
                 [] => Some(Field::new(DataType::Tuple(Tuple::new(vec![])))),
@@ -1379,9 +1391,11 @@ fn internal_tag_payload_compatibility(
             {
                 let payload_fields = match strct.fields() {
                     Fields::Unit => return Some(true),
-                    Fields::Unnamed(unnamed) => {
-                        unnamed.fields().iter().filter_map(Field::ty).collect::<Vec<_>>()
-                    }
+                    Fields::Unnamed(unnamed) => unnamed
+                        .fields()
+                        .iter()
+                        .filter_map(Field::ty)
+                        .collect::<Vec<_>>(),
                     Fields::Named(named) => named
                         .fields()
                         .iter()
@@ -1401,7 +1415,9 @@ fn internal_tag_payload_compatibility(
             }
 
             match strct.fields() {
-                Fields::Named(named) => Some(named.fields().iter().all(|(_, field)| field.ty().is_none())),
+                Fields::Named(named) => {
+                    Some(named.fields().iter().all(|(_, field)| field.ty().is_none()))
+                }
                 Fields::Unit | Fields::Unnamed(_) => None,
             }
         }
@@ -1416,31 +1432,30 @@ fn internal_tag_payload_compatibility(
                 return Some(false);
             }
 
-            let compatible = internal_tag_payload_compatibility(referenced.ty(), original_types, seen);
+            let compatible =
+                internal_tag_payload_compatibility(referenced.ty(), original_types, seen);
             seen.remove(&key);
             compatible
         }
-        DataType::Enum(enm) => {
-            match enum_repr_from_attrs(enm.attributes()).ok()? {
-                EnumRepr::Untagged => {
-                    let mut is_effectively_empty = true;
-                    for (_, variant) in enm.variants() {
-                        let Some(variant_empty) =
-                            internal_tag_variant_payload_compatibility(variant, original_types, seen)
-                        else {
-                            return None;
-                        };
+        DataType::Enum(enm) => match enum_repr_from_attrs(enm.attributes()).ok()? {
+            EnumRepr::Untagged => {
+                let mut is_effectively_empty = true;
+                for (_, variant) in enm.variants() {
+                    let Some(variant_empty) =
+                        internal_tag_variant_payload_compatibility(variant, original_types, seen)
+                    else {
+                        return None;
+                    };
 
-                        is_effectively_empty &= variant_empty;
-                    }
+                    is_effectively_empty &= variant_empty;
+                }
 
-                    Some(is_effectively_empty)
-                }
-                EnumRepr::External | EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. } => {
-                    Some(false)
-                }
+                Some(is_effectively_empty)
             }
-        }
+            EnumRepr::External | EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. } => {
+                Some(false)
+            }
+        },
         DataType::Primitive(_)
         | DataType::List(_)
         | DataType::Nullable(_)
