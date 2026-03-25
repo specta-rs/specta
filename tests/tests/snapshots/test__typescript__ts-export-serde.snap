@@ -45,7 +45,9 @@ export type BasicEnum = "A" | "B";
 export type BoxFlattened = (BoxedInner);
 
 export type BoxInline = {
-	c: BoxedInner,
+	c: {
+		a: number,
+	},
 };
 
 export type BoxedInner = {

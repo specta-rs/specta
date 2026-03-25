@@ -758,9 +758,22 @@ fn shallow_inline_datatype(
                 let ndt = r
                     .get(types)
                     .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
+                let inline_key = (
+                    ndt.module_path().clone(),
+                    ndt.name().clone(),
+                    r.generics().to_vec(),
+                );
+                let already_inlining = INLINE_REFERENCE_STACK
+                    .with(|stack| stack.borrow().iter().any(|key| key == &inline_key));
+
+                if already_inlining {
+                    return reference_named_dt(s, exporter, types, r, location, prefix, generics);
+                }
+
+                INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
                 let combined_generics = merged_generics(generics, r.generics());
                 let resolved = resolve_generics_in_datatype(ndt.ty(), &combined_generics);
-                datatype(
+                let result = shallow_inline_datatype(
                     s,
                     exporter,
                     types,
@@ -769,7 +782,12 @@ fn shallow_inline_datatype(
                     parent_name,
                     prefix,
                     &combined_generics,
-                )
+                );
+                INLINE_REFERENCE_STACK.with(|stack| {
+                    stack.borrow_mut().pop();
+                });
+
+                result
             }
             Reference::Generic(g) => {
                 if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
