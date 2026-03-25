@@ -231,8 +231,8 @@ expression: output
 	*
 	* @typedef {T} Box<T>
 	*
-	* @typedef {{ type: "A"; data: null } | { type: "B"; data: string }} SkippedFieldWithinVariant
-	* @property {{ type: "A"; data: null }} A
+	* @typedef {{ type: "A" } | { type: "B"; data: string }} SkippedFieldWithinVariant
+	* @property {{ type: "A" }} A
 	* @property {{ type: "B"; data: string }} B
 	*
 	* @typedef {{

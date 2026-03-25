@@ -155,7 +155,7 @@ InlineTuple2: {
 }
 Box<str>: string
 Box<String>: string
-SkippedFieldWithinVariant: { type: "A"; data: null } | { type: "B"; data: string }
+SkippedFieldWithinVariant: { type: "A" } | { type: "B"; data: string }
 KebabCase: {
 	"test-ing": string,
 }
