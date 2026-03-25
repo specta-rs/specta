@@ -1,10 +1,10 @@
 use std::{collections::HashMap, iter, path::Path};
 
 use specta::{
-    ResolvedTypes, Type, Types,
     datatype::{DataType, Reference},
+    ResolvedTypes, Type, Types,
 };
-use specta_typescript::{BigIntExportBehavior, Layout, Typescript, primitives};
+use specta_typescript::{primitives, BigIntExportBehavior, Layout, Typescript};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -285,7 +285,7 @@ fn typescript_export_serde_errors() {
     assert_serde_error::<HashMap<Variants, ()>>(
         &mut failures,
         "HashMap<Variants, ()>",
-        "enum key with tuple variants must be #[serde(untagged)]",
+        "key type is not supported by legacy map-key validation rules",
     );
 
     assert!(
