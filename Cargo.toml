@@ -39,4 +39,4 @@ similar.opt-level = 3
 # futures-lite = { git = "https://github.com/smol-rs/futures-lite", rev = "3dc587ffdd652bc6002f34dc24a300643ef498ae" }
 # rand = { git = "https://github.com/rust-random/rand", rev = "da891850ab2b38f4322ec140ae29d305dfb162c3" }
 
-error-stack = { git = "https://github.com/hashintel/hash", rev = "da576c7564b27247fd11c2cdae6ca1d2c8e01800" }
+# error-stack = { git = "https://github.com/hashintel/hash", rev = "da576c7564b27247fd11c2cdae6ca1d2c8e01800" }
