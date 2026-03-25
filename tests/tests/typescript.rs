@@ -1,10 +1,10 @@
-use std::{collections::HashMap, iter, path::Path};
+use std::{iter, path::Path};
 
 use specta::{
-    ResolvedTypes, Type, Types,
     datatype::{DataType, Reference},
+    ResolvedTypes, Type, Types,
 };
-use specta_typescript::{BigIntExportBehavior, Layout, Typescript, primitives};
+use specta_typescript::{primitives, BigIntExportBehavior, Layout, Typescript};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -382,6 +382,37 @@ fn primitives_export_many() {
         };
 
         insta::assert_snapshot!(format!("export-many-{mode}"), output);
+    }
+}
+
+#[test]
+fn primitives_export_allows_generic_hashmap_definition() {
+    let (types, dts) = crate::types();
+
+    for (mode, types) in phase_collections(types) {
+        let output = match types {
+            Ok(types) => {
+                let ts = Typescript::default().bigint(BigIntExportBehavior::Number);
+                let hash_map = dts
+                    .iter()
+                    .find_map(|(_, ty)| match ty {
+                        DataType::Reference(Reference::Named(r)) => r
+                            .get(types.as_types())
+                            .filter(|ndt| ndt.name() == "HashMap"),
+                        _ => None,
+                    })
+                    .expect("HashMap should be registered in shared test fixtures");
+
+                primitives::export(&ts, &types, iter::once(hash_map), "").unwrap()
+            }
+            Err(err) => format!("ERROR: {err}"),
+        };
+
+        assert!(
+            !output.starts_with("ERROR:"),
+            "unexpected error while exporting generic HashMap in {mode}: {output}"
+        );
+        assert!(output.contains("export type HashMap<K, V> = { [key in K]: V };"));
     }
 }
 
