@@ -1,10 +1,10 @@
 use std::{collections::HashMap, iter, path::Path};
 
 use specta::{
-    ResolvedTypes, Type, Types,
     datatype::{DataType, Reference},
+    ResolvedTypes, Type, Types,
 };
-use specta_typescript::{BigIntExportBehavior, Layout, Typescript, primitives};
+use specta_typescript::{primitives, BigIntExportBehavior, Layout, Typescript};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -331,14 +331,22 @@ fn typescript_export_serde_errors() {
             "enum key variant 'A' serializes as a struct variant, which serde_json rejects",
         );
     }
-    assert_serde_error::<InvalidMaybeValidKey>(&mut failures, "InvalidMaybeValidKey", "");
+    assert_serde_error::<InvalidMaybeValidKey>(
+        &mut failures,
+        "InvalidMaybeValidKey",
+        "tuple keys are not supported by serde_json map key serialization",
+    );
     assert_serde_error::<InvalidMaybeValidKeyNested>(
         &mut failures,
         "InvalidMaybeValidKeyNested",
-        "",
+        "tuple keys are not supported by serde_json map key serialization",
     );
 
-    assert_serde_error::<RecursiveMapKey>(&mut failures, "RecursiveMapKey", "");
+    assert_serde_error::<RecursiveMapKey>(
+        &mut failures,
+        "RecursiveMapKey",
+        "struct keys must serialize as a newtype struct to be valid serde_json map keys",
+    );
 
     assert!(
         failures.is_empty(),

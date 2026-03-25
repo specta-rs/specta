@@ -29,7 +29,7 @@ fn validate_map_key_inner(
     generics: &[(GenericReference, DataType)],
     path: String,
     visiting_named_refs: &mut HashSet<Reference>,
-    visiting_generic_refs: &mut HashSet<GenericReference>,
+    visiting_generic_refs: &mut HashSet<(GenericReference, DataType)>,
 ) -> Result<(), Error> {
     match key_ty {
         DataType::Primitive(primitive) if primitive_is_valid_key(primitive.clone()) => Ok(()),
@@ -135,11 +135,12 @@ fn validate_map_key_inner(
                 return Ok(());
             }
 
-            if !visiting_generic_refs.insert(generic.clone()) {
+            let resolved = resolve_generics_in_datatype(ty, generics);
+            let generic_state = (generic.clone(), resolved.clone());
+            if !visiting_generic_refs.insert(generic_state.clone()) {
                 return Ok(());
             }
 
-            let resolved = resolve_generics_in_datatype(ty, generics);
             let result = validate_map_key_inner(
                 &resolved,
                 types,
@@ -148,7 +149,7 @@ fn validate_map_key_inner(
                 visiting_named_refs,
                 visiting_generic_refs,
             );
-            visiting_generic_refs.remove(generic);
+            visiting_generic_refs.remove(&generic_state);
 
             result
         }
