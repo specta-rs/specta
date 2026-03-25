@@ -882,6 +882,9 @@ expression: output
 	* @typedef {{ type: "A" }} InternallyTaggedH
 	* @property {{ type: "A" }} A
 	*
+	* @typedef {{ type: "A" } & ({ type: "A" } | { type: "B" })} InternallyTaggedL
+	* @property {{ type: "A" } & ({ type: "A" } | { type: "B" })} A
+	*
 	* @typedef {{ type: "A" }} InternallyTaggedM
 	* @property {{ type: "A" }} A
 	*

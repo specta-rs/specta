@@ -341,7 +341,7 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         InternallyTaggedF,
         InternallyTaggedH,
         InternallyTaggedL,
-        InternallyTaggedM, // TODO: This is wrong
+        InternallyTaggedM,
 
         // Alias
         StructWithAlias,

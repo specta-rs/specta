@@ -440,6 +440,7 @@ InternallyTaggedD: { [key in string]: string }
 InternallyTaggedE: null
 InternallyTaggedF: InternallyTaggedFInner
 InternallyTaggedH: InternallyTaggedHInner
+InternallyTaggedL: "A" | "B"
 InternallyTaggedM: "A" | "B"
 StructWithAlias: {
 	field: string,

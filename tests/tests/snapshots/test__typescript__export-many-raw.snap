@@ -571,6 +571,8 @@ export type InternallyTaggedF = InternallyTaggedFInner;
 
 export type InternallyTaggedH = InternallyTaggedHInner;
 
+export type InternallyTaggedL = "A" | "B";
+
 export type InternallyTaggedM = "A" | "B";
 
 export type StructWithAlias = {

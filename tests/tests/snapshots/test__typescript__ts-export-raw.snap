@@ -401,6 +401,10 @@ export type InternallyTaggedH = InternallyTaggedHInner;
 
 export type InternallyTaggedHInner = null;
 
+export type InternallyTaggedL = "A" | "B";
+
+export type InternallyTaggedLInner = "A" | "B";
+
 export type InternallyTaggedM = "A" | "B";
 
 export type InternallyTaggedMInner = "A" | "B";
@@ -702,6 +706,7 @@ export type Primitives = {
 	InternallyTaggedE: InternallyTaggedE,
 	InternallyTaggedF: InternallyTaggedF,
 	InternallyTaggedH: InternallyTaggedH,
+	InternallyTaggedL: InternallyTaggedL,
 	InternallyTaggedM: InternallyTaggedM,
 	StructWithAlias: StructWithAlias,
 	StructWithMultipleAliases: StructWithMultipleAliases,

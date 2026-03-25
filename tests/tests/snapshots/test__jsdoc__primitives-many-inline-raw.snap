@@ -820,6 +820,9 @@ expression: output
 	* @typedef {InternallyTaggedHInner} InternallyTaggedH
 	* @property {InternallyTaggedHInner} A
 	*
+	* @typedef {"A" | "B"} InternallyTaggedL
+	* @property {"A" | "B"} A
+	*
 	* @typedef {"A" | "B"} InternallyTaggedM
 	* @property {"A" | "B"} A
 	*

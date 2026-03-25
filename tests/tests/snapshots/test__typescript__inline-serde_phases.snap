@@ -468,6 +468,7 @@ InternallyTaggedD: { type: "A" } & ({ [key in string]: string })
 InternallyTaggedE: { type: "A" }
 InternallyTaggedF: { type: "A" }
 InternallyTaggedH: { type: "A" }
+InternallyTaggedL: { type: "A" } & ({ type: "A" } | { type: "B" })
 InternallyTaggedM: { type: "A" }
 StructWithAlias: {
 	field: string,

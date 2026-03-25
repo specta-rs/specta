@@ -599,6 +599,8 @@ InternallyTaggedF: export type InternallyTaggedF = { type: "A" };
 
 InternallyTaggedH: export type InternallyTaggedH = { type: "A" };
 
+InternallyTaggedL: export type InternallyTaggedL = { type: "A" } & ({ type: "A" } | { type: "B" });
+
 InternallyTaggedM: export type InternallyTaggedM = { type: "A" };
 
 StructWithAlias: export type StructWithAlias = {
