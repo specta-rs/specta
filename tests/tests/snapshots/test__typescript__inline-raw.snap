@@ -468,6 +468,7 @@ SkipField: {
 	b: number,
 }
 SkipVariant: string
+SkipUnnamedFieldInVariant: never | [number]
 TransparentWithSkip: null
 TransparentWithSkip2: string
 TransparentWithSkip3: string

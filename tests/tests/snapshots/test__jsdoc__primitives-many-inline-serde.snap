@@ -285,8 +285,8 @@ expression: output
 	* @property {string} "line\u2028break"
 	* @property {string} "line\u2029break"
 	*
-	* @typedef {{ "a-b": null }} RenamedVariantWithSkippedPayload
-	* @property {{ "a-b": null }} "a-b"
+	* @typedef {"a-b"} RenamedVariantWithSkippedPayload
+	* @property {"a-b"} "a-b"
 	*
 	* @typedef {never} Type
 	*
@@ -961,6 +961,10 @@ expression: output
 	*
 	* @typedef {{ A: string }} SkipVariant
 	* @property {{ A: string }} A
+	*
+	* @typedef {"A" | { B: [number] }} SkipUnnamedFieldInVariant
+	* @property {"A"} A
+	* @property {{ B: [number] }} B
 	*
 	* @typedef {null} TransparentWithSkip
 	* @property {null} "0"

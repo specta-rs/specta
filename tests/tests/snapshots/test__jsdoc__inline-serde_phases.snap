@@ -1013,6 +1013,7 @@ expression: output
 	*		SkipOnlyField: SkipOnlyField,
 	*		SkipField: SkipField,
 	*		SkipVariant: SkipVariant,
+	*		SkipUnnamedFieldInVariant: SkipUnnamedFieldInVariant,
 	*		TransparentWithSkip: TransparentWithSkip,
 	*		TransparentWithSkip2: TransparentWithSkip2,
 	*		TransparentWithSkip3: TransparentWithSkip3,
@@ -1278,6 +1279,7 @@ expression: output
 	* @property {SkipOnlyField} SkipOnlyField
 	* @property {SkipField} SkipField
 	* @property {SkipVariant} SkipVariant
+	* @property {SkipUnnamedFieldInVariant} SkipUnnamedFieldInVariant
 	* @property {TransparentWithSkip} TransparentWithSkip
 	* @property {TransparentWithSkip2} TransparentWithSkip2
 	* @property {TransparentWithSkip3} TransparentWithSkip3
@@ -1364,8 +1366,8 @@ expression: output
 	* @property {string} "line\u2028break"
 	* @property {string} "line\u2029break"
 	*
-	* @typedef {{ "a-b": null }} RenamedVariantWithSkippedPayload
-	* @property {{ "a-b": null }} "a-b"
+	* @typedef {"a-b"} RenamedVariantWithSkippedPayload
+	* @property {"a-b"} "a-b"
 	*
 	* @typedef {{
 	*		a: number,
@@ -1442,6 +1444,10 @@ expression: output
 	*		a: number,
 	*	}} SkipStructFields
 	* @property {number} a
+	*
+	* @typedef {"A" | { B: [number] }} SkipUnnamedFieldInVariant
+	* @property {"A"} A
+	* @property {{ B: [number] }} B
 	*
 	* @typedef {{ A: string }} SkipVariant
 	* @property {{ A: string }} A

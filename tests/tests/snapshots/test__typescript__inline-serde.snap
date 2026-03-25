@@ -183,7 +183,7 @@ RenamedFieldKeys: {
 	"line\u2028break": string,
 	"line\u2029break": string,
 }
-RenamedVariantWithSkippedPayload: { "a-b": null }
+RenamedVariantWithSkippedPayload: "a-b"
 type_type::Type: never
 ActualType: {
 	a: GenericType<string>,
@@ -500,6 +500,7 @@ SkipField: {
 	b: number,
 }
 SkipVariant: { A: string }
+SkipUnnamedFieldInVariant: "A" | { B: [number] }
 TransparentWithSkip: null
 TransparentWithSkip2: string
 TransparentWithSkip3: string

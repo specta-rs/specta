@@ -950,6 +950,7 @@ expression: output
 	*		SkipOnlyField: SkipOnlyField,
 	*		SkipField: SkipField,
 	*		SkipVariant: SkipVariant,
+	*		SkipUnnamedFieldInVariant: SkipUnnamedFieldInVariant,
 	*		TransparentWithSkip: TransparentWithSkip,
 	*		TransparentWithSkip2: TransparentWithSkip2,
 	*		TransparentWithSkip3: TransparentWithSkip3,
@@ -1213,6 +1214,7 @@ expression: output
 	* @property {SkipOnlyField} SkipOnlyField
 	* @property {SkipField} SkipField
 	* @property {SkipVariant} SkipVariant
+	* @property {SkipUnnamedFieldInVariant} SkipUnnamedFieldInVariant
 	* @property {TransparentWithSkip} TransparentWithSkip
 	* @property {TransparentWithSkip2} TransparentWithSkip2
 	* @property {TransparentWithSkip3} TransparentWithSkip3
@@ -1375,6 +1377,10 @@ expression: output
 	*		a: number,
 	*	}} SkipStructFields
 	* @property {number} a
+	*
+	* @typedef {never | [number]} SkipUnnamedFieldInVariant
+	* @property {never} A
+	* @property {[number]} B
 	*
 	* @typedef {string} SkipVariant
 	* @property {string} A

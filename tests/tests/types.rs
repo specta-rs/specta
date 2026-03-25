@@ -369,7 +369,7 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         SkipOnlyField,
         SkipField,
         SkipVariant,
-        // SkipUnnamedFieldInVariant,
+        SkipUnnamedFieldInVariant,
         // SkipNamedFieldInVariant,
         TransparentWithSkip,
         TransparentWithSkip2,
@@ -1977,11 +1977,11 @@ enum SkipOnlyVariantUntagged {
 #[specta(collect = false)]
 enum SkipUnnamedFieldInVariant {
     // only field
-    A(#[specta(skip)] String),
+    A(#[serde(skip)] String),
     // not only field
     //
     // This will `B(String)` == `String` in TS whether this will be `[String]`. This is why `#[serde(skip)]` is processed at runtime not in the macro.
-    B(#[specta(skip)] String, i32),
+    B(#[serde(skip)] String, i32),
 }
 
 #[derive(Type, Serialize, Deserialize)]

@@ -207,7 +207,7 @@ RenamedFieldKeys: export type RenamedFieldKeys = {
 	"line\u2029break": string,
 };
 
-RenamedVariantWithSkippedPayload: export type RenamedVariantWithSkippedPayload = { "a-b": null };
+RenamedVariantWithSkippedPayload: export type RenamedVariantWithSkippedPayload = "a-b";
 
 type_type::Type: export type Type = never;
 
@@ -650,6 +650,8 @@ SkipField: export type SkipField = {
 };
 
 SkipVariant: export type SkipVariant = { A: string };
+
+SkipUnnamedFieldInVariant: export type SkipUnnamedFieldInVariant = "A" | { B: [number] };
 
 TransparentWithSkip: export type TransparentWithSkip = null;
 
