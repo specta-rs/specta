@@ -129,6 +129,7 @@ TransparentType2: null
 TransparentTypeWithOverride: string
 [Option<u8>; 3]: [(number | null), (number | null), (number | null)]
 HashMap<BasicEnum, ()>: Partial<{ [key in BasicEnum]: null }>
+HashMap<BasicEnum, i32>: Partial<{ [key in BasicEnum]: number }>
 Option<Option<Option<Option<i32>>>>: number | null
 Vec<PlaceholderInnerField>: PlaceholderInnerField[]
 EnumReferenceRecordKey: {

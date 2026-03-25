@@ -61,6 +61,7 @@ TransparentType: TransparentType
 TransparentType2: TransparentType2
 TransparentTypeWithOverride: TransparentTypeWithOverride
 HashMap<BasicEnum, ()>: Partial<{ [key in BasicEnum]: null }>
+HashMap<BasicEnum, i32>: Partial<{ [key in BasicEnum]: number }>
 Vec<PlaceholderInnerField>: PlaceholderInnerField[]
 EnumReferenceRecordKey: EnumReferenceRecordKey
 FlattenOnNestedEnum: FlattenOnNestedEnum

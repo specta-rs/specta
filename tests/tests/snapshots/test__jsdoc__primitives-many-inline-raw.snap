@@ -185,6 +185,8 @@ expression: output
 	*
 	* @typedef {{ [key in K]: V }} HashMap<K, V>
 	*
+	* @typedef {{ [key in K]: V }} HashMap<K, V>
+	*
 	* @typedef {T[]} Vec<T>
 	*
 	* @typedef {{
