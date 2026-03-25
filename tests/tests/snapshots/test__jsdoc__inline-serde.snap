@@ -33,7 +33,7 @@ expression: output
 	*	}} ActualType
 	* @property {GenericType<string>} a
 	*
-	* @typedef {({ t: "A" }) & { c?: never } | { t: "B"; c: {
+	* @typedef {{ t: "A" } | { t: "B"; c: {
 	* 	id: string,
 	* 	method: string,
 	* } } | { t: "C"; c: string }} AdjacentlyTagged
@@ -266,7 +266,7 @@ expression: output
 	* @property {{ t: "A" }} A
 	* @property {{ t: "B" }} B
 	*
-	* @typedef {({ t: "C" }) & { enumField?: never } | ({ t: "B" }) & { enumField?: never } | { t: "D"; enumField: null }} Enum2
+	* @typedef {{ t: "C" } | { t: "B" } | { t: "D"; enumField: null }} Enum2
 	* @property {{ t: "C" }} C
 	* @property {{ t: "B" }} B
 	* @property {{ t: "D"; enumField: null }} D
@@ -552,7 +552,7 @@ expression: output
 	* @property {InlineStruct} inline_this
 	* @property {RefStruct} dont_inline_this
 	*
-	* @typedef {({ type: "A"; field: string }) & { other?: never } | ({ type: "B"; other: number }) & { field?: never }} InternallyTaggedWithAlias
+	* @typedef {{ type: "A"; field: string } | { type: "B"; other: number }} InternallyTaggedWithAlias
 	* @property {{ type: "A"; field: string }} A
 	* @property {{ type: "B"; other: number }} B
 	*

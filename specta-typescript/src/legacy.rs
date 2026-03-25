@@ -317,6 +317,7 @@ pub(crate) fn struct_datatype(
                         generics,
                         &field_prefix,
                         false,
+                        None,
                     )?;
 
                     let docs = field
@@ -375,6 +376,7 @@ fn enum_variant_datatype(
     variant: &Variant,
     prefix: &str,
     generics: &[(GenericReference, DataType)],
+    ty_override: Option<VariantTypeOverride<'_>>,
 ) -> Result<Option<String>> {
     match &variant.fields() {
         Fields::Unit => Ok(Some(sanitise_key(name, true).to_string())),
@@ -441,6 +443,10 @@ fn enum_variant_datatype(
                             generics,
                             "",
                             false,
+                            ty_override
+                                .as_ref()
+                                .filter(|override_ty| override_ty.key == name.as_ref())
+                                .map(|override_ty| override_ty.ty),
                         )?;
 
                         let docs = field
@@ -519,6 +525,118 @@ struct EnumVariantOutput {
     strict_keys: Option<BTreeSet<String>>,
 }
 
+#[derive(Debug, Clone)]
+struct DiscriminatorAnalysis {
+    key: String,
+    known_literals: Vec<String>,
+    fallback_variant_idx: Option<usize>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct VariantTypeOverride<'a> {
+    key: &'a str,
+    ty: &'a str,
+}
+
+#[derive(Debug, Clone)]
+enum DiscriminatorValue {
+    StringLiteral(String),
+    String,
+}
+
+fn analyze_discriminator(
+    variants: &[&(Cow<'static, str>, Variant)],
+) -> Option<DiscriminatorAnalysis> {
+    let mut key = None::<String>;
+    let mut known_literals = BTreeSet::new();
+    let mut fallback_variant_idx = None;
+
+    for (idx, (_, variant)) in variants.iter().enumerate() {
+        let (variant_key, value) = variant_discriminator(variant)?;
+
+        if let Some(expected) = &key {
+            if expected != &variant_key {
+                return None;
+            }
+        } else {
+            key = Some(variant_key.clone());
+        }
+
+        match value {
+            DiscriminatorValue::StringLiteral(value) => {
+                known_literals.insert(value);
+            }
+            DiscriminatorValue::String => {
+                if fallback_variant_idx.replace(idx).is_some() {
+                    return None;
+                }
+            }
+        }
+    }
+
+    if known_literals.is_empty() {
+        return None;
+    }
+
+    Some(DiscriminatorAnalysis {
+        key: key.expect("at least one variant when called"),
+        known_literals: known_literals.into_iter().collect(),
+        fallback_variant_idx,
+    })
+}
+
+fn variant_discriminator(variant: &Variant) -> Option<(String, DiscriminatorValue)> {
+    let Fields::Named(named) = variant.fields() else {
+        return None;
+    };
+
+    let (name, field) = named
+        .fields()
+        .iter()
+        .find(|(_, field)| !field.flatten() && !field.optional())?;
+    let ty = field.ty()?;
+
+    if matches!(ty, DataType::Primitive(specta::datatype::Primitive::str)) {
+        return Some((name.to_string(), DiscriminatorValue::String));
+    }
+
+    string_literal_datatype_value(ty)
+        .map(|value| (name.to_string(), DiscriminatorValue::StringLiteral(value)))
+}
+
+fn string_literal_datatype_value(ty: &DataType) -> Option<String> {
+    let DataType::Enum(enm) = ty else {
+        return None;
+    };
+
+    let mut variants = enm.variants().iter();
+    let (name, variant) = variants.next()?;
+
+    if variants.next().is_some() {
+        return None;
+    }
+
+    if !matches!(variant.fields(), Fields::Unit) {
+        return None;
+    }
+
+    Some(name.to_string())
+}
+
+fn exclude_known_literals_type(literals: &[String]) -> Option<String> {
+    if literals.is_empty() {
+        return None;
+    }
+
+    let known = literals
+        .iter()
+        .map(|value| format!("\"{}\"", escape_typescript_string_literal(value.as_str())))
+        .collect::<Vec<_>>()
+        .join(" | ");
+
+    Some(format!("Exclude<string, {known}>"))
+}
+
 fn untagged_strict_keys(variant: &Variant) -> Option<BTreeSet<String>> {
     match variant.fields() {
         Fields::Named(obj) => {
@@ -590,26 +708,48 @@ pub(crate) fn enum_datatype(
         .filter(|(_, variant)| !variant.skip())
         .collect::<Vec<_>>();
 
-    let mut rendered_variants = filtered_variants
-        .iter()
-        .map(|(variant_name, variant)| {
-            let ts_values = enum_variant_datatype(
-                ctx.with(PathItem::Variant(variant_name.clone())),
-                types,
-                variant_name.clone(),
-                variant,
-                prefix,
-                generics,
-            )?;
-
-            Ok(EnumVariantOutput {
-                value: ts_values.unwrap_or_else(|| NEVER.to_string()),
-                strict_keys: untagged_strict_keys(variant),
-            })
+    let discriminator = analyze_discriminator(&filtered_variants);
+    let fallback_override = discriminator.as_ref().and_then(|discriminator| {
+        discriminator.fallback_variant_idx.and_then(|idx| {
+            exclude_known_literals_type(&discriminator.known_literals)
+                .map(|ty| (idx, discriminator.key.as_str(), ty))
         })
-        .collect::<Result<Vec<_>>>()?;
+    });
 
-    strictify_enum_variants(&mut rendered_variants);
+    let mut rendered_variants = Vec::with_capacity(filtered_variants.len());
+    for (idx, (variant_name, variant)) in filtered_variants.iter().enumerate() {
+        let variant_override = fallback_override
+            .as_ref()
+            .and_then(|(fallback_idx, key, ty)| {
+                if *fallback_idx == idx {
+                    Some(VariantTypeOverride {
+                        key,
+                        ty: ty.as_str(),
+                    })
+                } else {
+                    None
+                }
+            });
+
+        let ts_values = enum_variant_datatype(
+            ctx.with(PathItem::Variant(variant_name.clone())),
+            types,
+            variant_name.clone(),
+            variant,
+            prefix,
+            generics,
+            variant_override,
+        )?;
+
+        rendered_variants.push(EnumVariantOutput {
+            value: ts_values.unwrap_or_else(|| NEVER.to_string()),
+            strict_keys: untagged_strict_keys(variant),
+        });
+    }
+
+    if discriminator.is_none() {
+        strictify_enum_variants(&mut rendered_variants);
+    }
 
     let mut variants = filtered_variants
         .into_iter()
@@ -649,6 +789,7 @@ fn object_field_to_ts(
     generics: &[(GenericReference, DataType)],
     prefix: &str,
     force_inline: bool,
+    ty_override: Option<&str>,
 ) -> Result<()> {
     let (field, ty) = field_ref;
     let field_name_safe = sanitise_key(key, false);
@@ -659,18 +800,24 @@ fn object_field_to_ts(
         false => (field_name_safe, ty),
     };
 
-    let mut value = String::new();
-    crate::primitives::datatype_with_inline_attr(
-        &mut value,
-        ctx.cfg,
-        types,
-        ty,
-        vec![],
-        None,
-        prefix,
-        generics,
-        force_inline || field.inline(),
-    )?;
+    let value = match ty_override {
+        Some(ty_override) => ty_override.to_string(),
+        None => {
+            let mut value = String::new();
+            crate::primitives::datatype_with_inline_attr(
+                &mut value,
+                ctx.cfg,
+                types,
+                ty,
+                vec![],
+                None,
+                prefix,
+                generics,
+                force_inline || field.inline(),
+            )?;
+            value
+        }
+    };
 
     Ok(write!(s, "{prefix}{key}: {value}",)?)
 }
