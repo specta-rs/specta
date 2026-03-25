@@ -14,7 +14,7 @@
 //! Next copy the following into your `main.rs` file:
 //!
 //! ```rust
-//! use specta::{Type, Types};
+//! use specta::{ResolvedTypes, Type, Types};
 //! use specta_swift::Swift;
 //!
 //! #[derive(Type)]
@@ -30,9 +30,10 @@
 //! let mut types = Types::default()
 //!     // We don't need to specify `MyOtherType` because it's referenced by `MyType`
 //!     .register::<MyType>();
+//! let resolved = ResolvedTypes::from_resolved_types(types);
 //!
 //! Swift::default()
-//!     .export_to("./Types.swift", &types)
+//!     .export_to("./Types.swift", &resolved)
 //!     .unwrap();
 //! ```
 //!

@@ -116,17 +116,18 @@ fn main() {
         .register::<UserProfile>()
         .register::<UserPreferences>()
         .register::<UserMetadata>();
+    let resolved = specta::ResolvedTypes::from_resolved_types(types);
 
     // Export with default settings
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&resolved).unwrap();
 
     println!("📝 Generated Swift code:\n");
     println!("{}", output);
 
     // Write to file for inspection
     swift
-        .export_to("./examples/generated/BasicTypes.swift", &types)
+        .export_to("./examples/generated/BasicTypes.swift", &resolved)
         .unwrap();
     println!("✅ Basic types exported to BasicTypes.swift");
 

@@ -35,7 +35,7 @@ specta-swift = "0.1"
 Define your Rust types:
 
 ```rust
-use specta::{Type, Types};
+use specta::{ResolvedTypes, Type, Types};
 use specta_swift::Swift;
 
 #[derive(Type)]
@@ -69,9 +69,10 @@ fn main() {
         .register::<User>()
         .register::<UserRole>()
         .register::<ApiResult<String>>();
+    let resolved = ResolvedTypes::from_resolved_types(types);
 
     let swift = Swift::default();
-    swift.export_to("./Types.swift", &types).unwrap();
+    swift.export_to("./Types.swift", &resolved).unwrap();
 }
 ```
 
@@ -242,10 +243,12 @@ let swift = Swift::new()
 ### Serde Integration
 
 ```rust
-let types = specta_serde::apply(types).unwrap();
+let resolved = specta_serde::apply(types).unwrap();
 
 let swift = Swift::new()
     .add_protocol("CustomDebugStringConvertible");
+
+let output = swift.export(&resolved).unwrap();
 ```
 
 ## Type Mapping

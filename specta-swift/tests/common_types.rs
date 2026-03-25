@@ -1,4 +1,4 @@
-use specta::{Type, Types};
+use specta::{ResolvedTypes, Type, Types};
 use specta_swift::Swift;
 
 // Test with common types that might not have Type implementations
@@ -25,9 +25,10 @@ fn test_common_types() {
     let types = Types::default()
         .register::<TestStruct>()
         .register::<TestEnum>();
+    let resolved = ResolvedTypes::from_resolved_types(types);
 
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&resolved).unwrap();
 
     println!("Generated Swift code:\n{}", output);
 
