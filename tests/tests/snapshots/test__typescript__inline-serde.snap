@@ -212,7 +212,7 @@ Struct2: {
 	b: string,
 }
 Enum: { t: "A" } | { t: "B" }
-Enum2: ({ t: "C" }) & { enumField?: never } | ({ t: "B" }) & { enumField?: never } | { t: "D"; enumField: null }
+Enum2: { t: "C" } | { t: "B" } | { t: "D"; enumField: null }
 Enum3: { t: "A"; b: string }
 StructRenameAllUppercase: {
 	A: number,
@@ -418,7 +418,7 @@ EmptyStruct: Record<string, never>
 EmptyStructWithTag: {
 	a: "EmptyStructWithTag",
 }
-AdjacentlyTagged: ({ t: "A" }) & { c?: never } | { t: "B"; c: {
+AdjacentlyTagged: { t: "A" } | { t: "B"; c: {
 	id: string,
 	method: string,
 } } | { t: "C"; c: string }
@@ -452,7 +452,7 @@ StructWithAliasAndRename: {
 EnumWithVariantAlias: "Variant" | "Other"
 EnumWithMultipleVariantAliases: "Variant" | "Other"
 EnumWithVariantAliasAndRename: "renamed_variant" | "Other"
-InternallyTaggedWithAlias: ({ type: "A"; field: string }) & { other?: never } | ({ type: "B"; other: number }) & { field?: never }
+InternallyTaggedWithAlias: { type: "A"; field: string } | { type: "B"; other: number }
 AdjacentlyTaggedWithAlias: { type: "A"; data: {
 	field: string,
 } } | { type: "B"; data: {
