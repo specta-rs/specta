@@ -3,12 +3,12 @@
 //! The plan is to try and move these into the ecosystem for the v2 release.
 use super::macros::{impl_ndt, impl_ndt_as};
 use crate::{
+    Type, Types,
     datatype::{
         self, DataType, Enum, Field, Fields, List, NamedFields, Primitive, Reference, Struct,
         Variant,
     },
     r#type::{generics, impls::*},
-    Type, Types,
 };
 
 use std::borrow::Cow;
@@ -155,7 +155,7 @@ const _: () = {
 #[cfg(feature = "serde_yaml")]
 #[cfg_attr(docsrs, doc(cfg(feature = "serde_yaml")))]
 const _: () = {
-    use serde_yaml::{value::TaggedValue, Number, Value};
+    use serde_yaml::{Number, Value, value::TaggedValue};
 
     impl_ndt_as!(
         serde_yaml::Mapping as PrimitiveMap<serde_yaml::Value, serde_yaml::Value>
@@ -248,7 +248,7 @@ const _: () = {
 #[cfg(feature = "toml")]
 #[cfg_attr(docsrs, doc(cfg(feature = "toml")))]
 const _: () = {
-    use toml::{value, Value};
+    use toml::{Value, value};
 
     impl_ndt_as!(toml::map::Map<K, V> as PrimitiveMap<generics::K, generics::V>);
 

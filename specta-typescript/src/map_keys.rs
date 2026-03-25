@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use specta::{
-    datatype::{DataType, Fields, GenericReference, Primitive, Reference},
     Types,
+    datatype::{DataType, Fields, GenericReference, Primitive, Reference},
 };
 
 use crate::Error;
@@ -42,7 +42,11 @@ fn validate_map_key_inner(
                 match variant.fields() {
                     Fields::Unit => {}
                     Fields::Unnamed(unnamed) => {
-                        let non_skipped = unnamed.fields().iter().filter_map(|field| field.ty()).count();
+                        let non_skipped = unnamed
+                            .fields()
+                            .iter()
+                            .filter_map(|field| field.ty())
+                            .count();
                         if non_skipped != 1 {
                             return Err(Error::invalid_map_key(
                                 &path,
@@ -161,10 +165,12 @@ fn validate_map_key_inner(
             path,
             "tuple keys are not supported by serde_json map key serialization",
         )),
-        DataType::List(_) | DataType::Map(_) | DataType::Nullable(_) => Err(Error::invalid_map_key(
-            path,
-            "collection, map, and nullable keys are not supported by serde_json map key serialization",
-        )),
+        DataType::List(_) | DataType::Map(_) | DataType::Nullable(_) => {
+            Err(Error::invalid_map_key(
+                path,
+                "collection, map, and nullable keys are not supported by serde_json map key serialization",
+            ))
+        }
     }
 }
 

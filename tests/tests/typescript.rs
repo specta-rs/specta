@@ -1,10 +1,10 @@
 use std::{collections::HashMap, iter, path::Path};
 
 use specta::{
-    datatype::{DataType, Reference},
     ResolvedTypes, Type, Types,
+    datatype::{DataType, Reference},
 };
-use specta_typescript::{primitives, BigIntExportBehavior, Layout, Typescript};
+use specta_typescript::{BigIntExportBehavior, Layout, Typescript, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;

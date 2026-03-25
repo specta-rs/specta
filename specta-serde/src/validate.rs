@@ -32,7 +32,11 @@ pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn validate_datatype_for_mode(dt: &DataType, types: &Types, mode: ApplyMode) -> Result<()> {
+pub(crate) fn validate_datatype_for_mode(
+    dt: &DataType,
+    types: &Types,
+    mode: ApplyMode,
+) -> Result<()> {
     validate_datatype_with_generics_for_mode(dt, types, &[], "<top-level>".to_string(), mode)
 }
 
