@@ -1,4 +1,4 @@
-use specta::{ResolvedTypes, Type, Types};
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 /// A comprehensive example demonstrating multi-line comment support
@@ -106,7 +106,7 @@ fn main() {
     let types = Types::default()
         .register::<ApiResponse<String>>()
         .register::<User>();
-    let resolved = ResolvedTypes::from_resolved_types(types);
+    let resolved = specta_serde::apply(types).unwrap();
 
     let swift = Swift::default();
     let output = swift.export(&resolved).unwrap();

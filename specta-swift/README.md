@@ -24,18 +24,19 @@ A Rust crate for exporting Rust types to Swift, built on top of [Specta](https:/
 
 ## Quick Start
 
-Add `specta-swift` to your `Cargo.toml`:
+Add `specta-swift` and `specta-serde` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
 specta = { version = "2.0", features = ["derive"] }
+specta-serde = "0.0.10"
 specta-swift = "0.1"
 ```
 
 Define your Rust types:
 
 ```rust
-use specta::{ResolvedTypes, Type, Types};
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 #[derive(Type)]
@@ -69,7 +70,7 @@ fn main() {
         .register::<User>()
         .register::<UserRole>()
         .register::<ApiResult<String>>();
-    let resolved = ResolvedTypes::from_resolved_types(types);
+    let resolved = specta_serde::apply(types).unwrap();
 
     let swift = Swift::default();
     swift.export_to("./Types.swift", &resolved).unwrap();

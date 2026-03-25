@@ -1,4 +1,4 @@
-use specta::{ResolvedTypes, Type, Types};
+use specta::{Type, Types};
 use specta_swift::{GenericStyle, IndentStyle, NamingConvention, OptionalStyle, Swift};
 
 /// Comprehensive example showcasing ALL configuration options for specta-swift
@@ -38,7 +38,7 @@ fn main() {
         .register::<User>()
         .register::<ApiResponse<String>>()
         .register::<GenericContainer<String, u32>>();
-    let resolved = ResolvedTypes::from_resolved_types(types.clone());
+    let resolved = specta_serde::apply(types.clone()).unwrap();
 
     // 1. DEFAULT CONFIGURATION
     println!("\n📋 1. DEFAULT CONFIGURATION");

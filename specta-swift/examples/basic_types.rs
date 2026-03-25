@@ -116,7 +116,7 @@ fn main() {
         .register::<UserProfile>()
         .register::<UserPreferences>()
         .register::<UserMetadata>();
-    let resolved = specta::ResolvedTypes::from_resolved_types(types);
+    let resolved = specta_serde::apply(types).unwrap();
 
     // Export with default settings
     let swift = Swift::default();

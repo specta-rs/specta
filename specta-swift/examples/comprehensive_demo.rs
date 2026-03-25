@@ -386,7 +386,7 @@ fn main() {
 
     // Export with default settings
     let total_types = types.len();
-    let resolved = specta::ResolvedTypes::from_resolved_types(types);
+    let resolved = specta_serde::apply(types).unwrap();
     let swift = Swift::default();
     let output = swift.export(&resolved).unwrap();
 
