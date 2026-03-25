@@ -892,6 +892,10 @@ expression: output
 	* @typedef {string} SkipVariant
 	* @property {string} A
 	*
+	* @typedef {never | [number]} SkipUnnamedFieldInVariant
+	* @property {never} A
+	* @property {[number]} B
+	*
 	* @typedef {null} TransparentWithSkip
 	* @property {null} "0"
 	*

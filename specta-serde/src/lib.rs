@@ -136,6 +136,12 @@ pub mod internal {
 use error::Result;
 use repr::EnumRepr;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct OriginalUnnamedFieldLayout {
+    len: usize,
+    all_skipped: bool,
+}
+
 /// Validates whether a given [`DataType`] is a valid Serde-type.
 ///
 /// When using [`apply`]/[`apply_phases`] all [`NamedDataType`]s are validated automatically, however if you need to export a [`DataType`] directly this is required to validate the top-level type.
@@ -448,6 +454,22 @@ fn rewrite_datatype_for_phase(
             let container_attrs = e.attributes().get::<SerdeContainerAttrs>().cloned();
 
             for (variant_name, variant) in e.variants_mut() {
+                let original_unnamed_layout = match variant.fields() {
+                    Fields::Unnamed(unnamed) => Some(OriginalUnnamedFieldLayout {
+                        len: unnamed.fields().len(),
+                        all_skipped: !unnamed.fields().is_empty()
+                            && unnamed
+                                .fields()
+                                .iter()
+                                .all(|field| should_skip_field_for_mode(field, mode)),
+                    }),
+                    _ => None,
+                };
+
+                if let Some(layout) = original_unnamed_layout {
+                    variant.attributes_mut().insert(layout);
+                }
+
                 let rename_rule =
                     enum_variant_field_rename_rule(&container_attrs, variant, mode, variant_name)?;
 
@@ -1144,8 +1166,17 @@ fn deserialize_conversion_name(attrs: Option<&SerdeContainerAttrs>) -> Option<St
 }
 
 fn transform_external_variant(serialized_name: String, variant: &Variant) -> Result<Variant> {
+    let skipped_only_unnamed = variant
+        .attributes()
+        .get::<OriginalUnnamedFieldLayout>()
+        .is_some_and(|layout| layout.all_skipped);
+
     Ok(match variant.fields() {
         Fields::Unit => clone_variant_with_unnamed_fields(
+            variant,
+            vec![Field::new(string_literal_datatype(serialized_name))],
+        ),
+        _ if skipped_only_unnamed => clone_variant_with_unnamed_fields(
             variant,
             vec![Field::new(string_literal_datatype(serialized_name))],
         ),
@@ -1274,6 +1305,12 @@ fn variant_payload_field(variant: &Variant) -> Option<Field> {
             Some(Field::new(out.build()))
         }
         Fields::Unnamed(unnamed) => {
+            let original_unnamed_len = variant
+                .attributes()
+                .get::<OriginalUnnamedFieldLayout>()
+                .map(|layout| layout.len)
+                .unwrap_or_else(|| unnamed.fields().len());
+
             let non_skipped = unnamed
                 .fields()
                 .iter()
@@ -1281,11 +1318,8 @@ fn variant_payload_field(variant: &Variant) -> Option<Field> {
                 .collect::<Vec<_>>();
 
             match non_skipped.as_slice() {
-                [] if unnamed.fields().is_empty() => {
-                    Some(Field::new(DataType::Tuple(Tuple::new(vec![]))))
-                }
-                [] => None,
-                [single] if unnamed.fields().len() == 1 => Some((*single).clone()),
+                [] => Some(Field::new(DataType::Tuple(Tuple::new(vec![])))),
+                [single] if original_unnamed_len == 1 => Some((*single).clone()),
                 _ => Some(Field::new(DataType::Tuple(Tuple::new(
                     non_skipped
                         .iter()
