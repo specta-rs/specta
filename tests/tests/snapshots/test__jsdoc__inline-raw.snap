@@ -951,9 +951,12 @@ expression: output
 	*		SkipField: SkipField,
 	*		SkipVariant: SkipVariant,
 	*		SkipUnnamedFieldInVariant: SkipUnnamedFieldInVariant,
+	*		SkipNamedFieldInVariant: SkipNamedFieldInVariant,
 	*		TransparentWithSkip: TransparentWithSkip,
 	*		TransparentWithSkip2: TransparentWithSkip2,
 	*		TransparentWithSkip3: TransparentWithSkip3,
+	*		SkipVariant2: SkipVariant2,
+	*		SkipVariant3: SkipVariant3,
 	*		SkipStructFields: SkipStructFields,
 	*		SpectaSkipNonTypeField: SpectaSkipNonTypeField,
 	*		FlattenA: FlattenA,
@@ -1215,9 +1218,12 @@ expression: output
 	* @property {SkipField} SkipField
 	* @property {SkipVariant} SkipVariant
 	* @property {SkipUnnamedFieldInVariant} SkipUnnamedFieldInVariant
+	* @property {SkipNamedFieldInVariant} SkipNamedFieldInVariant
 	* @property {TransparentWithSkip} TransparentWithSkip
 	* @property {TransparentWithSkip2} TransparentWithSkip2
 	* @property {TransparentWithSkip3} TransparentWithSkip3
+	* @property {SkipVariant2} SkipVariant2
+	* @property {SkipVariant3} SkipVariant3
 	* @property {SkipStructFields} SkipStructFields
 	* @property {SpectaSkipNonTypeField} SpectaSkipNonTypeField
 	* @property {FlattenA} FlattenA
@@ -1371,6 +1377,10 @@ expression: output
 	*	}} SkipField
 	* @property {number} b
 	*
+	* @typedef {Record<string, never> | { b: number }} SkipNamedFieldInVariant
+	* @property {Record<string, never>} A
+	* @property {{ b: number }} B
+	*
 	* @typedef {Record<string, never>} SkipOnlyField
 	*
 	* @typedef {{
@@ -1384,6 +1394,12 @@ expression: output
 	*
 	* @typedef {string} SkipVariant
 	* @property {string} A
+	*
+	* @typedef {string} SkipVariant2
+	* @property {string} A
+	*
+	* @typedef {{ a: string }} SkipVariant3
+	* @property {{ a: string }} A
 	*
 	* @typedef {never | string} SkippedFieldWithinVariant
 	* @property {never} A

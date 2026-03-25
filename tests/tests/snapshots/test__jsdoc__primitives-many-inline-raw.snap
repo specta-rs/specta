@@ -896,6 +896,10 @@ expression: output
 	* @property {never} A
 	* @property {[number]} B
 	*
+	* @typedef {Record<string, never> | { b: number }} SkipNamedFieldInVariant
+	* @property {Record<string, never>} A
+	* @property {{ b: number }} B
+	*
 	* @typedef {null} TransparentWithSkip
 	* @property {null} "0"
 	*
@@ -904,6 +908,12 @@ expression: output
 	*
 	* @typedef {string} TransparentWithSkip3
 	* @property {string} "0"
+	*
+	* @typedef {string} SkipVariant2
+	* @property {string} A
+	*
+	* @typedef {{ a: string }} SkipVariant3
+	* @property {{ a: string }} A
 	*
 	* @typedef {{
 	*		a: number,

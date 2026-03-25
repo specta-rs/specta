@@ -195,9 +195,12 @@ SkipOnlyField: SkipOnlyField
 SkipField: SkipField
 SkipVariant: SkipVariant
 SkipUnnamedFieldInVariant: SkipUnnamedFieldInVariant
+SkipNamedFieldInVariant: SkipNamedFieldInVariant
 TransparentWithSkip: TransparentWithSkip
 TransparentWithSkip2: TransparentWithSkip2
 TransparentWithSkip3: TransparentWithSkip3
+SkipVariant2: SkipVariant2
+SkipVariant3: SkipVariant3
 SkipStructFields: SkipStructFields
 SpectaSkipNonTypeField: SpectaSkipNonTypeField
 FlattenA: FlattenA

@@ -966,6 +966,14 @@ expression: output
 	* @property {"A"} A
 	* @property {{ B: [number] }} B
 	*
+	* @typedef {({ A: Record<string, never> }) & { B?: never } | ({ B: {
+	* 	b: number,
+	* } }) & { A?: never }} SkipNamedFieldInVariant
+	* @property {{ A: Record<string, never> }} A
+	* @property {{ B: {
+	* 	b: number,
+	* } }} B
+	*
 	* @typedef {null} TransparentWithSkip
 	* @property {null} "0"
 	*
@@ -974,6 +982,16 @@ expression: output
 	*
 	* @typedef {string} TransparentWithSkip3
 	* @property {string} "0"
+	*
+	* @typedef {{ tag: "A"; data: string }} SkipVariant2
+	* @property {{ tag: "A"; data: string }} A
+	*
+	* @typedef {{ A: {
+	* 	a: string,
+	* } }} SkipVariant3
+	* @property {{ A: {
+	* 	a: string,
+	* } }} A
 	*
 	* @typedef {{
 	*		a: number,

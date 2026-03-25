@@ -469,9 +469,12 @@ SkipField: {
 }
 SkipVariant: string
 SkipUnnamedFieldInVariant: never | [number]
+SkipNamedFieldInVariant: Record<string, never> | { b: number }
 TransparentWithSkip: null
 TransparentWithSkip2: string
 TransparentWithSkip3: string
+SkipVariant2: string
+SkipVariant3: { a: string }
 SkipStructFields: {
 	a: number,
 }
