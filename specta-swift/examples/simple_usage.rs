@@ -1,4 +1,4 @@
-use specta::{ResolvedTypes, Type, Types};
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 // Simple user management types
@@ -31,7 +31,7 @@ fn main() {
         .register::<User>()
         .register::<UserRole>()
         .register::<ApiResult<String>>();
-    let resolved = ResolvedTypes::from_resolved_types(types);
+    let resolved = specta_serde::apply(types).unwrap();
 
     // Export to Swift with default settings
     let swift = Swift::default();

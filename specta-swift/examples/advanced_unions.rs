@@ -177,7 +177,7 @@ fn main() {
         .register::<JobStatus>()
         .register::<MixedEnum>()
         .register::<Event>();
-    let resolved = specta::ResolvedTypes::from_resolved_types(types);
+    let resolved = specta_serde::apply(types).unwrap();
 
     // Export with default settings
     let swift = Swift::default();

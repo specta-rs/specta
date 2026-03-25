@@ -12,6 +12,17 @@ fn phase_collections(
     ]
 }
 
+fn phase_output(types: Result<ResolvedTypes, specta_serde::Error>) -> String {
+    types.map_or_else(
+        |err| format!("ERROR: {err}"),
+        |types| {
+            Swift::default()
+                .export(&types)
+                .unwrap_or_else(|err| format!("ERROR: {err}"))
+        },
+    )
+}
+
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 #[serde(rename_all = "snake_case")]
@@ -36,61 +47,13 @@ enum MixedEnum {
 }
 
 #[test]
-fn swift_export_raw_and_serde_modes() {
+fn swift_export() {
     let types = Types::default()
         .register::<JobStatus>()
         .register::<RegularEnum>()
         .register::<MixedEnum>();
 
     for (mode, result) in phase_collections(types.clone()) {
-        let output = Swift::default().export(&result.unwrap()).unwrap();
-
-        match mode {
-            "raw" => {
-                assert!(
-                    output.contains("enum JobStatus: Codable"),
-                    "{mode}\n{output}"
-                );
-                assert!(output.contains("case queued"), "{mode}\n{output}");
-                assert!(
-                    !output.contains("enum JobStatus: String, Codable"),
-                    "{mode}\n{output}"
-                );
-
-                assert!(
-                    output.contains("enum RegularEnum: Codable"),
-                    "{mode}\n{output}"
-                );
-                assert!(output.contains("case variantOne"), "{mode}\n{output}");
-
-                assert!(output.contains("enum MixedEnum"), "{mode}\n{output}");
-                assert!(output.contains("case unit"), "{mode}\n{output}");
-                assert!(output.contains("case withData(String)"), "{mode}\n{output}");
-            }
-            "serde" | "serde_phases" => {
-                assert!(
-                    output.contains("enum JobStatus: String, Codable"),
-                    "{mode}\n{output}"
-                );
-                assert!(
-                    output.contains("case queued = \"queued\""),
-                    "{mode}\n{output}"
-                );
-                assert!(
-                    output.contains("case pendingApproval = \"pending_approval\""),
-                    "{mode}\n{output}"
-                );
-
-                assert!(
-                    output.contains("enum RegularEnum: String, Codable"),
-                    "{mode}\n{output}"
-                );
-                assert!(
-                    output.contains("case variantOne = \"VariantOne\""),
-                    "{mode}\n{output}"
-                );
-            }
-            _ => unreachable!(),
-        }
+        insta::assert_snapshot!(format!("swift-export-{mode}"), phase_output(result));
     }
 }
