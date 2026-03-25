@@ -621,11 +621,17 @@ SkipVariant: export type SkipVariant = string;
 
 SkipUnnamedFieldInVariant: export type SkipUnnamedFieldInVariant = never | [number];
 
+SkipNamedFieldInVariant: export type SkipNamedFieldInVariant = Record<string, never> | { b: number };
+
 TransparentWithSkip: export type TransparentWithSkip = null;
 
 TransparentWithSkip2: export type TransparentWithSkip2 = string;
 
 TransparentWithSkip3: export type TransparentWithSkip3 = string;
+
+SkipVariant2: export type SkipVariant2 = string;
+
+SkipVariant3: export type SkipVariant3 = { a: string };
 
 SkipStructFields: export type SkipStructFields = {
 	a: number,

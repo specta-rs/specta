@@ -501,9 +501,16 @@ SkipField: {
 }
 SkipVariant: { A: string }
 SkipUnnamedFieldInVariant: "A" | { B: [number] }
+SkipNamedFieldInVariant: ({ A: Record<string, never> }) & { B?: never } | ({ B: {
+	b: number,
+} }) & { A?: never }
 TransparentWithSkip: null
 TransparentWithSkip2: string
 TransparentWithSkip3: string
+SkipVariant2: { tag: "A"; data: string }
+SkipVariant3: { A: {
+	a: string,
+} }
 SkipStructFields: {
 	a: number,
 }

@@ -1014,9 +1014,12 @@ expression: output
 	*		SkipField: SkipField,
 	*		SkipVariant: SkipVariant,
 	*		SkipUnnamedFieldInVariant: SkipUnnamedFieldInVariant,
+	*		SkipNamedFieldInVariant: SkipNamedFieldInVariant,
 	*		TransparentWithSkip: TransparentWithSkip,
 	*		TransparentWithSkip2: TransparentWithSkip2,
 	*		TransparentWithSkip3: TransparentWithSkip3,
+	*		SkipVariant2: SkipVariant2,
+	*		SkipVariant3: SkipVariant3,
 	*		SkipStructFields: SkipStructFields,
 	*		SpectaSkipNonTypeField: SpectaSkipNonTypeField,
 	*		FlattenA: FlattenA,
@@ -1280,9 +1283,12 @@ expression: output
 	* @property {SkipField} SkipField
 	* @property {SkipVariant} SkipVariant
 	* @property {SkipUnnamedFieldInVariant} SkipUnnamedFieldInVariant
+	* @property {SkipNamedFieldInVariant} SkipNamedFieldInVariant
 	* @property {TransparentWithSkip} TransparentWithSkip
 	* @property {TransparentWithSkip2} TransparentWithSkip2
 	* @property {TransparentWithSkip3} TransparentWithSkip3
+	* @property {SkipVariant2} SkipVariant2
+	* @property {SkipVariant3} SkipVariant3
 	* @property {SkipStructFields} SkipStructFields
 	* @property {SpectaSkipNonTypeField} SpectaSkipNonTypeField
 	* @property {FlattenA} FlattenA
@@ -1438,6 +1444,14 @@ expression: output
 	*	}} SkipField
 	* @property {number} b
 	*
+	* @typedef {({ A: Record<string, never> }) & { B?: never } | ({ B: {
+	* 	b: number,
+	* } }) & { A?: never }} SkipNamedFieldInVariant
+	* @property {{ A: Record<string, never> }} A
+	* @property {{ B: {
+	* 	b: number,
+	* } }} B
+	*
 	* @typedef {Record<string, never>} SkipOnlyField
 	*
 	* @typedef {{
@@ -1451,6 +1465,16 @@ expression: output
 	*
 	* @typedef {{ A: string }} SkipVariant
 	* @property {{ A: string }} A
+	*
+	* @typedef {{ tag: "A"; data: string }} SkipVariant2
+	* @property {{ tag: "A"; data: string }} A
+	*
+	* @typedef {{ A: {
+	* 	a: string,
+	* } }} SkipVariant3
+	* @property {{ A: {
+	* 	a: string,
+	* } }} A
 	*
 	* @typedef {{ type: "A" } | { type: "B"; data: string }} SkippedFieldWithinVariant
 	* @property {{ type: "A" }} A
