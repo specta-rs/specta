@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use crate::{inflection::RenameRule, internal::Result, Error};
+use crate::{Error, inflection::RenameRule, internal::Result};
 use specta::datatype::{Attributes, DataType};
 
 const CONTAINER_RENAME_SERIALIZE: &str = "serde:container:rename_serialize";

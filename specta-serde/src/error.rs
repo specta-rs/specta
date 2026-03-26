@@ -287,10 +287,9 @@ impl fmt::Display for Error {
             ErrorKind::InvalidPhasedTypeUsage { path, reason } => {
                 write!(f, "Invalid phased type usage at '{path}': {reason}")
             }
-            ErrorKind::InvalidRenameRule { attribute, value } => write!(
-                f,
-                "Invalid serde rename rule for '{attribute}': {value:?}"
-            ),
+            ErrorKind::InvalidRenameRule { attribute, value } => {
+                write!(f, "Invalid serde rename rule for '{attribute}': {value:?}")
+            }
         }
     }
 }

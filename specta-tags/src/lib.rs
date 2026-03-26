@@ -171,11 +171,15 @@ enum EnumVariantMatcher {
 
 #[derive(Clone, Copy)]
 enum KnownNamedTag {
+    BigInt,
     Date,
     Uint8Array,
 }
 
+// TODO: Review everything in this!
 const BUILTIN_MATCHERS: &[(&str, &str, KnownNamedTag)] = &[
+    // BigInt-like wrapper
+    // ("tauri_specta", "BigInt", KnownNamedTag::BigInt), // TODO: Fix this
     // Date-like
     ("std::time", "SystemTime", KnownNamedTag::Date),
     ("toml::value", "Datetime", KnownNamedTag::Date),
@@ -273,6 +277,7 @@ impl Analyzer {
                 if let Some(ndt) = reference.get(types) {
                     if let Some(tag) = self.resolve_named_tag(ndt.module_path(), ndt.name()) {
                         return match tag {
+                            KnownNamedTag::BigInt => PlanNode::Leaf(Tag::BigInt),
                             KnownNamedTag::Date => PlanNode::Leaf(Tag::Date),
                             KnownNamedTag::Uint8Array => PlanNode::Leaf(Tag::Uint8Array),
                         };
