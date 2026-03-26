@@ -737,8 +737,7 @@ dependencies = [
 [[package]]
 name = "error-stack"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b878b3fac9613c3c7f22eb70bc8a3c6ebdc03cc11479ee60fde1692d747fd45f"
+source = "git+https://github.com/hashintel/hash?rev=da576c7564b27247fd11c2cdae6ca1d2c8e01800#da576c7564b27247fd11c2cdae6ca1d2c8e01800"
 dependencies = [
  "rustc_version",
 ]
@@ -2040,6 +2039,7 @@ dependencies = [
 name = "specta-serde"
 version = "0.0.10"
 dependencies = [
+ "serde",
  "specta",
  "specta-macros",
 ]
