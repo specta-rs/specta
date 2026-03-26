@@ -209,7 +209,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
- "toml_edit 0.23.10+spec-1.0.0",
+ "toml_edit",
 ]
 
 [[package]]
@@ -1509,15 +1509,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "proc-macro-crate"
-version = "3.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e67ba7e9b2b56446f1d419b1d807906278ffa1a658a8a5d8a39dcb1f5a78614f"
-dependencies = [
- "toml_edit 0.25.8+spec-1.1.0",
-]
-
-[[package]]
 name = "proc-macro2"
 version = "1.0.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2032,7 +2023,6 @@ name = "specta-macros"
 version = "2.0.0-rc.23"
 dependencies = [
  "Inflector",
- "proc-macro-crate",
  "proc-macro2",
  "quote",
  "syn",
@@ -2356,18 +2346,6 @@ dependencies = [
  "toml_datetime 0.7.5+spec-1.1.0",
  "toml_parser",
  "winnow 0.7.15",
-]
-
-[[package]]
-name = "toml_edit"
-version = "0.25.8+spec-1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16bff38f1d86c47f9ff0647e6838d7bb362522bdf44006c7068c2b1e606f1f3c"
-dependencies = [
- "indexmap 2.13.0",
- "toml_datetime 1.1.0+spec-1.1.0",
- "toml_parser",
- "winnow 1.0.0",
 ]
 
 [[package]]
@@ -2833,9 +2811,6 @@ name = "winnow"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a90e88e4667264a994d34e6d1ab2d26d398dcdca8b7f52bec8668957517fc7d8"
-dependencies = [
- "memchr",
-]
 
 [[package]]
 name = "wit-bindgen"

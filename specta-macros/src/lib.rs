@@ -26,24 +26,8 @@ use syn::{Error, LitStr, Type, parse_macro_input};
 ///  - `#[specta(type = ::std::string::String)]` - Will override the type of a item, variant or field to a given type.
 ///  - `#[specta(collect = false)]` - When using the `collect` feature, this will prevent the specific type from being exported.
 ///
-/// # Format parser discovery
-///
-/// Specta macros discover format parser crates at macro-expansion time.
-///
-/// - `specta-serde` is discovered automatically when it exists in the current
-///   crate dependency graph.
-/// - Additional parser crates can be registered globally with the
-///   `SPECTA_FORMAT_CRATES` environment variable as a comma-separated list.
-///
-/// A common way to set this is from your crate's `build.rs`:
-/// ```rust,ignore
-/// fn main() {
-///     println!("cargo:rustc-env=SPECTA_FORMAT_CRATES=my-format-parser,another-parser");
-/// }
-/// ```
-///
-/// Entries are resolved as Cargo package names first (rename-safe). If package
-/// resolution fails, entries are treated as Rust paths.
+/// When the `serde` feature is enabled on `specta-macros`, Specta will also
+/// read `#[serde(...)]` attributes while deriving `specta::Type`.
 ///
 /// ## Example
 ///

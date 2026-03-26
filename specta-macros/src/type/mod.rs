@@ -16,7 +16,6 @@ use self::generics::{
 pub(crate) mod attr;
 mod r#enum;
 mod field;
-mod format_crates;
 mod generics;
 #[cfg(feature = "serde")]
 mod serde;
@@ -34,7 +33,6 @@ pub(super) fn build_runtime_attributes(
     scope: AttributeScope,
     raw_attrs: &[syn::Attribute],
     skip_attrs: &[String],
-    format_crates: &[syn::Path],
 ) -> syn::Result<TokenStream> {
     let metas = raw_attrs
         .iter()
@@ -45,22 +43,14 @@ pub(super) fn build_runtime_attributes(
         .map(|attr| attr.meta.to_token_stream())
         .collect::<Vec<_>>();
 
-    let parser_scope = match scope {
-        AttributeScope::Container => quote!(@container),
-        AttributeScope::Variant => quote!(@variant),
-        AttributeScope::Field => quote!(@field),
-    };
-
-    let parser_calls = format_crates.iter().map(|crate_path| {
-        quote! {
-            attrs.extend(#crate_path::parser!(#parser_scope [#(#metas),*]));
-        }
-    });
-
     #[cfg(feature = "serde")]
     let serde_insert = serde::lower_runtime_attributes(crate_ref, scope, raw_attrs)?;
     #[cfg(not(feature = "serde"))]
-    let serde_insert: Option<TokenStream> = None;
+    let serde_insert: Option<TokenStream> = {
+        let _ = crate_ref;
+        let _ = scope;
+        None
+    };
 
     if metas.is_empty() && serde_insert.is_none() {
         return Ok(quote!(datatype::Attributes::default()));
@@ -69,7 +59,6 @@ pub(super) fn build_runtime_attributes(
     Ok(quote!({
         let mut attrs = datatype::Attributes::default();
         #serde_insert
-        #(#parser_calls)*
         attrs
     }))
 }
@@ -90,7 +79,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let container_attrs = ContainerAttr::from_attrs(&mut attrs)?;
     let crate_ref = container_attrs.crate_name.clone().unwrap_or(quote!(specta));
-    let format_crates = format_crates::format_crates()?;
 
     if container_attrs.r#type.is_some() && container_attrs.transparent {
         return Err(syn::Error::new(
@@ -158,15 +146,14 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         AttributeScope::Container,
         raw_attrs,
         &container_attrs.skip_attrs,
-        &format_crates,
     )?;
 
     let dt_expr = if let Some(container_ty) = &container_attrs.r#type {
         quote!(<#container_ty as #crate_ref::Type>::definition(types))
     } else {
         let dt_expr = match data {
-            Data::Struct(data) => parse_struct(&crate_ref, &container_attrs, data, &format_crates),
-            Data::Enum(data) => parse_enum(&crate_ref, &container_attrs, data, &format_crates),
+            Data::Struct(data) => parse_struct(&crate_ref, &container_attrs, data),
+            Data::Enum(data) => parse_enum(&crate_ref, &container_attrs, data),
             Data::Union(data) => Err(syn::Error::new_spanned(
                 data.union_token,
                 "specta: Union types are not supported by Specta yet!",

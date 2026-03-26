@@ -3,8 +3,8 @@ use crate::{
     utils::{parse_attrs_with_filter, unraw_raw_ident},
 };
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
-use syn::{DataStruct, Field, Fields, Type, spanned::Spanned};
+use quote::{quote, ToTokens};
+use syn::{spanned::Spanned, DataStruct, Field, Fields, Type};
 
 use super::attr::*;
 
@@ -68,7 +68,6 @@ pub fn parse_struct(
     crate_ref: &TokenStream,
     container_attrs: &ContainerAttr,
     data: &DataStruct,
-    format_crates: &[syn::Path],
 ) -> syn::Result<TokenStream> {
     if container_attrs.transparent {
         if let Fields::Unit = data.fields {
@@ -106,7 +105,6 @@ pub fn parse_struct(
             field_attrs,
             &field_ty,
             raw_attrs,
-            format_crates,
         )?;
 
         return Ok(quote!(datatype::Struct::unnamed().field(#field).build()));
@@ -136,7 +134,6 @@ pub fn parse_struct(
                         field_attrs,
                         &field.ty,
                         raw_attrs,
-                        format_crates,
                     )?;
                     Ok(quote!(builder.field_mut(#field_name, #inner);))
                 })
@@ -161,7 +158,6 @@ pub fn parse_struct(
                         field_attrs,
                         &field.ty,
                         raw_attrs,
-                        format_crates,
                     )
                     .map(|inner| quote!(builder.field_mut(#inner);))
                 })
