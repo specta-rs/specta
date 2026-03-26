@@ -1,10 +1,12 @@
 use std::borrow::Cow;
 
 use specta::{
-    Types,
-    datatype::{DataType, Fields, GenericReference, NamedReference, Primitive, Reference},
+    ResolvedTypes, Types,
+    datatype::{
+        DataType, Fields, GenericReference, NamedReference, Primitive, Reference,
+        SERDE_CONTAINER_ATTRIBUTE_KEY, SerdeContainerAttributeData,
+    },
 };
-use specta_serde::internal::SerdeContainerAttrs;
 
 // TODO: Allow configuring custom named types via NDT name and module path using config params.
 // TODO: Tagging-style system for `rspc` w/ runtime
@@ -48,13 +50,13 @@ pub struct TransformPlan {
 
 impl TransformPlan {
     /// TODO
-    pub fn analyze(dt: DataType, types: &Types) -> Self {
+    pub fn analyze(dt: DataType, types: &ResolvedTypes) -> Self {
         // Scan all `DataType` references, etc. and collect tags and their object location for `Self::map` to use.
         //
         // You should match on `NamedDataType`'s name and module path to determine known named types.
 
         Self {
-            plan: Analyzer::default().analyze(&dt, types, &[], &mut Vec::new()),
+            plan: Analyzer::default().analyze(&dt, types.as_types(), &[], &mut Vec::new()),
         }
     }
 
@@ -555,7 +557,9 @@ fn js_string(value: &str) -> String {
 }
 
 fn parse_enum_repr(attributes: &specta::datatype::Attributes) -> EnumRepr {
-    let Some(attrs) = SerdeContainerAttrs::from_attributes(attributes) else {
+    let Some(attrs) =
+        attributes.get_named_as::<SerdeContainerAttributeData>(SERDE_CONTAINER_ATTRIBUTE_KEY)
+    else {
         return EnumRepr::External;
     };
 
@@ -575,7 +579,7 @@ fn parse_enum_repr(attributes: &specta::datatype::Attributes) -> EnumRepr {
 
 #[cfg(test)]
 mod tests {
-    use specta::{Type, Types};
+    use specta::{ResolvedTypes, Type, Types};
 
     use super::TransformPlan;
 
@@ -599,7 +603,7 @@ mod tests {
     fn map_renders_trusting_transforms() {
         let mut types = Types::default();
         let dt = Root::definition(&mut types);
-        let plan = TransformPlan::analyze(dt, &types);
+        let plan = TransformPlan::analyze(dt, &ResolvedTypes::from_resolved_types(types));
         let js = plan.map("v");
 
         assert!(

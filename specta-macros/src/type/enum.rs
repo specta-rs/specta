@@ -1,8 +1,8 @@
-use super::{attr::*, build_runtime_attributes, r#struct::decode_field_attrs, AttributeScope};
+use super::{AttributeScope, attr::*, build_runtime_attributes, r#struct::decode_field_attrs};
 use crate::{r#type::field::construct_field_with_variant_skip, utils::*};
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
-use syn::{spanned::Spanned, DataEnum, Fields, Type};
+use quote::{ToTokens, quote};
+use syn::{DataEnum, Fields, Type, spanned::Spanned};
 
 pub fn parse_enum(
     crate_ref: &TokenStream,
