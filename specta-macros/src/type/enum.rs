@@ -71,11 +71,12 @@ pub fn parse_enum(
             }
 
             let runtime_attrs = build_runtime_attributes(
+                crate_ref,
                 AttributeScope::Variant,
                 &v.attrs,
                 &container_attrs.skip_attrs,
                 format_crates,
-            );
+            )?;
 
             Ok((v, variant_attrs, runtime_attrs))
         })

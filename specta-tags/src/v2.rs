@@ -555,7 +555,7 @@ fn js_string(value: &str) -> String {
 }
 
 fn parse_enum_repr(attributes: &specta::datatype::Attributes) -> EnumRepr {
-    let Some(attrs) = attributes.get::<SerdeContainerAttrs>() else {
+    let Some(attrs) = SerdeContainerAttrs::from_attributes(attributes) else {
         return EnumRepr::External;
     };
 

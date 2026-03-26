@@ -9,6 +9,7 @@ mod map;
 mod named;
 mod primitive;
 mod reference;
+mod serde;
 mod r#struct;
 mod tuple;
 
@@ -21,6 +22,11 @@ pub use map::Map;
 pub use named::{Deprecated, NamedDataType};
 pub use primitive::Primitive;
 pub use reference::{GenericReference, NamedReference, OpaqueReference, Reference};
+pub use serde::{
+    SERDE_CONTAINER_ATTRIBUTE_KEY, SERDE_FIELD_ATTRIBUTE_KEY, SERDE_VARIANT_ATTRIBUTE_KEY,
+    SerdeContainerAttributeData, SerdeConversionTypeData, SerdeFieldAttributeData, SerdeRenameRule,
+    SerdeVariantAttributeData,
+};
 pub use r#struct::Struct;
 pub use tuple::Tuple;
 

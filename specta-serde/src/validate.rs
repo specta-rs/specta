@@ -12,6 +12,18 @@ use crate::{
     repr::EnumRepr,
 };
 
+fn container_attrs(attributes: &specta::datatype::Attributes) -> Option<SerdeContainerAttrs> {
+    SerdeContainerAttrs::from_attributes(attributes)
+}
+
+fn field_attrs(attributes: &specta::datatype::Attributes) -> Option<SerdeFieldAttrs> {
+    SerdeFieldAttrs::from_attributes(attributes)
+}
+
+fn variant_attrs(attributes: &specta::datatype::Attributes) -> Option<SerdeVariantAttrs> {
+    SerdeVariantAttrs::from_attributes(attributes)
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ApplyMode {
     Unified,
@@ -107,9 +119,7 @@ fn inner(
                 &path,
                 mode,
             )?;
-            if strct
-                .attributes()
-                .get::<SerdeContainerAttrs>()
+            if container_attrs(strct.attributes())
                 .is_some_and(|attrs| attrs.variant_identifier || attrs.field_identifier)
             {
                 return Err(Error::invalid_phased_type_usage(
@@ -118,7 +128,7 @@ fn inner(
                 ));
             }
 
-            if let Some(attrs) = strct.attributes().get::<SerdeContainerAttrs>() {
+            if let Some(attrs) = container_attrs(strct.attributes()) {
                 if attrs.untagged {
                     return Err(Error::invalid_phased_type_usage(
                         path,
@@ -359,7 +369,7 @@ fn inner(
 }
 
 fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<()> {
-    let Some(attrs) = enm.attributes().get::<SerdeContainerAttrs>() else {
+    let Some(attrs) = container_attrs(enm.attributes()) else {
         return Ok(());
     };
 
@@ -425,7 +435,7 @@ fn validate_container_attributes(
     path: &str,
     mode: ApplyMode,
 ) -> Result<()> {
-    if let Some(parsed) = attrs.get::<SerdeContainerAttrs>()
+    if let Some(parsed) = container_attrs(attrs)
         && parsed.from.is_some()
         && parsed.try_from.is_some()
     {
@@ -435,7 +445,7 @@ fn validate_container_attributes(
         ));
     }
 
-    if let Some(conversions) = attrs.get::<SerdeContainerAttrs>() {
+    if let Some(conversions) = container_attrs(attrs) {
         for (suffix, target) in [
             ("<serde_into>", conversions.resolved_into.as_ref()),
             ("<serde_from>", conversions.resolved_from.as_ref()),
@@ -458,7 +468,7 @@ fn validate_container_attributes(
 }
 
 fn validate_variant_attributes(variant: &Variant, path: String, _mode: ApplyMode) -> Result<()> {
-    let Some(serde_attrs) = variant.attributes().get::<SerdeVariantAttrs>() else {
+    let Some(serde_attrs) = variant_attrs(variant.attributes()) else {
         return Ok(());
     };
 
@@ -476,7 +486,7 @@ fn validate_variant_attributes(variant: &Variant, path: String, _mode: ApplyMode
 }
 
 fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Result<()> {
-    let Some(serde_attrs) = field.attributes().get::<SerdeFieldAttrs>() else {
+    let Some(serde_attrs) = field_attrs(field.attributes()) else {
         return Ok(());
     };
 
@@ -556,9 +566,7 @@ fn validate_other_variant(enm: &Enum, path: &str, repr: &EnumRepr, mode: ApplyMo
         .variants()
         .iter()
         .filter_map(|(name, variant)| {
-            variant
-                .attributes()
-                .get::<SerdeVariantAttrs>()
+            variant_attrs(variant.attributes())
                 .is_some_and(|attrs| attrs.other)
                 .then_some((name, variant))
         })
@@ -675,7 +683,7 @@ fn validate_internally_tag_enum_datatype(
 }
 
 fn enum_repr_from_attrs(attrs: &specta::datatype::Attributes) -> Result<EnumRepr> {
-    let Some(container_attrs) = attrs.get::<SerdeContainerAttrs>() else {
+    let Some(container_attrs) = container_attrs(attrs) else {
         return Ok(EnumRepr::External);
     };
 

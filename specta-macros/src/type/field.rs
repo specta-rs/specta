@@ -38,11 +38,12 @@ pub fn construct_field_with_variant_skip(
     let doc = attrs.common.doc;
     let inline = attrs.inline;
     let runtime_attrs = build_runtime_attributes(
+        crate_ref,
         AttributeScope::Field,
         raw_attrs,
         &container_attrs.skip_attrs,
         format_crates,
-    );
+    )?;
     let type_overridden = attrs.r#type.is_some();
 
     let ty = if attrs.skip || variant_skip {

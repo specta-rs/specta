@@ -5,8 +5,7 @@
 //! attributes.
 //!
 //! Discovery sources, in order:
-//! 1. Built-in auto-detection of `specta-serde` for out-of-box serde support.
-//! 2. `SPECTA_FORMAT_CRATES`, a comma-separated list provided by the build
+//! 1. `SPECTA_FORMAT_CRATES`, a comma-separated list provided by the build
 //!    environment (for example from `build.rs`).
 //!
 //! A common setup in `build.rs`:
@@ -111,10 +110,6 @@ fn cached_format_crate_strings() -> syn::Result<Vec<String>> {
 
 fn compute_format_crate_strings() -> syn::Result<Vec<String>> {
     let mut crates = Vec::new();
-
-    if let Some(specta_serde) = resolve_package_crate_path("specta-serde")? {
-        crates.push(specta_serde);
-    }
 
     for entry in std::env::var(FORMAT_CRATES_ENV_VAR)
         .unwrap_or_default()

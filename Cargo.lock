@@ -2051,6 +2051,7 @@ name = "specta-serde"
 version = "0.0.10"
 dependencies = [
  "specta",
+ "specta-macros",
 ]
 
 [[package]]
