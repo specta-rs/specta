@@ -26,6 +26,16 @@ fn typescript_types() -> (Types, Vec<(&'static str, DataType)>) {
     (types, dts)
 }
 
+fn sanitize_typescript_phase(
+    dts: Vec<(&'static str, DataType)>,
+    types: Types,
+) -> (Vec<(&'static str, DataType)>, Types) {
+    (
+        crate::sanitize_typescript_bigints_in_dts(dts),
+        crate::sanitize_typescript_bigints_in_types(types),
+    )
+}
+
 fn phase_collections() -> [(
     &'static str,
     Result<(Vec<(&'static str, DataType)>, ResolvedTypes), specta_serde::Error>,
@@ -43,6 +53,9 @@ fn phase_collections() -> [(
         dts2.extend(dts.iter().cloned());
         (types2, dts2)
     };
+
+    let (dts, types) = sanitize_typescript_phase(dts, types);
+    let (phased_dts, phased_types) = sanitize_typescript_phase(phased_dts, phased_types);
 
     [
         (
@@ -373,6 +386,138 @@ fn typescript_export_serde_errors() {
     assert!(
         failures.is_empty(),
         "Unexpected TypeScript serde export behavior:\n{}",
+        failures.join("\n")
+    );
+}
+
+#[test]
+fn typescript_export_bigint_errors() {
+    fn assert_bigint_error<T: Type>(failures: &mut Vec<String>, name: &str) {
+        let ts = Typescript::default();
+        let mut types = Types::default();
+        let dt = T::definition(&mut types);
+        let resolved = ResolvedTypes::from_resolved_types(types);
+
+        match primitives::inline(&ts, &resolved, &dt) {
+            Ok(ty) => failures.push(format!(
+                "{name} [inline]: expected BigInt error, but export succeeded with '{ty}'"
+            )),
+            Err(err)
+                if err
+                    .to_string()
+                    .contains("forbids exporting BigInt-style types") => {}
+            Err(err) => failures.push(format!("{name} [inline]: unexpected error '{err}'")),
+        }
+
+        if resolved.as_types().is_empty() {
+            return;
+        }
+
+        match ts.export(&resolved) {
+            Ok(output) => failures.push(format!(
+                "{name} [export]: expected BigInt error, but export succeeded with '{output}'"
+            )),
+            Err(err)
+                if err
+                    .to_string()
+                    .contains("forbids exporting BigInt-style types") => {}
+            Err(err) => failures.push(format!("{name} [export]: unexpected error '{err}'")),
+        }
+    }
+
+    macro_rules! for_bigint_types {
+        (T -> $s:expr) => {{
+            for_bigint_types!(usize, isize, i64, u64, i128, u128; $s);
+        }};
+        ($($i:ty),+; $s:expr) => {{
+            $({
+                type T = $i;
+                $s(stringify!($i));
+            })*
+        }};
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct StructWithBigInt {
+        a: i128,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct StructWithStructWithBigInt {
+        #[specta(inline)]
+        abc: StructWithBigInt,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct StructWithStructWithStructWithBigInt {
+        #[specta(inline)]
+        field1: StructWithStructWithBigInt,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct StructWithOptionWithStructWithBigInt {
+        #[specta(inline)]
+        optional_field: Option<StructWithBigInt>,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    enum EnumWithStructWithStructWithBigInt {
+        #[specta(inline)]
+        A(StructWithStructWithBigInt),
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    enum EnumWithInlineStructWithBigInt {
+        #[specta(inline)]
+        B { a: i128 },
+    }
+
+    let mut failures = Vec::new();
+
+    for_bigint_types!(T -> |name| {
+        assert_bigint_error::<T>(&mut failures, name);
+    });
+
+    for (name, assert) in [
+        (
+            "StructWithBigInt",
+            assert_bigint_error::<StructWithBigInt> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "StructWithStructWithBigInt",
+            assert_bigint_error::<StructWithStructWithBigInt> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "StructWithStructWithStructWithBigInt",
+            assert_bigint_error::<StructWithStructWithStructWithBigInt>
+                as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "StructWithOptionWithStructWithBigInt",
+            assert_bigint_error::<StructWithOptionWithStructWithBigInt>
+                as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "EnumWithStructWithStructWithBigInt",
+            assert_bigint_error::<EnumWithStructWithStructWithBigInt> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "EnumWithInlineStructWithBigInt",
+            assert_bigint_error::<EnumWithInlineStructWithBigInt> as fn(&mut Vec<String>, &str),
+        ),
+    ] {
+        assert(&mut failures, name);
+    }
+
+    assert!(
+        failures.is_empty(),
+        "Unexpected TypeScript BigInt export behavior:\n{}",
         failures.join("\n")
     );
 }

@@ -12,7 +12,6 @@ macro_rules! register {
     }};
 }
 
-mod bigints;
 mod bound;
 mod errors;
 mod functions;
@@ -29,7 +28,9 @@ mod typescript;
 mod utils;
 
 pub use types::{types, types_phased};
-pub use utils::fs_to_string;
+pub use utils::{
+    fs_to_string, sanitize_typescript_bigints_in_dts, sanitize_typescript_bigints_in_types,
+};
 
 #[test]
 fn compile_errors() {

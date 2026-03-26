@@ -54,7 +54,9 @@ fn phase_collections(
 
 #[test]
 fn export() {
-    for (mode, types) in phase_collections(crate::types().0) {
+    for (mode, types) in phase_collections(crate::sanitize_typescript_bigints_in_types(
+        crate::types().0,
+    )) {
         let output = match types {
             Ok(types) => JSDoc::default().export(&types).unwrap(),
             Err(err) => format!("ERROR: {err}"),
@@ -67,7 +69,9 @@ fn export() {
 #[test]
 fn primitives_export_many() {
     let (types, dts) = crate::types();
-    for (mode, types) in phase_collections(types) {
+    let dts = crate::sanitize_typescript_bigints_in_dts(dts);
+
+    for (mode, types) in phase_collections(crate::sanitize_typescript_bigints_in_types(types)) {
         let output = match types {
             Ok(types) => {
                 let jsdoc = JSDoc::default();

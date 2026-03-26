@@ -4,6 +4,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use specta::{
+    Types,
+    datatype::{DataType, Fields, Primitive},
+};
+
 /// Get a `String` representation of the filesystem.
 /// This is used for snapshot testing multi-file exports.
 pub fn fs_to_string(path: &Path) -> Result<String, std::io::Error> {
@@ -120,5 +125,82 @@ fn normalize_newlines(text: &str) -> Cow<'_, str> {
         Cow::Owned(text.replace("\r\n", "\n"))
     } else {
         Cow::Borrowed(text)
+    }
+}
+
+pub fn sanitize_typescript_bigints_in_dts(
+    mut dts: Vec<(&'static str, DataType)>,
+) -> Vec<(&'static str, DataType)> {
+    for (_, dt) in &mut dts {
+        sanitize_typescript_bigints_in_datatype(dt);
+    }
+
+    dts.retain(
+        |(_, dt)| !matches!(dt, DataType::Primitive(primitive) if is_forbidden_typescript_bigint(primitive)),
+    );
+    dts
+}
+
+pub fn sanitize_typescript_bigints_in_types(types: Types) -> Types {
+    types.map(|mut ty| {
+        sanitize_typescript_bigints_in_datatype(ty.ty_mut());
+        ty
+    })
+}
+
+fn is_forbidden_typescript_bigint(primitive: &Primitive) -> bool {
+    matches!(
+        primitive,
+        Primitive::i64
+            | Primitive::i128
+            | Primitive::isize
+            | Primitive::u64
+            | Primitive::u128
+            | Primitive::usize
+    )
+}
+
+fn sanitize_typescript_bigints_in_datatype(dt: &mut DataType) {
+    match dt {
+        DataType::Primitive(primitive) => {
+            *primitive = match primitive.clone() {
+                Primitive::i64 | Primitive::i128 | Primitive::isize => Primitive::i32,
+                Primitive::u64 | Primitive::u128 | Primitive::usize => Primitive::u32,
+                primitive => primitive,
+            };
+        }
+        DataType::List(list) => sanitize_typescript_bigints_in_datatype(list.ty_mut()),
+        DataType::Map(map) => {
+            sanitize_typescript_bigints_in_datatype(map.key_ty_mut());
+            sanitize_typescript_bigints_in_datatype(map.value_ty_mut());
+        }
+        DataType::Struct(strct) => sanitize_typescript_bigints_in_fields(strct.fields_mut()),
+        DataType::Enum(enm) => {
+            for (_, variant) in enm.variants_mut() {
+                sanitize_typescript_bigints_in_fields(variant.fields_mut());
+            }
+        }
+        DataType::Tuple(tuple) => tuple
+            .elements_mut()
+            .iter_mut()
+            .for_each(sanitize_typescript_bigints_in_datatype),
+        DataType::Nullable(inner) => sanitize_typescript_bigints_in_datatype(inner),
+        DataType::Reference(_) => {}
+    }
+}
+
+fn sanitize_typescript_bigints_in_fields(fields: &mut Fields) {
+    match fields {
+        Fields::Unit => {}
+        Fields::Unnamed(fields) => fields
+            .fields_mut()
+            .iter_mut()
+            .filter_map(|field| field.ty_mut())
+            .for_each(sanitize_typescript_bigints_in_datatype),
+        Fields::Named(fields) => fields
+            .fields_mut()
+            .iter_mut()
+            .filter_map(|(_, field)| field.ty_mut())
+            .for_each(sanitize_typescript_bigints_in_datatype),
     }
 }

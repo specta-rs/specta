@@ -103,7 +103,7 @@ struct LegacyImpls {
 fn legacy_impls() {
     let output = Typescript::default()
         .export(&ResolvedTypes::from_resolved_types(
-            Types::default().register::<LegacyImpls>(),
+            crate::sanitize_typescript_bigints_in_types(Types::default().register::<LegacyImpls>()),
         ))
         .unwrap();
     insta::assert_snapshot!("legacy_impls", output);
