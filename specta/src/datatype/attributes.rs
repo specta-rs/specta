@@ -32,8 +32,9 @@ where
     }
 
     fn hash_dyn(&self, state: &mut dyn Hasher) {
-        let mut state = state;
-        self.0.hash(&mut state);
+        let mut hasher = DefaultHasher::new();
+        self.0.hash(&mut hasher);
+        state.write_u64(hasher.finish());
     }
 
     fn fmt_dyn(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -42,6 +43,34 @@ where
 }
 
 /// A named map of type-erased metadata attached to datatype nodes.
+///
+/// `Attributes` is primarily used by advanced consumers that need to inspect
+/// metadata recorded on [`DataType`](super::DataType) nodes at runtime. Each
+/// entry is stored under a string key and can later be retrieved either as a
+/// raw [`Any`] value or by downcasting to the original type.
+///
+/// Stored values must be owned and implement [`Clone`], [`Eq`], [`Hash`], and
+/// [`fmt::Debug`] so attributes remain comparable, hashable, and printable as
+/// part of the surrounding datatype graph.
+///
+/// # Examples
+///
+/// ```rust
+/// use specta::datatype::Attributes;
+///
+/// let mut attrs = Attributes::default();
+/// attrs.insert("serde.rename", String::from("user_name"));
+/// attrs.insert("serde.skip", true);
+///
+/// assert_eq!(attrs.len(), 2);
+/// assert!(attrs.contains_key("serde.rename"));
+/// assert_eq!(
+///     attrs.get_named_as::<String>("serde.rename"),
+///     Some(&String::from("user_name"))
+/// );
+/// assert_eq!(attrs.get_named_as::<bool>("serde.skip"), Some(&true));
+/// assert_eq!(attrs.get_named_as::<u32>("serde.skip"), None);
+/// ```
 #[derive(Default)]
 pub struct Attributes(HashMap<Cow<'static, str>, Arc<dyn DynAttributeValue>>);
 
@@ -67,7 +96,22 @@ impl Attributes {
         self.0.is_empty()
     }
 
-    /// Inserts an attribute value.
+    /// Inserts or replaces an attribute value.
+    ///
+    /// Values are stored in a type-erased form, but they must still implement
+    /// [`Clone`], [`Eq`], [`Hash`], and [`fmt::Debug`] so the containing
+    /// [`Attributes`] remains cloneable, comparable, hashable, and printable.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use specta::datatype::Attributes;
+    ///
+    /// let mut attrs = Attributes::default();
+    /// attrs.insert("serde.default", true);
+    ///
+    /// assert_eq!(attrs.get_named_as::<bool>("serde.default"), Some(&true));
+    /// ```
     pub fn insert<T>(&mut self, key: impl Into<Cow<'static, str>>, value: T)
     where
         T: Any + Clone + Eq + Hash + fmt::Debug + Send + Sync + 'static,
@@ -77,6 +121,25 @@ impl Attributes {
     }
 
     /// Extends `self` with entries from `other`.
+    ///
+    /// If both collections contain the same key, the value from `other`
+    /// replaces the existing entry in `self`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use specta::datatype::Attributes;
+    ///
+    /// let mut base = Attributes::default();
+    /// base.insert("serde.rename", String::from("first_name"));
+    ///
+    /// let mut extra = Attributes::default();
+    /// extra.insert("serde.skip", true);
+    ///
+    /// base.extend(extra);
+    ///
+    /// assert_eq!(base.get_named_as::<bool>("serde.skip"), Some(&true));
+    /// ```
     pub fn extend(&mut self, other: Self) {
         self.0.extend(other.0);
     }
@@ -87,11 +150,41 @@ impl Attributes {
     }
 
     /// Returns the raw type-erased value for a named attribute.
+    ///
+    /// This is useful when the expected type is not known until runtime.
+    /// Prefer [`Attributes::get_named_as`] when you know the concrete type.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use specta::datatype::Attributes;
+    ///
+    /// let mut attrs = Attributes::default();
+    /// attrs.insert("serde.rename", String::from("user_name"));
+    ///
+    /// let value = attrs.get_named("serde.rename").unwrap();
+    /// assert_eq!(value.downcast_ref::<String>(), Some(&String::from("user_name")));
+    /// ```
     pub fn get_named(&self, key: &str) -> Option<&dyn Any> {
         self.0.get(key).map(|value| value.value_any())
     }
 
     /// Returns a typed reference to the named attribute value.
+    ///
+    /// Returns `None` when the key is missing or when the stored value has a
+    /// different type than `T`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use specta::datatype::Attributes;
+    ///
+    /// let mut attrs = Attributes::default();
+    /// attrs.insert("serde.skip", true);
+    ///
+    /// assert_eq!(attrs.get_named_as::<bool>("serde.skip"), Some(&true));
+    /// assert_eq!(attrs.get_named_as::<String>("serde.skip"), None);
+    /// ```
     pub fn get_named_as<T: Any + 'static>(&self, key: &str) -> Option<&T> {
         self.0
             .get(key)
