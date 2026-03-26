@@ -1,4 +1,30 @@
-//! Shared semantic mapping analysis and JS/TS runtime generation.
+//! Analyze Specta datatypes and generate inline JavaScript transforms.
+//!
+//! `TransformPlan` walks a resolved `specta::DataType` tree, tags values that need
+//! JavaScript-side conversion, and renders a plain JavaScript expression that applies
+//! those conversions at runtime.
+//!
+//! This is intended for cases where a transport serializes values like `u128`, dates,
+//! or bytes into JSON-compatible representations and the client needs to restore their
+//! richer JavaScript forms.
+//!
+//! ```rust
+//! use specta::{ResolvedTypes, Type, Types};
+//!
+//! #[derive(Type)]
+//! struct Event {
+//!     id: u128,
+//! }
+//!
+//! let mut types = Types::default();
+//! let dt = Event::definition(&mut types);
+//! let resolved = ResolvedTypes::from_resolved_types(types);
+//!
+//! let plan = specta_tags::TransformPlan::analyze(dt, &resolved);
+//! let js = plan.map("value");
+//! assert!(js.contains("BigInt"));
+//! assert!(js.contains("[\"id\"]"));
+//! ```
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
     html_logo_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png",
@@ -46,14 +72,17 @@ impl std::fmt::Debug for Tag {
     }
 }
 
-/// TODO
+/// A compiled transform plan for a resolved Specta datatype.
+///
+/// Use [`TransformPlan::analyze`] to build the plan, then [`TransformPlan::map`] to
+/// render the JavaScript expression that applies the required runtime conversions.
 #[derive(Debug)]
 pub struct TransformPlan {
     plan: PlanNode,
 }
 
 impl TransformPlan {
-    /// TODO
+    /// Analyzes a resolved datatype and records the JavaScript conversions it needs.
     pub fn analyze(dt: DataType, types: &ResolvedTypes) -> Self {
         // Scan all `DataType` references, etc. and collect tags and their object location for `Self::map` to use.
         //
@@ -64,9 +93,11 @@ impl TransformPlan {
         }
     }
 
-    /// TODO
+    /// Renders a JavaScript expression that transforms the provided input expression.
     ///
-    /// This should produce something like
+    /// When no runtime conversions are required this returns the original expression.
+    /// Otherwise it returns a new expression that applies the necessary `BigInt`,
+    /// `Date`, or `Uint8Array` conversions inline.
     pub fn map<'a>(&self, t: &'a str) -> Cow<'a, str> {
         // If `t` is a struct and has tags we wanna decompose it to something like:
         // `{ ...t, field_with_override: { nested_override: new Date(t.field_with_override.nested_override) } }`
