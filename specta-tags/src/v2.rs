@@ -2,11 +2,9 @@ use std::borrow::Cow;
 
 use specta::{
     ResolvedTypes, Types,
-    datatype::{
-        DataType, Fields, GenericReference, NamedReference, Primitive, Reference,
-        SERDE_CONTAINER_ATTRIBUTE_KEY, SerdeContainerAttributeData,
-    },
+    datatype::{DataType, Fields, GenericReference, NamedReference, Primitive, Reference},
 };
+use specta_serde::internal::SerdeContainerAttrs;
 
 // TODO: Allow configuring custom named types via NDT name and module path using config params.
 // TODO: Tagging-style system for `rspc` w/ runtime
@@ -557,9 +555,7 @@ fn js_string(value: &str) -> String {
 }
 
 fn parse_enum_repr(attributes: &specta::datatype::Attributes) -> EnumRepr {
-    let Some(attrs) =
-        attributes.get_named_as::<SerdeContainerAttributeData>(SERDE_CONTAINER_ATTRIBUTE_KEY)
-    else {
+    let Some(attrs) = SerdeContainerAttrs::from_attributes(attributes) else {
         return EnumRepr::External;
     };
 
