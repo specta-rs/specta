@@ -1,7 +1,7 @@
 use std::{
     any::Any,
     borrow::Cow,
-    collections::{HashMap, hash_map::DefaultHasher},
+    collections::{hash_map::DefaultHasher, HashMap},
     fmt,
     hash::{Hash, Hasher},
     sync::Arc,
@@ -9,7 +9,6 @@ use std::{
 
 trait DynAttributeValue: Send + Sync {
     fn value_any(&self) -> &dyn Any;
-    fn clone_dyn(&self) -> Arc<dyn DynAttributeValue>;
     fn eq_dyn(&self, other: &dyn DynAttributeValue) -> bool;
     fn hash_dyn(&self, state: &mut dyn Hasher);
     fn fmt_dyn(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
@@ -23,10 +22,6 @@ where
 {
     fn value_any(&self) -> &dyn Any {
         &self.0
-    }
-
-    fn clone_dyn(&self) -> Arc<dyn DynAttributeValue> {
-        Arc::new(Self(self.0.clone()))
     }
 
     fn eq_dyn(&self, other: &dyn DynAttributeValue) -> bool {
@@ -55,18 +50,13 @@ impl Clone for Attributes {
         Self(
             self.0
                 .iter()
-                .map(|(key, value)| (key.clone(), value.clone_dyn()))
+                .map(|(key, value)| (key.clone(), value.clone()))
                 .collect(),
         )
     }
 }
 
 impl Attributes {
-    /// Creates an empty attribute collection.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Returns the number of stored attribute entries.
     pub fn len(&self) -> usize {
         self.0.len()
@@ -77,13 +67,8 @@ impl Attributes {
         self.0.is_empty()
     }
 
-    /// Removes all entries from the collection.
-    pub fn clear(&mut self) {
-        self.0.clear();
-    }
-
-    /// Inserts a named attribute value.
-    pub fn insert_named<T>(&mut self, key: impl Into<Cow<'static, str>>, value: T)
+    /// Inserts an attribute value.
+    pub fn insert<T>(&mut self, key: impl Into<Cow<'static, str>>, value: T)
     where
         T: Any + Clone + Eq + Hash + fmt::Debug + Send + Sync + 'static,
     {
@@ -96,8 +81,8 @@ impl Attributes {
         self.0.extend(other.0);
     }
 
-    /// Returns `true` if a named attribute is present.
-    pub fn contains_named(&self, key: &str) -> bool {
+    /// Returns `true` if an attribute entry is present for `key`.
+    pub fn contains_key(&self, key: &str) -> bool {
         self.0.contains_key(key)
     }
 
@@ -108,13 +93,9 @@ impl Attributes {
 
     /// Returns a typed reference to the named attribute value.
     pub fn get_named_as<T: Any + 'static>(&self, key: &str) -> Option<&T> {
-        self.get_named(key)
-            .and_then(|value| value.downcast_ref::<T>())
-    }
-
-    /// Removes the named attribute.
-    pub fn remove_named(&mut self, key: &str) -> bool {
-        self.0.remove(key).is_some()
+        self.0
+            .get(key)
+            .and_then(|value| value.value_any().downcast_ref::<T>())
     }
 }
 

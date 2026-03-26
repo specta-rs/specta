@@ -260,7 +260,7 @@ fn has_any_container_attr(attributes: &Attributes) -> bool {
         CONTAINER_FIELD_IDENTIFIER,
     ]
     .into_iter()
-    .any(|key| attributes.contains_named(key))
+    .any(|key| attributes.contains_key(key))
 }
 
 fn has_any_variant_attr(attributes: &Attributes) -> bool {
@@ -282,7 +282,7 @@ fn has_any_variant_attr(attributes: &Attributes) -> bool {
         VARIANT_UNTAGGED,
     ]
     .into_iter()
-    .any(|key| attributes.contains_named(key))
+    .any(|key| attributes.contains_key(key))
 }
 
 fn has_any_field_attr(attributes: &Attributes) -> bool {
@@ -303,5 +303,5 @@ fn has_any_field_attr(attributes: &Attributes) -> bool {
         FIELD_HAS_WITH,
     ]
     .into_iter()
-    .any(|key| attributes.contains_named(key))
+    .any(|key| attributes.contains_key(key))
 }

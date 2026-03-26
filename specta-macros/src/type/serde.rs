@@ -553,7 +553,7 @@ fn lower_field_attrs(_crate_ref: &TokenStream, attrs: FieldAttrs) -> TokenStream
 
 fn push_opt_string(inserts: &mut Vec<TokenStream>, key: &str, value: &Option<String>) {
     if let Some(value) = value {
-        inserts.push(quote!(attrs.insert_named(#key, ::std::string::String::from(#value));));
+        inserts.push(quote!(attrs.insert(#key, ::std::string::String::from(#value));));
     }
 }
 
@@ -565,19 +565,19 @@ fn push_vec_string(inserts: &mut Vec<TokenStream>, key: &str, value: &[String]) 
     let value = value
         .iter()
         .map(|value| quote!(::std::string::String::from(#value)));
-    inserts.push(quote!(attrs.insert_named(#key, vec![#(#value),*]);));
+    inserts.push(quote!(attrs.insert(#key, vec![#(#value),*]);));
 }
 
 fn push_bool(inserts: &mut Vec<TokenStream>, key: &str, value: bool) {
     if value {
-        inserts.push(quote!(attrs.insert_named(#key, true);));
+        inserts.push(quote!(attrs.insert(#key, true);));
     }
 }
 
 fn push_opt_rename_rule(inserts: &mut Vec<TokenStream>, key: &str, value: Option<RenameRule>) {
     if let Some(value) = value {
         let value = value.as_str();
-        inserts.push(quote!(attrs.insert_named(#key, ::std::string::String::from(#value));));
+        inserts.push(quote!(attrs.insert(#key, ::std::string::String::from(#value));));
     }
 }
 
@@ -592,9 +592,9 @@ fn push_opt_conversion(
         let ty = &value.ty;
         let src_key = format!("serde:container:{key}_type_src");
         let resolved_key = format!("serde:container:{key}_resolved");
-        inserts.push(quote!(attrs.insert_named(#src_key, ::std::string::String::from(#type_src));));
+        inserts.push(quote!(attrs.insert(#src_key, ::std::string::String::from(#type_src));));
         inserts.push(
-            quote!(attrs.insert_named(#resolved_key, <#ty as #crate_ref::Type>::definition(types));),
+            quote!(attrs.insert(#resolved_key, <#ty as #crate_ref::Type>::definition(types));),
         );
     }
 }
