@@ -265,42 +265,22 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
         let key = TypeIdentity::from_ndt(original);
 
         if split_types.contains(&key) {
-            let mut serialize_ndt = build_from_original(
+            let serialize_ndt = build_from_original(
                 original,
                 format!("{}_Serialize", original.name()),
                 original.generics().to_vec(),
                 original.ty().clone(),
                 &types,
             );
-            rewrite_datatype_for_phase(
-                serialize_ndt.ty_mut(),
-                PhaseRewrite::Serialize,
-                &types,
-                &generated,
-                &split_types,
-                Some(original.name().as_ref()),
-            )?;
 
-            let mut deserialize_ndt = build_from_original(
+            let deserialize_ndt = build_from_original(
                 original,
                 format!("{}_Deserialize", original.name()),
                 original.generics().to_vec(),
                 original.ty().clone(),
                 &types,
             );
-            rewrite_datatype_for_phase(
-                deserialize_ndt.ty_mut(),
-                PhaseRewrite::Deserialize,
-                &types,
-                &generated,
-                &split_types,
-                Some(original.name().as_ref()),
-            )?;
 
-            generated_types.insert(TypeIdentity::from_ndt(&serialize_ndt));
-            generated_types.insert(TypeIdentity::from_ndt(&deserialize_ndt));
-            serialize_ndt.register(&mut out);
-            deserialize_ndt.register(&mut out);
             generated.insert(
                 key,
                 SplitGeneratedTypes {
@@ -309,6 +289,45 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
                 },
             );
         }
+    }
+
+    for original in &originals {
+        let key = TypeIdentity::from_ndt(original);
+
+        if !split_types.contains(&key) {
+            continue;
+        }
+
+        let Some(mut generated_types_for_phase) = generated.get(&key).cloned() else {
+            continue;
+        };
+
+        rewrite_datatype_for_phase(
+            generated_types_for_phase.serialize.ty_mut(),
+            PhaseRewrite::Serialize,
+            &types,
+            &generated,
+            &split_types,
+            Some(original.name().as_ref()),
+        )?;
+
+        rewrite_datatype_for_phase(
+            generated_types_for_phase.deserialize.ty_mut(),
+            PhaseRewrite::Deserialize,
+            &types,
+            &generated,
+            &split_types,
+            Some(original.name().as_ref()),
+        )?;
+
+        generated.insert(key, generated_types_for_phase);
+    }
+
+    for generated_types_for_phase in generated.values() {
+        generated_types.insert(TypeIdentity::from_ndt(&generated_types_for_phase.serialize));
+        generated_types.insert(TypeIdentity::from_ndt(&generated_types_for_phase.deserialize));
+        generated_types_for_phase.serialize.register(&mut out);
+        generated_types_for_phase.deserialize.register(&mut out);
     }
 
     let mut rewrite_err = None;
