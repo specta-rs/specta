@@ -253,7 +253,8 @@ fn get_datatype(attributes: &Attributes, key: &str) -> Option<DataType> {
 fn get_rename_rule(attributes: &Attributes, key: &str) -> Option<RenameRule> {
     get_string(attributes, key).map(|value| {
         RenameRule::from_str(&value)
-            .unwrap_or_else(|_| panic!("invalid serde rename rule: {value}"))
+            .ok()
+            .expect("invalid serde rename rule")
     })
 }
 

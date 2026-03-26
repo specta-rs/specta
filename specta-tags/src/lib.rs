@@ -6,6 +6,7 @@
 )]
 
 mod v1;
+/// Experimental tag planning API.
 pub mod v2;
 
 pub use v1::*;

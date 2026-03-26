@@ -1,24 +1,31 @@
 use std::borrow::Cow;
 
-use serde::{Serialize, Serializer, ser::SerializeSeq};
+use serde::{ser::SerializeSeq, Serialize, Serializer};
 use specta::{
-    Types,
     datatype::{DataType, Fields, GenericReference, NamedReference, Primitive, Reference},
+    Types,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// JavaScript runtime output targets supported by `render_runtime`.
 pub enum RuntimeTarget {
+    /// Emit TypeScript helpers with type annotations.
     TypeScript,
+    /// Emit plain JavaScript helpers without type annotations.
     JavaScript,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Semantic categories recognized during type analysis.
 pub enum SemanticKind {
+    /// A value that should round-trip through the JavaScript `Date` runtime.
     Date,
+    /// A value that should round-trip through the JavaScript `Uint8Array` runtime.
     Bytes,
 }
 
 #[derive(Debug, Clone, Default)]
+/// Analyzes `specta::DataType` trees and produces runtime transform specifications.
 pub struct Analyzer {
     matchers: Vec<Matcher>,
     list_u8_is_bytes: bool,
@@ -32,6 +39,7 @@ struct Matcher {
 }
 
 impl Analyzer {
+    /// Creates an analyzer preconfigured with built-in semantic type matchers.
     pub fn with_builtins() -> Self {
         let mut this = Self::default();
         for (module_path, name, kind) in BUILTIN_MATCHERS {
@@ -40,6 +48,7 @@ impl Analyzer {
         this
     }
 
+    /// Registers a named type that should be treated as a specific semantic kind.
     pub fn with_named_type(
         mut self,
         module_path: impl Into<Cow<'static, str>>,
@@ -54,11 +63,13 @@ impl Analyzer {
         self
     }
 
+    /// Controls whether `Vec<u8>`-like list types are mapped to the bytes transform.
     pub fn with_list_u8_is_bytes(mut self, enabled: bool) -> Self {
         self.list_u8_is_bytes = enabled;
         self
     }
 
+    /// Analyzes a datatype and returns the transform runtime needed to decode it.
     pub fn analyze(
         &self,
         dt: &DataType,
@@ -240,17 +251,28 @@ const BUILTIN_MATCHERS: &[(&str, &str, SemanticKind)] = &[
 ];
 
 #[derive(Debug, Clone, Default)]
+/// A compact description of runtime transformations for a datatype tree.
 pub enum TransformSpec {
     #[default]
+    /// No runtime transform is required.
     Identity,
+    /// Convert the value into a JavaScript `BigInt`.
     BigInt,
+    /// Convert the value into a JavaScript `Date`.
     Date,
+    /// Convert the value into a JavaScript `Uint8Array`.
     Bytes,
+    /// Apply the nested transform when the value is non-null.
     Nullable(Box<TransformSpec>),
+    /// Apply the nested transform to each list element.
     List(Box<TransformSpec>),
+    /// Apply per-element transforms to a tuple.
     Tuple(Vec<TransformSpec>),
+    /// Apply per-field transforms to an object.
     Object(Vec<(String, TransformSpec)>),
+    /// Apply the nested transform to each map value.
     Map(Box<TransformSpec>),
+    /// Apply variant-specific transforms to an enum.
     Enum(Vec<EnumVariantTransformSpec>),
 }
 
@@ -305,6 +327,7 @@ impl Serialize for TransformSpec {
 }
 
 impl TransformSpec {
+    /// Returns `true` when the spec and all nested specs are identity transforms.
     pub fn is_identity(&self) -> bool {
         match self {
             Self::Identity => true,
@@ -316,6 +339,7 @@ impl TransformSpec {
         }
     }
 
+    /// Serializes the transform spec into the compact JSON format used by the runtime.
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).expect("failed to serialize transform spec")
     }
@@ -369,9 +393,13 @@ impl From<SemanticKind> for TransformSpec {
 }
 
 #[derive(Debug, Clone)]
+/// The runtime transform assigned to a single enum variant.
 pub struct EnumVariantTransformSpec {
+    /// The serialized variant name.
     pub name: String,
+    /// The encoded shape of the variant payload.
     pub kind: EnumVariantTransformKind,
+    /// The transform to apply to the variant payload.
     pub spec: TransformSpec,
 }
 
@@ -389,9 +417,13 @@ impl Serialize for EnumVariantTransformSpec {
 }
 
 #[derive(Debug, Clone)]
+/// The payload shape used by an enum variant transform.
 pub enum EnumVariantTransformKind {
+    /// The variant has no payload.
     Unit,
+    /// The variant uses named fields.
     Named,
+    /// The variant uses unnamed fields.
     Unnamed,
 }
 
@@ -406,8 +438,11 @@ impl EnumVariantTransformKind {
 }
 
 #[derive(Debug, Clone, Default)]
+/// Flags describing which runtime helpers must be emitted.
 pub struct RuntimeRequirements {
+    /// Whether the main transform helper is required.
     pub needs_transform: bool,
+    /// Whether the async result helper is required.
     pub needs_result_helper: bool,
     needs_bigint: bool,
     needs_date: bool,
@@ -421,6 +456,7 @@ pub struct RuntimeRequirements {
 }
 
 impl RuntimeRequirements {
+    /// Collects runtime requirements from a set of transform specs.
     pub fn from_specs<'a>(specs: impl IntoIterator<Item = &'a TransformSpec>) -> Self {
         let mut req = Self::default();
         for spec in specs {
@@ -429,22 +465,26 @@ impl RuntimeRequirements {
         req
     }
 
+    /// Enables or disables emission of the result helper.
     pub fn with_result_helper(mut self, enabled: bool) -> Self {
         self.needs_result_helper = enabled;
         self
     }
 
+    /// Returns `true` when no runtime helper output is needed.
     pub fn is_empty(&self) -> bool {
         !self.needs_transform && !self.needs_result_helper
     }
 }
 
+/// Helper names reserved by the generated runtime implementation.
 pub const RUNTIME_RESERVED_NAMES: &[&str] = &[
     "__TS_transform",
     "__TS_transformEnum",
     "__TS_transformResult",
 ];
 
+/// Renders the JavaScript or TypeScript runtime helpers required by `req`.
 pub fn render_runtime(target: RuntimeTarget, req: &RuntimeRequirements) -> Cow<'static, str> {
     if req.is_empty() {
         return Cow::Borrowed("");

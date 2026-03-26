@@ -1447,9 +1447,7 @@ fn internal_tag_payload_compatibility(
         }
         DataType::Tuple(tuple) => tuple.elements().is_empty().then_some(true),
         DataType::Reference(Reference::Named(reference)) => {
-            let Some(referenced) = reference.get(original_types) else {
-                return None;
-            };
+            let referenced = reference.get(original_types)?;
 
             let key = TypeIdentity::from_ndt(referenced);
             if !seen.insert(key.clone()) {
@@ -1465,11 +1463,8 @@ fn internal_tag_payload_compatibility(
             EnumRepr::Untagged => {
                 let mut is_effectively_empty = true;
                 for (_, variant) in enm.variants() {
-                    let Some(variant_empty) =
-                        internal_tag_variant_payload_compatibility(variant, original_types, seen)
-                    else {
-                        return None;
-                    };
+                    let variant_empty =
+                        internal_tag_variant_payload_compatibility(variant, original_types, seen)?;
 
                     is_effectively_empty &= variant_empty;
                 }

@@ -53,7 +53,7 @@ impl TransformPlan {
         // You should match on `NamedDataType`'s name and module path to determine known named types.
 
         Self {
-            plan: Analyzer::default().analyze(&dt, types.as_types(), &[], &mut Vec::new()),
+            plan: Analyzer.analyze(&dt, types.as_types(), &[], &mut Vec::new()),
         }
     }
 
