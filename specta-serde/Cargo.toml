@@ -24,3 +24,4 @@ specta-macros = { version = "=2.0.0-rc.23", path = "../specta-macros", features 
 
 [dev-dependencies]
 specta = { version = "=2.0.0-rc.23", path = "../specta", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }

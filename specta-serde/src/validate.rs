@@ -107,7 +107,7 @@ fn inner(
                 &path,
                 mode,
             )?;
-            if SerdeContainerAttrs::from_attributes(strct.attributes())
+            if SerdeContainerAttrs::from_attributes(strct.attributes())?
                 .is_some_and(|attrs| attrs.variant_identifier || attrs.field_identifier)
             {
                 return Err(Error::invalid_phased_type_usage(
@@ -116,7 +116,7 @@ fn inner(
                 ));
             }
 
-            if let Some(attrs) = SerdeContainerAttrs::from_attributes(strct.attributes()) {
+            if let Some(attrs) = SerdeContainerAttrs::from_attributes(strct.attributes())? {
                 if attrs.untagged {
                     return Err(Error::invalid_phased_type_usage(
                         path,
@@ -192,7 +192,7 @@ fn inner(
                 &path,
                 mode,
             )?;
-            if SerdeContainerAttrs::from_attributes(enm.attributes()).is_some_and(|attrs| attrs.default) {
+            if SerdeContainerAttrs::from_attributes(enm.attributes())?.is_some_and(|attrs| attrs.default) {
                 return Err(Error::invalid_phased_type_usage(
                     path,
                     "`#[serde(default)]` is only valid on structs",
@@ -363,7 +363,7 @@ fn inner(
 }
 
 fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<()> {
-    let Some(attrs) = SerdeContainerAttrs::from_attributes(enm.attributes()) else {
+    let Some(attrs) = SerdeContainerAttrs::from_attributes(enm.attributes())? else {
         return Ok(());
     };
 
@@ -429,7 +429,7 @@ fn validate_container_attributes(
     path: &str,
     mode: ApplyMode,
 ) -> Result<()> {
-    if let Some(parsed) = SerdeContainerAttrs::from_attributes(attrs)
+    if let Some(parsed) = SerdeContainerAttrs::from_attributes(attrs)?
         && parsed.from.is_some()
         && parsed.try_from.is_some()
     {
@@ -439,7 +439,7 @@ fn validate_container_attributes(
         ));
     }
 
-    if let Some(conversions) = SerdeContainerAttrs::from_attributes(attrs) {
+    if let Some(conversions) = SerdeContainerAttrs::from_attributes(attrs)? {
         for (suffix, target) in [
             ("<serde_into>", conversions.resolved_into.as_ref()),
             ("<serde_from>", conversions.resolved_from.as_ref()),
@@ -462,7 +462,7 @@ fn validate_container_attributes(
 }
 
 fn validate_variant_attributes(variant: &Variant, path: String, mode: ApplyMode) -> Result<()> {
-    let Some(serde_attrs) = SerdeVariantAttrs::from_attributes(variant.attributes()) else {
+    let Some(serde_attrs) = SerdeVariantAttrs::from_attributes(variant.attributes())? else {
         return Ok(());
     };
 
@@ -490,7 +490,7 @@ fn validate_variant_attributes(variant: &Variant, path: String, mode: ApplyMode)
 }
 
 fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Result<()> {
-    let Some(serde_attrs) = SerdeFieldAttrs::from_attributes(field.attributes()) else {
+    let Some(serde_attrs) = SerdeFieldAttrs::from_attributes(field.attributes())? else {
         return Ok(());
     };
 
@@ -570,7 +570,7 @@ fn validate_untagged_variants(enm: &Enum, path: &str) -> Result<()> {
     let mut seen_untagged = false;
 
     for (name, variant) in enm.variants() {
-        let is_untagged = SerdeVariantAttrs::from_attributes(variant.attributes())
+        let is_untagged = SerdeVariantAttrs::from_attributes(variant.attributes())?
             .is_some_and(|attrs| attrs.untagged);
 
         if is_untagged {
@@ -592,15 +592,14 @@ fn validate_untagged_variants(enm: &Enum, path: &str) -> Result<()> {
 }
 
 fn validate_other_variant(enm: &Enum, path: &str, repr: &EnumRepr, mode: ApplyMode) -> Result<()> {
-    let other_variants = enm
-        .variants()
-        .iter()
-        .filter_map(|(name, variant)| {
-            SerdeVariantAttrs::from_attributes(variant.attributes())
-                .is_some_and(|attrs| attrs.other)
-                .then_some((name, variant))
-        })
-        .collect::<Vec<_>>();
+    let mut other_variants = Vec::new();
+    for (name, variant) in enm.variants() {
+        if SerdeVariantAttrs::from_attributes(variant.attributes())?
+            .is_some_and(|attrs| attrs.other)
+        {
+            other_variants.push((name, variant));
+        }
+    }
 
     if other_variants.is_empty() {
         return Ok(());
@@ -654,7 +653,7 @@ fn validate_internally_tag_variant(
     path: &str,
 ) -> Result<()> {
     let _ = enm;
-    if SerdeVariantAttrs::from_attributes(variant.attributes()).is_some_and(|attrs| attrs.untagged) {
+    if SerdeVariantAttrs::from_attributes(variant.attributes())?.is_some_and(|attrs| attrs.untagged) {
         return Ok(());
     }
 
@@ -717,7 +716,7 @@ fn validate_internally_tag_enum_datatype(
 }
 
 fn enum_repr_from_attrs(attrs: &specta::datatype::Attributes) -> Result<EnumRepr> {
-    let Some(container_attrs) = SerdeContainerAttrs::from_attributes(attrs) else {
+    let Some(container_attrs) = SerdeContainerAttrs::from_attributes(attrs)? else {
         return Ok(EnumRepr::External);
     };
 

@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use crate::inflection::RenameRule;
+use crate::{inflection::RenameRule, internal::Result, Error};
 use specta::datatype::{Attributes, DataType};
 
 const CONTAINER_RENAME_SERIALIZE: &str = "serde:container:rename_serialize";
@@ -129,37 +129,47 @@ pub struct SerdeContainerAttrs {
 }
 
 impl SerdeContainerAttrs {
-    pub fn from_attributes(attributes: &Attributes) -> Option<Self> {
-        has_any_attr(attributes, CONTAINER_ATTR_KEYS).then(|| Self {
-            rename_serialize: get_string(attributes, CONTAINER_RENAME_SERIALIZE),
-            rename_deserialize: get_string(attributes, CONTAINER_RENAME_DESERIALIZE),
-            rename_all_serialize: get_rename_rule(attributes, CONTAINER_RENAME_ALL_SERIALIZE),
-            rename_all_deserialize: get_rename_rule(attributes, CONTAINER_RENAME_ALL_DESERIALIZE),
-            rename_all_fields_serialize: get_rename_rule(
-                attributes,
-                CONTAINER_RENAME_ALL_FIELDS_SERIALIZE,
-            ),
-            rename_all_fields_deserialize: get_rename_rule(
-                attributes,
-                CONTAINER_RENAME_ALL_FIELDS_DESERIALIZE,
-            ),
-            tag: get_string(attributes, CONTAINER_TAG),
-            content: get_string(attributes, CONTAINER_CONTENT),
-            untagged: has_attr(attributes, CONTAINER_UNTAGGED),
-            default: has_attr(attributes, CONTAINER_DEFAULT),
-            transparent: has_attr(attributes, CONTAINER_TRANSPARENT),
-            from: get_string(attributes, CONTAINER_FROM_TYPE_SRC)
-                .map(|type_src| ConversionType { type_src }),
-            try_from: get_string(attributes, CONTAINER_TRY_FROM_TYPE_SRC)
-                .map(|type_src| ConversionType { type_src }),
-            into: get_string(attributes, CONTAINER_INTO_TYPE_SRC)
-                .map(|type_src| ConversionType { type_src }),
-            resolved_from: get_datatype(attributes, CONTAINER_FROM_RESOLVED),
-            resolved_try_from: get_datatype(attributes, CONTAINER_TRY_FROM_RESOLVED),
-            resolved_into: get_datatype(attributes, CONTAINER_INTO_RESOLVED),
-            variant_identifier: has_attr(attributes, CONTAINER_VARIANT_IDENTIFIER),
-            field_identifier: has_attr(attributes, CONTAINER_FIELD_IDENTIFIER),
-        })
+    pub fn from_attributes(attributes: &Attributes) -> Result<Option<Self>> {
+        has_any_attr(attributes, CONTAINER_ATTR_KEYS)
+            .then(|| {
+                Ok(Self {
+                    rename_serialize: get_string(attributes, CONTAINER_RENAME_SERIALIZE),
+                    rename_deserialize: get_string(attributes, CONTAINER_RENAME_DESERIALIZE),
+                    rename_all_serialize: get_rename_rule(
+                        attributes,
+                        CONTAINER_RENAME_ALL_SERIALIZE,
+                    )?,
+                    rename_all_deserialize: get_rename_rule(
+                        attributes,
+                        CONTAINER_RENAME_ALL_DESERIALIZE,
+                    )?,
+                    rename_all_fields_serialize: get_rename_rule(
+                        attributes,
+                        CONTAINER_RENAME_ALL_FIELDS_SERIALIZE,
+                    )?,
+                    rename_all_fields_deserialize: get_rename_rule(
+                        attributes,
+                        CONTAINER_RENAME_ALL_FIELDS_DESERIALIZE,
+                    )?,
+                    tag: get_string(attributes, CONTAINER_TAG),
+                    content: get_string(attributes, CONTAINER_CONTENT),
+                    untagged: has_attr(attributes, CONTAINER_UNTAGGED),
+                    default: has_attr(attributes, CONTAINER_DEFAULT),
+                    transparent: has_attr(attributes, CONTAINER_TRANSPARENT),
+                    from: get_string(attributes, CONTAINER_FROM_TYPE_SRC)
+                        .map(|type_src| ConversionType { type_src }),
+                    try_from: get_string(attributes, CONTAINER_TRY_FROM_TYPE_SRC)
+                        .map(|type_src| ConversionType { type_src }),
+                    into: get_string(attributes, CONTAINER_INTO_TYPE_SRC)
+                        .map(|type_src| ConversionType { type_src }),
+                    resolved_from: get_datatype(attributes, CONTAINER_FROM_RESOLVED),
+                    resolved_try_from: get_datatype(attributes, CONTAINER_TRY_FROM_RESOLVED),
+                    resolved_into: get_datatype(attributes, CONTAINER_INTO_RESOLVED),
+                    variant_identifier: has_attr(attributes, CONTAINER_VARIANT_IDENTIFIER),
+                    field_identifier: has_attr(attributes, CONTAINER_FIELD_IDENTIFIER),
+                })
+            })
+            .transpose()
     }
 }
 
@@ -180,21 +190,31 @@ pub struct SerdeVariantAttrs {
 }
 
 impl SerdeVariantAttrs {
-    pub fn from_attributes(attributes: &Attributes) -> Option<Self> {
-        has_any_attr(attributes, VARIANT_ATTR_KEYS).then(|| Self {
-            rename_serialize: get_string(attributes, VARIANT_RENAME_SERIALIZE),
-            rename_deserialize: get_string(attributes, VARIANT_RENAME_DESERIALIZE),
-            aliases: get_strings(attributes, VARIANT_ALIASES),
-            rename_all_serialize: get_rename_rule(attributes, VARIANT_RENAME_ALL_SERIALIZE),
-            rename_all_deserialize: get_rename_rule(attributes, VARIANT_RENAME_ALL_DESERIALIZE),
-            skip_serializing: has_attr(attributes, VARIANT_SKIP_SERIALIZING),
-            skip_deserializing: has_attr(attributes, VARIANT_SKIP_DESERIALIZING),
-            has_serialize_with: has_attr(attributes, VARIANT_HAS_SERIALIZE_WITH),
-            has_deserialize_with: has_attr(attributes, VARIANT_HAS_DESERIALIZE_WITH),
-            has_with: has_attr(attributes, VARIANT_HAS_WITH),
-            other: has_attr(attributes, VARIANT_OTHER),
-            untagged: has_attr(attributes, VARIANT_UNTAGGED),
-        })
+    pub fn from_attributes(attributes: &Attributes) -> Result<Option<Self>> {
+        has_any_attr(attributes, VARIANT_ATTR_KEYS)
+            .then(|| {
+                Ok(Self {
+                    rename_serialize: get_string(attributes, VARIANT_RENAME_SERIALIZE),
+                    rename_deserialize: get_string(attributes, VARIANT_RENAME_DESERIALIZE),
+                    aliases: get_strings(attributes, VARIANT_ALIASES),
+                    rename_all_serialize: get_rename_rule(
+                        attributes,
+                        VARIANT_RENAME_ALL_SERIALIZE,
+                    )?,
+                    rename_all_deserialize: get_rename_rule(
+                        attributes,
+                        VARIANT_RENAME_ALL_DESERIALIZE,
+                    )?,
+                    skip_serializing: has_attr(attributes, VARIANT_SKIP_SERIALIZING),
+                    skip_deserializing: has_attr(attributes, VARIANT_SKIP_DESERIALIZING),
+                    has_serialize_with: has_attr(attributes, VARIANT_HAS_SERIALIZE_WITH),
+                    has_deserialize_with: has_attr(attributes, VARIANT_HAS_DESERIALIZE_WITH),
+                    has_with: has_attr(attributes, VARIANT_HAS_WITH),
+                    other: has_attr(attributes, VARIANT_OTHER),
+                    untagged: has_attr(attributes, VARIANT_UNTAGGED),
+                })
+            })
+            .transpose()
     }
 }
 
@@ -214,20 +234,24 @@ pub struct SerdeFieldAttrs {
 }
 
 impl SerdeFieldAttrs {
-    pub fn from_attributes(attributes: &Attributes) -> Option<Self> {
-        has_any_attr(attributes, FIELD_ATTR_KEYS).then(|| Self {
-            rename_serialize: get_string(attributes, FIELD_RENAME_SERIALIZE),
-            rename_deserialize: get_string(attributes, FIELD_RENAME_DESERIALIZE),
-            aliases: get_strings(attributes, FIELD_ALIASES),
-            default: has_attr(attributes, FIELD_DEFAULT),
-            flatten: has_attr(attributes, FIELD_FLATTEN),
-            skip_serializing: has_attr(attributes, FIELD_SKIP_SERIALIZING),
-            skip_deserializing: has_attr(attributes, FIELD_SKIP_DESERIALIZING),
-            skip_serializing_if: get_string(attributes, FIELD_SKIP_SERIALIZING_IF),
-            has_serialize_with: has_attr(attributes, FIELD_HAS_SERIALIZE_WITH),
-            has_deserialize_with: has_attr(attributes, FIELD_HAS_DESERIALIZE_WITH),
-            has_with: has_attr(attributes, FIELD_HAS_WITH),
-        })
+    pub fn from_attributes(attributes: &Attributes) -> Result<Option<Self>> {
+        has_any_attr(attributes, FIELD_ATTR_KEYS)
+            .then(|| {
+                Ok(Self {
+                    rename_serialize: get_string(attributes, FIELD_RENAME_SERIALIZE),
+                    rename_deserialize: get_string(attributes, FIELD_RENAME_DESERIALIZE),
+                    aliases: get_strings(attributes, FIELD_ALIASES),
+                    default: has_attr(attributes, FIELD_DEFAULT),
+                    flatten: has_attr(attributes, FIELD_FLATTEN),
+                    skip_serializing: has_attr(attributes, FIELD_SKIP_SERIALIZING),
+                    skip_deserializing: has_attr(attributes, FIELD_SKIP_DESERIALIZING),
+                    skip_serializing_if: get_string(attributes, FIELD_SKIP_SERIALIZING_IF),
+                    has_serialize_with: has_attr(attributes, FIELD_HAS_SERIALIZE_WITH),
+                    has_deserialize_with: has_attr(attributes, FIELD_HAS_DESERIALIZE_WITH),
+                    has_with: has_attr(attributes, FIELD_HAS_WITH),
+                })
+            })
+            .transpose()
     }
 }
 
@@ -250,12 +274,13 @@ fn get_datatype(attributes: &Attributes, key: &str) -> Option<DataType> {
     attributes.get_named_as::<DataType>(key).cloned()
 }
 
-fn get_rename_rule(attributes: &Attributes, key: &str) -> Option<RenameRule> {
-    get_string(attributes, key).map(|value| {
-        RenameRule::from_str(&value)
-            .ok()
-            .expect("invalid serde rename rule")
-    })
+fn get_rename_rule(attributes: &Attributes, key: &str) -> Result<Option<RenameRule>> {
+    match get_string(attributes, key) {
+        Some(value) => RenameRule::from_str(&value)
+            .map(Some)
+            .map_err(|_| Error::invalid_rename_rule(key.to_string(), value.clone())),
+        None => Ok(None),
+    }
 }
 
 fn has_any_attr(attributes: &Attributes, keys: &[&str]) -> bool {

@@ -124,6 +124,16 @@ use phased::PhasedTy;
 
 pub use error::Error;
 pub use phased::Phased;
+
+/// Selects which directional type shape to use after [`apply_phases`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Phase {
+    /// The shape used when Rust serializes data to the wire.
+    Serialize,
+    /// The shape used when Rust deserializes data from the wire.
+    Deserialize,
+}
+
 #[doc(hidden)]
 pub mod internal {
     pub use crate::error::Result;
@@ -219,7 +229,7 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
     for original in &originals {
         let key = TypeIdentity::from_ndt(original);
         let mut deps = HashSet::new();
-        collect_dependencies(original.ty(), &types, &mut deps);
+        collect_dependencies(original.ty(), &types, &mut deps)?;
         for dep in &deps {
             reverse_dependencies
                 .entry(dep.clone())
@@ -229,11 +239,12 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
         dependencies.insert(key, deps);
     }
 
-    let mut split_types = originals
-        .iter()
-        .filter(|ndt| has_local_phase_difference(ndt.ty()))
-        .map(|ndt| TypeIdentity::from_ndt(ndt))
-        .collect::<HashSet<_>>();
+    let mut split_types = HashSet::new();
+    for ndt in &originals {
+        if has_local_phase_difference(ndt.ty())? {
+            split_types.insert(TypeIdentity::from_ndt(ndt));
+        }
+    }
 
     let mut queue = VecDeque::from_iter(split_types.iter().cloned());
     while let Some(key) = queue.pop_front() {
@@ -376,11 +387,136 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
     Ok(ResolvedTypes::from_resolved_types(out))
 }
 
+/// Rewrites a [`DataType`] to the requested directional shape after [`apply_phases`].
+///
+/// This is useful for exporter integrations that need deserialize-specific input
+/// types and serialize-specific output types while still exporting against the
+/// resolved type graph returned by [`apply_phases`].
+pub fn select_phase_datatype(dt: &DataType, types: &ResolvedTypes, phase: Phase) -> DataType {
+    let mut dt = dt.clone();
+    select_phase_datatype_inner(&mut dt, types.as_types(), phase);
+    dt
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PhaseRewrite {
     Unified,
     Serialize,
     Deserialize,
+}
+
+fn select_phase_datatype_inner(ty: &mut DataType, types: &Types, phase: Phase) {
+    if let Some(resolved) = select_explicit_phased_type(ty, phase) {
+        *ty = resolved;
+        select_phase_datatype_inner(ty, types, phase);
+        return;
+    }
+
+    match ty {
+        DataType::Struct(s) => select_phase_fields(s.fields_mut(), types, phase),
+        DataType::Enum(e) => {
+            for (_, variant) in e.variants_mut() {
+                select_phase_fields(variant.fields_mut(), types, phase);
+            }
+        }
+        DataType::Tuple(tuple) => {
+            for ty in tuple.elements_mut() {
+                select_phase_datatype_inner(ty, types, phase);
+            }
+        }
+        DataType::List(list) => select_phase_datatype_inner(list.ty_mut(), types, phase),
+        DataType::Map(map) => {
+            select_phase_datatype_inner(map.key_ty_mut(), types, phase);
+            select_phase_datatype_inner(map.value_ty_mut(), types, phase);
+        }
+        DataType::Nullable(inner) => select_phase_datatype_inner(inner, types, phase),
+        DataType::Reference(Reference::Named(reference)) => {
+            let Some(referenced_ndt) = reference.get(types) else {
+                return;
+            };
+
+            let generics = reference
+                .generics()
+                .iter()
+                .map(|(generic, dt)| {
+                    let mut dt = dt.clone();
+                    select_phase_datatype_inner(&mut dt, types, phase);
+                    (generic.clone(), dt)
+                })
+                .collect::<Vec<_>>();
+
+            let target_ndt = select_split_type_variant(referenced_ndt, types, phase)
+                .unwrap_or(referenced_ndt);
+
+            let mut new_reference = target_ndt.reference(generics);
+            if reference.inline() {
+                new_reference = new_reference.inline();
+            }
+
+            *ty = DataType::Reference(new_reference);
+        }
+        DataType::Reference(Reference::Generic(_))
+        | DataType::Reference(Reference::Opaque(_))
+        | DataType::Primitive(_) => {}
+    }
+}
+
+fn select_phase_fields(fields: &mut Fields, types: &Types, phase: Phase) {
+    match fields {
+        Fields::Unit => {}
+        Fields::Unnamed(fields) => {
+            for field in fields.fields_mut() {
+                if let Some(ty) = field.ty_mut() {
+                    select_phase_datatype_inner(ty, types, phase);
+                }
+            }
+        }
+        Fields::Named(fields) => {
+            for (_, field) in fields.fields_mut() {
+                if let Some(ty) = field.ty_mut() {
+                    select_phase_datatype_inner(ty, types, phase);
+                }
+            }
+        }
+    }
+}
+
+fn select_explicit_phased_type(ty: &DataType, phase: Phase) -> Option<DataType> {
+    let DataType::Reference(Reference::Opaque(reference)) = ty else {
+        return None;
+    };
+    let phased = reference.downcast_ref::<PhasedTy>()?;
+
+    Some(match phase {
+        Phase::Serialize => phased.serialize.clone(),
+        Phase::Deserialize => phased.deserialize.clone(),
+    })
+}
+
+fn select_split_type_variant<'a>(
+    ndt: &'a NamedDataType,
+    types: &'a Types,
+    phase: Phase,
+) -> Option<&'a NamedDataType> {
+    let DataType::Enum(wrapper) = ndt.ty() else {
+        return None;
+    };
+
+    let variant_name = match phase {
+        Phase::Serialize => "Serialize",
+        Phase::Deserialize => "Deserialize",
+    };
+
+    let (_, variant) = wrapper.variants().iter().find(|(name, _)| name == variant_name)?;
+    let Fields::Unnamed(fields) = variant.fields() else {
+        return None;
+    };
+    let field = fields.fields().first()?;
+    let Some(DataType::Reference(Reference::Named(reference))) = field.ty() else {
+        return None;
+    };
+
+    reference.get(types)
 }
 
 #[derive(Debug, Clone)]
@@ -439,7 +575,7 @@ fn rewrite_datatype_for_phase(
 
     match ty {
         DataType::Struct(s) => {
-            let container_default = SerdeContainerAttrs::from_attributes(s.attributes())
+            let container_default = SerdeContainerAttrs::from_attributes(s.attributes())?
                 .is_some_and(|attrs| attrs.default);
             let container_rename_all = container_rename_all_rule(
                 s.attributes(),
@@ -461,8 +597,8 @@ fn rewrite_datatype_for_phase(
             rewrite_struct_repr_for_phase(s, mode, container_name)?;
         }
         DataType::Enum(e) => {
-            filter_enum_variants_for_phase(e, mode);
-            let container_attrs = SerdeContainerAttrs::from_attributes(e.attributes());
+            filter_enum_variants_for_phase(e, mode)?;
+            let container_attrs = SerdeContainerAttrs::from_attributes(e.attributes())?;
 
             for (variant_name, variant) in e.variants_mut() {
                 let rename_rule =
@@ -589,7 +725,7 @@ fn rewrite_fields_for_phase(
         Fields::Unit => {}
         Fields::Unnamed(unnamed) => {
             for field in unnamed.fields_mut() {
-                if should_skip_field_for_mode(field, mode) {
+                if should_skip_field_for_mode(field, mode)? {
                     if preserve_skipped_unnamed_fields {
                         *field = skipped_field_marker(field);
                     }
@@ -597,7 +733,7 @@ fn rewrite_fields_for_phase(
                     continue;
                 }
 
-                apply_field_attrs(field, mode, container_default);
+                apply_field_attrs(field, mode, container_default)?;
                 rewrite_field_for_phase(field, mode, original_types, generated, split_types)?;
             }
 
@@ -606,13 +742,24 @@ fn rewrite_fields_for_phase(
             }
         }
         Fields::Named(named) => {
-            named
-                .fields_mut()
-                .retain(|(_, field)| !should_skip_field_for_mode(field, mode));
-            for (name, field) in named.fields_mut() {
-                apply_field_attrs(field, mode, container_default);
+            let mut skip_err = None;
+            named.fields_mut().retain(|(_, field)| {
+                match should_skip_field_for_mode(field, mode) {
+                    Ok(skip) => !skip,
+                    Err(err) => {
+                        skip_err = Some(err);
+                        true
+                    }
+                }
+            });
+            if let Some(err) = skip_err {
+                return Err(err);
+            }
 
-                if let Some(serde_attrs) = SerdeFieldAttrs::from_attributes(field.attributes()) {
+            for (name, field) in named.fields_mut() {
+                apply_field_attrs(field, mode, container_default)?;
+
+                if let Some(serde_attrs) = SerdeFieldAttrs::from_attributes(field.attributes())? {
                     let rename = match mode {
                         PhaseRewrite::Serialize => serde_attrs.rename_serialize.as_deref(),
                         PhaseRewrite::Deserialize => serde_attrs.rename_deserialize.as_deref(),
@@ -646,7 +793,7 @@ fn rewrite_field_for_phase(
     generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
     split_types: &HashSet<TypeIdentity>,
 ) -> Result<()> {
-    if let Some(attrs) = SerdeFieldAttrs::from_attributes(field.attributes())
+    if let Some(attrs) = SerdeFieldAttrs::from_attributes(field.attributes())?
         && let PhaseRewrite::Serialize = mode
         && attrs.skip_serializing_if.is_some()
     {
@@ -672,7 +819,7 @@ fn rewrite_struct_repr_for_phase(
     container_name: Option<&str>,
 ) -> Result<()> {
     let Some((tag, rename_serialize, rename_deserialize)) =
-        SerdeContainerAttrs::from_attributes(strct.attributes()).map(|attrs| {
+        SerdeContainerAttrs::from_attributes(strct.attributes())?.map(|attrs| {
             (
                 attrs.tag.clone(),
                 attrs.rename_serialize.clone(),
@@ -720,16 +867,16 @@ fn rewrite_struct_repr_for_phase(
     Ok(())
 }
 
-fn should_skip_field_for_mode(field: &Field, mode: PhaseRewrite) -> bool {
-    let Some(attrs) = SerdeFieldAttrs::from_attributes(field.attributes()) else {
-        return false;
+fn should_skip_field_for_mode(field: &Field, mode: PhaseRewrite) -> Result<bool> {
+    let Some(attrs) = SerdeFieldAttrs::from_attributes(field.attributes())? else {
+        return Ok(false);
     };
 
-    match mode {
+    Ok(match mode {
         PhaseRewrite::Serialize => attrs.skip_serializing,
         PhaseRewrite::Deserialize => attrs.skip_deserializing,
         PhaseRewrite::Unified => attrs.skip_serializing || attrs.skip_deserializing,
-    }
+    })
 }
 
 fn skipped_field_marker(field: &Field) -> Field {
@@ -770,7 +917,7 @@ fn rewrite_enum_repr_for_phase(
         return Ok(());
     }
 
-    let container_attrs = SerdeContainerAttrs::from_attributes(e.attributes());
+    let container_attrs = SerdeContainerAttrs::from_attributes(e.attributes())?;
     let variants = std::mem::take(e.variants_mut());
     let mut transformed = Vec::with_capacity(variants.len());
     for (variant_name, variant) in variants {
@@ -778,7 +925,7 @@ fn rewrite_enum_repr_for_phase(
             continue;
         }
 
-        let variant_attrs = SerdeVariantAttrs::from_attributes(variant.attributes());
+        let variant_attrs = SerdeVariantAttrs::from_attributes(variant.attributes())?;
         if variant_attrs
             .as_ref()
             .is_some_and(|attrs| variant_is_skipped_for_mode(attrs, mode))
@@ -840,7 +987,7 @@ fn rewrite_identifier_enum_for_phase(
     generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
     split_types: &HashSet<TypeIdentity>,
 ) -> Result<bool> {
-    let Some(attrs) = SerdeContainerAttrs::from_attributes(e.attributes()) else {
+    let Some(attrs) = SerdeContainerAttrs::from_attributes(e.attributes())? else {
         return Ok(false);
     };
 
@@ -852,7 +999,7 @@ fn rewrite_identifier_enum_for_phase(
         return Ok(false);
     }
 
-    let container_attrs = SerdeContainerAttrs::from_attributes(e.attributes());
+    let container_attrs = SerdeContainerAttrs::from_attributes(e.attributes())?;
     let mut variants = Vec::new();
     let mut seen = HashSet::new();
 
@@ -871,7 +1018,7 @@ fn rewrite_identifier_enum_for_phase(
             ));
         }
 
-        if let Some(variant_attrs) = SerdeVariantAttrs::from_attributes(variant.attributes()) {
+        if let Some(variant_attrs) = SerdeVariantAttrs::from_attributes(variant.attributes())? {
             for alias in &variant_attrs.aliases {
                 if seen.insert(alias.clone()) {
                     variants.push((
@@ -919,12 +1066,12 @@ fn container_rename_all_rule(
     context: &str,
     container_name: &str,
 ) -> Result<Option<RenameRule>> {
+    let attrs = SerdeContainerAttrs::from_attributes(attrs)?;
+
     select_phase_rule(
         mode,
-        SerdeContainerAttrs::from_attributes(attrs)
-            .and_then(|container_attrs| container_attrs.rename_all_serialize),
-        SerdeContainerAttrs::from_attributes(attrs)
-            .and_then(|container_attrs| container_attrs.rename_all_deserialize),
+        attrs.as_ref().and_then(|attrs| attrs.rename_all_serialize),
+        attrs.as_ref().and_then(|attrs| attrs.rename_all_deserialize),
         context,
         container_name,
     )
@@ -936,12 +1083,12 @@ fn enum_variant_field_rename_rule(
     mode: PhaseRewrite,
     variant_name: &str,
 ) -> Result<Option<RenameRule>> {
+    let variant_attrs = SerdeVariantAttrs::from_attributes(variant.attributes())?;
+
     let variant_rule = select_phase_rule(
         mode,
-        SerdeVariantAttrs::from_attributes(variant.attributes())
-            .and_then(|attrs| attrs.rename_all_serialize),
-        SerdeVariantAttrs::from_attributes(variant.attributes())
-            .and_then(|attrs| attrs.rename_all_deserialize),
+        variant_attrs.as_ref().and_then(|attrs| attrs.rename_all_serialize),
+        variant_attrs.as_ref().and_then(|attrs| attrs.rename_all_deserialize),
         "enum variant rename_all",
         variant_name,
     )?;
@@ -977,18 +1124,28 @@ fn transform_untagged_variant(variant: &Variant) -> Result<Variant> {
     Ok(clone_variant_with_unnamed_fields(variant, vec![payload]))
 }
 
-fn filter_enum_variants_for_phase(e: &mut Enum, mode: PhaseRewrite) {
+fn filter_enum_variants_for_phase(e: &mut Enum, mode: PhaseRewrite) -> Result<()> {
+    let mut filter_err = None;
     e.variants_mut().retain(|(_, variant)| {
         if variant.skip() {
             return false;
         }
 
-        let Some(attrs) = SerdeVariantAttrs::from_attributes(variant.attributes()) else {
-            return true;
-        };
-
-        !variant_is_skipped_for_mode(&attrs, mode)
+        match SerdeVariantAttrs::from_attributes(variant.attributes()) {
+            Ok(Some(attrs)) => !variant_is_skipped_for_mode(&attrs, mode),
+            Ok(None) => true,
+            Err(err) => {
+                filter_err = Some(err);
+                true
+            }
+        }
     });
+
+    if let Some(err) = filter_err {
+        return Err(err);
+    }
+
+    Ok(())
 }
 
 fn variant_is_skipped_for_mode(attrs: &SerdeVariantAttrs, mode: PhaseRewrite) -> bool {
@@ -1000,7 +1157,7 @@ fn variant_is_skipped_for_mode(attrs: &SerdeVariantAttrs, mode: PhaseRewrite) ->
 }
 
 fn enum_repr_from_attrs(attrs: &specta::datatype::Attributes) -> Result<EnumRepr> {
-    let Some(container_attrs) = SerdeContainerAttrs::from_attributes(attrs) else {
+    let Some(container_attrs) = SerdeContainerAttrs::from_attributes(attrs)? else {
         return Ok(EnumRepr::External);
     };
 
@@ -1036,7 +1193,7 @@ fn serialized_variant_name(
     container_attrs: &Option<SerdeContainerAttrs>,
     mode: PhaseRewrite,
 ) -> Result<String> {
-    let variant_attrs = SerdeVariantAttrs::from_attributes(variant.attributes());
+    let variant_attrs = SerdeVariantAttrs::from_attributes(variant.attributes())?;
 
     if let Some(rename) = select_phase_string(
         mode,
@@ -1152,7 +1309,7 @@ fn select_conversion_target(
     attrs: &specta::datatype::Attributes,
     mode: PhaseRewrite,
 ) -> Result<Option<DataType>> {
-    let parsed = SerdeContainerAttrs::from_attributes(attrs);
+    let parsed = SerdeContainerAttrs::from_attributes(attrs)?;
     let resolved = parsed.as_ref();
 
     let serialize_target = resolved.and_then(|v| v.resolved_into.as_ref());
@@ -1169,7 +1326,7 @@ fn select_conversion_target(
             }
             _ => Err(Error::incompatible_conversion(
                 "container conversion",
-                conversion_name(attrs),
+                conversion_name(attrs)?,
                 serialize_conversion_name(parsed.as_ref()),
                 deserialize_conversion_name(parsed.as_ref()),
             )),
@@ -1177,8 +1334,8 @@ fn select_conversion_target(
     }
 }
 
-fn conversion_name(attrs: &specta::datatype::Attributes) -> String {
-    SerdeContainerAttrs::from_attributes(attrs)
+fn conversion_name(attrs: &specta::datatype::Attributes) -> Result<String> {
+    Ok(SerdeContainerAttrs::from_attributes(attrs)?
         .and_then(|attrs| {
             attrs
                 .into
@@ -1192,7 +1349,7 @@ fn conversion_name(attrs: &specta::datatype::Attributes) -> String {
                         .map(|v| format!("try_from({})", v.type_src))
                 })
         })
-        .unwrap_or_else(|| "<container>".to_string())
+        .unwrap_or_else(|| "<container>".to_string()))
 }
 
 fn serialize_conversion_name(attrs: Option<&SerdeContainerAttrs>) -> Option<String> {
@@ -1306,7 +1463,7 @@ fn transform_internal_variant(
                 &payload_ty,
                 original_types,
                 &mut HashSet::new(),
-            ) else {
+            )? else {
                 return Err(Error::invalid_internally_tagged_variant(
                     serialized_name,
                     "payload cannot be merged with a tag",
@@ -1406,15 +1563,15 @@ fn internal_tag_payload_compatibility(
     ty: &DataType,
     original_types: &Types,
     seen: &mut HashSet<TypeIdentity>,
-) -> Option<bool> {
+) -> Result<Option<bool>> {
     match ty {
-        DataType::Map(_) => Some(false),
+        DataType::Map(_) => Ok(Some(false)),
         DataType::Struct(strct) => {
-            if SerdeContainerAttrs::from_attributes(strct.attributes())
+            if SerdeContainerAttrs::from_attributes(strct.attributes())?
                 .is_some_and(|attrs| attrs.transparent)
             {
                 let payload_fields = match strct.fields() {
-                    Fields::Unit => return Some(true),
+                    Fields::Unit => return Ok(Some(true)),
                     Fields::Unnamed(unnamed) => unnamed
                         .fields()
                         .iter()
@@ -1429,29 +1586,31 @@ fn internal_tag_payload_compatibility(
 
                 let [inner_ty] = payload_fields.as_slice() else {
                     if payload_fields.is_empty() {
-                        return Some(true);
+                        return Ok(Some(true));
                     }
 
-                    return None;
+                    return Ok(None);
                 };
 
                 return internal_tag_payload_compatibility(inner_ty, original_types, seen);
             }
 
-            match strct.fields() {
+            Ok(match strct.fields() {
                 Fields::Named(named) => {
                     Some(named.fields().iter().all(|(_, field)| field.ty().is_none()))
                 }
                 Fields::Unit | Fields::Unnamed(_) => None,
-            }
+            })
         }
-        DataType::Tuple(tuple) => tuple.elements().is_empty().then_some(true),
+        DataType::Tuple(tuple) => Ok(tuple.elements().is_empty().then_some(true)),
         DataType::Reference(Reference::Named(reference)) => {
-            let referenced = reference.get(original_types)?;
+            let Some(referenced) = reference.get(original_types) else {
+                return Ok(None);
+            };
 
             let key = TypeIdentity::from_ndt(referenced);
             if !seen.insert(key.clone()) {
-                return Some(false);
+                return Ok(Some(false));
             }
 
             let compatible =
@@ -1459,27 +1618,31 @@ fn internal_tag_payload_compatibility(
             seen.remove(&key);
             compatible
         }
-        DataType::Enum(enm) => match enum_repr_from_attrs(enm.attributes()).ok()? {
-            EnumRepr::Untagged => {
+        DataType::Enum(enm) => match enum_repr_from_attrs(enm.attributes()) {
+            Ok(EnumRepr::Untagged) => {
                 let mut is_effectively_empty = true;
                 for (_, variant) in enm.variants() {
-                    let variant_empty =
-                        internal_tag_variant_payload_compatibility(variant, original_types, seen)?;
+                    let Some(variant_empty) =
+                        internal_tag_variant_payload_compatibility(variant, original_types, seen)?
+                    else {
+                        return Ok(None);
+                    };
 
                     is_effectively_empty &= variant_empty;
                 }
 
-                Some(is_effectively_empty)
+                Ok(Some(is_effectively_empty))
             }
-            EnumRepr::External | EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. } => {
-                Some(false)
+            Ok(EnumRepr::External | EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. }) => {
+                Ok(Some(false))
             }
+            Err(_) => Ok(None),
         },
         DataType::Primitive(_)
         | DataType::List(_)
         | DataType::Nullable(_)
         | DataType::Reference(Reference::Generic(_))
-        | DataType::Reference(Reference::Opaque(_)) => None,
+        | DataType::Reference(Reference::Opaque(_)) => Ok(None),
     }
 }
 
@@ -1487,58 +1650,69 @@ fn internal_tag_variant_payload_compatibility(
     variant: &Variant,
     original_types: &Types,
     seen: &mut HashSet<TypeIdentity>,
-) -> Option<bool> {
+) -> Result<Option<bool>> {
     match variant.fields() {
-        Fields::Unit => Some(true),
-        Fields::Named(named) => Some(named.fields().iter().all(|(_, field)| field.ty().is_none())),
+        Fields::Unit => Ok(Some(true)),
+        Fields::Named(named) => Ok(Some(named.fields().iter().all(|(_, field)| field.ty().is_none()))),
         Fields::Unnamed(unnamed) => {
             if unnamed.fields().len() != 1 {
-                return None;
+                return Ok(None);
             }
 
             unnamed
                 .fields()
                 .iter()
                 .find_map(|field| field.ty())
-                .and_then(|ty| internal_tag_payload_compatibility(ty, original_types, seen))
-        }
-    }
-}
-
-fn has_local_phase_difference(dt: &DataType) -> bool {
-    match dt {
-        DataType::Struct(s) => {
-            container_has_local_difference(s.attributes())
-                || fields_have_local_difference(s.fields())
-        }
-        DataType::Enum(e) => {
-            container_has_local_difference(e.attributes())
-                || e.variants().iter().any(|(_, variant)| {
-                    variant_has_local_difference(variant)
-                        || fields_have_local_difference(variant.fields())
+                .map_or(Ok(None), |ty| {
+                    internal_tag_payload_compatibility(ty, original_types, seen)
                 })
         }
-        DataType::Tuple(tuple) => tuple.elements().iter().any(has_local_phase_difference),
-        DataType::List(list) => has_local_phase_difference(list.ty()),
-        DataType::Map(map) => {
-            has_local_phase_difference(map.key_ty()) || has_local_phase_difference(map.value_ty())
-        }
-        DataType::Nullable(inner) => has_local_phase_difference(inner),
-        DataType::Reference(Reference::Opaque(reference)) => {
-            reference.downcast_ref::<PhasedTy>().is_some()
-        }
-        DataType::Primitive(_)
-        | DataType::Reference(Reference::Named(_))
-        | DataType::Reference(Reference::Generic(_)) => false,
     }
 }
 
-fn container_has_local_difference(attrs: &specta::datatype::Attributes) -> bool {
-    let Some(conversions) = SerdeContainerAttrs::from_attributes(attrs) else {
-        return false;
+fn has_local_phase_difference(dt: &DataType) -> Result<bool> {
+    match dt {
+        DataType::Struct(s) => {
+            Ok(container_has_local_difference(s.attributes())? || fields_have_local_difference(s.fields())?)
+        }
+        DataType::Enum(e) => Ok(
+            container_has_local_difference(e.attributes())?
+                || e.variants().iter().try_fold(false, |has_difference, (_, variant)| {
+                    if has_difference {
+                        return Ok(true);
+                    }
+
+                    Ok(
+                        variant_has_local_difference(variant)?
+                            || fields_have_local_difference(variant.fields())?,
+                    )
+                })?,
+        ),
+        DataType::Tuple(tuple) => tuple.elements().iter().try_fold(false, |has_difference, ty| {
+            if has_difference {
+                return Ok(true);
+            }
+
+            has_local_phase_difference(ty)
+        }),
+        DataType::List(list) => has_local_phase_difference(list.ty()),
+        DataType::Map(map) => {
+            Ok(has_local_phase_difference(map.key_ty())? || has_local_phase_difference(map.value_ty())?)
+        }
+        DataType::Nullable(inner) => has_local_phase_difference(inner),
+        DataType::Reference(Reference::Opaque(reference)) => Ok(reference.downcast_ref::<PhasedTy>().is_some()),
+        DataType::Primitive(_)
+        | DataType::Reference(Reference::Named(_))
+        | DataType::Reference(Reference::Generic(_)) => Ok(false),
+    }
+}
+
+fn container_has_local_difference(attrs: &specta::datatype::Attributes) -> Result<bool> {
+    let Some(conversions) = SerdeContainerAttrs::from_attributes(attrs)? else {
+        return Ok(false);
     };
 
-    conversions.resolved_into.as_ref()
+    Ok(conversions.resolved_into.as_ref()
         != conversions
             .resolved_from
             .as_ref()
@@ -1547,24 +1721,34 @@ fn container_has_local_difference(attrs: &specta::datatype::Attributes) -> bool 
         || conversions.rename_all_serialize != conversions.rename_all_deserialize
         || conversions.rename_all_fields_serialize != conversions.rename_all_fields_deserialize
         || conversions.variant_identifier
-        || conversions.field_identifier
+        || conversions.field_identifier)
 }
 
-fn fields_have_local_difference(fields: &Fields) -> bool {
+fn fields_have_local_difference(fields: &Fields) -> Result<bool> {
     match fields {
-        Fields::Unit => false,
-        Fields::Unnamed(unnamed) => unnamed
-            .fields()
-            .iter()
-            .any(|field| field.ty().is_some_and(has_local_phase_difference)),
-        Fields::Named(named) => named.fields().iter().any(|(_, field)| {
-            field_has_local_difference(field) || field.ty().is_some_and(has_local_phase_difference)
+        Fields::Unit => Ok(false),
+        Fields::Unnamed(unnamed) => unnamed.fields().iter().try_fold(false, |has_difference, field| {
+            if has_difference {
+                return Ok(true);
+            }
+
+            field.ty().map_or(Ok(false), has_local_phase_difference)
+        }),
+        Fields::Named(named) => named.fields().iter().try_fold(false, |has_difference, (_, field)| {
+            if has_difference {
+                return Ok(true);
+            }
+
+            Ok(
+                field_has_local_difference(field)?
+                    || field.ty().map_or(Ok(false), has_local_phase_difference)?,
+            )
         }),
     }
 }
 
-fn field_has_local_difference(field: &Field) -> bool {
-    SerdeFieldAttrs::from_attributes(field.attributes())
+fn field_has_local_difference(field: &Field) -> Result<bool> {
+    Ok(SerdeFieldAttrs::from_attributes(field.attributes())?
         .map(|attrs| {
             attrs.rename_serialize.as_deref() != attrs.rename_deserialize.as_deref()
                 || attrs.skip_serializing != attrs.skip_deserializing
@@ -1573,11 +1757,11 @@ fn field_has_local_difference(field: &Field) -> bool {
                 || attrs.has_deserialize_with
                 || attrs.has_with
         })
-        .unwrap_or_default()
+        .unwrap_or_default())
 }
 
-fn variant_has_local_difference(variant: &Variant) -> bool {
-    SerdeVariantAttrs::from_attributes(variant.attributes())
+fn variant_has_local_difference(variant: &Variant) -> Result<bool> {
+    Ok(SerdeVariantAttrs::from_attributes(variant.attributes())?
         .map(|attrs| {
             attrs.rename_serialize.as_deref() != attrs.rename_deserialize.as_deref()
                 || attrs.rename_all_serialize != attrs.rename_all_deserialize
@@ -1587,60 +1771,62 @@ fn variant_has_local_difference(variant: &Variant) -> bool {
                 || attrs.has_with
                 || attrs.other
         })
-        .unwrap_or_default()
+        .unwrap_or_default())
 }
 
-fn collect_dependencies(dt: &DataType, types: &Types, deps: &mut HashSet<TypeIdentity>) {
+fn collect_dependencies(dt: &DataType, types: &Types, deps: &mut HashSet<TypeIdentity>) -> Result<()> {
     match dt {
         DataType::Struct(s) => {
-            collect_conversion_dependencies(s.attributes(), types, deps);
-            collect_fields_dependencies(s.fields(), types, deps);
+            collect_conversion_dependencies(s.attributes(), types, deps)?;
+            collect_fields_dependencies(s.fields(), types, deps)?;
         }
         DataType::Enum(e) => {
-            collect_conversion_dependencies(e.attributes(), types, deps);
+            collect_conversion_dependencies(e.attributes(), types, deps)?;
             for (_, variant) in e.variants() {
-                collect_fields_dependencies(variant.fields(), types, deps);
+                collect_fields_dependencies(variant.fields(), types, deps)?;
             }
         }
         DataType::Tuple(tuple) => {
             for ty in tuple.elements() {
-                collect_dependencies(ty, types, deps);
+                collect_dependencies(ty, types, deps)?;
             }
         }
-        DataType::List(list) => collect_dependencies(list.ty(), types, deps),
+        DataType::List(list) => collect_dependencies(list.ty(), types, deps)?,
         DataType::Map(map) => {
-            collect_dependencies(map.key_ty(), types, deps);
-            collect_dependencies(map.value_ty(), types, deps);
+            collect_dependencies(map.key_ty(), types, deps)?;
+            collect_dependencies(map.value_ty(), types, deps)?;
         }
-        DataType::Nullable(inner) => collect_dependencies(inner, types, deps),
+        DataType::Nullable(inner) => collect_dependencies(inner, types, deps)?,
         DataType::Reference(Reference::Named(reference)) => {
             if let Some(referenced) = reference.get(types) {
                 deps.insert(TypeIdentity::from_ndt(referenced));
             }
 
             for (_, generic) in reference.generics() {
-                collect_dependencies(generic, types, deps);
+                collect_dependencies(generic, types, deps)?;
             }
         }
         DataType::Reference(Reference::Opaque(_)) => {
             if let DataType::Reference(Reference::Opaque(reference)) = dt
                 && let Some(phased) = reference.downcast_ref::<PhasedTy>()
             {
-                collect_dependencies(&phased.serialize, types, deps);
-                collect_dependencies(&phased.deserialize, types, deps);
+                collect_dependencies(&phased.serialize, types, deps)?;
+                collect_dependencies(&phased.deserialize, types, deps)?;
             }
         }
         DataType::Primitive(_) | DataType::Reference(Reference::Generic(_)) => {}
     }
+
+    Ok(())
 }
 
 fn collect_conversion_dependencies(
     attrs: &specta::datatype::Attributes,
     types: &Types,
     deps: &mut HashSet<TypeIdentity>,
-) {
-    let Some(conversions) = SerdeContainerAttrs::from_attributes(attrs) else {
-        return;
+) -> Result<()> {
+    let Some(conversions) = SerdeContainerAttrs::from_attributes(attrs)? else {
+        return Ok(());
     };
 
     for conversion in [
@@ -1651,28 +1837,36 @@ fn collect_conversion_dependencies(
     .into_iter()
     .flatten()
     {
-        collect_dependencies(conversion, types, deps);
+        collect_dependencies(conversion, types, deps)?;
     }
+
+    Ok(())
 }
 
-fn collect_fields_dependencies(fields: &Fields, types: &Types, deps: &mut HashSet<TypeIdentity>) {
+fn collect_fields_dependencies(
+    fields: &Fields,
+    types: &Types,
+    deps: &mut HashSet<TypeIdentity>,
+) -> Result<()> {
     match fields {
         Fields::Unit => {}
         Fields::Unnamed(unnamed) => {
             for field in unnamed.fields() {
                 if let Some(ty) = field.ty() {
-                    collect_dependencies(ty, types, deps);
+                    collect_dependencies(ty, types, deps)?;
                 }
             }
         }
         Fields::Named(named) => {
             for (_, field) in named.fields() {
                 if let Some(ty) = field.ty() {
-                    collect_dependencies(ty, types, deps);
+                    collect_dependencies(ty, types, deps)?;
                 }
             }
         }
     }
+
+    Ok(())
 }
 
 fn build_from_original(
@@ -1696,10 +1890,10 @@ fn build_from_original(
     ndt
 }
 
-fn apply_field_attrs(field: &mut Field, mode: PhaseRewrite, container_default: bool) {
+fn apply_field_attrs(field: &mut Field, mode: PhaseRewrite, container_default: bool) -> Result<()> {
     let mut flatten = field.flatten();
     let mut optional = field.optional();
-    if let Some(attrs) = SerdeFieldAttrs::from_attributes(field.attributes()) {
+    if let Some(attrs) = SerdeFieldAttrs::from_attributes(field.attributes())? {
         flatten = attrs.flatten;
         if field_is_optional_for_mode(Some(&attrs), container_default, mode) {
             optional = true;
@@ -1709,6 +1903,8 @@ fn apply_field_attrs(field: &mut Field, mode: PhaseRewrite, container_default: b
     }
     field.set_flatten(flatten);
     field.set_optional(optional);
+
+    Ok(())
 }
 
 fn field_is_optional_for_mode(
@@ -1721,5 +1917,145 @@ fn field_is_optional_for_mode(
         PhaseRewrite::Deserialize | PhaseRewrite::Unified => {
             container_default || attrs.is_some_and(|attrs| attrs.default || attrs.skip_deserializing)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde::{Deserialize, Serialize};
+    use specta::{ResolvedTypes, Type, datatype::DataType};
+
+    use super::{Phase, Phased, apply_phases, select_phase_datatype};
+
+    #[derive(Type, Serialize, Deserialize)]
+    #[serde(untagged)]
+    enum OneOrManyString {
+        One(String),
+        Many(Vec<String>),
+    }
+
+    #[derive(Type, Serialize, Deserialize)]
+    struct Filters {
+        #[specta(type = Phased<Vec<String>, OneOrManyString>)]
+        tags: Vec<String>,
+    }
+
+    #[derive(Type, Serialize, Deserialize)]
+    struct FilterList {
+        items: Vec<Filters>,
+    }
+
+    #[derive(Type, Serialize, Deserialize)]
+    struct Plain {
+        name: String,
+    }
+
+    #[test]
+    fn selects_split_named_reference_for_each_phase() {
+        let mut types = specta::Types::default();
+        let dt = Filters::definition(&mut types);
+        let resolved = apply_phases(types).expect("apply_phases should succeed");
+
+        let serialize = select_phase_datatype(&dt, &resolved, Phase::Serialize);
+        let deserialize = select_phase_datatype(&dt, &resolved, Phase::Deserialize);
+
+        assert_named_reference(&serialize, &resolved, "Filters_Serialize");
+        assert_named_reference(&deserialize, &resolved, "Filters_Deserialize");
+    }
+
+    #[test]
+    fn rewrites_nested_generics_for_each_phase() {
+        let mut types = specta::Types::default();
+        let dt = FilterList::definition(&mut types);
+        let resolved = apply_phases(types).expect("apply_phases should succeed");
+
+        let serialize = select_phase_datatype(&dt, &resolved, Phase::Serialize);
+        let deserialize = select_phase_datatype(&dt, &resolved, Phase::Deserialize);
+
+        assert_named_reference(&serialize, &resolved, "FilterList_Serialize");
+        assert_named_reference(&deserialize, &resolved, "FilterList_Deserialize");
+
+        let serialize_inner = named_field_type(&serialize, &resolved, "items");
+        let deserialize_inner = named_field_type(&deserialize, &resolved, "items");
+
+        assert_named_reference(first_generic_type(serialize_inner), &resolved, "Filters_Serialize");
+        assert_named_reference(
+            first_generic_type(deserialize_inner),
+            &resolved,
+            "Filters_Deserialize",
+        );
+    }
+
+    #[test]
+    fn preserves_unsplit_types() {
+        let mut types = specta::Types::default();
+        let dt = Plain::definition(&mut types);
+        let resolved = apply_phases(types).expect("apply_phases should succeed");
+
+        let serialize = select_phase_datatype(&dt, &resolved, Phase::Serialize);
+        let deserialize = select_phase_datatype(&dt, &resolved, Phase::Deserialize);
+
+        assert_named_reference(&serialize, &resolved, "Plain");
+        assert_named_reference(&deserialize, &resolved, "Plain");
+    }
+
+    #[test]
+    fn resolves_explicit_phased_datatypes_without_named_types() {
+        let mut types = specta::Types::default();
+        let dt = <Phased<String, Vec<String>>>::definition(&mut types);
+        let resolved = apply_phases(types).expect("apply_phases should succeed");
+
+        let serialize = select_phase_datatype(&dt, &resolved, Phase::Serialize);
+        let deserialize = select_phase_datatype(&dt, &resolved, Phase::Deserialize);
+
+        assert_named_reference(&serialize, &resolved, "String");
+        assert_named_reference(first_generic_type(&deserialize), &resolved, "String");
+    }
+
+    fn assert_named_reference(dt: &DataType, types: &ResolvedTypes, expected_name: &str) {
+        let DataType::Reference(specta::datatype::Reference::Named(reference)) = dt else {
+            panic!("expected named reference");
+        };
+
+        let actual = reference
+            .get(types.as_types())
+            .expect("reference should resolve")
+            .name();
+
+        assert_eq!(actual, expected_name);
+    }
+
+    fn named_field_type<'a>(dt: &'a DataType, types: &'a ResolvedTypes, field_name: &str) -> &'a DataType {
+        let DataType::Reference(specta::datatype::Reference::Named(reference)) = dt else {
+            panic!("expected named reference");
+        };
+
+        let named = reference
+            .get(types.as_types())
+            .expect("reference should resolve");
+        let DataType::Struct(strct) = named.ty() else {
+            panic!("expected struct type");
+        };
+        let specta::datatype::Fields::Named(fields) = strct.fields() else {
+            panic!("expected named fields");
+        };
+
+        fields
+            .fields()
+            .iter()
+            .find_map(|(name, field)| (name == field_name).then(|| field.ty()).flatten())
+            .expect("field should exist")
+    }
+
+    fn first_generic_type(dt: &DataType) -> &DataType {
+        let DataType::Reference(specta::datatype::Reference::Named(reference)) = dt else {
+            panic!("expected named reference with generics");
+        };
+
+        reference
+            .generics()
+            .first()
+            .map(|(_, dt)| dt)
+            .expect("expected first generic type")
     }
 }

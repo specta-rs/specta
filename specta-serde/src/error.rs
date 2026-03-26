@@ -61,6 +61,10 @@ enum ErrorKind {
         path: String,
         reason: Cow<'static, str>,
     },
+    InvalidRenameRule {
+        attribute: Cow<'static, str>,
+        value: String,
+    },
 }
 
 impl Error {
@@ -205,6 +209,18 @@ impl Error {
             },
         }
     }
+
+    pub(crate) fn invalid_rename_rule(
+        attribute: impl Into<Cow<'static, str>>,
+        value: impl Into<String>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::InvalidRenameRule {
+                attribute: attribute.into(),
+                value: value.into(),
+            },
+        }
+    }
 }
 
 impl fmt::Display for Error {
@@ -271,6 +287,10 @@ impl fmt::Display for Error {
             ErrorKind::InvalidPhasedTypeUsage { path, reason } => {
                 write!(f, "Invalid phased type usage at '{path}': {reason}")
             }
+            ErrorKind::InvalidRenameRule { attribute, value } => write!(
+                f,
+                "Invalid serde rename rule for '{attribute}': {value:?}"
+            ),
         }
     }
 }
