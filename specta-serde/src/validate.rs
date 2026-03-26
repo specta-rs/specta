@@ -192,7 +192,9 @@ fn inner(
                 &path,
                 mode,
             )?;
-            if SerdeContainerAttrs::from_attributes(enm.attributes())?.is_some_and(|attrs| attrs.default) {
+            if SerdeContainerAttrs::from_attributes(enm.attributes())?
+                .is_some_and(|attrs| attrs.default)
+            {
                 return Err(Error::invalid_phased_type_usage(
                     path,
                     "`#[serde(default)]` is only valid on structs",
@@ -653,7 +655,8 @@ fn validate_internally_tag_variant(
     path: &str,
 ) -> Result<()> {
     let _ = enm;
-    if SerdeVariantAttrs::from_attributes(variant.attributes())?.is_some_and(|attrs| attrs.untagged) {
+    if SerdeVariantAttrs::from_attributes(variant.attributes())?.is_some_and(|attrs| attrs.untagged)
+    {
         return Ok(());
     }
 

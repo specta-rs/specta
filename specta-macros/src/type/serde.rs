@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{meta::ParseNestedMeta, Attribute, LitStr, Meta, Result, Type};
+use syn::{Attribute, LitStr, Meta, Result, Type, meta::ParseNestedMeta};
 
 use super::AttributeScope;
 

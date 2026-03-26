@@ -325,7 +325,9 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
 
     for generated_types_for_phase in generated.values() {
         generated_types.insert(TypeIdentity::from_ndt(&generated_types_for_phase.serialize));
-        generated_types.insert(TypeIdentity::from_ndt(&generated_types_for_phase.deserialize));
+        generated_types.insert(TypeIdentity::from_ndt(
+            &generated_types_for_phase.deserialize,
+        ));
         generated_types_for_phase.serialize.register(&mut out);
         generated_types_for_phase.deserialize.register(&mut out);
     }
@@ -509,8 +511,8 @@ fn select_phase_datatype_inner(ty: &mut DataType, types: &Types, phase: Phase) {
                 })
                 .collect::<Vec<_>>();
 
-            let target_ndt = select_split_type_variant(referenced_ndt, types, phase)
-                .unwrap_or(referenced_ndt);
+            let target_ndt =
+                select_split_type_variant(referenced_ndt, types, phase).unwrap_or(referenced_ndt);
 
             let mut new_reference = target_ndt.reference(generics);
             if reference.inline() {
@@ -571,7 +573,10 @@ fn select_split_type_variant<'a>(
         Phase::Deserialize => "Deserialize",
     };
 
-    let (_, variant) = wrapper.variants().iter().find(|(name, _)| name == variant_name)?;
+    let (_, variant) = wrapper
+        .variants()
+        .iter()
+        .find(|(name, _)| name == variant_name)?;
     let Fields::Unnamed(fields) = variant.fields() else {
         return None;
     };
@@ -807,15 +812,15 @@ fn rewrite_fields_for_phase(
         }
         Fields::Named(named) => {
             let mut skip_err = None;
-            named.fields_mut().retain(|(_, field)| {
-                match should_skip_field_for_mode(field, mode) {
+            named
+                .fields_mut()
+                .retain(|(_, field)| match should_skip_field_for_mode(field, mode) {
                     Ok(skip) => !skip,
                     Err(err) => {
                         skip_err = Some(err);
                         true
                     }
-                }
-            });
+                });
             if let Some(err) = skip_err {
                 return Err(err);
             }
@@ -1135,7 +1140,9 @@ fn container_rename_all_rule(
     select_phase_rule(
         mode,
         attrs.as_ref().and_then(|attrs| attrs.rename_all_serialize),
-        attrs.as_ref().and_then(|attrs| attrs.rename_all_deserialize),
+        attrs
+            .as_ref()
+            .and_then(|attrs| attrs.rename_all_deserialize),
         context,
         container_name,
     )
@@ -1151,8 +1158,12 @@ fn enum_variant_field_rename_rule(
 
     let variant_rule = select_phase_rule(
         mode,
-        variant_attrs.as_ref().and_then(|attrs| attrs.rename_all_serialize),
-        variant_attrs.as_ref().and_then(|attrs| attrs.rename_all_deserialize),
+        variant_attrs
+            .as_ref()
+            .and_then(|attrs| attrs.rename_all_serialize),
+        variant_attrs
+            .as_ref()
+            .and_then(|attrs| attrs.rename_all_deserialize),
         "enum variant rename_all",
         variant_name,
     )?;
@@ -1527,7 +1538,8 @@ fn transform_internal_variant(
                 &payload_ty,
                 original_types,
                 &mut HashSet::new(),
-            )? else {
+            )?
+            else {
                 return Err(Error::invalid_internally_tagged_variant(
                     serialized_name,
                     "payload cannot be merged with a tag",
@@ -1717,7 +1729,9 @@ fn internal_tag_variant_payload_compatibility(
 ) -> Result<Option<bool>> {
     match variant.fields() {
         Fields::Unit => Ok(Some(true)),
-        Fields::Named(named) => Ok(Some(named.fields().iter().all(|(_, field)| field.ty().is_none()))),
+        Fields::Named(named) => Ok(Some(
+            named.fields().iter().all(|(_, field)| field.ty().is_none()),
+        )),
         Fields::Unnamed(unnamed) => {
             if unnamed.fields().len() != 1 {
                 return Ok(None);
@@ -1736,35 +1750,36 @@ fn internal_tag_variant_payload_compatibility(
 
 fn has_local_phase_difference(dt: &DataType) -> Result<bool> {
     match dt {
-        DataType::Struct(s) => {
-            Ok(container_has_local_difference(s.attributes())? || fields_have_local_difference(s.fields())?)
-        }
-        DataType::Enum(e) => Ok(
-            container_has_local_difference(e.attributes())?
-                || e.variants().iter().try_fold(false, |has_difference, (_, variant)| {
+        DataType::Struct(s) => Ok(container_has_local_difference(s.attributes())?
+            || fields_have_local_difference(s.fields())?),
+        DataType::Enum(e) => Ok(container_has_local_difference(e.attributes())?
+            || e.variants()
+                .iter()
+                .try_fold(false, |has_difference, (_, variant)| {
                     if has_difference {
                         return Ok(true);
                     }
 
-                    Ok(
-                        variant_has_local_difference(variant)?
-                            || fields_have_local_difference(variant.fields())?,
-                    )
-                })?,
-        ),
-        DataType::Tuple(tuple) => tuple.elements().iter().try_fold(false, |has_difference, ty| {
-            if has_difference {
-                return Ok(true);
-            }
+                    Ok(variant_has_local_difference(variant)?
+                        || fields_have_local_difference(variant.fields())?)
+                })?),
+        DataType::Tuple(tuple) => tuple
+            .elements()
+            .iter()
+            .try_fold(false, |has_difference, ty| {
+                if has_difference {
+                    return Ok(true);
+                }
 
-            has_local_phase_difference(ty)
-        }),
+                has_local_phase_difference(ty)
+            }),
         DataType::List(list) => has_local_phase_difference(list.ty()),
-        DataType::Map(map) => {
-            Ok(has_local_phase_difference(map.key_ty())? || has_local_phase_difference(map.value_ty())?)
-        }
+        DataType::Map(map) => Ok(has_local_phase_difference(map.key_ty())?
+            || has_local_phase_difference(map.value_ty())?),
         DataType::Nullable(inner) => has_local_phase_difference(inner),
-        DataType::Reference(Reference::Opaque(reference)) => Ok(reference.downcast_ref::<PhasedTy>().is_some()),
+        DataType::Reference(Reference::Opaque(reference)) => {
+            Ok(reference.downcast_ref::<PhasedTy>().is_some())
+        }
         DataType::Primitive(_)
         | DataType::Reference(Reference::Named(_))
         | DataType::Reference(Reference::Generic(_)) => Ok(false),
@@ -1791,23 +1806,31 @@ fn container_has_local_difference(attrs: &specta::datatype::Attributes) -> Resul
 fn fields_have_local_difference(fields: &Fields) -> Result<bool> {
     match fields {
         Fields::Unit => Ok(false),
-        Fields::Unnamed(unnamed) => unnamed.fields().iter().try_fold(false, |has_difference, field| {
-            if has_difference {
-                return Ok(true);
-            }
+        Fields::Unnamed(unnamed) => {
+            unnamed
+                .fields()
+                .iter()
+                .try_fold(false, |has_difference, field| {
+                    if has_difference {
+                        return Ok(true);
+                    }
 
-            field.ty().map_or(Ok(false), has_local_phase_difference)
-        }),
-        Fields::Named(named) => named.fields().iter().try_fold(false, |has_difference, (_, field)| {
-            if has_difference {
-                return Ok(true);
-            }
+                    field.ty().map_or(Ok(false), has_local_phase_difference)
+                })
+        }
+        Fields::Named(named) => {
+            named
+                .fields()
+                .iter()
+                .try_fold(false, |has_difference, (_, field)| {
+                    if has_difference {
+                        return Ok(true);
+                    }
 
-            Ok(
-                field_has_local_difference(field)?
-                    || field.ty().map_or(Ok(false), has_local_phase_difference)?,
-            )
-        }),
+                    Ok(field_has_local_difference(field)?
+                        || field.ty().map_or(Ok(false), has_local_phase_difference)?)
+                })
+        }
     }
 }
 
@@ -1838,7 +1861,11 @@ fn variant_has_local_difference(variant: &Variant) -> Result<bool> {
         .unwrap_or_default())
 }
 
-fn collect_dependencies(dt: &DataType, types: &Types, deps: &mut HashSet<TypeIdentity>) -> Result<()> {
+fn collect_dependencies(
+    dt: &DataType,
+    types: &Types,
+    deps: &mut HashSet<TypeIdentity>,
+) -> Result<()> {
     match dt {
         DataType::Struct(s) => {
             collect_conversion_dependencies(s.attributes(), types, deps)?;
@@ -1979,7 +2006,8 @@ fn field_is_optional_for_mode(
     match mode {
         PhaseRewrite::Serialize => false,
         PhaseRewrite::Deserialize | PhaseRewrite::Unified => {
-            container_default || attrs.is_some_and(|attrs| attrs.default || attrs.skip_deserializing)
+            container_default
+                || attrs.is_some_and(|attrs| attrs.default || attrs.skip_deserializing)
         }
     }
 }
@@ -2042,7 +2070,11 @@ mod tests {
         let serialize_inner = named_field_type(&serialize, &resolved, "items");
         let deserialize_inner = named_field_type(&deserialize, &resolved, "items");
 
-        assert_named_reference(first_generic_type(serialize_inner), &resolved, "Filters_Serialize");
+        assert_named_reference(
+            first_generic_type(serialize_inner),
+            &resolved,
+            "Filters_Serialize",
+        );
         assert_named_reference(
             first_generic_type(deserialize_inner),
             &resolved,
@@ -2089,7 +2121,11 @@ mod tests {
         assert_eq!(actual, expected_name);
     }
 
-    fn named_field_type<'a>(dt: &'a DataType, types: &'a ResolvedTypes, field_name: &str) -> &'a DataType {
+    fn named_field_type<'a>(
+        dt: &'a DataType,
+        types: &'a ResolvedTypes,
+        field_name: &str,
+    ) -> &'a DataType {
         let DataType::Reference(specta::datatype::Reference::Named(reference)) = dt else {
             panic!("expected named reference");
         };
