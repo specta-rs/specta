@@ -530,7 +530,7 @@ export type Optional_Serialize = {
 	a: number | null,
 	b?: number | null,
 	c?: string | null,
-	d?: boolean,
+	d: boolean,
 };
 
 export type OverridenStruct = {
