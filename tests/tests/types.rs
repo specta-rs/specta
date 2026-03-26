@@ -15,7 +15,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use specta::{Type, Types, datatype::DataType};
+use specta::{datatype::DataType, Type, Types};
 
 /// A macro to collect up the types for better testing.
 ///
@@ -1559,6 +1559,61 @@ struct Optional {
     d: bool,
 }
 
+#[derive(Type, Serialize, Deserialize, Default)]
+#[specta(collect = false)]
+#[serde(default)]
+struct ContainerDefault {
+    value: String,
+    flag: bool,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FieldDefault {
+    name: String,
+    #[serde(default)]
+    enabled: bool,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum MixedTaggedAndUntagged {
+    Tagged {
+        value: String,
+    },
+    #[serde(untagged)]
+    Raw(String),
+    #[serde(untagged)]
+    Empty,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum MixedTaggedAndUntaggedStruct {
+    Tagged {
+        value: String,
+    },
+    #[serde(untagged)]
+    Raw {
+        raw_value: String,
+    },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum MixedTaggedAndUntaggedPhased {
+    Tagged {
+        value: String,
+    },
+    #[serde(untagged, skip_serializing)]
+    DeserializeOnly(String),
+    #[serde(untagged, skip_deserializing)]
+    SerializeOnly(bool),
+}
+
 // Test that attributes with format strings are properly parsed
 // This tests the fix for parsing attributes like #[error("io error: {0}")]
 // which were causing "expected ident" errors in the lower_attr.rs parser
@@ -2495,4 +2550,73 @@ fn struct_collects_all_transparent_field_types() {
     assert!(names.contains(&"UsesTransparent"));
     assert!(names.contains(&"TransparentA"));
     assert!(names.contains(&"TransparentB"));
+}
+
+#[test]
+fn container_default_marks_all_fields_optional_in_unified_mode() {
+    let types = specta_serde::apply(Types::default().register::<ContainerDefault>())
+        .expect("container-level #[serde(default)] should be supported");
+    let ts = specta_typescript::Typescript::default()
+        .export(&types)
+        .expect("typescript export should succeed");
+
+    insta::assert_snapshot!("serde-default-container-typescript", ts);
+}
+
+#[test]
+fn field_default_still_marks_only_that_field_optional() {
+    let types = specta_serde::apply(Types::default().register::<FieldDefault>())
+        .expect("field-level #[serde(default)] should be supported");
+    let ts = specta_typescript::Typescript::default()
+        .export(&types)
+        .expect("typescript export should succeed");
+
+    insta::assert_snapshot!("serde-default-field-typescript", ts);
+}
+
+#[test]
+fn mixed_tagged_and_untagged_variants_export_in_unified_mode() {
+    let types = specta_serde::apply(Types::default().register::<MixedTaggedAndUntagged>())
+        .expect("mixed tagged and untagged variants should export when they share one shape");
+    let ts = specta_typescript::Typescript::default()
+        .export(&types)
+        .expect("typescript export should succeed");
+
+    insta::assert_snapshot!("serde-mixed-untagged-typescript", ts);
+}
+
+#[test]
+fn mixed_tagged_and_untagged_struct_variants_export_in_unified_mode() {
+    let types = specta_serde::apply(Types::default().register::<MixedTaggedAndUntaggedStruct>())
+        .expect(
+            "mixed tagged and untagged struct variants should export when they share one shape",
+        );
+    let ts = specta_typescript::Typescript::default()
+        .export(&types)
+        .expect("typescript export should succeed");
+
+    insta::assert_snapshot!("serde-mixed-untagged-struct-typescript", ts);
+}
+
+#[test]
+fn phased_mixed_untagged_variants_require_apply_phases() {
+    let err = specta_serde::apply(Types::default().register::<MixedTaggedAndUntaggedPhased>())
+        .expect_err("phase-specific mixed untagged variants should require apply_phases");
+
+    assert!(
+        err.to_string().contains("apply_phases"),
+        "unexpected error: {err}"
+    );
+}
+
+#[test]
+fn phased_mixed_untagged_variants_split_per_phase() {
+    let types =
+        specta_serde::apply_phases(Types::default().register::<MixedTaggedAndUntaggedPhased>())
+            .expect("apply_phases should support phase-specific mixed untagged variants");
+    let ts = specta_typescript::Typescript::default()
+        .export(&types)
+        .expect("typescript export should succeed");
+
+    insta::assert_snapshot!("serde-mixed-untagged-phased-typescript", ts);
 }

@@ -64,11 +64,10 @@ struct ContainerAttrs {
     rename_all_deserialize: Option<RenameRule>,
     rename_all_fields_serialize: Option<RenameRule>,
     rename_all_fields_deserialize: Option<RenameRule>,
-    deny_unknown_fields: bool,
     tag: Option<String>,
     content: Option<String>,
     untagged: bool,
-    default: Option<String>,
+    default: bool,
     transparent: bool,
     from: Option<ConversionType>,
     try_from: Option<ConversionType>,
@@ -86,11 +85,8 @@ struct VariantAttrs {
     rename_all_deserialize: Option<RenameRule>,
     skip_serializing: bool,
     skip_deserializing: bool,
-    serialize_with: Option<String>,
     has_serialize_with: bool,
-    deserialize_with: Option<String>,
     has_deserialize_with: bool,
-    with: Option<String>,
     has_with: bool,
     other: bool,
     untagged: bool,
@@ -101,16 +97,13 @@ struct FieldAttrs {
     rename_serialize: Option<String>,
     rename_deserialize: Option<String>,
     aliases: Vec<String>,
-    default: Option<String>,
+    default: bool,
     flatten: bool,
     skip_serializing: bool,
     skip_deserializing: bool,
     skip_serializing_if: Option<String>,
-    serialize_with: Option<String>,
     has_serialize_with: bool,
-    deserialize_with: Option<String>,
     has_deserialize_with: bool,
-    with: Option<String>,
     has_with: bool,
 }
 
@@ -196,8 +189,6 @@ fn parse_container_meta(target: &mut ContainerAttrs, meta: ParseNestedMeta<'_>) 
             &mut target.rename_all_fields_serialize,
             &mut target.rename_all_fields_deserialize,
         )?;
-    } else if meta.path.is_ident("deny_unknown_fields") {
-        target.deny_unknown_fields = true;
     } else if meta.path.is_ident("tag") {
         target.tag = Some(parse_string_assignment(&meta)?);
     } else if meta.path.is_ident("content") {
@@ -205,7 +196,8 @@ fn parse_container_meta(target: &mut ContainerAttrs, meta: ParseNestedMeta<'_>) 
     } else if meta.path.is_ident("untagged") {
         target.untagged = true;
     } else if meta.path.is_ident("default") {
-        target.default = Some(parse_default_assignment(&meta)?);
+        parse_default_assignment(&meta)?;
+        target.default = true;
     } else if meta.path.is_ident("transparent") {
         target.transparent = true;
     } else if meta.path.is_ident("from") {
@@ -247,13 +239,13 @@ fn parse_variant_meta(target: &mut VariantAttrs, meta: ParseNestedMeta<'_>) -> R
         target.skip_deserializing = true;
     } else if meta.path.is_ident("serialize_with") {
         target.has_serialize_with = true;
-        target.serialize_with = Some(parse_string_assignment(&meta)?);
+        parse_string_assignment(&meta)?;
     } else if meta.path.is_ident("deserialize_with") {
         target.has_deserialize_with = true;
-        target.deserialize_with = Some(parse_string_assignment(&meta)?);
+        parse_string_assignment(&meta)?;
     } else if meta.path.is_ident("with") {
         target.has_with = true;
-        target.with = Some(parse_string_assignment(&meta)?);
+        parse_string_assignment(&meta)?;
     } else if meta.path.is_ident("other") {
         target.other = true;
     } else if meta.path.is_ident("untagged") {
@@ -273,7 +265,8 @@ fn parse_field_meta(target: &mut FieldAttrs, meta: ParseNestedMeta<'_>) -> Resul
     } else if meta.path.is_ident("alias") {
         target.aliases.push(parse_string_assignment(&meta)?);
     } else if meta.path.is_ident("default") {
-        target.default = Some(parse_default_assignment(&meta)?);
+        parse_default_assignment(&meta)?;
+        target.default = true;
     } else if meta.path.is_ident("flatten") {
         target.flatten = true;
     } else if meta.path.is_ident("skip") {
@@ -287,13 +280,13 @@ fn parse_field_meta(target: &mut FieldAttrs, meta: ParseNestedMeta<'_>) -> Resul
         target.skip_serializing_if = Some(parse_string_assignment(&meta)?);
     } else if meta.path.is_ident("serialize_with") {
         target.has_serialize_with = true;
-        target.serialize_with = Some(parse_string_assignment(&meta)?);
+        parse_string_assignment(&meta)?;
     } else if meta.path.is_ident("deserialize_with") {
         target.has_deserialize_with = true;
-        target.deserialize_with = Some(parse_string_assignment(&meta)?);
+        parse_string_assignment(&meta)?;
     } else if meta.path.is_ident("with") {
         target.has_with = true;
-        target.with = Some(parse_string_assignment(&meta)?);
+        parse_string_assignment(&meta)?;
     }
 
     Ok(())
@@ -403,15 +396,10 @@ fn lower_container_attrs(crate_ref: &TokenStream, attrs: ContainerAttrs) -> Toke
         "serde:container:rename_all_fields_deserialize",
         attrs.rename_all_fields_deserialize,
     );
-    push_bool(
-        &mut inserts,
-        "serde:container:deny_unknown_fields",
-        attrs.deny_unknown_fields,
-    );
     push_opt_string(&mut inserts, "serde:container:tag", &attrs.tag);
     push_opt_string(&mut inserts, "serde:container:content", &attrs.content);
     push_bool(&mut inserts, "serde:container:untagged", attrs.untagged);
-    push_opt_string(&mut inserts, "serde:container:default", &attrs.default);
+    push_bool(&mut inserts, "serde:container:default", attrs.default);
     push_bool(
         &mut inserts,
         "serde:container:transparent",
@@ -467,27 +455,16 @@ fn lower_variant_attrs(_crate_ref: &TokenStream, attrs: VariantAttrs) -> TokenSt
         "serde:variant:skip_deserializing",
         attrs.skip_deserializing,
     );
-    push_opt_string(
-        &mut inserts,
-        "serde:variant:serialize_with",
-        &attrs.serialize_with,
-    );
     push_bool(
         &mut inserts,
         "serde:variant:has_serialize_with",
         attrs.has_serialize_with,
-    );
-    push_opt_string(
-        &mut inserts,
-        "serde:variant:deserialize_with",
-        &attrs.deserialize_with,
     );
     push_bool(
         &mut inserts,
         "serde:variant:has_deserialize_with",
         attrs.has_deserialize_with,
     );
-    push_opt_string(&mut inserts, "serde:variant:with", &attrs.with);
     push_bool(&mut inserts, "serde:variant:has_with", attrs.has_with);
     push_bool(&mut inserts, "serde:variant:other", attrs.other);
     push_bool(&mut inserts, "serde:variant:untagged", attrs.untagged);
@@ -508,7 +485,7 @@ fn lower_field_attrs(_crate_ref: &TokenStream, attrs: FieldAttrs) -> TokenStream
         &attrs.rename_deserialize,
     );
     push_vec_string(&mut inserts, "serde:field:aliases", &attrs.aliases);
-    push_opt_string(&mut inserts, "serde:field:default", &attrs.default);
+    push_bool(&mut inserts, "serde:field:default", attrs.default);
     push_bool(&mut inserts, "serde:field:flatten", attrs.flatten);
     push_bool(
         &mut inserts,
@@ -525,27 +502,16 @@ fn lower_field_attrs(_crate_ref: &TokenStream, attrs: FieldAttrs) -> TokenStream
         "serde:field:skip_serializing_if",
         &attrs.skip_serializing_if,
     );
-    push_opt_string(
-        &mut inserts,
-        "serde:field:serialize_with",
-        &attrs.serialize_with,
-    );
     push_bool(
         &mut inserts,
         "serde:field:has_serialize_with",
         attrs.has_serialize_with,
-    );
-    push_opt_string(
-        &mut inserts,
-        "serde:field:deserialize_with",
-        &attrs.deserialize_with,
     );
     push_bool(
         &mut inserts,
         "serde:field:has_deserialize_with",
         attrs.has_deserialize_with,
     );
-    push_opt_string(&mut inserts, "serde:field:with", &attrs.with);
     push_bool(&mut inserts, "serde:field:has_with", attrs.has_with);
 
     quote!(#(#inserts)*)

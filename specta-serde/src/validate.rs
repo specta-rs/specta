@@ -192,6 +192,12 @@ fn inner(
                 &path,
                 mode,
             )?;
+            if SerdeContainerAttrs::from_attributes(enm.attributes()).is_some_and(|attrs| attrs.default) {
+                return Err(Error::invalid_phased_type_usage(
+                    path,
+                    "`#[serde(default)]` is only valid on structs",
+                ));
+            }
             validate_identifier_enum(enm, &path, mode)?;
             validate_enum(enm, types, path.clone(), mode)?;
 
@@ -455,7 +461,7 @@ fn validate_container_attributes(
     Ok(())
 }
 
-fn validate_variant_attributes(variant: &Variant, path: String, _mode: ApplyMode) -> Result<()> {
+fn validate_variant_attributes(variant: &Variant, path: String, mode: ApplyMode) -> Result<()> {
     let Some(serde_attrs) = SerdeVariantAttrs::from_attributes(variant.attributes()) else {
         return Ok(());
     };
@@ -468,6 +474,16 @@ fn validate_variant_attributes(variant: &Variant, path: String, _mode: ApplyMode
     }
     if serde_attrs.has_with {
         ensure_codec_override(variant.type_overridden(), &path, "with")?;
+    }
+
+    if mode == ApplyMode::Unified
+        && serde_attrs.untagged
+        && serde_attrs.skip_serializing != serde_attrs.skip_deserializing
+    {
+        return Err(Error::invalid_phased_type_usage(
+            path,
+            "phase-specific `#[serde(untagged)]` variants require `apply_phases` because unified mode would drop one branch",
+        ));
     }
 
     Ok(())
@@ -540,10 +556,36 @@ fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Re
 
     let repr = enum_repr_from_attrs(enm.attributes())?;
 
+    validate_untagged_variants(enm, &path)?;
     validate_other_variant(enm, &path, &repr, mode)?;
 
     if matches!(repr, EnumRepr::Internal { .. }) {
         validate_internally_tag_enum(enm, types, path)?;
+    }
+
+    Ok(())
+}
+
+fn validate_untagged_variants(enm: &Enum, path: &str) -> Result<()> {
+    let mut seen_untagged = false;
+
+    for (name, variant) in enm.variants() {
+        let is_untagged = SerdeVariantAttrs::from_attributes(variant.attributes())
+            .is_some_and(|attrs| attrs.untagged);
+
+        if is_untagged {
+            seen_untagged = true;
+            continue;
+        }
+
+        if seen_untagged && !variant.skip() {
+            return Err(Error::invalid_phased_type_usage(
+                path,
+                format!(
+                    "`#[serde(untagged)]` variants must be ordered last, but variant `{name}` appears after an untagged variant"
+                ),
+            ));
+        }
     }
 
     Ok(())
@@ -612,6 +654,10 @@ fn validate_internally_tag_variant(
     path: &str,
 ) -> Result<()> {
     let _ = enm;
+    if SerdeVariantAttrs::from_attributes(variant.attributes()).is_some_and(|attrs| attrs.untagged) {
+        return Ok(());
+    }
+
     match &variant.fields() {
         Fields::Unit | Fields::Named(_) => Ok(()),
         Fields::Unnamed(unnamed) => {

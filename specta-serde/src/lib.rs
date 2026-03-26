@@ -439,6 +439,8 @@ fn rewrite_datatype_for_phase(
 
     match ty {
         DataType::Struct(s) => {
+            let container_default = SerdeContainerAttrs::from_attributes(s.attributes())
+                .is_some_and(|attrs| attrs.default);
             let container_rename_all = container_rename_all_rule(
                 s.attributes(),
                 mode,
@@ -453,6 +455,7 @@ fn rewrite_datatype_for_phase(
                 generated,
                 split_types,
                 container_rename_all,
+                container_default,
                 false,
             )?;
             rewrite_struct_repr_for_phase(s, mode, container_name)?;
@@ -472,6 +475,7 @@ fn rewrite_datatype_for_phase(
                     generated,
                     split_types,
                     rename_rule,
+                    false,
                     true,
                 )?;
             }
@@ -578,6 +582,7 @@ fn rewrite_fields_for_phase(
     generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
     split_types: &HashSet<TypeIdentity>,
     rename_all_rule: Option<RenameRule>,
+    container_default: bool,
     preserve_skipped_unnamed_fields: bool,
 ) -> Result<()> {
     match fields {
@@ -592,7 +597,7 @@ fn rewrite_fields_for_phase(
                     continue;
                 }
 
-                apply_field_attrs(field);
+                apply_field_attrs(field, mode, container_default);
                 rewrite_field_for_phase(field, mode, original_types, generated, split_types)?;
             }
 
@@ -605,7 +610,7 @@ fn rewrite_fields_for_phase(
                 .fields_mut()
                 .retain(|(_, field)| !should_skip_field_for_mode(field, mode));
             for (name, field) in named.fields_mut() {
-                apply_field_attrs(field);
+                apply_field_attrs(field, mode, container_default);
 
                 if let Some(serde_attrs) = SerdeFieldAttrs::from_attributes(field.attributes()) {
                     let rename = match mode {
@@ -774,16 +779,19 @@ fn rewrite_enum_repr_for_phase(
         }
 
         let variant_attrs = SerdeVariantAttrs::from_attributes(variant.attributes());
-        if let Some(ref attrs) = variant_attrs {
-            let skipped = match mode {
-                PhaseRewrite::Serialize => attrs.skip_serializing,
-                PhaseRewrite::Deserialize => attrs.skip_deserializing,
-                PhaseRewrite::Unified => attrs.skip_serializing || attrs.skip_deserializing,
-            };
+        if variant_attrs
+            .as_ref()
+            .is_some_and(|attrs| variant_is_skipped_for_mode(attrs, mode))
+        {
+            continue;
+        }
 
-            if skipped {
-                continue;
-            }
+        if variant_attrs.as_ref().is_some_and(|attrs| attrs.untagged) {
+            transformed.push((
+                Cow::Owned(variant_name.into_owned()),
+                transform_untagged_variant(&variant)?,
+            ));
+            continue;
         }
 
         let serialized_name =
@@ -963,6 +971,12 @@ fn identifier_union_variant(ty: DataType) -> Variant {
     variant
 }
 
+fn transform_untagged_variant(variant: &Variant) -> Result<Variant> {
+    let payload = variant_payload_field(variant)
+        .ok_or_else(|| Error::invalid_external_tagged_variant("<untagged variant>"))?;
+    Ok(clone_variant_with_unnamed_fields(variant, vec![payload]))
+}
+
 fn filter_enum_variants_for_phase(e: &mut Enum, mode: PhaseRewrite) {
     e.variants_mut().retain(|(_, variant)| {
         if variant.skip() {
@@ -973,12 +987,16 @@ fn filter_enum_variants_for_phase(e: &mut Enum, mode: PhaseRewrite) {
             return true;
         };
 
-        !match mode {
-            PhaseRewrite::Serialize => attrs.skip_serializing,
-            PhaseRewrite::Deserialize => attrs.skip_deserializing,
-            PhaseRewrite::Unified => attrs.skip_serializing || attrs.skip_deserializing,
-        }
+        !variant_is_skipped_for_mode(&attrs, mode)
     });
+}
+
+fn variant_is_skipped_for_mode(attrs: &SerdeVariantAttrs, mode: PhaseRewrite) -> bool {
+    match mode {
+        PhaseRewrite::Serialize => attrs.skip_serializing,
+        PhaseRewrite::Deserialize => attrs.skip_deserializing,
+        PhaseRewrite::Unified => attrs.skip_serializing || attrs.skip_deserializing,
+    }
 }
 
 fn enum_repr_from_attrs(attrs: &specta::datatype::Attributes) -> Result<EnumRepr> {
@@ -1683,15 +1701,30 @@ fn build_from_original(
     ndt
 }
 
-fn apply_field_attrs(field: &mut Field) {
-    let mut flatten = false;
+fn apply_field_attrs(field: &mut Field, mode: PhaseRewrite, container_default: bool) {
+    let mut flatten = field.flatten();
     let mut optional = field.optional();
     if let Some(attrs) = SerdeFieldAttrs::from_attributes(field.attributes()) {
         flatten = attrs.flatten;
-        if attrs.default.is_some() {
+        if field_is_optional_for_mode(Some(&attrs), container_default, mode) {
             optional = true;
         }
+    } else if field_is_optional_for_mode(None, container_default, mode) {
+        optional = true;
     }
     field.set_flatten(flatten);
     field.set_optional(optional);
+}
+
+fn field_is_optional_for_mode(
+    attrs: Option<&SerdeFieldAttrs>,
+    container_default: bool,
+    mode: PhaseRewrite,
+) -> bool {
+    match mode {
+        PhaseRewrite::Serialize => false,
+        PhaseRewrite::Deserialize | PhaseRewrite::Unified => {
+            container_default || attrs.is_some_and(|attrs| attrs.default || attrs.skip_deserializing)
+        }
+    }
 }
