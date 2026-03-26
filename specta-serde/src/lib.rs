@@ -123,7 +123,7 @@ use parser::{SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs};
 use phased::PhasedTy;
 
 pub use error::Error;
-pub use phased::Phased;
+pub use phased::{Phased, phased};
 
 /// Selects which directional type shape to use after [`apply_phases`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
