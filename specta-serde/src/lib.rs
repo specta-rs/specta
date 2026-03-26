@@ -411,6 +411,51 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
 /// This is useful for exporter integrations that need deserialize-specific input
 /// types and serialize-specific output types while still exporting against the
 /// resolved type graph returned by [`apply_phases`].
+///
+/// # Examples
+///
+/// ```rust
+/// use serde::{Deserialize, Serialize};
+/// use specta::{Type, Types, datatype::{DataType, Reference}};
+/// use specta_serde::{Phase, Phased, apply_phases, select_phase_datatype};
+///
+/// #[derive(Type, Serialize, Deserialize)]
+/// #[serde(untagged)]
+/// enum OneOrManyString {
+///     One(String),
+///     Many(Vec<String>),
+/// }
+///
+/// #[derive(Type, Serialize, Deserialize)]
+/// struct Filters {
+///     #[specta(type = Phased<Vec<String>, OneOrManyString>)]
+///     tags: Vec<String>,
+/// }
+///
+/// let mut types = Types::default();
+/// let dt = Filters::definition(&mut types);
+/// let resolved = apply_phases(types)?;
+///
+/// let serialize = select_phase_datatype(&dt, &resolved, Phase::Serialize);
+/// let deserialize = select_phase_datatype(&dt, &resolved, Phase::Deserialize);
+///
+/// let DataType::Reference(Reference::Named(serialize_reference)) = &serialize else {
+///     panic!("expected named serialize reference");
+/// };
+/// let DataType::Reference(Reference::Named(deserialize_reference)) = &deserialize else {
+///     panic!("expected named deserialize reference");
+/// };
+///
+/// assert_eq!(
+///     serialize_reference.get(resolved.as_types()).unwrap().name(),
+///     "Filters_Serialize"
+/// );
+/// assert_eq!(
+///     deserialize_reference.get(resolved.as_types()).unwrap().name(),
+///     "Filters_Deserialize"
+/// );
+/// # Ok::<(), specta_serde::Error>(())
+/// ```
 pub fn select_phase_datatype(dt: &DataType, types: &ResolvedTypes, phase: Phase) -> DataType {
     let mut dt = dt.clone();
     select_phase_datatype_inner(&mut dt, types.as_types(), phase);
