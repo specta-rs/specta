@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{Attribute, LitStr, Meta, Result, Type, meta::ParseNestedMeta};
+use syn::{meta::ParseNestedMeta, Attribute, LitStr, Meta, Result, Type};
 
 use super::AttributeScope;
 
@@ -12,27 +12,27 @@ struct ConversionType {
 
 #[derive(Copy, Clone)]
 enum RenameRule {
-    LowerCase,
-    UpperCase,
-    PascalCase,
-    CamelCase,
-    SnakeCase,
-    ScreamingSnakeCase,
-    KebabCase,
-    ScreamingKebabCase,
+    Lower,
+    Upper,
+    Pascal,
+    Camel,
+    Snake,
+    ScreamingSnake,
+    Kebab,
+    ScreamingKebab,
 }
 
 impl RenameRule {
     fn parse(lit: &LitStr) -> Result<Self> {
         Ok(match lit.value().as_str() {
-            "lowercase" => Self::LowerCase,
-            "UPPERCASE" => Self::UpperCase,
-            "PascalCase" => Self::PascalCase,
-            "camelCase" => Self::CamelCase,
-            "snake_case" => Self::SnakeCase,
-            "SCREAMING_SNAKE_CASE" => Self::ScreamingSnakeCase,
-            "kebab-case" => Self::KebabCase,
-            "SCREAMING-KEBAB-CASE" => Self::ScreamingKebabCase,
+            "lowercase" => Self::Lower,
+            "UPPERCASE" => Self::Upper,
+            "PascalCase" => Self::Pascal,
+            "camelCase" => Self::Camel,
+            "snake_case" => Self::Snake,
+            "SCREAMING_SNAKE_CASE" => Self::ScreamingSnake,
+            "kebab-case" => Self::Kebab,
+            "SCREAMING-KEBAB-CASE" => Self::ScreamingKebab,
             _ => {
                 return Err(syn::Error::new(
                     lit.span(),
@@ -44,14 +44,14 @@ impl RenameRule {
 
     fn as_str(self) -> &'static str {
         match self {
-            Self::LowerCase => "lowercase",
-            Self::UpperCase => "UPPERCASE",
-            Self::PascalCase => "PascalCase",
-            Self::CamelCase => "camelCase",
-            Self::SnakeCase => "snake_case",
-            Self::ScreamingSnakeCase => "SCREAMING_SNAKE_CASE",
-            Self::KebabCase => "kebab-case",
-            Self::ScreamingKebabCase => "SCREAMING-KEBAB-CASE",
+            Self::Lower => "lowercase",
+            Self::Upper => "UPPERCASE",
+            Self::Pascal => "PascalCase",
+            Self::Camel => "camelCase",
+            Self::Snake => "snake_case",
+            Self::ScreamingSnake => "SCREAMING_SNAKE_CASE",
+            Self::Kebab => "kebab-case",
+            Self::ScreamingKebab => "SCREAMING-KEBAB-CASE",
         }
     }
 }

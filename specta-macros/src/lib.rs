@@ -26,9 +26,6 @@ use syn::{Error, LitStr, Type, parse_macro_input};
 ///  - `#[specta(type = ::std::string::String)]` - Will override the type of a item, variant or field to a given type.
 ///  - `#[specta(collect = false)]` - When using the `collect` feature, this will prevent the specific type from being exported.
 ///
-/// When the `serde` feature is enabled on `specta-macros`, Specta will also
-/// read `#[serde(...)]` attributes while deriving `specta::Type`.
-///
 /// ## Example
 ///
 /// ```ignore

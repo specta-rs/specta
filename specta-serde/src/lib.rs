@@ -136,18 +136,6 @@ pub mod internal {
 use error::Result;
 use repr::EnumRepr;
 
-fn container_attrs(attributes: &specta::datatype::Attributes) -> Option<SerdeContainerAttrs> {
-    SerdeContainerAttrs::from_attributes(attributes)
-}
-
-fn field_attrs(attributes: &specta::datatype::Attributes) -> Option<SerdeFieldAttrs> {
-    SerdeFieldAttrs::from_attributes(attributes)
-}
-
-fn variant_attrs(attributes: &specta::datatype::Attributes) -> Option<SerdeVariantAttrs> {
-    SerdeVariantAttrs::from_attributes(attributes)
-}
-
 /// Validates whether a given [`DataType`] is a valid Serde-type.
 ///
 /// When using [`apply`]/[`apply_phases`] all [`NamedDataType`]s are validated automatically, however if you need to export a [`DataType`] directly this is required to validate the top-level type.
@@ -471,7 +459,7 @@ fn rewrite_datatype_for_phase(
         }
         DataType::Enum(e) => {
             filter_enum_variants_for_phase(e, mode);
-            let container_attrs = container_attrs(e.attributes());
+            let container_attrs = SerdeContainerAttrs::from_attributes(e.attributes());
 
             for (variant_name, variant) in e.variants_mut() {
                 let rename_rule =
@@ -619,7 +607,7 @@ fn rewrite_fields_for_phase(
             for (name, field) in named.fields_mut() {
                 apply_field_attrs(field);
 
-                if let Some(serde_attrs) = field_attrs(field.attributes()) {
+                if let Some(serde_attrs) = SerdeFieldAttrs::from_attributes(field.attributes()) {
                     let rename = match mode {
                         PhaseRewrite::Serialize => serde_attrs.rename_serialize.as_deref(),
                         PhaseRewrite::Deserialize => serde_attrs.rename_deserialize.as_deref(),
@@ -653,7 +641,7 @@ fn rewrite_field_for_phase(
     generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
     split_types: &HashSet<TypeIdentity>,
 ) -> Result<()> {
-    if let Some(attrs) = field_attrs(field.attributes())
+    if let Some(attrs) = SerdeFieldAttrs::from_attributes(field.attributes())
         && let PhaseRewrite::Serialize = mode
         && attrs.skip_serializing_if.is_some()
     {
@@ -678,8 +666,8 @@ fn rewrite_struct_repr_for_phase(
     mode: PhaseRewrite,
     container_name: Option<&str>,
 ) -> Result<()> {
-    let Some((tag, rename_serialize, rename_deserialize)) = container_attrs(strct.attributes())
-        .map(|attrs| {
+    let Some((tag, rename_serialize, rename_deserialize)) =
+        SerdeContainerAttrs::from_attributes(strct.attributes()).map(|attrs| {
             (
                 attrs.tag.clone(),
                 attrs.rename_serialize.clone(),
@@ -728,7 +716,7 @@ fn rewrite_struct_repr_for_phase(
 }
 
 fn should_skip_field_for_mode(field: &Field, mode: PhaseRewrite) -> bool {
-    let Some(attrs) = field_attrs(field.attributes()) else {
+    let Some(attrs) = SerdeFieldAttrs::from_attributes(field.attributes()) else {
         return false;
     };
 
@@ -777,7 +765,7 @@ fn rewrite_enum_repr_for_phase(
         return Ok(());
     }
 
-    let container_attrs = container_attrs(e.attributes());
+    let container_attrs = SerdeContainerAttrs::from_attributes(e.attributes());
     let variants = std::mem::take(e.variants_mut());
     let mut transformed = Vec::with_capacity(variants.len());
     for (variant_name, variant) in variants {
@@ -785,7 +773,7 @@ fn rewrite_enum_repr_for_phase(
             continue;
         }
 
-        let variant_attrs = variant_attrs(variant.attributes());
+        let variant_attrs = SerdeVariantAttrs::from_attributes(variant.attributes());
         if let Some(ref attrs) = variant_attrs {
             let skipped = match mode {
                 PhaseRewrite::Serialize => attrs.skip_serializing,
@@ -844,7 +832,7 @@ fn rewrite_identifier_enum_for_phase(
     generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
     split_types: &HashSet<TypeIdentity>,
 ) -> Result<bool> {
-    let Some(attrs) = container_attrs(e.attributes()) else {
+    let Some(attrs) = SerdeContainerAttrs::from_attributes(e.attributes()) else {
         return Ok(false);
     };
 
@@ -856,7 +844,7 @@ fn rewrite_identifier_enum_for_phase(
         return Ok(false);
     }
 
-    let container_attrs = container_attrs(e.attributes());
+    let container_attrs = SerdeContainerAttrs::from_attributes(e.attributes());
     let mut variants = Vec::new();
     let mut seen = HashSet::new();
 
@@ -875,7 +863,7 @@ fn rewrite_identifier_enum_for_phase(
             ));
         }
 
-        if let Some(variant_attrs) = variant_attrs(variant.attributes()) {
+        if let Some(variant_attrs) = SerdeVariantAttrs::from_attributes(variant.attributes()) {
             for alias in &variant_attrs.aliases {
                 if seen.insert(alias.clone()) {
                     variants.push((
@@ -925,8 +913,10 @@ fn container_rename_all_rule(
 ) -> Result<Option<RenameRule>> {
     select_phase_rule(
         mode,
-        container_attrs(attrs).and_then(|container_attrs| container_attrs.rename_all_serialize),
-        container_attrs(attrs).and_then(|container_attrs| container_attrs.rename_all_deserialize),
+        SerdeContainerAttrs::from_attributes(attrs)
+            .and_then(|container_attrs| container_attrs.rename_all_serialize),
+        SerdeContainerAttrs::from_attributes(attrs)
+            .and_then(|container_attrs| container_attrs.rename_all_deserialize),
         context,
         container_name,
     )
@@ -940,8 +930,10 @@ fn enum_variant_field_rename_rule(
 ) -> Result<Option<RenameRule>> {
     let variant_rule = select_phase_rule(
         mode,
-        variant_attrs(variant.attributes()).and_then(|attrs| attrs.rename_all_serialize),
-        variant_attrs(variant.attributes()).and_then(|attrs| attrs.rename_all_deserialize),
+        SerdeVariantAttrs::from_attributes(variant.attributes())
+            .and_then(|attrs| attrs.rename_all_serialize),
+        SerdeVariantAttrs::from_attributes(variant.attributes())
+            .and_then(|attrs| attrs.rename_all_deserialize),
         "enum variant rename_all",
         variant_name,
     )?;
@@ -977,7 +969,7 @@ fn filter_enum_variants_for_phase(e: &mut Enum, mode: PhaseRewrite) {
             return false;
         }
 
-        let Some(attrs) = variant_attrs(variant.attributes()) else {
+        let Some(attrs) = SerdeVariantAttrs::from_attributes(variant.attributes()) else {
             return true;
         };
 
@@ -990,7 +982,7 @@ fn filter_enum_variants_for_phase(e: &mut Enum, mode: PhaseRewrite) {
 }
 
 fn enum_repr_from_attrs(attrs: &specta::datatype::Attributes) -> Result<EnumRepr> {
-    let Some(container_attrs) = container_attrs(attrs) else {
+    let Some(container_attrs) = SerdeContainerAttrs::from_attributes(attrs) else {
         return Ok(EnumRepr::External);
     };
 
@@ -1026,7 +1018,7 @@ fn serialized_variant_name(
     container_attrs: &Option<SerdeContainerAttrs>,
     mode: PhaseRewrite,
 ) -> Result<String> {
-    let variant_attrs = variant_attrs(variant.attributes());
+    let variant_attrs = SerdeVariantAttrs::from_attributes(variant.attributes());
 
     if let Some(rename) = select_phase_string(
         mode,
@@ -1142,7 +1134,7 @@ fn select_conversion_target(
     attrs: &specta::datatype::Attributes,
     mode: PhaseRewrite,
 ) -> Result<Option<DataType>> {
-    let parsed = container_attrs(attrs);
+    let parsed = SerdeContainerAttrs::from_attributes(attrs);
     let resolved = parsed.as_ref();
 
     let serialize_target = resolved.and_then(|v| v.resolved_into.as_ref());
@@ -1168,7 +1160,7 @@ fn select_conversion_target(
 }
 
 fn conversion_name(attrs: &specta::datatype::Attributes) -> String {
-    container_attrs(attrs)
+    SerdeContainerAttrs::from_attributes(attrs)
         .and_then(|attrs| {
             attrs
                 .into
@@ -1400,7 +1392,9 @@ fn internal_tag_payload_compatibility(
     match ty {
         DataType::Map(_) => Some(false),
         DataType::Struct(strct) => {
-            if container_attrs(strct.attributes()).is_some_and(|attrs| attrs.transparent) {
+            if SerdeContainerAttrs::from_attributes(strct.attributes())
+                .is_some_and(|attrs| attrs.transparent)
+            {
                 let payload_fields = match strct.fields() {
                     Fields::Unit => return Some(true),
                     Fields::Unnamed(unnamed) => unnamed
@@ -1527,7 +1521,7 @@ fn has_local_phase_difference(dt: &DataType) -> bool {
 }
 
 fn container_has_local_difference(attrs: &specta::datatype::Attributes) -> bool {
-    let Some(conversions) = container_attrs(attrs) else {
+    let Some(conversions) = SerdeContainerAttrs::from_attributes(attrs) else {
         return false;
     };
 
@@ -1557,7 +1551,7 @@ fn fields_have_local_difference(fields: &Fields) -> bool {
 }
 
 fn field_has_local_difference(field: &Field) -> bool {
-    field_attrs(field.attributes())
+    SerdeFieldAttrs::from_attributes(field.attributes())
         .map(|attrs| {
             attrs.rename_serialize.as_deref() != attrs.rename_deserialize.as_deref()
                 || attrs.skip_serializing != attrs.skip_deserializing
@@ -1570,7 +1564,7 @@ fn field_has_local_difference(field: &Field) -> bool {
 }
 
 fn variant_has_local_difference(variant: &Variant) -> bool {
-    variant_attrs(variant.attributes())
+    SerdeVariantAttrs::from_attributes(variant.attributes())
         .map(|attrs| {
             attrs.rename_serialize.as_deref() != attrs.rename_deserialize.as_deref()
                 || attrs.rename_all_serialize != attrs.rename_all_deserialize
@@ -1632,7 +1626,7 @@ fn collect_conversion_dependencies(
     types: &Types,
     deps: &mut HashSet<TypeIdentity>,
 ) {
-    let Some(conversions) = container_attrs(attrs) else {
+    let Some(conversions) = SerdeContainerAttrs::from_attributes(attrs) else {
         return;
     };
 
@@ -1692,7 +1686,7 @@ fn build_from_original(
 fn apply_field_attrs(field: &mut Field) {
     let mut flatten = false;
     let mut optional = field.optional();
-    if let Some(attrs) = field_attrs(field.attributes()) {
+    if let Some(attrs) = SerdeFieldAttrs::from_attributes(field.attributes()) {
         flatten = attrs.flatten;
         if attrs.default.is_some() {
             optional = true;
