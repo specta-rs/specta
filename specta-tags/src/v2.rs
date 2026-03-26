@@ -4,7 +4,6 @@ use specta::{
     ResolvedTypes, Types,
     datatype::{DataType, Fields, GenericReference, NamedReference, Primitive, Reference},
 };
-use specta_serde::internal::SerdeContainerAttrs;
 
 // TODO: Allow configuring custom named types via NDT name and module path using config params.
 // TODO: Tagging-style system for `rspc` w/ runtime
@@ -87,12 +86,9 @@ enum PlanNode {
     Nullable(Box<PlanNode>),
     List(Box<PlanNode>),
     Tuple(Vec<PlanNode>),
-    Object(Vec<(String, PlanNode)>),
+    Object(Vec<ObjectFieldPlan>),
     Map(Box<PlanNode>),
-    Enum {
-        repr: EnumRepr,
-        variants: Vec<EnumVariantPlan>,
-    },
+    Enum(Vec<EnumVariantPlan>),
 }
 
 impl PlanNode {
@@ -102,38 +98,37 @@ impl PlanNode {
             Self::Leaf(_) => false,
             Self::Nullable(inner) | Self::List(inner) | Self::Map(inner) => inner.is_identity(),
             Self::Tuple(items) => items.iter().all(Self::is_identity),
-            Self::Object(fields) => fields.iter().all(|(_, v)| v.is_identity()),
-            Self::Enum { variants, .. } => variants.iter().all(|v| v.plan.is_identity()),
+            Self::Object(fields) => fields.iter().all(ObjectFieldPlan::is_identity),
+            Self::Enum(variants) => variants.iter().all(|v| v.plan.is_identity()),
+        }
+    }
+}
+
+#[derive(Debug)]
+enum ObjectFieldPlan {
+    Named(String, PlanNode),
+    Flattened(PlanNode),
+}
+
+impl ObjectFieldPlan {
+    fn is_identity(&self) -> bool {
+        match self {
+            Self::Named(_, plan) | Self::Flattened(plan) => plan.is_identity(),
         }
     }
 }
 
 #[derive(Debug)]
 struct EnumVariantPlan {
-    name: String,
-    kind: EnumVariantKind,
+    matcher: EnumVariantMatcher,
     plan: PlanNode,
 }
 
-#[derive(Debug, Clone, Copy)]
-enum EnumVariantKind {
-    Unit,
-    Named,
-    Unnamed,
-}
-
 #[derive(Debug, Clone)]
-enum EnumRepr {
-    External,
-    Internal { tag: String },
-    Adjacent { tag: String, content: String },
-    Untagged,
-}
-
-impl Default for EnumRepr {
-    fn default() -> Self {
-        Self::External
-    }
+enum EnumVariantMatcher {
+    HasField(String),
+    Tagged { field: String, value: String },
+    Direct,
 }
 
 #[derive(Clone, Copy)]
@@ -201,63 +196,18 @@ impl Analyzer {
                 let mut variants = Vec::new();
 
                 for (name, variant) in en.variants().iter().filter(|(_, v)| !v.skip()) {
-                    let (kind, plan) = match variant.fields() {
-                        Fields::Unit => (EnumVariantKind::Unit, PlanNode::Identity),
-                        Fields::Unnamed(fields) => {
-                            let mut items = fields
-                                .fields()
-                                .iter()
-                                .filter_map(|field| field.ty())
-                                .map(|ty| self.analyze(ty, types, generics, stack))
-                                .collect::<Vec<_>>();
-
-                            let plan = if items.is_empty() {
-                                PlanNode::Identity
-                            } else if items.len() == 1 {
-                                items.remove(0)
-                            } else {
-                                PlanNode::Tuple(items)
-                            };
-
-                            (EnumVariantKind::Unnamed, plan)
-                        }
-                        Fields::Named(fields) => {
-                            let object = fields
-                                .fields()
-                                .iter()
-                                .filter_map(|(field_name, field)| {
-                                    let ty = field.ty()?;
-                                    let plan = self.analyze(ty, types, generics, stack);
-                                    (!plan.is_identity()).then(|| (field_name.to_string(), plan))
-                                })
-                                .collect::<Vec<_>>();
-
-                            let plan = if object.is_empty() {
-                                PlanNode::Identity
-                            } else {
-                                PlanNode::Object(object)
-                            };
-
-                            (EnumVariantKind::Named, plan)
-                        }
-                    };
-
-                    if !plan.is_identity() {
-                        variants.push(EnumVariantPlan {
-                            name: name.to_string(),
-                            kind,
-                            plan,
-                        });
+                    if let Some(variant) =
+                        self.analyze_enum_variant(name, variant, types, generics, stack)
+                        && !variant.plan.is_identity()
+                    {
+                        variants.push(variant);
                     }
                 }
 
                 if variants.is_empty() {
                     PlanNode::Identity
                 } else {
-                    PlanNode::Enum {
-                        repr: parse_enum_repr(en.attributes()),
-                        variants,
-                    }
+                    PlanNode::Enum(variants)
                 }
             }
             DataType::Tuple(tuple) => {
@@ -341,7 +291,13 @@ impl Analyzer {
                     .filter_map(|(name, field)| {
                         let ty = field.ty()?;
                         let plan = self.analyze(ty, types, generics, stack);
-                        (!plan.is_identity()).then(|| (name.to_string(), plan))
+                        if plan.is_identity() {
+                            None
+                        } else if field.flatten() {
+                            Some(ObjectFieldPlan::Flattened(plan))
+                        } else {
+                            Some(ObjectFieldPlan::Named(name.to_string(), plan))
+                        }
                     })
                     .collect::<Vec<_>>();
 
@@ -359,6 +315,45 @@ impl Analyzer {
             .iter()
             .find(|(module, ty_name, _)| module_path == *module && name == *ty_name)
             .map(|(_, _, kind)| *kind)
+    }
+
+    fn analyze_enum_variant(
+        &self,
+        name: &str,
+        variant: &specta::datatype::Variant,
+        types: &Types,
+        generics: &[(GenericReference, DataType)],
+        stack: &mut Vec<NamedReference>,
+    ) -> Option<EnumVariantPlan> {
+        let plan = self.analyze_fields(variant.fields(), types, generics, stack);
+        let matcher = match variant.fields() {
+            Fields::Unit | Fields::Unnamed(_) => EnumVariantMatcher::Direct,
+            Fields::Named(fields) => {
+                let literal_fields = fields
+                    .fields()
+                    .iter()
+                    .filter_map(|(field_name, field)| {
+                        string_literal(field.ty()?).map(|value| (field_name.to_string(), value))
+                    })
+                    .collect::<Vec<_>>();
+
+                if literal_fields.len() == 1 {
+                    let (field, value) = &literal_fields[0];
+                    EnumVariantMatcher::Tagged {
+                        field: field.clone(),
+                        value: value.clone(),
+                    }
+                } else if fields.fields().len() == 1 {
+                    let (field_name, _) = &fields.fields()[0];
+                    EnumVariantMatcher::HasField(field_name.to_string())
+                } else {
+                    let _ = name;
+                    EnumVariantMatcher::Direct
+                }
+            }
+        };
+
+        Some(EnumVariantPlan { matcher, plan })
     }
 }
 
@@ -394,20 +389,7 @@ impl Renderer {
 
                 format!("[{rendered}]")
             }
-            PlanNode::Object(fields) => {
-                let updates = fields
-                    .iter()
-                    .map(|(field, plan)| {
-                        let key = js_string(field);
-                        let source = format!("{input}[{key}]");
-                        let value = self.render(plan, &source);
-                        format!("{key}: {value}")
-                    })
-                    .collect::<Vec<_>>()
-                    .join(", ");
-
-                format!("{{ ...{input}, {updates} }}")
-            }
+            PlanNode::Object(fields) => self.render_object(fields, input),
             PlanNode::Map(inner) => {
                 let key = self.next_ident("key");
                 let value = self.next_ident("value");
@@ -417,8 +399,35 @@ impl Renderer {
                     "Object.fromEntries(Object.entries({input}).map(([{key}, {value}]) => [{key}, {inner}]))"
                 )
             }
-            PlanNode::Enum { repr, variants } => self.render_enum(repr, variants, input),
+            PlanNode::Enum(variants) => self.render_enum(variants, input),
         }
+    }
+
+    fn render_object(&mut self, fields: &[ObjectFieldPlan], input: &str) -> String {
+        let value = self.next_ident("value");
+        let mut out = format!("(() => {{ let {value} = {input};");
+
+        for field in fields {
+            match field {
+                ObjectFieldPlan::Named(field, plan) => {
+                    let key = js_string(field);
+                    let source = format!("{value}[{key}]");
+                    let next = self.render(plan, &source);
+                    out.push_str(&format!(
+                        " {{ const next = {next}; if (next !== {source}) {value} = {{ ...{value}, {key}: next }}; }}"
+                    ));
+                }
+                ObjectFieldPlan::Flattened(plan) => {
+                    let next = self.render(plan, &value);
+                    out.push_str(&format!(
+                        " {{ const next = {next}; if (next !== {value}) {value} = next; }}"
+                    ));
+                }
+            }
+        }
+
+        out.push_str(&format!(" return {value}; }})()"));
+        out
     }
 
     fn render_leaf(&mut self, tag: &Tag, input: &str) -> String {
@@ -430,12 +439,7 @@ impl Renderer {
         }
     }
 
-    fn render_enum(
-        &mut self,
-        repr: &EnumRepr,
-        variants: &[EnumVariantPlan],
-        input: &str,
-    ) -> String {
+    fn render_enum(&mut self, variants: &[EnumVariantPlan], input: &str) -> String {
         let value = self.next_ident("value");
         let mut out = format!("(() => {{ const {value} = {input};");
 
@@ -444,100 +448,33 @@ impl Renderer {
             return out;
         }
 
-        match repr {
-            EnumRepr::External => {
-                out.push_str(&format!(
-                    " if ({value} != null && typeof {value} === \"object\" && !Array.isArray({value})) {{"
-                ));
-
-                for variant in variants {
-                    if matches!(variant.kind, EnumVariantKind::Unit) || variant.plan.is_identity() {
-                        continue;
-                    }
-
-                    let name = js_string(&variant.name);
-                    let payload = format!("{value}[{name}]");
-                    let next = self.render(&variant.plan, &payload);
-
-                    out.push_str(&format!(
-                        " if (Object.prototype.hasOwnProperty.call({value}, {name})) {{ const next = {next}; if (next !== {payload}) return {{ ...{value}, [{name}]: next }}; return {value}; }}"
-                    ));
-                }
-
-                out.push_str(" }");
-            }
-            EnumRepr::Internal { tag } => {
-                let tag_key = js_string(tag);
-                out.push_str(&format!(
-                    " if ({value} != null && typeof {value} === \"object\" && !Array.isArray({value})) {{"
-                ));
-
-                for variant in variants {
-                    if matches!(variant.kind, EnumVariantKind::Unit) || variant.plan.is_identity() {
-                        continue;
-                    }
-
-                    let name = js_string(&variant.name);
-                    out.push_str(&format!(" if ({value}[{tag_key}] === {name}) {{"));
-
-                    match variant.kind {
-                        EnumVariantKind::Named => {
-                            let next = self.render(&variant.plan, &value);
-                            out.push_str(&format!(
-                                " const next = {next}; if (next !== {value}) return next; return {value};"
-                            ));
-                        }
-                        EnumVariantKind::Unnamed => {
-                            let data_key = js_string("data");
-                            let payload = format!("{value}[{data_key}]");
-                            let next_payload = self.render(&variant.plan, &payload);
-                            let next_direct = self.render(&variant.plan, &value);
-                            out.push_str(&format!(
-                                " if (Object.prototype.hasOwnProperty.call({value}, {data_key})) {{ const next = {next_payload}; if (next !== {payload}) return {{ ...{value}, [{data_key}]: next }}; return {value}; }} const direct = {next_direct}; if (direct !== {value}) return direct; return {value};"
-                            ));
-                        }
-                        EnumVariantKind::Unit => {}
-                    }
-
-                    out.push_str(" }");
-                }
-
-                out.push_str(" }");
-            }
-            EnumRepr::Adjacent { tag, content } => {
-                let tag_key = js_string(tag);
-                let content_key = js_string(content);
-                out.push_str(&format!(
-                    " if ({value} != null && typeof {value} === \"object\" && !Array.isArray({value})) {{"
-                ));
-
-                for variant in variants {
-                    if matches!(variant.kind, EnumVariantKind::Unit) || variant.plan.is_identity() {
-                        continue;
-                    }
-
-                    let name = js_string(&variant.name);
-                    let payload = format!("{value}[{content_key}]");
-                    let next = self.render(&variant.plan, &payload);
-                    out.push_str(&format!(
-                        " if ({value}[{tag_key}] === {name} && Object.prototype.hasOwnProperty.call({value}, {content_key})) {{ const next = {next}; if (next !== {payload}) return {{ ...{value}, [{content_key}]: next }}; return {value}; }}"
-                    ));
-                }
-
-                out.push_str(" }");
-            }
-            EnumRepr::Untagged => {}
-        }
-
         for variant in variants {
             if variant.plan.is_identity() {
                 continue;
             }
 
-            let direct = self.render(&variant.plan, &value);
-            out.push_str(&format!(
-                " {{ const direct = {direct}; if (direct !== {value}) return direct; }}"
-            ));
+            let next = self.render(&variant.plan, &value);
+
+            match &variant.matcher {
+                EnumVariantMatcher::HasField(field) => {
+                    let field = js_string(field);
+                    out.push_str(&format!(
+                        " if ({value} != null && typeof {value} === \"object\" && !Array.isArray({value}) && Object.prototype.hasOwnProperty.call({value}, {field})) {{ const next = {next}; if (next !== {value}) return next; return {value}; }}"
+                    ));
+                }
+                EnumVariantMatcher::Tagged { field, value: tag } => {
+                    let field = js_string(field);
+                    let tag = js_string(tag);
+                    out.push_str(&format!(
+                        " if ({value} != null && typeof {value} === \"object\" && !Array.isArray({value}) && {value}[{field}] === {tag}) {{ const next = {next}; if (next !== {value}) return next; return {value}; }}"
+                    ));
+                }
+                EnumVariantMatcher::Direct => {
+                    out.push_str(&format!(
+                        " {{ const next = {next}; if (next !== {value}) return next; }}"
+                    ));
+                }
+            }
         }
 
         out.push_str(&format!(" return {value}; }})()"));
@@ -554,28 +491,23 @@ fn js_string(value: &str) -> String {
     serde_json::to_string(value).expect("failed to encode JavaScript string")
 }
 
-fn parse_enum_repr(attributes: &specta::datatype::Attributes) -> EnumRepr {
-    let Some(attrs) = SerdeContainerAttrs::from_attributes(attributes) else {
-        return EnumRepr::External;
+fn string_literal(ty: &DataType) -> Option<String> {
+    let DataType::Enum(enm) = ty else {
+        return None;
     };
 
-    if attrs.untagged {
-        EnumRepr::Untagged
-    } else {
-        match (&attrs.tag, &attrs.content) {
-            (Some(tag), Some(content)) => EnumRepr::Adjacent {
-                tag: tag.clone(),
-                content: content.clone(),
-            },
-            (Some(tag), None) => EnumRepr::Internal { tag: tag.clone() },
-            _ => EnumRepr::External,
-        }
-    }
+    let [(name, variant)] = enm.variants() else {
+        return None;
+    };
+
+    matches!(variant.fields(), Fields::Unit).then(|| name.to_string())
 }
 
 #[cfg(test)]
 mod tests {
+    use serde::{Deserialize, Serialize};
     use specta::{ResolvedTypes, Type, Types};
+    use specta_serde::apply;
 
     use super::TransformPlan;
 
@@ -603,23 +535,70 @@ mod tests {
         let js = plan.map("v");
 
         assert!(
-            js.contains("BigInt(v[\"bigint\"])")
-                && js.contains("BigInt(v[\"nested\"][\"bigint\"])")
+            js.contains("BigInt(") && js.contains("[\"bigint\"]") && js.contains("[\"nested\"]")
         );
         assert!(
-            js.contains("new Date(v[\"date\"])")
-                && js.contains("new Date(v[\"nested\"][\"date\"])")
+            js.contains("new Date(") && js.contains("[\"date\"]") && js.contains("[\"nested\"]")
         );
         assert!(
-            js.contains("Uint8Array.from(v[\"bytes\"])")
-                && js.contains("Uint8Array.from(v[\"nested\"][\"bytes\"])")
+            js.contains("Uint8Array.from(")
+                && js.contains("[\"bytes\"]")
+                && js.contains("[\"nested\"]")
         );
-        assert!(js.contains("v[\"list\"].map((__item"));
+        assert!(js.contains("[\"list\"]") && js.contains(".map((__item"));
 
         assert!(!js.contains("typeof "));
         assert!(!js.contains("Array.isArray("));
         assert!(!js.contains("Number.isInteger("));
         assert!(!js.contains("try {"));
         assert!(!js.contains(" catch "));
+    }
+
+    #[derive(Type, Serialize, Deserialize)]
+    #[serde(tag = "kind")]
+    enum TaggedEnum {
+        A { count: u128 },
+    }
+
+    #[derive(Type, Serialize, Deserialize)]
+    #[serde(tag = "kind", content = "payload")]
+    enum AdjacentEnum {
+        A { count: u128 },
+    }
+
+    #[test]
+    fn map_renders_from_serde_applied_internal_enum_shape() {
+        let resolved = apply(Types::default().register::<TaggedEnum>()).unwrap();
+        let dt = resolved
+            .as_types()
+            .into_sorted_iter()
+            .find(|ty| ty.name().as_ref() == "TaggedEnum")
+            .expect("TaggedEnum should be registered")
+            .ty()
+            .clone();
+
+        let js = TransformPlan::analyze(dt, &resolved).map("v");
+
+        assert!(js.contains("[\"kind\"] === \"A\""));
+        assert!(js.contains("BigInt("));
+        assert!(js.contains("[\"count\"]"));
+    }
+
+    #[test]
+    fn map_renders_from_serde_applied_adjacent_enum_shape() {
+        let resolved = apply(Types::default().register::<AdjacentEnum>()).unwrap();
+        let dt = resolved
+            .as_types()
+            .into_sorted_iter()
+            .find(|ty| ty.name().as_ref() == "AdjacentEnum")
+            .expect("AdjacentEnum should be registered")
+            .ty()
+            .clone();
+
+        let js = TransformPlan::analyze(dt, &resolved).map("v");
+
+        assert!(js.contains("[\"kind\"] === \"A\""));
+        assert!(js.contains("payload"));
+        assert!(js.contains("BigInt("));
     }
 }
