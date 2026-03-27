@@ -84,8 +84,8 @@ macro_rules! types {
 #[rustfmt::skip]
 pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
     types!(
-        i8, i16, i32, i64, i128, isize,
-        u8, u16, u32, u64, u128, usize,
+        i8, i16, i32,
+        u8, u16, u32,
         f32, f64, bool, char,
 
         // Serde is so mega cringe for this. Lack of support and the fact that `0..5` == `0..=5` is so dumb.
