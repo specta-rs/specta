@@ -37,20 +37,6 @@ expression: output
 	*
 	* @typedef {T} Cow<T>
 	*
-	* @typedef {{
-	*		duration_since_epoch: number,
-	*		duration_since_unix_epoch: number,
-	*	}} SystemTime
-	* @property {number} duration_since_epoch
-	* @property {number} duration_since_unix_epoch
-	*
-	* @typedef {{
-	*		secs: number,
-	*		nanos: number,
-	*	}} Duration
-	* @property {number} secs
-	* @property {number} nanos
-	*
 	* @typedef {T[]} Vec<T>
 	*
 	* @typedef {T[]} Vec<T>

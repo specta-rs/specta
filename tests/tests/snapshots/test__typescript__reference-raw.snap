@@ -20,14 +20,6 @@ SocketAddrV4: string
 SocketAddrV6: string
 Cow<'static, str>: string
 Cow<'static, i32>: number
-SystemTime: {
-	duration_since_epoch: number,
-	duration_since_unix_epoch: number,
-}
-Duration: {
-	secs: number,
-	nanos: number,
-}
 Vec<i32>: number[]
 Vec<MyEnum>: MyEnum[]
 Result<String, i32>: string | number

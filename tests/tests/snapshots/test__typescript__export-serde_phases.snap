@@ -39,16 +39,6 @@ Cow<'static, str>: export type Cow<T> = T;
 
 Cow<'static, i32>: export type Cow<T> = T;
 
-SystemTime: export type SystemTime = {
-	duration_since_epoch: number,
-	duration_since_unix_epoch: number,
-};
-
-Duration: export type Duration = {
-	secs: number,
-	nanos: number,
-};
-
 Vec<i32>: export type Vec<T> = T[];
 
 Vec<MyEnum>: export type Vec<T> = T[];
