@@ -5,7 +5,7 @@ use std::{
 
 use specta::datatype::{DataType, Reference};
 use specta::{ResolvedTypes, Type, Types};
-use specta_typescript::{primitives, JSDoc, Layout};
+use specta_typescript::{JSDoc, Layout, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;

@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use specta::{ResolvedTypes, Type, Types};
+use specta::{Type, Types};
 use specta_typescript::Typescript;
 
 #[derive(Type, Deserialize)]
@@ -43,9 +43,7 @@ fn identifier_apply_phases_exports_deserialize_union() {
         specta_serde::apply_phases(Types::default().register::<VariantIdentifier>())
             .expect("variant_identifier should be supported by apply_phases");
     let variant_ts = Typescript::default()
-        .export(&ResolvedTypes::from_resolved_types(
-            variant_types.into_types(),
-        ))
+        .export(&variant_types)
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-identifiers-variant-typescript", variant_ts);
@@ -53,9 +51,7 @@ fn identifier_apply_phases_exports_deserialize_union() {
     let field_types = specta_serde::apply_phases(Types::default().register::<FieldIdentifier>())
         .expect("field_identifier should be supported by apply_phases");
     let field_ts = Typescript::default()
-        .export(&ResolvedTypes::from_resolved_types(
-            field_types.into_types(),
-        ))
+        .export(&field_types)
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-identifiers-field-typescript", field_ts);
