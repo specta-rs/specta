@@ -1,10 +1,15 @@
-use std::{collections::HashMap, iter, path::Path};
+use std::{
+    collections::HashMap,
+    iter,
+    path::Path,
+    time::{Duration, SystemTime},
+};
 
 use specta::{
-    ResolvedTypes, Type, Types,
     datatype::{DataType, Reference},
+    ResolvedTypes, Type, Types,
 };
-use specta_typescript::{Layout, Typescript, primitives};
+use specta_typescript::{primitives, Layout, Typescript};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -422,6 +427,24 @@ fn typescript_export_bigint_errors() {
         }
     }
 
+    fn assert_inline_bigint_error<T: Type>(failures: &mut Vec<String>, name: &str) {
+        let ts = Typescript::default();
+        let mut types = Types::default();
+        let dt = T::definition(&mut types);
+        let resolved = ResolvedTypes::from_resolved_types(types);
+
+        match primitives::inline(&ts, &resolved, &dt) {
+            Ok(ty) => failures.push(format!(
+                "{name} [inline]: expected BigInt error, but export succeeded with '{ty}'"
+            )),
+            Err(err)
+                if err
+                    .to_string()
+                    .contains("forbids exporting BigInt-style types") => {}
+            Err(err) => failures.push(format!("{name} [inline]: unexpected error '{err}'")),
+        }
+    }
+
     macro_rules! for_bigint_types {
         (T -> $s:expr) => {{
             for_bigint_types!(usize, isize, i64, u64, i128, u128; $s);
@@ -432,6 +455,22 @@ fn typescript_export_bigint_errors() {
                 $s(stringify!($i));
             })*
         }};
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct StructWithSystemTime {
+        // https://github.com/specta-rs/specta/issues/77
+        #[specta(inline)]
+        value: SystemTime,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct StructWithDuration {
+        // https://github.com/specta-rs/specta/issues/77
+        #[specta(inline)]
+        value: Duration,
     }
 
     #[derive(Type)]
@@ -483,6 +522,14 @@ fn typescript_export_bigint_errors() {
 
     for (name, assert) in [
         (
+            "StructWithSystemTime",
+            assert_bigint_error::<StructWithSystemTime> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "StructWithDuration",
+            assert_bigint_error::<StructWithDuration> as fn(&mut Vec<String>, &str),
+        ),
+        (
             "StructWithBigInt",
             assert_bigint_error::<StructWithBigInt> as fn(&mut Vec<String>, &str),
         ),
@@ -511,6 +558,9 @@ fn typescript_export_bigint_errors() {
     ] {
         assert(&mut failures, name);
     }
+
+    assert_inline_bigint_error::<SystemTime>(&mut failures, "SystemTime");
+    assert_inline_bigint_error::<Duration>(&mut failures, "Duration");
 
     assert!(
         failures.is_empty(),

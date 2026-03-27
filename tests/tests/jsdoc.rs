@@ -1,8 +1,11 @@
-use std::path::Path;
+use std::{
+    path::Path,
+    time::{Duration, SystemTime},
+};
 
 use specta::datatype::{DataType, Reference};
 use specta::{ResolvedTypes, Type, Types};
-use specta_typescript::{JSDoc, Layout, primitives};
+use specta_typescript::{primitives, JSDoc, Layout};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -124,6 +127,24 @@ fn jsdoc_export_bigint_errors() {
         }
     }
 
+    fn assert_inline_bigint_error<T: Type>(failures: &mut Vec<String>, name: &str) {
+        let jsdoc = JSDoc::default();
+        let mut types = Types::default();
+        let dt = T::definition(&mut types);
+        let resolved = ResolvedTypes::from_resolved_types(types);
+
+        match primitives::inline(&jsdoc, &resolved, &dt) {
+            Ok(ty) => failures.push(format!(
+                "{name} [inline]: expected BigInt error, but export succeeded with '{ty}'"
+            )),
+            Err(err)
+                if err
+                    .to_string()
+                    .contains("forbids exporting BigInt-style types") => {}
+            Err(err) => failures.push(format!("{name} [inline]: unexpected error '{err}'")),
+        }
+    }
+
     macro_rules! for_bigint_types {
         (T -> $s:expr) => {{
             for_bigint_types!(usize, isize, i64, u64, i128, u128; $s);
@@ -134,6 +155,22 @@ fn jsdoc_export_bigint_errors() {
                 $s(stringify!($i));
             })*
         }};
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct StructWithSystemTime {
+        // https://github.com/specta-rs/specta/issues/77
+        #[specta(inline)]
+        value: SystemTime,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct StructWithDuration {
+        // https://github.com/specta-rs/specta/issues/77
+        #[specta(inline)]
+        value: Duration,
     }
 
     #[derive(Type)]
@@ -185,6 +222,14 @@ fn jsdoc_export_bigint_errors() {
 
     for (name, assert) in [
         (
+            "StructWithSystemTime",
+            assert_bigint_error::<StructWithSystemTime> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "StructWithDuration",
+            assert_bigint_error::<StructWithDuration> as fn(&mut Vec<String>, &str),
+        ),
+        (
             "StructWithBigInt",
             assert_bigint_error::<StructWithBigInt> as fn(&mut Vec<String>, &str),
         ),
@@ -213,6 +258,9 @@ fn jsdoc_export_bigint_errors() {
     ] {
         assert(&mut failures, name);
     }
+
+    assert_inline_bigint_error::<SystemTime>(&mut failures, "SystemTime");
+    assert_inline_bigint_error::<Duration>(&mut failures, "Duration");
 
     assert!(
         failures.is_empty(),
