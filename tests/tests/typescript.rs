@@ -6,10 +6,10 @@ use std::{
 };
 
 use specta::{
-    ResolvedTypes, Type, Types,
     datatype::{DataType, Reference},
+    ResolvedTypes, Type, Types,
 };
-use specta_typescript::{Layout, Typescript, primitives};
+use specta_typescript::{primitives, Layout, Typescript};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -31,13 +31,6 @@ fn typescript_types() -> (Types, Vec<(&'static str, DataType)>) {
     (types, dts)
 }
 
-fn sanitize_typescript_phase(
-    dts: Vec<(&'static str, DataType)>,
-    types: Types,
-) -> (Vec<(&'static str, DataType)>, Types) {
-    (dts, types)
-}
-
 fn phase_collections() -> [(
     &'static str,
     Result<(Vec<(&'static str, DataType)>, ResolvedTypes), specta_serde::Error>,
@@ -55,9 +48,6 @@ fn phase_collections() -> [(
         dts2.extend(dts.iter().cloned());
         (types2, dts2)
     };
-
-    let (dts, types) = sanitize_typescript_phase(dts, types);
-    let (phased_dts, phased_types) = sanitize_typescript_phase(phased_dts, phased_types);
 
     [
         (
