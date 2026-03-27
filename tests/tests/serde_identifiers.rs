@@ -44,7 +44,7 @@ fn identifier_apply_phases_exports_deserialize_union() {
             .expect("variant_identifier should be supported by apply_phases");
     let variant_ts = Typescript::default()
         .export(&ResolvedTypes::from_resolved_types(
-            crate::sanitize_typescript_bigints_in_types(variant_types.into_types()),
+            variant_types.into_types(),
         ))
         .expect("typescript export should succeed");
 
@@ -54,7 +54,7 @@ fn identifier_apply_phases_exports_deserialize_union() {
         .expect("field_identifier should be supported by apply_phases");
     let field_ts = Typescript::default()
         .export(&ResolvedTypes::from_resolved_types(
-            crate::sanitize_typescript_bigints_in_types(field_types.into_types()),
+            field_types.into_types(),
         ))
         .expect("typescript export should succeed");
 

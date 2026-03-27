@@ -30,10 +30,7 @@ fn sanitize_typescript_phase(
     dts: Vec<(&'static str, DataType)>,
     types: Types,
 ) -> (Vec<(&'static str, DataType)>, Types) {
-    (
-        crate::sanitize_typescript_bigints_in_dts(dts),
-        crate::sanitize_typescript_bigints_in_types(types),
-    )
+    (dts, types)
 }
 
 fn phase_collections() -> [(

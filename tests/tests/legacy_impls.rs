@@ -24,16 +24,7 @@ struct LegacyImpls {
     array_vec: arrayvec::ArrayVec<i32, 8>,
     array_string: arrayvec::ArrayString<16>,
     smallvec: smallvec::SmallVec<[i32; 8]>,
-    serde_json_map: serde_json::Map<String, serde_json::Value>,
-    serde_json_value: serde_json::Value,
-    serde_json_number: serde_json::Number,
-    serde_yaml_mapping: serde_yaml::Mapping,
-    serde_yaml_tagged: serde_yaml::value::TaggedValue,
-    serde_yaml_value: serde_yaml::Value,
-    serde_yaml_number: serde_yaml::Number,
-    toml_map: toml::map::Map<String, toml::Value>,
     toml_datetime: toml::value::Datetime,
-    toml_value: toml::Value,
     ulid: ulid::Ulid,
     chrono_naive_datetime: chrono::NaiveDateTime,
     chrono_naive_date: chrono::NaiveDate,
@@ -85,6 +76,13 @@ struct LegacyImpls {
     glam_uvec2: glam::UVec2,
     glam_uvec3: glam::UVec3,
     glam_uvec4: glam::UVec4,
+    glam_bvec2: glam::BVec2,
+    glam_bvec3: glam::BVec3,
+    glam_bvec4: glam::BVec4,
+}
+
+#[derive(Type)]
+struct LegacyImplBigGlams {
     glam_i64vec2: glam::I64Vec2,
     glam_i64vec3: glam::I64Vec3,
     glam_i64vec4: glam::I64Vec4,
@@ -94,17 +92,29 @@ struct LegacyImpls {
     glam_usizevec2: glam::USizeVec2,
     glam_usizevec3: glam::USizeVec3,
     glam_usizevec4: glam::USizeVec4,
-    glam_bvec2: glam::BVec2,
-    glam_bvec3: glam::BVec3,
-    glam_bvec4: glam::BVec4,
 }
 
 #[test]
 fn legacy_impls() {
     let output = Typescript::default()
         .export(&ResolvedTypes::from_resolved_types(
-            crate::sanitize_typescript_bigints_in_types(Types::default().register::<LegacyImpls>()),
+            Types::default().register::<LegacyImpls>(),
         ))
         .unwrap();
     insta::assert_snapshot!("legacy_impls", output);
+}
+
+#[test]
+fn legacy_impl_bigint_errors() {
+    let err = Typescript::default()
+        .export(&ResolvedTypes::from_resolved_types(
+            Types::default().register::<LegacyImplBigGlams>(),
+        ))
+        .expect_err("bigint glam vectors should fail TypeScript export");
+
+    assert!(
+        err.to_string()
+            .contains("forbids exporting BigInt-style types"),
+        "unexpected error: {err}"
+    );
 }

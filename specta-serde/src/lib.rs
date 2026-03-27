@@ -1101,7 +1101,7 @@ fn rewrite_identifier_enum_for_phase(
 
     variants.push((
         Cow::Borrowed("__specta_identifier_index"),
-        identifier_union_variant(DataType::Primitive(specta::datatype::Primitive::usize)),
+        identifier_union_variant(DataType::Primitive(specta::datatype::Primitive::u32)),
     ));
 
     if attrs.field_identifier

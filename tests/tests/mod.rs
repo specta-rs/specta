@@ -28,9 +28,7 @@ mod typescript;
 mod utils;
 
 pub use types::{types, types_phased};
-pub use utils::{
-    fs_to_string, sanitize_typescript_bigints_in_dts, sanitize_typescript_bigints_in_types,
-};
+pub use utils::fs_to_string;
 
 #[test]
 fn compile_errors() {

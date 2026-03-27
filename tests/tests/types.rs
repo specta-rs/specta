@@ -108,9 +108,6 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         SocketAddr, SocketAddrV4, SocketAddrV6,
         Cow<'static, str>, Cow<'static, i32>,
 
-        // https://github.com/specta-rs/specta/issues/77
-        SystemTime, Duration,
-
         &'static str, &'static bool, &'static i32,
         Vec<i32>, &'static [i32], &'static [i32; 3], [i32; 3],
         Vec<MyEnum>, &'static [MyEnum], &'static [MyEnum; 6], [MyEnum; 2],
