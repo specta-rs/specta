@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use specta::{Type, Types};
+use specta::{ResolvedTypes, Type, Types};
+use specta_serde::apply;
 use specta_swift::Swift;
 
 /// Test enum with snake_case rename_all - should generate string enum
@@ -22,25 +23,26 @@ enum RegularEnum {
 
 #[test]
 fn test_string_enum_generation() {
-    let types = Types::default()
-        .register::<JobStatus>()
-        .register::<RegularEnum>();
-
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let serde_resolved = apply(Types::default().register::<JobStatus>()).unwrap();
+    let raw_resolved =
+        ResolvedTypes::from_resolved_types(Types::default().register::<RegularEnum>());
+    let string_output = swift.export(&serde_resolved).unwrap();
+    let raw_output = swift.export(&raw_resolved).unwrap();
 
-    println!("String enum test output:\n{}", output);
+    println!("String enum test output:\n{}", string_output);
+    println!("Regular enum test output:\n{}", raw_output);
 
     // JobStatus should be a string enum (with String protocol and raw values)
-    assert!(output.contains("enum JobStatus: String, Codable"));
-    assert!(output.contains("case completed = \"completed\""));
-    assert!(output.contains("case running = \"running\""));
-    assert!(output.contains("case failed = \"failed\""));
-    assert!(output.contains("case pendingApproval = \"pending_approval\""));
+    assert!(string_output.contains("enum JobStatus: String, Codable"));
+    assert!(string_output.contains("case completed = \"completed\""));
+    assert!(string_output.contains("case running = \"running\""));
+    assert!(string_output.contains("case failed = \"failed\""));
+    assert!(string_output.contains("case pendingApproval = \"pending_approval\""));
 
-    // RegularEnum should be a tagged union
-    assert!(output.contains("enum RegularEnum: Codable"));
-    assert!(output.contains("case option1"));
-    assert!(output.contains("case option2"));
-    assert!(output.contains("case option3"));
+    // RegularEnum should stay a raw Specta enum without serde preprocessing.
+    assert!(raw_output.contains("enum RegularEnum: Codable"));
+    assert!(raw_output.contains("case option1"));
+    assert!(raw_output.contains("case option2"));
+    assert!(raw_output.contains("case option3"));
 }

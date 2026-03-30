@@ -9,17 +9,17 @@ use specta::{
     ResolvedTypes, Types,
     datatype::{
         DataType, Deprecated, Enum, Fields, GenericReference, List, Map, NamedDataType,
-        NamedReference, OpaqueReference, Primitive, Reference, Tuple,
+        NamedReference, OpaqueReference, Primitive, Reference, Tuple, Variant,
     },
 };
 
 use crate::{
-    BigIntExportBehavior, Branded, BrandedTypeExporter, Error, Exporter, Layout,
+    Branded, BrandedTypeExporter, Error, Exporter, Layout,
     legacy::{
         ExportContext, deprecated_details, escape_jsdoc_text, escape_typescript_string_literal,
         is_identifier, js_doc,
     },
-    opaque,
+    map_keys, opaque,
 };
 
 /// Generate a group of `export Type = ...` Typescript string for a specific [`NamedDataType`].
@@ -599,7 +599,7 @@ fn shallow_inline_datatype(
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     match dt {
-        DataType::Primitive(p) => s.push_str(primitive_dt(&exporter.bigint, p, location)?),
+        DataType::Primitive(p) => s.push_str(primitive_dt(p, location)?),
         DataType::List(list) => {
             let mut inner = String::new();
             shallow_inline_datatype(
@@ -635,6 +635,11 @@ fn shallow_inline_datatype(
             }
         }
         DataType::Map(map) => {
+            let path = map_key_path(&location);
+            map_keys::validate_map_key(map.key_ty(), types, generics, format!("{path}.<map_key>"))?;
+            let rendered_key =
+                map_key_render_type(resolve_generics_in_datatype(map.key_ty(), generics));
+
             fn is_exhaustive(dt: &DataType, types: &Types) -> bool {
                 match dt {
                     DataType::Enum(e) => {
@@ -648,7 +653,7 @@ fn shallow_inline_datatype(
                 }
             }
 
-            let exhaustive = is_exhaustive(map.key_ty(), types);
+            let exhaustive = is_exhaustive(&rendered_key, types);
             if !exhaustive {
                 s.push_str("Partial<");
             }
@@ -658,7 +663,7 @@ fn shallow_inline_datatype(
                 s,
                 exporter,
                 types,
-                map.key_ty(),
+                &rendered_key,
                 location.clone(),
                 parent_name,
                 prefix,
@@ -753,9 +758,22 @@ fn shallow_inline_datatype(
                 let ndt = r
                     .get(types)
                     .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
+                let inline_key = (
+                    ndt.module_path().clone(),
+                    ndt.name().clone(),
+                    r.generics().to_vec(),
+                );
+                let already_inlining = INLINE_REFERENCE_STACK
+                    .with(|stack| stack.borrow().iter().any(|key| key == &inline_key));
+
+                if already_inlining {
+                    return reference_named_dt(s, exporter, types, r, location, prefix, generics);
+                }
+
+                INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
                 let combined_generics = merged_generics(generics, r.generics());
                 let resolved = resolve_generics_in_datatype(ndt.ty(), &combined_generics);
-                datatype(
+                let result = shallow_inline_datatype(
                     s,
                     exporter,
                     types,
@@ -764,7 +782,12 @@ fn shallow_inline_datatype(
                     parent_name,
                     prefix,
                     &combined_generics,
-                )
+                );
+                INLINE_REFERENCE_STACK.with(|stack| {
+                    stack.borrow_mut().pop();
+                });
+
+                result
             }
             Reference::Generic(g) => {
                 if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
@@ -929,7 +952,7 @@ fn inline_datatype(
     }
 
     match dt {
-        DataType::Primitive(p) => s.push_str(primitive_dt(&exporter.bigint, p, location)?),
+        DataType::Primitive(p) => s.push_str(primitive_dt(p, location)?),
         DataType::List(l) => {
             // Inline the list element type
             let mut dt_str = String::new();
@@ -1099,7 +1122,7 @@ pub(crate) fn datatype(
     // TODO: Validating the variant from `dt` can be flattened
 
     match dt {
-        DataType::Primitive(p) => s.push_str(primitive_dt(&exporter.bigint, p, location)?),
+        DataType::Primitive(p) => s.push_str(primitive_dt(p, location)?),
         DataType::List(l) => list_dt(s, exporter, types, l, location, generics)?,
         DataType::Map(m) => map_dt(s, exporter, types, m, location, generics)?,
         DataType::Nullable(def) => {
@@ -1152,23 +1175,14 @@ pub(crate) fn datatype(
     Ok(())
 }
 
-fn primitive_dt(
-    b: &BigIntExportBehavior,
-    p: &Primitive,
-    location: Vec<Cow<'static, str>>,
-) -> Result<&'static str, Error> {
+fn primitive_dt(p: &Primitive, location: Vec<Cow<'static, str>>) -> Result<&'static str, Error> {
     use Primitive::*;
 
     Ok(match p {
-        i8 | i16 | i32 | u8 | u16 | u32 | f16 | f32 | f64 | f128 => "number",
-        usize | isize | i64 | u64 | i128 | u128 => match b {
-            BigIntExportBehavior::String => "string",
-            BigIntExportBehavior::Number => "number",
-            BigIntExportBehavior::BigInt => "bigint",
-            BigIntExportBehavior::Fail => {
-                return Err(Error::bigint_forbidden(location.join(".")));
-            }
-        },
+        i8 | i16 | i32 | u8 | u16 | u32 | f16 | f32 | f64 /* this looks wrong but `f64` is the direct equivalent of `number` */ => "number",
+        usize | isize | i64 | u64 | i128 | u128 | f128 => {
+            return Err(Error::bigint_forbidden(location.join(".")));
+        }
         Primitive::bool => "boolean",
         str | char => "string",
     })
@@ -1265,9 +1279,12 @@ fn map_dt(
     exporter: &Exporter,
     types: &Types,
     m: &Map,
-    _location: Vec<Cow<'static, str>>,
+    location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
+    let path = map_key_path(&location);
+    map_keys::validate_map_key(m.key_ty(), types, generics, format!("{path}.<map_key>"))?;
+
     {
         fn is_exhaustive(dt: &DataType, types: &Types) -> bool {
             match dt {
@@ -1284,7 +1301,7 @@ fn map_dt(
             }
         }
 
-        let resolved_key = resolve_generics_in_datatype(m.key_ty(), generics);
+        let resolved_key = map_key_render_type(resolve_generics_in_datatype(m.key_ty(), generics));
         let is_exhaustive = is_exhaustive(&resolved_key, types);
 
         // We use `{ [key in K]: V }` instead of `Record<K, V>` to avoid issues with circular references.
@@ -1331,6 +1348,33 @@ fn map_dt(
     Ok(())
 }
 
+fn map_key_path(location: &[Cow<'static, str>]) -> String {
+    if location.is_empty() {
+        return "HashMap".to_string();
+    }
+
+    location.join(".")
+}
+
+fn map_key_render_type(dt: DataType) -> DataType {
+    if matches!(dt, DataType::Primitive(Primitive::bool)) {
+        return bool_key_literal_datatype();
+    }
+
+    dt
+}
+
+fn bool_key_literal_datatype() -> DataType {
+    let mut bool_enum = Enum::new();
+    bool_enum
+        .variants_mut()
+        .push((Cow::Borrowed("true"), Variant::unit()));
+    bool_enum
+        .variants_mut()
+        .push((Cow::Borrowed("false"), Variant::unit()));
+    DataType::Enum(bool_enum)
+}
+
 fn enum_dt(
     s: &mut String,
     exporter: &Exporter,
@@ -1358,17 +1402,6 @@ fn enum_dt(
     //     assert!(!state.flattening, "todo: support for flattening enums"); // TODO
 
     //     location.push(e.name().clone());
-
-    //     let mut _ts = None;
-    //     if e.skip_bigint_checks() {
-    //         _ts = Some(Typescript {
-    //             bigint: BigIntExportBehavior::Number,
-    //             ..ts.clone()
-    //         });
-    //         _ts.as_ref().expect("set above")
-    //     } else {
-    //         ts
-    //     };
 
     //     let variants = e.variants().iter().filter(|(_, variant)| !variant.skip());
 

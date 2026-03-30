@@ -7,15 +7,48 @@ use crate::Layout;
 use super::legacy::ExportPath;
 
 /// The error type for the TypeScript exporter.
+///
+/// ## BigInt Forbidden
+///
+/// Specta Typescript intentionally forbids exporting BigInt-style Rust integer types.
+/// This includes [usize], [isize], [i64], [u64], [u128], [i128] and [f128].
+///
+/// This guard exists because `JSON.parse` will truncate large integers to fit into a JavaScript `number` type so we explicitly forbid exporting them.
+///
+/// If you encounter this error, there are a few common migration paths (in order of preference):
+///
+/// 1. Use a smaller integer types (any of `u8`/`i8`/`u16`/`i16`/`u32`/`i32`/`f64`).
+///    - Only possible when the biggest integer you need to represent is small enough to be represented by a `number` in JS.
+///    - This approach forces your application code to handle overflow/underflow values explicitly
+///    - Downside is that it can introduce annoying glue code and doesn't actually work if your need large values.
+///
+/// 2. Serialize the value as a string
+///     - This can be done using `#[specta(type = String)]` combined with a Serde `#[serde(with = "...")]` attribute.
+///     - Downside is that it can introduce annoying glue code, both on in Rust and in JS as you will need to turn it back into a `new BigInt(myString)` in JS.
+///
+/// 3. Use a Specta-based framework
+///     - Frameworks like [Tauri Specta](https://github.com/specta-rs/tauri-specta) and [TauRPC](https://github.com/MatsDK/TauRPC) take care of this for you.
+///     - They use special internals to preserve the values and make use of [`specta-tags`](http://docs.rs/specta-tags) for generating glue-code automatically.
+///
+/// 4. UNSAFE: Accept precision loss
+///     - Accept that large numbers may be deserialized differently and use `#[specta(type = f64)]` to bypass this warning on a per-field basis.
+///     - This can't be set globally as it is designed intentionally to introduce friction, as you are accepting the risk of data loss which is not okay.
+///
 #[non_exhaustive]
 pub struct Error {
     kind: ErrorKind,
 }
 
 type FrameworkSource = Box<dyn error::Error + Send + Sync + 'static>;
+const BIGINT_DOCS_URL: &str =
+    "https://docs.rs/specta-typescript/latest/specta_typescript/struct.Error.html#bigint-forbidden";
 
 #[allow(dead_code)]
 enum ErrorKind {
+    InvalidMapKey {
+        path: String,
+        reason: Cow<'static, str>,
+    },
     /// Attempted to export a bigint type but the configuration forbids it.
     BigIntForbidden {
         path: String,
@@ -93,6 +126,18 @@ enum ErrorKind {
 }
 
 impl Error {
+    pub(crate) fn invalid_map_key(
+        path: impl Into<String>,
+        reason: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::InvalidMapKey {
+                path: path.into(),
+                reason: reason.into(),
+            },
+        }
+    }
+
     /// Construct an error for framework-specific logic.
     pub fn framework(
         message: impl Into<Cow<'static, str>>,
@@ -215,9 +260,12 @@ impl From<std::fmt::Error> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
+            ErrorKind::InvalidMapKey { path, reason } => {
+                write!(f, "Invalid map key at '{path}': {reason}")
+            }
             ErrorKind::BigIntForbidden { path } => write!(
                 f,
-                "Attempted to export {path:?} but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. If your using a serializer/deserializer that natively has support for BigInt types you can disable this warning by editing your `ExportConfiguration`!"
+                "Attempted to export {path:?} but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128) to avoid precision loss. See {BIGINT_DOCS_URL} for a full explanation."
             ),
             ErrorKind::ForbiddenName { path, name } => write!(
                 f,
@@ -281,7 +329,7 @@ impl fmt::Display for Error {
             }
             ErrorKind::BigIntForbiddenLegacy(path) => write!(
                 f,
-                "Attempted to export {path:?} but Specta configuration forbids exporting BigInt types (i64, u64, i128, u128) because we don't know if your se/deserializer supports it. You can change this behavior by editing your `ExportConfiguration`!"
+                "Attempted to export {path:?} but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128) to avoid precision loss. See {BIGINT_DOCS_URL} for a full explanation."
             ),
             ErrorKind::ForbiddenNameLegacy(path, name) => write!(
                 f,

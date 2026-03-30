@@ -41,6 +41,11 @@ impl NamedReference {
         &self.generics
     }
 
+    /// Get the generic parameters set on this reference as mutable references.
+    pub fn generics_mut(&mut self) -> &mut Vec<(GenericReference, DataType)> {
+        &mut self.generics
+    }
+
     /// Get whether this reference should be inlined
     pub fn inline(&self) -> bool {
         self.inline

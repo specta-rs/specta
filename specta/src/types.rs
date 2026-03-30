@@ -71,7 +71,7 @@ impl Types {
     }
 
     /// Merge types from another collection into this one.
-    pub fn merge(&mut self, other: &Self) {
+    pub fn extend(&mut self, other: &Self) {
         for (id, other) in &other.0 {
             match self.0.get(id) {
                 // Key doesn't exist - insert from other
@@ -182,6 +182,29 @@ impl ResolvedTypes {
     /// remain whatever shape they were resolved into.
     pub fn into_types(self) -> Types {
         self.0
+    }
+
+    /// Sort the collection into a consistent order and return an iterator.
+    ///
+    /// The sort order is not necessarily guaranteed to be stable between versions but currently we sort by name.
+    ///
+    /// This method requires reallocating the map to sort the collection. You should prefer [Self::into_unsorted_iter] if you don't care about the order.
+    pub fn into_sorted_iter(&self) -> impl ExactSizeIterator<Item = &'_ NamedDataType> {
+        self.0.into_sorted_iter()
+    }
+
+    /// Return the unsorted iterator over the collection.
+    pub fn into_unsorted_iter(&self) -> impl ExactSizeIterator<Item = &NamedDataType> {
+        self.0.into_unsorted_iter()
+    }
+
+    /// Return an mutable iterator over the type collection.
+    /// Note: The order returned is unsorted.
+    pub fn iter_mut<F>(&mut self, f: F)
+    where
+        F: FnMut(&mut NamedDataType),
+    {
+        self.0.iter_mut(f);
     }
 }
 

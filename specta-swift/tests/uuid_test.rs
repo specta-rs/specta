@@ -1,4 +1,4 @@
-use specta::{Type, Types};
+use specta::{ResolvedTypes, Type, Types};
 use specta_swift::Swift;
 
 // Test with UUID - this should work if the uuid feature is enabled
@@ -13,8 +13,9 @@ struct WithUuid {
 #[test]
 fn test_uuid_support() {
     let types = Types::default().register::<WithUuid>();
+    let resolved = ResolvedTypes::from_resolved_types(types);
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&resolved).unwrap();
 
     println!("UUID support test:\n{}", output);
 
@@ -43,8 +44,9 @@ struct WithChrono {
 #[test]
 fn test_chrono_support() {
     let types = Types::default().register::<WithChrono>();
+    let resolved = ResolvedTypes::from_resolved_types(types);
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&resolved).unwrap();
 
     println!("Chrono support test:\n{}", output);
 

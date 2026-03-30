@@ -140,17 +140,18 @@ fn main() {
         .register::<ApiResponse>()
         .register::<JobStatus>()
         .register::<SystemHealth>();
+    let resolved = specta_serde::apply(types).unwrap();
 
     // Export with default settings
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&resolved).unwrap();
 
     println!("📝 Generated Swift code:\n");
     println!("{}", output);
 
     // Write to file for inspection
     swift
-        .export_to("./examples/generated/SpecialTypes.swift", &types)
+        .export_to("./examples/generated/SpecialTypes.swift", &resolved)
         .unwrap();
     println!("✅ Special types exported to SpecialTypes.swift");
 

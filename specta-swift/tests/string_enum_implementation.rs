@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
-use specta::{Type, Types};
-use specta_swift::{NamingConvention, Swift};
+use specta::{ResolvedTypes, Type, Types};
+use specta_serde::apply;
+use specta_swift::Swift;
 
 #[derive(Type, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -75,9 +76,10 @@ pub enum RegularEnum {
 #[test]
 fn test_string_enum_snake_case() {
     let types = Types::default().register::<JobStatus>();
+    let resolved = apply(types).unwrap();
 
     let swift = Swift::default();
-    let result = swift.export(&types).unwrap();
+    let result = swift.export(&resolved).unwrap();
 
     println!("Generated Swift for JobStatus:");
     println!("{}", result);
@@ -94,26 +96,28 @@ fn test_string_enum_snake_case() {
 #[test]
 fn test_string_enum_uppercase() {
     let types = Types::default().register::<Priority>();
+    let resolved = apply(types).unwrap();
 
     let swift = Swift::default();
-    let result = swift.export(&types).unwrap();
+    let result = swift.export(&resolved).unwrap();
 
     println!("Generated Swift for Priority:");
     println!("{}", result);
 
     // Should contain string enum syntax with uppercase values
     assert!(result.contains("enum Priority: String, Codable"));
-    assert!(result.contains("case lOW = \"LOW\""));
-    assert!(result.contains("case mEDIUM = \"MEDIUM\""));
-    assert!(result.contains("case hIGH = \"HIGH\""));
+    assert!(result.contains("case low = \"LOW\""));
+    assert!(result.contains("case medium = \"MEDIUM\""));
+    assert!(result.contains("case high = \"HIGH\""));
 }
 
 #[test]
 fn test_string_enum_camel_case() {
     let types = Types::default().register::<LogLevel>();
+    let resolved = apply(types).unwrap();
 
     let swift = Swift::default();
-    let result = swift.export(&types).unwrap();
+    let result = swift.export(&resolved).unwrap();
 
     println!("Generated Swift for LogLevel:");
     println!("{}", result);
@@ -129,9 +133,10 @@ fn test_string_enum_camel_case() {
 #[test]
 fn test_string_enum_pascal_case() {
     let types = Types::default().register::<UserRole>();
+    let resolved = apply(types).unwrap();
 
     let swift = Swift::default();
-    let result = swift.export(&types).unwrap();
+    let result = swift.export(&resolved).unwrap();
 
     println!("Generated Swift for UserRole:");
     println!("{}", result);
@@ -147,9 +152,10 @@ fn test_string_enum_pascal_case() {
 #[test]
 fn test_string_enum_kebab_case() {
     let types = Types::default().register::<ApiStatus>();
+    let resolved = apply(types).unwrap();
 
     let swift = Swift::default();
-    let result = swift.export(&types).unwrap();
+    let result = swift.export(&resolved).unwrap();
 
     println!("Generated Swift for ApiStatus:");
     println!("{}", result);
@@ -164,26 +170,28 @@ fn test_string_enum_kebab_case() {
 #[test]
 fn test_string_enum_screaming_kebab_case() {
     let types = Types::default().register::<DatabaseStatus>();
+    let resolved = apply(types).unwrap();
 
     let swift = Swift::default();
-    let result = swift.export(&types).unwrap();
+    let result = swift.export(&resolved).unwrap();
 
     println!("Generated Swift for DatabaseStatus:");
     println!("{}", result);
 
     // Should contain string enum syntax with SCREAMING-KEBAB-CASE values
     assert!(result.contains("enum DatabaseStatus: String, Codable"));
-    assert!(result.contains("case cONNECTED = \"C-O-N-N-E-C-T-E-D\""));
-    assert!(result.contains("case dISCONNECTED = \"D-I-S-C-O-N-N-E-C-T-E-D\""));
-    assert!(result.contains("case rECONNECTING = \"R-E-C-O-N-N-E-C-T-I-N-G\""));
+    assert!(result.contains("case connected = \"CONNECTED\""));
+    assert!(result.contains("case disconnected = \"DISCONNECTED\""));
+    assert!(result.contains("case reconnecting = \"RECONNECTING\""));
 }
 
 #[test]
 fn test_mixed_enum_not_string() {
     let types = Types::default().register::<MixedEnum>();
+    let resolved = ResolvedTypes::from_resolved_types(types);
 
     let swift = Swift::default();
-    let result = swift.export(&types).unwrap();
+    let result = swift.export(&resolved).unwrap();
 
     println!("Generated Swift for MixedEnum:");
     println!("{}", result);
@@ -206,9 +214,10 @@ fn test_mixed_enum_not_string() {
 #[test]
 fn test_regular_enum_not_string() {
     let types = Types::default().register::<RegularEnum>();
+    let resolved = ResolvedTypes::from_resolved_types(types);
 
     let swift = Swift::default();
-    let result = swift.export(&types).unwrap();
+    let result = swift.export(&resolved).unwrap();
 
     println!("Generated Swift for RegularEnum:");
     println!("{}", result);
@@ -223,18 +232,22 @@ fn test_regular_enum_not_string() {
 
 #[test]
 fn test_all_string_enums_together() {
-    let types = Types::default()
+    let string_types = Types::default()
         .register::<JobStatus>()
         .register::<Priority>()
         .register::<LogLevel>()
         .register::<UserRole>()
         .register::<ApiStatus>()
-        .register::<DatabaseStatus>()
+        .register::<DatabaseStatus>();
+    let other_types = Types::default()
         .register::<MixedEnum>()
         .register::<RegularEnum>();
+    let resolved = apply(string_types).unwrap();
+    let raw_resolved = ResolvedTypes::from_resolved_types(other_types);
 
     let swift = Swift::default();
-    let result = swift.export(&types).unwrap();
+    let result = swift.export(&resolved).unwrap();
+    let raw_result = swift.export(&raw_resolved).unwrap();
 
     println!("Generated Swift for all enums:");
     println!("{}", result);
@@ -248,7 +261,7 @@ fn test_all_string_enums_together() {
     assert!(result.contains("enum DatabaseStatus: String, Codable"));
 
     // Check that non-string enums are generated correctly
-    assert!(result.contains("enum MixedEnum")); // No redundant Codable in declaration
-    assert!(result.contains("enum RegularEnum: Codable")); // Simple enum can have Codable in declaration
-    assert!(result.contains("extension MixedEnum: Codable")); // Complex enum has Codable in extension
+    assert!(raw_result.contains("enum MixedEnum")); // No redundant Codable in declaration
+    assert!(raw_result.contains("enum RegularEnum: Codable")); // Simple enum can have Codable in declaration
+    assert!(raw_result.contains("extension MixedEnum: Codable")); // Complex enum has Codable in extension
 }

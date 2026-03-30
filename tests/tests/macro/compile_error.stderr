@@ -1,18 +1,8 @@
-error: unsupported serde casing: `"camelCase123"`
- --> tests/macro/compile_error.rs:6:10
+error: unsupported serde casing: `camelCase123`
+ --> tests/macro/compile_error.rs:8:22
   |
-6 | #[derive(Type)]
-  |          ^^^^
-  |
-  = note: this error originates in the macro `$crate::__specta_serde_set_case` which comes from the expansion of the derive macro `Type` (in Nightly builds, run with -Z macro-backtrace for more info)
-
-error: unsupported serde casing: `"camelCase123"`
- --> tests/macro/compile_error.rs:6:10
-  |
-6 | #[derive(Type)]
-  |          ^^^^
-  |
-  = note: this error originates in the macro `$crate::__specta_serde_set_case` which comes from the expansion of the derive macro `Type` (in Nightly builds, run with -Z macro-backtrace for more info)
+8 | #[serde(rename_all = "camelCase123")]
+  |                      ^^^^^^^^^^^^^^
 
 error: specta: Found unsupported container attribute 'noshot'
   --> tests/macro/compile_error.rs:86:10

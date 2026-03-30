@@ -15,6 +15,7 @@ proc-macro = true
 
 [features]
 default = []
+serde = []
 # These will be enabled by `specta` or `specta-util` automatically as required. They depend on certain exports of it so enabling them manually is not useful.
 DO_NOT_USE_collect = []
 DO_NOT_USE_function = []
@@ -27,4 +28,3 @@ proc-macro2 = "1"
 quote = "1"
 syn = { version = "2", features = ["full", "visit"] }  # TODO: default-features = false,
 Inflector = { version = "0.11", default-features = false }
-proc-macro-crate = "3"

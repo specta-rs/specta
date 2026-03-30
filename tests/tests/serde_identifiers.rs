@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use specta::{Type, Types};
-use specta_typescript::{BigIntExportBehavior, Typescript};
+use specta_typescript::Typescript;
 
 #[derive(Type, Deserialize)]
 #[specta(collect = false)]
@@ -43,7 +43,6 @@ fn identifier_apply_phases_exports_deserialize_union() {
         specta_serde::apply_phases(Types::default().register::<VariantIdentifier>())
             .expect("variant_identifier should be supported by apply_phases");
     let variant_ts = Typescript::default()
-        .bigint(BigIntExportBehavior::Number)
         .export(&variant_types)
         .expect("typescript export should succeed");
 
@@ -52,7 +51,6 @@ fn identifier_apply_phases_exports_deserialize_union() {
     let field_types = specta_serde::apply_phases(Types::default().register::<FieldIdentifier>())
         .expect("field_identifier should be supported by apply_phases");
     let field_ts = Typescript::default()
-        .bigint(BigIntExportBehavior::Number)
         .export(&field_types)
         .expect("typescript export should succeed");
 
