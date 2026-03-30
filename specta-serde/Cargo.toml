@@ -1,7 +1,7 @@
 [package]
 name = "specta-serde"
 description = "Serde support for Specta"
-version = "0.0.10"
+version = "0.0.11"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2024"
 license = "MIT"
@@ -19,9 +19,9 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
-specta = { version = "=2.0.0-rc.23", path = "../specta" }
-specta-macros = { version = "=2.0.0-rc.23", path = "../specta-macros", features = ["serde"] }
+specta = { version = "=2.0.0-rc.24", path = "../specta" }
+specta-macros = { version = "=2.0.0-rc.24", path = "../specta-macros", features = ["serde"] }
 
 [dev-dependencies]
-specta = { version = "=2.0.0-rc.23", path = "../specta", features = ["derive"] }
+specta = { version = "=2.0.0-rc.24", path = "../specta", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }

@@ -20,7 +20,7 @@
 //! let dt = Event::definition(&mut types);
 //! let resolved = ResolvedTypes::from_resolved_types(types);
 //!
-//! let plan = specta_tags::TransformPlan::analyze(dt, &resolved);
+//! let plan = specta_tags::TransformPlan::analyze(&dt, &resolved);
 //! let js = plan.map("value");
 //! assert!(js.contains("BigInt"));
 //! assert!(js.contains("[\"id\"]"));
@@ -576,7 +576,7 @@ mod tests {
     fn map_renders_trusting_transforms() {
         let mut types = Types::default();
         let dt = Root::definition(&mut types);
-        let plan = TransformPlan::analyze(dt, &ResolvedTypes::from_resolved_types(types));
+        let plan = TransformPlan::analyze(&dt, &ResolvedTypes::from_resolved_types(types));
         let js = plan.map("v");
 
         assert!(
@@ -622,7 +622,7 @@ mod tests {
             .ty()
             .clone();
 
-        let js = TransformPlan::analyze(dt, &resolved).map("v");
+        let js = TransformPlan::analyze(&dt, &resolved).map("v");
 
         assert!(js.contains("[\"kind\"] === \"A\""));
         assert!(js.contains("BigInt("));
@@ -640,7 +640,7 @@ mod tests {
             .ty()
             .clone();
 
-        let js = TransformPlan::analyze(dt, &resolved).map("v");
+        let js = TransformPlan::analyze(&dt, &resolved).map("v");
 
         assert!(js.contains("[\"kind\"] === \"A\""));
         assert!(js.contains("payload"));

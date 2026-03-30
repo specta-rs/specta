@@ -1,7 +1,7 @@
 [package]
 name = "specta-go"
 description = "Export your Rust types to Go"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2024"
 license = "MIT"
@@ -20,5 +20,5 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
-specta = { version = "=2.0.0-rc.23", path = "../specta" }
-specta-serde = { version = "=0.0.10", path = "../specta-serde" }
+specta = { version = "=2.0.0-rc.24", path = "../specta" }
+specta-serde = { version = "=0.0.11", path = "../specta-serde" }

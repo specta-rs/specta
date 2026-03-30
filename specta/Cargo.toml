@@ -1,7 +1,7 @@
 [package]
 name = "specta"
 description = "Easily export your Rust types to other languages"
-version = "2.0.0-rc.23"
+version = "2.0.0-rc.24"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2024"
 license = "MIT"
@@ -111,7 +111,7 @@ geozero = ["dep:geozero"]
 workspace = true
 
 [dependencies]
-specta-macros = { version = "=2.0.0-rc.23", optional = true, path = "../specta-macros" }
+specta-macros = { version = "=2.0.0-rc.24", optional = true, path = "../specta-macros" }
 paste = { version = "1", optional = true }
 
 ctor = { version = "0.8.0", default-features = false, optional = true, features = ["proc_macro"] }

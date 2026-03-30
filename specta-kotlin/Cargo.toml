@@ -1,7 +1,7 @@
 [package]
 name = "specta-kotlin"
 description = "Export your Rust types to Kotlin"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2024"
 license = "MIT"
@@ -20,4 +20,4 @@ rustdoc-args = ["--cfg", "docsrs"]
 workspace = true
 
 [dependencies]
-specta = { version = "=2.0.0-rc.23", path = "../specta" }
+specta = { version = "=2.0.0-rc.24", path = "../specta" }

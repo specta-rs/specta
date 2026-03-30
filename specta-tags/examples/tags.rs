@@ -24,7 +24,7 @@ fn main() {
     let dt = A::definition(&mut types);
     let resolved = ResolvedTypes::from_resolved_types(types);
 
-    let tags = specta_tags::TransformPlan::analyze(dt, &resolved);
+    let tags = specta_tags::TransformPlan::analyze(&dt, &resolved);
     println!("--- PLAN ---\n{tags:?}");
     println!("--- RESULT ---\nresult.then((v) => {})", tags.map("v"));
 }
