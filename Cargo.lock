@@ -1171,13 +1171,12 @@ dependencies = [
 
 [[package]]
 name = "insta"
-version = "1.47.1"
+version = "1.47.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99322078b2c076829a1db959d49da554fabc4342257fc0ba5a070a1eb3a01cd8"
+checksum = "7b4a6248eb93a4401ed2f37dfe8ea592d3cf05b7cf4f8efa867b6895af7e094e"
 dependencies = [
  "console",
  "once_cell",
- "serde",
  "similar",
  "tempfile",
 ]
@@ -1390,17 +1389,6 @@ name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
-
-[[package]]
-name = "openapiv3"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c8d427828b22ae1fff2833a03d8486c2c881367f1c336349f307f321e7f4d05"
-dependencies = [
- "indexmap 2.13.0",
- "serde",
- "serde_json",
-]
 
 [[package]]
 name = "ordered-float"
@@ -1993,34 +1981,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "specta-go"
-version = "0.0.2"
-dependencies = [
- "specta",
- "specta-serde",
-]
-
-[[package]]
-name = "specta-jsonschema"
-version = "0.0.2"
-dependencies = [
- "insta",
- "schemars 1.2.1",
- "serde",
- "serde_json",
- "specta",
- "specta-util",
- "thiserror",
-]
-
-[[package]]
-name = "specta-kotlin"
-version = "0.0.2"
-dependencies = [
- "specta",
-]
-
-[[package]]
 name = "specta-macros"
 version = "2.0.0-rc.24"
 dependencies = [
@@ -2028,14 +1988,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "specta-openapi"
-version = "0.0.2"
-dependencies = [
- "openapiv3",
- "specta",
 ]
 
 [[package]]
@@ -2059,18 +2011,6 @@ dependencies = [
  "thiserror",
  "trybuild",
  "uuid",
-]
-
-[[package]]
-name = "specta-tags"
-version = "0.0.0"
-dependencies = [
- "bytes",
- "chrono",
- "serde",
- "serde_json",
- "specta",
- "specta-serde",
 ]
 
 [[package]]
