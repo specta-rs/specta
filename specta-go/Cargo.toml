@@ -6,7 +6,7 @@ authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/specta-rs/specta"
-documentation = "https://docs.rs/specta-zod/latest/specta-zod"
+documentation = "https://docs.rs/specta-go/latest/specta-go"
 keywords = ["async", "specta", "rspc", "go", "typesafe"]
 categories = ["web-programming", "asynchronous"]
 readme = "../README.md"
@@ -21,3 +21,4 @@ workspace = true
 
 [dependencies]
 specta = { version = "=2.0.0-rc.23", path = "../specta" }
+specta-serde = { version = "=0.0.10", path = "../specta-serde" }
