@@ -83,13 +83,13 @@ pub struct TransformPlan {
 
 impl TransformPlan {
     /// Analyzes a resolved datatype and records the JavaScript conversions it needs.
-    pub fn analyze(dt: DataType, types: &ResolvedTypes) -> Self {
+    pub fn analyze(dt: &DataType, types: &ResolvedTypes) -> Self {
         // Scan all `DataType` references, etc. and collect tags and their object location for `Self::map` to use.
         //
         // You should match on `NamedDataType`'s name and module path to determine known named types.
 
         Self {
-            plan: Analyzer.analyze(&dt, types.as_types(), &[], &mut Vec::new()),
+            plan: Analyzer.analyze(dt, types.as_types(), &[], &mut Vec::new()),
         }
     }
 
