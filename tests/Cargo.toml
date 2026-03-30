@@ -13,6 +13,7 @@ harness = true
 [dependencies]
 specta = { path = "../specta", features = ["function", "std", "derive", "serde_json", "serde_yaml", "toml", "chrono", "either", "error-stack", "ulid", "glam", "ordered-float", "heapless", "semver", "smol_str", "arrayvec", "smallvec", "geojson"] }
 specta-serde = { path = "../specta-serde" }
+specta-openapi = { path = "../specta-openapi" }
 specta-swift = { path = "../specta-swift" }
 specta-typescript = { path = "../specta-typescript" }
 specta-zod = { path = "../specta-zod" }
