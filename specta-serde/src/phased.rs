@@ -33,18 +33,23 @@ pub(crate) struct PhasedTy {
     pub(crate) deserialize: DataType,
 }
 
+/// Builds an explicit phased [`DataType`] from precomputed serialize and deserialize shapes.
+pub fn phased(serialize: DataType, deserialize: DataType) -> DataType {
+    if serialize == deserialize {
+        serialize
+    } else {
+        DataType::Reference(Reference::opaque(PhasedTy {
+            serialize,
+            deserialize,
+        }))
+    }
+}
+
 impl<Serialize: Type, Deserialize: Type> Type for Phased<Serialize, Deserialize> {
     fn definition(types: &mut Types) -> DataType {
         let serialize = Serialize::definition(types);
         let deserialize = Deserialize::definition(types);
 
-        if serialize == deserialize {
-            serialize
-        } else {
-            DataType::Reference(Reference::opaque(PhasedTy {
-                serialize,
-                deserialize,
-            }))
-        }
+        phased(serialize, deserialize)
     }
 }

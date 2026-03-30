@@ -23,20 +23,3 @@ type_complexity = { level = "allow", priority = 0 }
 [profile.dev.package]
 insta.opt-level = 3
 similar.opt-level = 3
-
-[patch.crates-io]
-# Breaking doc generation on nightly:
-#
-# error[E0557]: feature has been removed
-#  --> /Users/oscar/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/variadics_please-1.1.0/src/lib.rs:3:29
-#   |
-# 3 | #![cfg_attr(docsrs, feature(doc_auto_cfg))]
-#   |                             ^^^^^^^^^^^^ feature has been removed
-#   |
-#   = note: removed in 1.92.0; see <https://github.com/rust-lang/rust/pull/138907> for more information
-#   = note: merged into `doc_cfg`
-# variadics_please = { git = "https://github.com/bevyengine/variadics_please", rev = "21778a774200a0d743f9f9212f489e01c17b0e4a" }
-# futures-lite = { git = "https://github.com/smol-rs/futures-lite", rev = "3dc587ffdd652bc6002f34dc24a300643ef498ae" }
-# rand = { git = "https://github.com/rust-random/rand", rev = "da891850ab2b38f4322ec140ae29d305dfb162c3" }
-
-error-stack = { git = "https://github.com/hashintel/hash", rev = "da576c7564b27247fd11c2cdae6ca1d2c8e01800" }

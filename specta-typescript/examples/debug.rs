@@ -30,7 +30,6 @@ fn main() {
     // println!("{:#?}", serde_yaml::Value::definition(&mut types));
 
     let out = specta_typescript::Typescript::new()
-        .bigint(specta_typescript::BigIntExportBehavior::Number)
         .export(&ResolvedTypes::from_resolved_types(types))
         .unwrap();
 

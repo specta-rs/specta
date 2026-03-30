@@ -20,14 +20,6 @@ SocketAddrV4: string
 SocketAddrV6: string
 Cow<'static, str>: string
 Cow<'static, i32>: number
-SystemTime: {
-	duration_since_epoch: number,
-	duration_since_unix_epoch: number,
-}
-Duration: {
-	secs: number,
-	nanos: number,
-}
 Vec<i32>: number[]
 Vec<MyEnum>: MyEnum[]
 Result<String, i32>: string | number
@@ -61,8 +53,8 @@ TransparentType: TransparentType
 TransparentType2: TransparentType2
 TransparentTypeWithOverride: TransparentTypeWithOverride
 HashMap<BasicEnum, ()>: Partial<{ [key in BasicEnum]: null }>
-Vec<PlaceholderInnerField>: PlaceholderInnerField[]
 HashMap<BasicEnum, i32>: Partial<{ [key in BasicEnum]: number }>
+Vec<PlaceholderInnerField>: PlaceholderInnerField[]
 EnumReferenceRecordKey: EnumReferenceRecordKey
 FlattenOnNestedEnum: FlattenOnNestedEnum
 MyEmptyInput: MyEmptyInput
@@ -97,6 +89,11 @@ TupleStruct: TupleStruct
 TupleStructWithRep: TupleStructWithRep
 GenericTupleStruct<String>: GenericTupleStruct<string>
 BracedStruct: BracedStruct
+Struct: Struct
+Struct2: Struct2
+Enum: Enum
+Enum2: Enum2
+Enum3: Enum3
 StructRenameAllUppercase: StructRenameAllUppercase
 RenameSerdeSpecialChar: RenameSerdeSpecialChar
 EnumRenameAllUppercase: EnumRenameAllUppercase
@@ -108,16 +105,17 @@ NonOptional: NonOptional
 OptionalOnNamedField: OptionalOnNamedField
 OptionalOnTransparentNamedField: OptionalOnTransparentNamedField
 OptionalInEnum: OptionalInEnum
-Optional: Optional
 UntaggedVariants: UntaggedVariants
 UntaggedVariantsWithoutValue: UntaggedVariantsWithoutValue
 UntaggedVariantsWithDuplicateBranches: UntaggedVariantsWithDuplicateBranches
 HashMap<String, ()>: { [key in string]: null }
 Regular: Regular
 HashMap<Infallible, ()>: { [key in never]: null }
+HashMap<TransparentStruct, ()>: { [key in TransparentStruct]: null }
 HashMap<UnitVariants, ()>: Partial<{ [key in UnitVariants]: null }>
 HashMap<UntaggedVariantsKey, ()>: Partial<{ [key in UntaggedVariantsKey]: null }>
-HashMap<Variants, ()>: Partial<{ [key in Variants]: null }>
+ValidMaybeValidKey: ValidMaybeValidKey
+ValidMaybeValidKeyNested: ValidMaybeValidKeyNested
 MacroStruct: MacroStruct
 MacroStruct2: MacroStruct2
 MacroEnum: MacroEnum
@@ -152,6 +150,7 @@ TagOnStructWithInline: TagOnStructWithInline
 Sixth: Sixth
 Seventh: Seventh
 Eight: Eight
+Ninth: Ninth
 Tenth: Tenth
 MyEnumTagged: MyEnumTagged
 MyEnumExternal: MyEnumExternal
@@ -217,3 +216,11 @@ InlineGenericNested<String>: [string, string[], [string, string], { [key in stri
 InlineFlattenGenericsG<()>: InlineFlattenGenericsG<null>
 InlineFlattenGenerics: InlineFlattenGenerics
 GenericParameterOrderPreserved: GenericParameterOrderPreserved
+TestCollectionRegister: TestCollectionRegister
+TestCollectionRegister: TestCollectionRegister
+specta_typescript::Any: any
+specta_typescript::Any<String>: any
+specta_typescript::Unknown: unknown
+specta_typescript::Unknown<String>: unknown
+specta_typescript::Never: never
+specta_typescript::Never<String>: never

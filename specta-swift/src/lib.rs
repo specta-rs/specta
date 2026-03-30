@@ -4,10 +4,11 @@
 //!
 //! # Usage
 //!
-//! Add `specta` and `specta-swift` to your project:
+//! Add `specta`, `specta-serde`, and `specta-swift` to your project:
 //!
 //! ```bash
 //! cargo add specta@2.0.0-rc.23 --features derive,export
+//! cargo add specta-serde@0.0.10
 //! cargo add specta-swift@0.0.1
 //! ```
 //!
@@ -27,12 +28,13 @@
 //!     pub other_field: String,
 //! }
 //!
-//! let mut types = Types::default()
+//! let types = Types::default()
 //!     // We don't need to specify `MyOtherType` because it's referenced by `MyType`
 //!     .register::<MyType>();
+//! let resolved = specta_serde::apply(types).unwrap();
 //!
 //! Swift::default()
-//!     .export_to("./Types.swift", &types)
+//!     .export_to("./Types.swift", &resolved)
 //!     .unwrap();
 //! ```
 //!

@@ -8,8 +8,7 @@ pub fn parse_enum(
     crate_ref: &TokenStream,
     container_attrs: &ContainerAttr,
     data: &DataEnum,
-    format_crates: &[syn::Path],
-) -> syn::Result<(TokenStream, TokenStream)> {
+) -> syn::Result<TokenStream> {
     if container_attrs.transparent {
         return Err(syn::Error::new(
             data.enum_token.span(),
@@ -71,11 +70,11 @@ pub fn parse_enum(
             }
 
             let runtime_attrs = build_runtime_attributes(
+                crate_ref,
                 AttributeScope::Variant,
                 &v.attrs,
                 &container_attrs.skip_attrs,
-                format_crates,
-            );
+            )?;
 
             Ok((v, variant_attrs, runtime_attrs))
         })
@@ -89,22 +88,15 @@ pub fn parse_enum(
             let variant_type = attrs.r#type.clone();
             let variant_type_overridden = variant_type.is_some();
 
-            let inner = if let Some(variant_ty) = variant_type {
-                quote!(internal::construct::fields_unnamed(
-                    vec![internal::construct::field(
-                        false,
-                        false,
-                        None,
-                        "".into(),
-                        false,
-                        true,
-                        datatype::Attributes::default(),
-                        Some(<#variant_ty as #crate_ref::Type>::definition(types)),
-                    )],
-                ))
+            let variant_value = if let Some(variant_ty) = variant_type {
+                quote!(datatype::Variant::unnamed().field({
+                    let mut field = datatype::Field::new(<#variant_ty as #crate_ref::Type>::definition(types));
+                    field.set_type_overridden(true);
+                    field
+                }).build())
             } else {
                 match &variant.fields {
-                    Fields::Unit => quote!(datatype::Fields::Unit),
+                    Fields::Unit => quote!(datatype::Variant::unit()),
                     Fields::Unnamed(fields) => {
                         let fields = fields
                             .unnamed
@@ -125,15 +117,14 @@ pub fn parse_enum(
                                     &field.ty,
                                     raw_attrs,
                                     variant_skip,
-                                    format_crates,
                                 )
                             })
                             .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                        quote!(internal::construct::fields_unnamed(vec![#(#fields),*]))
+                        quote!(datatype::Variant::unnamed() #(.field(#fields))* .build())
                     }
                     Fields::Named(fields) => {
-                        let fields = fields
+                        let field_calls = fields
                             .named
                             .iter()
                             .map(|field| {
@@ -157,13 +148,12 @@ pub fn parse_enum(
                                     &field.ty,
                                     raw_attrs,
                                     variant_skip,
-                                    format_crates,
                                 )?;
-                                Ok(quote!((#field_name.into(), #inner)))
+                                Ok(quote!(.field(#field_name, #inner)))
                             })
                             .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-                        quote!(internal::construct::fields_named(vec![#(#fields),*]))
+                        quote!(datatype::Variant::named() #(#field_calls)* .build())
                     }
                 }
             };
@@ -172,11 +162,10 @@ pub fn parse_enum(
             let skip = variant_skip;
             let doc = attrs.common.doc;
             Ok(quote!((#variant_name_str.into(), {
-                let mut v = datatype::Variant::unit();
+                let mut v = #variant_value;
                 v.set_skip(#skip);
                 v.set_deprecated(#deprecated);
                 v.set_docs(#doc.into());
-                v.set_fields(#inner);
                 v.set_type_overridden(#variant_type_overridden);
                 *v.attributes_mut() = #runtime_attrs;
                 v
@@ -184,13 +173,11 @@ pub fn parse_enum(
         })
         .collect::<syn::Result<Vec<_>>>()?;
 
-    Ok((
-        quote!(Enum),
-        quote!(
-            let mut e = datatype::Enum::new();
-            *e.variants_mut() = vec![#(#variant_types),*];
-        ),
-    ))
+    Ok(quote!({
+        let mut e = datatype::Enum::new();
+        *e.variants_mut() = vec![#(#variant_types),*];
+        e.into()
+    }))
 }
 
 fn parse_variant_type_override(attrs: &[syn::Attribute]) -> syn::Result<Option<Type>> {

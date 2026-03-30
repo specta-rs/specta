@@ -5,15 +5,9 @@ expression: output
 i8: number
 i16: number
 i32: number
-i64: number
-i128: number
-isize: number
 u8: number
 u16: number
 u32: number
-u64: number
-u128: number
-usize: number
 f32: number
 f64: number
 bool: boolean
@@ -42,14 +36,6 @@ SocketAddrV4: string
 SocketAddrV6: string
 Cow<'static, str>: string
 Cow<'static, i32>: number
-SystemTime: {
-	duration_since_epoch: number,
-	duration_since_unix_epoch: number,
-}
-Duration: {
-	secs: number,
-	nanos: number,
-}
 &'static str: string
 &'static bool: boolean
 &'static i32: number
@@ -129,9 +115,9 @@ TransparentType2: null
 TransparentTypeWithOverride: string
 [Option<u8>; 3]: [(number | null), (number | null), (number | null)]
 HashMap<BasicEnum, ()>: Partial<{ [key in BasicEnum]: null }>
+HashMap<BasicEnum, i32>: Partial<{ [key in BasicEnum]: number }>
 Option<Option<Option<Option<i32>>>>: number | null
 Vec<PlaceholderInnerField>: PlaceholderInnerField[]
-HashMap<BasicEnum, i32>: Partial<{ [key in BasicEnum]: number }>
 EnumReferenceRecordKey: {
 	a: Partial<{ [key in BasicEnum]: number }>,
 }
@@ -204,6 +190,15 @@ TupleStruct: string
 TupleStructWithRep: string
 GenericTupleStruct<String>: string
 BracedStruct: string
+Struct: {
+	a: string,
+}
+Struct2: {
+	a: string,
+}
+Enum: "A" | "B"
+Enum2: "A" | "B" | { enum_field: null }
+Enum3: { a: string }
 StructRenameAllUppercase: {
 	a: number,
 	b: number,
@@ -226,21 +221,17 @@ OptionalOnTransparentNamedField: {
 	b: string | null,
 }
 OptionalInEnum: string | null | { a: string | null } | { a?: string | null }
-Optional: {
-	a: number | null,
-	b?: number | null,
-	c: string | null,
-	d: boolean,
-}
 UntaggedVariants: string | number | { id: string } | [string, boolean]
 UntaggedVariantsWithoutValue: string | [number, string] | number
 UntaggedVariantsWithDuplicateBranches: null | number
 HashMap<String, ()>: { [key in string]: null }
 Regular: { [key in string]: null }
 HashMap<Infallible, ()>: { [key in never]: null }
+HashMap<TransparentStruct, ()>: { [key in TransparentStruct]: null }
 HashMap<UnitVariants, ()>: Partial<{ [key in UnitVariants]: null }>
 HashMap<UntaggedVariantsKey, ()>: Partial<{ [key in UntaggedVariantsKey]: null }>
-HashMap<Variants, ()>: Partial<{ [key in Variants]: null }>
+ValidMaybeValidKey: { [key in MaybeValidKey<string>]: null }
+ValidMaybeValidKeyNested: { [key in MaybeValidKey<MaybeValidKey<string>>]: null }
 MacroStruct: string
 MacroStruct2: {
 	demo: string,
@@ -379,7 +370,9 @@ BoxFlattened: {
 	b: BoxedInner,
 }
 BoxInline: {
-	c: BoxedInner,
+	c: {
+		a: number,
+	},
 }
 First: {
 	a: string,
@@ -413,6 +406,9 @@ Seventh: {
 	b: Second,
 }
 Eight: string | "B"
+Ninth: string | "B" | {
+	a: string,
+} | First
 Tenth: string | "B" | {
 	a: string,
 } | First
@@ -551,3 +547,11 @@ InlineFlattenGenerics: {
 GenericParameterOrderPreserved: {
 	pair: Pair<number, string>,
 }
+TestCollectionRegister: never
+TestCollectionRegister: never
+specta_typescript::Any: any
+specta_typescript::Any<String>: any
+specta_typescript::Unknown: unknown
+specta_typescript::Unknown<String>: unknown
+specta_typescript::Never: never
+specta_typescript::Never<String>: never

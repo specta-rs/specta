@@ -4,15 +4,39 @@ use std::borrow::Cow;
 
 use specta::{
     Types,
-    datatype::{DataType, GenericReference, Primitive, Reference},
+    datatype::{DataType, Enum, Fields, GenericReference, Primitive, Reference, Variant},
 };
 
 use crate::error::{Error, Result};
 use crate::swift::Swift;
 
-/// Check if an enum is a string enum (has String repr)
-fn is_string_enum(e: &specta::datatype::Enum) -> bool {
-    e.is_string_enum()
+fn enum_string_raw_value(variant: &Variant) -> Option<&str> {
+    let Fields::Unnamed(fields) = variant.fields() else {
+        return None;
+    };
+
+    let [field] = fields.fields() else {
+        return None;
+    };
+
+    let DataType::Enum(literal_enum) = field.ty()? else {
+        return None;
+    };
+
+    let [(raw_value, literal_variant)] = literal_enum.variants() else {
+        return None;
+    };
+
+    matches!(literal_variant.fields(), Fields::Unit).then_some(raw_value.as_ref())
+}
+
+fn resolved_string_enum(e: &Enum) -> Option<Vec<(&str, &str)>> {
+    e.variants()
+        .iter()
+        .map(|(variant_name, variant)| {
+            enum_string_raw_value(variant).map(|raw| (variant_name.as_ref(), raw))
+        })
+        .collect()
 }
 
 /// Export a single type to Swift.
@@ -93,7 +117,7 @@ pub fn export_type(
             };
 
             // Check if this is a string enum
-            let is_string_enum_val = is_string_enum(e);
+            let is_string_enum_val = resolved_string_enum(e).is_some();
 
             // Check if this enum has struct-like variants (needs custom Codable)
             let has_struct_variants = e.variants().iter().any(|(_, variant)| {
@@ -406,74 +430,6 @@ fn struct_to_swift(
     }
 }
 
-/// Generate raw value for string enum variants
-#[allow(clippy::unwrap_used)]
-fn generate_raw_value(variant_name: &str, rename_all: Option<&str>) -> String {
-    match rename_all {
-        Some("lowercase") => variant_name.to_lowercase(),
-        Some("UPPERCASE") => variant_name.to_uppercase(),
-        Some("camelCase") => {
-            let mut chars = variant_name.chars();
-            match chars.next() {
-                None => String::new(),
-                Some(first) => first.to_lowercase().chain(chars).collect(),
-            }
-        }
-        Some("PascalCase") => {
-            let mut chars = variant_name.chars();
-            match chars.next() {
-                None => String::new(),
-                Some(first) => first.to_uppercase().chain(chars).collect(),
-            }
-        }
-        Some("snake_case") => variant_name
-            .chars()
-            .enumerate()
-            .flat_map(|(i, c)| {
-                if c.is_uppercase() && i > 0 {
-                    vec!['_', c.to_lowercase().next().unwrap()]
-                } else {
-                    vec![c.to_lowercase().next().unwrap()]
-                }
-            })
-            .collect(),
-        Some("SCREAMING_SNAKE_CASE") => variant_name
-            .chars()
-            .enumerate()
-            .flat_map(|(i, c)| {
-                if c.is_uppercase() && i > 0 {
-                    vec!['_', c.to_uppercase().next().unwrap()]
-                } else {
-                    vec![c.to_uppercase().next().unwrap()]
-                }
-            })
-            .collect(),
-        Some("kebab-case") => variant_name
-            .chars()
-            .enumerate()
-            .flat_map(|(i, c)| {
-                if c.is_uppercase() && i > 0 {
-                    vec!['-', c.to_lowercase().next().unwrap()]
-                } else {
-                    vec![c.to_lowercase().next().unwrap()]
-                }
-            })
-            .collect(),
-        Some("SCREAMING-KEBAB-CASE") => variant_name
-            .chars()
-            .enumerate()
-            .flat_map(|(i, c)| {
-                if c.is_uppercase() && i > 0 {
-                    vec!['-', c.to_uppercase().next().unwrap()]
-                } else {
-                    vec![c.to_uppercase().next().unwrap()]
-                }
-            })
-            .collect(),
-        _ => variant_name.to_lowercase(), // Default to lowercase
-    }
-}
-
 /// Convert enum types to Swift.
 fn enum_to_swift(
     swift: &Swift,
@@ -487,7 +443,7 @@ fn enum_to_swift(
     let mut result = String::new();
 
     // Check if this is a string enum
-    let is_string_enum = is_string_enum(e);
+    let is_string_enum = resolved_string_enum(e).is_some();
 
     for (original_variant_name, variant) in e.variants() {
         if variant.skip() {
@@ -499,15 +455,17 @@ fn enum_to_swift(
         match variant.fields() {
             specta::datatype::Fields::Unit => {
                 if is_string_enum {
-                    // For string enums, generate raw value assignments
-                    let raw_value = generate_raw_value(original_variant_name, None);
+                    let raw_value = enum_string_raw_value(variant)
+                        .expect("string enum variants should have string literal payloads");
                     result.push_str(&format!("    case {} = \"{}\"\n", variant_name, raw_value));
                 } else {
                     result.push_str(&format!("    case {}\n", variant_name));
                 }
             }
             specta::datatype::Fields::Unnamed(fields) => {
-                if fields.fields().is_empty() {
+                if is_string_enum && let Some(raw_value) = enum_string_raw_value(variant) {
+                    result.push_str(&format!("    case {} = \"{}\"\n", variant_name, raw_value));
+                } else if fields.fields().is_empty() {
                     result.push_str(&format!("    case {}\n", variant_name));
                 } else {
                     let types_str = fields

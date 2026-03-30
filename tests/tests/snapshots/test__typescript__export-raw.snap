@@ -32,16 +32,6 @@ Cow<'static, str>: export type Cow<T> = T;
 
 Cow<'static, i32>: export type Cow<T> = T;
 
-SystemTime: export type SystemTime = {
-	duration_since_epoch: number,
-	duration_since_unix_epoch: number,
-};
-
-Duration: export type Duration = {
-	secs: number,
-	nanos: number,
-};
-
 Vec<i32>: export type Vec<T> = T[];
 
 Vec<MyEnum>: export type Vec<T> = T[];
@@ -135,9 +125,9 @@ TransparentTypeWithOverride: export type TransparentTypeWithOverride = string;
 
 HashMap<BasicEnum, ()>: export type HashMap<K, V> = { [key in K]: V };
 
-Vec<PlaceholderInnerField>: export type Vec<T> = T[];
-
 HashMap<BasicEnum, i32>: export type HashMap<K, V> = { [key in K]: V };
+
+Vec<PlaceholderInnerField>: export type Vec<T> = T[];
 
 EnumReferenceRecordKey: export type EnumReferenceRecordKey = {
 	a: Partial<{ [key in BasicEnum]: number }>,
@@ -243,6 +233,20 @@ GenericTupleStruct<String>: export type GenericTupleStruct<T> = T;
 
 BracedStruct: export type BracedStruct = string;
 
+Struct: export type Struct = {
+	a: string,
+};
+
+Struct2: export type Struct2 = {
+	a: string,
+};
+
+Enum: export type Enum = "A" | "B";
+
+Enum2: export type Enum2 = "A" | "B" | { enum_field: null };
+
+Enum3: export type Enum3 = { a: string };
+
 StructRenameAllUppercase: export type StructRenameAllUppercase = {
 	a: number,
 	b: number,
@@ -276,13 +280,6 @@ OptionalOnTransparentNamedField: export type OptionalOnTransparentNamedField = {
 
 OptionalInEnum: export type OptionalInEnum = string | null | { a: string | null } | { a?: string | null };
 
-Optional: export type Optional = {
-	a: number | null,
-	b?: number | null,
-	c: string | null,
-	d: boolean,
-};
-
 UntaggedVariants: export type UntaggedVariants = string | number | { id: string } | [string, boolean];
 
 UntaggedVariantsWithoutValue: export type UntaggedVariantsWithoutValue = string | [number, string] | number;
@@ -295,11 +292,15 @@ Regular: export type Regular = { [key in string]: null };
 
 HashMap<Infallible, ()>: export type HashMap<K, V> = { [key in K]: V };
 
+HashMap<TransparentStruct, ()>: export type HashMap<K, V> = { [key in K]: V };
+
 HashMap<UnitVariants, ()>: export type HashMap<K, V> = { [key in K]: V };
 
 HashMap<UntaggedVariantsKey, ()>: export type HashMap<K, V> = { [key in K]: V };
 
-HashMap<Variants, ()>: export type HashMap<K, V> = { [key in K]: V };
+ValidMaybeValidKey: export type ValidMaybeValidKey = { [key in MaybeValidKey<string>]: null };
+
+ValidMaybeValidKeyNested: export type ValidMaybeValidKeyNested = { [key in MaybeValidKey<MaybeValidKey<string>>]: null };
 
 MacroStruct: export type MacroStruct = string;
 
@@ -479,7 +480,9 @@ BoxFlattened: export type BoxFlattened = {
 };
 
 BoxInline: export type BoxInline = {
-	c: BoxedInner,
+	c: {
+		a: number,
+	},
 };
 
 First: export type First = {
@@ -521,6 +524,10 @@ Seventh: export type Seventh = {
 };
 
 Eight: export type Eight = string | "B";
+
+Ninth: export type Ninth = string | "B" | {
+	a: string,
+} | First;
 
 Tenth: export type Tenth = string | "B" | {
 	a: string,
@@ -724,3 +731,7 @@ InlineFlattenGenerics: export type InlineFlattenGenerics = {
 GenericParameterOrderPreserved: export type GenericParameterOrderPreserved = {
 	pair: Pair<number, string>,
 };
+
+TestCollectionRegister: export type TestCollectionRegister = never;
+
+TestCollectionRegister: export type TestCollectionRegister = never;

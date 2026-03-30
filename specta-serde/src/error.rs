@@ -11,10 +11,6 @@ pub struct Error {
 
 #[derive(Debug)]
 enum ErrorKind {
-    InvalidMapKey {
-        path: String,
-        reason: Cow<'static, str>,
-    },
     InvalidUsageOfSkip {
         path: String,
         reason: Cow<'static, str>,
@@ -65,21 +61,13 @@ enum ErrorKind {
         path: String,
         reason: Cow<'static, str>,
     },
+    InvalidRenameRule {
+        attribute: Cow<'static, str>,
+        value: String,
+    },
 }
 
 impl Error {
-    pub(crate) fn invalid_map_key(
-        path: impl Into<String>,
-        reason: impl Into<Cow<'static, str>>,
-    ) -> Self {
-        Self {
-            kind: ErrorKind::InvalidMapKey {
-                path: path.into(),
-                reason: reason.into(),
-            },
-        }
-    }
-
     pub(crate) fn invalid_usage_of_skip(
         path: impl Into<String>,
         reason: impl Into<Cow<'static, str>>,
@@ -221,14 +209,23 @@ impl Error {
             },
         }
     }
+
+    pub(crate) fn invalid_rename_rule(
+        attribute: impl Into<Cow<'static, str>>,
+        value: impl Into<String>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::InvalidRenameRule {
+                attribute: attribute.into(),
+                value: value.into(),
+            },
+        }
+    }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
-            ErrorKind::InvalidMapKey { path, reason } => {
-                write!(f, "Invalid map key at '{path}': {reason}")
-            }
             ErrorKind::InvalidUsageOfSkip { path, reason } => {
                 write!(f, "Invalid usage of #[serde(skip)] at '{path}': {reason}")
             }
@@ -289,6 +286,9 @@ impl fmt::Display for Error {
             ),
             ErrorKind::InvalidPhasedTypeUsage { path, reason } => {
                 write!(f, "Invalid phased type usage at '{path}': {reason}")
+            }
+            ErrorKind::InvalidRenameRule { attribute, value } => {
+                write!(f, "Invalid serde rename rule for '{attribute}': {value:?}")
             }
         }
     }

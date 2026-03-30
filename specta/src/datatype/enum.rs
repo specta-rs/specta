@@ -176,10 +176,7 @@ impl Variant {
         &mut self.fields
     }
 
-    /// Set the fields of this enum variant.
-    pub fn set_fields(&mut self, fields: Fields) {
-        self.fields = fields;
-    }
+    // No `set_fields` cause builder API is preferred
 
     /// Get an immutable reference to the runtime attributes for this variant.
     pub fn attributes(&self) -> &Attributes {

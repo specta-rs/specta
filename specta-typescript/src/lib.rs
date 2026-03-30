@@ -52,6 +52,7 @@ mod error;
 mod exporter;
 mod jsdoc;
 mod legacy; // TODO: Remove this
+mod map_keys;
 mod opaque;
 pub mod primitives;
 mod references;
@@ -61,9 +62,7 @@ mod typescript;
 
 pub use branded::Branded;
 pub use error::Error;
-pub use exporter::{
-    BigIntExportBehavior, BrandedTypeExporter, Exporter, FrameworkExporter, Layout,
-};
+pub use exporter::{BrandedTypeExporter, Exporter, FrameworkExporter, Layout};
 pub use jsdoc::JSDoc;
 pub use opaque::define;
 pub use references::collect_references;

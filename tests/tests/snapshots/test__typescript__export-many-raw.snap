@@ -32,16 +32,6 @@ export type Cow<T> = T;
 
 export type Cow<T> = T;
 
-export type SystemTime = {
-	duration_since_epoch: number,
-	duration_since_unix_epoch: number,
-};
-
-export type Duration = {
-	secs: number,
-	nanos: number,
-};
-
 export type Vec<T> = T[];
 
 export type Vec<T> = T[];
@@ -135,9 +125,9 @@ export type TransparentTypeWithOverride = string;
 
 export type HashMap<K, V> = { [key in K]: V };
 
-export type Vec<T> = T[];
-
 export type HashMap<K, V> = { [key in K]: V };
+
+export type Vec<T> = T[];
 
 export type EnumReferenceRecordKey = {
 	a: Partial<{ [key in BasicEnum]: number }>,
@@ -243,6 +233,20 @@ export type GenericTupleStruct<T> = T;
 
 export type BracedStruct = string;
 
+export type Struct = {
+	a: string,
+};
+
+export type Struct2 = {
+	a: string,
+};
+
+export type Enum = "A" | "B";
+
+export type Enum2 = "A" | "B" | { enum_field: null };
+
+export type Enum3 = { a: string };
+
 export type StructRenameAllUppercase = {
 	a: number,
 	b: number,
@@ -276,13 +280,6 @@ export type OptionalOnTransparentNamedField = {
 
 export type OptionalInEnum = string | null | { a: string | null } | { a?: string | null };
 
-export type Optional = {
-	a: number | null,
-	b?: number | null,
-	c: string | null,
-	d: boolean,
-};
-
 export type UntaggedVariants = string | number | { id: string } | [string, boolean];
 
 export type UntaggedVariantsWithoutValue = string | [number, string] | number;
@@ -300,6 +297,10 @@ export type HashMap<K, V> = { [key in K]: V };
 export type HashMap<K, V> = { [key in K]: V };
 
 export type HashMap<K, V> = { [key in K]: V };
+
+export type ValidMaybeValidKey = { [key in MaybeValidKey<string>]: null };
+
+export type ValidMaybeValidKeyNested = { [key in MaybeValidKey<MaybeValidKey<string>>]: null };
 
 export type MacroStruct = string;
 
@@ -479,7 +480,9 @@ export type BoxFlattened = {
 };
 
 export type BoxInline = {
-	c: BoxedInner,
+	c: {
+		a: number,
+	},
 };
 
 export type First = {
@@ -521,6 +524,10 @@ export type Seventh = {
 };
 
 export type Eight = string | "B";
+
+export type Ninth = string | "B" | {
+	a: string,
+} | First;
 
 export type Tenth = string | "B" | {
 	a: string,
@@ -724,3 +731,7 @@ export type InlineFlattenGenerics = {
 export type GenericParameterOrderPreserved = {
 	pair: Pair<number, string>,
 };
+
+export type TestCollectionRegister = never;
+
+export type TestCollectionRegister = never;

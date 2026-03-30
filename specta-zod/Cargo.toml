@@ -19,12 +19,15 @@ rustdoc-args = ["--cfg", "docsrs"]
 [lints]
 workspace = true
 
+[features]
+default = []
+
+# Implement `serde::Serialize` for Zod-specific wrapper types (Any, Unknown, Never)
+serde = ["dep:serde"]
+
 [dependencies]
 specta = { version = "=2.0.0-rc.23", path = "../specta" }
-specta-typescript = { version = "=0.0.10", path = "../specta-typescript" }
-# TODO: Don't depend on serde
-specta-serde = { version = "=0.0.10", path = "../specta-serde" }
-thiserror = "2" # TODO: Remove this
+serde = { version = "1", default-features = false, optional = true }
 
 [dev-dependencies]
 specta-util = { path = "../specta-util" }
