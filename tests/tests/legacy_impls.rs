@@ -130,3 +130,135 @@ fn legacy_impl_bigint_errors() {
         "unexpected error: {err}"
     );
 }
+
+#[test]
+fn legacy_impl_individual_bigint_errors() {
+    fn assert_bigint_export_error<T: Type>(failures: &mut Vec<String>, name: &str) {
+        match Typescript::default().export(&ResolvedTypes::from_resolved_types(
+            Types::default().register::<T>(),
+        )) {
+            Ok(output) => failures.push(format!(
+                "{name}: expected BigInt export error, but export succeeded with '{output}'"
+            )),
+            Err(err)
+                if err
+                    .to_string()
+                    .contains("forbids exporting BigInt-style types") => {}
+            Err(err) => failures.push(format!("{name}: unexpected error '{err}'")),
+        }
+    }
+
+    macro_rules! bigint_wrapper {
+        ($name:ident, $ty:ty) => {
+            #[derive(Type)]
+            #[specta(collect = false)]
+            struct $name {
+                value: $ty,
+            }
+        };
+    }
+
+    bigint_wrapper!(SerdeJsonMapBigint, serde_json::Map<String, serde_json::Value>);
+    bigint_wrapper!(SerdeJsonValueBigint, serde_json::Value);
+    bigint_wrapper!(SerdeJsonNumberBigint, serde_json::Number);
+    bigint_wrapper!(SerdeYamlMappingBigint, serde_yaml::Mapping);
+    bigint_wrapper!(SerdeYamlTaggedBigint, serde_yaml::value::TaggedValue);
+    bigint_wrapper!(SerdeYamlValueBigint, serde_yaml::Value);
+    bigint_wrapper!(SerdeYamlNumberBigint, serde_yaml::Number);
+    bigint_wrapper!(TomlMapBigint, toml::map::Map<String, toml::Value>);
+    bigint_wrapper!(TomlValueBigint, toml::Value);
+    bigint_wrapper!(GlamI64Vec2Bigint, glam::I64Vec2);
+    bigint_wrapper!(GlamI64Vec3Bigint, glam::I64Vec3);
+    bigint_wrapper!(GlamI64Vec4Bigint, glam::I64Vec4);
+    bigint_wrapper!(GlamU64Vec2Bigint, glam::U64Vec2);
+    bigint_wrapper!(GlamU64Vec3Bigint, glam::U64Vec3);
+    bigint_wrapper!(GlamU64Vec4Bigint, glam::U64Vec4);
+    bigint_wrapper!(GlamUSizeVec2Bigint, glam::USizeVec2);
+    bigint_wrapper!(GlamUSizeVec3Bigint, glam::USizeVec3);
+    bigint_wrapper!(GlamUSizeVec4Bigint, glam::USizeVec4);
+
+    let mut failures = Vec::new();
+
+    for (name, assert) in [
+        (
+            "serde_json::Map<String, serde_json::Value>",
+            assert_bigint_export_error::<SerdeJsonMapBigint> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "serde_json::Value",
+            assert_bigint_export_error::<SerdeJsonValueBigint> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "serde_json::Number",
+            assert_bigint_export_error::<SerdeJsonNumberBigint> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "serde_yaml::Mapping",
+            assert_bigint_export_error::<SerdeYamlMappingBigint> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "serde_yaml::value::TaggedValue",
+            assert_bigint_export_error::<SerdeYamlTaggedBigint> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "serde_yaml::Value",
+            assert_bigint_export_error::<SerdeYamlValueBigint> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "serde_yaml::Number",
+            assert_bigint_export_error::<SerdeYamlNumberBigint> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "toml::map::Map<String, toml::Value>",
+            assert_bigint_export_error::<TomlMapBigint> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "toml::Value",
+            assert_bigint_export_error::<TomlValueBigint> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "glam::I64Vec2",
+            assert_bigint_export_error::<GlamI64Vec2Bigint> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "glam::I64Vec3",
+            assert_bigint_export_error::<GlamI64Vec3Bigint> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "glam::I64Vec4",
+            assert_bigint_export_error::<GlamI64Vec4Bigint> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "glam::U64Vec2",
+            assert_bigint_export_error::<GlamU64Vec2Bigint> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "glam::U64Vec3",
+            assert_bigint_export_error::<GlamU64Vec3Bigint> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "glam::U64Vec4",
+            assert_bigint_export_error::<GlamU64Vec4Bigint> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "glam::USizeVec2",
+            assert_bigint_export_error::<GlamUSizeVec2Bigint> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "glam::USizeVec3",
+            assert_bigint_export_error::<GlamUSizeVec3Bigint> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "glam::USizeVec4",
+            assert_bigint_export_error::<GlamUSizeVec4Bigint> as fn(&mut Vec<String>, &str),
+        ),
+    ] {
+        assert(&mut failures, name);
+    }
+
+    assert!(
+        failures.is_empty(),
+        "Unexpected legacy impl BigInt export behavior:\n{}",
+        failures.join("\n")
+    );
+}
