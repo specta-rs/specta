@@ -82,7 +82,17 @@ struct LegacyImpls {
 }
 
 #[derive(Type)]
-struct LegacyImplBigGlams {
+struct LegacyImplWithBigints {
+    serde_json_map: serde_json::Map<String, serde_json::Value>,
+    serde_json_value: serde_json::Value,
+    serde_json_number: serde_json::Number,
+    serde_yaml_mapping: serde_yaml::Mapping,
+    serde_yaml_tagged: serde_yaml::value::TaggedValue,
+    serde_yaml_value: serde_yaml::Value,
+    serde_yaml_number: serde_yaml::Number,
+    toml_map: toml::map::Map<String, toml::Value>,
+    toml_value: toml::Value,
+
     glam_i64vec2: glam::I64Vec2,
     glam_i64vec3: glam::I64Vec3,
     glam_i64vec4: glam::I64Vec4,
@@ -96,19 +106,21 @@ struct LegacyImplBigGlams {
 
 #[test]
 fn legacy_impls() {
-    let output = Typescript::default()
-        .export(&ResolvedTypes::from_resolved_types(
-            Types::default().register::<LegacyImpls>(),
-        ))
-        .unwrap();
-    insta::assert_snapshot!("legacy_impls", output);
+    insta::assert_snapshot!(
+        "legacy_impls",
+        Typescript::default()
+            .export(&ResolvedTypes::from_resolved_types(
+                Types::default().register::<LegacyImpls>(),
+            ))
+            .unwrap()
+    );
 }
 
 #[test]
 fn legacy_impl_bigint_errors() {
     let err = Typescript::default()
         .export(&ResolvedTypes::from_resolved_types(
-            Types::default().register::<LegacyImplBigGlams>(),
+            Types::default().register::<LegacyImplWithBigints>(),
         ))
         .expect_err("bigint glam vectors should fail TypeScript export");
 
