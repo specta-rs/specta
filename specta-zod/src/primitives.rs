@@ -459,6 +459,11 @@ fn struct_dt(
                 .filter_map(|(name, field)| field.ty().map(|ty| (name, field, ty)))
                 .collect::<Vec<_>>();
 
+            if all_fields.is_empty() {
+                s.push_str("z.object({}).strict()");
+                return Ok(());
+            }
+
             let (flattened, non_flattened): (Vec<_>, Vec<_>) =
                 all_fields.iter().partition(|(_, field, _)| field.flatten());
 
@@ -566,6 +571,10 @@ fn enum_variant_dt(
     match variant.fields() {
         Fields::Unit => Ok(Some(format!("z.literal(\"{}\")", escape_string(name)))),
         Fields::Named(named) => {
+            if named.fields().iter().all(|(_, field)| field.ty().is_none()) {
+                return Ok(Some("z.object({}).strict()".to_string()));
+            }
+
             let mut schema = String::from("z.object({");
             let mut has_field = false;
             let mut flattened_sections = Vec::new();
