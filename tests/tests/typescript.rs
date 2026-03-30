@@ -1,10 +1,15 @@
-use std::{collections::HashMap, iter, path::Path};
+use std::{
+    collections::HashMap,
+    iter,
+    path::Path,
+    time::{Duration, SystemTime},
+};
 
 use specta::{
-    ResolvedTypes, Type, Types,
     datatype::{DataType, Reference},
+    ResolvedTypes, Type, Types,
 };
-use specta_typescript::{BigIntExportBehavior, Layout, Typescript, primitives};
+use specta_typescript::{primitives, Layout, Typescript};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -80,7 +85,6 @@ fn typescript_export() {
             format!("ts-export-{mode}"),
             phase_output(result, |_, types| {
                 Typescript::default()
-                    .bigint(BigIntExportBehavior::Number)
                     .export(&types)
                     .map_err(|err| err.to_string())
             })
@@ -129,10 +133,7 @@ fn typescript_export_serde_errors() {
                 continue;
             }
 
-            match Typescript::default()
-                .bigint(BigIntExportBehavior::Number)
-                .export(&types)
-            {
+            match Typescript::default().export(&types) {
                 Ok(_) => failures.push(format!(
                     "{name} ({mode}) [export]: expected error containing '{expected_error}', but export succeeded"
                 )),
@@ -382,6 +383,183 @@ fn typescript_export_serde_errors() {
 }
 
 #[test]
+fn typescript_export_bigint_errors() {
+    fn assert_bigint_error<T: Type>(failures: &mut Vec<String>, name: &str) {
+        let ts = Typescript::default();
+        let mut types = Types::default();
+        let dt = T::definition(&mut types);
+        let resolved = ResolvedTypes::from_resolved_types(types);
+
+        match primitives::inline(&ts, &resolved, &dt) {
+            Ok(ty) => failures.push(format!(
+                "{name} [inline]: expected BigInt error, but export succeeded with '{ty}'"
+            )),
+            Err(err)
+                if err
+                    .to_string()
+                    .contains("forbids exporting BigInt-style types") => {}
+            Err(err) => failures.push(format!("{name} [inline]: unexpected error '{err}'")),
+        }
+
+        if resolved.as_types().is_empty() {
+            return;
+        }
+
+        match ts.export(&resolved) {
+            Ok(output) => failures.push(format!(
+                "{name} [export]: expected BigInt error, but export succeeded with '{output}'"
+            )),
+            Err(err)
+                if err
+                    .to_string()
+                    .contains("forbids exporting BigInt-style types") => {}
+            Err(err) => failures.push(format!("{name} [export]: unexpected error '{err}'")),
+        }
+    }
+
+    fn assert_inline_bigint_error<T: Type>(failures: &mut Vec<String>, name: &str) {
+        let ts = Typescript::default();
+        let mut types = Types::default();
+        let dt = T::definition(&mut types);
+        let resolved = ResolvedTypes::from_resolved_types(types);
+
+        match primitives::inline(&ts, &resolved, &dt) {
+            Ok(ty) => failures.push(format!(
+                "{name} [inline]: expected BigInt error, but export succeeded with '{ty}'"
+            )),
+            Err(err)
+                if err
+                    .to_string()
+                    .contains("forbids exporting BigInt-style types") => {}
+            Err(err) => failures.push(format!("{name} [inline]: unexpected error '{err}'")),
+        }
+    }
+
+    macro_rules! for_bigint_types {
+        (T -> $s:expr) => {{
+            for_bigint_types!(usize, isize, i64, u64, i128, u128; $s);
+        }};
+        ($($i:ty),+; $s:expr) => {{
+            $({
+                type T = $i;
+                $s(stringify!($i));
+            })*
+        }};
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct StructWithSystemTime {
+        // https://github.com/specta-rs/specta/issues/77
+        #[specta(inline)]
+        value: SystemTime,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct StructWithDuration {
+        // https://github.com/specta-rs/specta/issues/77
+        #[specta(inline)]
+        value: Duration,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct StructWithBigInt {
+        a: i128,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct StructWithStructWithBigInt {
+        #[specta(inline)]
+        abc: StructWithBigInt,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct StructWithStructWithStructWithBigInt {
+        #[specta(inline)]
+        field1: StructWithStructWithBigInt,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct StructWithOptionWithStructWithBigInt {
+        #[specta(inline)]
+        optional_field: Option<StructWithBigInt>,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    enum EnumWithStructWithStructWithBigInt {
+        #[specta(inline)]
+        A(StructWithStructWithBigInt),
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    enum EnumWithInlineStructWithBigInt {
+        #[specta(inline)]
+        B { a: i128 },
+    }
+
+    let mut failures = Vec::new();
+
+    for_bigint_types!(T -> |name| {
+        assert_bigint_error::<T>(&mut failures, name);
+    });
+
+    for (name, assert) in [
+        (
+            "StructWithSystemTime",
+            assert_bigint_error::<StructWithSystemTime> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "StructWithDuration",
+            assert_bigint_error::<StructWithDuration> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "StructWithBigInt",
+            assert_bigint_error::<StructWithBigInt> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "StructWithStructWithBigInt",
+            assert_bigint_error::<StructWithStructWithBigInt> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "StructWithStructWithStructWithBigInt",
+            assert_bigint_error::<StructWithStructWithStructWithBigInt>
+                as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "StructWithOptionWithStructWithBigInt",
+            assert_bigint_error::<StructWithOptionWithStructWithBigInt>
+                as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "EnumWithStructWithStructWithBigInt",
+            assert_bigint_error::<EnumWithStructWithStructWithBigInt> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "EnumWithInlineStructWithBigInt",
+            assert_bigint_error::<EnumWithInlineStructWithBigInt> as fn(&mut Vec<String>, &str),
+        ),
+    ] {
+        assert(&mut failures, name);
+    }
+
+    assert_inline_bigint_error::<SystemTime>(&mut failures, "SystemTime");
+    assert_inline_bigint_error::<Duration>(&mut failures, "Duration");
+
+    assert!(
+        failures.is_empty(),
+        "Unexpected TypeScript BigInt export behavior:\n{}",
+        failures.join("\n")
+    );
+}
+
+#[test]
 fn typescript_export_to() {
     let temp = Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
     std::fs::create_dir_all(&temp).unwrap();
@@ -398,7 +576,6 @@ fn typescript_export_to() {
             let output = phase_output(result, |_, types| {
                 let path = temp.path().join(&name);
                 Typescript::default()
-                    .bigint(BigIntExportBehavior::Number)
                     .layout(layout)
                     .export_to(&path, &types)
                     .map_err(|err| err.to_string())?;
@@ -419,7 +596,7 @@ fn typescript_export_to() {
 fn primitives_export() {
     for (mode, result) in phase_collections() {
         let output = phase_output(result, |dts, types| {
-            let ts = Typescript::default().bigint(BigIntExportBehavior::Number);
+            let ts = Typescript::default();
 
             dts.iter()
                 .filter_map(|(name, ty)| match ty {
@@ -445,7 +622,7 @@ fn primitives_export() {
 fn primitives_export_many() {
     for (mode, result) in phase_collections() {
         let output = phase_output(result, |dts, types| {
-            let ts = Typescript::default().bigint(BigIntExportBehavior::Number);
+            let ts = Typescript::default();
             let ndts = dts
                 .iter()
                 .filter_map(|(_, ty)| match ty {
@@ -465,7 +642,7 @@ fn primitives_export_many() {
 fn primitives_export_allows_generic_hashmap_definition() {
     for (mode, result) in phase_collections() {
         let output = phase_output(result, |dts, types| {
-            let ts = Typescript::default().bigint(BigIntExportBehavior::Number);
+            let ts = Typescript::default();
             let hash_map = dts
                 .iter()
                 .find_map(|(_, ty)| match ty {
@@ -491,7 +668,7 @@ fn primitives_export_allows_generic_hashmap_definition() {
 fn primitives_reference() {
     for (mode, result) in phase_collections() {
         let output = phase_output(result, |dts, types| {
-            let ts = Typescript::default().bigint(BigIntExportBehavior::Number);
+            let ts = Typescript::default();
             dts.iter()
                 .filter_map(|(s, ty)| match ty {
                     DataType::Reference(r) => Some((s, r)),
@@ -511,7 +688,7 @@ fn primitives_reference() {
 fn primitives_inline() {
     for (mode, result) in phase_collections() {
         let output = phase_output(result, |dts, types| {
-            let ts = Typescript::default().bigint(BigIntExportBehavior::Number);
+            let ts = Typescript::default();
             dts.iter()
                 .map(|(s, ty)| primitives::inline(&ts, types, ty).map(|ty| format!("{s}: {ty}")))
                 .collect::<Result<Vec<_>, _>>()

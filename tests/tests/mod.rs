@@ -12,7 +12,6 @@ macro_rules! register {
     }};
 }
 
-mod bigints;
 mod bound;
 mod errors;
 mod functions;

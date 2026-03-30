@@ -717,15 +717,9 @@ expression: output
 	*		i8: number,
 	*		i16: number,
 	*		i32: number,
-	*		i64: number,
-	*		i128: number,
-	*		isize: number,
 	*		u8: number,
 	*		u16: number,
 	*		u32: number,
-	*		u64: number,
-	*		u128: number,
-	*		usize: number,
 	*		f32: number,
 	*		f64: number,
 	*		bool: boolean,
@@ -754,14 +748,6 @@ expression: output
 	*		SocketAddrV6: string,
 	*		"Cow<'static, str>": string,
 	*		"Cow<'static, i32>": number,
-	*		SystemTime: {
-	*			duration_since_epoch: number,
-	*			duration_since_unix_epoch: number,
-	*		},
-	*		Duration: {
-	*			secs: number,
-	*			nanos: number,
-	*		},
 	*		"&'static str": string,
 	*		"&'static bool": boolean,
 	*		"&'static i32": number,
@@ -986,15 +972,9 @@ expression: output
 	* @property {number} i8
 	* @property {number} i16
 	* @property {number} i32
-	* @property {number} i64
-	* @property {number} i128
-	* @property {number} isize
 	* @property {number} u8
 	* @property {number} u16
 	* @property {number} u32
-	* @property {number} u64
-	* @property {number} u128
-	* @property {number} usize
 	* @property {number} f32
 	* @property {number} f64
 	* @property {boolean} bool
@@ -1023,14 +1003,6 @@ expression: output
 	* @property {string} SocketAddrV6
 	* @property {string} "Cow<'static, str>"
 	* @property {number} "Cow<'static, i32>"
-	* @property {{
-	*		duration_since_epoch: number,
-	*		duration_since_unix_epoch: number,
-	*	}} SystemTime
-	* @property {{
-	*		secs: number,
-	*		nanos: number,
-	*	}} Duration
 	* @property {string} "&'static str"
 	* @property {boolean} "&'static bool"
 	* @property {number} "&'static i32"

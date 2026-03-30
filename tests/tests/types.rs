@@ -11,7 +11,6 @@ use std::{
     ops::{Range, RangeInclusive},
     path::PathBuf,
     rc::Rc,
-    time::{Duration, SystemTime},
 };
 
 use serde::{Deserialize, Serialize};
@@ -84,8 +83,8 @@ macro_rules! types {
 #[rustfmt::skip]
 pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
     types!(
-        i8, i16, i32, i64, i128, isize,
-        u8, u16, u32, u64, u128, usize,
+        i8, i16, i32,
+        u8, u16, u32,
         f32, f64, bool, char,
 
         // Serde is so mega cringe for this. Lack of support and the fact that `0..5` == `0..=5` is so dumb.
@@ -107,9 +106,6 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         IpAddr, Ipv4Addr, Ipv6Addr,
         SocketAddr, SocketAddrV4, SocketAddrV6,
         Cow<'static, str>, Cow<'static, i32>,
-
-        // https://github.com/specta-rs/specta/issues/77
-        SystemTime, Duration,
 
         &'static str, &'static bool, &'static i32,
         Vec<i32>, &'static [i32], &'static [i32; 3], [i32; 3],
