@@ -26,6 +26,7 @@ mod swift;
 mod types;
 mod typescript;
 mod utils;
+mod zod;
 
 pub use types::{types, types_phased};
 pub use utils::fs_to_string;
