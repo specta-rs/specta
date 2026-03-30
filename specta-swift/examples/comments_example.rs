@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 /// A comprehensive example demonstrating multi-line comment support
@@ -103,12 +103,13 @@ struct User {
 }
 
 fn main() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<ApiResponse<String>>()
         .register::<User>();
+    let resolved = specta_serde::apply(types).unwrap();
 
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&resolved).unwrap();
 
     println!(
         "Generated Swift code with comprehensive comments:\n{}",
@@ -117,7 +118,7 @@ fn main() {
 
     // Also write to file for inspection
     swift
-        .export_to("./examples/generated/CommentsExample.swift", &types)
+        .export_to("./examples/generated/CommentsExample.swift", &resolved)
         .unwrap();
     println!("\nComments example written to CommentsExample.swift");
 }

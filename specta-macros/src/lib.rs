@@ -13,7 +13,10 @@ mod specta;
 mod r#type;
 mod utils;
 
-/// Implements [`Type`] for a given struct or enum.
+use quote::quote;
+use syn::{Error, LitStr, Type, parse_macro_input};
+
+/// Implements `specta::Type` for a given struct or enum.
 ///
 /// # Attributes
 /// Attributes can be applied to modify Specta's behavior. Specta can natively read `#[serde(...)]` attributes so your generally recommend to [just use them](https://serde.rs/attributes.html).
@@ -50,7 +53,23 @@ pub fn derive_type(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     r#type::derive(input).unwrap_or_else(|err| err.into_compile_error().into())
 }
 
-/// Prepares a function to have its types extracted using [`fn_datatype!`](specta::fn_datatype)
+/// Parses a string literal into a Rust type token stream.
+///
+/// This is an internal helper proc macro used by Specta macros to turn a
+/// literal like `"Option<String>"` into a Rust type at compile time.
+#[proc_macro]
+pub fn parse_type_from_lit(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let lit = parse_macro_input!(input as LitStr);
+
+    match syn::parse_str::<Type>(&lit.value()) {
+        Ok(ty) => quote!(#ty).into(),
+        Err(err) => Error::new_spanned(lit, format!("invalid type literal: {err}"))
+            .to_compile_error()
+            .into(),
+    }
+}
+
+/// Prepares a function to have its types extracted using `specta::function::fn_datatype!`
 ///
 /// ## Example
 ///

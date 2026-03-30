@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use serde::Serialize;
-use specta::{Type, TypeCollection};
+use specta::{ResolvedTypes, Type, Types};
 
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
@@ -21,7 +21,7 @@ pub struct B {
 }
 
 fn main() {
-    let mut types = TypeCollection::default().register::<B>();
+    let types = Types::default().register::<B>();
     // .register::<Testing>()
     // .register::<serde_yaml::Value>();
     // println!("{:#?}", types.get(Testing::ID).unwrap());
@@ -30,8 +30,7 @@ fn main() {
     // println!("{:#?}", serde_yaml::Value::definition(&mut types));
 
     let out = specta_typescript::Typescript::new()
-        .bigint(specta_typescript::BigIntExportBehavior::Number)
-        .export(&types)
+        .export(&ResolvedTypes::from_resolved_types(types))
         .unwrap();
 
     println!("{:?}", out);

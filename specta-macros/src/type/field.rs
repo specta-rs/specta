@@ -1,8 +1,8 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::quote;
 use syn::Type;
 
-use super::{ContainerAttr, FieldAttr, lower_attr::lower_attribute};
+use super::{AttributeScope, ContainerAttr, FieldAttr, build_runtime_attributes};
 
 pub fn construct_field(
     crate_ref: &TokenStream,
@@ -33,17 +33,14 @@ pub fn construct_field_with_variant_skip(
     let deprecated = attrs.common.deprecated_as_tokens();
     let optional = attrs.optional;
     let doc = attrs.common.doc;
-    let inline = container_attrs.inline || attrs.inline;
-
-    let lowered_field_attrs = raw_attrs
-        .iter()
-        .filter(|attr| {
-            let path = attr.path().to_token_stream().to_string();
-            !container_attrs.skip_attrs.contains(&path) && path != "specta"
-        })
-        .filter_map(|attr| lower_attribute(attr).transpose())
-        .map(|result| result.map(|attr| attr.to_tokens()))
-        .collect::<Result<Vec<_>, _>>()?;
+    let inline = attrs.inline;
+    let runtime_attrs = build_runtime_attributes(
+        crate_ref,
+        AttributeScope::Field,
+        raw_attrs,
+        &container_attrs.skip_attrs,
+    )?;
+    let type_overridden = attrs.r#type.is_some();
 
     let ty = if attrs.skip || variant_skip {
         quote!(None)
@@ -51,12 +48,17 @@ pub fn construct_field_with_variant_skip(
         quote!(Some(<#field_ty as #crate_ref::Type>::definition(types)))
     };
 
-    Ok(quote!(internal::construct::field(
-        #optional,
-        #deprecated,
-        #doc.into(),
-        #inline,
-        vec![#(#lowered_field_attrs),*],
-        #ty
-    )))
+    Ok(quote!({
+        let mut field = datatype::Field::default();
+        field.set_optional(#optional);
+        field.set_deprecated(#deprecated);
+        field.set_docs(#doc.into());
+        field.set_inline(#inline);
+        field.set_type_overridden(#type_overridden);
+        field.set_attributes(#runtime_attrs);
+        if let Some(ty) = #ty {
+            field.set_ty(ty);
+        }
+        field
+    }))
 }

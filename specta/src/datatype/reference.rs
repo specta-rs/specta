@@ -4,39 +4,46 @@ use std::{
     sync::Arc,
 };
 
-use crate::{TypeCollection, datatype::NamedDataType};
+use crate::{Types, datatype::NamedDataType};
 
-use super::{DataType, Generic};
+use super::DataType;
 
-/// A reference to another type.
-/// This can either an [NamedReference] or [OpaqueReference].
+/// Reference to another type.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Reference {
+    /// Reference to a named type collected in a [`Types`].
     Named(NamedReference),
+    /// Reference to a generic type parameter.
+    Generic(GenericReference),
+    /// Reference to an opaque exporter-specific type.
     Opaque(OpaqueReference),
 }
 
-/// A reference to a [NamedDataType].
+/// Reference to a [NamedDataType].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NamedReference {
     pub(crate) id: NamedId,
-    // TODO: Should this be a map-type???
-    pub(crate) generics: Vec<(Generic, DataType)>, // TODO: Cow<'static, [(Generic, DataType)]>,
+    pub(crate) generics: Vec<(GenericReference, DataType)>,
     pub(crate) inline: bool,
 }
 
 impl NamedReference {
-    /// Get a reference to a [NamedDataType] from a [TypeCollection].
+    /// Get a reference to a [NamedDataType] from a [Types].
     ///
-    /// This is guaranteed to return a [NamedDataType] if the [TypeCollection] matches,
+    /// This is guaranteed to return a [NamedDataType] if the [Types] matches,
     /// what was used to get the original [Reference].
-    pub fn get<'a>(&self, types: &'a TypeCollection) -> Option<&'a NamedDataType> {
+    pub fn get<'a>(&self, types: &'a Types) -> Option<&'a NamedDataType> {
         types.0.get(&self.id)?.as_ref()
     }
 
     /// Get the generic parameters set on this reference which will be filled in by the [NamedDataType].
-    pub fn generics(&self) -> &[(Generic, DataType)] {
+    pub fn generics(&self) -> &[(GenericReference, DataType)] {
         &self.generics
+    }
+
+    /// Get the generic parameters set on this reference as mutable references.
+    pub fn generics_mut(&mut self) -> &mut Vec<(GenericReference, DataType)> {
+        &mut self.generics
     }
 
     /// Get whether this reference should be inlined
@@ -45,10 +52,42 @@ impl NamedReference {
     }
 }
 
-/// A reference to an opaque type which is understood by the type exporter.
-/// This powers [specta_typescript::branded], [specta_typescript::define] and more.
+/// Reference to a generic parameter a parent [NamedDataType].
+/// This is resolved to a concrete type by the language exporter.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct GenericReference {
+    pub(crate) id: TypeId,
+}
+
+impl GenericReference {
+    /// Build a new [GenericReference] for a generic type parameter marker.
+    /// `T` should be a unique type which identifies the generic (Eg. `pub struct GenericT;`) and must be registered on the parent [`NamedDataType`].
+    pub const fn new<T: ?Sized + 'static>() -> Self {
+        Self {
+            id: TypeId::of::<T>(),
+        }
+    }
+
+    /// Compare two [GenericReference]s for equality.
+    /// If this returns true they are both a reference to the same generic type.
+    pub fn eq<T: ?Sized + 'static>(&self) -> bool {
+        self.id == TypeId::of::<T>()
+    }
+}
+
+impl From<GenericReference> for DataType {
+    fn from(v: GenericReference) -> Self {
+        DataType::Reference(Reference::Generic(v))
+    }
+}
+
+/// Reference to a type not understood by Specta's core.
 ///
-/// This is an advanced feature designed for language exporters so should generally be avoided.
+/// These are implemented by the language exporter to implement cool features like
+/// [`specta_typescript::branded!`](https://docs.rs/specta-typescript/latest/specta_typescript/macro.branded.html),
+/// [`specta_typescript::define`](https://docs.rs/specta-typescript/latest/specta_typescript/fn.define.html), and more.
+///
+/// This is an advanced feature designed for language exporters so should generally be avoided and is not intended to be generally useful unless your in control of the language exporter.
 #[derive(Clone)]
 pub struct OpaqueReference(Arc<dyn DynOpaqueReference>);
 
@@ -126,14 +165,17 @@ impl hash::Hash for OpaqueReference {
 }
 
 impl OpaqueReference {
+    /// Get the Rust type name of the stored opaque state.
     pub fn type_name(&self) -> &'static str {
         self.0.type_name()
     }
 
+    /// Get the [`TypeId`] of the stored opaque state.
     pub fn type_id(&self) -> TypeId {
         self.0.as_any().type_id()
     }
 
+    /// Attempt to downcast the opaque state to `T`.
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.0.as_any().downcast_ref::<T>()
     }
@@ -156,6 +198,7 @@ impl Reference {
     pub fn ty_eq(&self, other: &Reference) -> bool {
         match (self, other) {
             (Reference::Named(a), Reference::Named(b)) => a.id == b.id,
+            (Reference::Generic(a), Reference::Generic(b)) => a.id == b.id,
             (Reference::Opaque(a), Reference::Opaque(b)) => *a == *b,
             _ => false,
         }
@@ -178,7 +221,7 @@ impl From<Reference> for DataType {
     }
 }
 
-/// A unique identifier for a [NamedDataType].
+/// Unique identifier for a [NamedDataType].
 ///
 /// For static types (from derive macros), we use a unique string based on the
 /// type's module path and name. For dynamic types, we use an Arc pointer.

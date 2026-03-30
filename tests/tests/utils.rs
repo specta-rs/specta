@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     fs,
     path::{Path, PathBuf},
 };
@@ -11,19 +12,21 @@ pub fn fs_to_string(path: &Path) -> Result<String, std::io::Error> {
     // Handle single file case
     if path.is_file() {
         let contents = fs::read(path)?;
-        let size = contents.len();
         let name = path.file_name().unwrap().to_string_lossy();
-
-        output.push_str(&format!("{} ({} bytes)\n", name, size));
-        output.push_str("────────────────────────────────────────\n");
 
         match String::from_utf8(contents) {
             Ok(text) => {
-                for line in text.lines() {
+                let normalized = normalize_newlines(&text);
+                output.push_str(&format!("{} ({} bytes)\n", name, normalized.len()));
+                output.push_str("────────────────────────────────────────\n");
+
+                for line in normalized.lines() {
                     output.push_str(&format!("{}\n", line));
                 }
             }
-            Err(_) => {
+            Err(err) => {
+                output.push_str(&format!("{} ({} bytes)\n", name, err.as_bytes().len()));
+                output.push_str("────────────────────────────────────────\n");
                 output.push_str("[Binary file]\n");
             }
         }
@@ -67,22 +70,37 @@ fn fs_to_string_impl(
             fs_to_string_impl(root, &entry, output, &format!("{}  ", indent))?;
         } else {
             let contents = fs::read(&entry)?;
-            let size = contents.len();
-
-            output.push_str(&format!("{}{} ({} bytes)\n", indent, name, size));
-            output.push_str(&format!(
-                "{}────────────────────────────────────────\n",
-                indent
-            ));
 
             // Try to read as UTF-8, otherwise show as binary
             match String::from_utf8(contents) {
                 Ok(text) => {
-                    for line in text.lines() {
+                    let normalized = normalize_newlines(&text);
+                    output.push_str(&format!(
+                        "{}{} ({} bytes)\n",
+                        indent,
+                        name,
+                        normalized.len()
+                    ));
+                    output.push_str(&format!(
+                        "{}────────────────────────────────────────\n",
+                        indent
+                    ));
+
+                    for line in normalized.lines() {
                         output.push_str(&format!("{}{}\n", indent, line));
                     }
                 }
-                Err(_) => {
+                Err(err) => {
+                    output.push_str(&format!(
+                        "{}{} ({} bytes)\n",
+                        indent,
+                        name,
+                        err.as_bytes().len()
+                    ));
+                    output.push_str(&format!(
+                        "{}────────────────────────────────────────\n",
+                        indent
+                    ));
                     output.push_str(&format!("{}[Binary file]\n", indent));
                 }
             }
@@ -95,4 +113,12 @@ fn fs_to_string_impl(
     }
 
     Ok(())
+}
+
+fn normalize_newlines(text: &str) -> Cow<'_, str> {
+    if text.contains("\r\n") {
+        Cow::Owned(text.replace("\r\n", "\n"))
+    } else {
+        Cow::Borrowed(text)
+    }
 }

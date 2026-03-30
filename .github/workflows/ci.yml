@@ -32,6 +32,12 @@ jobs:
 
   clippy:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+
     steps:
       - uses: actions/checkout@v6
       - name: Setup

@@ -1,12 +1,19 @@
 use std::fmt;
 
 use specta::{
-    Type, TypeCollection,
-    datatype::{DataType, Function, FunctionReturnType},
+    ResolvedTypes, Type, Types,
+    datatype::{DataType, Function},
     function::{self, fn_datatype},
     specta,
 };
 use specta_typescript::{Typescript, primitives};
+
+fn render_datatype(ts: &Typescript, types: &ResolvedTypes, dt: &DataType) -> Option<String> {
+    match dt {
+        DataType::Reference(r) => primitives::reference(ts, types, r).ok(),
+        dt => primitives::inline(ts, types, dt).ok(),
+    }
+}
 
 /// Multiline
 /// Docs
@@ -108,8 +115,9 @@ fn test_trailing_comma() {
 #[test]
 fn test_function_exporting() {
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![a](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"a");
@@ -118,8 +126,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![b](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"b");
@@ -135,8 +144,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![c](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"c");
@@ -166,8 +176,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![d](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"d");
@@ -181,25 +192,7 @@ fn test_function_exporting() {
         );
         insta::assert_snapshot!(
             def.result()
-                .and_then(|result| match result {
-                    FunctionReturnType::Value(dt) => match dt {
-                        DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                        dt => primitives::inline(&ts, &types, dt).ok(),
-                    }
-                    FunctionReturnType::Result(ok, err) => {
-                        let ok_str = match ok {
-                            DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                            dt => primitives::inline(&ts, &types, dt).ok(),
-                        }?;
-                        let err_str = match err {
-                            DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                            dt => primitives::inline(&ts, &types, dt).ok(),
-                        }?;
-                        let mut variants = vec![ok_str, err_str];
-                        variants.dedup();
-                        Some(variants.join(" | "))
-                    }
-                })
+                .and_then(|result| render_datatype(&ts, &types, result))
                 .as_deref()
                 .unwrap_or("None"),
             @"number"
@@ -207,8 +200,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![e::<bool>](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"e");
@@ -224,8 +218,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![f](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"f");
@@ -239,25 +234,7 @@ fn test_function_exporting() {
         );
         insta::assert_snapshot!(
             def.result()
-                .and_then(|result| match result {
-                    FunctionReturnType::Value(dt) => match dt {
-                        DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                        dt => primitives::inline(&ts, &types, dt).ok(),
-                    }
-                    FunctionReturnType::Result(ok, err) => {
-                        let ok_str = match ok {
-                            DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                            dt => primitives::inline(&ts, &types, dt).ok(),
-                        }?;
-                        let err_str = match err {
-                            DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                            dt => primitives::inline(&ts, &types, dt).ok(),
-                        }?;
-                        let mut variants = vec![ok_str, err_str];
-                        variants.dedup();
-                        Some(variants.join(" | "))
-                    }
-                })
+                .and_then(|result| render_datatype(&ts, &types, result))
                 .as_deref()
                 .unwrap_or("None"),
             @"number"
@@ -265,16 +242,17 @@ fn test_function_exporting() {
     }
 
     {
-        let mut type_map = TypeCollection::default();
-        let def: specta::datatype::Function = fn_datatype![g](&mut type_map);
+        let mut types = Types::default();
+        let def: specta::datatype::Function = fn_datatype![g](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"g");
         insta::assert_snapshot!(def.args().len(), @"1");
         insta::assert_snapshot!(
             match &def.args()[0].1 {
-                DataType::Reference(r) => primitives::reference(&ts, &type_map, r).ok(),
-                dt => primitives::inline(&ts, &type_map, dt).ok(),
+                DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
+                dt => primitives::inline(&ts, &types, dt).ok(),
             }.unwrap(),
             @"string"
         );
@@ -282,16 +260,17 @@ fn test_function_exporting() {
     }
 
     {
-        let mut type_map = TypeCollection::default();
-        let def: specta::datatype::Function = fn_datatype![h](&mut type_map);
+        let mut types = Types::default();
+        let def: specta::datatype::Function = fn_datatype![h](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"h");
         insta::assert_snapshot!(def.args().len(), @"1");
         insta::assert_snapshot!(
             match &def.args()[0].1 {
-                DataType::Reference(r) => primitives::reference(&ts, &type_map, r).ok(),
-                dt => primitives::inline(&ts, &type_map, dt).ok(),
+                DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
+                dt => primitives::inline(&ts, &types, dt).ok(),
             }.unwrap(),
             @"string"
         );
@@ -299,76 +278,43 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![i](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"i");
         insta::assert_snapshot!(def.args().len(), @"0");
         insta::assert_snapshot!(
             def.result()
-                .and_then(|result| match result {
-                    FunctionReturnType::Value(dt) => match dt {
-                        DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                        dt => primitives::inline(&ts, &types, dt).ok(),
-                    }
-                    FunctionReturnType::Result(ok, err) => {
-                        let ok_str = match ok {
-                            DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                            dt => primitives::inline(&ts, &types, dt).ok(),
-                        }?;
-                        let err_str = match err {
-                            DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                            dt => primitives::inline(&ts, &types, dt).ok(),
-                        }?;
-                        let mut variants = vec![ok_str, err_str];
-                        variants.dedup();
-                        Some(variants.join(" | "))
-                    }
-                })
+                .and_then(|result| render_datatype(&ts, &types, result))
                 .as_deref()
                 .unwrap_or("None"),
-            @"number"
+            @"({ Ok: number }) & { Err?: never } | ({ Err: number }) & { Ok?: never }"
         );
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![k](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"k");
         insta::assert_snapshot!(def.args().len(), @"0");
         insta::assert_snapshot!(
             def.result()
-                .and_then(|result| match result {
-                    FunctionReturnType::Value(dt) => match dt {
-                        DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                        dt => primitives::inline(&ts, &types, dt).ok(),
-                    }
-                    FunctionReturnType::Result(ok, err) => {
-                        let ok_str = match ok {
-                            DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                            dt => primitives::inline(&ts, &types, dt).ok(),
-                        }?;
-                        let err_str = match err {
-                            DataType::Reference(r) => primitives::reference(&ts, &types, r).ok(),
-                            dt => primitives::inline(&ts, &types, dt).ok(),
-                        }?;
-                        let mut variants = vec![ok_str, err_str];
-                        variants.dedup();
-                        Some(variants.join(" | "))
-                    }
-                })
+                .and_then(|result| render_datatype(&ts, &types, result))
                 .as_deref()
                 .unwrap_or("None"),
-            @"string | number"
+            @"({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never }"
         );
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![l](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"l");
@@ -391,8 +337,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![m](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         let ts = Typescript::new();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"m");
@@ -408,8 +355,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![async_fn](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         insta::assert_snapshot!(def.asyncness(), @"true");
         insta::assert_snapshot!(def.name(), @"async_fn");
         insta::assert_snapshot!(def.args().len(), @"0");
@@ -417,8 +365,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![with_docs](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         insta::assert_snapshot!(def.asyncness(), @"false");
         insta::assert_snapshot!(def.name(), @"with_docs");
         insta::assert_snapshot!(def.args().len(), @"0");
@@ -427,8 +376,9 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![raw](&mut types);
+        let types = specta_serde::apply(types).unwrap();
         insta::assert_snapshot!(def.args()[0].0, @"type");
     }
 }

@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{ResolvedTypes, Type, Types};
 use specta_swift::Swift;
 
 #[derive(Type)]
@@ -23,13 +23,14 @@ struct ApiRequest {
 
 #[test]
 fn test_struct_reuse_between_standalone_and_enum() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<UserData>()
         .register::<ApiResponse>()
         .register::<ApiRequest>();
+    let resolved = ResolvedTypes::from_resolved_types(types);
 
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&resolved).unwrap();
 
     println!("Generated Swift for struct reuse test:");
     println!("{}", output);
@@ -62,13 +63,14 @@ fn test_struct_reuse_between_standalone_and_enum() {
 #[test]
 fn test_struct_reuse_with_different_ordering() {
     // Test with different ordering - enum first, then standalone struct
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<ApiResponse>()
         .register::<UserData>()
         .register::<ApiRequest>();
+    let resolved = ResolvedTypes::from_resolved_types(types);
 
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&resolved).unwrap();
 
     println!("Generated Swift for struct reuse test (enum first):");
     println!("{}", output);

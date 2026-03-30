@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{ResolvedTypes, Type, Types};
 use specta_swift::Swift;
 
 #[derive(Type)]
@@ -97,16 +97,17 @@ enum ComplexUnion {
 
 #[test]
 fn test_enum_with_nested_structs() {
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<User>()
         .register::<Admin>()
         .register::<Guest>()
         .register::<UserType>()
         .register::<ApiResult<String, String>>()
         .register::<ComplexUnion>();
+    let resolved = ResolvedTypes::from_resolved_types(types);
 
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&resolved).unwrap();
 
     println!("Generated Swift code:\n{}", output);
 
@@ -146,10 +147,11 @@ fn test_enum_with_nested_structs() {
 
 #[test]
 fn test_swift_union_syntax() {
-    let types = TypeCollection::default().register::<UserType>();
+    let types = Types::default().register::<UserType>();
+    let resolved = ResolvedTypes::from_resolved_types(types);
 
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&resolved).unwrap();
 
     println!("UserType Swift code:\n{}", output);
 

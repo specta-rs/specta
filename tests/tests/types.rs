@@ -11,39 +11,36 @@ use std::{
     ops::{Range, RangeInclusive},
     path::PathBuf,
     rc::Rc,
-    time::{Duration, SystemTime},
 };
 
 use serde::{Deserialize, Serialize};
-use specta::{Type, TypeCollection, datatype::DataType};
+use specta::{Type, Types, datatype::DataType};
 
 /// A macro to collect up the types for better testing.
 ///
-/// In a real-world application you should prefer the `TypeCollection::register` method instead of this.
+/// In a real-world application you should prefer the `Types::register` method instead of this.
 /// In this case we can't use it because we intent to test `NamedDataType` and `DataType`'s.
-/// `TypeCollection` only registers `NamedDataType` as those are the only types that aren't built-in.
+/// `Types` only registers `NamedDataType` as those are the only types that aren't built-in.
+#[macro_export]
 macro_rules! types {
     ($($t:ty),* $(,)?) => {{
-        let mut types = specta::TypeCollection::default();
+        let mut types = specta::Types::default();
         let mut dts = Vec::new();
         let mut s = specta::datatype::Struct::named();
-        let mut i = 0;
 
         $({
             let ty = <$t as specta::Type>::definition(&mut types);
 
-            // Like `TypeCollection::register` we are relying on the side-effect of `definition`.
+            // Like `Types::register` we are relying on the side-effect of `definition`.
             // but unlike it also storing the resulting `DataType` for testing the primitives.
             dts.push((stringify!($t), ty.clone()));
 
-            i += 1;
-            s = s.field(format!("{i:x}"), specta::datatype::Field::new(ty));
+            s = s.field(stringify!($t), specta::datatype::Field::new(ty));
         })*
 
         // This allows us to end-to-end test primitives.
-        // Many types won't be directly added to the `TypeCollection`, as they are not named.
-        specta::datatype::NamedDataTypeBuilder::new("Primitives", vec![], s.build())
-            .build(&mut types);
+        // Many types won't be directly added to the `Types`, as they are not named.
+        specta::datatype::NamedDataType::new("Primitives", vec![], s.build()).register(&mut types);
 
         // Test `selection!`
         {
@@ -57,7 +54,7 @@ macro_rules! types {
                 password: &'static str,
             }
 
-            fn register<T: specta::Type>(types: &mut specta::TypeCollection, _: T) {
+            fn register<T: specta::Type>(types: &mut specta::Types, _: T) {
                 types.register_mut::<T>();
             }
             let user = User {
@@ -84,10 +81,10 @@ macro_rules! types {
 }
 
 #[rustfmt::skip]
-pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
+pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
     types!(
-        i8, i16, i32, i64, i128, isize,
-        u8, u16, u32, u64, u128, usize,
+        i8, i16, i32,
+        u8, u16, u32,
         f32, f64, bool, char,
 
         // Serde is so mega cringe for this. Lack of support and the fact that `0..5` == `0..=5` is so dumb.
@@ -110,14 +107,12 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         SocketAddr, SocketAddrV4, SocketAddrV6,
         Cow<'static, str>, Cow<'static, i32>,
 
-        // https://github.com/specta-rs/specta/issues/77
-        SystemTime, Duration,
-
         &'static str, &'static bool, &'static i32,
         Vec<i32>, &'static [i32], &'static [i32; 3], [i32; 3],
         Vec<MyEnum>, &'static [MyEnum], &'static [MyEnum; 6], [MyEnum; 2],
         &'static [i32; 1], &'static [i32; 0],
         Option<i32>, Option<()>, Option<Vec<i32>>,
+        Result<String, i32>,
         Vec<Option<Cow<'static, i32>>>, Option<Vec<Cow<'static, i32>>>, [Vec<String>; 3],
 
         Option<Option<String>>,
@@ -164,6 +159,7 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
 
         // https://github.com/specta-rs/specta/issues/65
         HashMap<BasicEnum, ()>,
+        HashMap<BasicEnum, i32>,
 
         // https://github.com/specta-rs/specta/issues/60
         Option<Option<Option<Option<i32>>>>,
@@ -171,7 +167,6 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         // https://github.com/specta-rs/specta/issues/71
         Vec<PlaceholderInnerField>,
 
-        HashMap<BasicEnum, i32>,
         EnumReferenceRecordKey,
 
         FlattenOnNestedEnum,
@@ -205,12 +200,15 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         &[&str],
         Issue281<'_>,
 
+        // https://github.com/specta-rs/specta/issues/317
+        LifetimeGenericStruct<'_, i32>,
+        LifetimeGenericEnum<'_, i32>,
+
         // https://github.com/specta-rs/specta/issues/90
         RenameWithWeirdCharsField,
         RenameWithWeirdCharsVariant,
-
-        // https://github.com/specta-rs/specta/issues/374
-        Issue374,
+        RenamedFieldKeys,
+        RenamedVariantWithSkippedPayload,
 
         // https://github.com/specta-rs/specta/issues/386
         type_type::Type,
@@ -219,6 +217,12 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         ActualType,
 
         SpectaTypeOverride,
+        ContainerTypeOverrideStruct,
+        ContainerTypeOverrideEnum,
+        ContainerTypeOverrideGeneric<Box<dyn Any>>,
+        ContainerTypeOverrideToGeneric<i32>,
+        ContainerTypeOverrideTuple,
+        ContainerTypeOverrideTupleGeneric<i32>,
         InvalidToValidType,
 
         // `#[specta(transparent)]`
@@ -228,18 +232,17 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         BracedStruct,
 
         // `#[serde(rename)]`
-        // Struct,
-        // Struct2,
-        // Enum,
-        // Enum2,
-        // Enum3, // TODO: Fix these
+        Struct,
+        Struct2,
+        Enum,
+        Enum2,
+        Enum3,
         StructRenameAllUppercase,
         RenameSerdeSpecialChar,
         EnumRenameAllUppercase,
 
         // Recursive types
         Recursive,
-        // RecursiveMapKey, // TODO: Fix this
         RecursiveMapValue,
         RecursiveTransparent,
         RecursiveInEnum,
@@ -249,26 +252,20 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         OptionalOnNamedField,
         OptionalOnTransparentNamedField,
         OptionalInEnum,
-        Optional,
 
         UntaggedVariants,
         UntaggedVariantsWithoutValue,
+        UntaggedVariantsWithDuplicateBranches,
 
         // Valid Map keys
         HashMap<String, ()>,
         Regular,
         HashMap<Infallible, ()>,
-        // HashMap<Any, ()>, // TODO: Fix this
-        // HashMap<TransparentStruct, ()>, // TODO: Fix this
+        HashMap<TransparentStruct, ()>,
         HashMap<UnitVariants, ()>,
         HashMap<UntaggedVariantsKey, ()>,
-        // ValidMaybeValidKey, // TODO: Fix this
-        // ValidMaybeValidKeyNested, // TODO: Fix this
-        // HashMap<() /* `null` */, ()>, // TODO: Fix this
-        // HashMap<RegularStruct, ()>, // TODO: Fix this
-        HashMap<Variants, ()>,
-        // InvalidMaybeValidKey, // TODO: Fix this
-        // InvalidMaybeValidKeyNested, // TODO: Fix this
+        ValidMaybeValidKey,
+        ValidMaybeValidKeyNested,
 
         // `macro_rules!` in decl
         MacroStruct,
@@ -301,9 +298,9 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
 
         A,
         DoubleFlattened,
-        FlattenedInner, // TODO: Fix this
-        BoxFlattened, // TODO: Fix this
-        BoxInline, // TODO: Fix this
+        FlattenedInner,
+        BoxFlattened,
+        BoxInline,
 
         // Flatten and inline
         First,
@@ -314,7 +311,7 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         Sixth,
         Seventh,
         Eight,
-        // Ninth, // TODO: Fix this
+        Ninth,
         Tenth,
 
         // Test for issue #393 - flatten in enum variants
@@ -333,16 +330,13 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
 
         // Serde - Externally Tagged
         ExternallyTagged,
+        Issue221External,
 
         // Serde - Internally Tagged
-        InternallyTaggedB,
-        InternallyTaggedC,
         InternallyTaggedD,
         InternallyTaggedE,
         InternallyTaggedF,
-        InternallyTaggedG,
         InternallyTaggedH,
-        InternallyTaggedI,
         InternallyTaggedL,
         InternallyTaggedM,
 
@@ -358,6 +352,8 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         InternallyTaggedWithAlias,
         AdjacentlyTaggedWithAlias,
         UntaggedWithAlias,
+        Issue221UntaggedSafe,
+        Issue221UntaggedMixed,
 
         // https://github.com/specta-rs/specta/issues/174
         // `never & { tag = "a" }` would coalesce to `never` so we don't need to include it.
@@ -366,19 +362,9 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         EmptyEnumTaggedWContent,
         EmptyEnumUntagged,
 
-        TaggedEnumOfUnitStruct,
-        TaggedEnumOfEmptyBracedStruct,
-        TaggedEnumOfEmptyTupleStruct,
-        TaggedEnumOfEmptyTupleBracedStructs,
-        TaggedStructOfStructWithTuple,
-
         // Skip
         SkipOnlyField,
         SkipField,
-        SkipOnlyVariantExternallyTagged,
-        SkipOnlyVariantInternallyTagged,
-        SkipOnlyVariantAdjacentlyTagged,
-        SkipOnlyVariantUntagged,
         SkipVariant,
         SkipUnnamedFieldInVariant,
         SkipNamedFieldInVariant,
@@ -416,8 +402,32 @@ pub fn types() -> (TypeCollection, Vec<(&'static str, DataType)>) {
         InlineFlattenGenericsG<()>,
         InlineFlattenGenerics,
         GenericParameterOrderPreserved,
+
+        // Test that the types don't get duplicated in the type map.
+        // (these will be duplicated in dts tests as that doesn't use the typemap)
+        TestCollectionRegister,
+        TestCollectionRegister,
     )
 }
+
+#[rustfmt::skip]
+pub fn types_phased() -> (Types, Vec<(&'static str, DataType)>) {
+    let mut types = Types::default();
+    let mut dts = Vec::new();
+
+    // https://github.com/specta-rs/specta/issues/374
+    register!(types, dts;
+        Issue374,
+        Optional,
+        StructPhaseSpecificRename,
+    );
+
+    (types, dts)
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+pub enum TestCollectionRegister {}
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
@@ -731,6 +741,30 @@ struct RenameWithWeirdCharsField {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct RenamedFieldKeys {
+    #[serde(rename = "")]
+    empty: String,
+    #[serde(rename = "a\"b")]
+    quote: String,
+    #[serde(rename = "a\\b")]
+    backslash: String,
+    #[serde(rename = "line\nbreak")]
+    newline: String,
+    #[serde(rename = "line\u{2028}break")]
+    line_separator: String,
+    #[serde(rename = "line\u{2029}break")]
+    paragraph_separator: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum RenamedVariantWithSkippedPayload {
+    #[serde(rename = "a-b")]
+    A(#[serde(skip)] String),
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 #[allow(unused_parens)]
 enum RenameWithWeirdCharsVariant {
     #[serde(rename = "@odata.context")]
@@ -790,6 +824,21 @@ struct Issue281<'a> {
     default_unity_arguments: &'a [&'a str],
 }
 
+// https://github.com/specta-rs/specta/issues/317
+#[derive(Type)]
+#[specta(collect = false)]
+struct LifetimeGenericStruct<'a, T> {
+    borrowed: &'a [T],
+    owned: Vec<T>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+enum LifetimeGenericEnum<'a, T> {
+    Borrowed(&'a T),
+    Owned(T),
+}
+
 /// https://github.com/specta-rs/specta/issues/374
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
@@ -832,7 +881,39 @@ struct SpectaTypeOverride {
     u32_ident: (),
     #[specta(type = ::std::string::String)] // Path
     path: (),
+    #[specta(type = (String, i32))] // Non-path type
+    tuple: (),
 }
+
+#[derive(Type)]
+#[specta(collect = false, type = String)]
+struct ContainerTypeOverrideStruct {
+    cause: Box<dyn std::error::Error + Send + Sync>,
+}
+
+#[derive(Type)]
+#[specta(collect = false, type = String)]
+enum ContainerTypeOverrideEnum {
+    A(Box<dyn std::error::Error + Send + Sync>),
+}
+
+#[derive(Type)]
+#[specta(collect = false, type = String)]
+struct ContainerTypeOverrideGeneric<T>(std::marker::PhantomData<T>);
+
+#[derive(Type)]
+#[specta(collect = false, type = T)]
+struct ContainerTypeOverrideToGeneric<T>(std::marker::PhantomData<T>);
+
+#[derive(Type)]
+#[specta(collect = false, type = (String, i32))]
+struct ContainerTypeOverrideTuple {
+    cause: Box<dyn std::error::Error + Send + Sync>,
+}
+
+#[derive(Type)]
+#[specta(collect = false, type = (T, String))]
+struct ContainerTypeOverrideTupleGeneric<T>(std::marker::PhantomData<T>);
 
 // Checking that you can override the type of a field that is invalid. This is to ensure user code can override Specta in the case we have a bug/unsupported type.
 #[derive(Type)]
@@ -913,6 +994,18 @@ enum EnumRenameAllUppercase {
     TestingWords,
 }
 
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+#[serde(rename(
+    serialize = "StructPhaseSpecificRenameSerialize",
+    deserialize = "StructPhaseSpecificRenameDeserialize"
+))]
+struct StructPhaseSpecificRename {
+    #[serde(rename(serialize = "ser", deserialize = "der"))]
+    a: String,
+}
+
 #[derive(serde::Serialize, Type)]
 #[specta(collect = false)]
 struct RenameSerdeSpecialChar {
@@ -934,16 +1027,6 @@ enum Enum3 {
 #[specta(collect = false)]
 struct Recursive {
     demo: Box<Recursive>,
-}
-
-#[derive(Type)]
-#[specta(transparent, collect = false)]
-struct RecursiveMapKeyTrick(RecursiveMapKey);
-
-#[derive(Type)]
-#[specta(collect = false)]
-struct RecursiveMapKey {
-    demo: HashMap<RecursiveMapKeyTrick, String>,
 }
 
 #[derive(Type)]
@@ -1063,6 +1146,15 @@ enum UntaggedVariantsWithoutValue {
 #[derive(Type, Serialize)]
 #[specta(collect = false)]
 #[serde(untagged)]
+enum UntaggedVariantsWithDuplicateBranches {
+    A(()),
+    B(i32),
+    C(()),
+}
+
+#[derive(Type, Serialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
 enum InvalidUntaggedVariants {
     A(String),
     B(i32, String),
@@ -1091,16 +1183,6 @@ struct ValidMaybeValidKey(HashMap<MaybeValidKey<String>, ()>);
 #[specta(collect = false)]
 #[serde(transparent)]
 struct ValidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<String>>, ()>);
-
-#[derive(Type, Serialize)]
-#[specta(collect = false)]
-#[serde(transparent)]
-struct InvalidMaybeValidKey(HashMap<MaybeValidKey<()>, ()>);
-
-#[derive(Type, Serialize)]
-#[specta(collect = false)]
-#[serde(transparent)]
-struct InvalidMaybeValidKeyNested(HashMap<MaybeValidKey<MaybeValidKey<()>>, ()>);
 
 macro_rules! field_ty_macro {
     () => {
@@ -1303,12 +1385,14 @@ struct DoubleFlattened {
 #[specta(collect = false)]
 struct Inner {
     a: i32,
+    #[serde(flatten)]
     b: Box<FlattenedInner>,
 }
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct FlattenedInner {
+    #[serde(flatten)]
     c: Inner,
 }
 
@@ -1321,6 +1405,7 @@ struct BoxedInner {
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
 struct BoxFlattened {
+    #[serde(flatten)]
     b: Box<BoxedInner>,
 }
 
@@ -1470,6 +1555,61 @@ struct Optional {
     d: bool,
 }
 
+#[derive(Type, Serialize, Deserialize, Default)]
+#[specta(collect = false)]
+#[serde(default)]
+struct ContainerDefault {
+    value: String,
+    flag: bool,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+struct FieldDefault {
+    name: String,
+    #[serde(default)]
+    enabled: bool,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum MixedTaggedAndUntagged {
+    Tagged {
+        value: String,
+    },
+    #[serde(untagged)]
+    Raw(String),
+    #[serde(untagged)]
+    Empty,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum MixedTaggedAndUntaggedStruct {
+    Tagged {
+        value: String,
+    },
+    #[serde(untagged)]
+    Raw {
+        raw_value: String,
+    },
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(tag = "kind")]
+enum MixedTaggedAndUntaggedPhased {
+    Tagged {
+        value: String,
+    },
+    #[serde(untagged, skip_serializing)]
+    DeserializeOnly(String),
+    #[serde(untagged, skip_deserializing)]
+    SerializeOnly(bool),
+}
+
 // Test that attributes with format strings are properly parsed
 // This tests the fix for parsing attributes like #[error("io error: {0}")]
 // which were causing "expected ident" errors in the lower_attr.rs parser
@@ -1524,6 +1664,14 @@ enum ExternallyTagged {
     A,
     B { id: String, method: String },
     C(String),
+}
+
+// https://github.com/specta-rs/specta/issues/221
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+enum Issue221External {
+    A { a: String },
+    B { b: String },
 }
 
 // Test struct with field alias
@@ -1616,6 +1764,32 @@ enum UntaggedWithAlias {
     },
     B {
         other: i32,
+    },
+}
+
+// https://github.com/specta-rs/specta/issues/221
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum Issue221UntaggedSafe {
+    A { a: String },
+    B { b: String },
+}
+
+// https://github.com/specta-rs/specta/issues/221
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
+#[serde(untagged)]
+enum Issue221UntaggedMixed {
+    A {
+        a: String,
+    },
+    B {
+        b: String,
+    },
+    Unsafe {
+        #[serde(flatten)]
+        values: BTreeMap<String, String>,
     },
 }
 
@@ -1868,11 +2042,11 @@ enum SkipOnlyVariantUntagged {
 #[specta(collect = false)]
 enum SkipUnnamedFieldInVariant {
     // only field
-    A(#[specta(skip)] String),
+    A(#[serde(skip)] String),
     // not only field
     //
     // This will `B(String)` == `String` in TS whether this will be `[String]`. This is why `#[serde(skip)]` is processed at runtime not in the macro.
-    B(#[specta(skip)] String, i32),
+    B(#[serde(skip)] String, i32),
 }
 
 #[derive(Type, Serialize, Deserialize)]
@@ -2347,16 +2521,98 @@ struct UsesTransparent {
 
 #[test]
 fn transparent_wrappers_have_distinct_ids() {
-    let mut types = TypeCollection::default();
+    let mut types = Types::default();
     let id_a = TransparentA::definition(&mut types);
     let id_b = TransparentB::definition(&mut types);
+    let names = types
+        .into_unsorted_iter()
+        .map(|ndt| ndt.name().as_ref())
+        .collect::<Vec<_>>();
+
     assert_ne!(format!("{:?}", id_a), format!("{:?}", id_b));
-    assert_eq!(types.len(), 2);
+    assert!(names.contains(&"TransparentA"));
+    assert!(names.contains(&"TransparentB"));
 }
 
 #[test]
 fn struct_collects_all_transparent_field_types() {
-    let mut types = TypeCollection::default();
+    let mut types = Types::default();
     UsesTransparent::definition(&mut types);
-    assert_eq!(types.len(), 3); // UsesTransparent + TransparentA + TransparentB
+    let names = types
+        .into_unsorted_iter()
+        .map(|ndt| ndt.name().as_ref())
+        .collect::<Vec<_>>();
+
+    assert!(names.contains(&"UsesTransparent"));
+    assert!(names.contains(&"TransparentA"));
+    assert!(names.contains(&"TransparentB"));
+}
+
+#[test]
+fn container_default_marks_all_fields_optional_in_unified_mode() {
+    let types = specta_serde::apply(Types::default().register::<ContainerDefault>())
+        .expect("container-level #[serde(default)] should be supported");
+    let ts = specta_typescript::Typescript::default()
+        .export(&types)
+        .expect("typescript export should succeed");
+
+    insta::assert_snapshot!("serde-default-container-typescript", ts);
+}
+
+#[test]
+fn field_default_still_marks_only_that_field_optional() {
+    let types = specta_serde::apply(Types::default().register::<FieldDefault>())
+        .expect("field-level #[serde(default)] should be supported");
+    let ts = specta_typescript::Typescript::default()
+        .export(&types)
+        .expect("typescript export should succeed");
+
+    insta::assert_snapshot!("serde-default-field-typescript", ts);
+}
+
+#[test]
+fn mixed_tagged_and_untagged_variants_export_in_unified_mode() {
+    let types = specta_serde::apply(Types::default().register::<MixedTaggedAndUntagged>())
+        .expect("mixed tagged and untagged variants should export when they share one shape");
+    let ts = specta_typescript::Typescript::default()
+        .export(&types)
+        .expect("typescript export should succeed");
+
+    insta::assert_snapshot!("serde-mixed-untagged-typescript", ts);
+}
+
+#[test]
+fn mixed_tagged_and_untagged_struct_variants_export_in_unified_mode() {
+    let types = specta_serde::apply(Types::default().register::<MixedTaggedAndUntaggedStruct>())
+        .expect(
+            "mixed tagged and untagged struct variants should export when they share one shape",
+        );
+    let ts = specta_typescript::Typescript::default()
+        .export(&types)
+        .expect("typescript export should succeed");
+
+    insta::assert_snapshot!("serde-mixed-untagged-struct-typescript", ts);
+}
+
+#[test]
+fn phased_mixed_untagged_variants_require_apply_phases() {
+    let err = specta_serde::apply(Types::default().register::<MixedTaggedAndUntaggedPhased>())
+        .expect_err("phase-specific mixed untagged variants should require apply_phases");
+
+    assert!(
+        err.to_string().contains("apply_phases"),
+        "unexpected error: {err}"
+    );
+}
+
+#[test]
+fn phased_mixed_untagged_variants_split_per_phase() {
+    let types =
+        specta_serde::apply_phases(Types::default().register::<MixedTaggedAndUntaggedPhased>())
+            .expect("apply_phases should support phase-specific mixed untagged variants");
+    let ts = specta_typescript::Typescript::default()
+        .export(&types)
+        .expect("typescript export should succeed");
+
+    insta::assert_snapshot!("serde-mixed-untagged-phased-typescript", ts);
 }

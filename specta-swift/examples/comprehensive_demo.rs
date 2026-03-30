@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::Swift;
 use std::time::Duration;
 
@@ -351,7 +351,7 @@ fn main() {
     println!("{}", "=".repeat(80));
 
     // Create comprehensive type collection
-    let types = TypeCollection::default()
+    let types = Types::default()
         // Core types
         .register::<Task>()
         .register::<TaskStatus>()
@@ -385,8 +385,10 @@ fn main() {
         .register::<SystemMetrics>();
 
     // Export with default settings
+    let total_types = types.len();
+    let resolved = specta_serde::apply(types).unwrap();
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&resolved).unwrap();
 
     println!("📝 Generated Swift code (first 2000 characters):\n");
     let preview = if output.len() > 2000 {
@@ -401,7 +403,7 @@ fn main() {
 
     // Write to file for inspection
     swift
-        .export_to("./examples/generated/ComprehensiveDemo.swift", &types)
+        .export_to("./examples/generated/ComprehensiveDemo.swift", &resolved)
         .unwrap();
     println!("✅ Comprehensive demo exported to ComprehensiveDemo.swift");
 
@@ -430,7 +432,7 @@ fn main() {
     println!("• ✅ Health monitoring and metrics");
 
     println!("\n📊 Statistics:");
-    println!("• Total types registered: {}", types.len());
+    println!("• Total types registered: {}", total_types);
     println!("• Generated Swift code length: {} characters", output.len());
     println!("• Lines of generated code: {}", output.lines().count());
 

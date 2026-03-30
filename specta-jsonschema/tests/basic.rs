@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_jsonschema::{JsonSchema, Layout, SchemaVersion};
 
 #[derive(Type)]
@@ -17,9 +17,7 @@ enum Status {
 
 #[test]
 fn test_basic_export() {
-    let types = TypeCollection::default()
-        .register::<User>()
-        .register::<Status>();
+    let types = Types::default().register::<User>().register::<Status>();
 
     let result = JsonSchema::default().export(&types);
     assert!(result.is_ok(), "Export should succeed: {:?}", result.err());
@@ -32,7 +30,7 @@ fn test_basic_export() {
 
 #[test]
 fn test_schema_version() {
-    let types = TypeCollection::default().register::<User>();
+    let types = Types::default().register::<User>();
 
     let result = JsonSchema::default()
         .schema_version(SchemaVersion::Draft7)
@@ -53,7 +51,7 @@ fn test_primitives() {
         bool_field: bool,
     }
 
-    let types = TypeCollection::default().register::<Primitives>();
+    let types = Types::default().register::<Primitives>();
     let result = JsonSchema::default().export(&types);
 
     assert!(result.is_ok());
@@ -66,7 +64,7 @@ fn test_primitives() {
 
 #[test]
 fn test_nullable() {
-    let types = TypeCollection::default().register::<User>();
+    let types = Types::default().register::<User>();
     let result = JsonSchema::default().export(&types);
 
     assert!(result.is_ok());
@@ -77,7 +75,7 @@ fn test_nullable() {
 
 #[test]
 fn test_enum() {
-    let types = TypeCollection::default().register::<Status>();
+    let types = Types::default().register::<Status>();
     let result = JsonSchema::default().export(&types);
 
     assert!(result.is_ok());

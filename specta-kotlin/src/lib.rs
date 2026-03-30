@@ -1,4 +1,9 @@
-//! TODO
+//! [Kotlin](https://kotlinlang.org) language exporter for [Specta](specta).
+//!
+//! <div class="warning">
+//! This crate is still in active development and is not yet ready for general purpose use!
+//! </div>
+//!
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
     html_logo_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png",
@@ -7,13 +12,13 @@
 
 // use specta::{
 //     datatype::{DataType, Primitive},
-//     Type, TypeCollection,
+//     Type, Types,
 // };
 
 // /// TODO
 // pub fn export<T: Type>() -> Result<String, String> {
 //     datatype(&T::definition(
-//         &mut TypeCollection::default(),
+//         &mut Types::default(),
 //         Generics::Definition,
 //     ))
 // }
@@ -21,7 +26,7 @@
 // fn datatype(t: &DataType) -> Result<String, String> {
 //     Ok(match t {
 //         DataType::Primitive(p) => match p {
-//             Primitive::String => "String",
+//             Primitive::str => "String",
 //             Primitive::char => "Char",
 //             Primitive::i8 => "Byte",
 //             Primitive::i16 => "Short",

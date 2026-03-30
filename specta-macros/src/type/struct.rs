@@ -30,10 +30,21 @@ pub fn decode_field_attrs<'a>(
                     "specta: invalid formatted attribute",
                 ));
             }
+            Some(crate::utils::AttributeValue::Expr(_)) => {
+                return Err(syn::Error::new(
+                    attr.key.span(),
+                    "specta: invalid formatted attribute",
+                ));
+            }
             Some(crate::utils::AttributeValue::Attribute {
                 attr: inner_attrs, ..
             }) => {
                 if let Some(inner_attr) = inner_attrs.first() {
+                    if let Some(message) = migration_hint(Scope::Field, &inner_attr.key.to_string())
+                    {
+                        return Err(syn::Error::new(inner_attr.key.span(), message));
+                    }
+
                     return Err(syn::Error::new(
                         inner_attr.key.span(),
                         format!(
@@ -57,7 +68,7 @@ pub fn parse_struct(
     crate_ref: &TokenStream,
     container_attrs: &ContainerAttr,
     data: &DataStruct,
-) -> syn::Result<(TokenStream, TokenStream)> {
+) -> syn::Result<TokenStream> {
     if container_attrs.transparent {
         if let Fields::Unit = data.fields {
             return Err(syn::Error::new(
@@ -96,13 +107,7 @@ pub fn parse_struct(
             raw_attrs,
         )?;
 
-        return Ok((
-            quote!(Struct),
-            quote!(
-                let mut e = datatype::Struct::unit();
-                *e.fields_mut() = internal::construct::fields_unnamed(vec![#field], vec![]);
-            ),
-        ));
+        return Ok(quote!(datatype::Struct::unnamed().field(#field).build()));
     }
 
     let fields = match &data.fields {
@@ -130,14 +135,15 @@ pub fn parse_struct(
                         &field.ty,
                         raw_attrs,
                     )?;
-                    Ok(quote!((#field_name.into(), #inner)))
+                    Ok(quote!(builder.field_mut(#field_name, #inner);))
                 })
                 .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-            quote!(internal::construct::fields_named(
-                vec![#(#fields),*],
-                vec![]
-            ))
+            quote!({
+                let mut builder = datatype::Struct::named();
+                #(#fields)*
+                builder.build()
+            })
         }
         Fields::Unnamed(_) => {
             let fields = data
@@ -153,22 +159,18 @@ pub fn parse_struct(
                         &field.ty,
                         raw_attrs,
                     )
+                    .map(|inner| quote!(builder.field_mut(#inner);))
                 })
                 .collect::<syn::Result<Vec<TokenStream>>>()?;
 
-            quote!(internal::construct::fields_unnamed(
-                vec![#(#fields),*],
-                vec![]
-            ))
+            quote!({
+                let mut builder = datatype::Struct::unnamed();
+                #(#fields)*
+                builder.build()
+            })
         }
-        Fields::Unit => quote!(datatype::Fields::Unit),
+        Fields::Unit => quote!(datatype::Struct::unit().into()),
     };
 
-    Ok((
-        quote!(Struct),
-        quote!(
-            let mut e = datatype::Struct::unit();
-            *e.fields_mut() = #fields;
-        ),
-    ))
+    Ok(fields)
 }

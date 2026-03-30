@@ -1,8 +1,10 @@
-use std::collections::HashSet;
+use std::{borrow::Cow, collections::HashSet};
 
 use specta::{
-    datatype::{DataType, Enum, Fields, NamedDataType, Primitive, Reference, Struct},
-    TypeCollection,
+    datatype::{
+        DataType, Enum, Fields, GenericReference, NamedDataType, Primitive, Reference, Struct,
+    },
+    Types,
 };
 
 use crate::{reserved_names::RESERVED_GO_NAMES, Error, Go};
@@ -21,7 +23,7 @@ impl GoContext {
 
 pub fn export(
     exporter: &Go,
-    types: &TypeCollection,
+    types: &Types,
     ndt: &NamedDataType,
     ctx: &mut GoContext,
 ) -> Result<String, Error> {
@@ -53,7 +55,7 @@ pub fn export(
             if i != 0 {
                 s.push_str(", ");
             }
-            s.push_str(&g.to_string());
+            s.push_str(g.1.as_ref());
             s.push_str(" any");
         }
         s.push(']');
@@ -67,6 +69,7 @@ pub fn export(
                 &mut s,
                 exporter,
                 types,
+                ndt.generics(),
                 st,
                 vec![ndt.name().to_string()],
                 ctx,
@@ -79,6 +82,7 @@ pub fn export(
                 &mut s,
                 exporter,
                 types,
+                ndt.generics(),
                 e,
                 vec![ndt.name().to_string()],
                 ctx,
@@ -91,6 +95,7 @@ pub fn export(
                     &mut s,
                     exporter,
                     types,
+                    ndt.generics(),
                     &t.elements()[0],
                     vec![ndt.name().to_string(), "0".into()],
                     ctx,
@@ -104,6 +109,7 @@ pub fn export(
                 &mut s,
                 exporter,
                 types,
+                ndt.generics(),
                 ndt.ty(),
                 vec![ndt.name().to_string()],
                 ctx,
@@ -118,7 +124,8 @@ pub fn export(
 fn struct_fields(
     s: &mut String,
     exporter: &Go,
-    types: &TypeCollection,
+    types: &Types,
+    generic_names: &[(GenericReference, Cow<'static, str>)],
     st: &Struct,
     location: Vec<String>,
     ctx: &mut GoContext,
@@ -138,7 +145,7 @@ fn struct_fields(
                 if let Some(ty) = field.ty() {
                     let mut location = location.clone();
                     location.push(i.to_string());
-                    datatype(s, exporter, types, ty, location, ctx)?;
+                    datatype(s, exporter, types, generic_names, ty, location, ctx)?;
                 } else {
                     s.push_str("any");
                 }
@@ -165,7 +172,7 @@ fn struct_fields(
                 if let Some(ty) = field.ty() {
                     let mut location = location.clone();
                     location.push(name.to_string());
-                    datatype(s, exporter, types, ty, location, ctx)?;
+                    datatype(s, exporter, types, generic_names, ty, location, ctx)?;
                 } else {
                     s.push_str("any");
                 }
@@ -184,7 +191,8 @@ fn struct_fields(
 fn enum_variants(
     s: &mut String,
     exporter: &Go,
-    types: &TypeCollection,
+    types: &Types,
+    generic_names: &[(GenericReference, Cow<'static, str>)],
     e: &Enum,
     location: Vec<String>,
     ctx: &mut GoContext,
@@ -214,7 +222,7 @@ fn enum_variants(
                         let mut location = location.clone();
                         location.push(name.to_string());
                         location.push(i.to_string());
-                        datatype(s, exporter, types, ty, location, ctx)?;
+                        datatype(s, exporter, types, generic_names, ty, location, ctx)?;
                     } else {
                         s.push_str("any");
                     }
@@ -230,7 +238,7 @@ fn enum_variants(
 
                 let mut location = location.clone();
                 location.push(name.to_string());
-                struct_fields(s, exporter, types, &fill_in, location, ctx)?;
+                struct_fields(s, exporter, types, generic_names, &fill_in, location, ctx)?;
                 s.push('\t');
                 s.push('}');
             }
@@ -243,7 +251,8 @@ fn enum_variants(
 fn datatype(
     s: &mut String,
     exporter: &Go,
-    types: &TypeCollection,
+    types: &Types,
+    generic_names: &[(GenericReference, Cow<'static, str>)],
     dt: &DataType,
     location: Vec<String>,
     ctx: &mut GoContext,
@@ -259,9 +268,9 @@ fn datatype(
             Primitive::u32 => s.push_str("uint32"),
             Primitive::u64 | Primitive::usize => s.push_str("uint64"),
             Primitive::f16 | Primitive::f32 => s.push_str("float32"),
-            Primitive::f64 => s.push_str("float64"),
+            Primitive::f64 | Primitive::f128 => s.push_str("float64"),
             Primitive::bool => s.push_str("bool"),
-            Primitive::String | Primitive::char => s.push_str("string"),
+            Primitive::str | Primitive::char => s.push_str("string"),
             Primitive::i128 | Primitive::u128 => {
                 return Err(Error::BigIntForbidden {
                     path: location.join("."),
@@ -270,17 +279,33 @@ fn datatype(
         },
         DataType::Nullable(t) => {
             s.push('*');
-            datatype(s, exporter, types, t, location, ctx)?;
+            datatype(s, exporter, types, generic_names, t, location, ctx)?;
         }
         DataType::Map(m) => {
             s.push_str("map[");
-            datatype(s, exporter, types, m.key_ty(), location.clone(), ctx)?;
+            datatype(
+                s,
+                exporter,
+                types,
+                generic_names,
+                m.key_ty(),
+                location.clone(),
+                ctx,
+            )?;
             s.push(']');
-            datatype(s, exporter, types, m.value_ty(), location, ctx)?;
+            datatype(
+                s,
+                exporter,
+                types,
+                generic_names,
+                m.value_ty(),
+                location,
+                ctx,
+            )?;
         }
         DataType::List(l) => {
             s.push_str("[]");
-            datatype(s, exporter, types, l.ty(), location, ctx)?;
+            datatype(s, exporter, types, generic_names, l.ty(), location, ctx)?;
         }
         DataType::Tuple(t) => {
             if t.elements().is_empty() {
@@ -291,12 +316,12 @@ fn datatype(
         }
         DataType::Struct(st) => {
             s.push_str("struct {\n");
-            struct_fields(s, exporter, types, st, location, ctx)?;
+            struct_fields(s, exporter, types, generic_names, st, location, ctx)?;
             s.push('}');
         }
         DataType::Enum(e) => {
             s.push_str("struct {\n");
-            enum_variants(s, exporter, types, e, location, ctx)?;
+            enum_variants(s, exporter, types, generic_names, e, location, ctx)?;
             s.push('}');
         }
         DataType::Reference(r) => match r {
@@ -317,10 +342,18 @@ fn datatype(
                         }
                         let mut location = location.clone();
                         location.push(format!("generic{}", i));
-                        datatype(s, exporter, types, g, location, ctx)?;
+                        datatype(s, exporter, types, generic_names, g, location, ctx)?;
                     }
                     s.push(']');
                 }
+            }
+            Reference::Generic(g) => {
+                let name = generic_names
+                    .iter()
+                    .find(|(candidate, _)| candidate == g)
+                    .map(|(_, name)| name.as_ref())
+                    .unwrap_or("any");
+                s.push_str(name);
             }
             Reference::Opaque(o) => match o.type_name() {
                 "String" | "char" => s.push_str("string"),
@@ -342,7 +375,6 @@ fn datatype(
                 _ => s.push_str("any"),
             },
         },
-        DataType::Generic(g) => s.push_str(&g.to_string()),
     }
     Ok(())
 }

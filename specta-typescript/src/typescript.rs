@@ -1,9 +1,8 @@
 use std::{borrow::Cow, path::Path};
 
-use specta::TypeCollection;
-use specta_serde::SerdeMode;
+use specta::ResolvedTypes;
 
-use crate::{BigIntExportBehavior, Branded, Error, Exporter, Layout};
+use crate::{Branded, BrandedTypeExporter, Error, Exporter, Layout};
 
 /// JSDoc language exporter.
 #[derive(Debug, Clone)]
@@ -42,11 +41,6 @@ impl Typescript {
         Self(self.0.header(header))
     }
 
-    /// Configure the BigInt handling behaviour
-    pub fn bigint(self, bigint: BigIntExportBehavior) -> Self {
-        Self(self.0.bigint(bigint))
-    }
-
     /// Configure the layout of the generated file
     pub fn layout(self, layout: Layout) -> Self {
         Self(self.0.layout(layout))
@@ -54,33 +48,21 @@ impl Typescript {
 
     /// Configure how `specta_typescript::branded!` types are rendered.
     ///
-    /// See [`Exporter::branded_type_impl`] for `ts-brand` and Effect examples.
+    /// See [`Exporter::branded_type_impl`] for details.
     pub fn branded_type_impl(
         self,
-        builder: impl Fn(&Branded) -> Result<Cow<'static, str>, Error> + 'static,
+        builder: impl for<'a> Fn(BrandedTypeExporter<'a>, &Branded) -> Result<Cow<'static, str>, Error>
+        + Send
+        + Sync
+        + 'static,
     ) -> Self {
         Self(self.0.branded_type_impl(builder))
     }
 
-    /// Configure the exporter to use specta-serde with the specified mode
-    pub fn with_serde(self, mode: SerdeMode) -> Self {
-        Self(self.0.with_serde(mode))
-    }
-
-    /// Configure the exporter to export the types for `#[derive(serde::Serialize)]`
-    pub fn with_serde_serialize(self) -> Self {
-        Self(self.0.with_serde_serialize())
-    }
-
-    /// Configure the exporter to export the types for `#[derive(serde::Deserialize)]`
-    pub fn with_serde_deserialize(self) -> Self {
-        Self(self.0.with_serde_deserialize())
-    }
-
     /// Export the files into a single string.
     ///
-    /// Note: This will return [`Error::UnableToExport`](crate::Error::UnableToExport) if the format is `Format::Files`.
-    pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
+    /// Note: This returns an error if the format is `Format::Files`.
+    pub fn export(&self, types: &ResolvedTypes) -> Result<String, Error> {
         self.0.export(types)
     }
 
@@ -89,7 +71,7 @@ impl Typescript {
     /// When configured when `format` is `Format::Files`, you must provide a directory path.
     /// Otherwise, you must provide the path of a single file.
     ///
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
+    pub fn export_to(&self, path: impl AsRef<Path>, types: &ResolvedTypes) -> Result<(), Error> {
         self.0.export_to(path, types)
     }
 }

@@ -50,7 +50,7 @@ macro_rules! branded {
         $vis struct $ident<$($generic),+>($ty);
 
         impl<$($generic: specta::Type),+> specta::Type for $ident<$($generic),+> {
-            fn definition(types: &mut specta::TypeCollection) -> specta::datatype::DataType {
+            fn definition(types: &mut specta::Types) -> specta::datatype::DataType {
                 let ty = <$ty as specta::Type>::definition(types);
                 let brand: &'static str = branded!(@brand $ident $( $ts_name )?);
 
@@ -72,7 +72,7 @@ macro_rules! branded {
         $vis struct $ident($ty);
 
         impl specta::Type for $ident {
-            fn definition(types: &mut specta::TypeCollection) -> specta::datatype::DataType {
+            fn definition(types: &mut specta::Types) -> specta::datatype::DataType {
                 let ty = <$ty as specta::Type>::definition(types);
                 let brand: &'static str = branded!(@brand $ident $( $ts_name )?);
 
@@ -95,12 +95,14 @@ macro_rules! branded {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// Runtime payload for a TypeScript branded type.
 pub struct Branded {
     brand: Cow<'static, str>,
     ty: DataType,
 }
 
 impl Branded {
+    /// Construct a branded type from a brand label and inner type.
     pub fn new(brand: impl Into<Cow<'static, str>>, ty: DataType) -> Self {
         Self {
             brand: brand.into(),
@@ -108,10 +110,12 @@ impl Branded {
         }
     }
 
+    /// Get the brand label.
     pub fn brand(&self) -> &Cow<'static, str> {
         &self.brand
     }
 
+    /// Get the inner data type.
     pub fn ty(&self) -> &DataType {
         &self.ty
     }

@@ -1,12 +1,19 @@
 use std::{borrow::Cow, path::Path};
 
-use specta::TypeCollection;
-use specta_serde::SerdeMode;
+use specta::{ResolvedTypes, Types};
 
 use crate::{
     primitives::{self, GoContext},
     Error,
 };
+
+/// Controls whether the exporter applies Specta's serde rewrites first.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SerdeMode {
+    Serialize,
+    Deserialize,
+    Both,
+}
 
 /// Allows configuring the format of the final file.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -59,20 +66,19 @@ impl Go {
         self
     }
 
-    pub fn export(&self, types: &TypeCollection) -> Result<String, Error> {
+    pub fn export(&self, types: &Types) -> Result<String, Error> {
         let mut ctx = GoContext::default();
         let mut body = String::new();
 
-        let types = if let Some(mode) = self.serde {
-            let mut types = types.clone();
-            specta_serde::apply(&mut types, mode)?;
-            Cow::Owned(types)
+        let resolved_types = if self.serde.is_some() {
+            specta_serde::apply(types.clone())?
         } else {
-            Cow::Borrowed(types)
+            ResolvedTypes::from_resolved_types(types.clone())
         };
+        let types = resolved_types.as_types();
 
         for ndt in types.into_sorted_iter() {
-            let type_def = primitives::export(&self, &types, ndt, &mut ctx)?;
+            let type_def = primitives::export(self, types, ndt, &mut ctx)?;
             body.push_str(&type_def);
             body.push('\n');
         }
@@ -101,7 +107,7 @@ impl Go {
         Ok(out)
     }
 
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &TypeCollection) -> Result<(), Error> {
+    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types) -> Result<(), Error> {
         if self.layout == Layout::Files {
             return Err(Error::UnableToExport(Layout::Files));
         }

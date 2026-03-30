@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use super::{DataType, DeprecatedType};
+use super::{DataType, Deprecated};
 
 /// Contains type information about a function annotated with the `#[specta]` attribute.
 /// Returned by the `fn_datatype!` macro.
@@ -13,28 +13,11 @@ pub struct Function {
     /// The name and type of each of the function's arguments.
     pub(crate) args: Vec<(Cow<'static, str>, DataType)>,
     /// The return type of the function.
-    pub(crate) result: Option<FunctionReturnType>,
+    pub(crate) result: Option<DataType>,
     /// The function's documentation. Detects both `///` and `#[doc = ...]` style documentation.
     pub(crate) docs: Cow<'static, str>,
     /// The deprecated status of the function.
-    pub(crate) deprecated: Option<DeprecatedType>,
-}
-
-/// The type of a function's return type.
-///
-/// This gives the flexibility of the result's structure to the downstream implementer.
-#[derive(Debug, Clone, PartialEq)]
-pub enum FunctionReturnType {
-    /// The function returns a `T`.
-    Value(DataType),
-    /// The function returns a `Result<T, E>`.
-    Result(DataType, DataType),
-}
-
-impl From<DataType> for FunctionReturnType {
-    fn from(value: DataType) -> Self {
-        FunctionReturnType::Value(value)
-    }
+    pub(crate) deprecated: Option<Deprecated>,
 }
 
 impl Function {
@@ -74,17 +57,17 @@ impl Function {
     }
 
     /// Get the result of the function.
-    pub fn result(&self) -> Option<&FunctionReturnType> {
+    pub fn result(&self) -> Option<&DataType> {
         self.result.as_ref()
     }
 
     /// Get the result of the function as mutable reference.
-    pub fn result_mut(&mut self) -> Option<&mut FunctionReturnType> {
+    pub fn result_mut(&mut self) -> Option<&mut DataType> {
         self.result.as_mut()
     }
 
     /// Set the result of the function.
-    pub fn set_result(&mut self, result: FunctionReturnType) {
+    pub fn set_result(&mut self, result: DataType) {
         self.result = Some(result);
     }
 
@@ -104,17 +87,17 @@ impl Function {
     }
 
     /// Get the deprecated status of the function.
-    pub fn deprecated(&self) -> Option<&DeprecatedType> {
+    pub fn deprecated(&self) -> Option<&Deprecated> {
         self.deprecated.as_ref()
     }
 
     /// Get the deprecated status of the function as mutable reference.
-    pub fn deprecated_mut(&mut self) -> Option<&mut DeprecatedType> {
+    pub fn deprecated_mut(&mut self) -> Option<&mut Deprecated> {
         self.deprecated.as_mut()
     }
 
     /// Set the deprecated status of the function.
-    pub fn set_deprecated(&mut self, deprecated: DeprecatedType) {
+    pub fn set_deprecated(&mut self, deprecated: Deprecated) {
         self.deprecated = Some(deprecated);
     }
 }

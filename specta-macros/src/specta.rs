@@ -106,7 +106,7 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
             // We take in `$function` from the invocation so we have `fn_name::<concrete_generics_types>`
             (@export_fn; $function:path) => {{
                 use #crate_ref::datatype;
-                fn export(types: &mut #crate_ref::TypeCollection) -> datatype::Function {
+                fn export(types: &mut #crate_ref::Types) -> datatype::Function {
                     #crate_ref::internal::get_fn_datatype(
                         $function as fn(#(#arg_signatures),*) -> _,
                         #function_asyncness,

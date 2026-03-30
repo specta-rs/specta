@@ -1,4 +1,4 @@
-use specta::{Type, TypeCollection};
+use specta::{Type, Types};
 use specta_swift::Swift;
 use std::time::Duration;
 
@@ -132,7 +132,7 @@ fn main() {
     println!("{}", "=".repeat(60));
 
     // Create type collection with all our special types
-    let types = TypeCollection::default()
+    let types = Types::default()
         .register::<IndexerMetrics>()
         .register::<EventLog>()
         .register::<TaskConfig>()
@@ -140,17 +140,18 @@ fn main() {
         .register::<ApiResponse>()
         .register::<JobStatus>()
         .register::<SystemHealth>();
+    let resolved = specta_serde::apply(types).unwrap();
 
     // Export with default settings
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&resolved).unwrap();
 
     println!("📝 Generated Swift code:\n");
     println!("{}", output);
 
     // Write to file for inspection
     swift
-        .export_to("./examples/generated/SpecialTypes.swift", &types)
+        .export_to("./examples/generated/SpecialTypes.swift", &resolved)
         .unwrap();
     println!("✅ Special types exported to SpecialTypes.swift");
 

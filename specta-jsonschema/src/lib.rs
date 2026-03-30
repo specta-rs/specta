@@ -1,4 +1,4 @@
-//! [JSON Schema](https://json-schema.org) exporter and importer for Specta.
+//! [JSON Schema](https://json-schema.org) exporter and importer for [Specta](specta).
 //!
 //! This crate provides bidirectional conversion between Specta types and JSON Schema:
 //! - Export Specta types to JSON Schema (Draft 7, 2019-09, or 2020-12)
@@ -8,7 +8,7 @@
 //!
 //! - **Bidirectional conversion**: Export to JSON Schema and import from JSON Schema
 //! - **Multiple schema versions**: Support for Draft 7 (default), Draft 2019-09, and Draft 2020-12
-//! - **Serde integration**: Respect `#[serde(...)]` attributes via `specta-serde`
+//! - **Serde integration**: Use `specta-serde` in userspace before export
 //! - **Flexible layouts**: Single file with `$defs` or separate files per type
 //! - **schemars ecosystem**: Compatible with the schemars crate for interoperability
 //!
@@ -17,7 +17,7 @@
 //! ## Exporting to JSON Schema
 //!
 //! ```ignore
-//! use specta::{Type, TypeCollection};
+//! use specta::{Type, Types};
 //! use specta_jsonschema::{JsonSchema, SchemaVersion};
 //!
 //! #[derive(Type)]
@@ -28,7 +28,7 @@
 //! }
 //!
 //! fn main() {
-//!     let types = TypeCollection::default()
+//!     let types = Types::default()
 //!         .register::<User>();
 //!
 //!     // Export to JSON Schema
@@ -44,7 +44,7 @@
 //! ## With Serde Integration
 //!
 //! ```ignore
-//! use specta::{Type, TypeCollection};
+//! use specta::{Type, Types};
 //! use specta_jsonschema::JsonSchema;
 //!
 //! #[derive(Type, serde::Serialize)]
@@ -56,20 +56,18 @@
 //! }
 //!
 //! fn main() {
-//!     let types = TypeCollection::default().register::<User>();
+//!     let types = Types::default().register::<User>();
 //!
-//!     // Export with serde transformations
-//!     JsonSchema::default()
-//!         .with_serde_serialize()
-//!         .export_to("./schema.json", &types)
-//!         .unwrap();
+//!     // Apply serde transforms in userspace, then export
+//!     let types = specta_serde::apply(types).unwrap();
+//!     JsonSchema::default().export_to("./schema.json", &types).unwrap();
 //! }
 //! ```
 //!
 //! ## Importing from JSON Schema
 //!
 //! ```ignore
-//! use schemars::schema::Schema;
+//! use schemars::Schema;
 //! use specta_jsonschema::import::from_schema;
 //!
 //! let schema: Schema = serde_json::from_str(r#"{
@@ -121,11 +119,8 @@ pub use json_schema::JsonSchema;
 pub use layout::Layout;
 pub use schema_version::SchemaVersion;
 
-// Re-export commonly used types
-pub use specta_serde::SerdeMode;
-
 // Legacy function - kept for backward compatibility
 #[deprecated(note = "Use import::from_schema instead")]
-pub fn to_ast(schema: &schemars::schema::Schema) -> Result<specta::datatype::DataType, Error> {
+pub fn to_ast(schema: &schemars::Schema) -> Result<specta::datatype::DataType, Error> {
     import::from_schema(schema)
 }
