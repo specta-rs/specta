@@ -31,7 +31,7 @@
     html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
 
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use specta::{
     ResolvedTypes, Types,
@@ -48,6 +48,7 @@ use specta::{
 // TODO: Documentations -> Explain how input types *just work* (double check that though)
 
 /// A tag is used to identify the transformation required for a given data type.
+#[derive(Clone)]
 pub enum Tag {
     /// [BigInt](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt)
     BigInt,
@@ -58,7 +59,7 @@ pub enum Tag {
     /// A custom tag.
     ///
     /// TODO: Document this
-    Custom(Box<dyn Fn(&str) -> Cow<'static, str> + Send + Sync>),
+    Custom(Arc<dyn Fn(&str) -> Cow<'static, str> + Send + Sync>),
 }
 
 impl std::fmt::Debug for Tag {

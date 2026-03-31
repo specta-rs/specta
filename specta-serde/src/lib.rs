@@ -829,14 +829,13 @@ fn rewrite_fields_for_phase(
                 apply_field_attrs(field, mode, container_default)?;
 
                 if let Some(serde_attrs) = SerdeFieldAttrs::from_attributes(field.attributes())? {
-                    let rename = match mode {
-                        PhaseRewrite::Serialize => serde_attrs.rename_serialize.as_deref(),
-                        PhaseRewrite::Deserialize => serde_attrs.rename_deserialize.as_deref(),
-                        PhaseRewrite::Unified => serde_attrs
-                            .rename_serialize
-                            .as_deref()
-                            .or(serde_attrs.rename_deserialize.as_deref()),
-                    };
+                    let rename = select_phase_string(
+                        mode,
+                        serde_attrs.rename_serialize.as_deref(),
+                        serde_attrs.rename_deserialize.as_deref(),
+                        "field rename",
+                        name,
+                    )?;
 
                     if let Some(rename) = rename {
                         *name = Cow::Owned(rename.to_string());

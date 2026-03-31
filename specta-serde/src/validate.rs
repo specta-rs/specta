@@ -496,6 +496,21 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
         return Ok(());
     };
 
+    if mode == ApplyMode::Unified
+        && let (Some(serialize), Some(deserialize)) = (
+            serde_attrs.rename_serialize.as_deref(),
+            serde_attrs.rename_deserialize.as_deref(),
+        )
+        && serialize != deserialize
+    {
+        return Err(Error::incompatible_rename(
+            "field rename",
+            path,
+            Some(serialize.to_string()),
+            Some(deserialize.to_string()),
+        ));
+    }
+
     if serde_attrs.has_serialize_with {
         ensure_codec_override(field.type_overridden(), &path, "serialize_with")?;
     }
