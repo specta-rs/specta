@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     collections::HashMap,
     iter,
     path::Path,
@@ -7,7 +8,7 @@ use std::{
 
 use specta::{
     ResolvedTypes, Type, Types,
-    datatype::{DataType, Reference},
+    datatype::{DataType, Primitive, Reference, Tuple},
 };
 use specta_typescript::{Layout, Typescript, primitives};
 use tempfile::TempDir;
@@ -698,6 +699,109 @@ fn primitives_inline() {
 
         insta::assert_snapshot!(format!("inline-{mode}"), output);
     }
+}
+
+#[test]
+fn primitives_framework_map_is_recursive() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Nested {
+        value: bool,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Container {
+        direct: bool,
+        list: Vec<bool>,
+        tuple: (bool, Option<bool>),
+        #[specta(inline)]
+        nested: Nested,
+    }
+
+    let mut types = Types::default();
+    let dt = Container::definition(&mut types);
+    let resolved = ResolvedTypes::from_resolved_types(types);
+    let ts = Typescript::default().framework_map(|dt| match dt {
+        DataType::Primitive(Primitive::bool) => Cow::Owned(DataType::Primitive(Primitive::str)),
+        _ => Cow::Borrowed(dt),
+    });
+
+    let rendered = primitives::inline(&ts, &resolved, &dt).unwrap();
+
+    assert!(rendered.contains("direct: string"), "{rendered}");
+    assert!(rendered.contains("list: string[]"), "{rendered}");
+    assert!(rendered.contains("[string, string | null]"), "{rendered}");
+    assert!(rendered.contains("value: string"), "{rendered}");
+}
+
+#[test]
+fn primitives_framework_map_stacks() {
+    let resolved = ResolvedTypes::from_resolved_types(Types::default());
+    let ts = Typescript::default()
+        .framework_map(|dt| match dt {
+            DataType::Primitive(Primitive::bool) => Cow::Owned(DataType::Primitive(Primitive::str)),
+            _ => Cow::Borrowed(dt),
+        })
+        .framework_map(|dt| match dt {
+            DataType::Primitive(Primitive::str) => Cow::Owned(DataType::Tuple(Tuple::new(vec![]))),
+            _ => Cow::Borrowed(dt),
+        });
+
+    let rendered =
+        primitives::inline(&ts, &resolved, &DataType::Primitive(Primitive::bool)).unwrap();
+
+    assert_eq!(rendered, "null");
+}
+
+#[test]
+fn primitives_reference_framework_map_can_replace_reference() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Demo {
+        value: bool,
+    }
+
+    let mut types = Types::default();
+    let dt = Demo::definition(&mut types);
+    let resolved = ResolvedTypes::from_resolved_types(types);
+    let DataType::Reference(reference) = dt else {
+        panic!("expected named reference");
+    };
+
+    let ts = Typescript::default().framework_map(|dt| match dt {
+        DataType::Reference(Reference::Named(_)) => Cow::Owned(DataType::Primitive(Primitive::str)),
+        _ => Cow::Borrowed(dt),
+    });
+
+    let rendered = primitives::reference(&ts, &resolved, &reference).unwrap();
+
+    assert_eq!(rendered, "string");
+}
+
+#[test]
+fn primitives_export_framework_map_updates_named_bodies() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Demo {
+        value: bool,
+    }
+
+    let mut types = Types::default();
+    let reference = Demo::definition(&mut types);
+    let DataType::Reference(Reference::Named(reference)) = reference else {
+        panic!("expected named reference");
+    };
+    let resolved = ResolvedTypes::from_resolved_types(types);
+    let ndt = reference.get(resolved.as_types()).unwrap();
+    let ts = Typescript::default().framework_map(|dt| match dt {
+        DataType::Primitive(Primitive::bool) => Cow::Owned(DataType::Primitive(Primitive::str)),
+        _ => Cow::Borrowed(dt),
+    });
+
+    let rendered = primitives::export(&ts, &resolved, iter::once(ndt), "").unwrap();
+
+    assert!(rendered.contains("value: string"), "{rendered}");
 }
 
 #[test]

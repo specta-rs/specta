@@ -81,8 +81,7 @@ pub fn export_type(
     // Format based on type
     match ndt.ty() {
         DataType::Struct(_) => {
-            let type_def =
-                datatype_to_swift(swift, types, ndt.ty(), generic_scope.clone(), false, None)?;
+            let type_def = datatype_to_swift(swift, types, ndt.ty(), generic_scope.clone(), None)?;
             let name = swift.naming.convert(ndt.name());
             let generics = if ndt.generics().is_empty() {
                 String::new()
@@ -147,21 +146,14 @@ pub fn export_type(
                 "public enum {}{}{} {{\n",
                 name, generics, protocol_part
             ));
-            let enum_body = enum_to_swift(
-                swift,
-                types,
-                e,
-                generic_scope.clone(),
-                false,
-                None,
-                Some(&name),
-            )?;
+            let enum_body =
+                enum_to_swift(swift, types, e, generic_scope.clone(), None, Some(&name))?;
             result.push_str(&enum_body);
             result.push('}');
 
             // Generate struct definitions for named field variants
             let struct_definitions =
-                generate_enum_structs(swift, types, e, generic_scope, false, None, &name)?;
+                generate_enum_structs(swift, types, e, generic_scope, None, &name)?;
             result.push_str(&struct_definitions);
 
             // Generate custom Codable implementation for enums with struct variants
@@ -184,7 +176,6 @@ pub fn datatype_to_swift(
     types: &Types,
     dt: &DataType,
     generic_scope: Vec<(GenericReference, Cow<'static, str>)>,
-    is_export: bool,
     reference: Option<&specta::datatype::Reference>,
 ) -> Result<String> {
     // Check for special standard library types first
@@ -198,7 +189,7 @@ pub fn datatype_to_swift(
         DataType::List(l) => list_to_swift(swift, types, l, generic_scope.clone()),
         DataType::Map(m) => map_to_swift(swift, types, m, generic_scope.clone()),
         DataType::Nullable(def) => {
-            let inner = datatype_to_swift(swift, types, def, generic_scope, is_export, None)?;
+            let inner = datatype_to_swift(swift, types, def, generic_scope, None)?;
             Ok(match swift.optionals {
                 crate::swift::OptionalStyle::QuestionMark => format!("{}?", inner),
                 crate::swift::OptionalStyle::Optional => format!("Optional<{}>", inner),
@@ -209,9 +200,9 @@ pub fn datatype_to_swift(
             if is_duration_struct(s) {
                 return Ok("RustDuration".to_string());
             }
-            struct_to_swift(swift, types, s, generic_scope, is_export, None)
+            struct_to_swift(swift, types, s, generic_scope, None)
         }
-        DataType::Enum(e) => enum_to_swift(swift, types, e, generic_scope, is_export, None, None),
+        DataType::Enum(e) => enum_to_swift(swift, types, e, generic_scope, None, None),
         DataType::Tuple(t) => tuple_to_swift(swift, types, t, generic_scope.clone()),
         DataType::Reference(r) => reference_to_swift(swift, types, r, &generic_scope),
     }
@@ -321,7 +312,7 @@ fn list_to_swift(
     list: &specta::datatype::List,
     generic_scope: Vec<(GenericReference, Cow<'static, str>)>,
 ) -> Result<String> {
-    let element_type = datatype_to_swift(swift, types, list.ty(), generic_scope, false, None)?;
+    let element_type = datatype_to_swift(swift, types, list.ty(), generic_scope, None)?;
     Ok(format!("[{}]", element_type))
 }
 
@@ -332,15 +323,8 @@ fn map_to_swift(
     map: &specta::datatype::Map,
     generic_scope: Vec<(GenericReference, Cow<'static, str>)>,
 ) -> Result<String> {
-    let key_type = datatype_to_swift(
-        swift,
-        types,
-        map.key_ty(),
-        generic_scope.clone(),
-        false,
-        None,
-    )?;
-    let value_type = datatype_to_swift(swift, types, map.value_ty(), generic_scope, false, None)?;
+    let key_type = datatype_to_swift(swift, types, map.key_ty(), generic_scope.clone(), None)?;
+    let value_type = datatype_to_swift(swift, types, map.value_ty(), generic_scope, None)?;
     Ok(format!("[{}: {}]", key_type, value_type))
 }
 
@@ -350,7 +334,6 @@ fn struct_to_swift(
     types: &Types,
     s: &specta::datatype::Struct,
     generic_scope: Vec<(GenericReference, Cow<'static, str>)>,
-    is_export: bool,
     _reference: Option<&specta::datatype::Reference>,
 ) -> Result<String> {
     match s.fields() {
@@ -367,7 +350,6 @@ fn struct_to_swift(
                         .ty()
                         .expect("tuple field should have a type"),
                     generic_scope,
-                    is_export,
                     None,
                 )?;
                 Ok(format!("    let value: {}\n", field_type))
@@ -380,7 +362,6 @@ fn struct_to_swift(
                         types,
                         field.ty().expect("tuple field should have a type"),
                         generic_scope.clone(),
-                        is_export,
                         None,
                     )?;
                     result.push_str(&format!("    public let field{}: {}\n", i, field_type));
@@ -394,7 +375,7 @@ fn struct_to_swift(
 
             for (original_field_name, field) in fields.fields() {
                 let field_type = if let Some(ty) = field.ty() {
-                    datatype_to_swift(swift, types, ty, generic_scope.clone(), is_export, None)?
+                    datatype_to_swift(swift, types, ty, generic_scope.clone(), None)?
                 } else {
                     continue;
                 };
@@ -436,7 +417,6 @@ fn enum_to_swift(
     types: &Types,
     e: &specta::datatype::Enum,
     generic_scope: Vec<(GenericReference, Cow<'static, str>)>,
-    is_export: bool,
     _reference: Option<&specta::datatype::Reference>,
     enum_name: Option<&str>,
 ) -> Result<String> {
@@ -477,7 +457,6 @@ fn enum_to_swift(
                                 types,
                                 f.ty().expect("enum variant field should have a type"),
                                 generic_scope.clone(),
-                                is_export,
                                 None,
                             )
                         })
@@ -515,7 +494,6 @@ fn generate_enum_structs(
     types: &Types,
     e: &specta::datatype::Enum,
     generic_scope: Vec<(GenericReference, Cow<'static, str>)>,
-    is_export: bool,
     _reference: Option<&specta::datatype::Reference>,
     enum_name: &str,
 ) -> Result<String> {
@@ -539,14 +517,8 @@ fn generate_enum_structs(
             let mut field_mappings = Vec::new();
             for (original_field_name, field) in fields.fields() {
                 if let Some(ty) = field.ty() {
-                    let field_type = datatype_to_swift(
-                        swift,
-                        types,
-                        ty,
-                        generic_scope.clone(),
-                        is_export,
-                        None,
-                    )?;
+                    let field_type =
+                        datatype_to_swift(swift, types, ty, generic_scope.clone(), None)?;
                     let optional_marker = if field.optional() { "?" } else { "" };
                     let swift_field_name = swift.naming.convert_field(original_field_name);
                     result.push_str(&format!(
@@ -614,12 +586,12 @@ fn tuple_to_swift(
     if t.elements().is_empty() {
         Ok("Void".to_string())
     } else if t.elements().len() == 1 {
-        datatype_to_swift(swift, types, &t.elements()[0], generic_scope, false, None)
+        datatype_to_swift(swift, types, &t.elements()[0], generic_scope, None)
     } else {
         let types_str = t
             .elements()
             .iter()
-            .map(|e| datatype_to_swift(swift, types, e, generic_scope.clone(), false, None))
+            .map(|e| datatype_to_swift(swift, types, e, generic_scope.clone(), None))
             .collect::<std::result::Result<Vec<_>, _>>()?
             .join(", ");
         Ok(format!("({})", types_str))
@@ -653,7 +625,7 @@ fn reference_to_swift(
                 && let Some((_, inner_ty)) = r.generics().first()
             {
                 let inner =
-                    datatype_to_swift(swift, types, inner_ty, generic_scope.to_vec(), false, None)?;
+                    datatype_to_swift(swift, types, inner_ty, generic_scope.to_vec(), None)?;
                 return Ok(format!("[{inner}]"));
             }
 
@@ -665,9 +637,7 @@ fn reference_to_swift(
                 let generics = r
                     .generics()
                     .iter()
-                    .map(|(_, t)| {
-                        datatype_to_swift(swift, types, t, generic_scope.to_vec(), false, None)
-                    })
+                    .map(|(_, t)| datatype_to_swift(swift, types, t, generic_scope.to_vec(), None))
                     .collect::<std::result::Result<Vec<_>, _>>()?
                     .join(", ");
                 Ok(format!("{}<{}>", name, generics))

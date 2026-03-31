@@ -149,11 +149,12 @@ fn export_single_internal(
     s.push_str(" = ");
 
     let _generic_scope = push_generic_scope(ndt.generics());
+    let mapped = apply_framework_map(exporter, ndt.ty());
     datatype(
         s,
         exporter,
         types,
-        ndt.ty(),
+        &mapped,
         vec![ndt.name().clone()],
         Some(ndt.name()),
         indent,
@@ -177,11 +178,12 @@ pub fn inline(
     dt: &DataType,
 ) -> Result<String, Error> {
     let mut s = String::new();
+    let dt = apply_framework_map(exporter.as_ref(), dt);
     inline_datatype(
         &mut s,
         exporter.as_ref(),
         types.as_types(),
-        dt,
+        &dt,
         vec![],
         None,
         "",
@@ -189,6 +191,78 @@ pub fn inline(
         &[],
     )?;
     Ok(s)
+}
+
+fn apply_framework_map(exporter: &Exporter, dt: &DataType) -> DataType {
+    let mapped = exporter
+        .framework_map
+        .as_ref()
+        .map(|framework_map| (framework_map.0)(dt))
+        .unwrap_or_else(|| Cow::Borrowed(dt));
+
+    match mapped {
+        Cow::Borrowed(dt) => apply_framework_map_children(exporter, dt.clone()),
+        Cow::Owned(dt) => apply_framework_map_children(exporter, dt),
+    }
+}
+
+fn apply_framework_map_children(exporter: &Exporter, mut dt: DataType) -> DataType {
+    match &mut dt {
+        DataType::Primitive(_) => {}
+        DataType::List(list) => {
+            let mapped = apply_framework_map(exporter, list.ty());
+            list.set_ty(mapped);
+        }
+        DataType::Map(map) => {
+            let key = apply_framework_map(exporter, map.key_ty());
+            let value = apply_framework_map(exporter, map.value_ty());
+            map.set_key_ty(key);
+            map.set_value_ty(value);
+        }
+        DataType::Nullable(inner) => {
+            let mapped = apply_framework_map(exporter, inner);
+            **inner = mapped;
+        }
+        DataType::Struct(strct) => map_fields(exporter, strct.fields_mut()),
+        DataType::Enum(enm) => {
+            for (_, variant) in enm.variants_mut() {
+                map_fields(exporter, variant.fields_mut());
+            }
+        }
+        DataType::Tuple(tuple) => {
+            for element in tuple.elements_mut() {
+                *element = apply_framework_map(exporter, element);
+            }
+        }
+        DataType::Reference(Reference::Named(reference)) => {
+            for (_, generic) in reference.generics_mut() {
+                *generic = apply_framework_map(exporter, generic);
+            }
+        }
+        DataType::Reference(Reference::Generic(_) | Reference::Opaque(_)) => {}
+    }
+
+    dt
+}
+
+fn map_fields(exporter: &Exporter, fields: &mut Fields) {
+    match fields {
+        Fields::Unit => {}
+        Fields::Unnamed(unnamed) => {
+            for field in unnamed.fields_mut() {
+                if let Some(ty) = field.ty_mut() {
+                    *ty = apply_framework_map(exporter, ty);
+                }
+            }
+        }
+        Fields::Named(named) => {
+            for (_, field) in named.fields_mut() {
+                if let Some(ty) = field.ty_mut() {
+                    *ty = apply_framework_map(exporter, ty);
+                }
+            }
+        }
+    }
 }
 
 // This can be used internally to prevent cloning `Typescript` instances.
@@ -211,10 +285,11 @@ fn append_jsdoc_properties(
     s: &mut String,
     exporter: &Exporter,
     types: &Types,
-    dt: &NamedDataType,
+    dt_name: &str,
+    dt: &DataType,
     indent: &str,
 ) -> Result<(), Error> {
-    match dt.ty() {
+    match dt {
         DataType::Struct(strct) => match strct.fields() {
             Fields::Unit => {}
             Fields::Unnamed(unnamed) => {
@@ -230,8 +305,8 @@ fn append_jsdoc_properties(
                         exporter,
                         types,
                         ty,
-                        vec![dt.name().clone(), idx.to_string().into()],
-                        Some(dt.name()),
+                        vec![Cow::Owned(dt_name.to_owned()), idx.to_string().into()],
+                        Some(dt_name),
                         &datatype_prefix,
                         Default::default(),
                     )?;
@@ -260,8 +335,8 @@ fn append_jsdoc_properties(
                         exporter,
                         types,
                         ty,
-                        vec![dt.name().clone(), name.clone()],
-                        Some(dt.name()),
+                        vec![Cow::Owned(dt_name.to_owned()), name.clone()],
+                        Some(dt_name),
                         &datatype_prefix,
                         Default::default(),
                     )?;
@@ -398,11 +473,12 @@ fn append_typedef_body(
     let mut typedef_ty = String::new();
     let datatype_prefix = format!("{indent}\t*\t");
     let _generic_scope = push_generic_scope(dt.generics());
+    let mapped = apply_framework_map(exporter, dt.ty());
     datatype(
         &mut typedef_ty,
         exporter,
         types,
-        dt.ty(),
+        &mapped,
         vec![dt.name().clone()],
         Some(dt.name()),
         &datatype_prefix,
@@ -437,7 +513,7 @@ fn append_typedef_body(
     s.push_str(&type_name);
     s.push('\n');
 
-    append_jsdoc_properties(s, exporter, types, dt, indent)?;
+    append_jsdoc_properties(s, exporter, types, dt.name(), &mapped, indent)?;
 
     Ok(())
 }
@@ -479,12 +555,14 @@ pub fn reference(
     r: &Reference,
 ) -> Result<String, Error> {
     let mut s = String::new();
-    reference_dt(
+    let dt = apply_framework_map(exporter.as_ref(), &DataType::Reference(r.clone()));
+    datatype(
         &mut s,
         exporter.as_ref(),
         types.as_types(),
-        r,
+        &dt,
         vec![],
+        None,
         "",
         &[],
     )?;
@@ -772,7 +850,10 @@ fn shallow_inline_datatype(
 
                 INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
                 let combined_generics = merged_generics(generics, r.generics());
-                let resolved = resolve_generics_in_datatype(ndt.ty(), &combined_generics);
+                let resolved = apply_framework_map(
+                    exporter,
+                    &resolve_generics_in_datatype(ndt.ty(), &combined_generics),
+                );
                 let result = shallow_inline_datatype(
                     s,
                     exporter,
@@ -1089,11 +1170,15 @@ fn inline_datatype(
                 && let Some(ndt) = r.get(types)
             {
                 let combined_generics = merged_generics(generics, r.generics());
+                let mapped = apply_framework_map(
+                    exporter,
+                    &resolve_generics_in_datatype(ndt.ty(), &combined_generics),
+                );
                 inline_datatype(
                     s,
                     exporter,
                     types,
-                    ndt.ty(),
+                    &mapped,
                     location,
                     parent_name,
                     prefix,
@@ -1964,7 +2049,10 @@ fn reference_named_dt(
             } else {
                 INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
                 let combined_generics = merged_generics(generics, r.generics());
-                let resolved = resolve_generics_in_datatype(ndt.ty(), &combined_generics);
+                let resolved = apply_framework_map(
+                    exporter,
+                    &resolve_generics_in_datatype(ndt.ty(), &combined_generics),
+                );
                 let result = datatype(
                     s,
                     exporter,
