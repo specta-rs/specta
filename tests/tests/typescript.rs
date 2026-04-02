@@ -10,7 +10,7 @@ use specta::{
     ResolvedTypes, Type, Types,
     datatype::{DataType, Primitive, Reference, Tuple},
 };
-use specta_typescript::{Layout, Typescript, primitives};
+use specta_typescript::{Error, Layout, Typescript, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -722,9 +722,13 @@ fn primitives_framework_map_is_recursive() {
     let mut types = Types::default();
     let dt = Container::definition(&mut types);
     let resolved = ResolvedTypes::from_resolved_types(types);
-    let ts = Typescript::default().framework_map(|dt| match dt {
-        DataType::Primitive(Primitive::bool) => Cow::Owned(DataType::Primitive(Primitive::str)),
-        _ => Cow::Borrowed(dt),
+    let ts = Typescript::default().framework_map(|dt| {
+        Ok(match dt {
+            &DataType::Primitive(Primitive::bool) => {
+                Cow::Owned(DataType::Primitive(Primitive::str))
+            }
+            _ => Cow::Borrowed(dt),
+        })
     });
 
     let rendered = primitives::inline(&ts, &resolved, &dt).unwrap();
@@ -739,13 +743,21 @@ fn primitives_framework_map_is_recursive() {
 fn primitives_framework_map_stacks() {
     let resolved = ResolvedTypes::from_resolved_types(Types::default());
     let ts = Typescript::default()
-        .framework_map(|dt| match dt {
-            DataType::Primitive(Primitive::bool) => Cow::Owned(DataType::Primitive(Primitive::str)),
-            _ => Cow::Borrowed(dt),
+        .framework_map(|dt| {
+            Ok(match dt {
+                &DataType::Primitive(Primitive::bool) => {
+                    Cow::Owned(DataType::Primitive(Primitive::str))
+                }
+                _ => Cow::Borrowed(dt),
+            })
         })
-        .framework_map(|dt| match dt {
-            DataType::Primitive(Primitive::str) => Cow::Owned(DataType::Tuple(Tuple::new(vec![]))),
-            _ => Cow::Borrowed(dt),
+        .framework_map(|dt| {
+            Ok(match dt {
+                &DataType::Primitive(Primitive::str) => {
+                    Cow::Owned(DataType::Tuple(Tuple::new(vec![])))
+                }
+                _ => Cow::Borrowed(dt),
+            })
         });
 
     let rendered =
@@ -769,9 +781,13 @@ fn primitives_reference_framework_map_can_replace_reference() {
         panic!("expected named reference");
     };
 
-    let ts = Typescript::default().framework_map(|dt| match dt {
-        DataType::Reference(Reference::Named(_)) => Cow::Owned(DataType::Primitive(Primitive::str)),
-        _ => Cow::Borrowed(dt),
+    let ts = Typescript::default().framework_map(|dt| {
+        Ok(match dt {
+            &DataType::Reference(Reference::Named(_)) => {
+                Cow::Owned(DataType::Primitive(Primitive::str))
+            }
+            _ => Cow::Borrowed(dt),
+        })
     });
 
     let rendered = primitives::reference(&ts, &resolved, &reference).unwrap();
@@ -794,14 +810,38 @@ fn primitives_export_framework_map_updates_named_bodies() {
     };
     let resolved = ResolvedTypes::from_resolved_types(types);
     let ndt = reference.get(resolved.as_types()).unwrap();
-    let ts = Typescript::default().framework_map(|dt| match dt {
-        DataType::Primitive(Primitive::bool) => Cow::Owned(DataType::Primitive(Primitive::str)),
-        _ => Cow::Borrowed(dt),
+    let ts = Typescript::default().framework_map(|dt| {
+        Ok(match dt {
+            &DataType::Primitive(Primitive::bool) => {
+                Cow::Owned(DataType::Primitive(Primitive::str))
+            }
+            _ => Cow::Borrowed(dt),
+        })
     });
 
     let rendered = primitives::export(&ts, &resolved, iter::once(ndt), "").unwrap();
 
     assert!(rendered.contains("value: string"), "{rendered}");
+}
+
+#[test]
+fn primitives_framework_map_errors_bubble_out() {
+    let resolved = ResolvedTypes::from_resolved_types(Types::default());
+    let ts = Typescript::default().framework_map(|dt| match dt {
+        &DataType::Primitive(Primitive::bool) => Err(Error::framework(
+            "framework_map failed",
+            std::io::Error::other("boom"),
+        )),
+        _ => Ok(Cow::Borrowed(dt)),
+    });
+
+    let err =
+        primitives::inline(&ts, &resolved, &DataType::Primitive(Primitive::bool)).unwrap_err();
+
+    assert_eq!(
+        err.to_string(),
+        "Framework error: framework_map failed: boom"
+    );
 }
 
 #[test]

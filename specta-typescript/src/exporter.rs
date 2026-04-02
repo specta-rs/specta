@@ -49,7 +49,7 @@ impl fmt::Debug for RuntimeFn {
 #[derive(Clone)]
 #[allow(clippy::type_complexity)]
 pub(crate) struct FrameworkMapFn(
-    pub(crate) Arc<dyn for<'a> Fn(&'a DataType) -> Cow<'a, DataType> + Send + Sync>,
+    pub(crate) Arc<dyn for<'a> Fn(&'a DataType) -> Result<Cow<'a, DataType>, Error> + Send + Sync>,
 );
 
 impl fmt::Debug for FrameworkMapFn {
@@ -130,7 +130,10 @@ impl Exporter {
     /// frameworks to rewrite types before they are rendered.
     pub fn framework_map(
         mut self,
-        builder: impl for<'a> Fn(&'a DataType) -> Cow<'a, DataType> + Send + Sync + 'static,
+        builder: impl for<'a> Fn(&'a DataType) -> Result<Cow<'a, DataType>, Error>
+        + Send
+        + Sync
+        + 'static,
     ) -> Self {
         let builder = Arc::new(builder);
         let previous = self.framework_map.take();
@@ -139,15 +142,17 @@ impl Exporter {
             let previous = previous
                 .as_ref()
                 .map(|previous| (previous.0)(dt))
+                .transpose()?
                 .unwrap_or_else(|| Cow::Borrowed(dt));
 
-            match previous {
-                Cow::Borrowed(previous) => builder(previous),
+            Ok(match previous {
+                Cow::Borrowed(previous) => builder(previous)?,
                 Cow::Owned(previous) => match builder(&previous) {
-                    Cow::Borrowed(_) => Cow::Owned(previous),
-                    Cow::Owned(next) => Cow::Owned(next),
+                    Ok(Cow::Borrowed(_)) => Cow::Owned(previous),
+                    Ok(Cow::Owned(next)) => Cow::Owned(next),
+                    Err(err) => return Err(err),
                 },
-            }
+            })
         })));
         self
     }

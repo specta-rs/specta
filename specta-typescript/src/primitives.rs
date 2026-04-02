@@ -149,7 +149,7 @@ fn export_single_internal(
     s.push_str(" = ");
 
     let _generic_scope = push_generic_scope(ndt.generics());
-    let mapped = apply_framework_map(exporter, ndt.ty());
+    let mapped = apply_framework_map(exporter, ndt.ty())?;
     datatype(
         s,
         exporter,
@@ -178,7 +178,7 @@ pub fn inline(
     dt: &DataType,
 ) -> Result<String, Error> {
     let mut s = String::new();
-    let dt = apply_framework_map(exporter.as_ref(), dt);
+    let dt = apply_framework_map(exporter.as_ref(), dt)?;
     inline_datatype(
         &mut s,
         exporter.as_ref(),
@@ -193,11 +193,12 @@ pub fn inline(
     Ok(s)
 }
 
-fn apply_framework_map(exporter: &Exporter, dt: &DataType) -> DataType {
+fn apply_framework_map(exporter: &Exporter, dt: &DataType) -> Result<DataType, Error> {
     let mapped = exporter
         .framework_map
         .as_ref()
         .map(|framework_map| (framework_map.0)(dt))
+        .transpose()?
         .unwrap_or_else(|| Cow::Borrowed(dt));
 
     match mapped {
@@ -206,63 +207,65 @@ fn apply_framework_map(exporter: &Exporter, dt: &DataType) -> DataType {
     }
 }
 
-fn apply_framework_map_children(exporter: &Exporter, mut dt: DataType) -> DataType {
+fn apply_framework_map_children(exporter: &Exporter, mut dt: DataType) -> Result<DataType, Error> {
     match &mut dt {
         DataType::Primitive(_) => {}
         DataType::List(list) => {
-            let mapped = apply_framework_map(exporter, list.ty());
+            let mapped = apply_framework_map(exporter, list.ty())?;
             list.set_ty(mapped);
         }
         DataType::Map(map) => {
-            let key = apply_framework_map(exporter, map.key_ty());
-            let value = apply_framework_map(exporter, map.value_ty());
+            let key = apply_framework_map(exporter, map.key_ty())?;
+            let value = apply_framework_map(exporter, map.value_ty())?;
             map.set_key_ty(key);
             map.set_value_ty(value);
         }
         DataType::Nullable(inner) => {
-            let mapped = apply_framework_map(exporter, inner);
+            let mapped = apply_framework_map(exporter, inner)?;
             **inner = mapped;
         }
-        DataType::Struct(strct) => map_fields(exporter, strct.fields_mut()),
+        DataType::Struct(strct) => map_fields(exporter, strct.fields_mut())?,
         DataType::Enum(enm) => {
             for (_, variant) in enm.variants_mut() {
-                map_fields(exporter, variant.fields_mut());
+                map_fields(exporter, variant.fields_mut())?;
             }
         }
         DataType::Tuple(tuple) => {
             for element in tuple.elements_mut() {
-                *element = apply_framework_map(exporter, element);
+                *element = apply_framework_map(exporter, element)?;
             }
         }
         DataType::Reference(Reference::Named(reference)) => {
             for (_, generic) in reference.generics_mut() {
-                *generic = apply_framework_map(exporter, generic);
+                *generic = apply_framework_map(exporter, generic)?;
             }
         }
         DataType::Reference(Reference::Generic(_) | Reference::Opaque(_)) => {}
     }
 
-    dt
+    Ok(dt)
 }
 
-fn map_fields(exporter: &Exporter, fields: &mut Fields) {
+fn map_fields(exporter: &Exporter, fields: &mut Fields) -> Result<(), Error> {
     match fields {
         Fields::Unit => {}
         Fields::Unnamed(unnamed) => {
             for field in unnamed.fields_mut() {
                 if let Some(ty) = field.ty_mut() {
-                    *ty = apply_framework_map(exporter, ty);
+                    *ty = apply_framework_map(exporter, ty)?;
                 }
             }
         }
         Fields::Named(named) => {
             for (_, field) in named.fields_mut() {
                 if let Some(ty) = field.ty_mut() {
-                    *ty = apply_framework_map(exporter, ty);
+                    *ty = apply_framework_map(exporter, ty)?;
                 }
             }
         }
     }
+
+    Ok(())
 }
 
 // This can be used internally to prevent cloning `Typescript` instances.
@@ -473,7 +476,7 @@ fn append_typedef_body(
     let mut typedef_ty = String::new();
     let datatype_prefix = format!("{indent}\t*\t");
     let _generic_scope = push_generic_scope(dt.generics());
-    let mapped = apply_framework_map(exporter, dt.ty());
+    let mapped = apply_framework_map(exporter, dt.ty())?;
     datatype(
         &mut typedef_ty,
         exporter,
@@ -555,7 +558,7 @@ pub fn reference(
     r: &Reference,
 ) -> Result<String, Error> {
     let mut s = String::new();
-    let dt = apply_framework_map(exporter.as_ref(), &DataType::Reference(r.clone()));
+    let dt = apply_framework_map(exporter.as_ref(), &DataType::Reference(r.clone()))?;
     datatype(
         &mut s,
         exporter.as_ref(),
@@ -854,16 +857,19 @@ fn shallow_inline_datatype(
                     exporter,
                     &resolve_generics_in_datatype(ndt.ty(), &combined_generics),
                 );
-                let result = shallow_inline_datatype(
-                    s,
-                    exporter,
-                    types,
-                    &resolved,
-                    location,
-                    parent_name,
-                    prefix,
-                    &combined_generics,
-                );
+                let result = match resolved {
+                    Ok(resolved) => shallow_inline_datatype(
+                        s,
+                        exporter,
+                        types,
+                        &resolved,
+                        location,
+                        parent_name,
+                        prefix,
+                        &combined_generics,
+                    ),
+                    Err(err) => Err(err),
+                };
                 INLINE_REFERENCE_STACK.with(|stack| {
                     stack.borrow_mut().pop();
                 });
@@ -1173,7 +1179,7 @@ fn inline_datatype(
                 let mapped = apply_framework_map(
                     exporter,
                     &resolve_generics_in_datatype(ndt.ty(), &combined_generics),
-                );
+                )?;
                 inline_datatype(
                     s,
                     exporter,
@@ -2053,16 +2059,19 @@ fn reference_named_dt(
                     exporter,
                     &resolve_generics_in_datatype(ndt.ty(), &combined_generics),
                 );
-                let result = datatype(
-                    s,
-                    exporter,
-                    types,
-                    &resolved,
-                    location,
-                    None,
-                    prefix,
-                    &combined_generics,
-                );
+                let result = match resolved {
+                    Ok(resolved) => datatype(
+                        s,
+                        exporter,
+                        types,
+                        &resolved,
+                        location,
+                        None,
+                        prefix,
+                        &combined_generics,
+                    ),
+                    Err(err) => Err(err),
+                };
                 INLINE_REFERENCE_STACK.with(|stack| {
                     stack.borrow_mut().pop();
                 });
