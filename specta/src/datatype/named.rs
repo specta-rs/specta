@@ -179,7 +179,7 @@ impl NamedDataType {
             };
 
             {
-                let prev = CONTEXT_HAS_CONST_PARAMS.replace(!has_const_param);
+                let prev = CONTEXT_HAS_CONST_PARAMS.replace(has_const_param);
                 let result = panic::catch_unwind(AssertUnwindSafe(|| build_ndt(types, &mut ndt)));
                 CONTEXT_HAS_CONST_PARAMS.set(prev);
                 if let Err(payload) = result {
