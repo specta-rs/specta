@@ -3,7 +3,7 @@ use std::{borrow::Cow, panic::Location, sync::Arc};
 use crate::{
     Types,
     datatype::{
-        DataType, NamedReference, Reference,
+        DataType, Generic, NamedReference, Reference,
         reference::{self, GenericReference, NamedId},
     },
 };
@@ -19,7 +19,7 @@ pub struct NamedDataType {
     pub(crate) deprecated: Option<Deprecated>,
     pub(crate) module_path: Cow<'static, str>,
     pub(crate) location: Location<'static>,
-    pub(crate) generics: Cow<'static, [(GenericReference, Cow<'static, str>)]>,
+    pub(crate) generics: Cow<'static, [Generic]>,
     pub(crate) inline: bool,
     pub(crate) inner: DataType,
 }
@@ -29,11 +29,7 @@ impl NamedDataType {
     ///
     /// Note: Ensure you call `Self::register` to register the type.
     #[track_caller]
-    pub fn new(
-        name: impl Into<Cow<'static, str>>,
-        generics: Vec<(GenericReference, Cow<'static, str>)>,
-        dt: DataType,
-    ) -> Self {
+    pub fn new(name: impl Into<Cow<'static, str>>, generics: Vec<Generic>, dt: DataType) -> Self {
         let location = Location::caller();
         Self {
             id: NamedId::Dynamic(Arc::new(())),
@@ -56,7 +52,7 @@ impl NamedDataType {
     #[track_caller]
     pub fn new_inline(
         name: impl Into<Cow<'static, str>>,
-        generics: Vec<(GenericReference, Cow<'static, str>)>,
+        generics: Vec<Generic>,
         dt: DataType,
     ) -> Self {
         let location = Location::caller();
@@ -89,7 +85,7 @@ impl NamedDataType {
     #[doc(hidden)]
     #[track_caller]
     pub fn init_with_sentinel(
-        generics_for_ndt: &'static [(GenericReference, Cow<'static, str>)],
+        generics_for_ndt: &'static [Generic],
         generics_for_ref: Vec<(GenericReference, DataType)>,
         mut inline: bool,
         types: &mut Types,
@@ -242,12 +238,12 @@ impl NamedDataType {
     }
 
     /// The generics that are defined on this type
-    pub fn generics(&self) -> &[(GenericReference, Cow<'static, str>)] {
+    pub fn generics(&self) -> &[Generic] {
         &self.generics
     }
 
     /// Get a mutable reference to the generics that are defined on this type
-    pub fn generics_mut(&mut self) -> &mut Cow<'static, [(GenericReference, Cow<'static, str>)]> {
+    pub fn generics_mut(&mut self) -> &mut Cow<'static, [Generic]> {
         &mut self.generics
     }
 

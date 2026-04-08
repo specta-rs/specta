@@ -2,12 +2,14 @@ use std::{any::TypeId, borrow::Cow};
 
 use crate::datatype::{DataType, GenericReference};
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum GenericType {
     Type,
     Const { ty: DataType },
 }
 
 // TODO: Sealing fields
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Generic {
     id: TypeId,
     pub name: Cow<'static, str>,
