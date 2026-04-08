@@ -18,6 +18,7 @@ pub use fields::{Field, Fields, NamedFields, StructBuilder, UnnamedFields};
 pub use function::Function;
 pub use list::List;
 pub use map::Map;
+pub(crate) use named::context_has_const_params;
 pub use named::{Deprecated, NamedDataType};
 pub use primitive::Primitive;
 pub use reference::{GenericReference, NamedReference, OpaqueReference, Reference};

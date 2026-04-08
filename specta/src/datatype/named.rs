@@ -1,4 +1,9 @@
-use std::{borrow::Cow, panic::Location, sync::Arc};
+use std::{
+    borrow::Cow,
+    cell::Cell,
+    panic::{self, AssertUnwindSafe, Location},
+    sync::Arc,
+};
 
 use crate::{
     Types,
@@ -7,6 +12,59 @@ use crate::{
         reference::{self, GenericReference, NamedId},
     },
 };
+
+thread_local! {
+    /// This variables remains false unless your exporting in the context of `#[derive(Type)]` on a type which contains one or more const-generic parameters.
+    ///
+    /// Say for a type like this
+    /// ```rs
+    /// #[derive(Type)]
+    /// struct Demo<const N: usize> {
+    ///     data: [u32; N],
+    /// }
+    /// ```
+    ///
+    /// If we always set the length in the `impl Type for [T; N]`, the implementation will "bake" whatever the first encountered value of `N` is into the global type definition which is wrong. For example:
+    /// ```rs
+    /// pub struct A {
+    ///     a: Demo<1>,
+    ///     b: Demo<2>,
+    /// }
+    /// // becomes:
+    /// // export type A = { a: Demo, b: Demo }
+    /// // export type Demo = { [number] }; // This is invalid for the `b` field.
+    ///
+    /// // and if we encounter the fields in the opposite order it changes:
+    ///
+    /// pub struct B {
+    ///     // we flipped field definition
+    ///     b: Demo<2>,
+    ///     a: Demo<1>,
+    /// }
+    /// // becomes:
+    /// // export type A = { a: Demo, b: Demo }
+    /// // export type Demo = { [number, number] }; // This is invalid for the `a` field.
+    /// ```
+    ///
+    /// One observation is that for a length to differ across two instantiations of the same type it must either:
+    ///  - Have a const parameter
+    ///  - Have a generic which uses a trait associated constant
+    ///
+    /// Now Specta doesn't and can't support a generic with a trait associated constant as the generic `T` is shadowed by a virtual struct which is used to alter the type to return a generic reference, instead of a flat datatype.
+    ///
+    /// So for DX we know including length is safe as long as the resolving context doesn't have any const parameters. We track this using a thread local so it's entirely runtime meaning the solution doesn't require brittle scanning of the user's `TokenStream` in the derive macro.
+    ///
+    ///
+    /// TODO:
+    ///  - Explain specta util helper
+    ///
+    ///
+    static CONTEXT_HAS_CONST_PARAMS: Cell<bool> = const { Cell::new(false) };
+}
+
+pub(crate) fn context_has_const_params() -> bool {
+    CONTEXT_HAS_CONST_PARAMS.with(|c| c.get())
+}
 
 /// Named type represents any type with it's own unique name and identity.
 ///
@@ -92,6 +150,7 @@ impl NamedDataType {
         generics_for_ndt: &'static [(GenericReference, Cow<'static, str>)],
         generics_for_ref: Vec<(GenericReference, DataType)>,
         mut inline: bool,
+        has_const_param: bool,
         types: &mut Types,
         sentinel: &'static str,
         build_ndt: fn(&mut Types, &mut NamedDataType),
@@ -118,7 +177,15 @@ impl NamedDataType {
                 inline,
                 inner: DataType::Primitive(super::Primitive::i8),
             };
-            build_ndt(types, &mut ndt);
+
+            {
+                let prev = CONTEXT_HAS_CONST_PARAMS.replace(!has_const_param);
+                let result = panic::catch_unwind(AssertUnwindSafe(|| build_ndt(types, &mut ndt)));
+                CONTEXT_HAS_CONST_PARAMS.set(prev);
+                if let Err(payload) = result {
+                    panic::resume_unwind(payload);
+                }
+            }
 
             // We patch the Tauri `Type` implementation.
             if ndt.name() == "TAURI_CHANNEL" && ndt.module_path().starts_with("tauri::") {

@@ -369,6 +369,7 @@ const _: () = {
                     GENERICS,
                     vec![],
                     true,
+                    false,
                     types,
                     SENTINEL,
                     |types, ndt| {
@@ -648,6 +649,7 @@ const _: () = {
                 GENERICS,
                 vec![],
                 false,
+                false,
                 types,
                 SENTINEL,
                 |types, ndt| {
@@ -674,6 +676,7 @@ const _: () = {
         DataType::Reference(datatype::NamedDataType::init_with_sentinel(
             GENERICS,
             vec![],
+            false,
             false,
             types,
             SENTINEL,
