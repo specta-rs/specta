@@ -15,32 +15,14 @@ use crate::{
 #[derive(Clone)]
 pub struct Literal(Arc<dyn LiteralType>);
 
-/// Construct a literal [`DataType`] from a concrete value.
-pub fn literal<T: LiteralType>(value: T) -> DataType {
-    DataType::Reference(Reference::opaque(Literal::from(value)))
-}
-
-/// Trait used by type-erased literal values.
-///
-/// This sealed, allowing us to add new implementations in minor releases.
-trait LiteralType: Any + Send + Sync + 'static {
-    /// Returns the underlying datatype represented by this literal value.
-    fn definition(&self, types: &mut Types) -> DataType;
-
-    #[doc(hidden)]
-    fn eq_dyn(&self, other: &dyn LiteralType) -> bool;
-
-    #[doc(hidden)]
-    fn hash_dyn(&self, state: &mut dyn hash::Hasher);
-
-    #[doc(hidden)]
-    fn fmt_dyn(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
-
-    #[doc(hidden)]
-    fn as_any(&self) -> &dyn Any;
-}
-
 impl Literal {
+    /// Construct a literal [`DataType`] from a concrete value.
+    ///
+    /// T can be any of [`i8`], [`i16`], [`i32`], [`i64`], [`i128`], [`isize`], [`u8`], [`u16`], [`u32`], [`u64`], [`u128`], [`usize`], [`bool`], [`char`], [`&'static str`], [`String`], [`Cow<'static, str>`].
+    pub fn new<T: LiteralType>(value: T) -> DataType {
+        DataType::Reference(Reference::opaque(Literal::from(value)))
+    }
+
     /// Returns the underlying datatype represented by this literal value.
     pub fn definition(&self, types: &mut Types) -> DataType {
         self.0.definition(types)
@@ -50,6 +32,22 @@ impl Literal {
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.0.as_any().downcast_ref::<T>()
     }
+}
+
+/// Trait used by type-erased literal values.
+///
+/// Sealed so we can add implementations in minor releases
+pub trait LiteralType: Any + Send + Sync + 'static {
+    /// Returns the underlying datatype represented by this literal value.
+    fn definition(&self, types: &mut Types) -> DataType;
+
+    fn eq_dyn(&self, other: &dyn LiteralType) -> bool;
+
+    fn hash_dyn(&self, state: &mut dyn hash::Hasher);
+
+    fn fmt_dyn(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+
+    fn as_any(&self) -> &dyn Any;
 }
 
 impl<T: LiteralType> From<T> for Literal {
@@ -127,109 +125,95 @@ impl_literal_type!(
 );
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum F32Key {
+enum FloatKey<Bits> {
     NegInfinity,
     NegZero,
-    Finite(u32),
+    Finite(Bits),
     Infinity,
     NaN,
 }
 
-impl From<f32> for F32Key {
-    fn from(value: f32) -> Self {
+trait FloatLiteral: Copy + PartialEq + Type + fmt::Debug + Send + Sync + 'static {
+    type Bits: Copy + Eq + Hash;
+
+    const INFINITY: Self;
+    const NEG_INFINITY: Self;
+    const ZERO_BITS: Self::Bits;
+    const NEG_ZERO_BITS: Self::Bits;
+
+    fn is_nan(self) -> bool;
+    fn to_bits(self) -> Self::Bits;
+}
+
+impl<T: FloatLiteral> From<T> for FloatKey<T::Bits> {
+    fn from(value: T) -> Self {
         if value.is_nan() {
             Self::NaN
-        } else if value == f32::INFINITY {
+        } else if value == T::INFINITY {
             Self::Infinity
-        } else if value == f32::NEG_INFINITY {
+        } else if value == T::NEG_INFINITY {
             Self::NegInfinity
-        } else if value == 0.0 {
-            if value.to_bits() == (-0.0f32).to_bits() {
-                Self::NegZero
-            } else {
-                Self::Finite(0.0f32.to_bits())
-            }
+        } else if value.to_bits() == T::NEG_ZERO_BITS {
+            Self::NegZero
+        } else if value.to_bits() == T::ZERO_BITS {
+            Self::Finite(T::ZERO_BITS)
         } else {
             Self::Finite(value.to_bits())
         }
     }
 }
 
-impl LiteralType for f32 {
-    fn definition(&self, types: &mut Types) -> DataType {
-        <f32 as Type>::definition(types)
-    }
+macro_rules! impl_float_literal {
+    ($ty:ty, $bits:ty, $zero:expr, $neg_zero:expr) => {
+        impl FloatLiteral for $ty {
+            type Bits = $bits;
 
-    fn eq_dyn(&self, other: &dyn LiteralType) -> bool {
-        other
-            .as_any()
-            .downcast_ref::<Self>()
-            .is_some_and(|other| F32Key::from(*self) == F32Key::from(*other))
-    }
+            const INFINITY: Self = <$ty>::INFINITY;
+            const NEG_INFINITY: Self = <$ty>::NEG_INFINITY;
+            const ZERO_BITS: Self::Bits = $zero;
+            const NEG_ZERO_BITS: Self::Bits = $neg_zero;
 
-    fn hash_dyn(&self, mut state: &mut dyn hash::Hasher) {
-        F32Key::from(*self).hash(&mut state);
-    }
-
-    fn fmt_dyn(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(self, f)
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum F64Key {
-    NegInfinity,
-    NegZero,
-    Finite(u64),
-    Infinity,
-    NaN,
-}
-
-impl From<f64> for F64Key {
-    fn from(value: f64) -> Self {
-        if value.is_nan() {
-            Self::NaN
-        } else if value == f64::INFINITY {
-            Self::Infinity
-        } else if value == f64::NEG_INFINITY {
-            Self::NegInfinity
-        } else if value == 0.0 {
-            if value.to_bits() == (-0.0f64).to_bits() {
-                Self::NegZero
-            } else {
-                Self::Finite(0.0f64.to_bits())
+            fn is_nan(self) -> bool {
+                self.is_nan()
             }
-        } else {
-            Self::Finite(value.to_bits())
+
+            fn to_bits(self) -> Self::Bits {
+                self.to_bits()
+            }
         }
-    }
+
+        impl LiteralType for $ty {
+            fn definition(&self, types: &mut Types) -> DataType {
+                <$ty as Type>::definition(types)
+            }
+
+            fn eq_dyn(&self, other: &dyn LiteralType) -> bool {
+                other
+                    .as_any()
+                    .downcast_ref::<Self>()
+                    .is_some_and(|other| FloatKey::from(*self) == FloatKey::from(*other))
+            }
+
+            fn hash_dyn(&self, mut state: &mut dyn hash::Hasher) {
+                FloatKey::from(*self).hash(&mut state);
+            }
+
+            fn fmt_dyn(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                fmt::Debug::fmt(self, f)
+            }
+
+            fn as_any(&self) -> &dyn Any {
+                self
+            }
+        }
+    };
 }
 
-impl LiteralType for f64 {
-    fn definition(&self, types: &mut Types) -> DataType {
-        <f64 as Type>::definition(types)
-    }
+impl_float_literal!(f32, u32, 0.0f32.to_bits(), (-0.0f32).to_bits());
+impl_float_literal!(f64, u64, 0.0f64.to_bits(), (-0.0f64).to_bits());
 
-    fn eq_dyn(&self, other: &dyn LiteralType) -> bool {
-        other
-            .as_any()
-            .downcast_ref::<Self>()
-            .is_some_and(|other| F64Key::from(*self) == F64Key::from(*other))
-    }
+#[cfg(is_nightly)]
+impl_float_literal!(f16, u16, 0.0f16.to_bits(), (-0.0f16).to_bits());
 
-    fn hash_dyn(&self, mut state: &mut dyn hash::Hasher) {
-        F64Key::from(*self).hash(&mut state);
-    }
-
-    fn fmt_dyn(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(self, f)
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
+#[cfg(is_nightly)]
+impl_float_literal!(f128, u128, 0.0f128.to_bits(), (-0.0f128).to_bits());

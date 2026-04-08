@@ -62,4 +62,12 @@ fn literals() {
         Reference::opaque(Literal::from(f64::NAN)),
         Reference::opaque(Literal::from(f64::NAN))
     );
+
+    #[cfg(is_nightly)]
+    {
+        assert_eq!(Literal::from(f16::NAN), Literal::from(f16::NAN));
+        assert_ne!(Literal::from(0.0f16), Literal::from(-0.0f16));
+        assert_eq!(Literal::from(f128::NAN), Literal::from(f128::NAN));
+        assert_ne!(Literal::from(0.0f128), Literal::from(-0.0f128));
+    }
 }
