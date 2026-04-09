@@ -16,13 +16,10 @@ use crate::{
 pub struct Types(
     // `None` indicates that the entry is a placeholder.
     // It is a reference and we are currently resolving it's definition.
-    pub(crate) HashMap<NamedId, Option<NamedDataType>>, // TODO: I think we can remove the `Option` wrapper
+    pub(crate) HashMap<NamedId, Option<NamedDataType>>,
     // The count of non-`None` items in the collection.
     // We store this to avoid expensive iteration.
     pub(crate) usize,
-    // Tracks the active named-type resolution stack so recursive references can reuse
-    // placeholders instead of re-entering resolution.
-    pub(crate) Vec<NamedId>,
 );
 
 /// A wrapper around [`Types`] indicating the type graph has already been
