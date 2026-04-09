@@ -436,6 +436,21 @@ expression: output
 	* @property {T[]} values
 	*
 	* @typedef {{
+	*		value: T,
+	*	}} GenericDefault<T>
+	* @property {T} value
+	*
+	* @typedef {{
+	*		value: number,
+	*	}} GenericDefaultSkipped
+	* @property {number} value
+	*
+	* @typedef {{
+	*		value: number,
+	*	}} GenericDefaultSkippedNonType
+	* @property {number} value
+	*
+	* @typedef {{
 	*		generic_flattened: T,
 	*	}} GenericFlattened<T>
 	* @property {T} generic_flattened
@@ -965,6 +980,9 @@ expression: output
 	*		"InlineGenericNested<String>": [string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | string | { value: string }],
 	*		"InlineFlattenGenericsG<()>": InlineFlattenGenericsG<null>,
 	*		InlineFlattenGenerics: InlineFlattenGenerics,
+	*		GenericDefault: GenericDefault<string>,
+	*		GenericDefaultSkipped: GenericDefaultSkipped,
+	*		GenericDefaultSkippedNonType: GenericDefaultSkippedNonType,
 	*		GenericParameterOrderPreserved: GenericParameterOrderPreserved,
 	*		TestCollectionRegister: TestCollectionRegister,
 	*		TestCollectionRegister: TestCollectionRegister,
@@ -1220,6 +1238,9 @@ expression: output
 	* @property {[string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | string | { value: string }]} "InlineGenericNested<String>"
 	* @property {InlineFlattenGenericsG<null>} "InlineFlattenGenericsG<()>"
 	* @property {InlineFlattenGenerics} InlineFlattenGenerics
+	* @property {GenericDefault<string>} GenericDefault
+	* @property {GenericDefaultSkipped} GenericDefaultSkipped
+	* @property {GenericDefaultSkippedNonType} GenericDefaultSkippedNonType
 	* @property {GenericParameterOrderPreserved} GenericParameterOrderPreserved
 	* @property {TestCollectionRegister} TestCollectionRegister
 	* @property {TestCollectionRegister} TestCollectionRegister

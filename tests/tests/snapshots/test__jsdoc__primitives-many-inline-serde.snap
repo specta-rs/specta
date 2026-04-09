@@ -1151,6 +1151,21 @@ expression: output
 	* @property {InlineFlattenGenericsG<string>} t
 	*
 	* @typedef {{
+	*		value: T,
+	*	}} GenericDefault<T>
+	* @property {T} value
+	*
+	* @typedef {{
+	*		value: number,
+	*	}} GenericDefaultSkipped
+	* @property {number} value
+	*
+	* @typedef {{
+	*		value: number,
+	*	}} GenericDefaultSkippedNonType
+	* @property {number} value
+	*
+	* @typedef {{
 	*		pair: Pair<number, string>,
 	*	}} GenericParameterOrderPreserved
 	* @property {Pair<number, string>} pair

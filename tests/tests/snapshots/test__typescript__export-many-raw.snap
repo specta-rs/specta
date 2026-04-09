@@ -728,6 +728,18 @@ export type InlineFlattenGenerics = {
 	t: InlineFlattenGenericsG<string>,
 };
 
+export type GenericDefault<T> = {
+	value: T,
+};
+
+export type GenericDefaultSkipped = {
+	value: number,
+};
+
+export type GenericDefaultSkippedNonType = {
+	value: number,
+};
+
 export type GenericParameterOrderPreserved = {
 	pair: Pair<number, string>,
 };

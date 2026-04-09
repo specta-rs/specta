@@ -584,6 +584,15 @@ InlineFlattenGenerics: {
 		t: string,
 	},
 } & (InlineFlattenGenericsG<string>)
+GenericDefault: {
+	value: string,
+}
+GenericDefaultSkipped: {
+	value: number,
+}
+GenericDefaultSkippedNonType: {
+	value: number,
+}
 GenericParameterOrderPreserved: {
 	pair: Pair<number, string>,
 }

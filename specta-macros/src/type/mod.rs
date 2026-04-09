@@ -175,7 +175,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let bounds = generics_with_ident_and_bounds_only(generics);
     let type_args = generics_with_ident_only(generics);
-    let used_generic_types = used_type_params(generics, data, container_attrs.r#type.as_ref());
+    let used_generic_types = used_type_params(generics, data, container_attrs.r#type.as_ref())?;
     let all_generic_type_idents = all_type_param_idents(generics);
     let used_direct_generics =
         used_direct_type_params(&used_generic_types, &all_generic_type_idents);
@@ -211,7 +211,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         })
         .unzip();
 
-    let (generics_for_ndt, generics_for_ref): (Vec<_>, Vec<_>) = generics
+    let generics_for_ndt_triplets = generics
         .params
         .iter()
         .filter_map(|param| match param {
@@ -223,10 +223,18 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     return None;
                 }
                 let i_str = i.to_string();
+                let default = match &t.default {
+                    Some(default) => quote!(Some(<#default as #crate_ref::Type>::definition(types))),
+                    None => quote!(None),
+                };
                 Some((
                     quote!(#crate_ref::datatype::Generic::new::<#placeholder_ident>(
                         Cow::Borrowed(#i_str),
                         None,
+                    )),
+                    quote!(#crate_ref::datatype::Generic::new::<#placeholder_ident>(
+                        Cow::Borrowed(#i_str),
+                        #default,
                     )),
                     quote!((
                         #crate_ref::datatype::GenericReference::new::<#placeholder_ident>(),
@@ -235,7 +243,28 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 ))
             }
         })
-        .unzip();
+        .collect::<Vec<_>>();
+
+    let generics_for_ndt = generics_for_ndt_triplets
+        .iter()
+        .map(|(generic, _, _)| generic.clone())
+        .collect::<Vec<_>>();
+    let generics_for_ndt_with_defaults = generics_for_ndt_triplets
+        .iter()
+        .map(|(_, generic, _)| generic.clone())
+        .collect::<Vec<_>>();
+    let generics_for_ref = generics_for_ndt_triplets
+        .into_iter()
+        .map(|(_, _, generic)| generic)
+        .collect::<Vec<_>>();
+
+    let generics_for_ndt_with_defaults = if generics_for_ndt_with_defaults.is_empty() {
+        None
+    } else {
+        Some(quote! {
+            *ndt.generics_mut() = Cow::Owned(vec![#(#generics_for_ndt_with_defaults),*]);
+        })
+    };
 
     let collect = (cfg!(feature = "DO_NOT_USE_collect") && container_attrs.collect.unwrap_or(true))
         .then(|| {
@@ -291,11 +320,9 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                                 ndt.set_docs(Cow::Borrowed(#comments));
                                 ndt.set_deprecated(#deprecated);
                                 ndt.set_module_path(Cow::Borrowed(module_path!()));
-                                ndt.set_ty({
-                                    #shadow_generic_aliases
-
-                                    #dt_expr
-                                });
+                                #shadow_generic_aliases
+                                #generics_for_ndt_with_defaults
+                                ndt.set_ty(#dt_expr);
                             }
                         )
                     )

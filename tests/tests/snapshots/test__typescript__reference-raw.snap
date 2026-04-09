@@ -215,6 +215,9 @@ InlineGenericNewtype<String>: string
 InlineGenericNested<String>: [string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | string | { value: string }]
 InlineFlattenGenericsG<()>: InlineFlattenGenericsG<null>
 InlineFlattenGenerics: InlineFlattenGenerics
+GenericDefault: GenericDefault<string>
+GenericDefaultSkipped: GenericDefaultSkipped
+GenericDefaultSkippedNonType: GenericDefaultSkippedNonType
 GenericParameterOrderPreserved: GenericParameterOrderPreserved
 TestCollectionRegister: TestCollectionRegister
 TestCollectionRegister: TestCollectionRegister
