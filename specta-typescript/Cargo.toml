@@ -33,3 +33,4 @@ serde = { version = "1", default-features = false, optional = true }
 serde = { version = "1", features = ["derive"] }
 specta = { version = "=2.0.0-rc.24", path = "../specta", features = ["derive", "collect"] }
 specta-util = { path = "../specta-util", features = ["serde"] }
+specta-serde = { path = "../specta-serde" }
