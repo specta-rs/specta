@@ -1,8 +1,8 @@
 use std::marker::PhantomData;
 
 use specta::{
-    datatype::{DataType, List},
     Type, Types,
+    datatype::{DataType, List},
 };
 
 /// Declares a fixed-length array type for Specta exporters.

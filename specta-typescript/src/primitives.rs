@@ -121,7 +121,12 @@ fn export_single_internal(
     )?;
 
     let mut comments = String::new();
-    js_doc(&mut comments, &ndt.docs, ndt.deprecated.as_ref(), !exporter.jsdoc);
+    js_doc(
+        &mut comments,
+        &ndt.docs,
+        ndt.deprecated.as_ref(),
+        !exporter.jsdoc,
+    );
     if !comments.is_empty() {
         for line in comments.lines() {
             s.push_str(indent);
@@ -268,7 +273,9 @@ fn append_jsdoc_properties(
         DataType::Enum(enm) => {
             for (variant_name, variant) in enm.variants.iter().filter(|(_, v)| !v.skip) {
                 let mut one_variant_enum = enm.clone();
-                one_variant_enum.variants.retain(|(name, _)| name == variant_name);
+                one_variant_enum
+                    .variants
+                    .retain(|(name, _)| name == variant_name);
 
                 let mut variant_ty = String::new();
                 crate::legacy::enum_datatype(
@@ -635,12 +642,16 @@ fn resolved_reference_generics(
             .as_ref()
             .map(|default| resolve_generics_in_datatype(default, &scoped_generics));
 
-        let resolved = explicit
-            .or_else(|| resolved_default.clone())
-            .or_else(|| Some(DataType::Reference(Reference::opaque(crate::opaque::Unknown))));
+        let resolved = explicit.or_else(|| resolved_default.clone()).or_else(|| {
+            Some(DataType::Reference(Reference::opaque(
+                crate::opaque::Unknown,
+            )))
+        });
 
         let resolved = resolved?;
-        all_default &= resolved_default.as_ref().is_some_and(|default| default == &resolved);
+        all_default &= resolved_default
+            .as_ref()
+            .is_some_and(|default| default == &resolved);
         scoped_generics.push((generic.reference(), resolved.clone()));
         rendered_generics.push(resolved);
     }
@@ -702,9 +713,7 @@ fn shallow_inline_datatype(
 
             fn is_exhaustive(dt: &DataType, types: &Types) -> bool {
                 match dt {
-                    DataType::Enum(e) => {
-                        e.variants.iter().filter(|(_, v)| !v.skip).count() == 0
-                    }
+                    DataType::Enum(e) => e.variants.iter().filter(|(_, v)| !v.skip).count() == 0,
                     DataType::Reference(Reference::Named(r)) => r
                         .get(types)
                         .is_some_and(|ndt| is_exhaustive(&ndt.inner, types)),
@@ -1436,8 +1445,12 @@ fn map_key_render_type(dt: DataType) -> DataType {
 
 fn bool_key_literal_datatype() -> DataType {
     let mut bool_enum = Enum::default();
-    bool_enum.variants.push((Cow::Borrowed("true"), Variant::unit()));
-    bool_enum.variants.push((Cow::Borrowed("false"), Variant::unit()));
+    bool_enum
+        .variants
+        .push((Cow::Borrowed("true"), Variant::unit()));
+    bool_enum
+        .variants
+        .push((Cow::Borrowed("false"), Variant::unit()));
     DataType::Enum(bool_enum)
 }
 
@@ -2058,14 +2071,14 @@ fn reference_named_dt(
                 if ndt.module_path.is_empty() {
                     ndt.name.clone()
                 } else {
-                    let mut path = ndt
-                        .module_path
-                        .split("::")
-                        .fold("$s$.".to_string(), |mut s, segment| {
-                            s.push_str(segment);
-                            s.push('.');
-                            s
-                        });
+                    let mut path =
+                        ndt.module_path
+                            .split("::")
+                            .fold("$s$.".to_string(), |mut s, segment| {
+                                s.push_str(segment);
+                                s.push('.');
+                                s
+                            });
                     path.push_str(&ndt.name);
                     Cow::Owned(path)
                 }

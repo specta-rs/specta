@@ -377,7 +377,8 @@ impl Analyzer {
                     .fields
                     .iter()
                     .filter_map(|(field_name, field)| {
-                        string_literal(field.ty.as_ref()?).map(|value| (field_name.to_string(), value))
+                        string_literal(field.ty.as_ref()?)
+                            .map(|value| (field_name.to_string(), value))
                     })
                     .collect::<Vec<_>>();
 

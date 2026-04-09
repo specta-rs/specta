@@ -64,7 +64,8 @@ pub fn export_type(
     // Add deprecated annotation if present
     if let Some(deprecated) = ndt.deprecated.as_ref() {
         let message = deprecated
-            .note.as_deref()
+            .note
+            .as_deref()
             .filter(|note| !note.trim().is_empty())
             .map(ToString::to_string)
             .unwrap_or_else(|| "This type is deprecated".to_string());
@@ -361,7 +362,10 @@ fn struct_to_swift(
                 let field_type = datatype_to_swift(
                     swift,
                     types,
-                    fields.fields[0].ty.as_ref().expect("tuple field should have a type"),
+                    fields.fields[0]
+                        .ty
+                        .as_ref()
+                        .expect("tuple field should have a type"),
                     generic_scope,
                     is_export,
                     None,
@@ -446,7 +450,9 @@ fn enum_to_swift(
             continue;
         }
 
-        let variant_name = swift.naming.convert_enum_case(original_variant_name.as_ref());
+        let variant_name = swift
+            .naming
+            .convert_enum_case(original_variant_name.as_ref());
 
         match &variant.fields {
             specta::datatype::Fields::Unit => {
@@ -471,7 +477,8 @@ fn enum_to_swift(
                             datatype_to_swift(
                                 swift,
                                 types,
-                                f.ty.as_ref().expect("enum variant field should have a type"),
+                                f.ty.as_ref()
+                                    .expect("enum variant field should have a type"),
                                 generic_scope.clone(),
                                 is_export,
                                 None,
@@ -708,7 +715,9 @@ fn generate_enum_codable_impl(
         if variant.skip {
             continue;
         }
-        let swift_case_name = swift.naming.convert_enum_case(original_variant_name.as_ref());
+        let swift_case_name = swift
+            .naming
+            .convert_enum_case(original_variant_name.as_ref());
         result.push_str(&format!(
             "        case {} = \"{}\"\n",
             swift_case_name, original_variant_name
@@ -733,7 +742,9 @@ fn generate_enum_codable_impl(
             continue;
         }
 
-        let swift_case_name = swift.naming.convert_enum_case(original_variant_name.as_ref());
+        let swift_case_name = swift
+            .naming
+            .convert_enum_case(original_variant_name.as_ref());
 
         match &variant.fields {
             specta::datatype::Fields::Unit => {
@@ -784,7 +795,9 @@ fn generate_enum_codable_impl(
             continue;
         }
 
-        let swift_case_name = swift.naming.convert_enum_case(original_variant_name.as_ref());
+        let swift_case_name = swift
+            .naming
+            .convert_enum_case(original_variant_name.as_ref());
 
         match &variant.fields {
             specta::datatype::Fields::Unit => {

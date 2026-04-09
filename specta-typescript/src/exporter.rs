@@ -274,10 +274,7 @@ impl Exporter {
 
             let import_paths = referenced_types
                 .into_iter()
-                .filter_map(|r| {
-                    r.get(types)
-                        .map(|ndt| ndt.module_path.as_ref().to_string())
-                })
+                .filter_map(|r| r.get(types).map(|ndt| ndt.module_path.as_ref().to_string()))
                 .filter(|module_path| module_path != module.module_path.as_ref())
                 .collect::<BTreeSet<_>>();
             if !import_paths.is_empty() {
@@ -373,8 +370,7 @@ impl Exporter {
                     let import_paths = runtime_references
                         .into_iter()
                         .filter_map(|r| {
-                            r.get(types)
-                                .map(|ndt| ndt.module_path.as_ref().to_string())
+                            r.get(types).map(|ndt| ndt.module_path.as_ref().to_string())
                         })
                         .filter(|module_path| !module_path.is_empty())
                         .collect::<BTreeSet<_>>();
@@ -730,11 +726,7 @@ fn render_flat_types<'a>(
         .map(|ndt| {
             let export_name = exported_type_name(exporter, ndt);
             if let Some(other) = exports.insert(export_name.to_string(), ndt.location) {
-                return Err(Error::duplicate_type_name(
-                    export_name,
-                    ndt.location,
-                    other,
-                ));
+                return Err(Error::duplicate_type_name(export_name, ndt.location, other));
             }
 
             Ok(ndt)

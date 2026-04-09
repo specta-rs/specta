@@ -415,7 +415,9 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
             return;
         };
 
-        let generic_args = ndt.generics.iter()
+        let generic_args = ndt
+            .generics
+            .iter()
             .map(|generic| {
                 let reference = generic.reference();
                 (reference.clone(), reference.into())
@@ -1683,9 +1685,12 @@ fn internal_tag_payload_compatibility(
             }
 
             Ok(match &strct.fields {
-                Fields::Named(named) => {
-                    Some(named.fields.iter().all(|(_, field)| field.ty.as_ref().is_none()))
-                }
+                Fields::Named(named) => Some(
+                    named
+                        .fields
+                        .iter()
+                        .all(|(_, field)| field.ty.as_ref().is_none()),
+                ),
                 Fields::Unit | Fields::Unnamed(_) => None,
             })
         }
@@ -1741,7 +1746,10 @@ fn internal_tag_variant_payload_compatibility(
     match &variant.fields {
         Fields::Unit => Ok(Some(true)),
         Fields::Named(named) => Ok(Some(
-            named.fields.iter().all(|(_, field)| field.ty.as_ref().is_none()),
+            named
+                .fields
+                .iter()
+                .all(|(_, field)| field.ty.as_ref().is_none()),
         )),
         Fields::Unnamed(unnamed) => {
             if unnamed.fields.len() != 1 {
@@ -1774,16 +1782,13 @@ fn has_local_phase_difference(dt: &DataType) -> Result<bool> {
                     Ok(variant_has_local_difference(variant)?
                         || fields_have_local_difference(&variant.fields)?)
                 })?),
-        DataType::Tuple(tuple) => tuple
-            .elements
-            .iter()
-            .try_fold(false, |has_difference, ty| {
-                if has_difference {
-                    return Ok(true);
-                }
+        DataType::Tuple(tuple) => tuple.elements.iter().try_fold(false, |has_difference, ty| {
+            if has_difference {
+                return Ok(true);
+            }
 
-                has_local_phase_difference(ty)
-            }),
+            has_local_phase_difference(ty)
+        }),
         DataType::List(list) => has_local_phase_difference(&list.ty),
         DataType::Map(map) => Ok(has_local_phase_difference(map.key_ty())?
             || has_local_phase_difference(map.value_ty())?),
@@ -1826,7 +1831,10 @@ fn fields_have_local_difference(fields: &Fields) -> Result<bool> {
                         return Ok(true);
                     }
 
-                    field.ty.as_ref().map_or(Ok(false), has_local_phase_difference)
+                    field
+                        .ty
+                        .as_ref()
+                        .map_or(Ok(false), has_local_phase_difference)
                 })
         }
         Fields::Named(named) => {
@@ -1839,7 +1847,10 @@ fn fields_have_local_difference(fields: &Fields) -> Result<bool> {
                     }
 
                     Ok(field_has_local_difference(field)?
-                        || field.ty.as_ref().map_or(Ok(false), has_local_phase_difference)?)
+                        || field
+                            .ty
+                            .as_ref()
+                            .map_or(Ok(false), has_local_phase_difference)?)
                 })
         }
     }

@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::{datatype::NamedDataType, Types};
+use crate::{Types, datatype::NamedDataType};
 
 use super::DataType;
 

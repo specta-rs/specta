@@ -1,9 +1,9 @@
 use std::marker::PhantomData;
 
 use crate::{
+    Type, Types,
     datatype::{self, DataType, Enum, Field, List, Variant},
     r#type::{generics, macros::*},
-    Type, Types,
 };
 
 impl_primitives!(

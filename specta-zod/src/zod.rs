@@ -8,11 +8,11 @@ use std::{
 };
 
 use specta::{
-    datatype::{DataType, NamedDataType, Reference},
     ResolvedTypes, Types,
+    datatype::{DataType, NamedDataType, Reference},
 };
 
-use crate::{primitives, references, Error};
+use crate::{Error, primitives, references};
 
 /// Allows configuring how Specta's Zod exporter will deal with BigInt types ([i64], [i128] etc).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -102,9 +102,9 @@ impl Zod {
     pub fn framework_runtime(
         mut self,
         builder: impl Fn(FrameworkExporter<'_>) -> Result<Cow<'static, str>, Error>
-            + Send
-            + Sync
-            + 'static,
+        + Send
+        + Sync
+        + 'static,
     ) -> Self {
         self.framework_runtime = Some(RuntimeFn(Arc::new(builder)));
         self

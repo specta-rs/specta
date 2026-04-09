@@ -6,10 +6,10 @@ use std::{
 };
 
 use specta::{
-    datatype::{DataType, Reference},
     ResolvedTypes, Type, Types,
+    datatype::{DataType, Reference},
 };
-use specta_typescript::{primitives, Layout, Typescript};
+use specta_typescript::{Layout, Typescript, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;

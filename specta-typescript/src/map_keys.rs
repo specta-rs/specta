@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use specta::{
-    datatype::{DataType, Fields, GenericReference, Primitive, Reference},
     Types,
+    datatype::{DataType, Fields, GenericReference, Primitive, Reference},
 };
 
 use crate::Error;

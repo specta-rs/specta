@@ -209,22 +209,18 @@ fn inner(
                 match &variant.fields {
                     Fields::Unit => {}
                     Fields::Named(named) => {
-                        for (name, (field, _)) in named
-                            .fields
-                            .iter()
-                            .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
-                        {
+                        for (name, (field, _)) in named.fields.iter().filter_map(|(name, field)| {
+                            field.ty.as_ref().map(|ty| (name, (field, ty)))
+                        }) {
                             validate_field_attributes(
                                 field,
                                 format!("{path}::{variant_name}.{name}"),
                                 mode,
                             )?;
                         }
-                        for (name, (_, ty)) in named
-                            .fields
-                            .iter()
-                            .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
-                        {
+                        for (name, (_, ty)) in named.fields.iter().filter_map(|(name, field)| {
+                            field.ty.as_ref().map(|ty| (name, (field, ty)))
+                        }) {
                             inner(
                                 ty,
                                 types,
@@ -612,8 +608,7 @@ fn validate_untagged_variants(enm: &Enum, path: &str) -> Result<()> {
 fn validate_other_variant(enm: &Enum, path: &str, repr: &EnumRepr, mode: ApplyMode) -> Result<()> {
     let mut other_variants = Vec::new();
     for (name, variant) in &enm.variants {
-        if SerdeVariantAttrs::from_attributes(&variant.attributes)?
-            .is_some_and(|attrs| attrs.other)
+        if SerdeVariantAttrs::from_attributes(&variant.attributes)?.is_some_and(|attrs| attrs.other)
         {
             other_variants.push((name, variant));
         }

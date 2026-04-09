@@ -89,7 +89,8 @@ fn instance_type_to_datatype(
                 if let Value::String(t) = item {
                     let dt = instance_type_name_to_datatype(t, obj)?;
                     let variant = Variant::unnamed().field(Field::new(dt)).build();
-                    e.variants.push((Cow::Owned(format!("Variant{}", i)), variant));
+                    e.variants
+                        .push((Cow::Owned(format!("Variant{}", i)), variant));
                 }
             }
 
@@ -241,7 +242,8 @@ fn handle_any_of(schemas: &[Value]) -> Result<DataType, Error> {
     for (i, schema) in schemas.iter().enumerate() {
         let dt = value_to_datatype(schema)?;
         let variant = Variant::unnamed().field(Field::new(dt)).build();
-        e.variants.push((Cow::Owned(format!("Variant{}", i)), variant));
+        e.variants
+            .push((Cow::Owned(format!("Variant{}", i)), variant));
     }
 
     Ok(DataType::Enum(e))

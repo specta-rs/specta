@@ -1,6 +1,6 @@
-use crate::{primitives, Error, Layout, SchemaVersion};
+use crate::{Error, Layout, SchemaVersion, primitives};
 use serde_json::Value;
-use specta::{datatype::NamedDataType, Types};
+use specta::{Types, datatype::NamedDataType};
 use std::collections::BTreeMap;
 use std::path::Path;
 

@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use specta::{
-    datatype::{DataType, NamedDataType, Primitive},
     ResolvedTypes, Type, Types,
+    datatype::{DataType, NamedDataType, Primitive},
 };
 use specta_typescript::{Layout, Typescript};
 use tempfile::TempDir;
