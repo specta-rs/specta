@@ -1156,6 +1156,34 @@ expression: output
 	* @property {T} value
 	*
 	* @typedef {{
+	*		first: T,
+	*		second: U,
+	*	}} ChainedGenericDefault<T = string, U = T>
+	* @property {T} first
+	* @property {U} second
+	*
+	* @typedef {{
+	*		first: T,
+	*		second: U,
+	*	}} ChainedGenericDefault<T = string, U = T>
+	* @property {T} first
+	* @property {U} second
+	*
+	* @typedef {{
+	*		first: T,
+	*		second: U,
+	*	}} ChainedGenericDefault<T = string, U = T>
+	* @property {T} first
+	* @property {U} second
+	*
+	* @typedef {{
+	*		first: T,
+	*		second: U,
+	*	}} ChainedGenericDefault<T = string, U = T>
+	* @property {T} first
+	* @property {U} second
+	*
+	* @typedef {{
 	*		value: T,
 	*	}} GenericDefaultSkipped<T>
 	* @property {T} value

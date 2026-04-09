@@ -83,6 +83,13 @@ expression: output
 	* @typedef {string} BracedStruct
 	* @property {string} "0"
 	*
+	* @typedef {{
+	*		first: T,
+	*		second: U,
+	*	}} ChainedGenericDefault<T = string, U = T>
+	* @property {T} first
+	* @property {U} second
+	*
 	*  Some triple-slash comment
 	*  Some more triple-slash comment
 	*
@@ -1136,7 +1143,11 @@ expression: output
 	* } }) & { Unnamed?: never }],
 	*		"InlineFlattenGenericsG<()>": InlineFlattenGenericsG<null>,
 	*		InlineFlattenGenerics: InlineFlattenGenerics,
-	*		GenericDefault: GenericDefault<string>,
+	*		GenericDefault: GenericDefault,
+	*		ChainedGenericDefault: ChainedGenericDefault,
+	*		"ChainedGenericDefault<String, String>": ChainedGenericDefault,
+	*		"ChainedGenericDefault<i32>": ChainedGenericDefault<number, number>,
+	*		"ChainedGenericDefault<String, i32>": ChainedGenericDefault<string, number>,
 	*		GenericDefaultSkipped: GenericDefaultSkipped<string>,
 	*		GenericDefaultSkippedNonType: GenericDefaultSkippedNonType<unknown>,
 	*		GenericParameterOrderPreserved: GenericParameterOrderPreserved,
@@ -1401,7 +1412,11 @@ expression: output
 	* } }) & { Unnamed?: never }]} "InlineGenericNested<String>"
 	* @property {InlineFlattenGenericsG<null>} "InlineFlattenGenericsG<()>"
 	* @property {InlineFlattenGenerics} InlineFlattenGenerics
-	* @property {GenericDefault<string>} GenericDefault
+	* @property {GenericDefault} GenericDefault
+	* @property {ChainedGenericDefault} ChainedGenericDefault
+	* @property {ChainedGenericDefault} "ChainedGenericDefault<String, String>"
+	* @property {ChainedGenericDefault<number, number>} "ChainedGenericDefault<i32>"
+	* @property {ChainedGenericDefault<string, number>} "ChainedGenericDefault<String, i32>"
 	* @property {GenericDefaultSkipped<string>} GenericDefaultSkipped
 	* @property {GenericDefaultSkippedNonType<unknown>} GenericDefaultSkippedNonType
 	* @property {GenericParameterOrderPreserved} GenericParameterOrderPreserved

@@ -601,6 +601,55 @@ fn write_generic_reference(s: &mut String, generic: &GenericReference) -> Result
     Ok(())
 }
 
+fn scoped_reference_generics(
+    parent_generics: &[(GenericReference, DataType)],
+    reference_generics: &[(GenericReference, DataType)],
+) -> Vec<(GenericReference, DataType)> {
+    parent_generics
+        .iter()
+        .filter(|(parent_generic, _)| {
+            !reference_generics
+                .iter()
+                .any(|(child_generic, _)| child_generic == parent_generic)
+        })
+        .cloned()
+        .collect()
+}
+
+fn resolved_reference_generics(
+    ndt: &specta::datatype::NamedDataType,
+    r: &NamedReference,
+    parent_generics: &[(GenericReference, DataType)],
+) -> Option<(Vec<DataType>, bool, Vec<(GenericReference, DataType)>)> {
+    let mut scoped_generics = scoped_reference_generics(parent_generics, r.generics());
+    let mut all_default = true;
+    let mut rendered_generics = Vec::with_capacity(ndt.generics().len());
+
+    for generic in ndt.generics() {
+        let explicit = r
+            .generics()
+            .iter()
+            .find(|(reference, _)| *reference == generic.reference())
+            .map(|(_, dt)| resolve_generics_in_datatype(dt, &scoped_generics));
+
+        let resolved_default = generic
+            .default
+            .as_ref()
+            .map(|default| resolve_generics_in_datatype(default, &scoped_generics));
+
+        let resolved = explicit
+            .or_else(|| resolved_default.clone())
+            .or_else(|| Some(DataType::Reference(Reference::opaque(crate::opaque::Unknown))));
+
+        let resolved = resolved?;
+        all_default &= resolved_default.as_ref().is_some_and(|default| default == &resolved);
+        scoped_generics.push((generic.reference(), resolved.clone()));
+        rendered_generics.push(resolved);
+    }
+
+    Some((rendered_generics, all_default, scoped_generics))
+}
+
 fn shallow_inline_datatype(
     s: &mut String,
     exporter: &Exporter,
@@ -2043,57 +2092,15 @@ fn reference_named_dt(
             _ => ndt.name().clone(),
         };
 
-        let scoped_generics = generics
-            .iter()
-            .filter(|(parent_generic, _)| {
-                !r.generics()
-                    .iter()
-                    .any(|(child_generic, _)| child_generic == parent_generic)
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-
-        let rendered_generics = ndt
-            .generics()
-            .iter()
-            .map(|generic| {
-                r.generics()
-                    .iter()
-                    .find(|(reference, _)| *reference == generic.reference())
-                    .map(|(_, dt)| resolve_generics_in_datatype(dt, &scoped_generics))
-                    .or_else(|| generic.default.clone())
-                    .or_else(|| Some(DataType::Reference(Reference::opaque(crate::opaque::Unknown))))
-            })
-            .collect::<Option<Vec<_>>>();
+        let (rendered_generics, omit_generics, scoped_generics) =
+            resolved_reference_generics(ndt, r, generics)
+                .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
 
         s.push_str(&name);
-        if let Some(rendered_generics) = rendered_generics {
-            if !rendered_generics.is_empty() {
-                s.push('<');
-
-                for (i, dt) in rendered_generics.iter().enumerate() {
-                    if i != 0 {
-                        s.push_str(", ");
-                    }
-
-                    crate::legacy::datatype_inner(
-                        crate::legacy::ExportContext {
-                            cfg: exporter,
-                            path: vec![],
-                        },
-                        dt,
-                        types,
-                        s,
-                        &scoped_generics,
-                    )?;
-                }
-
-                s.push('>');
-            }
-        } else if !r.generics().is_empty() {
+        if !omit_generics && !rendered_generics.is_empty() {
             s.push('<');
 
-            for (i, (_, v)) in r.generics().iter().enumerate() {
+            for (i, dt) in rendered_generics.iter().enumerate() {
                 if i != 0 {
                     s.push_str(", ");
                 }
@@ -2103,7 +2110,7 @@ fn reference_named_dt(
                         cfg: exporter,
                         path: vec![],
                     },
-                    v,
+                    dt,
                     types,
                     s,
                     &scoped_generics,

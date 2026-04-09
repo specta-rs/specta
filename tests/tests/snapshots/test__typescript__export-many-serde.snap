@@ -769,6 +769,26 @@ export type GenericDefault<T = string> = {
 	value: T,
 };
 
+export type ChainedGenericDefault<T = string, U = T> = {
+	first: T,
+	second: U,
+};
+
+export type ChainedGenericDefault<T = string, U = T> = {
+	first: T,
+	second: U,
+};
+
+export type ChainedGenericDefault<T = string, U = T> = {
+	first: T,
+	second: U,
+};
+
+export type ChainedGenericDefault<T = string, U = T> = {
+	first: T,
+	second: U,
+};
+
 export type GenericDefaultSkipped<T> = {
 	value: T,
 };

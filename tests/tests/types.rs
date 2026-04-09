@@ -15,7 +15,6 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use specta::{Type, Types, datatype::DataType};
-use specta_typescript::Typescript;
 
 /// A macro to collect up the types for better testing.
 ///
@@ -403,6 +402,10 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         InlineFlattenGenericsG<()>,
         InlineFlattenGenerics,
         GenericDefault,
+        ChainedGenericDefault,
+        ChainedGenericDefault<String, String>,
+        ChainedGenericDefault<i32>,
+        ChainedGenericDefault<String, i32>,
         GenericDefaultSkipped,
         GenericDefaultSkippedNonType,
         GenericParameterOrderPreserved,
@@ -2271,6 +2274,13 @@ struct InlineFlattenGenerics {
 #[specta(collect = false)]
 struct GenericDefault<T = String> {
     value: T,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct ChainedGenericDefault<T = String, U = T> {
+    first: T,
+    second: U,
 }
 
 #[derive(Type)]

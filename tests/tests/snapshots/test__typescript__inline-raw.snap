@@ -547,6 +547,22 @@ InlineFlattenGenerics: {
 GenericDefault: {
 	value: string,
 }
+ChainedGenericDefault: {
+	first: string,
+	second: string,
+}
+ChainedGenericDefault<String, String>: {
+	first: string,
+	second: string,
+}
+ChainedGenericDefault<i32>: {
+	first: number,
+	second: number,
+}
+ChainedGenericDefault<String, i32>: {
+	first: string,
+	second: number,
+}
 GenericDefaultSkipped: {
 	value: string,
 }
