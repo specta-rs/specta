@@ -15,6 +15,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use specta::{Type, Types, datatype::DataType};
+use specta_typescript::Typescript;
 
 /// A macro to collect up the types for better testing.
 ///
@@ -401,6 +402,9 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         InlineGenericNested<String>,
         InlineFlattenGenericsG<()>,
         InlineFlattenGenerics,
+        GenericDefault,
+        GenericDefaultSkipped,
+        GenericDefaultSkippedNonType,
         GenericParameterOrderPreserved,
 
         // Tests for handling of const generics
@@ -2261,6 +2265,30 @@ struct InlineFlattenGenerics {
     gi: InlineFlattenGenericsG<String>,
     #[serde(flatten)]
     t: InlineFlattenGenericsG<String>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericDefault<T = String> {
+    value: T,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericDefaultSkipped<#[specta(skip_default_generic)] T = String> {
+    value: T,
+}
+
+struct GenericDefaultSkippedNonTypeDefault;
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericDefaultSkippedNonType<
+    #[specta(skip_default_generic)] T = GenericDefaultSkippedNonTypeDefault,
+> {
+    value: i32,
+    #[specta(skip)]
+    _phantom: PhantomData<T>,
 }
 
 // #[test]

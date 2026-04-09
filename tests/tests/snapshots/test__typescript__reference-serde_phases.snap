@@ -220,6 +220,9 @@ InlineGenericNested<String>: [string, string[], [string, string], { [key in stri
 } }) & { Unnamed?: never }]
 InlineFlattenGenericsG<()>: InlineFlattenGenericsG<null>
 InlineFlattenGenerics: InlineFlattenGenerics
+GenericDefault: GenericDefault<string>
+GenericDefaultSkipped: GenericDefaultSkipped<string>
+GenericDefaultSkippedNonType: GenericDefaultSkippedNonType<unknown>
 GenericParameterOrderPreserved: GenericParameterOrderPreserved
 ConstGenericInNonConstContainer: ConstGenericInNonConstContainer
 ConstGenericInConstContainer: ConstGenericInConstContainer

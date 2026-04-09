@@ -418,7 +418,10 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
         let generic_args = ndt
             .generics()
             .iter()
-            .map(|(generic, _)| (generic.clone(), generic.clone().into()))
+            .map(|generic| {
+                let reference = generic.reference();
+                (reference.clone(), reference.into())
+            })
             .collect::<Vec<_>>();
 
         let mut serialize_variant = Variant::unnamed().build();

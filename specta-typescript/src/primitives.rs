@@ -3,12 +3,12 @@
 //! These are for advanced usecases, you should generally use [crate::Typescript] or
 //! [crate::JSDoc] in end-user applications.
 
-use std::{borrow::Cow, cell::RefCell, fmt::Write as _, iter};
+use std::{borrow::Cow, cell::RefCell, fmt::Write as _};
 
 use specta::{
     ResolvedTypes, Types,
     datatype::{
-        DataType, Deprecated, Enum, Fields, GenericReference, List, Map, NamedDataType,
+        DataType, Deprecated, Enum, Fields, Generic, GenericReference, List, Map, NamedDataType,
         NamedReference, OpaqueReference, Primitive, Reference, Tuple, Variant,
     },
 };
@@ -101,17 +101,7 @@ fn export_single_internal(
         return Ok(());
     }
 
-    let generics = (!ndt.generics().is_empty())
-        .then(|| {
-            iter::once("<")
-                .chain(intersperse(
-                    ndt.generics().iter().map(|(_, g)| g.as_ref()),
-                    ", ",
-                ))
-                .chain(iter::once(">"))
-        })
-        .into_iter()
-        .flatten();
+    let _generic_scope = push_generic_scope(ndt.generics());
 
     // TODO: Modernise this
     let name = crate::legacy::sanitise_type_name(
@@ -143,12 +133,9 @@ fn export_single_internal(
     s.push_str(indent);
     s.push_str("export type ");
     s.push_str(&name);
-    for part in generics {
-        s.push_str(part);
-    }
+    write_generic_parameters(s, exporter, types, ndt.generics())?;
     s.push_str(" = ");
 
-    let _generic_scope = push_generic_scope(ndt.generics());
     datatype(
         s,
         exporter,
@@ -377,27 +364,14 @@ fn append_typedef_body(
     dt: &NamedDataType,
     indent: &str,
 ) -> Result<(), Error> {
-    let generics = (!dt.generics().is_empty())
-        .then(|| {
-            iter::once("<")
-                .chain(intersperse(
-                    dt.generics().iter().map(|(_, g)| g.as_ref()),
-                    ", ",
-                ))
-                .chain(iter::once(">"))
-        })
-        .into_iter()
-        .flatten();
+    let _generic_scope = push_generic_scope(dt.generics());
 
     let name = dt.name();
-    let type_name = iter::empty()
-        .chain([name.as_ref()])
-        .chain(generics)
-        .collect::<String>();
+    let mut type_name = String::from(name.as_ref());
+    write_generic_parameters(&mut type_name, exporter, types, dt.generics())?;
 
     let mut typedef_ty = String::new();
     let datatype_prefix = format!("{indent}\t*\t");
-    let _generic_scope = push_generic_scope(dt.generics());
     datatype(
         &mut typedef_ty,
         exporter,
@@ -438,6 +412,45 @@ fn append_typedef_body(
     s.push('\n');
 
     append_jsdoc_properties(s, exporter, types, dt, indent)?;
+
+    Ok(())
+}
+
+fn write_generic_parameters(
+    s: &mut String,
+    exporter: &Exporter,
+    types: &Types,
+    generics: &[Generic],
+) -> Result<(), Error> {
+    if generics.is_empty() {
+        return Ok(());
+    }
+
+    s.push('<');
+    for (index, generic) in generics.iter().enumerate() {
+        if index != 0 {
+            s.push_str(", ");
+        }
+
+        s.push_str(generic.name.as_ref());
+
+        if let Some(default) = &generic.default {
+            let mut rendered_default = String::new();
+            shallow_inline_datatype(
+                &mut rendered_default,
+                exporter,
+                types,
+                default,
+                Vec::new(),
+                None,
+                "",
+                Default::default(),
+            )?;
+            s.push_str(" = ");
+            s.push_str(&rendered_default);
+        }
+    }
+    s.push('>');
 
     Ok(())
 }
@@ -550,7 +563,7 @@ fn merged_generics(
 thread_local! {
     static INLINE_REFERENCE_STACK: RefCell<Vec<NamedReference>> = const { RefCell::new(Vec::new()) };
     static RESOLVING_GENERICS: RefCell<Vec<GenericReference>> = const { RefCell::new(Vec::new()) };
-    static GENERIC_NAME_STACK: RefCell<Vec<Vec<(GenericReference, Cow<'static, str>)>>> = const { RefCell::new(Vec::new()) };
+    static GENERIC_NAME_STACK: RefCell<Vec<Vec<Generic>>> = const { RefCell::new(Vec::new()) };
 }
 
 struct GenericScopeGuard;
@@ -563,7 +576,7 @@ impl Drop for GenericScopeGuard {
     }
 }
 
-fn push_generic_scope(generics: &[(GenericReference, Cow<'static, str>)]) -> GenericScopeGuard {
+fn push_generic_scope(generics: &[Generic]) -> GenericScopeGuard {
     GENERIC_NAME_STACK.with(|stack| {
         stack.borrow_mut().push(generics.to_vec());
     });
@@ -575,8 +588,8 @@ fn resolve_generic_name(generic: &GenericReference) -> Option<Cow<'static, str>>
         stack.borrow().iter().rev().find_map(|scope| {
             scope
                 .iter()
-                .find(|(candidate, _)| candidate == generic)
-                .map(|(_, name)| name.clone())
+                .find(|candidate| candidate.reference() == *generic)
+                .map(|generic| generic.name.clone())
         })
     })
 }
@@ -2040,8 +2053,44 @@ fn reference_named_dt(
             .cloned()
             .collect::<Vec<_>>();
 
+        let rendered_generics = ndt
+            .generics()
+            .iter()
+            .map(|generic| {
+                r.generics()
+                    .iter()
+                    .find(|(reference, _)| *reference == generic.reference())
+                    .map(|(_, dt)| resolve_generics_in_datatype(dt, &scoped_generics))
+                    .or_else(|| generic.default.clone())
+                    .or_else(|| Some(DataType::Reference(Reference::opaque(crate::opaque::Unknown))))
+            })
+            .collect::<Option<Vec<_>>>();
+
         s.push_str(&name);
-        if !r.generics().is_empty() {
+        if let Some(rendered_generics) = rendered_generics {
+            if !rendered_generics.is_empty() {
+                s.push('<');
+
+                for (i, dt) in rendered_generics.iter().enumerate() {
+                    if i != 0 {
+                        s.push_str(", ");
+                    }
+
+                    crate::legacy::datatype_inner(
+                        crate::legacy::ExportContext {
+                            cfg: exporter,
+                            path: vec![],
+                        },
+                        dt,
+                        types,
+                        s,
+                        &scoped_generics,
+                    )?;
+                }
+
+                s.push('>');
+            }
+        } else if !r.generics().is_empty() {
             s.push('<');
 
             for (i, (_, v)) in r.generics().iter().enumerate() {
@@ -2176,14 +2225,3 @@ fn reference_named_dt(
 //     }
 //     Ok(())
 // }
-
-// A smaller helper until this is stablised into the Rust standard library.
-fn intersperse<T: Clone>(iter: impl Iterator<Item = T>, sep: T) -> impl Iterator<Item = T> {
-    iter.enumerate().flat_map(move |(i, item)| {
-        if i == 0 {
-            vec![item]
-        } else {
-            vec![sep.clone(), item]
-        }
-    })
-}

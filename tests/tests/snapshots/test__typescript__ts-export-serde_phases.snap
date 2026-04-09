@@ -328,6 +328,18 @@ export type GenericAutoBound2<T> = {
 	values: T[],
 };
 
+export type GenericDefault<T = string> = {
+	value: T,
+};
+
+export type GenericDefaultSkipped<T> = {
+	value: T,
+};
+
+export type GenericDefaultSkippedNonType<T> = {
+	value: number,
+};
+
 export type GenericFlattened<T> = {
 	generic_flattened: T,
 };
@@ -861,6 +873,9 @@ export type Primitives = {
 } }) & { Unnamed?: never }],
 	"InlineFlattenGenericsG<()>": InlineFlattenGenericsG<null>,
 	InlineFlattenGenerics: InlineFlattenGenerics,
+	GenericDefault: GenericDefault<string>,
+	GenericDefaultSkipped: GenericDefaultSkipped<string>,
+	GenericDefaultSkippedNonType: GenericDefaultSkippedNonType<unknown>,
 	GenericParameterOrderPreserved: GenericParameterOrderPreserved,
 	ConstGenericInNonConstContainer: ConstGenericInNonConstContainer,
 	ConstGenericInConstContainer: ConstGenericInConstContainer,

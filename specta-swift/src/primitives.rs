@@ -1,10 +1,8 @@
 //! Primitive type conversion from Rust to Swift.
 
-use std::borrow::Cow;
-
 use specta::{
     Types,
-    datatype::{DataType, Enum, Fields, GenericReference, Primitive, Reference, Variant},
+    datatype::{DataType, Enum, Fields, Generic, Primitive, Reference, Variant},
 };
 
 use crate::error::{Error, Result};
@@ -91,7 +89,7 @@ pub fn export_type(
                     "<{}>",
                     ndt.generics()
                         .iter()
-                        .map(|(_, g)| g.as_ref().to_string())
+                        .map(|g| g.name.as_ref().to_string())
                         .collect::<Vec<_>>()
                         .join(", ")
                 )
@@ -110,7 +108,7 @@ pub fn export_type(
                     "<{}>",
                     ndt.generics()
                         .iter()
-                        .map(|(_, g)| g.as_ref().to_string())
+                        .map(|g| g.name.as_ref().to_string())
                         .collect::<Vec<_>>()
                         .join(", ")
                 )
@@ -183,7 +181,7 @@ pub fn datatype_to_swift(
     swift: &Swift,
     types: &Types,
     dt: &DataType,
-    generic_scope: Vec<(GenericReference, Cow<'static, str>)>,
+    generic_scope: Vec<Generic>,
     is_export: bool,
     reference: Option<&specta::datatype::Reference>,
 ) -> Result<String> {
@@ -319,7 +317,7 @@ fn list_to_swift(
     swift: &Swift,
     types: &Types,
     list: &specta::datatype::List,
-    generic_scope: Vec<(GenericReference, Cow<'static, str>)>,
+    generic_scope: Vec<Generic>,
 ) -> Result<String> {
     let element_type = datatype_to_swift(swift, types, list.ty(), generic_scope, false, None)?;
     Ok(format!("[{}]", element_type))
@@ -330,7 +328,7 @@ fn map_to_swift(
     swift: &Swift,
     types: &Types,
     map: &specta::datatype::Map,
-    generic_scope: Vec<(GenericReference, Cow<'static, str>)>,
+    generic_scope: Vec<Generic>,
 ) -> Result<String> {
     let key_type = datatype_to_swift(
         swift,
@@ -349,7 +347,7 @@ fn struct_to_swift(
     swift: &Swift,
     types: &Types,
     s: &specta::datatype::Struct,
-    generic_scope: Vec<(GenericReference, Cow<'static, str>)>,
+    generic_scope: Vec<Generic>,
     is_export: bool,
     _reference: Option<&specta::datatype::Reference>,
 ) -> Result<String> {
@@ -435,7 +433,7 @@ fn enum_to_swift(
     swift: &Swift,
     types: &Types,
     e: &specta::datatype::Enum,
-    generic_scope: Vec<(GenericReference, Cow<'static, str>)>,
+    generic_scope: Vec<Generic>,
     is_export: bool,
     _reference: Option<&specta::datatype::Reference>,
     enum_name: Option<&str>,
@@ -514,7 +512,7 @@ fn generate_enum_structs(
     swift: &Swift,
     types: &Types,
     e: &specta::datatype::Enum,
-    generic_scope: Vec<(GenericReference, Cow<'static, str>)>,
+    generic_scope: Vec<Generic>,
     is_export: bool,
     _reference: Option<&specta::datatype::Reference>,
     enum_name: &str,
@@ -609,7 +607,7 @@ fn tuple_to_swift(
     swift: &Swift,
     types: &Types,
     t: &specta::datatype::Tuple,
-    generic_scope: Vec<(GenericReference, Cow<'static, str>)>,
+    generic_scope: Vec<Generic>,
 ) -> Result<String> {
     if t.elements().is_empty() {
         Ok("Void".to_string())
@@ -631,7 +629,7 @@ fn reference_to_swift(
     swift: &Swift,
     types: &Types,
     r: &specta::datatype::Reference,
-    generic_scope: &[(GenericReference, Cow<'static, str>)],
+    generic_scope: &[Generic],
 ) -> Result<String> {
     match r {
         Reference::Named(r) => {
@@ -684,11 +682,11 @@ fn reference_to_swift(
 fn generic_to_swift(
     _swift: &Swift,
     g: &specta::datatype::GenericReference,
-    generic_scope: &[(GenericReference, Cow<'static, str>)],
+    generic_scope: &[Generic],
 ) -> Result<String> {
     generic_scope
         .iter()
-        .find_map(|(candidate, name)| (candidate == g).then(|| name.to_string()))
+        .find_map(|generic| (generic.reference() == *g).then(|| generic.name.to_string()))
         .ok_or_else(|| Error::GenericConstraint(format!("Unresolved generic reference: {g:?}")))
 }
 

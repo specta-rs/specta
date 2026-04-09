@@ -364,7 +364,7 @@ const _: () = {
             fn definition(types: &mut Types) -> DataType {
                 // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
                 static SENTINEL: &str = stringify!($module::$type_name);
-                static GENERICS: &[(datatype::GenericReference, Cow<'static, str>)] = &[];
+                static GENERICS: &[datatype::Generic] = &[];
                 DataType::Reference(datatype::NamedDataType::init_with_sentinel(
                     GENERICS,
                     vec![],
@@ -643,7 +643,7 @@ const _: () = {
     impl Type for ErrorStackContext {
         fn definition(types: &mut Types) -> DataType {
             static SENTINEL: &str = "error_stack::ErrorStackContext";
-            static GENERICS: &[(datatype::GenericReference, Cow<'static, str>)] = &[];
+            static GENERICS: &[datatype::Generic] = &[];
 
             DataType::Reference(datatype::NamedDataType::init_with_sentinel(
                 GENERICS,
@@ -671,7 +671,7 @@ const _: () = {
 
     fn report_definition(types: &mut Types) -> DataType {
         static SENTINEL: &str = "error_stack::Report";
-        static GENERICS: &[(datatype::GenericReference, Cow<'static, str>)] = &[];
+        static GENERICS: &[datatype::Generic] = &[];
 
         DataType::Reference(datatype::NamedDataType::init_with_sentinel(
             GENERICS,
