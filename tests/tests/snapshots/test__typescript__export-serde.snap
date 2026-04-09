@@ -236,7 +236,7 @@ GenericTupleStruct<String>: export type GenericTupleStruct<T> = T;
 
 BracedStruct: export type BracedStruct = string;
 
-Struct: export type Struct = {
+Struct: export type StructNew = {
 	t: "StructNew",
 	a: string,
 };

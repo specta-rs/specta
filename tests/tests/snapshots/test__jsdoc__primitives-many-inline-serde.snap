@@ -324,7 +324,7 @@ expression: output
 	* @typedef {{
 	*		t: "StructNew",
 	*		a: string,
-	*	}} Struct
+	*	}} StructNew
 	* @property {"StructNew"} t
 	* @property {string} a
 	*

@@ -733,7 +733,7 @@ export type Primitives = {
 	TupleStructWithRep: TupleStructWithRep,
 	"GenericTupleStruct<String>": GenericTupleStruct<string>,
 	BracedStruct: BracedStruct,
-	Struct: Struct,
+	Struct: StructNew,
 	Struct2: Struct2,
 	Enum: Enum,
 	Enum2: Enum2,
@@ -981,23 +981,23 @@ export type SpectaTypeOverride = {
 	tuple: [string, number],
 };
 
-export type Struct = {
-	t: "StructNew",
-	a: string,
-};
-
 export type Struct2 = {
 	b: string,
 };
 
-export type StructPhaseSpecificRename = StructPhaseSpecificRename_Serialize | StructPhaseSpecificRename_Deserialize;
+export type StructNew = {
+	t: "StructNew",
+	a: string,
+};
 
-export type StructPhaseSpecificRename_Deserialize = {
+export type StructPhaseSpecificRename = StructPhaseSpecificRenameSerialize | StructPhaseSpecificRenameDeserialize;
+
+export type StructPhaseSpecificRenameDeserialize = {
 	kind: "StructPhaseSpecificRenameDeserialize",
 	der: string,
 };
 
-export type StructPhaseSpecificRename_Serialize = {
+export type StructPhaseSpecificRenameSerialize = {
 	kind: "StructPhaseSpecificRenameSerialize",
 	ser: string,
 };

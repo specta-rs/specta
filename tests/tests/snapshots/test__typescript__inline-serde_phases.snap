@@ -4,7 +4,7 @@ expression: output
 ---
 Issue374: Issue374_Serialize | Issue374_Deserialize
 Optional: Optional_Serialize | Optional_Deserialize
-StructPhaseSpecificRename: StructPhaseSpecificRename_Serialize | StructPhaseSpecificRename_Deserialize
+StructPhaseSpecificRename: StructPhaseSpecificRenameSerialize | StructPhaseSpecificRenameDeserialize
 i8: number
 i16: number
 i32: number

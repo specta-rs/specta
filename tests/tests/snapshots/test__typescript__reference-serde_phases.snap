@@ -92,7 +92,7 @@ TupleStruct: TupleStruct
 TupleStructWithRep: TupleStructWithRep
 GenericTupleStruct<String>: GenericTupleStruct<string>
 BracedStruct: BracedStruct
-Struct: Struct
+Struct: StructNew
 Struct2: Struct2
 Enum: Enum
 Enum2: Enum2

@@ -993,7 +993,7 @@ expression: output
 	*		TupleStructWithRep: TupleStructWithRep,
 	*		"GenericTupleStruct<String>": GenericTupleStruct<string>,
 	*		BracedStruct: BracedStruct,
-	*		Struct: Struct,
+	*		Struct: StructNew,
 	*		Struct2: Struct2,
 	*		Enum: Enum,
 	*		Enum2: Enum2,
@@ -1255,7 +1255,7 @@ expression: output
 	* @property {TupleStructWithRep} TupleStructWithRep
 	* @property {GenericTupleStruct<string>} "GenericTupleStruct<String>"
 	* @property {BracedStruct} BracedStruct
-	* @property {Struct} Struct
+	* @property {StructNew} Struct
 	* @property {Struct2} Struct2
 	* @property {Enum} Enum
 	* @property {Enum2} Enum2
@@ -1574,16 +1574,16 @@ expression: output
 	* @property {[string, number]} tuple
 	*
 	* @typedef {{
-	*		t: "StructNew",
-	*		a: string,
-	*	}} Struct
-	* @property {"StructNew"} t
-	* @property {string} a
-	*
-	* @typedef {{
 	*		b: string,
 	*	}} Struct2
 	* @property {string} b
+	*
+	* @typedef {{
+	*		t: "StructNew",
+	*		a: string,
+	*	}} StructNew
+	* @property {"StructNew"} t
+	* @property {string} a
 	*
 	* @typedef {{
 	*		A: number,

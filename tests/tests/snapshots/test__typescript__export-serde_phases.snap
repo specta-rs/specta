@@ -7,7 +7,7 @@ export type Issue374 = Issue374_Serialize | Issue374_Deserialize;
 
 Optional: export type Optional = Optional_Serialize | Optional_Deserialize;
 
-StructPhaseSpecificRename: export type StructPhaseSpecificRename = StructPhaseSpecificRename_Serialize | StructPhaseSpecificRename_Deserialize;
+StructPhaseSpecificRename: export type StructPhaseSpecificRename = StructPhaseSpecificRenameSerialize | StructPhaseSpecificRenameDeserialize;
 
 Range<i32>: export type Range<T> = {
 	start: T,
@@ -243,7 +243,7 @@ GenericTupleStruct<String>: export type GenericTupleStruct<T> = T;
 
 BracedStruct: export type BracedStruct = string;
 
-Struct: export type Struct = {
+Struct: export type StructNew = {
 	t: "StructNew",
 	a: string,
 };

@@ -203,6 +203,14 @@ pub fn apply(types: Types) -> Result<ResolvedTypes> {
                 rewrite_err = Some(err);
             }
         });
+
+        if rewrite_err.is_some() {
+            return;
+        }
+
+        if let Err(err) = rewrite_named_type_for_phase(ndt, PhaseRewrite::Unified) {
+            rewrite_err = Some(err);
+        }
     });
 
     if let Some(err) = rewrite_err {
@@ -271,11 +279,9 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
         let key = TypeIdentity::from_ndt(original);
 
         if split_types.contains(&key) {
-            let serialize_ndt =
-                build_from_original(original, format!("{}_Serialize", original.name()));
+            let serialize_ndt = build_from_original(original, PhaseRewrite::Serialize)?;
 
-            let deserialize_ndt =
-                build_from_original(original, format!("{}_Deserialize", original.name()));
+            let deserialize_ndt = build_from_original(original, PhaseRewrite::Deserialize)?;
 
             generated.insert(
                 key,
@@ -319,6 +325,11 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
             return Err(err);
         }
 
+        rewrite_named_type_for_phase(
+            &mut generated_types_for_phase.serialize,
+            PhaseRewrite::Serialize,
+        )?;
+
         generated_types_for_phase.deserialize.map_ty_mut(|ty| {
             if rewrite_err.is_some() {
                 return;
@@ -338,6 +349,11 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
         if let Some(err) = rewrite_err {
             return Err(err);
         }
+
+        rewrite_named_type_for_phase(
+            &mut generated_types_for_phase.deserialize,
+            PhaseRewrite::Deserialize,
+        )?;
 
         generated.insert(key, generated_types_for_phase);
     }
@@ -372,6 +388,11 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
             &split_types,
             Some(ndt_name.as_str()),
         ) {
+            rewrite_err = Some(err);
+            return;
+        }
+
+        if let Err(err) = rewrite_named_type_for_phase(ndt, PhaseRewrite::Unified) {
             rewrite_err = Some(err);
         }
     });
@@ -1949,14 +1970,58 @@ fn collect_fields_dependencies(
     Ok(())
 }
 
-fn build_from_original(
-    original: &NamedDataType,
-    name: impl Into<Cow<'static, str>>,
-) -> NamedDataType {
+fn build_from_original(original: &NamedDataType, mode: PhaseRewrite) -> Result<NamedDataType> {
     let mut ndt = original.clone_ty();
-    ndt.set_name(name.into());
+    ndt.set_name(Cow::Owned(split_type_name(original, mode)?));
 
-    ndt
+    Ok(ndt)
+}
+
+fn rewrite_named_type_for_phase(ndt: &mut NamedDataType, mode: PhaseRewrite) -> Result<()> {
+    if let Some(rename) = renamed_type_name_for_phase(ndt.ty(), mode, ndt.name())? {
+        ndt.set_name(Cow::Owned(rename));
+    }
+
+    Ok(())
+}
+
+fn split_type_name(original: &NamedDataType, mode: PhaseRewrite) -> Result<String> {
+    let suffix = match mode {
+        PhaseRewrite::Serialize => "Serialize",
+        PhaseRewrite::Deserialize => "Deserialize",
+        PhaseRewrite::Unified => return Ok(original.name().to_string()),
+    };
+
+    let base_name = renamed_type_name_for_phase(original.ty(), mode, original.name())?
+        .unwrap_or_else(|| original.name().to_string());
+
+    Ok(format!("{base_name}_{suffix}"))
+}
+
+fn renamed_type_name_for_phase(
+    ty: &DataType,
+    mode: PhaseRewrite,
+    current_name: &str,
+) -> Result<Option<String>> {
+    let Some(attrs) = struct_container_attrs(ty)? else {
+        return Ok(None);
+    };
+
+    Ok(select_phase_string(
+        mode,
+        attrs.rename_serialize.as_deref(),
+        attrs.rename_deserialize.as_deref(),
+        "container rename",
+        current_name,
+    )?
+    .map(str::to_string))
+}
+
+fn struct_container_attrs(ty: &DataType) -> Result<Option<SerdeContainerAttrs>> {
+    match ty {
+        DataType::Struct(strct) => SerdeContainerAttrs::from_attributes(strct.attributes()),
+        _ => Ok(None),
+    }
 }
 
 fn apply_field_attrs(field: &mut Field, mode: PhaseRewrite, container_default: bool) -> Result<()> {
