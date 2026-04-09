@@ -5,7 +5,7 @@ use quote::{ToTokens, format_ident, quote};
 use r#struct::parse_struct;
 use syn::{Data, DeriveInput, GenericParam, parse};
 
-use crate::utils::{parse_attrs, unraw_raw_ident};
+use crate::utils::{AttrExtract, parse_attrs, unraw_raw_ident};
 
 use self::generics::{
     add_type_to_where_clause, all_type_param_idents, generics_with_ident_and_bounds_only,
@@ -218,20 +218,35 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let generics_for_ndt_triplets = generics
         .params
         .iter()
-        .filter_map(|param| match param {
-            GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
+        .map(|param| match param {
+            GenericParam::Lifetime(_) | GenericParam::Const(_) => Ok(None),
             GenericParam::Type(t) => {
                 let i = &t.ident;
                 let placeholder_ident = format_ident!("PLACEHOLDER_{}", t.ident);
-                if !used_direct_generics.iter().any(|used| used == i) {
-                    return None;
+
+                let skip_default = parse_attrs(&t.attrs)?
+                    .extract("specta", "skip_default_generic")
+                    .map(|attr| attr.parse_bool().unwrap_or(true))
+                    .unwrap_or(false);
+
+                if !used_direct_generics.iter().any(|used| used == i) && !skip_default {
+                    return Ok(None);
                 }
+
                 let i_str = i.to_string();
-                let default = match &t.default {
-                    Some(default) => quote!(Some(<#default as #crate_ref::Type>::definition(types))),
-                    None => quote!(None),
+                let default = match (&t.default, skip_default) {
+                    (_, true) | (None, false) => quote!(None),
+                    (Some(default), false) => {
+                        quote!(Some(<#default as #crate_ref::Type>::definition(types)))
+                    }
                 };
-                Some((
+                let reference = used_direct_generics.iter().any(|used| used == i).then(|| {
+                    quote!((
+                        #crate_ref::datatype::GenericReference::new::<#placeholder_ident>(),
+                        <#i as #crate_ref::Type>::definition(types),
+                    ))
+                });
+                Ok(Some((
                     quote!(#crate_ref::datatype::Generic::new::<#placeholder_ident>(
                         Cow::Borrowed(#i_str),
                         None,
@@ -240,13 +255,13 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         Cow::Borrowed(#i_str),
                         #default,
                     )),
-                    quote!((
-                        #crate_ref::datatype::GenericReference::new::<#placeholder_ident>(),
-                        <#i as #crate_ref::Type>::definition(types),
-                    )),
-                ))
+                    reference,
+                )))
             }
         })
+        .collect::<syn::Result<Vec<_>>>()?
+        .into_iter()
+        .flatten()
         .collect::<Vec<_>>();
 
     let generics_for_ndt = generics_for_ndt_triplets
@@ -259,7 +274,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         .collect::<Vec<_>>();
     let generics_for_ref = generics_for_ndt_triplets
         .into_iter()
-        .map(|(_, _, generic)| generic)
+        .filter_map(|(_, _, generic)| generic)
         .collect::<Vec<_>>();
 
     let generics_for_ndt_with_defaults = if generics_for_ndt_with_defaults.is_empty() {

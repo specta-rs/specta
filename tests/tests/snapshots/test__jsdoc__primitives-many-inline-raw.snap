@@ -1067,17 +1067,17 @@ expression: output
 	*
 	* @typedef {{
 	*		value: T,
-	*	}} GenericDefault<T>
+	*	}} GenericDefault<T = string>
+	* @property {T} value
+	*
+	* @typedef {{
+	*		value: T,
+	*	}} GenericDefaultSkipped<T>
 	* @property {T} value
 	*
 	* @typedef {{
 	*		value: number,
-	*	}} GenericDefaultSkipped
-	* @property {number} value
-	*
-	* @typedef {{
-	*		value: number,
-	*	}} GenericDefaultSkippedNonType
+	*	}} GenericDefaultSkippedNonType<T>
 	* @property {number} value
 	*
 	* @typedef {{

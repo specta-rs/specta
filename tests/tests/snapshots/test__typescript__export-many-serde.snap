@@ -765,15 +765,15 @@ export type InlineFlattenGenerics = {
 	},
 } & (InlineFlattenGenericsG<string>);
 
-export type GenericDefault<T> = {
+export type GenericDefault<T = string> = {
 	value: T,
 };
 
-export type GenericDefaultSkipped = {
-	value: number,
+export type GenericDefaultSkipped<T> = {
+	value: T,
 };
 
-export type GenericDefaultSkippedNonType = {
+export type GenericDefaultSkippedNonType<T> = {
 	value: number,
 };
 

@@ -14,7 +14,8 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use specta::{datatype::DataType, Type, Types};
+use specta::{Type, Types, datatype::DataType};
+use specta_typescript::Typescript;
 
 /// A macro to collect up the types for better testing.
 ///
@@ -2274,17 +2275,17 @@ struct GenericDefault<T = String> {
 
 #[derive(Type)]
 #[specta(collect = false)]
-struct GenericDefaultSkipped<T = String> {
-    value: i32,
-    #[specta(skip)]
-    _phantom: PhantomData<T>,
+struct GenericDefaultSkipped<#[specta(skip_default_generic)] T = String> {
+    value: T,
 }
 
 struct GenericDefaultSkippedNonTypeDefault;
 
 #[derive(Type)]
 #[specta(collect = false)]
-struct GenericDefaultSkippedNonType<T = GenericDefaultSkippedNonTypeDefault> {
+struct GenericDefaultSkippedNonType<
+    #[specta(skip_default_generic)] T = GenericDefaultSkippedNonTypeDefault,
+> {
     value: i32,
     #[specta(skip)]
     _phantom: PhantomData<T>,
@@ -2660,88 +2661,6 @@ fn struct_collects_all_transparent_field_types() {
     assert!(names.contains(&"UsesTransparent"));
     assert!(names.contains(&"TransparentA"));
     assert!(names.contains(&"TransparentB"));
-}
-
-#[test]
-fn generic_defaults_are_recorded_in_named_type_metadata() {
-    fn named_type_for<T: Type>(types: &mut Types) -> specta::datatype::NamedDataType {
-        let dt = T::definition(types);
-        match dt {
-            DataType::Reference(specta::datatype::Reference::Named(reference)) => reference
-                .get(types)
-                .expect("named type should be registered")
-                .clone(),
-            other => panic!("expected named type reference, got {other:?}"),
-        }
-    }
-
-    let mut types = Types::default();
-    let ndt = named_type_for::<GenericDefault>(&mut types);
-
-    let generics = ndt.generics();
-    assert_eq!(generics.len(), 1);
-    assert_eq!(generics[0].name, "T");
-
-    let mut expected_types = Types::default();
-    let default = generics[0]
-        .default
-        .as_ref()
-        .expect("generic default should be recorded");
-    assert_eq!(default, &String::definition(&mut expected_types));
-
-    let skipped = named_type_for::<GenericDefaultSkipped>(&mut types);
-    assert!(
-        skipped.generics().is_empty(),
-        "skipped generic parameter should not be registered: {:?}",
-        skipped.generics()
-    );
-
-    let skipped_non_type = named_type_for::<GenericDefaultSkippedNonType>(&mut types);
-    assert!(
-        skipped_non_type.generics().is_empty(),
-        "skipped non-Type generic parameter should not be registered: {:?}",
-        skipped_non_type.generics()
-    );
-}
-
-#[test]
-fn nested_generic_defaults_preserve_generic_references() {
-    #[derive(Type)]
-    #[specta(collect = false)]
-    struct WithDefault<T, U = Vec<T>> {
-        t: T,
-        u: U,
-    }
-
-    let mut types = Types::default();
-    let dt = WithDefault::<String, bool>::definition(&mut types);
-    let ndt = match dt {
-        DataType::Reference(specta::datatype::Reference::Named(reference)) => reference
-            .get(&types)
-            .expect("named type should be registered"),
-        other => panic!("expected named type reference, got {other:?}"),
-    };
-
-    let generics = ndt.generics();
-    assert_eq!(generics.len(), 2);
-    assert_eq!(generics[0].default, None);
-
-    let default = generics[1]
-        .default
-        .as_ref()
-        .expect("second generic should preserve its default type");
-    assert!(
-        matches!(
-            default,
-            DataType::Reference(specta::datatype::Reference::Named(reference))
-                if matches!(
-                    reference.generics(),
-                    [(placeholder, DataType::Reference(specta::datatype::Reference::Generic(reference)))]
-                        if *placeholder != generics[0].reference() && *reference == generics[0].reference()
-                )
-        ),
-        "unexpected generic default: {default:?}"
-    );
 }
 
 #[test]

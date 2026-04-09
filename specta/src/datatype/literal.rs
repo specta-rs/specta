@@ -1,3 +1,9 @@
+//! This works but isn't being shipped for now as we don't need it for const generics anymore.
+//! Also it suffers from the following concerns:
+//!  - For a floating point number if it's a `NaN` or `Infinity` or `-Infinity` we should yield an error in the Typescript exporter as we can't export it to a Typescript type.
+//!  - What do we do about bigint primitives. Mainly Tauri Specta/TauRPC need to be able to deal with this somehow?
+//!
+
 use std::{
     any::Any,
     borrow::Cow,
@@ -18,7 +24,9 @@ pub struct Literal(Arc<dyn LiteralType>);
 impl Literal {
     /// Construct a literal [`DataType`] from a concrete value.
     ///
-    /// T can be any of [`i8`], [`i16`], [`i32`], [`i64`], [`i128`], [`isize`], [`u8`], [`u16`], [`u32`], [`u64`], [`u128`], [`usize`], [`bool`], [`char`], [`&'static str`], [`String`], [`Cow<'static, str>`].
+    /// T can be any of [`i8`], [`i16`], [`i32`], [`i64`], [`i128`], [`isize`], [`u8`], [`u16`], [`u32`], [`u64`], [`u128`], [`usize`], [`f32`], [`f64`], [`bool`], [`char`], [`&'static str`], [`String`], [`Cow<'static, str>`].
+    ///
+    /// On nightly, [`f16`] and [`f128`] are also supported.
     pub fn new<T: LiteralType>(value: T) -> DataType {
         DataType::Reference(Reference::opaque(Literal::from(value)))
     }
@@ -138,10 +146,10 @@ trait FloatLiteral: Copy + PartialEq + Type + fmt::Debug + Send + Sync + 'static
 
     const INFINITY: Self;
     const NEG_INFINITY: Self;
-    const ZERO_BITS: Self::Bits;
     const NEG_ZERO_BITS: Self::Bits;
 
     fn is_nan(self) -> bool;
+    fn is_negative_zero(self) -> bool;
     fn to_bits(self) -> Self::Bits;
 }
 
@@ -153,10 +161,8 @@ impl<T: FloatLiteral> From<T> for FloatKey<T::Bits> {
             Self::Infinity
         } else if value == T::NEG_INFINITY {
             Self::NegInfinity
-        } else if value.to_bits() == T::NEG_ZERO_BITS {
+        } else if value.is_negative_zero() {
             Self::NegZero
-        } else if value.to_bits() == T::ZERO_BITS {
-            Self::Finite(T::ZERO_BITS)
         } else {
             Self::Finite(value.to_bits())
         }
@@ -164,17 +170,20 @@ impl<T: FloatLiteral> From<T> for FloatKey<T::Bits> {
 }
 
 macro_rules! impl_float_literal {
-    ($ty:ty, $bits:ty, $zero:expr, $neg_zero:expr) => {
+    ($ty:ty, $bits:ty) => {
         impl FloatLiteral for $ty {
             type Bits = $bits;
 
             const INFINITY: Self = <$ty>::INFINITY;
             const NEG_INFINITY: Self = <$ty>::NEG_INFINITY;
-            const ZERO_BITS: Self::Bits = $zero;
-            const NEG_ZERO_BITS: Self::Bits = $neg_zero;
+            const NEG_ZERO_BITS: Self::Bits = (-0.0 as $ty).to_bits();
 
             fn is_nan(self) -> bool {
                 self.is_nan()
+            }
+
+            fn is_negative_zero(self) -> bool {
+                self.to_bits() == Self::NEG_ZERO_BITS
             }
 
             fn to_bits(self) -> Self::Bits {
@@ -209,11 +218,11 @@ macro_rules! impl_float_literal {
     };
 }
 
-impl_float_literal!(f32, u32, 0.0f32.to_bits(), (-0.0f32).to_bits());
-impl_float_literal!(f64, u64, 0.0f64.to_bits(), (-0.0f64).to_bits());
+impl_float_literal!(f32, u32);
+impl_float_literal!(f64, u64);
 
 #[cfg(is_nightly)]
-impl_float_literal!(f16, u16, 0.0f16.to_bits(), (-0.0f16).to_bits());
+impl_float_literal!(f16, u16);
 
 #[cfg(is_nightly)]
-impl_float_literal!(f128, u128, 0.0f128.to_bits(), (-0.0f128).to_bits());
+impl_float_literal!(f128, u128);

@@ -29,9 +29,4 @@ impl Generic {
     pub const fn reference(&self) -> GenericReference {
         GenericReference { id: self.id }
     }
-
-    /// Convert this generic parameter into a generic reference.
-    pub fn into_reference(self) -> GenericReference {
-        GenericReference { id: self.id }
-    }
 }

@@ -548,7 +548,7 @@ GenericDefault: {
 	value: string,
 }
 GenericDefaultSkipped: {
-	value: number,
+	value: string,
 }
 GenericDefaultSkippedNonType: {
 	value: number,
