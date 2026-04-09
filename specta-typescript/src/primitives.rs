@@ -548,7 +548,7 @@ fn merged_generics(
 }
 
 thread_local! {
-    static INLINE_REFERENCE_STACK: RefCell<Vec<(Cow<'static, str>, Cow<'static, str>, Vec<(GenericReference, DataType)>, Option<usize>)>> = const { RefCell::new(Vec::new()) };
+    static INLINE_REFERENCE_STACK: RefCell<Vec<NamedReference>> = const { RefCell::new(Vec::new()) };
     static RESOLVING_GENERICS: RefCell<Vec<GenericReference>> = const { RefCell::new(Vec::new()) };
     static GENERIC_NAME_STACK: RefCell<Vec<Vec<(GenericReference, Cow<'static, str>)>>> = const { RefCell::new(Vec::new()) };
 }
@@ -758,15 +758,7 @@ fn shallow_inline_datatype(
                 let ty = r
                     .ty(types)
                     .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
-                let ndt = r
-                    .get(types)
-                    .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
-                let inline_key = (
-                    ndt.module_path().clone(),
-                    ndt.name().clone(),
-                    r.generics().to_vec(),
-                    r.instance(),
-                );
+                let inline_key = r.clone();
                 let already_inlining = INLINE_REFERENCE_STACK
                     .with(|stack| stack.borrow().iter().any(|key| key == &inline_key));
 
@@ -1090,15 +1082,9 @@ fn inline_datatype(
         DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, generics)?,
         DataType::Reference(r) => {
             if let Reference::Named(r) = r
-                && let Some(ndt) = r.get(types)
                 && let Some(ty) = r.ty(types)
             {
-                let inline_key = (
-                    ndt.module_path().clone(),
-                    ndt.name().clone(),
-                    r.generics().to_vec(),
-                    r.instance(),
-                );
+                let inline_key = r.clone();
                 let already_inlining = INLINE_REFERENCE_STACK
                     .with(|stack| stack.borrow().iter().any(|key| key == &inline_key));
 
@@ -1975,12 +1961,7 @@ fn reference_named_dt(
 
         // Check if this reference should be inlined
         if r.inline() {
-            let inline_key = (
-                ndt.module_path().clone(),
-                ndt.name().clone(),
-                r.generics().to_vec(),
-                r.instance(),
-            );
+            let inline_key = r.clone();
             let already_inlining = INLINE_REFERENCE_STACK
                 .with(|stack| stack.borrow().iter().any(|key| key == &inline_key));
 

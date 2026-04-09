@@ -6,11 +6,11 @@ use std::{
 };
 
 use crate::{
-    Types,
     datatype::{
-        DataType, NamedReference, Reference,
         reference::{self, GenericReference, NamedId},
+        DataType, NamedReference, Reference,
     },
+    Types,
 };
 
 thread_local! {
@@ -309,6 +309,19 @@ impl NamedDataType {
             generics,
             inline: self.inline,
             instance: None,
+        })
+    }
+
+    /// Construct a [Reference] to this [NamedDataType] using another reference as a template.
+    ///
+    /// This preserves hidden per-reference state such as inline and instance information while
+    /// retargeting the reference to this named type.
+    pub fn reference_from(&self, template: &NamedReference) -> Reference {
+        Reference::Named(NamedReference {
+            id: self.id.clone(),
+            generics: template.generics.clone(),
+            inline: template.inline,
+            instance: template.instance,
         })
     }
 

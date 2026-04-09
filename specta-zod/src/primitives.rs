@@ -3,19 +3,19 @@
 use std::{borrow::Cow, cell::RefCell, fmt::Write as _};
 
 use specta::{
-    ResolvedTypes, Types,
     datatype::{
         DataType, Enum, Fields, GenericReference, List, Map, NamedDataType, NamedReference,
         OpaqueReference, Primitive, Reference, Struct, Tuple,
     },
+    ResolvedTypes, Types,
 };
 
 use crate::{
-    BigIntExportBehavior, Error, Layout, Zod, opaque, reserved_names::RESERVED_TYPE_NAMES,
+    opaque, reserved_names::RESERVED_TYPE_NAMES, BigIntExportBehavior, Error, Layout, Zod,
 };
 
 thread_local! {
-    static INLINE_REFERENCE_STACK: RefCell<Vec<(Cow<'static, str>, Cow<'static, str>, Vec<(GenericReference, DataType)>, Option<usize>)>> = const { RefCell::new(Vec::new()) };
+    static INLINE_REFERENCE_STACK: RefCell<Vec<NamedReference>> = const { RefCell::new(Vec::new()) };
     static TYPE_RENDER_STACK: RefCell<Vec<(Cow<'static, str>, Cow<'static, str>)>> = const { RefCell::new(Vec::new()) };
     static GENERIC_NAME_STACK: RefCell<Vec<Vec<(GenericReference, Cow<'static, str>)>>> = const { RefCell::new(Vec::new()) };
 }
@@ -754,12 +754,7 @@ fn reference_named_dt(
         let ty = r
             .ty(types)
             .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
-        let inline_key = (
-            ndt.module_path().clone(),
-            ndt.name().clone(),
-            r.generics().to_vec(),
-            r.instance(),
-        );
+        let inline_key = r.clone();
         let already_inlining = INLINE_REFERENCE_STACK
             .with(|stack| stack.borrow().iter().any(|key| key == &inline_key));
 
