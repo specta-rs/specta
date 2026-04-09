@@ -4,6 +4,7 @@ use crate::datatype::{DataType, GenericReference};
 
 /// Metadata describing a named generic parameter on a [`NamedDataType`](crate::datatype::NamedDataType).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct Generic {
     id: TypeId,
     /// The source-level name of the generic parameter.
