@@ -79,12 +79,8 @@ pub fn collect_references<R>(func: impl FnOnce() -> R) -> (R, HashSet<NamedRefer
 pub(crate) fn track_nr(r: &NamedReference) {
     REFERENCED_TYPES.with_borrow_mut(|ctxs| {
         if let Some(ctxs) = ctxs {
-            let mut tracked = r.clone();
-            tracked.generics_mut().clear();
-            tracked.set_instance(None);
-
             for ctx in ctxs {
-                ctx.insert(tracked.clone());
+                ctx.insert(r.clone());
             }
         }
     });
