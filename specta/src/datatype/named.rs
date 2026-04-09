@@ -312,19 +312,6 @@ impl NamedDataType {
         })
     }
 
-    /// Construct a [Reference] to this [NamedDataType] using another reference as a template.
-    ///
-    /// This preserves hidden per-reference state such as inline and instance information while
-    /// retargeting the reference to this named type.
-    pub fn reference_from(&self, template: &NamedReference) -> Reference {
-        Reference::Named(NamedReference {
-            id: self.id.clone(),
-            generics: template.generics.clone(),
-            inline: template.inline,
-            instance: template.instance,
-        })
-    }
-
     /// Check whether a type requires a reference to be generated.
     ///
     /// This if `false` is all [Reference]'s created for the type are inlined,
@@ -431,6 +418,19 @@ impl NamedDataType {
     /// Set the inner [`DataType`]
     pub fn set_ty(&mut self, ty: DataType) {
         self.inner = ty;
+    }
+
+    /// Construct a [Reference] to this [NamedDataType] using another reference as a template.
+    ///
+    /// This preserves hidden per-reference state such as inline and instance information while
+    /// retargeting the reference to this named type.
+    pub fn reference_from(&self, template: &NamedReference) -> Reference {
+        Reference::Named(NamedReference {
+            id: self.id.clone(),
+            generics: template.generics.clone(),
+            inline: template.inline,
+            instance: template.instance,
+        })
     }
 
     /// Allows you to map over the inner [`DataType`] and all instances.
