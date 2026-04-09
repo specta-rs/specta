@@ -1,8 +1,8 @@
 use std::any::TypeId;
 
 use specta::{
-    datatype::{DataType, Reference},
     Type, Types,
+    datatype::{DataType, Reference},
 };
 
 #[derive(Type)]

@@ -1,11 +1,11 @@
 use std::{
-    collections::{hash_map, HashMap},
+    collections::{HashMap, hash_map},
     fmt,
 };
 
 use crate::{
-    datatype::{NamedDataType, NamedId},
     Type,
+    datatype::{NamedDataType, NamedId},
 };
 
 /// Define a set of types which can be exported together.
