@@ -1,11 +1,11 @@
 use std::{
-    collections::{HashMap, hash_map},
+    collections::{hash_map, HashMap},
     fmt,
 };
 
 use crate::{
-    Type,
     datatype::{NamedDataType, NamedId},
+    Type,
 };
 
 /// Define a set of types which can be exported together.
@@ -20,8 +20,9 @@ pub struct Types(
     // The count of non-`None` items in the collection.
     // We store this to avoid expensive iteration.
     pub(crate) usize,
-    // TODO: Move to named fields
-    pub(crate) Option<NamedId>, // TODO: Can this be removed by using the `Option` system???
+    // Tracks the active named-type resolution stack so recursive references can reuse
+    // placeholders instead of re-entering resolution.
+    pub(crate) Vec<NamedId>,
 );
 
 /// A wrapper around [`Types`] indicating the type graph has already been

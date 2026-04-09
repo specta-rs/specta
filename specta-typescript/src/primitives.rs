@@ -1109,7 +1109,7 @@ fn inline_datatype(
 
                 let combined_generics = merged_generics(generics, r.generics());
                 INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
-                inline_datatype(
+                let result = inline_datatype(
                     s,
                     exporter,
                     types,
@@ -1119,10 +1119,11 @@ fn inline_datatype(
                     prefix,
                     depth + 1,
                     &combined_generics,
-                )?;
+                );
                 INLINE_REFERENCE_STACK.with(|stack| {
                     stack.borrow_mut().pop();
                 });
+                result?;
             } else {
                 reference_dt(s, exporter, types, r, location, prefix, generics)?;
             }

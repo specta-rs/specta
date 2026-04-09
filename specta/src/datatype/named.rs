@@ -6,11 +6,11 @@ use std::{
 };
 
 use crate::{
-    Types,
     datatype::{
-        DataType, NamedReference, Reference,
         reference::{self, GenericReference, NamedId},
+        DataType, NamedReference, Reference,
     },
+    Types,
 };
 
 thread_local! {
@@ -168,24 +168,12 @@ impl NamedDataType {
         let id = NamedId::Static(sentinel);
         let location = Location::caller().to_owned();
 
-        // TODO: Explain the rational of this
-        if Some(&id) == types.2.as_ref() {
-            // Impossible case of `#[specta(inline)]` on a type that references itself.
-            // if let Some(ndt) = types.0.get(&id) {
-            //     if let Some(ndt) = ndt {
-            //         if ndt.inline {
-            //             println!("RECURSIVE INLINE DETECTED");
-
-            //             return Reference::Named(NamedReference {
-            //                 id,
-            //                 generics: generics_for_ref,
-            //                 inline,
-            //             });
-            //         }
-            //     }
-            // }
-
-            // Case of field that references itself
+        // If this named type is already being resolved, emit a reference to the existing
+        // placeholder instead of re-entering resolution. This covers both direct and mutual
+        // recursion, including recursive instance construction for already-registered types.
+        if types.2.iter().any(|active| active == &id)
+            || types.0.get(&id).is_some_and(|slot| slot.is_none())
+        {
             return Reference::Named(NamedReference {
                 id,
                 generics: generics_for_ref,
@@ -218,9 +206,9 @@ impl NamedDataType {
             let mut inline = inline;
 
             {
-                types.2 = Some(id.clone());
+                types.2.push(id.clone());
                 let result = panic::catch_unwind(AssertUnwindSafe(|| build_ndt(types, &mut ndt)));
-                types.2 = None;
+                types.2.pop();
                 if let Err(payload) = result {
                     panic::resume_unwind(payload);
                 }
@@ -297,11 +285,11 @@ impl NamedDataType {
         types.0.insert(id.clone(), None);
 
         {
-            types.2 = Some(id.clone());
+            types.2.push(id.clone());
             let prev = CONTEXT_HAS_CONST_PARAMS.replace(has_const_param);
             let result = panic::catch_unwind(AssertUnwindSafe(|| build_ndt(types, &mut ndt)));
             CONTEXT_HAS_CONST_PARAMS.set(prev);
-            types.2 = None;
+            types.2.pop();
             if let Err(payload) = result {
                 panic::resume_unwind(payload);
             }
