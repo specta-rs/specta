@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use specta::{
     Types,
-    datatype::{DataType, Enum, Field, Fields, GenericReference, Reference, Variant},
+    datatype::{DataType, Enum, Field, Fields, Generic, GenericReference, Reference, Variant},
 };
 
 use crate::{
@@ -43,16 +43,17 @@ pub(crate) fn validate_datatype_for_mode(
 fn validate_datatype_with_generics_for_mode(
     dt: &DataType,
     types: &Types,
-    generics: &[(GenericReference, std::borrow::Cow<'static, str>)],
+    generics: &[Generic],
     path: String,
     mode: ApplyMode,
 ) -> Result<()> {
     let generics = generics
         .iter()
-        .map(|(generic, _)| {
+        .map(|generic| {
+            let reference = generic.reference();
             (
-                generic.clone(),
-                DataType::Reference(Reference::Generic(generic.clone())),
+                reference.clone(),
+                DataType::Reference(Reference::Generic(reference)),
             )
         })
         .collect::<Vec<_>>();

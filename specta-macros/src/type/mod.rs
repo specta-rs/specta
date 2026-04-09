@@ -224,9 +224,9 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 }
                 let i_str = i.to_string();
                 Some((
-                    quote!((
-                        #crate_ref::datatype::GenericReference::new::<#placeholder_ident>(),
+                    quote!(#crate_ref::datatype::Generic::new::<#placeholder_ident>(
                         Cow::Borrowed(#i_str),
+                        None,
                     )),
                     quote!((
                         #crate_ref::datatype::GenericReference::new::<#placeholder_ident>(),
@@ -278,7 +278,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     #(#generic_placeholders)*
 
                     static SENTINEL: &str = concat!(module_path!(), "::", stringify!(#raw_ident));
-                    static GENERICS: &[(datatype::GenericReference, Cow<'static, str>)] = &[#(#generics_for_ndt),*];
+                    static GENERICS: &[datatype::Generic] = &[#(#generics_for_ndt),*];
                     datatype::DataType::Reference(
                         datatype::NamedDataType::init_with_sentinel(
                             GENERICS,

@@ -8,7 +8,7 @@ use std::{borrow::Cow, cell::RefCell, fmt::Write as _, iter};
 use specta::{
     ResolvedTypes, Types,
     datatype::{
-        DataType, Deprecated, Enum, Fields, GenericReference, List, Map, NamedDataType,
+        DataType, Deprecated, Enum, Fields, Generic, GenericReference, List, Map, NamedDataType,
         NamedReference, OpaqueReference, Primitive, Reference, Tuple, Variant,
     },
 };
@@ -105,7 +105,7 @@ fn export_single_internal(
         .then(|| {
             iter::once("<")
                 .chain(intersperse(
-                    ndt.generics().iter().map(|(_, g)| g.as_ref()),
+                    ndt.generics().iter().map(|g| g.name.as_ref()),
                     ", ",
                 ))
                 .chain(iter::once(">"))
@@ -381,7 +381,7 @@ fn append_typedef_body(
         .then(|| {
             iter::once("<")
                 .chain(intersperse(
-                    dt.generics().iter().map(|(_, g)| g.as_ref()),
+                    dt.generics().iter().map(|g| g.name.as_ref()),
                     ", ",
                 ))
                 .chain(iter::once(">"))
@@ -550,7 +550,7 @@ fn merged_generics(
 thread_local! {
     static INLINE_REFERENCE_STACK: RefCell<Vec<(Cow<'static, str>, Cow<'static, str>, Vec<(GenericReference, DataType)>)>> = const { RefCell::new(Vec::new()) };
     static RESOLVING_GENERICS: RefCell<Vec<GenericReference>> = const { RefCell::new(Vec::new()) };
-    static GENERIC_NAME_STACK: RefCell<Vec<Vec<(GenericReference, Cow<'static, str>)>>> = const { RefCell::new(Vec::new()) };
+    static GENERIC_NAME_STACK: RefCell<Vec<Vec<Generic>>> = const { RefCell::new(Vec::new()) };
 }
 
 struct GenericScopeGuard;
@@ -563,7 +563,7 @@ impl Drop for GenericScopeGuard {
     }
 }
 
-fn push_generic_scope(generics: &[(GenericReference, Cow<'static, str>)]) -> GenericScopeGuard {
+fn push_generic_scope(generics: &[Generic]) -> GenericScopeGuard {
     GENERIC_NAME_STACK.with(|stack| {
         stack.borrow_mut().push(generics.to_vec());
     });
@@ -575,8 +575,8 @@ fn resolve_generic_name(generic: &GenericReference) -> Option<Cow<'static, str>>
         stack.borrow().iter().rev().find_map(|scope| {
             scope
                 .iter()
-                .find(|(candidate, _)| candidate == generic)
-                .map(|(_, name)| name.clone())
+                .find(|candidate| candidate.reference() == *generic)
+                .map(|generic| generic.name.clone())
         })
     })
 }

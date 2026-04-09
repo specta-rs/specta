@@ -1,10 +1,8 @@
-use std::{borrow::Cow, collections::HashSet};
+use std::collections::HashSet;
 
 use specta::{
     Types,
-    datatype::{
-        DataType, Enum, Fields, GenericReference, NamedDataType, Primitive, Reference, Struct,
-    },
+    datatype::{DataType, Enum, Fields, Generic, NamedDataType, Primitive, Reference, Struct},
 };
 
 use crate::{Error, Go, reserved_names::RESERVED_GO_NAMES};
@@ -55,7 +53,7 @@ pub fn export(
             if i != 0 {
                 s.push_str(", ");
             }
-            s.push_str(g.1.as_ref());
+            s.push_str(g.name.as_ref());
             s.push_str(" any");
         }
         s.push(']');
@@ -125,7 +123,7 @@ fn struct_fields(
     s: &mut String,
     exporter: &Go,
     types: &Types,
-    generic_names: &[(GenericReference, Cow<'static, str>)],
+    generic_names: &[Generic],
     st: &Struct,
     location: Vec<String>,
     ctx: &mut GoContext,
@@ -192,7 +190,7 @@ fn enum_variants(
     s: &mut String,
     exporter: &Go,
     types: &Types,
-    generic_names: &[(GenericReference, Cow<'static, str>)],
+    generic_names: &[Generic],
     e: &Enum,
     location: Vec<String>,
     ctx: &mut GoContext,
@@ -252,7 +250,7 @@ fn datatype(
     s: &mut String,
     exporter: &Go,
     types: &Types,
-    generic_names: &[(GenericReference, Cow<'static, str>)],
+    generic_names: &[Generic],
     dt: &DataType,
     location: Vec<String>,
     ctx: &mut GoContext,
@@ -350,8 +348,8 @@ fn datatype(
             Reference::Generic(g) => {
                 let name = generic_names
                     .iter()
-                    .find(|(candidate, _)| candidate == g)
-                    .map(|(_, name)| name.as_ref())
+                    .find(|candidate| candidate.reference() == *g)
+                    .map(|generic| generic.name.as_ref())
                     .unwrap_or("any");
                 s.push_str(name);
             }

@@ -5,7 +5,7 @@ use std::{
 
 use specta::{
     Type, Types,
-    datatype::{DataType, Literal, Reference, literal},
+    datatype::{DataType, Literal, Reference},
 };
 
 fn hash_value<T: Hash>(value: &T) -> u64 {
@@ -36,7 +36,7 @@ fn literals() {
         hash_value(&Literal::from(f64::NAN))
     );
 
-    let literal = match literal("hello") {
+    let literal = match Literal::new("hello") {
         DataType::Reference(Reference::Opaque(reference)) => reference,
         _ => panic!("expected opaque literal reference"),
     };

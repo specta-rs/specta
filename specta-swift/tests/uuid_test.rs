@@ -1,3 +1,5 @@
+//! Integration tests for Swift UUID and chrono support.
+
 use specta::{ResolvedTypes, Type, Types};
 use specta_swift::Swift;
 

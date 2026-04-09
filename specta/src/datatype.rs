@@ -18,7 +18,7 @@ pub use attributes::Attributes;
 pub use r#enum::{Enum, Variant, VariantBuilder};
 pub use fields::{Field, Fields, NamedFields, StructBuilder, UnnamedFields};
 pub use function::Function;
-pub use generic::{Generic, GenericType};
+pub use generic::Generic;
 pub use list::List;
 pub use literal::Literal;
 pub use map::Map;

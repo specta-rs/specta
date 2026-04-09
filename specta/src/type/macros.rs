@@ -44,10 +44,10 @@ macro_rules! _impl_ndt_as {
                 fn definition(types: &mut Types) -> DataType {
                     // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
                     static SENTINEL: &str = stringify!($head::$( $tail )::+<$generic, $const_generic>);
-                    static GENERICS: &[(datatype::GenericReference, ::std::borrow::Cow<'static, str>)] = &[
-                        (
-                            datatype::GenericReference::new::<generics::$generic>(),
+                    static GENERICS: &[datatype::Generic] = &[
+                        datatype::Generic::new::<generics::$generic>(
                             ::std::borrow::Cow::Borrowed(stringify!($generic)),
+                            None,
                         ),
                     ];
 
@@ -91,7 +91,7 @@ macro_rules! _impl_ndt_as {
                 fn definition(types: &mut Types) -> DataType {
                     // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
                     static SENTINEL: &str = stringify!($head::$( $tail )::+<$const_generic>);
-                    static GENERICS: &[(datatype::GenericReference, ::std::borrow::Cow<'static, str>)] = &[];
+                    static GENERICS: &[datatype::Generic] = &[];
 
                     DataType::Reference(datatype::NamedDataType::init_with_sentinel(
                         GENERICS,
@@ -131,10 +131,10 @@ macro_rules! _impl_ndt_as {
                 fn definition(types: &mut Types) -> DataType {
                     // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
                     static SENTINEL: &str = stringify!($head::$( $tail )::+<[$generic; $const_generic]>);
-                    static GENERICS: &[(datatype::GenericReference, ::std::borrow::Cow<'static, str>)] = &[
-                        (
-                            datatype::GenericReference::new::<generics::$generic>(),
+                    static GENERICS: &[datatype::Generic] = &[
+                        datatype::Generic::new::<generics::$generic>(
                             ::std::borrow::Cow::Borrowed(stringify!($generic)),
+                            None,
                         ),
                     ];
 
@@ -201,11 +201,11 @@ macro_rules! _impl_ndt {
                 fn definition(types: &mut Types) -> DataType {
                     // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
                     static SENTINEL: &str = stringify!($type_path);
-                    static GENERICS: &[(datatype::GenericReference, ::std::borrow::Cow<'static, str>)] = &[
+                    static GENERICS: &[datatype::Generic] = &[
                         $($(
-                            (
-                                datatype::GenericReference::new::<generics::$generic>(),
+                            datatype::Generic::new::<generics::$generic>(
                                 ::std::borrow::Cow::Borrowed(stringify!($generic)),
+                                None,
                             )
                         ),*)?
                     ];

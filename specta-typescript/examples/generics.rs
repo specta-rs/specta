@@ -25,9 +25,9 @@ const _: () = {
                 }
             }
             static SENTINEL: &str = "generics::Testing";
-            static GENERICS: &[(datatype::GenericReference, Cow<'static, str>)] = &[(
-                specta::datatype::GenericReference::new::<PLACEHOLDER_T>(),
+            static GENERICS: &[datatype::Generic] = &[datatype::Generic::new::<PLACEHOLDER_T>(
                 Cow::Borrowed("T"),
+                None,
             )];
             datatype::DataType::Reference(datatype::NamedDataType::init_with_sentinel(
                 GENERICS,

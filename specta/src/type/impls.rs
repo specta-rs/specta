@@ -166,15 +166,11 @@ const _: () = {
 
     impl<'a, T: ?Sized + ToOwned + Type + 'a> Type for std::borrow::Cow<'a, T> {
         fn definition(types: &mut Types) -> DataType {
-            use std::borrow::Cow;
-
-            use crate::datatype::GenericReference;
-
             // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
             static SENTINEL: &str = "std::borrow::Cow<'a, T>";
-            static GENERICS: &[(GenericReference, Cow<'static, str>)] = &[(
-                datatype::GenericReference::new::<generics::T>(),
+            static GENERICS: &[datatype::Generic] = &[datatype::Generic::new::<generics::T>(
                 std::borrow::Cow::Borrowed("T"),
+                None,
             )];
 
             DataType::Reference(datatype::NamedDataType::init_with_sentinel(

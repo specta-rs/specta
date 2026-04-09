@@ -5,8 +5,8 @@ use std::{borrow::Cow, cell::RefCell, fmt::Write as _};
 use specta::{
     ResolvedTypes, Types,
     datatype::{
-        DataType, Enum, Fields, GenericReference, List, Map, NamedDataType, NamedReference,
-        OpaqueReference, Primitive, Reference, Struct, Tuple,
+        DataType, Enum, Fields, Generic, GenericReference, List, Map, NamedDataType,
+        NamedReference, OpaqueReference, Primitive, Reference, Struct, Tuple,
     },
 };
 
@@ -17,7 +17,7 @@ use crate::{
 thread_local! {
     static INLINE_REFERENCE_STACK: RefCell<Vec<(Cow<'static, str>, Cow<'static, str>, Vec<(GenericReference, DataType)>)>> = const { RefCell::new(Vec::new()) };
     static TYPE_RENDER_STACK: RefCell<Vec<(Cow<'static, str>, Cow<'static, str>)>> = const { RefCell::new(Vec::new()) };
-    static GENERIC_NAME_STACK: RefCell<Vec<Vec<(GenericReference, Cow<'static, str>)>>> = const { RefCell::new(Vec::new()) };
+    static GENERIC_NAME_STACK: RefCell<Vec<Vec<Generic>>> = const { RefCell::new(Vec::new()) };
 }
 
 struct TypeRenderGuard;
@@ -50,7 +50,7 @@ fn push_type_render_stack(
     TypeRenderGuard
 }
 
-fn push_generic_scope(generics: &[(GenericReference, Cow<'static, str>)]) -> GenericScopeGuard {
+fn push_generic_scope(generics: &[Generic]) -> GenericScopeGuard {
     GENERIC_NAME_STACK.with(|stack| {
         stack.borrow_mut().push(generics.to_vec());
     });
@@ -62,8 +62,8 @@ fn resolve_generic_name(generic: &GenericReference) -> Option<Cow<'static, str>>
         stack.borrow().iter().rev().find_map(|scope| {
             scope
                 .iter()
-                .find(|(candidate, _)| candidate == generic)
-                .map(|(_, name)| name.clone())
+                .find(|candidate| candidate.reference() == *generic)
+                .map(|generic| generic.name.clone())
         })
     })
 }
@@ -155,7 +155,7 @@ fn export_single_internal(
     let generic_names = ndt
         .generics()
         .iter()
-        .map(|(_, name)| name.as_ref().to_string())
+        .map(|generic| generic.name.as_ref().to_string())
         .collect::<Vec<_>>();
 
     let generic_params = generic_names
