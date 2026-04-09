@@ -10,19 +10,27 @@ use specta::{
 /// This is primarily useful with `#[specta(type = ...)]` when you want an array
 /// field to keep its length information in exported schemas.
 ///
-/// A plain Rust array like `[u8; 2]` may be exported as `number[]` in generic
-/// contexts, because the named Specta type cannot safely encode every possible
-/// const-generic instantiation. `FixedArray<N, T>` lets you opt into a concrete
-/// fixed-length representation for a specific field instead.
-///
-/// Exporters that understand fixed-length lists can use this metadata to emit a
-/// tuple-like representation such as `[number, number]`.
+/// A plain Rust array like `[u8; 2]` may be exported as `number[]` if Specta
+/// deems it's unable to safely export it as `[number, number]`. This limitation
+/// is due to the fact that Specta can't track the inference of const generics and
+/// hence can't fully support them. Using `FixedArray<N, T>` will always encode the
+/// length so it can be used to force override Specta's conservative behaviour when you know what your doing.
 ///
 /// ```ignore
 /// use specta::Type;
 ///
+/// /// #[derive(Type)]
+/// struct DemoA {
+///     a: [u8; 2],     // becomes `[number, number]`
+///
+///     #[specta(type = specta_util::FixedArray<2, u8>)]
+///     d: [u8; 2],     // becomes `[number, number]`
+/// }
+///
 /// #[derive(Type)]
-/// struct Demo<const N: usize = 1> {
+/// struct DemoB<const N: usize = 1> {
+///     // These are generalised by Specta as we can't know if a specific type is using `N` or a constant, and we don't know what `N` is.
+///     // If you `#[specta(inline)]` or `#[serde(flatten)]` the `[number, number]` will be restored as we are able to track it properly.
 ///     data: [u32; N], // becomes `number[]`
 ///     a: [u8; 2],     // becomes `number[]`
 ///
@@ -35,7 +43,7 @@ pub struct FixedArray<const N: usize, T: Type>(PhantomData<[T; N]>);
 impl<const N: usize, T: Type> Type for FixedArray<N, T> {
     fn definition(types: &mut Types) -> DataType {
         let mut l = List::new(T::definition(types));
-        // TODO: Explain safety
+        // Refer to the type documentation for the safety around this.
         l.set_length(Some(N));
         DataType::List(l)
     }
