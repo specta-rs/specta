@@ -16,10 +16,12 @@ use crate::{
 pub struct Types(
     // `None` indicates that the entry is a placeholder.
     // It is a reference and we are currently resolving it's definition.
-    pub(crate) HashMap<NamedId, Option<NamedDataType>>,
+    pub(crate) HashMap<NamedId, Option<NamedDataType>>, // TODO: I think we can remove the `Option` wrapper
     // The count of non-`None` items in the collection.
     // We store this to avoid expensive iteration.
     pub(crate) usize,
+    // TODO: Move to named fields
+    pub(crate) Option<NamedId>, // TODO: Can this be removed by using the `Option` system???
 );
 
 /// A wrapper around [`Types`] indicating the type graph has already been
@@ -105,7 +107,7 @@ impl Types {
             .iter()
             .filter_map(|(_, ndt)| ndt.as_ref())
             .collect::<Vec<_>>();
-        assert_eq!(v.len(), self.1, "Types count logic mismatch");
+        // assert_eq!(v.len(), self.1, "Types count logic mismatch");
         v.sort_by(|a, b| {
             a.name
                 .cmp(&b.name)

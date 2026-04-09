@@ -110,10 +110,10 @@ fn validate_map_key_inner(
                 ));
             }
 
-            let result = if let Some(ndt) = reference.get(types) {
+            let result = if let Some(ty) = reference.ty(types) {
                 let merged_generics = merged_generics(generics, reference.generics());
                 validate_map_key_inner(
-                    ndt.ty(),
+                    ty,
                     types,
                     &merged_generics,
                     path,

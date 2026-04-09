@@ -196,6 +196,17 @@ pub fn apply(types: Types) -> Result<ResolvedTypes> {
             Some(ndt_name.as_str()),
         ) {
             rewrite_err = Some(err);
+            return;
+        }
+
+        if let Err(err) = rewrite_named_instances_for_phase(
+            ndt,
+            PhaseRewrite::Unified,
+            &types,
+            &generated,
+            &split_types,
+        ) {
+            rewrite_err = Some(err);
         }
     });
 
@@ -310,6 +321,13 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
             &split_types,
             Some(original.name().as_ref()),
         )?;
+        rewrite_named_instances_for_phase(
+            &mut generated_types_for_phase.serialize,
+            PhaseRewrite::Serialize,
+            &types,
+            &generated,
+            &split_types,
+        )?;
 
         rewrite_datatype_for_phase(
             generated_types_for_phase.deserialize.ty_mut(),
@@ -318,6 +336,13 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
             &generated,
             &split_types,
             Some(original.name().as_ref()),
+        )?;
+        rewrite_named_instances_for_phase(
+            &mut generated_types_for_phase.deserialize,
+            PhaseRewrite::Deserialize,
+            &types,
+            &generated,
+            &split_types,
         )?;
 
         generated.insert(key, generated_types_for_phase);
@@ -500,6 +525,7 @@ fn select_phase_datatype_inner(ty: &mut DataType, types: &Types, phase: Phase) {
             let Some(referenced_ndt) = reference.get(types) else {
                 return;
             };
+            let instance = reference.instance();
 
             let generics = reference
                 .generics()
@@ -515,6 +541,9 @@ fn select_phase_datatype_inner(ty: &mut DataType, types: &Types, phase: Phase) {
                 select_split_type_variant(referenced_ndt, types, phase).unwrap_or(referenced_ndt);
 
             let mut new_reference = target_ndt.reference(generics);
+            if let Reference::Named(new_reference) = &mut new_reference {
+                new_reference.set_instance(instance);
+            }
             if reference.inline() {
                 new_reference = new_reference.inline();
             }
@@ -730,6 +759,7 @@ fn rewrite_datatype_for_phase(
                 return Ok(());
             };
             let key = TypeIdentity::from_ndt(referenced_ndt);
+            let instance = reference.instance();
 
             let mut generics = Vec::with_capacity(reference.generics().len());
             for (generic, dt) in reference.generics() {
@@ -747,6 +777,9 @@ fn rewrite_datatype_for_phase(
 
             if !split_types.contains(&key) {
                 let mut new_reference = referenced_ndt.reference(generics);
+                if let Reference::Named(new_reference) = &mut new_reference {
+                    new_reference.set_instance(instance);
+                }
                 if reference.inline() {
                     new_reference = new_reference.inline();
                 }
@@ -766,6 +799,10 @@ fn rewrite_datatype_for_phase(
                 PhaseRewrite::Deserialize => target.deserialize.reference(generics),
             };
 
+            if let Reference::Named(new_reference) = &mut new_reference {
+                new_reference.set_instance(instance);
+            }
+
             if reference.inline() {
                 new_reference = new_reference.inline();
             }
@@ -775,6 +812,20 @@ fn rewrite_datatype_for_phase(
         DataType::Reference(Reference::Generic(_))
         | DataType::Reference(Reference::Opaque(_))
         | DataType::Primitive(_) => {}
+    }
+
+    Ok(())
+}
+
+fn rewrite_named_instances_for_phase(
+    ndt: &mut NamedDataType,
+    mode: PhaseRewrite,
+    original_types: &Types,
+    generated: &HashMap<TypeIdentity, SplitGeneratedTypes>,
+    split_types: &HashSet<TypeIdentity>,
+) -> Result<()> {
+    for instance in ndt.instances_mut() {
+        rewrite_datatype_for_phase(instance, mode, original_types, generated, split_types, None)?;
     }
 
     Ok(())
@@ -1976,6 +2027,7 @@ fn build_from_original(
     ndt.set_location(original.location());
     ndt.set_module_path(original.module_path().clone());
     ndt.set_deprecated(original.deprecated().cloned());
+    ndt.set_instances(original.instances().to_vec());
 
     ndt
 }

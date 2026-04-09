@@ -25,6 +25,7 @@ pub struct NamedReference {
     pub(crate) id: NamedId,
     pub(crate) generics: Vec<(GenericReference, DataType)>,
     pub(crate) inline: bool,
+    pub(crate) instance: Option<usize>,
 }
 
 impl NamedReference {
@@ -36,6 +37,23 @@ impl NamedReference {
         types.0.get(&self.id)?.as_ref()
     }
 
+    /// Get the datatype of this reference, if it is known.
+    ///
+    /// This is better than retrieving the type from the [`NamedDataType`] directly because we do our best to preserve the exact instantiated type that existed when the reference was created.
+    ///
+    /// Named references only store an instance identifier rather than embedding a full [`DataType`].
+    /// This keeps references lightweight and avoids pulling recursive instantiated type graphs into hashing and equality checks used by exporters.
+    /// The actual instantiated types are stored on the owning [`NamedDataType`] and resolved through the identifier here.
+    pub fn ty<'a, 'b>(&'a self, types: &'b Types) -> Option<&'a DataType>
+    where
+        'b: 'a,
+    {
+        let ndt = self.get(types)?;
+        self.instance
+            .and_then(|instance| ndt.instance(instance))
+            .or_else(|| Some(ndt.ty()))
+    }
+
     /// Get the generic parameters set on this reference which will be filled in by the [NamedDataType].
     pub fn generics(&self) -> &[(GenericReference, DataType)] {
         &self.generics
@@ -44,6 +62,16 @@ impl NamedReference {
     /// Get the generic parameters set on this reference as mutable references.
     pub fn generics_mut(&mut self) -> &mut Vec<(GenericReference, DataType)> {
         &mut self.generics
+    }
+
+    /// Get the stored instance identifier, if present.
+    pub fn instance(&self) -> Option<usize> {
+        self.instance
+    }
+
+    /// Replace the stored instance identifier.
+    pub fn set_instance(&mut self, instance: Option<usize>) {
+        self.instance = instance;
     }
 
     /// Get whether this reference should be inlined

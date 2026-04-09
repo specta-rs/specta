@@ -80,6 +80,14 @@ pub struct NamedDataType {
     pub(crate) generics: Cow<'static, [(GenericReference, Cow<'static, str>)]>,
     pub(crate) inline: bool,
     pub(crate) inner: DataType,
+    /// Specialized instantiated shapes for references to this named type.
+    ///
+    /// The canonical [`NamedDataType::ty`] must stay general so it can be shared by all references.
+    /// Some references, such as const-generic instantiations or post-processing rewrites, need a more precise shape than the canonical definition.
+    ///
+    /// We store those shapes here and let [`NamedReference`] keep only a stable index into this list.
+    /// Keeping the instantiated [`DataType`] off the reference avoids recursive type graphs becoming part of the reference's hash/equality semantics.
+    pub(crate) instances: Vec<DataType>,
 }
 
 impl NamedDataType {
@@ -105,6 +113,7 @@ impl NamedDataType {
             generics: Cow::Owned(generics),
             inline: false,
             inner: dt,
+            instances: Vec::new(),
         }
     }
 
@@ -130,6 +139,7 @@ impl NamedDataType {
             generics: Cow::Owned(generics),
             inline: true,
             inner: dt,
+            instances: Vec::new(),
         }
     }
 
@@ -158,17 +168,44 @@ impl NamedDataType {
         let id = NamedId::Static(sentinel);
         let location = Location::caller().to_owned();
 
-        // We have never encountered this type. Start resolving it!
-        if let Some(ndt) = types.0.get(&id) {
-            if let Some(ndt) = ndt {
-                inline = inline || ndt.inline;
-            }
-        } else {
-            types.0.insert(id.clone(), None);
+        // TODO: Explain the rational of this
+        if Some(&id) == types.2.as_ref() {
+            // Impossible case of `#[specta(inline)]` on a type that references itself.
+            // if let Some(ndt) = types.0.get(&id) {
+            //     if let Some(ndt) = ndt {
+            //         if ndt.inline {
+            //             println!("RECURSIVE INLINE DETECTED");
+
+            //             return Reference::Named(NamedReference {
+            //                 id,
+            //                 generics: generics_for_ref,
+            //                 inline,
+            //             });
+            //         }
+            //     }
+            // }
+
+            // Case of field that references itself
+            return Reference::Named(NamedReference {
+                id,
+                generics: generics_for_ref,
+                inline,
+                instance: None,
+            });
+        }
+
+        fn build_instance(
+            id: &NamedId,
+            location: Location<'static>,
+            generics_for_ndt: &'static [(GenericReference, Cow<'static, str>)],
+            inline: bool,
+            types: &mut Types,
+            build_ndt: fn(&mut Types, &mut NamedDataType),
+        ) -> (DataType, bool) {
             let mut ndt = NamedDataType {
                 id: id.clone(),
                 location,
-                // `build_ndt` will just override all of this
+                // `build_ndt` will just override all of this.
                 name: Cow::Borrowed(""),
                 docs: Cow::Borrowed(""),
                 deprecated: None,
@@ -176,37 +213,138 @@ impl NamedDataType {
                 generics: Cow::Borrowed(generics_for_ndt),
                 inline,
                 inner: DataType::Primitive(super::Primitive::i8),
+                instances: Vec::new(),
             };
+            let mut inline = inline;
 
             {
-                let prev = CONTEXT_HAS_CONST_PARAMS.replace(has_const_param);
+                types.2 = Some(id.clone());
                 let result = panic::catch_unwind(AssertUnwindSafe(|| build_ndt(types, &mut ndt)));
-                CONTEXT_HAS_CONST_PARAMS.set(prev);
+                types.2 = None;
                 if let Err(payload) = result {
                     panic::resume_unwind(payload);
                 }
             }
 
-            // We patch the Tauri `Type` implementation.
             if ndt.name() == "TAURI_CHANNEL" && ndt.module_path().starts_with("tauri::") {
-                // This causes an exporter that isn't aware of Tauri's channel to error.
-                // This is effectively `Reference::opaque(TauriChannel)` but we do some hackery for better errors.
                 ndt.inner = reference::tauri().into();
-
-                // This ensures that we never create a `export type Channel`,
-                // instead the definition gets inlined into each callsite.
                 inline = true;
-                ndt.inline = true;
             }
 
-            types.0.insert(id.clone(), Some(ndt));
-            types.1 += 1;
+            (ndt.inner, inline)
         }
+
+        if let Some(existing_inline) = types
+            .0
+            .get(&id)
+            .and_then(Option::as_ref)
+            .map(|ndt| ndt.inline)
+        {
+            inline = inline || existing_inline;
+            let (instance_ty, next_inline) =
+                build_instance(&id, location, generics_for_ndt, inline, types, build_ndt);
+            inline = next_inline;
+            let instance = types
+                .0
+                .get_mut(&id)
+                .and_then(Option::as_mut)
+                .and_then(|ndt| ndt.register_instance(instance_ty));
+
+            return Reference::Named(NamedReference {
+                id,
+                generics: generics_for_ref,
+                inline,
+                instance,
+            });
+        }
+
+        // TODO: If `has_const_param` this needs to be stored per-reference incase we wanna inline later?
+
+        // We have never encountered this type. Start resolving it!
+        // if let Some(ndt) = types.0.get(&id) {
+        //     if let Some(ndt) = ndt {
+        //         inline = inline || ndt.inline;
+        //     }
+        // } else {
+        // types.0.insert(id.clone(), None);
+        // let mut ndt = NamedDataType {
+        //     id: id.clone(),
+        //     location,
+        //     // `build_ndt` will just override all of this
+        //     name: Cow::Borrowed(""),
+        //     docs: Cow::Borrowed(""),
+        //     deprecated: None,
+        //     module_path: Cow::Borrowed(""),
+        //     generics: Cow::Borrowed(generics_for_ndt),
+        //     inline,
+        //     inner: DataType::Primitive(super::Primitive::i8),
+        // };
+
+        // TODO: This may have impliciations but it should be fine now?
+        let mut ndt = NamedDataType {
+            id: id.clone(),
+            location,
+            // `build_ndt` will just override all of this
+            name: Cow::Borrowed(""),
+            docs: Cow::Borrowed(""),
+            deprecated: None,
+            module_path: Cow::Borrowed(""),
+            generics: Cow::Borrowed(generics_for_ndt),
+            inline,
+            inner: DataType::Primitive(super::Primitive::i8),
+            instances: Vec::new(),
+        };
+        types.0.insert(id.clone(), None);
+
+        {
+            types.2 = Some(id.clone());
+            let prev = CONTEXT_HAS_CONST_PARAMS.replace(has_const_param);
+            let result = panic::catch_unwind(AssertUnwindSafe(|| build_ndt(types, &mut ndt)));
+            CONTEXT_HAS_CONST_PARAMS.set(prev);
+            types.2 = None;
+            if let Err(payload) = result {
+                panic::resume_unwind(payload);
+            }
+        }
+
+        // We patch the Tauri `Type` implementation.
+        if ndt.name() == "TAURI_CHANNEL" && ndt.module_path().starts_with("tauri::") {
+            // This causes an exporter that isn't aware of Tauri's channel to error.
+            // This is effectively `Reference::opaque(TauriChannel)` but we do some hackery for better errors.
+            ndt.inner = reference::tauri().into();
+
+            // This ensures that we never create a `export type Channel`,
+            // instead the definition gets inlined into each callsite.
+            inline = true;
+            ndt.inline = true;
+        }
+
+        // println!("RESOLVED TY: {:#?}", ndt.ty());
+
+        // let ty = ndt.ty().clone();
+
+        types.0.insert(id.clone(), Some(ndt));
+        types.1 += 1;
+        // }
+
+        // TODO: Constructing the DT is unsafe if it recurses right?
+
+        // TODO: Can we only do this if const generics and present???
+        let (ty2, next_inline) =
+            build_instance(&id, location, generics_for_ndt, inline, types, build_ndt);
+        inline = next_inline;
+
+        let instance = types
+            .0
+            .get_mut(&id)
+            .and_then(Option::as_mut)
+            .and_then(|ndt| ndt.register_instance(ty2));
 
         Reference::Named(NamedReference {
             id,
             generics: generics_for_ref,
             inline,
+            instance,
         })
     }
 
@@ -222,7 +360,42 @@ impl NamedDataType {
             id: self.id.clone(),
             generics,
             inline: self.inline,
+            instance: None,
         })
+    }
+
+    /// Get a specialized instantiated type for this named type by index.
+    pub fn instance(&self, index: usize) -> Option<&DataType> {
+        self.instances.get(index)
+    }
+
+    #[doc(hidden)]
+    pub fn instances(&self) -> &[DataType] {
+        &self.instances
+    }
+
+    #[doc(hidden)]
+    pub fn instances_mut(&mut self) -> &mut Vec<DataType> {
+        &mut self.instances
+    }
+
+    #[doc(hidden)]
+    pub fn set_instances(&mut self, instances: Vec<DataType>) {
+        self.instances = instances;
+    }
+
+    pub(crate) fn register_instance(&mut self, ty: DataType) -> Option<usize> {
+        if self.inner == ty {
+            return None;
+        }
+
+        if let Some(index) = self.instances.iter().position(|existing| existing == &ty) {
+            return Some(index);
+        }
+
+        let index = self.instances.len();
+        self.instances.push(ty);
+        Some(index)
     }
 
     /// Check whether a type requires a reference to be generated.
