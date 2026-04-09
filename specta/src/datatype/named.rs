@@ -178,64 +178,6 @@ impl NamedDataType {
         sentinel: &'static str,
         build_ndt: fn(&mut Types, &mut NamedDataType),
     ) -> Reference {
-        fn resolve_ndt(types: &mut Types, id: &NamedId, f: impl FnOnce(&mut Types)) {
-            // We also set `None` so we know the type is in the process of being resolved to avoid stack overflows.
-            // We reset it after to ensure we always have a definition for the type. We always prefer the first encountered definition (even though they should always match!).
-            let prev = types.0.insert(id.clone(), None);
-            let result = panic::catch_unwind(AssertUnwindSafe(|| f(types)));
-            if let Some(prev) = prev {
-                types.0.insert(id.clone(), prev);
-            }
-            if let Err(payload) = result {
-                panic::resume_unwind(payload);
-            }
-        }
-
-        fn register_instance(
-            id: &NamedId,
-            location: Location<'static>,
-            generics_for_ndt: &'static [(GenericReference, Cow<'static, str>)],
-            generics_for_ref: &[(GenericReference, DataType)],
-            inline: bool,
-            types: &mut Types,
-            build_ndt: fn(&mut Types, &mut NamedDataType),
-        ) -> Reference {
-            let mut ndt = NamedDataType {
-                id: id.clone(),
-                location,
-                // `build_ndt` will just override all of this.
-                name: Cow::Borrowed(""),
-                docs: Cow::Borrowed(""),
-                deprecated: None,
-                module_path: Cow::Borrowed(""),
-                generics: Cow::Borrowed(generics_for_ndt),
-                inline,
-                inner: DataType::Primitive(super::Primitive::i8),
-                instances: Vec::new(),
-            };
-            let mut inline = inline;
-
-            resolve_ndt(types, id, |types| build_ndt(types, &mut ndt));
-
-            if ndt.name() == "TAURI_CHANNEL" && ndt.module_path().starts_with("tauri::") {
-                ndt.inner = reference::tauri().into();
-                inline = true;
-            }
-
-            let instance = types
-                .0
-                .get_mut(id)
-                .and_then(Option::as_mut)
-                .and_then(|ndt| ndt.register_instance(ndt.inner.clone()));
-
-            Reference::Named(NamedReference {
-                id: id.clone(),
-                generics: generics_for_ref.to_vec(),
-                inline,
-                instance,
-            })
-        }
-
         let id = NamedId::Static(sentinel);
         let location = Location::caller().to_owned();
 
@@ -252,28 +194,10 @@ impl NamedDataType {
             });
         }
 
-        if let Some(existing_inline) = types
-            .0
-            .get(&id)
-            .and_then(Option::as_ref)
-            .map(|ndt| ndt.inline)
-        {
-            return register_instance(
-                &id,
-                location,
-                generics_for_ndt,
-                &generics_for_ref,
-                inline || existing_inline,
-                types,
-                build_ndt,
-            );
-        }
-
-        // TODO: If `has_const_param` this needs to be stored per-reference incase we wanna inline later?
         let mut ndt = NamedDataType {
             id: id.clone(),
             location,
-            // `build_ndt` will just override all of this
+            // `build_ndt` will just override all of this.
             name: Cow::Borrowed(""),
             docs: Cow::Borrowed(""),
             deprecated: None,
@@ -284,43 +208,76 @@ impl NamedDataType {
             instances: Vec::new(),
         };
 
+        if let Some(existing_inline) = types
+            .0
+            .get(&id)
+            .and_then(Option::as_ref)
+            .map(|ndt| ndt.inline)
         {
+            inline |= existing_inline;
+        } else {
+            let mut ndt = ndt.clone();
+
             let previous = CONTEXT_HAS_CONST_PARAMS.replace(has_const_param);
             let result = panic::catch_unwind(AssertUnwindSafe(|| {
-                resolve_ndt(types, &id, |types| build_ndt(types, &mut ndt))
+                let prev = types.0.insert(id.clone(), None);
+                let result = panic::catch_unwind(AssertUnwindSafe(|| build_ndt(types, &mut ndt)));
+                if let Some(prev) = prev {
+                    types.0.insert(id.clone(), prev);
+                }
+                if let Err(payload) = result {
+                    panic::resume_unwind(payload);
+                }
             }));
             CONTEXT_HAS_CONST_PARAMS.set(previous);
 
             match result {
                 Ok(value) => value,
                 Err(payload) => panic::resume_unwind(payload),
+            };
+
+            // We patch the Tauri `Type` implementation.
+            if ndt.name() == "TAURI_CHANNEL" && ndt.module_path().starts_with("tauri::") {
+                // This causes an exporter that isn't aware of Tauri's channel to error.
+                // This is effectively `Reference::opaque(TauriChannel)` but we do some hackery for better errors.
+                ndt.inner = reference::tauri().into();
+
+                // This ensures that we never create a `export type Channel`,
+                // instead the definition gets inlined into each callsite.
+                inline = true;
+                ndt.inline = true;
             }
+
+            types.0.insert(id.clone(), Some(ndt));
+            types.1 += 1;
         }
 
-        // We patch the Tauri `Type` implementation.
+        let prev = types.0.insert(id.clone(), None);
+        let result = panic::catch_unwind(AssertUnwindSafe(|| build_ndt(types, &mut ndt)));
+        if let Some(prev) = prev {
+            types.0.insert(id.clone(), prev);
+        }
+        if let Err(payload) = result {
+            panic::resume_unwind(payload);
+        }
+
         if ndt.name() == "TAURI_CHANNEL" && ndt.module_path().starts_with("tauri::") {
-            // This causes an exporter that isn't aware of Tauri's channel to error.
-            // This is effectively `Reference::opaque(TauriChannel)` but we do some hackery for better errors.
             ndt.inner = reference::tauri().into();
-
-            // This ensures that we never create a `export type Channel`,
-            // instead the definition gets inlined into each callsite.
             inline = true;
-            ndt.inline = true;
         }
 
-        types.0.insert(id.clone(), Some(ndt));
-        types.1 += 1;
+        let instance = types
+            .0
+            .get_mut(&id)
+            .and_then(Option::as_mut)
+            .and_then(|existing| existing.register_instance(ndt.inner));
 
-        register_instance(
-            &id,
-            location,
-            generics_for_ndt,
-            &generics_for_ref,
+        Reference::Named(NamedReference {
+            id: id.clone(),
+            generics: generics_for_ref,
             inline,
-            types,
-            build_ndt,
-        )
+            instance,
+        })
     }
 
     /// Construct a [Reference] to a [NamedDataType].
