@@ -54,10 +54,8 @@ thread_local! {
     ///
     /// So for DX we know including length is safe as long as the resolving context doesn't have any const parameters. We track this using a thread local so it's entirely runtime meaning the solution doesn't require brittle scanning of the user's `TokenStream` in the derive macro.
     ///
-    ///
-    /// TODO:
-    ///  - Explain specta util helper
-    ///
+    /// We provide `specta_util::FixedArray<N, T>` as a helper type to force Specta to export a fixed-length array instead of a generic `number[]` if you know what your doing.
+    /// This doesn't fix the core issue but it does allow the user to assert they are correct.
     ///
     static CONTEXT_HAS_CONST_PARAMS: Cell<bool> = const { Cell::new(false) };
 }
