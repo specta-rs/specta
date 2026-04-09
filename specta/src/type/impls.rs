@@ -232,6 +232,7 @@ impl<const N: usize, T: Type> Type for [T; N] {
         let mut l = List::new(T::definition(types));
 
         // Refer to the documentation for `CONTEXT_HAS_CONST_PARAMS` constant  in `named.rs` to understand this.
+        // If you wanna force this use `specta_utils::FixedArray<N, T>` instead.
         if !datatype::context_has_const_params() {
             l.set_length(Some(N));
         }
