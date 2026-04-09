@@ -1155,6 +1155,77 @@ expression: output
 	*	}} GenericParameterOrderPreserved
 	* @property {Pair<number, string>} pair
 	*
+	* @typedef {{
+	*		data: [number],
+	*		a: [number, number],
+	*		d: [number, number],
+	*	}} ConstGenericInNonConstContainer
+	* @property {[number]} data
+	* @property {[number, number]} a
+	* @property {[number, number]} d
+	*
+	* @typedef {{
+	*		data: number[],
+	*		a: number[],
+	*		d: [number, number],
+	*	}} ConstGenericInConstContainer
+	* @property {number[]} data
+	* @property {number[]} a
+	* @property {[number, number]} d
+	*
+	* @typedef {{
+	*		a: NamedConstGeneric,
+	*		b: NamedConstGeneric,
+	*		d: [number, number],
+	*	}} NamedConstGenericContainer
+	* @property {NamedConstGeneric} a
+	* @property {NamedConstGeneric} b
+	* @property {[number, number]} d
+	*
+	* @typedef {{
+	*		b: {
+	*			data: [number, number],
+	*			a: [number, number],
+	*			d: [number, number, number],
+	*		},
+	*		c: {
+	*			data: [number, number, number],
+	*			a: [number, number],
+	*			d: [number, number, number],
+	*		},
+	*		d: [number, number],
+	*	}} InlineConstGenericContainer
+	* @property {{
+	*		data: number[],
+	*		a: number[],
+	*		d: [number, number, number],
+	*	}} b
+	* @property {{
+	*		data: number[],
+	*		a: number[],
+	*		d: [number, number, number],
+	*	}} c
+	* @property {[number, number]} d
+	*
+	* @typedef {{
+	*		b: {
+	*			data: [number, number],
+	*			a: [number, number],
+	*			d: [number, number, number],
+	*			e: InlineRecursiveConstGeneric,
+	*		},
+	*		c: {
+	*			data: [number, number, number],
+	*			a: [number, number],
+	*			d: [number, number, number],
+	*			e: InlineRecursiveConstGeneric,
+	*		},
+	*		d: [number, number],
+	*	}} InlineRecursiveConstGenericContainer
+	* @property {InlineRecursiveConstGeneric} b
+	* @property {InlineRecursiveConstGeneric} c
+	* @property {[number, number]} d
+	*
 	* @typedef {never} TestCollectionRegister
 	*
 	* @typedef {never} TestCollectionRegister

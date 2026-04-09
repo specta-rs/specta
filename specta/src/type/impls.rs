@@ -184,6 +184,7 @@ const _: () = {
                     <T as Type>::definition(types),
                 )],
                 true,
+                false,
                 types,
                 SENTINEL,
                 |_types, ndt| {
@@ -229,7 +230,13 @@ impl<T: Type> Type for [T] {
 impl<const N: usize, T: Type> Type for [T; N] {
     fn definition(types: &mut Types) -> DataType {
         let mut l = List::new(T::definition(types));
-        l.set_length(Some(N));
+
+        // Refer to the documentation for `CONTEXT_HAS_CONST_PARAMS` constant  in `named.rs` to understand this.
+        // If you wanna force this use `specta_utils::FixedArray<N, T>` instead.
+        if !datatype::context_has_const_params() {
+            l.set_length(Some(N));
+        }
+
         DataType::List(l)
     }
 }

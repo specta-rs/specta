@@ -1,4 +1,9 @@
-use std::{borrow::Cow, panic::Location, sync::Arc};
+use std::{
+    borrow::Cow,
+    cell::Cell,
+    panic::{self, AssertUnwindSafe, Location},
+    sync::Arc,
+};
 
 use crate::{
     Types,
@@ -7,6 +12,57 @@ use crate::{
         reference::{self, GenericReference, NamedId},
     },
 };
+
+thread_local! {
+    /// This variables remains false unless your exporting in the context of `#[derive(Type)]` on a type which contains one or more const-generic parameters.
+    ///
+    /// Say for a type like this
+    /// ```rs
+    /// #[derive(Type)]
+    /// struct Demo<const N: usize> {
+    ///     data: [u32; N],
+    /// }
+    /// ```
+    ///
+    /// If we always set the length in the `impl Type for [T; N]`, the implementation will "bake" whatever the first encountered value of `N` is into the global type definition which is wrong. For example:
+    /// ```rs
+    /// pub struct A {
+    ///     a: Demo<1>,
+    ///     b: Demo<2>,
+    /// }
+    /// // becomes:
+    /// // export type A = { a: Demo, b: Demo }
+    /// // export type Demo = { [number] }; // This is invalid for the `b` field.
+    ///
+    /// // and if we encounter the fields in the opposite order it changes:
+    ///
+    /// pub struct B {
+    ///     // we flipped field definition
+    ///     b: Demo<2>,
+    ///     a: Demo<1>,
+    /// }
+    /// // becomes:
+    /// // export type A = { a: Demo, b: Demo }
+    /// // export type Demo = { [number, number] }; // This is invalid for the `a` field.
+    /// ```
+    ///
+    /// One observation is that for a length to differ across two instantiations of the same type it must either:
+    ///  - Have a const parameter
+    ///  - Have a generic which uses a trait associated constant
+    ///
+    /// Now Specta doesn't and can't support a generic with a trait associated constant as the generic `T` is shadowed by a virtual struct which is used to alter the type to return a generic reference, instead of a flat datatype.
+    ///
+    /// So for DX we know including length is safe as long as the resolving context doesn't have any const parameters. We track this using a thread local so it's entirely runtime meaning the solution doesn't require brittle scanning of the user's `TokenStream` in the derive macro.
+    ///
+    /// We provide `specta_util::FixedArray<N, T>` as a helper type to force Specta to export a fixed-length array instead of a generic `number[]` if you know what your doing.
+    /// This doesn't fix the core issue but it does allow the user to assert they are correct.
+    ///
+    static CONTEXT_HAS_CONST_PARAMS: Cell<bool> = const { Cell::new(false) };
+}
+
+pub(crate) fn context_has_const_params() -> bool {
+    CONTEXT_HAS_CONST_PARAMS.with(|c| c.get())
+}
 
 /// Named type represents any type with it's own unique name and identity.
 ///
@@ -22,6 +78,14 @@ pub struct NamedDataType {
     pub(crate) generics: Cow<'static, [(GenericReference, Cow<'static, str>)]>,
     pub(crate) inline: bool,
     pub(crate) inner: DataType,
+    /// Specialized instantiated shapes for references to this named type.
+    ///
+    /// The canonical [`NamedDataType::ty`] must stay general so it can be shared by all references.
+    /// Some references, such as const-generic instantiations or post-processing rewrites, need a more precise shape than the canonical definition.
+    ///
+    /// We store those shapes here and let [`NamedReference`] keep only a stable index into this list.
+    /// Keeping the instantiated [`DataType`] off the reference avoids recursive type graphs becoming part of the reference's hash/equality semantics.
+    pub(crate) instances: Vec<DataType>,
 }
 
 impl NamedDataType {
@@ -47,6 +111,7 @@ impl NamedDataType {
             generics: Cow::Owned(generics),
             inline: false,
             inner: dt,
+            instances: Vec::new(),
         }
     }
 
@@ -72,6 +137,25 @@ impl NamedDataType {
             generics: Cow::Owned(generics),
             inline: true,
             inner: dt,
+            instances: Vec::new(),
+        }
+    }
+
+    /// Clones the inner [`DataType`] of this named datatype to one with a unique identifier.
+    /// This can be modified before being registered. Not it's name and module path will overlap if not changed,
+    /// which will likely cause a duplication type warning in your exporter.
+    pub fn clone_ty(&self) -> Self {
+        Self {
+            id: NamedId::Dynamic(Arc::new(())),
+            name: self.name.clone(),
+            docs: self.docs.clone(),
+            deprecated: self.deprecated.clone(),
+            module_path: self.module_path.clone(),
+            location: self.location.clone(),
+            generics: self.generics.clone(),
+            inline: self.inline,
+            inner: self.inner.clone(),
+            instances: self.instances.clone(),
         }
     }
 
@@ -81,17 +165,31 @@ impl NamedDataType {
         types.1 += 1;
     }
 
-    // ## Why return a reference?
-    //
-    // If a recursive type is being resolved it's possible the `init_with_sentinel` function will be called recursively.
-    // To avoid this we avoid resolving a type that's already marked as being resolved but this means the [NamedDataType]'s [DataType] is unknown at this stage so we can't return it. Instead we always return [Reference]'s as they are always valid.
-    // WARNING: This should not be used outside of `specta_macros` as it may have breaking changes in minor releases
+    /// Initialize a named type using a temporary sentinel as it's identity. The sentinel avoids allocating an ID which is used by `#[derive(Type)]` but is too unsafe as a general public API.
+    ///
+    /// WARNING: This should not be used outside of `specta_macros` as it may have breaking changes in minor releases
+    ///
+    /// This always returns a [`Reference`] rather than a [`NamedDataType`]. While a type is being
+    /// resolved we insert `None` into [`Types`] for its id. Recursive lookups treat that `None` as
+    /// "currently resolving" and immediately emit a placeholder reference instead of re-entering
+    /// `build_ndt`.
+    ///
+    /// The canonical [`NamedDataType::inner`] must stay generic enough to be shared by every
+    /// reference to the type. When a particular use-site needs a more specific instantiated shape,
+    /// such as const-generic expansion or a post-processing rewrite, that shape is stored in
+    /// [`NamedDataType::instances`] and the returned [`NamedReference`] stores only the stable
+    /// instance index.
+    ///
+    /// `has_const_param` only affects the thread-local resolution context used while building the
+    /// canonical named type. That context intentionally does not become part of the global type
+    /// identity.
     #[doc(hidden)]
     #[track_caller]
     pub fn init_with_sentinel(
         generics_for_ndt: &'static [(GenericReference, Cow<'static, str>)],
         generics_for_ref: Vec<(GenericReference, DataType)>,
         mut inline: bool,
+        has_const_param: bool,
         types: &mut Types,
         sentinel: &'static str,
         build_ndt: fn(&mut Types, &mut NamedDataType),
@@ -99,26 +197,60 @@ impl NamedDataType {
         let id = NamedId::Static(sentinel);
         let location = Location::caller().to_owned();
 
-        // We have never encountered this type. Start resolving it!
-        if let Some(ndt) = types.0.get(&id) {
-            if let Some(ndt) = ndt {
-                inline = inline || ndt.inline;
-            }
-        } else {
-            types.0.insert(id.clone(), None);
-            let mut ndt = NamedDataType {
+        // If this named type is already being resolved, emit a reference to the placeholder
+        // instead of re-entering resolution which would likely trigger a stack overflow.
+        //
+        // This stops us resolving the `instances` entry for recursively inlined types but resolving it would just infinitely recurse so we can't.
+        if types.0.get(&id).is_some_and(|slot| slot.is_none()) {
+            return Reference::Named(NamedReference {
                 id: id.clone(),
-                location,
-                // `build_ndt` will just override all of this
-                name: Cow::Borrowed(""),
-                docs: Cow::Borrowed(""),
-                deprecated: None,
-                module_path: Cow::Borrowed(""),
-                generics: Cow::Borrowed(generics_for_ndt),
+                generics: generics_for_ref.clone(),
                 inline,
-                inner: DataType::Primitive(super::Primitive::i8),
+                instance: None,
+            });
+        }
+
+        let mut ndt = NamedDataType {
+            id: id.clone(),
+            location,
+            // `build_ndt` will just override all of this.
+            name: Cow::Borrowed(""),
+            docs: Cow::Borrowed(""),
+            deprecated: None,
+            module_path: Cow::Borrowed(""),
+            generics: Cow::Borrowed(generics_for_ndt),
+            inline,
+            inner: DataType::Primitive(super::Primitive::i8),
+            instances: Vec::new(),
+        };
+
+        if let Some(existing_inline) = types
+            .0
+            .get(&id)
+            .and_then(Option::as_ref)
+            .map(|ndt| ndt.inline)
+        {
+            inline |= existing_inline;
+        } else {
+            let mut ndt = ndt.clone();
+
+            let previous = CONTEXT_HAS_CONST_PARAMS.replace(has_const_param);
+            let result = panic::catch_unwind(AssertUnwindSafe(|| {
+                let prev = types.0.insert(id.clone(), None);
+                let result = panic::catch_unwind(AssertUnwindSafe(|| build_ndt(types, &mut ndt)));
+                if let Some(prev) = prev {
+                    types.0.insert(id.clone(), prev);
+                }
+                if let Err(payload) = result {
+                    panic::resume_unwind(payload);
+                }
+            }));
+            CONTEXT_HAS_CONST_PARAMS.set(previous);
+
+            match result {
+                Ok(value) => value,
+                Err(payload) => panic::resume_unwind(payload),
             };
-            build_ndt(types, &mut ndt);
 
             // We patch the Tauri `Type` implementation.
             if ndt.name() == "TAURI_CHANNEL" && ndt.module_path().starts_with("tauri::") {
@@ -136,10 +268,31 @@ impl NamedDataType {
             types.1 += 1;
         }
 
+        let prev = types.0.insert(id.clone(), None);
+        let result = panic::catch_unwind(AssertUnwindSafe(|| build_ndt(types, &mut ndt)));
+        if let Some(prev) = prev {
+            types.0.insert(id.clone(), prev);
+        }
+        if let Err(payload) = result {
+            panic::resume_unwind(payload);
+        }
+
+        if ndt.name() == "TAURI_CHANNEL" && ndt.module_path().starts_with("tauri::") {
+            ndt.inner = reference::tauri().into();
+            inline = true;
+        }
+
+        let instance = types
+            .0
+            .get_mut(&id)
+            .and_then(Option::as_mut)
+            .and_then(|existing| existing.register_instance(ndt.inner));
+
         Reference::Named(NamedReference {
-            id,
+            id: id.clone(),
             generics: generics_for_ref,
             inline,
+            instance,
         })
     }
 
@@ -155,6 +308,7 @@ impl NamedDataType {
             id: self.id.clone(),
             generics,
             inline: self.inline,
+            instance: None,
         })
     }
 
@@ -264,6 +418,42 @@ impl NamedDataType {
     /// Set the inner [`DataType`]
     pub fn set_ty(&mut self, ty: DataType) {
         self.inner = ty;
+    }
+
+    /// Construct a [Reference] to this [NamedDataType] using another reference as a template.
+    ///
+    /// This preserves hidden per-reference state such as inline and instance information while
+    /// retargeting the reference to this named type.
+    pub fn reference_from(&self, template: &NamedReference) -> Reference {
+        Reference::Named(NamedReference {
+            id: self.id.clone(),
+            generics: template.generics.clone(),
+            inline: template.inline,
+            instance: template.instance,
+        })
+    }
+
+    /// Allows you to map over the inner [`DataType`] and all instances.
+    /// Sometimes a [`NamedDataType`] will be represented as multiple [`DataType`]'s so inlining can be more accurate so you should prefer this over [`NamedDataType::ty_*`] helpers.
+    pub fn map_ty_mut(&mut self, mut f: impl FnMut(&mut DataType)) {
+        f(&mut self.inner);
+        for instance in self.instances.iter_mut() {
+            f(instance);
+        }
+    }
+
+    pub(crate) fn register_instance(&mut self, ty: DataType) -> Option<usize> {
+        if self.inner == ty {
+            return None;
+        }
+
+        if let Some(index) = self.instances.iter().position(|existing| existing == &ty) {
+            return Some(index);
+        }
+
+        let index = self.instances.len();
+        self.instances.push(ty);
+        Some(index)
     }
 }
 
