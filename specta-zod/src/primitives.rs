@@ -3,15 +3,15 @@
 use std::{borrow::Cow, cell::RefCell, fmt::Write as _};
 
 use specta::{
+    ResolvedTypes, Types,
     datatype::{
         DataType, Enum, Fields, GenericReference, List, Map, NamedDataType, NamedReference,
         OpaqueReference, Primitive, Reference, Struct, Tuple,
     },
-    ResolvedTypes, Types,
 };
 
 use crate::{
-    opaque, reserved_names::RESERVED_TYPE_NAMES, BigIntExportBehavior, Error, Layout, Zod,
+    BigIntExportBehavior, Error, Layout, Zod, opaque, reserved_names::RESERVED_TYPE_NAMES,
 };
 
 thread_local! {

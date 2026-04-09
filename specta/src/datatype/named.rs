@@ -6,11 +6,11 @@ use std::{
 };
 
 use crate::{
-    datatype::{
-        reference::{self, GenericReference, NamedId},
-        DataType, NamedReference, Reference,
-    },
     Types,
+    datatype::{
+        DataType, NamedReference, Reference,
+        reference::{self, GenericReference, NamedId},
+    },
 };
 
 thread_local! {

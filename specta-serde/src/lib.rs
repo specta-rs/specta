@@ -740,14 +740,7 @@ fn rewrite_datatype_for_phase(
             };
             let key = TypeIdentity::from_ndt(referenced_ndt);
             for (_, dt) in reference.generics_mut() {
-                rewrite_datatype_for_phase(
-                    dt,
-                    mode,
-                    original_types,
-                    generated,
-                    split_types,
-                    None,
-                )?;
+                rewrite_datatype_for_phase(dt, mode, original_types, generated, split_types, None)?;
             }
 
             if !split_types.contains(&key) {
