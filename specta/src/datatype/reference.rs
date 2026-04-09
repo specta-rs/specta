@@ -50,7 +50,7 @@ impl NamedReference {
     {
         let ndt = self.get(types)?;
         self.instance
-            .and_then(|instance| ndt.instance(instance))
+            .and_then(|instance| ndt.instances.get(instance))
             .or_else(|| Some(ndt.ty()))
     }
 
@@ -62,16 +62,6 @@ impl NamedReference {
     /// Get the generic parameters set on this reference as mutable references.
     pub fn generics_mut(&mut self) -> &mut Vec<(GenericReference, DataType)> {
         &mut self.generics
-    }
-
-    /// Get the stored instance identifier, if present.
-    pub fn instance(&self) -> Option<usize> {
-        self.instance
-    }
-
-    /// Replace the stored instance identifier.
-    pub fn set_instance(&mut self, instance: Option<usize>) {
-        self.instance = instance;
     }
 
     /// Get whether this reference should be inlined

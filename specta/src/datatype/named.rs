@@ -141,6 +141,24 @@ impl NamedDataType {
         }
     }
 
+    /// Clones the inner [`DataType`] of this named datatype to one with a unique identifier.
+    /// This can be modified before being registered. Not it's name and module path will overlap if not changed,
+    /// which will likely cause a duplication type warning in your exporter.
+    pub fn clone_ty(&self) -> Self {
+        Self {
+            id: NamedId::Dynamic(Arc::new(())),
+            name: self.name.clone(),
+            docs: self.docs.clone(),
+            deprecated: self.deprecated.clone(),
+            module_path: self.module_path.clone(),
+            location: self.location.clone(),
+            generics: self.generics.clone(),
+            inline: self.inline,
+            inner: self.inner.clone(),
+            instances: self.instances.clone(),
+        }
+    }
+
     /// Register the type into a [Types].
     pub fn register(&self, types: &mut Types) {
         types.0.insert(self.id.clone(), Some(self.clone()));
@@ -294,40 +312,6 @@ impl NamedDataType {
         })
     }
 
-    /// Get a specialized instantiated type for this named type by index.
-    pub fn instance(&self, index: usize) -> Option<&DataType> {
-        self.instances.get(index)
-    }
-
-    #[doc(hidden)]
-    pub fn instances(&self) -> &[DataType] {
-        &self.instances
-    }
-
-    #[doc(hidden)]
-    pub fn instances_mut(&mut self) -> &mut Vec<DataType> {
-        &mut self.instances
-    }
-
-    #[doc(hidden)]
-    pub fn set_instances(&mut self, instances: Vec<DataType>) {
-        self.instances = instances;
-    }
-
-    pub(crate) fn register_instance(&mut self, ty: DataType) -> Option<usize> {
-        if self.inner == ty {
-            return None;
-        }
-
-        if let Some(index) = self.instances.iter().position(|existing| existing == &ty) {
-            return Some(index);
-        }
-
-        let index = self.instances.len();
-        self.instances.push(ty);
-        Some(index)
-    }
-
     /// Check whether a type requires a reference to be generated.
     ///
     /// This if `false` is all [Reference]'s created for the type are inlined,
@@ -434,6 +418,29 @@ impl NamedDataType {
     /// Set the inner [`DataType`]
     pub fn set_ty(&mut self, ty: DataType) {
         self.inner = ty;
+    }
+
+    /// Allows you to map over the inner [`DataType`] and all instances.
+    /// Sometimes a [`NamedDataType`] will be represented as multiple [`DataType`]'s so inlining can be more accurate so you should prefer this over [`NamedDataType::ty_*`] helpers.
+    pub fn map_ty_mut(&mut self, mut f: impl FnMut(&mut DataType)) {
+        f(&mut self.inner);
+        for instance in self.instances.iter_mut() {
+            f(instance);
+        }
+    }
+
+    pub(crate) fn register_instance(&mut self, ty: DataType) -> Option<usize> {
+        if self.inner == ty {
+            return None;
+        }
+
+        if let Some(index) = self.instances.iter().position(|existing| existing == &ty) {
+            return Some(index);
+        }
+
+        let index = self.instances.len();
+        self.instances.push(ty);
+        Some(index)
     }
 }
 

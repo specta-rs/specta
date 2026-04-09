@@ -105,7 +105,7 @@ impl Types {
             .iter()
             .filter_map(|(_, ndt)| ndt.as_ref())
             .collect::<Vec<_>>();
-        // assert_eq!(v.len(), self.1, "Types count logic mismatch");
+        assert_eq!(v.len(), self.1, "Types count logic mismatch");
         v.sort_by(|a, b| {
             a.name
                 .cmp(&b.name)
