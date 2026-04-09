@@ -744,6 +744,54 @@ GenericParameterOrderPreserved: export type GenericParameterOrderPreserved = {
 	pair: Pair<number, string>,
 };
 
+ConstGenericInNonConstContainer: export type ConstGenericInNonConstContainer = {
+	data: [number],
+	a: [number, number],
+	d: [number, number],
+};
+
+ConstGenericInConstContainer: export type ConstGenericInConstContainer = {
+	data: number[],
+	a: number[],
+	d: [number, number],
+};
+
+NamedConstGenericContainer: export type NamedConstGenericContainer = {
+	a: NamedConstGeneric,
+	b: NamedConstGeneric,
+	d: [number, number],
+};
+
+InlineConstGenericContainer: export type InlineConstGenericContainer = {
+	b: {
+		data: [number, number],
+		a: [number, number],
+		d: [number, number, number],
+	},
+	c: {
+		data: [number, number, number],
+		a: [number, number],
+		d: [number, number, number],
+	},
+	d: [number, number],
+};
+
+InlineRecursiveConstGenericContainer: export type InlineRecursiveConstGenericContainer = {
+	b: {
+		data: [number, number],
+		a: [number, number],
+		d: [number, number, number],
+		e: InlineRecursiveConstGeneric,
+	},
+	c: {
+		data: [number, number, number],
+		a: [number, number],
+		d: [number, number, number],
+		e: InlineRecursiveConstGeneric,
+	},
+	d: [number, number],
+};
+
 TestCollectionRegister: export type TestCollectionRegister = never;
 
 TestCollectionRegister: export type TestCollectionRegister = never;

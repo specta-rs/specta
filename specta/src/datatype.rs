@@ -22,6 +22,7 @@ pub use generic::Generic;
 pub use list::List;
 pub use literal::Literal;
 pub use map::Map;
+pub(crate) use named::context_has_const_params;
 pub use named::{Deprecated, NamedDataType};
 pub use primitive::Primitive;
 pub use reference::{GenericReference, NamedReference, OpaqueReference, Reference};

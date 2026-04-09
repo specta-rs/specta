@@ -58,6 +58,7 @@ macro_rules! _impl_ndt_as {
                             <$generic as Type>::definition(types),
                         )],
                         true,
+                        true,
                         types,
                         SENTINEL,
                         |types, ndt| {
@@ -96,6 +97,7 @@ macro_rules! _impl_ndt_as {
                     DataType::Reference(datatype::NamedDataType::init_with_sentinel(
                         GENERICS,
                         vec![],
+                        true,
                         true,
                         types,
                         SENTINEL,
@@ -144,6 +146,7 @@ macro_rules! _impl_ndt_as {
                             datatype::GenericReference::new::<generics::$generic>(),
                             <$generic as Type>::definition(types),
                         )],
+                        true,
                         true,
                         types,
                         SENTINEL,
@@ -220,6 +223,7 @@ macro_rules! _impl_ndt {
                             ),*)?
                         ],
                         $inline,
+                        false,
                         types,
                         SENTINEL,
                         |$types, $ndt| {

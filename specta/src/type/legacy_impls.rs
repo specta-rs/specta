@@ -40,7 +40,7 @@ impl_ndt!(
 
 #[cfg(feature = "heapless")]
 #[cfg_attr(docsrs, doc(cfg(feature = "heapless")))]
-impl_ndt_as!(heapless::Vec<T, const N: usize> as [T]);
+impl_ndt_as!(heapless::Vec<T, const N: usize> as [T; N]);
 
 #[cfg(feature = "semver")]
 #[cfg_attr(docsrs, doc(cfg(feature = "semver")))]
@@ -52,7 +52,7 @@ impl_ndt_as!(smol_str::SmolStr as str);
 
 #[cfg(feature = "arrayvec")]
 #[cfg_attr(docsrs, doc(cfg(feature = "arrayvec")))]
-impl_ndt_as!(arrayvec::ArrayVec<T, const N: usize> as [T]);
+impl_ndt_as!(arrayvec::ArrayVec<T, const N: usize> as [T; N]);
 
 #[cfg(feature = "arrayvec")]
 #[cfg_attr(docsrs, doc(cfg(feature = "arrayvec")))]
@@ -60,7 +60,7 @@ impl_ndt_as!(arrayvec::ArrayString<const N: usize> as str);
 
 #[cfg(feature = "smallvec")]
 #[cfg_attr(docsrs, doc(cfg(feature = "smallvec")))]
-impl_ndt_as!(smallvec::SmallVec<[T; N]> where { [T; N]: smallvec::Array } as [T]);
+impl_ndt_as!(smallvec::SmallVec<[T; N]> where { [T; N]: smallvec::Array } as [T; N]);
 
 #[cfg(feature = "bytes")]
 #[cfg_attr(docsrs, doc(cfg(feature = "bytes")))]
@@ -369,6 +369,7 @@ const _: () = {
                     GENERICS,
                     vec![],
                     true,
+                    false,
                     types,
                     SENTINEL,
                     |types, ndt| {
@@ -648,6 +649,7 @@ const _: () = {
                 GENERICS,
                 vec![],
                 false,
+                false,
                 types,
                 SENTINEL,
                 |types, ndt| {
@@ -674,6 +676,7 @@ const _: () = {
         DataType::Reference(datatype::NamedDataType::init_with_sentinel(
             GENERICS,
             vec![],
+            false,
             false,
             types,
             SENTINEL,

@@ -406,6 +406,14 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         GenericDefaultSkippedNonType,
         GenericParameterOrderPreserved,
 
+        // Tests for handling of const generics
+        // Especially when inlining and flattening as it changes.
+        ConstGenericInNonConstContainer,
+        ConstGenericInConstContainer,
+        NamedConstGenericContainer,
+        InlineConstGenericContainer,
+        InlineRecursiveConstGenericContainer,
+
         // Test that the types don't get duplicated in the type map.
         // (these will be duplicated in dts tests as that doesn't use the typemap)
         TestCollectionRegister,
@@ -2368,6 +2376,85 @@ struct Pair<Z, A> {
 #[specta(collect = false)]
 struct GenericParameterOrderPreserved {
     pair: Pair<i32, String>,
+}
+
+const CONST_LEN: usize = 1;
+#[derive(Type)]
+#[specta(collect = false)]
+struct ConstGenericInNonConstContainer {
+    data: [u32; CONST_LEN],
+    a: [u8; 2],
+    #[specta(type = specta_util::FixedArray<2, u8>)]
+    d: [u8; 2],
+}
+
+// This is a duplicate of `NamedConstGeneric` but we keep it separate as it's a better test
+// or the global export ty that is registered.
+#[derive(Type)]
+#[specta(collect = false)]
+struct ConstGenericInConstContainer<const N: usize = 1> {
+    data: [u32; N],
+    a: [u8; 2],
+    #[specta(type = specta_util::FixedArray<2, u8>)]
+    d: [u8; 2],
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct NamedConstGeneric<const N: usize = 1> {
+    data: [u32; N],
+    a: [u8; 2],
+    #[specta(type = specta_util::FixedArray<2, u8>)]
+    d: [u8; 2],
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct NamedConstGenericContainer {
+    a: NamedConstGeneric,
+    b: NamedConstGeneric<2>,
+    d: [u8; 2],
+}
+
+#[derive(Type)]
+#[specta(collect = false, inline)]
+struct InlineConstGeneric<const N: usize = 1> {
+    #[specta(type = [u32; N])]
+    data: (),
+    a: [u8; 2],
+    #[specta(type = specta_util::FixedArray<3, u8>)]
+    d: [u8; 3],
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct InlineConstGenericContainer {
+    #[specta(inline)]
+    b: InlineConstGeneric<2>,
+    #[specta(inline)]
+    c: InlineConstGeneric<3>,
+    d: [u8; 2],
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct InlineRecursiveConstGeneric<const N: usize = 1> {
+    #[specta(type = [u32; N])]
+    data: (),
+    a: [u8; 2],
+    #[specta(type = specta_util::FixedArray<3, u8>)]
+    d: [u8; 3],
+    e: Box<InlineRecursiveConstGeneric<4>>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct InlineRecursiveConstGenericContainer {
+    #[specta(inline)]
+    b: InlineRecursiveConstGeneric<2>,
+    #[specta(inline)]
+    c: InlineRecursiveConstGeneric<3>,
+    d: [u8; 2],
 }
 
 // mod type_overrides {

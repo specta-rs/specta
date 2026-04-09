@@ -135,6 +135,24 @@ expression: output
 	* @property {number} a - Some triple-slash comment Some more triple-slash comment
 	*
 	* @typedef {{
+	*		data: number[],
+	*		a: number[],
+	*		d: [number, number],
+	*	}} ConstGenericInConstContainer
+	* @property {number[]} data
+	* @property {number[]} a
+	* @property {[number, number]} d
+	*
+	* @typedef {{
+	*		data: [number],
+	*		a: [number, number],
+	*		d: [number, number],
+	*	}} ConstGenericInNonConstContainer
+	* @property {[number]} data
+	* @property {[number, number]} a
+	* @property {[number, number]} d
+	*
+	* @typedef {{
 	*		foo: Generic1<number>,
 	*		bar: Generic1<number>[],
 	*		baz: { [key in string]: Generic1<string> },
@@ -531,6 +549,31 @@ expression: output
 	* @typedef {{ [key in number]: string }} HasGenericAlias
 	* @property {{ [key in number]: string }} "0"
 	*
+	* @typedef {{
+	*		b: {
+	*			data: [number, number],
+	*			a: [number, number],
+	*			d: [number, number, number],
+	*		},
+	*		c: {
+	*			data: [number, number, number],
+	*			a: [number, number],
+	*			d: [number, number, number],
+	*		},
+	*		d: [number, number],
+	*	}} InlineConstGenericContainer
+	* @property {{
+	*		data: number[],
+	*		a: number[],
+	*		d: [number, number, number],
+	*	}} b
+	* @property {{
+	*		data: number[],
+	*		a: number[],
+	*		d: [number, number, number],
+	*	}} c
+	* @property {[number, number]} d
+	*
 	* @typedef {{ A: {
 	* 	a: string,
 	* } }} InlineEnumField
@@ -559,6 +602,36 @@ expression: output
 	*		} | null,
 	*	}} InlineOptionalType
 	* @property {PlaceholderInnerField | null} optional_field
+	*
+	* @typedef {{
+	*		data: number[],
+	*		a: number[],
+	*		d: [number, number, number],
+	*		e: InlineRecursiveConstGeneric,
+	*	}} InlineRecursiveConstGeneric
+	* @property {number[]} data
+	* @property {number[]} a
+	* @property {[number, number, number]} d
+	* @property {InlineRecursiveConstGeneric} e
+	*
+	* @typedef {{
+	*		b: {
+	*			data: [number, number],
+	*			a: [number, number],
+	*			d: [number, number, number],
+	*			e: InlineRecursiveConstGeneric,
+	*		},
+	*		c: {
+	*			data: [number, number, number],
+	*			a: [number, number],
+	*			d: [number, number, number],
+	*			e: InlineRecursiveConstGeneric,
+	*		},
+	*		d: [number, number],
+	*	}} InlineRecursiveConstGenericContainer
+	* @property {InlineRecursiveConstGeneric} b
+	* @property {InlineRecursiveConstGeneric} c
+	* @property {[number, number]} d
 	*
 	* @typedef {{
 	*		ref_struct: SimpleStruct,
@@ -735,6 +808,24 @@ expression: output
 	*
 	* @typedef {(First)} MyEnumUntagged
 	* @property {(First)} Variant
+	*
+	* @typedef {{
+	*		data: number[],
+	*		a: number[],
+	*		d: [number, number],
+	*	}} NamedConstGeneric
+	* @property {number[]} data
+	* @property {number[]} a
+	* @property {[number, number]} d
+	*
+	* @typedef {{
+	*		a: NamedConstGeneric,
+	*		b: NamedConstGeneric,
+	*		d: [number, number],
+	*	}} NamedConstGenericContainer
+	* @property {NamedConstGeneric} a
+	* @property {NamedConstGeneric} b
+	* @property {[number, number]} d
 	*
 	* @typedef {{ type: "a"; value: string } | { type: "b"; value: number }} NestedEnum
 	* @property {{ type: "a"; value: string }} a
@@ -1049,6 +1140,11 @@ expression: output
 	*		GenericDefaultSkipped: GenericDefaultSkipped,
 	*		GenericDefaultSkippedNonType: GenericDefaultSkippedNonType,
 	*		GenericParameterOrderPreserved: GenericParameterOrderPreserved,
+	*		ConstGenericInNonConstContainer: ConstGenericInNonConstContainer,
+	*		ConstGenericInConstContainer: ConstGenericInConstContainer,
+	*		NamedConstGenericContainer: NamedConstGenericContainer,
+	*		InlineConstGenericContainer: InlineConstGenericContainer,
+	*		InlineRecursiveConstGenericContainer: InlineRecursiveConstGenericContainer,
 	*		TestCollectionRegister: TestCollectionRegister,
 	*		TestCollectionRegister: TestCollectionRegister,
 	*	}} Primitives
@@ -1309,6 +1405,11 @@ expression: output
 	* @property {GenericDefaultSkipped} GenericDefaultSkipped
 	* @property {GenericDefaultSkippedNonType} GenericDefaultSkippedNonType
 	* @property {GenericParameterOrderPreserved} GenericParameterOrderPreserved
+	* @property {ConstGenericInNonConstContainer} ConstGenericInNonConstContainer
+	* @property {ConstGenericInConstContainer} ConstGenericInConstContainer
+	* @property {NamedConstGenericContainer} NamedConstGenericContainer
+	* @property {InlineConstGenericContainer} InlineConstGenericContainer
+	* @property {InlineRecursiveConstGenericContainer} InlineRecursiveConstGenericContainer
 	* @property {TestCollectionRegister} TestCollectionRegister
 	* @property {TestCollectionRegister} TestCollectionRegister
 	*

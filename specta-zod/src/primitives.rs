@@ -15,7 +15,7 @@ use crate::{
 };
 
 thread_local! {
-    static INLINE_REFERENCE_STACK: RefCell<Vec<(Cow<'static, str>, Cow<'static, str>, Vec<(GenericReference, DataType)>)>> = const { RefCell::new(Vec::new()) };
+    static INLINE_REFERENCE_STACK: RefCell<Vec<NamedReference>> = const { RefCell::new(Vec::new()) };
     static TYPE_RENDER_STACK: RefCell<Vec<(Cow<'static, str>, Cow<'static, str>)>> = const { RefCell::new(Vec::new()) };
     static GENERIC_NAME_STACK: RefCell<Vec<Vec<Generic>>> = const { RefCell::new(Vec::new()) };
 }
@@ -272,19 +272,11 @@ fn datatype(
             if force_inline_ref {
                 match r {
                     Reference::Named(named) => {
-                        let ndt = named
-                            .get(types)
+                        let ty = named
+                            .ty(types)
                             .ok_or_else(|| Error::dangling_named_reference(format!("{named:?}")))?;
                         let combined_generics = merged_generics(generics, named.generics());
-                        datatype(
-                            s,
-                            exporter,
-                            types,
-                            ndt.ty(),
-                            location,
-                            &combined_generics,
-                            false,
-                        )?;
+                        datatype(s, exporter, types, ty, location, &combined_generics, false)?;
                     }
                     _ => reference_dt(s, exporter, types, r, location, generics)?,
                 }
@@ -759,26 +751,17 @@ fn reference_named_dt(
     let _generic_scope = push_generic_scope(ndt.generics());
 
     if r.inline() {
-        let inline_key = (
-            ndt.module_path().clone(),
-            ndt.name().clone(),
-            r.generics().to_vec(),
-        );
+        let ty = r
+            .ty(types)
+            .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
+        let inline_key = r.clone();
         let already_inlining = INLINE_REFERENCE_STACK
             .with(|stack| stack.borrow().iter().any(|key| key == &inline_key));
 
         if !already_inlining {
             INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
             let combined_generics = merged_generics(generics, r.generics());
-            let result = datatype(
-                s,
-                exporter,
-                types,
-                ndt.ty(),
-                location,
-                &combined_generics,
-                false,
-            );
+            let result = datatype(s, exporter, types, ty, location, &combined_generics, false);
             INLINE_REFERENCE_STACK.with(|stack| {
                 stack.borrow_mut().pop();
             });

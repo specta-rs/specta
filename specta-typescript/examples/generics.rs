@@ -36,6 +36,7 @@ const _: () = {
                     <T as specta::Type>::definition(types),
                 )],
                 false,
+                false,
                 types,
                 SENTINEL,
                 |types, ndt| {

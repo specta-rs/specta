@@ -175,6 +175,10 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let bounds = generics_with_ident_and_bounds_only(generics);
     let type_args = generics_with_ident_only(generics);
+    let has_const_param = generics
+        .params
+        .iter()
+        .any(|param| matches!(param, GenericParam::Const(_)));
     let used_generic_types = used_type_params(generics, data, container_attrs.r#type.as_ref())?;
     let all_generic_type_idents = all_type_param_idents(generics);
     let used_direct_generics =
@@ -313,6 +317,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                             GENERICS,
                             vec![#(#generics_for_ref),*],
                             #inline,
+                            #has_const_param,
                             types,
                             SENTINEL,
                             |types, ndt| {
