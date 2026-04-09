@@ -18,7 +18,6 @@ mod functions;
 mod jsdoc;
 mod layouts;
 mod legacy_impls;
-mod literals;
 mod references;
 mod serde_conversions;
 mod serde_identifiers;
