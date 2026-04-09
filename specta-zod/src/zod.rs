@@ -12,7 +12,7 @@ use specta::{
     ResolvedTypes, Types,
 };
 
-use crate::{compat::ZodNamedCompat, primitives, references, Error};
+use crate::{primitives, references, Error};
 
 /// Allows configuring how Specta's Zod exporter will deal with BigInt types ([i64], [i128] etc).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

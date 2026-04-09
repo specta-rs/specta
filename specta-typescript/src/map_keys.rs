@@ -5,7 +5,7 @@ use specta::{
     Types,
 };
 
-use crate::{compat::TsNamedReferenceCompat, Error};
+use crate::Error;
 
 pub(crate) fn validate_map_key(
     key_ty: &DataType,

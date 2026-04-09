@@ -6,10 +6,6 @@ use specta::{
 };
 
 use crate::{
-    compat::{
-        SerdeCompatEnum, SerdeCompatField, SerdeCompatNamed, SerdeCompatReference,
-        SerdeCompatStruct, SerdeCompatTuple, SerdeCompatUnnamed, SerdeCompatVariant,
-    },
     Error,
     internal::{Result, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs},
     phased::PhasedTy,

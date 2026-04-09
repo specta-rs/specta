@@ -11,14 +11,7 @@ use specta::{
 };
 
 use crate::{
-    compat::{
-        ZodEnumCompat, ZodFieldCompat, ZodListCompat, ZodNamedCompat, ZodNamedFieldsCompat,
-        ZodNamedReferenceCompat, ZodStructCompat, ZodTupleCompat, ZodUnnamedFieldsCompat,
-        ZodVariantCompat,
-    },
-    opaque,
-    reserved_names::RESERVED_TYPE_NAMES,
-    BigIntExportBehavior, Error, Layout, Zod,
+    opaque, reserved_names::RESERVED_TYPE_NAMES, BigIntExportBehavior, Error, Layout, Zod,
 };
 
 thread_local! {
@@ -128,25 +121,25 @@ fn export_single_internal(
     indent: &str,
 ) -> Result<(), Error> {
     let base_name = exported_type_name(exporter, ndt);
-    let name_path = if ndt.module_path().is_empty() {
-        ndt.name().to_string()
+    let name_path = if ndt.module_path.is_empty() {
+        ndt.name.to_string()
     } else {
-        format!("{}::{}", ndt.module_path(), ndt.name())
+        format!("{}::{}", ndt.module_path, ndt.name)
     };
     validate_type_name(&base_name, name_path)?;
     let schema_name = format!("{base_name}Schema");
 
-    let _guard = push_type_render_stack(ndt.module_path().clone(), ndt.name().clone());
-    let _generic_scope = push_generic_scope(ndt.generics());
+    let _guard = push_type_render_stack(ndt.module_path.clone(), ndt.name.clone());
+    let _generic_scope = push_generic_scope(&ndt.generics);
 
-    if ndt.generics().is_empty() {
+    if ndt.generics.is_empty() {
         let mut schema_expr = String::new();
         datatype(
             &mut schema_expr,
             exporter,
             types,
-            ndt.ty(),
-            vec![ndt.name().clone()],
+            &ndt.inner,
+            vec![ndt.name.clone()],
             &[],
             false,
         )?;
@@ -160,7 +153,7 @@ fn export_single_internal(
     }
 
     let generic_names = ndt
-        .generics()
+        .generics
         .iter()
         .map(|generic| generic.name.as_ref().to_string())
         .collect::<Vec<_>>();
@@ -178,8 +171,8 @@ fn export_single_internal(
         &mut schema_expr,
         exporter,
         types,
-        ndt.ty(),
-        vec![ndt.name().clone()],
+        &ndt.inner,
+        vec![ndt.name.clone()],
         &[],
         false,
     )?;
@@ -282,7 +275,7 @@ fn datatype(
                         let ty = named
                             .ty(types)
                             .ok_or_else(|| Error::dangling_named_reference(format!("{named:?}")))?;
-                        let combined_generics = merged_generics(generics, named.generics());
+                        let combined_generics = merged_generics(generics, &named.generics);
                         datatype(s, exporter, types, ty, location, &combined_generics, false)?;
                     }
                     _ => reference_dt(s, exporter, types, r, location, generics)?,
@@ -325,9 +318,9 @@ fn list_dt(
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     let mut dt = String::new();
-    datatype(&mut dt, exporter, types, l.ty(), location, generics, false)?;
+    datatype(&mut dt, exporter, types, &l.ty, location, generics, false)?;
 
-    if let Some(length) = l.length() {
+    if let Some(length) = l.length {
         s.push_str("z.tuple([");
         for n in 0..length {
             if n != 0 {
@@ -384,7 +377,7 @@ fn tuple_dt(
     location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
-    match t.elements() {
+    match t.elements.as_slice() {
         [] => s.push_str("z.null()"),
         elements => {
             s.push_str("z.tuple([");
@@ -409,18 +402,18 @@ fn struct_dt(
     location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
-    match st.fields() {
+    match &st.fields {
         Fields::Unit => s.push_str("z.null()"),
         Fields::Unnamed(unnamed) => {
             let fields = unnamed
-                .fields()
+                .fields
                 .iter()
-                .filter_map(|field| field.ty().map(|ty| (field, ty)))
+                .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
                 .collect::<Vec<_>>();
 
             match fields.as_slice() {
                 [] => s.push_str("z.tuple([])"),
-                [(field, ty)] if unnamed.fields().len() == 1 => {
+                [(field, ty)] if unnamed.fields.len() == 1 => {
                     datatype_with_inline_attr(
                         s,
                         exporter,
@@ -428,7 +421,7 @@ fn struct_dt(
                         ty,
                         location,
                         generics,
-                        field.inline(),
+                        field.inline,
                     )?;
                 }
                 fields => {
@@ -444,7 +437,7 @@ fn struct_dt(
                             ty,
                             location.clone(),
                             generics,
-                            field.inline(),
+                            field.inline,
                         )?;
                     }
                     s.push_str("])");
@@ -453,9 +446,9 @@ fn struct_dt(
         }
         Fields::Named(named) => {
             let all_fields = named
-                .fields()
+                .fields
                 .iter()
-                .filter_map(|(name, field)| field.ty().map(|ty| (name, field, ty)))
+                .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, field, ty)))
                 .collect::<Vec<_>>();
 
             if all_fields.is_empty() {
@@ -464,7 +457,7 @@ fn struct_dt(
             }
 
             let (flattened, non_flattened): (Vec<_>, Vec<_>) =
-                all_fields.iter().partition(|(_, field, _)| field.flatten());
+                all_fields.iter().partition(|(_, field, _)| field.flatten);
 
             let mut schema = String::from("z.object({");
             for (name, field, ty) in &non_flattened {
@@ -478,9 +471,9 @@ fn struct_dt(
                     ty,
                     location.clone(),
                     generics,
-                    field.inline(),
+                    field.inline,
                 )?;
-                if field.optional() {
+                if field.optional {
                     write!(schema, "{value}.optional(),")?;
                 } else {
                     write!(schema, "{value},")?;
@@ -501,7 +494,7 @@ fn struct_dt(
                     ty,
                     location.clone(),
                     generics,
-                    field.inline(),
+                    field.inline,
                 )?;
                 sections.push(value);
             }
@@ -525,9 +518,9 @@ fn enum_dt(
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     let variants = e
-        .variants()
+        .variants
         .iter()
-        .filter(|(_, variant)| !variant.skip())
+        .filter(|(_, variant)| !variant.skip)
         .map(|(name, variant)| {
             enum_variant_dt(
                 exporter,
@@ -567,10 +560,10 @@ fn enum_variant_dt(
     location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
 ) -> Result<Option<String>, Error> {
-    match variant.fields() {
+    match &variant.fields {
         Fields::Unit => Ok(Some(format!("z.literal(\"{}\")", escape_string(name)))),
         Fields::Named(named) => {
-            if named.fields().iter().all(|(_, field)| field.ty().is_none()) {
+            if named.fields.iter().all(|(_, field)| field.ty.is_none()) {
                 return Ok(Some("z.object({}).strict()".to_string()));
             }
 
@@ -578,12 +571,12 @@ fn enum_variant_dt(
             let mut has_field = false;
             let mut flattened_sections = Vec::new();
 
-            for (field_name, field) in named.fields() {
-                let Some(ty) = field.ty() else {
+            for (field_name, field) in &named.fields {
+                let Some(ty) = field.ty.as_ref() else {
                     continue;
                 };
 
-                if field.flatten() {
+                if field.flatten {
                     let mut value = String::new();
                     datatype_with_inline_attr(
                         &mut value,
@@ -592,7 +585,7 @@ fn enum_variant_dt(
                         ty,
                         location.clone(),
                         generics,
-                        field.inline(),
+                        field.inline,
                     )?;
                     flattened_sections.push(value);
                     continue;
@@ -607,11 +600,11 @@ fn enum_variant_dt(
                     ty,
                     location.clone(),
                     generics,
-                    field.inline(),
+                    field.inline,
                 )?;
 
                 let key = sanitise_key(field_name);
-                if field.optional() {
+                if field.optional {
                     write!(schema, "\n\t{key}: {value}.optional(),")?;
                 } else {
                     write!(schema, "\n\t{key}: {value},")?;
@@ -638,20 +631,20 @@ fn enum_variant_dt(
         }
         Fields::Unnamed(unnamed) => {
             let fields = unnamed
-                .fields()
+                .fields
                 .iter()
-                .filter_map(|field| field.ty().map(|ty| (field, ty)))
+                .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
                 .collect::<Vec<_>>();
 
             Ok(match fields.as_slice() {
                 [] => {
-                    if unnamed.fields().is_empty() {
+                    if unnamed.fields.is_empty() {
                         Some("z.tuple([])".to_string())
                     } else {
                         None
                     }
                 }
-                [(field, ty)] if unnamed.fields().len() == 1 => {
+                [(field, ty)] if unnamed.fields.len() == 1 => {
                     let mut out = String::new();
                     datatype_with_inline_attr(
                         &mut out,
@@ -660,7 +653,7 @@ fn enum_variant_dt(
                         ty,
                         location,
                         generics,
-                        field.inline(),
+                        field.inline,
                     )?;
                     Some(out)
                 }
@@ -678,7 +671,7 @@ fn enum_variant_dt(
                             ty,
                             location.clone(),
                             generics,
-                            field.inline(),
+                            field.inline,
                         )?;
                         out.push_str(&item);
                     }
@@ -755,7 +748,7 @@ fn reference_named_dt(
         .get(types)
         .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
 
-    let _generic_scope = push_generic_scope(ndt.generics());
+    let _generic_scope = push_generic_scope(&ndt.generics);
 
     if r.inline() {
         let ty = r
@@ -767,7 +760,7 @@ fn reference_named_dt(
 
         if !already_inlining {
             INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
-            let combined_generics = merged_generics(generics, r.generics());
+            let combined_generics = merged_generics(generics, &r.generics);
             let result = datatype(s, exporter, types, ty, location, &combined_generics, false);
             INLINE_REFERENCE_STACK.with(|stack| {
                 stack.borrow_mut().pop();
@@ -779,23 +772,23 @@ fn reference_named_dt(
     crate::references::track_nr(r);
 
     let schema_name = match exporter.layout {
-        Layout::FlatFile => format!("{}Schema", ndt.name()),
+        Layout::FlatFile => format!("{}Schema", ndt.name),
         Layout::ModulePrefixedName => {
-            let mut name = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
+            let mut name = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
             if !name.is_empty() {
                 name.push('_');
             }
-            name.push_str(ndt.name());
+            name.push_str(&ndt.name);
             name.push_str("Schema");
             name
         }
         Layout::Files => {
             let current_module_path = crate::references::current_module_path().unwrap_or_default();
-            let base = format!("{}Schema", ndt.name());
-            if ndt.module_path() == &current_module_path {
+            let base = format!("{}Schema", ndt.name);
+            if ndt.module_path == current_module_path {
                 base
             } else {
-                format!("{}.{}", crate::zod::module_alias(ndt.module_path()), base)
+                format!("{}.{}", crate::zod::module_alias(&ndt.module_path), base)
             }
         }
     };
@@ -804,15 +797,15 @@ fn reference_named_dt(
         stack
             .borrow()
             .iter()
-            .any(|(module, name)| module == ndt.module_path() && name == ndt.name())
+            .any(|(module, name)| module == &ndt.module_path && name == &ndt.name)
     });
 
     let mut reference_expr = schema_name;
-    if !r.generics().is_empty() {
+    if !r.generics.is_empty() {
         let scoped_generics = generics
             .iter()
             .filter(|(parent_generic, _)| {
-                !r.generics()
+                !r.generics
                     .iter()
                     .any(|(child_generic, _)| child_generic == parent_generic)
             })
@@ -820,7 +813,7 @@ fn reference_named_dt(
             .collect::<Vec<_>>();
 
         reference_expr.push('(');
-        for (i, (_, v)) in r.generics().iter().enumerate() {
+        for (i, (_, v)) in r.generics.iter().enumerate() {
             if i != 0 {
                 reference_expr.push_str(", ");
             }
@@ -850,13 +843,13 @@ fn reference_named_dt(
 
 fn exported_type_name(exporter: &Zod, ndt: &NamedDataType) -> Cow<'static, str> {
     match exporter.layout {
-        Layout::FlatFile | Layout::Files => ndt.name().clone(),
+        Layout::FlatFile | Layout::Files => ndt.name.clone(),
         Layout::ModulePrefixedName => {
-            let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
+            let mut s = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
             if !s.is_empty() {
                 s.push('_');
             }
-            s.push_str(ndt.name());
+            s.push_str(&ndt.name);
             Cow::Owned(s)
         }
     }

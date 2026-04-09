@@ -14,10 +14,7 @@ use specta::{
     },
 };
 
-use crate::{
-    compat::{TsCompat, TsEnumCompat, TsFieldCompat, TsFieldsCompat, TsStructCompat, TsTupleCompat, TsVariantCompat},
-    Error, Exporter, reserved_names::RESERVED_TYPE_NAMES,
-};
+use crate::{Error, Exporter, reserved_names::RESERVED_TYPE_NAMES};
 
 #[derive(Clone, Debug)]
 pub(crate) enum PathItem {

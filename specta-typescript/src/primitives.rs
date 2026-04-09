@@ -14,10 +14,6 @@ use specta::{
 };
 
 use crate::{
-    compat::{
-        TsCompat, TsEnumCompat, TsFieldCompat, TsFieldsCompat, TsListCompat,
-        TsNamedReferenceCompat, TsStructCompat, TsTupleCompat, TsVariantCompat,
-    },
     Branded, BrandedTypeExporter, Error, Exporter, Layout,
     legacy::{
         ExportContext, deprecated_details, escape_jsdoc_text, escape_typescript_string_literal,

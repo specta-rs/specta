@@ -48,7 +48,6 @@
 )]
 
 mod branded;
-mod compat;
 mod error;
 mod exporter;
 mod jsdoc;

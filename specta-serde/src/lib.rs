@@ -111,14 +111,7 @@ use specta::{
     },
 };
 
-use crate::compat::{
-    SerdeCompatEnum, SerdeCompatField, SerdeCompatNamed, SerdeCompatNamedFields,
-    SerdeCompatReference, SerdeCompatStruct, SerdeCompatTuple, SerdeCompatUnnamed,
-    SerdeCompatVariant,
-};
-
 mod error;
-mod compat;
 mod inflection;
 mod parser;
 mod phased;
