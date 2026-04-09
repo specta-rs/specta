@@ -216,6 +216,11 @@ InlineGenericNested<String>: [string, string[], [string, string], { [key in stri
 InlineFlattenGenericsG<()>: InlineFlattenGenericsG<null>
 InlineFlattenGenerics: InlineFlattenGenerics
 GenericParameterOrderPreserved: GenericParameterOrderPreserved
+ConstGenericInNonConstContainer: ConstGenericInNonConstContainer
+ConstGenericInConstContainer: ConstGenericInConstContainer
+NamedConstGenericContainer: NamedConstGenericContainer
+InlineConstGenericContainer: InlineConstGenericContainer
+InlineRecursiveConstGenericContainer: InlineRecursiveConstGenericContainer
 TestCollectionRegister: TestCollectionRegister
 TestCollectionRegister: TestCollectionRegister
 specta_typescript::Any: any

@@ -90,6 +90,18 @@ export type CommentedStruct = {
 	a: number,
 };
 
+export type ConstGenericInConstContainer = {
+	data: number[],
+	a: number[],
+	d: [number, number],
+};
+
+export type ConstGenericInNonConstContainer = {
+	data: [number],
+	a: [number, number],
+	d: [number, number],
+};
+
 export type Container1 = {
 	foo: Generic1<number>,
 	bar: Generic1<number>[],
@@ -349,6 +361,20 @@ export type GenericType<T> = "Undefined" | T;
 
 export type HasGenericAlias = { [key in number]: string };
 
+export type InlineConstGenericContainer = {
+	b: {
+		data: [number, number],
+		a: [number, number],
+		d: [number, number, number],
+	},
+	c: {
+		data: [number, number, number],
+		a: [number, number],
+		d: [number, number, number],
+	},
+	d: [number, number],
+};
+
 export type InlineEnumField = { A: {
 	a: string,
 } };
@@ -368,6 +394,29 @@ export type InlineOptionalType = {
 	optional_field: {
 		a: string,
 	} | null,
+};
+
+export type InlineRecursiveConstGeneric = {
+	data: number[],
+	a: number[],
+	d: [number, number, number],
+	e: InlineRecursiveConstGeneric,
+};
+
+export type InlineRecursiveConstGenericContainer = {
+	b: {
+		data: [number, number],
+		a: [number, number],
+		d: [number, number, number],
+		e: InlineRecursiveConstGeneric,
+	},
+	c: {
+		data: [number, number, number],
+		a: [number, number],
+		d: [number, number, number],
+		e: InlineRecursiveConstGeneric,
+	},
+	d: [number, number],
 };
 
 export type InlineStruct = {
@@ -481,6 +530,18 @@ export type MyEnumExternal = { Variant: (First) };
 export type MyEnumTagged = { type: "Variant" } & (First);
 
 export type MyEnumUntagged = (First);
+
+export type NamedConstGeneric = {
+	data: number[],
+	a: number[],
+	d: [number, number],
+};
+
+export type NamedConstGenericContainer = {
+	a: NamedConstGeneric,
+	b: NamedConstGeneric,
+	d: [number, number],
+};
 
 export type NestedEnum = { type: "a"; value: string } | { type: "b"; value: number };
 
@@ -770,6 +831,11 @@ export type Primitives = {
 	"InlineFlattenGenericsG<()>": InlineFlattenGenericsG<null>,
 	InlineFlattenGenerics: InlineFlattenGenerics,
 	GenericParameterOrderPreserved: GenericParameterOrderPreserved,
+	ConstGenericInNonConstContainer: ConstGenericInNonConstContainer,
+	ConstGenericInConstContainer: ConstGenericInConstContainer,
+	NamedConstGenericContainer: NamedConstGenericContainer,
+	InlineConstGenericContainer: InlineConstGenericContainer,
+	InlineRecursiveConstGenericContainer: InlineRecursiveConstGenericContainer,
 	TestCollectionRegister: TestCollectionRegister,
 	TestCollectionRegister: TestCollectionRegister,
 };
