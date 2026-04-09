@@ -6,10 +6,10 @@ use std::{
 };
 
 use specta::{
-    ResolvedTypes, Type, Types,
     datatype::{DataType, Reference},
+    ResolvedTypes, Type, Types,
 };
-use specta_typescript::{Layout, Typescript, primitives};
+use specta_typescript::{primitives, Layout, Typescript};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -646,9 +646,9 @@ fn primitives_export_allows_generic_hashmap_definition() {
             let hash_map = dts
                 .iter()
                 .find_map(|(_, ty)| match ty {
-                    DataType::Reference(Reference::Named(r)) => r
-                        .get(types.as_types())
-                        .filter(|ndt| ndt.name() == "HashMap"),
+                    DataType::Reference(Reference::Named(r)) => {
+                        r.get(types.as_types()).filter(|ndt| ndt.name == "HashMap")
+                    }
                     _ => None,
                 })
                 .expect("HashMap should be registered in shared test fixtures");

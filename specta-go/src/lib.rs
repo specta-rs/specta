@@ -7,10 +7,10 @@
 //! # Usage
 //!
 //! ```rust
-//! use specta::{Type, Types};
+//! use specta::Types;
 //! use specta_go::Go;
 //!
-//! #[derive(Type)]
+//! #[derive(specta::Type)]
 //! pub struct MyType {
 //!     pub field: String,
 //! }
@@ -28,6 +28,7 @@
     html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
 
+mod compat;
 mod error;
 mod go;
 mod primitives;

@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::{Types, datatype::NamedDataType};
+use crate::{datatype::NamedDataType, Types};
 
 use super::DataType;
 
@@ -51,7 +51,7 @@ impl NamedReference {
         let ndt = self.get(types)?;
         self.instance
             .and_then(|instance| ndt.instances.get(instance))
-            .or_else(|| Some(ndt.ty))
+            .or(Some(&ndt.inner))
     }
 
     /// Get whether this reference should be inlined

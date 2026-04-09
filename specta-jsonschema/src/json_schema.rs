@@ -1,6 +1,6 @@
-use crate::{Error, Layout, SchemaVersion, primitives};
+use crate::{primitives, Error, Layout, SchemaVersion};
 use serde_json::Value;
-use specta::{Types, datatype::NamedDataType};
+use specta::{datatype::NamedDataType, Types};
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -94,7 +94,7 @@ impl JsonSchema {
         // Convert each type to a schema
         for ndt in types.into_sorted_iter() {
             let schema = primitives::export(self, types, &ndt)?;
-            let name = ndt.name().to_string();
+            let name = ndt.name.to_string();
             definitions.insert(name, schema);
         }
 
@@ -131,7 +131,7 @@ impl JsonSchema {
         for ndt in types.into_sorted_iter() {
             // module_path returns &Cow<'static, str> which is like &String
             // We need to convert path segments to a string
-            let module = ndt.module_path().to_string().replace("::", "/");
+            let module = ndt.module_path.to_string().replace("::", "/");
             by_module.entry(module).or_default().push(ndt.clone());
         }
 
@@ -147,7 +147,7 @@ impl JsonSchema {
 
             for ndt in &ndts {
                 let schema = primitives::export(self, types, ndt)?;
-                let filename = format!("{}.schema.json", ndt.name());
+                let filename = format!("{}.schema.json", ndt.name);
                 let file_path = module_dir.join(filename);
 
                 // Create a root schema for this type

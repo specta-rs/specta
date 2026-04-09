@@ -1,9 +1,9 @@
 use std::marker::PhantomData;
 
 use crate::{
-    Type, Types,
     datatype::{self, DataType, Enum, Field, List, Variant},
     r#type::{generics, macros::*},
+    Type, Types,
 };
 
 impl_primitives!(
@@ -37,7 +37,7 @@ pub(crate) struct PrimitiveSet<T>(PhantomData<T>);
 impl<T: Type> Type for PrimitiveSet<T> {
     fn definition(types: &mut Types) -> DataType {
         let mut l = List::new(<T as Type>::definition(types));
-        l.set_unique(true);
+        l.unique = true;
         DataType::List(l)
     }
 }
@@ -184,8 +184,8 @@ const _: () = {
                 types,
                 SENTINEL,
                 |_types, ndt| {
-                    *ndt.name_mut() = std::borrow::Cow::Borrowed("Cow");
-                    *ndt.module_path_mut() = std::borrow::Cow::Borrowed("std::borrow");
+                    ndt.name = std::borrow::Cow::Borrowed("Cow");
+                    ndt.module_path = std::borrow::Cow::Borrowed("std::borrow");
                     ndt.inner = datatype::GenericReference::new::<generics::T>().into();
                 },
             ))
@@ -218,7 +218,7 @@ impl<T: Type + ?Sized> Type for &T {
 impl<T: Type> Type for [T] {
     fn definition(types: &mut Types) -> DataType {
         let mut l = List::new(<T as Type>::definition(types));
-        l.set_unique(false);
+        l.unique = false;
         DataType::List(l)
     }
 }
@@ -230,7 +230,7 @@ impl<const N: usize, T: Type> Type for [T; N] {
         // Refer to the documentation for `CONTEXT_HAS_CONST_PARAMS` constant  in `named.rs` to understand this.
         // If you wanna force this use `specta_utils::FixedArray<N, T>` instead.
         if !datatype::context_has_const_params() {
-            l.set_length(Some(N));
+            l.length = Some(N);
         }
 
         DataType::List(l)

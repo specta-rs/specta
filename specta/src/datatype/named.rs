@@ -6,11 +6,11 @@ use std::{
 };
 
 use crate::{
-    Types,
     datatype::{
-        DataType, Generic, NamedReference, Reference,
         reference::{self, GenericReference, NamedId},
+        DataType, Generic, NamedReference, Reference,
     },
+    Types,
 };
 
 thread_local! {
@@ -252,7 +252,7 @@ impl NamedDataType {
             };
 
             // We patch the Tauri `Type` implementation.
-            if ndt.name() == "TAURI_CHANNEL" && ndt.module_path().starts_with("tauri::") {
+            if ndt.name == "TAURI_CHANNEL" && ndt.module_path.starts_with("tauri::") {
                 // This causes an exporter that isn't aware of Tauri's channel to error.
                 // This is effectively `Reference::opaque(TauriChannel)` but we do some hackery for better errors.
                 ndt.inner = reference::tauri().into();
@@ -276,7 +276,7 @@ impl NamedDataType {
             panic::resume_unwind(payload);
         }
 
-        if ndt.name() == "TAURI_CHANNEL" && ndt.module_path().starts_with("tauri::") {
+        if ndt.name == "TAURI_CHANNEL" && ndt.module_path.starts_with("tauri::") {
             ndt.inner = reference::tauri().into();
             inline = true;
         }

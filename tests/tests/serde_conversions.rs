@@ -197,7 +197,7 @@ fn type_names(types: &ResolvedTypes) -> Vec<String> {
     types
         .as_types()
         .into_unsorted_iter()
-        .map(|ndt| ndt.name().to_string())
+        .map(|ndt| ndt.name.to_string())
         .collect()
 }
 
@@ -235,10 +235,9 @@ fn apply_accepts_symmetric_container_conversion() {
 fn apply_phases_accepts_generic_try_from_container_conversion() {
     let err = specta_serde::apply(Types::default().register::<GenericParent<String>>())
         .expect_err("apply should reject deserialize-only container conversions");
-    assert!(
-        err.to_string()
-            .contains("Incompatible container conversion")
-    );
+    assert!(err
+        .to_string()
+        .contains("Incompatible container conversion"));
 
     specta_serde::apply_phases(Types::default().register::<GenericParent<String>>())
         .expect("apply_phases should resolve nested generic references from container conversions");
@@ -320,10 +319,9 @@ fn field_phase_specific_rename_requires_phases() {
 fn identifier_enums_require_phases() {
     let err = specta_serde::apply(Types::default().register::<VariantIdentifierValid>())
         .expect_err("identifier enums should require apply_phases");
-    assert!(
-        err.to_string()
-            .contains("identifier enums require `apply_phases`")
-    );
+    assert!(err
+        .to_string()
+        .contains("identifier enums require `apply_phases`"));
 
     specta_serde::apply_phases(Types::default().register::<VariantIdentifierValid>())
         .expect("valid variant_identifier enum should pass in apply_phases");

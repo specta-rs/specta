@@ -164,8 +164,8 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             {
                 let mut e = #dt_expr;
                 match &mut e {
-                    datatype::DataType::Struct(s) => *s.attributes_mut() = #container_runtime_attrs,
-                    datatype::DataType::Enum(en) => *en.attributes_mut() = #container_runtime_attrs,
+                    datatype::DataType::Struct(s) => s.attributes = #container_runtime_attrs,
+                    datatype::DataType::Enum(en) => en.attributes = #container_runtime_attrs,
                     _ => unreachable!("specta derive generated non-container datatype"),
                 }
                 e
@@ -281,7 +281,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         None
     } else {
         Some(quote! {
-            *ndt.generics_mut() = Cow::Owned(vec![#(#generics_for_ndt_with_defaults),*]);
+            ndt.generics = Cow::Owned(vec![#(#generics_for_ndt_with_defaults),*]);
         })
     };
 
@@ -336,13 +336,13 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                             types,
                             SENTINEL,
                             |types, ndt| {
-                                ndt.set_name(Cow::Borrowed(#name));
-                                ndt.set_docs(Cow::Borrowed(#comments));
-                                ndt.set_deprecated(#deprecated);
-                                ndt.set_module_path(Cow::Borrowed(module_path!()));
+                                ndt.name = Cow::Borrowed(#name);
+                                ndt.docs = Cow::Borrowed(#comments);
+                                ndt.deprecated = #deprecated;
+                                ndt.module_path = Cow::Borrowed(module_path!());
                                 #shadow_generic_aliases
                                 #generics_for_ndt_with_defaults
-                                ndt.set_ty(#dt_expr);
+                                ndt.inner = #dt_expr;
                             }
                         )
                     )

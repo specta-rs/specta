@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use specta::{ResolvedTypes, Type, Types, datatype::NamedDataType};
-use specta_typescript::{Exporter, JSDoc, Layout, Typescript, primitives};
+use specta::{datatype::NamedDataType, ResolvedTypes, Type, Types};
+use specta_typescript::{primitives, Exporter, JSDoc, Layout, Typescript};
 use specta_util::selection;
 
 // #[derive(Type)]
@@ -97,18 +97,18 @@ fn main() {
 
     NamedDataType::new("VirtualOne", vec![], i32::definition(&mut types)).register(&mut types);
     let mut ndt = NamedDataType::new("VirtualTwo", vec![], i32::definition(&mut types));
-    ndt.set_module_path("".into());
+    ndt.module_path = "".into();
     ndt.register(&mut types);
 
     let r = ndt.reference(vec![]);
     // let r_inlined = ndt.reference(vec![]).inline(&mut types);
 
     let mut virtual_three = NamedDataType::new("VirtualThree", vec![], r.into());
-    virtual_three.set_module_path("".into());
+    virtual_three.module_path = "".into();
     virtual_three.register(&mut types);
 
     let mut ndt = NamedDataType::new_inline("AnotherOne", vec![], i32::definition(&mut types));
-    ndt.set_module_path("dontcreateme".into());
+    ndt.module_path = "dontcreateme".into();
     ndt.register(&mut types);
 
     // ndt.reference(vec![]); // TODO: This is required, I think, maybe be smarter???

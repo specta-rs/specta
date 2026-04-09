@@ -6,6 +6,10 @@ use specta::{
 };
 
 use crate::{
+    compat::{
+        SerdeCompatEnum, SerdeCompatField, SerdeCompatNamed, SerdeCompatReference,
+        SerdeCompatStruct, SerdeCompatTuple, SerdeCompatUnnamed, SerdeCompatVariant,
+    },
     Error,
     internal::{Result, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs},
     phased::PhasedTy,
@@ -21,10 +25,10 @@ pub enum ApplyMode {
 pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<()> {
     for ndt in types.into_unsorted_iter() {
         validate_datatype_with_generics_for_mode(
-            ndt.ty(),
+            &ndt.inner,
             types,
-            ndt.generics(),
-            ndt.name().to_string(),
+            &ndt.generics,
+            ndt.name.to_string(),
             mode,
         )?;
     }
@@ -91,7 +95,7 @@ fn inner(
         }
         DataType::List(list) => {
             inner(
-                list.ty(),
+                &list.ty,
                 types,
                 generics,
                 checked_references,
@@ -101,14 +105,14 @@ fn inner(
         }
         DataType::Struct(strct) => {
             validate_container_attributes(
-                strct.attributes(),
+                &strct.attributes,
                 types,
                 generics,
                 checked_references,
                 &path,
                 mode,
             )?;
-            if SerdeContainerAttrs::from_attributes(strct.attributes())?
+            if SerdeContainerAttrs::from_attributes(&strct.attributes)?
                 .is_some_and(|attrs| attrs.variant_identifier || attrs.field_identifier)
             {
                 return Err(Error::invalid_phased_type_usage(
@@ -117,7 +121,7 @@ fn inner(
                 ));
             }
 
-            if let Some(attrs) = SerdeContainerAttrs::from_attributes(strct.attributes())? {
+            if let Some(attrs) = SerdeContainerAttrs::from_attributes(&strct.attributes)? {
                 if attrs.untagged {
                     return Err(Error::invalid_phased_type_usage(
                         path,
@@ -132,7 +136,7 @@ fn inner(
                     ));
                 }
 
-                if attrs.tag.is_some() && !matches!(strct.fields(), Fields::Named(_)) {
+                if attrs.tag.is_some() && !matches!(&strct.fields, Fields::Named(_)) {
                     return Err(Error::invalid_phased_type_usage(
                         path,
                         "`#[serde(tag = ...)]` on structs requires named fields",
@@ -140,13 +144,13 @@ fn inner(
                 }
             }
 
-            match strct.fields() {
+            match &strct.fields {
                 Fields::Unit => {}
                 Fields::Unnamed(unnamed) => {
                     for (idx, (_, ty)) in unnamed
-                        .fields()
+                        .fields
                         .iter()
-                        .filter_map(|field| field.ty().map(|ty| (field, ty)))
+                        .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
                         .enumerate()
                     {
                         inner(
@@ -161,16 +165,16 @@ fn inner(
                 }
                 Fields::Named(named) => {
                     for (name, (field, _)) in named
-                        .fields()
+                        .fields
                         .iter()
-                        .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+                        .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
                     {
                         validate_field_attributes(field, format!("{path}.{name}"), mode)?;
                     }
                     for (name, (_, ty)) in named
-                        .fields()
+                        .fields
                         .iter()
-                        .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+                        .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
                     {
                         inner(
                             ty,
@@ -186,14 +190,14 @@ fn inner(
         }
         DataType::Enum(enm) => {
             validate_container_attributes(
-                enm.attributes(),
+                &enm.attributes,
                 types,
                 generics,
                 checked_references,
                 &path,
                 mode,
             )?;
-            if SerdeContainerAttrs::from_attributes(enm.attributes())?
+            if SerdeContainerAttrs::from_attributes(&enm.attributes)?
                 .is_some_and(|attrs| attrs.default)
             {
                 return Err(Error::invalid_phased_type_usage(
@@ -204,15 +208,15 @@ fn inner(
             validate_identifier_enum(enm, &path, mode)?;
             validate_enum(enm, types, path.clone(), mode)?;
 
-            for (variant_name, variant) in enm.variants() {
+            for (variant_name, variant) in &enm.variants {
                 validate_variant_attributes(variant, format!("{path}::{variant_name}"), mode)?;
-                match &variant.fields() {
+                match &variant.fields {
                     Fields::Unit => {}
                     Fields::Named(named) => {
                         for (name, (field, _)) in named
-                            .fields()
+                            .fields
                             .iter()
-                            .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+                            .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
                         {
                             validate_field_attributes(
                                 field,
@@ -221,9 +225,9 @@ fn inner(
                             )?;
                         }
                         for (name, (_, ty)) in named
-                            .fields()
+                            .fields
                             .iter()
-                            .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+                            .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
                         {
                             inner(
                                 ty,
@@ -237,9 +241,9 @@ fn inner(
                     }
                     Fields::Unnamed(unnamed) => {
                         for (idx, (field, _)) in unnamed
-                            .fields()
+                            .fields
                             .iter()
-                            .filter_map(|field| field.ty().map(|ty| (field, ty)))
+                            .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
                             .enumerate()
                         {
                             validate_field_attributes(
@@ -249,9 +253,9 @@ fn inner(
                             )?;
                         }
                         for (idx, (_, ty)) in unnamed
-                            .fields()
+                            .fields
                             .iter()
-                            .filter_map(|field| field.ty().map(|ty| (field, ty)))
+                            .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
                             .enumerate()
                         {
                             inner(
@@ -268,7 +272,7 @@ fn inner(
             }
         }
         DataType::Tuple(tuple) => {
-            for (idx, ty) in tuple.elements().iter().enumerate() {
+            for (idx, ty) in tuple.elements.iter().enumerate() {
                 inner(
                     ty,
                     types,
@@ -281,7 +285,7 @@ fn inner(
         }
         DataType::Reference(reference) => match reference {
             Reference::Named(reference) => {
-                for (_, dt) in reference.generics() {
+                for (_, dt) in &reference.generics {
                     inner(
                         dt,
                         types,
@@ -296,13 +300,13 @@ fn inner(
                     let reference_key = Reference::Named(reference.clone());
                     checked_references.insert(reference_key);
                     if let Some(ndt) = reference.get(types) {
-                        let merged_generics = merged_generics(generics, reference.generics());
+                        let merged_generics = merged_generics(generics, &reference.generics);
                         inner(
-                            ndt.ty(),
+                            &ndt.inner,
                             types,
                             &merged_generics,
                             checked_references,
-                            ndt.name().to_string(),
+                            ndt.name.to_string(),
                             mode,
                         )?;
                     }
@@ -366,7 +370,7 @@ fn inner(
 }
 
 fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<()> {
-    let Some(attrs) = SerdeContainerAttrs::from_attributes(enm.attributes())? else {
+    let Some(attrs) = SerdeContainerAttrs::from_attributes(&enm.attributes)? else {
         return Ok(());
     };
 
@@ -390,9 +394,9 @@ fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<(
 
     if attrs.variant_identifier
         && let Some((name, _)) = enm
-            .variants()
+            .variants
             .iter()
-            .find(|(_, variant)| !matches!(variant.fields(), Fields::Unit))
+            .find(|(_, variant)| !matches!(&variant.fields, Fields::Unit))
     {
         return Err(Error::invalid_phased_type_usage(
             path,
@@ -403,12 +407,12 @@ fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<(
     }
 
     if attrs.field_identifier {
-        let variants = enm.variants();
+        let variants = &enm.variants;
         for (idx, (name, variant)) in variants.iter().enumerate() {
             let is_last = idx + 1 == variants.len();
-            match variant.fields() {
+            match &variant.fields {
                 Fields::Unit => {}
-                Fields::Unnamed(unnamed) if is_last && unnamed.fields().len() == 1 => {}
+                Fields::Unnamed(unnamed) if is_last && unnamed.fields.len() == 1 => {}
                 _ => {
                     return Err(Error::invalid_phased_type_usage(
                         path,
@@ -465,18 +469,18 @@ fn validate_container_attributes(
 }
 
 fn validate_variant_attributes(variant: &Variant, path: String, mode: ApplyMode) -> Result<()> {
-    let Some(serde_attrs) = SerdeVariantAttrs::from_attributes(variant.attributes())? else {
+    let Some(serde_attrs) = SerdeVariantAttrs::from_attributes(&variant.attributes)? else {
         return Ok(());
     };
 
     if serde_attrs.has_serialize_with {
-        ensure_codec_override(variant.type_overridden(), &path, "serialize_with")?;
+        ensure_codec_override(variant.type_overridden, &path, "serialize_with")?;
     }
     if serde_attrs.has_deserialize_with {
-        ensure_codec_override(variant.type_overridden(), &path, "deserialize_with")?;
+        ensure_codec_override(variant.type_overridden, &path, "deserialize_with")?;
     }
     if serde_attrs.has_with {
-        ensure_codec_override(variant.type_overridden(), &path, "with")?;
+        ensure_codec_override(variant.type_overridden, &path, "with")?;
     }
 
     if mode == ApplyMode::Unified
@@ -493,7 +497,7 @@ fn validate_variant_attributes(variant: &Variant, path: String, mode: ApplyMode)
 }
 
 fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Result<()> {
-    let Some(serde_attrs) = SerdeFieldAttrs::from_attributes(field.attributes())? else {
+    let Some(serde_attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
         return Ok(());
     };
 
@@ -513,13 +517,13 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
     }
 
     if serde_attrs.has_serialize_with {
-        ensure_codec_override(field.type_overridden(), &path, "serialize_with")?;
+        ensure_codec_override(field.type_overridden, &path, "serialize_with")?;
     }
     if serde_attrs.has_deserialize_with {
-        ensure_codec_override(field.type_overridden(), &path, "deserialize_with")?;
+        ensure_codec_override(field.type_overridden, &path, "deserialize_with")?;
     }
     if serde_attrs.has_with {
-        ensure_codec_override(field.type_overridden(), &path, "with")?;
+        ensure_codec_override(field.type_overridden, &path, "with")?;
     }
 
     if mode == ApplyMode::Unified && serde_attrs.skip_serializing_if.is_some() {
@@ -561,18 +565,18 @@ fn merged_generics(
 
 fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Result<()> {
     let valid_variants = enm
-        .variants()
+        .variants
         .iter()
-        .filter(|(_, variant)| !variant.skip())
+        .filter(|(_, variant)| !variant.skip)
         .count();
-    if valid_variants == 0 && !enm.variants().is_empty() {
+    if valid_variants == 0 && !&enm.variants.is_empty() {
         return Err(Error::invalid_usage_of_skip(
             path,
             "all variants are skipped, resulting in an invalid non-empty enum",
         ));
     }
 
-    let repr = enum_repr_from_attrs(enm.attributes())?;
+    let repr = enum_repr_from_attrs(&enm.attributes)?;
 
     validate_untagged_variants(enm, &path)?;
     validate_other_variant(enm, &path, &repr, mode)?;
@@ -587,8 +591,8 @@ fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Re
 fn validate_untagged_variants(enm: &Enum, path: &str) -> Result<()> {
     let mut seen_untagged = false;
 
-    for (name, variant) in enm.variants() {
-        let is_untagged = SerdeVariantAttrs::from_attributes(variant.attributes())?
+    for (name, variant) in &enm.variants {
+        let is_untagged = SerdeVariantAttrs::from_attributes(&variant.attributes)?
             .is_some_and(|attrs| attrs.untagged);
 
         if is_untagged {
@@ -596,7 +600,7 @@ fn validate_untagged_variants(enm: &Enum, path: &str) -> Result<()> {
             continue;
         }
 
-        if seen_untagged && !variant.skip() {
+        if seen_untagged && !variant.skip {
             return Err(Error::invalid_phased_type_usage(
                 path,
                 format!(
@@ -611,8 +615,8 @@ fn validate_untagged_variants(enm: &Enum, path: &str) -> Result<()> {
 
 fn validate_other_variant(enm: &Enum, path: &str, repr: &EnumRepr, mode: ApplyMode) -> Result<()> {
     let mut other_variants = Vec::new();
-    for (name, variant) in enm.variants() {
-        if SerdeVariantAttrs::from_attributes(variant.attributes())?
+    for (name, variant) in &enm.variants {
+        if SerdeVariantAttrs::from_attributes(&variant.attributes)?
             .is_some_and(|attrs| attrs.other)
         {
             other_variants.push((name, variant));
@@ -645,7 +649,7 @@ fn validate_other_variant(enm: &Enum, path: &str, repr: &EnumRepr, mode: ApplyMo
     }
 
     let (name, variant) = other_variants[0];
-    if !matches!(variant.fields(), Fields::Unit) {
+    if !matches!(&variant.fields, Fields::Unit) {
         return Err(Error::invalid_phased_type_usage(
             path,
             format!("`#[serde(other)]` variant `{name}` must be a unit variant"),
@@ -656,7 +660,7 @@ fn validate_other_variant(enm: &Enum, path: &str, repr: &EnumRepr, mode: ApplyMo
 }
 
 fn validate_internally_tag_enum(enm: &Enum, types: &Types, path: String) -> Result<()> {
-    for (variant_name, variant) in enm.variants() {
+    for (variant_name, variant) in &enm.variants {
         validate_internally_tag_variant(enm, variant_name, variant, types, &path)?;
     }
 
@@ -671,18 +675,18 @@ fn validate_internally_tag_variant(
     path: &str,
 ) -> Result<()> {
     let _ = enm;
-    if SerdeVariantAttrs::from_attributes(variant.attributes())?.is_some_and(|attrs| attrs.untagged)
+    if SerdeVariantAttrs::from_attributes(&variant.attributes)?.is_some_and(|attrs| attrs.untagged)
     {
         return Ok(());
     }
 
-    match &variant.fields() {
+    match &variant.fields {
         Fields::Unit | Fields::Named(_) => Ok(()),
         Fields::Unnamed(unnamed) => {
             let mut fields = unnamed
-                .fields()
+                .fields
                 .iter()
-                .filter_map(|field| field.ty().map(|ty| (field, ty)));
+                .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)));
             let Some((_, first_field)) = fields.next() else {
                 return Ok(());
             };
@@ -709,14 +713,14 @@ fn validate_internally_tag_enum_datatype(
     match ty {
         DataType::Map(_) => Ok(()),
         DataType::Struct(_) => Ok(()),
-        DataType::Enum(enm) => match enum_repr_from_attrs(enm.attributes())? {
+        DataType::Enum(enm) => match enum_repr_from_attrs(&enm.attributes)? {
             EnumRepr::Untagged => validate_internally_tag_enum(enm, types, path.to_string()),
             EnumRepr::External | EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. } => Ok(()),
         },
-        DataType::Tuple(tuple) if tuple.elements().is_empty() => Ok(()),
+        DataType::Tuple(tuple) if tuple.elements.is_empty() => Ok(()),
         DataType::Reference(Reference::Named(reference)) => {
             if let Some(ndt) = reference.get(types) {
-                validate_internally_tag_enum_datatype(ndt.ty(), types, path, variant_name)?;
+                validate_internally_tag_enum_datatype(&ndt.inner, types, path, variant_name)?;
             }
 
             Ok(())

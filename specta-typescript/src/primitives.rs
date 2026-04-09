@@ -14,6 +14,10 @@ use specta::{
 };
 
 use crate::{
+    compat::{
+        TsCompat, TsEnumCompat, TsFieldCompat, TsFieldsCompat, TsListCompat,
+        TsNamedReferenceCompat, TsStructCompat, TsTupleCompat, TsVariantCompat,
+    },
     Branded, BrandedTypeExporter, Error, Exporter, Layout,
     legacy::{
         ExportContext, deprecated_details, escape_jsdoc_text, escape_typescript_string_literal,
@@ -101,7 +105,7 @@ fn export_single_internal(
         return Ok(());
     }
 
-    let _generic_scope = push_generic_scope(ndt.generics());
+    let _generic_scope = push_generic_scope(&ndt.generics);
 
     // TODO: Modernise this
     let name = crate::legacy::sanitise_type_name(
@@ -111,17 +115,17 @@ fn export_single_internal(
         },
         &match exporter.layout {
             Layout::ModulePrefixedName => {
-                let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
+                let mut s = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
                 s.push('_');
-                s.push_str(ndt.name());
+                s.push_str(&ndt.name);
                 Cow::Owned(s)
             }
-            _ => ndt.name().clone(),
+            _ => ndt.name.clone(),
         },
     )?;
 
     let mut comments = String::new();
-    js_doc(&mut comments, ndt.docs(), ndt.deprecated(), !exporter.jsdoc);
+    js_doc(&mut comments, &ndt.docs, ndt.deprecated.as_ref(), !exporter.jsdoc);
     if !comments.is_empty() {
         for line in comments.lines() {
             s.push_str(indent);
@@ -133,16 +137,16 @@ fn export_single_internal(
     s.push_str(indent);
     s.push_str("export type ");
     s.push_str(&name);
-    write_generic_parameters(s, exporter, types, ndt.generics())?;
+    write_generic_parameters(s, exporter, types, &ndt.generics)?;
     s.push_str(" = ");
 
     datatype(
         s,
         exporter,
         types,
-        ndt.ty(),
-        vec![ndt.name().clone()],
-        Some(ndt.name()),
+        &ndt.inner,
+        vec![ndt.name.clone()],
+        Some(ndt.name.as_ref()),
         indent,
         Default::default(),
     )?;
@@ -201,12 +205,12 @@ fn append_jsdoc_properties(
     dt: &NamedDataType,
     indent: &str,
 ) -> Result<(), Error> {
-    match dt.ty() {
-        DataType::Struct(strct) => match strct.fields() {
+    match &dt.inner {
+        DataType::Struct(strct) => match &strct.fields {
             Fields::Unit => {}
             Fields::Unnamed(unnamed) => {
-                for (idx, field) in unnamed.fields().iter().enumerate() {
-                    let Some(ty) = field.ty() else {
+                for (idx, field) in unnamed.fields.iter().enumerate() {
+                    let Some(ty) = field.ty.as_ref() else {
                         continue;
                     };
 
@@ -217,8 +221,8 @@ fn append_jsdoc_properties(
                         exporter,
                         types,
                         ty,
-                        vec![dt.name().clone(), idx.to_string().into()],
-                        Some(dt.name()),
+                        vec![dt.name.clone(), idx.to_string().into()],
+                        Some(dt.name.as_ref()),
                         &datatype_prefix,
                         Default::default(),
                     )?;
@@ -227,16 +231,16 @@ fn append_jsdoc_properties(
                         s,
                         &ty_str,
                         &idx.to_string(),
-                        field.optional(),
-                        field.docs(),
-                        field.deprecated(),
+                        field.optional,
+                        &field.docs,
+                        field.deprecated.as_ref(),
                         indent,
                     );
                 }
             }
             Fields::Named(named) => {
-                for (name, field) in named.fields() {
-                    let Some(ty) = field.ty() else {
+                for (name, field) in &named.fields {
+                    let Some(ty) = field.ty.as_ref() else {
                         continue;
                     };
 
@@ -247,8 +251,8 @@ fn append_jsdoc_properties(
                         exporter,
                         types,
                         ty,
-                        vec![dt.name().clone(), name.clone()],
-                        Some(dt.name()),
+                        vec![dt.name.clone(), name.clone()],
+                        Some(dt.name.as_ref()),
                         &datatype_prefix,
                         Default::default(),
                     )?;
@@ -257,20 +261,18 @@ fn append_jsdoc_properties(
                         s,
                         &ty_str,
                         name,
-                        field.optional(),
-                        field.docs(),
-                        field.deprecated(),
+                        field.optional,
+                        &field.docs,
+                        field.deprecated.as_ref(),
                         indent,
                     );
                 }
             }
         },
         DataType::Enum(enm) => {
-            for (variant_name, variant) in enm.variants().iter().filter(|(_, v)| !v.skip()) {
+            for (variant_name, variant) in enm.variants.iter().filter(|(_, v)| !v.skip) {
                 let mut one_variant_enum = enm.clone();
-                one_variant_enum
-                    .variants_mut()
-                    .retain(|(name, _)| name == variant_name);
+                one_variant_enum.variants.retain(|(name, _)| name == variant_name);
 
                 let mut variant_ty = String::new();
                 crate::legacy::enum_datatype(
@@ -290,8 +292,8 @@ fn append_jsdoc_properties(
                     &variant_ty,
                     variant_name,
                     false,
-                    variant.docs(),
-                    variant.deprecated(),
+                    &variant.docs,
+                    variant.deprecated.as_ref(),
                     indent,
                 );
             }
@@ -364,11 +366,11 @@ fn append_typedef_body(
     dt: &NamedDataType,
     indent: &str,
 ) -> Result<(), Error> {
-    let _generic_scope = push_generic_scope(dt.generics());
+    let _generic_scope = push_generic_scope(&dt.generics);
 
-    let name = dt.name();
+    let name = &dt.name;
     let mut type_name = String::from(name.as_ref());
-    write_generic_parameters(&mut type_name, exporter, types, dt.generics())?;
+    write_generic_parameters(&mut type_name, exporter, types, &dt.generics)?;
 
     let mut typedef_ty = String::new();
     let datatype_prefix = format!("{indent}\t*\t");
@@ -376,15 +378,15 @@ fn append_typedef_body(
         &mut typedef_ty,
         exporter,
         types,
-        dt.ty(),
-        vec![dt.name().clone()],
-        Some(dt.name()),
+        &dt.inner,
+        vec![dt.name.clone()],
+        Some(dt.name.as_ref()),
         &datatype_prefix,
         Default::default(),
     )?;
 
-    if !dt.docs().is_empty() {
-        for line in dt.docs().lines() {
+    if !dt.docs.is_empty() {
+        for line in dt.docs.lines() {
             s.push_str(indent);
             s.push_str("\t* ");
             s.push_str(&escape_jsdoc_text(line));
@@ -394,7 +396,7 @@ fn append_typedef_body(
         s.push_str("\t*\n");
     }
 
-    if let Some(deprecated) = dt.deprecated() {
+    if let Some(deprecated) = dt.deprecated.as_ref() {
         s.push_str(indent);
         s.push_str("\t* @deprecated");
         if let Some(details) = deprecated_details(deprecated) {
@@ -621,13 +623,13 @@ fn resolved_reference_generics(
     r: &NamedReference,
     parent_generics: &[(GenericReference, DataType)],
 ) -> Option<(Vec<DataType>, bool, Vec<(GenericReference, DataType)>)> {
-    let mut scoped_generics = scoped_reference_generics(parent_generics, r.generics());
+    let mut scoped_generics = scoped_reference_generics(parent_generics, &r.generics);
     let mut all_default = true;
-    let mut rendered_generics = Vec::with_capacity(ndt.generics().len());
+    let mut rendered_generics = Vec::with_capacity(ndt.generics.len());
 
-    for generic in ndt.generics() {
+    for generic in ndt.generics.iter() {
         let explicit = r
-            .generics()
+            .generics
             .iter()
             .find(|(reference, _)| *reference == generic.reference())
             .map(|(_, dt)| resolve_generics_in_datatype(dt, &scoped_generics));
@@ -668,7 +670,7 @@ fn shallow_inline_datatype(
                 &mut inner,
                 exporter,
                 types,
-                list.ty(),
+                &list.ty,
                 location,
                 parent_name,
                 prefix,
@@ -683,7 +685,7 @@ fn shallow_inline_datatype(
                 inner
             };
 
-            if let Some(length) = list.length() {
+            if let Some(length) = list.length {
                 s.push('[');
                 for i in 0..length {
                     if i != 0 {
@@ -705,11 +707,11 @@ fn shallow_inline_datatype(
             fn is_exhaustive(dt: &DataType, types: &Types) -> bool {
                 match dt {
                     DataType::Enum(e) => {
-                        e.variants().iter().filter(|(_, v)| !v.skip()).count() == 0
+                        e.variants.iter().filter(|(_, v)| !v.skip).count() == 0
                     }
                     DataType::Reference(Reference::Named(r)) => r
                         .get(types)
-                        .is_some_and(|ndt| is_exhaustive(ndt.ty(), types)),
+                        .is_some_and(|ndt| is_exhaustive(&ndt.inner, types)),
                     DataType::Reference(Reference::Opaque(_)) => false,
                     _ => true,
                 }
@@ -793,7 +795,7 @@ fn shallow_inline_datatype(
                 generics,
             )?;
         }
-        DataType::Tuple(tuple) => match tuple.elements() {
+        DataType::Tuple(tuple) => match tuple.elements.as_slice() {
             [] => s.push_str("null"),
             elements => {
                 s.push('[');
@@ -829,7 +831,7 @@ fn shallow_inline_datatype(
                 }
 
                 INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
-                let combined_generics = merged_generics(generics, r.generics());
+                let combined_generics = merged_generics(generics, &r.generics);
                 let resolved = resolve_generics_in_datatype(ty, &combined_generics);
                 let result = shallow_inline_datatype(
                     s,
@@ -900,7 +902,7 @@ fn resolve_generics_in_datatype(
             DataType::Primitive(_) => dt.clone(),
             DataType::List(l) => {
                 let mut out = l.clone();
-                out.set_ty(resolve(l.ty(), generics, visiting));
+                out.ty = Box::new(resolve(&l.ty, generics, visiting));
                 DataType::List(out)
             }
             DataType::Map(m) => {
@@ -914,18 +916,18 @@ fn resolve_generics_in_datatype(
             }
             DataType::Struct(st) => {
                 let mut out = st.clone();
-                match out.fields_mut() {
+                match &mut out.fields {
                     specta::datatype::Fields::Unit => {}
                     specta::datatype::Fields::Unnamed(unnamed) => {
-                        for field in unnamed.fields_mut() {
-                            if let Some(ty) = field.ty_mut() {
+                        for field in &mut unnamed.fields {
+                            if let Some(ty) = field.ty.as_mut() {
                                 *ty = resolve(ty, generics, visiting);
                             }
                         }
                     }
                     specta::datatype::Fields::Named(named) => {
-                        for (_, field) in named.fields_mut() {
-                            if let Some(ty) = field.ty_mut() {
+                        for (_, field) in &mut named.fields {
+                            if let Some(ty) = field.ty.as_mut() {
                                 *ty = resolve(ty, generics, visiting);
                             }
                         }
@@ -935,19 +937,19 @@ fn resolve_generics_in_datatype(
             }
             DataType::Enum(en) => {
                 let mut out = en.clone();
-                for (_, variant) in out.variants_mut() {
-                    match variant.fields_mut() {
+                for (_, variant) in &mut out.variants {
+                    match &mut variant.fields {
                         specta::datatype::Fields::Unit => {}
                         specta::datatype::Fields::Unnamed(unnamed) => {
-                            for field in unnamed.fields_mut() {
-                                if let Some(ty) = field.ty_mut() {
+                            for field in &mut unnamed.fields {
+                                if let Some(ty) = field.ty.as_mut() {
                                     *ty = resolve(ty, generics, visiting);
                                 }
                             }
                         }
                         specta::datatype::Fields::Named(named) => {
-                            for (_, field) in named.fields_mut() {
-                                if let Some(ty) = field.ty_mut() {
+                            for (_, field) in &mut named.fields {
+                                if let Some(ty) = field.ty.as_mut() {
                                     *ty = resolve(ty, generics, visiting);
                                 }
                             }
@@ -958,7 +960,7 @@ fn resolve_generics_in_datatype(
             }
             DataType::Tuple(t) => {
                 let mut out = t.clone();
-                for element in out.elements_mut() {
+                for element in &mut out.elements {
                     *element = resolve(element, generics, visiting);
                 }
                 DataType::Tuple(out)
@@ -1019,7 +1021,7 @@ fn inline_datatype(
                     cfg: exporter,
                     path: vec![],
                 },
-                l.ty(),
+                &l.ty,
                 types,
                 &mut dt_str,
                 generics,
@@ -1033,7 +1035,7 @@ fn inline_datatype(
                 dt_str
             };
 
-            if let Some(length) = l.length() {
+            if let Some(length) = l.length {
                 s.push('[');
                 for n in 0..length {
                     if n != 0 {
@@ -1070,14 +1072,14 @@ fn inline_datatype(
             // If we have generics to resolve, handle the struct inline to preserve context
             if !generics.is_empty() {
                 use specta::datatype::Fields;
-                match st.fields() {
+                match &st.fields {
                     Fields::Unit => s.push_str("null"),
                     Fields::Named(named) => {
                         s.push('{');
                         let mut has_field = false;
-                        for (key, field) in named.fields() {
+                        for (key, field) in &named.fields {
                             // Skip fields without a type (e.g., flattened or skipped fields)
-                            let Some(field_ty) = field.ty() else {
+                            let Some(field_ty) = field.ty.as_ref() else {
                                 continue;
                             };
 
@@ -1155,7 +1157,7 @@ fn inline_datatype(
                     return Ok(());
                 }
 
-                let combined_generics = merged_generics(generics, r.generics());
+                let combined_generics = merged_generics(generics, &r.generics);
                 INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
                 let result = inline_datatype(
                     s,
@@ -1224,7 +1226,7 @@ pub(crate) fn datatype(
         }
         DataType::Struct(st) => {
             // location.push(st.name().clone());
-            // fields_dt(s, ts, types, st.name(), &st.fields(), location, state)?
+            // fields_dt(s, ts, types, st.name(), &&st.fields, location, state)?
 
             crate::legacy::struct_datatype(
                 crate::legacy::ExportContext {
@@ -1276,7 +1278,7 @@ fn list_dt(
                 cfg: exporter,
                 path: vec![],
             },
-            l.ty(),
+            &l.ty,
             types,
             &mut dt,
             generics,
@@ -1292,7 +1294,7 @@ fn list_dt(
             dt
         };
 
-        if let Some(length) = l.length() {
+        if let Some(length) = l.length {
             s.push('[');
 
             for n in 0..length {
@@ -1312,7 +1314,7 @@ fn list_dt(
     //     // We use `T[]` instead of `Array<T>` to avoid issues with circular references.
 
     //     let mut result = String::new();
-    //     datatype(&mut result, ts, types, &l.ty(), location, state)?;
+    //     datatype(&mut result, ts, types, &&l.ty, location, state)?;
     //     let result = if (result.contains(' ') && !result.ends_with('}'))
     //         // This is to do with maintaining order of operations.
     //         // Eg `{} | {}` must be wrapped in parens like `({} | {})[]` but `{}` doesn't cause `{}[]` is valid
@@ -1323,7 +1325,7 @@ fn list_dt(
     //         result
     //     };
 
-    //     match l.length() {
+    //     match l.length {
     //         Some(len) => {
     //             s.push_str("[");
     //             iter_with_sep(
@@ -1360,10 +1362,10 @@ fn map_dt(
     {
         fn is_exhaustive(dt: &DataType, types: &Types) -> bool {
             match dt {
-                DataType::Enum(e) => e.variants().iter().filter(|(_, v)| !v.skip()).count() == 0,
+                DataType::Enum(e) => e.variants.iter().filter(|(_, v)| !v.skip).count() == 0,
                 DataType::Reference(Reference::Named(r)) => {
                     if let Some(ndt) = r.get(types) {
-                        is_exhaustive(ndt.ty(), types)
+                        is_exhaustive(&ndt.inner, types)
                     } else {
                         false
                     }
@@ -1437,13 +1439,9 @@ fn map_key_render_type(dt: DataType) -> DataType {
 }
 
 fn bool_key_literal_datatype() -> DataType {
-    let mut bool_enum = Enum::new();
-    bool_enum
-        .variants_mut()
-        .push((Cow::Borrowed("true"), Variant::unit()));
-    bool_enum
-        .variants_mut()
-        .push((Cow::Borrowed("false"), Variant::unit()));
+    let mut bool_enum = Enum::default();
+    bool_enum.variants.push((Cow::Borrowed("true"), Variant::unit()));
+    bool_enum.variants.push((Cow::Borrowed("false"), Variant::unit()));
     DataType::Enum(bool_enum)
 }
 
@@ -1475,7 +1473,7 @@ fn enum_dt(
 
     //     location.push(e.name().clone());
 
-    //     let variants = e.variants().iter().filter(|(_, variant)| !variant.skip());
+    //     let variants = &e.variants.iter().filter(|(_, variant)| !variant.skip);
 
     //     if variants.clone().next().is_none()
     //     /* is_empty */
@@ -1492,8 +1490,8 @@ fn enum_dt(
     //             location.push(variant_name.clone());
 
     //             // TODO
-    //             // variant.deprecated()
-    //             // variant.docs()
+    //             // variant.deprecated.as_ref()
+    //             // &variant.docs
 
     //             match &e.repr() {
     //                 EnumRepr::Untagged => {
@@ -1554,7 +1552,7 @@ fn enum_dt(
     //                                 let mut fields = f.fields.iter().filter(|f| f.ty().is_some());
     //                                 if let (Some(v), None) = (fields.next(), fields.next()) {
     //                                     if let Some(DataType::Tuple(tuple)) = &v.ty() {
-    //                                         skip_join = tuple.elements().len() == 0;
+    //                                         skip_join = &tuple.elements.len() == 0;
     //                                     }
     //                                 }
     //                             }
@@ -1805,8 +1803,8 @@ fn enum_dt(
 //     };
 
 //     // TODO
-//     // field.deprecated(),
-//     // field.docs(),
+//     // field.deprecated.as_ref(),
+//     // &field.docs,
 
 //     let ty = if f.inline() {
 //         specta::datatype::inline_dt(types, ty.clone())
@@ -1838,7 +1836,7 @@ fn enum_dt(
 //         //         DataType::Nullable(data_type) => todo!(),
 //         //         DataType::Struct(st) => {
 //         //             // location.push(st.name().clone()); // TODO
-//         //             flattened_fields_dt(s, ts, types, st.name(), &st.fields(), location)?
+//         //             flattened_fields_dt(s, ts, types, st.name(), &&st.fields, location)?
 //         //         }
 
 //         //         // flattened_fields_dt(s, ts, types, &ty, location)?,
@@ -2019,7 +2017,7 @@ fn reference_named_dt(
         let ndt = r
             .get(types)
             .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
-        let _generic_scope = push_generic_scope(ndt.generics());
+        let _generic_scope = push_generic_scope(&ndt.generics);
 
         // Check if this reference should be inlined
         if r.inline() {
@@ -2031,8 +2029,8 @@ fn reference_named_dt(
                 // Fall through and emit a named reference to break recursive inline expansions.
             } else {
                 INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
-                let combined_generics = merged_generics(generics, r.generics());
-                let resolved = resolve_generics_in_datatype(ndt.ty(), &combined_generics);
+                let combined_generics = merged_generics(generics, &r.generics);
+                let resolved = resolve_generics_in_datatype(&ndt.inner, &combined_generics);
                 let result = datatype(
                     s,
                     exporter,
@@ -2055,24 +2053,24 @@ fn reference_named_dt(
 
         let name = match exporter.layout {
             Layout::ModulePrefixedName => {
-                let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
+                let mut s = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
                 s.push('_');
-                s.push_str(ndt.name());
+                s.push_str(&ndt.name);
                 Cow::Owned(s)
             }
             Layout::Namespaces => {
-                if ndt.module_path().is_empty() {
-                    ndt.name().clone()
+                if ndt.module_path.is_empty() {
+                    ndt.name.clone()
                 } else {
-                    let mut path =
-                        ndt.module_path()
-                            .split("::")
-                            .fold("$s$.".to_string(), |mut s, segment| {
-                                s.push_str(segment);
-                                s.push('.');
-                                s
-                            });
-                    path.push_str(ndt.name());
+                    let mut path = ndt
+                        .module_path
+                        .split("::")
+                        .fold("$s$.".to_string(), |mut s, segment| {
+                            s.push_str(segment);
+                            s.push('.');
+                            s
+                        });
+                    path.push_str(&ndt.name);
                     Cow::Owned(path)
                 }
             }
@@ -2080,16 +2078,16 @@ fn reference_named_dt(
                 let current_module_path =
                     crate::references::current_module_path().unwrap_or_default();
 
-                if ndt.module_path() == &current_module_path {
-                    ndt.name().clone()
+                if ndt.module_path == current_module_path {
+                    ndt.name.clone()
                 } else {
-                    let mut path = crate::exporter::module_alias(ndt.module_path());
+                    let mut path = crate::exporter::module_alias(&ndt.module_path);
                     path.push('.');
-                    path.push_str(ndt.name());
+                    path.push_str(&ndt.name);
                     Cow::Owned(path)
                 }
             }
-            _ => ndt.name().clone(),
+            _ => ndt.name.clone(),
         };
 
         let (rendered_generics, omit_generics, scoped_generics) =
@@ -2130,7 +2128,7 @@ fn reference_named_dt(
     //         todo!("inline reference!");
     //     }
 
-    //     s.push_str(ndt.name());
+    //     s.push_str(&ndt.name);
     //     // TODO: We could possible break this out, the root `export` function also has to emit generics.
     //     match r.generics() {
     //         [] => {}

@@ -1,11 +1,19 @@
 use std::collections::HashSet;
 
 use specta::{
-    Types,
     datatype::{DataType, Enum, Fields, Generic, NamedDataType, Primitive, Reference, Struct},
+    Types,
 };
 
-use crate::{Error, Go, reserved_names::RESERVED_GO_NAMES};
+use crate::{
+    compat::{
+        GoEnumCompat, GoFieldCompat, GoListCompat, GoNamedCompat, GoNamedFieldsCompat,
+        GoNamedReferenceCompat, GoStructCompat, GoTupleCompat, GoUnnamedFieldsCompat,
+        GoVariantCompat,
+    },
+    reserved_names::RESERVED_GO_NAMES,
+    Error, Go,
+};
 
 /// Tracks necessary Go imports (e.g. "time", "encoding/json")
 #[derive(Default)]

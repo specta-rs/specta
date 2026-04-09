@@ -3,12 +3,12 @@
 //! The plan is to try and move these into the ecosystem for the v2 release.
 use super::macros::{impl_ndt, impl_ndt_as};
 use crate::{
-    Type, Types,
     datatype::{
         self, DataType, Enum, Field, Fields, List, NamedFields, Primitive, Reference, Struct,
         Variant,
     },
     r#type::{generics, impls::*},
+    Type, Types,
 };
 
 use std::borrow::Cow;
@@ -155,7 +155,7 @@ const _: () = {
 #[cfg(feature = "serde_yaml")]
 #[cfg_attr(docsrs, doc(cfg(feature = "serde_yaml")))]
 const _: () = {
-    use serde_yaml::{Number, Value, value::TaggedValue};
+    use serde_yaml::{value::TaggedValue, Number, Value};
 
     impl_ndt_as!(
         serde_yaml::Mapping as PrimitiveMap<serde_yaml::Value, serde_yaml::Value>
@@ -248,7 +248,7 @@ const _: () = {
 #[cfg(feature = "toml")]
 #[cfg_attr(docsrs, doc(cfg(feature = "toml")))]
 const _: () = {
-    use toml::{Value, value};
+    use toml::{value, Value};
 
     impl_ndt_as!(toml::map::Map<K, V> as PrimitiveMap<generics::K, generics::V>);
 
@@ -373,8 +373,8 @@ const _: () = {
                     types,
                     SENTINEL,
                     |types, ndt| {
-                        ndt.set_name(::std::borrow::Cow::Borrowed(stringify!($type_name)));
-                        ndt.set_module_path(::std::borrow::Cow::Borrowed(stringify!($module)));
+                        ndt.name = ::std::borrow::Cow::Borrowed(stringify!($type_name));
+                        ndt.module_path = ::std::borrow::Cow::Borrowed(stringify!($module));
                         ndt.inner = str::definition(types);
                     },
                 ))
@@ -653,8 +653,8 @@ const _: () = {
                 types,
                 SENTINEL,
                 |types, ndt| {
-                    ndt.set_name(Cow::Borrowed("ErrorStackContext"));
-                    ndt.set_module_path(Cow::Borrowed("error_stack"));
+                    ndt.name = Cow::Borrowed("ErrorStackContext");
+                    ndt.module_path = Cow::Borrowed("error_stack");
 
                     let attachments = DataType::List(List::new(String::definition(types)));
                     let sources = DataType::List(List::new(ErrorStackContext::definition(types)));
@@ -681,8 +681,8 @@ const _: () = {
             types,
             SENTINEL,
             |types, ndt| {
-                ndt.set_name(Cow::Borrowed("Report"));
-                ndt.set_module_path(Cow::Borrowed("error_stack"));
+                ndt.name = Cow::Borrowed("Report");
+                ndt.module_path = Cow::Borrowed("error_stack");
                 ndt.inner = DataType::List(List::new(ErrorStackContext::definition(types)));
             },
         ))

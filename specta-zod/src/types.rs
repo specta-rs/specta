@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 
 use specta::{
-    Type, Types,
     datatype::{DataType, Reference},
+    Type, Types,
 };
 
 use crate::opaque;

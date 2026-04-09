@@ -104,7 +104,7 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
         DataType::List(def) => ReferenceOr::Item(Schema {
             schema_data,
             schema_kind: SchemaKind::Type(Type::Array(ArrayType {
-                items: Some(match to_openapi(def.ty()) {
+                items: Some(match to_openapi(&def.ty) {
                     ReferenceOr::Item(schema) => ReferenceOr::Item(Box::new(schema)),
                     ReferenceOr::Reference { reference } => ReferenceOr::Reference { reference },
                 }),
@@ -114,7 +114,7 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
                 unique_items: false,
             })),
         }),
-        DataType::Tuple(tuple) => match tuple.elements() {
+        DataType::Tuple(tuple) => match tuple.elements.as_slice() {
             [] => {
                 schema_data.nullable = true;
                 ReferenceOr::Item(Schema {
@@ -126,7 +126,7 @@ pub fn to_openapi(typ: &DataType) -> ReferenceOr<Schema> {
             _tys => todo!(),
         },
         DataType::Struct(s) => {
-            let _fields = s.fields();
+            let _fields = &s.fields;
 
             // match &fields[..] {
             //     [] => todo!(), // "null".to_string(),

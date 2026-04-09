@@ -3,8 +3,8 @@ use std::{borrow::Cow, path::Path};
 use specta::{ResolvedTypes, Types};
 
 use crate::{
-    Error,
     primitives::{self, GoContext},
+    Error,
 };
 
 /// Controls whether the exporter applies Specta's serde rewrites first.

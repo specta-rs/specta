@@ -1,8 +1,8 @@
 use std::marker::PhantomData;
 
 use specta::{
-    Type, Types,
     datatype::{DataType, List},
+    Type, Types,
 };
 
 /// Declares a fixed-length array type for Specta exporters.
@@ -44,7 +44,7 @@ impl<const N: usize, T: Type> Type for FixedArray<N, T> {
     fn definition(types: &mut Types) -> DataType {
         let mut l = List::new(T::definition(types));
         // Refer to the type documentation for the safety around this.
-        l.set_length(Some(N));
+        l.length = Some(N);
         DataType::List(l)
     }
 }
