@@ -78,7 +78,7 @@ pub struct NamedDataType {
     pub location: Location<'static>,
     pub generics: Cow<'static, [Generic]>,
     pub inline: bool,
-    pub inner: DataType,
+    pub ty: DataType,
     /// Specialized instantiated shapes for references to this named type.
     ///
     /// The canonical [`NamedDataType::ty`] must stay general so it can be shared by all references.
@@ -109,7 +109,7 @@ impl NamedDataType {
             location: location.to_owned(),
             generics: Cow::Owned(generics),
             inline: false,
-            inner: dt,
+            ty: dt,
             instances: Vec::new(),
         }
     }
@@ -135,7 +135,7 @@ impl NamedDataType {
             location: location.to_owned(),
             generics: Cow::Owned(generics),
             inline: true,
-            inner: dt,
+            ty: dt,
             instances: Vec::new(),
         }
     }
@@ -153,7 +153,7 @@ impl NamedDataType {
             location: self.location.clone(),
             generics: self.generics.clone(),
             inline: self.inline,
-            inner: self.inner.clone(),
+            ty: self.ty.clone(),
             instances: self.instances.clone(),
         }
     }
@@ -219,7 +219,7 @@ impl NamedDataType {
             module_path: Cow::Borrowed(""),
             generics: Cow::Borrowed(generics_for_ndt),
             inline,
-            inner: DataType::Primitive(super::Primitive::i8),
+            ty: DataType::Primitive(super::Primitive::i8),
             instances: Vec::new(),
         };
 
@@ -255,7 +255,7 @@ impl NamedDataType {
             if ndt.name == "TAURI_CHANNEL" && ndt.module_path.starts_with("tauri::") {
                 // This causes an exporter that isn't aware of Tauri's channel to error.
                 // This is effectively `Reference::opaque(TauriChannel)` but we do some hackery for better errors.
-                ndt.inner = reference::tauri().into();
+                ndt.ty = reference::tauri().into();
 
                 // This ensures that we never create a `export type Channel`,
                 // instead the definition gets inlined into each callsite.
@@ -277,7 +277,7 @@ impl NamedDataType {
         }
 
         if ndt.name == "TAURI_CHANNEL" && ndt.module_path.starts_with("tauri::") {
-            ndt.inner = reference::tauri().into();
+            ndt.ty = reference::tauri().into();
             inline = true;
         }
 
@@ -285,7 +285,7 @@ impl NamedDataType {
             .0
             .get_mut(&id)
             .and_then(Option::as_mut)
-            .and_then(|existing| existing.register_instance(ndt.inner));
+            .and_then(|existing| existing.register_instance(ndt.ty));
 
         Reference::Named(NamedReference {
             id: id.clone(),
@@ -340,14 +340,14 @@ impl NamedDataType {
     /// Allows you to map over the inner [`DataType`] and all instances.
     /// Sometimes a [`NamedDataType`] will be represented as multiple [`DataType`]'s so inlining can be more accurate so you should prefer this over [`NamedDataType::ty_*`] helpers.
     pub fn map_ty_mut(&mut self, mut f: impl FnMut(&mut DataType)) {
-        f(&mut self.inner);
+        f(&mut self.ty);
         for instance in self.instances.iter_mut() {
             f(instance);
         }
     }
 
     pub(crate) fn register_instance(&mut self, ty: DataType) -> Option<usize> {
-        if self.inner == ty {
+        if self.ty == ty {
             return None;
         }
 

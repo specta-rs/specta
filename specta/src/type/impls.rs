@@ -133,14 +133,14 @@ const _: () = {
             inline: true;
             build: |_types, ndt| {
                 // Serde does no support `Infallible` as it can't be constructed as a `&self` method is uncallable on it.
-                ndt.inner = DataType::Enum(Enum::default());
+                ndt.ty = DataType::Enum(Enum::default());
             }
         }
 
         impl Type for std::time::SystemTime {
             inline: true;
             build: |types, ndt| {
-                ndt.inner = datatype::Struct::named()
+                ndt.ty = datatype::Struct::named()
                     .field(
                         "duration_since_epoch",
                         Field::new(<i64 as crate::Type>::definition(types)),
@@ -156,7 +156,7 @@ const _: () = {
         impl Type for std::time::Duration {
             inline: true;
             build: |types, ndt| {
-                ndt.inner = datatype::Struct::named()
+                ndt.ty = datatype::Struct::named()
                     .field("secs", Field::new(<u64 as crate::Type>::definition(types)))
                     .field("nanos", Field::new(<u32 as crate::Type>::definition(types)))
                     .build();
@@ -186,7 +186,7 @@ const _: () = {
                 |_types, ndt| {
                     ndt.name = std::borrow::Cow::Borrowed("Cow");
                     ndt.module_path = std::borrow::Cow::Borrowed("std::borrow");
-                    ndt.inner = datatype::GenericReference::new::<generics::T>().into();
+                    ndt.ty = datatype::GenericReference::new::<generics::T>().into();
                 },
             ))
         }
@@ -257,7 +257,7 @@ impl_ndt!(
             let err_variant = Variant::unnamed()
                 .field(Field::new(datatype::GenericReference::new::<generics::E>().into()))
                 .build();
-            ndt.inner = DataType::Enum(Enum {
+            ndt.ty = DataType::Enum(Enum {
                 variants: vec![("Ok".into(), ok_variant), ("Err".into(), err_variant)],
                 attributes: datatype::Attributes::default(),
             });

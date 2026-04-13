@@ -60,7 +60,7 @@ pub fn export(
     }
     s.push(' ');
 
-    match &ndt.inner {
+    match &ndt.ty {
         DataType::Struct(st) => {
             s.push_str("struct {\n");
             struct_fields(
@@ -108,7 +108,7 @@ pub fn export(
                 exporter,
                 types,
                 &ndt.generics,
-                &ndt.inner,
+                &ndt.ty,
                 vec![ndt.name.to_string()],
                 ctx,
             )?;

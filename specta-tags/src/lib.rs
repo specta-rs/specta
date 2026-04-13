@@ -289,7 +289,7 @@ impl Analyzer {
                     }
 
                     stack.push(reference.clone());
-                    let out = self.analyze(&ndt.inner, types, &reference.generics, stack);
+                    let out = self.analyze(&ndt.ty, types, &reference.generics, stack);
                     stack.pop();
                     out
                 } else {
@@ -621,7 +621,7 @@ mod tests {
             .into_sorted_iter()
             .find(|ty| ty.name.as_ref() == "TaggedEnum")
             .expect("TaggedEnum should be registered")
-            .inner
+            .ty
             .clone();
 
         let js = TransformPlan::analyze(&dt, &resolved).map("v");
@@ -639,7 +639,7 @@ mod tests {
             .into_sorted_iter()
             .find(|ty| ty.name.as_ref() == "AdjacentEnum")
             .expect("AdjacentEnum should be registered")
-            .inner
+            .ty
             .clone();
 
         let js = TransformPlan::analyze(&dt, &resolved).map("v");

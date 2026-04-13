@@ -43,7 +43,7 @@ pub fn export_type(
     types: &Types,
     ndt: &specta::datatype::NamedDataType,
 ) -> Result<String> {
-    if !matches!(&ndt.inner, DataType::Struct(_) | DataType::Enum(_)) {
+    if !matches!(&ndt.ty, DataType::Struct(_) | DataType::Enum(_)) {
         return Ok(String::new());
     }
 
@@ -78,10 +78,10 @@ pub fn export_type(
     let generic_scope = ndt.generics.to_vec();
 
     // Format based on type
-    match &ndt.inner {
+    match &ndt.ty {
         DataType::Struct(_) => {
             let type_def =
-                datatype_to_swift(swift, types, &ndt.inner, generic_scope.clone(), false, None)?;
+                datatype_to_swift(swift, types, &ndt.ty, generic_scope.clone(), false, None)?;
             let name = swift.naming.convert(&ndt.name);
             let generics = if ndt.generics.is_empty() {
                 String::new()

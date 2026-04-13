@@ -21,7 +21,7 @@ pub enum ApplyMode {
 pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<()> {
     for ndt in types.into_unsorted_iter() {
         validate_datatype_with_generics_for_mode(
-            &ndt.inner,
+            &ndt.ty,
             types,
             &ndt.generics,
             ndt.name.to_string(),
@@ -294,7 +294,7 @@ fn inner(
                     if let Some(ndt) = reference.get(types) {
                         let merged_generics = merged_generics(generics, &reference.generics);
                         inner(
-                            &ndt.inner,
+                            &ndt.ty,
                             types,
                             &merged_generics,
                             checked_references,
@@ -711,7 +711,7 @@ fn validate_internally_tag_enum_datatype(
         DataType::Tuple(tuple) if tuple.elements.is_empty() => Ok(()),
         DataType::Reference(Reference::Named(reference)) => {
             if let Some(ndt) = reference.get(types) {
-                validate_internally_tag_enum_datatype(&ndt.inner, types, path, variant_name)?;
+                validate_internally_tag_enum_datatype(&ndt.ty, types, path, variant_name)?;
             }
 
             Ok(())

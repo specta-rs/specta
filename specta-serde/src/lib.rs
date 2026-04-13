@@ -243,7 +243,7 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
     for original in &originals {
         let key = TypeIdentity::from_ndt(original);
         let mut deps = HashSet::new();
-        collect_dependencies(&original.inner, &types, &mut deps)?;
+        collect_dependencies(&original.ty, &types, &mut deps)?;
         for dep in &deps {
             reverse_dependencies
                 .entry(dep.clone())
@@ -255,7 +255,7 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
 
     let mut split_types = HashSet::new();
     for ndt in &originals {
-        if has_local_phase_difference(&ndt.inner)? {
+        if has_local_phase_difference(&ndt.ty)? {
             split_types.insert(TypeIdentity::from_ndt(ndt));
         }
     }
@@ -381,7 +381,7 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
         }
 
         if let Err(err) = rewrite_datatype_for_phase(
-            &mut ndt.inner,
+            &mut ndt.ty,
             PhaseRewrite::Unified,
             &types,
             &generated,
@@ -446,7 +446,7 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
             .variants
             .push((Cow::Borrowed("Deserialize"), deserialize_variant));
 
-        ndt.inner = DataType::Enum(wrapper);
+        ndt.ty = DataType::Enum(wrapper);
     });
     Ok(ResolvedTypes::from_resolved_types(out))
 }
@@ -597,7 +597,7 @@ fn select_split_type_variant<'a>(
     types: &'a Types,
     phase: Phase,
 ) -> Option<&'a NamedDataType> {
-    let DataType::Enum(wrapper) = &ndt.inner else {
+    let DataType::Enum(wrapper) = &ndt.ty else {
         return None;
     };
 
@@ -1706,7 +1706,7 @@ fn internal_tag_payload_compatibility(
             }
 
             let compatible =
-                internal_tag_payload_compatibility(&referenced.inner, original_types, seen);
+                internal_tag_payload_compatibility(&referenced.ty, original_types, seen);
             seen.remove(&key);
             compatible
         }
@@ -1990,7 +1990,7 @@ fn build_from_original(original: &NamedDataType, mode: PhaseRewrite) -> Result<N
 }
 
 fn rewrite_named_type_for_phase(ndt: &mut NamedDataType, mode: PhaseRewrite) -> Result<()> {
-    if let Some(rename) = renamed_type_name_for_phase(&ndt.inner, mode, ndt.name.as_ref())? {
+    if let Some(rename) = renamed_type_name_for_phase(&ndt.ty, mode, ndt.name.as_ref())? {
         ndt.name = Cow::Owned(rename);
     }
 
@@ -2004,7 +2004,7 @@ fn split_type_name(original: &NamedDataType, mode: PhaseRewrite) -> Result<Strin
         PhaseRewrite::Unified => return Ok(original.name.to_string()),
     };
 
-    let base_name = renamed_type_name_for_phase(&original.inner, mode, original.name.as_ref())?
+    let base_name = renamed_type_name_for_phase(&original.ty, mode, original.name.as_ref())?
         .unwrap_or_else(|| original.name.to_string());
 
     Ok(format!("{base_name}_{suffix}"))
@@ -2189,7 +2189,7 @@ mod tests {
         let named = reference
             .get(types.as_types())
             .expect("reference should resolve");
-        let DataType::Struct(strct) = &named.inner else {
+        let DataType::Struct(strct) = &named.ty else {
             panic!("expected struct type");
         };
         let specta::datatype::Fields::Named(fields) = &strct.fields else {

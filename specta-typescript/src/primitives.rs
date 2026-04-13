@@ -145,7 +145,7 @@ fn export_single_internal(
         s,
         exporter,
         types,
-        &ndt.inner,
+        &ndt.ty,
         vec![ndt.name.clone()],
         Some(ndt.name.as_ref()),
         indent,
@@ -206,7 +206,7 @@ fn append_jsdoc_properties(
     dt: &NamedDataType,
     indent: &str,
 ) -> Result<(), Error> {
-    match &dt.inner {
+    match &dt.ty {
         DataType::Struct(strct) => match &strct.fields {
             Fields::Unit => {}
             Fields::Unnamed(unnamed) => {
@@ -381,7 +381,7 @@ fn append_typedef_body(
         &mut typedef_ty,
         exporter,
         types,
-        &dt.inner,
+        &dt.ty,
         vec![dt.name.clone()],
         Some(dt.name.as_ref()),
         &datatype_prefix,
@@ -716,7 +716,7 @@ fn shallow_inline_datatype(
                     DataType::Enum(e) => e.variants.iter().filter(|(_, v)| !v.skip).count() == 0,
                     DataType::Reference(Reference::Named(r)) => r
                         .get(types)
-                        .is_some_and(|ndt| is_exhaustive(&ndt.inner, types)),
+                        .is_some_and(|ndt| is_exhaustive(&ndt.ty, types)),
                     DataType::Reference(Reference::Opaque(_)) => false,
                     _ => true,
                 }
@@ -1370,7 +1370,7 @@ fn map_dt(
                 DataType::Enum(e) => e.variants.iter().filter(|(_, v)| !v.skip).count() == 0,
                 DataType::Reference(Reference::Named(r)) => {
                     if let Some(ndt) = r.get(types) {
-                        is_exhaustive(&ndt.inner, types)
+                        is_exhaustive(&ndt.ty, types)
                     } else {
                         false
                     }
@@ -2039,7 +2039,7 @@ fn reference_named_dt(
             } else {
                 INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
                 let combined_generics = merged_generics(generics, &r.generics);
-                let resolved = resolve_generics_in_datatype(&ndt.inner, &combined_generics);
+                let resolved = resolve_generics_in_datatype(&ndt.ty, &combined_generics);
                 let result = datatype(
                     s,
                     exporter,

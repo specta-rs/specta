@@ -51,7 +51,7 @@ impl NamedReference {
         let ndt = self.get(types)?;
         self.instance
             .and_then(|instance| ndt.instances.get(instance))
-            .or(Some(&ndt.inner))
+            .or(Some(&ndt.ty))
     }
 
     /// Get whether this reference should be inlined

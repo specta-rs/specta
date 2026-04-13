@@ -7,7 +7,7 @@ use specta::{
 
 /// Convert a NamedDataType to a JSON Schema definition
 pub fn export(js: &JsonSchema, types: &Types, ndt: &NamedDataType) -> Result<Value, Error> {
-    datatype_to_schema(js, types, &ndt.inner, true)
+    datatype_to_schema(js, types, &ndt.ty, true)
 }
 
 /// Convert a DataType to a JSON Schema, optionally as a reference
@@ -80,7 +80,7 @@ pub fn datatype_to_schema(
                     if is_definition {
                         // When exporting a definition, inline it
                         if let Some(referenced_ndt) = r.get(types) {
-                            datatype_to_schema(js, types, &referenced_ndt.inner, true)
+                            datatype_to_schema(js, types, &referenced_ndt.ty, true)
                         } else {
                             Err(Error::InvalidReference(
                                 "Reference not found in Types".to_string(),

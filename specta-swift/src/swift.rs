@@ -296,7 +296,7 @@ fn needs_duration_helper(types: &Types) -> bool {
             return true;
         }
         // Also check if any struct fields contain Duration
-        if let DataType::Struct(s) = &ndt.inner
+        if let DataType::Struct(s) = &ndt.ty
             && let Fields::Named(fields) = &s.fields
         {
             for (_, field) in &fields.fields {

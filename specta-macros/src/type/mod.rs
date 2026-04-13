@@ -342,7 +342,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                                 ndt.module_path = Cow::Borrowed(module_path!());
                                 #shadow_generic_aliases
                                 #generics_for_ndt_with_defaults
-                                ndt.inner = #dt_expr;
+                                ndt.ty = #dt_expr;
                             }
                         )
                     )
