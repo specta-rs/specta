@@ -44,10 +44,10 @@ macro_rules! _impl_ndt_as {
                 fn definition(types: &mut Types) -> DataType {
                     // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
                     static SENTINEL: &str = stringify!($head::$( $tail )::+<$generic, $const_generic>);
-                    static GENERICS: &[(datatype::GenericReference, ::std::borrow::Cow<'static, str>)] = &[
-                        (
-                            datatype::GenericReference::new::<generics::$generic>(),
+                    static GENERICS: &[datatype::Generic] = &[
+                        datatype::Generic::new::<generics::$generic>(
                             ::std::borrow::Cow::Borrowed(stringify!($generic)),
+                            None,
                         ),
                     ];
 
@@ -57,6 +57,7 @@ macro_rules! _impl_ndt_as {
                             datatype::GenericReference::new::<generics::$generic>(),
                             <$generic as Type>::definition(types),
                         )],
+                        true,
                         true,
                         types,
                         SENTINEL,
@@ -74,9 +75,9 @@ macro_rules! _impl_ndt_as {
                                 }
                             };
 
-                            ndt.set_name(::std::borrow::Cow::Owned(type_name));
-                            ndt.set_module_path(::std::borrow::Cow::Owned(module_path));
-                            ndt.inner = <$ty2 as Type>::definition(types);
+                            ndt.name = ::std::borrow::Cow::Owned(type_name);
+                            ndt.module_path = ::std::borrow::Cow::Owned(module_path);
+                            ndt.ty = <$ty2 as Type>::definition(types);
                         },
                     ))
                 }
@@ -91,11 +92,12 @@ macro_rules! _impl_ndt_as {
                 fn definition(types: &mut Types) -> DataType {
                     // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
                     static SENTINEL: &str = stringify!($head::$( $tail )::+<$const_generic>);
-                    static GENERICS: &[(datatype::GenericReference, ::std::borrow::Cow<'static, str>)] = &[];
+                    static GENERICS: &[datatype::Generic] = &[];
 
                     DataType::Reference(datatype::NamedDataType::init_with_sentinel(
                         GENERICS,
                         vec![],
+                        true,
                         true,
                         types,
                         SENTINEL,
@@ -113,9 +115,9 @@ macro_rules! _impl_ndt_as {
                                 }
                             };
 
-                            ndt.set_name(::std::borrow::Cow::Owned(type_name));
-                            ndt.set_module_path(::std::borrow::Cow::Owned(module_path));
-                            ndt.inner = <$ty2 as Type>::definition(types);
+                            ndt.name = ::std::borrow::Cow::Owned(type_name);
+                            ndt.module_path = ::std::borrow::Cow::Owned(module_path);
+                            ndt.ty = <$ty2 as Type>::definition(types);
                         },
                     ))
                 }
@@ -131,10 +133,10 @@ macro_rules! _impl_ndt_as {
                 fn definition(types: &mut Types) -> DataType {
                     // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
                     static SENTINEL: &str = stringify!($head::$( $tail )::+<[$generic; $const_generic]>);
-                    static GENERICS: &[(datatype::GenericReference, ::std::borrow::Cow<'static, str>)] = &[
-                        (
-                            datatype::GenericReference::new::<generics::$generic>(),
+                    static GENERICS: &[datatype::Generic] = &[
+                        datatype::Generic::new::<generics::$generic>(
                             ::std::borrow::Cow::Borrowed(stringify!($generic)),
+                            None,
                         ),
                     ];
 
@@ -144,6 +146,7 @@ macro_rules! _impl_ndt_as {
                             datatype::GenericReference::new::<generics::$generic>(),
                             <$generic as Type>::definition(types),
                         )],
+                        true,
                         true,
                         types,
                         SENTINEL,
@@ -161,9 +164,9 @@ macro_rules! _impl_ndt_as {
                                 }
                             };
 
-                            ndt.set_name(::std::borrow::Cow::Owned(type_name));
-                            ndt.set_module_path(::std::borrow::Cow::Owned(module_path));
-                            ndt.inner = <$ty2 as Type>::definition(types);
+                            ndt.name = ::std::borrow::Cow::Owned(type_name);
+                            ndt.module_path = ::std::borrow::Cow::Owned(module_path);
+                            ndt.ty = <$ty2 as Type>::definition(types);
                         },
                     ))
                 }
@@ -179,7 +182,7 @@ macro_rules! _impl_ndt_as {
                 } {
                     inline: true;
                     build: |types, ndt| {
-                        ndt.inner = <$ty2 as Type>::definition(types);
+                        ndt.ty = <$ty2 as Type>::definition(types);
                     }
                 }
             )*
@@ -201,11 +204,11 @@ macro_rules! _impl_ndt {
                 fn definition(types: &mut Types) -> DataType {
                     // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
                     static SENTINEL: &str = stringify!($type_path);
-                    static GENERICS: &[(datatype::GenericReference, ::std::borrow::Cow<'static, str>)] = &[
+                    static GENERICS: &[datatype::Generic] = &[
                         $($(
-                            (
-                                datatype::GenericReference::new::<generics::$generic>(),
+                            datatype::Generic::new::<generics::$generic>(
                                 ::std::borrow::Cow::Borrowed(stringify!($generic)),
+                                None,
                             )
                         ),*)?
                     ];
@@ -220,6 +223,7 @@ macro_rules! _impl_ndt {
                             ),*)?
                         ],
                         $inline,
+                        false,
                         types,
                         SENTINEL,
                         |$types, $ndt| {
@@ -237,8 +241,8 @@ macro_rules! _impl_ndt {
                                  }
                             };
 
-                            $ndt.set_name(::std::borrow::Cow::Owned(type_name));
-                            $ndt.set_module_path(::std::borrow::Cow::Owned(module_path));
+                            $ndt.name = ::std::borrow::Cow::Owned(type_name);
+                            $ndt.module_path = ::std::borrow::Cow::Owned(module_path);
 
                             $build
                         },

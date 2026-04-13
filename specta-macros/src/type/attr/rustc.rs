@@ -134,12 +134,7 @@ impl RustCAttr {
                     None => quote!(None),
                 };
 
-                quote!({
-                    let mut deprecated = datatype::Deprecated::new();
-                    deprecated.set_since(#since);
-                    deprecated.set_note(#note);
-                    Some(deprecated)
-                })
+                quote!(Some(datatype::Deprecated::with_since_note(#since, #note.unwrap_or_default())))
             }
             None => quote!(None),
         }

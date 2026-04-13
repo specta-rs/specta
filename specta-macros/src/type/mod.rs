@@ -5,7 +5,7 @@ use quote::{ToTokens, format_ident, quote};
 use r#struct::parse_struct;
 use syn::{Data, DeriveInput, GenericParam, parse};
 
-use crate::utils::{parse_attrs, unraw_raw_ident};
+use crate::utils::{AttrExtract, parse_attrs, unraw_raw_ident};
 
 use self::generics::{
     add_type_to_where_clause, all_type_param_idents, generics_with_ident_and_bounds_only,
@@ -164,8 +164,8 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             {
                 let mut e = #dt_expr;
                 match &mut e {
-                    datatype::DataType::Struct(s) => *s.attributes_mut() = #container_runtime_attrs,
-                    datatype::DataType::Enum(en) => *en.attributes_mut() = #container_runtime_attrs,
+                    datatype::DataType::Struct(s) => s.attributes = #container_runtime_attrs,
+                    datatype::DataType::Enum(en) => en.attributes = #container_runtime_attrs,
                     _ => unreachable!("specta derive generated non-container datatype"),
                 }
                 e
@@ -175,7 +175,11 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let bounds = generics_with_ident_and_bounds_only(generics);
     let type_args = generics_with_ident_only(generics);
-    let used_generic_types = used_type_params(generics, data, container_attrs.r#type.as_ref());
+    let has_const_param = generics
+        .params
+        .iter()
+        .any(|param| matches!(param, GenericParam::Const(_)));
+    let used_generic_types = used_type_params(generics, data, container_attrs.r#type.as_ref())?;
     let all_generic_type_idents = all_type_param_idents(generics);
     let used_direct_generics =
         used_direct_type_params(&used_generic_types, &all_generic_type_idents);
@@ -211,31 +215,75 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         })
         .unzip();
 
-    let (generics_for_ndt, generics_for_ref): (Vec<_>, Vec<_>) = generics
+    let generics_for_ndt_triplets = generics
         .params
         .iter()
-        .filter_map(|param| match param {
-            GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
+        .map(|param| match param {
+            GenericParam::Lifetime(_) | GenericParam::Const(_) => Ok(None),
             GenericParam::Type(t) => {
                 let i = &t.ident;
                 let placeholder_ident = format_ident!("PLACEHOLDER_{}", t.ident);
-                if !used_direct_generics.iter().any(|used| used == i) {
-                    return None;
+
+                let skip_default = parse_attrs(&t.attrs)?
+                    .extract("specta", "skip_default_generic")
+                    .map(|attr| attr.parse_bool().unwrap_or(true))
+                    .unwrap_or(false);
+
+                if !used_direct_generics.iter().any(|used| used == i) && !skip_default {
+                    return Ok(None);
                 }
+
                 let i_str = i.to_string();
-                Some((
-                    quote!((
-                        #crate_ref::datatype::GenericReference::new::<#placeholder_ident>(),
-                        Cow::Borrowed(#i_str),
-                    )),
+                let default = match (&t.default, skip_default) {
+                    (_, true) | (None, false) => quote!(None),
+                    (Some(default), false) => {
+                        quote!(Some(<#default as #crate_ref::Type>::definition(types)))
+                    }
+                };
+                let reference = used_direct_generics.iter().any(|used| used == i).then(|| {
                     quote!((
                         #crate_ref::datatype::GenericReference::new::<#placeholder_ident>(),
                         <#i as #crate_ref::Type>::definition(types),
+                    ))
+                });
+                Ok(Some((
+                    quote!(#crate_ref::datatype::Generic::new::<#placeholder_ident>(
+                        Cow::Borrowed(#i_str),
+                        None,
                     )),
-                ))
+                    quote!(#crate_ref::datatype::Generic::new::<#placeholder_ident>(
+                        Cow::Borrowed(#i_str),
+                        #default,
+                    )),
+                    reference,
+                )))
             }
         })
-        .unzip();
+        .collect::<syn::Result<Vec<_>>>()?
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+
+    let generics_for_ndt = generics_for_ndt_triplets
+        .iter()
+        .map(|(generic, _, _)| generic.clone())
+        .collect::<Vec<_>>();
+    let generics_for_ndt_with_defaults = generics_for_ndt_triplets
+        .iter()
+        .map(|(_, generic, _)| generic.clone())
+        .collect::<Vec<_>>();
+    let generics_for_ref = generics_for_ndt_triplets
+        .into_iter()
+        .filter_map(|(_, _, generic)| generic)
+        .collect::<Vec<_>>();
+
+    let generics_for_ndt_with_defaults = if generics_for_ndt_with_defaults.is_empty() {
+        None
+    } else {
+        Some(quote! {
+            ndt.generics = Cow::Owned(vec![#(#generics_for_ndt_with_defaults),*]);
+        })
+    };
 
     let collect = (cfg!(feature = "DO_NOT_USE_collect") && container_attrs.collect.unwrap_or(true))
         .then(|| {
@@ -278,24 +326,23 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                     #(#generic_placeholders)*
 
                     static SENTINEL: &str = concat!(module_path!(), "::", stringify!(#raw_ident));
-                    static GENERICS: &[(datatype::GenericReference, Cow<'static, str>)] = &[#(#generics_for_ndt),*];
+                    static GENERICS: &[datatype::Generic] = &[#(#generics_for_ndt),*];
                     datatype::DataType::Reference(
                         datatype::NamedDataType::init_with_sentinel(
                             GENERICS,
                             vec![#(#generics_for_ref),*],
                             #inline,
+                            #has_const_param,
                             types,
                             SENTINEL,
                             |types, ndt| {
-                                ndt.set_name(Cow::Borrowed(#name));
-                                ndt.set_docs(Cow::Borrowed(#comments));
-                                ndt.set_deprecated(#deprecated);
-                                ndt.set_module_path(Cow::Borrowed(module_path!()));
-                                ndt.set_ty({
-                                    #shadow_generic_aliases
-
-                                    #dt_expr
-                                });
+                                ndt.name = Cow::Borrowed(#name);
+                                ndt.docs = Cow::Borrowed(#comments);
+                                ndt.deprecated = #deprecated;
+                                ndt.module_path = Cow::Borrowed(module_path!());
+                                #shadow_generic_aliases
+                                #generics_for_ndt_with_defaults
+                                ndt.ty = #dt_expr;
                             }
                         )
                     )

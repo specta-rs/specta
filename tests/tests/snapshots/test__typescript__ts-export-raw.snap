@@ -51,6 +51,11 @@ export type BoxedInner = {
 
 export type BracedStruct = string;
 
+export type ChainedGenericDefault<T = string, U = T> = {
+	first: T,
+	second: U,
+};
+
 /**
  *  Some triple-slash comment
  *  Some more triple-slash comment
@@ -82,6 +87,18 @@ export type CommentedStruct = {
 	 *  Some more triple-slash comment
 	 */
 	a: number,
+};
+
+export type ConstGenericInConstContainer = {
+	data: number[],
+	a: number[],
+	d: [number, number],
+};
+
+export type ConstGenericInNonConstContainer = {
+	data: [number],
+	a: [number, number],
+	d: [number, number],
 };
 
 export type Container1 = {
@@ -306,6 +323,18 @@ export type GenericAutoBound2<T> = {
 	values: T[],
 };
 
+export type GenericDefault<T = string> = {
+	value: T,
+};
+
+export type GenericDefaultSkipped<T> = {
+	value: T,
+};
+
+export type GenericDefaultSkippedNonType<T> = {
+	value: number,
+};
+
 export type GenericFlattened<T> = {
 	generic_flattened: T,
 };
@@ -339,6 +368,20 @@ export type GenericType<T> = "Undefined" | T;
 
 export type HasGenericAlias = { [key in number]: string };
 
+export type InlineConstGenericContainer = {
+	b: {
+		data: [number, number],
+		a: [number, number],
+		d: [number, number, number],
+	},
+	c: {
+		data: [number, number, number],
+		a: [number, number],
+		d: [number, number, number],
+	},
+	d: [number, number],
+};
+
 export type InlineEnumField = {
 	a: string,
 };
@@ -359,6 +402,29 @@ export type InlineOptionalType = {
 	optional_field: {
 		a: string,
 	} | null,
+};
+
+export type InlineRecursiveConstGeneric = {
+	data: number[],
+	a: number[],
+	d: [number, number, number],
+	e: InlineRecursiveConstGeneric,
+};
+
+export type InlineRecursiveConstGenericContainer = {
+	b: {
+		data: [number, number],
+		a: [number, number],
+		d: [number, number, number],
+		e: InlineRecursiveConstGeneric,
+	},
+	c: {
+		data: [number, number, number],
+		a: [number, number],
+		d: [number, number, number],
+		e: InlineRecursiveConstGeneric,
+	},
+	d: [number, number],
 };
 
 export type InlineStruct = {
@@ -459,6 +525,18 @@ export type MyEnumExternal = { inner: First };
 export type MyEnumTagged = { inner: First };
 
 export type MyEnumUntagged = { inner: First };
+
+export type NamedConstGeneric = {
+	data: number[],
+	a: number[],
+	d: [number, number],
+};
+
+export type NamedConstGenericContainer = {
+	a: NamedConstGeneric,
+	b: NamedConstGeneric,
+	d: [number, number],
+};
 
 export type NestedEnum = string | number;
 
@@ -741,7 +819,19 @@ export type Primitives = {
 	"InlineGenericNested<String>": [string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | string | { value: string }],
 	"InlineFlattenGenericsG<()>": InlineFlattenGenericsG<null>,
 	InlineFlattenGenerics: InlineFlattenGenerics,
+	GenericDefault: GenericDefault,
+	ChainedGenericDefault: ChainedGenericDefault,
+	"ChainedGenericDefault<String, String>": ChainedGenericDefault,
+	"ChainedGenericDefault<i32>": ChainedGenericDefault<number, number>,
+	"ChainedGenericDefault<String, i32>": ChainedGenericDefault<string, number>,
+	GenericDefaultSkipped: GenericDefaultSkipped<string>,
+	GenericDefaultSkippedNonType: GenericDefaultSkippedNonType<unknown>,
 	GenericParameterOrderPreserved: GenericParameterOrderPreserved,
+	ConstGenericInNonConstContainer: ConstGenericInNonConstContainer,
+	ConstGenericInConstContainer: ConstGenericInConstContainer,
+	NamedConstGenericContainer: NamedConstGenericContainer,
+	InlineConstGenericContainer: InlineConstGenericContainer,
+	InlineRecursiveConstGenericContainer: InlineRecursiveConstGenericContainer,
 	TestCollectionRegister: TestCollectionRegister,
 	TestCollectionRegister: TestCollectionRegister,
 };

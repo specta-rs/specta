@@ -581,8 +581,76 @@ InlineFlattenGenerics: {
 		t: string,
 	},
 } & (InlineFlattenGenericsG<string>)
+GenericDefault: {
+	value: string,
+}
+ChainedGenericDefault: {
+	first: string,
+	second: string,
+}
+ChainedGenericDefault<String, String>: {
+	first: string,
+	second: string,
+}
+ChainedGenericDefault<i32>: {
+	first: number,
+	second: number,
+}
+ChainedGenericDefault<String, i32>: {
+	first: string,
+	second: number,
+}
+GenericDefaultSkipped: {
+	value: string,
+}
+GenericDefaultSkippedNonType: {
+	value: number,
+}
 GenericParameterOrderPreserved: {
 	pair: Pair<number, string>,
+}
+ConstGenericInNonConstContainer: {
+	data: [number],
+	a: [number, number],
+	d: [number, number],
+}
+ConstGenericInConstContainer: {
+	data: [number],
+	a: [number, number],
+	d: [number, number],
+}
+NamedConstGenericContainer: {
+	a: NamedConstGeneric,
+	b: NamedConstGeneric,
+	d: [number, number],
+}
+InlineConstGenericContainer: {
+	b: {
+		data: [number, number],
+		a: [number, number],
+		d: [number, number, number],
+	},
+	c: {
+		data: [number, number, number],
+		a: [number, number],
+		d: [number, number, number],
+	},
+	d: [number, number],
+}
+InlineRecursiveConstGenericContainer: {
+	b: {
+		data: [number, number],
+		a: [number, number],
+		d: [number, number, number],
+		e: InlineRecursiveConstGeneric,
+	},
+	c: {
+		data: [number, number, number],
+		a: [number, number],
+		d: [number, number, number],
+		e: InlineRecursiveConstGeneric,
+	},
+	d: [number, number],
 }
 TestCollectionRegister: never
 TestCollectionRegister: never

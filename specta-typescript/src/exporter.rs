@@ -298,10 +298,10 @@ impl Exporter {
             files: &mut HashMap<PathBuf, String>,
         ) -> Result<bool, Error> {
             module.types.sort_by(|a, b| {
-                a.name()
-                    .cmp(b.name())
-                    .then(a.module_path().cmp(b.module_path()))
-                    .then(a.location().cmp(&b.location()))
+                a.name
+                    .cmp(&b.name)
+                    .then(a.module_path.cmp(&b.module_path))
+                    .then(a.location.cmp(&b.location))
             });
             let (rendered_types_result, referenced_types) =
                 references::with_module_path(module.module_path.as_ref(), || {
@@ -321,10 +321,7 @@ impl Exporter {
 
             let import_paths = referenced_types
                 .into_iter()
-                .filter_map(|r| {
-                    r.get(types)
-                        .map(|ndt| ndt.module_path().as_ref().to_string())
-                })
+                .filter_map(|r| r.get(types).map(|ndt| ndt.module_path.as_ref().to_string()))
                 .filter(|module_path| module_path != module.module_path.as_ref())
                 .collect::<BTreeSet<_>>();
             if !import_paths.is_empty() {
@@ -420,8 +417,7 @@ impl Exporter {
                     let import_paths = runtime_references
                         .into_iter()
                         .filter_map(|r| {
-                            r.get(types)
-                                .map(|ndt| ndt.module_path().as_ref().to_string())
+                            r.get(types).map(|ndt| ndt.module_path.as_ref().to_string())
                         })
                         .filter(|module_path| !module_path.is_empty())
                         .collect::<BTreeSet<_>>();
@@ -609,7 +605,7 @@ fn build_module_graph(types: &Types) -> Module<'_> {
             module_path: Default::default(),
         },
         |mut ns, ndt| {
-            let path = ndt.module_path();
+            let path = &ndt.module_path;
 
             if path.is_empty() {
                 ns.types.push(ndt);
@@ -693,10 +689,10 @@ fn render_types(
 
                     // Types
                     module.types.sort_by(|a, b| {
-                        a.name()
-                            .cmp(b.name())
-                            .then(a.module_path().cmp(b.module_path()))
-                            .then(a.location().cmp(&b.location()))
+                        a.name
+                            .cmp(&b.name)
+                            .then(a.module_path.cmp(&b.module_path))
+                            .then(a.location.cmp(&b.location))
                     });
                     render_flat_types(
                         s,
@@ -731,7 +727,7 @@ fn render_types(
                             .types
                             .iter()
                             .filter(|ndt| ndt.requires_reference(types))
-                            .map(|ndt| ndt.name().as_ref()),
+                            .map(|ndt| ndt.name.as_ref()),
                     )
                 {
                     reexports.push_str("export import ");
@@ -776,12 +772,8 @@ fn render_flat_types<'a>(
         .filter(|ndt| ndt.requires_reference(types))
         .map(|ndt| {
             let export_name = exported_type_name(exporter, ndt);
-            if let Some(other) = exports.insert(export_name.to_string(), ndt.location()) {
-                return Err(Error::duplicate_type_name(
-                    export_name,
-                    ndt.location(),
-                    other,
-                ));
+            if let Some(other) = exports.insert(export_name.to_string(), ndt.location) {
+                return Err(Error::duplicate_type_name(export_name, ndt.location, other));
             }
 
             Ok(ndt)
@@ -891,12 +883,12 @@ fn cleanup_stale_files(root: &Path, current_files: &HashMap<PathBuf, String>) ->
 fn exported_type_name(exporter: &Exporter, ndt: &NamedDataType) -> Cow<'static, str> {
     match exporter.layout {
         Layout::ModulePrefixedName => {
-            let mut s = ndt.module_path().split("::").collect::<Vec<_>>().join("_");
+            let mut s = ndt.module_path.split("::").collect::<Vec<_>>().join("_");
             s.push('_');
-            s.push_str(ndt.name());
+            s.push_str(&ndt.name);
             Cow::Owned(s)
         }
-        _ => ndt.name().clone(),
+        _ => ndt.name.clone(),
     }
 }
 

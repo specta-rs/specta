@@ -160,11 +160,11 @@ fn unnamed_fields_datatype(
                 None,
                 "",
                 generics,
-                force_inline || field.inline(),
+                force_inline || field.inline,
             )?;
             s.push_str(&inner_comments(
-                field.deprecated(),
-                field.docs(),
+                field.deprecated.as_ref(),
+                &field.docs,
                 v,
                 true,
                 prefix,
@@ -189,11 +189,11 @@ fn unnamed_fields_datatype(
                     None,
                     "",
                     generics,
-                    force_inline || field.inline(),
+                    force_inline || field.inline,
                 )?;
                 s.push_str(&inner_comments(
-                    field.deprecated(),
-                    field.docs(),
+                    field.deprecated.as_ref(),
+                    &field.docs,
                     v,
                     true,
                     prefix,
@@ -214,7 +214,7 @@ pub(crate) fn tuple_datatype(
     types: &Types,
     generics: &[(GenericReference, DataType)],
 ) -> Output {
-    match &tuple.elements() {
+    match tuple.elements.as_slice() {
         [] => Ok(NULL.to_string()),
         tys => Ok(format!(
             "[{}]",
@@ -238,14 +238,14 @@ pub(crate) fn struct_datatype(
     prefix: &str,
     generics: &[(GenericReference, DataType)],
 ) -> Result<()> {
-    match &strct.fields() {
+    match &strct.fields {
         Fields::Unit => s.push_str(NULL),
         Fields::Unnamed(unnamed) => unnamed_fields_datatype(
             ctx,
             &unnamed
-                .fields()
+                .fields
                 .iter()
-                .filter_map(|field| field.ty().map(|ty| (field, ty)))
+                .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
                 .collect::<Vec<_>>(),
             types,
             s,
@@ -255,9 +255,9 @@ pub(crate) fn struct_datatype(
         )?,
         Fields::Named(named) => {
             let fields = named
-                .fields()
+                .fields
                 .iter()
-                .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+                .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
                 .collect::<Vec<_>>();
 
             if fields.is_empty() {
@@ -271,7 +271,7 @@ pub(crate) fn struct_datatype(
             }
 
             let (flattened, non_flattened): (Vec<_>, Vec<_>) =
-                fields.iter().partition(|(_, (f, _))| f.flatten());
+                fields.iter().partition(|(_, (f, _))| f.flatten);
 
             let mut flattened_sections = flattened
                 .into_iter()
@@ -286,12 +286,12 @@ pub(crate) fn struct_datatype(
                         None,
                         "",
                         generics,
-                        field.inline(),
+                        field.inline,
                     )
                     .map(|_| {
                         inner_comments(
-                            field.deprecated(),
-                            field.docs(),
+                            field.deprecated.as_ref(),
+                            &field.docs,
                             format!("({s})"),
                             true,
                             prefix,
@@ -321,15 +321,15 @@ pub(crate) fn struct_datatype(
                     )?;
 
                     let docs = field
-                        .docs()
+                        .docs
                         .trim()
                         .is_empty()
                         .then(|| inline_reference_docs(types, (field, ty), false))
                         .flatten()
-                        .unwrap_or(field.docs());
+                        .unwrap_or(&field.docs);
 
                     Ok(inner_comments(
-                        field.deprecated(),
+                        field.deprecated.as_ref(),
                         docs,
                         other,
                         false,
@@ -378,17 +378,17 @@ fn enum_variant_datatype(
     generics: &[(GenericReference, DataType)],
     ty_override: Option<VariantTypeOverride<'_>>,
 ) -> Result<Option<String>> {
-    match &variant.fields() {
+    match &variant.fields {
         Fields::Unit => Ok(Some(sanitise_key(name, true).to_string())),
         Fields::Named(obj) => {
             let all_fields = obj
-                .fields()
+                .fields
                 .iter()
-                .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+                .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
                 .collect::<Vec<_>>();
 
             let (flattened, non_flattened): (Vec<_>, Vec<_>) =
-                all_fields.iter().partition(|(_, (f, _))| f.flatten());
+                all_fields.iter().partition(|(_, (f, _))| f.flatten);
 
             let field_sections = flattened
                 .into_iter()
@@ -403,12 +403,12 @@ fn enum_variant_datatype(
                         None,
                         "",
                         generics,
-                        field.inline(),
+                        field.inline,
                     )
                     .map(|_| {
                         inner_comments(
-                            field.deprecated(),
-                            field.docs(),
+                            field.deprecated.as_ref(),
+                            &field.docs,
                             format!("({s})"),
                             true,
                             prefix,
@@ -450,15 +450,15 @@ fn enum_variant_datatype(
                         )?;
 
                         let docs = field
-                            .docs()
+                            .docs
                             .trim()
                             .is_empty()
                             .then(|| inline_reference_docs(types, (field, ty), false))
                             .flatten()
-                            .unwrap_or(field.docs());
+                            .unwrap_or(&field.docs);
 
                         Ok(inner_comments(
-                            field.deprecated(),
+                            field.deprecated.as_ref(),
                             docs,
                             other,
                             true,
@@ -482,9 +482,9 @@ fn enum_variant_datatype(
         }
         Fields::Unnamed(obj) => {
             let fields = obj
-                .fields()
+                .fields
                 .iter()
-                .filter_map(|field| field.ty().map(|ty| (field, ty)))
+                .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
                 .map(|(field, ty)| {
                     let mut s = String::new();
                     crate::primitives::datatype_with_inline_attr(
@@ -496,7 +496,7 @@ fn enum_variant_datatype(
                         None,
                         "",
                         generics,
-                        field.inline(),
+                        field.inline,
                     )
                     .map(|_| s)
                 })
@@ -505,7 +505,7 @@ fn enum_variant_datatype(
             Ok(match &fields[..] {
                 [] => {
                     // If the actual length is 0, we know `#[serde(skip)]` was not used.
-                    if obj.fields().is_empty() {
+                    if obj.fields.is_empty() {
                         Some("[]".to_string())
                     } else {
                         // We wanna render `{tag}` not `{tag}: {type}` (where `{type}` is what this function returns)
@@ -513,7 +513,7 @@ fn enum_variant_datatype(
                     }
                 }
                 // If the actual length is 1, we know `#[serde(skip)]` was not used.
-                [field] if obj.fields().len() == 1 => Some(field.to_string()),
+                [field] if obj.fields.len() == 1 => Some(field.to_string()),
                 fields => Some(format!("[{}]", fields.join(", "))),
             })
         }
@@ -586,15 +586,15 @@ fn analyze_discriminator(
 }
 
 fn variant_discriminator(variant: &Variant) -> Option<(String, DiscriminatorValue)> {
-    let Fields::Named(named) = variant.fields() else {
+    let Fields::Named(named) = &variant.fields else {
         return None;
     };
 
     let (name, field) = named
-        .fields()
+        .fields
         .iter()
-        .find(|(_, field)| !field.flatten() && !field.optional())?;
-    let ty = field.ty()?;
+        .find(|(_, field)| !field.flatten && !field.optional)?;
+    let ty = field.ty.as_ref()?;
 
     if matches!(ty, DataType::Primitive(specta::datatype::Primitive::str)) {
         return Some((name.to_string(), DiscriminatorValue::String));
@@ -609,14 +609,14 @@ fn string_literal_datatype_value(ty: &DataType) -> Option<String> {
         return None;
     };
 
-    let mut variants = enm.variants().iter();
+    let mut variants = enm.variants.iter();
     let (name, variant) = variants.next()?;
 
     if variants.next().is_some() {
         return None;
     }
 
-    if !matches!(variant.fields(), Fields::Unit) {
+    if !matches!(&variant.fields, Fields::Unit) {
         return None;
     }
 
@@ -638,14 +638,14 @@ fn exclude_known_literals_type(literals: &[String]) -> Option<String> {
 }
 
 fn untagged_strict_keys(variant: &Variant) -> Option<BTreeSet<String>> {
-    match variant.fields() {
+    match &variant.fields {
         Fields::Named(obj) => {
             let all_fields = obj
-                .fields()
+                .fields
                 .iter()
-                .filter_map(|(name, field)| field.ty().map(|ty| (name, (field, ty))))
+                .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
                 .collect::<Vec<_>>();
-            if all_fields.iter().any(|(_, (field, _))| field.flatten()) {
+            if all_fields.iter().any(|(_, (field, _))| field.flatten) {
                 return None;
             }
 
@@ -698,14 +698,14 @@ pub(crate) fn enum_datatype(
     prefix: &str,
     generics: &[(GenericReference, DataType)],
 ) -> Result<()> {
-    if e.variants().is_empty() {
+    if e.variants.is_empty() {
         return Ok(write!(s, "{NEVER}")?);
     }
 
     let filtered_variants = e
-        .variants()
+        .variants
         .iter()
-        .filter(|(_, variant)| !variant.skip())
+        .filter(|(_, variant)| !variant.skip)
         .collect::<Vec<_>>();
 
     let discriminator = analyze_discriminator(&filtered_variants);
@@ -756,8 +756,8 @@ pub(crate) fn enum_datatype(
         .zip(rendered_variants)
         .map(|((_, variant), rendered)| {
             inner_comments(
-                variant.deprecated(),
-                variant.docs(),
+                variant.deprecated.as_ref(),
+                &variant.docs,
                 rendered.value,
                 true,
                 prefix,
@@ -795,7 +795,7 @@ fn object_field_to_ts(
     let field_name_safe = sanitise_key(key, false);
 
     // https://github.com/specta-rs/rspc/issues/100#issuecomment-1373092211
-    let (key, ty) = match field.optional() {
+    let (key, ty) = match field.optional {
         true => (format!("{field_name_safe}?").into(), ty),
         false => (field_name_safe, ty),
     };
@@ -813,7 +813,7 @@ fn object_field_to_ts(
                 None,
                 prefix,
                 generics,
-                force_inline || field.inline(),
+                force_inline || field.inline,
             )?;
             value
         }
@@ -831,13 +831,13 @@ fn inline_reference_docs<'a>(
         return None;
     };
 
-    if !(force_inline || field.inline() || r.inline()) {
+    if !(force_inline || field.inline || r.inline()) {
         return None;
     }
 
     r.get(types)
-        .filter(|ndt| !ndt.docs().trim().is_empty())
-        .map(|ndt| ndt.docs().as_ref())
+        .filter(|ndt| !ndt.docs.trim().is_empty())
+        .map(|ndt| ndt.docs.as_ref())
 }
 
 /// sanitise a string to be a valid Typescript key
@@ -979,8 +979,8 @@ pub(crate) fn escape_jsdoc_text(text: &str) -> Cow<'_, str> {
 }
 
 pub(crate) fn deprecated_details(typ: &Deprecated) -> Option<String> {
-    let note = typ.note().map(|v| v.trim()).filter(|v| !v.is_empty());
-    let since = typ.since().map(|v| v.trim()).filter(|v| !v.is_empty());
+    let note = typ.note.as_deref().map(str::trim).filter(|v| !v.is_empty());
+    let since: Option<&str> = None;
 
     match (note, since) {
         (Some(note), Some(since)) => Some(format!("{note} since {since}")),

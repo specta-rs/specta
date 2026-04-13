@@ -86,6 +86,13 @@ struct SkipSerializingIfOnly {
 
 #[derive(Type, Serialize, Deserialize)]
 #[specta(collect = false)]
+struct FieldPhaseSpecificRename {
+    #[serde(rename(serialize = "serialized_value", deserialize = "deserialized_value"))]
+    value: String,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+#[specta(collect = false)]
 enum VariantCodecNoOverride {
     #[serde(
         serialize_with = "codec_variant::serialize",
@@ -190,7 +197,7 @@ fn type_names(types: &ResolvedTypes) -> Vec<String> {
     types
         .as_types()
         .into_unsorted_iter()
-        .map(|ndt| ndt.name().to_string())
+        .map(|ndt| ndt.name.to_string())
         .collect()
 }
 
@@ -297,6 +304,16 @@ fn skip_serializing_if_requires_phases() {
 
     specta_serde::apply_phases(Types::default().register::<SkipSerializingIfOnly>())
         .expect("apply_phases should accept skip_serializing_if");
+}
+
+#[test]
+fn field_phase_specific_rename_requires_phases() {
+    let err = specta_serde::apply(Types::default().register::<FieldPhaseSpecificRename>())
+        .expect_err("field-level phase-specific renames should require apply_phases");
+    assert!(err.to_string().contains("Incompatible field rename"));
+
+    specta_serde::apply_phases(Types::default().register::<FieldPhaseSpecificRename>())
+        .expect("apply_phases should accept field-level phase-specific renames");
 }
 
 #[test]

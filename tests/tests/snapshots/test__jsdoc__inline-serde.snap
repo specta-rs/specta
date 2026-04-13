@@ -83,6 +83,13 @@ expression: output
 	* @typedef {string} BracedStruct
 	* @property {string} "0"
 	*
+	* @typedef {{
+	*		first: T,
+	*		second: U,
+	*	}} ChainedGenericDefault<T = string, U = T>
+	* @property {T} first
+	* @property {U} second
+	*
 	*  Some triple-slash comment
 	*  Some more triple-slash comment
 	*
@@ -133,6 +140,24 @@ expression: output
 	*		a: number,
 	*	}} CommentedStruct
 	* @property {number} a - Some triple-slash comment Some more triple-slash comment
+	*
+	* @typedef {{
+	*		data: number[],
+	*		a: number[],
+	*		d: [number, number],
+	*	}} ConstGenericInConstContainer
+	* @property {number[]} data
+	* @property {number[]} a
+	* @property {[number, number]} d
+	*
+	* @typedef {{
+	*		data: [number],
+	*		a: [number, number],
+	*		d: [number, number],
+	*	}} ConstGenericInNonConstContainer
+	* @property {[number]} data
+	* @property {[number, number]} a
+	* @property {[number, number]} d
 	*
 	* @typedef {{
 	*		foo: Generic1<number>,
@@ -465,6 +490,21 @@ expression: output
 	* @property {T[]} values
 	*
 	* @typedef {{
+	*		value: T,
+	*	}} GenericDefault<T = string>
+	* @property {T} value
+	*
+	* @typedef {{
+	*		value: T,
+	*	}} GenericDefaultSkipped<T>
+	* @property {T} value
+	*
+	* @typedef {{
+	*		value: number,
+	*	}} GenericDefaultSkippedNonType<T>
+	* @property {number} value
+	*
+	* @typedef {{
 	*		generic_flattened: T,
 	*	}} GenericFlattened<T>
 	* @property {T} generic_flattened
@@ -516,6 +556,31 @@ expression: output
 	* @typedef {{ [key in number]: string }} HasGenericAlias
 	* @property {{ [key in number]: string }} "0"
 	*
+	* @typedef {{
+	*		b: {
+	*			data: [number, number],
+	*			a: [number, number],
+	*			d: [number, number, number],
+	*		},
+	*		c: {
+	*			data: [number, number, number],
+	*			a: [number, number],
+	*			d: [number, number, number],
+	*		},
+	*		d: [number, number],
+	*	}} InlineConstGenericContainer
+	* @property {{
+	*		data: number[],
+	*		a: number[],
+	*		d: [number, number, number],
+	*	}} b
+	* @property {{
+	*		data: number[],
+	*		a: number[],
+	*		d: [number, number, number],
+	*	}} c
+	* @property {[number, number]} d
+	*
 	* @typedef {{ A: {
 	* 	a: string,
 	* } }} InlineEnumField
@@ -544,6 +609,36 @@ expression: output
 	*		} | null,
 	*	}} InlineOptionalType
 	* @property {PlaceholderInnerField | null} optional_field
+	*
+	* @typedef {{
+	*		data: number[],
+	*		a: number[],
+	*		d: [number, number, number],
+	*		e: InlineRecursiveConstGeneric,
+	*	}} InlineRecursiveConstGeneric
+	* @property {number[]} data
+	* @property {number[]} a
+	* @property {[number, number, number]} d
+	* @property {InlineRecursiveConstGeneric} e
+	*
+	* @typedef {{
+	*		b: {
+	*			data: [number, number],
+	*			a: [number, number],
+	*			d: [number, number, number],
+	*			e: InlineRecursiveConstGeneric,
+	*		},
+	*		c: {
+	*			data: [number, number, number],
+	*			a: [number, number],
+	*			d: [number, number, number],
+	*			e: InlineRecursiveConstGeneric,
+	*		},
+	*		d: [number, number],
+	*	}} InlineRecursiveConstGenericContainer
+	* @property {InlineRecursiveConstGeneric} b
+	* @property {InlineRecursiveConstGeneric} c
+	* @property {[number, number]} d
 	*
 	* @typedef {{
 	*		ref_struct: SimpleStruct,
@@ -720,6 +815,24 @@ expression: output
 	*
 	* @typedef {(First)} MyEnumUntagged
 	* @property {(First)} Variant
+	*
+	* @typedef {{
+	*		data: number[],
+	*		a: number[],
+	*		d: [number, number],
+	*	}} NamedConstGeneric
+	* @property {number[]} data
+	* @property {number[]} a
+	* @property {[number, number]} d
+	*
+	* @typedef {{
+	*		a: NamedConstGeneric,
+	*		b: NamedConstGeneric,
+	*		d: [number, number],
+	*	}} NamedConstGenericContainer
+	* @property {NamedConstGeneric} a
+	* @property {NamedConstGeneric} b
+	* @property {[number, number]} d
 	*
 	* @typedef {{ type: "a"; value: string } | { type: "b"; value: number }} NestedEnum
 	* @property {{ type: "a"; value: string }} a
@@ -902,7 +1015,7 @@ expression: output
 	*		TupleStructWithRep: TupleStructWithRep,
 	*		"GenericTupleStruct<String>": GenericTupleStruct<string>,
 	*		BracedStruct: BracedStruct,
-	*		Struct: Struct,
+	*		Struct: StructNew,
 	*		Struct2: Struct2,
 	*		Enum: Enum,
 	*		Enum2: Enum2,
@@ -1030,7 +1143,19 @@ expression: output
 	* } }) & { Unnamed?: never }],
 	*		"InlineFlattenGenericsG<()>": InlineFlattenGenericsG<null>,
 	*		InlineFlattenGenerics: InlineFlattenGenerics,
+	*		GenericDefault: GenericDefault,
+	*		ChainedGenericDefault: ChainedGenericDefault,
+	*		"ChainedGenericDefault<String, String>": ChainedGenericDefault,
+	*		"ChainedGenericDefault<i32>": ChainedGenericDefault<number, number>,
+	*		"ChainedGenericDefault<String, i32>": ChainedGenericDefault<string, number>,
+	*		GenericDefaultSkipped: GenericDefaultSkipped<string>,
+	*		GenericDefaultSkippedNonType: GenericDefaultSkippedNonType<unknown>,
 	*		GenericParameterOrderPreserved: GenericParameterOrderPreserved,
+	*		ConstGenericInNonConstContainer: ConstGenericInNonConstContainer,
+	*		ConstGenericInConstContainer: ConstGenericInConstContainer,
+	*		NamedConstGenericContainer: NamedConstGenericContainer,
+	*		InlineConstGenericContainer: InlineConstGenericContainer,
+	*		InlineRecursiveConstGenericContainer: InlineRecursiveConstGenericContainer,
 	*		TestCollectionRegister: TestCollectionRegister,
 	*		TestCollectionRegister: TestCollectionRegister,
 	*	}} Primitives
@@ -1159,7 +1284,7 @@ expression: output
 	* @property {TupleStructWithRep} TupleStructWithRep
 	* @property {GenericTupleStruct<string>} "GenericTupleStruct<String>"
 	* @property {BracedStruct} BracedStruct
-	* @property {Struct} Struct
+	* @property {StructNew} Struct
 	* @property {Struct2} Struct2
 	* @property {Enum} Enum
 	* @property {Enum2} Enum2
@@ -1287,7 +1412,19 @@ expression: output
 	* } }) & { Unnamed?: never }]} "InlineGenericNested<String>"
 	* @property {InlineFlattenGenericsG<null>} "InlineFlattenGenericsG<()>"
 	* @property {InlineFlattenGenerics} InlineFlattenGenerics
+	* @property {GenericDefault} GenericDefault
+	* @property {ChainedGenericDefault} ChainedGenericDefault
+	* @property {ChainedGenericDefault} "ChainedGenericDefault<String, String>"
+	* @property {ChainedGenericDefault<number, number>} "ChainedGenericDefault<i32>"
+	* @property {ChainedGenericDefault<string, number>} "ChainedGenericDefault<String, i32>"
+	* @property {GenericDefaultSkipped<string>} GenericDefaultSkipped
+	* @property {GenericDefaultSkippedNonType<unknown>} GenericDefaultSkippedNonType
 	* @property {GenericParameterOrderPreserved} GenericParameterOrderPreserved
+	* @property {ConstGenericInNonConstContainer} ConstGenericInNonConstContainer
+	* @property {ConstGenericInConstContainer} ConstGenericInConstContainer
+	* @property {NamedConstGenericContainer} NamedConstGenericContainer
+	* @property {InlineConstGenericContainer} InlineConstGenericContainer
+	* @property {InlineRecursiveConstGenericContainer} InlineRecursiveConstGenericContainer
 	* @property {TestCollectionRegister} TestCollectionRegister
 	* @property {TestCollectionRegister} TestCollectionRegister
 	*
@@ -1473,16 +1610,16 @@ expression: output
 	* @property {[string, number]} tuple
 	*
 	* @typedef {{
-	*		t: "StructNew",
-	*		a: string,
-	*	}} Struct
-	* @property {"StructNew"} t
-	* @property {string} a
-	*
-	* @typedef {{
 	*		b: string,
 	*	}} Struct2
 	* @property {string} b
+	*
+	* @typedef {{
+	*		t: "StructNew",
+	*		a: string,
+	*	}} StructNew
+	* @property {"StructNew"} t
+	* @property {string} a
 	*
 	* @typedef {{
 	*		A: number,

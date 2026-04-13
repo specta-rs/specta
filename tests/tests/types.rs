@@ -401,7 +401,22 @@ pub fn types() -> (Types, Vec<(&'static str, DataType)>) {
         InlineGenericNested<String>,
         InlineFlattenGenericsG<()>,
         InlineFlattenGenerics,
+        GenericDefault,
+        ChainedGenericDefault,
+        ChainedGenericDefault<String, String>,
+        ChainedGenericDefault<i32>,
+        ChainedGenericDefault<String, i32>,
+        GenericDefaultSkipped,
+        GenericDefaultSkippedNonType,
         GenericParameterOrderPreserved,
+
+        // Tests for handling of const generics
+        // Especially when inlining and flattening as it changes.
+        ConstGenericInNonConstContainer,
+        ConstGenericInConstContainer,
+        NamedConstGenericContainer,
+        InlineConstGenericContainer,
+        InlineRecursiveConstGenericContainer,
 
         // Test that the types don't get duplicated in the type map.
         // (these will be duplicated in dts tests as that doesn't use the typemap)
@@ -2255,6 +2270,37 @@ struct InlineFlattenGenerics {
     t: InlineFlattenGenericsG<String>,
 }
 
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericDefault<T = String> {
+    value: T,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct ChainedGenericDefault<T = String, U = T> {
+    first: T,
+    second: U,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericDefaultSkipped<#[specta(skip_default_generic)] T = String> {
+    value: T,
+}
+
+struct GenericDefaultSkippedNonTypeDefault;
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct GenericDefaultSkippedNonType<
+    #[specta(skip_default_generic)] T = GenericDefaultSkippedNonTypeDefault,
+> {
+    value: i32,
+    #[specta(skip)]
+    _phantom: PhantomData<T>,
+}
+
 // #[test]
 // fn default() {
 //     #[derive(Type)]
@@ -2341,6 +2387,85 @@ struct Pair<Z, A> {
 #[specta(collect = false)]
 struct GenericParameterOrderPreserved {
     pair: Pair<i32, String>,
+}
+
+const CONST_LEN: usize = 1;
+#[derive(Type)]
+#[specta(collect = false)]
+struct ConstGenericInNonConstContainer {
+    data: [u32; CONST_LEN],
+    a: [u8; 2],
+    #[specta(type = specta_util::FixedArray<2, u8>)]
+    d: [u8; 2],
+}
+
+// This is a duplicate of `NamedConstGeneric` but we keep it separate as it's a better test
+// or the global export ty that is registered.
+#[derive(Type)]
+#[specta(collect = false)]
+struct ConstGenericInConstContainer<const N: usize = 1> {
+    data: [u32; N],
+    a: [u8; 2],
+    #[specta(type = specta_util::FixedArray<2, u8>)]
+    d: [u8; 2],
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct NamedConstGeneric<const N: usize = 1> {
+    data: [u32; N],
+    a: [u8; 2],
+    #[specta(type = specta_util::FixedArray<2, u8>)]
+    d: [u8; 2],
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct NamedConstGenericContainer {
+    a: NamedConstGeneric,
+    b: NamedConstGeneric<2>,
+    d: [u8; 2],
+}
+
+#[derive(Type)]
+#[specta(collect = false, inline)]
+struct InlineConstGeneric<const N: usize = 1> {
+    #[specta(type = [u32; N])]
+    data: (),
+    a: [u8; 2],
+    #[specta(type = specta_util::FixedArray<3, u8>)]
+    d: [u8; 3],
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct InlineConstGenericContainer {
+    #[specta(inline)]
+    b: InlineConstGeneric<2>,
+    #[specta(inline)]
+    c: InlineConstGeneric<3>,
+    d: [u8; 2],
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct InlineRecursiveConstGeneric<const N: usize = 1> {
+    #[specta(type = [u32; N])]
+    data: (),
+    a: [u8; 2],
+    #[specta(type = specta_util::FixedArray<3, u8>)]
+    d: [u8; 3],
+    e: Box<InlineRecursiveConstGeneric<4>>,
+}
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct InlineRecursiveConstGenericContainer {
+    #[specta(inline)]
+    b: InlineRecursiveConstGeneric<2>,
+    #[specta(inline)]
+    c: InlineRecursiveConstGeneric<3>,
+    d: [u8; 2],
 }
 
 // mod type_overrides {
@@ -2526,7 +2651,7 @@ fn transparent_wrappers_have_distinct_ids() {
     let id_b = TransparentB::definition(&mut types);
     let names = types
         .into_unsorted_iter()
-        .map(|ndt| ndt.name().as_ref())
+        .map(|ndt| ndt.name.as_ref())
         .collect::<Vec<_>>();
 
     assert_ne!(format!("{:?}", id_a), format!("{:?}", id_b));
@@ -2540,7 +2665,7 @@ fn struct_collects_all_transparent_field_types() {
     UsesTransparent::definition(&mut types);
     let names = types
         .into_unsorted_iter()
-        .map(|ndt| ndt.name().as_ref())
+        .map(|ndt| ndt.name.as_ref())
         .collect::<Vec<_>>();
 
     assert!(names.contains(&"UsesTransparent"));

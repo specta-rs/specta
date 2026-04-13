@@ -1,0 +1,11 @@
+[package]
+name = "example-scratchpad"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+specta = { path = "../../specta", features = ["derive"] }
+specta-typescript = { path = "../../specta-typescript" }
+specta-serde = { path = "../../specta-serde" }
+serde = { version = "1", features = ["derive"] }

@@ -20,6 +20,7 @@ pub struct Function {
     pub(crate) deprecated: Option<Deprecated>,
 }
 
+// TODO: We are keeping the accessors as this submodule is likely going to go.
 impl Function {
     /// Is this function defined with the `async` keyword?
     pub fn asyncness(&self) -> bool {

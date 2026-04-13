@@ -31,7 +31,7 @@
     html_favicon_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png"
 )]
 
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use specta::{
     ResolvedTypes, Types,
@@ -48,6 +48,7 @@ use specta::{
 // TODO: Documentations -> Explain how input types *just work* (double check that though)
 
 /// A tag is used to identify the transformation required for a given data type.
+#[derive(Clone)]
 pub enum Tag {
     /// [BigInt](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt)
     BigInt,
@@ -58,7 +59,7 @@ pub enum Tag {
     /// A custom tag.
     ///
     /// TODO: Document this
-    Custom(Box<dyn Fn(&str) -> Cow<'static, str> + Send + Sync>),
+    Custom(Arc<dyn Fn(&str) -> Cow<'static, str> + Send + Sync>),
 }
 
 impl std::fmt::Debug for Tag {
@@ -218,7 +219,7 @@ impl Analyzer {
             | DataType::Primitive(Primitive::u128) => PlanNode::Leaf(Tag::BigInt),
             DataType::Primitive(_) => PlanNode::Identity,
             DataType::List(list) => {
-                let inner = self.analyze(list.ty(), types, generics, stack);
+                let inner = self.analyze(&list.ty, types, generics, stack);
                 if inner.is_identity() {
                     PlanNode::Identity
                 } else {
@@ -233,11 +234,11 @@ impl Analyzer {
                     PlanNode::Map(Box::new(inner))
                 }
             }
-            DataType::Struct(st) => self.analyze_fields(st.fields(), types, generics, stack),
+            DataType::Struct(st) => self.analyze_fields(&st.fields, types, generics, stack),
             DataType::Enum(en) => {
                 let mut variants = Vec::new();
 
-                for (name, variant) in en.variants().iter().filter(|(_, v)| !v.skip()) {
+                for (name, variant) in en.variants.iter().filter(|(_, v)| !v.skip) {
                     if let Some(variant) =
                         self.analyze_enum_variant(name, variant, types, generics, stack)
                         && !variant.plan.is_identity()
@@ -254,7 +255,7 @@ impl Analyzer {
             }
             DataType::Tuple(tuple) => {
                 let items = tuple
-                    .elements()
+                    .elements
                     .iter()
                     .map(|ty| self.analyze(ty, types, generics, stack))
                     .collect::<Vec<_>>();
@@ -275,7 +276,7 @@ impl Analyzer {
             }
             DataType::Reference(Reference::Named(reference)) => {
                 if let Some(ndt) = reference.get(types) {
-                    if let Some(tag) = self.resolve_named_tag(ndt.module_path(), ndt.name()) {
+                    if let Some(tag) = self.resolve_named_tag(&ndt.module_path, &ndt.name) {
                         return match tag {
                             KnownNamedTag::BigInt => PlanNode::Leaf(Tag::BigInt),
                             KnownNamedTag::Date => PlanNode::Leaf(Tag::Date),
@@ -288,7 +289,7 @@ impl Analyzer {
                     }
 
                     stack.push(reference.clone());
-                    let out = self.analyze(ndt.ty(), types, reference.generics(), stack);
+                    let out = self.analyze(&ndt.ty, types, &reference.generics, stack);
                     stack.pop();
                     out
                 } else {
@@ -315,9 +316,9 @@ impl Analyzer {
             Fields::Unit => PlanNode::Identity,
             Fields::Unnamed(fields) => {
                 let items = fields
-                    .fields()
+                    .fields
                     .iter()
-                    .filter_map(|field| field.ty())
+                    .filter_map(|field| field.ty.as_ref())
                     .map(|ty| self.analyze(ty, types, generics, stack))
                     .collect::<Vec<_>>();
 
@@ -329,14 +330,14 @@ impl Analyzer {
             }
             Fields::Named(fields) => {
                 let object = fields
-                    .fields()
+                    .fields
                     .iter()
                     .filter_map(|(name, field)| {
-                        let ty = field.ty()?;
+                        let ty = field.ty.as_ref()?;
                         let plan = self.analyze(ty, types, generics, stack);
                         if plan.is_identity() {
                             None
-                        } else if field.flatten() {
+                        } else if field.flatten {
                             Some(ObjectFieldPlan::Flattened(plan))
                         } else {
                             Some(ObjectFieldPlan::Named(name.to_string(), plan))
@@ -368,15 +369,16 @@ impl Analyzer {
         generics: &[(GenericReference, DataType)],
         stack: &mut Vec<NamedReference>,
     ) -> Option<EnumVariantPlan> {
-        let plan = self.analyze_fields(variant.fields(), types, generics, stack);
-        let matcher = match variant.fields() {
+        let plan = self.analyze_fields(&variant.fields, types, generics, stack);
+        let matcher = match &variant.fields {
             Fields::Unit | Fields::Unnamed(_) => EnumVariantMatcher::Direct,
             Fields::Named(fields) => {
                 let literal_fields = fields
-                    .fields()
+                    .fields
                     .iter()
                     .filter_map(|(field_name, field)| {
-                        string_literal(field.ty()?).map(|value| (field_name.to_string(), value))
+                        string_literal(field.ty.as_ref()?)
+                            .map(|value| (field_name.to_string(), value))
                     })
                     .collect::<Vec<_>>();
 
@@ -386,8 +388,8 @@ impl Analyzer {
                         field: field.clone(),
                         value: value.clone(),
                     }
-                } else if fields.fields().len() == 1 {
-                    let (field_name, _) = &fields.fields()[0];
+                } else if fields.fields.len() == 1 {
+                    let (field_name, _) = &fields.fields[0];
                     EnumVariantMatcher::HasField(field_name.to_string())
                 } else {
                     let _ = name;
@@ -539,11 +541,11 @@ fn string_literal(ty: &DataType) -> Option<String> {
         return None;
     };
 
-    let [(name, variant)] = enm.variants() else {
+    let [(name, variant)] = enm.variants.as_slice() else {
         return None;
     };
 
-    matches!(variant.fields(), Fields::Unit).then(|| name.to_string())
+    matches!(&variant.fields, Fields::Unit).then(|| name.to_string())
 }
 
 #[cfg(test)]
@@ -617,9 +619,9 @@ mod tests {
         let dt = resolved
             .as_types()
             .into_sorted_iter()
-            .find(|ty| ty.name().as_ref() == "TaggedEnum")
+            .find(|ty| ty.name.as_ref() == "TaggedEnum")
             .expect("TaggedEnum should be registered")
-            .ty()
+            .ty
             .clone();
 
         let js = TransformPlan::analyze(&dt, &resolved).map("v");
@@ -635,9 +637,9 @@ mod tests {
         let dt = resolved
             .as_types()
             .into_sorted_iter()
-            .find(|ty| ty.name().as_ref() == "AdjacentEnum")
+            .find(|ty| ty.name.as_ref() == "AdjacentEnum")
             .expect("AdjacentEnum should be registered")
-            .ty()
+            .ty
             .clone();
 
         let js = TransformPlan::analyze(&dt, &resolved).map("v");

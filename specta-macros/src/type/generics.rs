@@ -7,6 +7,10 @@ use syn::{
     visit::{self, Visit},
 };
 
+use crate::utils::parse_attrs;
+
+use super::{FieldAttr, VariantAttr};
+
 #[derive(Default)]
 pub struct UsedTypeParams {
     pub direct: Vec<syn::Ident>,
@@ -73,11 +77,11 @@ pub fn used_type_params(
     generics: &Generics,
     data: &Data,
     container_type: Option<&Type>,
-) -> UsedTypeParams {
+) -> syn::Result<UsedTypeParams> {
     let all_generic_type_idents = all_type_param_idents(generics);
 
     if all_generic_type_idents.is_empty() {
-        return UsedTypeParams::default();
+        return Ok(UsedTypeParams::default());
     }
 
     let known_generics = all_generic_type_idents
@@ -98,12 +102,24 @@ pub fn used_type_params(
         match data {
             Data::Struct(data) => {
                 for field in &data.fields {
+                    if field_is_skipped(field)? {
+                        continue;
+                    }
+
                     visitor.visit_type(&field.ty);
                 }
             }
             Data::Enum(data) => {
                 for variant in &data.variants {
+                    if variant_is_skipped(variant)? {
+                        continue;
+                    }
+
                     for field in &variant.fields {
+                        if field_is_skipped(field)? {
+                            continue;
+                        }
+
                         visitor.visit_type(&field.ty);
                     }
                 }
@@ -113,11 +129,11 @@ pub fn used_type_params(
     }
 
     if visitor.conservative {
-        return UsedTypeParams {
+        return Ok(UsedTypeParams {
             direct: all_generic_type_idents,
             associated: Vec::new(),
             conservative: true,
-        };
+        });
     }
 
     let direct = all_generic_type_idents
@@ -139,11 +155,21 @@ pub fn used_type_params(
         }
     }
 
-    UsedTypeParams {
+    Ok(UsedTypeParams {
         direct,
         associated,
         conservative: false,
-    }
+    })
+}
+
+fn field_is_skipped(field: &syn::Field) -> syn::Result<bool> {
+    let mut attrs = parse_attrs(&field.attrs)?;
+    Ok(FieldAttr::from_attrs(&mut attrs)?.skip)
+}
+
+fn variant_is_skipped(variant: &syn::Variant) -> syn::Result<bool> {
+    let mut attrs = parse_attrs(&variant.attrs)?;
+    Ok(VariantAttr::from_attrs(&mut attrs)?.skip)
 }
 
 pub fn has_associated_type_usage(used_generic_types: &UsedTypeParams) -> bool {

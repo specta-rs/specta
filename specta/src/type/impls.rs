@@ -37,7 +37,7 @@ pub(crate) struct PrimitiveSet<T>(PhantomData<T>);
 impl<T: Type> Type for PrimitiveSet<T> {
     fn definition(types: &mut Types) -> DataType {
         let mut l = List::new(<T as Type>::definition(types));
-        l.set_unique(true);
+        l.unique = true;
         DataType::List(l)
     }
 }
@@ -133,14 +133,14 @@ const _: () = {
             inline: true;
             build: |_types, ndt| {
                 // Serde does no support `Infallible` as it can't be constructed as a `&self` method is uncallable on it.
-                ndt.inner = DataType::Enum(Enum::default());
+                ndt.ty = DataType::Enum(Enum::default());
             }
         }
 
         impl Type for std::time::SystemTime {
             inline: true;
             build: |types, ndt| {
-                ndt.inner = datatype::Struct::named()
+                ndt.ty = datatype::Struct::named()
                     .field(
                         "duration_since_epoch",
                         Field::new(<i64 as crate::Type>::definition(types)),
@@ -156,7 +156,7 @@ const _: () = {
         impl Type for std::time::Duration {
             inline: true;
             build: |types, ndt| {
-                ndt.inner = datatype::Struct::named()
+                ndt.ty = datatype::Struct::named()
                     .field("secs", Field::new(<u64 as crate::Type>::definition(types)))
                     .field("nanos", Field::new(<u32 as crate::Type>::definition(types)))
                     .build();
@@ -166,15 +166,11 @@ const _: () = {
 
     impl<'a, T: ?Sized + ToOwned + Type + 'a> Type for std::borrow::Cow<'a, T> {
         fn definition(types: &mut Types) -> DataType {
-            use std::borrow::Cow;
-
-            use crate::datatype::GenericReference;
-
             // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
             static SENTINEL: &str = "std::borrow::Cow<'a, T>";
-            static GENERICS: &[(GenericReference, Cow<'static, str>)] = &[(
-                datatype::GenericReference::new::<generics::T>(),
+            static GENERICS: &[datatype::Generic] = &[datatype::Generic::new::<generics::T>(
                 std::borrow::Cow::Borrowed("T"),
+                None,
             )];
 
             DataType::Reference(datatype::NamedDataType::init_with_sentinel(
@@ -184,12 +180,13 @@ const _: () = {
                     <T as Type>::definition(types),
                 )],
                 true,
+                false,
                 types,
                 SENTINEL,
                 |_types, ndt| {
-                    *ndt.name_mut() = std::borrow::Cow::Borrowed("Cow");
-                    *ndt.module_path_mut() = std::borrow::Cow::Borrowed("std::borrow");
-                    ndt.inner = datatype::GenericReference::new::<generics::T>().into();
+                    ndt.name = std::borrow::Cow::Borrowed("Cow");
+                    ndt.module_path = std::borrow::Cow::Borrowed("std::borrow");
+                    ndt.ty = datatype::GenericReference::new::<generics::T>().into();
                 },
             ))
         }
@@ -221,7 +218,7 @@ impl<T: Type + ?Sized> Type for &T {
 impl<T: Type> Type for [T] {
     fn definition(types: &mut Types) -> DataType {
         let mut l = List::new(<T as Type>::definition(types));
-        l.set_unique(false);
+        l.unique = false;
         DataType::List(l)
     }
 }
@@ -229,7 +226,13 @@ impl<T: Type> Type for [T] {
 impl<const N: usize, T: Type> Type for [T; N] {
     fn definition(types: &mut Types) -> DataType {
         let mut l = List::new(T::definition(types));
-        l.set_length(Some(N));
+
+        // Refer to the documentation for `CONTEXT_HAS_CONST_PARAMS` constant  in `named.rs` to understand this.
+        // If you wanna force this use `specta_utils::FixedArray<N, T>` instead.
+        if !datatype::context_has_const_params() {
+            l.length = Some(N);
+        }
+
         DataType::List(l)
     }
 }
@@ -254,7 +257,7 @@ impl_ndt!(
             let err_variant = Variant::unnamed()
                 .field(Field::new(datatype::GenericReference::new::<generics::E>().into()))
                 .build();
-            ndt.inner = DataType::Enum(Enum {
+            ndt.ty = DataType::Enum(Enum {
                 variants: vec![("Ok".into(), ok_variant), ("Err".into(), err_variant)],
                 attributes: datatype::Attributes::default(),
             });
