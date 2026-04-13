@@ -2088,6 +2088,7 @@ name = "specta-tests"
 version = "0.0.0"
 dependencies = [
  "arrayvec",
+ "bson",
  "chrono",
  "either",
  "error-stack",

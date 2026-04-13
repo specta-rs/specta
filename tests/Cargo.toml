@@ -11,7 +11,7 @@ path = "tests/mod.rs"
 harness = true
 
 [dependencies]
-specta = { path = "../specta", features = ["function", "std", "derive", "serde_json", "serde_yaml", "toml", "chrono", "either", "error-stack", "ulid", "glam", "ordered-float", "heapless", "semver", "smol_str", "arrayvec", "smallvec", "geojson"] }
+specta = { path = "../specta", features = ["function", "std", "derive", "serde_json", "serde_yaml", "toml", "chrono", "either", "error-stack", "ulid", "glam", "ordered-float", "heapless", "semver", "smol_str", "arrayvec", "smallvec", "geojson", "bson"] }
 specta-serde = { path = "../specta-serde" }
 specta-swift = { path = "../specta-swift" }
 specta-typescript = { path = "../specta-typescript" }
@@ -39,3 +39,4 @@ geojson = { version = "1.0", default-features = false }
 tempfile = "3.27.0"
 thiserror = "2.0.18"
 error-stack = { version = "0.7", default-features = false }
+bson = { version = "3", default-features = false, features = ["compat-3-0-0"] }

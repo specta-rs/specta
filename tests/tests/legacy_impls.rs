@@ -1,6 +1,9 @@
 #![allow(deprecated)]
 
-use specta::{ResolvedTypes, Type, Types};
+use specta::{
+    ResolvedTypes, Type, Types,
+    datatype::{DataType, Fields, Primitive, Reference},
+};
 use specta_typescript::Typescript;
 
 #[derive(Debug)]
@@ -83,6 +86,8 @@ struct LegacyImpls {
 
 #[derive(Type)]
 struct LegacyImplWithBigints {
+    bson_document: bson::Document,
+    bson_value: bson::Bson,
     serde_json_map: serde_json::Map<String, serde_json::Value>,
     serde_json_value: serde_json::Value,
     serde_json_number: serde_json::Number,
@@ -158,6 +163,8 @@ fn legacy_impl_individual_bigint_errors() {
         };
     }
 
+    bigint_wrapper!(BsonDocumentBigint, bson::Document);
+    bigint_wrapper!(BsonValueBigint, bson::Bson);
     bigint_wrapper!(SerdeJsonMapBigint, serde_json::Map<String, serde_json::Value>);
     bigint_wrapper!(SerdeJsonValueBigint, serde_json::Value);
     bigint_wrapper!(SerdeJsonNumberBigint, serde_json::Number);
@@ -180,6 +187,14 @@ fn legacy_impl_individual_bigint_errors() {
     let mut failures = Vec::new();
 
     for (name, assert) in [
+        (
+            "bson::Document",
+            assert_bigint_export_error::<BsonDocumentBigint> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "bson::Bson",
+            assert_bigint_export_error::<BsonValueBigint> as fn(&mut Vec<String>, &str),
+        ),
         (
             "serde_json::Map<String, serde_json::Value>",
             assert_bigint_export_error::<SerdeJsonMapBigint> as fn(&mut Vec<String>, &str),
@@ -261,4 +276,88 @@ fn legacy_impl_individual_bigint_errors() {
         "Unexpected legacy impl BigInt export behavior:\n{}",
         failures.join("\n")
     );
+}
+
+#[test]
+fn legacy_impl_bson_definitions() {
+    let mut types = Types::default();
+
+    let document = bson::Document::definition(&mut types);
+    let document_reference = match &document {
+        DataType::Reference(Reference::Named(reference)) => reference,
+        other => panic!("expected bson::Document to be a named reference, got {other:?}"),
+    };
+
+    let document_named = document_reference
+        .get(&types)
+        .expect("bson::Document should be registered");
+    assert_eq!(document_named.name, "Document");
+    assert_eq!(document_named.module_path, "bson");
+
+    let document_map = match document_reference.ty(&types) {
+        Some(DataType::Map(map)) => map,
+        other => panic!("expected bson::Document to resolve to a map, got {other:?}"),
+    };
+    assert_eq!(document_map.key_ty(), &DataType::Primitive(Primitive::str));
+
+    let bson_value_reference = match document_map.value_ty() {
+        DataType::Reference(Reference::Named(reference)) => reference,
+        other => panic!("expected bson::Document values to reference bson::Bson, got {other:?}"),
+    };
+    assert_eq!(
+        bson_value_reference
+            .get(&types)
+            .expect("bson::Bson should be registered")
+            .name,
+        "Bson"
+    );
+
+    let bson_value = bson::Bson::definition(&mut types);
+    let bson_reference = match &bson_value {
+        DataType::Reference(Reference::Named(reference)) => reference,
+        other => panic!("expected bson::Bson to be a named reference, got {other:?}"),
+    };
+
+    let bson_enum = match bson_reference.ty(&types) {
+        Some(DataType::Enum(value)) => value,
+        other => panic!("expected bson::Bson to resolve to an enum, got {other:?}"),
+    };
+
+    let variant_names = bson_enum
+        .variants
+        .iter()
+        .map(|(name, _)| name.as_ref())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        variant_names,
+        vec![
+            "Double",
+            "String",
+            "Array",
+            "Document",
+            "Boolean",
+            "Null",
+            "RegularExpression",
+            "JavaScriptCode",
+            "JavaScriptCodeWithScope",
+            "Int32",
+            "Int64",
+            "Timestamp",
+            "Binary",
+            "ObjectId",
+            "DateTime",
+            "Symbol",
+            "Decimal128",
+            "Undefined",
+            "MaxKey",
+            "MinKey",
+            "DbPointer",
+        ]
+    );
+
+    let document_variant = &bson_enum.variants[3].1;
+    match &document_variant.fields {
+        Fields::Unnamed(fields) => assert_eq!(fields.fields.len(), 1),
+        other => panic!("expected bson::Bson::Document to be an unnamed variant, got {other:?}"),
+    }
 }

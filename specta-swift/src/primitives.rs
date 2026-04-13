@@ -151,14 +151,8 @@ pub fn export_type(
             result.push('}');
 
             // Generate struct definitions for named field variants
-            let struct_definitions = generate_enum_structs(
-                swift,
-                types,
-                e,
-                generic_scope.clone(),
-                None,
-                &name,
-            )?;
+            let struct_definitions =
+                generate_enum_structs(swift, types, e, generic_scope.clone(), None, &name)?;
             result.push_str(&struct_definitions);
 
             // Generate custom Codable implementation for enums with struct variants
@@ -526,7 +520,8 @@ fn generate_enum_structs(
             let mut field_mappings = Vec::new();
             for (original_field_name, field) in &fields.fields {
                 if let Some(ty) = field.ty.as_ref() {
-                    let field_type = datatype_to_swift(swift, types, ty, generic_scope.clone(), None)?;
+                    let field_type =
+                        datatype_to_swift(swift, types, ty, generic_scope.clone(), None)?;
                     let optional_marker = if field.optional { "?" } else { "" };
                     let swift_field_name = swift.naming.convert_field(original_field_name.as_ref());
                     result.push_str(&format!(

@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 
 use specta::{
-    datatype::{DataType, Enum, Fields, Generic, NamedDataType, Primitive, Reference, Struct},
     Types,
+    datatype::{DataType, Enum, Fields, Generic, NamedDataType, Primitive, Reference, Struct},
 };
 
-use crate::{reserved_names::RESERVED_GO_NAMES, Error, Go};
+use crate::{Error, Go, reserved_names::RESERVED_GO_NAMES};
 
 /// Tracks necessary Go imports (e.g. "time", "encoding/json")
 #[derive(Default)]
