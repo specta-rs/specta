@@ -91,7 +91,7 @@ pub fn parse_enum(
             let variant_value = if let Some(variant_ty) = variant_type {
                 quote!(datatype::Variant::unnamed().field({
                     let mut field = datatype::Field::new(<#variant_ty as #crate_ref::Type>::definition(types));
-                    field.set_type_overridden(true);
+                    field.type_overridden = true;
                     field
                 }).build())
             } else {
@@ -163,19 +163,19 @@ pub fn parse_enum(
             let doc = attrs.common.doc;
             Ok(quote!((#variant_name_str.into(), {
                 let mut v = #variant_value;
-                v.set_skip(#skip);
-                v.set_deprecated(#deprecated);
-                v.set_docs(#doc.into());
-                v.set_type_overridden(#variant_type_overridden);
-                *v.attributes_mut() = #runtime_attrs;
+                v.skip = #skip;
+                v.deprecated = #deprecated;
+                v.docs = #doc.into();
+                v.type_overridden = #variant_type_overridden;
+                v.attributes = #runtime_attrs;
                 v
             })))
         })
         .collect::<syn::Result<Vec<_>>>()?;
 
     Ok(quote!({
-        let mut e = datatype::Enum::new();
-        *e.variants_mut() = vec![#(#variant_types),*];
+        let mut e = datatype::Enum::default();
+        e.variants = vec![#(#variant_types),*];
         e.into()
     }))
 }

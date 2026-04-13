@@ -27,7 +27,7 @@ pub fn export(
 ) -> Result<String, Error> {
     let mut s = String::new();
 
-    let docs = ndt.docs();
+    let docs = &ndt.docs;
     if !docs.is_empty() {
         for line in docs.lines() {
             s.push_str("// ");
@@ -36,20 +36,20 @@ pub fn export(
         }
     }
 
-    let name = to_pascal_case(ndt.name());
+    let name = to_pascal_case(&ndt.name);
     if RESERVED_GO_NAMES.contains(&name.as_str()) {
         return Err(Error::ForbiddenName {
-            path: ndt.name().to_string(),
-            name: ndt.name().to_string(),
+            path: ndt.name.to_string(),
+            name: ndt.name.to_string(),
         });
     }
 
     s.push_str("type ");
     s.push_str(&name);
 
-    if !ndt.generics().is_empty() {
+    if !ndt.generics.is_empty() {
         s.push('[');
-        for (i, g) in ndt.generics().iter().enumerate() {
+        for (i, g) in ndt.generics.iter().enumerate() {
             if i != 0 {
                 s.push_str(", ");
             }
@@ -60,16 +60,16 @@ pub fn export(
     }
     s.push(' ');
 
-    match ndt.ty() {
+    match &ndt.ty {
         DataType::Struct(st) => {
             s.push_str("struct {\n");
             struct_fields(
                 &mut s,
                 exporter,
                 types,
-                ndt.generics(),
+                &ndt.generics,
                 st,
-                vec![ndt.name().to_string()],
+                vec![ndt.name.to_string()],
                 ctx,
             )?;
             s.push('}');
@@ -80,22 +80,22 @@ pub fn export(
                 &mut s,
                 exporter,
                 types,
-                ndt.generics(),
+                &ndt.generics,
                 e,
-                vec![ndt.name().to_string()],
+                vec![ndt.name.to_string()],
                 ctx,
             )?;
             s.push('}');
         }
         DataType::Tuple(t) => {
-            if t.elements().len() == 1 {
+            if t.elements.len() == 1 {
                 datatype(
                     &mut s,
                     exporter,
                     types,
-                    ndt.generics(),
-                    &t.elements()[0],
-                    vec![ndt.name().to_string(), "0".into()],
+                    &ndt.generics,
+                    &t.elements[0],
+                    vec![ndt.name.to_string(), "0".into()],
                     ctx,
                 )?;
             } else {
@@ -107,9 +107,9 @@ pub fn export(
                 &mut s,
                 exporter,
                 types,
-                ndt.generics(),
-                ndt.ty(),
-                vec![ndt.name().to_string()],
+                &ndt.generics,
+                &ndt.ty,
+                vec![ndt.name.to_string()],
                 ctx,
             )?;
         }
@@ -128,19 +128,19 @@ fn struct_fields(
     location: Vec<String>,
     ctx: &mut GoContext,
 ) -> Result<(), Error> {
-    match st.fields() {
+    match &st.fields {
         Fields::Unit => {}
         Fields::Unnamed(fields) => {
-            for (i, field) in fields.fields().iter().enumerate() {
+            for (i, field) in fields.fields.iter().enumerate() {
                 s.push('\t');
                 s.push_str(&format!("Field{}", i));
                 s.push(' ');
 
-                if field.optional() {
+                if field.optional {
                     s.push('*');
                 }
 
-                if let Some(ty) = field.ty() {
+                if let Some(ty) = field.ty.as_ref() {
                     let mut location = location.clone();
                     location.push(i.to_string());
                     datatype(s, exporter, types, generic_names, ty, location, ctx)?;
@@ -151,8 +151,8 @@ fn struct_fields(
             }
         }
         Fields::Named(fields) => {
-            for (name, field) in fields.fields() {
-                let docs = field.docs();
+            for (name, field) in &fields.fields {
+                let docs = &field.docs;
                 if !docs.is_empty() {
                     s.push_str("\t// ");
                     s.push_str(docs.replace('\n', "\n\t// ").trim());
@@ -163,11 +163,11 @@ fn struct_fields(
                 s.push_str(&to_pascal_case(name));
                 s.push(' ');
 
-                if field.optional() {
+                if field.optional {
                     s.push('*');
                 }
 
-                if let Some(ty) = field.ty() {
+                if let Some(ty) = field.ty.as_ref() {
                     let mut location = location.clone();
                     location.push(name.to_string());
                     datatype(s, exporter, types, generic_names, ty, location, ctx)?;
@@ -175,7 +175,7 @@ fn struct_fields(
                     s.push_str("any");
                 }
 
-                if field.optional() {
+                if field.optional {
                     s.push_str(&format!(" `json:\"{},omitempty\"`\n", name));
                 } else {
                     s.push_str(&format!(" `json:\"{}\"`\n", name));
@@ -195,8 +195,8 @@ fn enum_variants(
     location: Vec<String>,
     ctx: &mut GoContext,
 ) -> Result<(), Error> {
-    for (name, variant) in e.variants() {
-        let docs = variant.docs();
+    for (name, variant) in &e.variants {
+        let docs = &variant.docs;
         if !docs.is_empty() {
             s.push_str("\t// ");
             s.push_str(docs);
@@ -208,15 +208,15 @@ fn enum_variants(
         s.push(' ');
         s.push('*');
 
-        match variant.fields() {
+        match &variant.fields {
             Fields::Unit => s.push_str("bool"),
             Fields::Unnamed(f) => {
                 s.push_str("struct {\n");
-                for (i, field) in f.fields().iter().enumerate() {
+                for (i, field) in f.fields.iter().enumerate() {
                     s.push_str("\t\tValue");
                     s.push_str(&i.to_string());
                     s.push(' ');
-                    if let Some(ty) = field.ty() {
+                    if let Some(ty) = field.ty.as_ref() {
                         let mut location = location.clone();
                         location.push(name.to_string());
                         location.push(i.to_string());
@@ -232,7 +232,7 @@ fn enum_variants(
             Fields::Named(f) => {
                 s.push_str("struct {\n\t");
                 let mut fill_in = Struct::unit();
-                fill_in.set_fields(Fields::Named(f.clone()));
+                fill_in.fields = Fields::Named(f.clone());
 
                 let mut location = location.clone();
                 location.push(name.to_string());
@@ -303,10 +303,10 @@ fn datatype(
         }
         DataType::List(l) => {
             s.push_str("[]");
-            datatype(s, exporter, types, generic_names, l.ty(), location, ctx)?;
+            datatype(s, exporter, types, generic_names, &l.ty, location, ctx)?;
         }
         DataType::Tuple(t) => {
-            if t.elements().is_empty() {
+            if t.elements.is_empty() {
                 s.push_str("struct{}");
             } else {
                 s.push_str("[]any");
@@ -329,9 +329,9 @@ fn datatype(
                     name: "missing_reference_in_collection".into(),
                 })?;
 
-                s.push_str(&to_pascal_case(ndt.name()));
+                s.push_str(&to_pascal_case(&ndt.name));
 
-                let generics = r.generics();
+                let generics = &r.generics;
                 if !generics.is_empty() {
                     s.push('[');
                     for (i, (_, g)) in generics.iter().enumerate() {

@@ -292,18 +292,18 @@ impl NamingConvention {
 /// Check if the type collection contains any Duration types that need the helper
 fn needs_duration_helper(types: &Types) -> bool {
     for ndt in types.into_sorted_iter() {
-        if ndt.name() == "Duration" {
+        if ndt.name == "Duration" {
             return true;
         }
         // Also check if any struct fields contain Duration
-        if let DataType::Struct(s) = ndt.ty()
-            && let Fields::Named(fields) = s.fields()
+        if let DataType::Struct(s) = &ndt.ty
+            && let Fields::Named(fields) = &s.fields
         {
-            for (_, field) in fields.fields() {
-                if let Some(ty) = field.ty() {
+            for (_, field) in &fields.fields {
+                if let Some(ty) = field.ty.as_ref() {
                     if let DataType::Reference(Reference::Named(r)) = ty
                         && let Some(referenced_ndt) = r.get(types)
-                        && referenced_ndt.name() == "Duration"
+                        && referenced_ndt.name == "Duration"
                     {
                         return true;
                     }

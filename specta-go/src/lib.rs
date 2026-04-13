@@ -7,10 +7,10 @@
 //! # Usage
 //!
 //! ```rust
-//! use specta::{Type, Types};
+//! use specta::Types;
 //! use specta_go::Go;
 //!
-//! #[derive(Type)]
+//! #[derive(specta::Type)]
 //! pub struct MyType {
 //!     pub field: String,
 //! }

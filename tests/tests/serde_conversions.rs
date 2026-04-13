@@ -197,7 +197,7 @@ fn type_names(types: &ResolvedTypes) -> Vec<String> {
     types
         .as_types()
         .into_unsorted_iter()
-        .map(|ndt| ndt.name().to_string())
+        .map(|ndt| ndt.name.to_string())
         .collect()
 }
 

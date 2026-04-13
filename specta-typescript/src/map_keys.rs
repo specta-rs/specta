@@ -38,14 +38,14 @@ fn validate_map_key_inner(
             invalid_primitive_reason(other.clone()),
         )),
         DataType::Enum(enm) => {
-            for (variant_name, variant) in enm.variants() {
-                match variant.fields() {
+            for (variant_name, variant) in &enm.variants {
+                match &variant.fields {
                     Fields::Unit => {}
                     Fields::Unnamed(unnamed) => {
                         let non_skipped = unnamed
-                            .fields()
+                            .fields
                             .iter()
-                            .filter_map(|field| field.ty())
+                            .filter_map(|field| field.ty.as_ref())
                             .count();
                         if non_skipped != 1 {
                             return Err(Error::invalid_map_key(
@@ -70,14 +70,14 @@ fn validate_map_key_inner(
             Ok(())
         }
         DataType::Struct(strct) => {
-            let Fields::Unnamed(unnamed) = strct.fields() else {
+            let Fields::Unnamed(unnamed) = &strct.fields else {
                 return Err(Error::invalid_map_key(
                     path,
                     "struct keys must serialize as a newtype struct to be valid serde_json map keys",
                 ));
             };
 
-            let mut non_skipped = unnamed.fields().iter().filter_map(|field| field.ty());
+            let mut non_skipped = unnamed.fields.iter().filter_map(|field| field.ty.as_ref());
             let Some(inner_ty) = non_skipped.next() else {
                 return Err(Error::invalid_map_key(
                     path,
@@ -111,7 +111,7 @@ fn validate_map_key_inner(
             }
 
             let result = if let Some(ty) = reference.ty(types) {
-                let merged_generics = merged_generics(generics, reference.generics());
+                let merged_generics = merged_generics(generics, &reference.generics);
                 validate_map_key_inner(
                     ty,
                     types,
@@ -239,7 +239,7 @@ fn resolve_generics_in_datatype(
             DataType::Primitive(_) => dt.clone(),
             DataType::List(list) => {
                 let mut out = list.clone();
-                out.set_ty(resolve(list.ty(), generics, visiting));
+                out.ty = Box::new(resolve(&list.ty, generics, visiting));
                 DataType::List(out)
             }
             DataType::Map(map) => {
@@ -253,18 +253,18 @@ fn resolve_generics_in_datatype(
             }
             DataType::Struct(strct) => {
                 let mut out = strct.clone();
-                match out.fields_mut() {
+                match &mut out.fields {
                     Fields::Unit => {}
                     Fields::Unnamed(unnamed) => {
-                        for field in unnamed.fields_mut() {
-                            if let Some(ty) = field.ty_mut() {
+                        for field in &mut unnamed.fields {
+                            if let Some(ty) = field.ty.as_mut() {
                                 *ty = resolve(ty, generics, visiting);
                             }
                         }
                     }
                     Fields::Named(named) => {
-                        for (_, field) in named.fields_mut() {
-                            if let Some(ty) = field.ty_mut() {
+                        for (_, field) in &mut named.fields {
+                            if let Some(ty) = field.ty.as_mut() {
                                 *ty = resolve(ty, generics, visiting);
                             }
                         }
@@ -274,19 +274,19 @@ fn resolve_generics_in_datatype(
             }
             DataType::Enum(enm) => {
                 let mut out = enm.clone();
-                for (_, variant) in out.variants_mut() {
-                    match variant.fields_mut() {
+                for (_, variant) in &mut out.variants {
+                    match &mut variant.fields {
                         Fields::Unit => {}
                         Fields::Unnamed(unnamed) => {
-                            for field in unnamed.fields_mut() {
-                                if let Some(ty) = field.ty_mut() {
+                            for field in &mut unnamed.fields {
+                                if let Some(ty) = field.ty.as_mut() {
                                     *ty = resolve(ty, generics, visiting);
                                 }
                             }
                         }
                         Fields::Named(named) => {
-                            for (_, field) in named.fields_mut() {
-                                if let Some(ty) = field.ty_mut() {
+                            for (_, field) in &mut named.fields {
+                                if let Some(ty) = field.ty.as_mut() {
                                     *ty = resolve(ty, generics, visiting);
                                 }
                             }
@@ -297,7 +297,7 @@ fn resolve_generics_in_datatype(
             }
             DataType::Tuple(tuple) => {
                 let mut out = tuple.clone();
-                for element in out.elements_mut() {
+                for element in &mut out.elements {
                     *element = resolve(element, generics, visiting);
                 }
                 DataType::Tuple(out)

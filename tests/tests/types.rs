@@ -2651,7 +2651,7 @@ fn transparent_wrappers_have_distinct_ids() {
     let id_b = TransparentB::definition(&mut types);
     let names = types
         .into_unsorted_iter()
-        .map(|ndt| ndt.name().as_ref())
+        .map(|ndt| ndt.name.as_ref())
         .collect::<Vec<_>>();
 
     assert_ne!(format!("{:?}", id_a), format!("{:?}", id_b));
@@ -2665,7 +2665,7 @@ fn struct_collects_all_transparent_field_types() {
     UsesTransparent::definition(&mut types);
     let names = types
         .into_unsorted_iter()
-        .map(|ndt| ndt.name().as_ref())
+        .map(|ndt| ndt.name.as_ref())
         .collect::<Vec<_>>();
 
     assert!(names.contains(&"UsesTransparent"));

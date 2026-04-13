@@ -50,14 +50,14 @@ pub fn construct_field_with_variant_skip(
 
     Ok(quote!({
         let mut field = datatype::Field::default();
-        field.set_optional(#optional);
-        field.set_deprecated(#deprecated);
-        field.set_docs(#doc.into());
-        field.set_inline(#inline);
-        field.set_type_overridden(#type_overridden);
-        field.set_attributes(#runtime_attrs);
+        field.optional = #optional;
+        field.deprecated = #deprecated;
+        field.docs = #doc.into();
+        field.inline = #inline;
+        field.type_overridden = #type_overridden;
+        field.attributes = #runtime_attrs;
         if let Some(ty) = #ty {
-            field.set_ty(ty);
+            field.ty = Some(ty);
         }
         field
     }))

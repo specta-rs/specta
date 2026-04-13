@@ -141,7 +141,7 @@ fn empty_module_path_layouts() {
     let mut types = Types::default();
 
     let mut testing = NamedDataType::new("testing", Vec::new(), DataType::Primitive(Primitive::i8));
-    testing.set_module_path("".into());
+    testing.module_path = "".into();
     testing.register(&mut types);
     let resolved = ResolvedTypes::from_resolved_types(types.clone());
 

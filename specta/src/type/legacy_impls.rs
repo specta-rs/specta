@@ -3,12 +3,12 @@
 //! The plan is to try and move these into the ecosystem for the v2 release.
 use super::macros::{impl_ndt, impl_ndt_as};
 use crate::{
-    Type, Types,
     datatype::{
         self, DataType, Enum, Field, Fields, List, NamedFields, Primitive, Reference, Struct,
         Variant,
     },
     r#type::{generics, impls::*},
+    Type, Types,
 };
 
 use std::borrow::Cow;
@@ -26,14 +26,14 @@ impl_ndt!(
     impl Type for ordered_float::OrderedFloat<f32> {
         inline: true;
         build: |types, ndt| {
-            ndt.inner = f32::definition(types);
+            ndt.ty = f32::definition(types);
         }
     }
 
     impl Type for ordered_float::OrderedFloat<f64> {
         inline: true;
         build: |types, ndt| {
-            ndt.inner = f64::definition(types);
+            ndt.ty = f64::definition(types);
         }
     }
 );
@@ -82,7 +82,7 @@ const _: () = {
         impl Type for serde_json::Value {
             inline: true;
             build: |types, ndt| {
-                ndt.inner = DataType::Enum(Enum {
+                ndt.ty = DataType::Enum(Enum {
                     variants: vec![
                         ("Null".into(), Variant::unit()),
                         (
@@ -124,7 +124,7 @@ const _: () = {
         impl Type for serde_json::Number {
             inline: true;
             build: |types, ndt| {
-                ndt.inner = DataType::Enum(Enum {
+                ndt.ty = DataType::Enum(Enum {
                     variants: vec![
                         (
                             "f64".into(),
@@ -155,7 +155,7 @@ const _: () = {
 #[cfg(feature = "serde_yaml")]
 #[cfg_attr(docsrs, doc(cfg(feature = "serde_yaml")))]
 const _: () = {
-    use serde_yaml::{Number, Value, value::TaggedValue};
+    use serde_yaml::{value::TaggedValue, Number, Value};
 
     impl_ndt_as!(
         serde_yaml::Mapping as PrimitiveMap<serde_yaml::Value, serde_yaml::Value>
@@ -166,7 +166,7 @@ const _: () = {
         impl Type for serde_yaml::Value {
             inline: true;
             build: |types, ndt| {
-                ndt.inner = DataType::Enum(Enum {
+                ndt.ty = DataType::Enum(Enum {
                     variants: vec![
                         ("Null".into(), Variant::unit()),
                         (
@@ -217,7 +217,7 @@ const _: () = {
         impl Type for serde_yaml::Number {
             inline: true;
             build: |types, ndt| {
-                ndt.inner = DataType::Enum(Enum {
+                ndt.ty = DataType::Enum(Enum {
                     variants: vec![
                         (
                             "f64".into(),
@@ -248,7 +248,7 @@ const _: () = {
 #[cfg(feature = "toml")]
 #[cfg_attr(docsrs, doc(cfg(feature = "toml")))]
 const _: () = {
-    use toml::{Value, value};
+    use toml::{value, Value};
 
     impl_ndt_as!(toml::map::Map<K, V> as PrimitiveMap<generics::K, generics::V>);
 
@@ -256,7 +256,7 @@ const _: () = {
         impl Type for toml::value::Datetime {
             inline: true;
             build: |types, ndt| {
-                ndt.inner = DataType::Struct(Struct {
+                ndt.ty = DataType::Struct(Struct {
                     fields: Fields::Named(NamedFields {
                         fields: vec![(
                             "v".into(),
@@ -281,7 +281,7 @@ const _: () = {
         impl Type for toml::Value {
             inline: true;
             build: |types, ndt| {
-                ndt.inner = DataType::Enum(Enum {
+                ndt.ty = DataType::Enum(Enum {
                     variants: vec![
                         (
                             "String".into(),
@@ -373,9 +373,9 @@ const _: () = {
                     types,
                     SENTINEL,
                     |types, ndt| {
-                        ndt.set_name(::std::borrow::Cow::Borrowed(stringify!($type_name)));
-                        ndt.set_module_path(::std::borrow::Cow::Borrowed(stringify!($module)));
-                        ndt.inner = str::definition(types);
+                        ndt.name = ::std::borrow::Cow::Borrowed(stringify!($type_name));
+                        ndt.module_path = ::std::borrow::Cow::Borrowed(stringify!($module));
+                        ndt.ty = str::definition(types);
                     },
                 ))
             }
@@ -470,7 +470,7 @@ const _: () = {
         impl Type for uhlc::Timestamp {
             inline: true;
             build: |types, ndt| {
-                ndt.inner = DataType::Struct(Struct {
+                ndt.ty = DataType::Struct(Struct {
                     fields: Fields::Named(NamedFields {
                         fields: vec![
                             (
@@ -610,7 +610,7 @@ impl_ndt!(
     impl<L, R> Type for either::Either<L, R> where { L: Type, R: Type } {
         inline: true;
         build: |types, ndt| {
-            ndt.inner = DataType::Enum(Enum {
+            ndt.ty = DataType::Enum(Enum {
                 variants: vec![
                     (
                         "Left".into(),
@@ -653,13 +653,13 @@ const _: () = {
                 types,
                 SENTINEL,
                 |types, ndt| {
-                    ndt.set_name(Cow::Borrowed("ErrorStackContext"));
-                    ndt.set_module_path(Cow::Borrowed("error_stack"));
+                    ndt.name = Cow::Borrowed("ErrorStackContext");
+                    ndt.module_path = Cow::Borrowed("error_stack");
 
                     let attachments = DataType::List(List::new(String::definition(types)));
                     let sources = DataType::List(List::new(ErrorStackContext::definition(types)));
 
-                    ndt.inner = Struct::named()
+                    ndt.ty = Struct::named()
                         .field("context", Field::new(String::definition(types)))
                         .field("attachments", Field::new(attachments))
                         .field("sources", Field::new(sources))
@@ -681,9 +681,9 @@ const _: () = {
             types,
             SENTINEL,
             |types, ndt| {
-                ndt.set_name(Cow::Borrowed("Report"));
-                ndt.set_module_path(Cow::Borrowed("error_stack"));
-                ndt.inner = DataType::List(List::new(ErrorStackContext::definition(types)));
+                ndt.name = Cow::Borrowed("Report");
+                ndt.module_path = Cow::Borrowed("error_stack");
+                ndt.ty = DataType::List(List::new(ErrorStackContext::definition(types)));
             },
         ))
     }
@@ -707,7 +707,7 @@ impl_ndt!(
     impl Type for bevy_ecs::entity::Entity {
         inline: true;
         build: |types, ndt| {
-            ndt.inner = Struct::unnamed().field(Field::new(u64::definition(types))).build();
+            ndt.ty = Struct::unnamed().field(Field::new(u64::definition(types))).build();
         }
     }
 );
@@ -725,7 +725,7 @@ const _: () = {
         impl Type for bevy_input::ButtonState {
             inline: true;
             build: |_types, ndt| {
-                ndt.inner = DataType::Enum(Enum {
+                ndt.ty = DataType::Enum(Enum {
                     variants: vec![
                         ("Pressed".into(), Variant::unit()),
                         ("Released".into(), Variant::unit()),
@@ -738,7 +738,7 @@ const _: () = {
         impl Type for bevy_input::keyboard::KeyboardInput {
             inline: true;
             build: |types, ndt| {
-                ndt.inner = Struct::named()
+                ndt.ty = Struct::named()
                     .field(
                         "key_code",
                         Field::new(bevy_input::keyboard::KeyCode::definition(types)),
@@ -762,7 +762,7 @@ const _: () = {
         impl Type for bevy_input::mouse::MouseButtonInput {
             inline: true;
             build: |types, ndt| {
-                ndt.inner = Struct::named()
+                ndt.ty = Struct::named()
                     .field(
                         "button",
                         Field::new(bevy_input::mouse::MouseButton::definition(types)),
@@ -782,7 +782,7 @@ const _: () = {
         impl Type for bevy_input::mouse::MouseButton {
             inline: true;
             build: |types, ndt| {
-                ndt.inner = DataType::Enum(Enum {
+                ndt.ty = DataType::Enum(Enum {
                     variants: vec![
                         ("Left".into(), Variant::unit()),
                         ("Right".into(), Variant::unit()),
@@ -804,7 +804,7 @@ const _: () = {
         impl Type for bevy_input::mouse::MouseWheel {
             inline: true;
             build: |types, ndt| {
-                ndt.inner = Struct::named()
+                ndt.ty = Struct::named()
                     .field(
                         "unit",
                         Field::new(bevy_input::mouse::MouseScrollUnit::definition(types)),
@@ -822,7 +822,7 @@ const _: () = {
         impl Type for bevy_input::mouse::MouseScrollUnit {
             inline: true;
             build: |_types, ndt| {
-                ndt.inner = DataType::Enum(Enum {
+                ndt.ty = DataType::Enum(Enum {
                     variants: vec![
                         ("Line".into(), Variant::unit()),
                         ("Pixel".into(), Variant::unit()),
@@ -835,7 +835,7 @@ const _: () = {
         impl Type for bevy_input::mouse::MouseMotion {
             inline: true;
             build: |types, ndt| {
-                ndt.inner = Struct::named()
+                ndt.ty = Struct::named()
                     .field("delta", Field::new(glam::Vec2::definition(types)))
                     .build();
             }
@@ -860,7 +860,7 @@ impl_ndt!(
     impl Type for geojson::GeometryValue {
         inline: true;
         build: |types, ndt| {
-            ndt.inner = DataType::Enum(Enum {
+            ndt.ty = DataType::Enum(Enum {
                 variants: vec![
                     (
                         "Point".into(),
@@ -915,7 +915,7 @@ impl_ndt!(
     impl Type for geojson::Geometry {
         inline: true;
         build: |types, ndt| {
-            ndt.inner = Struct::named()
+            ndt.ty = Struct::named()
                 .field("bbox", Field::new(Option::<geojson::Bbox>::definition(types)))
                 .field("value", Field::new(geojson::GeometryValue::definition(types)))
                 .field(
@@ -929,7 +929,7 @@ impl_ndt!(
     impl Type for geojson::Feature {
         inline: true;
         build: |types, ndt| {
-            ndt.inner = Struct::named()
+            ndt.ty = Struct::named()
                 .field("bbox", Field::new(Option::<geojson::Bbox>::definition(types)))
                 .field(
                     "geometry",
@@ -954,7 +954,7 @@ impl_ndt!(
     impl Type for geojson::FeatureCollection {
         inline: true;
         build: |types, ndt| {
-            ndt.inner = Struct::named()
+            ndt.ty = Struct::named()
                 .field("bbox", Field::new(Option::<geojson::Bbox>::definition(types)))
                 .field(
                     "features",
@@ -971,7 +971,7 @@ impl_ndt!(
     impl Type for geojson::feature::Id {
         inline: true;
         build: |types, ndt| {
-            ndt.inner = DataType::Enum(Enum {
+            ndt.ty = DataType::Enum(Enum {
                 variants: vec![
                     (
                         "String".into(),
@@ -998,7 +998,7 @@ impl_ndt!(
     impl Type for geozero::mvt::Tile {
         inline: true;
         build: |types, ndt| {
-            ndt.inner = Struct::named()
+            ndt.ty = Struct::named()
                 .field(
                     "layers",
                     Field::new(Vec::<geozero::mvt::tile::Layer>::definition(types)),
@@ -1010,7 +1010,7 @@ impl_ndt!(
     impl Type for geozero::mvt::tile::Value {
         inline: true;
         build: |types, ndt| {
-            ndt.inner = Struct::named()
+            ndt.ty = Struct::named()
                 .field("string_value", Field::new(Option::<String>::definition(types)))
                 .field("float_value", Field::new(Option::<f32>::definition(types)))
                 .field("double_value", Field::new(Option::<f64>::definition(types)))
@@ -1025,7 +1025,7 @@ impl_ndt!(
     impl Type for geozero::mvt::tile::Feature {
         inline: true;
         build: |types, ndt| {
-            ndt.inner = Struct::named()
+            ndt.ty = Struct::named()
                 .field("id", Field::new(Option::<u64>::definition(types)))
                 .field("tags", Field::new(Vec::<u32>::definition(types)))
                 .field("type", Field::new(Option::<i32>::definition(types)))
@@ -1037,7 +1037,7 @@ impl_ndt!(
     impl Type for geozero::mvt::tile::Layer {
         inline: true;
         build: |types, ndt| {
-            ndt.inner = Struct::named()
+            ndt.ty = Struct::named()
                 .field("version", Field::new(u32::definition(types)))
                 .field("name", Field::new(String::definition(types)))
                 .field(
@@ -1057,7 +1057,7 @@ impl_ndt!(
     impl Type for geozero::mvt::tile::GeomType {
         inline: true;
         build: |_types, ndt| {
-            ndt.inner = DataType::Enum(Enum {
+            ndt.ty = DataType::Enum(Enum {
                 variants: vec![
                     ("Unknown".into(), Variant::unit()),
                     ("Point".into(), Variant::unit()),

@@ -23,7 +23,7 @@ pub enum Reference {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NamedReference {
     pub(crate) id: NamedId,
-    pub(crate) generics: Vec<(GenericReference, DataType)>,
+    pub generics: Vec<(GenericReference, DataType)>,
     pub(crate) inline: bool,
     pub(crate) instance: Option<usize>,
 }
@@ -51,17 +51,7 @@ impl NamedReference {
         let ndt = self.get(types)?;
         self.instance
             .and_then(|instance| ndt.instances.get(instance))
-            .or_else(|| Some(ndt.ty()))
-    }
-
-    /// Get the generic parameters set on this reference which will be filled in by the [NamedDataType].
-    pub fn generics(&self) -> &[(GenericReference, DataType)] {
-        &self.generics
-    }
-
-    /// Get the generic parameters set on this reference as mutable references.
-    pub fn generics_mut(&mut self) -> &mut Vec<(GenericReference, DataType)> {
-        &mut self.generics
+            .or(Some(&ndt.ty))
     }
 
     /// Get whether this reference should be inlined

@@ -68,16 +68,17 @@ pub(crate) fn context_has_const_params() -> bool {
 ///
 /// These can become `export MyNamedType = ...` in Typescript can we be referenced in types like `{ field: MyNamedType }`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct NamedDataType {
-    pub(crate) id: NamedId,
-    pub(crate) name: Cow<'static, str>,
-    pub(crate) docs: Cow<'static, str>,
-    pub(crate) deprecated: Option<Deprecated>,
-    pub(crate) module_path: Cow<'static, str>,
-    pub(crate) location: Location<'static>,
-    pub(crate) generics: Cow<'static, [Generic]>,
-    pub(crate) inline: bool,
-    pub(crate) inner: DataType,
+    pub id: NamedId,
+    pub name: Cow<'static, str>,
+    pub docs: Cow<'static, str>,
+    pub deprecated: Option<Deprecated>,
+    pub module_path: Cow<'static, str>,
+    pub location: Location<'static>,
+    pub generics: Cow<'static, [Generic]>,
+    pub inline: bool,
+    pub ty: DataType,
     /// Specialized instantiated shapes for references to this named type.
     ///
     /// The canonical [`NamedDataType::ty`] must stay general so it can be shared by all references.
@@ -85,6 +86,8 @@ pub struct NamedDataType {
     ///
     /// We store those shapes here and let [`NamedReference`] keep only a stable index into this list.
     /// Keeping the instantiated [`DataType`] off the reference avoids recursive type graphs becoming part of the reference's hash/equality semantics.
+    ///
+    /// This is kept private to ensure we can remove the removal of items as that would change the indexes and could break existing references.
     pub(crate) instances: Vec<DataType>,
 }
 
@@ -106,7 +109,7 @@ impl NamedDataType {
             location: location.to_owned(),
             generics: Cow::Owned(generics),
             inline: false,
-            inner: dt,
+            ty: dt,
             instances: Vec::new(),
         }
     }
@@ -132,7 +135,7 @@ impl NamedDataType {
             location: location.to_owned(),
             generics: Cow::Owned(generics),
             inline: true,
-            inner: dt,
+            ty: dt,
             instances: Vec::new(),
         }
     }
@@ -150,7 +153,7 @@ impl NamedDataType {
             location: self.location.clone(),
             generics: self.generics.clone(),
             inline: self.inline,
-            inner: self.inner.clone(),
+            ty: self.ty.clone(),
             instances: self.instances.clone(),
         }
     }
@@ -216,7 +219,7 @@ impl NamedDataType {
             module_path: Cow::Borrowed(""),
             generics: Cow::Borrowed(generics_for_ndt),
             inline,
-            inner: DataType::Primitive(super::Primitive::i8),
+            ty: DataType::Primitive(super::Primitive::i8),
             instances: Vec::new(),
         };
 
@@ -249,10 +252,10 @@ impl NamedDataType {
             };
 
             // We patch the Tauri `Type` implementation.
-            if ndt.name() == "TAURI_CHANNEL" && ndt.module_path().starts_with("tauri::") {
+            if ndt.name == "TAURI_CHANNEL" && ndt.module_path.starts_with("tauri::") {
                 // This causes an exporter that isn't aware of Tauri's channel to error.
                 // This is effectively `Reference::opaque(TauriChannel)` but we do some hackery for better errors.
-                ndt.inner = reference::tauri().into();
+                ndt.ty = reference::tauri().into();
 
                 // This ensures that we never create a `export type Channel`,
                 // instead the definition gets inlined into each callsite.
@@ -273,8 +276,8 @@ impl NamedDataType {
             panic::resume_unwind(payload);
         }
 
-        if ndt.name() == "TAURI_CHANNEL" && ndt.module_path().starts_with("tauri::") {
-            ndt.inner = reference::tauri().into();
+        if ndt.name == "TAURI_CHANNEL" && ndt.module_path.starts_with("tauri::") {
+            ndt.ty = reference::tauri().into();
             inline = true;
         }
 
@@ -282,7 +285,7 @@ impl NamedDataType {
             .0
             .get_mut(&id)
             .and_then(Option::as_mut)
-            .and_then(|existing| existing.register_instance(ndt.inner));
+            .and_then(|existing| existing.register_instance(ndt.ty));
 
         Reference::Named(NamedReference {
             id: id.clone(),
@@ -321,101 +324,6 @@ impl NamedDataType {
         !self.inline
     }
 
-    /// The name of the type
-    pub fn name(&self) -> &Cow<'static, str> {
-        &self.name
-    }
-
-    /// Get a mutable reference to the name of the type
-    pub fn name_mut(&mut self) -> &mut Cow<'static, str> {
-        &mut self.name
-    }
-
-    /// Set the name of the type
-    pub fn set_name(&mut self, name: Cow<'static, str>) {
-        self.name = name;
-    }
-
-    /// Rust documentation comments on the type
-    pub fn docs(&self) -> &Cow<'static, str> {
-        &self.docs
-    }
-
-    /// Get a mutable reference to the Rust documentation comments on the type
-    pub fn docs_mut(&mut self) -> &mut Cow<'static, str> {
-        &mut self.docs
-    }
-
-    /// Set the Rust documentation comments on the type
-    pub fn set_docs(&mut self, docs: Cow<'static, str>) {
-        self.docs = docs;
-    }
-
-    /// The Rust deprecated comment if the type is deprecated.
-    pub fn deprecated(&self) -> Option<&Deprecated> {
-        self.deprecated.as_ref()
-    }
-
-    /// Get a mutable reference to the Rust deprecated comment if the type is deprecated.
-    pub fn deprecated_mut(&mut self) -> Option<&mut Deprecated> {
-        self.deprecated.as_mut()
-    }
-
-    /// Set the Rust deprecated comment if the type is deprecated.
-    pub fn set_deprecated(&mut self, deprecated: Option<Deprecated>) {
-        self.deprecated = deprecated;
-    }
-
-    /// The code location where this type is implemented
-    pub fn location(&self) -> Location<'static> {
-        self.location
-    }
-
-    /// Set the code location where this type is implemented
-    pub fn set_location(&mut self, location: Location<'static>) {
-        self.location = location;
-    }
-
-    /// The Rust path of the module where this type is defined
-    pub fn module_path(&self) -> &Cow<'static, str> {
-        &self.module_path
-    }
-
-    /// Get a mutable reference to the Rust path of the module where this type is defined
-    pub fn module_path_mut(&mut self) -> &mut Cow<'static, str> {
-        &mut self.module_path
-    }
-
-    /// Set the Rust path of the module where this type is defined
-    pub fn set_module_path(&mut self, module_path: Cow<'static, str>) {
-        self.module_path = module_path;
-    }
-
-    /// The generics that are defined on this type
-    pub fn generics(&self) -> &[Generic] {
-        &self.generics
-    }
-
-    /// Get a mutable reference to the generics that are defined on this type
-    pub fn generics_mut(&mut self) -> &mut Cow<'static, [Generic]> {
-        &mut self.generics
-    }
-
-    /// Get the inner [`DataType`]
-    pub fn ty(&self) -> &DataType {
-        &self.inner
-    }
-
-    /// Get a mutable reference to the inner [`DataType`]
-    pub fn ty_mut(&mut self) -> &mut DataType {
-        &mut self.inner
-    }
-
-    /// Set the inner [`DataType`]
-    pub fn set_ty(&mut self, ty: DataType) {
-        self.inner = ty;
-    }
-
     /// Construct a [Reference] to this [NamedDataType] using another reference as a template.
     ///
     /// This preserves hidden per-reference state such as inline and instance information while
@@ -432,14 +340,14 @@ impl NamedDataType {
     /// Allows you to map over the inner [`DataType`] and all instances.
     /// Sometimes a [`NamedDataType`] will be represented as multiple [`DataType`]'s so inlining can be more accurate so you should prefer this over [`NamedDataType::ty_*`] helpers.
     pub fn map_ty_mut(&mut self, mut f: impl FnMut(&mut DataType)) {
-        f(&mut self.inner);
+        f(&mut self.ty);
         for instance in self.instances.iter_mut() {
             f(instance);
         }
     }
 
     pub(crate) fn register_instance(&mut self, ty: DataType) -> Option<usize> {
-        if self.inner == ty {
+        if self.ty == ty {
             return None;
         }
 
@@ -456,7 +364,7 @@ impl NamedDataType {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 /// Runtime representation of Rust's `#[deprecated]` metadata.
 pub struct Deprecated {
-    note: Option<Cow<'static, str>>,
+    pub note: Option<Cow<'static, str>>,
     since: Option<Cow<'static, str>>,
 }
 
@@ -489,36 +397,6 @@ impl Deprecated {
             note: Some(note),
             since,
         }
-    }
-
-    /// Optional deprecation note/message.
-    pub fn note(&self) -> Option<&Cow<'static, str>> {
-        self.note.as_ref()
-    }
-
-    /// Mutable optional deprecation note/message.
-    pub fn note_mut(&mut self) -> Option<&mut Cow<'static, str>> {
-        self.note.as_mut()
-    }
-
-    /// Set the optional deprecation note/message.
-    pub fn set_note(&mut self, note: Option<Cow<'static, str>>) {
-        self.note = note;
-    }
-
-    /// Optional version string from `since = "..."`.
-    pub fn since(&self) -> Option<&Cow<'static, str>> {
-        self.since.as_ref()
-    }
-
-    /// Mutable optional version string from `since = "..."`.
-    pub fn since_mut(&mut self) -> Option<&mut Cow<'static, str>> {
-        self.since.as_mut()
-    }
-
-    /// Set the optional version string from `since = "..."`.
-    pub fn set_since(&mut self, since: Option<Cow<'static, str>>) {
-        self.since = since;
     }
 }
 

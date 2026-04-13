@@ -75,9 +75,9 @@ macro_rules! _impl_ndt_as {
                                 }
                             };
 
-                            ndt.set_name(::std::borrow::Cow::Owned(type_name));
-                            ndt.set_module_path(::std::borrow::Cow::Owned(module_path));
-                            ndt.inner = <$ty2 as Type>::definition(types);
+                            ndt.name = ::std::borrow::Cow::Owned(type_name);
+                            ndt.module_path = ::std::borrow::Cow::Owned(module_path);
+                            ndt.ty = <$ty2 as Type>::definition(types);
                         },
                     ))
                 }
@@ -115,9 +115,9 @@ macro_rules! _impl_ndt_as {
                                 }
                             };
 
-                            ndt.set_name(::std::borrow::Cow::Owned(type_name));
-                            ndt.set_module_path(::std::borrow::Cow::Owned(module_path));
-                            ndt.inner = <$ty2 as Type>::definition(types);
+                            ndt.name = ::std::borrow::Cow::Owned(type_name);
+                            ndt.module_path = ::std::borrow::Cow::Owned(module_path);
+                            ndt.ty = <$ty2 as Type>::definition(types);
                         },
                     ))
                 }
@@ -164,9 +164,9 @@ macro_rules! _impl_ndt_as {
                                 }
                             };
 
-                            ndt.set_name(::std::borrow::Cow::Owned(type_name));
-                            ndt.set_module_path(::std::borrow::Cow::Owned(module_path));
-                            ndt.inner = <$ty2 as Type>::definition(types);
+                            ndt.name = ::std::borrow::Cow::Owned(type_name);
+                            ndt.module_path = ::std::borrow::Cow::Owned(module_path);
+                            ndt.ty = <$ty2 as Type>::definition(types);
                         },
                     ))
                 }
@@ -182,7 +182,7 @@ macro_rules! _impl_ndt_as {
                 } {
                     inline: true;
                     build: |types, ndt| {
-                        ndt.inner = <$ty2 as Type>::definition(types);
+                        ndt.ty = <$ty2 as Type>::definition(types);
                     }
                 }
             )*
@@ -241,8 +241,8 @@ macro_rules! _impl_ndt {
                                  }
                             };
 
-                            $ndt.set_name(::std::borrow::Cow::Owned(type_name));
-                            $ndt.set_module_path(::std::borrow::Cow::Owned(module_path));
+                            $ndt.name = ::std::borrow::Cow::Owned(type_name);
+                            $ndt.module_path = ::std::borrow::Cow::Owned(module_path);
 
                             $build
                         },
