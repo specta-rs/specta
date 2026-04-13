@@ -775,6 +775,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "example-scratchpad"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "specta",
+ "specta-serde",
+ "specta-typescript",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
