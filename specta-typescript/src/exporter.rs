@@ -1,7 +1,7 @@
 use std::{
     borrow::Cow,
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    fmt,
+    error, fmt,
     ops::Deref,
     panic::Location,
     path::{Path, PathBuf},
@@ -14,6 +14,9 @@ use specta::{
 };
 
 use crate::{Branded, Error, primitives, references};
+
+/// Error type returned by exporter format callbacks.
+pub type FormatError = Box<dyn error::Error + Send + Sync + 'static>;
 
 /// Allows configuring the format of the final types file
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -46,9 +49,11 @@ impl fmt::Debug for RuntimeFn {
     }
 }
 
-type TypesFormatFn = Arc<dyn for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, Error> + Send + Sync>;
-type DataTypeFormatFn =
-    Arc<dyn for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, Error> + Send + Sync>;
+type TypesFormatFn =
+    Arc<dyn for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError> + Send + Sync>;
+type DataTypeFormatFn = Arc<
+    dyn for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError> + Send + Sync,
+>;
 
 #[derive(Clone)]
 #[doc(hidden)]
@@ -75,8 +80,8 @@ pub trait IntoFormat {
 
 impl<TypesFn, DataTypeFn> IntoFormat for (TypesFn, DataTypeFn)
 where
-    TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, Error> + Send + Sync + 'static,
-    DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, Error>
+    TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError> + Send + Sync + 'static,
+    DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError>
         + Send
         + Sync
         + 'static,
@@ -92,8 +97,8 @@ where
 impl<F, TypesFn, DataTypeFn> IntoFormat for F
 where
     F: FnOnce() -> (TypesFn, DataTypeFn),
-    TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, Error> + Send + Sync + 'static,
-    DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, Error>
+    TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError> + Send + Sync + 'static,
+    DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError>
         + Send
         + Sync
         + 'static,
@@ -498,7 +503,10 @@ impl Exporter {
         self.format
             .as_ref()
             .ok_or_else(Error::format_not_set)
-            .and_then(|format| (format.types)(types))
+            .and_then(|format| {
+                (format.types)(types)
+                    .map_err(|err| Error::format("type graph formatter failed", err))
+            })
     }
 }
 

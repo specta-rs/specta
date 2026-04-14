@@ -14,18 +14,18 @@ pub struct Demo {
 }
 
 fn main() {
-    // let types = Types::default().register::<Demo>();
-    // let out = specta_typescript::Typescript::new()
-    //     .export(&specta_serde::apply(types).unwrap())
-    //     .unwrap();
+    let types = Types::default().register::<Demo>();
+    let out = specta_typescript::Typescript::new()
+        .export(&specta_serde::apply(types).unwrap())
+        .unwrap();
 
-    // let out = specta_typescript::Typescript::new()
-    //     // .format(specta_serde::format)
-    //     .format(specta_serde::format_phases)
-    //     .export(&Types::default().register::<Demo>())
-    //     .unwrap();
+    let out = specta_typescript::Typescript::new()
+        // .format(specta_typescript::serde::format)
+        .format(specta_typescript::serde::format_phases)
+        .export(&Types::default().register::<Demo>())
+        .unwrap();
 
-    // println!("{}", out);
+    println!("{}", out);
 
     let mut types = Types::default();
     let dt = Demo::definition(&mut types);
@@ -38,7 +38,7 @@ fn main() {
         "{:?}",
         // TODO: This should error?
         specta_typescript::primitives::inline(
-            &specta_typescript::Typescript::new().format(specta_serde::format),
+            &specta_typescript::Typescript::new().format(specta_typescript::serde::format),
             &types,
             &dt
         )
@@ -46,7 +46,7 @@ fn main() {
     println!(
         "{:?}",
         specta_typescript::primitives::inline(
-            &specta_typescript::Typescript::new().format(specta_serde::format_phases),
+            &specta_typescript::Typescript::new().format(specta_typescript::serde::format_phases),
             &types,
             &dt
         )

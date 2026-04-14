@@ -112,6 +112,11 @@ enum ErrorKind {
         message: Cow<'static, str>,
         source: FrameworkSource,
     },
+    /// An error occurred in a format callback.
+    Format {
+        message: Cow<'static, str>,
+        source: FrameworkSource,
+    },
     FormatNotSet,
 
     //
@@ -146,6 +151,19 @@ impl Error {
     ) -> Self {
         Self {
             kind: ErrorKind::Framework {
+                message: message.into(),
+                source: source.into(),
+            },
+        }
+    }
+
+    /// Construct an error for custom format callbacks.
+    pub fn format(
+        message: impl Into<Cow<'static, str>>,
+        source: impl Into<Box<dyn std::error::Error + Send + Sync>>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::Format {
                 message: message.into(),
                 source: source.into(),
             },
@@ -334,6 +352,16 @@ impl fmt::Display for Error {
                     write!(f, "Framework error: {message}: {source}")
                 }
             }
+            ErrorKind::Format { message, source } => {
+                let source = source.to_string();
+                if message.is_empty() && source.is_empty() {
+                    write!(f, "Format error")
+                } else if source.is_empty() {
+                    write!(f, "Format error: {message}")
+                } else {
+                    write!(f, "Format error: {message}: {source}")
+                }
+            }
             ErrorKind::FormatNotSet => write!(
                 f,
                 "Exporter format is not configured. Call `Exporter::format(...)`, `Typescript::format(...)`, or `JSDoc::format(...)` before exporting."
@@ -373,7 +401,9 @@ impl error::Error for Error {
             | ErrorKind::Metadata { source, .. }
             | ErrorKind::RemoveFile { source, .. }
             | ErrorKind::RemoveDir { source, .. } => Some(source),
-            ErrorKind::Framework { source, .. } => Some(source.as_ref()),
+            ErrorKind::Framework { source, .. } | ErrorKind::Format { source, .. } => {
+                Some(source.as_ref())
+            }
             ErrorKind::FmtLegacy(error) => Some(error),
             _ => None,
         }

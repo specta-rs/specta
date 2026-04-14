@@ -17,14 +17,14 @@
 //! use specta::{Type, Types};
 //! use specta_typescript::Typescript;
 //!
-//! fn raw_types<'a>(types: &'a Types) -> Result<Cow<'a, Types>, specta_typescript::Error> {
+//! fn raw_types<'a>(types: &'a Types) -> Result<Cow<'a, Types>, specta_typescript::FormatError> {
 //!     Ok(Cow::Borrowed(types))
 //! }
 //!
 //! fn raw_datatype<'a>(
 //!     _types: &'a Types,
 //!     ty: &'a specta::datatype::DataType,
-//! ) -> Result<Cow<'a, specta::datatype::DataType>, specta_typescript::Error> {
+//! ) -> Result<Cow<'a, specta::datatype::DataType>, specta_typescript::FormatError> {
 //!     Ok(Cow::Borrowed(ty))
 //! }
 //!
@@ -68,12 +68,16 @@ mod opaque;
 pub mod primitives;
 mod references;
 pub(crate) mod reserved_names;
+/// Helpers for integrating `specta-serde` with the TypeScript exporter.
+pub mod serde;
 mod types;
 mod typescript;
 
 pub use branded::Branded;
 pub use error::Error;
-pub use exporter::{BrandedTypeExporter, Exporter, FrameworkExporter, IntoFormat, Layout};
+pub use exporter::{
+    BrandedTypeExporter, Exporter, FormatError, FrameworkExporter, IntoFormat, Layout,
+};
 pub use jsdoc::JSDoc;
 pub use opaque::define;
 pub use references::collect_references;

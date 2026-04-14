@@ -156,8 +156,11 @@ pub struct SerdeWithOneOrMany {
 }
 
 fn raw_format() -> (
-    impl for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, specta_typescript::Error>,
-    impl for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, specta_typescript::Error>,
+    impl for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, specta_typescript::FormatError>,
+    impl for<'a> Fn(
+        &'a Types,
+        &'a DataType,
+    ) -> Result<Cow<'a, DataType>, specta_typescript::FormatError>,
 ) {
     (
         |types| Ok(Cow::Borrowed(types)),
@@ -223,7 +226,7 @@ fn main() {
             Ok(_) => println!(
                 "specta_serde::apply(...):\n{}",
                 Typescript::default()
-                    .format(specta_serde::format)
+                    .format(specta_typescript::serde::format)
                     .export(&types)
                     .unwrap()
             ),
@@ -232,7 +235,7 @@ fn main() {
         println!(
             "specta_serde::apply_phases(...):\n{}",
             Typescript::default()
-                .format(specta_serde::format_phases)
+                .format(specta_typescript::serde::format_phases)
                 .export(&types)
                 .unwrap()
         );
@@ -245,7 +248,7 @@ fn main() {
         println!(
             "serde_with + specta_serde::apply_phases(...):\n{}",
             Typescript::default()
-                .format(specta_serde::format_phases)
+                .format(specta_typescript::serde::format_phases)
                 .export(&serde_with_types)
                 .unwrap()
         );

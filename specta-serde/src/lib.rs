@@ -110,7 +110,6 @@ use specta::{
         UnnamedFields, Variant,
     },
 };
-use specta_typescript::Error as TypescriptError;
 
 mod error;
 mod inflection;
@@ -133,56 +132,6 @@ pub enum Phase {
     Serialize,
     /// The shape used when Rust deserializes data from the wire.
     Deserialize,
-}
-
-fn identity_datatype<'a>(
-    _: &'a Types,
-    dt: &'a DataType,
-) -> std::result::Result<Cow<'a, DataType>, TypescriptError> {
-    Ok(Cow::Borrowed(dt))
-}
-
-/// Type graph formatter returned by [`format`] and [`format_phases`].
-pub type TypesFormatter =
-    for<'a> fn(&'a Types) -> std::result::Result<Cow<'a, Types>, TypescriptError>;
-/// Datatype formatter returned by [`format`] and [`format_phases`].
-pub type DataTypeFormatter =
-    for<'a> fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, TypescriptError>;
-
-fn format_types(types: &Types) -> std::result::Result<Cow<'_, Types>, TypescriptError> {
-    let types = apply(types.clone())
-        .map_err(|err| TypescriptError::framework("specta_serde::format failed", err))?;
-    Ok(Cow::Owned(types))
-}
-
-fn format_phases_types(types: &Types) -> std::result::Result<Cow<'_, Types>, TypescriptError> {
-    let types = apply_phases(types.clone())
-        .map_err(|err| TypescriptError::framework("specta_serde::format_phases failed", err))?;
-    Ok(Cow::Owned(types))
-}
-
-fn format_phases_datatype<'a>(
-    types: &'a Types,
-    dt: &'a DataType,
-) -> std::result::Result<Cow<'a, DataType>, TypescriptError> {
-    Ok(Cow::Owned(select_phase_datatype(
-        dt,
-        types,
-        Phase::Serialize,
-    )))
-}
-
-/// Formatter helpers for `specta-typescript` exporters in unified serde mode.
-pub fn format() -> (TypesFormatter, DataTypeFormatter) {
-    (format_types, identity_datatype)
-}
-
-/// Formatter helpers for `specta-typescript` exporters in split-phase serde mode.
-///
-/// The type graph is expanded to include both `*_Serialize` and `*_Deserialize`
-/// named types. Inline primitive rendering selects the serialize-facing shape.
-pub fn format_phases() -> (TypesFormatter, DataTypeFormatter) {
-    (format_phases_types, format_phases_datatype)
 }
 
 // TODO: Remove this

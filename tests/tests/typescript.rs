@@ -10,42 +10,48 @@ use specta::{
     Type, Types,
     datatype::{DataType, Primitive, Reference, Tuple},
 };
-use specta_typescript::{Error, Layout, Typescript, primitives};
+use specta_typescript::{FormatError, Layout, Typescript, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
 
-fn identity_types<'a>(types: &'a Types) -> Result<Cow<'a, Types>, Error> {
+fn identity_types<'a>(types: &'a Types) -> Result<Cow<'a, Types>, FormatError> {
     Ok(Cow::Borrowed(types))
 }
 
-fn map_bool_to_string<'a>(_: &'a Types, dt: &'a DataType) -> Result<Cow<'a, DataType>, Error> {
+fn map_bool_to_string<'a>(
+    _: &'a Types,
+    dt: &'a DataType,
+) -> Result<Cow<'a, DataType>, FormatError> {
     Ok(match dt {
         DataType::Primitive(Primitive::bool) => Cow::Owned(DataType::Primitive(Primitive::str)),
         _ => Cow::Borrowed(dt),
     })
 }
 
-fn map_bool_to_null_tuple<'a>(_: &'a Types, dt: &'a DataType) -> Result<Cow<'a, DataType>, Error> {
+fn map_bool_to_null_tuple<'a>(
+    _: &'a Types,
+    dt: &'a DataType,
+) -> Result<Cow<'a, DataType>, FormatError> {
     Ok(match dt {
         DataType::Primitive(Primitive::bool) => Cow::Owned(DataType::Tuple(Tuple::new(vec![]))),
         _ => Cow::Borrowed(dt),
     })
 }
 
-fn map_reference_to_string<'a>(_: &'a Types, dt: &'a DataType) -> Result<Cow<'a, DataType>, Error> {
+fn map_reference_to_string<'a>(
+    _: &'a Types,
+    dt: &'a DataType,
+) -> Result<Cow<'a, DataType>, FormatError> {
     Ok(match dt {
         DataType::Reference(Reference::Named(_)) => Cow::Owned(DataType::Primitive(Primitive::str)),
         _ => Cow::Borrowed(dt),
     })
 }
 
-fn error_on_bool<'a>(_: &'a Types, dt: &'a DataType) -> Result<Cow<'a, DataType>, Error> {
+fn error_on_bool<'a>(_: &'a Types, dt: &'a DataType) -> Result<Cow<'a, DataType>, FormatError> {
     match dt {
-        DataType::Primitive(Primitive::bool) => Err(Error::framework(
-            "format hook failed",
-            std::io::Error::other("boom"),
-        )),
+        DataType::Primitive(Primitive::bool) => Err(std::io::Error::other("boom").into()),
         _ => Ok(Cow::Borrowed(dt)),
     }
 }
@@ -819,7 +825,10 @@ fn primitives_format_datatype_hook_errors_bubble_out() {
 
     let err = primitives::inline(&ts, &types, &DataType::Primitive(Primitive::bool)).unwrap_err();
 
-    assert_eq!(err.to_string(), "Framework error: format hook failed: boom");
+    assert_eq!(
+        err.to_string(),
+        "Format error: datatype formatter failed: boom"
+    );
 }
 
 #[test]

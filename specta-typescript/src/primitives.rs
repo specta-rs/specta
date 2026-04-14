@@ -195,7 +195,10 @@ fn apply_datatype_format(
         .format
         .as_ref()
         .ok_or_else(Error::format_not_set)
-        .and_then(|format| (format.datatype)(types, dt))?;
+        .and_then(|format| {
+            (format.datatype)(types, dt)
+                .map_err(|err| Error::format("datatype formatter failed", err))
+        })?;
 
     match mapped {
         Cow::Borrowed(dt) => apply_datatype_format_children(exporter, types, dt.clone()),

@@ -2055,7 +2055,6 @@ dependencies = [
  "serde",
  "specta",
  "specta-macros",
- "specta-typescript",
 ]
 
 [[package]]
