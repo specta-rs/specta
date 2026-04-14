@@ -1,18 +1,16 @@
 use serde::{Deserialize, Serialize};
-use specta::{ResolvedTypes, Type, Types};
+use specta::{Type, Types};
 use specta_swift::Swift;
 
-fn phase_collections(
-    types: Types,
-) -> [(&'static str, Result<ResolvedTypes, specta_serde::Error>); 3] {
+fn phase_collections(types: Types) -> [(&'static str, Result<Types, specta_serde::Error>); 3] {
     [
-        ("raw", Ok(ResolvedTypes::from_resolved_types(types.clone()))),
+        ("raw", Ok(types.clone())),
         ("serde", specta_serde::apply(types.clone())),
         ("serde_phases", specta_serde::apply_phases(types)),
     ]
 }
 
-fn phase_output(types: Result<ResolvedTypes, specta_serde::Error>) -> String {
+fn phase_output(types: Result<Types, specta_serde::Error>) -> String {
     types.map_or_else(
         |err| format!("ERROR: {err}"),
         |types| {

@@ -21,7 +21,7 @@ mod r#type;
 mod types;
 
 pub use r#type::Type;
-pub use types::{ResolvedTypes, Types};
+pub use types::Types;
 
 #[doc(inline)]
 #[cfg(feature = "collect")]

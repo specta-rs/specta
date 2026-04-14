@@ -1,8 +1,8 @@
 use std::{borrow::Cow, path::Path};
 
-use specta::ResolvedTypes;
+use specta::Types;
 
-use crate::{Branded, BrandedTypeExporter, Error, Exporter, Layout};
+use crate::{Branded, BrandedTypeExporter, Error, Exporter, Layout, exporter::IntoFormat};
 
 /// JSDoc language exporter.
 #[derive(Debug, Clone)]
@@ -61,10 +61,15 @@ impl JSDoc {
         Self(self.0.branded_type_impl(builder))
     }
 
+    /// Configure how Specta types are rewritten before JSDoc rendering.
+    pub fn format(self, builder: impl IntoFormat) -> Self {
+        Self(self.0.format(builder))
+    }
+
     /// Export the files into a single string.
     ///
     /// Note: This returns an error if the format is `Format::Files`.
-    pub fn export(&self, types: &ResolvedTypes) -> Result<String, Error> {
+    pub fn export(&self, types: &Types) -> Result<String, Error> {
         self.0.export(types)
     }
 
@@ -73,7 +78,7 @@ impl JSDoc {
     /// When configured when `format` is `Format::Files`, you must provide a directory path.
     /// Otherwise, you must provide the path of a single file.
     ///
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &ResolvedTypes) -> Result<(), Error> {
+    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types) -> Result<(), Error> {
         self.0.export_to(path, types)
     }
 }

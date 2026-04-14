@@ -2,7 +2,7 @@ use std::{iter, path::Path};
 
 use serde::{Deserialize, Serialize};
 use specta::{
-    ResolvedTypes, Type, Types,
+    Type, Types,
     datatype::{DataType, NamedDataType, Primitive, Reference},
 };
 use specta_typescript::Typescript;
@@ -109,7 +109,7 @@ mod testing {
 fn inline_for<T: Type>(zod: &Zod) -> Result<String, specta_zod::Error> {
     let mut types = Types::default();
     let dt = T::definition(&mut types);
-    primitives::inline(zod, &ResolvedTypes::from_resolved_types(types), &dt)
+    primitives::inline(zod, &types, &dt)
 }
 
 fn temp_root() -> std::path::PathBuf {
@@ -133,11 +133,9 @@ fn zod_export_smoke() {
     }
 
     let types = Types::default().register::<Demo>();
-    let resolved = ResolvedTypes::from_resolved_types(types);
-
     let out = Zod::default()
         .bigint(BigIntExportBehavior::Number)
-        .export(&resolved)
+        .export(&types)
         .unwrap();
 
     assert!(out.contains("import { z } from \"zod\";"));
@@ -148,24 +146,22 @@ fn zod_export_smoke() {
 #[test]
 fn zod_primitives_smoke() {
     let (types, dts) = crate::types();
-    let resolved = ResolvedTypes::from_resolved_types(types);
-
     let zod = Zod::default().bigint(BigIntExportBehavior::Number);
 
     for (_, ty) in &dts {
-        let rendered = primitives::inline(&zod, &resolved, ty).unwrap();
+        let rendered = primitives::inline(&zod, &types, ty).unwrap();
         assert!(!rendered.is_empty());
     }
 
     let ndt = dts
         .iter()
         .find_map(|(_, ty)| match ty {
-            DataType::Reference(Reference::Named(r)) => r.get(resolved.as_types()),
+            DataType::Reference(Reference::Named(r)) => r.get(&types),
             _ => None,
         })
         .unwrap();
 
-    let rendered = primitives::export(&zod, &resolved, iter::once(ndt), "").unwrap();
+    let rendered = primitives::export(&zod, &types, iter::once(ndt), "").unwrap();
     assert!(rendered.contains("Schema"));
 }
 
@@ -209,14 +205,12 @@ fn zod_bigint_errors_propagate_from_nested_types() {
 #[test]
 fn zod_layout_duplicate_typenames() {
     let types = Types::default().register::<Testing>().register::<Another>();
-    let resolved = ResolvedTypes::from_resolved_types(types.clone());
-
-    let err = Zod::default().export(&resolved).unwrap_err();
+    let err = Zod::default().export(&types).unwrap_err();
     assert!(err.to_string().contains("Detected multiple types"));
 
     let module_prefixed = Zod::default()
         .layout(Layout::ModulePrefixedName)
-        .export(&resolved)
+        .export(&types)
         .unwrap();
     assert!(module_prefixed.contains("TestingSchema"));
     assert!(module_prefixed.contains("testing2"));
@@ -225,14 +219,12 @@ fn zod_layout_duplicate_typenames() {
 #[test]
 fn zod_layout_files_export_to() {
     let types = Types::default().register::<Testing>().register::<Another>();
-    let resolved = ResolvedTypes::from_resolved_types(types.clone());
-
     let temp = temp_dir();
     let path = temp.path().join("zod-layout-files");
 
     Zod::default()
         .layout(Layout::Files)
-        .export_to(&path, &resolved)
+        .export_to(&path, &types)
         .unwrap();
 
     let output = crate::fs_to_string(Path::new(&path)).unwrap();
@@ -244,10 +236,11 @@ fn zod_layout_files_export_to() {
 fn zod_uses_serde_transformed_resolved_types() {
     let types = Types::default().register::<SerdeTaggedEnum>();
 
-    let raw = ResolvedTypes::from_resolved_types(types.clone());
     let serde = specta_serde::apply(types).unwrap();
 
-    let raw_out = Zod::default().export(&raw).unwrap();
+    let raw_out = Zod::default()
+        .export(&Types::default().register::<SerdeTaggedEnum>())
+        .unwrap();
     let serde_out = Zod::default().export(&serde).unwrap();
 
     assert_ne!(raw_out, serde_out);
@@ -276,8 +269,6 @@ fn zod_empty_named_shapes_are_strict() {
 #[test]
 fn zod_layout_files_preserves_unrelated_typescript_files() {
     let types = Types::default().register::<Testing>().register::<Another>();
-    let resolved = ResolvedTypes::from_resolved_types(types);
-
     let temp = TempDir::new_in(temp_root()).unwrap();
     let path = temp.path().join("zod-layout-files-preserve");
     std::fs::create_dir_all(&path).unwrap();
@@ -287,7 +278,7 @@ fn zod_layout_files_preserves_unrelated_typescript_files() {
 
     Zod::default()
         .layout(Layout::Files)
-        .export_to(&path, &resolved)
+        .export_to(&path, &types)
         .unwrap();
 
     assert!(keep_path.exists());
@@ -301,8 +292,6 @@ fn zod_layout_files_preserves_unrelated_typescript_files() {
 #[test]
 fn typescript_layout_files_preserves_unrelated_typescript_files() {
     let types = Types::default().register::<Testing>().register::<Another>();
-    let resolved = ResolvedTypes::from_resolved_types(types);
-
     let temp = TempDir::new_in(temp_root()).unwrap();
     let path = temp.path().join("typescript-layout-files-preserve");
     std::fs::create_dir_all(&path).unwrap();
@@ -311,8 +300,9 @@ fn typescript_layout_files_preserves_unrelated_typescript_files() {
     std::fs::write(&keep_path, "export const keep = true;\n").unwrap();
 
     Typescript::default()
+        .format(crate::raw_format)
         .layout(specta_typescript::Layout::Files)
-        .export_to(&path, &resolved)
+        .export_to(&path, &types)
         .unwrap();
 
     assert!(keep_path.exists());
@@ -326,9 +316,7 @@ fn typescript_layout_files_preserves_unrelated_typescript_files() {
 #[test]
 fn zod_recursive_types_use_lazy() {
     let types = Types::default().register::<Recursive>();
-    let resolved = ResolvedTypes::from_resolved_types(types);
-
-    let out = Zod::default().export(&resolved).unwrap();
+    let out = Zod::default().export(&types).unwrap();
     assert!(out.contains("z.lazy(() => RecursiveSchema)"));
 }
 
@@ -337,20 +325,16 @@ fn zod_reserved_type_name_errors() {
     let mut types = Types::default();
     NamedDataType::new("class", Vec::new(), DataType::Primitive(Primitive::i8))
         .register(&mut types);
-    let resolved = ResolvedTypes::from_resolved_types(types);
-
-    let err = Zod::default().export(&resolved).unwrap_err();
+    let err = Zod::default().export(&types).unwrap_err();
     assert!(err.to_string().contains("reserved keyword"));
 }
 
 #[test]
 fn zod_layout_files_errors_on_export() {
     let types = Types::default();
-    let resolved = ResolvedTypes::from_resolved_types(types);
-
     let err = Zod::default()
         .layout(Layout::Files)
-        .export(&resolved)
+        .export(&types)
         .unwrap_err();
     assert!(err.to_string().contains("Unable to export layout Files"));
 }
@@ -361,5 +345,5 @@ fn temp_dir() -> TempDir {
 
 fn export_for<T: Type>() -> Result<String, specta_zod::Error> {
     let types = Types::default().register::<T>();
-    Zod::default().export(&ResolvedTypes::from_resolved_types(types))
+    Zod::default().export(&types)
 }

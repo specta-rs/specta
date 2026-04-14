@@ -8,7 +8,7 @@ use std::{
 };
 
 use specta::{
-    ResolvedTypes, Types,
+    Types,
     datatype::{DataType, NamedDataType, Reference},
 };
 
@@ -129,9 +129,7 @@ impl Zod {
     }
 
     /// Export files into a single string.
-    pub fn export(&self, resolved_types: &ResolvedTypes) -> Result<String, Error> {
-        let types = resolved_types.as_types();
-
+    pub fn export(&self, types: &Types) -> Result<String, Error> {
         if let Layout::Files = self.layout {
             return Err(Error::unable_to_export(self.layout));
         }
@@ -145,7 +143,7 @@ impl Zod {
                 exporter: self,
                 has_manually_exported_user_types: &mut has_manually_exported_user_types,
                 files_root_types: "",
-                types: resolved_types,
+                types,
             });
         }
         let runtime = runtime?;
@@ -164,16 +162,11 @@ impl Zod {
     }
 
     /// Export the types to a specific file/folder.
-    pub fn export_to(
-        &self,
-        path: impl AsRef<Path>,
-        resolved_types: &ResolvedTypes,
-    ) -> Result<(), Error> {
-        let types = resolved_types.as_types();
+    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types) -> Result<(), Error> {
         let path = path.as_ref();
 
         if self.layout != Layout::Files {
-            let result = self.export(resolved_types)?;
+            let result = self.export(types)?;
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)?;
             }
@@ -275,7 +268,7 @@ impl Zod {
                             exporter: self,
                             has_manually_exported_user_types: &mut has_manually_exported_user_types,
                             files_root_types: &root_types,
-                            types: resolved_types,
+                            types,
                         })
                     })
                 });
@@ -372,7 +365,7 @@ pub struct FrameworkExporter<'a> {
     has_manually_exported_user_types: &'a mut bool,
     files_root_types: &'a str,
     /// Collected types currently being exported.
-    pub types: &'a ResolvedTypes,
+    pub types: &'a Types,
 }
 
 impl fmt::Debug for FrameworkExporter<'_> {
@@ -396,15 +389,10 @@ impl Deref for FrameworkExporter<'_> {
 }
 
 impl FrameworkExporter<'_> {
-    /// Render the types within [`ResolvedTypes`](specta::ResolvedTypes).
+    /// Render the types within [`Types`](specta::Types).
     pub fn render_types(&mut self) -> Result<Cow<'static, str>, Error> {
         let mut s = String::new();
-        render_types(
-            &mut s,
-            self.exporter,
-            self.types.as_types(),
-            self.files_root_types,
-        )?;
+        render_types(&mut s, self.exporter, self.types, self.files_root_types)?;
         *self.has_manually_exported_user_types = true;
         Ok(Cow::Owned(s))
     }

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use specta::{ResolvedTypes, Type, Types};
+use specta::{Type, Types};
 use specta_typescript::Typescript;
 
 #[derive(Type, Serialize, Deserialize)]
@@ -193,9 +193,8 @@ impl<T> TryFrom<GenericWire<T>> for GenericTryFrom<T> {
     }
 }
 
-fn type_names(types: &ResolvedTypes) -> Vec<String> {
+fn type_names(types: &Types) -> Vec<String> {
     types
-        .as_types()
         .into_unsorted_iter()
         .map(|ndt| ndt.name.to_string())
         .collect()
@@ -282,9 +281,8 @@ fn field_only_phased_override_requires_apply_phases() {
     assert!(err.to_string().contains("requires `apply_phases`"));
 
     let raw_err = Typescript::default()
-        .export(&ResolvedTypes::from_resolved_types(
-            Types::default().register::<FieldOnlyPhasedOverride>(),
-        ))
+        .format(crate::raw_format)
+        .export(&Types::default().register::<FieldOnlyPhasedOverride>())
         .expect_err("raw export should fail on unresolved phased opaque reference");
     assert!(raw_err.to_string().contains("unsupported opaque reference"));
 
@@ -292,6 +290,7 @@ fn field_only_phased_override_requires_apply_phases() {
         specta_serde::apply_phases(Types::default().register::<FieldOnlyPhasedOverride>())
             .expect("apply_phases should accept phased field overrides");
     Typescript::default()
+        .format(crate::raw_format)
         .export(&phased_types)
         .expect("phased export should remove phased opaque references");
 }

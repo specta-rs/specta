@@ -2,10 +2,11 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::{DisplayFromStr, OneOrMany, serde_as};
 use specta::{
-    ResolvedTypes, Type, Types,
+    Type, Types,
     datatype::{DataType, Reference},
 };
 use specta_typescript::Typescript;
+use std::borrow::Cow;
 use std::convert::TryFrom;
 
 #[derive(Serialize, Type)]
@@ -154,6 +155,13 @@ pub struct SerdeWithOneOrMany {
     tags: Vec<String>,
 }
 
+fn raw_format() -> (
+    impl for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, specta_typescript::Error>,
+    impl for<'a> Fn(&'a DataType) -> Result<Cow<'a, DataType>, specta_typescript::Error>,
+) {
+    (|types| Ok(Cow::Borrowed(types)), |dt| Ok(Cow::Borrowed(dt)))
+}
+
 fn main() {
     {
         let mut types = Types::default();
@@ -174,13 +182,13 @@ fn main() {
         println!(
             "{:#?}",
             match def {
-                DataType::Reference(Reference::Named(r)) => r.get(types.as_types()).unwrap(),
+                DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
                 _ => unreachable!(),
             }
         );
 
         println!("{:#?}", types);
-        println!("Types Count: {}", types.as_types().len());
+        println!("Types Count: {}", types.len());
     }
 
     {
@@ -204,20 +212,25 @@ fn main() {
         println!(
             "RAW:\n{}",
             Typescript::default()
-                .export(&ResolvedTypes::from_resolved_types(types.clone()))
+                .format(raw_format)
+                .export(&types)
                 .unwrap()
         );
         match specta_serde::apply(types.clone()) {
-            Ok(types) => println!(
+            Ok(_) => println!(
                 "specta_serde::apply(...):\n{}",
-                Typescript::default().export(&types).unwrap()
+                Typescript::default()
+                    .format(specta_serde::format)
+                    .export(&types)
+                    .unwrap()
             ),
             Err(err) => println!("specta_serde::apply(...) ERROR: {err}"),
         }
         println!(
             "specta_serde::apply_phases(...):\n{}",
             Typescript::default()
-                .export(&specta_serde::apply_phases(types).unwrap())
+                .format(specta_serde::format_phases)
+                .export(&types)
                 .unwrap()
         );
     }
@@ -229,7 +242,8 @@ fn main() {
         println!(
             "serde_with + specta_serde::apply_phases(...):\n{}",
             Typescript::default()
-                .export(&specta_serde::apply_phases(serde_with_types).unwrap())
+                .format(specta_serde::format_phases)
+                .export(&serde_with_types)
                 .unwrap()
         );
     }

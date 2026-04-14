@@ -1,6 +1,10 @@
 //! We register a single entrypoint so all tests are compiled into a single binary.
 #![allow(unused_parens, unused_variables, dead_code, unused_mut)]
 
+use std::borrow::Cow;
+
+use specta::{Types, datatype::DataType};
+
 macro_rules! register {
     ($types:expr, $dts:expr; $($ty:ty),* $(,)?) => {{
         $(
@@ -30,6 +34,13 @@ mod zod;
 
 pub use types::{types, types_phased};
 pub use utils::fs_to_string;
+
+pub fn raw_format() -> (
+    impl for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, specta_typescript::Error>,
+    impl for<'a> Fn(&'a DataType) -> Result<Cow<'a, DataType>, specta_typescript::Error>,
+) {
+    (|types| Ok(Cow::Borrowed(types)), |dt| Ok(Cow::Borrowed(dt)))
+}
 
 #[test]
 fn compile_errors() {

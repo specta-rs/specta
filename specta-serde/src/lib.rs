@@ -100,16 +100,18 @@
 
 use std::{
     borrow::Cow,
+    cell::RefCell,
     collections::{HashMap, HashSet, VecDeque},
 };
 
 use specta::{
-    ResolvedTypes, Types,
+    Types,
     datatype::{
         DataType, Enum, Field, Fields, NamedDataType, Primitive, Reference, Struct, Tuple,
         UnnamedFields, Variant,
     },
 };
+use specta_typescript::Error as TypescriptError;
 
 mod error;
 mod inflection;
@@ -134,6 +136,78 @@ pub enum Phase {
     Deserialize,
 }
 
+thread_local! {
+    static FORMAT_PHASE_TYPES: RefCell<Option<Types>> = const { RefCell::new(None) };
+}
+
+fn store_format_phase_types(types: &Types) {
+    FORMAT_PHASE_TYPES.with(|slot| {
+        *slot.borrow_mut() = Some(types.clone());
+    });
+}
+
+fn current_format_phase_types() -> std::result::Result<Types, TypescriptError> {
+    FORMAT_PHASE_TYPES.with(|slot| {
+        slot.borrow().clone().ok_or_else(|| {
+            TypescriptError::framework(
+                "specta_serde::format_phases requires the formatted type graph to be initialized",
+                std::io::Error::other("format hook order violation"),
+            )
+        })
+    })
+}
+
+fn identity_datatype<'a>(
+    dt: &'a DataType,
+) -> std::result::Result<Cow<'a, DataType>, TypescriptError> {
+    Ok(Cow::Borrowed(dt))
+}
+
+/// Type graph formatter returned by [`format`] and [`format_phases`].
+pub type TypesFormatter =
+    for<'a> fn(&'a Types) -> std::result::Result<Cow<'a, Types>, TypescriptError>;
+/// Datatype formatter returned by [`format`] and [`format_phases`].
+pub type DataTypeFormatter =
+    for<'a> fn(&'a DataType) -> std::result::Result<Cow<'a, DataType>, TypescriptError>;
+
+fn format_types(types: &Types) -> std::result::Result<Cow<'_, Types>, TypescriptError> {
+    let types = apply(types.clone())
+        .map_err(|err| TypescriptError::framework("specta_serde::format failed", err))?;
+    Ok(Cow::Owned(types))
+}
+
+fn format_phases_types(types: &Types) -> std::result::Result<Cow<'_, Types>, TypescriptError> {
+    let types = apply_phases(types.clone())
+        .map_err(|err| TypescriptError::framework("specta_serde::format_phases failed", err))?;
+    store_format_phase_types(&types);
+    Ok(Cow::Owned(types))
+}
+
+fn format_phases_datatype(
+    dt: &DataType,
+) -> std::result::Result<Cow<'_, DataType>, TypescriptError> {
+    let types = current_format_phase_types()?;
+    Ok(Cow::Owned(select_phase_datatype(
+        dt,
+        &types,
+        Phase::Serialize,
+    )))
+}
+
+/// Formatter helpers for `specta-typescript` exporters in unified serde mode.
+pub fn format() -> (TypesFormatter, DataTypeFormatter) {
+    (format_types, identity_datatype)
+}
+
+/// Formatter helpers for `specta-typescript` exporters in split-phase serde mode.
+///
+/// The type graph is expanded to include both `*_Serialize` and `*_Deserialize`
+/// named types. Inline primitive rendering selects the serialize-facing shape.
+pub fn format_phases() -> (TypesFormatter, DataTypeFormatter) {
+    (format_phases_types, format_phases_datatype)
+}
+
+// TODO: Remove this
 #[doc(hidden)]
 pub mod internal {
     pub use crate::error::Result;
@@ -153,8 +227,8 @@ use repr::EnumRepr;
 /// For example if you try and export `HashMap<InvalidKey, MyGenericType<()>>`, [`apply`]/[`apply_phases`] can validate `MyGenericType` but it doesn't see the top-level `HashMap`'s generics so it can't validate them.
 ///
 /// This is *only* required if your using the primitives from your language exporter.
-pub fn validate(dt: &DataType, types: &ResolvedTypes) -> Result<()> {
-    validate::validate_datatype_for_mode(dt, types.as_types(), validate::ApplyMode::Unified)
+pub fn validate(dt: &DataType, types: &Types) -> Result<()> {
+    validate::validate_datatype_for_mode(dt, types, validate::ApplyMode::Unified)
 }
 
 /// Applies serde transformations in unified mode.
@@ -163,16 +237,13 @@ pub fn validate(dt: &DataType, types: &ResolvedTypes) -> Result<()> {
 /// serialization and deserialization behavior. This is the simplest mode and is
 /// usually what exporters want when serde behavior is symmetric.
 ///
-/// Returns [`ResolvedTypes`] because serde rewrites may
-/// alter type shapes.
-///
 /// Returns an [`Error`] when serde metadata introduces phase-only differences
 /// that cannot be represented as one shape (for example `#[serde(other)]`,
 /// identifier enums, asymmetric conversion attributes, `skip_serializing_if`,
 /// or explicit [`Phased`] overrides).
 ///
 /// Use [`apply_phases`] when your serialize and deserialize wire shapes differ.
-pub fn apply(types: Types) -> Result<ResolvedTypes> {
+pub fn apply(types: Types) -> Result<Types> {
     validate::validate_for_mode(&types, validate::ApplyMode::Unified)?;
 
     let mut out = types.clone();
@@ -217,7 +288,7 @@ pub fn apply(types: Types) -> Result<ResolvedTypes> {
         return Err(err);
     }
 
-    Ok(ResolvedTypes::from_resolved_types(out))
+    Ok(out)
 }
 
 /// Applies serde transformations in split-phase mode.
@@ -227,13 +298,10 @@ pub fn apply(types: Types) -> Result<ResolvedTypes> {
 /// references accordingly. This allows exporters to represent serde behavior
 /// that is asymmetric between serialization and deserialization.
 ///
-/// Returns [`ResolvedTypes`] because serde rewrites may
-/// alter type shapes.
-///
 /// Use this when working with deserialize-widening attributes like
 /// `#[serde(other)]`/identifier enums, asymmetric conversion attributes, or
 /// explicit [`Phased`] overrides.
-pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
+pub fn apply_phases(types: Types) -> Result<Types> {
     validate::validate_for_mode(&types, validate::ApplyMode::Phases)?;
 
     let originals = types.into_unsorted_iter().collect::<Vec<_>>();
@@ -448,7 +516,7 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
 
         ndt.ty = DataType::Enum(wrapper);
     });
-    Ok(ResolvedTypes::from_resolved_types(out))
+    Ok(out)
 }
 
 /// Rewrites a [`DataType`] to the requested directional shape after [`apply_phases`].
@@ -492,18 +560,18 @@ pub fn apply_phases(types: Types) -> Result<ResolvedTypes> {
 /// };
 ///
 /// assert_eq!(
-///     serialize_reference.get(resolved.as_types()).unwrap().name,
+///     serialize_reference.get(&resolved).unwrap().name,
 ///     "Filters_Serialize"
 /// );
 /// assert_eq!(
-///     deserialize_reference.get(resolved.as_types()).unwrap().name,
+///     deserialize_reference.get(&resolved).unwrap().name,
 ///     "Filters_Deserialize"
 /// );
 /// # Ok::<(), specta_serde::Error>(())
 /// ```
-pub fn select_phase_datatype(dt: &DataType, types: &ResolvedTypes, phase: Phase) -> DataType {
+pub fn select_phase_datatype(dt: &DataType, types: &Types, phase: Phase) -> DataType {
     let mut dt = dt.clone();
-    select_phase_datatype_inner(&mut dt, types.as_types(), phase);
+    select_phase_datatype_inner(&mut dt, types, phase);
     dt
 }
 
@@ -2070,7 +2138,7 @@ fn field_is_optional_for_mode(
 #[cfg(test)]
 mod tests {
     use serde::{Deserialize, Serialize};
-    use specta::{ResolvedTypes, Type, datatype::DataType};
+    use specta::{Type, Types, datatype::DataType};
 
     use super::{Phase, Phased, apply_phases, select_phase_datatype};
 
@@ -2163,13 +2231,13 @@ mod tests {
         assert_named_reference(first_generic_type(&deserialize), &resolved, "String");
     }
 
-    fn assert_named_reference(dt: &DataType, types: &ResolvedTypes, expected_name: &str) {
+    fn assert_named_reference(dt: &DataType, types: &Types, expected_name: &str) {
         let DataType::Reference(specta::datatype::Reference::Named(reference)) = dt else {
             panic!("expected named reference");
         };
 
         let actual = reference
-            .get(types.as_types())
+            .get(types)
             .expect("reference should resolve")
             .name
             .as_ref();
@@ -2177,18 +2245,12 @@ mod tests {
         assert_eq!(actual, expected_name);
     }
 
-    fn named_field_type<'a>(
-        dt: &'a DataType,
-        types: &'a ResolvedTypes,
-        field_name: &str,
-    ) -> &'a DataType {
+    fn named_field_type<'a>(dt: &'a DataType, types: &'a Types, field_name: &str) -> &'a DataType {
         let DataType::Reference(specta::datatype::Reference::Named(reference)) = dt else {
             panic!("expected named reference");
         };
 
-        let named = reference
-            .get(types.as_types())
-            .expect("reference should resolve");
+        let named = reference.get(types).expect("reference should resolve");
         let DataType::Struct(strct) = &named.ty else {
             panic!("expected struct type");
         };

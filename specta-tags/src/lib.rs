@@ -9,7 +9,7 @@
 //! richer JavaScript forms.
 //!
 //! ```rust
-//! use specta::{ResolvedTypes, Type, Types};
+//! use specta::{Type, Types};
 //!
 //! #[derive(Type)]
 //! struct Event {
@@ -18,9 +18,7 @@
 //!
 //! let mut types = Types::default();
 //! let dt = Event::definition(&mut types);
-//! let resolved = ResolvedTypes::from_resolved_types(types);
-//!
-//! let plan = specta_tags::TransformPlan::analyze(&dt, &resolved);
+//! let plan = specta_tags::TransformPlan::analyze(&dt, &types);
 //! let js = plan.map("value");
 //! assert!(js.contains("BigInt"));
 //! assert!(js.contains("[\"id\"]"));
@@ -34,7 +32,7 @@
 use std::{borrow::Cow, sync::Arc};
 
 use specta::{
-    ResolvedTypes, Types,
+    Types,
     datatype::{DataType, Fields, GenericReference, NamedReference, Primitive, Reference},
 };
 
@@ -84,13 +82,13 @@ pub struct TransformPlan {
 
 impl TransformPlan {
     /// Analyzes a resolved datatype and records the JavaScript conversions it needs.
-    pub fn analyze(dt: &DataType, types: &ResolvedTypes) -> Self {
+    pub fn analyze(dt: &DataType, types: &Types) -> Self {
         // Scan all `DataType` references, etc. and collect tags and their object location for `Self::map` to use.
         //
         // You should match on `NamedDataType`'s name and module path to determine known named types.
 
         Self {
-            plan: Analyzer.analyze(dt, types.as_types(), &[], &mut Vec::new()),
+            plan: Analyzer.analyze(dt, types, &[], &mut Vec::new()),
         }
     }
 
@@ -551,7 +549,7 @@ fn string_literal(ty: &DataType) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use serde::{Deserialize, Serialize};
-    use specta::{ResolvedTypes, Type, Types};
+    use specta::{Type, Types};
     use specta_serde::apply;
 
     use super::TransformPlan;
@@ -578,7 +576,7 @@ mod tests {
     fn map_renders_trusting_transforms() {
         let mut types = Types::default();
         let dt = Root::definition(&mut types);
-        let plan = TransformPlan::analyze(&dt, &ResolvedTypes::from_resolved_types(types));
+        let plan = TransformPlan::analyze(&dt, &types);
         let js = plan.map("v");
 
         assert!(
@@ -617,7 +615,6 @@ mod tests {
     fn map_renders_from_serde_applied_internal_enum_shape() {
         let resolved = apply(Types::default().register::<TaggedEnum>()).unwrap();
         let dt = resolved
-            .as_types()
             .into_sorted_iter()
             .find(|ty| ty.name.as_ref() == "TaggedEnum")
             .expect("TaggedEnum should be registered")
@@ -635,7 +632,6 @@ mod tests {
     fn map_renders_from_serde_applied_adjacent_enum_shape() {
         let resolved = apply(Types::default().register::<AdjacentEnum>()).unwrap();
         let dt = resolved
-            .as_types()
             .into_sorted_iter()
             .find(|ty| ty.name.as_ref() == "AdjacentEnum")
             .expect("AdjacentEnum should be registered")

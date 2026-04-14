@@ -13,8 +13,19 @@
 //! Next copy the following into your `main.rs` file:
 //!
 //! ```rust
-//! use specta::{ResolvedTypes, Type, Types};
+//! use std::borrow::Cow;
+//! use specta::{Type, Types};
 //! use specta_typescript::Typescript;
+//!
+//! fn raw_types<'a>(types: &'a Types) -> Result<Cow<'a, Types>, specta_typescript::Error> {
+//!     Ok(Cow::Borrowed(types))
+//! }
+//!
+//! fn raw_datatype<'a>(
+//!     ty: &'a specta::datatype::DataType,
+//! ) -> Result<Cow<'a, specta::datatype::DataType>, specta_typescript::Error> {
+//!     Ok(Cow::Borrowed(ty))
+//! }
 //!
 //! #[derive(Type)]
 //! pub struct MyType {
@@ -30,10 +41,9 @@
 //! let mut types = Types::default()
 //!     // We don't need to specify `MyOtherType` because it's referenced by `MyType`
 //!     .register::<MyType>();
-//! let resolved_types = ResolvedTypes::from_resolved_types(types);
-//!
 //! Typescript::default()
-//!     .export_to("./bindings.ts", &resolved_types)
+//!     .format((raw_types, raw_datatype))
+//!     .export_to("./bindings.ts", &types)
 //!     .unwrap();
 //! ```
 //!
@@ -62,7 +72,7 @@ mod typescript;
 
 pub use branded::Branded;
 pub use error::Error;
-pub use exporter::{BrandedTypeExporter, Exporter, FrameworkExporter, Layout};
+pub use exporter::{BrandedTypeExporter, Exporter, FrameworkExporter, IntoFormat, Layout};
 pub use jsdoc::JSDoc;
 pub use opaque::define;
 pub use references::collect_references;

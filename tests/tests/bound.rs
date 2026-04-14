@@ -1,4 +1,4 @@
-use specta::{ResolvedTypes, Type, Types};
+use specta::{Type, Types};
 use specta_typescript::Typescript;
 
 #[derive(Type)]
@@ -139,7 +139,8 @@ fn associated_type_bound_issue_138() {
 
     let types = Types::default().register::<Demo<AssocIsI32>>();
     let output = Typescript::default()
-        .export(&ResolvedTypes::from_resolved_types(types))
+        .format(crate::raw_format)
+        .export(&types)
         .unwrap();
     insta::assert_snapshot!("bound-associated-type-issue-138", output);
 }

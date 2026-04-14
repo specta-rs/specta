@@ -3,7 +3,7 @@
 use std::{borrow::Cow, path::Path};
 
 use specta::{
-    ResolvedTypes, Types,
+    Types,
     datatype::{DataType, Fields, Reference},
 };
 
@@ -130,9 +130,9 @@ impl Swift {
     }
 
     /// Export types to a Swift string.
-    pub fn export(&self, types: &ResolvedTypes) -> Result<String> {
+    pub fn export(&self, types: &Types) -> Result<String> {
         let mut result = String::new();
-        let raw_types = types.as_types();
+        let raw_types = types;
 
         // Add header
         if !self.header.is_empty() {
@@ -165,7 +165,7 @@ impl Swift {
     }
 
     /// Export types to a file.
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &ResolvedTypes) -> Result<()> {
+    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types) -> Result<()> {
         let content = self.export(types)?;
         std::fs::write(path, content)?;
         Ok(())

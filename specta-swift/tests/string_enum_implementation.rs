@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use specta::{ResolvedTypes, Type, Types};
+use specta::{Type, Types};
 use specta_serde::apply;
 use specta_swift::Swift;
 
@@ -188,10 +188,8 @@ fn test_string_enum_screaming_kebab_case() {
 #[test]
 fn test_mixed_enum_not_string() {
     let types = Types::default().register::<MixedEnum>();
-    let resolved = ResolvedTypes::from_resolved_types(types);
-
     let swift = Swift::default();
-    let result = swift.export(&resolved).unwrap();
+    let result = swift.export(&types).unwrap();
 
     println!("Generated Swift for MixedEnum:");
     println!("{}", result);
@@ -214,10 +212,8 @@ fn test_mixed_enum_not_string() {
 #[test]
 fn test_regular_enum_not_string() {
     let types = Types::default().register::<RegularEnum>();
-    let resolved = ResolvedTypes::from_resolved_types(types);
-
     let swift = Swift::default();
-    let result = swift.export(&resolved).unwrap();
+    let result = swift.export(&types).unwrap();
 
     println!("Generated Swift for RegularEnum:");
     println!("{}", result);
@@ -243,11 +239,9 @@ fn test_all_string_enums_together() {
         .register::<MixedEnum>()
         .register::<RegularEnum>();
     let resolved = apply(string_types).unwrap();
-    let raw_resolved = ResolvedTypes::from_resolved_types(other_types);
-
     let swift = Swift::default();
     let result = swift.export(&resolved).unwrap();
-    let raw_result = swift.export(&raw_resolved).unwrap();
+    let raw_result = swift.export(&other_types).unwrap();
 
     println!("Generated Swift for all enums:");
     println!("{}", result);

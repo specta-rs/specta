@@ -1,6 +1,6 @@
 use std::{borrow::Cow, path::Path};
 
-use specta::{ResolvedTypes, Types};
+use specta::Types;
 
 use crate::{
     Error,
@@ -73,9 +73,9 @@ impl Go {
         let resolved_types = if self.serde.is_some() {
             specta_serde::apply(types.clone())?
         } else {
-            ResolvedTypes::from_resolved_types(types.clone())
+            types.clone()
         };
-        let types = resolved_types.as_types();
+        let types = &resolved_types;
 
         for ndt in types.into_sorted_iter() {
             let type_def = primitives::export(self, types, ndt, &mut ctx)?;

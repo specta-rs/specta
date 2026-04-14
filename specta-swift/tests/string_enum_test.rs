@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use specta::{ResolvedTypes, Type, Types};
+use specta::{Type, Types};
 use specta_serde::apply;
 use specta_swift::Swift;
 
@@ -25,8 +25,7 @@ enum RegularEnum {
 fn test_string_enum_generation() {
     let swift = Swift::default();
     let serde_resolved = apply(Types::default().register::<JobStatus>()).unwrap();
-    let raw_resolved =
-        ResolvedTypes::from_resolved_types(Types::default().register::<RegularEnum>());
+    let raw_resolved = Types::default().register::<RegularEnum>();
     let string_output = swift.export(&serde_resolved).unwrap();
     let raw_output = swift.export(&raw_resolved).unwrap();
 

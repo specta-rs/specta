@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 
 use specta::{
-    ResolvedTypes, Type, Types,
+    Type, Types,
     datatype::{DataType, Fields, Primitive, Reference},
 };
 use specta_typescript::Typescript;
@@ -114,9 +114,8 @@ fn legacy_impls() {
     insta::assert_snapshot!(
         "legacy_impls",
         Typescript::default()
-            .export(&ResolvedTypes::from_resolved_types(
-                Types::default().register::<LegacyImpls>(),
-            ))
+            .format(crate::raw_format)
+            .export(&Types::default().register::<LegacyImpls>())
             .unwrap()
     );
 }
@@ -124,9 +123,8 @@ fn legacy_impls() {
 #[test]
 fn legacy_impl_bigint_errors() {
     let err = Typescript::default()
-        .export(&ResolvedTypes::from_resolved_types(
-            Types::default().register::<LegacyImplWithBigints>(),
-        ))
+        .format(crate::raw_format)
+        .export(&Types::default().register::<LegacyImplWithBigints>())
         .expect_err("bigint glam vectors should fail TypeScript export");
 
     assert!(
@@ -139,9 +137,10 @@ fn legacy_impl_bigint_errors() {
 #[test]
 fn legacy_impl_individual_bigint_errors() {
     fn assert_bigint_export_error<T: Type>(failures: &mut Vec<String>, name: &str) {
-        match Typescript::default().export(&ResolvedTypes::from_resolved_types(
-            Types::default().register::<T>(),
-        )) {
+        match Typescript::default()
+            .format(crate::raw_format)
+            .export(&Types::default().register::<T>())
+        {
             Ok(output) => failures.push(format!(
                 "{name}: expected BigInt export error, but export succeeded with '{output}'"
             )),
@@ -298,7 +297,19 @@ fn legacy_impl_bson_definitions() {
         Some(DataType::Map(map)) => map,
         other => panic!("expected bson::Document to resolve to a map, got {other:?}"),
     };
-    assert_eq!(document_map.key_ty(), &DataType::Primitive(Primitive::str));
+    match document_map.key_ty() {
+        DataType::Primitive(Primitive::str) => {}
+        DataType::Reference(Reference::Named(reference)) => {
+            assert_eq!(
+                reference
+                    .get(&types)
+                    .expect("String should be registered")
+                    .name,
+                "String"
+            );
+        }
+        other => panic!("expected bson::Document keys to resolve to string, got {other:?}"),
+    }
 
     let bson_value_reference = match document_map.value_ty() {
         DataType::Reference(Reference::Named(reference)) => reference,

@@ -4,7 +4,7 @@ use std::{
 };
 
 use specta::datatype::{DataType, Reference};
-use specta::{ResolvedTypes, Type, Types};
+use specta::{Type, Types};
 use specta_typescript::{JSDoc, Layout, primitives};
 use tempfile::TempDir;
 
@@ -45,11 +45,9 @@ mod jsdoc_export_to_files_runtime_imports_types {
     }
 }
 
-fn phase_collections(
-    types: Types,
-) -> [(&'static str, Result<ResolvedTypes, specta_serde::Error>); 3] {
+fn phase_collections(types: Types) -> [(&'static str, Result<Types, specta_serde::Error>); 3] {
     [
-        ("raw", Ok(ResolvedTypes::from_resolved_types(types.clone()))),
+        ("raw", Ok(types.clone())),
         ("serde", specta_serde::apply(types.clone())),
         ("serde_phases", specta_serde::apply_phases(types)),
     ]
@@ -59,7 +57,10 @@ fn phase_collections(
 fn export() {
     for (mode, types) in phase_collections(crate::types().0) {
         let output = match types {
-            Ok(types) => JSDoc::default().export(&types).unwrap(),
+            Ok(types) => JSDoc::default()
+                .format(crate::raw_format)
+                .export(&types)
+                .unwrap(),
             Err(err) => format!("ERROR: {err}"),
         };
 
@@ -74,11 +75,11 @@ fn primitives_export_many() {
     for (mode, types) in phase_collections(types) {
         let output = match types {
             Ok(types) => {
-                let jsdoc = JSDoc::default();
+                let jsdoc = JSDoc::default().format(crate::raw_format);
                 let ndts = dts
                     .iter()
                     .filter_map(|(_, ty)| match ty {
-                        DataType::Reference(Reference::Named(r)) => r.get(types.as_types()),
+                        DataType::Reference(Reference::Named(r)) => r.get(&types),
                         _ => None,
                     })
                     .collect::<Vec<_>>();
@@ -95,12 +96,11 @@ fn primitives_export_many() {
 #[test]
 fn jsdoc_export_bigint_errors() {
     fn assert_bigint_error<T: Type>(failures: &mut Vec<String>, name: &str) {
-        let jsdoc = JSDoc::default();
+        let jsdoc = JSDoc::default().format(crate::raw_format);
         let mut types = Types::default();
         let dt = T::definition(&mut types);
-        let resolved = ResolvedTypes::from_resolved_types(types);
 
-        match primitives::inline(&jsdoc, &resolved, &dt) {
+        match primitives::inline(&jsdoc, &types, &dt) {
             Ok(ty) => failures.push(format!(
                 "{name} [inline]: expected BigInt error, but export succeeded with '{ty}'"
             )),
@@ -111,11 +111,11 @@ fn jsdoc_export_bigint_errors() {
             Err(err) => failures.push(format!("{name} [inline]: unexpected error '{err}'")),
         }
 
-        if resolved.as_types().is_empty() {
+        if types.is_empty() {
             return;
         }
 
-        match jsdoc.export(&resolved) {
+        match jsdoc.export(&types) {
             Ok(output) => failures.push(format!(
                 "{name} [export]: expected BigInt error, but export succeeded with '{output}'"
             )),
@@ -128,12 +128,11 @@ fn jsdoc_export_bigint_errors() {
     }
 
     fn assert_inline_bigint_error<T: Type>(failures: &mut Vec<String>, name: &str) {
-        let jsdoc = JSDoc::default();
+        let jsdoc = JSDoc::default().format(crate::raw_format);
         let mut types = Types::default();
         let dt = T::definition(&mut types);
-        let resolved = ResolvedTypes::from_resolved_types(types);
 
-        match primitives::inline(&jsdoc, &resolved, &dt) {
+        match primitives::inline(&jsdoc, &types, &dt) {
             Ok(ty) => failures.push(format!(
                 "{name} [inline]: expected BigInt error, but export succeeded with '{ty}'"
             )),
@@ -282,8 +281,9 @@ fn jsdoc_export_to_files_uses_jsdoc_import_typedefs() {
         .register::<jsdoc_export_to_files_runtime_imports_types::three::Three>();
 
     JSDoc::default()
+        .format(crate::raw_format)
         .layout(Layout::Files)
-        .export_to(&path, &ResolvedTypes::from_resolved_types(types))
+        .export_to(&path, &types)
         .unwrap();
 
     let output = fs_to_string(&path).unwrap();

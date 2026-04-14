@@ -99,7 +99,7 @@ enum ErrorKind {
     /// You may be referencing a type which is not supported by the Typescript exporter.
     UnsupportedOpaqueReference(OpaqueReference),
     /// Found a named reference that cannot be resolved from the provided
-    /// [`ResolvedTypes`](specta::ResolvedTypes).
+    /// [`Types`](specta::Types).
     DanglingNamedReference {
         reference: String,
     },
@@ -112,6 +112,7 @@ enum ErrorKind {
         message: Cow<'static, str>,
         source: FrameworkSource,
     },
+    FormatNotSet,
 
     //
     //
@@ -228,6 +229,12 @@ impl Error {
         }
     }
 
+    pub(crate) fn format_not_set() -> Self {
+        Self {
+            kind: ErrorKind::FormatNotSet,
+        }
+    }
+
     pub(crate) fn invalid_name_legacy(path: ExportPath, name: String) -> Self {
         Self {
             kind: ErrorKind::InvalidNameLegacy(path, name),
@@ -327,6 +334,10 @@ impl fmt::Display for Error {
                     write!(f, "Framework error: {message}: {source}")
                 }
             }
+            ErrorKind::FormatNotSet => write!(
+                f,
+                "Exporter format is not configured. Call `Exporter::format(...)`, `Typescript::format(...)`, or `JSDoc::format(...)` before exporting."
+            ),
             ErrorKind::BigIntForbiddenLegacy(path) => write!(
                 f,
                 "Attempted to export {path:?} but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128) to avoid precision loss. See {BIGINT_DOCS_URL} for a full explanation."
