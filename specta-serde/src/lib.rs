@@ -100,7 +100,6 @@
 
 use std::{
     borrow::Cow,
-    cell::RefCell,
     collections::{HashMap, HashSet, VecDeque},
 };
 
@@ -136,28 +135,8 @@ pub enum Phase {
     Deserialize,
 }
 
-thread_local! {
-    static FORMAT_PHASE_TYPES: RefCell<Option<Types>> = const { RefCell::new(None) };
-}
-
-fn store_format_phase_types(types: &Types) {
-    FORMAT_PHASE_TYPES.with(|slot| {
-        *slot.borrow_mut() = Some(types.clone());
-    });
-}
-
-fn current_format_phase_types() -> std::result::Result<Types, TypescriptError> {
-    FORMAT_PHASE_TYPES.with(|slot| {
-        slot.borrow().clone().ok_or_else(|| {
-            TypescriptError::framework(
-                "specta_serde::format_phases requires the formatted type graph to be initialized",
-                std::io::Error::other("format hook order violation"),
-            )
-        })
-    })
-}
-
 fn identity_datatype<'a>(
+    _: &'a Types,
     dt: &'a DataType,
 ) -> std::result::Result<Cow<'a, DataType>, TypescriptError> {
     Ok(Cow::Borrowed(dt))
@@ -168,7 +147,7 @@ pub type TypesFormatter =
     for<'a> fn(&'a Types) -> std::result::Result<Cow<'a, Types>, TypescriptError>;
 /// Datatype formatter returned by [`format`] and [`format_phases`].
 pub type DataTypeFormatter =
-    for<'a> fn(&'a DataType) -> std::result::Result<Cow<'a, DataType>, TypescriptError>;
+    for<'a> fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, TypescriptError>;
 
 fn format_types(types: &Types) -> std::result::Result<Cow<'_, Types>, TypescriptError> {
     let types = apply(types.clone())
@@ -179,17 +158,16 @@ fn format_types(types: &Types) -> std::result::Result<Cow<'_, Types>, Typescript
 fn format_phases_types(types: &Types) -> std::result::Result<Cow<'_, Types>, TypescriptError> {
     let types = apply_phases(types.clone())
         .map_err(|err| TypescriptError::framework("specta_serde::format_phases failed", err))?;
-    store_format_phase_types(&types);
     Ok(Cow::Owned(types))
 }
 
-fn format_phases_datatype(
-    dt: &DataType,
-) -> std::result::Result<Cow<'_, DataType>, TypescriptError> {
-    let types = current_format_phase_types()?;
+fn format_phases_datatype<'a>(
+    types: &'a Types,
+    dt: &'a DataType,
+) -> std::result::Result<Cow<'a, DataType>, TypescriptError> {
     Ok(Cow::Owned(select_phase_datatype(
         dt,
-        &types,
+        types,
         Phase::Serialize,
     )))
 }

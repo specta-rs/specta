@@ -296,6 +296,17 @@ fn field_only_phased_override_requires_apply_phases() {
 }
 
 #[test]
+fn format_phases_exports_field_only_phased_override() {
+    let rendered = Typescript::default()
+        .format(specta_serde::format_phases)
+        .export(&Types::default().register::<FieldOnlyPhasedOverride>())
+        .expect("format_phases should resolve phased overrides during export");
+
+    assert!(rendered.contains("FieldOnlyPhasedOverride_Serialize"));
+    assert!(rendered.contains("FieldOnlyPhasedOverride_Deserialize"));
+}
+
+#[test]
 fn skip_serializing_if_requires_phases() {
     let err = specta_serde::apply(Types::default().register::<SkipSerializingIfOnly>())
         .expect_err("skip_serializing_if should require apply_phases");

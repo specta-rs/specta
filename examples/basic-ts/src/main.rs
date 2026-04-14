@@ -157,9 +157,12 @@ pub struct SerdeWithOneOrMany {
 
 fn raw_format() -> (
     impl for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, specta_typescript::Error>,
-    impl for<'a> Fn(&'a DataType) -> Result<Cow<'a, DataType>, specta_typescript::Error>,
+    impl for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, specta_typescript::Error>,
 ) {
-    (|types| Ok(Cow::Borrowed(types)), |dt| Ok(Cow::Borrowed(dt)))
+    (
+        |types| Ok(Cow::Borrowed(types)),
+        |_, dt| Ok(Cow::Borrowed(dt)),
+    )
 }
 
 fn main() {

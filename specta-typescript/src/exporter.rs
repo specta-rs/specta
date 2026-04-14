@@ -48,7 +48,7 @@ impl fmt::Debug for RuntimeFn {
 
 type TypesFormatFn = Arc<dyn for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, Error> + Send + Sync>;
 type DataTypeFormatFn =
-    Arc<dyn for<'a> Fn(&'a DataType) -> Result<Cow<'a, DataType>, Error> + Send + Sync>;
+    Arc<dyn for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, Error> + Send + Sync>;
 
 #[derive(Clone)]
 #[doc(hidden)]
@@ -76,8 +76,10 @@ pub trait IntoFormat {
 impl<TypesFn, DataTypeFn> IntoFormat for (TypesFn, DataTypeFn)
 where
     TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, Error> + Send + Sync + 'static,
-    DataTypeFn:
-        for<'a> Fn(&'a DataType) -> Result<Cow<'a, DataType>, Error> + Send + Sync + 'static,
+    DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, Error>
+        + Send
+        + Sync
+        + 'static,
 {
     fn into_format_fns(self) -> FormatFns {
         FormatFns {
@@ -91,8 +93,10 @@ impl<F, TypesFn, DataTypeFn> IntoFormat for F
 where
     F: FnOnce() -> (TypesFn, DataTypeFn),
     TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, Error> + Send + Sync + 'static,
-    DataTypeFn:
-        for<'a> Fn(&'a DataType) -> Result<Cow<'a, DataType>, Error> + Send + Sync + 'static,
+    DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, Error>
+        + Send
+        + Sync
+        + 'static,
 {
     fn into_format_fns(self) -> FormatFns {
         self().into_format_fns()

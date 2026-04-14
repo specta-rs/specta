@@ -22,6 +22,7 @@
 //! }
 //!
 //! fn raw_datatype<'a>(
+//!     _types: &'a Types,
 //!     ty: &'a specta::datatype::DataType,
 //! ) -> Result<Cow<'a, specta::datatype::DataType>, specta_typescript::Error> {
 //!     Ok(Cow::Borrowed(ty))

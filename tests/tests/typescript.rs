@@ -19,28 +19,28 @@ fn identity_types<'a>(types: &'a Types) -> Result<Cow<'a, Types>, Error> {
     Ok(Cow::Borrowed(types))
 }
 
-fn map_bool_to_string<'a>(dt: &'a DataType) -> Result<Cow<'a, DataType>, Error> {
+fn map_bool_to_string<'a>(_: &'a Types, dt: &'a DataType) -> Result<Cow<'a, DataType>, Error> {
     Ok(match dt {
         DataType::Primitive(Primitive::bool) => Cow::Owned(DataType::Primitive(Primitive::str)),
         _ => Cow::Borrowed(dt),
     })
 }
 
-fn map_bool_to_null_tuple<'a>(dt: &'a DataType) -> Result<Cow<'a, DataType>, Error> {
+fn map_bool_to_null_tuple<'a>(_: &'a Types, dt: &'a DataType) -> Result<Cow<'a, DataType>, Error> {
     Ok(match dt {
         DataType::Primitive(Primitive::bool) => Cow::Owned(DataType::Tuple(Tuple::new(vec![]))),
         _ => Cow::Borrowed(dt),
     })
 }
 
-fn map_reference_to_string<'a>(dt: &'a DataType) -> Result<Cow<'a, DataType>, Error> {
+fn map_reference_to_string<'a>(_: &'a Types, dt: &'a DataType) -> Result<Cow<'a, DataType>, Error> {
     Ok(match dt {
         DataType::Reference(Reference::Named(_)) => Cow::Owned(DataType::Primitive(Primitive::str)),
         _ => Cow::Borrowed(dt),
     })
 }
 
-fn error_on_bool<'a>(dt: &'a DataType) -> Result<Cow<'a, DataType>, Error> {
+fn error_on_bool<'a>(_: &'a Types, dt: &'a DataType) -> Result<Cow<'a, DataType>, Error> {
     match dt {
         DataType::Primitive(Primitive::bool) => Err(Error::framework(
             "format hook failed",
