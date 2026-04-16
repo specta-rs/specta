@@ -35,33 +35,22 @@ mod zod;
 pub use types::{types, types_phased};
 pub use utils::fs_to_string;
 
-pub fn raw_format() -> (
-    impl for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, specta_typescript::FormatError>,
-    impl for<'a> Fn(
-        &'a Types,
-        &'a DataType,
-    ) -> Result<Cow<'a, DataType>, specta_typescript::FormatError>,
-) {
-    (
-        |types| Ok(Cow::Borrowed(types)),
-        |_, dt| Ok(Cow::Borrowed(dt)),
-    )
+fn raw_map_types(types: &Types) -> Result<Cow<'_, Types>, specta_typescript::FormatError> {
+    Ok(Cow::Borrowed(types))
 }
 
-pub fn serde(types: Types) -> Result<Types, specta_serde::FormatError> {
-    let (map_types, _) = specta_serde::format();
-    Ok(map_types(&types)?.into_owned())
+fn raw_map_datatype(
+    _types: &Types,
+    dt: &DataType,
+) -> Result<Cow<'_, DataType>, specta_typescript::FormatError> {
+    Ok(Cow::Borrowed(dt))
 }
 
-pub fn serde_phases(types: Types) -> Result<Types, specta_serde::FormatError> {
-    let (map_types, _) = specta_serde::format_phases();
-    Ok(map_types(&types)?.into_owned())
-}
-
-pub fn serde_validate(dt: &DataType, types: &Types) -> Result<(), specta_serde::FormatError> {
-    let (_, map_datatype) = specta_serde::format();
-    map_datatype(types, dt).map(|_| ())
-}
+#[allow(non_upper_case_globals)]
+pub const raw_format: (
+    for<'a> fn(&'a Types) -> Result<Cow<'a, Types>, specta_typescript::FormatError>,
+    for<'a> fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, specta_typescript::FormatError>,
+) = (raw_map_types, raw_map_datatype);
 
 #[test]
 fn compile_errors() {

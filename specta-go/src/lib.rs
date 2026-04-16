@@ -34,4 +34,4 @@ mod primitives;
 mod reserved_names;
 
 pub use error::Error;
-pub use go::{FormatError, Go, IntoFormat, Layout};
+pub use go::{FormatError, Go, Layout};

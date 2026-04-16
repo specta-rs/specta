@@ -31,6 +31,25 @@ pub struct FormatFns {
     pub(crate) datatype: DataTypeFormatFn,
 }
 
+impl<TypesFn, DataTypeFn> From<(TypesFn, DataTypeFn)> for FormatFns
+where
+    TypesFn: for<'a> Fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>
+        + Send
+        + Sync
+        + 'static,
+    DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>
+        + Send
+        + Sync
+        + 'static,
+{
+    fn from(format: (TypesFn, DataTypeFn)) -> Self {
+        Self {
+            types: Arc::new(format.0),
+            datatype: Arc::new(format.1),
+        }
+    }
+}
+
 impl fmt::Debug for FormatFns {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -39,47 +58,6 @@ impl fmt::Debug for FormatFns {
             Arc::as_ptr(&self.types),
             Arc::as_ptr(&self.datatype)
         )
-    }
-}
-
-#[doc(hidden)]
-pub trait IntoFormat {
-    fn into_format_fns(self) -> FormatFns;
-}
-
-impl<TypesFn, DataTypeFn> IntoFormat for (TypesFn, DataTypeFn)
-where
-    TypesFn: for<'a> Fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>
-        + Send
-        + Sync
-        + 'static,
-    DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>
-        + Send
-        + Sync
-        + 'static,
-{
-    fn into_format_fns(self) -> FormatFns {
-        FormatFns {
-            types: Arc::new(self.0),
-            datatype: Arc::new(self.1),
-        }
-    }
-}
-
-impl<F, TypesFn, DataTypeFn> IntoFormat for F
-where
-    F: FnOnce() -> (TypesFn, DataTypeFn),
-    TypesFn: for<'a> Fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>
-        + Send
-        + Sync
-        + 'static,
-    DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>
-        + Send
-        + Sync
-        + 'static,
-{
-    fn into_format_fns(self) -> FormatFns {
-        self().into_format_fns()
     }
 }
 
@@ -204,13 +182,40 @@ impl Swift {
         self
     }
 
-    pub(crate) fn with_format(mut self, builder: impl IntoFormat) -> Self {
-        self.format = Some(builder.into_format_fns());
+    pub(crate) fn with_format<TypesFn, DataTypeFn>(
+        mut self,
+        format: (TypesFn, DataTypeFn),
+    ) -> Self
+    where
+        TypesFn: for<'a> Fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>
+            + Send
+            + Sync
+            + 'static,
+        DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>
+            + Send
+            + Sync
+            + 'static,
+    {
+        self.format = Some(format.into());
         self
     }
 
     /// Export types to a Swift string.
-    pub fn export(&self, types: &Types, format: impl IntoFormat) -> Result<String> {
+    pub fn export<TypesFn, DataTypeFn>(
+        &self,
+        types: &Types,
+        format: (TypesFn, DataTypeFn),
+    ) -> Result<String>
+    where
+        TypesFn: for<'a> Fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>
+            + Send
+            + Sync
+            + 'static,
+        DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>
+            + Send
+            + Sync
+            + 'static,
+    {
         let exporter = self.clone().with_format(format);
         let formatted_types = exporter.format_types(types)?;
         let raw_types = formatted_types.as_ref();
@@ -248,12 +253,22 @@ impl Swift {
     }
 
     /// Export types to a file.
-    pub fn export_to(
+    pub fn export_to<TypesFn, DataTypeFn>(
         &self,
         path: impl AsRef<Path>,
         types: &Types,
-        format: impl IntoFormat,
-    ) -> Result<()> {
+        format: (TypesFn, DataTypeFn),
+    ) -> Result<()>
+    where
+        TypesFn: for<'a> Fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>
+            + Send
+            + Sync
+            + 'static,
+        DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>
+            + Send
+            + Sync
+            + 'static,
+    {
         let content = self.export(types, format)?;
         std::fs::write(path, content)?;
         Ok(())

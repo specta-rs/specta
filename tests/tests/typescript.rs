@@ -77,6 +77,9 @@ fn phase_collections() -> [(
     &'static str,
     Result<(Vec<(&'static str, DataType)>, Types), specta_serde::FormatError>,
 ); 3] {
+    let (serde_map_types, _) = specta_serde::format;
+    let (serde_phases_map_types, _) = specta_serde::format_phases;
+
     let (types, dts) = {
         let (mut types, mut dts) = crate::types();
         let (types2, dts2) = typescript_types();
@@ -93,10 +96,17 @@ fn phase_collections() -> [(
 
     [
         ("raw", Ok((dts.clone(), types.clone()))),
-        ("serde", crate::serde(types).map(|types| (dts, types))),
+        (
+            "serde",
+            serde_map_types(&types)
+                .map(|types| types.into_owned())
+                .map(|types| (dts, types)),
+        ),
         (
             "serde_phases",
-            crate::serde_phases(phased_types).map(|types| (phased_dts, types)),
+            serde_phases_map_types(&phased_types)
+                .map(|types| types.into_owned())
+                .map(|types| (phased_dts, types)),
         ),
     ]
 }
@@ -148,9 +158,12 @@ fn typescript_export_serde_errors() {
         let dt = T::definition(&mut types);
 
         for mode in ["serde", "serde_phases"] {
+            let (serde_map_types, serde_map_datatype) = specta_serde::format;
+            let (serde_phases_map_types, serde_phases_map_datatype) = specta_serde::format_phases;
+
             let types = match mode {
-                "serde" => crate::serde(types.clone()),
-                _ => crate::serde_phases(types.clone()),
+                "serde" => serde_map_types(&types.clone()).map(|types| types.into_owned()),
+                _ => serde_phases_map_types(&types.clone()).map(|types| types.into_owned()),
             };
 
             let types = match types {
@@ -161,7 +174,12 @@ fn typescript_export_serde_errors() {
                 }
             };
 
-            if let Err(err) = crate::serde_validate(&dt, &types) {
+            let validate = match mode {
+                "serde" => serde_map_datatype(&types, &dt),
+                _ => serde_phases_map_datatype(&types, &dt),
+            };
+
+            if let Err(err) = validate {
                 assert_expected_error(failures, name, mode, "validate", expected_error, err);
                 continue;
             }

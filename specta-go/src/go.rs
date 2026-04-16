@@ -23,6 +23,22 @@ pub struct FormatFns {
     pub(crate) datatype: DataTypeFormatFn,
 }
 
+impl<TypesFn, DataTypeFn> From<(TypesFn, DataTypeFn)> for FormatFns
+where
+    TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError> + Send + Sync + 'static,
+    DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError>
+        + Send
+        + Sync
+        + 'static,
+{
+    fn from(format: (TypesFn, DataTypeFn)) -> Self {
+        Self {
+            types: Arc::new(format.0),
+            datatype: Arc::new(format.1),
+        }
+    }
+}
+
 impl fmt::Debug for FormatFns {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -31,41 +47,6 @@ impl fmt::Debug for FormatFns {
             Arc::as_ptr(&self.types),
             Arc::as_ptr(&self.datatype)
         )
-    }
-}
-
-#[doc(hidden)]
-pub trait IntoFormat {
-    fn into_format_fns(self) -> FormatFns;
-}
-
-impl<TypesFn, DataTypeFn> IntoFormat for (TypesFn, DataTypeFn)
-where
-    TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError> + Send + Sync + 'static,
-    DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError>
-        + Send
-        + Sync
-        + 'static,
-{
-    fn into_format_fns(self) -> FormatFns {
-        FormatFns {
-            types: Arc::new(self.0),
-            datatype: Arc::new(self.1),
-        }
-    }
-}
-
-impl<F, TypesFn, DataTypeFn> IntoFormat for F
-where
-    F: FnOnce() -> (TypesFn, DataTypeFn),
-    TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError> + Send + Sync + 'static,
-    DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError>
-        + Send
-        + Sync
-        + 'static,
-{
-    fn into_format_fns(self) -> FormatFns {
-        self().into_format_fns()
     }
 }
 
@@ -115,12 +96,39 @@ impl Go {
         self
     }
 
-    pub(crate) fn with_format(mut self, builder: impl IntoFormat) -> Self {
-        self.format = Some(builder.into_format_fns());
+    pub(crate) fn with_format<TypesFn, DataTypeFn>(
+        mut self,
+        format: (TypesFn, DataTypeFn),
+    ) -> Self
+    where
+        TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError>
+            + Send
+            + Sync
+            + 'static,
+        DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError>
+            + Send
+            + Sync
+            + 'static,
+    {
+        self.format = Some(format.into());
         self
     }
 
-    pub fn export(&self, types: &Types, format: impl IntoFormat) -> Result<String, Error> {
+    pub fn export<TypesFn, DataTypeFn>(
+        &self,
+        types: &Types,
+        format: (TypesFn, DataTypeFn),
+    ) -> Result<String, Error>
+    where
+        TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError>
+            + Send
+            + Sync
+            + 'static,
+        DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError>
+            + Send
+            + Sync
+            + 'static,
+    {
         let mut ctx = GoContext::default();
         let mut body = String::new();
 
@@ -158,12 +166,22 @@ impl Go {
         Ok(out)
     }
 
-    pub fn export_to(
+    pub fn export_to<TypesFn, DataTypeFn>(
         &self,
         path: impl AsRef<Path>,
         types: &Types,
-        format: impl IntoFormat,
-    ) -> Result<(), Error> {
+        format: (TypesFn, DataTypeFn),
+    ) -> Result<(), Error>
+    where
+        TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError>
+            + Send
+            + Sync
+            + 'static,
+        DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError>
+            + Send
+            + Sync
+            + 'static,
+    {
         if self.layout == Layout::Files {
             return Err(Error::UnableToExport(Layout::Files));
         }

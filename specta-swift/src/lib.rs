@@ -52,5 +52,5 @@ mod swift;
 
 pub use error::Error;
 pub use swift::{
-    FormatError, GenericStyle, IndentStyle, IntoFormat, NamingConvention, OptionalStyle, Swift,
+    FormatError, GenericStyle, IndentStyle, NamingConvention, OptionalStyle, Swift,
 };

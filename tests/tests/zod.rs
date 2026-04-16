@@ -118,18 +118,22 @@ fn temp_root() -> std::path::PathBuf {
     temp_root
 }
 
-fn zod_raw_format() -> (
-    impl for<'a> Fn(&'a Types) -> Result<std::borrow::Cow<'a, Types>, specta_zod::FormatError>,
-    impl for<'a> Fn(
-        &'a Types,
-        &'a DataType,
-    ) -> Result<std::borrow::Cow<'a, DataType>, specta_zod::FormatError>,
-) {
-    (
-        |types| Ok(std::borrow::Cow::Borrowed(types)),
-        |_, dt| Ok(std::borrow::Cow::Borrowed(dt)),
-    )
+fn zod_raw_map_types(types: &Types) -> Result<std::borrow::Cow<'_, Types>, specta_zod::FormatError> {
+    Ok(std::borrow::Cow::Borrowed(types))
 }
+
+fn zod_raw_map_datatype(
+    _types: &Types,
+    dt: &DataType,
+) -> Result<std::borrow::Cow<'_, DataType>, specta_zod::FormatError> {
+    Ok(std::borrow::Cow::Borrowed(dt))
+}
+
+#[allow(non_upper_case_globals)]
+const zod_raw_format: (
+    for<'a> fn(&'a Types) -> Result<std::borrow::Cow<'a, Types>, specta_zod::FormatError>,
+    for<'a> fn(&'a Types, &'a DataType) -> Result<std::borrow::Cow<'a, DataType>, specta_zod::FormatError>,
+) = (zod_raw_map_types, zod_raw_map_datatype);
 
 #[test]
 fn zod_export_smoke() {
@@ -266,7 +270,7 @@ fn zod_uses_serde_transformed_resolved_types() {
 #[test]
 fn zod_rejects_invalid_serde_shapes_via_transformation() {
     let types = Types::default().register::<InvalidInternallyTaggedEnum>();
-    let (map_types, _) = specta_serde::format();
+    let (map_types, _) = specta_serde::format;
     let err = map_types(&types).unwrap_err();
 
     assert!(err.to_string().contains("Invalid internally tagged enum"));

@@ -72,9 +72,7 @@ mod typescript;
 
 pub use branded::Branded;
 pub use error::Error;
-pub use exporter::{
-    BrandedTypeExporter, Exporter, FormatError, FrameworkExporter, IntoFormat, Layout,
-};
+pub use exporter::{BrandedTypeExporter, Exporter, FormatError, FrameworkExporter, Layout};
 pub use jsdoc::JSDoc;
 pub use opaque::define;
 pub use references::collect_references;

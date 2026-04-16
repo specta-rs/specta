@@ -612,7 +612,7 @@ mod tests {
 
     #[test]
     fn map_renders_from_serde_applied_internal_enum_shape() {
-        let (map_types, _) = specta_serde::format();
+        let (map_types, _) = specta_serde::format;
         let resolved = map_types(&Types::default().register::<TaggedEnum>())
             .unwrap()
             .into_owned();
@@ -632,7 +632,7 @@ mod tests {
 
     #[test]
     fn map_renders_from_serde_applied_adjacent_enum_shape() {
-        let (map_types, _) = specta_serde::format();
+        let (map_types, _) = specta_serde::format;
         let resolved = map_types(&Types::default().register::<AdjacentEnum>())
             .unwrap()
             .into_owned();

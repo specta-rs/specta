@@ -247,7 +247,7 @@ fn test_all_string_enums_together() {
         .register::<RegularEnum>();
     let swift = Swift::default();
     let result = swift.export(&string_types, specta_serde::format).unwrap();
-    let raw_result = swift.export(&other_types, raw_format).unwrap();
+    let raw_result = swift.export(&other_types, raw_format()).unwrap();
 
     println!("Generated Swift for all enums:");
     println!("{}", result);

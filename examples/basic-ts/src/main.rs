@@ -184,7 +184,7 @@ fn main() {
     {
         let mut types = Types::default().register::<NotPhaseSpecific>();
         let def = HelloWorld::definition(&mut types);
-        let (map_types, _) = specta_serde::format_phases();
+        let (map_types, _) = specta_serde::format_phases;
         let types = map_types(&types).unwrap().into_owned();
         println!(
             "{:#?}",
@@ -218,9 +218,9 @@ fn main() {
             .register::<SerdeWithOneOrMany>();
         println!(
             "RAW:\n{}",
-            Typescript::default().export(&types, raw_format).unwrap()
+            Typescript::default().export(&types, raw_format()).unwrap()
         );
-        let (map_types, _) = specta_serde::format();
+        let (map_types, _) = specta_serde::format;
         match map_types(&types) {
             Ok(_) => println!(
                 "specta_serde::format(...):\n{}",

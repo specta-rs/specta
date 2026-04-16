@@ -228,24 +228,23 @@ fn map_phases_datatype<'a>(
     )))
 }
 
+/// Types graph formatter function signature.
+pub type TypesMapFn = for<'a> fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>;
+
+/// Inline datatype formatter function signature.
+pub type DataTypeMapFn =
+    for<'a> fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>;
+
 /// Formatter helpers for unified serde mode.
-pub fn format() -> (
-    impl for<'a> Fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>,
-    impl for<'a> Fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>,
-) {
-    (map_types, map_datatype)
-}
+#[allow(non_upper_case_globals)]
+pub const format: (TypesMapFn, DataTypeMapFn) = (map_types, map_datatype);
 
 /// Formatter helpers for split-phase serde mode.
 ///
 /// The type graph is expanded to include both `*_Serialize` and `*_Deserialize`
 /// named types. Inline datatype rendering selects the serialize-facing shape.
-pub fn format_phases() -> (
-    impl for<'a> Fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>,
-    impl for<'a> Fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>,
-) {
-    (map_phases_types, map_phases_datatype)
-}
+#[allow(non_upper_case_globals)]
+pub const format_phases: (TypesMapFn, DataTypeMapFn) = (map_phases_types, map_phases_datatype);
 
 fn apply_phases(types: Types) -> Result<Types> {
     validate::validate_for_mode(&types, validate::ApplyMode::Phases)?;
@@ -494,7 +493,7 @@ fn apply_phases(types: Types) -> Result<Types> {
 ///
 /// let mut types = Types::default();
 /// let dt = Filters::definition(&mut types);
-/// let (map_types, _) = format_phases();
+/// let (map_types, _) = format_phases;
 /// let resolved = map_types(&types).expect("format_phases should succeed").into_owned();
 ///
 /// let serialize = select_phase_datatype(&dt, &resolved, Phase::Serialize);
@@ -2226,7 +2225,7 @@ mod tests {
     }
 
     fn formatted_phases(types: Types) -> Types {
-        let (map_types, _) = format_phases();
+        let (map_types, _) = format_phases;
         map_types(&types)
             .expect("format_phases should succeed")
             .into_owned()

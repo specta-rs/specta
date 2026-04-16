@@ -59,7 +59,7 @@
 //!     let types = Types::default().register::<User>();
 //!
 //!     // Export with serde formatting
-//!     let (map_types, _) = specta_serde::format();
+//!     let (map_types, _) = specta_serde::format;
 //!     let serde_types = map_types(&types).unwrap();
 //!     JsonSchema::default()
 //!         .export_to("./schema.json", serde_types.as_ref())

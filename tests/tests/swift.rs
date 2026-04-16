@@ -5,10 +5,19 @@ use specta_swift::Swift;
 fn phase_collections(
     types: Types,
 ) -> [(&'static str, Result<Types, specta_serde::FormatError>); 3] {
+    let (serde_map_types, _) = specta_serde::format;
+    let (serde_phases_map_types, _) = specta_serde::format_phases;
+
     [
         ("raw", Ok(types.clone())),
-        ("serde", crate::serde(types.clone())),
-        ("serde_phases", crate::serde_phases(types)),
+        (
+            "serde",
+            serde_map_types(&types.clone()).map(|types| types.into_owned()),
+        ),
+        (
+            "serde_phases",
+            serde_phases_map_types(&types).map(|types| types.into_owned()),
+        ),
     ]
 }
 

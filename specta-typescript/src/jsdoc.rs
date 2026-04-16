@@ -1,8 +1,11 @@
 use std::{borrow::Cow, path::Path};
 
-use specta::Types;
+use specta::{
+    Types,
+    datatype::DataType,
+};
 
-use crate::{Branded, BrandedTypeExporter, Error, Exporter, Layout, exporter::IntoFormat};
+use crate::{Branded, BrandedTypeExporter, Error, Exporter, FormatError, Layout};
 
 /// JSDoc language exporter.
 #[derive(Debug, Clone)]
@@ -75,7 +78,21 @@ impl JSDoc {
     /// Export the files into a single string.
     ///
     /// Note: This returns an error if the format is `Format::Files`.
-    pub fn export(&self, types: &Types, format: impl IntoFormat) -> Result<String, Error> {
+    pub fn export<TypesFn, DataTypeFn>(
+        &self,
+        types: &Types,
+        format: (TypesFn, DataTypeFn),
+    ) -> Result<String, Error>
+    where
+        TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError>
+            + Send
+            + Sync
+            + 'static,
+        DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError>
+            + Send
+            + Sync
+            + 'static,
+    {
         self.0.export(types, format)
     }
 
@@ -84,12 +101,22 @@ impl JSDoc {
     /// When configured when `format` is `Format::Files`, you must provide a directory path.
     /// Otherwise, you must provide the path of a single file.
     ///
-    pub fn export_to(
+    pub fn export_to<TypesFn, DataTypeFn>(
         &self,
         path: impl AsRef<Path>,
         types: &Types,
-        format: impl IntoFormat,
-    ) -> Result<(), Error> {
+        format: (TypesFn, DataTypeFn),
+    ) -> Result<(), Error>
+    where
+        TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError>
+            + Send
+            + Sync
+            + 'static,
+        DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError>
+            + Send
+            + Sync
+            + 'static,
+    {
         self.0.export_to(path, types, format)
     }
 }

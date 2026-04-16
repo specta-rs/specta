@@ -49,7 +49,7 @@ fn main() {
     //     )
     // );
     println!("{:?}", {
-        let (map_types, map_datatype) = specta_serde::format_phases();
+        let (map_types, map_datatype) = specta_serde::format_phases;
         let mapped_types = map_types(&types).unwrap();
         let mapped_dt = map_datatype(&types, &dt).unwrap();
         specta_typescript::primitives::inline(
