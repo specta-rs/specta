@@ -37,6 +37,57 @@ fn resolved_string_enum(e: &Enum) -> Option<Vec<(&str, &str)>> {
         .collect()
 }
 
+fn serde_variant_payload<'a>(variant_name: &str, variant: &'a Variant) -> Option<&'a DataType> {
+    let Fields::Named(fields) = &variant.fields else {
+        return None;
+    };
+
+    let [(payload_name, payload_field)] = fields.fields.as_slice() else {
+        return None;
+    };
+
+    payload_name
+        .as_ref()
+        .eq_ignore_ascii_case(variant_name)
+        .then_some(payload_field.ty.as_ref())
+        .flatten()
+}
+
+fn is_unit_payload(dt: &DataType) -> bool {
+    let DataType::Enum(enm) = dt else {
+        return false;
+    };
+
+    let [(_, variant)] = enm.variants.as_slice() else {
+        return false;
+    };
+
+    matches!(variant.fields, Fields::Unit)
+}
+
+fn should_emit_variant_wrapper(variant_name: &str, variant: &Variant) -> bool {
+    let Fields::Named(fields) = &variant.fields else {
+        return false;
+    };
+
+    if fields.fields.is_empty() {
+        return false;
+    }
+
+    let Some(payload) = serde_variant_payload(variant_name, variant) else {
+        return true;
+    };
+
+    matches!(
+        payload,
+        DataType::Struct(strct)
+            if matches!(
+                &strct.fields,
+                Fields::Named(named) if !named.fields.is_empty()
+            )
+    )
+}
+
 /// Export a single type to Swift.
 pub fn export_type(
     swift: &Swift,
@@ -118,9 +169,10 @@ pub fn export_type(
             let is_string_enum_val = resolved_string_enum(e).is_some();
 
             // Check if this enum has struct-like variants (needs custom Codable)
-            let has_struct_variants = e.variants.iter().any(|(_, variant)| {
-                matches!(&variant.fields, specta::datatype::Fields::Named(fields) if !fields.fields.is_empty())
-            });
+            let has_struct_variants = e
+                .variants
+                .iter()
+                .any(|(variant_name, variant)| should_emit_variant_wrapper(variant_name, variant));
 
             // Determine protocols based on whether we'll generate custom Codable
             let protocols = if is_string_enum_val {
@@ -210,6 +262,10 @@ pub fn datatype_to_swift(
 }
 
 fn apply_datatype_format(swift: &Swift, types: &Types, dt: &DataType) -> Result<DataType> {
+    if contains_generic_reference(dt) {
+        return apply_datatype_format_children(swift, types, dt.clone());
+    }
+
     let Some(format) = swift.format.as_ref() else {
         return Ok(dt.clone());
     };
@@ -284,6 +340,43 @@ fn map_fields(swift: &Swift, types: &Types, fields: &mut Fields) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn contains_generic_reference(dt: &DataType) -> bool {
+    match dt {
+        DataType::Primitive(_) => false,
+        DataType::List(list) => contains_generic_reference(&list.ty),
+        DataType::Map(map) => {
+            contains_generic_reference(map.key_ty()) || contains_generic_reference(map.value_ty())
+        }
+        DataType::Nullable(inner) => contains_generic_reference(inner),
+        DataType::Struct(strct) => fields_contain_generic_reference(&strct.fields),
+        DataType::Enum(enm) => enm
+            .variants
+            .iter()
+            .any(|(_, variant)| fields_contain_generic_reference(&variant.fields)),
+        DataType::Tuple(tuple) => tuple.elements.iter().any(contains_generic_reference),
+        DataType::Reference(Reference::Named(reference)) => reference
+            .generics
+            .iter()
+            .any(|(_, generic)| contains_generic_reference(generic)),
+        DataType::Reference(Reference::Generic(_)) => true,
+        DataType::Reference(Reference::Opaque(_)) => false,
+    }
+}
+
+fn fields_contain_generic_reference(fields: &Fields) -> bool {
+    match fields {
+        Fields::Unit => false,
+        Fields::Unnamed(unnamed) => unnamed
+            .fields
+            .iter()
+            .any(|field| field.ty.as_ref().is_some_and(|ty| contains_generic_reference(ty))),
+        Fields::Named(named) => named
+            .fields
+            .iter()
+            .any(|(_, field)| field.ty.as_ref().is_some_and(|ty| contains_generic_reference(ty))),
+    }
 }
 
 /// Check if a struct is a Duration by examining its fields
@@ -550,6 +643,38 @@ fn enum_to_swift(
             specta::datatype::Fields::Named(fields) => {
                 if fields.fields.is_empty() {
                     result.push_str(&format!("    case {}\n", variant_name));
+                } else if !should_emit_variant_wrapper(original_variant_name, variant) {
+                    let payload = serde_variant_payload(original_variant_name, variant)
+                        .expect("serde payload variants should contain a payload");
+
+                    if is_unit_payload(payload) {
+                        result.push_str(&format!("    case {}\n", variant_name));
+                    } else {
+                        let payload_ty = match payload {
+                            DataType::Tuple(tuple) if tuple.elements.len() > 1 => tuple
+                                .elements
+                                .iter()
+                                .map(|element| {
+                                    datatype_to_swift(
+                                        swift,
+                                        types,
+                                        element,
+                                        generic_scope.clone(),
+                                        None,
+                                    )
+                                })
+                                .collect::<std::result::Result<Vec<_>, _>>()?
+                                .join(", "),
+                            _ => datatype_to_swift(
+                                swift,
+                                types,
+                                payload,
+                                generic_scope.clone(),
+                                None,
+                            )?,
+                        };
+                        result.push_str(&format!("    case {}({})\n", variant_name, payload_ty));
+                    }
                 } else {
                     // Generate struct for named fields
                     // Use the original variant name for PascalCase struct name
@@ -588,6 +713,7 @@ fn generate_enum_structs(
 
         if let specta::datatype::Fields::Named(fields) = &variant.fields
             && !fields.fields.is_empty()
+            && should_emit_variant_wrapper(original_variant_name, variant)
         {
             let pascal_variant_name = to_pascal_case(original_variant_name.as_ref());
             let struct_name = format!("{}{}Data", enum_name, pascal_variant_name);
