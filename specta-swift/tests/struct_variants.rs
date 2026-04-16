@@ -41,7 +41,7 @@ fn test_struct_variants_generation() {
         .register::<Event>()
         .register::<ApiResponse>();
     let swift = Swift::default();
-    let result = swift.export(&types, specta_serde::format).unwrap();
+    let result = swift.export(&types, specta_swift::raw_format()).unwrap();
 
     println!("Generated Swift for struct variants:");
     println!("{}", result);

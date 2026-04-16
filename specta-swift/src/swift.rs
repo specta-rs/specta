@@ -24,6 +24,29 @@ type DataTypeFormatFn = Arc<
         + Sync,
 >;
 
+type RawTypesFormatFn = for<'a> fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>;
+type RawDataTypeFormatFn =
+    for<'a> fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>;
+
+fn raw_types_format<'a>(types: &'a Types) -> std::result::Result<Cow<'a, Types>, FormatError> {
+    Ok(Cow::Borrowed(types))
+}
+
+fn raw_datatype_format<'a>(
+    _types: &'a Types,
+    datatype: &'a DataType,
+) -> std::result::Result<Cow<'a, DataType>, FormatError> {
+    Ok(Cow::Borrowed(datatype))
+}
+
+/// No-op format callbacks for exporting raw Specta types.
+///
+/// This is useful when you don't want any serialization-specific transformations.
+/// Users can compose their own format pipeline in application code if needed.
+pub fn raw_format() -> (RawTypesFormatFn, RawDataTypeFormatFn) {
+    (raw_types_format, raw_datatype_format)
+}
+
 #[derive(Clone)]
 #[doc(hidden)]
 pub struct FormatFns {

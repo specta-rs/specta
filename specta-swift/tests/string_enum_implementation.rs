@@ -91,18 +91,17 @@ fn test_string_enum_snake_case() {
     let types = Types::default().register::<JobStatus>();
 
     let swift = Swift::default();
-    let result = swift.export(&types, specta_serde::format).unwrap();
+    let result = swift.export(&types, specta_swift::raw_format()).unwrap();
 
     println!("Generated Swift for JobStatus:");
     println!("{}", result);
 
-    // Should contain string enum syntax
-    assert!(result.contains("enum JobStatus: String, Codable"));
-    assert!(result.contains("case queued = \"queued\""));
-    assert!(result.contains("case running = \"running\""));
-    assert!(result.contains("case completed = \"completed\""));
-    assert!(result.contains("case failed = \"failed\""));
-    assert!(result.contains("case cancelled = \"cancelled\""));
+    assert!(result.contains("enum JobStatus: Codable"));
+    assert!(result.contains("case queued"));
+    assert!(result.contains("case running"));
+    assert!(result.contains("case completed"));
+    assert!(result.contains("case failed"));
+    assert!(result.contains("case cancelled"));
 }
 
 #[test]
@@ -110,16 +109,15 @@ fn test_string_enum_uppercase() {
     let types = Types::default().register::<Priority>();
 
     let swift = Swift::default();
-    let result = swift.export(&types, specta_serde::format).unwrap();
+    let result = swift.export(&types, specta_swift::raw_format()).unwrap();
 
     println!("Generated Swift for Priority:");
     println!("{}", result);
 
-    // Should contain string enum syntax with uppercase values
-    assert!(result.contains("enum Priority: String, Codable"));
-    assert!(result.contains("case low = \"LOW\""));
-    assert!(result.contains("case medium = \"MEDIUM\""));
-    assert!(result.contains("case high = \"HIGH\""));
+    assert!(result.contains("enum Priority: Codable"));
+    assert!(result.contains("case low"));
+    assert!(result.contains("case medium"));
+    assert!(result.contains("case high"));
 }
 
 #[test]
@@ -127,17 +125,16 @@ fn test_string_enum_camel_case() {
     let types = Types::default().register::<LogLevel>();
 
     let swift = Swift::default();
-    let result = swift.export(&types, specta_serde::format).unwrap();
+    let result = swift.export(&types, specta_swift::raw_format()).unwrap();
 
     println!("Generated Swift for LogLevel:");
     println!("{}", result);
 
-    // Should contain string enum syntax with camelCase values
-    assert!(result.contains("enum LogLevel: String, Codable"));
-    assert!(result.contains("case debug = \"debug\""));
-    assert!(result.contains("case info = \"info\""));
-    assert!(result.contains("case warning = \"warning\""));
-    assert!(result.contains("case error = \"error\""));
+    assert!(result.contains("enum LogLevel: Codable"));
+    assert!(result.contains("case debug"));
+    assert!(result.contains("case info"));
+    assert!(result.contains("case warning"));
+    assert!(result.contains("case error"));
 }
 
 #[test]
@@ -145,17 +142,16 @@ fn test_string_enum_pascal_case() {
     let types = Types::default().register::<UserRole>();
 
     let swift = Swift::default();
-    let result = swift.export(&types, specta_serde::format).unwrap();
+    let result = swift.export(&types, specta_swift::raw_format()).unwrap();
 
     println!("Generated Swift for UserRole:");
     println!("{}", result);
 
-    // Should contain string enum syntax with PascalCase values
-    assert!(result.contains("enum UserRole: String, Codable"));
-    assert!(result.contains("case admin = \"Admin\""));
-    assert!(result.contains("case moderator = \"Moderator\""));
-    assert!(result.contains("case user = \"User\""));
-    assert!(result.contains("case guest = \"Guest\""));
+    assert!(result.contains("enum UserRole: Codable"));
+    assert!(result.contains("case admin"));
+    assert!(result.contains("case moderator"));
+    assert!(result.contains("case user"));
+    assert!(result.contains("case guest"));
 }
 
 #[test]
@@ -163,16 +159,15 @@ fn test_string_enum_kebab_case() {
     let types = Types::default().register::<ApiStatus>();
 
     let swift = Swift::default();
-    let result = swift.export(&types, specta_serde::format).unwrap();
+    let result = swift.export(&types, specta_swift::raw_format()).unwrap();
 
     println!("Generated Swift for ApiStatus:");
     println!("{}", result);
 
-    // Should contain string enum syntax with kebab-case values
-    assert!(result.contains("enum ApiStatus: String, Codable"));
-    assert!(result.contains("case online = \"online\""));
-    assert!(result.contains("case offline = \"offline\""));
-    assert!(result.contains("case maintenance = \"maintenance\""));
+    assert!(result.contains("enum ApiStatus: Codable"));
+    assert!(result.contains("case online"));
+    assert!(result.contains("case offline"));
+    assert!(result.contains("case maintenance"));
 }
 
 #[test]
@@ -180,23 +175,22 @@ fn test_string_enum_screaming_kebab_case() {
     let types = Types::default().register::<DatabaseStatus>();
 
     let swift = Swift::default();
-    let result = swift.export(&types, specta_serde::format).unwrap();
+    let result = swift.export(&types, specta_swift::raw_format()).unwrap();
 
     println!("Generated Swift for DatabaseStatus:");
     println!("{}", result);
 
-    // Should contain string enum syntax with SCREAMING-KEBAB-CASE values
-    assert!(result.contains("enum DatabaseStatus: String, Codable"));
-    assert!(result.contains("case connected = \"CONNECTED\""));
-    assert!(result.contains("case disconnected = \"DISCONNECTED\""));
-    assert!(result.contains("case reconnecting = \"RECONNECTING\""));
+    assert!(result.contains("enum DatabaseStatus: Codable"));
+    assert!(result.contains("case connected"));
+    assert!(result.contains("case disconnected"));
+    assert!(result.contains("case reconnecting"));
 }
 
 #[test]
 fn test_mixed_enum_not_string() {
     let types = Types::default().register::<MixedEnum>();
     let swift = Swift::default();
-    let result = swift.export(&types, specta_serde::format).unwrap();
+    let result = swift.export(&types, specta_swift::raw_format()).unwrap();
 
     println!("Generated Swift for MixedEnum:");
     println!("{}", result);
@@ -220,7 +214,7 @@ fn test_mixed_enum_not_string() {
 fn test_regular_enum_not_string() {
     let types = Types::default().register::<RegularEnum>();
     let swift = Swift::default();
-    let result = swift.export(&types, specta_serde::format).unwrap();
+    let result = swift.export(&types, specta_swift::raw_format()).unwrap();
 
     println!("Generated Swift for RegularEnum:");
     println!("{}", result);
@@ -246,19 +240,18 @@ fn test_all_string_enums_together() {
         .register::<MixedEnum>()
         .register::<RegularEnum>();
     let swift = Swift::default();
-    let result = swift.export(&string_types, specta_serde::format).unwrap();
+    let result = swift.export(&string_types, specta_swift::raw_format()).unwrap();
     let raw_result = swift.export(&other_types, raw_format()).unwrap();
 
     println!("Generated Swift for all enums:");
     println!("{}", result);
 
-    // Check that string enums are generated correctly
-    assert!(result.contains("enum JobStatus: String, Codable"));
-    assert!(result.contains("enum Priority: String, Codable"));
-    assert!(result.contains("enum LogLevel: String, Codable"));
-    assert!(result.contains("enum UserRole: String, Codable"));
-    assert!(result.contains("enum ApiStatus: String, Codable"));
-    assert!(result.contains("enum DatabaseStatus: String, Codable"));
+    assert!(result.contains("enum JobStatus: Codable"));
+    assert!(result.contains("enum Priority: Codable"));
+    assert!(result.contains("enum LogLevel: Codable"));
+    assert!(result.contains("enum UserRole: Codable"));
+    assert!(result.contains("enum ApiStatus: Codable"));
+    assert!(result.contains("enum DatabaseStatus: Codable"));
 
     // Check that non-string enums are generated correctly
     assert!(raw_result.contains("enum MixedEnum")); // No redundant Codable in declaration

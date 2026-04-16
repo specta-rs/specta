@@ -38,7 +38,7 @@ fn main() {
         .export_to(
             "./examples/generated/SimpleTypes.swift",
             &types,
-            specta_serde::format,
+            specta_swift::raw_format(),
         )
         .unwrap();
 
@@ -54,7 +54,7 @@ fn main() {
         .export_to(
             "./examples/generated/CustomTypes.swift",
             &types,
-            specta_serde::format,
+            specta_swift::raw_format(),
         )
         .unwrap();
 

@@ -4,11 +4,10 @@
 //!
 //! # Usage
 //!
-//! Add `specta`, `specta-serde`, and `specta-swift` to your project:
+//! Add `specta` and `specta-swift` to your project:
 //!
 //! ```bash
 //! cargo add specta@2.0.0-rc.24 --features derive,collect
-//! cargo add specta-serde@0.0.11
 //! cargo add specta-swift@0.0.2
 //! ```
 //!
@@ -33,7 +32,7 @@
 //!     .register::<MyType>();
 //!
 //! Swift::default()
-//!     .export_to("./Types.swift", &types, specta_serde::format)
+//!     .export_to("./Types.swift", &types, specta_swift::raw_format())
 //!     .unwrap();
 //! ```
 //!
@@ -51,4 +50,6 @@ mod primitives;
 mod swift;
 
 pub use error::Error;
-pub use swift::{FormatError, GenericStyle, IndentStyle, NamingConvention, OptionalStyle, Swift};
+pub use swift::{
+    FormatError, GenericStyle, IndentStyle, NamingConvention, OptionalStyle, Swift, raw_format,
+};

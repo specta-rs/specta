@@ -26,7 +26,6 @@ serde = { version = "1.0", features = ["derive"] }
 [dev-dependencies]
 insta = "1.47"
 trybuild = "1.0"
-specta-serde = { version = "=0.0.11", path = "../specta-serde" }
 uuid = "1.23.0"
 chrono = { version = "0.4.44", features = ["clock"] }
 

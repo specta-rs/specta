@@ -2064,7 +2064,6 @@ dependencies = [
  "insta",
  "serde",
  "specta",
- "specta-serde",
  "thiserror",
  "trybuild",
  "uuid",

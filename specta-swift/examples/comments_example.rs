@@ -108,7 +108,7 @@ fn main() {
         .register::<User>();
 
     let swift = Swift::default();
-    let output = swift.export(&types, specta_serde::format).unwrap();
+    let output = swift.export(&types, specta_swift::raw_format()).unwrap();
 
     println!(
         "Generated Swift code with comprehensive comments:\n{}",
@@ -120,7 +120,7 @@ fn main() {
         .export_to(
             "./examples/generated/CommentsExample.swift",
             &types,
-            specta_serde::format,
+            specta_swift::raw_format(),
         )
         .unwrap();
     println!("\nComments example written to CommentsExample.swift");

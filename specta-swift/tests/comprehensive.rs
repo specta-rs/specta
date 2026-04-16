@@ -60,7 +60,7 @@ fn test_comprehensive_export() {
         .register::<ApiResponse<String>>()
         .register::<ApiResult<String, String>>();
     let swift = Swift::default();
-    let output = swift.export(&types, specta_serde::format).unwrap();
+    let output = swift.export(&types, specta_swift::raw_format()).unwrap();
 
     println!("Generated Swift code:\n{}", output);
 
@@ -111,7 +111,7 @@ fn test_comprehensive_export() {
 fn test_naming_conventions() {
     let types = Types::default().register::<User>();
     let swift = Swift::default();
-    let output = swift.export(&types, specta_serde::format).unwrap();
+    let output = swift.export(&types, specta_swift::raw_format()).unwrap();
 
     // Test PascalCase for type names
     assert!(output.contains("struct User"));
@@ -130,7 +130,7 @@ fn test_swift_configuration() {
         .naming(specta_swift::NamingConvention::SnakeCase)
         .optionals(specta_swift::OptionalStyle::Optional);
 
-    let output = swift.export(&types, specta_serde::format).unwrap();
+    let output = swift.export(&types, specta_swift::raw_format()).unwrap();
 
     println!("Snake case output:\n{}", output);
 
