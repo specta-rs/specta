@@ -49,7 +49,10 @@ fn raw_map_datatype(
 #[allow(non_upper_case_globals)]
 pub const raw_format: (
     for<'a> fn(&'a Types) -> Result<Cow<'a, Types>, specta_typescript::FormatError>,
-    for<'a> fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, specta_typescript::FormatError>,
+    for<'a> fn(
+        &'a Types,
+        &'a DataType,
+    ) -> Result<Cow<'a, DataType>, specta_typescript::FormatError>,
 ) = (raw_map_types, raw_map_datatype);
 
 #[test]

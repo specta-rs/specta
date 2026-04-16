@@ -118,7 +118,9 @@ fn temp_root() -> std::path::PathBuf {
     temp_root
 }
 
-fn zod_raw_map_types(types: &Types) -> Result<std::borrow::Cow<'_, Types>, specta_zod::FormatError> {
+fn zod_raw_map_types(
+    types: &Types,
+) -> Result<std::borrow::Cow<'_, Types>, specta_zod::FormatError> {
     Ok(std::borrow::Cow::Borrowed(types))
 }
 
@@ -132,7 +134,10 @@ fn zod_raw_map_datatype(
 #[allow(non_upper_case_globals)]
 const zod_raw_format: (
     for<'a> fn(&'a Types) -> Result<std::borrow::Cow<'a, Types>, specta_zod::FormatError>,
-    for<'a> fn(&'a Types, &'a DataType) -> Result<std::borrow::Cow<'a, DataType>, specta_zod::FormatError>,
+    for<'a> fn(
+        &'a Types,
+        &'a DataType,
+    ) -> Result<std::borrow::Cow<'a, DataType>, specta_zod::FormatError>,
 ) = (zod_raw_map_types, zod_raw_map_datatype);
 
 #[test]

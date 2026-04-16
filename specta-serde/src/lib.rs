@@ -228,23 +228,22 @@ fn map_phases_datatype<'a>(
     )))
 }
 
-/// Types graph formatter function signature.
-pub type TypesMapFn = for<'a> fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>;
-
-/// Inline datatype formatter function signature.
-pub type DataTypeMapFn =
-    for<'a> fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>;
-
 /// Formatter helpers for unified serde mode.
 #[allow(non_upper_case_globals)]
-pub const format: (TypesMapFn, DataTypeMapFn) = (map_types, map_datatype);
+pub const format: (
+    for<'a> fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>,
+    for<'a> fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>,
+) = (map_types, map_datatype);
 
 /// Formatter helpers for split-phase serde mode.
 ///
 /// The type graph is expanded to include both `*_Serialize` and `*_Deserialize`
 /// named types. Inline datatype rendering selects the serialize-facing shape.
 #[allow(non_upper_case_globals)]
-pub const format_phases: (TypesMapFn, DataTypeMapFn) = (map_phases_types, map_phases_datatype);
+pub const format_phases: (
+    for<'a> fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>,
+    for<'a> fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>,
+) = (map_phases_types, map_phases_datatype);
 
 fn apply_phases(types: Types) -> Result<Types> {
     validate::validate_for_mode(&types, validate::ApplyMode::Phases)?;

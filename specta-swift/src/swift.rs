@@ -182,10 +182,7 @@ impl Swift {
         self
     }
 
-    pub(crate) fn with_format<TypesFn, DataTypeFn>(
-        mut self,
-        format: (TypesFn, DataTypeFn),
-    ) -> Self
+    pub(crate) fn with_format<TypesFn, DataTypeFn>(mut self, format: (TypesFn, DataTypeFn)) -> Self
     where
         (TypesFn, DataTypeFn): Into<FormatFns>,
     {

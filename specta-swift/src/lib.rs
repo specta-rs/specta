@@ -51,6 +51,4 @@ mod primitives;
 mod swift;
 
 pub use error::Error;
-pub use swift::{
-    FormatError, GenericStyle, IndentStyle, NamingConvention, OptionalStyle, Swift,
-};
+pub use swift::{FormatError, GenericStyle, IndentStyle, NamingConvention, OptionalStyle, Swift};
