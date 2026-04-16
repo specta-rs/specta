@@ -113,7 +113,6 @@ pub struct Zod {
     pub bigint: BigIntExportBehavior,
     /// Output layout mode for generated Zod TypeScript.
     pub layout: Layout,
-    pub(crate) format: Option<FormatFns>,
 }
 
 impl Default for Zod {
@@ -133,16 +132,7 @@ impl Zod {
             ),
             bigint: Default::default(),
             layout: Default::default(),
-            format: None,
         }
-    }
-
-    pub(crate) fn with_format<TypesFn, DataTypeFn>(mut self, format: (TypesFn, DataTypeFn)) -> Self
-    where
-        (TypesFn, DataTypeFn): Into<FormatFns>,
-    {
-        self.format = Some(format.into());
-        self
     }
 
     /// Provide a prelude which is added to the start of all exported files.
@@ -190,8 +180,9 @@ impl Zod {
     where
         (TypesFn, DataTypeFn): Into<FormatFns>,
     {
-        let exporter = self.clone().with_format(format);
-        let formatted_types = exporter.format_types(types)?;
+        let format = format.into();
+        let exporter = self.clone();
+        let formatted_types = format_types(types, &format)?;
         let types = formatted_types.as_ref();
 
         if let Layout::Files = exporter.layout {
@@ -205,6 +196,7 @@ impl Zod {
         if let Some(framework_runtime) = &exporter.framework_runtime {
             runtime = (framework_runtime.0)(FrameworkExporter {
                 exporter: &exporter,
+                format: Some(&format),
                 has_manually_exported_user_types: &mut has_manually_exported_user_types,
                 files_root_types: "",
                 types,
@@ -235,8 +227,9 @@ impl Zod {
     where
         (TypesFn, DataTypeFn): Into<FormatFns>,
     {
-        let exporter = self.clone().with_format(format);
-        let formatted_types = exporter.format_types(types)?;
+        let format = format.into();
+        let exporter = self.clone();
+        let formatted_types = format_types(types, &format)?;
         let types = formatted_types.as_ref();
         let path = path.as_ref();
 
@@ -248,6 +241,7 @@ impl Zod {
             if let Some(framework_runtime) = &exporter.framework_runtime {
                 runtime = (framework_runtime.0)(FrameworkExporter {
                     exporter: &exporter,
+                    format: Some(&format),
                     has_manually_exported_user_types: &mut has_manually_exported_user_types,
                     files_root_types: "",
                     types,
@@ -364,6 +358,7 @@ impl Zod {
                     references::collect_references(|| {
                         (framework_runtime.0)(FrameworkExporter {
                             exporter: &exporter,
+                            format: Some(&format),
                             has_manually_exported_user_types: &mut has_manually_exported_user_types,
                             files_root_types: &root_types,
                             types,
@@ -443,22 +438,22 @@ impl Zod {
 
         Ok(())
     }
-
-    pub(crate) fn format_types<'a>(&self, types: &'a Types) -> Result<Cow<'a, Types>, Error> {
-        let Some(format) = &self.format else {
-            return Ok(Cow::Borrowed(types));
-        };
-
-        let mapped_types = (format.types)(types)
-            .map_err(|err| Error::format("type graph formatter failed", err))?;
-        Ok(Cow::Owned(
-            map_types_for_datatype_format(self, mapped_types.as_ref())?.into_owned(),
-        ))
-    }
 }
 
-fn map_datatype_format(exporter: &Zod, types: &Types, dt: &DataType) -> Result<DataType, Error> {
-    let Some(format) = exporter.format.as_ref() else {
+fn format_types<'a>(types: &'a Types, format: &FormatFns) -> Result<Cow<'a, Types>, Error> {
+    let mapped_types =
+        (format.types)(types).map_err(|err| Error::format("type graph formatter failed", err))?;
+    Ok(Cow::Owned(
+        map_types_for_datatype_format(mapped_types.as_ref(), Some(format))?.into_owned(),
+    ))
+}
+
+fn map_datatype_format(
+    format: Option<&FormatFns>,
+    types: &Types,
+    dt: &DataType,
+) -> Result<DataType, Error> {
+    let Some(format) = format else {
         return Ok(dt.clone());
     };
 
@@ -466,44 +461,44 @@ fn map_datatype_format(exporter: &Zod, types: &Types, dt: &DataType) -> Result<D
         .map_err(|err| Error::format("datatype formatter failed", err))?;
 
     match mapped {
-        Cow::Borrowed(dt) => map_datatype_format_children(exporter, types, dt.clone()),
-        Cow::Owned(dt) => map_datatype_format_children(exporter, types, dt),
+        Cow::Borrowed(dt) => map_datatype_format_children(Some(format), types, dt.clone()),
+        Cow::Owned(dt) => map_datatype_format_children(Some(format), types, dt),
     }
 }
 
 fn map_datatype_format_children(
-    exporter: &Zod,
+    format: Option<&FormatFns>,
     types: &Types,
     mut dt: DataType,
 ) -> Result<DataType, Error> {
     match &mut dt {
         DataType::Primitive(_) => {}
         DataType::List(list) => {
-            list.ty = Box::new(map_datatype_format(exporter, types, &list.ty)?);
+            list.ty = Box::new(map_datatype_format(format, types, &list.ty)?);
         }
         DataType::Map(map) => {
-            let key = map_datatype_format(exporter, types, map.key_ty())?;
-            let value = map_datatype_format(exporter, types, map.value_ty())?;
+            let key = map_datatype_format(format, types, map.key_ty())?;
+            let value = map_datatype_format(format, types, map.value_ty())?;
             map.set_key_ty(key);
             map.set_value_ty(value);
         }
         DataType::Nullable(inner) => {
-            **inner = map_datatype_format(exporter, types, inner)?;
+            **inner = map_datatype_format(format, types, inner)?;
         }
-        DataType::Struct(strct) => map_datatype_fields(exporter, types, &mut strct.fields)?,
+        DataType::Struct(strct) => map_datatype_fields(format, types, &mut strct.fields)?,
         DataType::Enum(enm) => {
             for (_, variant) in &mut enm.variants {
-                map_datatype_fields(exporter, types, &mut variant.fields)?;
+                map_datatype_fields(format, types, &mut variant.fields)?;
             }
         }
         DataType::Tuple(tuple) => {
             for element in &mut tuple.elements {
-                *element = map_datatype_format(exporter, types, element)?;
+                *element = map_datatype_format(format, types, element)?;
             }
         }
         DataType::Reference(Reference::Named(reference)) => {
             for (_, generic) in &mut reference.generics {
-                *generic = map_datatype_format(exporter, types, generic)?;
+                *generic = map_datatype_format(format, types, generic)?;
             }
         }
         DataType::Reference(Reference::Generic(_) | Reference::Opaque(_)) => {}
@@ -512,20 +507,24 @@ fn map_datatype_format_children(
     Ok(dt)
 }
 
-fn map_datatype_fields(exporter: &Zod, types: &Types, fields: &mut Fields) -> Result<(), Error> {
+fn map_datatype_fields(
+    format: Option<&FormatFns>,
+    types: &Types,
+    fields: &mut Fields,
+) -> Result<(), Error> {
     match fields {
         Fields::Unit => {}
         Fields::Unnamed(unnamed) => {
             for field in &mut unnamed.fields {
                 if let Some(ty) = field.ty.as_mut() {
-                    *ty = map_datatype_format(exporter, types, ty)?;
+                    *ty = map_datatype_format(format, types, ty)?;
                 }
             }
         }
         Fields::Named(named) => {
             for (_, field) in &mut named.fields {
                 if let Some(ty) = field.ty.as_mut() {
-                    *ty = map_datatype_format(exporter, types, ty)?;
+                    *ty = map_datatype_format(format, types, ty)?;
                 }
             }
         }
@@ -535,20 +534,20 @@ fn map_datatype_fields(exporter: &Zod, types: &Types, fields: &mut Fields) -> Re
 }
 
 fn map_named_datatype_format(
-    exporter: &Zod,
+    format: Option<&FormatFns>,
     types: &Types,
     ndt: &NamedDataType,
 ) -> Result<NamedDataType, Error> {
     let mut mapped = ndt.clone();
-    mapped.ty = map_datatype_format(exporter, types, &ndt.ty)?;
+    mapped.ty = map_datatype_format(format, types, &ndt.ty)?;
     Ok(mapped)
 }
 
 fn map_types_for_datatype_format<'a>(
-    exporter: &Zod,
     types: &'a Types,
+    format: Option<&FormatFns>,
 ) -> Result<Cow<'a, Types>, Error> {
-    if exporter.format.is_none() {
+    if format.is_none() {
         return Ok(Cow::Borrowed(types));
     }
 
@@ -559,7 +558,7 @@ fn map_types_for_datatype_format<'a>(
             return;
         }
 
-        match map_datatype_format(exporter, types, &ndt.ty) {
+        match map_datatype_format(format, types, &ndt.ty) {
             Ok(mapped) => ndt.ty = mapped,
             Err(err) => map_err = Some(err),
         }
@@ -587,6 +586,7 @@ impl AsMut<Zod> for Zod {
 /// Reference to the Zod exporter for framework callbacks.
 pub struct FrameworkExporter<'a> {
     exporter: &'a Zod,
+    format: Option<&'a FormatFns>,
     has_manually_exported_user_types: &'a mut bool,
     files_root_types: &'a str,
     /// Collected types currently being exported.
@@ -624,14 +624,13 @@ impl FrameworkExporter<'_> {
 
     /// [primitives::inline]
     pub fn inline(&self, dt: &DataType) -> Result<String, Error> {
-        let mapped = map_datatype_format(self.exporter, self.types, dt)?;
+        let mapped = map_datatype_format(self.format, self.types, dt)?;
         primitives::inline(self, self.types, &mapped)
     }
 
     /// [primitives::reference]
     pub fn reference(&self, r: &Reference) -> Result<String, Error> {
-        let mapped =
-            map_datatype_format(self.exporter, self.types, &DataType::Reference(r.clone()))?;
+        let mapped = map_datatype_format(self.format, self.types, &DataType::Reference(r.clone()))?;
         match mapped {
             DataType::Reference(reference) => primitives::reference(self, self.types, &reference),
             dt => primitives::inline(self, self.types, &dt),
@@ -645,7 +644,7 @@ impl FrameworkExporter<'_> {
         indent: &'a str,
     ) -> Result<String, Error> {
         let mapped = ndts
-            .map(|ndt| map_named_datatype_format(self.exporter, self.types, ndt))
+            .map(|ndt| map_named_datatype_format(self.format, self.types, ndt))
             .collect::<Result<Vec<_>, _>>()?;
         primitives::export(self, self.types, mapped.iter(), indent)
     }

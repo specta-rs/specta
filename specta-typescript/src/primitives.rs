@@ -1997,7 +1997,16 @@ fn reference_opaque_dt(
         if let Some(branded_type) = exporter
             .branded_type_impl
             .as_ref()
-            .map(|builder| (builder.0)(BrandedTypeExporter { exporter, types }, def))
+            .map(|builder| {
+                (builder.0)(
+                    BrandedTypeExporter {
+                        exporter,
+                        format: None,
+                        types,
+                    },
+                    def,
+                )
+            })
             .transpose()?
         {
             s.push_str(branded_type.as_ref());
