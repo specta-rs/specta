@@ -155,19 +155,6 @@ pub struct SerdeWithOneOrMany {
     tags: Vec<String>,
 }
 
-fn raw_format() -> (
-    impl for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, specta_typescript::FormatError>,
-    impl for<'a> Fn(
-        &'a Types,
-        &'a DataType,
-    ) -> Result<Cow<'a, DataType>, specta_typescript::FormatError>,
-) {
-    (
-        |types| Ok(Cow::Borrowed(types)),
-        |_, dt| Ok(Cow::Borrowed(dt)),
-    )
-}
-
 fn main() {
     {
         let mut types = Types::default();
@@ -218,7 +205,17 @@ fn main() {
             .register::<SerdeWithOneOrMany>();
         println!(
             "RAW:\n{}",
-            Typescript::default().export(&types, raw_format()).unwrap()
+            Typescript::default()
+                .export(
+                    &types,
+                    // You don't want to copy this.
+                    // Use `specta_serde`. This is just good for internal testing.
+                    (
+                        |types| Ok(Cow::Borrowed(types)),
+                        |_, dt| Ok(Cow::Borrowed(dt)),
+                    )
+                )
+                .unwrap()
         );
         let (map_types, _) = specta_serde::format;
         match map_types(&types) {
