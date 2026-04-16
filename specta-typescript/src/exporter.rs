@@ -174,12 +174,7 @@ impl Exporter {
         self
     }
 
-    /// Configure how Specta types are rewritten before TypeScript rendering.
-    ///
-    /// The first callback transforms the full [`Types`] graph used by the exporter.
-    /// The second callback transforms individual [`DataType`] values used by the
-    /// primitives API.
-    pub fn format(mut self, builder: impl IntoFormat) -> Self {
+    pub(crate) fn with_format(mut self, builder: impl IntoFormat) -> Self {
         self.format = Some(builder.into_format_fns());
         self
     }
@@ -251,26 +246,27 @@ impl Exporter {
     /// Export the files into a single string.
     ///
     /// Note: This returns an error if the format is `Format::Files`.
-    pub fn export(&self, types: &Types) -> Result<String, Error> {
-        let types = self.format_types(types)?;
+    pub fn export(&self, types: &Types, format: impl IntoFormat) -> Result<String, Error> {
+        let exporter = self.clone().with_format(format);
+        let types = exporter.format_types(types)?;
         let types = types.as_ref();
 
-        if let Layout::Files = self.layout {
-            return Err(Error::unable_to_export(self.layout));
+        if let Layout::Files = exporter.layout {
+            return Err(Error::unable_to_export(exporter.layout));
         }
-        if let Layout::Namespaces = self.layout
-            && self.jsdoc
+        if let Layout::Namespaces = exporter.layout
+            && exporter.jsdoc
         {
-            return Err(Error::unable_to_export(self.layout));
+            return Err(Error::unable_to_export(exporter.layout));
         }
 
-        let mut out = render_file_header(self)?;
+        let mut out = render_file_header(&exporter)?;
 
         let mut has_manually_exported_user_types = false;
         let mut runtime = Ok(Cow::default());
-        if let Some(framework_runtime) = &self.framework_runtime {
+        if let Some(framework_runtime) = &exporter.framework_runtime {
             runtime = (framework_runtime.0)(FrameworkExporter {
-                exporter: self,
+                exporter: &exporter,
                 has_manually_exported_user_types: &mut has_manually_exported_user_types,
                 files_root_types: "",
                 types,
@@ -289,7 +285,7 @@ impl Exporter {
 
         // User types (if not included in framework runtime)
         if !has_manually_exported_user_types {
-            render_types(&mut out, self, types, "")?;
+            render_types(&mut out, &exporter, types, "")?;
         }
 
         Ok(out)
@@ -300,13 +296,42 @@ impl Exporter {
     /// When configured when `format` is `Format::Files`, you must provide a directory path.
     /// Otherwise, you must provide the path of a single file.
     ///
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types) -> Result<(), Error> {
-        let formatted_types = self.format_types(types)?;
+    pub fn export_to(
+        &self,
+        path: impl AsRef<Path>,
+        types: &Types,
+        format: impl IntoFormat,
+    ) -> Result<(), Error> {
+        let exporter = self.clone().with_format(format);
+        let formatted_types = exporter.format_types(types)?;
         let types = formatted_types.as_ref();
         let path = path.as_ref();
 
-        if self.layout != Layout::Files {
-            let result = self.export(types)?;
+        if exporter.layout != Layout::Files {
+            let mut result = render_file_header(&exporter)?;
+
+            let mut has_manually_exported_user_types = false;
+            let mut runtime = Ok(Cow::default());
+            if let Some(framework_runtime) = &exporter.framework_runtime {
+                runtime = (framework_runtime.0)(FrameworkExporter {
+                    exporter: &exporter,
+                    has_manually_exported_user_types: &mut has_manually_exported_user_types,
+                    files_root_types: "",
+                    types,
+                });
+            }
+            let runtime = runtime?;
+
+            if !runtime.is_empty() {
+                result.push('\n');
+                result.push_str(&runtime);
+                result.push('\n');
+            }
+
+            if !has_manually_exported_user_types {
+                render_types(&mut result, &exporter, types, "")?;
+            }
+
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)?;
             };
@@ -390,7 +415,7 @@ impl Exporter {
 
         let mut root_types = String::new();
         export(
-            self,
+            &exporter,
             types,
             &mut build_module_graph(types),
             &mut root_types,
@@ -402,11 +427,11 @@ impl Exporter {
             let mut has_manually_exported_user_types = false;
             let mut runtime = Cow::default();
             let mut runtime_references = HashSet::new();
-            if let Some(framework_runtime) = &self.framework_runtime {
+            if let Some(framework_runtime) = &exporter.framework_runtime {
                 let (runtime_result, referenced_types) = references::with_module_path("", || {
                     references::collect_references(|| {
                         (framework_runtime.0)(FrameworkExporter {
-                            exporter: self,
+                            exporter: &exporter,
                             has_manually_exported_user_types: &mut has_manually_exported_user_types,
                             files_root_types: &root_types,
                             types,
@@ -422,7 +447,7 @@ impl Exporter {
 
             if !runtime.is_empty() || should_export_user_types {
                 files.insert(runtime_path, {
-                    let mut out = render_file_header(self)?;
+                    let mut out = render_file_header(&exporter)?;
                     let mut body = String::new();
 
                     // Framework runtime
@@ -450,13 +475,13 @@ impl Exporter {
                     let import_paths = import_paths
                         .into_iter()
                         .filter(|module_path| {
-                            !body.contains(&module_import_statement(self, "", module_path))
+                            !body.contains(&module_import_statement(&exporter, "", module_path))
                         })
                         .collect::<BTreeSet<_>>();
 
                     if !import_paths.is_empty() {
                         out.push('\n');
-                        out.push_str(&module_import_block(self, "", &import_paths));
+                        out.push_str(&module_import_block(&exporter, "", &import_paths));
                     }
 
                     if !body.is_empty() {
@@ -500,13 +525,11 @@ impl Exporter {
 
 impl Exporter {
     pub(crate) fn format_types<'a>(&self, types: &'a Types) -> Result<Cow<'a, Types>, Error> {
-        self.format
-            .as_ref()
-            .ok_or_else(Error::format_not_set)
-            .and_then(|format| {
-                (format.types)(types)
-                    .map_err(|err| Error::format("type graph formatter failed", err))
-            })
+        let Some(format) = &self.format else {
+            return Ok(Cow::Borrowed(types));
+        };
+
+        (format.types)(types).map_err(|err| Error::format("type graph formatter failed", err))
     }
 }
 

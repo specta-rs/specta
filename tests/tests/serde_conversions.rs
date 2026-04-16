@@ -281,8 +281,10 @@ fn field_only_phased_override_requires_apply_phases() {
     assert!(err.to_string().contains("requires `apply_phases`"));
 
     let raw_err = Typescript::default()
-        .format(crate::raw_format)
-        .export(&Types::default().register::<FieldOnlyPhasedOverride>())
+        .export(
+            &Types::default().register::<FieldOnlyPhasedOverride>(),
+            crate::raw_format,
+        )
         .expect_err("raw export should fail on unresolved phased opaque reference");
     assert!(raw_err.to_string().contains("unsupported opaque reference"));
 
@@ -290,16 +292,17 @@ fn field_only_phased_override_requires_apply_phases() {
         specta_serde::apply_phases(Types::default().register::<FieldOnlyPhasedOverride>())
             .expect("apply_phases should accept phased field overrides");
     Typescript::default()
-        .format(crate::raw_format)
-        .export(&phased_types)
+        .export(&phased_types, crate::raw_format)
         .expect("phased export should remove phased opaque references");
 }
 
 #[test]
 fn format_phases_exports_field_only_phased_override() {
     let rendered = Typescript::default()
-        .format(specta_typescript::serde::format_phases)
-        .export(&Types::default().register::<FieldOnlyPhasedOverride>())
+        .export(
+            &Types::default().register::<FieldOnlyPhasedOverride>(),
+            specta_typescript::serde::format_phases,
+        )
         .expect("format_phases should resolve phased overrides during export");
 
     assert!(rendered.contains("FieldOnlyPhasedOverride_Serialize"));

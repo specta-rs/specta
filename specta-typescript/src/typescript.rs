@@ -59,16 +59,22 @@ impl Typescript {
         Self(self.0.branded_type_impl(builder))
     }
 
-    /// Configure how Specta types are rewritten before TypeScript rendering.
-    pub fn format(self, builder: impl IntoFormat) -> Self {
-        Self(self.0.format(builder))
+    /// Add some custom Typescript or Javascript code that is exported as part of the bindings.
+    pub fn framework_runtime(
+        self,
+        builder: impl Fn(crate::FrameworkExporter) -> Result<Cow<'static, str>, Error>
+        + Send
+        + Sync
+        + 'static,
+    ) -> Self {
+        Self(self.0.framework_runtime(builder))
     }
 
     /// Export the files into a single string.
     ///
     /// Note: This returns an error if the format is `Format::Files`.
-    pub fn export(&self, types: &Types) -> Result<String, Error> {
-        self.0.export(types)
+    pub fn export(&self, types: &Types, format: impl IntoFormat) -> Result<String, Error> {
+        self.0.export(types, format)
     }
 
     /// Export the types to a specific file/folder.
@@ -76,8 +82,13 @@ impl Typescript {
     /// When configured when `format` is `Format::Files`, you must provide a directory path.
     /// Otherwise, you must provide the path of a single file.
     ///
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types) -> Result<(), Error> {
-        self.0.export_to(path, types)
+    pub fn export_to(
+        &self,
+        path: impl AsRef<Path>,
+        types: &Types,
+        format: impl IntoFormat,
+    ) -> Result<(), Error> {
+        self.0.export_to(path, types, format)
     }
 }
 

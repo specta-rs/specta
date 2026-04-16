@@ -43,8 +43,7 @@
 //!     // We don't need to specify `MyOtherType` because it's referenced by `MyType`
 //!     .register::<MyType>();
 //! Typescript::default()
-//!     .format((raw_types, raw_datatype))
-//!     .export_to("./bindings.ts", &types)
+//!     .export_to("./bindings.ts", &types, (raw_types, raw_datatype))
 //!     .unwrap();
 //! ```
 //!

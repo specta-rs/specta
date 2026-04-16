@@ -28,8 +28,15 @@ use crate::{
 ///  - Ensuring all referenced types are exported
 ///  - Handling multiple type with overlapping names
 ///  - Transforming the type for your serialization format (Eg. Serde)
+///  - Keeping the provided [`Types`] graph and [`NamedDataType`] values mapped consistently
 ///
 /// We recommend passing in your types in bulk instead of doing individual calls as it leaves formatting to us and also allows us to merge the JSDoc types into a single large comment.
+///
+/// If you are using a custom format such as [`crate::serde::format`] with the high-level exporter,
+/// these primitive helpers do not apply that mapping automatically unless they are called from a
+/// configured exporter callback such as [`crate::FrameworkExporter`]. Standalone primitive usage
+/// should map both the full [`Types`] graph and any top-level [`DataType`] values with matching
+/// helpers first.
 ///
 pub fn export<'a>(
     exporter: &dyn AsRef<Exporter>,
@@ -165,6 +172,9 @@ fn export_single_internal(
 /// Note that calling this method with a tagged struct or enum may cause the tag to not be exported.
 /// The type should be wrapped in a [`NamedDataType`] to provide a proper name.
 ///
+/// When using custom formatting, you are responsible for mapping this top-level datatype in the
+/// same way as the [`Types`] graph before calling this helper.
+///
 pub fn inline(
     exporter: &dyn AsRef<Exporter>,
     types: &Types,
@@ -191,14 +201,12 @@ fn apply_datatype_format(
     types: &Types,
     dt: &DataType,
 ) -> Result<DataType, Error> {
-    let mapped = exporter
-        .format
-        .as_ref()
-        .ok_or_else(Error::format_not_set)
-        .and_then(|format| {
-            (format.datatype)(types, dt)
-                .map_err(|err| Error::format("datatype formatter failed", err))
-        })?;
+    let Some(format) = exporter.format.as_ref() else {
+        return Ok(dt.clone());
+    };
+
+    let mapped = (format.datatype)(types, dt)
+        .map_err(|err| Error::format("datatype formatter failed", err))?;
 
     match mapped {
         Cow::Borrowed(dt) => apply_datatype_format_children(exporter, types, dt.clone()),
@@ -582,6 +590,8 @@ fn jsdoc_description(docs: &str, deprecated: Option<&Deprecated>) -> Option<Stri
 /// For primitives this will include the literal type but for named type it will contain a reference.
 ///
 /// See [`export`] for the list of things to consider when using this.
+/// When using custom formatting, you are responsible for mapping this top-level reference in the
+/// same way as the [`Types`] graph before calling this helper.
 pub fn reference(
     exporter: &dyn AsRef<Exporter>,
     types: &Types,

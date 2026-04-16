@@ -121,8 +121,7 @@ fn typescript_export() {
             format!("ts-export-{mode}"),
             phase_output(result, |_, types| {
                 Typescript::default()
-                    .format(crate::raw_format)
-                    .export(&types)
+                    .export(&types, crate::raw_format)
                     .map_err(|err| err.to_string())
             })
         );
@@ -170,7 +169,7 @@ fn typescript_export_serde_errors() {
                 continue;
             }
 
-            match Typescript::default().format(crate::raw_format).export(&types) {
+            match Typescript::default().export(&types, crate::raw_format) {
                 Ok(_) => failures.push(format!(
                     "{name} ({mode}) [export]: expected error containing '{expected_error}', but export succeeded"
                 )),
@@ -422,7 +421,7 @@ fn typescript_export_serde_errors() {
 #[test]
 fn typescript_export_bigint_errors() {
     fn assert_bigint_error<T: Type>(failures: &mut Vec<String>, name: &str) {
-        let ts = Typescript::default().format(crate::raw_format);
+        let ts = Typescript::default();
         let mut types = Types::default();
         let dt = T::definition(&mut types);
 
@@ -441,7 +440,7 @@ fn typescript_export_bigint_errors() {
             return;
         }
 
-        match ts.export(&types) {
+        match ts.export(&types, crate::raw_format) {
             Ok(output) => failures.push(format!(
                 "{name} [export]: expected BigInt error, but export succeeded with '{output}'"
             )),
@@ -454,7 +453,7 @@ fn typescript_export_bigint_errors() {
     }
 
     fn assert_inline_bigint_error<T: Type>(failures: &mut Vec<String>, name: &str) {
-        let ts = Typescript::default().format(crate::raw_format);
+        let ts = Typescript::default();
         let mut types = Types::default();
         let dt = T::definition(&mut types);
 
@@ -611,9 +610,8 @@ fn typescript_export_to() {
             let output = phase_output(result, |_, types| {
                 let path = temp.path().join(&name);
                 Typescript::default()
-                    .format(crate::raw_format)
                     .layout(layout)
-                    .export_to(&path, &types)
+                    .export_to(&path, &types, crate::raw_format)
                     .map_err(|err| err.to_string())?;
                 fs_to_string(&path).map_err(|err| err.to_string())
             });
@@ -632,7 +630,7 @@ fn typescript_export_to() {
 fn primitives_export() {
     for (mode, result) in phase_collections() {
         let output = phase_output(result, |dts, types| {
-            let ts = Typescript::default().format(crate::raw_format);
+            let ts = Typescript::default();
 
             dts.iter()
                 .filter_map(|(name, ty)| match ty {
@@ -658,7 +656,7 @@ fn primitives_export() {
 fn primitives_export_many() {
     for (mode, result) in phase_collections() {
         let output = phase_output(result, |dts, types| {
-            let ts = Typescript::default().format(crate::raw_format);
+            let ts = Typescript::default();
             let ndts = dts
                 .iter()
                 .filter_map(|(_, ty)| match ty {
@@ -678,7 +676,7 @@ fn primitives_export_many() {
 fn primitives_export_allows_generic_hashmap_definition() {
     for (mode, result) in phase_collections() {
         let output = phase_output(result, |dts, types| {
-            let ts = Typescript::default().format(crate::raw_format);
+            let ts = Typescript::default();
             let hash_map = dts
                 .iter()
                 .find_map(|(_, ty)| match ty {
@@ -704,7 +702,7 @@ fn primitives_export_allows_generic_hashmap_definition() {
 fn primitives_reference() {
     for (mode, result) in phase_collections() {
         let output = phase_output(result, |dts, types| {
-            let ts = Typescript::default().format(crate::raw_format);
+            let ts = Typescript::default();
             dts.iter()
                 .filter_map(|(s, ty)| match ty {
                     DataType::Reference(r) => Some((s, r)),
@@ -724,7 +722,7 @@ fn primitives_reference() {
 fn primitives_inline() {
     for (mode, result) in phase_collections() {
         let output = phase_output(result, |dts, types| {
-            let ts = Typescript::default().format(crate::raw_format);
+            let ts = Typescript::default();
             dts.iter()
                 .map(|(s, ty)| primitives::inline(&ts, types, ty).map(|ty| format!("{s}: {ty}")))
                 .collect::<Result<Vec<_>, _>>()
@@ -756,9 +754,10 @@ fn primitives_format_datatype_hook_is_recursive() {
 
     let mut types = Types::default();
     let dt = Container::definition(&mut types);
-    let ts = Typescript::default().format((identity_types, map_bool_to_string));
-
-    let rendered = primitives::inline(&ts, &types, &dt).unwrap();
+    let rendered = Typescript::default()
+        .framework_runtime(move |ctx| Ok(ctx.inline(&dt)?.into()))
+        .export(&types, (identity_types, map_bool_to_string))
+        .unwrap();
 
     assert!(rendered.contains("direct: string"), "{rendered}");
     assert!(rendered.contains("list: string[]"), "{rendered}");
@@ -769,11 +768,12 @@ fn primitives_format_datatype_hook_is_recursive() {
 #[test]
 fn primitives_format_datatype_hook_can_return_owned_types() {
     let types = Types::default();
-    let ts = Typescript::default().format((identity_types, map_bool_to_null_tuple));
+    let rendered = Typescript::default()
+        .framework_runtime(|ctx| Ok(ctx.inline(&DataType::Primitive(Primitive::bool))?.into()))
+        .export(&types, (identity_types, map_bool_to_null_tuple))
+        .unwrap();
 
-    let rendered = primitives::inline(&ts, &types, &DataType::Primitive(Primitive::bool)).unwrap();
-
-    assert_eq!(rendered, "null");
+    assert!(rendered.contains("\n\nnull\n"), "{rendered}");
 }
 
 #[test]
@@ -790,11 +790,12 @@ fn primitives_reference_format_datatype_hook_can_replace_reference() {
         panic!("expected named reference");
     };
 
-    let ts = Typescript::default().format((identity_types, map_reference_to_string));
+    let rendered = Typescript::default()
+        .framework_runtime(move |ctx| Ok(ctx.reference(&reference)?.into()))
+        .export(&types, (identity_types, map_reference_to_string))
+        .unwrap();
 
-    let rendered = primitives::reference(&ts, &types, &reference).unwrap();
-
-    assert_eq!(rendered, "string");
+    assert!(rendered.contains("\n\nstring\n"), "{rendered}");
 }
 
 #[test]
@@ -810,10 +811,11 @@ fn primitives_export_format_datatype_hook_updates_named_bodies() {
     let DataType::Reference(Reference::Named(reference)) = reference else {
         panic!("expected named reference");
     };
-    let ndt = reference.get(&types).unwrap();
-    let ts = Typescript::default().format((identity_types, map_bool_to_string));
-
-    let rendered = primitives::export(&ts, &types, iter::once(ndt), "").unwrap();
+    let ndt = reference.get(&types).unwrap().clone();
+    let rendered = Typescript::default()
+        .framework_runtime(move |ctx| Ok(ctx.export(iter::once(&ndt), "")?.into()))
+        .export(&types, (identity_types, map_bool_to_string))
+        .unwrap();
 
     assert!(rendered.contains("value: string"), "{rendered}");
 }
@@ -821,9 +823,10 @@ fn primitives_export_format_datatype_hook_updates_named_bodies() {
 #[test]
 fn primitives_format_datatype_hook_errors_bubble_out() {
     let types = Types::default();
-    let ts = Typescript::default().format((identity_types, error_on_bool));
-
-    let err = primitives::inline(&ts, &types, &DataType::Primitive(Primitive::bool)).unwrap_err();
+    let err = Typescript::default()
+        .framework_runtime(|ctx| Ok(ctx.inline(&DataType::Primitive(Primitive::bool))?.into()))
+        .export(&types, (identity_types, error_on_bool))
+        .unwrap_err();
 
     assert_eq!(
         err.to_string(),
@@ -846,7 +849,7 @@ fn reserved_names() {
             DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
             _ => panic!("Failed to get reference"),
         };
-        insta::assert_snapshot!(primitives::export(&Typescript::default().format(crate::raw_format), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
     }
 
     {
@@ -860,7 +863,7 @@ fn reserved_names() {
             DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
             _ => panic!("Failed to get reference"),
         };
-        insta::assert_snapshot!(primitives::export(&Typescript::default().format(crate::raw_format), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
     }
 
     {
@@ -877,7 +880,7 @@ fn reserved_names() {
             DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
             _ => panic!("Failed to get reference"),
         };
-        insta::assert_snapshot!(primitives::export(&Typescript::default().format(crate::raw_format), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
+        insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
     }
 }
 

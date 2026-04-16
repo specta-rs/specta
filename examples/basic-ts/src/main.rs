@@ -217,17 +217,13 @@ fn main() {
             .register::<SerdeWithOneOrMany>();
         println!(
             "RAW:\n{}",
-            Typescript::default()
-                .format(raw_format)
-                .export(&types)
-                .unwrap()
+            Typescript::default().export(&types, raw_format).unwrap()
         );
         match specta_serde::apply(types.clone()) {
             Ok(_) => println!(
                 "specta_serde::apply(...):\n{}",
                 Typescript::default()
-                    .format(specta_typescript::serde::format)
-                    .export(&types)
+                    .export(&types, specta_typescript::serde::format)
                     .unwrap()
             ),
             Err(err) => println!("specta_serde::apply(...) ERROR: {err}"),
@@ -235,8 +231,7 @@ fn main() {
         println!(
             "specta_serde::apply_phases(...):\n{}",
             Typescript::default()
-                .format(specta_typescript::serde::format_phases)
-                .export(&types)
+                .export(&types, specta_typescript::serde::format_phases)
                 .unwrap()
         );
     }
@@ -248,8 +243,7 @@ fn main() {
         println!(
             "serde_with + specta_serde::apply_phases(...):\n{}",
             Typescript::default()
-                .format(specta_typescript::serde::format_phases)
-                .export(&serde_with_types)
+                .export(&serde_with_types, specta_typescript::serde::format_phases)
                 .unwrap()
         );
     }

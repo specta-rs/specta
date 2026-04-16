@@ -14,17 +14,18 @@ pub struct Demo {
 }
 
 fn main() {
-    let types = Types::default().register::<Demo>();
-    let out = specta_typescript::Typescript::new()
-        .export(&specta_serde::apply(types).unwrap())
-        .unwrap();
+    // let types = Types::default().register::<Demo>();
+    // let out = specta_typescript::Typescript::new()
+    //     .export(&specta_serde::apply(types).unwrap(), specta_typescript::serde::format)
+    //     .unwrap();
+    // println!("{}", out);
 
     let out = specta_typescript::Typescript::new()
-        // .format(specta_typescript::serde::format)
-        .format(specta_typescript::serde::format_phases)
-        .export(&Types::default().register::<Demo>())
+        .export(
+            &Types::default().register::<Demo>(),
+            specta_typescript::serde::format_phases,
+        )
         .unwrap();
-
     println!("{}", out);
 
     let mut types = Types::default();
@@ -34,21 +35,29 @@ fn main() {
         _ => panic!("Expected a named reference"),
     };
 
+    // println!(
+    //     "{:?}",
+    //     // TODO: This should error?
+    //     specta_typescript::primitives::inline(
+    //         &specta_typescript::Typescript::new(),
+    //         specta_typescript::serde::map_types(&types)
+    //             .unwrap()
+    //             .as_ref(),
+    //         specta_typescript::serde::map_datatype(&types, &dt)
+    //             .unwrap()
+    //             .as_ref()
+    //     )
+    // );
     println!(
         "{:?}",
-        // TODO: This should error?
         specta_typescript::primitives::inline(
-            &specta_typescript::Typescript::new().format(specta_typescript::serde::format),
-            &types,
-            &dt
-        )
-    );
-    println!(
-        "{:?}",
-        specta_typescript::primitives::inline(
-            &specta_typescript::Typescript::new().format(specta_typescript::serde::format_phases),
-            &types,
-            &dt
+            &specta_typescript::Typescript::new(),
+            specta_typescript::serde::map_phases_types(&types)
+                .unwrap()
+                .as_ref(),
+            specta_typescript::serde::map_phases_datatype(&types, &dt)
+                .unwrap()
+                .as_ref()
         )
     );
 }

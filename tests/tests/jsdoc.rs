@@ -57,10 +57,7 @@ fn phase_collections(types: Types) -> [(&'static str, Result<Types, specta_serde
 fn export() {
     for (mode, types) in phase_collections(crate::types().0) {
         let output = match types {
-            Ok(types) => JSDoc::default()
-                .format(crate::raw_format)
-                .export(&types)
-                .unwrap(),
+            Ok(types) => JSDoc::default().export(&types, crate::raw_format).unwrap(),
             Err(err) => format!("ERROR: {err}"),
         };
 
@@ -75,7 +72,7 @@ fn primitives_export_many() {
     for (mode, types) in phase_collections(types) {
         let output = match types {
             Ok(types) => {
-                let jsdoc = JSDoc::default().format(crate::raw_format);
+                let jsdoc = JSDoc::default();
                 let ndts = dts
                     .iter()
                     .filter_map(|(_, ty)| match ty {
@@ -96,7 +93,7 @@ fn primitives_export_many() {
 #[test]
 fn jsdoc_export_bigint_errors() {
     fn assert_bigint_error<T: Type>(failures: &mut Vec<String>, name: &str) {
-        let jsdoc = JSDoc::default().format(crate::raw_format);
+        let jsdoc = JSDoc::default();
         let mut types = Types::default();
         let dt = T::definition(&mut types);
 
@@ -115,7 +112,7 @@ fn jsdoc_export_bigint_errors() {
             return;
         }
 
-        match jsdoc.export(&types) {
+        match jsdoc.export(&types, crate::raw_format) {
             Ok(output) => failures.push(format!(
                 "{name} [export]: expected BigInt error, but export succeeded with '{output}'"
             )),
@@ -128,7 +125,7 @@ fn jsdoc_export_bigint_errors() {
     }
 
     fn assert_inline_bigint_error<T: Type>(failures: &mut Vec<String>, name: &str) {
-        let jsdoc = JSDoc::default().format(crate::raw_format);
+        let jsdoc = JSDoc::default();
         let mut types = Types::default();
         let dt = T::definition(&mut types);
 
@@ -281,9 +278,8 @@ fn jsdoc_export_to_files_uses_jsdoc_import_typedefs() {
         .register::<jsdoc_export_to_files_runtime_imports_types::three::Three>();
 
     JSDoc::default()
-        .format(crate::raw_format)
         .layout(Layout::Files)
-        .export_to(&path, &types)
+        .export_to(&path, &types, crate::raw_format)
         .unwrap();
 
     let output = fs_to_string(&path).unwrap();

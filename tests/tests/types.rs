@@ -2678,8 +2678,7 @@ fn container_default_marks_all_fields_optional_in_unified_mode() {
     let types = specta_serde::apply(Types::default().register::<ContainerDefault>())
         .expect("container-level #[serde(default)] should be supported");
     let ts = specta_typescript::Typescript::default()
-        .format(crate::raw_format)
-        .export(&types)
+        .export(&types, crate::raw_format)
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-default-container-typescript", ts);
@@ -2690,8 +2689,7 @@ fn field_default_still_marks_only_that_field_optional() {
     let types = specta_serde::apply(Types::default().register::<FieldDefault>())
         .expect("field-level #[serde(default)] should be supported");
     let ts = specta_typescript::Typescript::default()
-        .format(crate::raw_format)
-        .export(&types)
+        .export(&types, crate::raw_format)
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-default-field-typescript", ts);
@@ -2702,8 +2700,7 @@ fn mixed_tagged_and_untagged_variants_export_in_unified_mode() {
     let types = specta_serde::apply(Types::default().register::<MixedTaggedAndUntagged>())
         .expect("mixed tagged and untagged variants should export when they share one shape");
     let ts = specta_typescript::Typescript::default()
-        .format(crate::raw_format)
-        .export(&types)
+        .export(&types, crate::raw_format)
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-mixed-untagged-typescript", ts);
@@ -2716,8 +2713,7 @@ fn mixed_tagged_and_untagged_struct_variants_export_in_unified_mode() {
             "mixed tagged and untagged struct variants should export when they share one shape",
         );
     let ts = specta_typescript::Typescript::default()
-        .format(crate::raw_format)
-        .export(&types)
+        .export(&types, crate::raw_format)
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-mixed-untagged-struct-typescript", ts);
@@ -2740,8 +2736,7 @@ fn phased_mixed_untagged_variants_split_per_phase() {
         specta_serde::apply_phases(Types::default().register::<MixedTaggedAndUntaggedPhased>())
             .expect("apply_phases should support phase-specific mixed untagged variants");
     let ts = specta_typescript::Typescript::default()
-        .format(crate::raw_format)
-        .export(&types)
+        .export(&types, crate::raw_format)
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-mixed-untagged-phased-typescript", ts);

@@ -114,8 +114,10 @@ fn legacy_impls() {
     insta::assert_snapshot!(
         "legacy_impls",
         Typescript::default()
-            .format(crate::raw_format)
-            .export(&Types::default().register::<LegacyImpls>())
+            .export(
+                &Types::default().register::<LegacyImpls>(),
+                crate::raw_format
+            )
             .unwrap()
     );
 }
@@ -123,8 +125,10 @@ fn legacy_impls() {
 #[test]
 fn legacy_impl_bigint_errors() {
     let err = Typescript::default()
-        .format(crate::raw_format)
-        .export(&Types::default().register::<LegacyImplWithBigints>())
+        .export(
+            &Types::default().register::<LegacyImplWithBigints>(),
+            crate::raw_format,
+        )
         .expect_err("bigint glam vectors should fail TypeScript export");
 
     assert!(
@@ -137,10 +141,7 @@ fn legacy_impl_bigint_errors() {
 #[test]
 fn legacy_impl_individual_bigint_errors() {
     fn assert_bigint_export_error<T: Type>(failures: &mut Vec<String>, name: &str) {
-        match Typescript::default()
-            .format(crate::raw_format)
-            .export(&Types::default().register::<T>())
-        {
+        match Typescript::default().export(&Types::default().register::<T>(), crate::raw_format) {
             Ok(output) => failures.push(format!(
                 "{name}: expected BigInt export error, but export succeeded with '{output}'"
             )),

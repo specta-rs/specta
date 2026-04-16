@@ -300,9 +300,8 @@ fn typescript_layout_files_preserves_unrelated_typescript_files() {
     std::fs::write(&keep_path, "export const keep = true;\n").unwrap();
 
     Typescript::default()
-        .format(crate::raw_format)
         .layout(specta_typescript::Layout::Files)
-        .export_to(&path, &types)
+        .export_to(&path, &types, crate::raw_format)
         .unwrap();
 
     assert!(keep_path.exists());
