@@ -10,7 +10,7 @@ use specta::{
     Type, Types,
     datatype::{DataType, Primitive, Reference, Tuple},
 };
-use specta_typescript::{FormatError, Layout, Typescript, primitives};
+use specta_typescript::{FormatError, Layout, Typescript, branded, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -47,6 +47,15 @@ fn map_reference_to_string<'a>(
         DataType::Reference(Reference::Named(_)) => Cow::Owned(DataType::Primitive(Primitive::str)),
         _ => Cow::Borrowed(dt),
     })
+}
+
+branded!(struct BoolBrand(bool) as "BoolBrand");
+branded!(struct RefBrand(BrandedReferenceInner) as "RefBrand");
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct BrandedReferenceInner {
+    value: bool,
 }
 
 fn error_on_bool<'a>(_: &'a Types, dt: &'a DataType) -> Result<Cow<'a, DataType>, FormatError> {
@@ -847,6 +856,43 @@ fn primitives_format_datatype_hook_errors_bubble_out() {
         err.to_string(),
         "Format error: datatype formatter failed: boom"
     );
+}
+
+#[test]
+fn branded_type_exporter_inline_applies_datatype_mapping() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Demo {
+        value: BoolBrand,
+    }
+
+    let types = Types::default().register::<Demo>();
+    let rendered = Typescript::default()
+        .branded_type_impl(|ctx, branded| Ok(ctx.inline(branded.ty())?.into()))
+        .export(&types, (identity_types, map_bool_to_string))
+        .unwrap();
+
+    assert!(rendered.contains("value: string"), "{rendered}");
+}
+
+#[test]
+fn branded_type_exporter_reference_applies_datatype_mapping() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Demo {
+        value: RefBrand,
+    }
+
+    let types = Types::default().register::<Demo>();
+    let rendered = Typescript::default()
+        .branded_type_impl(|ctx, branded| match branded.ty() {
+            DataType::Reference(reference) => Ok(ctx.reference(reference)?.into()),
+            dt => Ok(ctx.inline(dt)?.into()),
+        })
+        .export(&types, (identity_types, map_reference_to_string))
+        .unwrap();
+
+    assert!(rendered.contains("value: string"), "{rendered}");
 }
 
 #[test]

@@ -1,4 +1,4 @@
-use std::{iter, path::Path};
+use std::{borrow::Cow, iter, path::Path};
 
 use serde::{Deserialize, Serialize};
 use specta::{
@@ -124,10 +124,10 @@ fn zod_raw_map_types(
     Ok(std::borrow::Cow::Borrowed(types))
 }
 
-fn zod_raw_map_datatype(
-    _types: &Types,
-    dt: &DataType,
-) -> Result<std::borrow::Cow<'_, DataType>, specta_zod::FormatError> {
+fn zod_raw_map_datatype<'a>(
+    _types: &'a Types,
+    dt: &'a DataType,
+) -> Result<std::borrow::Cow<'a, DataType>, specta_zod::FormatError> {
     Ok(std::borrow::Cow::Borrowed(dt))
 }
 
@@ -139,6 +139,40 @@ const zod_raw_format: (
         &'a DataType,
     ) -> Result<std::borrow::Cow<'a, DataType>, specta_zod::FormatError>,
 ) = (zod_raw_map_types, zod_raw_map_datatype);
+
+fn zod_identity_types<'a>(types: &'a Types) -> Result<Cow<'a, Types>, specta_zod::FormatError> {
+    Ok(Cow::Borrowed(types))
+}
+
+fn zod_map_bool_to_string<'a>(
+    _: &'a Types,
+    dt: &'a DataType,
+) -> Result<Cow<'a, DataType>, specta_zod::FormatError> {
+    Ok(match dt {
+        DataType::Primitive(Primitive::bool) => Cow::Owned(DataType::Primitive(Primitive::str)),
+        _ => Cow::Borrowed(dt),
+    })
+}
+
+fn zod_map_reference_to_string<'a>(
+    _: &'a Types,
+    dt: &'a DataType,
+) -> Result<Cow<'a, DataType>, specta_zod::FormatError> {
+    Ok(match dt {
+        DataType::Reference(Reference::Named(_)) => Cow::Owned(DataType::Primitive(Primitive::str)),
+        _ => Cow::Borrowed(dt),
+    })
+}
+
+fn zod_error_on_bool<'a>(
+    _: &'a Types,
+    dt: &'a DataType,
+) -> Result<Cow<'a, DataType>, specta_zod::FormatError> {
+    match dt {
+        DataType::Primitive(Primitive::bool) => Err(std::io::Error::other("boom").into()),
+        _ => Ok(Cow::Borrowed(dt)),
+    }
+}
 
 #[test]
 fn zod_export_smoke() {
@@ -206,6 +240,88 @@ fn zod_bigint_export_behaviors() {
             "z.bigint()"
         );
     });
+}
+
+#[test]
+fn zod_framework_inline_applies_datatype_mapping() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Nested {
+        value: bool,
+    }
+
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Container {
+        direct: bool,
+        list: Vec<bool>,
+        tuple: (bool, Option<bool>),
+        #[specta(inline)]
+        nested: Nested,
+    }
+
+    let mut types = Types::default();
+    let dt = Container::definition(&mut types);
+    let DataType::Reference(Reference::Named(reference)) = dt else {
+        panic!("expected named reference");
+    };
+    let ty = reference.get(&types).unwrap().ty.clone();
+
+    let rendered = Zod::default()
+        .framework_runtime(move |ctx| Ok(ctx.inline(&ty)?.into()))
+        .export(&types, (zod_identity_types, zod_map_bool_to_string))
+        .unwrap();
+
+    assert!(rendered.contains("z.string()"), "{rendered}");
+    assert!(!rendered.contains("z.boolean()"), "{rendered}");
+}
+
+#[test]
+fn zod_framework_reference_and_export_apply_datatype_mapping() {
+    #[derive(Type)]
+    #[specta(collect = false)]
+    struct Demo {
+        value: bool,
+    }
+
+    let mut types = Types::default();
+    let reference = Demo::definition(&mut types);
+    let DataType::Reference(Reference::Named(reference)) = reference else {
+        panic!("expected named reference");
+    };
+    let ndt = reference.get(&types).unwrap().clone();
+
+    let reference_rendered = Zod::default()
+        .framework_runtime({
+            let reference = reference.clone();
+            move |ctx| Ok(ctx.reference(&Reference::Named(reference.clone()))?.into())
+        })
+        .export(&types, (zod_identity_types, zod_map_reference_to_string))
+        .unwrap();
+    assert!(
+        reference_rendered.contains("z.string()"),
+        "{reference_rendered}"
+    );
+
+    let export_rendered = Zod::default()
+        .framework_runtime(move |ctx| Ok(ctx.export(iter::once(&ndt), "")?.into()))
+        .export(&types, (zod_identity_types, zod_map_bool_to_string))
+        .unwrap();
+    assert!(export_rendered.contains("z.string()"), "{export_rendered}");
+}
+
+#[test]
+fn zod_framework_datatype_mapping_errors_bubble_out() {
+    let types = Types::default();
+    let err = Zod::default()
+        .framework_runtime(|ctx| Ok(ctx.inline(&DataType::Primitive(Primitive::bool))?.into()))
+        .export(&types, (zod_identity_types, zod_error_on_bool))
+        .unwrap_err();
+
+    assert_eq!(
+        err.to_string(),
+        "Framework error: datatype formatter failed: boom"
+    );
 }
 
 #[test]

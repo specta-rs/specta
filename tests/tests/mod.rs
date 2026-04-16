@@ -39,10 +39,10 @@ fn raw_map_types(types: &Types) -> Result<Cow<'_, Types>, specta_typescript::For
     Ok(Cow::Borrowed(types))
 }
 
-fn raw_map_datatype(
-    _types: &Types,
-    dt: &DataType,
-) -> Result<Cow<'_, DataType>, specta_typescript::FormatError> {
+fn raw_map_datatype<'a>(
+    _types: &'a Types,
+    dt: &'a DataType,
+) -> Result<Cow<'a, DataType>, specta_typescript::FormatError> {
     Ok(Cow::Borrowed(dt))
 }
 

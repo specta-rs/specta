@@ -33,8 +33,7 @@ use crate::{
 /// We recommend passing in your types in bulk instead of doing individual calls as it leaves formatting to us and also allows us to merge the JSDoc types into a single large comment.
 ///
 /// If you are using a custom format such as [`crate::serde::format`] with the high-level exporter,
-/// these primitive helpers do not apply that mapping automatically unless they are called from a
-/// configured exporter callback such as [`crate::FrameworkExporter`]. Standalone primitive usage
+/// these primitive helpers do not apply that mapping automatically. Standalone primitive usage
 /// should map both the full [`Types`] graph and any top-level [`DataType`] values with matching
 /// helpers first.
 ///
@@ -149,12 +148,11 @@ fn export_single_internal(
     s.push_str(" = ");
 
     let _generic_scope = push_generic_scope(&ndt.generics);
-    let mapped = apply_datatype_format(exporter, types, &ndt.ty)?;
     datatype(
         s,
         exporter,
         types,
-        &mapped,
+        &ndt.ty,
         vec![ndt.name.clone()],
         Some(ndt.name.as_ref()),
         indent,
@@ -181,12 +179,11 @@ pub fn inline(
     dt: &DataType,
 ) -> Result<String, Error> {
     let mut s = String::new();
-    let dt = apply_datatype_format(exporter.as_ref(), types, dt)?;
     inline_datatype(
         &mut s,
         exporter.as_ref(),
         types,
-        &dt,
+        dt,
         vec![],
         None,
         "",
@@ -194,89 +191,6 @@ pub fn inline(
         &[],
     )?;
     Ok(s)
-}
-
-fn apply_datatype_format(
-    exporter: &Exporter,
-    types: &Types,
-    dt: &DataType,
-) -> Result<DataType, Error> {
-    let Some(format) = exporter.format.as_ref() else {
-        return Ok(dt.clone());
-    };
-
-    let mapped = (format.datatype)(types, dt)
-        .map_err(|err| Error::format("datatype formatter failed", err))?;
-
-    match mapped {
-        Cow::Borrowed(dt) => apply_datatype_format_children(exporter, types, dt.clone()),
-        Cow::Owned(dt) => apply_datatype_format_children(exporter, types, dt),
-    }
-}
-
-fn apply_datatype_format_children(
-    exporter: &Exporter,
-    types: &Types,
-    mut dt: DataType,
-) -> Result<DataType, Error> {
-    match &mut dt {
-        DataType::Primitive(_) => {}
-        DataType::List(list) => {
-            let mapped = apply_datatype_format(exporter, types, &list.ty)?;
-            list.ty = Box::new(mapped);
-        }
-        DataType::Map(map) => {
-            let key = apply_datatype_format(exporter, types, map.key_ty())?;
-            let value = apply_datatype_format(exporter, types, map.value_ty())?;
-            map.set_key_ty(key);
-            map.set_value_ty(value);
-        }
-        DataType::Nullable(inner) => {
-            let mapped = apply_datatype_format(exporter, types, inner)?;
-            **inner = mapped;
-        }
-        DataType::Struct(strct) => map_fields(exporter, types, &mut strct.fields)?,
-        DataType::Enum(enm) => {
-            for (_, variant) in &mut enm.variants {
-                map_fields(exporter, types, &mut variant.fields)?;
-            }
-        }
-        DataType::Tuple(tuple) => {
-            for element in &mut tuple.elements {
-                *element = apply_datatype_format(exporter, types, element)?;
-            }
-        }
-        DataType::Reference(Reference::Named(reference)) => {
-            for (_, generic) in &mut reference.generics {
-                *generic = apply_datatype_format(exporter, types, generic)?;
-            }
-        }
-        DataType::Reference(Reference::Generic(_) | Reference::Opaque(_)) => {}
-    }
-
-    Ok(dt)
-}
-
-fn map_fields(exporter: &Exporter, types: &Types, fields: &mut Fields) -> Result<(), Error> {
-    match fields {
-        Fields::Unit => {}
-        Fields::Unnamed(unnamed) => {
-            for field in &mut unnamed.fields {
-                if let Some(ty) = field.ty.as_mut() {
-                    *ty = apply_datatype_format(exporter, types, ty)?;
-                }
-            }
-        }
-        Fields::Named(named) => {
-            for (_, field) in &mut named.fields {
-                if let Some(ty) = field.ty.as_mut() {
-                    *ty = apply_datatype_format(exporter, types, ty)?;
-                }
-            }
-        }
-    }
-
-    Ok(())
 }
 
 // This can be used internally to prevent cloning `Typescript` instances.
@@ -475,12 +389,11 @@ fn append_typedef_body(
     let mut typedef_ty = String::new();
     let datatype_prefix = format!("{indent}\t*\t");
     let _generic_scope = push_generic_scope(&dt.generics);
-    let mapped = apply_datatype_format(exporter, types, &dt.ty)?;
     datatype(
         &mut typedef_ty,
         exporter,
         types,
-        &mapped,
+        &dt.ty,
         vec![dt.name.clone()],
         Some(dt.name.as_ref()),
         &datatype_prefix,
@@ -515,7 +428,7 @@ fn append_typedef_body(
     s.push_str(&type_name);
     s.push('\n');
 
-    append_jsdoc_properties(s, exporter, types, dt.name.as_ref(), &mapped, indent)?;
+    append_jsdoc_properties(s, exporter, types, dt.name.as_ref(), &dt.ty, indent)?;
 
     Ok(())
 }
@@ -598,8 +511,16 @@ pub fn reference(
     r: &Reference,
 ) -> Result<String, Error> {
     let mut s = String::new();
-    let dt = apply_datatype_format(exporter.as_ref(), types, &DataType::Reference(r.clone()))?;
-    datatype(&mut s, exporter.as_ref(), types, &dt, vec![], None, "", &[])?;
+    datatype(
+        &mut s,
+        exporter.as_ref(),
+        types,
+        &DataType::Reference(r.clone()),
+        vec![],
+        None,
+        "",
+        &[],
+    )?;
     Ok(s)
 }
 
@@ -931,24 +852,17 @@ fn shallow_inline_datatype(
 
                 INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
                 let combined_generics = merged_generics(generics, &r.generics);
-                let resolved = apply_datatype_format(
+                let resolved = resolve_generics_in_datatype(ty, &combined_generics);
+                let result = shallow_inline_datatype(
+                    s,
                     exporter,
                     types,
-                    &resolve_generics_in_datatype(ty, &combined_generics),
+                    &resolved,
+                    location,
+                    parent_name,
+                    prefix,
+                    &combined_generics,
                 );
-                let result = match resolved {
-                    Ok(resolved) => shallow_inline_datatype(
-                        s,
-                        exporter,
-                        types,
-                        &resolved,
-                        location,
-                        parent_name,
-                        prefix,
-                        &combined_generics,
-                    ),
-                    Err(err) => Err(err),
-                };
                 INLINE_REFERENCE_STACK.with(|stack| {
                     stack.borrow_mut().pop();
                 });
@@ -1265,11 +1179,7 @@ fn inline_datatype(
 
                 let combined_generics = merged_generics(generics, &r.generics);
                 INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
-                let mapped = apply_datatype_format(
-                    exporter,
-                    types,
-                    &resolve_generics_in_datatype(ty, &combined_generics),
-                )?;
+                let mapped = resolve_generics_in_datatype(ty, &combined_generics);
                 let result = inline_datatype(
                     s,
                     exporter,
@@ -2135,24 +2045,17 @@ fn reference_named_dt(
             } else {
                 INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
                 let combined_generics = merged_generics(generics, &r.generics);
-                let resolved = apply_datatype_format(
+                let resolved = resolve_generics_in_datatype(&ndt.ty, &combined_generics);
+                let result = datatype(
+                    s,
                     exporter,
                     types,
-                    &resolve_generics_in_datatype(&ndt.ty, &combined_generics),
+                    &resolved,
+                    location,
+                    None,
+                    prefix,
+                    &combined_generics,
                 );
-                let result = match resolved {
-                    Ok(resolved) => datatype(
-                        s,
-                        exporter,
-                        types,
-                        &resolved,
-                        location,
-                        None,
-                        prefix,
-                        &combined_generics,
-                    ),
-                    Err(err) => Err(err),
-                };
                 INLINE_REFERENCE_STACK.with(|stack| {
                     stack.borrow_mut().pop();
                 });
