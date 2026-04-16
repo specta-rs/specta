@@ -301,7 +301,7 @@ fn format_phases_exports_field_only_phased_override() {
     let rendered = Typescript::default()
         .export(
             &Types::default().register::<FieldOnlyPhasedOverride>(),
-            specta_typescript::serde::format_phases,
+            specta_serde::format_phases,
         )
         .expect("format_phases should resolve phased overrides during export");
 

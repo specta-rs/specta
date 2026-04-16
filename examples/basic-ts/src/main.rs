@@ -223,7 +223,7 @@ fn main() {
             Ok(_) => println!(
                 "specta_serde::apply(...):\n{}",
                 Typescript::default()
-                    .export(&types, specta_typescript::serde::format)
+                    .export(&types, specta_serde::format)
                     .unwrap()
             ),
             Err(err) => println!("specta_serde::apply(...) ERROR: {err}"),
@@ -231,7 +231,7 @@ fn main() {
         println!(
             "specta_serde::apply_phases(...):\n{}",
             Typescript::default()
-                .export(&types, specta_typescript::serde::format_phases)
+                .export(&types, specta_serde::format_phases)
                 .unwrap()
         );
     }
@@ -243,7 +243,7 @@ fn main() {
         println!(
             "serde_with + specta_serde::apply_phases(...):\n{}",
             Typescript::default()
-                .export(&serde_with_types, specta_typescript::serde::format_phases)
+                .export(&serde_with_types, specta_serde::format_phases)
                 .unwrap()
         );
     }

@@ -101,6 +101,7 @@
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet, VecDeque},
+    error::Error as StdError,
 };
 
 use specta::{
@@ -124,6 +125,9 @@ use phased::PhasedTy;
 
 pub use error::Error;
 pub use phased::{Phased, phased};
+
+/// Error type returned by serde format helpers.
+pub type FormatError = Box<dyn StdError + Send + Sync + 'static>;
 
 /// Selects which directional type shape to use after [`apply_phases`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -216,6 +220,55 @@ pub fn apply(types: Types) -> Result<Types> {
     }
 
     Ok(out)
+}
+
+/// Map a full [`Types`] graph using unified serde handling.
+pub fn map_types(types: &Types) -> std::result::Result<Cow<'_, Types>, FormatError> {
+    Ok(Cow::Owned(apply(types.clone())?))
+}
+
+/// Map a full [`Types`] graph using split-phase serde handling.
+pub fn map_phases_types(types: &Types) -> std::result::Result<Cow<'_, Types>, FormatError> {
+    Ok(Cow::Owned(apply_phases(types.clone())?))
+}
+
+/// Map a single [`DataType`] using unified serde handling.
+pub fn map_datatype<'a>(
+    _: &'a Types,
+    dt: &'a DataType,
+) -> std::result::Result<Cow<'a, DataType>, FormatError> {
+    Ok(Cow::Borrowed(dt))
+}
+
+/// Map a single [`DataType`] using split-phase serde handling.
+pub fn map_phases_datatype<'a>(
+    types: &'a Types,
+    dt: &'a DataType,
+) -> std::result::Result<Cow<'a, DataType>, FormatError> {
+    Ok(Cow::Owned(select_phase_datatype(
+        dt,
+        types,
+        Phase::Serialize,
+    )))
+}
+
+/// Formatter helpers for unified serde mode.
+pub fn format() -> (
+    impl for<'a> Fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>,
+    impl for<'a> Fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>,
+) {
+    (map_types, map_datatype)
+}
+
+/// Formatter helpers for split-phase serde mode.
+///
+/// The type graph is expanded to include both `*_Serialize` and `*_Deserialize`
+/// named types. Inline datatype rendering selects the serialize-facing shape.
+pub fn format_phases() -> (
+    impl for<'a> Fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>,
+    impl for<'a> Fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>,
+) {
+    (map_phases_types, map_phases_datatype)
 }
 
 /// Applies serde transformations in split-phase mode.

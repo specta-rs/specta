@@ -67,8 +67,6 @@ mod opaque;
 pub mod primitives;
 mod references;
 pub(crate) mod reserved_names;
-/// Helpers for integrating `specta-serde` with the TypeScript exporter.
-pub mod serde;
 mod types;
 mod typescript;
 
