@@ -550,7 +550,6 @@ fn string_literal(ty: &DataType) -> Option<String> {
 mod tests {
     use serde::{Deserialize, Serialize};
     use specta::{Type, Types};
-    use specta_serde::apply;
 
     use super::TransformPlan;
 
@@ -613,7 +612,10 @@ mod tests {
 
     #[test]
     fn map_renders_from_serde_applied_internal_enum_shape() {
-        let resolved = apply(Types::default().register::<TaggedEnum>()).unwrap();
+        let (map_types, _) = specta_serde::format();
+        let resolved = map_types(&Types::default().register::<TaggedEnum>())
+            .unwrap()
+            .into_owned();
         let dt = resolved
             .into_sorted_iter()
             .find(|ty| ty.name.as_ref() == "TaggedEnum")
@@ -630,7 +632,10 @@ mod tests {
 
     #[test]
     fn map_renders_from_serde_applied_adjacent_enum_shape() {
-        let resolved = apply(Types::default().register::<AdjacentEnum>()).unwrap();
+        let (map_types, _) = specta_serde::format();
+        let resolved = map_types(&Types::default().register::<AdjacentEnum>())
+            .unwrap()
+            .into_owned();
         let dt = resolved
             .into_sorted_iter()
             .find(|ty| ty.name.as_ref() == "AdjacentEnum")

@@ -1,7 +1,7 @@
 use std::{
     borrow::Cow,
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    fmt,
+    error, fmt,
     ops::Deref,
     path::{Path, PathBuf},
     sync::Arc,
@@ -13,6 +13,68 @@ use specta::{
 };
 
 use crate::{Error, primitives, references};
+
+/// Error type returned by exporter format callbacks.
+pub type FormatError = Box<dyn error::Error + Send + Sync + 'static>;
+
+type TypesFormatFn =
+    Arc<dyn for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError> + Send + Sync>;
+type DataTypeFormatFn = Arc<
+    dyn for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError> + Send + Sync,
+>;
+
+#[derive(Clone)]
+#[doc(hidden)]
+pub struct FormatFns {
+    pub(crate) types: TypesFormatFn,
+    pub(crate) datatype: DataTypeFormatFn,
+}
+
+impl fmt::Debug for FormatFns {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "FormatFns({:p}, {:p})",
+            Arc::as_ptr(&self.types),
+            Arc::as_ptr(&self.datatype)
+        )
+    }
+}
+
+#[doc(hidden)]
+pub trait IntoFormat {
+    fn into_format_fns(self) -> FormatFns;
+}
+
+impl<TypesFn, DataTypeFn> IntoFormat for (TypesFn, DataTypeFn)
+where
+    TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError> + Send + Sync + 'static,
+    DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError>
+        + Send
+        + Sync
+        + 'static,
+{
+    fn into_format_fns(self) -> FormatFns {
+        FormatFns {
+            types: Arc::new(self.0),
+            datatype: Arc::new(self.1),
+        }
+    }
+}
+
+impl<F, TypesFn, DataTypeFn> IntoFormat for F
+where
+    F: FnOnce() -> (TypesFn, DataTypeFn),
+    TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError> + Send + Sync + 'static,
+    DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError>
+        + Send
+        + Sync
+        + 'static,
+{
+    fn into_format_fns(self) -> FormatFns {
+        self().into_format_fns()
+    }
+}
 
 /// Allows configuring how Specta's Zod exporter will deal with BigInt types ([i64], [i128] etc).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -70,6 +132,7 @@ pub struct Zod {
     pub bigint: BigIntExportBehavior,
     /// Output layout mode for generated Zod TypeScript.
     pub layout: Layout,
+    pub(crate) format: Option<FormatFns>,
 }
 
 impl Default for Zod {
@@ -89,7 +152,13 @@ impl Zod {
             ),
             bigint: Default::default(),
             layout: Default::default(),
+            format: None,
         }
+    }
+
+    pub(crate) fn with_format(mut self, builder: impl IntoFormat) -> Self {
+        self.format = Some(builder.into_format_fns());
+        self
     }
 
     /// Provide a prelude which is added to the start of all exported files.
@@ -129,18 +198,22 @@ impl Zod {
     }
 
     /// Export files into a single string.
-    pub fn export(&self, types: &Types) -> Result<String, Error> {
-        if let Layout::Files = self.layout {
-            return Err(Error::unable_to_export(self.layout));
+    pub fn export(&self, types: &Types, format: impl IntoFormat) -> Result<String, Error> {
+        let exporter = self.clone().with_format(format);
+        let formatted_types = exporter.format_types(types)?;
+        let types = formatted_types.as_ref();
+
+        if let Layout::Files = exporter.layout {
+            return Err(Error::unable_to_export(exporter.layout));
         }
 
-        let mut out = render_file_header(self);
+        let mut out = render_file_header(&exporter);
 
         let mut has_manually_exported_user_types = false;
         let mut runtime = Ok(Cow::default());
-        if let Some(framework_runtime) = &self.framework_runtime {
+        if let Some(framework_runtime) = &exporter.framework_runtime {
             runtime = (framework_runtime.0)(FrameworkExporter {
-                exporter: self,
+                exporter: &exporter,
                 has_manually_exported_user_types: &mut has_manually_exported_user_types,
                 files_root_types: "",
                 types,
@@ -155,18 +228,49 @@ impl Zod {
         }
 
         if !has_manually_exported_user_types {
-            render_types(&mut out, self, types, "")?;
+            render_types(&mut out, &exporter, types, "")?;
         }
 
         Ok(out)
     }
 
     /// Export the types to a specific file/folder.
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types) -> Result<(), Error> {
+    pub fn export_to(
+        &self,
+        path: impl AsRef<Path>,
+        types: &Types,
+        format: impl IntoFormat,
+    ) -> Result<(), Error> {
+        let exporter = self.clone().with_format(format);
+        let formatted_types = exporter.format_types(types)?;
+        let types = formatted_types.as_ref();
         let path = path.as_ref();
 
-        if self.layout != Layout::Files {
-            let result = self.export(types)?;
+        if exporter.layout != Layout::Files {
+            let mut result = render_file_header(&exporter);
+
+            let mut has_manually_exported_user_types = false;
+            let mut runtime = Ok(Cow::default());
+            if let Some(framework_runtime) = &exporter.framework_runtime {
+                runtime = (framework_runtime.0)(FrameworkExporter {
+                    exporter: &exporter,
+                    has_manually_exported_user_types: &mut has_manually_exported_user_types,
+                    files_root_types: "",
+                    types,
+                });
+            }
+            let runtime = runtime?;
+
+            if !runtime.is_empty() {
+                result.push('\n');
+                result.push_str(&runtime);
+                result.push('\n');
+            }
+
+            if !has_manually_exported_user_types {
+                render_types(&mut result, &exporter, types, "")?;
+            }
+
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)?;
             }
@@ -249,7 +353,7 @@ impl Zod {
 
         let mut root_types = String::new();
         export(
-            self,
+            &exporter,
             types,
             &mut build_module_graph(types),
             &mut root_types,
@@ -261,11 +365,11 @@ impl Zod {
             let mut has_manually_exported_user_types = false;
             let mut runtime = Cow::default();
             let mut runtime_references = HashSet::new();
-            if let Some(framework_runtime) = &self.framework_runtime {
+            if let Some(framework_runtime) = &exporter.framework_runtime {
                 let (runtime_result, referenced_types) = references::with_module_path("", || {
                     references::collect_references(|| {
                         (framework_runtime.0)(FrameworkExporter {
-                            exporter: self,
+                            exporter: &exporter,
                             has_manually_exported_user_types: &mut has_manually_exported_user_types,
                             files_root_types: &root_types,
                             types,
@@ -281,7 +385,7 @@ impl Zod {
 
             if !runtime.is_empty() || should_export_user_types {
                 files.insert(runtime_path, {
-                    let mut out = render_file_header(self);
+                    let mut out = render_file_header(&exporter);
                     let mut body = String::new();
 
                     if !runtime.is_empty() {
@@ -344,6 +448,14 @@ impl Zod {
         cleanup_stale_files(path, &files)?;
 
         Ok(())
+    }
+
+    pub(crate) fn format_types<'a>(&self, types: &'a Types) -> Result<Cow<'a, Types>, Error> {
+        let Some(format) = &self.format else {
+            return Ok(Cow::Borrowed(types));
+        };
+
+        (format.types)(types).map_err(|err| Error::format("type graph formatter failed", err))
     }
 }
 

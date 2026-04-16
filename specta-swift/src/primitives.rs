@@ -177,12 +177,14 @@ pub fn datatype_to_swift(
     generic_scope: Vec<Generic>,
     reference: Option<&specta::datatype::Reference>,
 ) -> Result<String> {
+    let dt = apply_datatype_format(swift, types, dt)?;
+
     // Check for special standard library types first
     if let Some(special_type) = is_special_std_type(types, reference) {
         return Ok(special_type);
     }
 
-    match dt {
+    match &dt {
         DataType::Primitive(p) => primitive_to_swift(p),
         // DataType::Literal(l) => literal_to_swift(l),
         DataType::List(l) => list_to_swift(swift, types, l, generic_scope.clone()),
@@ -205,6 +207,83 @@ pub fn datatype_to_swift(
         DataType::Tuple(t) => tuple_to_swift(swift, types, t, generic_scope.clone()),
         DataType::Reference(r) => reference_to_swift(swift, types, r, &generic_scope),
     }
+}
+
+fn apply_datatype_format(swift: &Swift, types: &Types, dt: &DataType) -> Result<DataType> {
+    let Some(format) = swift.format.as_ref() else {
+        return Ok(dt.clone());
+    };
+
+    let mapped = (format.datatype)(types, dt)
+        .map_err(|err| Error::format("datatype formatter failed", err))?;
+
+    match mapped {
+        std::borrow::Cow::Borrowed(dt) => apply_datatype_format_children(swift, types, dt.clone()),
+        std::borrow::Cow::Owned(dt) => apply_datatype_format_children(swift, types, dt),
+    }
+}
+
+fn apply_datatype_format_children(
+    swift: &Swift,
+    types: &Types,
+    mut dt: DataType,
+) -> Result<DataType> {
+    match &mut dt {
+        DataType::Primitive(_) => {}
+        DataType::List(list) => {
+            list.ty = Box::new(apply_datatype_format(swift, types, &list.ty)?);
+        }
+        DataType::Map(map) => {
+            let key = apply_datatype_format(swift, types, map.key_ty())?;
+            let value = apply_datatype_format(swift, types, map.value_ty())?;
+            map.set_key_ty(key);
+            map.set_value_ty(value);
+        }
+        DataType::Nullable(inner) => {
+            **inner = apply_datatype_format(swift, types, inner)?;
+        }
+        DataType::Struct(strct) => map_fields(swift, types, &mut strct.fields)?,
+        DataType::Enum(enm) => {
+            for (_, variant) in &mut enm.variants {
+                map_fields(swift, types, &mut variant.fields)?;
+            }
+        }
+        DataType::Tuple(tuple) => {
+            for element in &mut tuple.elements {
+                *element = apply_datatype_format(swift, types, element)?;
+            }
+        }
+        DataType::Reference(Reference::Named(reference)) => {
+            for (_, generic) in &mut reference.generics {
+                *generic = apply_datatype_format(swift, types, generic)?;
+            }
+        }
+        DataType::Reference(Reference::Generic(_) | Reference::Opaque(_)) => {}
+    }
+
+    Ok(dt)
+}
+
+fn map_fields(swift: &Swift, types: &Types, fields: &mut Fields) -> Result<()> {
+    match fields {
+        Fields::Unit => {}
+        Fields::Unnamed(unnamed) => {
+            for field in &mut unnamed.fields {
+                if let Some(ty) = field.ty.as_mut() {
+                    *ty = apply_datatype_format(swift, types, ty)?;
+                }
+            }
+        }
+        Fields::Named(named) => {
+            for (_, field) in &mut named.fields {
+                if let Some(ty) = field.ty.as_mut() {
+                    *ty = apply_datatype_format(swift, types, ty)?;
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Check if a struct is a Duration by examining its fields

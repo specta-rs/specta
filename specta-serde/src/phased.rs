@@ -14,7 +14,7 @@ use specta::{
 /// - `Deserialize` is the type accepted for deserialization input.
 ///
 /// When both phases resolve to the same Specta datatype, this collapses to that
-/// single type. When they differ, `apply_phases` can split the graph into
+/// single type. When they differ, `format_phases` can split the graph into
 /// `*_Serialize` and `*_Deserialize` variants.
 ///
 /// ```rust

@@ -41,7 +41,7 @@ fn test_multiline_comments() {
         .register::<SdPath>()
         .register::<SimpleStruct>();
     let swift = Swift::default();
-    let output = swift.export(&types).unwrap();
+    let output = swift.export(&types, specta_serde::format).unwrap();
 
     println!("Generated Swift code with comments:\n{}", output);
 

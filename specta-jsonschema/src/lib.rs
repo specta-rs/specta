@@ -58,9 +58,12 @@
 //! fn main() {
 //!     let types = Types::default().register::<User>();
 //!
-//!     // Apply serde transforms in userspace, then export
-//!     let types = specta_serde::apply(types).unwrap();
-//!     JsonSchema::default().export_to("./schema.json", &types).unwrap();
+//!     // Export with serde formatting
+//!     let (map_types, _) = specta_serde::format();
+//!     let serde_types = map_types(&types).unwrap();
+//!     JsonSchema::default()
+//!         .export_to("./schema.json", serde_types.as_ref())
+//!         .unwrap();
 //! }
 //! ```
 //!

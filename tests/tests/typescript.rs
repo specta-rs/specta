@@ -75,7 +75,7 @@ fn typescript_types() -> (Types, Vec<(&'static str, DataType)>) {
 
 fn phase_collections() -> [(
     &'static str,
-    Result<(Vec<(&'static str, DataType)>, Types), specta_serde::Error>,
+    Result<(Vec<(&'static str, DataType)>, Types), specta_serde::FormatError>,
 ); 3] {
     let (types, dts) = {
         let (mut types, mut dts) = crate::types();
@@ -93,19 +93,16 @@ fn phase_collections() -> [(
 
     [
         ("raw", Ok((dts.clone(), types.clone()))),
-        (
-            "serde",
-            specta_serde::apply(types).map(|types| (dts, types)),
-        ),
+        ("serde", crate::serde(types).map(|types| (dts, types))),
         (
             "serde_phases",
-            specta_serde::apply_phases(phased_types).map(|types| (phased_dts, types)),
+            crate::serde_phases(phased_types).map(|types| (phased_dts, types)),
         ),
     ]
 }
 
 fn phase_output(
-    result: Result<(Vec<(&'static str, DataType)>, Types), specta_serde::Error>,
+    result: Result<(Vec<(&'static str, DataType)>, Types), specta_serde::FormatError>,
     f: impl FnOnce(&[(&'static str, DataType)], &Types) -> Result<String, String>,
 ) -> String {
     result.map_or_else(
@@ -152,8 +149,8 @@ fn typescript_export_serde_errors() {
 
         for mode in ["serde", "serde_phases"] {
             let types = match mode {
-                "serde" => specta_serde::apply(types.clone()),
-                _ => specta_serde::apply_phases(types.clone()),
+                "serde" => crate::serde(types.clone()),
+                _ => crate::serde_phases(types.clone()),
             };
 
             let types = match types {
@@ -164,7 +161,7 @@ fn typescript_export_serde_errors() {
                 }
             };
 
-            if let Err(err) = specta_serde::validate(&dt, &types) {
+            if let Err(err) = crate::serde_validate(&dt, &types) {
                 assert_expected_error(failures, name, mode, "validate", expected_error, err);
                 continue;
             }

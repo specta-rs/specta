@@ -31,10 +31,9 @@
 //! let types = Types::default()
 //!     // We don't need to specify `MyOtherType` because it's referenced by `MyType`
 //!     .register::<MyType>();
-//! let resolved = specta_serde::apply(types).unwrap();
 //!
 //! Swift::default()
-//!     .export_to("./Types.swift", &resolved)
+//!     .export_to("./Types.swift", &types, specta_serde::format)
 //!     .unwrap();
 //! ```
 //!
@@ -52,4 +51,6 @@ mod primitives;
 mod swift;
 
 pub use error::Error;
-pub use swift::{GenericStyle, IndentStyle, NamingConvention, OptionalStyle, Swift};
+pub use swift::{
+    FormatError, GenericStyle, IndentStyle, IntoFormat, NamingConvention, OptionalStyle, Swift,
+};

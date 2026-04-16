@@ -48,6 +48,21 @@ pub fn raw_format() -> (
     )
 }
 
+pub fn serde(types: Types) -> Result<Types, specta_serde::FormatError> {
+    let (map_types, _) = specta_serde::format();
+    Ok(map_types(&types)?.into_owned())
+}
+
+pub fn serde_phases(types: Types) -> Result<Types, specta_serde::FormatError> {
+    let (map_types, _) = specta_serde::format_phases();
+    Ok(map_types(&types)?.into_owned())
+}
+
+pub fn serde_validate(dt: &DataType, types: &Types) -> Result<(), specta_serde::FormatError> {
+    let (_, map_datatype) = specta_serde::format();
+    map_datatype(types, dt).map(|_| ())
+}
+
 #[test]
 fn compile_errors() {
     let t = trybuild::TestCases::new();

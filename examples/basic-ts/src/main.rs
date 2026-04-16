@@ -184,7 +184,8 @@ fn main() {
     {
         let mut types = Types::default().register::<NotPhaseSpecific>();
         let def = HelloWorld::definition(&mut types);
-        let types = specta_serde::apply_phases(types).unwrap();
+        let (map_types, _) = specta_serde::format_phases();
+        let types = map_types(&types).unwrap().into_owned();
         println!(
             "{:#?}",
             match def {
@@ -219,17 +220,18 @@ fn main() {
             "RAW:\n{}",
             Typescript::default().export(&types, raw_format).unwrap()
         );
-        match specta_serde::apply(types.clone()) {
+        let (map_types, _) = specta_serde::format();
+        match map_types(&types) {
             Ok(_) => println!(
-                "specta_serde::apply(...):\n{}",
+                "specta_serde::format(...):\n{}",
                 Typescript::default()
                     .export(&types, specta_serde::format)
                     .unwrap()
             ),
-            Err(err) => println!("specta_serde::apply(...) ERROR: {err}"),
+            Err(err) => println!("specta_serde::format(...) ERROR: {err}"),
         }
         println!(
-            "specta_serde::apply_phases(...):\n{}",
+            "specta_serde::format_phases(...):\n{}",
             Typescript::default()
                 .export(&types, specta_serde::format_phases)
                 .unwrap()
@@ -241,7 +243,7 @@ fn main() {
             .register::<SerdeWithDisplayFromStr>()
             .register::<SerdeWithOneOrMany>();
         println!(
-            "serde_with + specta_serde::apply_phases(...):\n{}",
+            "serde_with + specta_serde::format_phases(...):\n{}",
             Typescript::default()
                 .export(&serde_with_types, specta_serde::format_phases)
                 .unwrap()

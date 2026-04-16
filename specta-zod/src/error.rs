@@ -160,6 +160,18 @@ impl Error {
             kind: ErrorKind::UnableToExport(layout),
         }
     }
+
+    pub(crate) fn format(
+        message: impl Into<Cow<'static, str>>,
+        source: crate::FormatError,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::Framework {
+                message: message.into(),
+                source,
+            },
+        }
+    }
 }
 
 impl From<io::Error> for Error {

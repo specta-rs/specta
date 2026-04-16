@@ -45,11 +45,13 @@ mod jsdoc_export_to_files_runtime_imports_types {
     }
 }
 
-fn phase_collections(types: Types) -> [(&'static str, Result<Types, specta_serde::Error>); 3] {
+fn phase_collections(
+    types: Types,
+) -> [(&'static str, Result<Types, specta_serde::FormatError>); 3] {
     [
         ("raw", Ok(types.clone())),
-        ("serde", specta_serde::apply(types.clone())),
-        ("serde_phases", specta_serde::apply_phases(types)),
+        ("serde", crate::serde(types.clone())),
+        ("serde_phases", crate::serde_phases(types)),
     ]
 }
 

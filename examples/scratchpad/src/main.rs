@@ -16,7 +16,7 @@ pub struct Demo {
 fn main() {
     // let types = Types::default().register::<Demo>();
     // let out = specta_typescript::Typescript::new()
-    //     .export(&specta_serde::apply(types).unwrap(), specta_serde::format)
+    //     .export(&types, specta_serde::format)
     //     .unwrap();
     // println!("{}", out);
 
@@ -48,14 +48,14 @@ fn main() {
     //             .as_ref()
     //     )
     // );
-    println!(
-        "{:?}",
+    println!("{:?}", {
+        let (map_types, map_datatype) = specta_serde::format_phases();
+        let mapped_types = map_types(&types).unwrap();
+        let mapped_dt = map_datatype(&types, &dt).unwrap();
         specta_typescript::primitives::inline(
             &specta_typescript::Typescript::new(),
-            specta_serde::map_phases_types(&types).unwrap().as_ref(),
-            specta_serde::map_phases_datatype(&types, &dt)
-                .unwrap()
-                .as_ref()
+            mapped_types.as_ref(),
+            mapped_dt.as_ref(),
         )
-    );
+    });
 }

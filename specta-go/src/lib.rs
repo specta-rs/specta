@@ -18,7 +18,7 @@
 //! let types = Types::default().register::<MyType>();
 //!
 //! Go::default()
-//!     .export_to("./bindings.go", &types)
+//!     .export_to("./bindings.go", &types, specta_serde::format)
 //!     .unwrap();
 //! ```
 
@@ -34,4 +34,4 @@ mod primitives;
 mod reserved_names;
 
 pub use error::Error;
-pub use go::{Go, Layout, SerdeMode};
+pub use go::{FormatError, Go, IntoFormat, Layout};

@@ -1,7 +1,20 @@
 use serde::{Deserialize, Serialize};
+use specta::datatype::DataType;
 use specta::{Type, Types};
-use specta_serde::apply;
 use specta_swift::Swift;
+
+fn raw_format() -> (
+    impl for<'a> Fn(&'a Types) -> Result<std::borrow::Cow<'a, Types>, specta_swift::FormatError>,
+    impl for<'a> Fn(
+        &'a Types,
+        &'a DataType,
+    ) -> Result<std::borrow::Cow<'a, DataType>, specta_swift::FormatError>,
+) {
+    (
+        |types| Ok(std::borrow::Cow::Borrowed(types)),
+        |_, dt| Ok(std::borrow::Cow::Borrowed(dt)),
+    )
+}
 
 /// Test enum with snake_case rename_all - should generate string enum
 #[derive(Type, Serialize, Deserialize)]
@@ -24,10 +37,10 @@ enum RegularEnum {
 #[test]
 fn test_string_enum_generation() {
     let swift = Swift::default();
-    let serde_resolved = apply(Types::default().register::<JobStatus>()).unwrap();
+    let serde_resolved = Types::default().register::<JobStatus>();
     let raw_resolved = Types::default().register::<RegularEnum>();
-    let string_output = swift.export(&serde_resolved).unwrap();
-    let raw_output = swift.export(&raw_resolved).unwrap();
+    let string_output = swift.export(&serde_resolved, specta_serde::format).unwrap();
+    let raw_output = swift.export(&raw_resolved, raw_format).unwrap();
 
     println!("String enum test output:\n{}", string_output);
     println!("Regular enum test output:\n{}", raw_output);

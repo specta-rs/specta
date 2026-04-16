@@ -255,7 +255,9 @@ fn datatype(
     location: Vec<String>,
     ctx: &mut GoContext,
 ) -> Result<(), Error> {
-    match dt {
+    let dt = apply_datatype_format(exporter, types, dt)?;
+
+    match &dt {
         DataType::Primitive(p) => match p {
             Primitive::i8 => s.push_str("int8"),
             Primitive::i16 => s.push_str("int16"),
@@ -374,6 +376,85 @@ fn datatype(
             },
         },
     }
+    Ok(())
+}
+
+fn apply_datatype_format(exporter: &Go, types: &Types, dt: &DataType) -> Result<DataType, Error> {
+    let Some(format) = exporter.format.as_ref() else {
+        return Ok(dt.clone());
+    };
+
+    let mapped = (format.datatype)(types, dt)
+        .map_err(|err| Error::format("datatype formatter failed", err))?;
+
+    match mapped {
+        std::borrow::Cow::Borrowed(dt) => {
+            apply_datatype_format_children(exporter, types, dt.clone())
+        }
+        std::borrow::Cow::Owned(dt) => apply_datatype_format_children(exporter, types, dt),
+    }
+}
+
+fn apply_datatype_format_children(
+    exporter: &Go,
+    types: &Types,
+    mut dt: DataType,
+) -> Result<DataType, Error> {
+    match &mut dt {
+        DataType::Primitive(_) => {}
+        DataType::List(list) => {
+            list.ty = Box::new(apply_datatype_format(exporter, types, &list.ty)?);
+        }
+        DataType::Map(map) => {
+            let key = apply_datatype_format(exporter, types, map.key_ty())?;
+            let value = apply_datatype_format(exporter, types, map.value_ty())?;
+            map.set_key_ty(key);
+            map.set_value_ty(value);
+        }
+        DataType::Nullable(inner) => {
+            **inner = apply_datatype_format(exporter, types, inner)?;
+        }
+        DataType::Struct(strct) => map_fields(exporter, types, &mut strct.fields)?,
+        DataType::Enum(enm) => {
+            for (_, variant) in &mut enm.variants {
+                map_fields(exporter, types, &mut variant.fields)?;
+            }
+        }
+        DataType::Tuple(tuple) => {
+            for element in &mut tuple.elements {
+                *element = apply_datatype_format(exporter, types, element)?;
+            }
+        }
+        DataType::Reference(Reference::Named(reference)) => {
+            for (_, generic) in &mut reference.generics {
+                *generic = apply_datatype_format(exporter, types, generic)?;
+            }
+        }
+        DataType::Reference(Reference::Generic(_) | Reference::Opaque(_)) => {}
+    }
+
+    Ok(dt)
+}
+
+fn map_fields(exporter: &Go, types: &Types, fields: &mut Fields) -> Result<(), Error> {
+    match fields {
+        Fields::Unit => {}
+        Fields::Unnamed(unnamed) => {
+            for field in &mut unnamed.fields {
+                if let Some(ty) = field.ty.as_mut() {
+                    *ty = apply_datatype_format(exporter, types, ty)?;
+                }
+            }
+        }
+        Fields::Named(named) => {
+            for (_, field) in &mut named.fields {
+                if let Some(ty) = field.ty.as_mut() {
+                    *ty = apply_datatype_format(exporter, types, ty)?;
+                }
+            }
+        }
+    }
+
     Ok(())
 }
 

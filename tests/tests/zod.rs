@@ -118,6 +118,19 @@ fn temp_root() -> std::path::PathBuf {
     temp_root
 }
 
+fn zod_raw_format() -> (
+    impl for<'a> Fn(&'a Types) -> Result<std::borrow::Cow<'a, Types>, specta_zod::FormatError>,
+    impl for<'a> Fn(
+        &'a Types,
+        &'a DataType,
+    ) -> Result<std::borrow::Cow<'a, DataType>, specta_zod::FormatError>,
+) {
+    (
+        |types| Ok(std::borrow::Cow::Borrowed(types)),
+        |_, dt| Ok(std::borrow::Cow::Borrowed(dt)),
+    )
+}
+
 #[test]
 fn zod_export_smoke() {
     #[derive(Type)]
@@ -135,7 +148,7 @@ fn zod_export_smoke() {
     let types = Types::default().register::<Demo>();
     let out = Zod::default()
         .bigint(BigIntExportBehavior::Number)
-        .export(&types)
+        .export(&types, zod_raw_format)
         .unwrap();
 
     assert!(out.contains("import { z } from \"zod\";"));
@@ -205,12 +218,12 @@ fn zod_bigint_errors_propagate_from_nested_types() {
 #[test]
 fn zod_layout_duplicate_typenames() {
     let types = Types::default().register::<Testing>().register::<Another>();
-    let err = Zod::default().export(&types).unwrap_err();
+    let err = Zod::default().export(&types, zod_raw_format).unwrap_err();
     assert!(err.to_string().contains("Detected multiple types"));
 
     let module_prefixed = Zod::default()
         .layout(Layout::ModulePrefixedName)
-        .export(&types)
+        .export(&types, zod_raw_format)
         .unwrap();
     assert!(module_prefixed.contains("TestingSchema"));
     assert!(module_prefixed.contains("testing2"));
@@ -224,7 +237,7 @@ fn zod_layout_files_export_to() {
 
     Zod::default()
         .layout(Layout::Files)
-        .export_to(&path, &types)
+        .export_to(&path, &types, zod_raw_format)
         .unwrap();
 
     let output = crate::fs_to_string(Path::new(&path)).unwrap();
@@ -236,12 +249,13 @@ fn zod_layout_files_export_to() {
 fn zod_uses_serde_transformed_resolved_types() {
     let types = Types::default().register::<SerdeTaggedEnum>();
 
-    let serde = specta_serde::apply(types).unwrap();
-
     let raw_out = Zod::default()
-        .export(&Types::default().register::<SerdeTaggedEnum>())
+        .export(
+            &Types::default().register::<SerdeTaggedEnum>(),
+            zod_raw_format,
+        )
         .unwrap();
-    let serde_out = Zod::default().export(&serde).unwrap();
+    let serde_out = Zod::default().export(&types, specta_serde::format).unwrap();
 
     assert_ne!(raw_out, serde_out);
     assert!(serde_out.contains("type: z.literal(\"unit\")"));
@@ -252,7 +266,8 @@ fn zod_uses_serde_transformed_resolved_types() {
 #[test]
 fn zod_rejects_invalid_serde_shapes_via_transformation() {
     let types = Types::default().register::<InvalidInternallyTaggedEnum>();
-    let err = specta_serde::apply(types).unwrap_err();
+    let (map_types, _) = specta_serde::format();
+    let err = map_types(&types).unwrap_err();
 
     assert!(err.to_string().contains("Invalid internally tagged enum"));
 }
@@ -278,7 +293,7 @@ fn zod_layout_files_preserves_unrelated_typescript_files() {
 
     Zod::default()
         .layout(Layout::Files)
-        .export_to(&path, &types)
+        .export_to(&path, &types, zod_raw_format)
         .unwrap();
 
     assert!(keep_path.exists());
@@ -315,7 +330,7 @@ fn typescript_layout_files_preserves_unrelated_typescript_files() {
 #[test]
 fn zod_recursive_types_use_lazy() {
     let types = Types::default().register::<Recursive>();
-    let out = Zod::default().export(&types).unwrap();
+    let out = Zod::default().export(&types, zod_raw_format).unwrap();
     assert!(out.contains("z.lazy(() => RecursiveSchema)"));
 }
 
@@ -324,7 +339,7 @@ fn zod_reserved_type_name_errors() {
     let mut types = Types::default();
     NamedDataType::new("class", Vec::new(), DataType::Primitive(Primitive::i8))
         .register(&mut types);
-    let err = Zod::default().export(&types).unwrap_err();
+    let err = Zod::default().export(&types, zod_raw_format).unwrap_err();
     assert!(err.to_string().contains("reserved keyword"));
 }
 
@@ -333,7 +348,7 @@ fn zod_layout_files_errors_on_export() {
     let types = Types::default();
     let err = Zod::default()
         .layout(Layout::Files)
-        .export(&types)
+        .export(&types, zod_raw_format)
         .unwrap_err();
     assert!(err.to_string().contains("Unable to export layout Files"));
 }
@@ -344,5 +359,5 @@ fn temp_dir() -> TempDir {
 
 fn export_for<T: Type>() -> Result<String, specta_zod::Error> {
     let types = Types::default().register::<T>();
-    Zod::default().export(&types)
+    Zod::default().export(&types, zod_raw_format)
 }

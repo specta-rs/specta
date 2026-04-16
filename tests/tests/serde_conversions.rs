@@ -202,7 +202,7 @@ fn type_names(types: &Types) -> Vec<String> {
 
 #[test]
 fn apply_rejects_asymmetric_container_conversion() {
-    let err = specta_serde::apply(Types::default().register::<IntoOnly>())
+    let err = crate::serde(Types::default().register::<IntoOnly>())
         .expect_err("apply should reject asymmetric serde conversions");
 
     assert!(
@@ -213,9 +213,9 @@ fn apply_rejects_asymmetric_container_conversion() {
 }
 
 #[test]
-fn apply_phases_splits_container_and_dependents_for_conversions() {
-    let types = specta_serde::apply_phases(Types::default().register::<Parent>())
-        .expect("apply_phases should support asymmetric serde conversions");
+fn format_phases_splits_container_and_dependents_for_conversions() {
+    let types = crate::serde_phases(Types::default().register::<Parent>())
+        .expect("format_phases should support asymmetric serde conversions");
     let names = type_names(&types);
 
     assert!(names.iter().any(|name| name == "IntoOnly_Serialize"));
@@ -226,59 +226,60 @@ fn apply_phases_splits_container_and_dependents_for_conversions() {
 
 #[test]
 fn apply_accepts_symmetric_container_conversion() {
-    specta_serde::apply(Types::default().register::<Symmetric>())
+    crate::serde(Types::default().register::<Symmetric>())
         .expect("apply should accept symmetric serde conversions");
 }
 
 #[test]
-fn apply_phases_accepts_generic_try_from_container_conversion() {
-    let err = specta_serde::apply(Types::default().register::<GenericParent<String>>())
+fn format_phases_accepts_generic_try_from_container_conversion() {
+    let err = crate::serde(Types::default().register::<GenericParent<String>>())
         .expect_err("apply should reject deserialize-only container conversions");
     assert!(
         err.to_string()
             .contains("Incompatible container conversion")
     );
 
-    specta_serde::apply_phases(Types::default().register::<GenericParent<String>>())
-        .expect("apply_phases should resolve nested generic references from container conversions");
+    crate::serde_phases(Types::default().register::<GenericParent<String>>()).expect(
+        "format_phases should resolve nested generic references from container conversions",
+    );
 }
 
 #[test]
 fn custom_codec_requires_explicit_override() {
-    let err = specta_serde::apply(Types::default().register::<CustomCodecNoOverride>())
+    let err = crate::serde(Types::default().register::<CustomCodecNoOverride>())
         .expect_err("custom serde codecs should require #[specta(type = ...)]");
 
     assert!(err.to_string().contains("Unsupported serde attribute"));
 
-    specta_serde::apply(Types::default().register::<CustomCodecWithOverride>())
+    crate::serde(Types::default().register::<CustomCodecWithOverride>())
         .expect("override should satisfy custom serde codecs");
 }
 
 #[test]
 fn custom_codec_variant_requires_explicit_override() {
-    let err = specta_serde::apply(Types::default().register::<VariantCodecNoOverride>())
+    let err = crate::serde(Types::default().register::<VariantCodecNoOverride>())
         .expect_err("variant custom serde codecs should require #[specta(type = ...)]");
     assert!(err.to_string().contains("Unsupported serde attribute"));
 
-    specta_serde::apply(Types::default().register::<VariantCodecWithOverride>())
+    crate::serde(Types::default().register::<VariantCodecWithOverride>())
         .expect("variant override should satisfy custom serde codecs");
 }
 
 #[test]
-fn phased_override_requires_apply_phases() {
-    let err = specta_serde::apply(Types::default().register::<CustomCodecWithPhasedOverride>())
+fn phased_override_requires_format_phases() {
+    let err = crate::serde(Types::default().register::<CustomCodecWithPhasedOverride>())
         .expect_err("apply should reject phased overrides");
-    assert!(err.to_string().contains("requires `apply_phases`"));
+    assert!(err.to_string().contains("requires `format_phases`"));
 
-    specta_serde::apply_phases(Types::default().register::<CustomCodecWithPhasedOverride>())
-        .expect("apply_phases should accept phased overrides");
+    crate::serde_phases(Types::default().register::<CustomCodecWithPhasedOverride>())
+        .expect("format_phases should accept phased overrides");
 }
 
 #[test]
-fn field_only_phased_override_requires_apply_phases() {
-    let err = specta_serde::apply(Types::default().register::<FieldOnlyPhasedOverride>())
+fn field_only_phased_override_requires_format_phases() {
+    let err = crate::serde(Types::default().register::<FieldOnlyPhasedOverride>())
         .expect_err("apply should reject phased field overrides");
-    assert!(err.to_string().contains("requires `apply_phases`"));
+    assert!(err.to_string().contains("requires `format_phases`"));
 
     let raw_err = Typescript::default()
         .export(
@@ -288,9 +289,8 @@ fn field_only_phased_override_requires_apply_phases() {
         .expect_err("raw export should fail on unresolved phased opaque reference");
     assert!(raw_err.to_string().contains("unsupported opaque reference"));
 
-    let phased_types =
-        specta_serde::apply_phases(Types::default().register::<FieldOnlyPhasedOverride>())
-            .expect("apply_phases should accept phased field overrides");
+    let phased_types = crate::serde_phases(Types::default().register::<FieldOnlyPhasedOverride>())
+        .expect("format_phases should accept phased field overrides");
     Typescript::default()
         .export(&phased_types, crate::raw_format)
         .expect("phased export should remove phased opaque references");
@@ -311,35 +311,35 @@ fn format_phases_exports_field_only_phased_override() {
 
 #[test]
 fn skip_serializing_if_requires_phases() {
-    let err = specta_serde::apply(Types::default().register::<SkipSerializingIfOnly>())
-        .expect_err("skip_serializing_if should require apply_phases");
+    let err = crate::serde(Types::default().register::<SkipSerializingIfOnly>())
+        .expect_err("skip_serializing_if should require format_phases");
     assert!(err.to_string().contains("skip_serializing_if"));
 
-    specta_serde::apply_phases(Types::default().register::<SkipSerializingIfOnly>())
-        .expect("apply_phases should accept skip_serializing_if");
+    crate::serde_phases(Types::default().register::<SkipSerializingIfOnly>())
+        .expect("format_phases should accept skip_serializing_if");
 }
 
 #[test]
 fn field_phase_specific_rename_requires_phases() {
-    let err = specta_serde::apply(Types::default().register::<FieldPhaseSpecificRename>())
-        .expect_err("field-level phase-specific renames should require apply_phases");
+    let err = crate::serde(Types::default().register::<FieldPhaseSpecificRename>())
+        .expect_err("field-level phase-specific renames should require format_phases");
     assert!(err.to_string().contains("Incompatible field rename"));
 
-    specta_serde::apply_phases(Types::default().register::<FieldPhaseSpecificRename>())
-        .expect("apply_phases should accept field-level phase-specific renames");
+    crate::serde_phases(Types::default().register::<FieldPhaseSpecificRename>())
+        .expect("format_phases should accept field-level phase-specific renames");
 }
 
 #[test]
 fn identifier_enums_require_phases() {
-    let err = specta_serde::apply(Types::default().register::<VariantIdentifierValid>())
-        .expect_err("identifier enums should require apply_phases");
+    let err = crate::serde(Types::default().register::<VariantIdentifierValid>())
+        .expect_err("identifier enums should require format_phases");
     assert!(
         err.to_string()
-            .contains("identifier enums require `apply_phases`")
+            .contains("identifier enums require `format_phases`")
     );
 
-    specta_serde::apply_phases(Types::default().register::<VariantIdentifierValid>())
-        .expect("valid variant_identifier enum should pass in apply_phases");
-    specta_serde::apply_phases(Types::default().register::<FieldIdentifierValid>())
-        .expect("valid field_identifier enum should pass in apply_phases");
+    crate::serde_phases(Types::default().register::<VariantIdentifierValid>())
+        .expect("valid variant_identifier enum should pass in format_phases");
+    crate::serde_phases(Types::default().register::<FieldIdentifierValid>())
+        .expect("valid field_identifier enum should pass in format_phases");
 }

@@ -28,7 +28,20 @@ pub enum Error {
     /// Invalid configuration.
     #[error("Configuration error: {0}")]
     Configuration(String),
+
+    /// Custom format callback failed.
+    #[error("Format error: {message}: {source}")]
+    Format {
+        message: &'static str,
+        source: crate::swift::FormatError,
+    },
 }
 
 /// Result type alias for Swift export operations.
 pub type Result<T> = std::result::Result<T, Error>;
+
+impl Error {
+    pub(crate) fn format(message: &'static str, source: crate::swift::FormatError) -> Self {
+        Self::Format { message, source }
+    }
+}

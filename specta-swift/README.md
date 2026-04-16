@@ -70,10 +70,11 @@ fn main() {
         .register::<User>()
         .register::<UserRole>()
         .register::<ApiResult<String>>();
-    let resolved = specta_serde::apply(types).unwrap();
 
     let swift = Swift::default();
-    swift.export_to("./Types.swift", &resolved).unwrap();
+    swift
+        .export_to("./Types.swift", &types, specta_serde::format)
+        .unwrap();
 }
 ```
 
@@ -244,12 +245,10 @@ let swift = Swift::new()
 ### Serde Integration
 
 ```rust
-let resolved = specta_serde::apply(types).unwrap();
-
 let swift = Swift::new()
     .add_protocol("CustomDebugStringConvertible");
 
-let output = swift.export(&resolved).unwrap();
+let output = swift.export(&types, specta_serde::format).unwrap();
 ```
 
 ## Type Mapping

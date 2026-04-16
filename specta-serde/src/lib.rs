@@ -2,9 +2,9 @@
 //!
 //! # Choosing a mode
 //!
-//! - Use [`apply`] when serde behavior is symmetric and a single exported shape
+//! - Use [`format`] when serde behavior is symmetric and a single exported shape
 //!   should work for both serialization and deserialization.
-//! - Use [`apply_phases`] when serde behavior differs by direction (for example
+//! - Use [`format_phases`] when serde behavior differs by direction (for example
 //!   deserialize-widening enums, asymmetric conversion attributes, or explicit
 //!   [`Phased`] overrides).
 //!
@@ -29,7 +29,7 @@
 //! ```
 //!
 //! If serialize and deserialize shapes are different, use [`Phased`] and
-//! [`apply_phases`].
+//! [`format_phases`].
 //!
 //! This is required because a single unified type graph cannot represent two
 //! different directional wire shapes at once.
@@ -55,7 +55,8 @@
 //! }
 //!
 //! let types = Types::default().register::<Filters>();
-//! let phased_types = specta_serde::apply_phases(types)?;
+//! let phased_types = specta_typescript::Typescript::default()
+//!     .export(&types, specta_serde::format_phases)?;
 //! ```
 //!
 //! As an alternative to codec attributes, `#[serde(into = ...)]`,
@@ -91,7 +92,7 @@
 //! ```
 //!
 //! See `examples/basic-ts/src/main.rs` for a complete exporter example using
-//! [`apply`] and [`apply_phases`].
+//! [`format`] and [`format_phases`].
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
     html_logo_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png",
@@ -129,7 +130,7 @@ pub use phased::{Phased, phased};
 /// Error type returned by serde format helpers.
 pub type FormatError = Box<dyn StdError + Send + Sync + 'static>;
 
-/// Selects which directional type shape to use after [`apply_phases`].
+/// Selects which directional type shape to use with [`format_phases`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
     /// The shape used when Rust serializes data to the wire.
@@ -151,30 +152,7 @@ pub mod internal {
 use error::Result;
 use repr::EnumRepr;
 
-/// Validates whether a given [`DataType`] is a valid Serde-type.
-///
-/// When using [`apply`]/[`apply_phases`] all [`NamedDataType`]s are validated automatically, however if you need to export a [`DataType`] directly this is required to validate the top-level type.
-///
-/// For example if you try and export `HashMap<InvalidKey, MyGenericType<()>>`, [`apply`]/[`apply_phases`] can validate `MyGenericType` but it doesn't see the top-level `HashMap`'s generics so it can't validate them.
-///
-/// This is *only* required if your using the primitives from your language exporter.
-pub fn validate(dt: &DataType, types: &Types) -> Result<()> {
-    validate::validate_datatype_for_mode(dt, types, validate::ApplyMode::Unified)
-}
-
-/// Applies serde transformations in unified mode.
-///
-/// Unified mode produces a single transformed type graph that must satisfy both
-/// serialization and deserialization behavior. This is the simplest mode and is
-/// usually what exporters want when serde behavior is symmetric.
-///
-/// Returns an [`Error`] when serde metadata introduces phase-only differences
-/// that cannot be represented as one shape (for example `#[serde(other)]`,
-/// identifier enums, asymmetric conversion attributes, `skip_serializing_if`,
-/// or explicit [`Phased`] overrides).
-///
-/// Use [`apply_phases`] when your serialize and deserialize wire shapes differ.
-pub fn apply(types: Types) -> Result<Types> {
+fn apply(types: Types) -> Result<Types> {
     validate::validate_for_mode(&types, validate::ApplyMode::Unified)?;
 
     let mut out = types.clone();
@@ -222,29 +200,27 @@ pub fn apply(types: Types) -> Result<Types> {
     Ok(out)
 }
 
-/// Map a full [`Types`] graph using unified serde handling.
-pub fn map_types(types: &Types) -> std::result::Result<Cow<'_, Types>, FormatError> {
+fn map_types(types: &Types) -> std::result::Result<Cow<'_, Types>, FormatError> {
     Ok(Cow::Owned(apply(types.clone())?))
 }
 
-/// Map a full [`Types`] graph using split-phase serde handling.
-pub fn map_phases_types(types: &Types) -> std::result::Result<Cow<'_, Types>, FormatError> {
+fn map_phases_types(types: &Types) -> std::result::Result<Cow<'_, Types>, FormatError> {
     Ok(Cow::Owned(apply_phases(types.clone())?))
 }
 
-/// Map a single [`DataType`] using unified serde handling.
-pub fn map_datatype<'a>(
-    _: &'a Types,
-    dt: &'a DataType,
-) -> std::result::Result<Cow<'a, DataType>, FormatError> {
-    Ok(Cow::Borrowed(dt))
-}
-
-/// Map a single [`DataType`] using split-phase serde handling.
-pub fn map_phases_datatype<'a>(
+fn map_datatype<'a>(
     types: &'a Types,
     dt: &'a DataType,
 ) -> std::result::Result<Cow<'a, DataType>, FormatError> {
+    validate::validate_datatype_for_mode(dt, types, validate::ApplyMode::Unified)?;
+    Ok(Cow::Borrowed(dt))
+}
+
+fn map_phases_datatype<'a>(
+    types: &'a Types,
+    dt: &'a DataType,
+) -> std::result::Result<Cow<'a, DataType>, FormatError> {
+    validate::validate_datatype_for_mode(dt, types, validate::ApplyMode::Phases)?;
     Ok(Cow::Owned(select_phase_datatype(
         dt,
         types,
@@ -271,17 +247,7 @@ pub fn format_phases() -> (
     (map_phases_types, map_phases_datatype)
 }
 
-/// Applies serde transformations in split-phase mode.
-///
-/// Phase mode preserves directional differences by rewriting affected named
-/// types into paired `*_Serialize` and `*_Deserialize` types and then updating
-/// references accordingly. This allows exporters to represent serde behavior
-/// that is asymmetric between serialization and deserialization.
-///
-/// Use this when working with deserialize-widening attributes like
-/// `#[serde(other)]`/identifier enums, asymmetric conversion attributes, or
-/// explicit [`Phased`] overrides.
-pub fn apply_phases(types: Types) -> Result<Types> {
+fn apply_phases(types: Types) -> Result<Types> {
     validate::validate_for_mode(&types, validate::ApplyMode::Phases)?;
 
     let originals = types.into_unsorted_iter().collect::<Vec<_>>();
@@ -499,18 +465,19 @@ pub fn apply_phases(types: Types) -> Result<Types> {
     Ok(out)
 }
 
-/// Rewrites a [`DataType`] to the requested directional shape after [`apply_phases`].
+/// Rewrites a [`DataType`] to the requested directional shape for [`format_phases`].
 ///
 /// This is useful for exporter integrations that need deserialize-specific input
 /// types and serialize-specific output types while still exporting against the
-/// resolved type graph returned by [`apply_phases`].
+/// resolved type graph produced by the `map_types` callback from
+/// [`format_phases`].
 ///
 /// # Examples
 ///
 /// ```rust
 /// use serde::{Deserialize, Serialize};
 /// use specta::{Type, Types, datatype::{DataType, Reference}};
-/// use specta_serde::{Phase, Phased, apply_phases, select_phase_datatype};
+/// use specta_serde::{Phase, Phased, format_phases, select_phase_datatype};
 ///
 /// #[derive(Type, Serialize, Deserialize)]
 /// #[serde(untagged)]
@@ -527,7 +494,8 @@ pub fn apply_phases(types: Types) -> Result<Types> {
 ///
 /// let mut types = Types::default();
 /// let dt = Filters::definition(&mut types);
-/// let resolved = apply_phases(types)?;
+/// let (map_types, _) = format_phases();
+/// let resolved = map_types(&types).expect("format_phases should succeed").into_owned();
 ///
 /// let serialize = select_phase_datatype(&dt, &resolved, Phase::Serialize);
 /// let deserialize = select_phase_datatype(&dt, &resolved, Phase::Deserialize);
@@ -1423,7 +1391,7 @@ fn resolve_phased_type(ty: &DataType, mode: PhaseRewrite, path: &str) -> Result<
         PhaseRewrite::Unified => {
             return Err(Error::invalid_phased_type_usage(
                 path,
-                "`specta_serde::Phased<Serialize, Deserialize>` requires `apply_phases`",
+                "`specta_serde::Phased<Serialize, Deserialize>` requires `format_phases`",
             ));
         }
         PhaseRewrite::Serialize => Some(phased.serialize.clone()),
@@ -2120,7 +2088,7 @@ mod tests {
     use serde::{Deserialize, Serialize};
     use specta::{Type, Types, datatype::DataType};
 
-    use super::{Phase, Phased, apply_phases, select_phase_datatype};
+    use super::{Phase, Phased, format_phases, select_phase_datatype};
 
     #[derive(Type, Serialize, Deserialize)]
     #[serde(untagged)]
@@ -2149,7 +2117,7 @@ mod tests {
     fn selects_split_named_reference_for_each_phase() {
         let mut types = specta::Types::default();
         let dt = Filters::definition(&mut types);
-        let resolved = apply_phases(types).expect("apply_phases should succeed");
+        let resolved = formatted_phases(types);
 
         let serialize = select_phase_datatype(&dt, &resolved, Phase::Serialize);
         let deserialize = select_phase_datatype(&dt, &resolved, Phase::Deserialize);
@@ -2162,7 +2130,7 @@ mod tests {
     fn rewrites_nested_generics_for_each_phase() {
         let mut types = specta::Types::default();
         let dt = FilterList::definition(&mut types);
-        let resolved = apply_phases(types).expect("apply_phases should succeed");
+        let resolved = formatted_phases(types);
 
         let serialize = select_phase_datatype(&dt, &resolved, Phase::Serialize);
         let deserialize = select_phase_datatype(&dt, &resolved, Phase::Deserialize);
@@ -2189,7 +2157,7 @@ mod tests {
     fn preserves_unsplit_types() {
         let mut types = specta::Types::default();
         let dt = Plain::definition(&mut types);
-        let resolved = apply_phases(types).expect("apply_phases should succeed");
+        let resolved = formatted_phases(types);
 
         let serialize = select_phase_datatype(&dt, &resolved, Phase::Serialize);
         let deserialize = select_phase_datatype(&dt, &resolved, Phase::Deserialize);
@@ -2202,7 +2170,7 @@ mod tests {
     fn resolves_explicit_phased_datatypes_without_named_types() {
         let mut types = specta::Types::default();
         let dt = <Phased<String, Vec<String>>>::definition(&mut types);
-        let resolved = apply_phases(types).expect("apply_phases should succeed");
+        let resolved = formatted_phases(types);
 
         let serialize = select_phase_datatype(&dt, &resolved, Phase::Serialize);
         let deserialize = select_phase_datatype(&dt, &resolved, Phase::Deserialize);
@@ -2255,5 +2223,12 @@ mod tests {
             .first()
             .map(|(_, dt)| dt)
             .expect("expected first generic type")
+    }
+
+    fn formatted_phases(types: Types) -> Types {
+        let (map_types, _) = format_phases();
+        map_types(&types)
+            .expect("format_phases should succeed")
+            .into_owned()
     }
 }

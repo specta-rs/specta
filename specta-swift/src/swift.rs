@@ -1,14 +1,87 @@
 //! Swift language exporter configuration and main export functionality.
 
 use std::{borrow::Cow, path::Path};
+use std::{error, fmt, sync::Arc};
 
 use specta::{
     Types,
     datatype::{DataType, Fields, Reference},
 };
 
+use crate::Error;
 use crate::error::Result;
 use crate::primitives::{export_type, is_duration_struct};
+
+/// Error type returned by exporter format callbacks.
+pub type FormatError = Box<dyn error::Error + Send + Sync + 'static>;
+
+type TypesFormatFn = Arc<
+    dyn for<'a> Fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError> + Send + Sync,
+>;
+type DataTypeFormatFn = Arc<
+    dyn for<'a> Fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>
+        + Send
+        + Sync,
+>;
+
+#[derive(Clone)]
+#[doc(hidden)]
+pub struct FormatFns {
+    pub(crate) types: TypesFormatFn,
+    pub(crate) datatype: DataTypeFormatFn,
+}
+
+impl fmt::Debug for FormatFns {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "FormatFns({:p}, {:p})",
+            Arc::as_ptr(&self.types),
+            Arc::as_ptr(&self.datatype)
+        )
+    }
+}
+
+#[doc(hidden)]
+pub trait IntoFormat {
+    fn into_format_fns(self) -> FormatFns;
+}
+
+impl<TypesFn, DataTypeFn> IntoFormat for (TypesFn, DataTypeFn)
+where
+    TypesFn: for<'a> Fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>
+        + Send
+        + Sync
+        + 'static,
+    DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>
+        + Send
+        + Sync
+        + 'static,
+{
+    fn into_format_fns(self) -> FormatFns {
+        FormatFns {
+            types: Arc::new(self.0),
+            datatype: Arc::new(self.1),
+        }
+    }
+}
+
+impl<F, TypesFn, DataTypeFn> IntoFormat for F
+where
+    F: FnOnce() -> (TypesFn, DataTypeFn),
+    TypesFn: for<'a> Fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>
+        + Send
+        + Sync
+        + 'static,
+    DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>
+        + Send
+        + Sync
+        + 'static,
+{
+    fn into_format_fns(self) -> FormatFns {
+        self().into_format_fns()
+    }
+}
 
 /// Swift language exporter.
 #[derive(Debug, Clone)]
@@ -25,6 +98,7 @@ pub struct Swift {
     pub optionals: OptionalStyle,
     /// Additional protocols to conform to.
     pub protocols: Vec<Cow<'static, str>>,
+    pub(crate) format: Option<FormatFns>,
 }
 
 /// Indentation style for generated Swift code.
@@ -83,6 +157,7 @@ impl Default for Swift {
             generics: GenericStyle::default(),
             optionals: OptionalStyle::default(),
             protocols: vec![],
+            format: None,
         }
     }
 }
@@ -129,20 +204,28 @@ impl Swift {
         self
     }
 
+    pub(crate) fn with_format(mut self, builder: impl IntoFormat) -> Self {
+        self.format = Some(builder.into_format_fns());
+        self
+    }
+
     /// Export types to a Swift string.
-    pub fn export(&self, types: &Types) -> Result<String> {
+    pub fn export(&self, types: &Types, format: impl IntoFormat) -> Result<String> {
+        let exporter = self.clone().with_format(format);
+        let formatted_types = exporter.format_types(types)?;
+        let raw_types = formatted_types.as_ref();
+
         let mut result = String::new();
-        let raw_types = types;
 
         // Add header
-        if !self.header.is_empty() {
-            result.push_str(&self.header);
+        if !exporter.header.is_empty() {
+            result.push_str(&exporter.header);
             result.push('\n');
         }
 
         // Add imports
         result.push_str("import Foundation\n");
-        for protocol in &self.protocols {
+        for protocol in &exporter.protocols {
             result.push_str(&format!("import {}\n", protocol));
         }
         result.push('\n');
@@ -154,7 +237,7 @@ impl Swift {
 
         // Export types
         for ndt in raw_types.into_sorted_iter() {
-            let exported = export_type(self, raw_types, ndt)?;
+            let exported = export_type(&exporter, raw_types, ndt)?;
             if !exported.is_empty() {
                 result.push_str(&exported);
                 result.push_str("\n\n");
@@ -165,10 +248,23 @@ impl Swift {
     }
 
     /// Export types to a file.
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types) -> Result<()> {
-        let content = self.export(types)?;
+    pub fn export_to(
+        &self,
+        path: impl AsRef<Path>,
+        types: &Types,
+        format: impl IntoFormat,
+    ) -> Result<()> {
+        let content = self.export(types, format)?;
         std::fs::write(path, content)?;
         Ok(())
+    }
+
+    pub(crate) fn format_types<'a>(&self, types: &'a Types) -> Result<Cow<'a, Types>> {
+        let Some(format) = &self.format else {
+            return Ok(Cow::Borrowed(types));
+        };
+
+        (format.types)(types).map_err(|err| Error::format("type graph formatter failed", err))
     }
 }
 

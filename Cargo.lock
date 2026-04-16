@@ -2007,7 +2007,6 @@ name = "specta-go"
 version = "0.0.2"
 dependencies = [
  "specta",
- "specta-serde",
 ]
 
 [[package]]

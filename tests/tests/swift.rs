@@ -2,20 +2,22 @@ use serde::{Deserialize, Serialize};
 use specta::{Type, Types};
 use specta_swift::Swift;
 
-fn phase_collections(types: Types) -> [(&'static str, Result<Types, specta_serde::Error>); 3] {
+fn phase_collections(
+    types: Types,
+) -> [(&'static str, Result<Types, specta_serde::FormatError>); 3] {
     [
         ("raw", Ok(types.clone())),
-        ("serde", specta_serde::apply(types.clone())),
-        ("serde_phases", specta_serde::apply_phases(types)),
+        ("serde", crate::serde(types.clone())),
+        ("serde_phases", crate::serde_phases(types)),
     ]
 }
 
-fn phase_output(types: Result<Types, specta_serde::Error>) -> String {
+fn phase_output(types: Result<Types, specta_serde::FormatError>) -> String {
     types.map_or_else(
         |err| format!("ERROR: {err}"),
         |types| {
             Swift::default()
-                .export(&types)
+                .export(&types, specta_serde::format)
                 .unwrap_or_else(|err| format!("ERROR: {err}"))
         },
     )
