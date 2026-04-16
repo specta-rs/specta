@@ -187,14 +187,7 @@ impl Swift {
         format: (TypesFn, DataTypeFn),
     ) -> Self
     where
-        TypesFn: for<'a> Fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>
-            + Send
-            + Sync
-            + 'static,
-        DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>
-            + Send
-            + Sync
-            + 'static,
+        (TypesFn, DataTypeFn): Into<FormatFns>,
     {
         self.format = Some(format.into());
         self
@@ -207,14 +200,7 @@ impl Swift {
         format: (TypesFn, DataTypeFn),
     ) -> Result<String>
     where
-        TypesFn: for<'a> Fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>
-            + Send
-            + Sync
-            + 'static,
-        DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>
-            + Send
-            + Sync
-            + 'static,
+        (TypesFn, DataTypeFn): Into<FormatFns>,
     {
         let exporter = self.clone().with_format(format);
         let formatted_types = exporter.format_types(types)?;
@@ -260,14 +246,7 @@ impl Swift {
         format: (TypesFn, DataTypeFn),
     ) -> Result<()>
     where
-        TypesFn: for<'a> Fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>
-            + Send
-            + Sync
-            + 'static,
-        DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>
-            + Send
-            + Sync
-            + 'static,
+        (TypesFn, DataTypeFn): Into<FormatFns>,
     {
         let content = self.export(types, format)?;
         std::fs::write(path, content)?;

@@ -1,11 +1,8 @@
 use std::{borrow::Cow, path::Path};
 
-use specta::{
-    Types,
-    datatype::DataType,
-};
+use specta::Types;
 
-use crate::{Branded, BrandedTypeExporter, Error, Exporter, FormatError, Layout};
+use crate::{Branded, BrandedTypeExporter, Error, Exporter, Layout, exporter::FormatFns};
 
 /// JSDoc language exporter.
 #[derive(Debug, Clone)]
@@ -82,14 +79,7 @@ impl Typescript {
         format: (TypesFn, DataTypeFn),
     ) -> Result<String, Error>
     where
-        TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError>
-            + Send
-            + Sync
-            + 'static,
-        DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError>
-            + Send
-            + Sync
-            + 'static,
+        (TypesFn, DataTypeFn): Into<FormatFns>,
     {
         self.0.export(types, format)
     }
@@ -106,14 +96,7 @@ impl Typescript {
         format: (TypesFn, DataTypeFn),
     ) -> Result<(), Error>
     where
-        TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError>
-            + Send
-            + Sync
-            + 'static,
-        DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError>
-            + Send
-            + Sync
-            + 'static,
+        (TypesFn, DataTypeFn): Into<FormatFns>,
     {
         self.0.export_to(path, types, format)
     }

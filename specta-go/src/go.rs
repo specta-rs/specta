@@ -101,14 +101,7 @@ impl Go {
         format: (TypesFn, DataTypeFn),
     ) -> Self
     where
-        TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError>
-            + Send
-            + Sync
-            + 'static,
-        DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError>
-            + Send
-            + Sync
-            + 'static,
+        (TypesFn, DataTypeFn): Into<FormatFns>,
     {
         self.format = Some(format.into());
         self
@@ -120,14 +113,7 @@ impl Go {
         format: (TypesFn, DataTypeFn),
     ) -> Result<String, Error>
     where
-        TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError>
-            + Send
-            + Sync
-            + 'static,
-        DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError>
-            + Send
-            + Sync
-            + 'static,
+        (TypesFn, DataTypeFn): Into<FormatFns>,
     {
         let mut ctx = GoContext::default();
         let mut body = String::new();
@@ -173,14 +159,7 @@ impl Go {
         format: (TypesFn, DataTypeFn),
     ) -> Result<(), Error>
     where
-        TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError>
-            + Send
-            + Sync
-            + 'static,
-        DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError>
-            + Send
-            + Sync
-            + 'static,
+        (TypesFn, DataTypeFn): Into<FormatFns>,
     {
         if self.layout == Layout::Files {
             return Err(Error::UnableToExport(Layout::Files));
