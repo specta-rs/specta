@@ -20,7 +20,7 @@ enum Status {
 fn test_basic_export() {
     let types = Types::default().register::<User>().register::<Status>();
     let swift = Swift::default();
-    let output = swift.export(&types, specta_swift::raw_format()).unwrap();
+    let output = swift.export(&types, specta_serde::format).unwrap();
 
     println!("Generated Swift code:\n{}", output);
 

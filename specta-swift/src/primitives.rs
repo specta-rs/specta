@@ -62,7 +62,28 @@ fn is_unit_payload(dt: &DataType) -> bool {
         return false;
     };
 
-    matches!(variant.fields, Fields::Unit)
+    match &variant.fields {
+        Fields::Unit => true,
+        Fields::Unnamed(fields) => fields.fields.is_empty(),
+        Fields::Named(fields) => fields.fields.is_empty(),
+    }
+}
+
+fn enum_payload_to_swift_type(
+    swift: &Swift,
+    types: &Types,
+    payload: &DataType,
+    generic_scope: &[Generic],
+) -> Result<String> {
+    Ok(match payload {
+        DataType::Tuple(tuple) if tuple.elements.len() > 1 => tuple
+            .elements
+            .iter()
+            .map(|element| datatype_to_swift(swift, types, element, generic_scope.to_vec(), None))
+            .collect::<std::result::Result<Vec<_>, _>>()?
+            .join(", "),
+        _ => datatype_to_swift(swift, types, payload, generic_scope.to_vec(), None)?,
+    })
 }
 
 fn should_emit_variant_wrapper(variant_name: &str, variant: &Variant) -> bool {
@@ -209,7 +230,8 @@ pub fn export_type(
 
             // Generate custom Codable implementation for enums with struct variants
             if has_struct_variants {
-                let codable_impl = generate_enum_codable_impl(swift, e, &name)?;
+                let codable_impl =
+                    generate_enum_codable_impl(swift, types, e, generic_scope.clone(), &name)?;
                 result.push_str(&codable_impl);
             }
         }
@@ -650,29 +672,12 @@ fn enum_to_swift(
                     if is_unit_payload(payload) {
                         result.push_str(&format!("    case {}\n", variant_name));
                     } else {
-                        let payload_ty = match payload {
-                            DataType::Tuple(tuple) if tuple.elements.len() > 1 => tuple
-                                .elements
-                                .iter()
-                                .map(|element| {
-                                    datatype_to_swift(
-                                        swift,
-                                        types,
-                                        element,
-                                        generic_scope.clone(),
-                                        None,
-                                    )
-                                })
-                                .collect::<std::result::Result<Vec<_>, _>>()?
-                                .join(", "),
-                            _ => datatype_to_swift(
-                                swift,
-                                types,
-                                payload,
-                                generic_scope.clone(),
-                                None,
-                            )?,
-                        };
+                        let payload_ty = enum_payload_to_swift_type(
+                            swift,
+                            types,
+                            payload,
+                            &generic_scope,
+                        )?;
                         result.push_str(&format!("    case {}({})\n", variant_name, payload_ty));
                     }
                 } else {
@@ -873,7 +878,9 @@ fn generic_to_swift(
 /// Generate custom Codable implementation for enums with struct-like variants
 fn generate_enum_codable_impl(
     swift: &Swift,
+    types: &Types,
     e: &specta::datatype::Enum,
+    generic_scope: Vec<Generic>,
     enum_name: &str,
 ) -> Result<String> {
     let mut result = String::new();
@@ -943,15 +950,37 @@ fn generate_enum_codable_impl(
                 }
             }
             specta::datatype::Fields::Named(_) => {
-                let pascal_variant_name = to_pascal_case(original_variant_name.as_ref());
-                let struct_name = format!("{}{}Data", enum_name, pascal_variant_name);
+                if should_emit_variant_wrapper(original_variant_name, variant) {
+                    let pascal_variant_name = to_pascal_case(original_variant_name.as_ref());
+                    let struct_name = format!("{}{}Data", enum_name, pascal_variant_name);
 
-                result.push_str(&format!("        case .{}:\n", swift_case_name));
-                result.push_str(&format!(
-                    "            let data = try container.decode({}.self, forKey: .{})\n",
-                    struct_name, swift_case_name
-                ));
-                result.push_str(&format!("            self = .{}(data)\n", swift_case_name));
+                    result.push_str(&format!("        case .{}:\n", swift_case_name));
+                    result.push_str(&format!(
+                        "            let data = try container.decode({}.self, forKey: .{})\n",
+                        struct_name, swift_case_name
+                    ));
+                    result.push_str(&format!("            self = .{}(data)\n", swift_case_name));
+                } else {
+                    let payload = serde_variant_payload(original_variant_name, variant)
+                        .expect("serde payload variants should contain a payload");
+
+                    result.push_str(&format!("        case .{}:\n", swift_case_name));
+                    if is_unit_payload(payload) {
+                        result.push_str(&format!("            self = .{}\n", swift_case_name));
+                    } else {
+                        let payload_ty = enum_payload_to_swift_type(
+                            swift,
+                            types,
+                            payload,
+                            &generic_scope,
+                        )?;
+                        result.push_str(&format!(
+                            "            let data = try container.decode({}.self, forKey: .{})\n",
+                            payload_ty, swift_case_name
+                        ));
+                        result.push_str(&format!("            self = .{}(data)\n", swift_case_name));
+                    }
+                }
             }
         }
     }
@@ -994,11 +1023,30 @@ fn generate_enum_codable_impl(
                 );
             }
             specta::datatype::Fields::Named(_) => {
-                result.push_str(&format!("        case .{}(let data):\n", swift_case_name));
-                result.push_str(&format!(
-                    "            try container.encode(data, forKey: .{})\n",
-                    swift_case_name
-                ));
+                if should_emit_variant_wrapper(original_variant_name, variant) {
+                    result.push_str(&format!("        case .{}(let data):\n", swift_case_name));
+                    result.push_str(&format!(
+                        "            try container.encode(data, forKey: .{})\n",
+                        swift_case_name
+                    ));
+                } else {
+                    let payload = serde_variant_payload(original_variant_name, variant)
+                        .expect("serde payload variants should contain a payload");
+
+                    if is_unit_payload(payload) {
+                        result.push_str(&format!("        case .{}:\n", swift_case_name));
+                        result.push_str(&format!(
+                            "            try container.encodeNil(forKey: .{})\n",
+                            swift_case_name
+                        ));
+                    } else {
+                        result.push_str(&format!("        case .{}(let data):\n", swift_case_name));
+                        result.push_str(&format!(
+                            "            try container.encode(data, forKey: .{})\n",
+                            swift_case_name
+                        ));
+                    }
+                }
             }
         }
     }

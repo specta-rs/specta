@@ -19,7 +19,7 @@ struct WithChrono {
 fn test_uuid_support() {
     let types = Types::default().register::<WithUuid>();
     let swift = Swift::default();
-    let output = swift.export(&types, specta_swift::raw_format()).unwrap();
+    let output = swift.export(&types, specta_serde::format).unwrap();
 
     println!("UUID support test:\n{}", output);
 
@@ -32,7 +32,7 @@ fn test_uuid_support() {
 fn test_chrono_support() {
     let types = Types::default().register::<WithChrono>();
     let swift = Swift::default();
-    let output = swift.export(&types, specta_swift::raw_format()).unwrap();
+    let output = swift.export(&types, specta_serde::format).unwrap();
 
     println!("Chrono support test:\n{}", output);
 

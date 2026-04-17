@@ -72,7 +72,7 @@ fn main() {
 
     let swift = Swift::default();
     swift
-        .export_to("./Types.swift", &types, specta_swift::raw_format())
+        .export_to("./Types.swift", &types, specta_serde::format)
         .unwrap();
 }
 ```
@@ -247,7 +247,7 @@ let swift = Swift::new()
 let swift = Swift::new()
     .add_protocol("CustomDebugStringConvertible");
 
-let output = swift.export(&types, specta_swift::raw_format()).unwrap();
+let output = swift.export(&types, specta_serde::format).unwrap();
 ```
 
 ## Type Mapping

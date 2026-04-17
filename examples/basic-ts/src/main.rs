@@ -6,7 +6,6 @@ use specta::{
     datatype::{DataType, Reference},
 };
 use specta_typescript::Typescript;
-use std::borrow::Cow;
 use std::convert::TryFrom;
 
 #[derive(Serialize, Type)]

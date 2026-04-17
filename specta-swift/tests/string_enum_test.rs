@@ -25,21 +25,20 @@ fn test_string_enum_generation() {
     let swift = Swift::default();
     let serde_resolved = Types::default().register::<JobStatus>();
     let raw_resolved = Types::default().register::<RegularEnum>();
-    let string_output = swift.export(&serde_resolved, specta_swift::raw_format()).unwrap();
-    let raw_output = swift.export(&raw_resolved, specta_swift::raw_format()).unwrap();
+    let string_output = swift.export(&serde_resolved, specta_serde::format).unwrap();
+    let raw_output = swift.export(&raw_resolved, specta_serde::format).unwrap();
 
     println!("String enum test output:\n{}", string_output);
     println!("Regular enum test output:\n{}", raw_output);
 
-    assert!(string_output.contains("enum JobStatus: Codable"));
-    assert!(string_output.contains("case completed"));
-    assert!(string_output.contains("case running"));
-    assert!(string_output.contains("case failed"));
-    assert!(string_output.contains("case pendingApproval"));
+    assert!(string_output.contains("enum JobStatus: String, Codable"));
+    assert!(string_output.contains("case completed = \"completed\""));
+    assert!(string_output.contains("case running = \"running\""));
+    assert!(string_output.contains("case failed = \"failed\""));
+    assert!(string_output.contains("case pendingApproval = \"pending_approval\""));
 
-    // RegularEnum should stay a raw Specta enum without serde preprocessing.
-    assert!(raw_output.contains("enum RegularEnum: Codable"));
-    assert!(raw_output.contains("case option1"));
-    assert!(raw_output.contains("case option2"));
-    assert!(raw_output.contains("case option3"));
+    assert!(raw_output.contains("enum RegularEnum: String, Codable"));
+    assert!(raw_output.contains("case option1 = \"Option1\""));
+    assert!(raw_output.contains("case option2 = \"Option2\""));
+    assert!(raw_output.contains("case option3 = \"Option3\""));
 }

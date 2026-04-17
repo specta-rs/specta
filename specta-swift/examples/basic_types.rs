@@ -119,7 +119,7 @@ fn main() {
 
     // Export with default settings
     let swift = Swift::default();
-    let output = swift.export(&types, specta_swift::raw_format()).unwrap();
+    let output = swift.export(&types, specta_serde::format).unwrap();
 
     println!("📝 Generated Swift code:\n");
     println!("{}", output);
@@ -129,7 +129,7 @@ fn main() {
         .export_to(
             "./examples/generated/BasicTypes.swift",
             &types,
-            specta_swift::raw_format(),
+            specta_serde::format,
         )
         .unwrap();
     println!("✅ Basic types exported to BasicTypes.swift");
