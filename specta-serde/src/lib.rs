@@ -500,7 +500,7 @@ fn apply_phases(types: Types) -> Result<Types, Error> {
 /// let mut types = Types::default();
 /// let dt = Filters::definition(&mut types);
 /// let format = format_phases;
-/// let resolved = (format.format_types)(&types)
+/// let resolved = (format.map_types)(&types)
 ///     .expect("format_phases should succeed")
 ///     .into_owned();
 ///

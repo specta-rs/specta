@@ -386,7 +386,7 @@ impl Zod {
 }
 
 fn format_types<'a>(types: &'a Types, format: &Format) -> Result<Cow<'a, Types>, Error> {
-    let mapped_types = (format.format_types)(types)
+    let mapped_types = (format.map_types)(types)
         .map_err(|err| Error::format("type graph formatter failed", err))?;
     Ok(Cow::Owned(
         map_types_for_datatype_format(mapped_types.as_ref(), Some(format))?.into_owned(),
@@ -402,7 +402,7 @@ fn map_datatype_format(
         return Ok(dt.clone());
     };
 
-    let mapped = (format.format_dt)(types, dt)
+    let mapped = (format.map_type)(types, dt)
         .map_err(|err| Error::format("datatype formatter failed", err))?;
 
     match mapped {

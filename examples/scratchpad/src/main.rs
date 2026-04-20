@@ -50,8 +50,8 @@ fn main() {
     // );
     // println!("{:?}", {
     //     let format = specta_serde::format_phases;
-    //     let mapped_types = (format.format_types)(&types).unwrap();
-    //     let mapped_dt = (format.format_dt)(&types, &dt).unwrap();
+    //     let mapped_types = (format.map_types)(&types).unwrap();
+    //     let mapped_dt = (format.map_type)(&types, &dt).unwrap();
     //     specta_typescript::primitives::inline(
     //         &specta_typescript::Typescript::new(),
     //         mapped_types.as_ref(),

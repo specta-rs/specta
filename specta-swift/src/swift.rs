@@ -187,8 +187,7 @@ impl Swift {
             return Ok(Cow::Borrowed(types));
         };
 
-        (format.format_types)(types)
-            .map_err(|err| Error::format("type graph formatter failed", err))
+        (format.map_types)(types).map_err(|err| Error::format("type graph formatter failed", err))
     }
 }
 
