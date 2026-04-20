@@ -2,6 +2,7 @@
 source: tests/tests/typescript.rs
 expression: output
 ---
+
 Issue374: {
 	foo?: boolean,
 	bar?: boolean,

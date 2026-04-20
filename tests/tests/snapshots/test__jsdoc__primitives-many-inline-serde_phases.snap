@@ -2,6 +2,7 @@
 source: tests/tests/jsdoc.rs
 expression: output
 ---
+
 /**
 	*  https://github.com/specta-rs/specta/issues/374
 	*

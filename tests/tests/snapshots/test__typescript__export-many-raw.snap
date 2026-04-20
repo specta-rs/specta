@@ -2,6 +2,7 @@
 source: tests/tests/typescript.rs
 expression: output
 ---
+
 export type Range<T> = {
 	start: T,
 	end: T,

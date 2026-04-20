@@ -2,6 +2,7 @@
 source: tests/tests/typescript.rs
 expression: output
 ---
+
 i8: number
 i16: number
 i32: number

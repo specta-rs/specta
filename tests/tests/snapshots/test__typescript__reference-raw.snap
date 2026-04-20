@@ -2,6 +2,7 @@
 source: tests/tests/typescript.rs
 expression: output
 ---
+
 Range<i32>: {
 	start: number,
 	end: number,

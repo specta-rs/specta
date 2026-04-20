@@ -2,6 +2,7 @@
 source: tests/tests/typescript.rs
 expression: output
 ---
+
 Issue374: Issue374_Serialize
 Optional: Optional_Serialize
 StructPhaseSpecificRename: StructPhaseSpecificRenameSerialize

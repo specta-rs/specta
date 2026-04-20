@@ -2,6 +2,7 @@
 source: tests/tests/jsdoc.rs
 expression: output
 ---
+
 /**
 	* @typedef {{
 	*		start: T,
