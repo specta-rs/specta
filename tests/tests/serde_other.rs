@@ -39,12 +39,8 @@ fn serde_other_requires_format_phases() {
 
 #[test]
 fn serde_other_internal_tag_widens_deserialize_tag_to_string() {
-    let format = specta_serde::format_phases;
-    let types = (format.format_types)(&Types::default().register::<InternalOther>())
-        .map(|types| types.into_owned())
-        .expect("format_phases should support internally tagged #[serde(other)] enums");
     let ts = Typescript::default()
-        .export(&types, crate::identity_format)
+        .export(&Types::default().register::<InternalOther>(), specta_serde::format_phases)
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-other-internal-tag-typescript", ts);
@@ -52,12 +48,8 @@ fn serde_other_internal_tag_widens_deserialize_tag_to_string() {
 
 #[test]
 fn serde_other_adjacent_tag_widens_deserialize_tag_to_string() {
-    let format = specta_serde::format_phases;
-    let types = (format.format_types)(&Types::default().register::<AdjacentOther>())
-        .map(|types| types.into_owned())
-        .expect("format_phases should support adjacently tagged #[serde(other)] enums");
     let ts = Typescript::default()
-        .export(&types, crate::identity_format)
+        .export(&Types::default().register::<AdjacentOther>(), specta_serde::format_phases)
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-other-adjacent-tag-typescript", ts);

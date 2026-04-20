@@ -565,7 +565,7 @@ fn map_named_datatype_format(
     ndt: &NamedDataType,
 ) -> Result<NamedDataType, Error> {
     let mut mapped = ndt.clone();
-    mapped.ty = map_datatype_format(format, types, &ndt.ty)?;
+    mapped.ty = map_datatype_format_children(format, types, ndt.ty.clone())?;
     Ok(mapped)
 }
 
@@ -584,8 +584,8 @@ fn map_types_for_datatype_format<'a>(
             return;
         }
 
-        match map_datatype_format(format, types, &ndt.ty) {
-            Ok(mapped) => ndt.ty = mapped,
+        match map_named_datatype_format(format, types, ndt) {
+            Ok(mapped) => *ndt = mapped,
             Err(err) => map_err = Some(err),
         }
     });

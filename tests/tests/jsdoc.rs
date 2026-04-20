@@ -45,34 +45,51 @@ mod jsdoc_export_to_files_runtime_imports_types {
     }
 }
 
-fn phase_collections(types: Types) -> [(&'static str, Result<Types, specta::FormatError>); 3] {
-    let serde_format = specta_serde::format;
-    let serde_phases_format = specta_serde::format_phases;
+#[derive(Clone, Copy)]
+enum PhaseCollection {
+    Raw,
+    Serde,
+    SerdePhases,
+}
+
+impl PhaseCollection {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Raw => "raw",
+            Self::Serde => "serde",
+            Self::SerdePhases => "serde_phases",
+        }
+    }
+
+    fn export_jsdoc(self, types: &Types) -> Result<String, specta_typescript::Error> {
+        let _ = self;
+        JSDoc::default().export(types, crate::identity_format)
+    }
+}
+
+fn phase_collections(types: Types) -> [(PhaseCollection, Types); 3] {
+    let serde_types = (specta_serde::format.format_types)(&types)
+        .map(|types| types.into_owned())
+        .expect("serde formatting should succeed for shared JSDoc fixtures");
+    let serde_phases_types = (specta_serde::format_phases.format_types)(&types)
+        .map(|types| types.into_owned())
+        .expect("serde phase formatting should succeed for shared JSDoc fixtures");
 
     [
-        ("raw", Ok(types.clone())),
-        (
-            "serde",
-            (serde_format.format_types)(&types.clone()).map(|types| types.into_owned()),
-        ),
-        (
-            "serde_phases",
-            (serde_phases_format.format_types)(&types).map(|types| types.into_owned()),
-        ),
+        (PhaseCollection::Raw, types.clone()),
+        (PhaseCollection::Serde, serde_types),
+        (PhaseCollection::SerdePhases, serde_phases_types),
     ]
 }
 
 #[test]
 fn export() {
     for (mode, types) in phase_collections(crate::types().0) {
-        let output = match types {
-            Ok(types) => JSDoc::default()
-                .export(&types, crate::identity_format)
-                .unwrap(),
-            Err(err) => format!("ERROR: {err}"),
-        };
+        let output = mode
+            .export_jsdoc(&types)
+            .unwrap_or_else(|err| format!("ERROR: {err}"));
 
-        insta::assert_snapshot!(format!("inline-{mode}"), output);
+        insta::assert_snapshot!(format!("inline-{}", mode.name()), output);
     }
 }
 
@@ -81,23 +98,21 @@ fn primitives_export_many() {
     let (types, dts) = crate::types();
 
     for (mode, types) in phase_collections(types) {
-        let output = match types {
-            Ok(types) => {
-                let jsdoc = JSDoc::default();
-                let ndts = dts
-                    .iter()
-                    .filter_map(|(_, ty)| match ty {
-                        DataType::Reference(Reference::Named(r)) => r.get(&types),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>();
+        let output = {
+            let jsdoc = JSDoc::default();
+            let ndts = dts
+                .iter()
+                .filter_map(|(_, ty)| match ty {
+                    DataType::Reference(Reference::Named(r)) => r.get(&types),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
 
-                primitives::export(&jsdoc, &types, ndts.into_iter(), "").unwrap()
-            }
-            Err(err) => format!("ERROR: {err}"),
+            primitives::export(&jsdoc, &types, ndts.into_iter(), "")
+                .unwrap_or_else(|err| format!("ERROR: {err}"))
         };
 
-        insta::assert_snapshot!(format!("primitives-many-inline-{mode}"), output);
+        insta::assert_snapshot!(format!("primitives-many-inline-{}", mode.name()), output);
     }
 }
 

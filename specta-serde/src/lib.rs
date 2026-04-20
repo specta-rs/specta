@@ -211,12 +211,9 @@ fn map_phases_datatype<'a>(
     types: &'a Types,
     dt: &'a DataType,
 ) -> Result<Cow<'a, DataType>, FormatError> {
-    validate::validate_datatype_for_mode(dt, types, validate::ApplyMode::Phases)?;
-    Ok(Cow::Owned(select_phase_datatype(
-        dt,
-        types,
-        Phase::Serialize,
-    )))
+    let selected = select_phase_datatype(dt, types, Phase::Serialize);
+    validate::validate_datatype_for_mode_shallow(&selected, types, validate::ApplyMode::Phases)?;
+    Ok(Cow::Owned(selected))
 }
 
 /// Applies serde-aware rewrites to a single shared type graph.

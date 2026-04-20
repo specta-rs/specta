@@ -26,6 +26,7 @@ pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<(), Error> {
             &ndt.generics,
             ndt.name.to_string(),
             mode,
+            true,
         )?;
     }
 
@@ -37,7 +38,29 @@ pub(crate) fn validate_datatype_for_mode(
     types: &Types,
     mode: ApplyMode,
 ) -> Result<(), Error> {
-    validate_datatype_with_generics_for_mode(dt, types, &[], "<top-level>".to_string(), mode)
+    validate_datatype_with_generics_for_mode(
+        dt,
+        types,
+        &[],
+        "<top-level>".to_string(),
+        mode,
+        true,
+    )
+}
+
+pub(crate) fn validate_datatype_for_mode_shallow(
+    dt: &DataType,
+    types: &Types,
+    mode: ApplyMode,
+) -> Result<(), Error> {
+    validate_datatype_with_generics_for_mode(
+        dt,
+        types,
+        &[],
+        "<top-level>".to_string(),
+        mode,
+        false,
+    )
 }
 
 fn validate_datatype_with_generics_for_mode(
@@ -46,6 +69,7 @@ fn validate_datatype_with_generics_for_mode(
     generics: &[Generic],
     path: String,
     mode: ApplyMode,
+    follow_named_references: bool,
 ) -> Result<(), Error> {
     let generics = generics
         .iter()
@@ -58,7 +82,15 @@ fn validate_datatype_with_generics_for_mode(
         })
         .collect::<Vec<_>>();
 
-    inner(dt, types, &generics, &mut HashSet::new(), path, mode)
+    inner(
+        dt,
+        types,
+        &generics,
+        &mut HashSet::new(),
+        path,
+        mode,
+        follow_named_references,
+    )
 }
 
 fn inner(
@@ -68,9 +100,18 @@ fn inner(
     checked_references: &mut HashSet<Reference>,
     path: String,
     mode: ApplyMode,
+    follow_named_references: bool,
 ) -> Result<(), Error> {
     match dt {
-        DataType::Nullable(ty) => inner(ty, types, generics, checked_references, path, mode)?,
+        DataType::Nullable(ty) => inner(
+            ty,
+            types,
+            generics,
+            checked_references,
+            path,
+            mode,
+            follow_named_references,
+        )?,
         DataType::Map(map) => {
             inner(
                 map.key_ty(),
@@ -79,6 +120,7 @@ fn inner(
                 checked_references,
                 format!("{path}.<map_key>"),
                 mode,
+                follow_named_references,
             )?;
             inner(
                 map.value_ty(),
@@ -87,6 +129,7 @@ fn inner(
                 checked_references,
                 format!("{path}.<map_value>"),
                 mode,
+                follow_named_references,
             )?;
         }
         DataType::List(list) => {
@@ -97,6 +140,7 @@ fn inner(
                 checked_references,
                 format!("{path}.<list_item>"),
                 mode,
+                follow_named_references,
             )?;
         }
         DataType::Struct(strct) => {
@@ -156,6 +200,7 @@ fn inner(
                             checked_references,
                             format!("{path}[{idx}]"),
                             mode,
+                            follow_named_references,
                         )?;
                     }
                 }
@@ -179,6 +224,7 @@ fn inner(
                             checked_references,
                             format!("{path}.{name}"),
                             mode,
+                            follow_named_references,
                         )?;
                     }
                 }
@@ -225,10 +271,11 @@ fn inner(
                                 ty,
                                 types,
                                 generics,
-                                checked_references,
-                                format!("{path}::{variant_name}.{name}"),
-                                mode,
-                            )?;
+                            checked_references,
+                            format!("{path}::{variant_name}.{name}"),
+                            mode,
+                            follow_named_references,
+                        )?;
                         }
                     }
                     Fields::Unnamed(unnamed) => {
@@ -254,10 +301,11 @@ fn inner(
                                 ty,
                                 types,
                                 generics,
-                                checked_references,
-                                format!("{path}::{variant_name}[{idx}]"),
-                                mode,
-                            )?;
+                            checked_references,
+                            format!("{path}::{variant_name}[{idx}]"),
+                            mode,
+                            follow_named_references,
+                        )?;
                         }
                     }
                 }
@@ -272,6 +320,7 @@ fn inner(
                     checked_references,
                     format!("{path}[{idx}]"),
                     mode,
+                    follow_named_references,
                 )?;
             }
         }
@@ -285,10 +334,13 @@ fn inner(
                         checked_references,
                         format!("{path}.<generic>"),
                         mode,
+                        follow_named_references,
                     )?;
                 }
 
-                if !checked_references.contains(&Reference::Named(reference.clone())) {
+                if follow_named_references
+                    && !checked_references.contains(&Reference::Named(reference.clone()))
+                {
                     let reference_key = Reference::Named(reference.clone());
                     checked_references.insert(reference_key);
                     if let Some(ndt) = reference.get(types) {
@@ -300,6 +352,7 @@ fn inner(
                             checked_references,
                             ndt.name.to_string(),
                             mode,
+                            follow_named_references,
                         )?;
                     }
                 }
@@ -325,6 +378,7 @@ fn inner(
                     checked_references,
                     format!("{path}.<generic_ref>"),
                     mode,
+                    follow_named_references,
                 )?;
             }
             Reference::Opaque(reference) => {
@@ -343,6 +397,7 @@ fn inner(
                         checked_references,
                         format!("{path}.<phased_serialize>"),
                         mode,
+                        follow_named_references,
                     )?;
                     inner(
                         &phased.deserialize,
@@ -351,6 +406,7 @@ fn inner(
                         checked_references,
                         format!("{path}.<phased_deserialize>"),
                         mode,
+                        follow_named_references,
                     )?;
                 }
             }
@@ -452,6 +508,7 @@ fn validate_container_attributes(
                     checked_references,
                     format!("{path}.{suffix}"),
                     mode,
+                    true,
                 )?;
             }
         }
