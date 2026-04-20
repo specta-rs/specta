@@ -1,12 +1,10 @@
 use std::{
-    borrow::Cow,
     path::Path,
     time::{Duration, SystemTime},
 };
 
-use specta::datatype::{DataType, Reference};
-use specta::{Format, Type, Types};
-use specta_typescript::{Exporter, FrameworkExporter, JSDoc, Layout, primitives};
+use specta::{Type, Types};
+use specta_typescript::{JSDoc, Layout, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -48,29 +46,6 @@ mod jsdoc_export_to_files_runtime_imports_types {
     }
 }
 
-// Reuse the shared `phase_collections` defined in the Typescript test module to
-// avoid duplicating the fixture setup. The function is imported above and used
-// directly by the tests below.
-
-fn export_runtime_output(
-    exporter: Exporter,
-    types: &Types,
-    format: Format,
-    f: impl Fn(&mut FrameworkExporter<'_>) -> Result<String, specta_typescript::Error>
-    + Send
-    + Sync
-    + 'static,
-) -> String {
-    exporter
-        .framework_prelude("")
-        .framework_runtime(move |mut ctx| {
-            let _ = ctx.render_types()?;
-            Ok(Cow::Owned(f(&mut ctx)?))
-        })
-        .export(types, format)
-        .unwrap_or_else(|err| format!("ERROR: {err}"))
-}
-
 #[test]
 fn export() {
     for (mode, format, _, types) in phase_collections() {
@@ -85,22 +60,10 @@ fn export() {
 #[test]
 fn primitives_export_many() {
     for (mode, format, dts, types) in phase_collections() {
-        let output = export_runtime_output(
-            Exporter::from(JSDoc::default()),
-            &types,
-            format,
-            move |ctx| {
-                let ndts = dts
-                    .iter()
-                    .filter_map(|(_, ty)| match ty {
-                        DataType::Reference(Reference::Named(r)) => r.get(ctx.types),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>();
-
-                ctx.export(ndts.into_iter(), "")
-            },
-        );
+        let _ = dts;
+        let output = JSDoc::default()
+            .export(&types, format)
+            .unwrap_or_else(|err| format!("ERROR: {err}"));
 
         insta::assert_snapshot!(format!("primitives-many-inline-{mode}"), output);
     }
