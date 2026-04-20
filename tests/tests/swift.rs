@@ -4,7 +4,7 @@ use specta_swift::Swift;
 
 fn phase_collections(
     types: Types,
-) -> [(&'static str, Result<Types, specta_serde::FormatError>); 3] {
+) -> [(&'static str, Result<Types, specta::FormatError>); 3] {
     let serde_format = specta_serde::format;
     let serde_phases_format = specta_serde::format_phases;
 
@@ -21,7 +21,7 @@ fn phase_collections(
     ]
 }
 
-fn phase_output(types: Result<Types, specta_serde::FormatError>) -> String {
+fn phase_output(types: Result<Types, specta::FormatError>) -> String {
     types.map_or_else(
         |err| format!("ERROR: {err}"),
         |types| {

@@ -87,7 +87,7 @@ fn typescript_types() -> (Types, Vec<(&'static str, DataType)>) {
 
 fn phase_collections() -> [(
     &'static str,
-    Result<(Vec<(&'static str, DataType)>, Types), specta_serde::FormatError>,
+    Result<(Vec<(&'static str, DataType)>, Types), specta::FormatError>,
 ); 3] {
     let serde_format = specta_serde::format;
     let serde_phases_format = specta_serde::format_phases;
@@ -124,7 +124,7 @@ fn phase_collections() -> [(
 }
 
 fn phase_output(
-    result: Result<(Vec<(&'static str, DataType)>, Types), specta_serde::FormatError>,
+    result: Result<(Vec<(&'static str, DataType)>, Types), specta::FormatError>,
     f: impl FnOnce(&[(&'static str, DataType)], &Types) -> Result<String, String>,
 ) -> String {
     result.map_or_else(

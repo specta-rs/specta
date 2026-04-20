@@ -52,7 +52,7 @@ fn identifier_format_phases_exports_deserialize_union() {
 
     insta::assert_snapshot!("serde-identifiers-variant-typescript", variant_ts);
 
-    let field_types = map_types(&Types::default().register::<FieldIdentifier>())
+    let field_types = (format.format_types)(&Types::default().register::<FieldIdentifier>())
         .map(|types| types.into_owned())
         .expect("field_identifier should be supported by format_phases");
     let field_ts = Typescript::default()
