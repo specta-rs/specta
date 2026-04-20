@@ -114,23 +114,6 @@ fn typescript_export_serde_errors() {
             ("serde", specta_serde::format),
             ("serde_phases", specta_serde::format_phases),
         ] {
-            // let types = (format.format_types)(&registered_types).map(|types| types.into_owned());
-
-            // let types = match types {
-            //     Ok(types) => types,
-            //     Err(err) => {
-            //         assert_expected_error(failures, name, mode, "apply", expected_error, err);
-            //         continue;
-            //     }
-            // };
-
-            // let validate = (format.format_dt)(&types, &dt);
-
-            // if let Err(err) = validate {
-            //     assert_expected_error(failures, name, mode, "validate", expected_error, err);
-            //     continue;
-            // }
-
             match Typescript::default().export(&types, format) {
                 Ok(_) => failures.push(format!(
                     "{name} ({mode}) [export]: expected error containing '{expected_error}', but export succeeded"
