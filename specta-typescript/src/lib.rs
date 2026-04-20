@@ -2,31 +2,19 @@
 //!
 //! # Usage
 //!
-//! Add `specta` and `specta-typescript` to your project:
+//! Add `specta`, `specta-serde`, and `specta-typescript` to your project:
 //!
 //! ```bash
 //! cargo add specta@2.0.0-rc.24 --features derive,collect
-//! cargo add specta-typescript@0.0.11
 //! cargo add specta-serde@0.0.11
+//! cargo add specta-typescript@0.0.11
 //! ```
 //!
 //! Next copy the following into your `main.rs` file:
 //!
 //! ```rust
-//! use std::borrow::Cow;
-//! use specta::{Format, Type, Types};
+//! use specta::{Type, Types};
 //! use specta_typescript::Typescript;
-//!
-//! fn raw_types<'a>(types: &'a Types) -> Result<Cow<'a, Types>, specta::FormatError> {
-//!     Ok(Cow::Borrowed(types))
-//! }
-//!
-//! fn raw_datatype<'a>(
-//!     _types: &'a Types,
-//!     ty: &'a specta::datatype::DataType,
-//! ) -> Result<Cow<'a, specta::datatype::DataType>, specta::FormatError> {
-//!     Ok(Cow::Borrowed(ty))
-//! }
 //!
 //! #[derive(Type)]
 //! pub struct MyType {
@@ -46,7 +34,7 @@
 //!     .export_to(
 //!         "./bindings.ts",
 //!         &types,
-//!         Format::new(raw_types, raw_datatype),
+//!         specta_serde::format,
 //!     )
 //!     .unwrap();
 //! ```

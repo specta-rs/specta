@@ -28,7 +28,6 @@ use crate::{
 ///  - Ensuring all referenced types are exported
 ///  - Handling multiple type with overlapping names
 ///  - Transforming the type for your serialization format (Eg. Serde)
-///  - Keeping the provided [`Types`] graph and [`NamedDataType`] values mapped consistently
 ///
 /// We recommend passing in your types in bulk instead of doing individual calls as it leaves formatting to us and also allows us to merge the JSDoc types into a single large comment.
 ///
@@ -173,7 +172,7 @@ fn export_single_internal(
 /// Note that calling this method with a tagged struct or enum may cause the tag to not be exported.
 /// The type should be wrapped in a [`NamedDataType`] to provide a proper name.
 ///
-/// When using custom formatting, you are responsible for mapping this top-level datatype in the
+/// You are responsible for apply Serde or other format mapping to the top-level datatype in the
 /// same way as the [`Types`] graph before calling this helper.
 ///
 pub fn inline(
@@ -514,8 +513,6 @@ fn jsdoc_description(docs: &str, deprecated: Option<&Deprecated>) -> Option<Stri
 /// For primitives this will include the literal type but for named type it will contain a reference.
 ///
 /// See [`export`] for the list of things to consider when using this.
-/// When using custom formatting, you are responsible for mapping this top-level reference in the
-/// same way as the [`Types`] graph before calling this helper.
 pub fn reference(
     exporter: &dyn AsRef<Exporter>,
     types: &Types,
