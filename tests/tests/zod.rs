@@ -1,8 +1,8 @@
-use std::{borrow::Cow, iter, path::Path};
+use std::{iter, path::Path};
 
 use serde::{Deserialize, Serialize};
 use specta::{
-    Format, Type, Types,
+    Type, Types,
     datatype::{DataType, NamedDataType, Primitive, Reference},
 };
 use specta_typescript::Typescript;
@@ -50,7 +50,7 @@ enum EnumWithInlineStructWithBigInt {
 
 #[derive(Type)]
 struct Recursive {
-    child: Option<Box<Recursive>>,
+    children: Vec<Recursive>,
 }
 
 #[derive(Type)]
@@ -118,54 +118,6 @@ fn temp_root() -> std::path::PathBuf {
     temp_root
 }
 
-fn zod_raw_map_types(types: &Types) -> Result<std::borrow::Cow<'_, Types>, specta::FormatError> {
-    Ok(std::borrow::Cow::Borrowed(types))
-}
-
-fn zod_raw_map_datatype<'a>(
-    _types: &'a Types,
-    dt: &'a DataType,
-) -> Result<std::borrow::Cow<'a, DataType>, specta::FormatError> {
-    Ok(std::borrow::Cow::Borrowed(dt))
-}
-
-#[allow(non_upper_case_globals)]
-const zod_raw_format: Format = Format::new(zod_raw_map_types, zod_raw_map_datatype);
-
-fn zod_identity_types<'a>(types: &'a Types) -> Result<Cow<'a, Types>, specta::FormatError> {
-    Ok(Cow::Borrowed(types))
-}
-
-fn zod_map_bool_to_string<'a>(
-    _: &'a Types,
-    dt: &'a DataType,
-) -> Result<Cow<'a, DataType>, specta::FormatError> {
-    Ok(match dt {
-        DataType::Primitive(Primitive::bool) => Cow::Owned(DataType::Primitive(Primitive::str)),
-        _ => Cow::Borrowed(dt),
-    })
-}
-
-fn zod_map_reference_to_string<'a>(
-    _: &'a Types,
-    dt: &'a DataType,
-) -> Result<Cow<'a, DataType>, specta::FormatError> {
-    Ok(match dt {
-        DataType::Reference(Reference::Named(_)) => Cow::Owned(DataType::Primitive(Primitive::str)),
-        _ => Cow::Borrowed(dt),
-    })
-}
-
-fn zod_error_on_bool<'a>(
-    _: &'a Types,
-    dt: &'a DataType,
-) -> Result<Cow<'a, DataType>, specta::FormatError> {
-    match dt {
-        DataType::Primitive(Primitive::bool) => Err(std::io::Error::other("boom").into()),
-        _ => Ok(Cow::Borrowed(dt)),
-    }
-}
-
 #[test]
 fn zod_export_smoke() {
     #[derive(Type)]
@@ -183,7 +135,7 @@ fn zod_export_smoke() {
     let types = Types::default().register::<Demo>();
     let out = Zod::default()
         .bigint(BigIntExportBehavior::Number)
-        .export(&types, zod_raw_format)
+        .export(&types, specta_serde::format)
         .unwrap();
 
     assert!(out.contains("import { z } from \"zod\";"));
@@ -235,97 +187,6 @@ fn zod_bigint_export_behaviors() {
 }
 
 #[test]
-fn zod_framework_inline_applies_datatype_mapping() {
-    #[derive(Type)]
-    #[specta(collect = false)]
-    struct Nested {
-        value: bool,
-    }
-
-    #[derive(Type)]
-    #[specta(collect = false)]
-    struct Container {
-        direct: bool,
-        list: Vec<bool>,
-        tuple: (bool, Option<bool>),
-        #[specta(inline)]
-        nested: Nested,
-    }
-
-    let mut types = Types::default();
-    let dt = Container::definition(&mut types);
-    let DataType::Reference(Reference::Named(reference)) = dt else {
-        panic!("expected named reference");
-    };
-    let ty = reference.get(&types).unwrap().ty.clone();
-
-    let rendered = Zod::default()
-        .framework_runtime(move |ctx| Ok(ctx.inline(&ty)?.into()))
-        .export(
-            &types,
-            Format::new(zod_identity_types, zod_map_bool_to_string),
-        )
-        .unwrap();
-
-    assert!(rendered.contains("z.string()"), "{rendered}");
-    assert!(!rendered.contains("z.boolean()"), "{rendered}");
-}
-
-#[test]
-fn zod_framework_reference_and_export_apply_datatype_mapping() {
-    #[derive(Type)]
-    #[specta(collect = false)]
-    struct Demo {
-        value: bool,
-    }
-
-    let mut types = Types::default();
-    let reference = Demo::definition(&mut types);
-    let DataType::Reference(Reference::Named(reference)) = reference else {
-        panic!("expected named reference");
-    };
-    let ndt = reference.get(&types).unwrap().clone();
-
-    let reference_rendered = Zod::default()
-        .framework_runtime({
-            let reference = reference.clone();
-            move |ctx| Ok(ctx.reference(&Reference::Named(reference.clone()))?.into())
-        })
-        .export(
-            &types,
-            Format::new(zod_identity_types, zod_map_reference_to_string),
-        )
-        .unwrap();
-    assert!(
-        reference_rendered.contains("z.string()"),
-        "{reference_rendered}"
-    );
-
-    let export_rendered = Zod::default()
-        .framework_runtime(move |ctx| Ok(ctx.export(iter::once(&ndt), "")?.into()))
-        .export(
-            &types,
-            Format::new(zod_identity_types, zod_map_bool_to_string),
-        )
-        .unwrap();
-    assert!(export_rendered.contains("z.string()"), "{export_rendered}");
-}
-
-#[test]
-fn zod_framework_datatype_mapping_errors_bubble_out() {
-    let types = Types::default();
-    let err = Zod::default()
-        .framework_runtime(|ctx| Ok(ctx.inline(&DataType::Primitive(Primitive::bool))?.into()))
-        .export(&types, Format::new(zod_identity_types, zod_error_on_bool))
-        .unwrap_err();
-
-    assert_eq!(
-        err.to_string(),
-        "Framework error: datatype formatter failed: boom"
-    );
-}
-
-#[test]
 fn zod_bigint_errors_propagate_from_nested_types() {
     for err in [
         export_for::<StructWithBigInt>(),
@@ -344,12 +205,12 @@ fn zod_bigint_errors_propagate_from_nested_types() {
 #[test]
 fn zod_layout_duplicate_typenames() {
     let types = Types::default().register::<Testing>().register::<Another>();
-    let err = Zod::default().export(&types, zod_raw_format).unwrap_err();
+    let err = Zod::default().export(&types, specta_serde::format).unwrap_err();
     assert!(err.to_string().contains("Detected multiple types"));
 
     let module_prefixed = Zod::default()
         .layout(Layout::ModulePrefixedName)
-        .export(&types, zod_raw_format)
+        .export(&types, specta_serde::format)
         .unwrap();
     assert!(module_prefixed.contains("TestingSchema"));
     assert!(module_prefixed.contains("testing2"));
@@ -363,7 +224,7 @@ fn zod_layout_files_export_to() {
 
     Zod::default()
         .layout(Layout::Files)
-        .export_to(&path, &types, zod_raw_format)
+        .export_to(&path, &types, specta_serde::format)
         .unwrap();
 
     let output = crate::fs_to_string(Path::new(&path)).unwrap();
@@ -374,16 +235,8 @@ fn zod_layout_files_export_to() {
 #[test]
 fn zod_uses_serde_transformed_resolved_types() {
     let types = Types::default().register::<SerdeTaggedEnum>();
-
-    let raw_out = Zod::default()
-        .export(
-            &Types::default().register::<SerdeTaggedEnum>(),
-            zod_raw_format,
-        )
-        .unwrap();
     let serde_out = Zod::default().export(&types, specta_serde::format).unwrap();
 
-    assert_ne!(raw_out, serde_out);
     assert!(serde_out.contains("type: z.literal(\"unit\")"));
     assert!(serde_out.contains("type: z.literal(\"string_value\")"));
     assert!(serde_out.contains("data: z.string()"));
@@ -419,7 +272,7 @@ fn zod_layout_files_preserves_unrelated_typescript_files() {
 
     Zod::default()
         .layout(Layout::Files)
-        .export_to(&path, &types, zod_raw_format)
+        .export_to(&path, &types, specta_serde::format)
         .unwrap();
 
     assert!(keep_path.exists());
@@ -456,7 +309,9 @@ fn typescript_layout_files_preserves_unrelated_typescript_files() {
 #[test]
 fn zod_recursive_types_use_lazy() {
     let types = Types::default().register::<Recursive>();
-    let out = Zod::default().export(&types, zod_raw_format).unwrap();
+    let out = Zod::default()
+        .export(&types, specta_serde::format_phases)
+        .unwrap();
     assert!(out.contains("z.lazy(() => RecursiveSchema)"));
 }
 
@@ -465,7 +320,7 @@ fn zod_reserved_type_name_errors() {
     let mut types = Types::default();
     NamedDataType::new("class", Vec::new(), DataType::Primitive(Primitive::i8))
         .register(&mut types);
-    let err = Zod::default().export(&types, zod_raw_format).unwrap_err();
+    let err = Zod::default().export(&types, specta_serde::format).unwrap_err();
     assert!(err.to_string().contains("reserved keyword"));
 }
 
@@ -474,7 +329,7 @@ fn zod_layout_files_errors_on_export() {
     let types = Types::default();
     let err = Zod::default()
         .layout(Layout::Files)
-        .export(&types, zod_raw_format)
+        .export(&types, specta_serde::format)
         .unwrap_err();
     assert!(err.to_string().contains("Unable to export layout Files"));
 }
@@ -485,5 +340,5 @@ fn temp_dir() -> TempDir {
 
 fn export_for<T: Type>() -> Result<String, specta_zod::Error> {
     let types = Types::default().register::<T>();
-    Zod::default().export(&types, zod_raw_format)
+    Zod::default().export(&types, specta_serde::format)
 }

@@ -364,6 +364,10 @@ fn inner(
             Reference::Generic(generic) => {
                 let Some((_, ty)) = generics.iter().find(|(candidate, _)| candidate == generic)
                 else {
+                    if !follow_named_references {
+                        return Ok(());
+                    }
+
                     return Err(Error::unresolved_generic_reference(
                         path,
                         format!("{generic:?}"),
