@@ -102,11 +102,10 @@
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet, VecDeque},
-    error::Error as StdError,
 };
 
 use specta::{
-    Format, Types,
+    Format, FormatError, Types,
     datatype::{
         DataType, Enum, Field, Fields, NamedDataType, Primitive, Reference, Struct, Tuple,
         UnnamedFields, Variant,
@@ -126,9 +125,6 @@ use phased::PhasedTy;
 
 pub use error::Error;
 pub use phased::{Phased, phased};
-
-/// Error type returned by serde format helpers.
-pub type FormatError = Box<dyn StdError + Send + Sync + 'static>;
 
 /// Selects which directional type shape to use with [`format_phases`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -226,14 +222,39 @@ fn map_phases_datatype<'a>(
     )))
 }
 
-/// Formatter helpers for unified serde mode.
+/// Applies serde-aware rewrites to a single shared type graph.
+///
+/// Use this when the serialized and deserialized wire shape can be represented
+/// by the same exported schema. Exporters should pass this formatter to Specta's
+/// formatting hook, for example
+/// `specta_typescript::Typescript::default().export(&types, specta_serde::format)`.
+///
+/// This formatter validates the graph for unified export and applies serde
+/// container, variant, and field behavior that affects the exported shape, such
+/// as renames, tagging, defaults, flattening, and compatible conversion attrs.
+///
+/// If serde metadata produces different serialize and deserialize shapes, this
+/// formatter returns an error instead of guessing. In that case, use
+/// [`format_phases`].
 #[allow(non_upper_case_globals)]
 pub const format: Format = Format::new(map_types, map_datatype);
 
-/// Formatter helpers for split-phase serde mode.
+/// Applies serde-aware rewrites while preserving separate serialize and
+/// deserialize shapes.
 ///
-/// The type graph is expanded to include both `*_Serialize` and `*_Deserialize`
-/// named types. Inline datatype rendering selects the serialize-facing shape.
+/// Use this when serde metadata makes the wire format directional, such as
+/// asymmetric renames, directional skips, `#[serde(with = ...)]`-style codecs,
+/// `#[serde(into = ...)]`/`#[serde(from = ...)]`, or explicit [`Phased`]
+/// overrides.
+///
+/// Exporters should pass this formatter to Specta's formatting hook, for
+/// example
+/// `specta_typescript::Typescript::default().export(&types, specta_serde::format_phases)`.
+///
+/// The transformed type graph includes `*_Serialize` and `*_Deserialize` named
+/// types for definitions that need to diverge, while unchanged definitions stay
+/// shared. Inline datatype rendering uses the serialize-facing shape; use
+/// [`select_phase_datatype`] to inspect either direction explicitly.
 #[allow(non_upper_case_globals)]
 pub const format_phases: Format = Format::new(map_phases_types, map_phases_datatype);
 
