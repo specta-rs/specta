@@ -10,7 +10,7 @@ use specta::{
     Format, Type, Types,
     datatype::{DataType, Primitive, Reference, Tuple},
 };
-use specta_typescript::{Layout, Typescript, branded, primitives};
+use specta_typescript::{Exporter, Layout, Typescript, branded, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -784,7 +784,7 @@ fn primitives_format_datatype_hook_is_recursive() {
 
     let mut types = Types::default();
     let dt = Container::definition(&mut types);
-    let rendered = Typescript::default()
+    let rendered = Exporter::from(Typescript::default())
         .framework_runtime(move |ctx| Ok(ctx.inline(&dt)?.into()))
         .export(&types, Format::new(identity_types, map_bool_to_string))
         .unwrap();
@@ -798,7 +798,7 @@ fn primitives_format_datatype_hook_is_recursive() {
 #[test]
 fn primitives_format_datatype_hook_can_return_owned_types() {
     let types = Types::default();
-    let rendered = Typescript::default()
+    let rendered = Exporter::from(Typescript::default())
         .framework_runtime(|ctx| Ok(ctx.inline(&DataType::Primitive(Primitive::bool))?.into()))
         .export(&types, Format::new(identity_types, map_bool_to_null_tuple))
         .unwrap();
@@ -820,7 +820,7 @@ fn primitives_reference_format_datatype_hook_can_replace_reference() {
         panic!("expected named reference");
     };
 
-    let rendered = Typescript::default()
+    let rendered = Exporter::from(Typescript::default())
         .framework_runtime(move |ctx| Ok(ctx.reference(&reference)?.into()))
         .export(&types, Format::new(identity_types, map_reference_to_string))
         .unwrap();
@@ -842,7 +842,7 @@ fn primitives_export_format_datatype_hook_updates_named_bodies() {
         panic!("expected named reference");
     };
     let ndt = reference.get(&types).unwrap().clone();
-    let rendered = Typescript::default()
+    let rendered = Exporter::from(Typescript::default())
         .framework_runtime(move |ctx| Ok(ctx.export(iter::once(&ndt), "")?.into()))
         .export(&types, Format::new(identity_types, map_bool_to_string))
         .unwrap();
@@ -853,7 +853,7 @@ fn primitives_export_format_datatype_hook_updates_named_bodies() {
 #[test]
 fn primitives_format_datatype_hook_errors_bubble_out() {
     let types = Types::default();
-    let err = Typescript::default()
+    let err = Exporter::from(Typescript::default())
         .framework_runtime(|ctx| Ok(ctx.inline(&DataType::Primitive(Primitive::bool))?.into()))
         .export(&types, Format::new(identity_types, error_on_bool))
         .unwrap_err();
