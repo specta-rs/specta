@@ -11,18 +11,7 @@ use tempfile::TempDir;
 
 use crate::fs_to_string;
 
-fn identity_types(types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
-    Ok(Cow::Borrowed(types))
-}
-
-fn identity_datatype<'a>(
-    _: &'a Types,
-    dt: &'a DataType,
-) -> Result<Cow<'a, DataType>, specta::FormatError> {
-    Ok(Cow::Borrowed(dt))
-}
-
-const IDENTITY_FORMAT: Format = Format::new(identity_types, identity_datatype);
+use specta_tests::typescript::{PhaseCollection, phase_collections};
 
 mod jsdoc_export_to_files_runtime_imports_types {
     use super::*;
@@ -59,28 +48,9 @@ mod jsdoc_export_to_files_runtime_imports_types {
     }
 }
 
-type PhaseCollection = (&'static str, Format, Vec<(&'static str, DataType)>, Types);
-
-fn phase_collections() -> [PhaseCollection; 3] {
-    let (types, dts) = crate::types();
-    let (phased_types, phased_dts) = {
-        let (mut types2, mut dts2) = crate::types_phased();
-        types2.extend(&types);
-        dts2.extend(dts.iter().cloned());
-        (types2, dts2)
-    };
-
-    [
-        ("raw", IDENTITY_FORMAT, dts.clone(), types.clone()),
-        ("serde", specta_serde::format, dts, types),
-        (
-            "serde_phases",
-            specta_serde::format_phases,
-            phased_dts,
-            phased_types,
-        ),
-    ]
-}
+// Reuse the shared `phase_collections` defined in the Typescript test module to
+// avoid duplicating the fixture setup. The function is imported above and used
+// directly by the tests below.
 
 fn export_runtime_output(
     exporter: Exporter,
