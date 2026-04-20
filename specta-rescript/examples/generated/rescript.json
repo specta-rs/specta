@@ -1,0 +1,16 @@
+{
+  "name": "specta-rescript-generated",
+  "sources": [
+    {
+      "dir": ".",
+      "subdirs": false
+    }
+  ],
+  "package-specs": [
+    {
+      "module": "esmodule",
+      "in-source": false
+    }
+  ],
+  "suffix": ".mjs"
+}
