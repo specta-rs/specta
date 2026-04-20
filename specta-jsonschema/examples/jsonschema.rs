@@ -1,6 +1,17 @@
 use specta::{Type, Types};
 use specta_jsonschema::{JsonSchema, SchemaVersion};
 
+fn raw_map_types(types: &Types) -> Result<std::borrow::Cow<'_, Types>, specta::FormatError> {
+    Ok(std::borrow::Cow::Borrowed(types))
+}
+
+fn raw_map_datatype<'a>(
+    _types: &'a Types,
+    dt: &'a specta::datatype::DataType,
+) -> Result<std::borrow::Cow<'a, specta::datatype::DataType>, specta::FormatError> {
+    Ok(std::borrow::Cow::Borrowed(dt))
+}
+
 #[derive(Type)]
 pub struct User {
     pub id: u32,
@@ -37,7 +48,7 @@ fn main() {
         .schema_version(SchemaVersion::Draft7)
         .title("My API Types")
         .description("JSON Schema for my API types")
-        .export(&types)
+        .export(&types, specta::Format::new(raw_map_types, raw_map_datatype))
         .unwrap();
 
     println!("{}", schema);

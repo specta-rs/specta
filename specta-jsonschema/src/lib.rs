@@ -34,7 +34,7 @@
 //!     // Export to JSON Schema
 //!     let schema = JsonSchema::default()
 //!         .schema_version(SchemaVersion::Draft7)
-//!         .export(&types)
+//!         .export(&types, specta::Format::new(|types| Ok(types.into()), |_, dt| Ok(dt.into())))
 //!         .unwrap();
 //!
 //!     println!("{}", schema);
@@ -62,7 +62,7 @@
 //!     let format = specta_serde::format;
 //!     let serde_types = (format.format_types)(&types).unwrap();
 //!     JsonSchema::default()
-//!         .export_to("./schema.json", serde_types.as_ref())
+//!         .export_to("./schema.json", serde_types.as_ref(), format)
 //!         .unwrap();
 //! }
 //! ```
@@ -93,13 +93,21 @@
 //! // Single file with all types in $defs
 //! JsonSchema::default()
 //!     .layout(Layout::SingleFile)
-//!     .export_to("./schema.json", &types)
+//!     .export_to(
+//!         "./schema.json",
+//!         &types,
+//!         specta::Format::new(|types| Ok(types.into()), |_, dt| Ok(dt.into())),
+//!     )
 //!     .unwrap();
 //!
 //! // Separate file per type, organized by module
 //! JsonSchema::default()
 //!     .layout(Layout::Files)
-//!     .export_to("./schemas/", &types)
+//!     .export_to(
+//!         "./schemas/",
+//!         &types,
+//!         specta::Format::new(|types| Ok(types.into()), |_, dt| Ok(dt.into())),
+//!     )
 //!     .unwrap();
 //! ```
 

@@ -17,14 +17,17 @@ type TypesFormatFn = Arc<
         + Sync,
 >;
 type DataTypeFormatFn = Arc<
-    dyn for<'a> Fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, specta::FormatError>
+    dyn for<'a> Fn(
+            &'a Types,
+            &'a DataType,
+        ) -> std::result::Result<Cow<'a, DataType>, specta::FormatError>
         + Send
         + Sync,
 >;
 
 #[derive(Clone)]
 #[doc(hidden)]
-pub struct FormatFns {
+pub(crate) struct FormatFns {
     pub(crate) types: TypesFormatFn,
     pub(crate) datatype: DataTypeFormatFn,
 }

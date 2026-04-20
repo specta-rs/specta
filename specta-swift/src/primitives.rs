@@ -508,14 +508,18 @@ fn contains_generic_reference(dt: &DataType) -> bool {
 fn fields_contain_generic_reference(fields: &Fields) -> bool {
     match fields {
         Fields::Unit => false,
-        Fields::Unnamed(unnamed) => unnamed
-            .fields
-            .iter()
-            .any(|field| field.ty.as_ref().is_some_and(|ty| contains_generic_reference(ty))),
-        Fields::Named(named) => named
-            .fields
-            .iter()
-            .any(|(_, field)| field.ty.as_ref().is_some_and(|ty| contains_generic_reference(ty))),
+        Fields::Unnamed(unnamed) => unnamed.fields.iter().any(|field| {
+            field
+                .ty
+                .as_ref()
+                .is_some_and(|ty| contains_generic_reference(ty))
+        }),
+        Fields::Named(named) => named.fields.iter().any(|(_, field)| {
+            field
+                .ty
+                .as_ref()
+                .is_some_and(|ty| contains_generic_reference(ty))
+        }),
     }
 }
 
@@ -758,8 +762,8 @@ fn enum_to_swift(
             }
             specta::datatype::Fields::Unnamed(fields) => {
                 if is_string_enum {
-                    let raw_value =
-                        enum_string_raw_value(variant).unwrap_or_else(|| original_variant_name.as_ref());
+                    let raw_value = enum_string_raw_value(variant)
+                        .unwrap_or_else(|| original_variant_name.as_ref());
                     result.push_str(&format!("    case {} = \"{}\"\n", variant_name, raw_value));
                 } else if fields.fields.len() == 1
                     && fields.fields[0]
@@ -1132,7 +1136,8 @@ fn generate_enum_codable_impl(
                             "            let data = try container.decode({}.self, forKey: .{})\n",
                             payload_ty, swift_case_name
                         ));
-                        result.push_str(&format!("            self = .{}(data)\n", swift_case_name));
+                        result
+                            .push_str(&format!("            self = .{}(data)\n", swift_case_name));
                     }
                 }
             }

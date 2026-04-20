@@ -56,7 +56,7 @@ type DataTypeFormatFn = Arc<
 
 #[derive(Clone)]
 #[doc(hidden)]
-pub struct FormatFns {
+pub(crate) struct FormatFns {
     pub(crate) types: TypesFormatFn,
     pub(crate) datatype: DataTypeFormatFn,
 }
@@ -264,7 +264,12 @@ impl Exporter {
     /// When configured when `format` is `Format::Files`, you must provide a directory path.
     /// Otherwise, you must provide the path of a single file.
     ///
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types, format: Format) -> Result<(), Error> {
+    pub fn export_to(
+        &self,
+        path: impl AsRef<Path>,
+        types: &Types,
+        format: Format,
+    ) -> Result<(), Error> {
         let format = format.into();
         let exporter = self.with_export_format(&format);
         let formatted_types = format_types(types, &format)?;

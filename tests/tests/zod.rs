@@ -118,9 +118,7 @@ fn temp_root() -> std::path::PathBuf {
     temp_root
 }
 
-fn zod_raw_map_types(
-    types: &Types,
-) -> Result<std::borrow::Cow<'_, Types>, specta::FormatError> {
+fn zod_raw_map_types(types: &Types) -> Result<std::borrow::Cow<'_, Types>, specta::FormatError> {
     Ok(std::borrow::Cow::Borrowed(types))
 }
 
@@ -318,10 +316,7 @@ fn zod_framework_datatype_mapping_errors_bubble_out() {
     let types = Types::default();
     let err = Zod::default()
         .framework_runtime(|ctx| Ok(ctx.inline(&DataType::Primitive(Primitive::bool))?.into()))
-        .export(
-            &types,
-            Format::new(zod_identity_types, zod_error_on_bool),
-        )
+        .export(&types, Format::new(zod_identity_types, zod_error_on_bool))
         .unwrap_err();
 
     assert_eq!(

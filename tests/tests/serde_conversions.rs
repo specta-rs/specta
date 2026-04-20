@@ -313,9 +313,10 @@ fn field_only_phased_override_requires_format_phases() {
     assert!(raw_err.to_string().contains("unsupported opaque reference"));
 
     let format = specta_serde::format_phases;
-    let phased_types = (format.format_types)(&Types::default().register::<FieldOnlyPhasedOverride>())
-        .map(|types| types.into_owned())
-        .expect("format_phases should accept phased field overrides");
+    let phased_types =
+        (format.format_types)(&Types::default().register::<FieldOnlyPhasedOverride>())
+            .map(|types| types.into_owned())
+            .expect("format_phases should accept phased field overrides");
     Typescript::default()
         .export(&phased_types, crate::raw_format)
         .expect("phased export should remove phased opaque references");

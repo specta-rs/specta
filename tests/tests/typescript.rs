@@ -58,7 +58,10 @@ struct BrandedReferenceInner {
     value: bool,
 }
 
-fn error_on_bool<'a>(_: &'a Types, dt: &'a DataType) -> Result<Cow<'a, DataType>, specta::FormatError> {
+fn error_on_bool<'a>(
+    _: &'a Types,
+    dt: &'a DataType,
+) -> Result<Cow<'a, DataType>, specta::FormatError> {
     match dt {
         DataType::Primitive(Primitive::bool) => Err(std::io::Error::other("boom").into()),
         _ => Ok(Cow::Borrowed(dt)),
@@ -171,8 +174,11 @@ fn typescript_export_serde_errors() {
             let serde_phases_format = specta_serde::format_phases;
 
             let types = match mode {
-                "serde" => (serde_format.format_types)(&types.clone()).map(|types| types.into_owned()),
-                _ => (serde_phases_format.format_types)(&types.clone()).map(|types| types.into_owned()),
+                "serde" => {
+                    (serde_format.format_types)(&types.clone()).map(|types| types.into_owned())
+                }
+                _ => (serde_phases_format.format_types)(&types.clone())
+                    .map(|types| types.into_owned()),
             };
 
             let types = match types {
@@ -780,10 +786,7 @@ fn primitives_format_datatype_hook_is_recursive() {
     let dt = Container::definition(&mut types);
     let rendered = Typescript::default()
         .framework_runtime(move |ctx| Ok(ctx.inline(&dt)?.into()))
-        .export(
-            &types,
-            Format::new(identity_types, map_bool_to_string),
-        )
+        .export(&types, Format::new(identity_types, map_bool_to_string))
         .unwrap();
 
     assert!(rendered.contains("direct: string"), "{rendered}");
@@ -797,10 +800,7 @@ fn primitives_format_datatype_hook_can_return_owned_types() {
     let types = Types::default();
     let rendered = Typescript::default()
         .framework_runtime(|ctx| Ok(ctx.inline(&DataType::Primitive(Primitive::bool))?.into()))
-        .export(
-            &types,
-            Format::new(identity_types, map_bool_to_null_tuple),
-        )
+        .export(&types, Format::new(identity_types, map_bool_to_null_tuple))
         .unwrap();
 
     assert!(rendered.contains("\n\nnull\n"), "{rendered}");
@@ -822,10 +822,7 @@ fn primitives_reference_format_datatype_hook_can_replace_reference() {
 
     let rendered = Typescript::default()
         .framework_runtime(move |ctx| Ok(ctx.reference(&reference)?.into()))
-        .export(
-            &types,
-            Format::new(identity_types, map_reference_to_string),
-        )
+        .export(&types, Format::new(identity_types, map_reference_to_string))
         .unwrap();
 
     assert!(rendered.contains("\n\nstring\n"), "{rendered}");
@@ -847,10 +844,7 @@ fn primitives_export_format_datatype_hook_updates_named_bodies() {
     let ndt = reference.get(&types).unwrap().clone();
     let rendered = Typescript::default()
         .framework_runtime(move |ctx| Ok(ctx.export(iter::once(&ndt), "")?.into()))
-        .export(
-            &types,
-            Format::new(identity_types, map_bool_to_string),
-        )
+        .export(&types, Format::new(identity_types, map_bool_to_string))
         .unwrap();
 
     assert!(rendered.contains("value: string"), "{rendered}");
@@ -861,10 +855,7 @@ fn primitives_format_datatype_hook_errors_bubble_out() {
     let types = Types::default();
     let err = Typescript::default()
         .framework_runtime(|ctx| Ok(ctx.inline(&DataType::Primitive(Primitive::bool))?.into()))
-        .export(
-            &types,
-            Format::new(identity_types, error_on_bool),
-        )
+        .export(&types, Format::new(identity_types, error_on_bool))
         .unwrap_err();
 
     assert_eq!(
@@ -884,10 +875,7 @@ fn branded_type_exporter_inline_applies_datatype_mapping() {
     let types = Types::default().register::<Demo>();
     let rendered = Typescript::default()
         .branded_type_impl(|ctx, branded| Ok(ctx.inline(branded.ty())?.into()))
-        .export(
-            &types,
-            Format::new(identity_types, map_bool_to_string),
-        )
+        .export(&types, Format::new(identity_types, map_bool_to_string))
         .unwrap();
 
     assert!(rendered.contains("value: string"), "{rendered}");
@@ -907,10 +895,7 @@ fn branded_type_exporter_reference_applies_datatype_mapping() {
             DataType::Reference(reference) => Ok(ctx.reference(reference)?.into()),
             dt => Ok(ctx.inline(dt)?.into()),
         })
-        .export(
-            &types,
-            Format::new(identity_types, map_reference_to_string),
-        )
+        .export(&types, Format::new(identity_types, map_reference_to_string))
         .unwrap();
 
     assert!(rendered.contains("value: string"), "{rendered}");

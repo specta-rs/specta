@@ -20,7 +20,7 @@ type DataTypeFormatFn = Arc<
 
 #[derive(Clone)]
 #[doc(hidden)]
-pub struct FormatFns {
+pub(crate) struct FormatFns {
     pub(crate) types: TypesFormatFn,
     pub(crate) datatype: DataTypeFormatFn,
 }
@@ -134,7 +134,12 @@ impl Go {
         Ok(out)
     }
 
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types, format: Format) -> Result<(), Error> {
+    pub fn export_to(
+        &self,
+        path: impl AsRef<Path>,
+        types: &Types,
+        format: Format,
+    ) -> Result<(), Error> {
         if self.layout == Layout::Files {
             return Err(Error::UnableToExport(Layout::Files));
         }

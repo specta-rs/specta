@@ -24,9 +24,21 @@ pub enum Error {
     #[error("Unable to convert schema: {0}")]
     ConversionError(String),
 
+    #[error("Format error: {message}: {source}")]
+    Format {
+        message: &'static str,
+        source: specta::FormatError,
+    },
+
     #[error("Unsupported DataType: {0}")]
     UnsupportedDataType(String),
 
     #[error("Invalid reference: {0}")]
     InvalidReference(String),
+}
+
+impl Error {
+    pub(crate) fn format(message: &'static str, source: specta::FormatError) -> Self {
+        Self::Format { message, source }
+    }
 }

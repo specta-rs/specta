@@ -82,7 +82,12 @@ impl Typescript {
     /// When configured when `format` is `Format::Files`, you must provide a directory path.
     /// Otherwise, you must provide the path of a single file.
     ///
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types, format: Format) -> Result<(), Error> {
+    pub fn export_to(
+        &self,
+        path: impl AsRef<Path>,
+        types: &Types,
+        format: Format,
+    ) -> Result<(), Error> {
         self.0.export_to(path, types, format)
     }
 }

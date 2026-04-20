@@ -202,10 +202,7 @@ fn map_phases_types(types: &Types) -> Result<Cow<'_, Types>, FormatError> {
     Ok(Cow::Owned(apply_phases(types.clone())?))
 }
 
-fn map_datatype<'a>(
-    types: &'a Types,
-    dt: &'a DataType,
-) -> Result<Cow<'a, DataType>, FormatError> {
+fn map_datatype<'a>(types: &'a Types, dt: &'a DataType) -> Result<Cow<'a, DataType>, FormatError> {
     validate::validate_datatype_for_mode(dt, types, validate::ApplyMode::Unified)?;
     Ok(Cow::Borrowed(dt))
 }
@@ -1416,7 +1413,10 @@ fn resolve_phased_type(
     })
 }
 
-fn conversion_datatype_for_mode(ty: &DataType, mode: PhaseRewrite) -> Result<Option<DataType>, Error> {
+fn conversion_datatype_for_mode(
+    ty: &DataType,
+    mode: PhaseRewrite,
+) -> Result<Option<DataType>, Error> {
     let attrs = match ty {
         DataType::Struct(s) => &s.attributes,
         DataType::Enum(e) => &e.attributes,
@@ -1488,7 +1488,10 @@ fn deserialize_conversion_name(attrs: Option<&SerdeContainerAttrs>) -> Option<St
     })
 }
 
-fn transform_external_variant(serialized_name: String, variant: &Variant) -> Result<Variant, Error> {
+fn transform_external_variant(
+    serialized_name: String,
+    variant: &Variant,
+) -> Result<Variant, Error> {
     let skipped_only_unnamed = match &variant.fields {
         Fields::Unnamed(unnamed) => unnamed_fields_all_skipped(unnamed),
         Fields::Unit | Fields::Named(_) => false,
@@ -2015,7 +2018,10 @@ fn collect_fields_dependencies(
     Ok(())
 }
 
-fn build_from_original(original: &NamedDataType, mode: PhaseRewrite) -> Result<NamedDataType, Error> {
+fn build_from_original(
+    original: &NamedDataType,
+    mode: PhaseRewrite,
+) -> Result<NamedDataType, Error> {
     let mut ndt = original.clone_ty();
     ndt.name = Cow::Owned(split_type_name(original, mode)?);
 

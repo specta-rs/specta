@@ -24,7 +24,7 @@ type DataTypeFormatFn = Arc<
 
 #[derive(Clone)]
 #[doc(hidden)]
-pub struct FormatFns {
+pub(crate) struct FormatFns {
     pub(crate) types: TypesFormatFn,
     pub(crate) datatype: DataTypeFormatFn,
 }
@@ -203,7 +203,12 @@ impl Zod {
     }
 
     /// Export the types to a specific file/folder.
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types, format: Format) -> Result<(), Error> {
+    pub fn export_to(
+        &self,
+        path: impl AsRef<Path>,
+        types: &Types,
+        format: Format,
+    ) -> Result<(), Error> {
         let format = format.into();
         let exporter = self.clone();
         let formatted_types = format_types(types, &format)?;
