@@ -19,7 +19,6 @@ type DataTypeFormatFn = Arc<
 >;
 
 #[derive(Clone)]
-#[doc(hidden)]
 pub(crate) struct FormatFns {
     pub(crate) types: TypesFormatFn,
     pub(crate) datatype: DataTypeFormatFn,
