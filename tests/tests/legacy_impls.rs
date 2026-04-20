@@ -116,7 +116,7 @@ fn legacy_impls() {
         Typescript::default()
             .export(
                 &Types::default().register::<LegacyImpls>(),
-                crate::identity_format
+                specta_serde::format
             )
             .unwrap()
     );
@@ -127,7 +127,7 @@ fn legacy_impl_bigint_errors() {
     let err = Typescript::default()
         .export(
             &Types::default().register::<LegacyImplWithBigints>(),
-            crate::identity_format,
+            specta_serde::format,
         )
         .expect_err("bigint glam vectors should fail TypeScript export");
 
@@ -141,8 +141,7 @@ fn legacy_impl_bigint_errors() {
 #[test]
 fn legacy_impl_individual_bigint_errors() {
     fn assert_bigint_export_error<T: Type>(failures: &mut Vec<String>, name: &str) {
-        match Typescript::default()
-            .export(&Types::default().register::<T>(), crate::identity_format)
+        match Typescript::default().export(&Types::default().register::<T>(), specta_serde::format)
         {
             Ok(output) => failures.push(format!(
                 "{name}: expected BigInt export error, but export succeeded with '{output}'"
@@ -151,6 +150,24 @@ fn legacy_impl_individual_bigint_errors() {
                 if err
                     .to_string()
                     .contains("forbids exporting BigInt-style types") => {}
+            Err(err) => failures.push(format!("{name}: unexpected error '{err}'")),
+        }
+    }
+
+    fn assert_bigint_or_invalid_map_key_error<T: Type>(failures: &mut Vec<String>, name: &str) {
+        match Typescript::default().export(&Types::default().register::<T>(), specta_serde::format)
+        {
+            Ok(output) => failures.push(format!(
+                "{name}: expected BigInt or invalid map key error, but export succeeded with '{output}'"
+            )),
+            Err(err)
+                if err
+                    .to_string()
+                    .contains("forbids exporting BigInt-style types") => {}
+            Err(err)
+                if err
+                    .to_string()
+                    .contains("Invalid map key") => {}
             Err(err) => failures.push(format!("{name}: unexpected error '{err}'")),
         }
     }
@@ -211,7 +228,8 @@ fn legacy_impl_individual_bigint_errors() {
         ),
         (
             "serde_yaml::Mapping",
-            assert_bigint_export_error::<SerdeYamlMappingBigint> as fn(&mut Vec<String>, &str),
+            assert_bigint_or_invalid_map_key_error::<SerdeYamlMappingBigint>
+                as fn(&mut Vec<String>, &str),
         ),
         (
             "serde_yaml::value::TaggedValue",

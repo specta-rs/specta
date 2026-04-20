@@ -470,6 +470,10 @@ fn map_datatype_format(
     types: &Types,
     dt: &DataType,
 ) -> Result<DataType, Error> {
+    if matches!(dt, DataType::Reference(Reference::Generic(_))) {
+        return Ok(dt.clone());
+    }
+
     let Some(format) = format else {
         return Ok(dt.clone());
     };

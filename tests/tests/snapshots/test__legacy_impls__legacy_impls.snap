@@ -31,7 +31,7 @@ export type LegacyImpls = {
 	chrono_fixed_offset: string,
 	chrono_utc: string,
 	chrono_local: string,
-	either: number | string,
+	either: ({ Left: number }) & { Right?: never } | ({ Right: string }) & { Left?: never },
 	error_stack_report: Report,
 	error_stack_multi_report: Report,
 	glam_affine2: [number, number, number, number, number, number],

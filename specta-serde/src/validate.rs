@@ -343,14 +343,18 @@ fn inner(
                 {
                     let reference_key = Reference::Named(reference.clone());
                     checked_references.insert(reference_key);
-                    if let Some(ndt) = reference.get(types) {
+                    if let Some(ty) = reference.ty(types) {
                         let merged_generics = merged_generics(generics, &reference.generics);
+                        let name = reference
+                            .get(types)
+                            .map(|ndt| ndt.name.to_string())
+                            .unwrap_or_else(|| path.clone());
                         inner(
-                            &ndt.ty,
+                            ty,
                             types,
                             &merged_generics,
                             checked_references,
-                            ndt.name.to_string(),
+                            name,
                             mode,
                             follow_named_references,
                         )?;
@@ -780,8 +784,8 @@ fn validate_internally_tag_enum_datatype(
         },
         DataType::Tuple(tuple) if tuple.elements.is_empty() => Ok(()),
         DataType::Reference(Reference::Named(reference)) => {
-            if let Some(ndt) = reference.get(types) {
-                validate_internally_tag_enum_datatype(&ndt.ty, types, path, variant_name)?;
+            if let Some(ty) = reference.ty(types) {
+                validate_internally_tag_enum_datatype(ty, types, path, variant_name)?;
             }
 
             Ok(())
