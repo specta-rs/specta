@@ -1,29 +1,17 @@
-use std::{borrow::Cow, fs};
+use std::fs;
 
+use serde::{Deserialize, Serialize};
 use specta::{Type, Types};
 use specta_jsonschema::{JsonSchema, SchemaVersion};
 
-fn raw_map_types(types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
-    Ok(Cow::Borrowed(types))
-}
-
-fn raw_map_datatype<'a>(
-    _types: &'a Types,
-    dt: &'a specta::datatype::DataType,
-) -> Result<Cow<'a, specta::datatype::DataType>, specta::FormatError> {
-    Ok(Cow::Borrowed(dt))
-}
-
-const RAW_FORMAT: specta::Format = specta::Format::new(raw_map_types, raw_map_datatype);
-
-#[derive(Type)]
+#[derive(Serialize, Deserialize, Type)]
 struct User {
     id: u32,
     name: String,
     email: Option<String>,
 }
 
-#[derive(Type)]
+#[derive(Serialize, Deserialize, Type)]
 enum Status {
     Active,
     Inactive,
@@ -34,7 +22,7 @@ enum Status {
 fn test_basic_export() {
     let types = Types::default().register::<User>().register::<Status>();
 
-    let result = JsonSchema::default().export(&types, RAW_FORMAT);
+    let result = JsonSchema::default().export(&types, specta_serde::format);
     assert!(result.is_ok(), "Export should succeed: {:?}", result.err());
 
     let schema_str = result.unwrap();
@@ -49,7 +37,7 @@ fn test_schema_version() {
 
     let result = JsonSchema::default()
         .schema_version(SchemaVersion::Draft7)
-        .export(&types, RAW_FORMAT);
+        .export(&types, specta_serde::format);
 
     assert!(result.is_ok());
     let schema = result.unwrap();
@@ -58,7 +46,7 @@ fn test_schema_version() {
 
 #[test]
 fn test_primitives() {
-    #[derive(Type)]
+    #[derive(Serialize, Deserialize, Type)]
     struct Primitives {
         string_field: String,
         int_field: i32,
@@ -67,7 +55,7 @@ fn test_primitives() {
     }
 
     let types = Types::default().register::<Primitives>();
-    let result = JsonSchema::default().export(&types, RAW_FORMAT);
+    let result = JsonSchema::default().export(&types, specta_serde::format);
 
     assert!(result.is_ok());
     let schema = result.unwrap();
@@ -80,7 +68,7 @@ fn test_primitives() {
 #[test]
 fn test_nullable() {
     let types = Types::default().register::<User>();
-    let result = JsonSchema::default().export(&types, RAW_FORMAT);
+    let result = JsonSchema::default().export(&types, specta_serde::format);
 
     assert!(result.is_ok());
     let schema = result.unwrap();
@@ -91,7 +79,7 @@ fn test_nullable() {
 #[test]
 fn test_enum() {
     let types = Types::default().register::<Status>();
-    let result = JsonSchema::default().export(&types, RAW_FORMAT);
+    let result = JsonSchema::default().export(&types, specta_serde::format);
 
     assert!(result.is_ok());
     let schema = result.unwrap();

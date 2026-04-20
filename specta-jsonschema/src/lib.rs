@@ -17,10 +17,12 @@
 //! ## Exporting to JSON Schema
 //!
 //! ```ignore
+//! use serde::{Deserialize, Serialize};
 //! use specta::{Type, Types};
 //! use specta_jsonschema::{JsonSchema, SchemaVersion};
 //!
-//! #[derive(Type)]
+//! #[derive(Serialize, Deserialize, Type)]
+//! #[serde(rename_all = "camelCase")]
 //! pub struct User {
 //!     pub id: u32,
 //!     pub name: String,
@@ -34,7 +36,7 @@
 //!     // Export to JSON Schema
 //!     let schema = JsonSchema::default()
 //!         .schema_version(SchemaVersion::Draft7)
-//!         .export(&types, specta::Format::new(|types| Ok(types.into()), |_, dt| Ok(dt.into())))
+//!         .export(&types, specta_serde::format)
 //!         .unwrap();
 //!
 //!     println!("{}", schema);
@@ -44,10 +46,11 @@
 //! ## With Serde Integration
 //!
 //! ```ignore
+//! use serde::{Deserialize, Serialize};
 //! use specta::{Type, Types};
 //! use specta_jsonschema::JsonSchema;
 //!
-//! #[derive(Type, serde::Serialize)]
+//! #[derive(Serialize, Deserialize, Type)]
 //! #[serde(rename_all = "camelCase")]
 //! pub struct User {
 //!     pub user_id: u32,
@@ -58,11 +61,8 @@
 //! fn main() {
 //!     let types = Types::default().register::<User>();
 //!
-//!     // Export with serde formatting
-//!     let format = specta_serde::format;
-//!     let serde_types = (format.format_types)(&types).unwrap();
 //!     JsonSchema::default()
-//!         .export_to("./schema.json", serde_types.as_ref(), format)
+//!         .export_to("./schema.json", &types, specta_serde::format)
 //!         .unwrap();
 //! }
 //! ```
@@ -96,7 +96,7 @@
 //!     .export_to(
 //!         "./schema.json",
 //!         &types,
-//!         specta::Format::new(|types| Ok(types.into()), |_, dt| Ok(dt.into())),
+//!         specta_serde::format,
 //!     )
 //!     .unwrap();
 //!
@@ -106,7 +106,7 @@
 //!     .export_to(
 //!         "./schemas/",
 //!         &types,
-//!         specta::Format::new(|types| Ok(types.into()), |_, dt| Ok(dt.into())),
+//!         specta_serde::format,
 //!     )
 //!     .unwrap();
 //! ```
