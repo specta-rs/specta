@@ -12,6 +12,7 @@
 #[doc(hidden)]
 pub mod collect;
 pub mod datatype;
+mod format;
 #[cfg(feature = "function")]
 #[cfg_attr(docsrs, doc(cfg(feature = "function")))]
 pub mod function;
@@ -20,6 +21,7 @@ pub mod internal;
 mod r#type;
 mod types;
 
+pub use format::{Format, FormatError};
 pub use r#type::Type;
 pub use types::Types;
 
