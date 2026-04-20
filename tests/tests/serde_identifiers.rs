@@ -22,17 +22,22 @@ enum FieldIdentifier {
 
 #[test]
 fn identifier_apply_requires_phases() {
-    let format = specta_serde::format;
-    let err = (format.format_types)(&Types::default().register::<VariantIdentifier>())
-        .map(|types| types.into_owned())
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<VariantIdentifier>(),
+            specta_serde::format,
+        )
         .expect_err("variant_identifier should require format_phases");
     assert!(
         err.to_string()
             .contains("identifier enums require `format_phases`")
     );
 
-    let err = (format.format_types)(&Types::default().register::<FieldIdentifier>())
-        .map(|types| types.into_owned())
+    let err = Typescript::default()
+        .export(
+            &Types::default().register::<FieldIdentifier>(),
+            specta_serde::format,
+        )
         .expect_err("field_identifier should require format_phases");
     assert!(
         err.to_string()

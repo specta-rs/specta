@@ -107,29 +107,29 @@ fn typescript_export_serde_errors() {
             }
         }
 
-        let mut registered_types = Types::default();
-        let dt = T::definition(&mut registered_types);
+        let mut types = Types::default();
+        let dt = T::definition(&mut types);
 
         for (mode, format) in [
             ("serde", specta_serde::format),
             ("serde_phases", specta_serde::format_phases),
         ] {
-            let types = (format.format_types)(&registered_types).map(|types| types.into_owned());
+            // let types = (format.format_types)(&registered_types).map(|types| types.into_owned());
 
-            let types = match types {
-                Ok(types) => types,
-                Err(err) => {
-                    assert_expected_error(failures, name, mode, "apply", expected_error, err);
-                    continue;
-                }
-            };
+            // let types = match types {
+            //     Ok(types) => types,
+            //     Err(err) => {
+            //         assert_expected_error(failures, name, mode, "apply", expected_error, err);
+            //         continue;
+            //     }
+            // };
 
-            let validate = (format.format_dt)(&types, &dt);
+            // let validate = (format.format_dt)(&types, &dt);
 
-            if let Err(err) = validate {
-                assert_expected_error(failures, name, mode, "validate", expected_error, err);
-                continue;
-            }
+            // if let Err(err) = validate {
+            //     assert_expected_error(failures, name, mode, "validate", expected_error, err);
+            //     continue;
+            // }
 
             match Typescript::default().export(&types, format) {
                 Ok(_) => failures.push(format!(

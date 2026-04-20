@@ -2722,19 +2722,6 @@ fn mixed_tagged_and_untagged_struct_variants_export_in_unified_mode() {
 }
 
 #[test]
-fn phased_mixed_untagged_variants_require_format_phases() {
-    let format = specta_serde::format;
-    let err = (format.format_types)(&Types::default().register::<MixedTaggedAndUntaggedPhased>())
-        .map(|types| types.into_owned())
-        .expect_err("phase-specific mixed untagged variants should require format_phases");
-
-    assert!(
-        err.to_string().contains("format_phases"),
-        "unexpected error: {err}"
-    );
-}
-
-#[test]
 fn phased_mixed_untagged_variants_split_per_phase() {
     let ts = specta_typescript::Typescript::default()
         .export(

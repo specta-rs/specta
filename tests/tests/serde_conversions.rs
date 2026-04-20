@@ -247,9 +247,11 @@ fn format_phases_accepts_generic_try_from_container_conversion() {
             .contains("Incompatible container conversion")
     );
 
-    let format = specta_serde::format_phases;
-    (format.format_types)(&Types::default().register::<GenericParent<String>>())
-        .map(|types| types.into_owned())
+    Typescript::default()
+        .export(
+            &Types::default().register::<GenericParent<String>>(),
+            specta_serde::format_phases,
+        )
         .expect(
             "format_phases should resolve nested generic references from container conversions",
         );

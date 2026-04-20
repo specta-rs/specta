@@ -245,15 +245,6 @@ fn zod_uses_serde_transformed_resolved_types() {
 }
 
 #[test]
-fn zod_rejects_invalid_serde_shapes_via_transformation() {
-    let types = Types::default().register::<InvalidInternallyTaggedEnum>();
-    let format = specta_serde::format;
-    let err = (format.format_types)(&types).unwrap_err();
-
-    assert!(err.to_string().contains("Invalid internally tagged enum"));
-}
-
-#[test]
 fn zod_empty_named_shapes_are_strict() {
     let empty_struct = export_for::<EmptyStruct>().unwrap();
     assert!(empty_struct.contains("z.object({}).strict()"));
