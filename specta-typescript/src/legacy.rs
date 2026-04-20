@@ -135,7 +135,7 @@ pub(crate) fn datatype_inner(
     s: &mut String,
     generics: &[(GenericReference, DataType)],
 ) -> Result<()> {
-    crate::primitives::datatype(s, ctx.cfg, types, typ, vec![], None, "", generics)
+    crate::primitives::datatype(s, ctx.cfg, None, types, typ, vec![], None, "", generics)
 }
 
 // Can be used with `StructUnnamedFields.fields` or `EnumNamedFields.fields`
@@ -154,6 +154,7 @@ fn unnamed_fields_datatype(
             crate::primitives::datatype_with_inline_attr(
                 &mut v,
                 ctx.cfg,
+                None,
                 types,
                 ty,
                 vec![],
@@ -183,6 +184,7 @@ fn unnamed_fields_datatype(
                 crate::primitives::datatype_with_inline_attr(
                     &mut v,
                     ctx.cfg,
+                    None,
                     types,
                     ty,
                     vec![],
@@ -280,6 +282,7 @@ pub(crate) fn struct_datatype(
                     crate::primitives::datatype_with_inline_attr(
                         &mut s,
                         ctx.cfg,
+                        None,
                         types,
                         ty,
                         vec![],
@@ -397,6 +400,7 @@ fn enum_variant_datatype(
                     crate::primitives::datatype_with_inline_attr(
                         &mut s,
                         ctx.cfg,
+                        None,
                         types,
                         ty,
                         vec![],
@@ -490,6 +494,7 @@ fn enum_variant_datatype(
                     crate::primitives::datatype_with_inline_attr(
                         &mut s,
                         ctx.cfg,
+                        None,
                         types,
                         ty,
                         vec![],
@@ -807,6 +812,7 @@ fn object_field_to_ts(
             crate::primitives::datatype_with_inline_attr(
                 &mut value,
                 ctx.cfg,
+                None,
                 types,
                 ty,
                 vec![],

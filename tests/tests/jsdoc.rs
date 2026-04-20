@@ -45,9 +45,7 @@ mod jsdoc_export_to_files_runtime_imports_types {
     }
 }
 
-fn phase_collections(
-    types: Types,
-) -> [(&'static str, Result<Types, specta::FormatError>); 3] {
+fn phase_collections(types: Types) -> [(&'static str, Result<Types, specta::FormatError>); 3] {
     let serde_format = specta_serde::format;
     let serde_phases_format = specta_serde::format_phases;
 

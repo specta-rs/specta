@@ -1,7 +1,6 @@
 //! Swift language exporter configuration and main export functionality.
 
 use std::{borrow::Cow, path::Path};
-use std::{fmt, sync::Arc};
 
 use specta::{
     Format, Types,
@@ -10,46 +9,6 @@ use specta::{
 
 use crate::Error;
 use crate::primitives::{export_type, is_duration_struct};
-
-type TypesFormatFn = Arc<
-    dyn for<'a> Fn(&'a Types) -> std::result::Result<Cow<'a, Types>, specta::FormatError>
-        + Send
-        + Sync,
->;
-type DataTypeFormatFn = Arc<
-    dyn for<'a> Fn(
-            &'a Types,
-            &'a DataType,
-        ) -> std::result::Result<Cow<'a, DataType>, specta::FormatError>
-        + Send
-        + Sync,
->;
-
-#[derive(Clone)]
-pub(crate) struct FormatFns {
-    pub(crate) types: TypesFormatFn,
-    pub(crate) datatype: DataTypeFormatFn,
-}
-
-impl From<Format> for FormatFns {
-    fn from(format: Format) -> Self {
-        Self {
-            types: Arc::new(format.format_types),
-            datatype: Arc::new(format.format_dt),
-        }
-    }
-}
-
-impl fmt::Debug for FormatFns {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "FormatFns({:p}, {:p})",
-            Arc::as_ptr(&self.types),
-            Arc::as_ptr(&self.datatype)
-        )
-    }
-}
 
 /// Swift language exporter.
 #[derive(Debug, Clone)]
@@ -66,7 +25,7 @@ pub struct Swift {
     pub optionals: OptionalStyle,
     /// Additional protocols to conform to.
     pub protocols: Vec<Cow<'static, str>>,
-    pub(crate) format: Option<FormatFns>,
+    pub(crate) format: Option<Format>,
 }
 
 /// Indentation style for generated Swift code.
@@ -172,14 +131,10 @@ impl Swift {
         self
     }
 
-    pub(crate) fn with_format(mut self, format: Format) -> Self {
-        self.format = Some(format.into());
-        self
-    }
-
     /// Export types to a Swift string.
     pub fn export(&self, types: &Types, format: Format) -> Result<String, Error> {
-        let exporter = self.clone().with_format(format);
+        let mut exporter = self.clone();
+        exporter.format = Some(format);
         let formatted_types = exporter.format_types(types)?;
         let raw_types = formatted_types.as_ref();
 
@@ -232,7 +187,8 @@ impl Swift {
             return Ok(Cow::Borrowed(types));
         };
 
-        (format.types)(types).map_err(|err| Error::format("type graph formatter failed", err))
+        (format.format_types)(types)
+            .map_err(|err| Error::format("type graph formatter failed", err))
     }
 }
 

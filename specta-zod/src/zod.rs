@@ -14,40 +14,6 @@ use specta::{
 
 use crate::{Error, primitives, references};
 
-type TypesFormatFn =
-    Arc<dyn for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, specta::FormatError> + Send + Sync>;
-type DataTypeFormatFn = Arc<
-    dyn for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, specta::FormatError>
-        + Send
-        + Sync,
->;
-
-#[derive(Clone)]
-pub(crate) struct FormatFns {
-    pub(crate) types: TypesFormatFn,
-    pub(crate) datatype: DataTypeFormatFn,
-}
-
-impl From<Format> for FormatFns {
-    fn from(format: Format) -> Self {
-        Self {
-            types: Arc::new(format.format_types),
-            datatype: Arc::new(format.format_dt),
-        }
-    }
-}
-
-impl fmt::Debug for FormatFns {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "FormatFns({:p}, {:p})",
-            Arc::as_ptr(&self.types),
-            Arc::as_ptr(&self.datatype)
-        )
-    }
-}
-
 /// Allows configuring how Specta's Zod exporter will deal with BigInt types ([i64], [i128] etc).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum BigIntExportBehavior {
@@ -164,7 +130,6 @@ impl Zod {
 
     /// Export files into a single string.
     pub fn export(&self, types: &Types, format: Format) -> Result<String, Error> {
-        let format = format.into();
         let exporter = self.clone();
         let formatted_types = format_types(types, &format)?;
         let types = formatted_types.as_ref();
@@ -208,7 +173,6 @@ impl Zod {
         types: &Types,
         format: Format,
     ) -> Result<(), Error> {
-        let format = format.into();
         let exporter = self.clone();
         let formatted_types = format_types(types, &format)?;
         let types = formatted_types.as_ref();
@@ -421,16 +385,16 @@ impl Zod {
     }
 }
 
-fn format_types<'a>(types: &'a Types, format: &FormatFns) -> Result<Cow<'a, Types>, Error> {
-    let mapped_types =
-        (format.types)(types).map_err(|err| Error::format("type graph formatter failed", err))?;
+fn format_types<'a>(types: &'a Types, format: &Format) -> Result<Cow<'a, Types>, Error> {
+    let mapped_types = (format.format_types)(types)
+        .map_err(|err| Error::format("type graph formatter failed", err))?;
     Ok(Cow::Owned(
         map_types_for_datatype_format(mapped_types.as_ref(), Some(format))?.into_owned(),
     ))
 }
 
 fn map_datatype_format(
-    format: Option<&FormatFns>,
+    format: Option<&Format>,
     types: &Types,
     dt: &DataType,
 ) -> Result<DataType, Error> {
@@ -438,7 +402,7 @@ fn map_datatype_format(
         return Ok(dt.clone());
     };
 
-    let mapped = (format.datatype)(types, dt)
+    let mapped = (format.format_dt)(types, dt)
         .map_err(|err| Error::format("datatype formatter failed", err))?;
 
     match mapped {
@@ -448,7 +412,7 @@ fn map_datatype_format(
 }
 
 fn map_datatype_format_children(
-    format: Option<&FormatFns>,
+    format: Option<&Format>,
     types: &Types,
     mut dt: DataType,
 ) -> Result<DataType, Error> {
@@ -489,7 +453,7 @@ fn map_datatype_format_children(
 }
 
 fn map_datatype_fields(
-    format: Option<&FormatFns>,
+    format: Option<&Format>,
     types: &Types,
     fields: &mut Fields,
 ) -> Result<(), Error> {
@@ -515,7 +479,7 @@ fn map_datatype_fields(
 }
 
 fn map_named_datatype_format(
-    format: Option<&FormatFns>,
+    format: Option<&Format>,
     types: &Types,
     ndt: &NamedDataType,
 ) -> Result<NamedDataType, Error> {
@@ -526,7 +490,7 @@ fn map_named_datatype_format(
 
 fn map_types_for_datatype_format<'a>(
     types: &'a Types,
-    format: Option<&FormatFns>,
+    format: Option<&Format>,
 ) -> Result<Cow<'a, Types>, Error> {
     if format.is_none() {
         return Ok(Cow::Borrowed(types));
@@ -567,7 +531,7 @@ impl AsMut<Zod> for Zod {
 /// Reference to the Zod exporter for framework callbacks.
 pub struct FrameworkExporter<'a> {
     exporter: &'a Zod,
-    format: Option<&'a FormatFns>,
+    format: Option<&'a Format>,
     has_manually_exported_user_types: &'a mut bool,
     files_root_types: &'a str,
     /// Collected types currently being exported.

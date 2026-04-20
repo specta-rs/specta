@@ -410,7 +410,7 @@ fn apply_datatype_format(swift: &Swift, types: &Types, dt: &DataType) -> Result<
         return Ok(dt.clone());
     };
 
-    let mapped = (format.datatype)(types, dt)
+    let mapped = (format.format_dt)(types, dt)
         .map_err(|err| Error::format("datatype formatter failed", err))?;
 
     match mapped {
