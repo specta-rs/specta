@@ -27,7 +27,10 @@ enum AdjacentOther {
 #[test]
 fn serde_other_requires_format_phases() {
     let err = Typescript::default()
-        .export(&Types::default().register::<InternalOther>(), specta_serde::format)
+        .export(
+            &Types::default().register::<InternalOther>(),
+            specta_serde::format,
+        )
         .expect_err("#[serde(other)] should require format_phases");
 
     assert!(
