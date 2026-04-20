@@ -10,7 +10,7 @@ use specta::{
     Format, Type, Types,
     datatype::{DataType, Primitive, Reference, Tuple},
 };
-use specta_typescript::{Exporter, Layout, Typescript, branded, primitives};
+use specta_typescript::{Exporter, FrameworkExporter, Layout, Typescript, branded, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -123,26 +123,23 @@ fn phase_collections() -> [PhaseCollection; 3] {
     ]
 }
 
-fn phase_output(
-    format: Format,
-    dts: &[(&'static str, DataType)],
+fn export_runtime_output(
+    exporter: Exporter,
     types: &Types,
-    f: impl FnOnce(&[(&'static str, DataType)], &Types) -> Result<String, String>,
+    format: Format,
+    f: impl Fn(&mut FrameworkExporter<'_>) -> Result<String, specta_typescript::Error>
+    + Send
+    + Sync
+    + 'static,
 ) -> String {
-    let types = match (format.format_types)(types) {
-        Ok(types) => types.into_owned(),
-        Err(err) => return format!("ERROR: {err}"),
-    };
-    let dts = match dts
-        .iter()
-        .map(|(name, dt)| (format.format_dt)(&types, dt).map(|dt| (*name, dt.into_owned())))
-        .collect::<Result<Vec<_>, _>>()
-    {
-        Ok(dts) => dts,
-        Err(err) => return format!("ERROR: {err}"),
-    };
-
-    f(&dts, &types).unwrap_or_else(|err| format!("ERROR: {err}"))
+    exporter
+        .framework_prelude("")
+        .framework_runtime(move |mut ctx| {
+            let _ = ctx.render_types()?;
+            Ok(Cow::Owned(f(&mut ctx)?))
+        })
+        .export(types, format)
+        .unwrap_or_else(|err| format!("ERROR: {err}"))
 }
 
 #[test]
@@ -665,24 +662,26 @@ fn typescript_export_to() {
 #[test]
 fn primitives_export() {
     for (mode, format, dts, types) in phase_collections() {
-        let output = phase_output(format, &dts, &types, |dts, types| {
-            let ts = Typescript::default();
-
-            dts.iter()
-                .filter_map(|(name, ty)| match ty {
-                    DataType::Reference(Reference::Named(reference)) => {
-                        reference.get(types).map(|ty| (name, ty))
-                    }
-                    _ => None,
-                })
-                .map(|(name, ty)| {
-                    primitives::export(&ts, types, iter::once(ty), "")
-                        .map(|ty| format!("{name}: {ty}"))
-                })
-                .collect::<Result<Vec<_>, _>>()
-                .map(|exports| exports.join("\n"))
-                .map_err(|err| err.to_string())
-        });
+        let output = export_runtime_output(
+            Exporter::from(Typescript::default()),
+            &types,
+            format,
+            move |ctx| {
+                dts.iter()
+                    .filter_map(|(name, ty)| match ty {
+                        DataType::Reference(Reference::Named(reference)) => {
+                            reference.get(ctx.types).map(|ty| (name, ty))
+                        }
+                        _ => None,
+                    })
+                    .map(|(name, ty)| {
+                        ctx.export(iter::once(ty), "")
+                            .map(|ty| format!("{name}: {ty}"))
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+                    .map(|exports| exports.join("\n"))
+            },
+        );
 
         insta::assert_snapshot!(format!("export-{mode}"), output);
     }
@@ -691,18 +690,22 @@ fn primitives_export() {
 #[test]
 fn primitives_export_many() {
     for (mode, format, dts, types) in phase_collections() {
-        let output = phase_output(format, &dts, &types, |dts, types| {
-            let ts = Typescript::default();
-            let ndts = dts
-                .iter()
-                .filter_map(|(_, ty)| match ty {
-                    DataType::Reference(Reference::Named(r)) => r.get(types),
-                    _ => None,
-                })
-                .collect::<Vec<_>>();
+        let output = export_runtime_output(
+            Exporter::from(Typescript::default()),
+            &types,
+            format,
+            move |ctx| {
+                let ndts = dts
+                    .iter()
+                    .filter_map(|(_, ty)| match ty {
+                        DataType::Reference(Reference::Named(r)) => r.get(ctx.types),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>();
 
-            primitives::export(&ts, types, ndts.into_iter(), "").map_err(|err| err.to_string())
-        });
+                ctx.export(ndts.into_iter(), "")
+            },
+        );
 
         insta::assert_snapshot!(format!("export-many-{mode}"), output);
     }
@@ -711,20 +714,24 @@ fn primitives_export_many() {
 #[test]
 fn primitives_export_allows_generic_hashmap_definition() {
     for (mode, format, dts, types) in phase_collections() {
-        let output = phase_output(format, &dts, &types, |dts, types| {
-            let ts = Typescript::default();
-            let hash_map = dts
-                .iter()
-                .find_map(|(_, ty)| match ty {
-                    DataType::Reference(Reference::Named(r)) => {
-                        r.get(types).filter(|ndt| ndt.name == "HashMap")
-                    }
-                    _ => None,
-                })
-                .expect("HashMap should be registered in shared test fixtures");
+        let output = export_runtime_output(
+            Exporter::from(Typescript::default()),
+            &types,
+            format,
+            move |ctx| {
+                let hash_map = dts
+                    .iter()
+                    .find_map(|(_, ty)| match ty {
+                        DataType::Reference(Reference::Named(r)) => {
+                            r.get(ctx.types).filter(|ndt| ndt.name == "HashMap")
+                        }
+                        _ => None,
+                    })
+                    .expect("HashMap should be registered in shared test fixtures");
 
-            primitives::export(&ts, types, iter::once(hash_map), "").map_err(|err| err.to_string())
-        });
+                ctx.export(iter::once(hash_map), "")
+            },
+        );
 
         assert!(
             !output.starts_with("ERROR:"),
@@ -738,18 +745,21 @@ fn primitives_export_allows_generic_hashmap_definition() {
 #[test]
 fn primitives_reference() {
     for (mode, format, dts, types) in phase_collections() {
-        let output = phase_output(format, &dts, &types, |dts, types| {
-            let ts = Typescript::default();
-            dts.iter()
-                .filter_map(|(s, ty)| match ty {
-                    DataType::Reference(r) => Some((s, r)),
-                    _ => None,
-                })
-                .map(|(s, ty)| primitives::reference(&ts, types, ty).map(|ty| format!("{s}: {ty}")))
-                .collect::<Result<Vec<_>, _>>()
-                .map(|exports| exports.join("\n"))
-                .map_err(|err| err.to_string())
-        });
+        let output = export_runtime_output(
+            Exporter::from(Typescript::default()),
+            &types,
+            format,
+            move |ctx| {
+                dts.iter()
+                    .filter_map(|(s, ty)| match ty {
+                        DataType::Reference(r) => Some((s, r)),
+                        _ => None,
+                    })
+                    .map(|(s, ty)| ctx.reference(ty).map(|ty| format!("{s}: {ty}")))
+                    .collect::<Result<Vec<_>, _>>()
+                    .map(|exports| exports.join("\n"))
+            },
+        );
 
         insta::assert_snapshot!(format!("reference-{mode}"), output);
     }
@@ -758,14 +768,17 @@ fn primitives_reference() {
 #[test]
 fn primitives_inline() {
     for (mode, format, dts, types) in phase_collections() {
-        let output = phase_output(format, &dts, &types, |dts, types| {
-            let ts = Typescript::default();
-            dts.iter()
-                .map(|(s, ty)| primitives::inline(&ts, types, ty).map(|ty| format!("{s}: {ty}")))
-                .collect::<Result<Vec<_>, _>>()
-                .map(|exports| exports.join("\n"))
-                .map_err(|err| err.to_string())
-        });
+        let output = export_runtime_output(
+            Exporter::from(Typescript::default()),
+            &types,
+            format,
+            move |ctx| {
+                dts.iter()
+                    .map(|(s, ty)| ctx.inline(ty).map(|ty| format!("{s}: {ty}")))
+                    .collect::<Result<Vec<_>, _>>()
+                    .map(|exports| exports.join("\n"))
+            },
+        );
 
         insta::assert_snapshot!(format!("inline-{mode}"), output);
     }

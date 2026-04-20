@@ -5,30 +5,17 @@ expression: output
 /**
 	*  https://github.com/specta-rs/specta/issues/374
 	*
-	* @typedef {{
-	*		foo?: boolean,
-	*		bar?: boolean,
-	*	}} Issue374_Serialize
-	* @property {boolean} [foo]
-	* @property {boolean} [bar]
+	* @typedef {Issue374_Serialize | Issue374_Deserialize} Issue374
+	* @property {Issue374_Serialize} Serialize
+	* @property {Issue374_Deserialize} Deserialize
 	*
-	* @typedef {{
-	*		a: number | null,
-	*		b?: number | null,
-	*		c?: string | null,
-	*		d: boolean,
-	*	}} Optional_Serialize
-	* @property {number | null} a
-	* @property {number | null} [b]
-	* @property {string | null} [c]
-	* @property {boolean} d
+	* @typedef {Optional_Serialize | Optional_Deserialize} Optional
+	* @property {Optional_Serialize} Serialize
+	* @property {Optional_Deserialize} Deserialize
 	*
-	* @typedef {{
-	*		kind: "StructPhaseSpecificRenameSerialize",
-	*		ser: string,
-	*	}} StructPhaseSpecificRenameSerialize
-	* @property {"StructPhaseSpecificRenameSerialize"} kind
-	* @property {string} ser
+	* @typedef {StructPhaseSpecificRenameSerialize | StructPhaseSpecificRenameDeserialize} StructPhaseSpecificRename
+	* @property {StructPhaseSpecificRenameSerialize} Serialize
+	* @property {StructPhaseSpecificRenameDeserialize} Deserialize
 	*
 	* @typedef {{
 	*		start: T,

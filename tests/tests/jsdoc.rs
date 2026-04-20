@@ -6,7 +6,7 @@ use std::{
 
 use specta::datatype::{DataType, Reference};
 use specta::{Format, Type, Types};
-use specta_typescript::{JSDoc, Layout, primitives};
+use specta_typescript::{Exporter, FrameworkExporter, JSDoc, Layout, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
@@ -82,26 +82,23 @@ fn phase_collections() -> [PhaseCollection; 3] {
     ]
 }
 
-fn phase_output(
-    format: Format,
-    dts: &[(&'static str, DataType)],
+fn export_runtime_output(
+    exporter: Exporter,
     types: &Types,
-    f: impl FnOnce(&[(&'static str, DataType)], &Types) -> Result<String, String>,
+    format: Format,
+    f: impl Fn(&mut FrameworkExporter<'_>) -> Result<String, specta_typescript::Error>
+    + Send
+    + Sync
+    + 'static,
 ) -> String {
-    let types = match (format.format_types)(types) {
-        Ok(types) => types.into_owned(),
-        Err(err) => return format!("ERROR: {err}"),
-    };
-    let dts = match dts
-        .iter()
-        .map(|(name, dt)| (format.format_dt)(&types, dt).map(|dt| (*name, dt.into_owned())))
-        .collect::<Result<Vec<_>, _>>()
-    {
-        Ok(dts) => dts,
-        Err(err) => return format!("ERROR: {err}"),
-    };
-
-    f(&dts, &types).unwrap_or_else(|err| format!("ERROR: {err}"))
+    exporter
+        .framework_prelude("")
+        .framework_runtime(move |mut ctx| {
+            let _ = ctx.render_types()?;
+            Ok(Cow::Owned(f(&mut ctx)?))
+        })
+        .export(types, format)
+        .unwrap_or_else(|err| format!("ERROR: {err}"))
 }
 
 #[test]
@@ -118,18 +115,22 @@ fn export() {
 #[test]
 fn primitives_export_many() {
     for (mode, format, dts, types) in phase_collections() {
-        let output = phase_output(format, &dts, &types, |dts, types| {
-            let jsdoc = JSDoc::default();
-            let ndts = dts
-                .iter()
-                .filter_map(|(_, ty)| match ty {
-                    DataType::Reference(Reference::Named(r)) => r.get(&types),
-                    _ => None,
-                })
-                .collect::<Vec<_>>();
+        let output = export_runtime_output(
+            Exporter::from(JSDoc::default()),
+            &types,
+            format,
+            move |ctx| {
+                let ndts = dts
+                    .iter()
+                    .filter_map(|(_, ty)| match ty {
+                        DataType::Reference(Reference::Named(r)) => r.get(ctx.types),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>();
 
-            primitives::export(&jsdoc, types, ndts.into_iter(), "").map_err(|err| err.to_string())
-        });
+                ctx.export(ndts.into_iter(), "")
+            },
+        );
 
         insta::assert_snapshot!(format!("primitives-many-inline-{mode}"), output);
     }
