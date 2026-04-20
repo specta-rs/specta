@@ -458,7 +458,7 @@ impl Exporter {
 }
 
 fn format_types<'a>(types: &'a Types, format: &Format) -> Result<Cow<'a, Types>, Error> {
-    let mapped_types = (format.format_types)(types)
+    let mapped_types = (format.map_types)(types)
         .map_err(|err| Error::format("type graph formatter failed", err))?;
     Ok(Cow::Owned(
         map_types_for_datatype_format(mapped_types.as_ref(), Some(format))?.into_owned(),
@@ -523,14 +523,27 @@ fn map_datatype_format(
     }
 
     if contains_generic_reference(dt) {
-        return map_datatype_format_children(format, types, dt.clone());
+        let Some(format) = format else {
+            return map_datatype_format_children(None, types, dt.clone());
+        };
+
+        match (format.map_type)(types, dt) {
+            Ok(Cow::Borrowed(dt)) => {
+                return map_datatype_format_children(Some(format), types, dt.clone());
+            }
+            Ok(Cow::Owned(dt)) => return map_datatype_format_children(Some(format), types, dt),
+            Err(err) if err.to_string().contains("Unresolved generic reference") => {
+                return map_datatype_format_children(Some(format), types, dt.clone());
+            }
+            Err(err) => return Err(Error::format("datatype formatter failed", err)),
+        }
     }
 
     let Some(format) = format else {
         return Ok(dt.clone());
     };
 
-    let mapped = (format.format_dt)(types, dt)
+    let mapped = (format.map_type)(types, dt)
         .map_err(|err| Error::format("datatype formatter failed", err))?;
 
     match mapped {

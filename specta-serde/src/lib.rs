@@ -2251,7 +2251,7 @@ mod tests {
 
     fn formatted_phases(types: Types) -> Types {
         let format = format_phases;
-        (format.format_types)(&types)
+        (format.map_types)(&types)
             .expect("format_phases should succeed")
             .into_owned()
     }

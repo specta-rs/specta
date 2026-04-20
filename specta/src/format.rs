@@ -13,31 +13,31 @@ pub type FormatError = Box<dyn error::Error + Send + Sync + 'static>;
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Format {
-    /// Formats the full [`Types`] collection.
+    /// Apply a map function to the full [`Types`] collection.
     ///
     /// Returns [`Cow::Borrowed`] when no changes are needed, or
     /// [`Cow::Owned`] when the formatter produces a transformed collection.
-    pub format_types: for<'a> fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>,
-    /// Formats an individual [`DataType`] with access to the surrounding [`Types`].
+    pub map_types: for<'a> fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>,
+    /// Map an individual [`DataType`] with access to the surrounding [`Types`].
     ///
     /// Returns [`Cow::Borrowed`] when no changes are needed, or
     /// [`Cow::Owned`] when the formatter produces a transformed datatype.
-    pub format_dt:
+    pub map_type:
         for<'a> fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>,
 }
 
 impl Format {
     /// Creates a formatter from collection and datatype callbacks.
     pub const fn new(
-        format_types: for<'a> fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>,
-        format_dt: for<'a> fn(
+        map_types: for<'a> fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>,
+        map_type: for<'a> fn(
             &'a Types,
             &'a DataType,
         ) -> std::result::Result<Cow<'a, DataType>, FormatError>,
     ) -> Self {
         Self {
-            format_types,
-            format_dt,
+            map_types,
+            map_type,
         }
     }
 }
