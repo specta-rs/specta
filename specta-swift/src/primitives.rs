@@ -5,7 +5,7 @@ use specta::{
     datatype::{DataType, Enum, Fields, Generic, Primitive, Reference, Variant},
 };
 
-use crate::error::{Error, Result};
+use crate::error::Error;
 use crate::swift::Swift;
 
 fn string_literal_raw_value(dt: &DataType) -> Option<&str> {
@@ -141,7 +141,7 @@ fn enum_payload_to_swift_type(
     variant_name: &str,
     payload: &DataType,
     generic_scope: &[Generic],
-) -> Result<String> {
+) -> Result<String, Error> {
     let payload = normalized_payload(variant_name, payload);
 
     Ok(match payload {
@@ -216,7 +216,7 @@ pub fn export_type(
     swift: &Swift,
     types: &Types,
     ndt: &specta::datatype::NamedDataType,
-) -> Result<String> {
+) -> Result<String, Error> {
     if !matches!(&ndt.ty, DataType::Struct(_) | DataType::Enum(_)) {
         return Ok(String::new());
     }
@@ -368,7 +368,7 @@ pub fn datatype_to_swift(
     dt: &DataType,
     generic_scope: Vec<Generic>,
     reference: Option<&specta::datatype::Reference>,
-) -> Result<String> {
+) -> Result<String, Error> {
     let dt = apply_datatype_format(swift, types, dt)?;
 
     // Check for special standard library types first
@@ -401,7 +401,7 @@ pub fn datatype_to_swift(
     }
 }
 
-fn apply_datatype_format(swift: &Swift, types: &Types, dt: &DataType) -> Result<DataType> {
+fn apply_datatype_format(swift: &Swift, types: &Types, dt: &DataType) -> Result<DataType, Error> {
     if contains_generic_reference(dt) {
         return apply_datatype_format_children(swift, types, dt.clone());
     }
@@ -423,7 +423,7 @@ fn apply_datatype_format_children(
     swift: &Swift,
     types: &Types,
     mut dt: DataType,
-) -> Result<DataType> {
+) -> Result<DataType, Error> {
     match &mut dt {
         DataType::Primitive(_) => {}
         DataType::List(list) => {
@@ -460,7 +460,7 @@ fn apply_datatype_format_children(
     Ok(dt)
 }
 
-fn map_fields(swift: &Swift, types: &Types, fields: &mut Fields) -> Result<()> {
+fn map_fields(swift: &Swift, types: &Types, fields: &mut Fields) -> Result<(), Error> {
     match fields {
         Fields::Unit => {}
         Fields::Unnamed(unnamed) => {
@@ -558,7 +558,7 @@ fn is_special_std_type(
 }
 
 /// Convert primitive types to Swift.
-fn primitive_to_swift(primitive: &Primitive) -> Result<String> {
+fn primitive_to_swift(primitive: &Primitive) -> Result<String, Error> {
     Ok(match primitive {
         Primitive::i8 => "Int8".to_string(),
         Primitive::i16 => "Int16".to_string(),
@@ -594,7 +594,7 @@ fn primitive_to_swift(primitive: &Primitive) -> Result<String> {
 }
 
 // /// Convert literal types to Swift.
-// fn literal_to_swift(literal: &specta::datatype::Literal) -> Result<String> {
+// fn literal_to_swift(literal: &specta::datatype::Literal) -> Result<String, Error> {
 //     Ok(match literal {
 //         specta::datatype::Literal::i8(v) => v.to_string(),
 //         specta::datatype::Literal::i16(v) => v.to_string(),
@@ -622,7 +622,7 @@ fn list_to_swift(
     types: &Types,
     list: &specta::datatype::List,
     generic_scope: Vec<Generic>,
-) -> Result<String> {
+) -> Result<String, Error> {
     let element_type = datatype_to_swift(swift, types, &list.ty, generic_scope, None)?;
     Ok(format!("[{}]", element_type))
 }
@@ -633,7 +633,7 @@ fn map_to_swift(
     types: &Types,
     map: &specta::datatype::Map,
     generic_scope: Vec<Generic>,
-) -> Result<String> {
+) -> Result<String, Error> {
     let key_type = datatype_to_swift(swift, types, map.key_ty(), generic_scope.clone(), None)?;
     let value_type = datatype_to_swift(swift, types, map.value_ty(), generic_scope, None)?;
     Ok(format!("[{}: {}]", key_type, value_type))
@@ -646,7 +646,7 @@ fn struct_to_swift(
     s: &specta::datatype::Struct,
     generic_scope: Vec<Generic>,
     _reference: Option<&specta::datatype::Reference>,
-) -> Result<String> {
+) -> Result<String, Error> {
     match &s.fields {
         specta::datatype::Fields::Unit => Ok("Void".to_string()),
         specta::datatype::Fields::Unnamed(fields) => {
@@ -731,7 +731,7 @@ fn enum_to_swift(
     generic_scope: Vec<Generic>,
     _reference: Option<&specta::datatype::Reference>,
     enum_name: Option<&str>,
-) -> Result<String> {
+) -> Result<String, Error> {
     let mut result = String::new();
 
     // Check if this is a string enum
@@ -836,7 +836,7 @@ fn generate_enum_structs(
     generic_scope: Vec<Generic>,
     _reference: Option<&specta::datatype::Reference>,
     enum_name: &str,
-) -> Result<String> {
+) -> Result<String, Error> {
     let mut result = String::new();
 
     for (original_variant_name, variant) in &e.variants {
@@ -923,7 +923,7 @@ fn tuple_to_swift(
     types: &Types,
     t: &specta::datatype::Tuple,
     generic_scope: Vec<Generic>,
-) -> Result<String> {
+) -> Result<String, Error> {
     if t.elements.is_empty() {
         Ok("Void".to_string())
     } else if t.elements.len() == 1 {
@@ -945,7 +945,7 @@ fn reference_to_swift(
     types: &Types,
     r: &specta::datatype::Reference,
     generic_scope: &[Generic],
-) -> Result<String> {
+) -> Result<String, Error> {
     match r {
         Reference::Named(r) => {
             let Some(ndt) = r.get(types) else {
@@ -996,7 +996,7 @@ fn generic_to_swift(
     _swift: &Swift,
     g: &specta::datatype::GenericReference,
     generic_scope: &[Generic],
-) -> Result<String> {
+) -> Result<String, Error> {
     generic_scope
         .iter()
         .find_map(|generic| (generic.reference() == *g).then(|| generic.name.to_string()))
@@ -1010,7 +1010,7 @@ fn generate_enum_codable_impl(
     e: &specta::datatype::Enum,
     generic_scope: Vec<Generic>,
     enum_name: &str,
-) -> Result<String> {
+) -> Result<String, Error> {
     let mut result = String::new();
 
     result.push_str(&format!(

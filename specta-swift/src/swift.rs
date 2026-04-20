@@ -9,7 +9,6 @@ use specta::{
 };
 
 use crate::Error;
-use crate::error::Result;
 use crate::primitives::{export_type, is_duration_struct};
 
 type TypesFormatFn = Arc<
@@ -177,7 +176,7 @@ impl Swift {
     }
 
     /// Export types to a Swift string.
-    pub fn export(&self, types: &Types, format: Format) -> Result<String> {
+    pub fn export(&self, types: &Types, format: Format) -> Result<String, Error> {
         let exporter = self.clone().with_format(format);
         let formatted_types = exporter.format_types(types)?;
         let raw_types = formatted_types.as_ref();
@@ -215,13 +214,18 @@ impl Swift {
     }
 
     /// Export types to a file.
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types, format: Format) -> Result<()> {
+    pub fn export_to(
+        &self,
+        path: impl AsRef<Path>,
+        types: &Types,
+        format: Format,
+    ) -> Result<(), Error> {
         let content = self.export(types, format)?;
         std::fs::write(path, content)?;
         Ok(())
     }
 
-    pub(crate) fn format_types<'a>(&self, types: &'a Types) -> Result<Cow<'a, Types>> {
+    pub(crate) fn format_types<'a>(&self, types: &'a Types) -> Result<Cow<'a, Types>, Error> {
         let Some(format) = &self.format else {
             return Ok(Cow::Borrowed(types));
         };

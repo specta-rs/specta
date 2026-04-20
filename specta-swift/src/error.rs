@@ -37,9 +37,6 @@ pub enum Error {
     },
 }
 
-/// Result type alias for Swift export operations.
-pub type Result<T> = std::result::Result<T, Error>;
-
 impl Error {
     pub(crate) fn format(message: &'static str, source: specta::FormatError) -> Self {
         Self::Format { message, source }
