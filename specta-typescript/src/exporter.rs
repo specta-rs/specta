@@ -518,7 +518,16 @@ fn map_datatype_format_children(
                 *generic = map_datatype_format(format, types, generic)?;
             }
         }
-        DataType::Reference(Reference::Generic(_) | Reference::Opaque(_)) => {}
+        DataType::Reference(Reference::Generic(_)) => {}
+        DataType::Reference(Reference::Opaque(reference)) => {
+            if let Some(branded) = reference.downcast_ref::<Branded>() {
+                dt = Reference::opaque(Branded::new(
+                    branded.brand().clone(),
+                    map_datatype_format(format, types, branded.ty())?,
+                ))
+                .into();
+            }
+        }
     }
 
     Ok(dt)
