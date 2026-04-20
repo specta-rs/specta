@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use crate::{Error, inflection::RenameRule, internal::Result};
+use crate::{Error, inflection::RenameRule};
 use specta::datatype::{Attributes, DataType};
 
 const CONTAINER_RENAME_SERIALIZE: &str = "serde:container:rename_serialize";
@@ -129,7 +129,7 @@ pub struct SerdeContainerAttrs {
 }
 
 impl SerdeContainerAttrs {
-    pub fn from_attributes(attributes: &Attributes) -> Result<Option<Self>> {
+    pub fn from_attributes(attributes: &Attributes) -> Result<Option<Self>, Error> {
         has_any_attr(attributes, CONTAINER_ATTR_KEYS)
             .then(|| {
                 Ok(Self {
@@ -190,7 +190,7 @@ pub struct SerdeVariantAttrs {
 }
 
 impl SerdeVariantAttrs {
-    pub fn from_attributes(attributes: &Attributes) -> Result<Option<Self>> {
+    pub fn from_attributes(attributes: &Attributes) -> Result<Option<Self>, Error> {
         has_any_attr(attributes, VARIANT_ATTR_KEYS)
             .then(|| {
                 Ok(Self {
@@ -234,7 +234,7 @@ pub struct SerdeFieldAttrs {
 }
 
 impl SerdeFieldAttrs {
-    pub fn from_attributes(attributes: &Attributes) -> Result<Option<Self>> {
+    pub fn from_attributes(attributes: &Attributes) -> Result<Option<Self>, Error> {
         has_any_attr(attributes, FIELD_ATTR_KEYS)
             .then(|| {
                 Ok(Self {
@@ -274,7 +274,7 @@ fn get_datatype(attributes: &Attributes, key: &str) -> Option<DataType> {
     attributes.get_named_as::<DataType>(key).cloned()
 }
 
-fn get_rename_rule(attributes: &Attributes, key: &str) -> Result<Option<RenameRule>> {
+fn get_rename_rule(attributes: &Attributes, key: &str) -> Result<Option<RenameRule>, Error> {
     match get_string(attributes, key) {
         Some(value) => RenameRule::from_str(&value)
             .map(Some)

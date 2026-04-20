@@ -1,8 +1,5 @@
 use std::{borrow::Cow, error, fmt};
 
-/// Result type for `specta-serde` operations.
-pub type Result<T> = std::result::Result<T, Error>;
-
 /// Error type for serde transformation and validation failures.
 #[non_exhaustive]
 pub struct Error {

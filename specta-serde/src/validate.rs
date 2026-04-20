@@ -7,7 +7,7 @@ use specta::{
 
 use crate::{
     Error,
-    internal::{Result, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs},
+    internal::{SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs},
     phased::PhasedTy,
     repr::EnumRepr,
 };
@@ -18,7 +18,7 @@ pub enum ApplyMode {
     Phases,
 }
 
-pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<()> {
+pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<(), Error> {
     for ndt in types.into_unsorted_iter() {
         validate_datatype_with_generics_for_mode(
             &ndt.ty,
@@ -36,7 +36,7 @@ pub(crate) fn validate_datatype_for_mode(
     dt: &DataType,
     types: &Types,
     mode: ApplyMode,
-) -> Result<()> {
+) -> Result<(), Error> {
     validate_datatype_with_generics_for_mode(dt, types, &[], "<top-level>".to_string(), mode)
 }
 
@@ -46,7 +46,7 @@ fn validate_datatype_with_generics_for_mode(
     generics: &[Generic],
     path: String,
     mode: ApplyMode,
-) -> Result<()> {
+) -> Result<(), Error> {
     let generics = generics
         .iter()
         .map(|generic| {
@@ -68,7 +68,7 @@ fn inner(
     checked_references: &mut HashSet<Reference>,
     path: String,
     mode: ApplyMode,
-) -> Result<()> {
+) -> Result<(), Error> {
     match dt {
         DataType::Nullable(ty) => inner(ty, types, generics, checked_references, path, mode)?,
         DataType::Map(map) => {
@@ -361,7 +361,7 @@ fn inner(
     Ok(())
 }
 
-fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<()> {
+fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<(), Error> {
     let Some(attrs) = SerdeContainerAttrs::from_attributes(&enm.attributes)? else {
         return Ok(());
     };
@@ -427,7 +427,7 @@ fn validate_container_attributes(
     checked_references: &mut HashSet<Reference>,
     path: &str,
     mode: ApplyMode,
-) -> Result<()> {
+) -> Result<(), Error> {
     if let Some(parsed) = SerdeContainerAttrs::from_attributes(attrs)?
         && parsed.from.is_some()
         && parsed.try_from.is_some()
@@ -460,7 +460,11 @@ fn validate_container_attributes(
     Ok(())
 }
 
-fn validate_variant_attributes(variant: &Variant, path: String, mode: ApplyMode) -> Result<()> {
+fn validate_variant_attributes(
+    variant: &Variant,
+    path: String,
+    mode: ApplyMode,
+) -> Result<(), Error> {
     let Some(serde_attrs) = SerdeVariantAttrs::from_attributes(&variant.attributes)? else {
         return Ok(());
     };
@@ -488,7 +492,7 @@ fn validate_variant_attributes(variant: &Variant, path: String, mode: ApplyMode)
     Ok(())
 }
 
-fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Result<()> {
+fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Result<(), Error> {
     let Some(serde_attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? else {
         return Ok(());
     };
@@ -528,7 +532,11 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
     Ok(())
 }
 
-fn ensure_codec_override(has_type_overridden: bool, path: &str, attr: &'static str) -> Result<()> {
+fn ensure_codec_override(
+    has_type_overridden: bool,
+    path: &str,
+    attr: &'static str,
+) -> Result<(), Error> {
     if has_type_overridden {
         return Ok(());
     }
@@ -555,7 +563,7 @@ fn merged_generics(
     child.iter().cloned().chain(unshadowed_parent).collect()
 }
 
-fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Result<()> {
+fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Result<(), Error> {
     let valid_variants = enm
         .variants
         .iter()
@@ -580,7 +588,7 @@ fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Re
     Ok(())
 }
 
-fn validate_untagged_variants(enm: &Enum, path: &str) -> Result<()> {
+fn validate_untagged_variants(enm: &Enum, path: &str) -> Result<(), Error> {
     let mut seen_untagged = false;
 
     for (name, variant) in &enm.variants {
@@ -605,7 +613,12 @@ fn validate_untagged_variants(enm: &Enum, path: &str) -> Result<()> {
     Ok(())
 }
 
-fn validate_other_variant(enm: &Enum, path: &str, repr: &EnumRepr, mode: ApplyMode) -> Result<()> {
+fn validate_other_variant(
+    enm: &Enum,
+    path: &str,
+    repr: &EnumRepr,
+    mode: ApplyMode,
+) -> Result<(), Error> {
     let mut other_variants = Vec::new();
     for (name, variant) in &enm.variants {
         if SerdeVariantAttrs::from_attributes(&variant.attributes)?.is_some_and(|attrs| attrs.other)
@@ -650,7 +663,7 @@ fn validate_other_variant(enm: &Enum, path: &str, repr: &EnumRepr, mode: ApplyMo
     Ok(())
 }
 
-fn validate_internally_tag_enum(enm: &Enum, types: &Types, path: String) -> Result<()> {
+fn validate_internally_tag_enum(enm: &Enum, types: &Types, path: String) -> Result<(), Error> {
     for (variant_name, variant) in &enm.variants {
         validate_internally_tag_variant(enm, variant_name, variant, types, &path)?;
     }
@@ -664,7 +677,7 @@ fn validate_internally_tag_variant(
     variant: &Variant,
     types: &Types,
     path: &str,
-) -> Result<()> {
+) -> Result<(), Error> {
     let _ = enm;
     if SerdeVariantAttrs::from_attributes(&variant.attributes)?.is_some_and(|attrs| attrs.untagged)
     {
@@ -700,7 +713,7 @@ fn validate_internally_tag_enum_datatype(
     types: &Types,
     path: &str,
     variant_name: &str,
-) -> Result<()> {
+) -> Result<(), Error> {
     match ty {
         DataType::Map(_) => Ok(()),
         DataType::Struct(_) => Ok(()),
@@ -729,7 +742,7 @@ fn validate_internally_tag_enum_datatype(
     }
 }
 
-fn enum_repr_from_attrs(attrs: &specta::datatype::Attributes) -> Result<EnumRepr> {
+fn enum_repr_from_attrs(attrs: &specta::datatype::Attributes) -> Result<EnumRepr, Error> {
     let Some(container_attrs) = SerdeContainerAttrs::from_attributes(attrs)? else {
         return Ok(EnumRepr::External);
     };
