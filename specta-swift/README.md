@@ -24,11 +24,12 @@ A Rust crate for exporting Rust types to Swift, built on top of [Specta](https:/
 
 ## Quick Start
 
-Add `specta-swift` to your `Cargo.toml`:
+Add `specta-swift` and `specta-serde` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
 specta = { version = "2.0", features = ["derive"] }
+specta-serde = "0.0.11"
 specta-swift = "0.1"
 ```
 
