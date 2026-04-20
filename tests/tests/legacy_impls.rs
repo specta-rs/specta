@@ -1,9 +1,6 @@
 #![allow(deprecated)]
 
-use specta::{
-    Type, Types,
-    datatype::{DataType, Fields, Primitive, Reference},
-};
+use specta::{Type, Types};
 use specta_typescript::Typescript;
 
 #[derive(Debug)]

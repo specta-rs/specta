@@ -11,7 +11,7 @@ use tempfile::TempDir;
 
 use crate::fs_to_string;
 
-use specta_tests::typescript::{PhaseCollection, phase_collections};
+use crate::typescript::phase_collections;
 
 mod jsdoc_export_to_files_runtime_imports_types {
     use super::*;
