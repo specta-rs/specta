@@ -156,7 +156,7 @@ impl Error {
     }
 
     /// Construct an error for custom format callbacks.
-    pub fn format(
+    pub(crate) fn format(
         message: impl Into<Cow<'static, str>>,
         source: impl Into<Box<dyn std::error::Error + Send + Sync>>,
     ) -> Self {

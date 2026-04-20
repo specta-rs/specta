@@ -61,17 +61,6 @@ impl JSDoc {
         Self(self.0.branded_type_impl(builder))
     }
 
-    /// Add some custom Typescript or Javascript code that is exported as part of the bindings.
-    pub fn framework_runtime(
-        self,
-        builder: impl Fn(crate::FrameworkExporter) -> Result<Cow<'static, str>, Error>
-        + Send
-        + Sync
-        + 'static,
-    ) -> Self {
-        Self(self.0.framework_runtime(builder))
-    }
-
     /// Export the files into a single string.
     ///
     /// Note: This returns an error if the format is `Format::Files`.
