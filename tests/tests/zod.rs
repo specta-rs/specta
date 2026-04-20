@@ -2,7 +2,7 @@ use std::{borrow::Cow, iter, path::Path};
 
 use serde::{Deserialize, Serialize};
 use specta::{
-    Type, Types,
+    Format, Type, Types,
     datatype::{DataType, NamedDataType, Primitive, Reference},
 };
 use specta_typescript::Typescript;
@@ -120,34 +120,28 @@ fn temp_root() -> std::path::PathBuf {
 
 fn zod_raw_map_types(
     types: &Types,
-) -> Result<std::borrow::Cow<'_, Types>, specta_zod::FormatError> {
+) -> Result<std::borrow::Cow<'_, Types>, specta::FormatError> {
     Ok(std::borrow::Cow::Borrowed(types))
 }
 
 fn zod_raw_map_datatype<'a>(
     _types: &'a Types,
     dt: &'a DataType,
-) -> Result<std::borrow::Cow<'a, DataType>, specta_zod::FormatError> {
+) -> Result<std::borrow::Cow<'a, DataType>, specta::FormatError> {
     Ok(std::borrow::Cow::Borrowed(dt))
 }
 
 #[allow(non_upper_case_globals)]
-const zod_raw_format: (
-    for<'a> fn(&'a Types) -> Result<std::borrow::Cow<'a, Types>, specta_zod::FormatError>,
-    for<'a> fn(
-        &'a Types,
-        &'a DataType,
-    ) -> Result<std::borrow::Cow<'a, DataType>, specta_zod::FormatError>,
-) = (zod_raw_map_types, zod_raw_map_datatype);
+const zod_raw_format: Format = Format::new(zod_raw_map_types, zod_raw_map_datatype);
 
-fn zod_identity_types<'a>(types: &'a Types) -> Result<Cow<'a, Types>, specta_zod::FormatError> {
+fn zod_identity_types<'a>(types: &'a Types) -> Result<Cow<'a, Types>, specta::FormatError> {
     Ok(Cow::Borrowed(types))
 }
 
 fn zod_map_bool_to_string<'a>(
     _: &'a Types,
     dt: &'a DataType,
-) -> Result<Cow<'a, DataType>, specta_zod::FormatError> {
+) -> Result<Cow<'a, DataType>, specta::FormatError> {
     Ok(match dt {
         DataType::Primitive(Primitive::bool) => Cow::Owned(DataType::Primitive(Primitive::str)),
         _ => Cow::Borrowed(dt),
@@ -157,7 +151,7 @@ fn zod_map_bool_to_string<'a>(
 fn zod_map_reference_to_string<'a>(
     _: &'a Types,
     dt: &'a DataType,
-) -> Result<Cow<'a, DataType>, specta_zod::FormatError> {
+) -> Result<Cow<'a, DataType>, specta::FormatError> {
     Ok(match dt {
         DataType::Reference(Reference::Named(_)) => Cow::Owned(DataType::Primitive(Primitive::str)),
         _ => Cow::Borrowed(dt),
@@ -167,7 +161,7 @@ fn zod_map_reference_to_string<'a>(
 fn zod_error_on_bool<'a>(
     _: &'a Types,
     dt: &'a DataType,
-) -> Result<Cow<'a, DataType>, specta_zod::FormatError> {
+) -> Result<Cow<'a, DataType>, specta::FormatError> {
     match dt {
         DataType::Primitive(Primitive::bool) => Err(std::io::Error::other("boom").into()),
         _ => Ok(Cow::Borrowed(dt)),
@@ -269,7 +263,10 @@ fn zod_framework_inline_applies_datatype_mapping() {
 
     let rendered = Zod::default()
         .framework_runtime(move |ctx| Ok(ctx.inline(&ty)?.into()))
-        .export(&types, (zod_identity_types, zod_map_bool_to_string))
+        .export(
+            &types,
+            Format::new(zod_identity_types, zod_map_bool_to_string),
+        )
         .unwrap();
 
     assert!(rendered.contains("z.string()"), "{rendered}");
@@ -296,7 +293,10 @@ fn zod_framework_reference_and_export_apply_datatype_mapping() {
             let reference = reference.clone();
             move |ctx| Ok(ctx.reference(&Reference::Named(reference.clone()))?.into())
         })
-        .export(&types, (zod_identity_types, zod_map_reference_to_string))
+        .export(
+            &types,
+            Format::new(zod_identity_types, zod_map_reference_to_string),
+        )
         .unwrap();
     assert!(
         reference_rendered.contains("z.string()"),
@@ -305,7 +305,10 @@ fn zod_framework_reference_and_export_apply_datatype_mapping() {
 
     let export_rendered = Zod::default()
         .framework_runtime(move |ctx| Ok(ctx.export(iter::once(&ndt), "")?.into()))
-        .export(&types, (zod_identity_types, zod_map_bool_to_string))
+        .export(
+            &types,
+            Format::new(zod_identity_types, zod_map_bool_to_string),
+        )
         .unwrap();
     assert!(export_rendered.contains("z.string()"), "{export_rendered}");
 }
@@ -315,7 +318,10 @@ fn zod_framework_datatype_mapping_errors_bubble_out() {
     let types = Types::default();
     let err = Zod::default()
         .framework_runtime(|ctx| Ok(ctx.inline(&DataType::Primitive(Primitive::bool))?.into()))
-        .export(&types, (zod_identity_types, zod_error_on_bool))
+        .export(
+            &types,
+            Format::new(zod_identity_types, zod_error_on_bool),
+        )
         .unwrap_err();
 
     assert_eq!(
@@ -391,8 +397,8 @@ fn zod_uses_serde_transformed_resolved_types() {
 #[test]
 fn zod_rejects_invalid_serde_shapes_via_transformation() {
     let types = Types::default().register::<InvalidInternallyTaggedEnum>();
-    let (map_types, _) = specta_serde::format;
-    let err = map_types(&types).unwrap_err();
+    let format = specta_serde::format;
+    let err = (format.format_types)(&types).unwrap_err();
 
     assert!(err.to_string().contains("Invalid internally tagged enum"));
 }

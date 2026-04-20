@@ -14,17 +14,17 @@
 //!
 //! ```rust
 //! use std::borrow::Cow;
-//! use specta::{Type, Types};
+//! use specta::{Format, Type, Types};
 //! use specta_typescript::Typescript;
 //!
-//! fn raw_types<'a>(types: &'a Types) -> Result<Cow<'a, Types>, specta_typescript::FormatError> {
+//! fn raw_types<'a>(types: &'a Types) -> Result<Cow<'a, Types>, specta::FormatError> {
 //!     Ok(Cow::Borrowed(types))
 //! }
 //!
 //! fn raw_datatype<'a>(
 //!     _types: &'a Types,
 //!     ty: &'a specta::datatype::DataType,
-//! ) -> Result<Cow<'a, specta::datatype::DataType>, specta_typescript::FormatError> {
+//! ) -> Result<Cow<'a, specta::datatype::DataType>, specta::FormatError> {
 //!     Ok(Cow::Borrowed(ty))
 //! }
 //!
@@ -43,7 +43,11 @@
 //!     // We don't need to specify `MyOtherType` because it's referenced by `MyType`
 //!     .register::<MyType>();
 //! Typescript::default()
-//!     .export_to("./bindings.ts", &types, (raw_types, raw_datatype))
+//!     .export_to(
+//!         "./bindings.ts",
+//!         &types,
+//!         Format::new(raw_types, raw_datatype),
+//!     )
 //!     .unwrap();
 //! ```
 //!
@@ -72,7 +76,7 @@ mod typescript;
 
 pub use branded::Branded;
 pub use error::Error;
-pub use exporter::{BrandedTypeExporter, Exporter, FormatError, FrameworkExporter, Layout};
+pub use exporter::{BrandedTypeExporter, Exporter, FrameworkExporter, Layout};
 pub use jsdoc::JSDoc;
 pub use opaque::define;
 pub use references::collect_references;

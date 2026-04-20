@@ -1,26 +1,25 @@
 use std::{
     borrow::Cow,
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    error, fmt,
+    fmt,
     ops::Deref,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
 use specta::{
-    Types,
+    Format, Types,
     datatype::{DataType, Fields, NamedDataType, Reference},
 };
 
 use crate::{Error, primitives, references};
 
-/// Error type returned by exporter format callbacks.
-pub type FormatError = Box<dyn error::Error + Send + Sync + 'static>;
-
 type TypesFormatFn =
-    Arc<dyn for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError> + Send + Sync>;
+    Arc<dyn for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, specta::FormatError> + Send + Sync>;
 type DataTypeFormatFn = Arc<
-    dyn for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError> + Send + Sync,
+    dyn for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, specta::FormatError>
+        + Send
+        + Sync,
 >;
 
 #[derive(Clone)]
@@ -30,18 +29,11 @@ pub struct FormatFns {
     pub(crate) datatype: DataTypeFormatFn,
 }
 
-impl<TypesFn, DataTypeFn> From<(TypesFn, DataTypeFn)> for FormatFns
-where
-    TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError> + Send + Sync + 'static,
-    DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError>
-        + Send
-        + Sync
-        + 'static,
-{
-    fn from(format: (TypesFn, DataTypeFn)) -> Self {
+impl From<Format> for FormatFns {
+    fn from(format: Format) -> Self {
         Self {
-            types: Arc::new(format.0),
-            datatype: Arc::new(format.1),
+            types: Arc::new(format.format_types),
+            datatype: Arc::new(format.format_dt),
         }
     }
 }
@@ -172,14 +164,7 @@ impl Zod {
     }
 
     /// Export files into a single string.
-    pub fn export<TypesFn, DataTypeFn>(
-        &self,
-        types: &Types,
-        format: (TypesFn, DataTypeFn),
-    ) -> Result<String, Error>
-    where
-        (TypesFn, DataTypeFn): Into<FormatFns>,
-    {
+    pub fn export(&self, types: &Types, format: Format) -> Result<String, Error> {
         let format = format.into();
         let exporter = self.clone();
         let formatted_types = format_types(types, &format)?;
@@ -218,15 +203,7 @@ impl Zod {
     }
 
     /// Export the types to a specific file/folder.
-    pub fn export_to<TypesFn, DataTypeFn>(
-        &self,
-        path: impl AsRef<Path>,
-        types: &Types,
-        format: (TypesFn, DataTypeFn),
-    ) -> Result<(), Error>
-    where
-        (TypesFn, DataTypeFn): Into<FormatFns>,
-    {
+    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types, format: Format) -> Result<(), Error> {
         let format = format.into();
         let exporter = self.clone();
         let formatted_types = format_types(types, &format)?;

@@ -22,8 +22,8 @@ enum FieldIdentifier {
 
 #[test]
 fn identifier_apply_requires_phases() {
-    let (map_types, _) = specta_serde::format;
-    let err = map_types(&Types::default().register::<VariantIdentifier>())
+    let format = specta_serde::format;
+    let err = (format.format_types)(&Types::default().register::<VariantIdentifier>())
         .map(|types| types.into_owned())
         .expect_err("variant_identifier should require format_phases");
     assert!(
@@ -31,7 +31,7 @@ fn identifier_apply_requires_phases() {
             .contains("identifier enums require `format_phases`")
     );
 
-    let err = map_types(&Types::default().register::<FieldIdentifier>())
+    let err = (format.format_types)(&Types::default().register::<FieldIdentifier>())
         .map(|types| types.into_owned())
         .expect_err("field_identifier should require format_phases");
     assert!(
@@ -42,8 +42,8 @@ fn identifier_apply_requires_phases() {
 
 #[test]
 fn identifier_format_phases_exports_deserialize_union() {
-    let (map_types, _) = specta_serde::format_phases;
-    let variant_types = map_types(&Types::default().register::<VariantIdentifier>())
+    let format = specta_serde::format_phases;
+    let variant_types = (format.format_types)(&Types::default().register::<VariantIdentifier>())
         .map(|types| types.into_owned())
         .expect("variant_identifier should be supported by format_phases");
     let variant_ts = Typescript::default()

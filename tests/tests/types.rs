@@ -2675,8 +2675,8 @@ fn struct_collects_all_transparent_field_types() {
 
 #[test]
 fn container_default_marks_all_fields_optional_in_unified_mode() {
-    let (map_types, _) = specta_serde::format;
-    let types = map_types(&Types::default().register::<ContainerDefault>())
+    let format = specta_serde::format;
+    let types = (format.format_types)(&Types::default().register::<ContainerDefault>())
         .map(|types| types.into_owned())
         .expect("container-level #[serde(default)] should be supported");
     let ts = specta_typescript::Typescript::default()
@@ -2688,8 +2688,8 @@ fn container_default_marks_all_fields_optional_in_unified_mode() {
 
 #[test]
 fn field_default_still_marks_only_that_field_optional() {
-    let (map_types, _) = specta_serde::format;
-    let types = map_types(&Types::default().register::<FieldDefault>())
+    let format = specta_serde::format;
+    let types = (format.format_types)(&Types::default().register::<FieldDefault>())
         .map(|types| types.into_owned())
         .expect("field-level #[serde(default)] should be supported");
     let ts = specta_typescript::Typescript::default()
@@ -2701,8 +2701,8 @@ fn field_default_still_marks_only_that_field_optional() {
 
 #[test]
 fn mixed_tagged_and_untagged_variants_export_in_unified_mode() {
-    let (map_types, _) = specta_serde::format;
-    let types = map_types(&Types::default().register::<MixedTaggedAndUntagged>())
+    let format = specta_serde::format;
+    let types = (format.format_types)(&Types::default().register::<MixedTaggedAndUntagged>())
         .map(|types| types.into_owned())
         .expect("mixed tagged and untagged variants should export when they share one shape");
     let ts = specta_typescript::Typescript::default()
@@ -2714,8 +2714,8 @@ fn mixed_tagged_and_untagged_variants_export_in_unified_mode() {
 
 #[test]
 fn mixed_tagged_and_untagged_struct_variants_export_in_unified_mode() {
-    let (map_types, _) = specta_serde::format;
-    let types = map_types(&Types::default().register::<MixedTaggedAndUntaggedStruct>())
+    let format = specta_serde::format;
+    let types = (format.format_types)(&Types::default().register::<MixedTaggedAndUntaggedStruct>())
         .map(|types| types.into_owned())
         .expect(
             "mixed tagged and untagged struct variants should export when they share one shape",
@@ -2729,8 +2729,8 @@ fn mixed_tagged_and_untagged_struct_variants_export_in_unified_mode() {
 
 #[test]
 fn phased_mixed_untagged_variants_require_format_phases() {
-    let (map_types, _) = specta_serde::format;
-    let err = map_types(&Types::default().register::<MixedTaggedAndUntaggedPhased>())
+    let format = specta_serde::format;
+    let err = (format.format_types)(&Types::default().register::<MixedTaggedAndUntaggedPhased>())
         .map(|types| types.into_owned())
         .expect_err("phase-specific mixed untagged variants should require format_phases");
 
@@ -2742,8 +2742,8 @@ fn phased_mixed_untagged_variants_require_format_phases() {
 
 #[test]
 fn phased_mixed_untagged_variants_split_per_phase() {
-    let (map_types, _) = specta_serde::format_phases;
-    let types = map_types(&Types::default().register::<MixedTaggedAndUntaggedPhased>())
+    let format = specta_serde::format_phases;
+    let types = (format.format_types)(&Types::default().register::<MixedTaggedAndUntaggedPhased>())
         .map(|types| types.into_owned())
         .expect("format_phases should support phase-specific mixed untagged variants");
     let ts = specta_typescript::Typescript::default()

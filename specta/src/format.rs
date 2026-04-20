@@ -25,3 +25,19 @@ pub struct Format {
     pub format_dt:
         for<'a> fn(&'a Types, &'a DataType) -> std::result::Result<Cow<'a, DataType>, FormatError>,
 }
+
+impl Format {
+    /// Creates a formatter from collection and datatype callbacks.
+    pub const fn new(
+        format_types: for<'a> fn(&'a Types) -> std::result::Result<Cow<'a, Types>, FormatError>,
+        format_dt: for<'a> fn(
+            &'a Types,
+            &'a DataType,
+        ) -> std::result::Result<Cow<'a, DataType>, FormatError>,
+    ) -> Self {
+        Self {
+            format_types,
+            format_dt,
+        }
+    }
+}

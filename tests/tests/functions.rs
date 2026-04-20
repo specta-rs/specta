@@ -115,8 +115,8 @@ fn test_trailing_comma() {
 #[test]
 fn test_function_exporting() {
     let serde_types = |types: Types| {
-        let (map_types, _) = specta_serde::format;
-        map_types(&types).map(|types| types.into_owned())
+        let format = specta_serde::format;
+        (format.format_types)(&types).map(|types| types.into_owned())
     };
 
     {

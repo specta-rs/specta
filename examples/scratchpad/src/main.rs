@@ -48,14 +48,14 @@ fn main() {
     //             .as_ref()
     //     )
     // );
-    println!("{:?}", {
-        let (map_types, map_datatype) = specta_serde::format_phases;
-        let mapped_types = map_types(&types).unwrap();
-        let mapped_dt = map_datatype(&types, &dt).unwrap();
-        specta_typescript::primitives::inline(
-            &specta_typescript::Typescript::new(),
-            mapped_types.as_ref(),
-            mapped_dt.as_ref(),
-        )
-    });
+    // println!("{:?}", {
+    //     let format = specta_serde::format_phases;
+    //     let mapped_types = (format.format_types)(&types).unwrap();
+    //     let mapped_dt = (format.format_dt)(&types, &dt).unwrap();
+    //     specta_typescript::primitives::inline(
+    //         &specta_typescript::Typescript::new(),
+    //         mapped_types.as_ref(),
+    //         mapped_dt.as_ref(),
+    //     )
+    // });
 }

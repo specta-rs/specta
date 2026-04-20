@@ -1,8 +1,8 @@
 use std::{borrow::Cow, path::Path};
 
-use specta::Types;
+use specta::{Format, Types};
 
-use crate::{Branded, BrandedTypeExporter, Error, Exporter, Layout, exporter::FormatFns};
+use crate::{Branded, BrandedTypeExporter, Error, Exporter, Layout};
 
 /// JSDoc language exporter.
 #[derive(Debug, Clone)]
@@ -75,14 +75,7 @@ impl JSDoc {
     /// Export the files into a single string.
     ///
     /// Note: This returns an error if the format is `Format::Files`.
-    pub fn export<TypesFn, DataTypeFn>(
-        &self,
-        types: &Types,
-        format: (TypesFn, DataTypeFn),
-    ) -> Result<String, Error>
-    where
-        (TypesFn, DataTypeFn): Into<FormatFns>,
-    {
+    pub fn export(&self, types: &Types, format: Format) -> Result<String, Error> {
         self.0.export(types, format)
     }
 
@@ -91,15 +84,7 @@ impl JSDoc {
     /// When configured when `format` is `Format::Files`, you must provide a directory path.
     /// Otherwise, you must provide the path of a single file.
     ///
-    pub fn export_to<TypesFn, DataTypeFn>(
-        &self,
-        path: impl AsRef<Path>,
-        types: &Types,
-        format: (TypesFn, DataTypeFn),
-    ) -> Result<(), Error>
-    where
-        (TypesFn, DataTypeFn): Into<FormatFns>,
-    {
+    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types, format: Format) -> Result<(), Error> {
         self.0.export_to(path, types, format)
     }
 }

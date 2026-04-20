@@ -3,7 +3,7 @@
 
 use std::borrow::Cow;
 
-use specta::{Types, datatype::DataType};
+use specta::{Format, Types, datatype::DataType};
 
 macro_rules! register {
     ($types:expr, $dts:expr; $($ty:ty),* $(,)?) => {{
@@ -35,25 +35,19 @@ mod zod;
 pub use types::{types, types_phased};
 pub use utils::fs_to_string;
 
-fn raw_map_types(types: &Types) -> Result<Cow<'_, Types>, specta_typescript::FormatError> {
+fn raw_map_types(types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
     Ok(Cow::Borrowed(types))
 }
 
 fn raw_map_datatype<'a>(
     _types: &'a Types,
     dt: &'a DataType,
-) -> Result<Cow<'a, DataType>, specta_typescript::FormatError> {
+) -> Result<Cow<'a, DataType>, specta::FormatError> {
     Ok(Cow::Borrowed(dt))
 }
 
 #[allow(non_upper_case_globals)]
-pub const raw_format: (
-    for<'a> fn(&'a Types) -> Result<Cow<'a, Types>, specta_typescript::FormatError>,
-    for<'a> fn(
-        &'a Types,
-        &'a DataType,
-    ) -> Result<Cow<'a, DataType>, specta_typescript::FormatError>,
-) = (raw_map_types, raw_map_datatype);
+pub const raw_format: Format = Format::new(raw_map_types, raw_map_datatype);
 
 #[test]
 fn compile_errors() {

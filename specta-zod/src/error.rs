@@ -163,7 +163,7 @@ impl Error {
 
     pub(crate) fn format(
         message: impl Into<Cow<'static, str>>,
-        source: crate::FormatError,
+        source: specta::FormatError,
     ) -> Self {
         Self {
             kind: ErrorKind::Framework {

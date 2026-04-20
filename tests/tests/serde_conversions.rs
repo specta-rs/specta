@@ -202,8 +202,8 @@ fn type_names(types: &Types) -> Vec<String> {
 
 #[test]
 fn apply_rejects_asymmetric_container_conversion() {
-    let (map_types, _) = specta_serde::format;
-    let err = map_types(&Types::default().register::<IntoOnly>())
+    let format = specta_serde::format;
+    let err = (format.format_types)(&Types::default().register::<IntoOnly>())
         .map(|types| types.into_owned())
         .expect_err("apply should reject asymmetric serde conversions");
 
@@ -216,8 +216,8 @@ fn apply_rejects_asymmetric_container_conversion() {
 
 #[test]
 fn format_phases_splits_container_and_dependents_for_conversions() {
-    let (map_types, _) = specta_serde::format_phases;
-    let types = map_types(&Types::default().register::<Parent>())
+    let format = specta_serde::format_phases;
+    let types = (format.format_types)(&Types::default().register::<Parent>())
         .map(|types| types.into_owned())
         .expect("format_phases should support asymmetric serde conversions");
     let names = type_names(&types);
@@ -230,16 +230,16 @@ fn format_phases_splits_container_and_dependents_for_conversions() {
 
 #[test]
 fn apply_accepts_symmetric_container_conversion() {
-    let (map_types, _) = specta_serde::format;
-    map_types(&Types::default().register::<Symmetric>())
+    let format = specta_serde::format;
+    (format.format_types)(&Types::default().register::<Symmetric>())
         .map(|types| types.into_owned())
         .expect("apply should accept symmetric serde conversions");
 }
 
 #[test]
 fn format_phases_accepts_generic_try_from_container_conversion() {
-    let (map_types, _) = specta_serde::format;
-    let err = map_types(&Types::default().register::<GenericParent<String>>())
+    let format = specta_serde::format;
+    let err = (format.format_types)(&Types::default().register::<GenericParent<String>>())
         .map(|types| types.into_owned())
         .expect_err("apply should reject deserialize-only container conversions");
     assert!(
@@ -247,8 +247,8 @@ fn format_phases_accepts_generic_try_from_container_conversion() {
             .contains("Incompatible container conversion")
     );
 
-    let (map_types, _) = specta_serde::format_phases;
-    map_types(&Types::default().register::<GenericParent<String>>())
+    let format = specta_serde::format_phases;
+    (format.format_types)(&Types::default().register::<GenericParent<String>>())
         .map(|types| types.into_owned())
         .expect(
             "format_phases should resolve nested generic references from container conversions",
@@ -257,49 +257,49 @@ fn format_phases_accepts_generic_try_from_container_conversion() {
 
 #[test]
 fn custom_codec_requires_explicit_override() {
-    let (map_types, _) = specta_serde::format;
-    let err = map_types(&Types::default().register::<CustomCodecNoOverride>())
+    let format = specta_serde::format;
+    let err = (format.format_types)(&Types::default().register::<CustomCodecNoOverride>())
         .map(|types| types.into_owned())
         .expect_err("custom serde codecs should require #[specta(type = ...)]");
 
     assert!(err.to_string().contains("Unsupported serde attribute"));
 
-    map_types(&Types::default().register::<CustomCodecWithOverride>())
+    (format.format_types)(&Types::default().register::<CustomCodecWithOverride>())
         .map(|types| types.into_owned())
         .expect("override should satisfy custom serde codecs");
 }
 
 #[test]
 fn custom_codec_variant_requires_explicit_override() {
-    let (map_types, _) = specta_serde::format;
-    let err = map_types(&Types::default().register::<VariantCodecNoOverride>())
+    let format = specta_serde::format;
+    let err = (format.format_types)(&Types::default().register::<VariantCodecNoOverride>())
         .map(|types| types.into_owned())
         .expect_err("variant custom serde codecs should require #[specta(type = ...)]");
     assert!(err.to_string().contains("Unsupported serde attribute"));
 
-    map_types(&Types::default().register::<VariantCodecWithOverride>())
+    (format.format_types)(&Types::default().register::<VariantCodecWithOverride>())
         .map(|types| types.into_owned())
         .expect("variant override should satisfy custom serde codecs");
 }
 
 #[test]
 fn phased_override_requires_format_phases() {
-    let (map_types, _) = specta_serde::format;
-    let err = map_types(&Types::default().register::<CustomCodecWithPhasedOverride>())
+    let format = specta_serde::format;
+    let err = (format.format_types)(&Types::default().register::<CustomCodecWithPhasedOverride>())
         .map(|types| types.into_owned())
         .expect_err("apply should reject phased overrides");
     assert!(err.to_string().contains("requires `format_phases`"));
 
-    let (map_types, _) = specta_serde::format_phases;
-    map_types(&Types::default().register::<CustomCodecWithPhasedOverride>())
+    let format = specta_serde::format_phases;
+    (format.format_types)(&Types::default().register::<CustomCodecWithPhasedOverride>())
         .map(|types| types.into_owned())
         .expect("format_phases should accept phased overrides");
 }
 
 #[test]
 fn field_only_phased_override_requires_format_phases() {
-    let (map_types, _) = specta_serde::format;
-    let err = map_types(&Types::default().register::<FieldOnlyPhasedOverride>())
+    let format = specta_serde::format;
+    let err = (format.format_types)(&Types::default().register::<FieldOnlyPhasedOverride>())
         .map(|types| types.into_owned())
         .expect_err("apply should reject phased field overrides");
     assert!(err.to_string().contains("requires `format_phases`"));
@@ -312,8 +312,8 @@ fn field_only_phased_override_requires_format_phases() {
         .expect_err("raw export should fail on unresolved phased opaque reference");
     assert!(raw_err.to_string().contains("unsupported opaque reference"));
 
-    let (map_types, _) = specta_serde::format_phases;
-    let phased_types = map_types(&Types::default().register::<FieldOnlyPhasedOverride>())
+    let format = specta_serde::format_phases;
+    let phased_types = (format.format_types)(&Types::default().register::<FieldOnlyPhasedOverride>())
         .map(|types| types.into_owned())
         .expect("format_phases should accept phased field overrides");
     Typescript::default()
@@ -336,36 +336,36 @@ fn format_phases_exports_field_only_phased_override() {
 
 #[test]
 fn skip_serializing_if_requires_phases() {
-    let (map_types, _) = specta_serde::format;
-    let err = map_types(&Types::default().register::<SkipSerializingIfOnly>())
+    let format = specta_serde::format;
+    let err = (format.format_types)(&Types::default().register::<SkipSerializingIfOnly>())
         .map(|types| types.into_owned())
         .expect_err("skip_serializing_if should require format_phases");
     assert!(err.to_string().contains("skip_serializing_if"));
 
-    let (map_types, _) = specta_serde::format_phases;
-    map_types(&Types::default().register::<SkipSerializingIfOnly>())
+    let format = specta_serde::format_phases;
+    (format.format_types)(&Types::default().register::<SkipSerializingIfOnly>())
         .map(|types| types.into_owned())
         .expect("format_phases should accept skip_serializing_if");
 }
 
 #[test]
 fn field_phase_specific_rename_requires_phases() {
-    let (map_types, _) = specta_serde::format;
-    let err = map_types(&Types::default().register::<FieldPhaseSpecificRename>())
+    let format = specta_serde::format;
+    let err = (format.format_types)(&Types::default().register::<FieldPhaseSpecificRename>())
         .map(|types| types.into_owned())
         .expect_err("field-level phase-specific renames should require format_phases");
     assert!(err.to_string().contains("Incompatible field rename"));
 
-    let (map_types, _) = specta_serde::format_phases;
-    map_types(&Types::default().register::<FieldPhaseSpecificRename>())
+    let format = specta_serde::format_phases;
+    (format.format_types)(&Types::default().register::<FieldPhaseSpecificRename>())
         .map(|types| types.into_owned())
         .expect("format_phases should accept field-level phase-specific renames");
 }
 
 #[test]
 fn identifier_enums_require_phases() {
-    let (map_types, _) = specta_serde::format;
-    let err = map_types(&Types::default().register::<VariantIdentifierValid>())
+    let format = specta_serde::format;
+    let err = (format.format_types)(&Types::default().register::<VariantIdentifierValid>())
         .map(|types| types.into_owned())
         .expect_err("identifier enums should require format_phases");
     assert!(
@@ -373,11 +373,11 @@ fn identifier_enums_require_phases() {
             .contains("identifier enums require `format_phases`")
     );
 
-    let (map_types, _) = specta_serde::format_phases;
-    map_types(&Types::default().register::<VariantIdentifierValid>())
+    let format = specta_serde::format_phases;
+    (format.format_types)(&Types::default().register::<VariantIdentifierValid>())
         .map(|types| types.into_owned())
         .expect("valid variant_identifier enum should pass in format_phases");
-    map_types(&Types::default().register::<FieldIdentifierValid>())
+    (format.format_types)(&Types::default().register::<FieldIdentifierValid>())
         .map(|types| types.into_owned())
         .expect("valid field_identifier enum should pass in format_phases");
 }

@@ -8,7 +8,7 @@ pub enum Error {
     Fmt(fmt::Error),
     Format {
         message: &'static str,
-        source: crate::go::FormatError,
+        source: specta::FormatError,
     },
     ForbiddenName {
         path: String,
@@ -54,7 +54,7 @@ impl From<fmt::Error> for Error {
 }
 
 impl Error {
-    pub(crate) fn format(message: &'static str, source: crate::go::FormatError) -> Self {
+    pub(crate) fn format(message: &'static str, source: specta::FormatError) -> Self {
         Self::Format { message, source }
     }
 }

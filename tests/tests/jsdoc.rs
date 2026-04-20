@@ -48,18 +48,18 @@ mod jsdoc_export_to_files_runtime_imports_types {
 fn phase_collections(
     types: Types,
 ) -> [(&'static str, Result<Types, specta_serde::FormatError>); 3] {
-    let (serde_map_types, _) = specta_serde::format;
-    let (serde_phases_map_types, _) = specta_serde::format_phases;
+    let serde_format = specta_serde::format;
+    let serde_phases_format = specta_serde::format_phases;
 
     [
         ("raw", Ok(types.clone())),
         (
             "serde",
-            serde_map_types(&types.clone()).map(|types| types.into_owned()),
+            (serde_format.format_types)(&types.clone()).map(|types| types.into_owned()),
         ),
         (
             "serde_phases",
-            serde_phases_map_types(&types).map(|types| types.into_owned()),
+            (serde_phases_format.format_types)(&types).map(|types| types.into_owned()),
         ),
     ]
 }

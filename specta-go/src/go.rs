@@ -1,7 +1,7 @@
-use std::{borrow::Cow, error, fmt, path::Path, sync::Arc};
+use std::{borrow::Cow, fmt, path::Path, sync::Arc};
 
 use specta::{
-    Types,
+    Format, Types,
     datatype::{DataType, Fields, Reference},
 };
 
@@ -10,13 +10,12 @@ use crate::{
     primitives::{self, GoContext},
 };
 
-/// Error type returned by exporter format callbacks.
-pub type FormatError = Box<dyn error::Error + Send + Sync + 'static>;
-
 type TypesFormatFn =
-    Arc<dyn for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError> + Send + Sync>;
+    Arc<dyn for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, specta::FormatError> + Send + Sync>;
 type DataTypeFormatFn = Arc<
-    dyn for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError> + Send + Sync,
+    dyn for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, specta::FormatError>
+        + Send
+        + Sync,
 >;
 
 #[derive(Clone)]
@@ -26,18 +25,11 @@ pub struct FormatFns {
     pub(crate) datatype: DataTypeFormatFn,
 }
 
-impl<TypesFn, DataTypeFn> From<(TypesFn, DataTypeFn)> for FormatFns
-where
-    TypesFn: for<'a> Fn(&'a Types) -> Result<Cow<'a, Types>, FormatError> + Send + Sync + 'static,
-    DataTypeFn: for<'a> Fn(&'a Types, &'a DataType) -> Result<Cow<'a, DataType>, FormatError>
-        + Send
-        + Sync
-        + 'static,
-{
-    fn from(format: (TypesFn, DataTypeFn)) -> Self {
+impl From<Format> for FormatFns {
+    fn from(format: Format) -> Self {
         Self {
-            types: Arc::new(format.0),
-            datatype: Arc::new(format.1),
+            types: Arc::new(format.format_types),
+            datatype: Arc::new(format.format_dt),
         }
     }
 }
@@ -99,22 +91,12 @@ impl Go {
         self
     }
 
-    pub(crate) fn with_format<TypesFn, DataTypeFn>(mut self, format: (TypesFn, DataTypeFn)) -> Self
-    where
-        (TypesFn, DataTypeFn): Into<FormatFns>,
-    {
+    pub(crate) fn with_format(mut self, format: Format) -> Self {
         self.format = Some(format.into());
         self
     }
 
-    pub fn export<TypesFn, DataTypeFn>(
-        &self,
-        types: &Types,
-        format: (TypesFn, DataTypeFn),
-    ) -> Result<String, Error>
-    where
-        (TypesFn, DataTypeFn): Into<FormatFns>,
-    {
+    pub fn export(&self, types: &Types, format: Format) -> Result<String, Error> {
         let mut ctx = GoContext::default();
         let mut body = String::new();
 
@@ -152,15 +134,7 @@ impl Go {
         Ok(out)
     }
 
-    pub fn export_to<TypesFn, DataTypeFn>(
-        &self,
-        path: impl AsRef<Path>,
-        types: &Types,
-        format: (TypesFn, DataTypeFn),
-    ) -> Result<(), Error>
-    where
-        (TypesFn, DataTypeFn): Into<FormatFns>,
-    {
+    pub fn export_to(&self, path: impl AsRef<Path>, types: &Types, format: Format) -> Result<(), Error> {
         if self.layout == Layout::Files {
             return Err(Error::UnableToExport(Layout::Files));
         }

@@ -21,4 +21,4 @@ mod zod;
 pub use error::Error;
 pub use opaque::define;
 pub use types::{Any, Never, Unknown};
-pub use zod::{BigIntExportBehavior, FormatError, FrameworkExporter, Layout, Zod};
+pub use zod::{BigIntExportBehavior, FrameworkExporter, Layout, Zod};
