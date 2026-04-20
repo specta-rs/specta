@@ -194,6 +194,9 @@ fn test_mixed_enum_not_string() {
     assert!(result.contains("struct MixedEnumWithFieldsData: Codable"));
     assert!(result.contains("let name: String"));
     assert!(result.contains("let value: Int32"));
+    assert!(!result.contains("case unit(    case unit"));
+    assert!(!result.contains("public let withFields:     public let"));
+    assert!(!result.contains("public let withData:     public let"));
 }
 
 #[test]

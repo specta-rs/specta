@@ -11,18 +11,9 @@ public enum JobStatus: String, Codable {
 }
 
 public enum MixedEnum {
-    case unit(    case unit
-)
-    case withData(MixedEnumWithDataData)
+    case unit
+    case withData(String)
 }
-public struct MixedEnumWithDataData: Codable {
-    public let withData: String
-
-    private enum CodingKeys: String, CodingKey {
-        case withData = "with_data"
-    }
-}
-
 // MARK: - MixedEnum Codable Implementation
 extension MixedEnum: Codable {
     private enum CodingKeys: String, CodingKey {
@@ -42,10 +33,9 @@ extension MixedEnum: Codable {
         let key = container.allKeys.first!
         switch key {
         case .unit:
-            // TODO: Implement tuple variant decoding for unit
-            fatalError("Tuple variant decoding not implemented")
+            self = .unit
         case .withData:
-            let data = try container.decode(MixedEnumWithDataData.self, forKey: .withData)
+            let data = try container.decode(String.self, forKey: .withData)
             self = .withData(data)
         }
     }
@@ -55,8 +45,7 @@ extension MixedEnum: Codable {
         
         switch self {
         case .unit:
-            // TODO: Implement tuple variant encoding for unit
-            fatalError("Tuple variant encoding not implemented")
+            try container.encodeNil(forKey: .unit)
         case .withData(let data):
             try container.encode(data, forKey: .withData)
         }
