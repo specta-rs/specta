@@ -442,7 +442,7 @@ fn typescript_layout_files_preserves_unrelated_typescript_files() {
 
     Typescript::default()
         .layout(specta_typescript::Layout::Files)
-        .export_to(&path, &types, crate::raw_format)
+        .export_to(&path, &types, crate::identity_format)
         .unwrap();
 
     assert!(keep_path.exists());

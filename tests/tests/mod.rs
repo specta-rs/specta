@@ -35,11 +35,11 @@ mod zod;
 pub use types::{types, types_phased};
 pub use utils::fs_to_string;
 
-fn raw_map_types(types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
+fn identity_map_types(types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
     Ok(Cow::Borrowed(types))
 }
 
-fn raw_map_datatype<'a>(
+fn identity_map_datatype<'a>(
     _types: &'a Types,
     dt: &'a DataType,
 ) -> Result<Cow<'a, DataType>, specta::FormatError> {
@@ -47,7 +47,7 @@ fn raw_map_datatype<'a>(
 }
 
 #[allow(non_upper_case_globals)]
-pub const raw_format: Format = Format::new(raw_map_types, raw_map_datatype);
+pub const identity_format: Format = Format::new(identity_map_types, identity_map_datatype);
 
 #[test]
 fn compile_errors() {

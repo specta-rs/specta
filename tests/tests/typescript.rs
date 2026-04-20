@@ -140,7 +140,7 @@ fn typescript_export() {
             format!("ts-export-{mode}"),
             phase_output(result, |_, types| {
                 Typescript::default()
-                    .export(&types, crate::raw_format)
+                    .export(&types, crate::identity_format)
                     .map_err(|err| err.to_string())
             })
         );
@@ -199,7 +199,7 @@ fn typescript_export_serde_errors() {
                 continue;
             }
 
-            match Typescript::default().export(&types, crate::raw_format) {
+            match Typescript::default().export(&types, crate::identity_format) {
                 Ok(_) => failures.push(format!(
                     "{name} ({mode}) [export]: expected error containing '{expected_error}', but export succeeded"
                 )),
@@ -470,7 +470,7 @@ fn typescript_export_bigint_errors() {
             return;
         }
 
-        match ts.export(&types, crate::raw_format) {
+        match ts.export(&types, crate::identity_format) {
             Ok(output) => failures.push(format!(
                 "{name} [export]: expected BigInt error, but export succeeded with '{output}'"
             )),
@@ -641,7 +641,7 @@ fn typescript_export_to() {
                 let path = temp.path().join(&name);
                 Typescript::default()
                     .layout(layout)
-                    .export_to(&path, &types, crate::raw_format)
+                    .export_to(&path, &types, crate::identity_format)
                     .map_err(|err| err.to_string())?;
                 fs_to_string(&path).map_err(|err| err.to_string())
             });

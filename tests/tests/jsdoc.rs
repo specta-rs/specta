@@ -66,7 +66,9 @@ fn phase_collections(types: Types) -> [(&'static str, Result<Types, specta::Form
 fn export() {
     for (mode, types) in phase_collections(crate::types().0) {
         let output = match types {
-            Ok(types) => JSDoc::default().export(&types, crate::raw_format).unwrap(),
+            Ok(types) => JSDoc::default()
+                .export(&types, crate::identity_format)
+                .unwrap(),
             Err(err) => format!("ERROR: {err}"),
         };
 
@@ -121,7 +123,7 @@ fn jsdoc_export_bigint_errors() {
             return;
         }
 
-        match jsdoc.export(&types, crate::raw_format) {
+        match jsdoc.export(&types, crate::identity_format) {
             Ok(output) => failures.push(format!(
                 "{name} [export]: expected BigInt error, but export succeeded with '{output}'"
             )),
@@ -288,7 +290,7 @@ fn jsdoc_export_to_files_uses_jsdoc_import_typedefs() {
 
     JSDoc::default()
         .layout(Layout::Files)
-        .export_to(&path, &types, crate::raw_format)
+        .export_to(&path, &types, crate::identity_format)
         .unwrap();
 
     let output = fs_to_string(&path).unwrap();

@@ -304,13 +304,13 @@ fn field_only_phased_override_requires_format_phases() {
         .expect_err("apply should reject phased field overrides");
     assert!(err.to_string().contains("requires `format_phases`"));
 
-    let raw_err = Typescript::default()
+    let export_err = Typescript::default()
         .export(
             &Types::default().register::<FieldOnlyPhasedOverride>(),
-            crate::raw_format,
+            specta_serde::format,
         )
-        .expect_err("raw export should fail on unresolved phased opaque reference");
-    assert!(raw_err.to_string().contains("unsupported opaque reference"));
+        .expect_err("serde export should fail when phased overrides require format_phases");
+    assert!(export_err.to_string().contains("requires `format_phases`"));
 
     let format = specta_serde::format_phases;
     let phased_types =
@@ -318,7 +318,7 @@ fn field_only_phased_override_requires_format_phases() {
             .map(|types| types.into_owned())
             .expect("format_phases should accept phased field overrides");
     Typescript::default()
-        .export(&phased_types, crate::raw_format)
+        .export(&phased_types, crate::identity_format)
         .expect("phased export should remove phased opaque references");
 }
 

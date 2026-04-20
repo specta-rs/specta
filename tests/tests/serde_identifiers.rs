@@ -47,7 +47,7 @@ fn identifier_format_phases_exports_deserialize_union() {
         .map(|types| types.into_owned())
         .expect("variant_identifier should be supported by format_phases");
     let variant_ts = Typescript::default()
-        .export(&variant_types, crate::raw_format)
+        .export(&variant_types, crate::identity_format)
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-identifiers-variant-typescript", variant_ts);
@@ -56,7 +56,7 @@ fn identifier_format_phases_exports_deserialize_union() {
         .map(|types| types.into_owned())
         .expect("field_identifier should be supported by format_phases");
     let field_ts = Typescript::default()
-        .export(&field_types, crate::raw_format)
+        .export(&field_types, crate::identity_format)
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-identifiers-field-typescript", field_ts);
