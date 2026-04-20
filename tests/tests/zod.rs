@@ -205,7 +205,9 @@ fn zod_bigint_errors_propagate_from_nested_types() {
 #[test]
 fn zod_layout_duplicate_typenames() {
     let types = Types::default().register::<Testing>().register::<Another>();
-    let err = Zod::default().export(&types, specta_serde::format).unwrap_err();
+    let err = Zod::default()
+        .export(&types, specta_serde::format)
+        .unwrap_err();
     assert!(err.to_string().contains("Detected multiple types"));
 
     let module_prefixed = Zod::default()
@@ -295,7 +297,7 @@ fn typescript_layout_files_preserves_unrelated_typescript_files() {
 
     Typescript::default()
         .layout(specta_typescript::Layout::Files)
-        .export_to(&path, &types, crate::identity_format)
+        .export_to(&path, &types, specta_serde::format)
         .unwrap();
 
     assert!(keep_path.exists());
@@ -320,7 +322,9 @@ fn zod_reserved_type_name_errors() {
     let mut types = Types::default();
     NamedDataType::new("class", Vec::new(), DataType::Primitive(Primitive::i8))
         .register(&mut types);
-    let err = Zod::default().export(&types, specta_serde::format).unwrap_err();
+    let err = Zod::default()
+        .export(&types, specta_serde::format)
+        .unwrap_err();
     assert!(err.to_string().contains("reserved keyword"));
 }
 

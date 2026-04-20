@@ -3,6 +3,33 @@ source: tests/tests/jsdoc.rs
 expression: output
 ---
 /**
+	*  https://github.com/specta-rs/specta/issues/374
+	*
+	* @typedef {{
+	*		foo?: boolean,
+	*		bar?: boolean,
+	*	}} Issue374_Serialize
+	* @property {boolean} [foo]
+	* @property {boolean} [bar]
+	*
+	* @typedef {{
+	*		a: number | null,
+	*		b?: number | null,
+	*		c?: string | null,
+	*		d: boolean,
+	*	}} Optional_Serialize
+	* @property {number | null} a
+	* @property {number | null} [b]
+	* @property {string | null} [c]
+	* @property {boolean} d
+	*
+	* @typedef {{
+	*		kind: "StructPhaseSpecificRenameSerialize",
+	*		ser: string,
+	*	}} StructPhaseSpecificRenameSerialize
+	* @property {"StructPhaseSpecificRenameSerialize"} kind
+	* @property {string} ser
+	*
 	* @typedef {{
 	*		start: T,
 	*		end: T,

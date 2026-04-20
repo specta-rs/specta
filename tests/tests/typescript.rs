@@ -15,8 +15,18 @@ use tempfile::TempDir;
 
 use crate::fs_to_string;
 
-fn identity_types<'a>(types: &'a Types) -> Result<Cow<'a, Types>, specta::FormatError> {
+branded!(struct BoolBrand(bool) as "BoolBrand");
+branded!(struct RefBrand(BrandedReferenceInner) as "RefBrand");
+
+fn identity_types(types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
     Ok(Cow::Borrowed(types))
+}
+
+fn identity_datatype<'a>(
+    _: &'a Types,
+    dt: &'a DataType,
+) -> Result<Cow<'a, DataType>, specta::FormatError> {
+    Ok(Cow::Borrowed(dt))
 }
 
 fn map_bool_to_string<'a>(
@@ -34,7 +44,7 @@ fn map_bool_to_null_tuple<'a>(
     dt: &'a DataType,
 ) -> Result<Cow<'a, DataType>, specta::FormatError> {
     Ok(match dt {
-        DataType::Primitive(Primitive::bool) => Cow::Owned(DataType::Tuple(Tuple::new(vec![]))),
+        DataType::Primitive(Primitive::bool) => Cow::Owned(DataType::Tuple(Tuple::new(Vec::new()))),
         _ => Cow::Borrowed(dt),
     })
 }
@@ -44,18 +54,9 @@ fn map_reference_to_string<'a>(
     dt: &'a DataType,
 ) -> Result<Cow<'a, DataType>, specta::FormatError> {
     Ok(match dt {
-        DataType::Reference(Reference::Named(_)) => Cow::Owned(DataType::Primitive(Primitive::str)),
+        DataType::Reference(_) => Cow::Owned(DataType::Primitive(Primitive::str)),
         _ => Cow::Borrowed(dt),
     })
-}
-
-branded!(struct BoolBrand(bool) as "BoolBrand");
-branded!(struct RefBrand(BrandedReferenceInner) as "RefBrand");
-
-#[derive(Type)]
-#[specta(collect = false)]
-struct BrandedReferenceInner {
-    value: bool,
 }
 
 fn error_on_bool<'a>(
@@ -63,9 +64,17 @@ fn error_on_bool<'a>(
     dt: &'a DataType,
 ) -> Result<Cow<'a, DataType>, specta::FormatError> {
     match dt {
-        DataType::Primitive(Primitive::bool) => Err(std::io::Error::other("boom").into()),
+        DataType::Primitive(Primitive::bool) => Err("boom".into()),
         _ => Ok(Cow::Borrowed(dt)),
     }
+}
+
+const IDENTITY_FORMAT: Format = Format::new(identity_types, identity_datatype);
+
+#[derive(Type)]
+#[specta(collect = false)]
+struct BrandedReferenceInner {
+    value: bool,
 }
 
 fn typescript_types() -> (Types, Vec<(&'static str, DataType)>) {
@@ -85,10 +94,9 @@ fn typescript_types() -> (Types, Vec<(&'static str, DataType)>) {
     (types, dts)
 }
 
-fn phase_collections() -> [(PhaseCollection, Vec<(&'static str, DataType)>, Types); 3] {
-    let serde_format = specta_serde::format;
-    let serde_phases_format = specta_serde::format_phases;
+type PhaseCollection = (&'static str, Format, Vec<(&'static str, DataType)>, Types);
 
+fn phase_collections() -> [PhaseCollection; 3] {
     let (types, dts) = {
         let (mut types, mut dts) = crate::types();
         let (types2, dts2) = typescript_types();
@@ -103,68 +111,47 @@ fn phase_collections() -> [(PhaseCollection, Vec<(&'static str, DataType)>, Type
         (types2, dts2)
     };
 
-    let serde_types = (serde_format.format_types)(&types)
-        .map(|types| types.into_owned())
-        .expect("serde formatting should succeed for shared TypeScript fixtures");
-    let serde_phases_types = (serde_phases_format.format_types)(&phased_types)
-        .map(|types| types.into_owned())
-        .expect("serde phase formatting should succeed for shared TypeScript fixtures");
-
     [
-        (PhaseCollection::Raw, dts.clone(), types.clone()),
-        (PhaseCollection::Serde, dts, serde_types),
-        (PhaseCollection::SerdePhases, phased_dts, serde_phases_types),
+        ("raw", IDENTITY_FORMAT, dts.clone(), types.clone()),
+        ("serde", specta_serde::format, dts, types),
+        (
+            "serde_phases",
+            specta_serde::format_phases,
+            phased_dts,
+            phased_types,
+        ),
     ]
 }
 
-#[derive(Clone, Copy)]
-enum PhaseCollection {
-    Raw,
-    Serde,
-    SerdePhases,
-}
-
-impl PhaseCollection {
-    fn name(self) -> &'static str {
-        match self {
-            Self::Raw => "raw",
-            Self::Serde => "serde",
-            Self::SerdePhases => "serde_phases",
-        }
-    }
-
-    fn export_typescript(self, types: &Types) -> Result<String, specta_typescript::Error> {
-        let _ = self;
-        Typescript::default().export(types, crate::identity_format)
-    }
-
-    fn export_typescript_to(
-        self,
-        path: &Path,
-        types: &Types,
-        layout: Layout,
-    ) -> Result<(), specta_typescript::Error> {
-        let _ = self;
-        Typescript::default()
-            .layout(layout)
-            .export_to(path, types, crate::identity_format)
-    }
-}
-
 fn phase_output(
+    format: Format,
     dts: &[(&'static str, DataType)],
     types: &Types,
     f: impl FnOnce(&[(&'static str, DataType)], &Types) -> Result<String, String>,
 ) -> String {
-    f(dts, types).unwrap_or_else(|err| format!("ERROR: {err}"))
+    let types = match (format.format_types)(types) {
+        Ok(types) => types.into_owned(),
+        Err(err) => return format!("ERROR: {err}"),
+    };
+    let dts = match dts
+        .iter()
+        .map(|(name, dt)| (format.format_dt)(&types, dt).map(|dt| (*name, dt.into_owned())))
+        .collect::<Result<Vec<_>, _>>()
+    {
+        Ok(dts) => dts,
+        Err(err) => return format!("ERROR: {err}"),
+    };
+
+    f(&dts, &types).unwrap_or_else(|err| format!("ERROR: {err}"))
 }
 
 #[test]
 fn typescript_export() {
-    for (mode, _, types) in phase_collections() {
+    for (mode, format, _, types) in phase_collections() {
         insta::assert_snapshot!(
-            format!("ts-export-{}", mode.name()),
-            mode.export_typescript(&types)
+            format!("ts-export-{mode}"),
+            Typescript::default()
+                .export(&types, format)
                 .unwrap_or_else(|err| format!("ERROR: {err}"))
         );
     }
@@ -192,18 +179,11 @@ fn typescript_export_serde_errors() {
         let mut registered_types = Types::default();
         let dt = T::definition(&mut registered_types);
 
-        for mode in ["serde", "serde_phases"] {
-            let serde_format = specta_serde::format;
-            let serde_phases_format = specta_serde::format_phases;
-
-            let types = match mode {
-                "serde" => {
-                    (serde_format.format_types)(&registered_types.clone())
-                        .map(|types| types.into_owned())
-                }
-                _ => (serde_phases_format.format_types)(&registered_types.clone())
-                    .map(|types| types.into_owned()),
-            };
+        for (mode, format) in [
+            ("serde", specta_serde::format),
+            ("serde_phases", specta_serde::format_phases),
+        ] {
+            let types = (format.format_types)(&registered_types).map(|types| types.into_owned());
 
             let types = match types {
                 Ok(types) => types,
@@ -213,17 +193,14 @@ fn typescript_export_serde_errors() {
                 }
             };
 
-            let validate = match mode {
-                "serde" => (serde_format.format_dt)(&types, &dt),
-                _ => (serde_phases_format.format_dt)(&types, &dt),
-            };
+            let validate = (format.format_dt)(&types, &dt);
 
             if let Err(err) = validate {
                 assert_expected_error(failures, name, mode, "validate", expected_error, err);
                 continue;
             }
 
-            match Typescript::default().export(&types, crate::identity_format) {
+            match Typescript::default().export(&types, format) {
                 Ok(_) => failures.push(format!(
                     "{name} ({mode}) [export]: expected error containing '{expected_error}', but export succeeded"
                 )),
@@ -494,7 +471,7 @@ fn typescript_export_bigint_errors() {
             return;
         }
 
-        match ts.export(&types, crate::identity_format) {
+        match ts.export(&types, specta_serde::format) {
             Ok(output) => failures.push(format!(
                 "{name} [export]: expected BigInt error, but export succeeded with '{output}'"
             )),
@@ -659,15 +636,17 @@ fn typescript_export_to() {
         Layout::ModulePrefixedName,
         Layout::Namespaces,
     ] {
-        for (mode, _, types) in phase_collections() {
+        for (mode, format, _, types) in phase_collections() {
             let name = format!(
                 "ts-export-to-{}-{}",
                 layout.to_string().to_lowercase(),
-                mode.name()
+                mode
             );
             let output = (|| {
                 let path = temp.path().join(&name);
-                mode.export_typescript_to(&path, &types, layout)
+                Typescript::default()
+                    .layout(layout)
+                    .export_to(&path, &types, format)
                     .map_err(|err| err.to_string())?;
                 fs_to_string(&path).map_err(|err| err.to_string())
             })()
@@ -685,8 +664,8 @@ fn typescript_export_to() {
 
 #[test]
 fn primitives_export() {
-    for (mode, dts, types) in phase_collections() {
-        let output = phase_output(&dts, &types, |dts, types| {
+    for (mode, format, dts, types) in phase_collections() {
+        let output = phase_output(format, &dts, &types, |dts, types| {
             let ts = Typescript::default();
 
             dts.iter()
@@ -705,14 +684,14 @@ fn primitives_export() {
                 .map_err(|err| err.to_string())
         });
 
-        insta::assert_snapshot!(format!("export-{}", mode.name()), output);
+        insta::assert_snapshot!(format!("export-{mode}"), output);
     }
 }
 
 #[test]
 fn primitives_export_many() {
-    for (mode, dts, types) in phase_collections() {
-        let output = phase_output(&dts, &types, |dts, types| {
+    for (mode, format, dts, types) in phase_collections() {
+        let output = phase_output(format, &dts, &types, |dts, types| {
             let ts = Typescript::default();
             let ndts = dts
                 .iter()
@@ -725,14 +704,14 @@ fn primitives_export_many() {
             primitives::export(&ts, types, ndts.into_iter(), "").map_err(|err| err.to_string())
         });
 
-        insta::assert_snapshot!(format!("export-many-{}", mode.name()), output);
+        insta::assert_snapshot!(format!("export-many-{mode}"), output);
     }
 }
 
 #[test]
 fn primitives_export_allows_generic_hashmap_definition() {
-    for (mode, dts, types) in phase_collections() {
-        let output = phase_output(&dts, &types, |dts, types| {
+    for (mode, format, dts, types) in phase_collections() {
+        let output = phase_output(format, &dts, &types, |dts, types| {
             let ts = Typescript::default();
             let hash_map = dts
                 .iter()
@@ -750,7 +729,7 @@ fn primitives_export_allows_generic_hashmap_definition() {
         assert!(
             !output.starts_with("ERROR:"),
             "unexpected error while exporting generic HashMap in {}: {output}",
-            mode.name()
+            mode
         );
         assert!(output.contains("export type HashMap<K, V> = { [key in K]: V };"));
     }
@@ -758,8 +737,8 @@ fn primitives_export_allows_generic_hashmap_definition() {
 
 #[test]
 fn primitives_reference() {
-    for (mode, dts, types) in phase_collections() {
-        let output = phase_output(&dts, &types, |dts, types| {
+    for (mode, format, dts, types) in phase_collections() {
+        let output = phase_output(format, &dts, &types, |dts, types| {
             let ts = Typescript::default();
             dts.iter()
                 .filter_map(|(s, ty)| match ty {
@@ -772,14 +751,14 @@ fn primitives_reference() {
                 .map_err(|err| err.to_string())
         });
 
-        insta::assert_snapshot!(format!("reference-{}", mode.name()), output);
+        insta::assert_snapshot!(format!("reference-{mode}"), output);
     }
 }
 
 #[test]
 fn primitives_inline() {
-    for (mode, dts, types) in phase_collections() {
-        let output = phase_output(&dts, &types, |dts, types| {
+    for (mode, format, dts, types) in phase_collections() {
+        let output = phase_output(format, &dts, &types, |dts, types| {
             let ts = Typescript::default();
             dts.iter()
                 .map(|(s, ty)| primitives::inline(&ts, types, ty).map(|ty| format!("{s}: {ty}")))
@@ -788,7 +767,7 @@ fn primitives_inline() {
                 .map_err(|err| err.to_string())
         });
 
-        insta::assert_snapshot!(format!("inline-{}", mode.name()), output);
+        insta::assert_snapshot!(format!("inline-{mode}"), output);
     }
 }
 

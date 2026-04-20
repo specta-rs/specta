@@ -40,7 +40,10 @@ fn serde_other_requires_format_phases() {
 #[test]
 fn serde_other_internal_tag_widens_deserialize_tag_to_string() {
     let ts = Typescript::default()
-        .export(&Types::default().register::<InternalOther>(), specta_serde::format_phases)
+        .export(
+            &Types::default().register::<InternalOther>(),
+            specta_serde::format_phases,
+        )
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-other-internal-tag-typescript", ts);
@@ -49,7 +52,10 @@ fn serde_other_internal_tag_widens_deserialize_tag_to_string() {
 #[test]
 fn serde_other_adjacent_tag_widens_deserialize_tag_to_string() {
     let ts = Typescript::default()
-        .export(&Types::default().register::<AdjacentOther>(), specta_serde::format_phases)
+        .export(
+            &Types::default().register::<AdjacentOther>(),
+            specta_serde::format_phases,
+        )
         .expect("typescript export should succeed");
 
     insta::assert_snapshot!("serde-other-adjacent-tag-typescript", ts);

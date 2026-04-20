@@ -1,10 +1,6 @@
 //! We register a single entrypoint so all tests are compiled into a single binary.
 #![allow(unused_parens, unused_variables, dead_code, unused_mut)]
 
-use std::borrow::Cow;
-
-use specta::{Format, Types, datatype::DataType};
-
 macro_rules! register {
     ($types:expr, $dts:expr; $($ty:ty),* $(,)?) => {{
         $(
@@ -34,20 +30,6 @@ mod zod;
 
 pub use types::{types, types_phased};
 pub use utils::fs_to_string;
-
-fn identity_map_types(types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
-    Ok(Cow::Borrowed(types))
-}
-
-fn identity_map_datatype<'a>(
-    _types: &'a Types,
-    dt: &'a DataType,
-) -> Result<Cow<'a, DataType>, specta::FormatError> {
-    Ok(Cow::Borrowed(dt))
-}
-
-#[allow(non_upper_case_globals)]
-pub const identity_format: Format = Format::new(identity_map_types, identity_map_datatype);
 
 #[test]
 fn compile_errors() {

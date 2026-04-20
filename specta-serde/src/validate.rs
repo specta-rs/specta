@@ -38,14 +38,7 @@ pub(crate) fn validate_datatype_for_mode(
     types: &Types,
     mode: ApplyMode,
 ) -> Result<(), Error> {
-    validate_datatype_with_generics_for_mode(
-        dt,
-        types,
-        &[],
-        "<top-level>".to_string(),
-        mode,
-        true,
-    )
+    validate_datatype_with_generics_for_mode(dt, types, &[], "<top-level>".to_string(), mode, true)
 }
 
 pub(crate) fn validate_datatype_for_mode_shallow(
@@ -53,14 +46,7 @@ pub(crate) fn validate_datatype_for_mode_shallow(
     types: &Types,
     mode: ApplyMode,
 ) -> Result<(), Error> {
-    validate_datatype_with_generics_for_mode(
-        dt,
-        types,
-        &[],
-        "<top-level>".to_string(),
-        mode,
-        false,
-    )
+    validate_datatype_with_generics_for_mode(dt, types, &[], "<top-level>".to_string(), mode, false)
 }
 
 fn validate_datatype_with_generics_for_mode(
@@ -271,11 +257,11 @@ fn inner(
                                 ty,
                                 types,
                                 generics,
-                            checked_references,
-                            format!("{path}::{variant_name}.{name}"),
-                            mode,
-                            follow_named_references,
-                        )?;
+                                checked_references,
+                                format!("{path}::{variant_name}.{name}"),
+                                mode,
+                                follow_named_references,
+                            )?;
                         }
                     }
                     Fields::Unnamed(unnamed) => {
@@ -301,11 +287,11 @@ fn inner(
                                 ty,
                                 types,
                                 generics,
-                            checked_references,
-                            format!("{path}::{variant_name}[{idx}]"),
-                            mode,
-                            follow_named_references,
-                        )?;
+                                checked_references,
+                                format!("{path}::{variant_name}[{idx}]"),
+                                mode,
+                                follow_named_references,
+                            )?;
                         }
                     }
                 }

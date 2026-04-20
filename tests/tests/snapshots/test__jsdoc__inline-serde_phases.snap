@@ -742,6 +742,30 @@ expression: output
 	*	}} Issue281
 	* @property {string[]} default_unity_arguments
 	*
+	*  https://github.com/specta-rs/specta/issues/374
+	*
+	* @typedef {Issue374_Serialize | Issue374_Deserialize} Issue374
+	* @property {Issue374_Serialize} Serialize
+	* @property {Issue374_Deserialize} Deserialize
+	*
+	*  https://github.com/specta-rs/specta/issues/374
+	*
+	* @typedef {{
+	*		foo?: boolean,
+	*		bar?: boolean,
+	*	}} Issue374_Deserialize
+	* @property {boolean} [foo]
+	* @property {boolean} [bar]
+	*
+	*  https://github.com/specta-rs/specta/issues/374
+	*
+	* @typedef {{
+	*		foo?: boolean,
+	*		bar?: boolean,
+	*	}} Issue374_Serialize
+	* @property {boolean} [foo]
+	* @property {boolean} [bar]
+	*
 	* @typedef {{
 	*		"test-ing": string,
 	*	}} KebabCase
@@ -851,6 +875,10 @@ expression: output
 	* @typedef {string | null} NonOptional
 	* @property {string | null} "0"
 	*
+	* @typedef {Optional_Serialize | Optional_Deserialize} Optional
+	* @property {Optional_Serialize} Serialize
+	* @property {Optional_Deserialize} Deserialize
+	*
 	* @typedef {({ A?: string | null }) & { B?: never; C?: never } | ({ B: {
 	* 	a: string | null,
 	* } }) & { A?: never; C?: never } | ({ C: {
@@ -871,6 +899,28 @@ expression: output
 	*		b: string | null,
 	*	}} OptionalOnTransparentNamedField
 	* @property {string | null} b
+	*
+	* @typedef {{
+	*		a: number | null,
+	*		b?: number | null,
+	*		c: string | null,
+	*		d?: boolean,
+	*	}} Optional_Deserialize
+	* @property {number | null} a
+	* @property {number | null} [b]
+	* @property {string | null} c
+	* @property {boolean} [d]
+	*
+	* @typedef {{
+	*		a: number | null,
+	*		b?: number | null,
+	*		c?: string | null,
+	*		d: boolean,
+	*	}} Optional_Serialize
+	* @property {number | null} a
+	* @property {number | null} [b]
+	* @property {string | null} [c]
+	* @property {boolean} d
 	*
 	* @typedef {{
 	*		overriden_field: string,
@@ -1620,6 +1670,24 @@ expression: output
 	*	}} StructNew
 	* @property {"StructNew"} t
 	* @property {string} a
+	*
+	* @typedef {StructPhaseSpecificRenameSerialize | StructPhaseSpecificRenameDeserialize} StructPhaseSpecificRename
+	* @property {StructPhaseSpecificRenameSerialize} Serialize
+	* @property {StructPhaseSpecificRenameDeserialize} Deserialize
+	*
+	* @typedef {{
+	*		kind: "StructPhaseSpecificRenameDeserialize",
+	*		der: string,
+	*	}} StructPhaseSpecificRenameDeserialize
+	* @property {"StructPhaseSpecificRenameDeserialize"} kind
+	* @property {string} der
+	*
+	* @typedef {{
+	*		kind: "StructPhaseSpecificRenameSerialize",
+	*		ser: string,
+	*	}} StructPhaseSpecificRenameSerialize
+	* @property {"StructPhaseSpecificRenameSerialize"} kind
+	* @property {string} ser
 	*
 	* @typedef {{
 	*		A: number,

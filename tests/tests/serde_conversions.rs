@@ -196,7 +196,10 @@ impl<T> TryFrom<GenericWire<T>> for GenericTryFrom<T> {
 #[test]
 fn apply_rejects_asymmetric_container_conversion() {
     let err = Typescript::default()
-        .export(&Types::default().register::<IntoOnly>(), specta_serde::format)
+        .export(
+            &Types::default().register::<IntoOnly>(),
+            specta_serde::format,
+        )
         .expect_err("apply should reject asymmetric serde conversions");
 
     assert!(
@@ -209,7 +212,10 @@ fn apply_rejects_asymmetric_container_conversion() {
 #[test]
 fn format_phases_splits_container_and_dependents_for_conversions() {
     let rendered = Typescript::default()
-        .export(&Types::default().register::<Parent>(), specta_serde::format_phases)
+        .export(
+            &Types::default().register::<Parent>(),
+            specta_serde::format_phases,
+        )
         .expect("format_phases should support asymmetric serde conversions");
 
     insta::assert_snapshot!(
@@ -221,7 +227,10 @@ fn format_phases_splits_container_and_dependents_for_conversions() {
 #[test]
 fn apply_accepts_symmetric_container_conversion() {
     Typescript::default()
-        .export(&Types::default().register::<Symmetric>(), specta_serde::format)
+        .export(
+            &Types::default().register::<Symmetric>(),
+            specta_serde::format,
+        )
         .expect("apply should accept symmetric serde conversions");
 }
 

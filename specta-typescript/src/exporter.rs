@@ -474,6 +474,58 @@ fn map_datatype_format(
         return Ok(dt.clone());
     }
 
+    fn contains_generic_reference(dt: &DataType) -> bool {
+        match dt {
+            DataType::Primitive(_) => false,
+            DataType::List(list) => contains_generic_reference(&list.ty),
+            DataType::Map(map) => {
+                contains_generic_reference(map.key_ty())
+                    || contains_generic_reference(map.value_ty())
+            }
+            DataType::Nullable(inner) => contains_generic_reference(inner),
+            DataType::Struct(strct) => match &strct.fields {
+                Fields::Unit => false,
+                Fields::Unnamed(unnamed) => unnamed
+                    .fields
+                    .iter()
+                    .filter_map(|field| field.ty.as_ref())
+                    .any(contains_generic_reference),
+                Fields::Named(named) => named
+                    .fields
+                    .iter()
+                    .filter_map(|(_, field)| field.ty.as_ref())
+                    .any(contains_generic_reference),
+            },
+            DataType::Enum(enm) => enm
+                .variants
+                .iter()
+                .any(|(_, variant)| match &variant.fields {
+                    Fields::Unit => false,
+                    Fields::Unnamed(unnamed) => unnamed
+                        .fields
+                        .iter()
+                        .filter_map(|field| field.ty.as_ref())
+                        .any(contains_generic_reference),
+                    Fields::Named(named) => named
+                        .fields
+                        .iter()
+                        .filter_map(|(_, field)| field.ty.as_ref())
+                        .any(contains_generic_reference),
+                }),
+            DataType::Tuple(tuple) => tuple.elements.iter().any(contains_generic_reference),
+            DataType::Reference(Reference::Named(reference)) => reference
+                .generics
+                .iter()
+                .any(|(_, dt)| contains_generic_reference(dt)),
+            DataType::Reference(Reference::Generic(_)) => true,
+            DataType::Reference(Reference::Opaque(_)) => false,
+        }
+    }
+
+    if contains_generic_reference(dt) {
+        return map_datatype_format_children(format, types, dt.clone());
+    }
+
     let Some(format) = format else {
         return Ok(dt.clone());
     };
