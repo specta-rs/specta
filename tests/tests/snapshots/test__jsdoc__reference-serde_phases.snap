@@ -2,9 +2,9 @@
 source: tests/tests/jsdoc.rs
 expression: output
 ---
-Issue374: Issue374
-Optional: Optional
-StructPhaseSpecificRename: StructPhaseSpecificRename
+Issue374: Issue374_Serialize
+Optional: Optional_Serialize
+StructPhaseSpecificRename: StructPhaseSpecificRenameSerialize
 Range<i32>: {
 	start: number,
 	end: number,

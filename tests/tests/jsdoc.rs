@@ -148,6 +148,8 @@ fn primitives_reference() {
         let output = dts
             .iter()
             .filter_map(|(name, dt)| {
+                let dt = (format.map_type)(&types, dt).unwrap().into_owned();
+
                 let reference = match dt {
                     DataType::Reference(reference) => reference.clone(),
                     _ => return None,
