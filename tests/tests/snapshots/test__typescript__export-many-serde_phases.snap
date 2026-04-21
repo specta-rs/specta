@@ -3,22 +3,11 @@ source: tests/tests/typescript.rs
 expression: output
 ---
 // https://github.com/specta-rs/specta/issues/374
-export type Issue374_Serialize = {
-	foo?: boolean,
-	bar?: boolean,
-};
+export type Issue374 = Issue374_Serialize;
 
-export type Optional_Serialize = {
-	a: number | null,
-	b?: number | null,
-	c?: string | null,
-	d: boolean,
-};
+export type Optional = Optional_Serialize;
 
-export type StructPhaseSpecificRenameSerialize = {
-	kind: "StructPhaseSpecificRenameSerialize",
-	ser: string,
-};
+export type StructPhaseSpecificRename = StructPhaseSpecificRenameSerialize;
 
 export type Range<T> = {
 	start: T,

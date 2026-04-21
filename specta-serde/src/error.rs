@@ -65,6 +65,10 @@ enum ErrorKind {
 }
 
 impl Error {
+    pub(crate) fn is_unresolved_generic_reference(&self) -> bool {
+        matches!(self.kind, ErrorKind::UnresolvedGenericReference { .. })
+    }
+
     pub(crate) fn invalid_usage_of_skip(
         path: impl Into<String>,
         reason: impl Into<Cow<'static, str>>,

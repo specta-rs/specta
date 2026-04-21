@@ -203,7 +203,12 @@ fn map_phases_types(types: &Types) -> Result<Cow<'_, Types>, FormatError> {
 }
 
 fn map_datatype<'a>(types: &'a Types, dt: &'a DataType) -> Result<Cow<'a, DataType>, FormatError> {
-    validate::validate_datatype_for_mode(dt, types, validate::ApplyMode::Unified)?;
+    if let Err(err) = validate::validate_datatype_for_mode(dt, types, validate::ApplyMode::Unified)
+        && !err.is_unresolved_generic_reference()
+    {
+        return Err(err.into());
+    }
+
     Ok(Cow::Borrowed(dt))
 }
 
@@ -212,7 +217,14 @@ fn map_phases_datatype<'a>(
     dt: &'a DataType,
 ) -> Result<Cow<'a, DataType>, FormatError> {
     let selected = select_phase_datatype(dt, types, Phase::Serialize);
-    validate::validate_datatype_for_mode_shallow(&selected, types, validate::ApplyMode::Phases)?;
+
+    if let Err(err) =
+        validate::validate_datatype_for_mode_shallow(&selected, types, validate::ApplyMode::Phases)
+            && !err.is_unresolved_generic_reference()
+    {
+        return Err(err.into());
+    }
+
     Ok(Cow::Owned(selected))
 }
 
@@ -538,6 +550,12 @@ enum PhaseRewrite {
 }
 
 fn select_phase_datatype_inner(ty: &mut DataType, types: &Types, phase: Phase) {
+    if let Some(resolved) = select_split_wrapper_variant(ty, phase) {
+        *ty = resolved;
+        select_phase_datatype_inner(ty, types, phase);
+        return;
+    }
+
     if let Some(resolved) = select_explicit_phased_type(ty, phase) {
         *ty = resolved;
         select_phase_datatype_inner(ty, types, phase);
@@ -613,6 +631,35 @@ fn select_explicit_phased_type(ty: &DataType, phase: Phase) -> Option<DataType> 
         Phase::Serialize => phased.serialize.clone(),
         Phase::Deserialize => phased.deserialize.clone(),
     })
+}
+
+fn select_split_wrapper_variant(ty: &DataType, phase: Phase) -> Option<DataType> {
+    let DataType::Enum(wrapper) = ty else {
+        return None;
+    };
+
+    if wrapper.variants.len() != 2 {
+        return None;
+    }
+
+    let variant_name = match phase {
+        Phase::Serialize => "Serialize",
+        Phase::Deserialize => "Deserialize",
+    };
+
+    let (_, variant) = wrapper
+        .variants
+        .iter()
+        .find(|(name, _)| name == variant_name)?;
+    let Fields::Unnamed(fields) = &variant.fields else {
+        return None;
+    };
+
+    let [field] = &fields.fields[..] else {
+        return None;
+    };
+
+    field.ty.clone()
 }
 
 fn select_split_type_variant<'a>(
