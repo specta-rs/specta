@@ -1,10 +1,7 @@
 ---
-source: tests/tests/typescript.rs
+source: tests/tests/jsdoc.rs
 expression: output
 ---
-Issue374: Issue374
-Optional: Optional
-StructPhaseSpecificRename: StructPhaseSpecificRename
 Range<i32>: {
 	start: number,
 	end: number,
@@ -25,7 +22,7 @@ Cow<'static, str>: string
 Cow<'static, i32>: number
 Vec<i32>: number[]
 Vec<MyEnum>: MyEnum[]
-Result<String, i32>: ({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never }
+Result<String, i32>: string | number
 Vec<Option<Cow<'static, i32>>>: (number | null)[]
 PhantomData<()>: null
 PhantomData<String>: null
@@ -92,7 +89,7 @@ TupleStruct: TupleStruct
 TupleStructWithRep: TupleStructWithRep
 GenericTupleStruct<String>: GenericTupleStruct<string>
 BracedStruct: BracedStruct
-Struct: StructNew
+Struct: Struct
 Struct2: Struct2
 Enum: Enum
 Enum2: Enum2
@@ -215,9 +212,7 @@ GenericNewType1<()>: GenericNewType1<null>
 GenericTuple<()>: GenericTuple<null>
 GenericStruct2<()>: GenericStruct2<null>
 InlineGenericNewtype<String>: string
-InlineGenericNested<String>: [string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | ({ Unnamed: string }) & { Named?: never } | ({ Named: {
-	value: string,
-} }) & { Unnamed?: never }]
+InlineGenericNested<String>: [string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | string | { value: string }]
 InlineFlattenGenericsG<()>: InlineFlattenGenericsG<null>
 InlineFlattenGenerics: InlineFlattenGenerics
 GenericDefault: GenericDefault

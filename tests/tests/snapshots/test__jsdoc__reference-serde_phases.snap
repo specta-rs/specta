@@ -1,5 +1,5 @@
 ---
-source: tests/tests/typescript.rs
+source: tests/tests/jsdoc.rs
 expression: output
 ---
 Issue374: Issue374

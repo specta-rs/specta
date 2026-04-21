@@ -1,10 +1,7 @@
 ---
-source: tests/tests/typescript.rs
+source: tests/tests/jsdoc.rs
 expression: output
 ---
-Issue374: Issue374
-Optional: Optional
-StructPhaseSpecificRename: StructPhaseSpecificRename
 Range<i32>: {
 	start: number,
 	end: number,

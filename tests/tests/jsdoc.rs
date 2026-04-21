@@ -3,6 +3,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use specta::datatype::{DataType, Reference};
 use specta::{Type, Types};
 use specta_typescript::{JSDoc, Layout, primitives};
 use tempfile::TempDir;
@@ -47,25 +48,141 @@ mod jsdoc_export_to_files_runtime_imports_types {
 }
 
 #[test]
-fn export() {
-    for (mode, format, _, types) in phase_collections() {
-        let output = JSDoc::default()
-            .export(&types, format)
-            .unwrap_or_else(|err| format!("ERROR: {err}"));
+fn export_to() {
+    let temp = Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
+    std::fs::create_dir_all(&temp).unwrap();
+    let temp = TempDir::new_in(temp).unwrap();
 
-        insta::assert_snapshot!(format!("inline-{mode}"), output);
+    for layout in [
+        Layout::Files,
+        Layout::FlatFile,
+        Layout::ModulePrefixedName,
+        Layout::Namespaces,
+    ] {
+        for (mode, format, _, types) in phase_collections() {
+            let name = format!(
+                "jsdoc-export-to-{}-{}",
+                layout.to_string().to_lowercase(),
+                mode
+            );
+            let output = (|| {
+                let path = temp.path().join(&name);
+                JSDoc::default()
+                    .layout(layout)
+                    .export_to(&path, &types, format)
+                    .unwrap();
+                fs_to_string(&path).map_err(|err| err.to_string())
+            })()
+            .unwrap();
+
+            insta::assert_snapshot!(name, output);
+        }
+    }
+
+    temp.close().unwrap();
+
+    // TODO: Assert layouts error out with `export` method
+    // TODO: Assert it errors if given the path to a file
+}
+
+#[test]
+fn primitives_export() {
+    for (mode, format, dts, types) in phase_collections() {
+        let types = (format.map_types)(&types).unwrap().into_owned();
+
+        let output = dts
+            .iter()
+            .filter_map(|(name, dt)| {
+                let mut ndt = match dt {
+                    DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap().to_owned(),
+                    _ => return None,
+                };
+
+                ndt.map_ty_mut(|ty| *ty = (format.map_type)(&types, ty).unwrap().into_owned());
+
+                Some(
+                    primitives::export(&JSDoc::default(), &types, [ndt].iter(), "")
+                        .map(|ty| format!("{name}: {ty}")),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(|exports| exports.join("\n"))
+            .unwrap();
+
+        insta::assert_snapshot!(format!("export-{mode}"), output);
     }
 }
 
 #[test]
 fn primitives_export_many() {
     for (mode, format, dts, types) in phase_collections() {
-        let _ = dts;
-        let output = JSDoc::default()
-            .export(&types, format)
-            .unwrap_or_else(|err| format!("ERROR: {err}"));
+        let types = (format.map_types)(&types).unwrap().into_owned();
 
-        insta::assert_snapshot!(format!("primitives-many-inline-{mode}"), output);
+        let output = primitives::export(
+            &JSDoc::default(),
+            &types,
+            dts.iter()
+                .filter_map(|(_, ty)| match ty {
+                    DataType::Reference(Reference::Named(r)) => r.get(&types).cloned(),
+                    _ => None,
+                })
+                .map(|mut ndt| {
+                    ndt.map_ty_mut(|ty| *ty = (format.map_type)(&types, ty).unwrap().into_owned());
+                    ndt
+                })
+                .collect::<Vec<_>>()
+                .iter(),
+            "",
+        )
+        .unwrap();
+
+        insta::assert_snapshot!(format!("export-many-{mode}"), output);
+    }
+}
+
+#[test]
+fn primitives_reference() {
+    for (mode, format, dts, types) in phase_collections() {
+        let types = (format.map_types)(&types).unwrap().into_owned();
+
+        let output = dts
+            .iter()
+            .filter_map(|(name, dt)| {
+                let reference = match dt {
+                    DataType::Reference(reference) => reference.clone(),
+                    _ => return None,
+                };
+
+                Some(
+                    primitives::reference(&JSDoc::default(), &types, &reference)
+                        .map(|ty| format!("{name}: {ty}")),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(|exports| exports.join("\n"))
+            .unwrap();
+
+        insta::assert_snapshot!(format!("reference-{mode}"), output);
+    }
+}
+
+#[test]
+fn primitives_inline() {
+    for (mode, format, dts, types) in phase_collections() {
+        let types = (format.map_types)(&types).unwrap().into_owned();
+
+        let output = dts
+            .iter()
+            .map(|(name, dt)| {
+                let dt = (format.map_type)(&types, dt).unwrap().into_owned();
+
+                primitives::inline(&JSDoc::default(), &types, &dt).map(|ty| format!("{name}: {ty}"))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(|exports| exports.join("\n"))
+            .unwrap();
+
+        insta::assert_snapshot!(format!("inline-{mode}"), output);
     }
 }
 

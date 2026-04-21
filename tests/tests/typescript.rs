@@ -81,9 +81,7 @@ fn typescript_export() {
     for (mode, format, _, types) in phase_collections() {
         insta::assert_snapshot!(
             format!("ts-export-{mode}"),
-            Typescript::default()
-                .export(&types, format)
-                .unwrap_or_else(|err| format!("ERROR: {err}"))
+            Typescript::default().export(&types, format).unwrap()
         );
     }
 }
@@ -561,10 +559,10 @@ fn typescript_export_to() {
                 Typescript::default()
                     .layout(layout)
                     .export_to(&path, &types, format)
-                    .map_err(|err| err.to_string())?;
+                    .unwrap();
                 fs_to_string(&path).map_err(|err| err.to_string())
             })()
-            .unwrap_or_else(|err| format!("ERROR: {err}"));
+            .unwrap();
 
             insta::assert_snapshot!(name, output);
         }
@@ -579,10 +577,26 @@ fn typescript_export_to() {
 #[test]
 fn primitives_export() {
     for (mode, format, dts, types) in phase_collections() {
-        let _ = dts;
-        let output = Typescript::default()
-            .export(&types, format)
-            .unwrap_or_else(|err| format!("ERROR: {err}"));
+        let types = (format.map_types)(&types).unwrap().into_owned();
+
+        let output = dts
+            .iter()
+            .filter_map(|(name, dt)| {
+                let mut ndt = match dt {
+                    DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap().to_owned(),
+                    _ => return None,
+                };
+
+                ndt.map_ty_mut(|ty| *ty = (format.map_type)(&types, ty).unwrap().into_owned());
+
+                Some(
+                    primitives::export(&Typescript::default(), &types, [ndt].iter(), "")
+                        .map(|ty| format!("{name}: {ty}")),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(|exports| exports.join("\n"))
+            .unwrap();
 
         insta::assert_snapshot!(format!("export-{mode}"), output);
     }
@@ -591,10 +605,25 @@ fn primitives_export() {
 #[test]
 fn primitives_export_many() {
     for (mode, format, dts, types) in phase_collections() {
-        let _ = dts;
-        let output = Typescript::default()
-            .export(&types, format)
-            .unwrap_or_else(|err| format!("ERROR: {err}"));
+        let types = (format.map_types)(&types).unwrap().into_owned();
+
+        let output = primitives::export(
+            &Typescript::default(),
+            &types,
+            dts.iter()
+                .filter_map(|(_, ty)| match ty {
+                    DataType::Reference(Reference::Named(r)) => r.get(&types).cloned(),
+                    _ => None,
+                })
+                .map(|mut ndt| {
+                    ndt.map_ty_mut(|ty| *ty = (format.map_type)(&types, ty).unwrap().into_owned());
+                    ndt
+                })
+                .collect::<Vec<_>>()
+                .iter(),
+            "",
+        )
+        .unwrap();
 
         insta::assert_snapshot!(format!("export-many-{mode}"), output);
     }
@@ -603,10 +632,24 @@ fn primitives_export_many() {
 #[test]
 fn primitives_reference() {
     for (mode, format, dts, types) in phase_collections() {
-        let _ = dts;
-        let output = Typescript::default()
-            .export(&types, format)
-            .unwrap_or_else(|err| format!("ERROR: {err}"));
+        let types = (format.map_types)(&types).unwrap().into_owned();
+
+        let output = dts
+            .iter()
+            .filter_map(|(name, dt)| {
+                let reference = match dt {
+                    DataType::Reference(reference) => reference.clone(),
+                    _ => return None,
+                };
+
+                Some(
+                    primitives::reference(&Typescript::default(), &types, &reference)
+                        .map(|ty| format!("{name}: {ty}")),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(|exports| exports.join("\n"))
+            .unwrap();
 
         insta::assert_snapshot!(format!("reference-{mode}"), output);
     }
@@ -615,10 +658,19 @@ fn primitives_reference() {
 #[test]
 fn primitives_inline() {
     for (mode, format, dts, types) in phase_collections() {
-        let _ = dts;
-        let output = Typescript::default()
-            .export(&types, format)
-            .unwrap_or_else(|err| format!("ERROR: {err}"));
+        let types = (format.map_types)(&types).unwrap().into_owned();
+
+        let output = dts
+            .iter()
+            .map(|(name, dt)| {
+                let dt = (format.map_type)(&types, dt).unwrap().into_owned();
+
+                primitives::inline(&Typescript::default(), &types, &dt)
+                    .map(|ty| format!("{name}: {ty}"))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(|exports| exports.join("\n"))
+            .unwrap();
 
         insta::assert_snapshot!(format!("inline-{mode}"), output);
     }

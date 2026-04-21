@@ -28,9 +28,7 @@ fn phase_collections(types: Types) -> [(&'static str, Format, Types); 3] {
 }
 
 fn phase_output(types: &Types, format: Format) -> String {
-    Swift::default()
-        .export(types, format)
-        .unwrap_or_else(|err| format!("ERROR: {err}"))
+    Swift::default().export(types, format).unwrap()
 }
 
 #[derive(Type, Serialize, Deserialize)]
