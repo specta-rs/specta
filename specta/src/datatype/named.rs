@@ -59,13 +59,25 @@ thread_local! {
     /// We provide `specta_util::FixedArray<N, T>` as a helper type to force Specta to export a fixed-length array instead of a generic `number[]` if you know what your doing.
     /// This doesn't fix the core issue but it does allow the user to assert they are correct.
     ///
-    static CONTEXT_HAS_CONST_PARAMS: Cell<bool> = const { Cell::new(false) };
+    static HAS_CONST_PARAMS: Cell<bool> = const { Cell::new(false) };
 
-    static BUILDING_NDT: Cell<bool> = const { Cell::new(false) };
+    /// TODO
+    static SHOULD_INLINE: Cell<bool> = const { Cell::new(false) };
+}
+
+pub fn inline<R>(func: impl FnOnce() -> R) -> R {
+    println!("USED INLINE");
+    let prev = SHOULD_INLINE.replace(true);
+    let result = panic::catch_unwind(AssertUnwindSafe(func));
+    SHOULD_INLINE.set(prev);
+    match result {
+        Ok(result) => result,
+        Err(payload) => panic::resume_unwind(payload),
+    }
 }
 
 pub(crate) fn context_has_const_params() -> bool {
-    CONTEXT_HAS_CONST_PARAMS.with(|c| c.get())
+    HAS_CONST_PARAMS.with(|c| c.get())
 }
 
 /// Named type represents any type with it's own unique name and identity.
@@ -145,74 +157,7 @@ impl NamedDataType {
         types.len += 1;
     }
 
-    // TODO
-    // #[doc(hidden)]
-    // pub fn todo(
-    //     types: &mut Types,
-    //     sentinel: &'static str,
-    //     has_const_param: bool,
-    //     build: fn(&mut Types) -> DataType,
-    // ) {
-    //     // TODO: Merge some of this into `init_with_sentinel_inline`?
-    //     let id = NamedId::Static(sentinel);
-    //     let prev = types.types.insert(id.clone(), None);
-    //     let result = panic::catch_unwind(AssertUnwindSafe(|| build(types)));
-    //     if let Some(prev) = prev {
-    //         types.types.insert(id.clone(), prev);
-    //     }
-    //     if let Err(payload) = result {
-    //         panic::resume_unwind(payload);
-    //     }
-    // }
-
-    // This is called for a container inlined type.
-    // This means we know the type is *always* inlined.
-    #[doc(hidden)]
-    #[track_caller]
-    pub fn init_with_sentinel_inline(
-        types: &mut Types,
-        sentinel: &'static str,
-        generics: &'static [Generic],
-        build_ndt: fn(&mut Types, &mut NamedDataType),
-        build_ty: fn(&mut Types) -> DataType,
-    ) -> Reference {
-        let id = NamedId::Static(sentinel);
-        let location = Location::caller().to_owned();
-
-        // If we have never encountered this type, register it to type map
-        if !types.types.contains_key(&id) {
-            let mut ndt = NamedDataType {
-                id: id.clone(),
-                location,
-                generics: Cow::Borrowed(generics),
-                ty: None,
-                // `build_ndt` will just override all of this.
-                name: Cow::Borrowed(""),
-                docs: Cow::Borrowed(""),
-                deprecated: None,
-                module_path: Cow::Borrowed(""),
-            };
-
-            // TODO: Do we need panic catcher still?
-            types.types.insert(id.clone(), None);
-            let result = panic::catch_unwind(AssertUnwindSafe(|| build_ndt(types, &mut ndt)));
-            types.types.insert(
-                id.clone(),
-                match result {
-                    Ok(_) => Some(ndt),
-                    Err(payload) => panic::resume_unwind(payload),
-                },
-            );
-        }
-
-        Reference::Named(NamedReference {
-            id,
-            inner: NamedReferenceInner::Inline {
-                dt: Box::new(build_ty(types)),
-            },
-        })
-    }
-
+    // TODO: Rewrite this with the new changes
     /// Initialize a named type using a temporary sentinel as it's identity. The sentinel avoids allocating an ID which is used by `#[derive(Type)]` but is too unsafe as a general public API.
     ///
     /// WARNING: This should not be used outside of `specta_macros` as it may have breaking changes in minor releases
@@ -231,161 +176,138 @@ impl NamedDataType {
     /// `has_const_param` only affects the thread-local resolution context used while building the
     /// canonical named type. That context intentionally does not become part of the global type
     /// identity.
+    // This is called for a container inlined type.
+    // This means we know the type is *always* inlined.
     #[doc(hidden)]
     #[track_caller]
-    pub fn init_with_sentinel2(
-        generics_for_ndt: &'static [Generic],
-        generics_for_ref: Vec<(GenericReference, DataType)>,
-        has_const_param: bool,
+    pub fn init_with_sentinel_inline(
         types: &mut Types,
         sentinel: &'static str,
+        generics: &'static [Generic],
+        instantiation_generics: &[(GenericReference, DataType)],
+        has_const_param: bool,
+        container_inline: bool,
+        passthrough_inline: bool,
         build_ndt: fn(&mut Types, &mut NamedDataType),
+        mut build_ty: fn(&mut Types) -> DataType,
     ) -> Reference {
         let id = NamedId::Static(sentinel);
         let location = Location::caller().to_owned();
+        let mut inline = container_inline || SHOULD_INLINE.get();
 
-        let inline = false; // TODO: Get this from the runtime param too
+        println!("init_with_sentinel_inline {sentinel} {inline}");
 
-        // if BUILDING_NDT.get() {
-        //     // This type has already been seen.
-        //     // It could be resolved or it could be currently being resolved.
-        //     if types.types.contains_key(&id) {
-        //         return Reference::Named(NamedReference {
-        //             id: id.clone(),
-        //             generics: generics_for_ref.clone(),
-        //             inline,
-        //             instance: None,
-        //             dt: None, // TODO
-        //         });
-        //     }
-        // } else {
-        //     todo!();
+        // If we have never encountered this type, register it to type map
+        if !types.types.contains_key(&id) {
+            let mut ndt = NamedDataType {
+                id: id.clone(),
+                location,
+                generics: Cow::Borrowed(generics),
+                ty: None,
+                // `build_ndt` will just override all of this.
+                name: Cow::Borrowed(""),
+                docs: Cow::Borrowed(""),
+                deprecated: None,
+                module_path: Cow::Borrowed(""),
+            };
+
+            // TODO: Do we need panic catcher still?
+            // TODO: Adjust typemap length properly
+            types.types.insert(id.clone(), None);
+            let prev_inline = SHOULD_INLINE.replace(false);
+            let prev_has_const_params = HAS_CONST_PARAMS.replace(has_const_param);
+            let result = panic::catch_unwind(AssertUnwindSafe(|| build_ndt(types, &mut ndt)));
+            SHOULD_INLINE.set(prev_inline);
+            HAS_CONST_PARAMS.set(prev_has_const_params);
+            if let Err(payload) = result {
+                panic::resume_unwind(payload);
+            };
+
+            // We patch the Tauri `Type` implementation.
+            if ndt.name == "TAURI_CHANNEL" && ndt.module_path.starts_with("tauri::") {
+                ndt.ty = None;
+                inline = true;
+                build_ty = |_| reference::tauri().into();
+
+                // // This causes an exporter that isn't aware of Tauri's channel to error.
+                // // This is effectively `Reference::opaque(TauriChannel)` but we do some hackery for better errors.
+
+                // TODO: reference::tauri().into();
+
+                // // This ensures that we never create a `export type Channel`,
+                // // instead the definition gets inlined into each callsite.
+                // inline = true;
+                // // ndt.inline = true;
+            }
+
+            types.types.insert(id.clone(), Some(ndt));
+            types.len += 1;
+        }
+
+        // // TODO: Is this good?
+        // if types.types.get(&id).cloned().is_none() {
+        //     return Reference::Named(NamedReference {
+        //         id,
+        //         inner: NamedReferenceInner::Reference {
+        //             generics: Vec::new(), // TODO: Hook this up
+        //         },
+        //     });
         // }
 
-        // If this named type is already being resolved, emit a reference to the placeholder
-        // instead of re-entering resolution which would likely trigger a stack overflow.
-        //
-        // This stops us resolving the `instances` entry for recursively inlined types but resolving it would just infinitely recurse so we can't.
+        if inline {
+            let hash = {
+                let mut h = DefaultHasher::new();
+                sentinel.hash(&mut h);
+                ptr::hash(sentinel, &mut h);
+                for (generic_r, generic) in instantiation_generics {
+                    generic_r.hash(&mut h);
+                    generic.hash(&mut h);
+                }
+                h.finish()
+            };
+            println!("INLINE {sentinel} {hash:?}");
 
-        todo!("init_with_sentinel2");
+            if types.stack.contains(&hash) {
+                todo!("recursive inline reference detected {:?}", types.stack);
+                return Reference::Named(NamedReference {
+                    id,
+                    // TODO: Include metadata about where the recursive loop is
+                    inner: NamedReferenceInner::Recursive,
+                });
+            }
 
-        // let hash = {
-        //     let mut h = DefaultHasher::new();
-        //     sentinel.hash(&mut h);
-        //     ptr::hash(sentinel, &mut h);
-        //     for (generic_r, generic) in &generics_for_ref {
-        //         generic_r.id.hash(&mut h);
-        //         generic.hash(&mut h);
-        //     }
-        //     h.finish()
-        // };
-        // println!("{:?} {sentinel} {generics_for_ref:?}", hash);
+            let prev_inline = SHOULD_INLINE.replace(
+                // Say for `Box<T>` if we put `#[specta(inline)]` on it we will,
+                // naively inline the `Box` instead of `T`.
+                //
+                // "wrapper" types enable this to properly passthrough inline.
+                if passthrough_inline {
+                    SHOULD_INLINE.get()
+                } else {
+                    false
+                },
+            );
+            types.stack.push(hash);
+            let result = panic::catch_unwind(AssertUnwindSafe(|| build_ty(types)));
+            SHOULD_INLINE.set(prev_inline);
+            types.stack.pop();
+            let dt = match result {
+                Ok(dt) => Box::new(dt),
+                Err(payload) => panic::resume_unwind(payload),
+            };
 
-        // // TODO: Only deal with this when `inline` is required
-        // // Same instantiation is already being expanded on this path.
-        // // That means inlining it again would recurse forever, so fall back to a plain named ref.
-        // if inline && types.stack.contains(&hash) {
-        //     todo!(
-        //         "recursive inline for {sentinel} {generics_for_ref:?} {:?}",
-        //         types.stack
-        //     );
-        //     // return Reference::Named(NamedReference {
-        //     //     id: id.clone(),
-        //     //     generics: generics_for_ref,
-        //     //     inline: false,
-        //     //     instance: None,
-        //     // });
-        // }
-
-        // let mut ndt = NamedDataType {
-        //     id: id.clone(),
-        //     location,
-        //     // `build_ndt` will just override all of this.
-        //     name: Cow::Borrowed(""),
-        //     docs: Cow::Borrowed(""),
-        //     deprecated: None,
-        //     module_path: Cow::Borrowed(""),
-        //     generics: Cow::Borrowed(generics_for_ndt),
-        //     inline,
-        //     ty: DataType::Primitive(super::Primitive::i8),
-        //     instances: Vec::new(),
-        // };
-
-        // if let Some(existing_inline) = types
-        //     .types
-        //     .get(&id)
-        //     .and_then(Option::as_ref)
-        //     .map(|ndt| ndt.inline)
-        // {
-        //     inline |= existing_inline;
-        // } else {
-        //     let mut ndt = ndt.clone();
-
-        //     let previous = CONTEXT_HAS_CONST_PARAMS.replace(has_const_param);
-        //     let result = panic::catch_unwind(AssertUnwindSafe(|| {
-        //         types.stack.push(hash);
-        //         let prev = types.types.insert(id.clone(), None);
-        //         let result = panic::catch_unwind(AssertUnwindSafe(|| build_ndt(types, &mut ndt)));
-        //         if let Some(prev) = prev {
-        //             types.types.insert(id.clone(), prev);
-        //         }
-        //         types.stack.pop();
-        //         if let Err(payload) = result {
-        //             panic::resume_unwind(payload);
-        //         }
-        //     }));
-        //     CONTEXT_HAS_CONST_PARAMS.set(previous);
-
-        //     match result {
-        //         Ok(value) => value,
-        //         Err(payload) => panic::resume_unwind(payload),
-        //     };
-
-        //     // We patch the Tauri `Type` implementation.
-        //     if ndt.name == "TAURI_CHANNEL" && ndt.module_path.starts_with("tauri::") {
-        //         // This causes an exporter that isn't aware of Tauri's channel to error.
-        //         // This is effectively `Reference::opaque(TauriChannel)` but we do some hackery for better errors.
-        //         ndt.ty = reference::tauri().into();
-
-        //         // This ensures that we never create a `export type Channel`,
-        //         // instead the definition gets inlined into each callsite.
-        //         inline = true;
-        //         ndt.inline = true;
-        //     }
-
-        //     types.types.insert(id.clone(), Some(ndt));
-        //     types.len += 1;
-        // }
-
-        // types.stack.push(hash);
-        // let prev = types.types.insert(id.clone(), None);
-        // let result = panic::catch_unwind(AssertUnwindSafe(|| build_ndt(types, &mut ndt)));
-        // if let Some(prev) = prev {
-        //     types.types.insert(id.clone(), prev);
-        // }
-        // types.stack.pop();
-        // if let Err(payload) = result {
-        //     panic::resume_unwind(payload);
-        // }
-
-        // if ndt.name == "TAURI_CHANNEL" && ndt.module_path.starts_with("tauri::") {
-        //     ndt.ty = reference::tauri().into();
-        //     inline = true;
-        // }
-
-        // let instance = types
-        //     .types
-        //     .get_mut(&id)
-        //     .and_then(Option::as_mut)
-        //     .and_then(|existing| existing.register_instance(ndt.ty));
-
-        // Reference::Named(NamedReference {
-        //     id: id.clone(),
-        //     generics: generics_for_ref,
-        //     inline,
-        //     instance,
-        //     dt: None, // TODO
-        // })
+            Reference::Named(NamedReference {
+                id,
+                inner: NamedReferenceInner::Inline { dt },
+            })
+        } else {
+            Reference::Named(NamedReference {
+                id,
+                inner: NamedReferenceInner::Reference {
+                    generics: instantiation_generics.to_owned(),
+                },
+            })
+        }
     }
 
     #[doc(hidden)]

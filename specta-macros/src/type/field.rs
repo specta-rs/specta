@@ -44,6 +44,8 @@ pub fn construct_field_with_variant_skip(
 
     let ty = if attrs.skip || variant_skip {
         quote!(None)
+    } else if inline {
+        quote!(Some(datatype::inline(|| <#field_ty as #crate_ref::Type>::definition(types))))
     } else {
         quote!(Some(<#field_ty as #crate_ref::Type>::definition(types)))
     };
@@ -53,7 +55,6 @@ pub fn construct_field_with_variant_skip(
         field.optional = #optional;
         field.deprecated = #deprecated;
         field.docs = #doc.into();
-        field.inline = #inline;
         field.type_overridden = #type_overridden;
         field.attributes = #runtime_attrs;
         if let Some(ty) = #ty {

@@ -34,8 +34,6 @@ pub struct Field {
     pub deprecated: Option<Deprecated>,
     /// Documentation comments for the field.
     pub docs: Cow<'static, str>,
-    /// Should we inline the definition of this type.
-    pub inline: bool,
     /// Did the user apply a `#[specta(type = ...)]` or `#[specta(r#type = ...)]` attribute.
     pub type_overridden: bool,
     /// Runtime attributes for this field.
@@ -57,7 +55,6 @@ impl Field {
             flatten: false,
             deprecated: None,
             docs: "".into(),
-            inline: false,
             type_overridden: false,
             ty: Some(ty),
             attributes: Attributes::default(),

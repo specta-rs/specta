@@ -24,7 +24,7 @@ pub struct Types {
     // TODO
     // pub(crate) inlined: HashMap<NamedId, Option<NamedDataType>>,
     // TODO
-    // pub(crate) stack: Vec<u64>,
+    pub(crate) stack: Vec<u64>,
 }
 
 impl fmt::Debug for Types {

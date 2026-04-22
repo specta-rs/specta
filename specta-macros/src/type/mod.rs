@@ -215,7 +215,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         })
         .unzip();
 
-    let (generics_for_ndt, generics_for_ref) = generics
+    let (generics_for_ndt, instantiation_generics) = generics
         .params
         .iter()
         .map(|param| match param {
@@ -279,6 +279,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             }
         });
 
+    let inline = container_attrs.inline;
     let comments = &container_attrs.common.doc;
     let deprecated = container_attrs.common.deprecated_as_tokens();
 
@@ -305,6 +306,10 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 types,
                 SENTINEL,
                 GENERICS,
+                &[], // TODO: &[#(#instantiation_generics),*],
+                #has_const_param,
+                #inline,
+                false,
                 |types, ndt| {
                     ndt.name = Cow::Borrowed(#name);
                     ndt.docs = Cow::Borrowed(#comments);
@@ -329,7 +334,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             impl #bounds #crate_ref::Type for #ident #type_args #where_bound {
                 fn definition(types: &mut #crate_ref::Types) -> datatype::DataType {
                     static SENTINEL: &str = concat!(module_path!(), "::", stringify!(#raw_ident));
-                    static GENERICS: &[datatype::Generic] = &[#(#generics_for_ndt),*];
+                    static GENERICS: &[datatype::Generic] = &[]; // TODO: &[#(#generics_for_ndt),*];
 
                     #definition
                 }

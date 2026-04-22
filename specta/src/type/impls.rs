@@ -2,7 +2,9 @@ use std::marker::PhantomData;
 
 use crate::{
     Type, Types,
-    datatype::{self, DataType, Enum, Field, List, Variant},
+    datatype::{
+        self, DataType, Enum, Field, List, NamedDataType, NamedReference, Reference, Variant,
+    },
     r#type::{generics, macros::*},
 };
 
@@ -23,7 +25,30 @@ impl Type for String {
 // TODO: Remove this
 impl<T: Type> Type for Box<T> {
     fn definition(types: &mut Types) -> DataType {
-        str::definition(types)
+        NamedDataType::init_with_sentinel_inline(
+            types,
+            "std::box::Box",
+            &[],
+            &[],
+            false,
+            true,
+            true,
+            |types, ndt| {
+                // ndt.name = ""
+            },
+            |types| T::definition(types),
+        )
+        .into()
+
+        // TODO: Catch panics
+        // let prev_inline = SHOULD_INLINE.replace(false);
+        // let dt = Box::new(T::definition(types));
+        // SHOULD_INLINE.set(prev_inline);
+
+        // Reference::Named(NamedReference {
+        //     id,
+        //     inner: datatype::NamedReferenceInner::Inline { dt },
+        // })
     }
 }
 
@@ -236,19 +261,19 @@ impl<T: Type> Type for Box<T> {
 //     }
 // }
 
-// impl<const N: usize, T: Type> Type for [T; N] {
-//     fn definition(types: &mut Types) -> DataType {
-//         let mut l = List::new(T::definition(types));
+impl<const N: usize, T: Type> Type for [T; N] {
+    fn definition(types: &mut Types) -> DataType {
+        let mut l = List::new(T::definition(types));
 
-//         // Refer to the documentation for `CONTEXT_HAS_CONST_PARAMS` constant  in `named.rs` to understand this.
-//         // If you wanna force this use `specta_utils::FixedArray<N, T>` instead.
-//         if !datatype::context_has_const_params() {
-//             l.length = Some(N);
-//         }
+        // Refer to the documentation for `CONTEXT_HAS_CONST_PARAMS` constant  in `named.rs` to understand this.
+        // If you wanna force this use `specta_utils::FixedArray<N, T>` instead.
+        if !datatype::context_has_const_params() {
+            l.length = Some(N);
+        }
 
-//         DataType::List(l)
-//     }
-// }
+        DataType::List(l)
+    }
+}
 
 // impl<T: Type> Type for Option<T> {
 //     fn definition(types: &mut Types) -> DataType {

@@ -22,6 +22,7 @@ pub use list::List;
 // pub use literal::Literal;
 pub use map::Map;
 pub(crate) use named::context_has_const_params;
+pub use named::inline;
 pub use named::{Deprecated, NamedDataType};
 pub use primitive::Primitive;
 pub(crate) use reference::NamedReferenceInner;
