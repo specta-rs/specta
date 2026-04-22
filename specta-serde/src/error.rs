@@ -1,8 +1,5 @@
 use std::{borrow::Cow, error, fmt};
 
-/// Result type for `specta-serde` operations.
-pub type Result<T> = std::result::Result<T, Error>;
-
 /// Error type for serde transformation and validation failures.
 #[non_exhaustive]
 pub struct Error {
@@ -68,6 +65,10 @@ enum ErrorKind {
 }
 
 impl Error {
+    pub(crate) fn is_unresolved_generic_reference(&self) -> bool {
+        matches!(self.kind, ErrorKind::UnresolvedGenericReference { .. })
+    }
+
     pub(crate) fn invalid_usage_of_skip(
         path: impl Into<String>,
         reason: impl Into<Cow<'static, str>>,
@@ -272,7 +273,7 @@ impl fmt::Display for Error {
                 deserialize,
             } => write!(
                 f,
-                "Incompatible {context} for '{name}' in unified mode: serialize={serialize:?}, deserialize={deserialize:?}. Use apply_phases for asymmetric serde conversions"
+                "Incompatible {context} for '{name}' in unified mode: serialize={serialize:?}, deserialize={deserialize:?}. Use format_phases for asymmetric serde conversions"
             ),
             ErrorKind::InvalidConversionUsage { path, reason } => {
                 write!(

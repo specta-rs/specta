@@ -2,18 +2,18 @@
 //!
 //! # Usage
 //!
-//! Add `specta` and `specta-typescript` to your project:
+//! Add `specta`, `specta-serde`, and `specta-typescript` to your project:
 //!
 //! ```bash
 //! cargo add specta@2.0.0-rc.24 --features derive,collect
-//! cargo add specta-typescript@0.0.11
 //! cargo add specta-serde@0.0.11
+//! cargo add specta-typescript@0.0.11
 //! ```
 //!
 //! Next copy the following into your `main.rs` file:
 //!
 //! ```rust
-//! use specta::{ResolvedTypes, Type, Types};
+//! use specta::{Type, Types};
 //! use specta_typescript::Typescript;
 //!
 //! #[derive(Type)]
@@ -30,10 +30,12 @@
 //! let mut types = Types::default()
 //!     // We don't need to specify `MyOtherType` because it's referenced by `MyType`
 //!     .register::<MyType>();
-//! let resolved_types = ResolvedTypes::from_resolved_types(types);
-//!
 //! Typescript::default()
-//!     .export_to("./bindings.ts", &resolved_types)
+//!     .export_to(
+//!         "./bindings.ts",
+//!         &types,
+//!         specta_serde::format,
+//!     )
 //!     .unwrap();
 //! ```
 //!

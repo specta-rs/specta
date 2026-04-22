@@ -3,12 +3,12 @@
 //! The plan is to try and move these into the ecosystem for the v2 release.
 use super::macros::{impl_ndt, impl_ndt_as};
 use crate::{
+    Type, Types,
     datatype::{
         self, DataType, Enum, Field, Fields, List, NamedFields, Primitive, Reference, Struct,
         Variant,
     },
     r#type::{generics, impls::*},
-    Type, Types,
 };
 
 use std::borrow::Cow;
@@ -155,7 +155,7 @@ const _: () = {
 #[cfg(feature = "serde_yaml")]
 #[cfg_attr(docsrs, doc(cfg(feature = "serde_yaml")))]
 const _: () = {
-    use serde_yaml::{value::TaggedValue, Number, Value};
+    use serde_yaml::{Number, Value, value::TaggedValue};
 
     impl_ndt_as!(
         serde_yaml::Mapping as PrimitiveMap<serde_yaml::Value, serde_yaml::Value>
@@ -248,7 +248,7 @@ const _: () = {
 #[cfg(feature = "toml")]
 #[cfg_attr(docsrs, doc(cfg(feature = "toml")))]
 const _: () = {
-    use toml::{value, Value};
+    use toml::{Value, value};
 
     impl_ndt_as!(toml::map::Map<K, V> as PrimitiveMap<generics::K, generics::V>);
 
@@ -451,8 +451,181 @@ impl_ndt_as!(
     bson::Uuid as str
 );
 
-// TODO: bson::bson
-// TODO: bson::Document
+#[cfg(feature = "bson")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bson")))]
+const _: () = {
+    impl_ndt!(
+        impl Type for bson::Timestamp {
+            inline: true;
+            build: |types, ndt| {
+                ndt.ty = Struct::named()
+                    .field("time", Field::new(u32::definition(types)))
+                    .field("increment", Field::new(u32::definition(types)))
+                    .build();
+            }
+        }
+
+        impl Type for bson::Binary {
+            inline: true;
+            build: |types, ndt| {
+                ndt.ty = Struct::named()
+                    .field("subtype", Field::new(str::definition(types)))
+                    .field("bytes", Field::new(Vec::<u8>::definition(types)))
+                    .build();
+            }
+        }
+
+        impl Type for bson::Regex {
+            inline: true;
+            build: |types, ndt| {
+                ndt.ty = Struct::named()
+                    .field("pattern", Field::new(str::definition(types)))
+                    .field("options", Field::new(str::definition(types)))
+                    .build();
+            }
+        }
+
+        impl Type for bson::JavaScriptCodeWithScope {
+            inline: true;
+            build: |types, ndt| {
+                ndt.ty = Struct::named()
+                    .field("code", Field::new(String::definition(types)))
+                    .field("scope", Field::new(bson::Document::definition(types)))
+                    .build();
+            }
+        }
+
+        impl Type for bson::Document {
+            inline: true;
+            build: |types, ndt| {
+                ndt.ty = datatype::Map::new(
+                    String::definition(types),
+                    bson::Bson::definition(types),
+                )
+                .into();
+            }
+        }
+
+        impl Type for bson::Bson {
+            inline: true;
+            build: |types, ndt| {
+                ndt.ty = DataType::Enum(Enum {
+                    variants: vec![
+                        (
+                            "Double".into(),
+                            Variant::unnamed()
+                                .field(Field::new(f64::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "String".into(),
+                            Variant::unnamed()
+                                .field(Field::new(String::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Array".into(),
+                            Variant::unnamed()
+                                .field(Field::new(Vec::<bson::Bson>::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Document".into(),
+                            Variant::unnamed()
+                                .field(Field::new(bson::Document::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Boolean".into(),
+                            Variant::unnamed()
+                                .field(Field::new(bool::definition(types)))
+                                .build(),
+                        ),
+                        ("Null".into(), Variant::unit()),
+                        (
+                            "RegularExpression".into(),
+                            Variant::unnamed()
+                                .field(Field::new(bson::Regex::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "JavaScriptCode".into(),
+                            Variant::unnamed()
+                                .field(Field::new(String::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "JavaScriptCodeWithScope".into(),
+                            Variant::unnamed()
+                                .field(Field::new(
+                                    bson::JavaScriptCodeWithScope::definition(types),
+                                ))
+                                .build(),
+                        ),
+                        (
+                            "Int32".into(),
+                            Variant::unnamed()
+                                .field(Field::new(i32::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Int64".into(),
+                            Variant::unnamed()
+                                .field(Field::new(i64::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Timestamp".into(),
+                            Variant::unnamed()
+                                .field(Field::new(bson::Timestamp::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Binary".into(),
+                            Variant::unnamed()
+                                .field(Field::new(bson::Binary::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "ObjectId".into(),
+                            Variant::unnamed()
+                                .field(Field::new(bson::oid::ObjectId::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "DateTime".into(),
+                            Variant::unnamed()
+                                .field(Field::new(bson::DateTime::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Symbol".into(),
+                            Variant::unnamed()
+                                .field(Field::new(String::definition(types)))
+                                .build(),
+                        ),
+                        (
+                            "Decimal128".into(),
+                            Variant::unnamed()
+                                .field(Field::new(bson::Decimal128::definition(types)))
+                                .build(),
+                        ),
+                        ("Undefined".into(), Variant::unit()),
+                        ("MaxKey".into(), Variant::unit()),
+                        ("MinKey".into(), Variant::unit()),
+                        (
+                            "DbPointer".into(),
+                            Variant::unnamed()
+                                .field(Field::new(str::definition(types)))
+                                .build(),
+                        ),
+                    ],
+                    attributes: datatype::Attributes::default(),
+                });
+            }
+        }
+    );
+};
 
 #[cfg(feature = "bytesize")]
 #[cfg_attr(docsrs, doc(cfg(feature = "bytesize")))]

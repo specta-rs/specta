@@ -9,8 +9,8 @@ use std::{
 };
 
 use specta::{
-    ResolvedTypes, Types,
-    datatype::{DataType, NamedDataType, Reference},
+    Format, Types,
+    datatype::{DataType, Fields, NamedDataType, Reference},
 };
 
 use crate::{Branded, Error, primitives, references};
@@ -177,28 +177,31 @@ impl Exporter {
     /// Export the files into a single string.
     ///
     /// Note: This returns an error if the format is `Format::Files`.
-    pub fn export(&self, resolved_types: &ResolvedTypes) -> Result<String, Error> {
-        let types = resolved_types.as_types();
+    pub fn export(&self, types: &Types, format: Format) -> Result<String, Error> {
+        let exporter = self.clone();
+        let types = format_types(types, &format)?;
+        let types = types.as_ref();
 
-        if let Layout::Files = self.layout {
-            return Err(Error::unable_to_export(self.layout));
+        if let Layout::Files = exporter.layout {
+            return Err(Error::unable_to_export(exporter.layout));
         }
-        if let Layout::Namespaces = self.layout
-            && self.jsdoc
+        if let Layout::Namespaces = exporter.layout
+            && exporter.jsdoc
         {
-            return Err(Error::unable_to_export(self.layout));
+            return Err(Error::unable_to_export(exporter.layout));
         }
 
-        let mut out = render_file_header(self)?;
+        let mut out = render_file_header(&exporter)?;
 
         let mut has_manually_exported_user_types = false;
         let mut runtime = Ok(Cow::default());
-        if let Some(framework_runtime) = &self.framework_runtime {
+        if let Some(framework_runtime) = &exporter.framework_runtime {
             runtime = (framework_runtime.0)(FrameworkExporter {
-                exporter: self,
+                exporter: &exporter,
+                format: Some(&format),
                 has_manually_exported_user_types: &mut has_manually_exported_user_types,
                 files_root_types: "",
-                types: resolved_types,
+                types,
             });
         }
         let runtime = runtime?;
@@ -214,7 +217,7 @@ impl Exporter {
 
         // User types (if not included in framework runtime)
         if !has_manually_exported_user_types {
-            render_types(&mut out, self, types, "")?;
+            render_types(&mut out, &exporter, types, "")?;
         }
 
         Ok(out)
@@ -228,13 +231,40 @@ impl Exporter {
     pub fn export_to(
         &self,
         path: impl AsRef<Path>,
-        resolved_types: &ResolvedTypes,
+        types: &Types,
+        format: Format,
     ) -> Result<(), Error> {
-        let types = resolved_types.as_types();
+        let exporter = self.clone();
+        let formatted_types = format_types(types, &format)?;
+        let types = formatted_types.as_ref();
         let path = path.as_ref();
 
-        if self.layout != Layout::Files {
-            let result = self.export(resolved_types)?;
+        if exporter.layout != Layout::Files {
+            let mut result = render_file_header(&exporter)?;
+
+            let mut has_manually_exported_user_types = false;
+            let mut runtime = Ok(Cow::default());
+            if let Some(framework_runtime) = &exporter.framework_runtime {
+                runtime = (framework_runtime.0)(FrameworkExporter {
+                    exporter: &exporter,
+                    format: Some(&format),
+                    has_manually_exported_user_types: &mut has_manually_exported_user_types,
+                    files_root_types: "",
+                    types,
+                });
+            }
+            let runtime = runtime?;
+
+            if !runtime.is_empty() {
+                result.push('\n');
+                result.push_str(&runtime);
+                result.push('\n');
+            }
+
+            if !has_manually_exported_user_types {
+                render_types(&mut result, &exporter, types, "")?;
+            }
+
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)?;
             };
@@ -318,7 +348,7 @@ impl Exporter {
 
         let mut root_types = String::new();
         export(
-            self,
+            &exporter,
             types,
             &mut build_module_graph(types),
             &mut root_types,
@@ -330,14 +360,15 @@ impl Exporter {
             let mut has_manually_exported_user_types = false;
             let mut runtime = Cow::default();
             let mut runtime_references = HashSet::new();
-            if let Some(framework_runtime) = &self.framework_runtime {
+            if let Some(framework_runtime) = &exporter.framework_runtime {
                 let (runtime_result, referenced_types) = references::with_module_path("", || {
                     references::collect_references(|| {
                         (framework_runtime.0)(FrameworkExporter {
-                            exporter: self,
+                            exporter: &exporter,
+                            format: Some(&format),
                             has_manually_exported_user_types: &mut has_manually_exported_user_types,
                             files_root_types: &root_types,
-                            types: resolved_types,
+                            types,
                         })
                     })
                 });
@@ -350,7 +381,7 @@ impl Exporter {
 
             if !runtime.is_empty() || should_export_user_types {
                 files.insert(runtime_path, {
-                    let mut out = render_file_header(self)?;
+                    let mut out = render_file_header(&exporter)?;
                     let mut body = String::new();
 
                     // Framework runtime
@@ -378,13 +409,13 @@ impl Exporter {
                     let import_paths = import_paths
                         .into_iter()
                         .filter(|module_path| {
-                            !body.contains(&module_import_statement(self, "", module_path))
+                            !body.contains(&module_import_statement(&exporter, "", module_path))
                         })
                         .collect::<BTreeSet<_>>();
 
                     if !import_paths.is_empty() {
                         out.push('\n');
-                        out.push_str(&module_import_block(self, "", &import_paths));
+                        out.push_str(&module_import_block(&exporter, "", &import_paths));
                     }
 
                     if !body.is_empty() {
@@ -426,6 +457,215 @@ impl Exporter {
     }
 }
 
+fn format_types<'a>(types: &'a Types, format: &Format) -> Result<Cow<'a, Types>, Error> {
+    let mapped_types = (format.map_types)(types)
+        .map_err(|err| Error::format("type graph formatter failed", err))?;
+    Ok(Cow::Owned(
+        map_types_for_datatype_format(mapped_types.as_ref(), Some(format))?.into_owned(),
+    ))
+}
+
+fn map_datatype_format(
+    format: Option<&Format>,
+    types: &Types,
+    dt: &DataType,
+) -> Result<DataType, Error> {
+    if matches!(dt, DataType::Reference(Reference::Generic(_))) {
+        return Ok(dt.clone());
+    }
+
+    fn contains_generic_reference(dt: &DataType) -> bool {
+        match dt {
+            DataType::Primitive(_) => false,
+            DataType::List(list) => contains_generic_reference(&list.ty),
+            DataType::Map(map) => {
+                contains_generic_reference(map.key_ty())
+                    || contains_generic_reference(map.value_ty())
+            }
+            DataType::Nullable(inner) => contains_generic_reference(inner),
+            DataType::Struct(strct) => match &strct.fields {
+                Fields::Unit => false,
+                Fields::Unnamed(unnamed) => unnamed
+                    .fields
+                    .iter()
+                    .filter_map(|field| field.ty.as_ref())
+                    .any(contains_generic_reference),
+                Fields::Named(named) => named
+                    .fields
+                    .iter()
+                    .filter_map(|(_, field)| field.ty.as_ref())
+                    .any(contains_generic_reference),
+            },
+            DataType::Enum(enm) => enm
+                .variants
+                .iter()
+                .any(|(_, variant)| match &variant.fields {
+                    Fields::Unit => false,
+                    Fields::Unnamed(unnamed) => unnamed
+                        .fields
+                        .iter()
+                        .filter_map(|field| field.ty.as_ref())
+                        .any(contains_generic_reference),
+                    Fields::Named(named) => named
+                        .fields
+                        .iter()
+                        .filter_map(|(_, field)| field.ty.as_ref())
+                        .any(contains_generic_reference),
+                }),
+            DataType::Tuple(tuple) => tuple.elements.iter().any(contains_generic_reference),
+            DataType::Reference(Reference::Named(reference)) => reference
+                .generics
+                .iter()
+                .any(|(_, dt)| contains_generic_reference(dt)),
+            DataType::Reference(Reference::Generic(_)) => true,
+            DataType::Reference(Reference::Opaque(_)) => false,
+        }
+    }
+
+    if contains_generic_reference(dt) {
+        let Some(format) = format else {
+            return map_datatype_format_children(None, types, dt.clone());
+        };
+
+        match (format.map_type)(types, dt) {
+            Ok(Cow::Borrowed(dt)) => {
+                return map_datatype_format_children(Some(format), types, dt.clone());
+            }
+            Ok(Cow::Owned(dt)) => return map_datatype_format_children(Some(format), types, dt),
+            Err(err) if err.to_string().contains("Unresolved generic reference") => {
+                return map_datatype_format_children(Some(format), types, dt.clone());
+            }
+            Err(err) => return Err(Error::format("datatype formatter failed", err)),
+        }
+    }
+
+    let Some(format) = format else {
+        return Ok(dt.clone());
+    };
+
+    let mapped = (format.map_type)(types, dt)
+        .map_err(|err| Error::format("datatype formatter failed", err))?;
+
+    match mapped {
+        Cow::Borrowed(dt) => map_datatype_format_children(Some(format), types, dt.clone()),
+        Cow::Owned(dt) => map_datatype_format_children(Some(format), types, dt),
+    }
+}
+
+fn map_datatype_format_children(
+    format: Option<&Format>,
+    types: &Types,
+    mut dt: DataType,
+) -> Result<DataType, Error> {
+    match &mut dt {
+        DataType::Primitive(_) => {}
+        DataType::List(list) => {
+            list.ty = Box::new(map_datatype_format(format, types, &list.ty)?);
+        }
+        DataType::Map(map) => {
+            let key = map_datatype_format(format, types, map.key_ty())?;
+            let value = map_datatype_format(format, types, map.value_ty())?;
+            map.set_key_ty(key);
+            map.set_value_ty(value);
+        }
+        DataType::Nullable(inner) => {
+            **inner = map_datatype_format(format, types, inner)?;
+        }
+        DataType::Struct(strct) => map_datatype_fields(format, types, &mut strct.fields)?,
+        DataType::Enum(enm) => {
+            for (_, variant) in &mut enm.variants {
+                map_datatype_fields(format, types, &mut variant.fields)?;
+            }
+        }
+        DataType::Tuple(tuple) => {
+            for element in &mut tuple.elements {
+                *element = map_datatype_format(format, types, element)?;
+            }
+        }
+        DataType::Reference(Reference::Named(reference)) => {
+            for (_, generic) in &mut reference.generics {
+                *generic = map_datatype_format(format, types, generic)?;
+            }
+        }
+        DataType::Reference(Reference::Generic(_)) => {}
+        DataType::Reference(Reference::Opaque(reference)) => {
+            if let Some(branded) = reference.downcast_ref::<Branded>() {
+                dt = Reference::opaque(Branded::new(
+                    branded.brand().clone(),
+                    map_datatype_format(format, types, branded.ty())?,
+                ))
+                .into();
+            }
+        }
+    }
+
+    Ok(dt)
+}
+
+fn map_datatype_fields(
+    format: Option<&Format>,
+    types: &Types,
+    fields: &mut Fields,
+) -> Result<(), Error> {
+    match fields {
+        Fields::Unit => {}
+        Fields::Unnamed(unnamed) => {
+            for field in &mut unnamed.fields {
+                if let Some(ty) = field.ty.as_mut() {
+                    *ty = map_datatype_format(format, types, ty)?;
+                }
+            }
+        }
+        Fields::Named(named) => {
+            for (_, field) in &mut named.fields {
+                if let Some(ty) = field.ty.as_mut() {
+                    *ty = map_datatype_format(format, types, ty)?;
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn map_named_datatype_format(
+    format: Option<&Format>,
+    types: &Types,
+    ndt: &NamedDataType,
+) -> Result<NamedDataType, Error> {
+    let mut mapped = ndt.clone();
+    mapped.ty = map_datatype_format_children(format, types, ndt.ty.clone())?;
+    Ok(mapped)
+}
+
+fn map_types_for_datatype_format<'a>(
+    types: &'a Types,
+    format: Option<&Format>,
+) -> Result<Cow<'a, Types>, Error> {
+    if format.is_none() {
+        return Ok(Cow::Borrowed(types));
+    }
+
+    let mut mapped_types = types.clone();
+    let mut map_err = None;
+    mapped_types.iter_mut(|ndt| {
+        if map_err.is_some() {
+            return;
+        }
+
+        match map_named_datatype_format(format, types, ndt) {
+            Ok(mapped) => *ndt = mapped,
+            Err(err) => map_err = Some(err),
+        }
+    });
+
+    if let Some(err) = map_err {
+        return Err(err);
+    }
+
+    Ok(Cow::Owned(mapped_types))
+}
+
 impl AsRef<Exporter> for Exporter {
     fn as_ref(&self) -> &Exporter {
         self
@@ -441,8 +681,9 @@ impl AsMut<Exporter> for Exporter {
 /// Reference to Typescript language exporter for branded type callbacks.
 pub struct BrandedTypeExporter<'a> {
     pub(crate) exporter: &'a Exporter,
+    pub(crate) format: Option<&'a Format>,
     /// Collected types currently being exported.
-    pub types: &'a ResolvedTypes,
+    pub types: &'a Types,
 }
 
 impl fmt::Debug for BrandedTypeExporter<'_> {
@@ -468,23 +709,29 @@ impl Deref for BrandedTypeExporter<'_> {
 impl BrandedTypeExporter<'_> {
     /// [primitives::inline]
     pub fn inline(&self, dt: &DataType) -> Result<String, Error> {
-        primitives::inline(self, self.types, dt)
+        let mapped = map_datatype_format(self.format, self.types, dt)?;
+        primitives::inline(self, self.types, &mapped)
     }
 
     /// [primitives::reference]
     pub fn reference(&self, r: &Reference) -> Result<String, Error> {
-        primitives::reference(self, self.types, r)
+        let mapped = map_datatype_format(self.format, self.types, &DataType::Reference(r.clone()))?;
+        match mapped {
+            DataType::Reference(reference) => primitives::reference(self, self.types, &reference),
+            dt => primitives::inline(self, self.types, &dt),
+        }
     }
 }
 
 /// Reference to Typescript language exporter for framework
 pub struct FrameworkExporter<'a> {
     exporter: &'a Exporter,
+    format: Option<&'a Format>,
     has_manually_exported_user_types: &'a mut bool,
     // For `Layout::Files` we need to inject the value
     files_root_types: &'a str,
     /// Collected types currently being exported.
-    pub types: &'a ResolvedTypes,
+    pub types: &'a Types,
 }
 
 impl fmt::Debug for FrameworkExporter<'_> {
@@ -508,30 +755,30 @@ impl Deref for FrameworkExporter<'_> {
 }
 
 impl FrameworkExporter<'_> {
-    /// Render the types within the [`ResolvedTypes`](specta::ResolvedTypes).
+    /// Render the types within the [`Types`](specta::Types).
     ///
     /// This will only work if used within [`Exporter::framework_runtime`].
     /// It allows frameworks to intersperse their user types into their runtime code.
     pub fn render_types(&mut self) -> Result<Cow<'static, str>, Error> {
         let mut s = String::new();
-        render_types(
-            &mut s,
-            self.exporter,
-            self.types.as_types(),
-            self.files_root_types,
-        )?;
+        render_types(&mut s, self.exporter, self.types, self.files_root_types)?;
         *self.has_manually_exported_user_types = true;
         Ok(Cow::Owned(s))
     }
 
     /// [primitives::inline]
     pub fn inline(&self, dt: &DataType) -> Result<String, Error> {
-        primitives::inline(self, self.types, dt)
+        let mapped = map_datatype_format(self.format, self.types, dt)?;
+        primitives::inline(self, self.types, &mapped)
     }
 
     /// [primitives::reference]
     pub fn reference(&self, r: &Reference) -> Result<String, Error> {
-        primitives::reference(self, self.types, r)
+        let mapped = map_datatype_format(self.format, self.types, &DataType::Reference(r.clone()))?;
+        match mapped {
+            DataType::Reference(reference) => primitives::reference(self, self.types, &reference),
+            dt => primitives::inline(self, self.types, &dt),
+        }
     }
 
     /// [primitives::export]
@@ -540,7 +787,10 @@ impl FrameworkExporter<'_> {
         ndts: impl Iterator<Item = &'a NamedDataType>,
         indent: &'a str,
     ) -> Result<String, Error> {
-        primitives::export(self, self.types, ndts, indent)
+        let mapped = ndts
+            .map(|ndt| map_named_datatype_format(self.format, self.types, ndt))
+            .collect::<Result<Vec<_>, _>>()?;
+        primitives::export(self, self.types, mapped.iter(), indent)
     }
 }
 
@@ -733,7 +983,7 @@ fn render_flat_types<'a>(
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    primitives::export_internal(s, exporter, types, ndts.into_iter(), indent)?;
+    primitives::export_internal(s, exporter, None, types, ndts.into_iter(), indent)?;
 
     Ok(exports)
 }

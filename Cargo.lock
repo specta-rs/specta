@@ -2026,6 +2026,7 @@ dependencies = [
  "serde",
  "serde_json",
  "specta",
+ "specta-serde",
  "specta-util",
  "thiserror",
 ]
@@ -2095,6 +2096,7 @@ name = "specta-tests"
 version = "0.0.0"
 dependencies = [
  "arrayvec",
+ "bson",
  "chrono",
  "either",
  "error-stack",

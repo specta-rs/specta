@@ -3,6 +3,20 @@ source: tests/tests/jsdoc.rs
 expression: output
 ---
 /**
+	*  https://github.com/specta-rs/specta/issues/374
+	*
+	* @typedef {Issue374_Serialize | Issue374_Deserialize} Issue374
+	* @property {Issue374_Serialize} Serialize
+	* @property {Issue374_Deserialize} Deserialize
+	*
+	* @typedef {Optional_Serialize | Optional_Deserialize} Optional
+	* @property {Optional_Serialize} Serialize
+	* @property {Optional_Deserialize} Deserialize
+	*
+	* @typedef {StructPhaseSpecificRenameSerialize | StructPhaseSpecificRenameDeserialize} StructPhaseSpecificRename
+	* @property {StructPhaseSpecificRenameSerialize} Serialize
+	* @property {StructPhaseSpecificRenameDeserialize} Deserialize
+	*
 	* @typedef {{
 	*		start: T,
 	*		end: T,

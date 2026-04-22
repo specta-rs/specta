@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::{DisplayFromStr, OneOrMany, serde_as};
 use specta::{
-    ResolvedTypes, Type, Types,
+    Type, Types,
     datatype::{DataType, Reference},
 };
 use specta_typescript::Typescript;
@@ -167,69 +167,81 @@ fn main() {
         );
     }
 
-    {
-        let mut types = Types::default().register::<NotPhaseSpecific>();
-        let def = HelloWorld::definition(&mut types);
-        let types = specta_serde::apply_phases(types).unwrap();
-        println!(
-            "{:#?}",
-            match def {
-                DataType::Reference(Reference::Named(r)) => r.get(types.as_types()).unwrap(),
-                _ => unreachable!(),
-            }
-        );
+    // TODO
+    // {
+    //     let mut types = Types::default().register::<NotPhaseSpecific>();
+    //     let def = HelloWorld::definition(&mut types);
+    //     let types = map_types(&types).unwrap().into_owned();
+    //     println!(
+    //         "{:#?}",
+    //         match def {
+    //             DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
+    //             _ => unreachable!(),
+    //         }
+    //     );
 
-        println!("{:#?}", types);
-        println!("Types Count: {}", types.as_types().len());
-    }
+    //     println!("{:#?}", types);
+    //     println!("Types Count: {}", types.len());
+    // }
 
-    {
-        let types = Types::default()
-            .register::<NotPhaseSpecific>()
-            .register::<NotPhaseSpecificButReferencing>()
-            .register::<HelloWorld>()
-            .register::<TestingFlatten>()
-            .register::<SerdeExternalExample>()
-            .register::<SerdeInternalExample>()
-            .register::<SerdeAdjacentExample>()
-            .register::<SerdeUntaggedExample>()
-            .register::<UserWire>()
-            .register::<UserInto>()
-            .register::<UserFrom>()
-            .register::<UserTryFrom>()
-            .register::<UsesSerdeConversions>()
-            .register::<SmallPrime>()
-            .register::<SerdeWithDisplayFromStr>()
-            .register::<SerdeWithOneOrMany>();
-        println!(
-            "RAW:\n{}",
-            Typescript::default()
-                .export(&ResolvedTypes::from_resolved_types(types.clone()))
-                .unwrap()
-        );
-        match specta_serde::apply(types.clone()) {
-            Ok(types) => println!(
-                "specta_serde::apply(...):\n{}",
-                Typescript::default().export(&types).unwrap()
-            ),
-            Err(err) => println!("specta_serde::apply(...) ERROR: {err}"),
-        }
-        println!(
-            "specta_serde::apply_phases(...):\n{}",
-            Typescript::default()
-                .export(&specta_serde::apply_phases(types).unwrap())
-                .unwrap()
-        );
-    }
+    // TODO
+    // {
+    //     let types = Types::default()
+    //         .register::<NotPhaseSpecific>()
+    //         .register::<NotPhaseSpecificButReferencing>()
+    //         .register::<HelloWorld>()
+    //         .register::<TestingFlatten>()
+    //         .register::<SerdeExternalExample>()
+    //         .register::<SerdeInternalExample>()
+    //         .register::<SerdeAdjacentExample>()
+    //         .register::<SerdeUntaggedExample>()
+    //         .register::<UserWire>()
+    //         .register::<UserInto>()
+    //         .register::<UserFrom>()
+    //         .register::<UserTryFrom>()
+    //         .register::<UsesSerdeConversions>()
+    //         .register::<SmallPrime>()
+    //         .register::<SerdeWithDisplayFromStr>()
+    //         .register::<SerdeWithOneOrMany>();
+    //     println!(
+    //         "RAW:\n{}",
+    //         Typescript::default()
+    //             .export(
+    //                 &types,
+    //                 // You don't want to copy this.
+    //                 // Use `specta_serde`. This is just good for internal testing.
+    //                 (
+    //                     |types| Ok(Cow::Borrowed(types)),
+    //                     |_, dt| Ok(Cow::Borrowed(dt)),
+    //                 )
+    //             )
+    //             .unwrap()
+    //     );
+    //     match map_types(&types) {
+    //         Ok(_) => println!(
+    //             "specta_serde::format(...):\n{}",
+    //             Typescript::default()
+    //                 .export(&types, specta_serde::format)
+    //                 .unwrap()
+    //         ),
+    //         Err(err) => println!("specta_serde::format(...) ERROR: {err}"),
+    //     }
+    //     println!(
+    //         "specta_serde::format_phases(...):\n{}",
+    //         Typescript::default()
+    //             .export(&types, specta_serde::format_phases)
+    //             .unwrap()
+    //     );
+    // }
 
     {
         let serde_with_types = Types::default()
             .register::<SerdeWithDisplayFromStr>()
             .register::<SerdeWithOneOrMany>();
         println!(
-            "serde_with + specta_serde::apply_phases(...):\n{}",
+            "serde_with + specta_serde::format_phases(...):\n{}",
             Typescript::default()
-                .export(&specta_serde::apply_phases(serde_with_types).unwrap())
+                .export(&serde_with_types, specta_serde::format_phases)
                 .unwrap()
         );
     }

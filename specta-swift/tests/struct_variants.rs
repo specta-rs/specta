@@ -1,4 +1,4 @@
-use specta::{ResolvedTypes, Type, Types};
+use specta::{Type, Types};
 use specta_swift::Swift;
 
 /// Test enum with struct-like variants (named fields)
@@ -40,10 +40,8 @@ fn test_struct_variants_generation() {
     let types = Types::default()
         .register::<Event>()
         .register::<ApiResponse>();
-    let resolved = ResolvedTypes::from_resolved_types(types);
-
     let swift = Swift::default();
-    let result = swift.export(&resolved).unwrap();
+    let result = swift.export(&types, specta_serde::format).unwrap();
 
     println!("Generated Swift for struct variants:");
     println!("{}", result);

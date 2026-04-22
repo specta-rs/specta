@@ -21,4 +21,6 @@ workspace = true
 
 [dependencies]
 specta = { version = "=2.0.0-rc.24", path = "../specta" }
-specta-serde = { version = "=0.0.11", path = "../specta-serde" }
+
+[dev-dependencies]
+specta_serde = { package = "specta-serde", version = "=0.0.11", path = "../specta-serde" }

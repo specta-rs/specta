@@ -3,11 +3,11 @@ source: tests/tests/typescript.rs
 expression: output
 ---
 Issue374: // https://github.com/specta-rs/specta/issues/374
-export type Issue374 = Issue374_Serialize | Issue374_Deserialize;
+export type Issue374 = Issue374_Serialize;
 
-Optional: export type Optional = Optional_Serialize | Optional_Deserialize;
+Optional: export type Optional = Optional_Serialize;
 
-StructPhaseSpecificRename: export type StructPhaseSpecificRename = StructPhaseSpecificRenameSerialize | StructPhaseSpecificRenameDeserialize;
+StructPhaseSpecificRename: export type StructPhaseSpecificRename = StructPhaseSpecificRenameSerialize;
 
 Range<i32>: export type Range<T> = {
 	start: T,

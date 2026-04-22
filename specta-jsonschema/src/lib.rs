@@ -17,10 +17,12 @@
 //! ## Exporting to JSON Schema
 //!
 //! ```ignore
+//! use serde::{Deserialize, Serialize};
 //! use specta::{Type, Types};
 //! use specta_jsonschema::{JsonSchema, SchemaVersion};
 //!
-//! #[derive(Type)]
+//! #[derive(Serialize, Deserialize, Type)]
+//! #[serde(rename_all = "camelCase")]
 //! pub struct User {
 //!     pub id: u32,
 //!     pub name: String,
@@ -34,7 +36,7 @@
 //!     // Export to JSON Schema
 //!     let schema = JsonSchema::default()
 //!         .schema_version(SchemaVersion::Draft7)
-//!         .export(&types)
+//!         .export(&types, specta_serde::format)
 //!         .unwrap();
 //!
 //!     println!("{}", schema);
@@ -44,10 +46,11 @@
 //! ## With Serde Integration
 //!
 //! ```ignore
+//! use serde::{Deserialize, Serialize};
 //! use specta::{Type, Types};
 //! use specta_jsonschema::JsonSchema;
 //!
-//! #[derive(Type, serde::Serialize)]
+//! #[derive(Serialize, Deserialize, Type)]
 //! #[serde(rename_all = "camelCase")]
 //! pub struct User {
 //!     pub user_id: u32,
@@ -58,9 +61,9 @@
 //! fn main() {
 //!     let types = Types::default().register::<User>();
 //!
-//!     // Apply serde transforms in userspace, then export
-//!     let types = specta_serde::apply(types).unwrap();
-//!     JsonSchema::default().export_to("./schema.json", &types).unwrap();
+//!     JsonSchema::default()
+//!         .export_to("./schema.json", &types, specta_serde::format)
+//!         .unwrap();
 //! }
 //! ```
 //!
@@ -90,13 +93,21 @@
 //! // Single file with all types in $defs
 //! JsonSchema::default()
 //!     .layout(Layout::SingleFile)
-//!     .export_to("./schema.json", &types)
+//!     .export_to(
+//!         "./schema.json",
+//!         &types,
+//!         specta_serde::format,
+//!     )
 //!     .unwrap();
 //!
 //! // Separate file per type, organized by module
 //! JsonSchema::default()
 //!     .layout(Layout::Files)
-//!     .export_to("./schemas/", &types)
+//!     .export_to(
+//!         "./schemas/",
+//!         &types,
+//!         specta_serde::format,
+//!     )
 //!     .unwrap();
 //! ```
 

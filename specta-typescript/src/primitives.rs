@@ -6,7 +6,7 @@
 use std::{borrow::Cow, cell::RefCell, fmt::Write as _};
 
 use specta::{
-    ResolvedTypes, Types,
+    Format, Types,
     datatype::{
         DataType, Deprecated, Enum, Fields, Generic, GenericReference, List, Map, NamedDataType,
         NamedReference, OpaqueReference, Primitive, Reference, Tuple, Variant,
@@ -31,20 +31,26 @@ use crate::{
 ///
 /// We recommend passing in your types in bulk instead of doing individual calls as it leaves formatting to us and also allows us to merge the JSDoc types into a single large comment.
 ///
+/// If you are using a custom format such as [`crate::serde::format`] with the high-level exporter,
+/// these primitive helpers do not apply that mapping automatically. Standalone primitive usage
+/// should map both the full [`Types`] graph and any top-level [`DataType`] values with matching
+/// helpers first.
+///
 pub fn export<'a>(
     exporter: &dyn AsRef<Exporter>,
-    types: &ResolvedTypes,
+    types: &Types,
     ndts: impl Iterator<Item = &'a NamedDataType>,
     indent: &str,
 ) -> Result<String, Error> {
     let mut s = String::new();
-    export_internal(&mut s, exporter.as_ref(), types.as_types(), ndts, indent)?;
+    export_internal(&mut s, exporter.as_ref(), None, types, ndts, indent)?;
     Ok(s)
 }
 
 pub(crate) fn export_internal<'a>(
     s: &mut String,
     exporter: &Exporter,
+    format: Option<&Format>,
     types: &Types,
     ndts: impl Iterator<Item = &'a NamedDataType>,
     indent: &str,
@@ -64,7 +70,7 @@ pub(crate) fn export_internal<'a>(
                 s.push_str("\t*\n");
             }
 
-            append_typedef_body(s, exporter, types, ndt, indent)?;
+            append_typedef_body(s, exporter, format, types, ndt, indent)?;
         }
 
         s.push_str(indent);
@@ -77,7 +83,7 @@ pub(crate) fn export_internal<'a>(
             s.push('\n');
         }
 
-        export_single_internal(s, exporter, types, ndt, indent)?;
+        export_single_internal(s, exporter, format, types, ndt, indent)?;
     }
 
     Ok(())
@@ -86,13 +92,14 @@ pub(crate) fn export_internal<'a>(
 fn export_single_internal(
     s: &mut String,
     exporter: &Exporter,
+    format: Option<&Format>,
     types: &Types,
     ndt: &NamedDataType,
     indent: &str,
 ) -> Result<(), Error> {
     if exporter.jsdoc {
         let mut typedef = String::new();
-        typedef_internal(&mut typedef, exporter, types, ndt)?;
+        typedef_internal(&mut typedef, exporter, format, types, ndt)?;
         for line in typedef.lines() {
             s.push_str(indent);
             s.push_str(line);
@@ -141,9 +148,11 @@ fn export_single_internal(
     write_generic_parameters(s, exporter, types, &ndt.generics)?;
     s.push_str(" = ");
 
+    let _generic_scope = push_generic_scope(&ndt.generics);
     datatype(
         s,
         exporter,
+        format,
         types,
         &ndt.ty,
         vec![ndt.name.clone()],
@@ -163,16 +172,20 @@ fn export_single_internal(
 /// Note that calling this method with a tagged struct or enum may cause the tag to not be exported.
 /// The type should be wrapped in a [`NamedDataType`] to provide a proper name.
 ///
+/// You are responsible for apply Serde or other format mapping to the top-level datatype in the
+/// same way as the [`Types`] graph before calling this helper.
+///
 pub fn inline(
     exporter: &dyn AsRef<Exporter>,
-    types: &ResolvedTypes,
+    types: &Types,
     dt: &DataType,
 ) -> Result<String, Error> {
     let mut s = String::new();
     inline_datatype(
         &mut s,
         exporter.as_ref(),
-        types.as_types(),
+        None,
+        types,
         dt,
         vec![],
         None,
@@ -188,11 +201,12 @@ pub fn inline(
 pub(crate) fn typedef_internal(
     s: &mut String,
     exporter: &Exporter,
+    format: Option<&Format>,
     types: &Types,
     dt: &NamedDataType,
 ) -> Result<(), Error> {
     s.push_str("/**\n");
-    append_typedef_body(s, exporter, types, dt, "")?;
+    append_typedef_body(s, exporter, format, types, dt, "")?;
 
     s.push_str("\t*/");
 
@@ -202,11 +216,13 @@ pub(crate) fn typedef_internal(
 fn append_jsdoc_properties(
     s: &mut String,
     exporter: &Exporter,
+    format: Option<&Format>,
     types: &Types,
-    dt: &NamedDataType,
+    dt_name: &str,
+    dt: &DataType,
     indent: &str,
 ) -> Result<(), Error> {
-    match &dt.ty {
+    match dt {
         DataType::Struct(strct) => match &strct.fields {
             Fields::Unit => {}
             Fields::Unnamed(unnamed) => {
@@ -220,10 +236,11 @@ fn append_jsdoc_properties(
                     datatype(
                         &mut ty_str,
                         exporter,
+                        format,
                         types,
                         ty,
-                        vec![dt.name.clone(), idx.to_string().into()],
-                        Some(dt.name.as_ref()),
+                        vec![Cow::Owned(dt_name.to_owned()), idx.to_string().into()],
+                        Some(dt_name),
                         &datatype_prefix,
                         Default::default(),
                     )?;
@@ -250,10 +267,11 @@ fn append_jsdoc_properties(
                     datatype(
                         &mut ty_str,
                         exporter,
+                        format,
                         types,
                         ty,
-                        vec![dt.name.clone(), name.clone()],
-                        Some(dt.name.as_ref()),
+                        vec![Cow::Owned(dt_name.to_owned()), name.clone()],
+                        Some(dt_name),
                         &datatype_prefix,
                         Default::default(),
                     )?;
@@ -365,6 +383,7 @@ fn jsdoc_property_name(name: &str, optional: bool) -> String {
 fn append_typedef_body(
     s: &mut String,
     exporter: &Exporter,
+    format: Option<&Format>,
     types: &Types,
     dt: &NamedDataType,
     indent: &str,
@@ -377,9 +396,11 @@ fn append_typedef_body(
 
     let mut typedef_ty = String::new();
     let datatype_prefix = format!("{indent}\t*\t");
+    let _generic_scope = push_generic_scope(&dt.generics);
     datatype(
         &mut typedef_ty,
         exporter,
+        format,
         types,
         &dt.ty,
         vec![dt.name.clone()],
@@ -416,7 +437,7 @@ fn append_typedef_body(
     s.push_str(&type_name);
     s.push('\n');
 
-    append_jsdoc_properties(s, exporter, types, dt, indent)?;
+    append_jsdoc_properties(s, exporter, format, types, dt.name.as_ref(), &dt.ty, indent)?;
 
     Ok(())
 }
@@ -444,6 +465,7 @@ fn write_generic_parameters(
             shallow_inline_datatype(
                 &mut rendered_default,
                 exporter,
+                None,
                 types,
                 default,
                 Vec::new(),
@@ -493,16 +515,18 @@ fn jsdoc_description(docs: &str, deprecated: Option<&Deprecated>) -> Option<Stri
 /// See [`export`] for the list of things to consider when using this.
 pub fn reference(
     exporter: &dyn AsRef<Exporter>,
-    types: &ResolvedTypes,
+    types: &Types,
     r: &Reference,
 ) -> Result<String, Error> {
     let mut s = String::new();
-    reference_dt(
+    datatype(
         &mut s,
         exporter.as_ref(),
-        types.as_types(),
-        r,
+        None,
+        types,
+        &DataType::Reference(r.clone()),
         vec![],
+        None,
         "",
         &[],
     )?;
@@ -512,6 +536,7 @@ pub fn reference(
 pub(crate) fn datatype_with_inline_attr(
     s: &mut String,
     exporter: &Exporter,
+    format: Option<&Format>,
     types: &Types,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
@@ -524,6 +549,7 @@ pub(crate) fn datatype_with_inline_attr(
         return shallow_inline_datatype(
             s,
             exporter,
+            format,
             types,
             dt,
             location,
@@ -536,6 +562,7 @@ pub(crate) fn datatype_with_inline_attr(
     datatype(
         s,
         exporter,
+        format,
         types,
         dt,
         location,
@@ -662,6 +689,7 @@ fn resolved_reference_generics(
 fn shallow_inline_datatype(
     s: &mut String,
     exporter: &Exporter,
+    format: Option<&Format>,
     types: &Types,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
@@ -676,6 +704,7 @@ fn shallow_inline_datatype(
             shallow_inline_datatype(
                 &mut inner,
                 exporter,
+                format,
                 types,
                 &list.ty,
                 location,
@@ -731,6 +760,7 @@ fn shallow_inline_datatype(
             shallow_inline_datatype(
                 s,
                 exporter,
+                format,
                 types,
                 &rendered_key,
                 location.clone(),
@@ -742,6 +772,7 @@ fn shallow_inline_datatype(
             shallow_inline_datatype(
                 s,
                 exporter,
+                format,
                 types,
                 map.value_ty(),
                 location,
@@ -760,6 +791,7 @@ fn shallow_inline_datatype(
             shallow_inline_datatype(
                 &mut inner,
                 exporter,
+                format,
                 types,
                 dt,
                 location,
@@ -811,6 +843,7 @@ fn shallow_inline_datatype(
                     shallow_inline_datatype(
                         s,
                         exporter,
+                        format,
                         types,
                         dt,
                         location.clone(),
@@ -832,7 +865,9 @@ fn shallow_inline_datatype(
                     .with(|stack| stack.borrow().iter().any(|key| key == &inline_key));
 
                 if already_inlining {
-                    return reference_named_dt(s, exporter, types, r, location, prefix, generics);
+                    return reference_named_dt(
+                        s, exporter, format, types, r, location, prefix, generics,
+                    );
                 }
 
                 INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
@@ -841,6 +876,7 @@ fn shallow_inline_datatype(
                 let result = shallow_inline_datatype(
                     s,
                     exporter,
+                    format,
                     types,
                     &resolved,
                     location,
@@ -869,6 +905,7 @@ fn shallow_inline_datatype(
                             let result = shallow_inline_datatype(
                                 s,
                                 exporter,
+                                format,
                                 types,
                                 resolved_dt,
                                 location,
@@ -887,7 +924,9 @@ fn shallow_inline_datatype(
                 }
                 Ok(())
             }
-            Reference::Opaque(_) => reference_dt(s, exporter, types, r, location, prefix, generics),
+            Reference::Opaque(_) => {
+                reference_dt(s, exporter, format, types, r, location, prefix, generics)
+            }
         }?,
     }
 
@@ -1000,6 +1039,7 @@ fn resolve_generics_in_datatype(
 fn inline_datatype(
     s: &mut String,
     exporter: &Exporter,
+    format: Option<&Format>,
     types: &Types,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
@@ -1059,6 +1099,7 @@ fn inline_datatype(
             inline_datatype(
                 &mut inner,
                 exporter,
+                format,
                 types,
                 def,
                 location,
@@ -1097,6 +1138,7 @@ fn inline_datatype(
                             inline_datatype(
                                 s,
                                 exporter,
+                                format,
                                 types,
                                 field_ty,
                                 location.clone(),
@@ -1158,17 +1200,19 @@ fn inline_datatype(
                     .with(|stack| stack.borrow().iter().any(|key| key == &inline_key));
 
                 if already_inlining {
-                    reference_named_dt(s, exporter, types, r, location, prefix, generics)?;
+                    reference_named_dt(s, exporter, format, types, r, location, prefix, generics)?;
                     return Ok(());
                 }
 
                 let combined_generics = merged_generics(generics, &r.generics);
                 INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
+                let mapped = resolve_generics_in_datatype(ty, &combined_generics);
                 let result = inline_datatype(
                     s,
                     exporter,
+                    format,
                     types,
-                    ty,
+                    &mapped,
                     location,
                     parent_name,
                     prefix,
@@ -1180,7 +1224,7 @@ fn inline_datatype(
                 });
                 result?;
             } else {
-                reference_dt(s, exporter, types, r, location, prefix, generics)?;
+                reference_dt(s, exporter, format, types, r, location, prefix, generics)?;
             }
         }
     }
@@ -1191,6 +1235,7 @@ fn inline_datatype(
 pub(crate) fn datatype(
     s: &mut String,
     exporter: &Exporter,
+    format: Option<&Format>,
     types: &Types,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
@@ -1248,7 +1293,9 @@ pub(crate) fn datatype(
         }
         DataType::Enum(e) => enum_dt(s, exporter, types, e, location, prefix, generics)?,
         DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, generics)?,
-        DataType::Reference(r) => reference_dt(s, exporter, types, r, location, prefix, generics)?,
+        DataType::Reference(r) => {
+            reference_dt(s, exporter, format, types, r, location, prefix, generics)?
+        }
     };
 
     Ok(())
@@ -1922,6 +1969,7 @@ fn tuple_dt(
 fn reference_dt(
     s: &mut String,
     exporter: &Exporter,
+    format: Option<&Format>,
     types: &Types,
     r: &Reference,
     location: Vec<Cow<'static, str>>,
@@ -1930,7 +1978,7 @@ fn reference_dt(
 ) -> Result<(), Error> {
     match r {
         Reference::Named(r) => {
-            reference_named_dt(s, exporter, types, r, location, prefix, generics)
+            reference_named_dt(s, exporter, format, types, r, location, prefix, generics)
         }
         Reference::Generic(g) => {
             if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
@@ -1942,6 +1990,7 @@ fn reference_dt(
                     datatype(
                         s,
                         exporter,
+                        format,
                         types,
                         resolved_dt,
                         location,
@@ -1955,13 +2004,14 @@ fn reference_dt(
                 Ok(())
             }
         }
-        Reference::Opaque(r) => reference_opaque_dt(s, exporter, types, r),
+        Reference::Opaque(r) => reference_opaque_dt(s, exporter, format, types, r),
     }
 }
 
 fn reference_opaque_dt(
     s: &mut String,
     exporter: &Exporter,
+    format: Option<&Format>,
     types: &Types,
     r: &OpaqueReference,
 ) -> Result<(), Error> {
@@ -1978,8 +2028,6 @@ fn reference_opaque_dt(
         s.push_str("never");
         return Ok(());
     } else if let Some(def) = r.downcast_ref::<Branded>() {
-        let resolved_types = ResolvedTypes::from_resolved_types(types.clone());
-
         if let Some(branded_type) = exporter
             .branded_type_impl
             .as_ref()
@@ -1987,7 +2035,8 @@ fn reference_opaque_dt(
                 (builder.0)(
                     BrandedTypeExporter {
                         exporter,
-                        types: &resolved_types,
+                        format,
+                        types,
                     },
                     def,
                 )
@@ -2000,8 +2049,8 @@ fn reference_opaque_dt(
 
         // TODO: Build onto `s` instead of appending a separate string
         match def.ty() {
-            DataType::Reference(r) => reference_dt(s, exporter, types, r, vec![], "", &[])?,
-            ty => inline_datatype(s, exporter, types, ty, vec![], None, "", 0, &[])?,
+            DataType::Reference(r) => reference_dt(s, exporter, format, types, r, vec![], "", &[])?,
+            ty => inline_datatype(s, exporter, format, types, ty, vec![], None, "", 0, &[])?,
         }
         s.push_str(r#" & { { readonly __brand: ""#);
         s.push_str(def.brand());
@@ -2015,6 +2064,7 @@ fn reference_opaque_dt(
 fn reference_named_dt(
     s: &mut String,
     exporter: &Exporter,
+    format: Option<&Format>,
     types: &Types,
     r: &NamedReference,
     location: Vec<Cow<'static, str>>,
@@ -2043,6 +2093,7 @@ fn reference_named_dt(
                 let result = datatype(
                     s,
                     exporter,
+                    format,
                     types,
                     &resolved,
                     location,

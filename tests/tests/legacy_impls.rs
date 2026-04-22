@@ -1,6 +1,6 @@
 #![allow(deprecated)]
 
-use specta::{ResolvedTypes, Type, Types};
+use specta::{Type, Types};
 use specta_typescript::Typescript;
 
 #[derive(Debug)]
@@ -83,6 +83,8 @@ struct LegacyImpls {
 
 #[derive(Type)]
 struct LegacyImplWithBigints {
+    bson_document: bson::Document,
+    bson_value: bson::Bson,
     serde_json_map: serde_json::Map<String, serde_json::Value>,
     serde_json_value: serde_json::Value,
     serde_json_number: serde_json::Number,
@@ -109,9 +111,10 @@ fn legacy_impls() {
     insta::assert_snapshot!(
         "legacy_impls",
         Typescript::default()
-            .export(&ResolvedTypes::from_resolved_types(
-                Types::default().register::<LegacyImpls>(),
-            ))
+            .export(
+                &Types::default().register::<LegacyImpls>(),
+                specta_serde::format
+            )
             .unwrap()
     );
 }
@@ -119,9 +122,10 @@ fn legacy_impls() {
 #[test]
 fn legacy_impl_bigint_errors() {
     let err = Typescript::default()
-        .export(&ResolvedTypes::from_resolved_types(
-            Types::default().register::<LegacyImplWithBigints>(),
-        ))
+        .export(
+            &Types::default().register::<LegacyImplWithBigints>(),
+            specta_serde::format,
+        )
         .expect_err("bigint glam vectors should fail TypeScript export");
 
     assert!(
@@ -134,9 +138,8 @@ fn legacy_impl_bigint_errors() {
 #[test]
 fn legacy_impl_individual_bigint_errors() {
     fn assert_bigint_export_error<T: Type>(failures: &mut Vec<String>, name: &str) {
-        match Typescript::default().export(&ResolvedTypes::from_resolved_types(
-            Types::default().register::<T>(),
-        )) {
+        match Typescript::default().export(&Types::default().register::<T>(), specta_serde::format)
+        {
             Ok(output) => failures.push(format!(
                 "{name}: expected BigInt export error, but export succeeded with '{output}'"
             )),
@@ -144,6 +147,24 @@ fn legacy_impl_individual_bigint_errors() {
                 if err
                     .to_string()
                     .contains("forbids exporting BigInt-style types") => {}
+            Err(err) => failures.push(format!("{name}: unexpected error '{err}'")),
+        }
+    }
+
+    fn assert_bigint_or_invalid_map_key_error<T: Type>(failures: &mut Vec<String>, name: &str) {
+        match Typescript::default().export(&Types::default().register::<T>(), specta_serde::format)
+        {
+            Ok(output) => failures.push(format!(
+                "{name}: expected BigInt or invalid map key error, but export succeeded with '{output}'"
+            )),
+            Err(err)
+                if err
+                    .to_string()
+                    .contains("forbids exporting BigInt-style types") => {}
+            Err(err)
+                if err
+                    .to_string()
+                    .contains("Invalid map key") => {}
             Err(err) => failures.push(format!("{name}: unexpected error '{err}'")),
         }
     }
@@ -158,6 +179,8 @@ fn legacy_impl_individual_bigint_errors() {
         };
     }
 
+    bigint_wrapper!(BsonDocumentBigint, bson::Document);
+    bigint_wrapper!(BsonValueBigint, bson::Bson);
     bigint_wrapper!(SerdeJsonMapBigint, serde_json::Map<String, serde_json::Value>);
     bigint_wrapper!(SerdeJsonValueBigint, serde_json::Value);
     bigint_wrapper!(SerdeJsonNumberBigint, serde_json::Number);
@@ -181,6 +204,14 @@ fn legacy_impl_individual_bigint_errors() {
 
     for (name, assert) in [
         (
+            "bson::Document",
+            assert_bigint_export_error::<BsonDocumentBigint> as fn(&mut Vec<String>, &str),
+        ),
+        (
+            "bson::Bson",
+            assert_bigint_export_error::<BsonValueBigint> as fn(&mut Vec<String>, &str),
+        ),
+        (
             "serde_json::Map<String, serde_json::Value>",
             assert_bigint_export_error::<SerdeJsonMapBigint> as fn(&mut Vec<String>, &str),
         ),
@@ -194,7 +225,8 @@ fn legacy_impl_individual_bigint_errors() {
         ),
         (
             "serde_yaml::Mapping",
-            assert_bigint_export_error::<SerdeYamlMappingBigint> as fn(&mut Vec<String>, &str),
+            assert_bigint_or_invalid_map_key_error::<SerdeYamlMappingBigint>
+                as fn(&mut Vec<String>, &str),
         ),
         (
             "serde_yaml::value::TaggedValue",

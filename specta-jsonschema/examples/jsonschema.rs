@@ -1,7 +1,9 @@
+use serde::{Deserialize, Serialize};
 use specta::{Type, Types};
 use specta_jsonschema::{JsonSchema, SchemaVersion};
 
-#[derive(Type)]
+#[derive(Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct User {
     pub id: u32,
     pub name: String,
@@ -9,14 +11,15 @@ pub struct User {
     pub role: Role,
 }
 
-#[derive(Type)]
+#[derive(Serialize, Deserialize, Type)]
 pub enum Role {
     Admin,
     User,
     Guest,
 }
 
-#[derive(Type)]
+#[derive(Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct Post {
     pub id: u32,
     pub title: String,
@@ -37,7 +40,7 @@ fn main() {
         .schema_version(SchemaVersion::Draft7)
         .title("My API Types")
         .description("JSON Schema for my API types")
-        .export(&types)
+        .export(&types, specta_serde::format)
         .unwrap();
 
     println!("{}", schema);

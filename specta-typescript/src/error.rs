@@ -99,7 +99,7 @@ enum ErrorKind {
     /// You may be referencing a type which is not supported by the Typescript exporter.
     UnsupportedOpaqueReference(OpaqueReference),
     /// Found a named reference that cannot be resolved from the provided
-    /// [`ResolvedTypes`](specta::ResolvedTypes).
+    /// [`Types`](specta::Types).
     DanglingNamedReference {
         reference: String,
     },
@@ -112,7 +112,11 @@ enum ErrorKind {
         message: Cow<'static, str>,
         source: FrameworkSource,
     },
-
+    /// An error occurred in a format callback.
+    Format {
+        message: Cow<'static, str>,
+        source: FrameworkSource,
+    },
     //
     //
     // TODO: Break
@@ -145,6 +149,19 @@ impl Error {
     ) -> Self {
         Self {
             kind: ErrorKind::Framework {
+                message: message.into(),
+                source: source.into(),
+            },
+        }
+    }
+
+    /// Construct an error for custom format callbacks.
+    pub(crate) fn format(
+        message: impl Into<Cow<'static, str>>,
+        source: impl Into<Box<dyn std::error::Error + Send + Sync>>,
+    ) -> Self {
+        Self {
+            kind: ErrorKind::Format {
                 message: message.into(),
                 source: source.into(),
             },
@@ -327,6 +344,16 @@ impl fmt::Display for Error {
                     write!(f, "Framework error: {message}: {source}")
                 }
             }
+            ErrorKind::Format { message, source } => {
+                let source = source.to_string();
+                if message.is_empty() && source.is_empty() {
+                    write!(f, "Format error")
+                } else if source.is_empty() {
+                    write!(f, "Format error: {message}")
+                } else {
+                    write!(f, "Format error: {message}: {source}")
+                }
+            }
             ErrorKind::BigIntForbiddenLegacy(path) => write!(
                 f,
                 "Attempted to export {path:?} but Specta forbids exporting BigInt-style types (usize, isize, i64, u64, i128, u128) to avoid precision loss. See {BIGINT_DOCS_URL} for a full explanation."
@@ -362,7 +389,9 @@ impl error::Error for Error {
             | ErrorKind::Metadata { source, .. }
             | ErrorKind::RemoveFile { source, .. }
             | ErrorKind::RemoveDir { source, .. } => Some(source),
-            ErrorKind::Framework { source, .. } => Some(source.as_ref()),
+            ErrorKind::Framework { source, .. } | ErrorKind::Format { source, .. } => {
+                Some(source.as_ref())
+            }
             ErrorKind::FmtLegacy(error) => Some(error),
             _ => None,
         }

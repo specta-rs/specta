@@ -4,11 +4,13 @@ use std::{
 };
 
 use specta::datatype::{DataType, Reference};
-use specta::{ResolvedTypes, Type, Types};
+use specta::{Type, Types};
 use specta_typescript::{JSDoc, Layout, primitives};
 use tempfile::TempDir;
 
 use crate::fs_to_string;
+
+use crate::typescript::phase_collections;
 
 mod jsdoc_export_to_files_runtime_imports_types {
     use super::*;
@@ -45,50 +47,144 @@ mod jsdoc_export_to_files_runtime_imports_types {
     }
 }
 
-fn phase_collections(
-    types: Types,
-) -> [(&'static str, Result<ResolvedTypes, specta_serde::Error>); 3] {
-    [
-        ("raw", Ok(ResolvedTypes::from_resolved_types(types.clone()))),
-        ("serde", specta_serde::apply(types.clone())),
-        ("serde_phases", specta_serde::apply_phases(types)),
-    ]
+#[test]
+fn export_to() {
+    let temp = Path::new(env!("CARGO_MANIFEST_DIR")).join(".temp");
+    std::fs::create_dir_all(&temp).unwrap();
+    let temp = TempDir::new_in(temp).unwrap();
+
+    for layout in [
+        Layout::Files,
+        Layout::FlatFile,
+        Layout::ModulePrefixedName,
+        Layout::Namespaces,
+    ] {
+        for (mode, format, _, types) in phase_collections() {
+            let name = format!(
+                "jsdoc-export-to-{}-{}",
+                layout.to_string().to_lowercase(),
+                mode
+            );
+            let output = (|| {
+                let path = temp.path().join(&name);
+                JSDoc::default()
+                    .layout(layout)
+                    .export_to(&path, &types, format)
+                    .unwrap();
+                fs_to_string(&path).map_err(|err| err.to_string())
+            })()
+            .unwrap();
+
+            insta::assert_snapshot!(name, output);
+        }
+    }
+
+    temp.close().unwrap();
+
+    // TODO: Assert layouts error out with `export` method
+    // TODO: Assert it errors if given the path to a file
 }
 
 #[test]
-fn export() {
-    for (mode, types) in phase_collections(crate::types().0) {
-        let output = match types {
-            Ok(types) => JSDoc::default().export(&types).unwrap(),
-            Err(err) => format!("ERROR: {err}"),
-        };
+fn primitives_export() {
+    for (mode, format, dts, types) in phase_collections() {
+        let types = (format.map_types)(&types).unwrap().into_owned();
 
-        insta::assert_snapshot!(format!("inline-{mode}"), output);
+        let output = dts
+            .iter()
+            .filter_map(|(name, dt)| {
+                let mut ndt = match dt {
+                    DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap().to_owned(),
+                    _ => return None,
+                };
+
+                ndt.map_ty_mut(|ty| *ty = (format.map_type)(&types, ty).unwrap().into_owned());
+
+                Some(
+                    primitives::export(&JSDoc::default(), &types, [ndt].iter(), "")
+                        .map(|ty| format!("{name}: {ty}")),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(|exports| exports.join("\n"))
+            .unwrap();
+
+        insta::assert_snapshot!(format!("export-{mode}"), output);
     }
 }
 
 #[test]
 fn primitives_export_many() {
-    let (types, dts) = crate::types();
+    for (mode, format, dts, types) in phase_collections() {
+        let types = (format.map_types)(&types).unwrap().into_owned();
 
-    for (mode, types) in phase_collections(types) {
-        let output = match types {
-            Ok(types) => {
-                let jsdoc = JSDoc::default();
-                let ndts = dts
-                    .iter()
-                    .filter_map(|(_, ty)| match ty {
-                        DataType::Reference(Reference::Named(r)) => r.get(types.as_types()),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>();
+        let output = primitives::export(
+            &JSDoc::default(),
+            &types,
+            dts.iter()
+                .filter_map(|(_, ty)| match ty {
+                    DataType::Reference(Reference::Named(r)) => r.get(&types).cloned(),
+                    _ => None,
+                })
+                .map(|mut ndt| {
+                    ndt.map_ty_mut(|ty| *ty = (format.map_type)(&types, ty).unwrap().into_owned());
+                    ndt
+                })
+                .collect::<Vec<_>>()
+                .iter(),
+            "",
+        )
+        .unwrap();
 
-                primitives::export(&jsdoc, &types, ndts.into_iter(), "").unwrap()
-            }
-            Err(err) => format!("ERROR: {err}"),
-        };
+        insta::assert_snapshot!(format!("export-many-{mode}"), output);
+    }
+}
 
-        insta::assert_snapshot!(format!("primitives-many-inline-{mode}"), output);
+#[test]
+fn primitives_reference() {
+    for (mode, format, dts, types) in phase_collections() {
+        let types = (format.map_types)(&types).unwrap().into_owned();
+
+        let output = dts
+            .iter()
+            .filter_map(|(name, dt)| {
+                let dt = (format.map_type)(&types, dt).unwrap().into_owned();
+
+                let reference = match dt {
+                    DataType::Reference(reference) => reference.clone(),
+                    _ => return None,
+                };
+
+                Some(
+                    primitives::reference(&JSDoc::default(), &types, &reference)
+                        .map(|ty| format!("{name}: {ty}")),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(|exports| exports.join("\n"))
+            .unwrap();
+
+        insta::assert_snapshot!(format!("reference-{mode}"), output);
+    }
+}
+
+#[test]
+fn primitives_inline() {
+    for (mode, format, dts, types) in phase_collections() {
+        let types = (format.map_types)(&types).unwrap().into_owned();
+
+        let output = dts
+            .iter()
+            .map(|(name, dt)| {
+                let dt = (format.map_type)(&types, dt).unwrap().into_owned();
+
+                primitives::inline(&JSDoc::default(), &types, &dt).map(|ty| format!("{name}: {ty}"))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(|exports| exports.join("\n"))
+            .unwrap();
+
+        insta::assert_snapshot!(format!("inline-{mode}"), output);
     }
 }
 
@@ -98,9 +194,8 @@ fn jsdoc_export_bigint_errors() {
         let jsdoc = JSDoc::default();
         let mut types = Types::default();
         let dt = T::definition(&mut types);
-        let resolved = ResolvedTypes::from_resolved_types(types);
 
-        match primitives::inline(&jsdoc, &resolved, &dt) {
+        match primitives::inline(&jsdoc, &types, &dt) {
             Ok(ty) => failures.push(format!(
                 "{name} [inline]: expected BigInt error, but export succeeded with '{ty}'"
             )),
@@ -111,11 +206,11 @@ fn jsdoc_export_bigint_errors() {
             Err(err) => failures.push(format!("{name} [inline]: unexpected error '{err}'")),
         }
 
-        if resolved.as_types().is_empty() {
+        if types.is_empty() {
             return;
         }
 
-        match jsdoc.export(&resolved) {
+        match jsdoc.export(&types, specta_serde::format) {
             Ok(output) => failures.push(format!(
                 "{name} [export]: expected BigInt error, but export succeeded with '{output}'"
             )),
@@ -131,9 +226,8 @@ fn jsdoc_export_bigint_errors() {
         let jsdoc = JSDoc::default();
         let mut types = Types::default();
         let dt = T::definition(&mut types);
-        let resolved = ResolvedTypes::from_resolved_types(types);
 
-        match primitives::inline(&jsdoc, &resolved, &dt) {
+        match primitives::inline(&jsdoc, &types, &dt) {
             Ok(ty) => failures.push(format!(
                 "{name} [inline]: expected BigInt error, but export succeeded with '{ty}'"
             )),
@@ -283,7 +377,7 @@ fn jsdoc_export_to_files_uses_jsdoc_import_typedefs() {
 
     JSDoc::default()
         .layout(Layout::Files)
-        .export_to(&path, &ResolvedTypes::from_resolved_types(types))
+        .export_to(&path, &types, specta_serde::format)
         .unwrap();
 
     let output = fs_to_string(&path).unwrap();

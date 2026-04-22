@@ -6,9 +6,17 @@ use crate::Layout;
 pub enum Error {
     Io(io::Error),
     Fmt(fmt::Error),
-    Serde(specta_serde::Error),
-    ForbiddenName { path: String, name: String },
-    BigIntForbidden { path: String },
+    Format {
+        message: &'static str,
+        source: specta::FormatError,
+    },
+    ForbiddenName {
+        path: String,
+        name: String,
+    },
+    BigIntForbidden {
+        path: String,
+    },
     UnableToExport(Layout),
 }
 
@@ -17,7 +25,7 @@ impl fmt::Display for Error {
         match self {
             Error::Io(e) => write!(f, "IO error: {e}"),
             Error::Fmt(e) => write!(f, "Fmt error: {e}"),
-            Error::Serde(e) => write!(f, "Serde error: {e}"),
+            Error::Format { message, source } => write!(f, "Format error: {message}: {source}"),
             Error::ForbiddenName { path, name } => {
                 write!(f, "Forbidden name: {name} in {path}")
             }
@@ -45,8 +53,8 @@ impl From<fmt::Error> for Error {
     }
 }
 
-impl From<specta_serde::Error> for Error {
-    fn from(e: specta_serde::Error) -> Self {
-        Self::Serde(e)
+impl Error {
+    pub(crate) fn format(message: &'static str, source: specta::FormatError) -> Self {
+        Self::Format { message, source }
     }
 }

@@ -31,5 +31,6 @@ thiserror = "2"
 
 [dev-dependencies]
 specta = { version = "=2.0.0-rc.24", path = "../specta", features = ["derive", "collect"] }
+specta-serde = { path = "../specta-serde" }
 specta-util = { path = "../specta-util", features = ["serde"] }
 insta = { version = "1", features = ["json"] }

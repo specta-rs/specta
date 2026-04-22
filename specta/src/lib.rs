@@ -12,6 +12,7 @@
 #[doc(hidden)]
 pub mod collect;
 pub mod datatype;
+mod format;
 #[cfg(feature = "function")]
 #[cfg_attr(docsrs, doc(cfg(feature = "function")))]
 pub mod function;
@@ -20,9 +21,9 @@ pub mod internal;
 mod r#type;
 mod types;
 
-// TODO: Can we just move the trait here or `#[doc(inline)]`
+pub use format::{Format, FormatError};
 pub use r#type::Type;
-pub use types::{ResolvedTypes, Types};
+pub use types::Types;
 
 #[doc(inline)]
 #[cfg(feature = "collect")]
@@ -44,7 +45,7 @@ pub use specta_macros::parse_type_from_lit;
 #[cfg_attr(docsrs, doc(cfg(all(feature = "derive", feature = "function"))))]
 pub use specta_macros::specta;
 
-// TODO(v2): Remove this. This must be kept for Specta v1 as Tauri v2 depends on it.
+// TODO(v3): Remove this. This must be kept for Specta v1 as Tauri v2 depends on it.
 #[doc(hidden)]
 #[deprecated(note = "Migrate from `TypeMap` to `Types`")]
 pub type TypeMap = Types;

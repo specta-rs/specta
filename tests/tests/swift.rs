@@ -1,26 +1,34 @@
+use std::borrow::Cow;
+
 use serde::{Deserialize, Serialize};
-use specta::{ResolvedTypes, Type, Types};
+use specta::{Format, Type, Types};
 use specta_swift::Swift;
 
-fn phase_collections(
-    types: Types,
-) -> [(&'static str, Result<ResolvedTypes, specta_serde::Error>); 3] {
+fn phase_collections(types: Types) -> [(&'static str, Format, Types); 3] {
+    // Don't copy this format pattern anywhere else!!!
+    // It's not correct but it's useful specifically here!!!
+    fn identity_types(types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
+        Ok(Cow::Borrowed(types))
+    }
+
+    fn identity_datatype<'a>(
+        _: &'a Types,
+        dt: &'a specta::datatype::DataType,
+    ) -> Result<Cow<'a, specta::datatype::DataType>, specta::FormatError> {
+        Ok(Cow::Borrowed(dt))
+    }
+
+    let identity_format = Format::new(identity_types, identity_datatype);
+
     [
-        ("raw", Ok(ResolvedTypes::from_resolved_types(types.clone()))),
-        ("serde", specta_serde::apply(types.clone())),
-        ("serde_phases", specta_serde::apply_phases(types)),
+        ("raw", identity_format, types.clone()),
+        ("serde", specta_serde::format, types.clone()),
+        ("serde_phases", specta_serde::format_phases, types),
     ]
 }
 
-fn phase_output(types: Result<ResolvedTypes, specta_serde::Error>) -> String {
-    types.map_or_else(
-        |err| format!("ERROR: {err}"),
-        |types| {
-            Swift::default()
-                .export(&types)
-                .unwrap_or_else(|err| format!("ERROR: {err}"))
-        },
-    )
+fn phase_output(types: &Types, format: Format) -> String {
+    Swift::default().export(types, format).unwrap()
 }
 
 #[derive(Type, Serialize, Deserialize)]
@@ -53,7 +61,7 @@ fn swift_export() {
         .register::<RegularEnum>()
         .register::<MixedEnum>();
 
-    for (mode, result) in phase_collections(types.clone()) {
-        insta::assert_snapshot!(format!("swift-export-{mode}"), phase_output(result));
+    for (mode, format, types) in phase_collections(types) {
+        insta::assert_snapshot!(format!("swift-export-{mode}"), phase_output(&types, format));
     }
 }

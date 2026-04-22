@@ -3,7 +3,7 @@
 use std::{borrow::Cow, cell::RefCell, fmt::Write as _};
 
 use specta::{
-    ResolvedTypes, Types,
+    Types,
     datatype::{
         DataType, Enum, Fields, Generic, GenericReference, List, Map, NamedDataType,
         NamedReference, OpaqueReference, Primitive, Reference, Struct, Tuple,
@@ -87,12 +87,12 @@ fn merged_generics(
 /// Generate a group of `export const XSchema = ...` declarations for named types.
 pub fn export<'a>(
     exporter: &dyn AsRef<Zod>,
-    types: &ResolvedTypes,
+    types: &Types,
     ndts: impl Iterator<Item = &'a NamedDataType>,
     indent: &str,
 ) -> Result<String, Error> {
     let mut s = String::new();
-    export_internal(&mut s, exporter.as_ref(), types.as_types(), ndts, indent)?;
+    export_internal(&mut s, exporter.as_ref(), types, ndts, indent)?;
     Ok(s)
 }
 
@@ -198,32 +198,23 @@ fn export_single_internal(
 }
 
 /// Generate an inline Zod expression for a [`DataType`].
-pub fn inline(
-    exporter: &dyn AsRef<Zod>,
-    types: &ResolvedTypes,
-    dt: &DataType,
-) -> Result<String, Error> {
+///
+/// If you are using a custom format such as `specta_serde::format`, this helper does not apply
+/// datatype mapping automatically. Map both the full [`Types`] graph and any top-level
+/// [`DataType`] values before calling this helper.
+pub fn inline(exporter: &dyn AsRef<Zod>, types: &Types, dt: &DataType) -> Result<String, Error> {
     let mut s = String::new();
-    datatype(
-        &mut s,
-        exporter.as_ref(),
-        types.as_types(),
-        dt,
-        vec![],
-        &[],
-        false,
-    )?;
+    datatype(&mut s, exporter.as_ref(), types, dt, vec![], &[], false)?;
     Ok(s)
 }
 
 /// Generate a Zod expression for a [`Reference`].
-pub fn reference(
-    exporter: &dyn AsRef<Zod>,
-    types: &ResolvedTypes,
-    r: &Reference,
-) -> Result<String, Error> {
+///
+/// If you are using a custom format such as `specta_serde::format`, this helper does not apply
+/// datatype mapping automatically.
+pub fn reference(exporter: &dyn AsRef<Zod>, types: &Types, r: &Reference) -> Result<String, Error> {
     let mut s = String::new();
-    reference_dt(&mut s, exporter.as_ref(), types.as_types(), r, vec![], &[])?;
+    reference_dt(&mut s, exporter.as_ref(), types, r, vec![], &[])?;
     Ok(s)
 }
 

@@ -386,9 +386,8 @@ fn main() {
 
     // Export with default settings
     let total_types = types.len();
-    let resolved = specta_serde::apply(types).unwrap();
     let swift = Swift::default();
-    let output = swift.export(&resolved).unwrap();
+    let output = swift.export(&types, specta_serde::format).unwrap();
 
     println!("📝 Generated Swift code (first 2000 characters):\n");
     let preview = if output.len() > 2000 {
@@ -403,7 +402,11 @@ fn main() {
 
     // Write to file for inspection
     swift
-        .export_to("./examples/generated/ComprehensiveDemo.swift", &resolved)
+        .export_to(
+            "./examples/generated/ComprehensiveDemo.swift",
+            &types,
+            specta_serde::format,
+        )
         .unwrap();
     println!("✅ Comprehensive demo exported to ComprehensiveDemo.swift");
 

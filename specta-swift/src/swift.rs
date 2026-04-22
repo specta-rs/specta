@@ -3,11 +3,11 @@
 use std::{borrow::Cow, path::Path};
 
 use specta::{
-    ResolvedTypes, Types,
+    Format, Types,
     datatype::{DataType, Fields, Reference},
 };
 
-use crate::error::Result;
+use crate::Error;
 use crate::primitives::{export_type, is_duration_struct};
 
 /// Swift language exporter.
@@ -25,6 +25,7 @@ pub struct Swift {
     pub optionals: OptionalStyle,
     /// Additional protocols to conform to.
     pub protocols: Vec<Cow<'static, str>>,
+    pub(crate) format: Option<Format>,
 }
 
 /// Indentation style for generated Swift code.
@@ -83,6 +84,7 @@ impl Default for Swift {
             generics: GenericStyle::default(),
             optionals: OptionalStyle::default(),
             protocols: vec![],
+            format: None,
         }
     }
 }
@@ -130,19 +132,23 @@ impl Swift {
     }
 
     /// Export types to a Swift string.
-    pub fn export(&self, types: &ResolvedTypes) -> Result<String> {
+    pub fn export(&self, types: &Types, format: Format) -> Result<String, Error> {
+        let mut exporter = self.clone();
+        exporter.format = Some(format);
+        let formatted_types = exporter.format_types(types)?;
+        let raw_types = formatted_types.as_ref();
+
         let mut result = String::new();
-        let raw_types = types.as_types();
 
         // Add header
-        if !self.header.is_empty() {
-            result.push_str(&self.header);
+        if !exporter.header.is_empty() {
+            result.push_str(&exporter.header);
             result.push('\n');
         }
 
         // Add imports
         result.push_str("import Foundation\n");
-        for protocol in &self.protocols {
+        for protocol in &exporter.protocols {
             result.push_str(&format!("import {}\n", protocol));
         }
         result.push('\n');
@@ -154,7 +160,7 @@ impl Swift {
 
         // Export types
         for ndt in raw_types.into_sorted_iter() {
-            let exported = export_type(self, raw_types, ndt)?;
+            let exported = export_type(&exporter, raw_types, ndt)?;
             if !exported.is_empty() {
                 result.push_str(&exported);
                 result.push_str("\n\n");
@@ -165,10 +171,23 @@ impl Swift {
     }
 
     /// Export types to a file.
-    pub fn export_to(&self, path: impl AsRef<Path>, types: &ResolvedTypes) -> Result<()> {
-        let content = self.export(types)?;
+    pub fn export_to(
+        &self,
+        path: impl AsRef<Path>,
+        types: &Types,
+        format: Format,
+    ) -> Result<(), Error> {
+        let content = self.export(types, format)?;
         std::fs::write(path, content)?;
         Ok(())
+    }
+
+    pub(crate) fn format_types<'a>(&self, types: &'a Types) -> Result<Cow<'a, Types>, Error> {
+        let Some(format) = &self.format else {
+            return Ok(Cow::Borrowed(types));
+        };
+
+        (format.map_types)(types).map_err(|err| Error::format("type graph formatter failed", err))
     }
 }
 
