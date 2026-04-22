@@ -14,7 +14,8 @@ macro_rules! impl_generic {
 
             impl Type for $ident {
                 fn definition(_: &mut Types) -> DataType {
-                    datatype::GenericReference::new::<Self>().into()
+                    // datatype::GenericReference::new::<Self>().into()
+                    todo!();
                 }
             }
         )*

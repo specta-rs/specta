@@ -17,9 +17,14 @@ pub struct Types {
     // `None` indicates that the entry is a placeholder.
     // It is a reference and we are currently resolving it's definition.
     pub(crate) types: HashMap<NamedId, Option<NamedDataType>>,
+
     // The count of non-`None` items in the collection.
     // We store this to avoid expensive iteration.
     pub(crate) len: usize,
+    // TODO
+    // pub(crate) inlined: HashMap<NamedId, Option<NamedDataType>>,
+    // TODO
+    // pub(crate) stack: Vec<u64>,
 }
 
 impl fmt::Debug for Types {

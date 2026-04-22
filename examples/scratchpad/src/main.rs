@@ -20,6 +20,7 @@ pub struct B {
 }
 
 #[derive(Type)]
+// #[specta(inline)]
 pub struct C {
     c: D,
 }
@@ -38,6 +39,7 @@ pub struct E<EE> {
 }
 
 #[derive(Type)]
+#[specta(inline)] // TODO
 pub struct E2<T> {
     f: T,
     // Infinitely recursive
@@ -46,6 +48,7 @@ pub struct E2<T> {
 }
 
 #[derive(Type)]
+#[specta(inline)] // TODO
 struct E3 {
     e: E2<String>,
     // { f: String, e: { f: String, e: { f: String, e: ... } } }
@@ -54,13 +57,13 @@ struct E3 {
 }
 
 fn main() {
-    let types = Types::default()
-        // .register::<A>()
-        .register::<E3>();
+    let types = Types::default().register::<A>().register::<E3>();
 
-    let out = specta_typescript::Typescript::new()
-        .export(&types, specta_serde::format_phases)
-        .unwrap();
+    println!("{types:#?}");
 
-    println!("{}", out);
+    // let out = specta_typescript::Typescript::new()
+    //     .export(&types, specta_serde::format_phases)
+    //     .unwrap();
+
+    // println!("{}", out);
 }

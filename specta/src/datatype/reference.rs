@@ -1,5 +1,6 @@
 use std::{
     any::{Any, TypeId},
+    borrow::Cow,
     fmt, hash,
     sync::Arc,
 };
@@ -12,8 +13,10 @@ use super::DataType;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Reference {
     /// Reference to a named type collected in a [`Types`].
+    /// This can either produce `TypeName<Generics>` or just an inlined definition.
     Named(NamedReference),
     /// Reference to a generic type parameter.
+    /// This produces something like `T`.
     Generic(GenericReference),
     /// Reference to an opaque exporter-specific type.
     Opaque(OpaqueReference),
@@ -23,9 +26,19 @@ pub enum Reference {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NamedReference {
     pub(crate) id: NamedId,
-    pub generics: Vec<(GenericReference, DataType)>,
-    pub(crate) inline: bool,
-    pub(crate) instance: Option<usize>,
+    pub(crate) inner: NamedReferenceInner,
+}
+
+/// Reference to a [NamedDataType].
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) enum NamedReferenceInner {
+    Recursive,
+    Inline {
+        dt: Box<DataType>, // TODO: Expose this mutablly??
+    },
+    Reference {
+        generics: Vec<(GenericReference, DataType)>, // TODO: Expose this mutablly??
+    },
 }
 
 impl NamedReference {
@@ -48,38 +61,31 @@ impl NamedReference {
     where
         'b: 'a,
     {
-        let ndt = self.get(types)?;
-        self.instance
-            .and_then(|instance| ndt.instances.get(instance))
-            .or(Some(&ndt.ty))
+        // let ndt = self.get(types)?;
+        // self.instance
+        //     .and_then(|instance| ndt.instances.get(instance))
+        //     .or(Some(&ndt.ty))
+        todo!();
     }
 
     /// Get whether this reference should be inlined
     pub fn inline(&self) -> bool {
-        self.inline
+        // self.inline
+        todo!();
     }
 }
 
-/// Reference to a generic parameter a parent [NamedDataType].
-/// This is resolved to a concrete type by the language exporter.
+/// Reference to a generic parameter.
+/// This renders like `T` in the final output.
+/// This should only exist in `NamedDataType.ty`, not in normal [`DataType`] values returned from [`Type::definition`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct GenericReference {
-    pub(crate) id: TypeId,
-}
+pub struct GenericReference(Cow<'static, str>);
 
 impl GenericReference {
     /// Build a new [GenericReference] for a generic type parameter marker.
     /// `T` should be a unique type which identifies the generic (Eg. `pub struct GenericT;`) and must be registered on the parent [`NamedDataType`].
-    pub const fn new<T: ?Sized + 'static>() -> Self {
-        Self {
-            id: TypeId::of::<T>(),
-        }
-    }
-
-    /// Compare two [GenericReference]s for equality.
-    /// If this returns true they are both a reference to the same generic type.
-    pub fn eq<T: ?Sized + 'static>(&self) -> bool {
-        self.id == TypeId::of::<T>()
+    pub const fn new(name: Cow<'static, str>) -> Self {
+        Self(name)
     }
 }
 
@@ -206,7 +212,7 @@ impl Reference {
     pub fn ty_eq(&self, other: &Reference) -> bool {
         match (self, other) {
             (Reference::Named(a), Reference::Named(b)) => a.id == b.id,
-            (Reference::Generic(a), Reference::Generic(b)) => a.id == b.id,
+            (Reference::Generic(a), Reference::Generic(b)) => todo!(), // a.id == b.id,
             (Reference::Opaque(a), Reference::Opaque(b)) => *a == *b,
             _ => false,
         }
@@ -216,10 +222,12 @@ impl Reference {
     ///
     /// It's not safe to go the other way incase the type is inlined which requires all [Reference]'s to be inlined.
     pub fn inline(mut self) -> Reference {
-        if let Reference::Named(n) = &mut self {
-            n.inline = true;
-        }
-        self
+        // if let Reference::Named(n) = &mut self {
+        //     n.inline = true;
+        // }
+        // self
+
+        todo!();
     }
 }
 

@@ -205,7 +205,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                         pub struct #placeholder_ident;
                         impl #crate_ref::Type for #placeholder_ident {
                             fn definition(_: &mut #crate_ref::Types) -> datatype::DataType {
-                                datatype::GenericReference::new::<Self>().into()
+                                datatype::GenericReference::new(stringify!(#ident).into()).into()
                             }
                         }
                     ),
@@ -215,7 +215,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         })
         .unzip();
 
-    let generics_for_ndt_triplets = generics
+    let (generics_for_ndt, generics_for_ref) = generics
         .params
         .iter()
         .map(|param| match param {
@@ -242,16 +242,12 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 };
                 let reference = used_direct_generics.iter().any(|used| used == i).then(|| {
                     quote!((
-                        #crate_ref::datatype::GenericReference::new::<#placeholder_ident>(),
+                        todo!(), // #crate_ref::datatype::GenericReference::new::<#placeholder_ident>(),
                         <#i as #crate_ref::Type>::definition(types),
                     ))
                 });
                 Ok(Some((
-                    quote!(#crate_ref::datatype::Generic::new::<#placeholder_ident>(
-                        Cow::Borrowed(#i_str),
-                        None,
-                    )),
-                    quote!(#crate_ref::datatype::Generic::new::<#placeholder_ident>(
+                    quote!(#crate_ref::datatype::Generic::new(
                         Cow::Borrowed(#i_str),
                         #default,
                     )),
@@ -262,28 +258,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         .collect::<syn::Result<Vec<_>>>()?
         .into_iter()
         .flatten()
-        .collect::<Vec<_>>();
-
-    let generics_for_ndt = generics_for_ndt_triplets
-        .iter()
-        .map(|(generic, _, _)| generic.clone())
-        .collect::<Vec<_>>();
-    let generics_for_ndt_with_defaults = generics_for_ndt_triplets
-        .iter()
-        .map(|(_, generic, _)| generic.clone())
-        .collect::<Vec<_>>();
-    let generics_for_ref = generics_for_ndt_triplets
-        .into_iter()
-        .filter_map(|(_, _, generic)| generic)
-        .collect::<Vec<_>>();
-
-    let generics_for_ndt_with_defaults = if generics_for_ndt_with_defaults.is_empty() {
-        None
-    } else {
-        Some(quote! {
-            ndt.generics = Cow::Owned(vec![#(#generics_for_ndt_with_defaults),*]);
-        })
-    };
+        .collect::<(Vec<_>, Vec<_>)>();
 
     let collect = (cfg!(feature = "DO_NOT_USE_collect") && container_attrs.collect.unwrap_or(true))
         .then(|| {
@@ -305,13 +280,43 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         });
 
     let comments = &container_attrs.common.doc;
-    let inline = container_attrs.inline;
     let deprecated = container_attrs.common.deprecated_as_tokens();
 
     let shadow_generic_aliases = if has_associated_type_usage(&used_generic_types) {
         quote!()
     } else {
         quote!(#(#shadow_generics)*)
+    };
+
+    // TODO: Avoid emitting `dt_expr` twice into the codegen output
+
+    let ndt_ty = (!container_attrs.inline).then(|| {
+        quote! {
+            #(#generic_placeholders)*
+
+            // TODO: Set params
+            ndt.ty = Some(#dt_expr);
+        }
+    });
+
+    let definition = quote! {
+        datatype::DataType::Reference(
+            datatype::NamedDataType::init_with_sentinel_inline(
+                types,
+                SENTINEL,
+                GENERICS,
+                |types, ndt| {
+                    ndt.name = Cow::Borrowed(#name);
+                    ndt.docs = Cow::Borrowed(#comments);
+                    ndt.deprecated = #deprecated;
+                    ndt.module_path = Cow::Borrowed(module_path!());
+                    #ndt_ty
+                },
+                |types| {
+                    #dt_expr
+                }
+            )
+        )
     };
 
     Ok(quote! {
@@ -323,29 +328,10 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             #[automatically_derived]
             impl #bounds #crate_ref::Type for #ident #type_args #where_bound {
                 fn definition(types: &mut #crate_ref::Types) -> datatype::DataType {
-                    #(#generic_placeholders)*
-
                     static SENTINEL: &str = concat!(module_path!(), "::", stringify!(#raw_ident));
                     static GENERICS: &[datatype::Generic] = &[#(#generics_for_ndt),*];
-                    datatype::DataType::Reference(
-                        datatype::NamedDataType::init_with_sentinel(
-                            GENERICS,
-                            vec![#(#generics_for_ref),*],
-                            #inline,
-                            #has_const_param,
-                            types,
-                            SENTINEL,
-                            |types, ndt| {
-                                ndt.name = Cow::Borrowed(#name);
-                                ndt.docs = Cow::Borrowed(#comments);
-                                ndt.deprecated = #deprecated;
-                                ndt.module_path = Cow::Borrowed(module_path!());
-                                #shadow_generic_aliases
-                                #generics_for_ndt_with_defaults
-                                ndt.ty = #dt_expr;
-                            }
-                        )
-                    )
+
+                    #definition
                 }
             }
 

@@ -24,6 +24,7 @@ pub use map::Map;
 pub(crate) use named::context_has_const_params;
 pub use named::{Deprecated, NamedDataType};
 pub use primitive::Primitive;
+pub(crate) use reference::NamedReferenceInner;
 pub use reference::{GenericReference, NamedReference, OpaqueReference, Reference};
 pub use r#struct::Struct;
 pub use tuple::Tuple;

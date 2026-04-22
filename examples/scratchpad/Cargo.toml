@@ -6,6 +6,6 @@ publish = false
 
 [dependencies]
 specta = { path = "../../specta", features = ["derive"] }
-specta-typescript = { path = "../../specta-typescript" }
-specta-serde = { path = "../../specta-serde" }
+# specta-typescript = { path = "../../specta-typescript" }
+# specta-serde = { path = "../../specta-serde" }
 serde = { version = "1", features = ["derive"] }

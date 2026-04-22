@@ -206,7 +206,7 @@ macro_rules! _impl_ndt {
                     static SENTINEL: &str = stringify!($type_path);
                     static GENERICS: &[datatype::Generic] = &[
                         $($(
-                            datatype::Generic::new::<generics::$generic>(
+                            datatype::Generic::new(
                                 ::std::borrow::Cow::Borrowed(stringify!($generic)),
                                 None,
                             )
@@ -217,7 +217,7 @@ macro_rules! _impl_ndt {
                         vec![
                             $($(
                                 (
-                                    datatype::GenericReference::new::<generics::$generic>(),
+                                    todo!(), // TODO: datatype::GenericReference::new::<generics::$generic>(),
                                     <$generic as Type>::definition(types),
                                 )
                             ),*)?
