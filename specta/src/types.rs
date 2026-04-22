@@ -13,18 +13,18 @@ use crate::{
 /// While exporting a type will add all of the types it depends on to the collection.
 /// You can also construct your own collection to easily export a set of types together.
 #[derive(Default, Clone)]
-pub struct Types(
+pub struct Types {
     // `None` indicates that the entry is a placeholder.
     // It is a reference and we are currently resolving it's definition.
-    pub(crate) HashMap<NamedId, Option<NamedDataType>>,
+    pub(crate) types: HashMap<NamedId, Option<NamedDataType>>,
     // The count of non-`None` items in the collection.
     // We store this to avoid expensive iteration.
-    pub(crate) usize,
-);
+    pub(crate) len: usize,
+}
 
 impl fmt::Debug for Types {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Types").field(&self.0).finish()
+        f.debug_tuple("Types").field(&self.types).finish()
     }
 }
 
@@ -44,36 +44,39 @@ impl Types {
     /// Get the length of the collection.
     pub fn len(&self) -> usize {
         debug_assert_eq!(
-            self.1,
-            self.0.iter().filter_map(|(_, ndt)| ndt.as_ref()).count(),
+            self.len,
+            self.types
+                .iter()
+                .filter_map(|(_, ndt)| ndt.as_ref())
+                .count(),
             "Types count logic mismatch"
         );
 
-        self.1
+        self.len
     }
 
     /// Check if the collection is empty.
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.types.is_empty()
     }
 
     /// Merge types from another collection into this one.
     pub fn extend(&mut self, other: &Self) {
-        for (id, other) in &other.0 {
-            match self.0.get(id) {
+        for (id, other) in &other.types {
+            match self.types.get(id) {
                 // Key doesn't exist - insert from other
                 None => {
                     if other.is_some() {
-                        self.1 += 1;
+                        self.len += 1;
                     }
-                    self.0.insert(id.clone(), other.clone());
+                    self.types.insert(id.clone(), other.clone());
                 }
                 // Key exists with Some - keep self (prefer self over other)
                 Some(Some(_)) => {}
                 // Key exists with None, but other has Some - use other (prefer Some over None)
                 Some(None) if other.is_some() => {
-                    self.1 += 1;
-                    self.0.insert(id.clone(), other.clone());
+                    self.len += 1;
+                    self.types.insert(id.clone(), other.clone());
                 }
                 // Key exists with None, other also None - do nothing
                 Some(None) => {}
@@ -88,11 +91,11 @@ impl Types {
     /// This method requires reallocating the map to sort the collection. You should prefer [Self::into_unsorted_iter] if you don't care about the order.
     pub fn into_sorted_iter(&self) -> impl ExactSizeIterator<Item = &'_ NamedDataType> {
         let mut v = self
-            .0
+            .types
             .iter()
             .filter_map(|(_, ndt)| ndt.as_ref())
             .collect::<Vec<_>>();
-        assert_eq!(v.len(), self.1, "Types count logic mismatch");
+        assert_eq!(v.len(), self.len, "Types count logic mismatch");
         v.sort_by(|a, b| {
             a.name
                 .cmp(&b.name)
@@ -105,8 +108,8 @@ impl Types {
     /// Return the unsorted iterator over the collection.
     pub fn into_unsorted_iter(&self) -> impl ExactSizeIterator<Item = &NamedDataType> {
         UnsortedIter {
-            iter: self.0.iter(),
-            count: self.1,
+            iter: self.types.iter(),
+            count: self.len,
         }
     }
 
@@ -116,7 +119,7 @@ impl Types {
     where
         F: FnMut(&mut NamedDataType),
     {
-        for (_, ndt) in self.0.iter_mut() {
+        for (_, ndt) in self.types.iter_mut() {
             if let Some(ndt) = ndt {
                 f(ndt);
             }
@@ -129,7 +132,7 @@ impl Types {
     where
         F: FnMut(NamedDataType) -> NamedDataType,
     {
-        for (_, slot) in self.0.iter_mut() {
+        for (_, slot) in self.types.iter_mut() {
             if let Some(ndt) = slot.take() {
                 *slot = Some(f(ndt));
             }

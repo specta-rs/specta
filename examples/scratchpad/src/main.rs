@@ -1,61 +1,66 @@
 //! A playground for quickly reproducing issue.
 
 use serde::Serialize;
-use specta::{
-    Type, Types,
-    datatype::{DataType, Reference},
-};
+use specta::{Type, Types};
 
-#[derive(Serialize, Type)]
-pub struct Demo {
-    // #[serde(rename = "field2")]
-    #[serde(rename(serialize = "field_ser", deserialize = "field_der"))]
-    field: String,
+#[derive(Type)]
+// #[specta(inline)]
+pub struct A {
+    #[specta(inline)]
+    b: B,
+    c: C,
+}
+
+#[derive(Type)]
+// #[specta(inline)]
+pub struct B {
+    #[specta(inline)]
+    a: Box<A>,
+    c: C,
+}
+
+#[derive(Type)]
+pub struct C {
+    c: D,
+}
+
+#[derive(Type)]
+pub struct D {
+    // This should never show up in output
+    d: String,
+    // Is recursive but not infinitely recursive.
+    e: E<E<E<String>>>,
+}
+
+#[derive(Type)]
+pub struct E<EE> {
+    e: EE,
+}
+
+#[derive(Type)]
+pub struct E2<T> {
+    f: T,
+    // Infinitely recursive
+    #[specta(inline)]
+    e: Box<E2<T>>,
+}
+
+#[derive(Type)]
+struct E3 {
+    e: E2<String>,
+    // { f: String, e: { f: String, e: { f: String, e: ... } } }
+    ee: E2<E2<String>>,
+    // { f: String, e: { f: String, e: { f: String, e: ... } } }
 }
 
 fn main() {
-    // let types = Types::default().register::<Demo>();
-    // let out = specta_typescript::Typescript::new()
-    //     .export(&types, specta_serde::format)
-    //     .unwrap();
-    // println!("{}", out);
+    let types = Types::default()
+        // .register::<A>()
+        .register::<E3>();
 
     let out = specta_typescript::Typescript::new()
-        .export(
-            &Types::default().register::<Demo>(),
-            specta_serde::format_phases,
-        )
+        .export(&types, specta_serde::format_phases)
         .unwrap();
+
     println!("{}", out);
-
-    let mut types = Types::default();
-    let dt = Demo::definition(&mut types);
-    let dt = match dt {
-        DataType::Reference(Reference::Named(r)) => r.ty(&types).unwrap().clone(),
-        _ => panic!("Expected a named reference"),
-    };
-
-    // println!(
-    //     "{:?}",
-    //     // TODO: This should error?
-    //     specta_typescript::primitives::inline(
-    //         &specta_typescript::Typescript::new(),
-    //         specta_serde::map_types(&types)
-    //             .unwrap()
-    //             .as_ref(),
-    //         specta_serde::map_datatype(&types, &dt)
-    //             .unwrap()
-    //             .as_ref()
-    //     )
-    // );
-    // println!("{:?}", {
-    //     let format = specta_serde::format_phases;
-    //     let mapped_types = (format.map_types)(&types).unwrap();
-    //     let mapped_dt = (format.map_type)(&types, &dt).unwrap();
-    //     specta_typescript::primitives::inline(
-    //         &specta_typescript::Typescript::new(),
-    //         mapped_types.as_ref(),
-    //         mapped_dt.as_ref(),
-    //     )
-    // });
 }

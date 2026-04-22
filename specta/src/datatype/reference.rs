@@ -34,7 +34,7 @@ impl NamedReference {
     /// This is guaranteed to return a [NamedDataType] if the [Types] matches,
     /// what was used to get the original [Reference].
     pub fn get<'a>(&self, types: &'a Types) -> Option<&'a NamedDataType> {
-        types.0.get(&self.id)?.as_ref()
+        types.types.get(&self.id)?.as_ref()
     }
 
     /// Get the datatype of this reference, if it is known.

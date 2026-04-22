@@ -1,7 +1,9 @@
 use std::{
     borrow::Cow,
     cell::Cell,
+    hash::{DefaultHasher, Hash, Hasher},
     panic::{self, AssertUnwindSafe, Location},
+    ptr,
     sync::Arc,
 };
 
@@ -160,8 +162,8 @@ impl NamedDataType {
 
     /// Register the type into a [Types].
     pub fn register(&self, types: &mut Types) {
-        types.0.insert(self.id.clone(), Some(self.clone()));
-        types.1 += 1;
+        types.types.insert(self.id.clone(), Some(self.clone()));
+        types.len += 1;
     }
 
     /// Initialize a named type using a temporary sentinel as it's identity. The sentinel avoids allocating an ID which is used by `#[derive(Type)]` but is too unsafe as a general public API.
@@ -196,11 +198,23 @@ impl NamedDataType {
         let id = NamedId::Static(sentinel);
         let location = Location::caller().to_owned();
 
+        let hash = {
+            let mut h = DefaultHasher::new();
+            sentinel.hash(&mut h);
+            ptr::hash(sentinel, &mut h);
+            for (generic_r, generic) in &generics_for_ref {
+                generic_r.id.hash(&mut h);
+                generic.hash(&mut h);
+            }
+            h.finish()
+        };
+        println!("{:?} {sentinel} {generics_for_ref:?}", hash);
+
         // If this named type is already being resolved, emit a reference to the placeholder
         // instead of re-entering resolution which would likely trigger a stack overflow.
         //
         // This stops us resolving the `instances` entry for recursively inlined types but resolving it would just infinitely recurse so we can't.
-        if types.0.get(&id).is_some_and(|slot| slot.is_none()) {
+        if types.types.get(&id).is_some_and(|slot| slot.is_none()) {
             return Reference::Named(NamedReference {
                 id: id.clone(),
                 generics: generics_for_ref.clone(),
@@ -224,7 +238,7 @@ impl NamedDataType {
         };
 
         if let Some(existing_inline) = types
-            .0
+            .types
             .get(&id)
             .and_then(Option::as_ref)
             .map(|ndt| ndt.inline)
@@ -235,10 +249,10 @@ impl NamedDataType {
 
             let previous = CONTEXT_HAS_CONST_PARAMS.replace(has_const_param);
             let result = panic::catch_unwind(AssertUnwindSafe(|| {
-                let prev = types.0.insert(id.clone(), None);
+                let prev = types.types.insert(id.clone(), None);
                 let result = panic::catch_unwind(AssertUnwindSafe(|| build_ndt(types, &mut ndt)));
                 if let Some(prev) = prev {
-                    types.0.insert(id.clone(), prev);
+                    types.types.insert(id.clone(), prev);
                 }
                 if let Err(payload) = result {
                     panic::resume_unwind(payload);
@@ -263,14 +277,14 @@ impl NamedDataType {
                 ndt.inline = true;
             }
 
-            types.0.insert(id.clone(), Some(ndt));
-            types.1 += 1;
+            types.types.insert(id.clone(), Some(ndt));
+            types.len += 1;
         }
 
-        let prev = types.0.insert(id.clone(), None);
+        let prev = types.types.insert(id.clone(), None);
         let result = panic::catch_unwind(AssertUnwindSafe(|| build_ndt(types, &mut ndt)));
         if let Some(prev) = prev {
-            types.0.insert(id.clone(), prev);
+            types.types.insert(id.clone(), prev);
         }
         if let Err(payload) = result {
             panic::resume_unwind(payload);
@@ -282,7 +296,7 @@ impl NamedDataType {
         }
 
         let instance = types
-            .0
+            .types
             .get_mut(&id)
             .and_then(Option::as_mut)
             .and_then(|existing| existing.register_instance(ndt.ty));
