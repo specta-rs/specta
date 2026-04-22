@@ -1,11 +1,13 @@
 use std::{
     any::{Any, TypeId},
-    borrow::Cow,
     fmt, hash,
     sync::Arc,
 };
 
-use crate::{Types, datatype::NamedDataType};
+use crate::{
+    Types,
+    datatype::{Generic, NamedDataType},
+};
 
 use super::DataType;
 
@@ -15,9 +17,6 @@ pub enum Reference {
     /// Reference to a named type collected in a [`Types`].
     /// This can either produce `TypeName<Generics>` or just an inlined definition.
     Named(NamedReference),
-    /// Reference to a generic type parameter.
-    /// This produces something like `T`.
-    Generic(GenericReference),
     /// Reference to an opaque exporter-specific type.
     Opaque(OpaqueReference),
 }
@@ -37,7 +36,7 @@ pub(crate) enum NamedReferenceInner {
         dt: Box<DataType>, // TODO: Expose this mutablly??
     },
     Reference {
-        generics: Vec<(GenericReference, DataType)>, // TODO: Expose this mutablly??
+        generics: Vec<(Generic, DataType)>, // TODO: Expose this mutablly??
     },
 }
 
@@ -72,26 +71,6 @@ impl NamedReference {
     pub fn inline(&self) -> bool {
         // self.inline
         todo!();
-    }
-}
-
-/// Reference to a generic parameter.
-/// This renders like `T` in the final output.
-/// This should only exist in `NamedDataType.ty`, not in normal [`DataType`] values returned from [`Type::definition`].
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct GenericReference(Cow<'static, str>);
-
-impl GenericReference {
-    /// Build a new [GenericReference] for a generic type parameter marker.
-    /// `T` should be a unique type which identifies the generic (Eg. `pub struct GenericT;`) and must be registered on the parent [`NamedDataType`].
-    pub const fn new(name: Cow<'static, str>) -> Self {
-        Self(name)
-    }
-}
-
-impl From<GenericReference> for DataType {
-    fn from(v: GenericReference) -> Self {
-        DataType::Reference(Reference::Generic(v))
     }
 }
 
@@ -212,7 +191,6 @@ impl Reference {
     pub fn ty_eq(&self, other: &Reference) -> bool {
         match (self, other) {
             (Reference::Named(a), Reference::Named(b)) => a.id == b.id,
-            (Reference::Generic(a), Reference::Generic(b)) => todo!(), // a.id == b.id,
             (Reference::Opaque(a), Reference::Opaque(b)) => *a == *b,
             _ => false,
         }

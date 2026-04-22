@@ -11,7 +11,8 @@ use crate::{
     Types,
     datatype::{
         DataType, Generic, NamedReference, NamedReferenceInner, Reference,
-        reference::{self, GenericReference, NamedId},
+        generic::GenericDefinition,
+        reference::{self, NamedId},
     },
 };
 
@@ -92,7 +93,7 @@ pub struct NamedDataType {
     pub deprecated: Option<Deprecated>,
     pub module_path: Cow<'static, str>,
     pub location: Location<'static>,
-    pub generics: Cow<'static, [Generic]>,
+    pub generics: Cow<'static, [GenericDefinition]>,
     /// The generalised datatype of this specific named data type.
     /// This is what will be used for creating `export Type = ...;` statements.
     ///
@@ -181,13 +182,13 @@ impl NamedDataType {
     #[doc(hidden)]
     #[track_caller]
     pub fn init_with_sentinel_inline(
-        types: &mut Types,
         sentinel: &'static str,
-        generics: &'static [Generic],
-        instantiation_generics: &[(GenericReference, DataType)],
+        generics: &'static [GenericDefinition],
+        instantiation_generics: &[(Generic, DataType)],
         has_const_param: bool,
         container_inline: bool,
         passthrough_inline: bool,
+        types: &mut Types,
         build_ndt: fn(&mut Types, &mut NamedDataType),
         mut build_ty: fn(&mut Types) -> DataType,
     ) -> Reference {
@@ -243,16 +244,6 @@ impl NamedDataType {
             types.types.insert(id.clone(), Some(ndt));
             types.len += 1;
         }
-
-        // // TODO: Is this good?
-        // if types.types.get(&id).cloned().is_none() {
-        //     return Reference::Named(NamedReference {
-        //         id,
-        //         inner: NamedReferenceInner::Reference {
-        //             generics: Vec::new(), // TODO: Hook this up
-        //         },
-        //     });
-        // }
 
         if inline {
             let hash = {
@@ -310,25 +301,11 @@ impl NamedDataType {
         }
     }
 
-    #[doc(hidden)]
-    #[track_caller]
-    pub fn init_with_sentinel(
-        generics_for_ndt: &'static [Generic],
-        generics_for_ref: Vec<(GenericReference, DataType)>,
-        has_const_param: bool,
-        inline: bool,
-        types: &mut Types,
-        sentinel: &'static str,
-        build_ndt: fn(&mut Types, &mut NamedDataType),
-    ) -> Reference {
-        todo!();
-    }
-
     /// Construct a [Reference] to a [NamedDataType].
     /// This can be included in a `DataType::Reference` within another type.
     ///
     /// This reference will be inlined if the type is inlined, otherwise you can inline it with [Reference::inline].
-    pub fn reference(&self, generics: Vec<(GenericReference, DataType)>) -> Reference {
+    pub fn reference(&self, generics: Vec<(Generic, DataType)>) -> Reference {
         // TODO: allow generics to be `Cow`
         // TODO: HashMap instead of array for better typesafety??
 
@@ -340,62 +317,6 @@ impl NamedDataType {
         //     dt: None, // TODO
         // })
 
-        todo!();
-    }
-
-    /// Check whether a type requires a reference to be generated.
-    ///
-    /// This if `false` is all [Reference]'s created for the type are inlined,
-    /// in that case it doesn't need to be exported because it will never be
-    /// referenced.
-    pub fn requires_reference(&self, _types: &Types) -> bool {
-        // `Types` is unused but I wanna keep it for future flexibility.
-
-        // If a type is inlined, all it's references are,
-        // therefor we don't need to export a named version of it.
-        // !self.inline
-
-        todo!();
-    }
-
-    /// Construct a [Reference] to this [NamedDataType] using another reference as a template.
-    ///
-    /// This preserves hidden per-reference state such as inline and instance information while
-    /// retargeting the reference to this named type.
-    pub fn reference_from(&self, template: &NamedReference) -> Reference {
-        // Reference::Named(NamedReference {
-        //     id: self.id.clone(),
-        //     generics: template.generics.clone(),
-        //     inline: template.inline,
-        //     instance: template.instance,
-        //     dt: None, // TODO
-        // })
-
-        todo!();
-    }
-
-    /// Allows you to map over the inner [`DataType`] and all instances.
-    /// Sometimes a [`NamedDataType`] will be represented as multiple [`DataType`]'s so inlining can be more accurate so you should prefer this over [`NamedDataType::ty_*`] helpers.
-    pub fn map_ty_mut(&mut self, mut f: impl FnMut(&mut DataType)) {
-        // f(&mut self.ty);
-        // for instance in self.instances.iter_mut() {
-        //     f(instance);
-        // }
-        todo!();
-    }
-
-    pub(crate) fn register_instance(&mut self, ty: DataType) -> Option<usize> {
-        // if self.ty == ty {
-        //     return None;
-        // }
-
-        // if let Some(index) = self.instances.iter().position(|existing| existing == &ty) {
-        //     return Some(index);
-        // }
-
-        // let index = self.instances.len();
-        // self.instances.push(ty);
-        // Some(index)
         todo!();
     }
 }

@@ -14,7 +14,7 @@ pub struct A {
 #[derive(Type)]
 // #[specta(inline)]
 pub struct B {
-    #[specta(inline)]
+    // #[specta(inline)]
     a: Box<A>,
     c: C,
 }

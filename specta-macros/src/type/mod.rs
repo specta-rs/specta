@@ -199,13 +199,14 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             GenericParam::Lifetime(_) | GenericParam::Const(_) => None,
             GenericParam::Type(t) => {
                 let ident = &t.ident;
+                let ident_str = ident.to_string();
                 let placeholder_ident = format_ident!("PLACEHOLDER_{ident}");
                 Some((
                     quote!(
                         pub struct #placeholder_ident;
                         impl #crate_ref::Type for #placeholder_ident {
                             fn definition(_: &mut #crate_ref::Types) -> datatype::DataType {
-                                datatype::GenericReference::new(stringify!(#ident).into()).into()
+                                datatype::Generic::new(Cow::Borrowed(#ident_str)).into()
                             }
                         }
                     ),
@@ -222,7 +223,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             GenericParam::Lifetime(_) | GenericParam::Const(_) => Ok(None),
             GenericParam::Type(t) => {
                 let i = &t.ident;
-                let placeholder_ident = format_ident!("PLACEHOLDER_{}", t.ident);
+                let i_str = i.to_string();
 
                 let skip_default = parse_attrs(&t.attrs)?
                     .extract("specta", "skip_default_generic")
@@ -242,12 +243,12 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 };
                 let reference = used_direct_generics.iter().any(|used| used == i).then(|| {
                     quote!((
-                        todo!(), // #crate_ref::datatype::GenericReference::new::<#placeholder_ident>(),
+                        #crate_ref::datatype::Generic::new(Cow::Borrowed(#i_str)),
                         <#i as #crate_ref::Type>::definition(types),
                     ))
                 });
                 Ok(Some((
-                    quote!(#crate_ref::datatype::Generic::new(
+                    quote!(#crate_ref::datatype::GenericDefinition::new(
                         Cow::Borrowed(#i_str),
                         #default,
                     )),
@@ -272,8 +273,8 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
             quote! {
                 #[allow(unsafe_code, non_snake_case)]
-                #[#crate_ref::collect::internal::ctor::ctor(anonymous, crate_path = #crate_ref::collect::internal::ctor)]
-                unsafe fn #export_fn_name() {
+                #[#crate_ref::collect::internal::ctor::ctor(unsafe, anonymous, crate_path = #crate_ref::collect::internal::ctor)]
+                fn #export_fn_name() {
                     #crate_ref::collect::internal::register::<#ident<#(#generic_params),*>>();
                 }
             }
@@ -303,13 +304,13 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let definition = quote! {
         datatype::DataType::Reference(
             datatype::NamedDataType::init_with_sentinel_inline(
-                types,
                 SENTINEL,
                 GENERICS,
-                &[], // TODO: &[#(#instantiation_generics),*],
+                &[#(#instantiation_generics),*],
                 #has_const_param,
                 #inline,
                 false,
+                types,
                 |types, ndt| {
                     ndt.name = Cow::Borrowed(#name);
                     ndt.docs = Cow::Borrowed(#comments);
@@ -334,7 +335,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             impl #bounds #crate_ref::Type for #ident #type_args #where_bound {
                 fn definition(types: &mut #crate_ref::Types) -> datatype::DataType {
                     static SENTINEL: &str = concat!(module_path!(), "::", stringify!(#raw_ident));
-                    static GENERICS: &[datatype::Generic] = &[]; // TODO: &[#(#generics_for_ndt),*];
+                    static GENERICS: &[datatype::GenericDefinition] = &[#(#generics_for_ndt),*];
 
                     #definition
                 }

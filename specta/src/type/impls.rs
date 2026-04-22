@@ -26,29 +26,19 @@ impl Type for String {
 impl<T: Type> Type for Box<T> {
     fn definition(types: &mut Types) -> DataType {
         NamedDataType::init_with_sentinel_inline(
-            types,
             "std::box::Box",
             &[],
             &[],
             false,
             true,
             true,
+            types,
             |types, ndt| {
                 // ndt.name = ""
             },
             |types| T::definition(types),
         )
         .into()
-
-        // TODO: Catch panics
-        // let prev_inline = SHOULD_INLINE.replace(false);
-        // let dt = Box::new(T::definition(types));
-        // SHOULD_INLINE.set(prev_inline);
-
-        // Reference::Named(NamedReference {
-        //     id,
-        //     inner: datatype::NamedReferenceInner::Inline { dt },
-        // })
     }
 }
 
