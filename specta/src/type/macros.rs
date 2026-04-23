@@ -44,26 +44,25 @@ macro_rules! _impl_ndt_as {
                 fn definition(types: &mut Types) -> DataType {
                     // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
                     static SENTINEL: &str = stringify!($head::$( $tail )::+<$generic, $const_generic>);
-                    static GENERICS: &[datatype::Generic] = &[
-                        datatype::Generic::new::<generics::$generic>(
+                    static GENERICS: &[datatype::GenericDefinition] = &[
+                        datatype::Generic::new(
                             ::std::borrow::Cow::Borrowed(stringify!($generic)),
                             None,
                         ),
                     ];
 
                     DataType::Reference(datatype::NamedDataType::init_with_sentinel(
+                        SENTINEL,
                         GENERICS,
-                        vec![(
-                            datatype::GenericReference::new::<generics::$generic>(),
+                        &[(
+                            #crate_ref::datatype::Generic::new(::std::borrow::Cow::Borrowed(stringify!($generic))),
                             <$generic as Type>::definition(types),
                         )],
+                        false,
                         true,
-                        true,
+                        true, // TODO: This is only for some things???
                         types,
-                        SENTINEL,
                         |types, ndt| {
-                            let _ = &types;
-
                             let (type_name, module_path) = {
                                 let s = stringify!($head::$( $tail )::+<$generic, $const_generic>);
                                 let cleaned: String = s.chars().filter(|c| !c.is_whitespace()).collect();
@@ -77,97 +76,11 @@ macro_rules! _impl_ndt_as {
 
                             ndt.name = ::std::borrow::Cow::Owned(type_name);
                             ndt.module_path = ::std::borrow::Cow::Owned(module_path);
-                            ndt.ty = <$ty2 as Type>::definition(types);
+                            // ndt.ty = <$ty2 as Type>::definition(types);
                         },
-                    ))
-                }
-            }
-        )*
-    };
-    ( $($head:ident :: $( $tail:ident )::+ < const $const_generic:ident: usize > $( where { $($bounds:tt)* } )? as $ty2:ty )* ) => {
-        $(
-            impl<const $const_generic: usize> Type for $head::$( $tail )::+<$const_generic>
-            $(where $($bounds)*)?
-            {
-                fn definition(types: &mut Types) -> DataType {
-                    // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
-                    static SENTINEL: &str = stringify!($head::$( $tail )::+<$const_generic>);
-                    static GENERICS: &[datatype::Generic] = &[];
-
-                    DataType::Reference(datatype::NamedDataType::init_with_sentinel(
-                        GENERICS,
-                        vec![],
-                        true,
-                        true,
-                        types,
-                        SENTINEL,
-                        |types, ndt| {
-                            let _ = &types;
-
-                            let (type_name, module_path) = {
-                                let s = stringify!($head::$( $tail )::+<$const_generic>);
-                                let cleaned: String = s.chars().filter(|c| !c.is_whitespace()).collect();
-                                let s = cleaned.split('<').next().unwrap();
-                                if let Some((path, name)) = s.rsplit_once("::") {
-                                    (name.to_string(), path.to_string())
-                                } else {
-                                    (s.to_string(), String::new())
-                                }
-                            };
-
-                            ndt.name = ::std::borrow::Cow::Owned(type_name);
-                            ndt.module_path = ::std::borrow::Cow::Owned(module_path);
-                            ndt.ty = <$ty2 as Type>::definition(types);
-                        },
-                    ))
-                }
-            }
-        )*
-    };
-    ( $($head:ident :: $( $tail:ident )::+ < [ $generic:ident ; $const_generic:ident ] > $( where { $($bounds:tt)* } )? as $ty2:ty )* ) => {
-        $(
-            impl<$generic: Type, const $const_generic: usize> Type
-                for $head::$( $tail )::+<[$generic; $const_generic]>
-            $(where $($bounds)*)?
-            {
-                fn definition(types: &mut Types) -> DataType {
-                    // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
-                    static SENTINEL: &str = stringify!($head::$( $tail )::+<[$generic; $const_generic]>);
-                    static GENERICS: &[datatype::Generic] = &[
-                        datatype::Generic::new::<generics::$generic>(
-                            ::std::borrow::Cow::Borrowed(stringify!($generic)),
-                            None,
-                        ),
-                    ];
-
-                    DataType::Reference(datatype::NamedDataType::init_with_sentinel(
-                        GENERICS,
-                        vec![(
-                            datatype::GenericReference::new::<generics::$generic>(),
-                            <$generic as Type>::definition(types),
-                        )],
-                        true,
-                        true,
-                        types,
-                        SENTINEL,
-                        |types, ndt| {
-                            let _ = &types;
-
-                            let (type_name, module_path) = {
-                                let s = stringify!($head::$( $tail )::+<[$generic; $const_generic]>);
-                                let cleaned: String = s.chars().filter(|c| !c.is_whitespace()).collect();
-                                let s = cleaned.split('<').next().unwrap();
-                                if let Some((path, name)) = s.rsplit_once("::") {
-                                    (name.to_string(), path.to_string())
-                                } else {
-                                    (s.to_string(), String::new())
-                                }
-                            };
-
-                            ndt.name = ::std::borrow::Cow::Owned(type_name);
-                            ndt.module_path = ::std::borrow::Cow::Owned(module_path);
-                            ndt.ty = <$ty2 as Type>::definition(types);
-                        },
+                        |types| {
+                            todo!();
+                        }
                     ))
                 }
             }
@@ -203,50 +116,51 @@ macro_rules! _impl_ndt {
             impl$(<$($generic),*>)? Type for $type_path $(where $($bounds)*)? {
                 fn definition(types: &mut Types) -> DataType {
                     // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
-                    static SENTINEL: &str = stringify!($type_path);
-                    static GENERICS: &[datatype::Generic] = &[
-                        $($(
-                            datatype::Generic::new(
-                                ::std::borrow::Cow::Borrowed(stringify!($generic)),
-                                None,
-                            )
-                        ),*)?
-                    ];
-                    DataType::Reference(datatype::NamedDataType::init_with_sentinel(
-                        GENERICS,
-                        vec![
-                            $($(
-                                (
-                                    todo!(), // TODO: datatype::GenericReference::new::<generics::$generic>(),
-                                    <$generic as Type>::definition(types),
-                                )
-                            ),*)?
-                        ],
-                        $inline,
-                        false,
-                        types,
-                        SENTINEL,
-                        |$types, $ndt| {
-                            let _ = &$types;
+                    // static SENTINEL: &str = stringify!($type_path);
+                    // static GENERICS: &[datatype::GenericDefinition] = &[
+                    //     $($(
+                    //         datatype::GenericDefinition::new(
+                    //             ::std::borrow::Cow::Borrowed(stringify!($generic)),
+                    //             None,
+                    //         )
+                    //     ),*)?
+                    // ];
+                    // DataType::Reference(datatype::NamedDataType::init_with_sentinel(
+                    //     GENERICS,
+                    //     vec![
+                    //         $($(
+                    //             (
+                    //                 datatype::Generic::new(::std::borrow::Cow::Borrowed(stringify!($generic))),
+                    //                 <$generic as Type>::definition(types),
+                    //             )
+                    //         ),*)?
+                    //     ],
+                    //     $inline,
+                    //     false,
+                    //     types,
+                    //     SENTINEL,
+                    //     |$types, $ndt| {
+                    //         let _ = &$types;
 
-                            // TODO: This should be doable in the macro instead of the runtime. This will do for now though.
-                            let (type_name, module_path) = {
-                                let s = stringify!($type_path);
-                                let cleaned: String = s.chars().filter(|c| !c.is_whitespace()).collect();
-                                 let s = cleaned.split('<').next().unwrap();
-                                 if let Some((path, name)) = s.rsplit_once("::") {
-                                     (name.to_string(), path.to_string())
-                                 } else {
-                                     (s.to_string(), String::new())
-                                 }
-                            };
+                    //         // TODO: This should be doable in the macro instead of the runtime. This will do for now though.
+                    //         let (type_name, module_path) = {
+                    //             let s = stringify!($type_path);
+                    //             let cleaned: String = s.chars().filter(|c| !c.is_whitespace()).collect();
+                    //              let s = cleaned.split('<').next().unwrap();
+                    //              if let Some((path, name)) = s.rsplit_once("::") {
+                    //                  (name.to_string(), path.to_string())
+                    //              } else {
+                    //                  (s.to_string(), String::new())
+                    //              }
+                    //         };
 
-                            $ndt.name = ::std::borrow::Cow::Owned(type_name);
-                            $ndt.module_path = ::std::borrow::Cow::Owned(module_path);
+                    //         $ndt.name = ::std::borrow::Cow::Owned(type_name);
+                    //         $ndt.module_path = ::std::borrow::Cow::Owned(module_path);
 
-                            $build
-                        },
-                    ))
+                    //         // $build // TODO: Fix this
+                    //     },
+                    // ))
+                    todo!();
                 }
             }
         )+

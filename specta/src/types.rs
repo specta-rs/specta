@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     Type,
-    datatype::{NamedDataType, NamedId},
+    datatype::{NamedDataType, NamedId, NamedReference},
 };
 
 /// Define a set of types which can be exported together.
@@ -21,10 +21,58 @@ pub struct Types {
     // The count of non-`None` items in the collection.
     // We store this to avoid expensive iteration.
     pub(crate) len: usize,
-    // TODO
-    // pub(crate) inlined: HashMap<NamedId, Option<NamedDataType>>,
+
     // TODO
     pub(crate) stack: Vec<u64>,
+
+    // TODO: Explain
+    pub(crate) should_inline: bool,
+
+    // TODO: Explain
+    /// This variables remains false unless your exporting in the context of `#[derive(Type)]` on a type which contains one or more const-generic parameters.
+    ///
+    /// Say for a type like this
+    /// ```rs
+    /// #[derive(Type)]
+    /// struct Demo<const N: usize> {
+    ///     data: [u32; N],
+    /// }
+    /// ```
+    ///
+    /// If we always set the length in the `impl Type for [T; N]`, the implementation will "bake" whatever the first encountered value of `N` is into the global type definition which is wrong. For example:
+    /// ```rs
+    /// pub struct A {
+    ///     a: Demo<1>,
+    ///     b: Demo<2>,
+    /// }
+    /// // becomes:
+    /// // export type A = { a: Demo, b: Demo }
+    /// // export type Demo = { [number] }; // This is invalid for the `b` field.
+    ///
+    /// // and if we encounter the fields in the opposite order it changes:
+    ///
+    /// pub struct B {
+    ///     // we flipped field definition
+    ///     b: Demo<2>,
+    ///     a: Demo<1>,
+    /// }
+    /// // becomes:
+    /// // export type A = { a: Demo, b: Demo }
+    /// // export type Demo = { [number, number] }; // This is invalid for the `a` field.
+    /// ```
+    ///
+    /// One observation is that for a length to differ across two instantiations of the same type it must either:
+    ///  - Have a const parameter
+    ///  - Have a generic which uses a trait associated constant
+    ///
+    /// Now Specta doesn't and can't support a generic with a trait associated constant as the generic `T` is shadowed by a virtual struct which is used to alter the type to return a generic reference, instead of a flat datatype.
+    ///
+    /// So for DX we know including length is safe as long as the resolving context doesn't have any const parameters. We track this using a thread local so it's entirely runtime meaning the solution doesn't require brittle scanning of the user's `TokenStream` in the derive macro.
+    ///
+    /// We provide `specta_util::FixedArray<N, T>` as a helper type to force Specta to export a fixed-length array instead of a generic `number[]` if you know what your doing.
+    /// This doesn't fix the core issue but it does allow the user to assert they are correct.
+    ///
+    pub(crate) has_const_params: bool,
 }
 
 impl fmt::Debug for Types {
@@ -44,6 +92,11 @@ impl Types {
     pub fn register_mut<T: Type>(&mut self) -> &mut Self {
         T::definition(self);
         self
+    }
+
+    /// Get a [`NamedDataType`] from a [`NamedReference`].
+    pub fn get(&self, r: &NamedReference) -> Option<&NamedDataType> {
+        self.types.get(&r.id)?.as_ref()
     }
 
     /// Get the length of the collection.

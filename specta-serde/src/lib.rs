@@ -220,7 +220,7 @@ fn map_phases_datatype<'a>(
 
     if let Err(err) =
         validate::validate_datatype_for_mode_shallow(&selected, types, validate::ApplyMode::Phases)
-            && !err.is_unresolved_generic_reference()
+        && !err.is_unresolved_generic_reference()
     {
         return Err(err.into());
     }

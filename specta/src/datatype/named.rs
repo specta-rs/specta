@@ -1,84 +1,28 @@
 use std::{
     borrow::Cow,
-    cell::Cell,
     hash::{DefaultHasher, Hash, Hasher},
+    mem,
     panic::{self, AssertUnwindSafe, Location},
     ptr,
-    sync::Arc,
 };
 
 use crate::{
     Types,
     datatype::{
-        DataType, Generic, NamedReference, NamedReferenceInner, Reference,
+        DataType, Generic, NamedReference, NamedReferenceType, Reference,
         generic::GenericDefinition,
         reference::{self, NamedId},
     },
 };
 
-thread_local! {
-    /// This variables remains false unless your exporting in the context of `#[derive(Type)]` on a type which contains one or more const-generic parameters.
-    ///
-    /// Say for a type like this
-    /// ```rs
-    /// #[derive(Type)]
-    /// struct Demo<const N: usize> {
-    ///     data: [u32; N],
-    /// }
-    /// ```
-    ///
-    /// If we always set the length in the `impl Type for [T; N]`, the implementation will "bake" whatever the first encountered value of `N` is into the global type definition which is wrong. For example:
-    /// ```rs
-    /// pub struct A {
-    ///     a: Demo<1>,
-    ///     b: Demo<2>,
-    /// }
-    /// // becomes:
-    /// // export type A = { a: Demo, b: Demo }
-    /// // export type Demo = { [number] }; // This is invalid for the `b` field.
-    ///
-    /// // and if we encounter the fields in the opposite order it changes:
-    ///
-    /// pub struct B {
-    ///     // we flipped field definition
-    ///     b: Demo<2>,
-    ///     a: Demo<1>,
-    /// }
-    /// // becomes:
-    /// // export type A = { a: Demo, b: Demo }
-    /// // export type Demo = { [number, number] }; // This is invalid for the `a` field.
-    /// ```
-    ///
-    /// One observation is that for a length to differ across two instantiations of the same type it must either:
-    ///  - Have a const parameter
-    ///  - Have a generic which uses a trait associated constant
-    ///
-    /// Now Specta doesn't and can't support a generic with a trait associated constant as the generic `T` is shadowed by a virtual struct which is used to alter the type to return a generic reference, instead of a flat datatype.
-    ///
-    /// So for DX we know including length is safe as long as the resolving context doesn't have any const parameters. We track this using a thread local so it's entirely runtime meaning the solution doesn't require brittle scanning of the user's `TokenStream` in the derive macro.
-    ///
-    /// We provide `specta_util::FixedArray<N, T>` as a helper type to force Specta to export a fixed-length array instead of a generic `number[]` if you know what your doing.
-    /// This doesn't fix the core issue but it does allow the user to assert they are correct.
-    ///
-    static HAS_CONST_PARAMS: Cell<bool> = const { Cell::new(false) };
-
-    /// TODO
-    static SHOULD_INLINE: Cell<bool> = const { Cell::new(false) };
-}
-
-pub fn inline<R>(func: impl FnOnce() -> R) -> R {
-    println!("USED INLINE");
-    let prev = SHOULD_INLINE.replace(true);
-    let result = panic::catch_unwind(AssertUnwindSafe(func));
-    SHOULD_INLINE.set(prev);
+pub fn inline<R>(types: &mut Types, func: impl FnOnce(&mut Types) -> R) -> R {
+    let prev = mem::replace(&mut types.should_inline, true);
+    let result = panic::catch_unwind(AssertUnwindSafe(|| func(types)));
+    types.should_inline = prev;
     match result {
         Ok(result) => result,
         Err(payload) => panic::resume_unwind(payload),
     }
-}
-
-pub(crate) fn context_has_const_params() -> bool {
-    HAS_CONST_PARAMS.with(|c| c.get())
 }
 
 /// Named type represents any type with it's own unique name and identity.
@@ -120,7 +64,6 @@ impl NamedDataType {
         //     generics: Cow::Owned(generics),
         //     inline: false,
         //     ty: dt,
-        //     instances: Vec::new(),
         // }
         todo!();
     }
@@ -181,7 +124,7 @@ impl NamedDataType {
     // This means we know the type is *always* inlined.
     #[doc(hidden)]
     #[track_caller]
-    pub fn init_with_sentinel_inline(
+    pub fn init_with_sentinel(
         sentinel: &'static str,
         generics: &'static [GenericDefinition],
         instantiation_generics: &[(Generic, DataType)],
@@ -194,9 +137,9 @@ impl NamedDataType {
     ) -> Reference {
         let id = NamedId::Static(sentinel);
         let location = Location::caller().to_owned();
-        let mut inline = container_inline || SHOULD_INLINE.get();
+        let mut inline = container_inline || types.should_inline;
 
-        println!("init_with_sentinel_inline {sentinel} {inline}");
+        println!("init_with_sentinel {sentinel} {inline}");
 
         // If we have never encountered this type, register it to type map
         if !types.types.contains_key(&id) {
@@ -212,15 +155,18 @@ impl NamedDataType {
                 module_path: Cow::Borrowed(""),
             };
 
-            // TODO: Do we need panic catcher still?
-            // TODO: Adjust typemap length properly
             types.types.insert(id.clone(), None);
-            let prev_inline = SHOULD_INLINE.replace(false);
-            let prev_has_const_params = HAS_CONST_PARAMS.replace(has_const_param);
+
+            let prev_inline = mem::replace(&mut types.should_inline, false);
+            let prev_has_const_params = mem::replace(&mut types.has_const_params, has_const_param);
+
             let result = panic::catch_unwind(AssertUnwindSafe(|| build_ndt(types, &mut ndt)));
-            SHOULD_INLINE.set(prev_inline);
-            HAS_CONST_PARAMS.set(prev_has_const_params);
+            types.should_inline = prev_inline;
+            types.has_const_params = prev_has_const_params;
             if let Err(payload) = result {
+                if types.types.contains_key(&id) {
+                    types.types.remove(&id);
+                }
                 panic::resume_unwind(payload);
             };
 
@@ -263,24 +209,21 @@ impl NamedDataType {
                 return Reference::Named(NamedReference {
                     id,
                     // TODO: Include metadata about where the recursive loop is
-                    inner: NamedReferenceInner::Recursive,
+                    inner: NamedReferenceType::Recursive,
                 });
             }
 
-            let prev_inline = SHOULD_INLINE.replace(
-                // Say for `Box<T>` if we put `#[specta(inline)]` on it we will,
-                // naively inline the `Box` instead of `T`.
-                //
-                // "wrapper" types enable this to properly passthrough inline.
-                if passthrough_inline {
-                    SHOULD_INLINE.get()
-                } else {
-                    false
-                },
-            );
+            // Say for `Box<T>` if we put `#[specta(inline)]` on it we will,
+            // naively inline the `Box` instead of `T`.
+            //
+            // "wrapper" types enable this to properly to passthrough inline to the inner type's resolution.
+            let prev_inline =
+                (!passthrough_inline).then(|| mem::replace(&mut types.should_inline, false));
             types.stack.push(hash);
             let result = panic::catch_unwind(AssertUnwindSafe(|| build_ty(types)));
-            SHOULD_INLINE.set(prev_inline);
+            if let Some(prev_inline) = prev_inline {
+                types.should_inline = prev_inline;
+            };
             types.stack.pop();
             let dt = match result {
                 Ok(dt) => Box::new(dt),
@@ -289,12 +232,12 @@ impl NamedDataType {
 
             Reference::Named(NamedReference {
                 id,
-                inner: NamedReferenceInner::Inline { dt },
+                inner: NamedReferenceType::Inline { dt },
             })
         } else {
             Reference::Named(NamedReference {
                 id,
-                inner: NamedReferenceInner::Reference {
+                inner: NamedReferenceType::Reference {
                     generics: instantiation_generics.to_owned(),
                 },
             })

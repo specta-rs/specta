@@ -28,14 +28,10 @@ pub enum Fields {
 pub struct Field {
     /// Did the user apply a `#[specta(optional)]` attribute.
     pub optional: bool,
-    /// Did the user apply a `#[serde(flatten)]` attribute.
-    pub flatten: bool,
     /// Deprecated attribute for the field.
     pub deprecated: Option<Deprecated>,
     /// Documentation comments for the field.
     pub docs: Cow<'static, str>,
-    /// Did the user apply a `#[specta(type = ...)]` or `#[specta(r#type = ...)]` attribute.
-    pub type_overridden: bool,
     /// Runtime attributes for this field.
     pub attributes: Attributes,
     /// Type for the field. Is optional if `#[serde(skip)]` or `#[specta(skip)]` was applied.
@@ -52,10 +48,8 @@ impl Field {
     pub fn new(ty: DataType) -> Self {
         Field {
             optional: false,
-            flatten: false,
             deprecated: None,
             docs: "".into(),
-            type_overridden: false,
             ty: Some(ty),
             attributes: Attributes::default(),
         }

@@ -21,12 +21,9 @@ pub use generic::{Generic, GenericDefinition};
 pub use list::List;
 // pub use literal::Literal;
 pub use map::Map;
-pub(crate) use named::context_has_const_params;
-pub use named::inline;
-pub use named::{Deprecated, NamedDataType};
+pub use named::{Deprecated, NamedDataType, inline};
 pub use primitive::Primitive;
-pub(crate) use reference::NamedReferenceInner;
-pub use reference::{NamedReference, OpaqueReference, Reference};
+pub use reference::{NamedReference, NamedReferenceType, OpaqueReference, Reference};
 pub use r#struct::Struct;
 pub use tuple::Tuple;
 

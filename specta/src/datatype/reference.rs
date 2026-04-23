@@ -4,10 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::{
-    Types,
-    datatype::{Generic, NamedDataType},
-};
+use crate::datatype::Generic;
 
 use super::DataType;
 
@@ -23,55 +20,24 @@ pub enum Reference {
 
 /// Reference to a [NamedDataType].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct NamedReference {
     pub(crate) id: NamedId,
-    pub(crate) inner: NamedReferenceInner,
+    pub inner: NamedReferenceType,
 }
 
-/// Reference to a [NamedDataType].
+/// Internal representation of a specific [NamedDataType].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum NamedReferenceInner {
+pub enum NamedReferenceType {
     Recursive,
+    #[non_exhaustive]
     Inline {
-        dt: Box<DataType>, // TODO: Expose this mutablly??
+        dt: Box<DataType>,
     },
+    #[non_exhaustive]
     Reference {
-        generics: Vec<(Generic, DataType)>, // TODO: Expose this mutablly??
+        generics: Vec<(Generic, DataType)>,
     },
-}
-
-impl NamedReference {
-    /// Get a reference to a [NamedDataType] from a [Types].
-    ///
-    /// This is guaranteed to return a [NamedDataType] if the [Types] matches,
-    /// what was used to get the original [Reference].
-    pub fn get<'a>(&self, types: &'a Types) -> Option<&'a NamedDataType> {
-        types.types.get(&self.id)?.as_ref()
-    }
-
-    /// Get the datatype of this reference, if it is known.
-    ///
-    /// This is better than retrieving the type from the [`NamedDataType`] directly because we do our best to preserve the exact instantiated type that existed when the reference was created.
-    ///
-    /// Named references only store an instance identifier rather than embedding a full [`DataType`].
-    /// This keeps references lightweight and avoids pulling recursive instantiated type graphs into hashing and equality checks used by exporters.
-    /// The actual instantiated types are stored on the owning [`NamedDataType`] and resolved through the identifier here.
-    pub fn ty<'a, 'b>(&'a self, types: &'b Types) -> Option<&'a DataType>
-    where
-        'b: 'a,
-    {
-        // let ndt = self.get(types)?;
-        // self.instance
-        //     .and_then(|instance| ndt.instances.get(instance))
-        //     .or(Some(&ndt.ty))
-        todo!();
-    }
-
-    /// Get whether this reference should be inlined
-    pub fn inline(&self) -> bool {
-        // self.inline
-        todo!();
-    }
 }
 
 /// Reference to a type not understood by Specta's core.
