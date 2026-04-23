@@ -27,71 +27,95 @@ macro_rules! _impl_tuple {
 }
 
 macro_rules! _impl_ndt {
-    // Public API
-    // inline the type. Types which shouldn't show up as named in the output. Eg. `String`
-    ($head:ident :: $( $tail:ident )::+ $(< $( $generic:ident ),* >)? as $as_ty:ty = inline) => {
-        impl_ndt!(true, false $head :: $( $tail )::+ $(< $( $generic ),* >)? as $as_ty);
+    // Multiple types
+    (
+        $(
+            $head:ident :: $( $tail:ident )::+
+            $(< $( $generic:ident ),* >)?
+            $( where { $($bounds:tt)* } )?
+            as $as_ty:ty = $kind:ident
+        );+ $(;)?
+    ) => {
+        $(
+            impl_ndt!(@single
+                $head :: $( $tail )::+
+                $(< $( $generic ),* >)?
+                $( where { $($bounds)* } )?
+                as $as_ty = $kind
+            );
+        )+
     };
-    // inline the type, and passthrough `#[specta(inline)]`. Used for containers like `Box<T>`
-    ($head:ident :: $( $tail:ident )::+ $(< $( $generic:ident ),* >)? as $as_ty:ty = inline_passthrough) => {
-        impl_ndt!(true, true $head :: $( $tail )::+ $(< $( $generic ),* >)? as $as_ty);
+
+    // Single type
+    (@single $head:ident :: $( $tail:ident )::+ $(< $( $generic:ident ),* >)? $( where { $($bounds:tt)* } )? as $as_ty:ty = inline) => {
+        impl_ndt!(true, false $head :: $( $tail )::+ $(< $( $generic ),* >)? $( where { $($bounds)* } )? as $as_ty);
     };
-    // Used for named types. Like `std::ops::Range`.
-    ($head:ident :: $( $tail:ident )::+ $(< $( $generic:ident ),* >)? as $as_ty:ty = named) => {
-        impl_ndt!(false, false $head :: $( $tail )::+ $(< $( $generic ),* >)? as $as_ty);
+    (@single $head:ident :: $( $tail:ident )::+ $(< $( $generic:ident ),* >)? $( where { $($bounds:tt)* } )? as $as_ty:ty = inline_passthrough) => {
+        impl_ndt!(true, true $head :: $( $tail )::+ $(< $( $generic ),* >)? $( where { $($bounds)* } )? as $as_ty);
+    };
+    (@single $head:ident :: $( $tail:ident )::+ $(< $( $generic:ident ),* >)? $( where { $($bounds:tt)* } )? as $as_ty:ty = named) => {
+        impl_ndt!(false, false $head :: $( $tail )::+ $(< $( $generic ),* >)? $( where { $($bounds)* } )? as $as_ty);
     };
 
     // Base implementation
-    ($inline:literal, $container:literal $head:ident :: $( $tail:ident )::+ $(< $( $generic:ident ),* >)? as $as_ty:ty) => {
-        fn definition(types: &mut Types) -> DataType {
-            static SENTINEL: &str = stringify!($head::$( $tail )::+ $(< $( $generic ),* >)?);
-            static GENERICS: &[datatype::GenericDefinition] = &[
-                $($(
-                    datatype::GenericDefinition::new(
-                        ::std::borrow::Cow::Borrowed(stringify!($generic)),
-                        None,
-                    ),
-                )*)?
-            ];
-            DataType::Reference(datatype::NamedDataType::init_with_sentinel(
-                SENTINEL,
-                GENERICS,
-                &[
+    ($inline:literal, $container:literal $head:ident :: $( $tail:ident )::+ $(< $( $generic:ident ),* >)? $( where { $($bounds:tt)* } )? as $as_ty:ty) => {
+        impl<$( $( $generic ),* )?> Type for $head :: $( $tail )::+ $(< $( $generic ),* >)?
+        where
+            $(
+                $( $generic: Type, )*
+            )?
+            $($($bounds)*)?
+        {
+            fn definition(types: &mut Types) -> DataType {
+                static SENTINEL: &str = stringify!($head::$( $tail )::+ $(< $( $generic ),* >)?);
+                static GENERICS: &[datatype::GenericDefinition] = &[
                     $($(
-                        (
-                            datatype::Generic::new(::std::borrow::Cow::Borrowed(stringify!($generic))),
-                            <$generic as Type>::definition(types),
+                        datatype::GenericDefinition::new(
+                            ::std::borrow::Cow::Borrowed(stringify!($generic)),
+                            None,
                         ),
                     )*)?
-                ],
-                false,
-                $inline,
-                $container,
-                types,
-                |types, ndt| {
-                    ndt.name = ::std::borrow::Cow::Borrowed(
-                        impl_ndt!(@type_name $head :: $( $tail )::+ $(< $( $generic ),* >)?)
-                    );
-                    ndt.module_path = ::std::borrow::Cow::Borrowed(
-                        impl_ndt!(@module_path $head :: $( $tail )::+)
-                    );
-                    if !$inline {
+                ];
+                DataType::Reference(datatype::NamedDataType::init_with_sentinel(
+                    SENTINEL,
+                    GENERICS,
+                    &[
                         $($(
-                            #[allow(dead_code)]
-                            pub(crate) struct $generic;
-                            impl Type for $generic {
-                                fn definition(_: &mut Types) -> DataType {
-                                    datatype::Generic::new(
-                                        ::std::borrow::Cow::Borrowed(stringify!($generic))
-                                    ).into()
-                                }
-                            }
+                            (
+                                datatype::Generic::new(::std::borrow::Cow::Borrowed(stringify!($generic))),
+                                <$generic as Type>::definition(types),
+                            ),
                         )*)?
-                        ndt.ty = Some(<$as_ty as Type>::definition(types));
-                    }
-                },
-                |types| <$as_ty as Type>::definition(types),
-            ))
+                    ],
+                    false,
+                    $inline,
+                    $container,
+                    types,
+                    |types, ndt| {
+                        ndt.name = ::std::borrow::Cow::Borrowed(
+                            impl_ndt!(@type_name $head :: $( $tail )::+ $(< $( $generic ),* >)?)
+                        );
+                        ndt.module_path = ::std::borrow::Cow::Borrowed(
+                            impl_ndt!(@module_path $head :: $( $tail )::+)
+                        );
+                        if !$inline {
+                            $($(
+                                #[allow(dead_code)]
+                                pub(crate) struct $generic;
+                                impl Type for $generic {
+                                    fn definition(_: &mut Types) -> DataType {
+                                        datatype::Generic::new(
+                                            ::std::borrow::Cow::Borrowed(stringify!($generic))
+                                        ).into()
+                                    }
+                                }
+                            )*)?
+                            ndt.ty = Some(<$as_ty as Type>::definition(types));
+                        }
+                    },
+                    |types| <$as_ty as Type>::definition(types),
+                ))
+            }
         }
     };
 

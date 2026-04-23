@@ -1,24 +1,20 @@
-// #![allow(unused)]
-
-// //! The plan is to try and move these into the ecosystem for the v2 release.
-// use super::macros::{impl_ndt, impl_ndt_as};
-// use crate::{
-//     Type, Types,
-//     datatype::{
-//         self, DataType, Enum, Field, Fields, List, NamedFields, Primitive, Reference, Struct,
-//         Variant,
-//     },
-//     r#type::{generics, impls::*},
-// };
+use crate::{
+    Type, Types,
+    datatype::{
+        self, DataType, Enum, Field, Fields, List, NamedFields, Primitive, Reference, Struct,
+        Variant,
+    },
+    r#type::{generics, impls::*, macros::impl_ndt},
+};
 
 // use std::borrow::Cow;
 
-// #[cfg(feature = "indexmap")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "indexmap")))]
-// impl_ndt_as!(
-//     indexmap::IndexSet<T> as PrimitiveSet<generics::T>
-//     indexmap::IndexMap<K, V> as PrimitiveMap<generics::K, generics::V>
-// );
+#[cfg(feature = "indexmap")]
+#[cfg_attr(docsrs, doc(cfg(feature = "indexmap")))]
+impl_ndt!(
+    indexmap::IndexSet<T> as PrimitiveSet<T> = inline_passthrough;
+    indexmap::IndexMap<K, V> as PrimitiveMap<K, V> = inline_passthrough;
+);
 
 // #[cfg(feature = "ordered-float")]
 // #[cfg_attr(docsrs, doc(cfg(feature = "ordered-float")))]

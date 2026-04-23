@@ -95,15 +95,15 @@ fn main() {
         }
     );
 
-    let def = Range::<i32>::definition(&mut types);
-    println!("{:?}", def);
-    println!(
-        "{:?}",
-        match def {
-            DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
-            _ => unreachable!(),
-        }
-    );
+    // let def = Range::<i32>::definition(&mut types);
+    // println!("{:?}", def);
+    // println!(
+    //     "{:?}",
+    //     match def {
+    //         DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
+    //         _ => unreachable!(),
+    //     }
+    // );
 
     // println!("{types:#?}");
 
