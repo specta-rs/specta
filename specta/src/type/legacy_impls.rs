@@ -4,10 +4,8 @@ use crate::{
         self, DataType, Enum, Field, Fields, List, NamedFields, Primitive, Reference, Struct,
         Variant,
     },
-    r#type::{generics, impls::*, macros::impl_ndt},
+    r#type::{impls::*, macros::impl_ndt},
 };
-
-// use std::borrow::Cow;
 
 #[cfg(feature = "indexmap")]
 #[cfg_attr(docsrs, doc(cfg(feature = "indexmap")))]
@@ -16,27 +14,16 @@ impl_ndt!(
     indexmap::IndexMap<K, V> as PrimitiveMap<K, V> = inline_passthrough;
 );
 
-// #[cfg(feature = "ordered-float")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "ordered-float")))]
-// impl_ndt!(
-//     impl Type for ordered_float::OrderedFloat<f32> {
-//         inline: true;
-//         build: |types, ndt| {
-//             ndt.ty = f32::definition(types);
-//         }
-//     }
+#[cfg(feature = "ordered-float")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ordered-float")))]
+impl_ndt!(
+    ordered_float::OrderedFloat<T> where { T: ordered_float::FloatCore } as T = inline;
+    ordered_float::NotNan<T> where { T: ordered_float::FloatCore } as T = inline;
+);
 
-//     impl Type for ordered_float::OrderedFloat<f64> {
-//         inline: true;
-//         build: |types, ndt| {
-//             ndt.ty = f64::definition(types);
-//         }
-//     }
-// );
-
-// #[cfg(feature = "heapless")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "heapless")))]
-// impl_ndt_as!(heapless::Vec<T, const N: usize> as [T; N]);
+#[cfg(feature = "heapless")]
+#[cfg_attr(docsrs, doc(cfg(feature = "heapless")))]
+impl_ndt!(heapless::Vec<T, const N: usize> as [T; N]); // TODO: More stuff in docs
 
 // #[cfg(feature = "semver")]
 // #[cfg_attr(docsrs, doc(cfg(feature = "semver")))]

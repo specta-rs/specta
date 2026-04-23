@@ -1,6 +1,6 @@
 //! A playground for quickly reproducing issue.
 
-use std::ops::Range;
+use std::{borrow::Cow, ops::Range};
 
 use serde::Serialize;
 use specta::{
@@ -86,7 +86,7 @@ fn main() {
         .register::<G>();
 
     let def = String::definition(&mut types);
-    println!("{:?}", def);
+    println!("\n{:?}", def);
     println!(
         "{:?}",
         match def {
@@ -95,15 +95,25 @@ fn main() {
         }
     );
 
-    // let def = Range::<i32>::definition(&mut types);
-    // println!("{:?}", def);
-    // println!(
-    //     "{:?}",
-    //     match def {
-    //         DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
-    //         _ => unreachable!(),
-    //     }
-    // );
+    let def = Range::<i32>::definition(&mut types);
+    println!("\n{:?}", def);
+    println!(
+        "{:?}",
+        match def {
+            DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
+            _ => unreachable!(),
+        }
+    );
+
+    let def = Cow::<'static, str>::definition(&mut types);
+    println!("\n{:?}", def);
+    println!(
+        "{:?}",
+        match def {
+            DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
+            _ => unreachable!(),
+        }
+    );
 
     // println!("{types:#?}");
 

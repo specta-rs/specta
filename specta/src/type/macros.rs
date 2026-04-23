@@ -31,7 +31,7 @@ macro_rules! _impl_ndt {
     (
         $(
             $head:ident :: $( $tail:ident )::+
-            $(< $( $generic:ident ),* >)?
+            $(< $( $lifetime:lifetime, )* $( $generic:ident ),* $(,)? >)?
             $( where { $($bounds:tt)* } )?
             as $as_ty:ty = $kind:ident
         );+ $(;)?
@@ -39,7 +39,7 @@ macro_rules! _impl_ndt {
         $(
             impl_ndt!(@single
                 $head :: $( $tail )::+
-                $(< $( $generic ),* >)?
+                $(< $( $lifetime, )* $( $generic ),* >)?
                 $( where { $($bounds)* } )?
                 as $as_ty = $kind
             );
@@ -47,19 +47,19 @@ macro_rules! _impl_ndt {
     };
 
     // Single type
-    (@single $head:ident :: $( $tail:ident )::+ $(< $( $generic:ident ),* >)? $( where { $($bounds:tt)* } )? as $as_ty:ty = inline) => {
-        impl_ndt!(true, false $head :: $( $tail )::+ $(< $( $generic ),* >)? $( where { $($bounds)* } )? as $as_ty);
+    (@single $head:ident :: $( $tail:ident )::+ $(< $( $lifetime:lifetime, )* $( $generic:ident ),* $(,)? >)? $( where { $($bounds:tt)* } )? as $as_ty:ty = inline) => {
+        impl_ndt!(true, false $head :: $( $tail )::+ $(< $( $lifetime, )* $( $generic ),* >)? $( where { $($bounds)* } )? as $as_ty);
     };
-    (@single $head:ident :: $( $tail:ident )::+ $(< $( $generic:ident ),* >)? $( where { $($bounds:tt)* } )? as $as_ty:ty = inline_passthrough) => {
-        impl_ndt!(true, true $head :: $( $tail )::+ $(< $( $generic ),* >)? $( where { $($bounds)* } )? as $as_ty);
+    (@single $head:ident :: $( $tail:ident )::+ $(< $( $lifetime:lifetime, )* $( $generic:ident ),* $(,)? >)? $( where { $($bounds:tt)* } )? as $as_ty:ty = inline_passthrough) => {
+        impl_ndt!(true, true $head :: $( $tail )::+ $(< $( $lifetime, )* $( $generic ),* >)? $( where { $($bounds)* } )? as $as_ty);
     };
-    (@single $head:ident :: $( $tail:ident )::+ $(< $( $generic:ident ),* >)? $( where { $($bounds:tt)* } )? as $as_ty:ty = named) => {
-        impl_ndt!(false, false $head :: $( $tail )::+ $(< $( $generic ),* >)? $( where { $($bounds)* } )? as $as_ty);
+    (@single $head:ident :: $( $tail:ident )::+ $(< $( $lifetime:lifetime, )* $( $generic:ident ),* $(,)? >)? $( where { $($bounds:tt)* } )? as $as_ty:ty = named) => {
+        impl_ndt!(false, false $head :: $( $tail )::+ $(< $( $lifetime, )* $( $generic ),* >)? $( where { $($bounds)* } )? as $as_ty);
     };
 
     // Base implementation
-    ($inline:literal, $container:literal $head:ident :: $( $tail:ident )::+ $(< $( $generic:ident ),* >)? $( where { $($bounds:tt)* } )? as $as_ty:ty) => {
-        impl<$( $( $generic ),* )?> Type for $head :: $( $tail )::+ $(< $( $generic ),* >)?
+    ($inline:literal, $container:literal $head:ident :: $( $tail:ident )::+ $(< $( $lifetime:lifetime, )* $( $generic:ident ),* $(,)? >)? $( where { $($bounds:tt)* } )? as $as_ty:ty) => {
+        impl<$( $( $lifetime, )* $( $generic ),* )?> Type for $head :: $( $tail )::+ $(< $( $lifetime, )* $( $generic ),* >)?
         where
             $(
                 $( $generic: Type, )*

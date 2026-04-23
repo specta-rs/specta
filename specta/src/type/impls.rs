@@ -2,9 +2,7 @@ use std::marker::PhantomData;
 
 use crate::{
     Type, Types,
-    datatype::{
-        self, DataType, Enum, Field, List, NamedDataType, NamedReference, Reference, Variant,
-    },
+    datatype::{self, DataType, Enum, Field, List},
     r#type::macros::*,
 };
 
