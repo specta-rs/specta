@@ -1,7 +1,12 @@
 //! A playground for quickly reproducing issue.
 
+use std::ops::Range;
+
 use serde::Serialize;
-use specta::{Type, Types};
+use specta::{
+    Type, Types,
+    datatype::{DataType, NamedReferenceType, Reference},
+};
 
 #[derive(Type)]
 // #[specta(inline)]
@@ -75,12 +80,32 @@ struct G {
 }
 
 fn main() {
-    let types = Types::default()
+    let mut types = Types::default()
         .register::<A>()
         // .register::<E3>()
         .register::<G>();
 
-    println!("{types:#?}");
+    let def = String::definition(&mut types);
+    println!("{:?}", def);
+    println!(
+        "{:?}",
+        match def {
+            DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
+            _ => unreachable!(),
+        }
+    );
+
+    let def = Range::<i32>::definition(&mut types);
+    println!("{:?}", def);
+    println!(
+        "{:?}",
+        match def {
+            DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
+            _ => unreachable!(),
+        }
+    );
+
+    // println!("{types:#?}");
 
     // let out = specta_typescript::Typescript::new()
     //     .export(&types, specta_serde::format_phases)

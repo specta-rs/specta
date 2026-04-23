@@ -1,6 +1,5 @@
 use crate::{Types, datatype::DataType};
 
-pub(crate) mod generics;
 mod impls;
 mod macros;
 // TODO: We don't care much about these cause they are gonna go so this will do for now.
