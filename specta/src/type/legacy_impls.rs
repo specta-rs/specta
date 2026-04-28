@@ -23,19 +23,18 @@ impl_ndt!(
     indexmap::IndexMap<K, V> as PrimitiveMap<K, V> = inline_passthrough;
 );
 
-// TODO: Don't enforce `Type` bound on `T`?
-// #[cfg(feature = "ordered-float")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "ordered-float")))]
-// impl_ndt!(
-//     ordered_float::OrderedFloat<T> where { T: ordered_float::FloatCore } as T = inline;
-//     ordered_float::NotNan<T> where { T: ordered_float::FloatCore } as T = inline;
-// );
+#[cfg(feature = "ordered-float")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ordered-float")))]
+impl_ndt!(
+    ordered_float::OrderedFloat<T> where { T: ordered_float::FloatCore } as T = inline;
+    ordered_float::NotNan<T> where { T: ordered_float::FloatCore } as T = inline;
+);
 
-// #[cfg(feature = "heapless")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "heapless")))]
-// impl_ndt!(heapless::Vec<T, const N: usize, LenT> as [T; N] = inline_passthrough); // TODO: More stuff in docs
-
-// We do it custom to avoid `Type` on
+#[cfg(feature = "heapless")]
+#[cfg_attr(docsrs, doc(cfg(feature = "heapless")))]
+impl_ndt!(
+    heapless::Vec<T> <T, const N: usize, LenT> as [T; N] = inline_passthrough;
+);
 
 #[cfg(feature = "semver")]
 #[cfg_attr(docsrs, doc(cfg(feature = "semver")))]
@@ -51,18 +50,14 @@ impl_ndt!(smol_str::SmolStr as str = inline);
 
 #[cfg(feature = "arrayvec")]
 #[cfg_attr(docsrs, doc(cfg(feature = "arrayvec")))]
-impl_ndt_as!(arrayvec::ArrayVec<T> <T, const N: usize> as [T; N]);
+impl_ndt!(
+    arrayvec::ArrayString <const N: usize> as str;
+    arrayvec::ArrayVec<T> <T, const N: usize> where { T: Type } as [T; N]
+);
 
-// #[cfg(feature = "arrayvec")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "arrayvec")))]
-// impl_ndt!(
-//     arrayvec::ArrayString<const N: usize> as str;
-//     arrayvec::ArrayVec<const N: usize> as [T; N]
-// );
-
-// #[cfg(feature = "smallvec")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "smallvec")))]
-// impl_ndt_as!(smallvec::SmallVec<[T; N]> where { [T; N]: smallvec::Array } as [T; N]);
+#[cfg(feature = "smallvec")]
+#[cfg_attr(docsrs, doc(cfg(feature = "smallvec")))]
+impl_ndt!(smallvec::SmallVec<T> where { T: smallvec::Array } as T);
 
 #[cfg(feature = "bytes")]
 #[cfg_attr(docsrs, doc(cfg(feature = "bytes")))]
@@ -347,7 +342,7 @@ impl_ndt!(
 // #[cfg_attr(docsrs, doc(cfg(feature = "chrono")))]
 // #[allow(deprecated)]
 // const _: () = {
-//     impl_ndt_as!(
+//     impl_ndt!(
 //         chrono::NaiveDateTime as str
 //         chrono::NaiveDate as str
 //         chrono::NaiveTime as str
@@ -392,26 +387,26 @@ impl_ndt!(
 
 #[cfg(feature = "time")]
 #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
-impl_ndt_as!(
-    time::PrimitiveDateTime as str = inline;
-    time::OffsetDateTime as str = inline;
-    time::Date as str = inline;
-    time::Time as str = inline;
-    time::Duration as str = inline;
-    time::Weekday as str = inline;
+impl_ndt!(
+    time::PrimitiveDateTime as str;
+    time::OffsetDateTime as str;
+    time::Date as str;
+    time::Time as str;
+    time::Duration as str;
+    time::Weekday as str;
 );
 
 #[cfg(feature = "jiff")]
 #[cfg_attr(docsrs, doc(cfg(feature = "jiff")))]
-impl_ndt_as!(
-    jiff::Timestamp as str = inline;
-    jiff::Zoned as str = inline;
-    jiff::SignedDuration as str = inline;
-    jiff::civil::Date as str = inline;
-    jiff::civil::Time as str = inline;
-    jiff::civil::DateTime as str = inline;
-    jiff::civil::ISOWeekDate as str = inline;
-    jiff::tz::TimeZone as str = inline;
+impl_ndt!(
+    jiff::Timestamp as str;
+    jiff::Zoned as str;
+    jiff::SignedDuration as str;
+    jiff::civil::Date as str;
+    jiff::civil::Time as str;
+    jiff::civil::DateTime as str;
+    jiff::civil::ISOWeekDate as str;
+    jiff::tz::TimeZone as str;
 );
 
 #[cfg(feature = "bigdecimal")]
@@ -712,7 +707,7 @@ const _: () = {
 // but we have no way of inspecting that as it's runtime. This is the most common output.
 #[cfg(feature = "bytesize")]
 #[cfg_attr(docsrs, doc(cfg(feature = "bytesize")))]
-impl_ndt_as!(bytesize::ByteSize as String);
+impl_ndt!(bytesize::ByteSize as String);
 
 #[cfg(feature = "uhlc")]
 #[cfg_attr(docsrs, doc(cfg(feature = "uhlc")))]
@@ -733,7 +728,6 @@ const _: () = {
                             "time".into(),
                             Field {
                                 optional: false,
-                                flatten: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
                                 ty: Some(uhlc::NTP64::definition(types)),
@@ -744,7 +738,6 @@ const _: () = {
                             "id".into(),
                             Field {
                                 optional: false,
-                                flatten: false,
                                 deprecated: None,
                                 docs: Cow::Borrowed(""),
                                 ty: Some(uhlc::ID::definition(types)),
@@ -921,85 +914,90 @@ const _: () = {
 //     }
 // );
 
-// #[cfg(feature = "error-stack")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "error-stack")))]
-// const _: () = {
-//     struct ErrorStackContext;
-//     impl Type for ErrorStackContext {
-//         fn definition(types: &mut Types) -> DataType {
-//             static SENTINEL: &str = "error_stack::ErrorStackContext";
-//             static GENERICS: &[datatype::GenericDefinition] = &[];
-//             DataType::Reference(datatype::NamedDataType::init_with_sentinel(
-//                 SENTINEL,
-//                 GENERICS,
-//                 &[],
-//                 false,
-//                 false,
-//                 false,
-//                 types,
-//                 |types, ndt| {
-//                     ndt.name = ::std::borrow::Cow::Borrowed("ErrorStackContext");
-//                     ndt.module_path = ::std::borrow::Cow::Borrowed("error_stack");
-//                     let attachments = DataType::List(List::new(str::definition(types)));
-//                     let sources = DataType::List(List::new(ErrorStackContext::definition(types)));
-//                     ndt.ty = Some(
-//                         Struct::named()
-//                             .field("context", Field::new(str::definition(types)))
-//                             .field("attachments", Field::new(attachments))
-//                             .field("sources", Field::new(sources))
-//                             .build(),
-//                     );
-//                 },
-//                 |types| {
-//                     Struct::named()
-//                         .field("context", Field::new(str::definition(types)))
-//                         .field(
-//                             "attachments",
-//                             Field::new(DataType::List(List::new(str::definition(types)))),
-//                         )
-//                         .field(
-//                             "sources",
-//                             Field::new(DataType::List(List::new(ErrorStackContext::definition(
-//                                 types,
-//                             )))),
-//                         )
-//                         .build()
-//                 },
-//             ))
-//         }
-//     }
-//     fn report_definition(types: &mut Types) -> DataType {
-//         static SENTINEL: &str = "error_stack::Report";
-//         static GENERICS: &[datatype::GenericDefinition] = &[];
-//         DataType::Reference(datatype::NamedDataType::init_with_sentinel(
-//             SENTINEL,
-//             GENERICS,
-//             &[],
-//             false,
-//             false,
-//             false,
-//             types,
-//             |types, ndt| {
-//                 ndt.name = ::std::borrow::Cow::Borrowed("Report");
-//                 ndt.module_path = ::std::borrow::Cow::Borrowed("error_stack");
-//                 ndt.ty = Some(DataType::List(List::new(ErrorStackContext::definition(
-//                     types,
-//                 ))));
-//             },
-//             |types| DataType::List(List::new(ErrorStackContext::definition(types))),
-//         ))
-//     }
-//     impl<C: std::error::Error + Send + Sync + 'static> Type for error_stack::Report<C> {
-//         fn definition(types: &mut Types) -> DataType {
-//             report_definition(types)
-//         }
-//     }
-//     impl<C: std::error::Error + Send + Sync + 'static> Type for error_stack::Report<[C]> {
-//         fn definition(types: &mut Types) -> DataType {
-//             report_definition(types)
-//         }
-//     }
-// };
+#[cfg(feature = "error-stack")]
+#[cfg_attr(docsrs, doc(cfg(feature = "error-stack")))]
+const _: () = {
+    // impl_ndt!(
+    //     arrayvec::ArrayString <const N: usize> as str;
+    //     arrayvec::ArrayVec<T> <T, const N: usize> as [T; N]
+    // );
+
+    //     struct ErrorStackContext;
+    //     impl Type for ErrorStackContext {
+    //         fn definition(types: &mut Types) -> DataType {
+    //             static SENTINEL: &str = "error_stack::ErrorStackContext";
+    //             static GENERICS: &[datatype::GenericDefinition] = &[];
+    //             DataType::Reference(datatype::NamedDataType::init_with_sentinel(
+    //                 SENTINEL,
+    //                 GENERICS,
+    //                 &[],
+    //                 false,
+    //                 false,
+    //                 false,
+    //                 types,
+    //                 |types, ndt| {
+    //                     ndt.name = ::std::borrow::Cow::Borrowed("ErrorStackContext");
+    //                     ndt.module_path = ::std::borrow::Cow::Borrowed("error_stack");
+    //                     let attachments = DataType::List(List::new(str::definition(types)));
+    //                     let sources = DataType::List(List::new(ErrorStackContext::definition(types)));
+    //                     ndt.ty = Some(
+    //                         Struct::named()
+    //                             .field("context", Field::new(str::definition(types)))
+    //                             .field("attachments", Field::new(attachments))
+    //                             .field("sources", Field::new(sources))
+    //                             .build(),
+    //                     );
+    //                 },
+    //                 |types| {
+    //                     Struct::named()
+    //                         .field("context", Field::new(str::definition(types)))
+    //                         .field(
+    //                             "attachments",
+    //                             Field::new(DataType::List(List::new(str::definition(types)))),
+    //                         )
+    //                         .field(
+    //                             "sources",
+    //                             Field::new(DataType::List(List::new(ErrorStackContext::definition(
+    //                                 types,
+    //                             )))),
+    //                         )
+    //                         .build()
+    //                 },
+    //             ))
+    //         }
+    //     }
+    //     fn report_definition(types: &mut Types) -> DataType {
+    //         static SENTINEL: &str = "error_stack::Report";
+    //         static GENERICS: &[datatype::GenericDefinition] = &[];
+    //         DataType::Reference(datatype::NamedDataType::init_with_sentinel(
+    //             SENTINEL,
+    //             GENERICS,
+    //             &[],
+    //             false,
+    //             false,
+    //             false,
+    //             types,
+    //             |types, ndt| {
+    //                 ndt.name = ::std::borrow::Cow::Borrowed("Report");
+    //                 ndt.module_path = ::std::borrow::Cow::Borrowed("error_stack");
+    //                 ndt.ty = Some(DataType::List(List::new(ErrorStackContext::definition(
+    //                     types,
+    //                 ))));
+    //             },
+    //             |types| DataType::List(List::new(ErrorStackContext::definition(types))),
+    //         ))
+    //     }
+    //     impl<C: std::error::Error + Send + Sync + 'static> Type for error_stack::Report<C> {
+    //         fn definition(types: &mut Types) -> DataType {
+    //             report_definition(types)
+    //         }
+    //     }
+    //     impl<C: std::error::Error + Send + Sync + 'static> Type for error_stack::Report<[C]> {
+    //         fn definition(types: &mut Types) -> DataType {
+    //             report_definition(types)
+    //         }
+    //     }
+};
 
 // #[cfg(feature = "bevy_ecs")]
 // #[cfg_attr(docsrs, doc(cfg(feature = "bevy_ecs")))]
@@ -1016,7 +1014,7 @@ const _: () = {
 // #[cfg_attr(docsrs, doc(cfg(feature = "bevy_input")))]
 // const _: () = {
 //     // Reduced KeyCode and Key to str to avoid redefining a quite large enum (for now)
-//     impl_ndt_as!(
+//     impl_ndt!(
 //         bevy_input::keyboard::KeyCode as str
 //         bevy_input::keyboard::Key as str
 //     );
@@ -1145,14 +1143,14 @@ const _: () = {
 
 // #[cfg(feature = "camino")]
 // #[cfg_attr(docsrs, doc(cfg(feature = "camino")))]
-// impl_ndt_as!(
+// impl_ndt!(
 //     camino::Utf8Path as str
 //     camino::Utf8PathBuf as str
 // );
 
 // #[cfg(feature = "geojson")]
 // #[cfg_attr(docsrs, doc(cfg(feature = "geojson")))]
-// impl_ndt_as!(geojson::Position as [f64]);
+// impl_ndt!(geojson::Position as [f64]);
 
 // #[cfg(feature = "geojson")]
 // #[cfg_attr(docsrs, doc(cfg(feature = "geojson")))]

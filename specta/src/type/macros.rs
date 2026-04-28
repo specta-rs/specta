@@ -27,6 +27,123 @@ macro_rules! _impl_tuple {
 }
 
 macro_rules! _impl_ndt {
+    () => {};
+
+    (
+        $head:ident :: $( $tail:ident )::+ < $( $specta_generic:ident ),* $(,)? >
+        < $impl_generic:ident, $( const $const_generic:ident : $const_ty:ty ),+ $(,)? >
+        $( where { $($bounds:tt)* } )?
+        as $as_ty:ty;
+        $($rest:tt)*
+    ) => {
+        impl_ndt!(@as
+            [$impl_generic, $( const $const_generic : $const_ty, )*]
+            [$head :: $( $tail )::+]
+            [< $impl_generic, $( $const_generic ),* >]
+            $( where { $($bounds)* } )?
+            as $as_ty
+        );
+        impl_ndt!($($rest)*);
+    };
+    (
+        $head:ident :: $( $tail:ident )::+ < $impl_generic:ident, $( const $const_generic:ident : $const_ty:ty ),+ $(,)? >
+        $( where { $($bounds:tt)* } )?
+        as $as_ty:ty;
+        $($rest:tt)*
+    ) => {
+        impl_ndt!(@as
+            [$impl_generic, $( const $const_generic : $const_ty, )*]
+            [$head :: $( $tail )::+]
+            [< $impl_generic, $( $const_generic ),* >]
+            $( where { $($bounds)* } )?
+            as $as_ty
+        );
+        impl_ndt!($($rest)*);
+    };
+    (
+        $head:ident :: $( $tail:ident )::+ < $( const $const_generic:ident : $const_ty:ty ),+ $(,)? >
+        $( where { $($bounds:tt)* } )?
+        as $as_ty:ty;
+        $($rest:tt)*
+    ) => {
+        impl_ndt!(@as
+            [$( const $const_generic : $const_ty, )*]
+            [$head :: $( $tail )::+]
+            [< $( $const_generic ),* >]
+            $( where { $($bounds)* } )?
+            as $as_ty
+        );
+        impl_ndt!($($rest)*);
+    };
+    (
+        $head:ident :: $( $tail:ident )::+ $(< $( $generic:ident ),* $(,)? >)?
+        $( where { $($bounds:tt)* } )?
+        as $as_ty:ty;
+        $($rest:tt)*
+    ) => {
+        impl_ndt!(@as
+            []
+            [$head :: $( $tail )::+]
+            [$(< $( $generic ),* >)?]
+            $( where { $($bounds)* } )?
+            as $as_ty
+        );
+        impl_ndt!($($rest)*);
+    };
+    (
+        $head:ident :: $( $tail:ident )::+ < $( $specta_generic:ident ),* $(,)? >
+        < $impl_generic:ident, $( const $const_generic:ident : $const_ty:ty ),+ $(,)? >
+        $( where { $($bounds:tt)* } )?
+        as $as_ty:ty
+    ) => {
+        impl_ndt!(@as
+            [$impl_generic, $( const $const_generic : $const_ty, )*]
+            [$head :: $( $tail )::+]
+            [< $impl_generic, $( $const_generic ),* >]
+            $( where { $($bounds)* } )?
+            as $as_ty
+        );
+    };
+    (
+        $head:ident :: $( $tail:ident )::+ < $impl_generic:ident, $( const $const_generic:ident : $const_ty:ty ),+ $(,)? >
+        $( where { $($bounds:tt)* } )?
+        as $as_ty:ty
+    ) => {
+        impl_ndt!(@as
+            [$impl_generic, $( const $const_generic : $const_ty, )*]
+            [$head :: $( $tail )::+]
+            [< $impl_generic, $( $const_generic ),* >]
+            $( where { $($bounds)* } )?
+            as $as_ty
+        );
+    };
+    (
+        $head:ident :: $( $tail:ident )::+ < $( const $const_generic:ident : $const_ty:ty ),+ $(,)? >
+        $( where { $($bounds:tt)* } )?
+        as $as_ty:ty
+    ) => {
+        impl_ndt!(@as
+            [$( const $const_generic : $const_ty, )*]
+            [$head :: $( $tail )::+]
+            [< $( $const_generic ),* >]
+            $( where { $($bounds)* } )?
+            as $as_ty
+        );
+    };
+    (
+        $head:ident :: $( $tail:ident )::+ $(< $( $generic:ident ),* $(,)? >)?
+        $( where { $($bounds:tt)* } )?
+        as $as_ty:ty
+    ) => {
+        impl_ndt!(@as
+            []
+            [$head :: $( $tail )::+]
+            [$(< $( $generic ),* >)?]
+            $( where { $($bounds)* } )?
+            as $as_ty
+        );
+    };
+
     // Multiple types
     (
         $(
@@ -115,6 +232,23 @@ macro_rules! _impl_ndt {
                     },
                     |types| <$as_ty as Type>::definition(types),
                 ))
+            }
+        }
+    };
+
+    (@as
+        [$($impl_generics:tt)*]
+        [$($ty:tt)*]
+        [$($ty_generics:tt)*]
+        $( where { $($bounds:tt)* } )?
+        as $as_ty:ty
+    ) => {
+        impl<$($impl_generics)*> Type for $($ty)* $($ty_generics)*
+        where
+            $($($bounds)*)?
+        {
+            fn definition(types: &mut Types) -> DataType {
+                <$as_ty as Type>::definition(types)
             }
         }
     };
