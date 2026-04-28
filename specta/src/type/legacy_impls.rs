@@ -7,6 +7,15 @@ use crate::{
     r#type::{impls::*, macros::impl_ndt},
 };
 
+// `String` requires `std` feature, while `str` does not.
+// We can't use `str` in a lot of places because it's not `Sized`, so this bridges that.
+pub struct String;
+impl Type for String {
+    fn definition(types: &mut Types) -> DataType {
+        str::definition(types)
+    }
+}
+
 #[cfg(feature = "indexmap")]
 #[cfg_attr(docsrs, doc(cfg(feature = "indexmap")))]
 impl_ndt!(
@@ -14,24 +23,31 @@ impl_ndt!(
     indexmap::IndexMap<K, V> as PrimitiveMap<K, V> = inline_passthrough;
 );
 
-#[cfg(feature = "ordered-float")]
-#[cfg_attr(docsrs, doc(cfg(feature = "ordered-float")))]
+// TODO: Don't enforce `Type` bound on `T`?
+// #[cfg(feature = "ordered-float")]
+// #[cfg_attr(docsrs, doc(cfg(feature = "ordered-float")))]
+// impl_ndt!(
+//     ordered_float::OrderedFloat<T> where { T: ordered_float::FloatCore } as T = inline;
+//     ordered_float::NotNan<T> where { T: ordered_float::FloatCore } as T = inline;
+// );
+
+// #[cfg(feature = "heapless")]
+// #[cfg_attr(docsrs, doc(cfg(feature = "heapless")))]
+// impl_ndt!(heapless::Vec<T, const N: usize, LenT> as [T; N] = inline_passthrough); // TODO: More stuff in docs
+
+// We do it custom to avoid `Type` on
+
+#[cfg(feature = "semver")]
+#[cfg_attr(docsrs, doc(cfg(feature = "semver")))]
 impl_ndt!(
-    ordered_float::OrderedFloat<T> where { T: ordered_float::FloatCore } as T = inline;
-    ordered_float::NotNan<T> where { T: ordered_float::FloatCore } as T = inline;
+     semver::Version as str = inline;
+     semver::VersionReq  as str = inline;
+     semver::Comparator  as str = inline;
 );
 
-#[cfg(feature = "heapless")]
-#[cfg_attr(docsrs, doc(cfg(feature = "heapless")))]
-impl_ndt!(heapless::Vec<T, const N: usize> as [T; N]); // TODO: More stuff in docs
-
-// #[cfg(feature = "semver")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "semver")))]
-// impl_ndt_as!(semver::Version as str);
-
-// #[cfg(feature = "smol_str")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "smol_str")))]
-// impl_ndt_as!(smol_str::SmolStr as str);
+#[cfg(feature = "smol_str")]
+#[cfg_attr(docsrs, doc(cfg(feature = "smol_str")))]
+impl_ndt!(smol_str::SmolStr as str = inline);
 
 // #[cfg(feature = "arrayvec")]
 // #[cfg_attr(docsrs, doc(cfg(feature = "arrayvec")))]
@@ -39,295 +55,293 @@ impl_ndt!(heapless::Vec<T, const N: usize> as [T; N]); // TODO: More stuff in do
 
 // #[cfg(feature = "arrayvec")]
 // #[cfg_attr(docsrs, doc(cfg(feature = "arrayvec")))]
-// impl_ndt_as!(arrayvec::ArrayString<const N: usize> as str);
+// impl_ndt!(
+//     arrayvec::ArrayString<const N: usize> as str;
+//     arrayvec::ArrayVec<const N: usize> as [T; N]
+// );
 
 // #[cfg(feature = "smallvec")]
 // #[cfg_attr(docsrs, doc(cfg(feature = "smallvec")))]
 // impl_ndt_as!(smallvec::SmallVec<[T; N]> where { [T; N]: smallvec::Array } as [T; N]);
 
-// #[cfg(feature = "bytes")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "bytes")))]
-// impl_ndt_as!(
-//     bytes::Bytes as [u8]
-//     bytes::BytesMut as [u8]
-// );
+#[cfg(feature = "bytes")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bytes")))]
+impl_ndt!(
+    bytes::Bytes as [u8] = inline;
+    bytes::BytesMut as [u8] = inline;
+);
 
-// #[cfg(feature = "serde_json")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "serde_json")))]
-// const _: () = {
-//     use serde_json::{Map, Number, Value};
+#[cfg(feature = "serde_json")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde_json")))]
+const _: () = {
+    use serde_json::{Map, Number, Value};
 
-//     impl_ndt_as!(
-//         serde_json::Map<K, V> as PrimitiveMap<generics::K, generics::V>
-//     );
+    impl_ndt!(
+        serde_json::Map<K, V> as PrimitiveMap<K, V> = inline_passthrough;
+        serde_json::Value as SerdeValue = inline;
+        serde_json::Number as SerdeNumber = inline;
+    );
 
-//     impl_ndt!(
-//         impl Type for serde_json::Value {
-//             inline: true;
-//             build: |types, ndt| {
-//                 ndt.ty = DataType::Enum(Enum {
-//                     variants: vec![
-//                         ("Null".into(), Variant::unit()),
-//                         (
-//                             "Bool".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(bool::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Number".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(Number::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "String".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(String::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Array".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(Vec::<Value>::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Object".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(Map::<String, Value>::definition(types)))
-//                                 .build(),
-//                         ),
-//                     ],
-//                     attributes: datatype::Attributes::default(),
-//                 })
-//             }
-//         }
+    struct SerdeValue;
+    impl Type for SerdeValue {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    ("Null".into(), Variant::unit()),
+                    (
+                        "Bool".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bool::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Number".into(),
+                        Variant::unnamed()
+                            .field(Field::new(Number::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "String".into(),
+                        Variant::unnamed()
+                            .field(Field::new(str::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Array".into(),
+                        Variant::unnamed()
+                            .field(Field::new(Vec::<Value>::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Object".into(),
+                        Variant::unnamed()
+                            .field(Field::new(Map::<String, Value>::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: Default::default(),
+            })
+        }
+    }
 
-//         impl Type for serde_json::Number {
-//             inline: true;
-//             build: |types, ndt| {
-//                 ndt.ty = DataType::Enum(Enum {
-//                     variants: vec![
-//                         (
-//                             "f64".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(DataType::Primitive(Primitive::f64)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "i64".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(DataType::Primitive(Primitive::i64)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "u64".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(DataType::Primitive(Primitive::u64)))
-//                                 .build(),
-//                         ),
-//                     ],
-//                     attributes: datatype::Attributes::default(),
-//                 });
-//             }
-//         }
-//     );
-// };
+    struct SerdeNumber;
+    impl Type for SerdeNumber {
+        fn definition(_: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "f64".into(),
+                        Variant::unnamed()
+                            .field(Field::new(DataType::Primitive(Primitive::f64)))
+                            .build(),
+                    ),
+                    (
+                        "i64".into(),
+                        Variant::unnamed()
+                            .field(Field::new(DataType::Primitive(Primitive::i64)))
+                            .build(),
+                    ),
+                    (
+                        "u64".into(),
+                        Variant::unnamed()
+                            .field(Field::new(DataType::Primitive(Primitive::u64)))
+                            .build(),
+                    ),
+                ],
+                attributes: datatype::Attributes::default(),
+            })
+        }
+    }
+};
 
-// #[cfg(feature = "serde_yaml")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "serde_yaml")))]
-// const _: () = {
-//     use serde_yaml::{Number, Value, value::TaggedValue};
+#[cfg(feature = "serde_yaml")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde_yaml")))]
+const _: () = {
+    use serde_yaml::{Mapping, Number, Value, value::TaggedValue};
 
-//     impl_ndt_as!(
-//         serde_yaml::Mapping as PrimitiveMap<serde_yaml::Value, serde_yaml::Value>
-//         serde_yaml::value::TaggedValue as PrimitiveMap<String, serde_yaml::Value>
-//     );
+    impl_ndt!(
+        serde_yaml::Mapping as PrimitiveMap<Value, Value> = inline_passthrough;
+        serde_yaml::Value as SerdeYamlValue = inline;
+        serde_yaml::Number as SerdeYamlNumber = inline;
+        serde_yaml::value::TaggedValue as SerdeYamlTaggedValue = inline;
+    );
 
-//     impl_ndt!(
-//         impl Type for serde_yaml::Value {
-//             inline: true;
-//             build: |types, ndt| {
-//                 ndt.ty = DataType::Enum(Enum {
-//                     variants: vec![
-//                         ("Null".into(), Variant::unit()),
-//                         (
-//                             "Bool".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(bool::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Number".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(Number::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "String".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(String::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Sequence".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(Vec::<Value>::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Mapping".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(std::collections::BTreeMap::<
-//                                     serde_yaml::Value,
-//                                     serde_yaml::Value,
-//                                 >::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Tagged".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(Box::<TaggedValue>::definition(types)))
-//                                 .build(),
-//                         ),
-//                     ],
-//                     attributes: datatype::Attributes::default(),
-//                 })
-//             }
-//         }
+    struct SerdeYamlValue;
+    impl Type for SerdeYamlValue {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    ("Null".into(), Variant::unit()),
+                    (
+                        "Bool".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bool::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Number".into(),
+                        Variant::unnamed()
+                            .field(Field::new(Number::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "String".into(),
+                        Variant::unnamed()
+                            .field(Field::new(str::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Sequence".into(),
+                        Variant::unnamed()
+                            .field(Field::new(Vec::<Value>::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Mapping".into(),
+                        Variant::unnamed()
+                            .field(Field::new(Mapping::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Tagged".into(),
+                        Variant::unnamed()
+                            .field(Field::new(Box::<TaggedValue>::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: datatype::Attributes::default(),
+            })
+        }
+    }
 
-//         impl Type for serde_yaml::Number {
-//             inline: true;
-//             build: |types, ndt| {
-//                 ndt.ty = DataType::Enum(Enum {
-//                     variants: vec![
-//                         (
-//                             "f64".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(DataType::Primitive(Primitive::f64)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "i64".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(DataType::Primitive(Primitive::i64)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "u64".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(DataType::Primitive(Primitive::u64)))
-//                                 .build(),
-//                         ),
-//                     ],
-//                     attributes: datatype::Attributes::default(),
-//                 })
-//             }
-//         }
-//     );
-// };
+    struct SerdeYamlNumber;
+    impl Type for SerdeYamlNumber {
+        fn definition(_: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "f64".into(),
+                        Variant::unnamed()
+                            .field(Field::new(DataType::Primitive(Primitive::f64)))
+                            .build(),
+                    ),
+                    (
+                        "i64".into(),
+                        Variant::unnamed()
+                            .field(Field::new(DataType::Primitive(Primitive::i64)))
+                            .build(),
+                    ),
+                    (
+                        "u64".into(),
+                        Variant::unnamed()
+                            .field(Field::new(DataType::Primitive(Primitive::u64)))
+                            .build(),
+                    ),
+                ],
+                attributes: datatype::Attributes::default(),
+            })
+        }
+    }
 
-// #[cfg(feature = "toml")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "toml")))]
-// const _: () = {
-//     use toml::{Value, value};
+    struct SerdeYamlTaggedValue;
+    impl Type for SerdeYamlTaggedValue {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("tag", Field::new(str::definition(types)))
+                .field("value", Field::new(Value::definition(types)))
+                .build()
+        }
+    }
+};
+#[cfg(feature = "toml")]
+#[cfg_attr(docsrs, doc(cfg(feature = "toml")))]
+const _: () = {
+    use toml::{Value, value};
 
-//     impl_ndt_as!(toml::map::Map<K, V> as PrimitiveMap<generics::K, generics::V>);
+    impl_ndt!(
+        toml::map::Map<K, V> as PrimitiveMap<K, V> = inline_passthrough;
+        toml::value::Datetime as TomlDatetime = inline;
+        toml::Value as TomlValue = inline;
+    );
 
-//     impl_ndt!(
-//         impl Type for toml::value::Datetime {
-//             inline: true;
-//             build: |types, ndt| {
-//                 ndt.ty = DataType::Struct(Struct {
-//                     fields: Fields::Named(NamedFields {
-//                         fields: vec![(
-//                             "v".into(),
-//                             Field {
-//                                 optional: false,
-//                                 flatten: false,
+    struct TomlDatetime;
+    impl Type for TomlDatetime {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("v", Field::new(str::definition(types)))
+                .build()
+        }
+    }
 
-//                                 inline: false,
-//                                 type_overridden: false,
-//                                 deprecated: None,
-//                                 docs: Cow::Borrowed(""),
-//                                 ty: Some(String::definition(types)),
-//                                 attributes: datatype::Attributes::default(),
-//                             },
-//                         )],
-//                     }),
-//                     attributes: datatype::Attributes::default(),
-//                 })
-//             }
-//         }
+    struct TomlValue;
+    impl Type for TomlValue {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "String".into(),
+                        Variant::unnamed()
+                            .field(Field::new(str::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Integer".into(),
+                        Variant::unnamed()
+                            .field(Field::new(i64::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Float".into(),
+                        Variant::unnamed()
+                            .field(Field::new(f64::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Boolean".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bool::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Datetime".into(),
+                        Variant::unnamed()
+                            .field(Field::new(value::Datetime::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Array".into(),
+                        Variant::unnamed()
+                            .field(Field::new(Vec::<Value>::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Table".into(),
+                        Variant::unnamed()
+                            .field(Field::new(toml::map::Map::<String, Value>::definition(
+                                types,
+                            )))
+                            .build(),
+                    ),
+                ],
+                attributes: datatype::Attributes::default(),
+            })
+        }
+    }
+};
 
-//         impl Type for toml::Value {
-//             inline: true;
-//             build: |types, ndt| {
-//                 ndt.ty = DataType::Enum(Enum {
-//                     variants: vec![
-//                         (
-//                             "String".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(String::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Integer".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(i64::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Float".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(f64::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Boolean".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(bool::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Datetime".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(value::Datetime::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Array".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(Vec::<Value>::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Table".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(
-//                                     std::collections::BTreeMap::<String, Value>::definition(types),
-//                                 ))
-//                                 .build(),
-//                         ),
-//                     ],
-//                     attributes: datatype::Attributes::default(),
-//                 })
-//             }
-//         }
-//     );
-// };
+#[cfg(feature = "ulid")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ulid")))]
+impl_ndt!(ulid::Ulid as str = inline);
 
-// #[cfg(feature = "ulid")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "ulid")))]
-// impl_ndt_as!(ulid::Ulid as str);
-
-// #[cfg(feature = "uuid")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "uuid")))]
-// impl_ndt_as!(
-//     uuid::Uuid as str
-//     uuid::fmt::Hyphenated as str
-// );
+#[cfg(feature = "uuid")]
+#[cfg_attr(docsrs, doc(cfg(feature = "uuid")))]
+impl_ndt!(
+    uuid::Uuid as str = inline;
+    uuid::fmt::Braced as str = inline;
+    uuid::fmt::Hyphenated as str = inline;
+    uuid::fmt::Simple as str = inline;
+    uuid::fmt::Urn as str = inline;
+);
 
 // #[cfg(feature = "chrono")]
 // #[cfg_attr(docsrs, doc(cfg(feature = "chrono")))]
@@ -338,6 +352,9 @@ impl_ndt!(heapless::Vec<T, const N: usize> as [T; N]); // TODO: More stuff in do
 //         chrono::NaiveDate as str
 //         chrono::NaiveTime as str
 //         chrono::Duration as str
+//     chrono::FixedOffset as str
+//     chrono::Utc as str
+//     chrono::Local as str
 //     );
 
 //     // This is special cause of how it ignores the `generics` param to `NamedDataType::init_with_sentinel`
@@ -373,392 +390,406 @@ impl_ndt!(heapless::Vec<T, const N: usize> as [T; N]); // TODO: More stuff in do
 //     }
 // };
 
-// #[cfg(feature = "time")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
-// impl_ndt_as!(
-//     time::PrimitiveDateTime as str
-//     time::OffsetDateTime as str
-//     time::Date as str
-//     time::Time as str
-//     time::Duration as str
-//     time::Weekday as str
-// );
+#[cfg(feature = "time")]
+#[cfg_attr(docsrs, doc(cfg(feature = "time")))]
+impl_ndt_as!(
+    time::PrimitiveDateTime as str = inline;
+    time::OffsetDateTime as str = inline;
+    time::Date as str = inline;
+    time::Time as str = inline;
+    time::Duration as str = inline;
+    time::Weekday as str = inline;
+);
 
-// #[cfg(feature = "jiff")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "jiff")))]
-// impl_ndt_as!(
-//     jiff::Timestamp as str
-//     jiff::Zoned as str
-//     jiff::Span as str
-//     jiff::civil::Date as str
-//     jiff::civil::Time as str
-//     jiff::civil::DateTime as str
-//     jiff::tz::TimeZone as str
-// );
+#[cfg(feature = "jiff")]
+#[cfg_attr(docsrs, doc(cfg(feature = "jiff")))]
+impl_ndt_as!(
+    jiff::Timestamp as str = inline;
+    jiff::Zoned as str = inline;
+    jiff::SignedDuration as str = inline;
+    jiff::civil::Date as str = inline;
+    jiff::civil::Time as str = inline;
+    jiff::civil::DateTime as str = inline;
+    jiff::civil::ISOWeekDate as str = inline;
+    jiff::tz::TimeZone as str = inline;
+);
 
-// #[cfg(feature = "bigdecimal")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "bigdecimal")))]
-// impl_ndt_as!(bigdecimal::BigDecimal as str);
+#[cfg(feature = "bigdecimal")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bigdecimal")))]
+impl_ndt!(bigdecimal::BigDecimal as str = inline);
 
-// // This assumes the `serde-with-str` feature is enabled. Check #26 for more info.
-// #[cfg(feature = "rust_decimal")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "rust_decimal")))]
-// impl_ndt_as!(rust_decimal::Decimal as str);
+// This assumes the `serde-with-str` feature is enabled. Check #26 for more info.
+#[cfg(feature = "rust_decimal")]
+#[cfg_attr(docsrs, doc(cfg(feature = "rust_decimal")))]
+impl_ndt!(rust_decimal::Decimal as str = inline);
 
-// #[cfg(feature = "ipnetwork")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "ipnetwork")))]
-// impl_ndt_as!(
-//     ipnetwork::IpNetwork as str
-//     ipnetwork::Ipv4Network as str
-//     ipnetwork::Ipv6Network as str
-// );
+#[cfg(feature = "ipnetwork")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ipnetwork")))]
+impl_ndt!(
+    ipnetwork::IpNetwork as str = inline;
+    ipnetwork::Ipv4Network as str = inline;
+    ipnetwork::Ipv6Network as str = inline;
+);
 
-// #[cfg(feature = "mac_address")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "mac_address")))]
-// impl_ndt_as!(mac_address::MacAddress as str);
+#[cfg(feature = "mac_address")]
+#[cfg_attr(docsrs, doc(cfg(feature = "mac_address")))]
+impl_ndt!(mac_address::MacAddress as str = inline);
 
-// #[cfg(feature = "chrono")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "chrono")))]
-// impl_ndt_as!(
-//     chrono::FixedOffset as str
-//     chrono::Utc as str
-//     chrono::Local as str
-// );
+#[cfg(feature = "bson")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bson")))]
+const _: () = {
+    impl_ndt!(
+        bson::oid::ObjectId as str = inline;
+        bson::Decimal128 as i128 = inline;
+        bson::DateTime as str = inline;
+        bson::Uuid as str = inline;
+        bson::Timestamp as BsonTimestamp = inline;
+        bson::Binary as JsonBinary = inline;
+        bson::Regex as BsonRegex = inline;
+        bson::JavaScriptCodeWithScope as BsonJavaScriptCodeWithScope = inline;
+        bson::Document as MapPrimitive<str, bson::Bson> = inline;
+        bson::Bson as Bson = inline;
+    );
 
-// #[cfg(feature = "bson")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "bson")))]
-// impl_ndt_as!(
-//     bson::oid::ObjectId as str
-//     bson::Decimal128 as i128
-//     bson::DateTime as str
-//     bson::Uuid as str
-// );
+    struct BsonTimestamp;
+    impl Type for BsonTimestamp {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("time", Field::new(u32::definition(types)))
+                .field("increment", Field::new(u32::definition(types)))
+                .build()
+        }
+    }
 
-// #[cfg(feature = "bson")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "bson")))]
-// const _: () = {
-//     impl_ndt!(
-//         impl Type for bson::Timestamp {
-//             inline: true;
-//             build: |types, ndt| {
-//                 ndt.ty = Struct::named()
-//                     .field("time", Field::new(u32::definition(types)))
-//                     .field("increment", Field::new(u32::definition(types)))
-//                     .build();
-//             }
-//         }
+    struct BsonBinary;
+    impl Type for BsonBinary {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("subtype", Field::new(str::definition(types)))
+                .field("bytes", Field::new(Vec::<u8>::definition(types)))
+                .build()
+        }
+    }
 
-//         impl Type for bson::Binary {
-//             inline: true;
-//             build: |types, ndt| {
-//                 ndt.ty = Struct::named()
-//                     .field("subtype", Field::new(str::definition(types)))
-//                     .field("bytes", Field::new(Vec::<u8>::definition(types)))
-//                     .build();
-//             }
-//         }
+    struct BsonRegex;
+    impl Type for BsonRegex {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("pattern", Field::new(str::definition(types)))
+                .field("options", Field::new(str::definition(types)))
+                .build()
+        }
+    }
 
-//         impl Type for bson::Regex {
-//             inline: true;
-//             build: |types, ndt| {
-//                 ndt.ty = Struct::named()
-//                     .field("pattern", Field::new(str::definition(types)))
-//                     .field("options", Field::new(str::definition(types)))
-//                     .build();
-//             }
-//         }
+    struct BsonJavaScriptCodeWithScope;
+    impl Type for BsonJavaScriptCodeWithScope {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("code", Field::new(str::definition(types)))
+                .field("scope", Field::new(bson::Document::definition(types)))
+                .build()
+        }
+    }
 
-//         impl Type for bson::JavaScriptCodeWithScope {
-//             inline: true;
-//             build: |types, ndt| {
-//                 ndt.ty = Struct::named()
-//                     .field("code", Field::new(String::definition(types)))
-//                     .field("scope", Field::new(bson::Document::definition(types)))
-//                     .build();
-//             }
-//         }
+    struct Bson;
+    impl Type for Bson {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "Double".into(),
+                        Variant::unnamed()
+                            .field(Field::new(f64::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "String".into(),
+                        Variant::unnamed()
+                            .field(Field::new(str::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Array".into(),
+                        Variant::unnamed()
+                            .field(Field::new(Vec::<bson::Bson>::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Document".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bson::Document::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Boolean".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bool::definition(types)))
+                            .build(),
+                    ),
+                    ("Null".into(), Variant::unit()),
+                    (
+                        "RegularExpression".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bson::Regex::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "JavaScriptCode".into(),
+                        Variant::unnamed()
+                            .field(Field::new(str::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "JavaScriptCodeWithScope".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bson::JavaScriptCodeWithScope::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Int32".into(),
+                        Variant::unnamed()
+                            .field(Field::new(i32::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Int64".into(),
+                        Variant::unnamed()
+                            .field(Field::new(i64::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Timestamp".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bson::Timestamp::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Binary".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bson::Binary::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "ObjectId".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bson::oid::ObjectId::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "DateTime".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bson::DateTime::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Symbol".into(),
+                        Variant::unnamed()
+                            .field(Field::new(str::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Decimal128".into(),
+                        Variant::unnamed()
+                            .field(Field::new(bson::Decimal128::definition(types)))
+                            .build(),
+                    ),
+                    ("Undefined".into(), Variant::unit()),
+                    ("MaxKey".into(), Variant::unit()),
+                    ("MinKey".into(), Variant::unit()),
+                    (
+                        "DbPointer".into(),
+                        Variant::unnamed()
+                            .field(Field::new(str::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: datatype::Attributes::default(),
+            })
+        }
+    }
+};
 
-//         impl Type for bson::Document {
-//             inline: true;
-//             build: |types, ndt| {
-//                 ndt.ty = datatype::Map::new(
-//                     String::definition(types),
-//                     bson::Bson::definition(types),
-//                 )
-//                 .into();
-//             }
-//         }
+// Technically this can be u64 for formats not marked as human readable in Serde.
+// but we have no way of inspecting that as it's runtime. This is the most common output.
+#[cfg(feature = "bytesize")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bytesize")))]
+impl_ndt_as!(bytesize::ByteSize as String);
 
-//         impl Type for bson::Bson {
-//             inline: true;
-//             build: |types, ndt| {
-//                 ndt.ty = DataType::Enum(Enum {
-//                     variants: vec![
-//                         (
-//                             "Double".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(f64::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "String".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(String::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Array".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(Vec::<bson::Bson>::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Document".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(bson::Document::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Boolean".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(bool::definition(types)))
-//                                 .build(),
-//                         ),
-//                         ("Null".into(), Variant::unit()),
-//                         (
-//                             "RegularExpression".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(bson::Regex::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "JavaScriptCode".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(String::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "JavaScriptCodeWithScope".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(
-//                                     bson::JavaScriptCodeWithScope::definition(types),
-//                                 ))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Int32".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(i32::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Int64".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(i64::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Timestamp".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(bson::Timestamp::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Binary".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(bson::Binary::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "ObjectId".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(bson::oid::ObjectId::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "DateTime".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(bson::DateTime::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Symbol".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(String::definition(types)))
-//                                 .build(),
-//                         ),
-//                         (
-//                             "Decimal128".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(bson::Decimal128::definition(types)))
-//                                 .build(),
-//                         ),
-//                         ("Undefined".into(), Variant::unit()),
-//                         ("MaxKey".into(), Variant::unit()),
-//                         ("MinKey".into(), Variant::unit()),
-//                         (
-//                             "DbPointer".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(str::definition(types)))
-//                                 .build(),
-//                         ),
-//                     ],
-//                     attributes: datatype::Attributes::default(),
-//                 });
-//             }
-//         }
-//     );
-// };
+#[cfg(feature = "uhlc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "uhlc")))]
+const _: () = {
+    impl_ndt!(
+        uhlc::NTP64 as u64 = inline;
+        uhlc::ID as std::num::NonZeroU128 = inline;
+        uhlc::Timestamp as UhlcTimestamp = inline;
+    );
 
-// #[cfg(feature = "bytesize")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "bytesize")))]
-// impl_ndt_as!(bytesize::ByteSize as u64);
+    struct UhlcTimestamp;
+    impl Type for UhlcTimestamp {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Struct(Struct {
+                fields: Fields::Named(NamedFields {
+                    fields: vec![
+                        (
+                            "time".into(),
+                            Field {
+                                optional: false,
+                                flatten: false,
+                                deprecated: None,
+                                docs: Cow::Borrowed(""),
+                                ty: Some(uhlc::NTP64::definition(types)),
+                                attributes: datatype::Attributes::default(),
+                            },
+                        ),
+                        (
+                            "id".into(),
+                            Field {
+                                optional: false,
+                                flatten: false,
+                                deprecated: None,
+                                docs: Cow::Borrowed(""),
+                                ty: Some(uhlc::ID::definition(types)),
+                                attributes: datatype::Attributes::default(),
+                            },
+                        ),
+                    ],
+                }),
+                attributes: datatype::Attributes::default(),
+            })
+        }
+    }
+};
 
-// #[cfg(feature = "uhlc")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "uhlc")))]
-// const _: () = {
-//     impl_ndt_as!(
-//         uhlc::NTP64 as u64
-//         uhlc::ID as std::num::NonZeroU128
-//     );
+#[cfg(feature = "glam")]
+#[cfg_attr(docsrs, doc(cfg(feature = "glam")))]
+impl_ndt!(
+    // Affines
+    glam::Affine2 as [f32; 6] = inline;
+    glam::Affine3A as [f32; 12] = inline;
 
-//     impl_ndt!(
-//         impl Type for uhlc::Timestamp {
-//             inline: true;
-//             build: |types, ndt| {
-//                 ndt.ty = DataType::Struct(Struct {
-//                     fields: Fields::Named(NamedFields {
-//                         fields: vec![
-//                             (
-//                                 "time".into(),
-//                                 Field {
-//                                     optional: false,
-//                                     flatten: false,
+    glam::DAffine2 as [f64; 6] = inline;
+    glam::DAffine3 as [f64; 12] = inline;
 
-//                                     inline: false,
-//                                     type_overridden: false,
-//                                     deprecated: None,
-//                                     docs: Cow::Borrowed(""),
-//                                     ty: Some(uhlc::NTP64::definition(types)),
-//                                     attributes: datatype::Attributes::default(),
-//                                 },
-//                             ),
-//                             (
-//                                 "id".into(),
-//                                 Field {
-//                                     optional: false,
-//                                     flatten: false,
+    // Matrices
+    glam::Mat2 as [f32; 4] = inline;
+    glam::Mat3 as [f32; 9] = inline;
+    glam::Mat3A as [f32; 9] = inline;
+    glam::Mat4 as [f32; 16] = inline;
 
-//                                     inline: false,
-//                                     type_overridden: false,
-//                                     deprecated: None,
-//                                     docs: Cow::Borrowed(""),
-//                                     ty: Some(uhlc::ID::definition(types)),
-//                                     attributes: datatype::Attributes::default(),
-//                                 },
-//                             ),
-//                         ],
-//                     }),
-//                     attributes: datatype::Attributes::default(),
-//                 });
-//             }
-//         }
-//     );
-// };
+    glam::DMat2 as [f64; 4] = inline;
+    glam::DMat3 as [f64; 9] = inline;
+    glam::DMat4 as [f64; 16] = inline;
 
-// #[cfg(feature = "glam")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "glam")))]
-// impl_ndt_as!(
-//     // Affines
-//     glam::Affine2 as [f32; 6]
-//     glam::Affine3A as [f32; 12]
+    // Quaternions
+    glam::Quat as [f32; 4] = inline;
 
-//     // Matrices
-//     glam::Mat2 as [f32; 4]
-//     glam::Mat3 as [f32; 9]
-//     glam::Mat3A as [f32; 9]
-//     glam::Mat4 as [f32; 16]
+    glam::DQuat as [f64; 4] = inline;
 
-//     // Quaternions
-//     glam::Quat as [f32; 4]
+    // Vectors
+    glam::Vec2 as [f32; 2] = inline;
+    glam::Vec3 as [f32; 3] = inline;
+    glam::Vec3A as [f32; 3] = inline;
+    glam::Vec4 as [f32; 4] = inline;
 
-//     // Vectors
-//     glam::Vec2 as [f32; 2]
-//     glam::Vec3 as [f32; 3]
-//     glam::Vec3A as [f32; 3]
-//     glam::Vec4 as [f32; 4]
+    glam::DVec2 as [f64; 2] = inline;
+    glam::DVec3 as [f64; 3] = inline;
+    glam::DVec4 as [f64; 4] = inline;
 
-//     // Affines
-//     glam::DAffine2 as [f64; 6]
-//     glam::DAffine3 as [f64; 12]
+    // Implementation for https://docs.rs/glam/latest/glam/bool/index.html
+    glam::BVec2 as [bool; 2] = inline;
+    glam::BVec3 as [bool; 3] = inline;
+    glam::BVec3A as [bool; 3] = inline;
+    glam::BVec4 as [bool; 4] = inline;
+    glam::BVec4A as [bool; 4] = inline;
 
-//     // Matrices
-//     glam::DMat2 as [f64; 4]
-//     glam::DMat3 as [f64; 9]
-//     glam::DMat4 as [f64; 16]
+    // Implementations for https://docs.rs/glam/latest/glam/i8/index.html
+    glam::I8Vec2 as [i8; 2] = inline;
+    glam::I8Vec3 as [i8; 3] = inline;
+    glam::I8Vec4 as [i8; 4] = inline;
 
-//     // Quaternions
-//     glam::DQuat as [f64; 4]
+    // Implementations for https://docs.rs/glam/latest/glam/u8/index.html
+    glam::U8Vec2 as [u8; 2] = inline;
+    glam::U8Vec3 as [u8; 3] = inline;
+    glam::U8Vec4 as [u8; 4] = inline;
 
-//     // Vectors
-//     glam::DVec2 as [f64; 2]
-//     glam::DVec3 as [f64; 3]
-//     glam::DVec4 as [f64; 4]
+    // Implementations for https://docs.rs/glam/latest/glam/i16/index.html
+    glam::I16Vec2 as [i16; 2] = inline;
+    glam::I16Vec3 as [i16; 3] = inline;
+    glam::I16Vec4 as [i16; 4] = inline;
 
-//     // Implementations for https://docs.rs/glam/latest/glam/i8/index.html
-//     glam::I8Vec2 as [i8; 2]
-//     glam::I8Vec3 as [i8; 3]
-//     glam::I8Vec4 as [i8; 4]
+    // Implementations for https://docs.rs/glam/latest/glam/u16/index.html
+    glam::U16Vec2 as [u16; 2] = inline;
+    glam::U16Vec3 as [u16; 3] = inline;
+    glam::U16Vec4 as [u16; 4] = inline;
 
-//     // Implementations for https://docs.rs/glam/latest/glam/u8/index.html
-//     glam::U8Vec2 as [u8; 2]
-//     glam::U8Vec3 as [u8; 3]
-//     glam::U8Vec4 as [u8; 4]
+    // Implementations for https://docs.rs/glam/latest/glam/u32/index.html
+    glam::UVec2 as [u32; 2] = inline;
+    glam::UVec3 as [u32; 3] = inline;
+    glam::UVec4 as [u32; 4] = inline;
 
-//     // Implementations for https://docs.rs/glam/latest/glam/i16/index.html
-//     glam::I16Vec2 as [i16; 2]
-//     glam::I16Vec3 as [i16; 3]
-//     glam::I16Vec4 as [i16; 4]
+    // Implementations for https://docs.rs/glam/latest/glam/i32/index.html
+    glam::IVec2 as [i32; 2] = inline;
+    glam::IVec3 as [i32; 3] = inline;
+    glam::IVec4 as [i32; 4] = inline;
 
-//     // Implementations for https://docs.rs/glam/latest/glam/u16/index.html
-//     glam::U16Vec2 as [u16; 2]
-//     glam::U16Vec3 as [u16; 3]
-//     glam::U16Vec4 as [u16; 4]
+    // Implementation for https://docs.rs/glam/latest/glam/i64/index.html
+    glam::I64Vec2 as [i64; 2] = inline;
+    glam::I64Vec3 as [i64; 3] = inline;
+    glam::I64Vec4 as [i64; 4] = inline;
 
-//     // Implementations for https://docs.rs/glam/latest/glam/i32/index.html
-//     glam::IVec2 as [i32; 2]
-//     glam::IVec3 as [i32; 3]
-//     glam::IVec4 as [i32; 4]
+    // Implementation for https://docs.rs/glam/latest/glam/u64/index.html
+    glam::U64Vec2 as [u64; 2] = inline;
+    glam::U64Vec3 as [u64; 3] = inline;
+    glam::U64Vec4 as [u64; 4] = inline;
 
-//     // Implementations for https://docs.rs/glam/latest/glam/u32/index.html
-//     glam::UVec2 as [u32; 2]
-//     glam::UVec3 as [u32; 3]
-//     glam::UVec4 as [u32; 4]
+    // implementation for https://docs.rs/glam/latest/glam/usize/index.html
+    glam::USizeVec2 as [usize; 2] = inline;
+    glam::USizeVec3 as [usize; 3] = inline;
+    glam::USizeVec4 as [usize; 4] = inline;
 
-//     // Implementation for https://docs.rs/glam/latest/glam/i64/index.html
-//     glam::I64Vec2 as [i64; 2]
-//     glam::I64Vec3 as [i64; 3]
-//     glam::I64Vec4 as [i64; 4]
+    // implementation for https://docs.rs/glam/latest/glam/isize/index.html
+    glam::ISizeVec2 as [isize; 2] = inline;
+    glam::ISizeVec3 as [isize; 3] = inline;
+    glam::ISizeVec4 as [isize; 4] = inline;
+);
 
-//     // Implementation for https://docs.rs/glam/latest/glam/u64/index.html
-//     glam::U64Vec2 as [u64; 2]
-//     glam::U64Vec3 as [u64; 3]
-//     glam::U64Vec4 as [u64; 4]
+#[cfg(feature = "url")]
+#[cfg_attr(docsrs, doc(cfg(feature = "url")))]
+const _: () = {
+    impl_ndt!(
+        url::Url as str = inline;
+        url::Host as UrlHost = inline;
+    );
 
-//     // implementation for https://docs.rs/glam/latest/glam/usize/index.html
-//     glam::USizeVec2 as [usize; 2]
-//     glam::USizeVec3 as [usize; 3]
-//     glam::USizeVec4 as [usize; 4]
-
-//     // Implementation for https://docs.rs/glam/latest/glam/bool/index.html
-//     glam::BVec2 as [bool; 2]
-//     glam::BVec3 as [bool; 3]
-//     glam::BVec4 as [bool; 4]
-// );
-
-// #[cfg(feature = "url")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "url")))]
-// impl_ndt_as!(url::Url as str);
+    struct UrlHost;
+    impl Type for UrlHost {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "Domain".into(),
+                        Variant::unnamed()
+                            .field(Field::new(String::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Ipv4".into(),
+                        Variant::unnamed()
+                            .field(Field::new(std::net::Ipv4Addr::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Ipv6".into(),
+                        Variant::unnamed()
+                            .field(Field::new(std::net::Ipv6Addr::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: datatype::Attributes::default(),
+            })
+        }
+    }
+};
 
 // #[cfg(feature = "either")]
 // #[cfg_attr(docsrs, doc(cfg(feature = "either")))]
@@ -812,11 +843,11 @@ impl_ndt!(heapless::Vec<T, const N: usize> as [T; N]); // TODO: More stuff in do
 //                     ndt.name = Cow::Borrowed("ErrorStackContext");
 //                     ndt.module_path = Cow::Borrowed("error_stack");
 
-//                     let attachments = DataType::List(List::new(String::definition(types)));
+//                     let attachments = DataType::List(List::new(str::definition(types)));
 //                     let sources = DataType::List(List::new(ErrorStackContext::definition(types)));
 
 //                     ndt.ty = Struct::named()
-//                         .field("context", Field::new(String::definition(types)))
+//                         .field("context", Field::new(str::definition(types)))
 //                         .field("attachments", Field::new(attachments))
 //                         .field("sources", Field::new(sources))
 //                         .build();
@@ -1167,7 +1198,7 @@ impl_ndt!(heapless::Vec<T, const N: usize> as [T; N]); // TODO: More stuff in do
 //         inline: true;
 //         build: |types, ndt| {
 //             ndt.ty = Struct::named()
-//                 .field("string_value", Field::new(Option::<String>::definition(types)))
+//                 .field("string_value", Field::new(Option::<str>::definition(types)))
 //                 .field("float_value", Field::new(Option::<f32>::definition(types)))
 //                 .field("double_value", Field::new(Option::<f64>::definition(types)))
 //                 .field("int_value", Field::new(Option::<i64>::definition(types)))
@@ -1195,12 +1226,12 @@ impl_ndt!(heapless::Vec<T, const N: usize> as [T; N]); // TODO: More stuff in do
 //         build: |types, ndt| {
 //             ndt.ty = Struct::named()
 //                 .field("version", Field::new(u32::definition(types)))
-//                 .field("name", Field::new(String::definition(types)))
+//                 .field("name", Field::new(str::definition(types)))
 //                 .field(
 //                     "features",
 //                     Field::new(Vec::<geozero::mvt::tile::Feature>::definition(types)),
 //                 )
-//                 .field("keys", Field::new(Vec::<String>::definition(types)))
+//                 .field("keys", Field::new(Vec::<str>::definition(types)))
 //                 .field(
 //                     "values",
 //                     Field::new(Vec::<geozero::mvt::tile::Value>::definition(types)),

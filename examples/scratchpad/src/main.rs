@@ -115,6 +115,16 @@ fn main() {
         }
     );
 
+    // let def = heapless::Vec::<String, 5>::definition(&mut types);
+    // println!("\n{:?}", def);
+    // println!(
+    //     "{:?}",
+    //     match def {
+    //         DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
+    //         _ => unreachable!(),
+    //     }
+    // )
+
     // println!("{types:#?}");
 
     // let out = specta_typescript::Typescript::new()
