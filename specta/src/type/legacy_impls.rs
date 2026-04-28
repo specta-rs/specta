@@ -34,10 +34,10 @@ impl_ndt!(
 #[cfg_attr(docsrs, doc(cfg(feature = "heapless")))]
 impl_ndt!(
     // Sequential containers
-    heapless::Vec<T> <T, const N: usize, LenT> where { T: Type, LenT: heapless::LenType } as [T; N];
-    heapless::Deque<T> <T, const N: usize> where { T: Type } as [T; N];
-    heapless::HistoryBuf<T> <T, const N: usize> where { T: Type } as [T; N];
-    heapless::BinaryHeap<T, K> <T, K, const N: usize> where { T: Type + Ord, K: heapless::binary_heap::Kind } as [T; N];
+    heapless::Vec<T> <T, const N: usize, LenT> where { T: Type, LenT: heapless::LenType } as [T; N] = inline_passthrough;
+    heapless::Deque<T> <T, const N: usize> where { T: Type } as [T; N] = inline_passthrough;
+    heapless::HistoryBuf<T> <T, const N: usize> where { T: Type } as [T; N] = inline_passthrough;
+    heapless::BinaryHeap<T, K> <T, K, const N: usize> where { T: Type + Ord, K: heapless::binary_heap::Kind } as [T; N] = inline_passthrough;
 
     // Sets
     heapless::IndexSet<T, S> <T, S, const N: usize> where { T: Type + Eq + core::hash::Hash, S: core::hash::BuildHasher } as PrimitiveSet<T> = inline_passthrough;
@@ -71,7 +71,7 @@ impl_ndt!(
 
 #[cfg(feature = "smallvec")]
 #[cfg_attr(docsrs, doc(cfg(feature = "smallvec")))]
-impl_ndt!(smallvec::SmallVec<T> where { T: smallvec::Array + Type } as T);
+impl_ndt!(smallvec::SmallVec<T> where { T: smallvec::Array + Type } as T = inline_passthrough);
 
 #[cfg(feature = "bytes")]
 #[cfg_attr(docsrs, doc(cfg(feature = "bytes")))]
@@ -374,25 +374,25 @@ const _: () = {
 #[cfg(feature = "time")]
 #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
 impl_ndt!(
-    time::PrimitiveDateTime as str;
-    time::OffsetDateTime as str;
-    time::Date as str;
-    time::Time as str;
-    time::Duration as str;
-    time::Weekday as str;
+    time::PrimitiveDateTime as str = inline;
+    time::OffsetDateTime as str = inline;
+    time::Date as str = inline;
+    time::Time as str = inline;
+    time::Duration as str = inline;
+    time::Weekday as str = inline;
 );
 
 #[cfg(feature = "jiff")]
 #[cfg_attr(docsrs, doc(cfg(feature = "jiff")))]
 impl_ndt!(
-    jiff::Timestamp as str;
-    jiff::Zoned as str;
-    jiff::SignedDuration as str;
-    jiff::civil::Date as str;
-    jiff::civil::Time as str;
-    jiff::civil::DateTime as str;
-    jiff::civil::ISOWeekDate as str;
-    jiff::tz::TimeZone as str;
+    jiff::Timestamp as str = inline;
+    jiff::Zoned as str = inline;
+    jiff::SignedDuration as str = inline;
+    jiff::civil::Date as str = inline;
+    jiff::civil::Time as str = inline;
+    jiff::civil::DateTime as str = inline;
+    jiff::civil::ISOWeekDate as str = inline;
+    jiff::tz::TimeZone as str = inline;
 );
 
 #[cfg(feature = "bigdecimal")]
@@ -693,7 +693,7 @@ const _: () = {
 // but we have no way of inspecting that as it's runtime. This is the most common output.
 #[cfg(feature = "bytesize")]
 #[cfg_attr(docsrs, doc(cfg(feature = "bytesize")))]
-impl_ndt!(bytesize::ByteSize as String);
+impl_ndt!(bytesize::ByteSize as String = inline);
 
 #[cfg(feature = "uhlc")]
 #[cfg_attr(docsrs, doc(cfg(feature = "uhlc")))]
@@ -902,7 +902,7 @@ const _: () = {
 #[cfg_attr(docsrs, doc(cfg(feature = "error-stack")))]
 const _: () = {
     impl_ndt!(
-        error_stack::Report<C> where { C: std::error::Error + Send + Sync + 'static } as ErrorStackReport;
+        error_stack::Report<C> <> where { C: std::error::Error + Send + Sync + 'static } as ErrorStackReport = inline;
     );
 
     //     impl<C: std::error::Error + Send + Sync + 'static> Type for error_stack::Report<C> {
