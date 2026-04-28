@@ -33,7 +33,8 @@ impl_ndt!(
 #[cfg(feature = "heapless")]
 #[cfg_attr(docsrs, doc(cfg(feature = "heapless")))]
 impl_ndt!(
-    heapless::Vec<T> <T, const N: usize, LenT> as [T; N] = inline_passthrough;
+    heapless::Vec<T> <T, const N: usize, LenT> where { T: Type, LenT: heapless::LenType }
+        as [T; N];
 );
 
 #[cfg(feature = "semver")]
@@ -51,8 +52,8 @@ impl_ndt!(smol_str::SmolStr as str = inline);
 #[cfg(feature = "arrayvec")]
 #[cfg_attr(docsrs, doc(cfg(feature = "arrayvec")))]
 impl_ndt!(
-    arrayvec::ArrayString <const N: usize> as str;
-    arrayvec::ArrayVec<T> <T, const N: usize> where { T: Type } as [T; N]
+    arrayvec::ArrayString <const N: usize> as str = inline;
+    arrayvec::ArrayVec<T> <T, const N: usize> where { T: Type } as [T; N] = inline_passthrough;
 );
 
 #[cfg(feature = "smallvec")]
