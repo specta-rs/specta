@@ -33,8 +33,21 @@ impl_ndt!(
 #[cfg(feature = "heapless")]
 #[cfg_attr(docsrs, doc(cfg(feature = "heapless")))]
 impl_ndt!(
-    heapless::Vec<T> <T, const N: usize, LenT> where { T: Type, LenT: heapless::LenType }
-        as [T; N];
+    // Sequential containers
+    heapless::Vec<T> <T, const N: usize, LenT> where { T: Type, LenT: heapless::LenType } as [T; N];
+    heapless::Deque<T> <T, const N: usize> where { T: Type } as [T; N];
+    heapless::HistoryBuf<T> <T, const N: usize> where { T: Type } as [T; N];
+    heapless::BinaryHeap<T, K> <T, K, const N: usize> where { T: Type + Ord, K: heapless::binary_heap::Kind } as [T; N];
+
+    // Sets
+    heapless::IndexSet<T, S> <T, S, const N: usize> where { T: Type + Eq + core::hash::Hash, S: core::hash::BuildHasher } as PrimitiveSet<T> = inline_passthrough;
+
+    // Maps
+    heapless::IndexMap<K, V, S> <K, V, S, const N: usize> where { K: Type + Eq + core::hash::Hash, V: Type, S: core::hash::BuildHasher } as PrimitiveMap<K, V> = inline_passthrough;
+    heapless::LinearMap<K, V> <K, V, const N: usize> where { K: Type + Eq, V: Type } as PrimitiveMap<K, V> = inline_passthrough;
+
+    // String container
+    heapless::String <const N: usize, LenT> where { LenT: heapless::LenType } as str = inline;
 );
 
 #[cfg(feature = "semver")]
@@ -53,12 +66,12 @@ impl_ndt!(smol_str::SmolStr as str = inline);
 #[cfg_attr(docsrs, doc(cfg(feature = "arrayvec")))]
 impl_ndt!(
     arrayvec::ArrayString <const N: usize> as str = inline;
-    arrayvec::ArrayVec<T> <T, const N: usize> where { T: Type } as [T; N] = inline_passthrough;
+    arrayvec::ArrayVec<T> <T, const N: usize> as [T; N] = inline_passthrough;
 );
 
 #[cfg(feature = "smallvec")]
 #[cfg_attr(docsrs, doc(cfg(feature = "smallvec")))]
-impl_ndt!(smallvec::SmallVec<T> where { T: smallvec::Array } as T);
+impl_ndt!(smallvec::SmallVec<T> where { T: smallvec::Array + Type } as T);
 
 #[cfg(feature = "bytes")]
 #[cfg_attr(docsrs, doc(cfg(feature = "bytes")))]
@@ -339,52 +352,24 @@ impl_ndt!(
     uuid::fmt::Urn as str = inline;
 );
 
-// #[cfg(feature = "chrono")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "chrono")))]
-// #[allow(deprecated)]
-// const _: () = {
-//     impl_ndt!(
-//         chrono::NaiveDateTime as str
-//         chrono::NaiveDate as str
-//         chrono::NaiveTime as str
-//         chrono::Duration as str
-//     chrono::FixedOffset as str
-//     chrono::Utc as str
-//     chrono::Local as str
-//     );
-
-//     // This is special cause of how it ignores the `generics` param to `NamedDataType::init_with_sentinel`
-//     // These needs generics which also aren't `Type` & aren't in `References` param so `impl_ndt` doesn't work.
-//     macro_rules! impl_as_str {
-//         ($module:ident :: $type_name:ident) => {
-//             fn definition(types: &mut Types) -> DataType {
-//                 // This API is internal. Use [NamedDataType::register] if you want a custom implementation.
-//                 static SENTINEL: &str = stringify!($module::$type_name);
-//                 static GENERICS: &[datatype::Generic] = &[];
-//                 DataType::Reference(datatype::NamedDataType::init_with_sentinel(
-//                     GENERICS,
-//                     vec![],
-//                     true,
-//                     false,
-//                     types,
-//                     SENTINEL,
-//                     |types, ndt| {
-//                         ndt.name = ::std::borrow::Cow::Borrowed(stringify!($type_name));
-//                         ndt.module_path = ::std::borrow::Cow::Borrowed(stringify!($module));
-//                         ndt.ty = str::definition(types);
-//                     },
-//                 ))
-//             }
-//         };
-//     }
-
-//     impl<T: chrono::TimeZone> Type for chrono::Date<T> {
-//         impl_as_str!(chrono::Date);
-//     }
-//     impl<T: chrono::TimeZone> Type for chrono::DateTime<T> {
-//         impl_as_str!(chrono::DateTime);
-//     }
-// };
+#[cfg(feature = "chrono")]
+#[cfg_attr(docsrs, doc(cfg(feature = "chrono")))]
+#[allow(deprecated)]
+const _: () = {
+    impl_ndt!(
+        chrono::NaiveDateTime as str = inline;
+        chrono::NaiveDate as str = inline;
+        chrono::NaiveTime as str = inline;
+        chrono::Duration as str = inline;
+        chrono::FixedOffset as str = inline;
+        chrono::Utc as str = inline;
+        chrono::Local as str = inline;
+        chrono::Weekday as str = inline;
+        chrono::Month as str = inline;
+        chrono::Date<T> where { T: chrono::TimeZone } as str = inline;
+        chrono::DateTime<T> where { T: chrono::TimeZone } as str = inline;
+    );
+};
 
 #[cfg(feature = "time")]
 #[cfg_attr(docsrs, doc(cfg(feature = "time")))]
@@ -884,44 +869,68 @@ const _: () = {
     }
 };
 
-// #[cfg(feature = "either")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "either")))]
-// impl_ndt!(
-//     impl<L, R> Type for either::Either<L, R> where { L: Type, R: Type } {
-//         inline: true;
-//         build: |types, ndt| {
-//             ndt.ty = DataType::Enum(Enum {
-//                 variants: vec![
-//                     (
-//                         "Left".into(),
-//                         Variant::unnamed()
-//                             .field(Field::new(
-//                                 datatype::GenericReference::new::<generics::L>().into(),
-//                             ))
-//                             .build(),
-//                     ),
-//                     (
-//                         "Right".into(),
-//                         Variant::unnamed()
-//                             .field(Field::new(
-//                                 datatype::GenericReference::new::<generics::R>().into(),
-//                             ))
-//                             .build(),
-//                     ),
-//                 ],
-//                 attributes: datatype::Attributes::default(),
-//             });
-//         }
-//     }
-// );
+#[cfg(feature = "either")]
+#[cfg_attr(docsrs, doc(cfg(feature = "either")))]
+const _: () = {
+    impl_ndt!(either::Either<L, R> as Either<L, R> = inline);
+
+    struct Either<L, R>(std::marker::PhantomData<(L, R)>);
+    impl<L: Type, R: Type> Type for Either<L, R> {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "Left".into(),
+                        Variant::unnamed()
+                            .field(Field::new(L::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Right".into(),
+                        Variant::unnamed()
+                            .field(Field::new(R::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: datatype::Attributes::default(),
+            })
+        }
+    }
+};
 
 #[cfg(feature = "error-stack")]
 #[cfg_attr(docsrs, doc(cfg(feature = "error-stack")))]
 const _: () = {
-    // impl_ndt!(
-    //     arrayvec::ArrayString <const N: usize> as str;
-    //     arrayvec::ArrayVec<T> <T, const N: usize> as [T; N]
-    // );
+    impl_ndt!(
+        error_stack::Report<C> where { C: std::error::Error + Send + Sync + 'static } as ErrorStackReport = inline;
+    );
+
+    struct ErrorStackReport;
+    impl Type for ErrorStackReport {
+        fn definition(types: &mut Types) -> DataType {
+            // DataType::List(List::new(ErrorStackContext::definition(types)))
+            todo!();
+        }
+    }
+
+    // struct ErrorStackContext;
+    // impl Type for ErrorStackContext {
+    //     fn definition(types: &mut Types) -> DataType {
+    //         Struct::named()
+    //             .field("context", Field::new(str::definition(types)))
+    //             .field(
+    //                 "attachments",
+    //                 Field::new(DataType::List(List::new(str::definition(types)))),
+    //             )
+    //             .field(
+    //                 "sources",
+    //                 Field::new(DataType::List(List::new(ErrorStackContext::definition(
+    //                     types,
+    //                 )))),
+    //             )
+    //             .build()
+    //     }
+    // }
 
     //     struct ErrorStackContext;
     //     impl Type for ErrorStackContext {

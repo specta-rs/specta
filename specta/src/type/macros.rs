@@ -98,7 +98,7 @@ macro_rules! _impl_ndt {
         $($rest:tt)*
     ) => {
         impl_ndt!(@as
-            []
+            [$( $( $generic, )* )?]
             [$head :: $( $tail )::+]
             [$(< $( $generic ),* >)?]
             $( where { $($bounds)* } )?
@@ -161,20 +161,74 @@ macro_rules! _impl_ndt {
         );
     };
     (
-        $head:ident :: $( $tail:ident )::+ $(< $( $generic:ident ),* $(,)? >)?
+        $head:ident :: $( $tail:ident )::+ < $( $generic:ident ),+ $(,)? >
+        $( where { $($bounds:tt)* } )?
+        as $as_ty:ty
+    ) => {
+        impl_ndt!(@as
+            [$( $generic, )*]
+            [$head :: $( $tail )::+]
+            [< $( $generic ),* >]
+            $( where { $($bounds)* } )?
+            as $as_ty
+        );
+    };
+    (
+        $head:ident :: $( $tail:ident )::+
         $( where { $($bounds:tt)* } )?
         as $as_ty:ty
     ) => {
         impl_ndt!(@as
             []
             [$head :: $( $tail )::+]
-            [$(< $( $generic ),* >)?]
+            []
             $( where { $($bounds)* } )?
             as $as_ty
         );
     };
 
     // Multiple types
+    (
+        $head:ident :: $( $tail:ident )::+ < $( $specta_generic:ident ),* $(,)? >
+        < $impl_generic:ident, $( const $const_generic:ident : $const_ty:ty ),+ $(,)? >
+        $( where { $($bounds:tt)* } )?
+        as $as_ty:ty = $kind:ident;
+        $($rest:tt)*
+    ) => {
+        impl_ndt!(@single
+            $head :: $( $tail )::+ < $( $specta_generic ),* >
+            < $impl_generic, $( const $const_generic : $const_ty ),* >
+            $( where { $($bounds)* } )?
+            as $as_ty = $kind
+        );
+        impl_ndt!($($rest)*);
+    };
+    (
+        $head:ident :: $( $tail:ident )::+ < $( const $const_generic:ident : $const_ty:ty ),+ $(,)? >
+        $( where { $($bounds:tt)* } )?
+        as $as_ty:ty = $kind:ident;
+        $($rest:tt)*
+    ) => {
+        impl_ndt!(@single
+            $head :: $( $tail )::+ < $( const $const_generic : $const_ty ),* >
+            $( where { $($bounds)* } )?
+            as $as_ty = $kind
+        );
+        impl_ndt!($($rest)*);
+    };
+    (
+        $head:ident :: $( $tail:ident )::+ < $impl_generic:ident, $( const $const_generic:ident : $const_ty:ty ),+ $(,)? >
+        $( where { $($bounds:tt)* } )?
+        as $as_ty:ty = $kind:ident;
+        $($rest:tt)*
+    ) => {
+        impl_ndt!(@single
+            $head :: $( $tail )::+ < $impl_generic, $( const $const_generic : $const_ty ),* >
+            $( where { $($bounds)* } )?
+            as $as_ty = $kind
+        );
+        impl_ndt!($($rest)*);
+    };
     (
         $(
             $head:ident :: $( $tail:ident )::+
@@ -194,6 +248,24 @@ macro_rules! _impl_ndt {
     };
 
     // Single type
+    (@single $head:ident :: $( $tail:ident )::+ < $( $specta_generic:ident ),* $(,)? > < $impl_generic:ident, $( const $const_generic:ident : $const_ty:ty ),+ $(,)? > $( where { $($bounds:tt)* } )? as $as_ty:ty = inline) => {
+        impl_ndt!(true, false [$( $specta_generic ),*] [$impl_generic, $( const $const_generic : $const_ty, )*] [$head :: $( $tail )::+] [< $( $specta_generic ),* >] [< $impl_generic, $( $const_generic ),* >] $( where { $($bounds)* } )? as $as_ty);
+    };
+    (@single $head:ident :: $( $tail:ident )::+ < $( $specta_generic:ident ),* $(,)? > < $impl_generic:ident, $( const $const_generic:ident : $const_ty:ty ),+ $(,)? > $( where { $($bounds:tt)* } )? as $as_ty:ty = inline_passthrough) => {
+        impl_ndt!(true, true [$( $specta_generic ),*] [$impl_generic, $( const $const_generic : $const_ty, )*] [$head :: $( $tail )::+] [< $( $specta_generic ),* >] [< $impl_generic, $( $const_generic ),* >] $( where { $($bounds)* } )? as $as_ty);
+    };
+    (@single $head:ident :: $( $tail:ident )::+ < $( const $const_generic:ident : $const_ty:ty ),+ $(,)? > $( where { $($bounds:tt)* } )? as $as_ty:ty = inline) => {
+        impl_ndt!(true, false [] [$( const $const_generic : $const_ty, )*] [$head :: $( $tail )::+] [] [< $( $const_generic ),* >] $( where { $($bounds)* } )? as $as_ty);
+    };
+    (@single $head:ident :: $( $tail:ident )::+ < $( const $const_generic:ident : $const_ty:ty ),+ $(,)? > $( where { $($bounds:tt)* } )? as $as_ty:ty = inline_passthrough) => {
+        impl_ndt!(true, true [] [$( const $const_generic : $const_ty, )*] [$head :: $( $tail )::+] [] [< $( $const_generic ),* >] $( where { $($bounds)* } )? as $as_ty);
+    };
+    (@single $head:ident :: $( $tail:ident )::+ < $impl_generic:ident, $( const $const_generic:ident : $const_ty:ty ),+ $(,)? > $( where { $($bounds:tt)* } )? as $as_ty:ty = inline) => {
+        impl_ndt!(true, false [$impl_generic] [$impl_generic, $( const $const_generic : $const_ty, )*] [$head :: $( $tail )::+] [< $impl_generic >] [< $impl_generic, $( $const_generic ),* >] $( where { $($bounds)* } )? as $as_ty);
+    };
+    (@single $head:ident :: $( $tail:ident )::+ < $impl_generic:ident, $( const $const_generic:ident : $const_ty:ty ),+ $(,)? > $( where { $($bounds:tt)* } )? as $as_ty:ty = inline_passthrough) => {
+        impl_ndt!(true, true [$impl_generic] [$impl_generic, $( const $const_generic : $const_ty, )*] [$head :: $( $tail )::+] [< $impl_generic >] [< $impl_generic, $( $const_generic ),* >] $( where { $($bounds)* } )? as $as_ty);
+    };
     (@single $head:ident :: $( $tail:ident )::+ $(< $( $lifetime:lifetime, )* $( $generic:ident ),* $(,)? >)? $( where { $($bounds:tt)* } )? as $as_ty:ty = inline) => {
         impl_ndt!(true, false $head :: $( $tail )::+ $(< $( $lifetime, )* $( $generic ),* >)? $( where { $($bounds)* } )? as $as_ty);
     };
@@ -257,6 +329,63 @@ macro_rules! _impl_ndt {
                                     }
                                 }
                             )*)?
+                            ndt.ty = Some(<$as_ty as Type>::definition(types));
+                        }
+                    },
+                    |types| <$as_ty as Type>::definition(types),
+                ))
+            }
+        }
+    };
+
+    // Base implementation for types with const generics. Const generics are part of the Rust
+    // implementation but not Specta generic definitions.
+    ($inline:literal, $container:literal [$($generic:ident),*] [$($impl_generics:tt)*] [$($ty:tt)*] [$($specta_generics:tt)*] [$($ty_generics:tt)*] $( where { $($bounds:tt)* } )? as $as_ty:ty) => {
+        impl<$($impl_generics)*> Type for $($ty)* $($ty_generics)*
+        where
+            $($generic: Type,)*
+            $($($bounds)*)?
+        {
+            fn definition(types: &mut Types) -> DataType {
+                static SENTINEL: &str = stringify!($($ty)* $($ty_generics)*);
+                static GENERICS: &[datatype::GenericDefinition] = &[
+                    $(
+                        datatype::GenericDefinition::new(
+                            ::std::borrow::Cow::Borrowed(stringify!($generic)),
+                            None,
+                        ),
+                    )*
+                ];
+                DataType::Reference(datatype::NamedDataType::init_with_sentinel(
+                    SENTINEL,
+                    GENERICS,
+                    &[
+                        $(
+                            (
+                                datatype::Generic::new(::std::borrow::Cow::Borrowed(stringify!($generic))),
+                                <$generic as Type>::definition(types),
+                            ),
+                        )*
+                    ],
+                    false,
+                    $inline,
+                    $container,
+                    types,
+                    |types, ndt| {
+                        ndt.name = ::std::borrow::Cow::Borrowed(impl_ndt!(@type_name $($ty)* $($specta_generics)*));
+                        ndt.module_path = ::std::borrow::Cow::Borrowed(impl_ndt!(@module_path $($ty)*));
+                        if !$inline {
+                            $(
+                                #[allow(dead_code)]
+                                pub(crate) struct $generic;
+                                impl Type for $generic {
+                                    fn definition(_: &mut Types) -> DataType {
+                                        datatype::Generic::new(
+                                            ::std::borrow::Cow::Borrowed(stringify!($generic))
+                                        ).into()
+                                    }
+                                }
+                            )*
                             ndt.ty = Some(<$as_ty as Type>::definition(types));
                         }
                     },
