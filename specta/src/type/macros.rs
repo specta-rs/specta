@@ -425,14 +425,71 @@ macro_rules! _impl_ndt {
         impl_ndt!(false, false $head :: $( $tail )::+ $(< $( $lifetime, )* $( $generic ),* >)? $( where { $($bounds)* } )? as $as_ty);
     };
 
-    // Base implementation
-    ($inline:literal, $container:literal $head:ident :: $( $tail:ident )::+ $(< $( $lifetime:lifetime, )* $( $generic:ident ),* $(,)? >)? $( where { $($bounds:tt)* } )? as $as_ty:ty) => {
+    // Base implementation. Providing a where clause opts out of automatic Type bounds so
+    // callers can use non-Specta impl generics.
+    ($inline:literal, $container:literal $head:ident :: $( $tail:ident )::+ $(< $( $lifetime:lifetime, )* $( $generic:ident ),* $(,)? >)? where { $($bounds:tt)* } as $as_ty:ty) => {
+        impl<$( $( $lifetime, )* $( $generic ),* )?> Type for $head :: $( $tail )::+ $(< $( $lifetime, )* $( $generic ),* >)?
+        where
+            $($bounds)*
+        {
+            fn definition(types: &mut Types) -> DataType {
+                static SENTINEL: &str = stringify!($head::$( $tail )::+ $(< $( $generic ),* >)?);
+                static GENERICS: &[datatype::GenericDefinition] = &[
+                    $($(
+                        datatype::GenericDefinition::new(
+                            ::std::borrow::Cow::Borrowed(stringify!($generic)),
+                            None,
+                        ),
+                    )*)?
+                ];
+                DataType::Reference(datatype::NamedDataType::init_with_sentinel(
+                    SENTINEL,
+                    GENERICS,
+                    &[
+                        $($(
+                            (
+                                datatype::Generic::new(::std::borrow::Cow::Borrowed(stringify!($generic))),
+                                <$generic as Type>::definition(types),
+                            ),
+                        )*)?
+                    ],
+                    false,
+                    $inline,
+                    $container,
+                    types,
+                    |types, ndt| {
+                        ndt.name = ::std::borrow::Cow::Borrowed(
+                            impl_ndt!(@type_name $head :: $( $tail )::+ $(< $( $generic ),* >)?)
+                        );
+                        ndt.module_path = ::std::borrow::Cow::Borrowed(
+                            impl_ndt!(@module_path $head :: $( $tail )::+)
+                        );
+                        if !$inline {
+                            $($(
+                                #[allow(dead_code)]
+                                pub(crate) struct $generic;
+                                impl Type for $generic {
+                                    fn definition(_: &mut Types) -> DataType {
+                                        datatype::Generic::new(
+                                            ::std::borrow::Cow::Borrowed(stringify!($generic))
+                                        ).into()
+                                    }
+                                }
+                            )*)?
+                            ndt.ty = Some(<$as_ty as Type>::definition(types));
+                        }
+                    },
+                    |types| <$as_ty as Type>::definition(types),
+                ))
+            }
+        }
+    };
+    ($inline:literal, $container:literal $head:ident :: $( $tail:ident )::+ $(< $( $lifetime:lifetime, )* $( $generic:ident ),* $(,)? >)? as $as_ty:ty) => {
         impl<$( $( $lifetime, )* $( $generic ),* )?> Type for $head :: $( $tail )::+ $(< $( $lifetime, )* $( $generic ),* >)?
         where
             $(
                 $( $generic: Type, )*
             )?
-            $($($bounds)*)?
         {
             fn definition(types: &mut Types) -> DataType {
                 static SENTINEL: &str = stringify!($head::$( $tail )::+ $(< $( $generic ),* >)?);
@@ -489,11 +546,63 @@ macro_rules! _impl_ndt {
 
     // Base implementation for types with const generics. Const generics are part of the Rust
     // implementation but not Specta generic definitions.
-    ($inline:literal, $container:literal [$($generic:ident),*] [$($impl_generics:tt)*] [$($ty:tt)*] [$($specta_generics:tt)*] [$($ty_generics:tt)*] $( where { $($bounds:tt)* } )? as $as_ty:ty) => {
+    ($inline:literal, $container:literal [$($generic:ident),*] [$($impl_generics:tt)*] [$($ty:tt)*] [$($specta_generics:tt)*] [$($ty_generics:tt)*] where { $($bounds:tt)* } as $as_ty:ty) => {
+        impl<$($impl_generics)*> Type for $($ty)* $($ty_generics)*
+        where
+            $($bounds)*
+        {
+            fn definition(types: &mut Types) -> DataType {
+                static SENTINEL: &str = stringify!($($ty)* $($ty_generics)*);
+                static GENERICS: &[datatype::GenericDefinition] = &[
+                    $(
+                        datatype::GenericDefinition::new(
+                            ::std::borrow::Cow::Borrowed(stringify!($generic)),
+                            None,
+                        ),
+                    )*
+                ];
+                DataType::Reference(datatype::NamedDataType::init_with_sentinel(
+                    SENTINEL,
+                    GENERICS,
+                    &[
+                        $(
+                            (
+                                datatype::Generic::new(::std::borrow::Cow::Borrowed(stringify!($generic))),
+                                <$generic as Type>::definition(types),
+                            ),
+                        )*
+                    ],
+                    false,
+                    $inline,
+                    $container,
+                    types,
+                    |types, ndt| {
+                        ndt.name = ::std::borrow::Cow::Borrowed(impl_ndt!(@type_name $($ty)* $($specta_generics)*));
+                        ndt.module_path = ::std::borrow::Cow::Borrowed(impl_ndt!(@module_path $($ty)*));
+                        if !$inline {
+                            $(
+                                #[allow(dead_code)]
+                                pub(crate) struct $generic;
+                                impl Type for $generic {
+                                    fn definition(_: &mut Types) -> DataType {
+                                        datatype::Generic::new(
+                                            ::std::borrow::Cow::Borrowed(stringify!($generic))
+                                        ).into()
+                                    }
+                                }
+                            )*
+                            ndt.ty = Some(<$as_ty as Type>::definition(types));
+                        }
+                    },
+                    |types| <$as_ty as Type>::definition(types),
+                ))
+            }
+        }
+    };
+    ($inline:literal, $container:literal [$($generic:ident),*] [$($impl_generics:tt)*] [$($ty:tt)*] [$($specta_generics:tt)*] [$($ty_generics:tt)*] as $as_ty:ty) => {
         impl<$($impl_generics)*> Type for $($ty)* $($ty_generics)*
         where
             $($generic: Type,)*
-            $($($bounds)*)?
         {
             fn definition(types: &mut Types) -> DataType {
                 static SENTINEL: &str = stringify!($($ty)* $($ty_generics)*);

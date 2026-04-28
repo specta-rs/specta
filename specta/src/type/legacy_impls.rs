@@ -26,8 +26,8 @@ impl_ndt!(
 #[cfg(feature = "ordered-float")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ordered-float")))]
 impl_ndt!(
-    ordered_float::OrderedFloat<T> where { T: ordered_float::FloatCore } as T = inline;
-    ordered_float::NotNan<T> where { T: ordered_float::FloatCore } as T = inline;
+    ordered_float::OrderedFloat<T> where { T: Type + ordered_float::FloatCore } as T = inline;
+    ordered_float::NotNan<T> where { T: Type + ordered_float::FloatCore } as T = inline;
 );
 
 #[cfg(feature = "heapless")]
@@ -366,8 +366,8 @@ const _: () = {
         chrono::Local as str = inline;
         chrono::Weekday as str = inline;
         chrono::Month as str = inline;
-        chrono::Date<T> where { T: chrono::TimeZone } as str = inline;
-        chrono::DateTime<T> where { T: chrono::TimeZone } as str = inline;
+        chrono::Date<T> where { T: Type + chrono::TimeZone } as str = inline;
+        chrono::DateTime<T> where { T: Type + chrono::TimeZone } as str = inline;
     );
 };
 
@@ -902,7 +902,7 @@ const _: () = {
 #[cfg_attr(docsrs, doc(cfg(feature = "error-stack")))]
 const _: () = {
     impl_ndt!(
-        error_stack::Report <C> where { C: std::error::Error + Send + Sync + 'static } as ErrorStackReport = inline;
+        error_stack::Report<C> where { C: std::error::Error + Send + Sync + 'static } as ErrorStackReport;
     );
 
     //     impl<C: std::error::Error + Send + Sync + 'static> Type for error_stack::Report<C> {
