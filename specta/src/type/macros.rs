@@ -31,19 +31,6 @@ macro_rules! _impl_ndt {
 
     // Multiple types
     (
-        $head:ident :: $( $tail:ident )::+ < $( $impl_generic:ident ),* $(,)? > <>
-        $( where { $($bounds:tt)* } )?
-        as $as_ty:ty = $kind:ident;
-        $($rest:tt)*
-    ) => {
-        impl_ndt!(@single
-            $head :: $( $tail )::+ < $( $impl_generic ),* > <>
-            $( where { $($bounds)* } )?
-            as $as_ty = $kind
-        );
-        impl_ndt!($($rest)*);
-    };
-    (
         $head:ident :: $( $tail:ident )::+ < $( $specta_generic:ident ),* $(,)? >
         < $first_impl_generic:ident, $second_impl_generic:ident, $third_impl_generic:ident, $( const $const_generic:ident : $const_ty:ty ),+ $(,)? >
         $( where { $($bounds:tt)* } )?
@@ -161,15 +148,6 @@ macro_rules! _impl_ndt {
     };
 
     // Single type
-    (@single $head:ident :: $( $tail:ident )::+ < $( $impl_generic:ident ),* $(,)? > <> $( where { $($bounds:tt)* } )? as $as_ty:ty = inline) => {
-        impl_ndt!(true, false [] [$( $impl_generic, )*] [$head :: $( $tail )::+] [] [< $( $impl_generic ),* >] $( where { $($bounds)* } )? as $as_ty);
-    };
-    (@single $head:ident :: $( $tail:ident )::+ < $( $impl_generic:ident ),* $(,)? > <> $( where { $($bounds:tt)* } )? as $as_ty:ty = inline_passthrough) => {
-        impl_ndt!(true, true [] [$( $impl_generic, )*] [$head :: $( $tail )::+] [] [< $( $impl_generic ),* >] $( where { $($bounds)* } )? as $as_ty);
-    };
-    (@single $head:ident :: $( $tail:ident )::+ < $( $impl_generic:ident ),* $(,)? > <> $( where { $($bounds:tt)* } )? as $as_ty:ty = named) => {
-        impl_ndt!(false, false [] [$( $impl_generic, )*] [$head :: $( $tail )::+] [] [< $( $impl_generic ),* >] $( where { $($bounds)* } )? as $as_ty);
-    };
     (@single $head:ident :: $( $tail:ident )::+ < $( $specta_generic:ident ),* $(,)? > < $first_impl_generic:ident, $second_impl_generic:ident, $third_impl_generic:ident, $( const $const_generic:ident : $const_ty:ty ),+ $(,)? > $( where { $($bounds:tt)* } )? as $as_ty:ty = inline) => {
         impl_ndt!(true, false [$( $specta_generic ),*] [$first_impl_generic, $second_impl_generic, $third_impl_generic, $( const $const_generic : $const_ty, )*] [$head :: $( $tail )::+] [< $( $specta_generic ),* >] [< $first_impl_generic, $second_impl_generic, $third_impl_generic, $( $const_generic ),* >] $( where { $($bounds)* } )? as $as_ty);
     };

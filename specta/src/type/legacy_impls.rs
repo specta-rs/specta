@@ -902,114 +902,38 @@ const _: () = {
 #[cfg_attr(docsrs, doc(cfg(feature = "error-stack")))]
 const _: () = {
     impl_ndt!(
-        error_stack::Report<C> <> where { C: std::error::Error + Send + Sync + 'static } as ErrorStackReport = inline;
+        ErrorStackContext as ErrorStackContextInner = named;
+        error_stack::Report<C> where { C: std::error::Error + Send + Sync + 'static } as ReportInner = named;
     );
 
-    //     impl<C: std::error::Error + Send + Sync + 'static> Type for error_stack::Report<C> {
-    //         fn definition(types: &mut Types) -> DataType {
-    //             report_definition(types)
-    //         }
-    //     }
     impl<C: std::error::Error + Send + Sync + 'static> Type for error_stack::Report<[C]> {
         fn definition(types: &mut Types) -> DataType {
             error_stack::Report::<C>::definition(types)
         }
     }
 
-    // impl<
+    struct ErrorStackContext;
 
-    struct ErrorStackReport;
-    impl Type for ErrorStackReport {
+    struct ErrorStackContextInner;
+    impl Type for ErrorStackContextInner {
         fn definition(types: &mut Types) -> DataType {
-            // DataType::List(List::new(ErrorStackContext::definition(types)))
-            todo!();
+            let attachments = DataType::List(List::new(String::definition(types)));
+            let sources = DataType::List(List::new(ErrorStackContext::definition(types)));
+
+            Struct::named()
+                .field("context", Field::new(String::definition(types)))
+                .field("attachments", Field::new(attachments))
+                .field("sources", Field::new(sources))
+                .build()
         }
     }
 
-    // struct ErrorStackContext;
-    // impl Type for ErrorStackContext {
-    //     fn definition(types: &mut Types) -> DataType {
-    //         Struct::named()
-    //             .field("context", Field::new(str::definition(types)))
-    //             .field(
-    //                 "attachments",
-    //                 Field::new(DataType::List(List::new(str::definition(types)))),
-    //             )
-    //             .field(
-    //                 "sources",
-    //                 Field::new(DataType::List(List::new(ErrorStackContext::definition(
-    //                     types,
-    //                 )))),
-    //             )
-    //             .build()
-    //     }
-    // }
-
-    //     struct ErrorStackContext;
-    //     impl Type for ErrorStackContext {
-    //         fn definition(types: &mut Types) -> DataType {
-    //             static SENTINEL: &str = "error_stack::ErrorStackContext";
-    //             static GENERICS: &[datatype::GenericDefinition] = &[];
-    //             DataType::Reference(datatype::NamedDataType::init_with_sentinel(
-    //                 SENTINEL,
-    //                 GENERICS,
-    //                 &[],
-    //                 false,
-    //                 false,
-    //                 false,
-    //                 types,
-    //                 |types, ndt| {
-    //                     ndt.name = ::std::borrow::Cow::Borrowed("ErrorStackContext");
-    //                     ndt.module_path = ::std::borrow::Cow::Borrowed("error_stack");
-    //                     let attachments = DataType::List(List::new(str::definition(types)));
-    //                     let sources = DataType::List(List::new(ErrorStackContext::definition(types)));
-    //                     ndt.ty = Some(
-    //                         Struct::named()
-    //                             .field("context", Field::new(str::definition(types)))
-    //                             .field("attachments", Field::new(attachments))
-    //                             .field("sources", Field::new(sources))
-    //                             .build(),
-    //                     );
-    //                 },
-    //                 |types| {
-    //                     Struct::named()
-    //                         .field("context", Field::new(str::definition(types)))
-    //                         .field(
-    //                             "attachments",
-    //                             Field::new(DataType::List(List::new(str::definition(types)))),
-    //                         )
-    //                         .field(
-    //                             "sources",
-    //                             Field::new(DataType::List(List::new(ErrorStackContext::definition(
-    //                                 types,
-    //                             )))),
-    //                         )
-    //                         .build()
-    //                 },
-    //             ))
-    //         }
-    //     }
-    //     fn report_definition(types: &mut Types) -> DataType {
-    //         static SENTINEL: &str = "error_stack::Report";
-    //         static GENERICS: &[datatype::GenericDefinition] = &[];
-    //         DataType::Reference(datatype::NamedDataType::init_with_sentinel(
-    //             SENTINEL,
-    //             GENERICS,
-    //             &[],
-    //             false,
-    //             false,
-    //             false,
-    //             types,
-    //             |types, ndt| {
-    //                 ndt.name = ::std::borrow::Cow::Borrowed("Report");
-    //                 ndt.module_path = ::std::borrow::Cow::Borrowed("error_stack");
-    //                 ndt.ty = Some(DataType::List(List::new(ErrorStackContext::definition(
-    //                     types,
-    //                 ))));
-    //             },
-    //             |types| DataType::List(List::new(ErrorStackContext::definition(types))),
-    //         ))
-    //     }
+    struct ReportInner;
+    impl Type for ReportInner {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::List(List::new(ErrorStackContext::definition(types)))
+        }
+    }
 };
 
 // #[cfg(feature = "bevy_ecs")]
