@@ -938,152 +938,561 @@ const _: () = {
 
 #[cfg(feature = "bevy_ecs")]
 #[cfg_attr(docsrs, doc(cfg(feature = "bevy_ecs")))]
-impl_ndt!(
-    bevy_ecs::entity::Entity as u64 = inline;
-    bevy_ecs::name::Name as str = inline;
-);
+const _: () = {
+    impl_ndt!(
+        bevy_ecs::entity::Entity as u64 = named;
+        bevy_ecs::name::Name as str = named;
+        bevy_ecs::hierarchy::ChildOf as bevy_ecs::entity::Entity = named;
+        bevy_ecs::entity::EntityHashMap<V> where { V: Type } as PrimitiveMap<bevy_ecs::entity::Entity, V> = named;
+        bevy_ecs::entity::EntityHashSet as PrimitiveSet<bevy_ecs::entity::Entity> = named;
+        bevy_ecs::entity::EntityIndexMap<V> where { V: Type } as PrimitiveMap<bevy_ecs::entity::Entity, V> = named;
+        bevy_ecs::entity::EntityIndexSet as PrimitiveSet<bevy_ecs::entity::Entity> = named;
+    );
+};
 
 #[cfg(feature = "bevy_input")]
 #[cfg_attr(docsrs, doc(cfg(feature = "bevy_input")))]
 const _: () = {
-    // Reduced KeyCode and Key to str to avoid redefining a quite large enum (for now)
-    // impl_ndt!(
-    //     bevy_input::keyboard::KeyCode as str
-    //     bevy_input::keyboard::Key as str
-    // );
+    impl_ndt!(
+        bevy_input::ButtonState as BevyButtonState = named;
+        bevy_input::keyboard::KeyboardInput as BevyKeyboardInput = named;
+        bevy_input::keyboard::KeyboardFocusLost as BevyKeyboardFocusLost = named;
+        bevy_input::keyboard::NativeKeyCode as str = named;
+        bevy_input::keyboard::KeyCode as str = named;
+        bevy_input::keyboard::NativeKey as str = named;
+        bevy_input::keyboard::Key as str = named;
+        bevy_input::mouse::MouseButtonInput as BevyMouseButtonInput = named;
+        bevy_input::mouse::MouseButton as BevyMouseButton = named;
+        bevy_input::mouse::MouseMotion as BevyMouseMotion = named;
+        bevy_input::mouse::MouseScrollUnit as BevyMouseScrollUnit = named;
+        bevy_input::mouse::MouseWheel as BevyMouseWheel = named;
+        bevy_input::mouse::AccumulatedMouseMotion as BevyAccumulatedMouseMotion = named;
+        bevy_input::mouse::AccumulatedMouseScroll as BevyAccumulatedMouseScroll = named;
+        bevy_input::touch::TouchInput as BevyTouchInput = named;
+        bevy_input::touch::ForceTouch as BevyForceTouch = named;
+        bevy_input::touch::TouchPhase as BevyTouchPhase = named;
+        bevy_input::gestures::PinchGesture as f32 = named;
+        bevy_input::gestures::RotationGesture as f32 = named;
+        bevy_input::gestures::DoubleTapGesture as BevyDoubleTapGesture = named;
+        bevy_input::gestures::PanGesture as [f32; 2] = named;
+        bevy_input::gamepad::GamepadEvent as BevyGamepadEvent = named;
+        bevy_input::gamepad::RawGamepadEvent as BevyRawGamepadEvent = named;
+        bevy_input::gamepad::RawGamepadButtonChangedEvent as BevyRawGamepadButtonChangedEvent = named;
+        bevy_input::gamepad::RawGamepadAxisChangedEvent as BevyRawGamepadAxisChangedEvent = named;
+        bevy_input::gamepad::GamepadConnectionEvent as BevyGamepadConnectionEvent = named;
+        bevy_input::gamepad::GamepadButtonStateChangedEvent as BevyGamepadButtonStateChangedEvent = named;
+        bevy_input::gamepad::GamepadButtonChangedEvent as BevyGamepadButtonChangedEvent = named;
+        bevy_input::gamepad::GamepadAxisChangedEvent as BevyGamepadAxisChangedEvent = named;
+        bevy_input::gamepad::GamepadButton as BevyGamepadButton = named;
+        bevy_input::gamepad::GamepadAxis as BevyGamepadAxis = named;
+        bevy_input::gamepad::GamepadConnection as BevyGamepadConnection = named;
+    );
 
-    //     impl_ndt!(
-    //         impl Type for bevy_input::ButtonState {
-    //             inline: true;
-    //             build: |_types, ndt| {
-    //                 ndt.ty = DataType::Enum(Enum {
-    //                     variants: vec![
-    //                         ("Pressed".into(), Variant::unit()),
-    //                         ("Released".into(), Variant::unit()),
-    //                     ],
-    //                     attributes: datatype::Attributes::default(),
-    //                 });
-    //             }
-    //         }
+    struct BevyButtonState;
+    impl Type for BevyButtonState {
+        fn definition(_: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    ("Pressed".into(), Variant::unit()),
+                    ("Released".into(), Variant::unit()),
+                ],
+                attributes: datatype::Attributes::default(),
+            })
+        }
+    }
 
-    //         impl Type for bevy_input::keyboard::KeyboardInput {
-    //             inline: true;
-    //             build: |types, ndt| {
-    //                 ndt.ty = Struct::named()
-    //                     .field(
-    //                         "key_code",
-    //                         Field::new(bevy_input::keyboard::KeyCode::definition(types)),
-    //                     )
-    //                     .field(
-    //                         "logical_key",
-    //                         Field::new(bevy_input::keyboard::Key::definition(types)),
-    //                     )
-    //                     .field(
-    //                         "state",
-    //                         Field::new(bevy_input::ButtonState::definition(types)),
-    //                     )
-    //                     .field(
-    //                         "window",
-    //                         Field::new(bevy_ecs::entity::Entity::definition(types)),
-    //                     )
-    //                     .build();
-    //             }
-    //         }
+    struct BevyKeyboardFocusLost;
+    impl Type for BevyKeyboardFocusLost {
+        fn definition(_: &mut Types) -> DataType {
+            DataType::Struct(Struct {
+                fields: Fields::Unit,
+                attributes: datatype::Attributes::default(),
+            })
+        }
+    }
 
-    //         impl Type for bevy_input::mouse::MouseButtonInput {
-    //             inline: true;
-    //             build: |types, ndt| {
-    //                 ndt.ty = Struct::named()
-    //                     .field(
-    //                         "button",
-    //                         Field::new(bevy_input::mouse::MouseButton::definition(types)),
-    //                     )
-    //                     .field(
-    //                         "state",
-    //                         Field::new(bevy_input::ButtonState::definition(types)),
-    //                     )
-    //                     .field(
-    //                         "window",
-    //                         Field::new(bevy_ecs::entity::Entity::definition(types)),
-    //                     )
-    //                     .build();
-    //             }
-    //         }
+    struct BevyKeyboardInput;
+    impl Type for BevyKeyboardInput {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "key_code",
+                    Field::new(bevy_input::keyboard::KeyCode::definition(types)),
+                )
+                .field(
+                    "logical_key",
+                    Field::new(bevy_input::keyboard::Key::definition(types)),
+                )
+                .field(
+                    "state",
+                    Field::new(bevy_input::ButtonState::definition(types)),
+                )
+                .field(
+                    "text",
+                    Field::new(Option::<smol_str::SmolStr>::definition(types)),
+                )
+                .field("repeat", Field::new(bool::definition(types)))
+                .field(
+                    "window",
+                    Field::new(bevy_ecs::entity::Entity::definition(types)),
+                )
+                .build()
+        }
+    }
 
-    //         impl Type for bevy_input::mouse::MouseButton {
-    //             inline: true;
-    //             build: |types, ndt| {
-    //                 ndt.ty = DataType::Enum(Enum {
-    //                     variants: vec![
-    //                         ("Left".into(), Variant::unit()),
-    //                         ("Right".into(), Variant::unit()),
-    //                         ("Middle".into(), Variant::unit()),
-    //                         ("Back".into(), Variant::unit()),
-    //                         ("Forward".into(), Variant::unit()),
-    //                         (
-    //                             "Other".into(),
-    //                             Variant::unnamed()
-    //                                 .field(Field::new(u16::definition(types)))
-    //                                 .build(),
-    //                         ),
-    //                     ],
-    //                     attributes: datatype::Attributes::default(),
-    //                 });
-    //             }
-    //         }
+    struct BevyMouseButtonInput;
+    impl Type for BevyMouseButtonInput {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "button",
+                    Field::new(bevy_input::mouse::MouseButton::definition(types)),
+                )
+                .field(
+                    "state",
+                    Field::new(bevy_input::ButtonState::definition(types)),
+                )
+                .field(
+                    "window",
+                    Field::new(bevy_ecs::entity::Entity::definition(types)),
+                )
+                .build()
+        }
+    }
 
-    //         impl Type for bevy_input::mouse::MouseWheel {
-    //             inline: true;
-    //             build: |types, ndt| {
-    //                 ndt.ty = Struct::named()
-    //                     .field(
-    //                         "unit",
-    //                         Field::new(bevy_input::mouse::MouseScrollUnit::definition(types)),
-    //                     )
-    //                     .field("x", Field::new(f32::definition(types)))
-    //                     .field("y", Field::new(f32::definition(types)))
-    //                     .field(
-    //                         "window",
-    //                         Field::new(bevy_ecs::entity::Entity::definition(types)),
-    //                     )
-    //                     .build();
-    //             }
-    //         }
+    struct BevyMouseButton;
+    impl Type for BevyMouseButton {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    ("Left".into(), Variant::unit()),
+                    ("Right".into(), Variant::unit()),
+                    ("Middle".into(), Variant::unit()),
+                    ("Back".into(), Variant::unit()),
+                    ("Forward".into(), Variant::unit()),
+                    (
+                        "Other".into(),
+                        Variant::unnamed()
+                            .field(Field::new(u16::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: datatype::Attributes::default(),
+            })
+        }
+    }
 
-    //         impl Type for bevy_input::mouse::MouseScrollUnit {
-    //             inline: true;
-    //             build: |_types, ndt| {
-    //                 ndt.ty = DataType::Enum(Enum {
-    //                     variants: vec![
-    //                         ("Line".into(), Variant::unit()),
-    //                         ("Pixel".into(), Variant::unit()),
-    //                     ],
-    //                     attributes: datatype::Attributes::default(),
-    //                 });
-    //             }
-    //         }
+    struct BevyMouseMotion;
+    impl Type for BevyMouseMotion {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("delta", Field::new(<[f32; 2]>::definition(types)))
+                .build()
+        }
+    }
 
-    //         impl Type for bevy_input::mouse::MouseMotion {
-    //             inline: true;
-    //             build: |types, ndt| {
-    //                 ndt.ty = Struct::named()
-    //                     .field("delta", Field::new(glam::Vec2::definition(types)))
-    //                     .build();
-    //             }
-    //         }
-    //     );
+    struct BevyMouseScrollUnit;
+    impl Type for BevyMouseScrollUnit {
+        fn definition(_: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    ("Line".into(), Variant::unit()),
+                    ("Pixel".into(), Variant::unit()),
+                ],
+                attributes: datatype::Attributes::default(),
+            })
+        }
+    }
+
+    struct BevyMouseWheel;
+    impl Type for BevyMouseWheel {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "unit",
+                    Field::new(bevy_input::mouse::MouseScrollUnit::definition(types)),
+                )
+                .field("x", Field::new(f32::definition(types)))
+                .field("y", Field::new(f32::definition(types)))
+                .field(
+                    "window",
+                    Field::new(bevy_ecs::entity::Entity::definition(types)),
+                )
+                .field(
+                    "phase",
+                    Field::new(bevy_input::touch::TouchPhase::definition(types)),
+                )
+                .build()
+        }
+    }
+
+    struct BevyAccumulatedMouseMotion;
+    impl Type for BevyAccumulatedMouseMotion {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("delta", Field::new(<[f32; 2]>::definition(types)))
+                .build()
+        }
+    }
+
+    struct BevyAccumulatedMouseScroll;
+    impl Type for BevyAccumulatedMouseScroll {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "unit",
+                    Field::new(bevy_input::mouse::MouseScrollUnit::definition(types)),
+                )
+                .field("delta", Field::new(<[f32; 2]>::definition(types)))
+                .build()
+        }
+    }
+
+    struct BevyTouchInput;
+    impl Type for BevyTouchInput {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "phase",
+                    Field::new(bevy_input::touch::TouchPhase::definition(types)),
+                )
+                .field("position", Field::new(<[f32; 2]>::definition(types)))
+                .field(
+                    "window",
+                    Field::new(bevy_ecs::entity::Entity::definition(types)),
+                )
+                .field(
+                    "force",
+                    Field::new(Option::<bevy_input::touch::ForceTouch>::definition(types)),
+                )
+                .field("id", Field::new(u64::definition(types)))
+                .build()
+        }
+    }
+
+    struct BevyForceTouch;
+    impl Type for BevyForceTouch {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "Calibrated".into(),
+                        Variant::named()
+                            .field("force", Field::new(f64::definition(types)))
+                            .field("max_possible_force", Field::new(f64::definition(types)))
+                            .field(
+                                "altitude_angle",
+                                Field::new(Option::<f64>::definition(types)),
+                            )
+                            .build(),
+                    ),
+                    (
+                        "Normalized".into(),
+                        Variant::unnamed()
+                            .field(Field::new(f64::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: datatype::Attributes::default(),
+            })
+        }
+    }
+
+    struct BevyTouchPhase;
+    impl Type for BevyTouchPhase {
+        fn definition(_: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    ("Started".into(), Variant::unit()),
+                    ("Moved".into(), Variant::unit()),
+                    ("Ended".into(), Variant::unit()),
+                    ("Canceled".into(), Variant::unit()),
+                ],
+                attributes: datatype::Attributes::default(),
+            })
+        }
+    }
+
+    struct BevyDoubleTapGesture;
+    impl Type for BevyDoubleTapGesture {
+        fn definition(_: &mut Types) -> DataType {
+            DataType::Struct(Struct {
+                fields: Fields::Unit,
+                attributes: datatype::Attributes::default(),
+            })
+        }
+    }
+
+    struct BevyGamepadEvent;
+    impl Type for BevyGamepadEvent {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "Connection".into(),
+                        Variant::unnamed()
+                            .field(Field::new(
+                                bevy_input::gamepad::GamepadConnectionEvent::definition(types),
+                            ))
+                            .build(),
+                    ),
+                    (
+                        "Button".into(),
+                        Variant::unnamed()
+                            .field(Field::new(
+                                bevy_input::gamepad::GamepadButtonChangedEvent::definition(types),
+                            ))
+                            .build(),
+                    ),
+                    (
+                        "Axis".into(),
+                        Variant::unnamed()
+                            .field(Field::new(
+                                bevy_input::gamepad::GamepadAxisChangedEvent::definition(types),
+                            ))
+                            .build(),
+                    ),
+                ],
+                attributes: datatype::Attributes::default(),
+            })
+        }
+    }
+
+    struct BevyRawGamepadEvent;
+    impl Type for BevyRawGamepadEvent {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "Connection".into(),
+                        Variant::unnamed()
+                            .field(Field::new(
+                                bevy_input::gamepad::GamepadConnectionEvent::definition(types),
+                            ))
+                            .build(),
+                    ),
+                    (
+                        "Button".into(),
+                        Variant::unnamed()
+                            .field(Field::new(
+                                bevy_input::gamepad::RawGamepadButtonChangedEvent::definition(
+                                    types,
+                                ),
+                            ))
+                            .build(),
+                    ),
+                    (
+                        "Axis".into(),
+                        Variant::unnamed()
+                            .field(Field::new(
+                                bevy_input::gamepad::RawGamepadAxisChangedEvent::definition(types),
+                            ))
+                            .build(),
+                    ),
+                ],
+                attributes: datatype::Attributes::default(),
+            })
+        }
+    }
+
+    struct BevyRawGamepadButtonChangedEvent;
+    impl Type for BevyRawGamepadButtonChangedEvent {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "gamepad",
+                    Field::new(bevy_ecs::entity::Entity::definition(types)),
+                )
+                .field(
+                    "button",
+                    Field::new(bevy_input::gamepad::GamepadButton::definition(types)),
+                )
+                .field("value", Field::new(f32::definition(types)))
+                .build()
+        }
+    }
+
+    struct BevyRawGamepadAxisChangedEvent;
+    impl Type for BevyRawGamepadAxisChangedEvent {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "gamepad",
+                    Field::new(bevy_ecs::entity::Entity::definition(types)),
+                )
+                .field(
+                    "axis",
+                    Field::new(bevy_input::gamepad::GamepadAxis::definition(types)),
+                )
+                .field("value", Field::new(f32::definition(types)))
+                .build()
+        }
+    }
+
+    struct BevyGamepadConnectionEvent;
+    impl Type for BevyGamepadConnectionEvent {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "gamepad",
+                    Field::new(bevy_ecs::entity::Entity::definition(types)),
+                )
+                .field(
+                    "connection",
+                    Field::new(bevy_input::gamepad::GamepadConnection::definition(types)),
+                )
+                .build()
+        }
+    }
+
+    struct BevyGamepadButtonStateChangedEvent;
+    impl Type for BevyGamepadButtonStateChangedEvent {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "entity",
+                    Field::new(bevy_ecs::entity::Entity::definition(types)),
+                )
+                .field(
+                    "button",
+                    Field::new(bevy_input::gamepad::GamepadButton::definition(types)),
+                )
+                .field(
+                    "state",
+                    Field::new(bevy_input::ButtonState::definition(types)),
+                )
+                .build()
+        }
+    }
+
+    struct BevyGamepadButtonChangedEvent;
+    impl Type for BevyGamepadButtonChangedEvent {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "entity",
+                    Field::new(bevy_ecs::entity::Entity::definition(types)),
+                )
+                .field(
+                    "button",
+                    Field::new(bevy_input::gamepad::GamepadButton::definition(types)),
+                )
+                .field(
+                    "state",
+                    Field::new(bevy_input::ButtonState::definition(types)),
+                )
+                .field("value", Field::new(f32::definition(types)))
+                .build()
+        }
+    }
+
+    struct BevyGamepadAxisChangedEvent;
+    impl Type for BevyGamepadAxisChangedEvent {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "entity",
+                    Field::new(bevy_ecs::entity::Entity::definition(types)),
+                )
+                .field(
+                    "axis",
+                    Field::new(bevy_input::gamepad::GamepadAxis::definition(types)),
+                )
+                .field("value", Field::new(f32::definition(types)))
+                .build()
+        }
+    }
+
+    struct BevyGamepadButton;
+    impl Type for BevyGamepadButton {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    ("South".into(), Variant::unit()),
+                    ("East".into(), Variant::unit()),
+                    ("North".into(), Variant::unit()),
+                    ("West".into(), Variant::unit()),
+                    ("C".into(), Variant::unit()),
+                    ("Z".into(), Variant::unit()),
+                    ("LeftTrigger".into(), Variant::unit()),
+                    ("LeftTrigger2".into(), Variant::unit()),
+                    ("RightTrigger".into(), Variant::unit()),
+                    ("RightTrigger2".into(), Variant::unit()),
+                    ("Select".into(), Variant::unit()),
+                    ("Start".into(), Variant::unit()),
+                    ("Mode".into(), Variant::unit()),
+                    ("LeftThumb".into(), Variant::unit()),
+                    ("RightThumb".into(), Variant::unit()),
+                    ("DPadUp".into(), Variant::unit()),
+                    ("DPadDown".into(), Variant::unit()),
+                    ("DPadLeft".into(), Variant::unit()),
+                    ("DPadRight".into(), Variant::unit()),
+                    (
+                        "Other".into(),
+                        Variant::unnamed()
+                            .field(Field::new(u8::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: datatype::Attributes::default(),
+            })
+        }
+    }
+
+    struct BevyGamepadAxis;
+    impl Type for BevyGamepadAxis {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    ("LeftStickX".into(), Variant::unit()),
+                    ("LeftStickY".into(), Variant::unit()),
+                    ("LeftZ".into(), Variant::unit()),
+                    ("RightStickX".into(), Variant::unit()),
+                    ("RightStickY".into(), Variant::unit()),
+                    ("RightZ".into(), Variant::unit()),
+                    (
+                        "Other".into(),
+                        Variant::unnamed()
+                            .field(Field::new(u8::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes: datatype::Attributes::default(),
+            })
+        }
+    }
+
+    struct BevyGamepadConnection;
+    impl Type for BevyGamepadConnection {
+        fn definition(types: &mut Types) -> DataType {
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "Connected".into(),
+                        Variant::named()
+                            .field("name", Field::new(String::definition(types)))
+                            .field("vendor_id", Field::new(Option::<u16>::definition(types)))
+                            .field("product_id", Field::new(Option::<u16>::definition(types)))
+                            .build(),
+                    ),
+                    ("Disconnected".into(), Variant::unit()),
+                ],
+                attributes: datatype::Attributes::default(),
+            })
+        }
+    }
 };
 
-// #[cfg(feature = "camino")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "camino")))]
-// impl_ndt!(
-//     camino::Utf8Path as str
-//     camino::Utf8PathBuf as str
-// );
+#[cfg(feature = "camino")]
+#[cfg_attr(docsrs, doc(cfg(feature = "camino")))]
+impl_ndt!(
+    camino::Utf8Path as str = inline;
+    camino::Utf8PathBuf as str = inline;
+);
 
-// #[cfg(feature = "geojson")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "geojson")))]
-// impl_ndt!(geojson::Position as [f64]);
+#[cfg(feature = "geojson")]
+#[cfg_attr(docsrs, doc(cfg(feature = "geojson")))]
+impl_ndt!(geojson::Position as [f64] = inline;);
 
 // #[cfg(feature = "geojson")]
 // #[cfg_attr(docsrs, doc(cfg(feature = "geojson")))]
