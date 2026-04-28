@@ -936,147 +936,143 @@ const _: () = {
     }
 };
 
-// #[cfg(feature = "bevy_ecs")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "bevy_ecs")))]
-// impl_ndt!(
-//     impl Type for bevy_ecs::entity::Entity {
-//         inline: true;
-//         build: |types, ndt| {
-//             ndt.ty = Struct::unnamed().field(Field::new(u64::definition(types))).build();
-//         }
-//     }
-// );
+#[cfg(feature = "bevy_ecs")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bevy_ecs")))]
+impl_ndt!(
+    bevy_ecs::entity::Entity as u64 = inline;
+    bevy_ecs::name::Name as str = inline;
+);
 
-// #[cfg(feature = "bevy_input")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "bevy_input")))]
-// const _: () = {
-//     // Reduced KeyCode and Key to str to avoid redefining a quite large enum (for now)
-//     impl_ndt!(
-//         bevy_input::keyboard::KeyCode as str
-//         bevy_input::keyboard::Key as str
-//     );
+#[cfg(feature = "bevy_input")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bevy_input")))]
+const _: () = {
+    // Reduced KeyCode and Key to str to avoid redefining a quite large enum (for now)
+    // impl_ndt!(
+    //     bevy_input::keyboard::KeyCode as str
+    //     bevy_input::keyboard::Key as str
+    // );
 
-//     impl_ndt!(
-//         impl Type for bevy_input::ButtonState {
-//             inline: true;
-//             build: |_types, ndt| {
-//                 ndt.ty = DataType::Enum(Enum {
-//                     variants: vec![
-//                         ("Pressed".into(), Variant::unit()),
-//                         ("Released".into(), Variant::unit()),
-//                     ],
-//                     attributes: datatype::Attributes::default(),
-//                 });
-//             }
-//         }
+    //     impl_ndt!(
+    //         impl Type for bevy_input::ButtonState {
+    //             inline: true;
+    //             build: |_types, ndt| {
+    //                 ndt.ty = DataType::Enum(Enum {
+    //                     variants: vec![
+    //                         ("Pressed".into(), Variant::unit()),
+    //                         ("Released".into(), Variant::unit()),
+    //                     ],
+    //                     attributes: datatype::Attributes::default(),
+    //                 });
+    //             }
+    //         }
 
-//         impl Type for bevy_input::keyboard::KeyboardInput {
-//             inline: true;
-//             build: |types, ndt| {
-//                 ndt.ty = Struct::named()
-//                     .field(
-//                         "key_code",
-//                         Field::new(bevy_input::keyboard::KeyCode::definition(types)),
-//                     )
-//                     .field(
-//                         "logical_key",
-//                         Field::new(bevy_input::keyboard::Key::definition(types)),
-//                     )
-//                     .field(
-//                         "state",
-//                         Field::new(bevy_input::ButtonState::definition(types)),
-//                     )
-//                     .field(
-//                         "window",
-//                         Field::new(bevy_ecs::entity::Entity::definition(types)),
-//                     )
-//                     .build();
-//             }
-//         }
+    //         impl Type for bevy_input::keyboard::KeyboardInput {
+    //             inline: true;
+    //             build: |types, ndt| {
+    //                 ndt.ty = Struct::named()
+    //                     .field(
+    //                         "key_code",
+    //                         Field::new(bevy_input::keyboard::KeyCode::definition(types)),
+    //                     )
+    //                     .field(
+    //                         "logical_key",
+    //                         Field::new(bevy_input::keyboard::Key::definition(types)),
+    //                     )
+    //                     .field(
+    //                         "state",
+    //                         Field::new(bevy_input::ButtonState::definition(types)),
+    //                     )
+    //                     .field(
+    //                         "window",
+    //                         Field::new(bevy_ecs::entity::Entity::definition(types)),
+    //                     )
+    //                     .build();
+    //             }
+    //         }
 
-//         impl Type for bevy_input::mouse::MouseButtonInput {
-//             inline: true;
-//             build: |types, ndt| {
-//                 ndt.ty = Struct::named()
-//                     .field(
-//                         "button",
-//                         Field::new(bevy_input::mouse::MouseButton::definition(types)),
-//                     )
-//                     .field(
-//                         "state",
-//                         Field::new(bevy_input::ButtonState::definition(types)),
-//                     )
-//                     .field(
-//                         "window",
-//                         Field::new(bevy_ecs::entity::Entity::definition(types)),
-//                     )
-//                     .build();
-//             }
-//         }
+    //         impl Type for bevy_input::mouse::MouseButtonInput {
+    //             inline: true;
+    //             build: |types, ndt| {
+    //                 ndt.ty = Struct::named()
+    //                     .field(
+    //                         "button",
+    //                         Field::new(bevy_input::mouse::MouseButton::definition(types)),
+    //                     )
+    //                     .field(
+    //                         "state",
+    //                         Field::new(bevy_input::ButtonState::definition(types)),
+    //                     )
+    //                     .field(
+    //                         "window",
+    //                         Field::new(bevy_ecs::entity::Entity::definition(types)),
+    //                     )
+    //                     .build();
+    //             }
+    //         }
 
-//         impl Type for bevy_input::mouse::MouseButton {
-//             inline: true;
-//             build: |types, ndt| {
-//                 ndt.ty = DataType::Enum(Enum {
-//                     variants: vec![
-//                         ("Left".into(), Variant::unit()),
-//                         ("Right".into(), Variant::unit()),
-//                         ("Middle".into(), Variant::unit()),
-//                         ("Back".into(), Variant::unit()),
-//                         ("Forward".into(), Variant::unit()),
-//                         (
-//                             "Other".into(),
-//                             Variant::unnamed()
-//                                 .field(Field::new(u16::definition(types)))
-//                                 .build(),
-//                         ),
-//                     ],
-//                     attributes: datatype::Attributes::default(),
-//                 });
-//             }
-//         }
+    //         impl Type for bevy_input::mouse::MouseButton {
+    //             inline: true;
+    //             build: |types, ndt| {
+    //                 ndt.ty = DataType::Enum(Enum {
+    //                     variants: vec![
+    //                         ("Left".into(), Variant::unit()),
+    //                         ("Right".into(), Variant::unit()),
+    //                         ("Middle".into(), Variant::unit()),
+    //                         ("Back".into(), Variant::unit()),
+    //                         ("Forward".into(), Variant::unit()),
+    //                         (
+    //                             "Other".into(),
+    //                             Variant::unnamed()
+    //                                 .field(Field::new(u16::definition(types)))
+    //                                 .build(),
+    //                         ),
+    //                     ],
+    //                     attributes: datatype::Attributes::default(),
+    //                 });
+    //             }
+    //         }
 
-//         impl Type for bevy_input::mouse::MouseWheel {
-//             inline: true;
-//             build: |types, ndt| {
-//                 ndt.ty = Struct::named()
-//                     .field(
-//                         "unit",
-//                         Field::new(bevy_input::mouse::MouseScrollUnit::definition(types)),
-//                     )
-//                     .field("x", Field::new(f32::definition(types)))
-//                     .field("y", Field::new(f32::definition(types)))
-//                     .field(
-//                         "window",
-//                         Field::new(bevy_ecs::entity::Entity::definition(types)),
-//                     )
-//                     .build();
-//             }
-//         }
+    //         impl Type for bevy_input::mouse::MouseWheel {
+    //             inline: true;
+    //             build: |types, ndt| {
+    //                 ndt.ty = Struct::named()
+    //                     .field(
+    //                         "unit",
+    //                         Field::new(bevy_input::mouse::MouseScrollUnit::definition(types)),
+    //                     )
+    //                     .field("x", Field::new(f32::definition(types)))
+    //                     .field("y", Field::new(f32::definition(types)))
+    //                     .field(
+    //                         "window",
+    //                         Field::new(bevy_ecs::entity::Entity::definition(types)),
+    //                     )
+    //                     .build();
+    //             }
+    //         }
 
-//         impl Type for bevy_input::mouse::MouseScrollUnit {
-//             inline: true;
-//             build: |_types, ndt| {
-//                 ndt.ty = DataType::Enum(Enum {
-//                     variants: vec![
-//                         ("Line".into(), Variant::unit()),
-//                         ("Pixel".into(), Variant::unit()),
-//                     ],
-//                     attributes: datatype::Attributes::default(),
-//                 });
-//             }
-//         }
+    //         impl Type for bevy_input::mouse::MouseScrollUnit {
+    //             inline: true;
+    //             build: |_types, ndt| {
+    //                 ndt.ty = DataType::Enum(Enum {
+    //                     variants: vec![
+    //                         ("Line".into(), Variant::unit()),
+    //                         ("Pixel".into(), Variant::unit()),
+    //                     ],
+    //                     attributes: datatype::Attributes::default(),
+    //                 });
+    //             }
+    //         }
 
-//         impl Type for bevy_input::mouse::MouseMotion {
-//             inline: true;
-//             build: |types, ndt| {
-//                 ndt.ty = Struct::named()
-//                     .field("delta", Field::new(glam::Vec2::definition(types)))
-//                     .build();
-//             }
-//         }
-//     );
-// };
+    //         impl Type for bevy_input::mouse::MouseMotion {
+    //             inline: true;
+    //             build: |types, ndt| {
+    //                 ndt.ty = Struct::named()
+    //                     .field("delta", Field::new(glam::Vec2::definition(types)))
+    //                     .build();
+    //             }
+    //         }
+    //     );
+};
 
 // #[cfg(feature = "camino")]
 // #[cfg_attr(docsrs, doc(cfg(feature = "camino")))]
