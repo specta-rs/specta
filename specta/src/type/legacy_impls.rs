@@ -902,7 +902,7 @@ const _: () = {
 #[cfg_attr(docsrs, doc(cfg(feature = "error-stack")))]
 const _: () = {
     impl_ndt!(
-        ErrorStackContext as ErrorStackContextInner = named;
+        "error_stack" ErrorStackContext as ErrorStackContextInner = named;
         error_stack::Report<C> where { C: std::error::Error + Send + Sync + 'static } as ReportInner = named;
     );
 
