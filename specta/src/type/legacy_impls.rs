@@ -49,9 +49,9 @@ impl_ndt!(
 #[cfg_attr(docsrs, doc(cfg(feature = "smol_str")))]
 impl_ndt!(smol_str::SmolStr as str = inline);
 
-// #[cfg(feature = "arrayvec")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "arrayvec")))]
-// impl_ndt_as!(arrayvec::ArrayVec<T, const N: usize> as [T; N]);
+#[cfg(feature = "arrayvec")]
+#[cfg_attr(docsrs, doc(cfg(feature = "arrayvec")))]
+impl_ndt_as!(arrayvec::ArrayVec<T> <T, const N: usize> as [T; N]);
 
 // #[cfg(feature = "arrayvec")]
 // #[cfg_attr(docsrs, doc(cfg(feature = "arrayvec")))]
@@ -439,24 +439,59 @@ impl_ndt!(mac_address::MacAddress as str = inline);
 #[cfg_attr(docsrs, doc(cfg(feature = "bson")))]
 const _: () = {
     impl_ndt!(
-        bson::oid::ObjectId as str = inline;
-        bson::Decimal128 as i128 = inline;
-        bson::DateTime as str = inline;
+        bson::oid::ObjectId as BsonObjectId = inline;
+        bson::Decimal128 as BsonDecimal128 = inline;
+        bson::DateTime as BsonDateTime = inline;
         bson::Uuid as str = inline;
         bson::Timestamp as BsonTimestamp = inline;
-        bson::Binary as JsonBinary = inline;
+        bson::Binary as BsonBinary = inline;
         bson::Regex as BsonRegex = inline;
         bson::JavaScriptCodeWithScope as BsonJavaScriptCodeWithScope = inline;
-        bson::Document as MapPrimitive<str, bson::Bson> = inline;
+        bson::DbPointer as BsonDbPointer = inline;
+        bson::Document as PrimitiveMap<String, bson::Bson> = inline;
         bson::Bson as Bson = inline;
     );
+
+    struct BsonObjectId;
+    impl Type for BsonObjectId {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("$oid", Field::new(str::definition(types)))
+                .build()
+        }
+    }
+
+    struct BsonDecimal128;
+    impl Type for BsonDecimal128 {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("$numberDecimal", Field::new(str::definition(types)))
+                .build()
+        }
+    }
+
+    struct BsonDateTime;
+    impl Type for BsonDateTime {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("$date", Field::new(str::definition(types)))
+                .build()
+        }
+    }
 
     struct BsonTimestamp;
     impl Type for BsonTimestamp {
         fn definition(types: &mut Types) -> DataType {
             Struct::named()
-                .field("time", Field::new(u32::definition(types)))
-                .field("increment", Field::new(u32::definition(types)))
+                .field(
+                    "$timestamp",
+                    Field::new(
+                        Struct::named()
+                            .field("t", Field::new(u32::definition(types)))
+                            .field("i", Field::new(u32::definition(types)))
+                            .build(),
+                    ),
+                )
                 .build()
         }
     }
@@ -465,8 +500,15 @@ const _: () = {
     impl Type for BsonBinary {
         fn definition(types: &mut Types) -> DataType {
             Struct::named()
-                .field("subtype", Field::new(str::definition(types)))
-                .field("bytes", Field::new(Vec::<u8>::definition(types)))
+                .field(
+                    "$binary",
+                    Field::new(
+                        Struct::named()
+                            .field("base64", Field::new(str::definition(types)))
+                            .field("subType", Field::new(str::definition(types)))
+                            .build(),
+                    ),
+                )
                 .build()
         }
     }
@@ -475,8 +517,17 @@ const _: () = {
     impl Type for BsonRegex {
         fn definition(types: &mut Types) -> DataType {
             Struct::named()
-                .field("pattern", Field::new(str::definition(types)))
-                .field("options", Field::new(str::definition(types)))
+                .field("$regex", Field::new(str::definition(types)))
+                .field("$options", Field::new(str::definition(types)))
+                .build()
+        }
+    }
+
+    struct BsonJavaScriptCode;
+    impl Type for BsonJavaScriptCode {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field("$code", Field::new(str::definition(types)))
                 .build()
         }
     }
@@ -485,8 +536,25 @@ const _: () = {
     impl Type for BsonJavaScriptCodeWithScope {
         fn definition(types: &mut Types) -> DataType {
             Struct::named()
-                .field("code", Field::new(str::definition(types)))
-                .field("scope", Field::new(bson::Document::definition(types)))
+                .field("$code", Field::new(str::definition(types)))
+                .field("$scope", Field::new(bson::Document::definition(types)))
+                .build()
+        }
+    }
+
+    struct BsonDbPointer;
+    impl Type for BsonDbPointer {
+        fn definition(types: &mut Types) -> DataType {
+            Struct::named()
+                .field(
+                    "$dbPointer",
+                    Field::new(
+                        Struct::named()
+                            .field("$ref", Field::new(str::definition(types)))
+                            .field("$id", Field::new(bson::oid::ObjectId::definition(types)))
+                            .build(),
+                    ),
+                )
                 .build()
         }
     }
@@ -536,7 +604,7 @@ const _: () = {
                     (
                         "JavaScriptCode".into(),
                         Variant::unnamed()
-                            .field(Field::new(str::definition(types)))
+                            .field(Field::new(BsonJavaScriptCode::definition(types)))
                             .build(),
                     ),
                     (
@@ -554,7 +622,7 @@ const _: () = {
                     (
                         "Int64".into(),
                         Variant::unnamed()
-                            .field(Field::new(i64::definition(types)))
+                            .field(Field::new(f64::definition(types)))
                             .build(),
                     ),
                     (
@@ -584,7 +652,11 @@ const _: () = {
                     (
                         "Symbol".into(),
                         Variant::unnamed()
-                            .field(Field::new(str::definition(types)))
+                            .field(Field::new(
+                                Struct::named()
+                                    .field("$symbol", Field::new(str::definition(types)))
+                                    .build(),
+                            ))
                             .build(),
                     ),
                     (
@@ -593,13 +665,40 @@ const _: () = {
                             .field(Field::new(bson::Decimal128::definition(types)))
                             .build(),
                     ),
-                    ("Undefined".into(), Variant::unit()),
-                    ("MaxKey".into(), Variant::unit()),
-                    ("MinKey".into(), Variant::unit()),
+                    (
+                        "Undefined".into(),
+                        Variant::unnamed()
+                            .field(Field::new(
+                                Struct::named()
+                                    .field("$undefined", Field::new(bool::definition(types)))
+                                    .build(),
+                            ))
+                            .build(),
+                    ),
+                    (
+                        "MaxKey".into(),
+                        Variant::unnamed()
+                            .field(Field::new(
+                                Struct::named()
+                                    .field("$maxKey", Field::new(u8::definition(types)))
+                                    .build(),
+                            ))
+                            .build(),
+                    ),
+                    (
+                        "MinKey".into(),
+                        Variant::unnamed()
+                            .field(Field::new(
+                                Struct::named()
+                                    .field("$minKey", Field::new(u8::definition(types)))
+                                    .build(),
+                            ))
+                            .build(),
+                    ),
                     (
                         "DbPointer".into(),
                         Variant::unnamed()
-                            .field(Field::new(str::definition(types)))
+                            .field(Field::new(bson::DbPointer::definition(types)))
                             .build(),
                     ),
                 ],
@@ -826,61 +925,75 @@ const _: () = {
 // #[cfg_attr(docsrs, doc(cfg(feature = "error-stack")))]
 // const _: () = {
 //     struct ErrorStackContext;
-
 //     impl Type for ErrorStackContext {
 //         fn definition(types: &mut Types) -> DataType {
 //             static SENTINEL: &str = "error_stack::ErrorStackContext";
-//             static GENERICS: &[datatype::Generic] = &[];
-
+//             static GENERICS: &[datatype::GenericDefinition] = &[];
 //             DataType::Reference(datatype::NamedDataType::init_with_sentinel(
+//                 SENTINEL,
 //                 GENERICS,
-//                 vec![],
+//                 &[],
+//                 false,
 //                 false,
 //                 false,
 //                 types,
-//                 SENTINEL,
 //                 |types, ndt| {
-//                     ndt.name = Cow::Borrowed("ErrorStackContext");
-//                     ndt.module_path = Cow::Borrowed("error_stack");
-
+//                     ndt.name = ::std::borrow::Cow::Borrowed("ErrorStackContext");
+//                     ndt.module_path = ::std::borrow::Cow::Borrowed("error_stack");
 //                     let attachments = DataType::List(List::new(str::definition(types)));
 //                     let sources = DataType::List(List::new(ErrorStackContext::definition(types)));
-
-//                     ndt.ty = Struct::named()
+//                     ndt.ty = Some(
+//                         Struct::named()
+//                             .field("context", Field::new(str::definition(types)))
+//                             .field("attachments", Field::new(attachments))
+//                             .field("sources", Field::new(sources))
+//                             .build(),
+//                     );
+//                 },
+//                 |types| {
+//                     Struct::named()
 //                         .field("context", Field::new(str::definition(types)))
-//                         .field("attachments", Field::new(attachments))
-//                         .field("sources", Field::new(sources))
-//                         .build();
+//                         .field(
+//                             "attachments",
+//                             Field::new(DataType::List(List::new(str::definition(types)))),
+//                         )
+//                         .field(
+//                             "sources",
+//                             Field::new(DataType::List(List::new(ErrorStackContext::definition(
+//                                 types,
+//                             )))),
+//                         )
+//                         .build()
 //                 },
 //             ))
 //         }
 //     }
-
 //     fn report_definition(types: &mut Types) -> DataType {
 //         static SENTINEL: &str = "error_stack::Report";
-//         static GENERICS: &[datatype::Generic] = &[];
-
+//         static GENERICS: &[datatype::GenericDefinition] = &[];
 //         DataType::Reference(datatype::NamedDataType::init_with_sentinel(
+//             SENTINEL,
 //             GENERICS,
-//             vec![],
+//             &[],
+//             false,
 //             false,
 //             false,
 //             types,
-//             SENTINEL,
 //             |types, ndt| {
-//                 ndt.name = Cow::Borrowed("Report");
-//                 ndt.module_path = Cow::Borrowed("error_stack");
-//                 ndt.ty = DataType::List(List::new(ErrorStackContext::definition(types)));
+//                 ndt.name = ::std::borrow::Cow::Borrowed("Report");
+//                 ndt.module_path = ::std::borrow::Cow::Borrowed("error_stack");
+//                 ndt.ty = Some(DataType::List(List::new(ErrorStackContext::definition(
+//                     types,
+//                 ))));
 //             },
+//             |types| DataType::List(List::new(ErrorStackContext::definition(types))),
 //         ))
 //     }
-
 //     impl<C: std::error::Error + Send + Sync + 'static> Type for error_stack::Report<C> {
 //         fn definition(types: &mut Types) -> DataType {
 //             report_definition(types)
 //         }
 //     }
-
 //     impl<C: std::error::Error + Send + Sync + 'static> Type for error_stack::Report<[C]> {
 //         fn definition(types: &mut Types) -> DataType {
 //             report_definition(types)
