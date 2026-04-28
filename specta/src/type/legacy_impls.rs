@@ -377,9 +377,12 @@ impl_ndt!(
     time::PrimitiveDateTime as str = inline;
     time::OffsetDateTime as str = inline;
     time::Date as str = inline;
+    time::UtcDateTime as str = inline;
     time::Time as str = inline;
     time::Duration as str = inline;
+    time::UtcOffset as str = inline;
     time::Weekday as str = inline;
+    time::Month as str = inline;
 );
 
 #[cfg(feature = "jiff")]
@@ -431,6 +434,8 @@ const _: () = {
         bson::DbPointer as BsonDbPointer = inline;
         bson::Document as PrimitiveMap<String, bson::Bson> = inline;
         bson::Bson as Bson = inline;
+        bson::Utf8Lossy<T> as T = inline_passthrough;
+        bson::RawBsonRef<'a,> as Bson = inline;
     );
 
     struct BsonObjectId;

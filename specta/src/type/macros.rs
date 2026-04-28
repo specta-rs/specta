@@ -362,10 +362,16 @@ macro_rules! _impl_ndt {
     (@type_name $name:ident) => {
         stringify!($name)
     };
-    (@type_name $head:ident :: $( $tail:ident )::+ $(< $( $generic:ident ),* >)?) => {
-        impl_ndt!(@type_name $( $tail )::+ $(< $( $generic ),* >)?)
+    (@type_name $head:ident :: $( $tail:ident )::+ $(< $( $lifetime:lifetime, )* $( $generic:ident ),* $(,)? >)?) => {
+        impl_ndt!(@type_name $( $tail )::+ $(< $( $lifetime, )* $( $generic ),* >)?)
     };
-    (@type_name $name:ident < $generic:ident $(, $rest:ident)* >) => {
+    (@type_name $name:ident < >) => {
+        stringify!($name)
+    };
+    (@type_name $name:ident < $( $lifetime:lifetime, )+ >) => {
+        stringify!($name)
+    };
+    (@type_name $name:ident < $( $lifetime:lifetime, )* $generic:ident $(, $rest:ident)* $(,)? >) => {
         concat!(
             stringify!($name),
             "<",
