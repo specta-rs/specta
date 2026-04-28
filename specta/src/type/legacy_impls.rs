@@ -1492,145 +1492,236 @@ impl_ndt!(
 
 #[cfg(feature = "geojson")]
 #[cfg_attr(docsrs, doc(cfg(feature = "geojson")))]
-impl_ndt!(geojson::Position as [f64] = inline;);
+const _: () = {
+    impl_ndt!(
+        geojson::Position as [f64] = inline;
+        geojson::GeoJson as GeoJson = inline;
+        geojson::GeometryValue as GeoJsonGeometryValue = inline;
+        geojson::Geometry as GeoJsonGeometry = inline;
+        geojson::Feature as GeoJsonFeature = inline;
+        geojson::FeatureCollection as GeoJsonFeatureCollection = inline;
+        geojson::feature::Id as GeoJsonFeatureId = inline;
+    );
 
-// #[cfg(feature = "geojson")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "geojson")))]
-// impl_ndt!(
-//     impl Type for geojson::GeometryValue {
-//         inline: true;
-//         build: |types, ndt| {
-//             ndt.ty = DataType::Enum(Enum {
-//                 variants: vec![
-//                     (
-//                         "Point".into(),
-//                         Variant::unnamed()
-//                             .field(Field::new(geojson::PointType::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "MultiPoint".into(),
-//                         Variant::unnamed()
-//                             .field(Field::new(Vec::<geojson::PointType>::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "LineString".into(),
-//                         Variant::unnamed()
-//                             .field(Field::new(geojson::LineStringType::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "MultiLineString".into(),
-//                         Variant::unnamed()
-//                             .field(Field::new(Vec::<geojson::LineStringType>::definition(
-//                                 types,
-//                             )))
-//                             .build(),
-//                     ),
-//                     (
-//                         "Polygon".into(),
-//                         Variant::unnamed()
-//                             .field(Field::new(geojson::PolygonType::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "MultiPolygon".into(),
-//                         Variant::unnamed()
-//                             .field(Field::new(Vec::<geojson::PolygonType>::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "GeometryCollection".into(),
-//                         Variant::unnamed()
-//                             .field(Field::new(Vec::<geojson::Geometry>::definition(types)))
-//                             .build(),
-//                     ),
-//                 ],
-//                 attributes: datatype::Attributes::default(),
-//             });
-//         }
-//     }
+    struct GeoJson;
+    impl Type for GeoJson {
+        fn definition(types: &mut Types) -> DataType {
+            let mut attributes = datatype::Attributes::default();
+            attributes.insert("serde.untagged", true);
 
-//     impl Type for geojson::Geometry {
-//         inline: true;
-//         build: |types, ndt| {
-//             ndt.ty = Struct::named()
-//                 .field("bbox", Field::new(Option::<geojson::Bbox>::definition(types)))
-//                 .field("value", Field::new(geojson::GeometryValue::definition(types)))
-//                 .field(
-//                     "foreign_members",
-//                     Field::new(Option::<geojson::JsonObject>::definition(types)),
-//                 )
-//                 .build();
-//         }
-//     }
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "Geometry".into(),
+                        Variant::unnamed()
+                            .field(Field::new(geojson::Geometry::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Feature".into(),
+                        Variant::unnamed()
+                            .field(Field::new(geojson::Feature::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "FeatureCollection".into(),
+                        Variant::unnamed()
+                            .field(Field::new(geojson::FeatureCollection::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes,
+            })
+        }
+    }
 
-//     impl Type for geojson::Feature {
-//         inline: true;
-//         build: |types, ndt| {
-//             ndt.ty = Struct::named()
-//                 .field("bbox", Field::new(Option::<geojson::Bbox>::definition(types)))
-//                 .field(
-//                     "geometry",
-//                     Field::new(Option::<geojson::Geometry>::definition(types)),
-//                 )
-//                 .field(
-//                     "id",
-//                     Field::new(Option::<geojson::feature::Id>::definition(types)),
-//                 )
-//                 .field(
-//                     "properties",
-//                     Field::new(Option::<geojson::JsonObject>::definition(types)),
-//                 )
-//                 .field(
-//                     "foreign_members",
-//                     Field::new(Option::<geojson::JsonObject>::definition(types)),
-//                 )
-//                 .build();
-//         }
-//     }
+    struct GeoJsonGeometryValue;
+    impl Type for GeoJsonGeometryValue {
+        fn definition(types: &mut Types) -> DataType {
+            let mut attributes = datatype::Attributes::default();
+            attributes.insert("serde.tag", std::string::String::from("type"));
 
-//     impl Type for geojson::FeatureCollection {
-//         inline: true;
-//         build: |types, ndt| {
-//             ndt.ty = Struct::named()
-//                 .field("bbox", Field::new(Option::<geojson::Bbox>::definition(types)))
-//                 .field(
-//                     "features",
-//                     Field::new(Vec::<geojson::Feature>::definition(types)),
-//                 )
-//                 .field(
-//                     "foreign_members",
-//                     Field::new(Option::<geojson::JsonObject>::definition(types)),
-//                 )
-//                 .build();
-//         }
-//     }
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "Point".into(),
+                        Variant::named()
+                            .field(
+                                "coordinates",
+                                Field::new(geojson::PointType::definition(types)),
+                            )
+                            .build(),
+                    ),
+                    (
+                        "MultiPoint".into(),
+                        Variant::named()
+                            .field(
+                                "coordinates",
+                                Field::new(Vec::<geojson::PointType>::definition(types)),
+                            )
+                            .build(),
+                    ),
+                    (
+                        "LineString".into(),
+                        Variant::named()
+                            .field(
+                                "coordinates",
+                                Field::new(geojson::LineStringType::definition(types)),
+                            )
+                            .build(),
+                    ),
+                    (
+                        "MultiLineString".into(),
+                        Variant::named()
+                            .field(
+                                "coordinates",
+                                Field::new(Vec::<geojson::LineStringType>::definition(types)),
+                            )
+                            .build(),
+                    ),
+                    (
+                        "Polygon".into(),
+                        Variant::named()
+                            .field(
+                                "coordinates",
+                                Field::new(geojson::PolygonType::definition(types)),
+                            )
+                            .build(),
+                    ),
+                    (
+                        "MultiPolygon".into(),
+                        Variant::named()
+                            .field(
+                                "coordinates",
+                                Field::new(Vec::<geojson::PolygonType>::definition(types)),
+                            )
+                            .build(),
+                    ),
+                    (
+                        "GeometryCollection".into(),
+                        Variant::named()
+                            .field(
+                                "geometries",
+                                Field::new(Vec::<geojson::Geometry>::definition(types)),
+                            )
+                            .build(),
+                    ),
+                ],
+                attributes,
+            })
+        }
+    }
 
-//     impl Type for geojson::feature::Id {
-//         inline: true;
-//         build: |types, ndt| {
-//             ndt.ty = DataType::Enum(Enum {
-//                 variants: vec![
-//                     (
-//                         "String".into(),
-//                         Variant::unnamed()
-//                             .field(Field::new(str::definition(types)))
-//                             .build(),
-//                     ),
-//                     (
-//                         "Number".into(),
-//                         Variant::unnamed()
-//                             .field(Field::new(serde_json::Number::definition(types)))
-//                             .build(),
-//                     ),
-//                 ],
-//                 attributes: datatype::Attributes::default(),
-//             });
-//         }
-//     }
-// );
+    struct GeoJsonGeometry;
+    impl Type for GeoJsonGeometry {
+        fn definition(types: &mut Types) -> DataType {
+            let mut value = Field::new(geojson::GeometryValue::definition(types));
+            value.attributes.insert("serde.flatten", true);
+
+            let mut foreign_members = Field::new(Option::<geojson::JsonObject>::definition(types));
+            foreign_members.attributes.insert("serde.flatten", true);
+
+            Struct::named()
+                .field(
+                    "bbox",
+                    Field::new(Option::<geojson::Bbox>::definition(types)),
+                )
+                .field("value", value)
+                .field("foreign_members", foreign_members)
+                .build()
+        }
+    }
+
+    struct GeoJsonFeature;
+    impl Type for GeoJsonFeature {
+        fn definition(types: &mut Types) -> DataType {
+            let mut attributes = datatype::Attributes::default();
+            attributes.insert("serde.tag", std::string::String::from("type"));
+
+            let mut foreign_members = Field::new(Option::<geojson::JsonObject>::definition(types));
+            foreign_members.attributes.insert("serde.flatten", true);
+
+            DataType::Struct(Struct {
+                fields: Fields::Named(NamedFields {
+                    fields: vec![
+                        (
+                            "bbox".into(),
+                            Field::new(Option::<geojson::Bbox>::definition(types)),
+                        ),
+                        (
+                            "geometry".into(),
+                            Field::new(Option::<geojson::Geometry>::definition(types)),
+                        ),
+                        (
+                            "id".into(),
+                            Field::new(Option::<geojson::feature::Id>::definition(types)),
+                        ),
+                        (
+                            "properties".into(),
+                            Field::new(Option::<geojson::JsonObject>::definition(types)),
+                        ),
+                        ("foreign_members".into(), foreign_members),
+                    ],
+                }),
+                attributes,
+            })
+        }
+    }
+
+    struct GeoJsonFeatureCollection;
+    impl Type for GeoJsonFeatureCollection {
+        fn definition(types: &mut Types) -> DataType {
+            let mut attributes = datatype::Attributes::default();
+            attributes.insert("serde.tag", std::string::String::from("type"));
+
+            let mut foreign_members = Field::new(Option::<geojson::JsonObject>::definition(types));
+            foreign_members.attributes.insert("serde.flatten", true);
+
+            DataType::Struct(Struct {
+                fields: Fields::Named(NamedFields {
+                    fields: vec![
+                        (
+                            "bbox".into(),
+                            Field::new(Option::<geojson::Bbox>::definition(types)),
+                        ),
+                        (
+                            "features".into(),
+                            Field::new(Vec::<geojson::Feature>::definition(types)),
+                        ),
+                        ("foreign_members".into(), foreign_members),
+                    ],
+                }),
+                attributes,
+            })
+        }
+    }
+
+    struct GeoJsonFeatureId;
+    impl Type for GeoJsonFeatureId {
+        fn definition(types: &mut Types) -> DataType {
+            let mut attributes = datatype::Attributes::default();
+            attributes.insert("serde.untagged", true);
+
+            DataType::Enum(Enum {
+                variants: vec![
+                    (
+                        "String".into(),
+                        Variant::unnamed()
+                            .field(Field::new(str::definition(types)))
+                            .build(),
+                    ),
+                    (
+                        "Number".into(),
+                        Variant::unnamed()
+                            .field(Field::new(serde_json::Number::definition(types)))
+                            .build(),
+                    ),
+                ],
+                attributes,
+            })
+        }
+    }
+};
 
 // #[cfg(feature = "geozero")]
 // #[cfg_attr(docsrs, doc(cfg(feature = "geozero")))]
