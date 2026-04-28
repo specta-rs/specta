@@ -902,8 +902,21 @@ const _: () = {
 #[cfg_attr(docsrs, doc(cfg(feature = "error-stack")))]
 const _: () = {
     impl_ndt!(
-        error_stack::Report<C> where { C: std::error::Error + Send + Sync + 'static } as ErrorStackReport = inline;
+        error_stack::Report <C> where { C: std::error::Error + Send + Sync + 'static } as ErrorStackReport = inline;
     );
+
+    //     impl<C: std::error::Error + Send + Sync + 'static> Type for error_stack::Report<C> {
+    //         fn definition(types: &mut Types) -> DataType {
+    //             report_definition(types)
+    //         }
+    //     }
+    impl<C: std::error::Error + Send + Sync + 'static> Type for error_stack::Report<[C]> {
+        fn definition(types: &mut Types) -> DataType {
+            error_stack::Report::<C>::definition(types)
+        }
+    }
+
+    // impl<
 
     struct ErrorStackReport;
     impl Type for ErrorStackReport {
@@ -996,16 +1009,6 @@ const _: () = {
     //             },
     //             |types| DataType::List(List::new(ErrorStackContext::definition(types))),
     //         ))
-    //     }
-    //     impl<C: std::error::Error + Send + Sync + 'static> Type for error_stack::Report<C> {
-    //         fn definition(types: &mut Types) -> DataType {
-    //             report_definition(types)
-    //         }
-    //     }
-    //     impl<C: std::error::Error + Send + Sync + 'static> Type for error_stack::Report<[C]> {
-    //         fn definition(types: &mut Types) -> DataType {
-    //             report_definition(types)
-    //         }
     //     }
 };
 
