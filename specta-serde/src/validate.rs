@@ -520,14 +520,16 @@ fn validate_variant_attributes(
         return Ok(());
     };
 
+    let has_type_override = has_type_override(&variant.attributes);
+
     if serde_attrs.has_serialize_with {
-        ensure_codec_override(variant.type_overridden, &path, "serialize_with")?;
+        ensure_codec_override(has_type_override, &path, "serialize_with")?;
     }
     if serde_attrs.has_deserialize_with {
-        ensure_codec_override(variant.type_overridden, &path, "deserialize_with")?;
+        ensure_codec_override(has_type_override, &path, "deserialize_with")?;
     }
     if serde_attrs.has_with {
-        ensure_codec_override(variant.type_overridden, &path, "with")?;
+        ensure_codec_override(has_type_override, &path, "with")?;
     }
 
     if mode == ApplyMode::Unified
@@ -563,14 +565,16 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
         ));
     }
 
+    let has_type_override = has_type_override(&field.attributes);
+
     if serde_attrs.has_serialize_with {
-        ensure_codec_override(field.type_overridden, &path, "serialize_with")?;
+        ensure_codec_override(has_type_override, &path, "serialize_with")?;
     }
     if serde_attrs.has_deserialize_with {
-        ensure_codec_override(field.type_overridden, &path, "deserialize_with")?;
+        ensure_codec_override(has_type_override, &path, "deserialize_with")?;
     }
     if serde_attrs.has_with {
-        ensure_codec_override(field.type_overridden, &path, "with")?;
+        ensure_codec_override(has_type_override, &path, "with")?;
     }
 
     if mode == ApplyMode::Unified && serde_attrs.skip_serializing_if.is_some() {
@@ -584,11 +588,11 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
 }
 
 fn ensure_codec_override(
-    has_type_overridden: bool,
+    has_type_override: bool,
     path: &str,
     attr: &'static str,
 ) -> Result<(), Error> {
-    if has_type_overridden {
+    if has_type_override {
         return Ok(());
     }
 
@@ -596,6 +600,13 @@ fn ensure_codec_override(
         path.to_string(),
         attr,
     ))
+}
+
+fn has_type_override(attributes: &specta::datatype::Attributes) -> bool {
+    attributes
+        .get_named_as::<bool>("specta:inline")
+        .copied()
+        .unwrap_or(false)
 }
 
 fn merged_generics(

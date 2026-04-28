@@ -1038,7 +1038,6 @@ fn skipped_field_marker(field: &Field) -> Field {
     skipped.deprecated = field.deprecated.clone();
     skipped.docs = field.docs.clone();
     skipped.inline = field.inline;
-    skipped.type_overridden = field.type_overridden;
     skipped.attributes = field.attributes.clone();
     skipped
 }
@@ -1708,7 +1707,6 @@ fn clone_variant_with_named_fields(
     transformed.skip = original.skip;
     transformed.docs = original.docs.clone();
     transformed.deprecated = original.deprecated.clone();
-    transformed.type_overridden = original.type_overridden;
     transformed.attributes = original.attributes.clone();
     transformed
 }
@@ -1723,7 +1721,6 @@ fn clone_variant_with_unnamed_fields(original: &Variant, fields: Vec<Field>) -> 
     transformed.skip = original.skip;
     transformed.docs = original.docs.clone();
     transformed.deprecated = original.deprecated.clone();
-    transformed.type_overridden = original.type_overridden;
     transformed.attributes = original.attributes.clone();
     transformed
 }

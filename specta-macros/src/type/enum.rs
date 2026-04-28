@@ -86,13 +86,11 @@ pub fn parse_enum(
             let variant_skip = attrs.skip;
             let variant_inline = attrs.inline;
             let variant_type = attrs.r#type.clone();
-            let variant_type_overridden = variant_type.is_some();
+            let type_overridden = variant_type.is_some();
 
             let variant_value = if let Some(variant_ty) = variant_type {
                 quote!(datatype::Variant::unnamed().field({
-                    let mut field = datatype::Field::new(<#variant_ty as #crate_ref::Type>::definition(types));
-                    field.type_overridden = true;
-                    field
+                    datatype::Field::new(<#variant_ty as #crate_ref::Type>::definition(types))
                 }).build())
             } else {
                 match &variant.fields {
@@ -166,8 +164,10 @@ pub fn parse_enum(
                 v.skip = #skip;
                 v.deprecated = #deprecated;
                 v.docs = #doc.into();
-                v.type_overridden = #variant_type_overridden;
                 v.attributes = #runtime_attrs;
+                if #type_overridden {
+                    v.attributes.insert("specta:inline", true);
+                }
                 v
             })))
         })

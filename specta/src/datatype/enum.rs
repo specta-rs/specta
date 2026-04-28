@@ -42,8 +42,6 @@ pub struct Variant {
     pub fields: Fields,
     /// Runtime attributes for this variant
     pub attributes: Attributes,
-    /// Did the user apply a `#[specta(type = ...)]` or `#[specta(r#type = ...)]` attribute.
-    pub type_overridden: bool,
 }
 
 impl Variant {
@@ -55,7 +53,6 @@ impl Variant {
             deprecated: None,
             fields: Fields::Unit,
             attributes: Attributes::default(),
-            type_overridden: false,
         }
     }
 
@@ -70,7 +67,6 @@ impl Variant {
                     fields: Default::default(),
                 }),
                 attributes: Attributes::default(),
-                type_overridden: false,
             },
             variant: NamedFields { fields: vec![] },
         }
@@ -87,7 +83,6 @@ impl Variant {
                     fields: Default::default(),
                 }),
                 attributes: Attributes::default(),
-                type_overridden: false,
             },
             variant: UnnamedFields {
                 fields: Default::default(),
@@ -131,17 +126,6 @@ impl<T> VariantBuilder<T> {
     /// Set runtime attributes on the variant in-place.
     pub fn attributes_mut(&mut self, attributes: Attributes) {
         self.v.attributes = attributes;
-    }
-
-    /// Set whether the variant has a Specta type override.
-    pub fn type_overridden(mut self, type_overridden: bool) -> Self {
-        self.v.type_overridden = type_overridden;
-        self
-    }
-
-    /// Set whether the variant has a Specta type override in-place.
-    pub fn type_overridden_mut(&mut self, type_overridden: bool) {
-        self.v.type_overridden = type_overridden;
     }
 }
 

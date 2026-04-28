@@ -1512,7 +1512,7 @@ const _: () = {
     impl Type for GeoJson {
         fn definition(types: &mut Types) -> DataType {
             let mut attributes = datatype::Attributes::default();
-            attributes.insert("serde.untagged", true);
+            attributes.insert("serde:container:untagged", true);
 
             DataType::Enum(Enum {
                 variants: vec![
@@ -1544,7 +1544,7 @@ const _: () = {
     impl Type for GeoJsonGeometryValue {
         fn definition(types: &mut Types) -> DataType {
             let mut attributes = datatype::Attributes::default();
-            attributes.insert("serde.tag", std::string::String::from("type"));
+            attributes.insert("serde:container:tag", std::string::String::from("type"));
 
             DataType::Enum(Enum {
                 variants: vec![
@@ -1621,10 +1621,12 @@ const _: () = {
     impl Type for GeoJsonGeometry {
         fn definition(types: &mut Types) -> DataType {
             let mut value = Field::new(geojson::GeometryValue::definition(types));
-            value.attributes.insert("serde.flatten", true);
+            value.attributes.insert("serde:field:flatten", true);
 
             let mut foreign_members = Field::new(Option::<geojson::JsonObject>::definition(types));
-            foreign_members.attributes.insert("serde.flatten", true);
+            foreign_members
+                .attributes
+                .insert("serde:field:flatten", true);
 
             Struct::named()
                 .field(
@@ -1641,10 +1643,12 @@ const _: () = {
     impl Type for GeoJsonFeature {
         fn definition(types: &mut Types) -> DataType {
             let mut attributes = datatype::Attributes::default();
-            attributes.insert("serde.tag", std::string::String::from("type"));
+            attributes.insert("serde:container:tag", std::string::String::from("type"));
 
             let mut foreign_members = Field::new(Option::<geojson::JsonObject>::definition(types));
-            foreign_members.attributes.insert("serde.flatten", true);
+            foreign_members
+                .attributes
+                .insert("serde:field:flatten", true);
 
             DataType::Struct(Struct {
                 fields: Fields::Named(NamedFields {
@@ -1677,10 +1681,12 @@ const _: () = {
     impl Type for GeoJsonFeatureCollection {
         fn definition(types: &mut Types) -> DataType {
             let mut attributes = datatype::Attributes::default();
-            attributes.insert("serde.tag", std::string::String::from("type"));
+            attributes.insert("serde:container:tag", std::string::String::from("type"));
 
             let mut foreign_members = Field::new(Option::<geojson::JsonObject>::definition(types));
-            foreign_members.attributes.insert("serde.flatten", true);
+            foreign_members
+                .attributes
+                .insert("serde:field:flatten", true);
 
             DataType::Struct(Struct {
                 fields: Fields::Named(NamedFields {
@@ -1705,7 +1711,7 @@ const _: () = {
     impl Type for GeoJsonFeatureId {
         fn definition(types: &mut Types) -> DataType {
             let mut attributes = datatype::Attributes::default();
-            attributes.insert("serde.untagged", true);
+            attributes.insert("serde:container:untagged", true);
 
             DataType::Enum(Enum {
                 variants: vec![
