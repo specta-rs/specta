@@ -716,7 +716,15 @@ fn render_flat_types<'a>(
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    primitives::export_internal(s, exporter, types, ndts.into_iter(), indent)?;
+    let mut type_render_stack = Vec::new();
+    primitives::export_internal(
+        s,
+        exporter,
+        types,
+        ndts.into_iter(),
+        indent,
+        &mut type_render_stack,
+    )?;
 
     Ok(exports)
 }
