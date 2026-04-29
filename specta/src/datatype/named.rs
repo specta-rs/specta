@@ -89,27 +89,38 @@ impl NamedDataType {
         ndt
     }
 
-    // TODO: Rewrite this with the new changes
-    /// Initialize a named type using a temporary sentinel as it's identity. The sentinel avoids allocating an ID which is used by `#[derive(Type)]` but is too unsafe as a general public API.
+    /// Initializes a named type using a static sentinel as its identity.
     ///
-    /// WARNING: This should not be used outside of `specta_macros` as it may have breaking changes in minor releases
+    /// This is used by `#[derive(Type)]` and the built-in `Type` implementation macros and must be used carefully.
     ///
-    /// This always returns a [`Reference`] rather than a [`NamedDataType`]. While a type is being
-    /// resolved we insert `None` into [`Types`] for its id. Recursive lookups treat that `None` as
-    /// "currently resolving" and immediately emit a placeholder reference instead of re-entering
-    /// `build_ndt`.
+    /// WARNING: Do not call this outside of `specta` as its signature and behavior may change in minor releases!!!!
     ///
-    /// The canonical [`NamedDataType::inner`] must stay generic enough to be shared by every
-    /// reference to the type. When a particular use-site needs a more specific instantiated shape,
-    /// such as const-generic expansion or a post-processing rewrite, that shape is stored in
-    /// [`NamedDataType::instances`] and the returned [`NamedReference`] stores only the stable
-    /// instance index.
+    /// This registers the canonical [`NamedDataType`] for `sentinel` at most once, then returns a
+    /// use-site [`Reference`]. During first registration, `None` is inserted into [`Types`] before
+    /// `build_ndt` runs so recursive named lookups can observe that the type is already being
+    /// resolved instead of re-entering `build_ndt` (which would stack overflow).
     ///
-    /// `has_const_param` only affects the thread-local resolution context used while building the
-    /// canonical named type. That context intentionally does not become part of the global type
-    /// identity.
-    // This is called for a container inlined type.
-    // This means we know the type is *always* inlined.
+    /// The returned reference depends on the current inline context:
+    ///
+    /// - When not inlining, this returns [`NamedReferenceType::Reference`] with
+    ///   `instantiation_generics` as the concrete generic arguments for this use site.
+    /// - When inlining, this calls `build_ty` and returns [`NamedReferenceType::Inline`] containing
+    ///   the resulting datatype.
+    /// - If inline expansion recursively reaches the same sentinel and generic arguments, this
+    ///   returns [`NamedReferenceType::Recursive`] so exporters can avoid infinite expansion.
+    ///
+    /// `has_const_param` only affects the temporary resolution context used while `build_ndt`
+    /// builds the canonical named type. That context controls implementations such as fixed-size
+    /// arrays, so they intentionally don't become part of the global type identity
+    /// (We don't want one call-sites const generic in the shared datatype on the `NamedDataType`).
+    ///
+    /// `passthrough_inline` is for wrapper/container types whose own definition is inline but whose
+    /// inner type should still see the caller's inline context. When it is `false`, inline expansion
+    /// temporarily clears `Types::should_inline` before calling `build_ty`.
+    ///
+    /// `build_ndt` fills metadata and, for exported named types, `NamedDataType::ty`. `build_ty`
+    /// builds the datatype used by inline references. If `build_ndt` panics, this removes the
+    /// placeholder entry and restores the previous resolution context before resuming the panic.
     #[doc(hidden)]
     #[track_caller]
     pub fn init_with_sentinel(
@@ -226,18 +237,8 @@ impl NamedDataType {
     }
 
     /// Constructs a [`Reference`] to this named datatype.
-    ///
-    /// The returned reference can be embedded in another [`DataType`]. The
-    /// `generics` vector provides concrete datatypes for this named type's
-    /// declared generic parameters.
-    ///
-    /// This reference will be inlined if the type is configured for inline
-    /// export. Otherwise callers can force an inline reference with
-    /// [`Reference::inline`].
+    /// The reference returned by this will error in the language exporter if `Self.ty` is `None` as the type can't generate a named export.
     pub fn reference(&self, generics: Vec<(Generic, DataType)>) -> Reference {
-        // TODO: allow generics to be `Cow`
-        // TODO: HashMap instead of array for better typesafety??
-
         Reference::Named(NamedReference {
             id: self.id.clone(),
             inner: NamedReferenceType::Reference { generics },
