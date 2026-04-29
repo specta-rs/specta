@@ -114,9 +114,11 @@ impl NamedDataType {
     /// arrays, so they intentionally don't become part of the global type identity
     /// (We don't want one call-sites const generic in the shared datatype on the `NamedDataType`).
     ///
-    /// `passthrough_inline` is for wrapper/container types whose own definition is inline but whose
-    /// inner type should still see the caller's inline context. When it is `false`, inline expansion
-    /// temporarily clears `Types::should_inline` before calling `build_ty`.
+    /// `inline` forces this type's own definition to be inlined. `passthrough` is for
+    /// wrapper/container types whose own definition is inline but whose inner type should only see
+    /// the caller's inline context. When passthrough expansion recursively reaches the same wrapper,
+    /// it clears `Types::should_inline` before calling `build_ty` so the inner named type can break
+    /// the cycle with a reference.
     ///
     /// `build_ndt` fills metadata and, for exported named types, `NamedDataType::ty`. `build_ty`
     /// builds the datatype used by inline references. If `build_ndt` panics, this removes the
@@ -127,14 +129,16 @@ impl NamedDataType {
         sentinel: &'static str,
         instantiation_generics: &[(Generic, DataType)],
         has_const_param: bool,
-        passthrough_inline: bool,
+        inline: bool,
+        passthrough: bool,
         types: &mut Types,
         build_ndt: fn(&mut Types, &mut NamedDataType),
         mut build_ty: fn(&mut Types) -> DataType,
     ) -> Reference {
         let id = NamedId::Static(sentinel);
         let location = Location::caller().to_owned();
-        let mut inline = types.should_inline;
+        let caller_inline = types.should_inline;
+        let mut inline = caller_inline || inline || passthrough;
 
         // If we have never encountered this type, register it to type map
         if !types.types.contains_key(&id) {
@@ -200,7 +204,7 @@ impl NamedDataType {
 
             if types.stack.contains(&hash) {
                 // For container inline types we wanna passthrough instead of rejecting on the container.
-                if passthrough_inline {
+                if passthrough {
                     let prev_inline = mem::replace(&mut types.should_inline, false);
                     let result = panic::catch_unwind(AssertUnwindSafe(|| build_ty(types)));
                     types.should_inline = prev_inline;
@@ -225,8 +229,9 @@ impl NamedDataType {
             // naively inline the `Box` instead of `T`.
             //
             // "wrapper" types enable this to properly to passthrough inline to the inner type's resolution.
-            let prev_inline =
-                (!passthrough_inline).then(|| mem::replace(&mut types.should_inline, false));
+            let child_inline = passthrough && caller_inline;
+            let prev_inline = (types.should_inline != child_inline)
+                .then(|| mem::replace(&mut types.should_inline, child_inline));
             types.stack.push(hash);
             let result = panic::catch_unwind(AssertUnwindSafe(|| build_ty(types)));
             if let Some(prev_inline) = prev_inline {
@@ -234,6 +239,7 @@ impl NamedDataType {
             };
             types.stack.pop();
             let dt = match result {
+                Ok(DataType::Reference(reference)) if passthrough && !caller_inline => return reference,
                 Ok(dt) => Box::new(dt),
                 Err(payload) => panic::resume_unwind(payload),
             };

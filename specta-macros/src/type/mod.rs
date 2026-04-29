@@ -390,6 +390,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 &[#(#instantiation_generics),*],
                 #has_const_param,
                 false,
+                false,
                 types,
                 |types, ndt| {
                     ndt.name = Cow::Borrowed(#name);
