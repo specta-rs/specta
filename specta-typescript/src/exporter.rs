@@ -463,9 +463,9 @@ impl Exporter {
 
 fn reference_module_path(types: &Types, r: &NamedReference) -> Result<Option<String>, Error> {
     match &r.inner {
-        NamedReferenceType::Reference { .. } => Ok(types
-            .get(r)
-            .map(|ndt| ndt.module_path.as_ref().to_string())),
+        NamedReferenceType::Reference { .. } => {
+            Ok(types.get(r).map(|ndt| ndt.module_path.as_ref().to_string()))
+        }
         NamedReferenceType::Inline { .. } => Ok(None),
         NamedReferenceType::Recursive => Err(Error::dangling_named_reference(format!(
             "recursive inline named reference {r:?}"
@@ -517,38 +517,36 @@ fn map_datatype_format(
                         Ok::<_, Error>(found || contains_generic_reference(ty)?)
                     })?,
             },
-            DataType::Enum(enm) => enm
-                .variants
-                .iter()
-                .try_fold(false, |found, (_, variant)| {
-                    let variant_found = match &variant.fields {
-                        Fields::Unit => false,
-                        Fields::Unnamed(unnamed) => unnamed
-                            .fields
-                            .iter()
-                            .filter_map(|field| field.ty.as_ref())
-                            .try_fold(false, |found, ty| {
-                                Ok::<_, Error>(found || contains_generic_reference(ty)?)
-                            })?,
-                        Fields::Named(named) => named
-                            .fields
-                            .iter()
-                            .filter_map(|(_, field)| field.ty.as_ref())
-                            .try_fold(false, |found, ty| {
-                                Ok::<_, Error>(found || contains_generic_reference(ty)?)
-                            })?,
-                    };
+            DataType::Enum(enm) => enm.variants.iter().try_fold(false, |found, (_, variant)| {
+                let variant_found = match &variant.fields {
+                    Fields::Unit => false,
+                    Fields::Unnamed(unnamed) => unnamed
+                        .fields
+                        .iter()
+                        .filter_map(|field| field.ty.as_ref())
+                        .try_fold(false, |found, ty| {
+                            Ok::<_, Error>(found || contains_generic_reference(ty)?)
+                        })?,
+                    Fields::Named(named) => named
+                        .fields
+                        .iter()
+                        .filter_map(|(_, field)| field.ty.as_ref())
+                        .try_fold(false, |found, ty| {
+                            Ok::<_, Error>(found || contains_generic_reference(ty)?)
+                        })?,
+                };
 
-                    Ok::<_, Error>(found || variant_found)
-                })?,
+                Ok::<_, Error>(found || variant_found)
+            })?,
             DataType::Tuple(tuple) => tuple.elements.iter().try_fold(false, |found, ty| {
                 Ok::<_, Error>(found || contains_generic_reference(ty)?)
             })?,
             DataType::Reference(Reference::Named(reference)) => match &reference.inner {
-                NamedReferenceType::Reference { generics, .. } => generics.iter().try_fold(
-                    false,
-                    |found, (_, dt)| Ok::<_, Error>(found || contains_generic_reference(dt)?),
-                )?,
+                NamedReferenceType::Reference { generics, .. } => {
+                    generics.iter().try_fold(false, |found, (_, dt)| {
+                        Ok::<_, Error>(found || contains_generic_reference(dt)?)
+                    })?
+                }
                 NamedReferenceType::Inline { .. } => false,
                 NamedReferenceType::Recursive => {
                     return Err(Error::dangling_named_reference(format!(

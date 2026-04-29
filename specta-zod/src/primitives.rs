@@ -5,8 +5,8 @@ use std::{borrow::Cow, cell::RefCell, fmt::Write as _};
 use specta::{
     Types,
     datatype::{
-        DataType, Enum, Fields, Generic, GenericReference, List, Map, NamedDataType,
-        NamedReference, OpaqueReference, Primitive, Reference, Struct, Tuple,
+        DataType, Enum, Fields, GenericReference, List, Map, NamedDataType, NamedReference,
+        NamedReferenceType, OpaqueReference, Primitive, Reference, Struct, Tuple,
     },
 };
 
@@ -15,9 +15,7 @@ use crate::{
 };
 
 thread_local! {
-    static INLINE_REFERENCE_STACK: RefCell<Vec<NamedReference>> = const { RefCell::new(Vec::new()) };
     static TYPE_RENDER_STACK: RefCell<Vec<(Cow<'static, str>, Cow<'static, str>)>> = const { RefCell::new(Vec::new()) };
-    static GENERIC_NAME_STACK: RefCell<Vec<Vec<Generic>>> = const { RefCell::new(Vec::new()) };
 }
 
 struct TypeRenderGuard;
@@ -25,16 +23,6 @@ struct TypeRenderGuard;
 impl Drop for TypeRenderGuard {
     fn drop(&mut self) {
         TYPE_RENDER_STACK.with(|stack| {
-            stack.borrow_mut().pop();
-        });
-    }
-}
-
-struct GenericScopeGuard;
-
-impl Drop for GenericScopeGuard {
-    fn drop(&mut self) {
-        GENERIC_NAME_STACK.with(|stack| {
             stack.borrow_mut().pop();
         });
     }
@@ -48,24 +36,6 @@ fn push_type_render_stack(
         stack.borrow_mut().push((module_path, name));
     });
     TypeRenderGuard
-}
-
-fn push_generic_scope(generics: &[Generic]) -> GenericScopeGuard {
-    GENERIC_NAME_STACK.with(|stack| {
-        stack.borrow_mut().push(generics.to_vec());
-    });
-    GenericScopeGuard
-}
-
-fn resolve_generic_name(generic: &GenericReference) -> Option<Cow<'static, str>> {
-    GENERIC_NAME_STACK.with(|stack| {
-        stack.borrow().iter().rev().find_map(|scope| {
-            scope
-                .iter()
-                .find(|candidate| candidate.reference() == *generic)
-                .map(|generic| generic.name().clone())
-        })
-    })
 }
 
 fn merged_generics(
@@ -82,6 +52,29 @@ fn merged_generics(
         .cloned();
 
     child.iter().cloned().chain(unshadowed_parent).collect()
+}
+
+fn named_reference_generics(r: &NamedReference) -> Result<&[(GenericReference, DataType)], Error> {
+    match &r.inner {
+        NamedReferenceType::Reference { generics, .. } => Ok(generics),
+        NamedReferenceType::Inline { .. } => Ok(&[]),
+        NamedReferenceType::Recursive => Err(Error::dangling_named_reference(format!(
+            "recursive inline named reference {r:?}"
+        ))),
+    }
+}
+
+fn named_reference_ty<'a>(types: &'a Types, r: &'a NamedReference) -> Result<&'a DataType, Error> {
+    match &r.inner {
+        NamedReferenceType::Reference { .. } => types
+            .get(r)
+            .and_then(|ndt| ndt.ty.as_ref())
+            .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}"))),
+        NamedReferenceType::Inline { dt, .. } => Ok(dt),
+        NamedReferenceType::Recursive => Err(Error::dangling_named_reference(format!(
+            "recursive inline named reference {r:?}"
+        ))),
+    }
 }
 
 /// Generate a group of `export const XSchema = ...` declarations for named types.
@@ -130,12 +123,6 @@ fn export_single_internal(
     let schema_name = format!("{base_name}Schema");
 
     let _guard = push_type_render_stack(ndt.module_path.clone(), ndt.name.clone());
-    let generic_scope = ndt
-        .generics
-        .iter()
-        .map(|generic| generic.reference())
-        .collect::<Vec<_>>();
-    let _generic_scope = push_generic_scope(&generic_scope);
 
     let Some(ty) = &ndt.ty else {
         return Ok(());
@@ -272,10 +259,9 @@ fn datatype(
             if force_inline_ref {
                 match r {
                     Reference::Named(named) => {
-                        let ty = named
-                            .ty(types)
-                            .ok_or_else(|| Error::dangling_named_reference(format!("{named:?}")))?;
-                        let combined_generics = merged_generics(generics, named.generics());
+                        let ty = named_reference_ty(types, named)?;
+                        let combined_generics =
+                            merged_generics(generics, named_reference_generics(named)?);
                         datatype(s, exporter, types, ty, location, &combined_generics, false)?;
                     }
                     _ => reference_dt(s, exporter, types, r, location, generics)?,
@@ -284,7 +270,7 @@ fn datatype(
                 reference_dt(s, exporter, types, r, location, generics)?;
             }
         }
-        DataType::Generic(g) => generic_dt(s, exporter, types, g, location, generics)?,
+        DataType::Generic(g) => generic_dt(s, g),
         DataType::Intersection(intersection) => {
             let mut parts = Vec::with_capacity(intersection.len());
             for ty in intersection {
@@ -685,29 +671,8 @@ fn reference_dt(
     }
 }
 
-fn generic_dt(
-    s: &mut String,
-    exporter: &Zod,
-    types: &Types,
-    g: &GenericReference,
-    location: Vec<Cow<'static, str>>,
-    generics: &[(GenericReference, DataType)],
-) -> Result<(), Error> {
-    if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
-        if matches!(resolved_dt, DataType::Generic(inner) if inner == g) {
-            let generic_name = resolve_generic_name(g)
-                .ok_or_else(|| Error::unresolved_generic_reference(format!("{g:?}")))?;
-            s.push_str(generic_name.as_ref());
-        } else {
-            datatype(s, exporter, types, resolved_dt, location, generics, false)?;
-        }
-    } else {
-        let generic_name = resolve_generic_name(g)
-            .ok_or_else(|| Error::unresolved_generic_reference(format!("{g:?}")))?;
-        s.push_str(generic_name.as_ref());
-    }
-
-    Ok(())
+fn generic_dt(s: &mut String, g: &GenericReference) {
+    s.push_str(g.name());
 }
 
 fn reference_opaque_dt(s: &mut String, r: &OpaqueReference) -> Result<(), Error> {
@@ -739,34 +704,14 @@ fn reference_named_dt(
     location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
-    let ndt = r
-        .get(types)
+    let ndt = types
+        .get(r)
         .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
 
-    let generic_scope = ndt
-        .generics
-        .iter()
-        .map(|generic| generic.reference())
-        .collect::<Vec<_>>();
-    let _generic_scope = push_generic_scope(&generic_scope);
-
-    if matches!(r.inner, specta::datatype::NamedReferenceType::Inline { .. }) {
-        let ty = r
-            .ty(types)
-            .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
-        let inline_key = r.clone();
-        let already_inlining = INLINE_REFERENCE_STACK
-            .with(|stack| stack.borrow().iter().any(|key| key == &inline_key));
-
-        if !already_inlining {
-            INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
-            let combined_generics = merged_generics(generics, r.generics());
-            let result = datatype(s, exporter, types, ty, location, &combined_generics, false);
-            INLINE_REFERENCE_STACK.with(|stack| {
-                stack.borrow_mut().pop();
-            });
-            return result;
-        }
+    if matches!(r.inner, NamedReferenceType::Inline { .. }) {
+        let ty = named_reference_ty(types, r)?;
+        let combined_generics = merged_generics(generics, named_reference_generics(r)?);
+        return datatype(s, exporter, types, ty, location, &combined_generics, false);
     }
 
     crate::references::track_nr(r);
@@ -801,11 +746,12 @@ fn reference_named_dt(
     });
 
     let mut reference_expr = schema_name;
-    if !r.generics().is_empty() {
+    let reference_generics = named_reference_generics(r)?;
+    if !reference_generics.is_empty() {
         let scoped_generics = generics
             .iter()
             .filter(|(parent_generic, _)| {
-                !r.generics()
+                !reference_generics
                     .iter()
                     .any(|(child_generic, _)| child_generic == parent_generic)
             })
@@ -813,7 +759,7 @@ fn reference_named_dt(
             .collect::<Vec<_>>();
 
         reference_expr.push('(');
-        for (i, (_, v)) in r.generics().iter().enumerate() {
+        for (i, (_, v)) in reference_generics.iter().enumerate() {
             if i != 0 {
                 reference_expr.push_str(", ");
             }

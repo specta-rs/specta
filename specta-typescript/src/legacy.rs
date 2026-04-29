@@ -9,8 +9,8 @@ use std::{
 use specta::{
     Types,
     datatype::{
-        DataType, Deprecated, Enum, Field, Fields, GenericReference, NamedReferenceType,
-        Reference, Struct, Tuple, Variant,
+        DataType, Deprecated, Enum, Field, Fields, GenericReference, NamedReferenceType, Reference,
+        Struct, Tuple, Variant,
     },
 };
 

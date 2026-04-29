@@ -10,26 +10,17 @@ use crate::Error;
 pub(crate) fn validate_map_key(
     key_ty: &DataType,
     types: &Types,
-    generics: &[(GenericReference, DataType)],
+    _generics: &[(GenericReference, DataType)],
     path: String,
 ) -> Result<(), Error> {
-    validate_map_key_inner(
-        key_ty,
-        types,
-        generics,
-        path,
-        &mut HashSet::new(),
-        &mut HashSet::new(),
-    )
+    validate_map_key_inner(key_ty, types, path, &mut HashSet::new())
 }
 
 fn validate_map_key_inner(
     key_ty: &DataType,
     types: &Types,
-    generics: &[(GenericReference, DataType)],
     path: String,
     visiting_named_refs: &mut HashSet<Reference>,
-    visiting_generic_refs: &mut HashSet<(GenericReference, DataType)>,
 ) -> Result<(), Error> {
     fn unwrap_synthetic_variant_fields<'a>(
         variant_name: &str,
@@ -123,14 +114,7 @@ fn validate_map_key_inner(
                 ));
             }
 
-            validate_map_key_inner(
-                inner_ty,
-                types,
-                generics,
-                path,
-                visiting_named_refs,
-                visiting_generic_refs,
-            )
+            validate_map_key_inner(inner_ty, types, path, visiting_named_refs)
         }
         DataType::Reference(Reference::Named(reference)) => {
             let reference_key = Reference::Named(reference.clone());
@@ -142,21 +126,10 @@ fn validate_map_key_inner(
             }
 
             let result = match &reference.inner {
-                NamedReferenceType::Reference {
-                    generics: ref_generics,
-                    ..
-                } => {
+                NamedReferenceType::Reference { .. } => {
                     if let Some(ndt) = types.get(reference) {
                         if let Some(ty) = ndt.ty.as_ref() {
-                            let merged_generics = merged_generics(generics, ref_generics);
-                            validate_map_key_inner(
-                                ty,
-                                types,
-                                &merged_generics,
-                                path,
-                                visiting_named_refs,
-                                visiting_generic_refs,
-                            )
+                            validate_map_key_inner(ty, types, path, visiting_named_refs)
                         } else {
                             Err(Error::invalid_map_key(
                                 path,
@@ -170,14 +143,9 @@ fn validate_map_key_inner(
                         ))
                     }
                 }
-                NamedReferenceType::Inline { dt, .. } => validate_map_key_inner(
-                    dt,
-                    types,
-                    generics,
-                    path,
-                    visiting_named_refs,
-                    visiting_generic_refs,
-                ),
+                NamedReferenceType::Inline { dt, .. } => {
+                    validate_map_key_inner(dt, types, path, visiting_named_refs)
+                }
                 NamedReferenceType::Recursive => Err(Error::invalid_map_key(
                     path,
                     format!("recursive inline named map key reference {reference:?}"),
@@ -187,33 +155,7 @@ fn validate_map_key_inner(
             visiting_named_refs.remove(&reference_key);
             result
         }
-        DataType::Generic(generic) => {
-            let Some((_, ty)) = generics.iter().find(|(candidate, _)| candidate == generic) else {
-                return Ok(());
-            };
-
-            if matches!(ty, DataType::Generic(inner) if inner == generic) {
-                return Ok(());
-            }
-
-            let resolved = resolve_generics_in_datatype(ty, generics);
-            let generic_state = (generic.clone(), resolved.clone());
-            if !visiting_generic_refs.insert(generic_state.clone()) {
-                return Ok(());
-            }
-
-            let result = validate_map_key_inner(
-                &resolved,
-                types,
-                generics,
-                path,
-                visiting_named_refs,
-                visiting_generic_refs,
-            );
-            visiting_generic_refs.remove(&generic_state);
-
-            result
-        }
+        DataType::Generic(_) => Ok(()),
         DataType::Reference(Reference::Opaque(_)) => Err(Error::invalid_map_key(
             path,
             "opaque references cannot be validated as serde_json map keys",
@@ -262,127 +204,4 @@ fn invalid_primitive_reason(primitive: Primitive) -> &'static str {
         }
         _ => "unsupported primitive key type for serde_json map key serialization",
     }
-}
-
-fn merged_generics(
-    parent: &[(GenericReference, DataType)],
-    child: &[(GenericReference, DataType)],
-) -> Vec<(GenericReference, DataType)> {
-    let unshadowed_parent = parent
-        .iter()
-        .filter(|(parent_generic, _)| {
-            !child
-                .iter()
-                .any(|(child_generic, _)| child_generic == parent_generic)
-        })
-        .cloned();
-
-    child
-        .iter()
-        .map(|(generic, dt)| (generic.clone(), resolve_generics_in_datatype(dt, parent)))
-        .chain(unshadowed_parent)
-        .collect()
-}
-
-fn resolve_generics_in_datatype(
-    dt: &DataType,
-    generics: &[(GenericReference, DataType)],
-) -> DataType {
-    fn resolve(
-        dt: &DataType,
-        generics: &[(GenericReference, DataType)],
-        visiting: &mut Vec<GenericReference>,
-    ) -> DataType {
-        match dt {
-            DataType::Primitive(_) => dt.clone(),
-            DataType::List(list) => {
-                let mut out = list.clone();
-                out.ty = Box::new(resolve(&list.ty, generics, visiting));
-                DataType::List(out)
-            }
-            DataType::Map(map) => {
-                let mut out = map.clone();
-                out.set_key_ty(resolve(map.key_ty(), generics, visiting));
-                out.set_value_ty(resolve(map.value_ty(), generics, visiting));
-                DataType::Map(out)
-            }
-            DataType::Nullable(inner) => {
-                DataType::Nullable(Box::new(resolve(inner, generics, visiting)))
-            }
-            DataType::Struct(strct) => {
-                let mut out = strct.clone();
-                match &mut out.fields {
-                    Fields::Unit => {}
-                    Fields::Unnamed(unnamed) => {
-                        for field in &mut unnamed.fields {
-                            if let Some(ty) = field.ty.as_mut() {
-                                *ty = resolve(ty, generics, visiting);
-                            }
-                        }
-                    }
-                    Fields::Named(named) => {
-                        for (_, field) in &mut named.fields {
-                            if let Some(ty) = field.ty.as_mut() {
-                                *ty = resolve(ty, generics, visiting);
-                            }
-                        }
-                    }
-                }
-                DataType::Struct(out)
-            }
-            DataType::Enum(enm) => {
-                let mut out = enm.clone();
-                for (_, variant) in &mut out.variants {
-                    match &mut variant.fields {
-                        Fields::Unit => {}
-                        Fields::Unnamed(unnamed) => {
-                            for field in &mut unnamed.fields {
-                                if let Some(ty) = field.ty.as_mut() {
-                                    *ty = resolve(ty, generics, visiting);
-                                }
-                            }
-                        }
-                        Fields::Named(named) => {
-                            for (_, field) in &mut named.fields {
-                                if let Some(ty) = field.ty.as_mut() {
-                                    *ty = resolve(ty, generics, visiting);
-                                }
-                            }
-                        }
-                    }
-                }
-                DataType::Enum(out)
-            }
-            DataType::Tuple(tuple) => {
-                let mut out = tuple.clone();
-                for element in &mut out.elements {
-                    *element = resolve(element, generics, visiting);
-                }
-                DataType::Tuple(out)
-            }
-            DataType::Generic(generic) => {
-                if visiting.iter().any(|seen| seen == generic) {
-                    return dt.clone();
-                }
-
-                if let Some((_, resolved)) =
-                    generics.iter().find(|(candidate, _)| candidate == generic)
-                {
-                    if matches!(resolved, DataType::Generic(inner) if inner == generic) {
-                        dt.clone()
-                    } else {
-                        visiting.push(generic.clone());
-                        let out = resolve(resolved, generics, visiting);
-                        visiting.pop();
-                        out
-                    }
-                } else {
-                    dt.clone()
-                }
-            }
-            DataType::Reference(_) | DataType::Intersection(_) => dt.clone(),
-        }
-    }
-
-    resolve(dt, generics, &mut Vec::new())
 }

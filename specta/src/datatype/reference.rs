@@ -4,10 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::{
-    Types,
-    datatype::{Generic, NamedDataType},
-};
+use crate::datatype::Generic;
 
 use super::DataType;
 
