@@ -720,7 +720,7 @@ const _: () = {
                             Field {
                                 optional: false,
                                 deprecated: None,
-                                docs: Cow::Borrowed(""),
+                                docs: Default::default(),
                                 ty: Some(uhlc::NTP64::definition(types)),
                                 attributes: datatype::Attributes::default(),
                             },
@@ -730,7 +730,7 @@ const _: () = {
                             Field {
                                 optional: false,
                                 deprecated: None,
-                                docs: Cow::Borrowed(""),
+                                docs: Default::default(),
                                 ty: Some(uhlc::ID::definition(types)),
                                 attributes: datatype::Attributes::default(),
                             },

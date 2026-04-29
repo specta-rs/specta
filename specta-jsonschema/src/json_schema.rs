@@ -61,13 +61,13 @@ impl JsonSchema {
     }
 
     /// Export types to JSON Schema as a JSON string
-    pub fn export(&self, types: &Types, format: Format) -> Result<String, Error> {
+    pub fn export(&self, types: &Types, format: impl Format) -> Result<String, Error> {
         let value = self.export_as_value(types, format)?;
         Ok(serde_json::to_string_pretty(&value)?)
     }
 
     /// Export types to JSON Schema as serde_json::Value
-    pub fn export_as_value(&self, types: &Types, format: Format) -> Result<Value, Error> {
+    pub fn export_as_value(&self, types: &Types, format: impl Format) -> Result<Value, Error> {
         let exporter = self.clone();
         let formatted_types = format_types(&exporter, types, &format)?;
         let types = formatted_types.as_ref();
@@ -85,7 +85,7 @@ impl JsonSchema {
         &self,
         path: impl AsRef<Path>,
         types: &Types,
-        format: Format,
+        format: impl Format,
     ) -> Result<(), Error> {
         let exporter = self.clone();
         let formatted_types = format_types(&exporter, types, &format)?;
@@ -190,9 +190,10 @@ impl JsonSchema {
 fn format_types<'a>(
     exporter: &JsonSchema,
     types: &'a Types,
-    format: &Format,
+    format: &dyn Format,
 ) -> Result<Cow<'a, Types>, Error> {
-    let mapped_types = (format.map_types)(types)
+    let mapped_types = format
+        .map_types(types)
         .map_err(|err| Error::format("type graph formatter failed", err))?;
     Ok(Cow::Owned(
         map_types_for_datatype_format(exporter, mapped_types.as_ref(), Some(format))?.into_owned(),
@@ -201,7 +202,7 @@ fn format_types<'a>(
 
 fn map_datatype_format(
     exporter: &JsonSchema,
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
     types: &Types,
     dt: &DataType,
 ) -> Result<DataType, Error> {
@@ -209,7 +210,8 @@ fn map_datatype_format(
         return Ok(dt.clone());
     };
 
-    let mapped = (format.map_type)(types, dt)
+    let mapped = format
+        .map_type(types, dt)
         .map_err(|err| Error::format("datatype formatter failed", err))?;
 
     match mapped {
@@ -222,7 +224,7 @@ fn map_datatype_format(
 
 fn map_datatype_format_children(
     exporter: &JsonSchema,
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
     types: &Types,
     mut dt: DataType,
 ) -> Result<DataType, Error> {
@@ -251,12 +253,19 @@ fn map_datatype_format_children(
                 *element = map_datatype_format(exporter, format, types, element)?;
             }
         }
-        DataType::Reference(Reference::Named(reference)) => {
-            for (_, generic) in &mut reference.generics {
-                *generic = map_datatype_format(exporter, format, types, generic)?;
+        DataType::Intersection(intersection) => {
+            for element in intersection {
+                *element = map_datatype_format(exporter, format, types, element)?;
             }
         }
-        DataType::Reference(Reference::Generic(_) | Reference::Opaque(_)) => {}
+        DataType::Reference(Reference::Named(reference)) => {
+            if let specta::datatype::NamedReferenceType::Reference { generics, .. } = &mut reference.inner {
+                for (_, generic) in generics {
+                    *generic = map_datatype_format(exporter, format, types, generic)?;
+                }
+            }
+        }
+        DataType::Reference(Reference::Opaque(_)) | DataType::Generic(_) => {}
     }
 
     Ok(dt)
@@ -264,7 +273,7 @@ fn map_datatype_format_children(
 
 fn map_datatype_fields(
     exporter: &JsonSchema,
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
     types: &Types,
     fields: &mut Fields,
 ) -> Result<(), Error> {
@@ -292,7 +301,7 @@ fn map_datatype_fields(
 fn map_types_for_datatype_format<'a>(
     exporter: &JsonSchema,
     types: &'a Types,
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
 ) -> Result<Cow<'a, Types>, Error> {
     if format.is_none() {
         return Ok(Cow::Borrowed(types));
@@ -305,8 +314,12 @@ fn map_types_for_datatype_format<'a>(
             return;
         }
 
-        match map_datatype_format(exporter, format, types, &ndt.ty) {
-            Ok(mapped) => ndt.ty = mapped,
+        let Some(ty) = &ndt.ty else {
+            return;
+        };
+
+        match map_datatype_format(exporter, format, types, ty) {
+            Ok(mapped) => ndt.ty = Some(mapped),
             Err(err) => map_err = Some(err),
         }
     });

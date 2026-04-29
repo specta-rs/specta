@@ -161,7 +161,7 @@ fn unnamed_fields_datatype(
                 None,
                 "",
                 generics,
-                force_inline || field.inline,
+                force_inline,
             )?;
             s.push_str(&inner_comments(
                 field.deprecated.as_ref(),
@@ -191,7 +191,7 @@ fn unnamed_fields_datatype(
                     None,
                     "",
                     generics,
-                    force_inline || field.inline,
+                    force_inline,
                 )?;
                 s.push_str(&inner_comments(
                     field.deprecated.as_ref(),
@@ -272,8 +272,8 @@ pub(crate) fn struct_datatype(
                 return Ok(());
             }
 
-            let (flattened, non_flattened): (Vec<_>, Vec<_>) =
-                fields.iter().partition(|(_, (f, _))| f.flatten);
+            let flattened: Vec<(&Cow<'static, str>, (&Field, &DataType))> = Vec::new();
+            let non_flattened = fields.clone();
 
             let mut flattened_sections = flattened
                 .into_iter()
@@ -289,7 +289,7 @@ pub(crate) fn struct_datatype(
                         None,
                         "",
                         generics,
-                        field.inline,
+                        false,
                     )
                     .map(|_| {
                         inner_comments(
@@ -390,8 +390,8 @@ fn enum_variant_datatype(
                 .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
                 .collect::<Vec<_>>();
 
-            let (flattened, non_flattened): (Vec<_>, Vec<_>) =
-                all_fields.iter().partition(|(_, (f, _))| f.flatten);
+            let flattened: Vec<(&Cow<'static, str>, (&Field, &DataType))> = Vec::new();
+            let non_flattened = all_fields.clone();
 
             let field_sections = flattened
                 .into_iter()
@@ -407,7 +407,7 @@ fn enum_variant_datatype(
                         None,
                         "",
                         generics,
-                        field.inline,
+                        false,
                     )
                     .map(|_| {
                         inner_comments(
@@ -501,7 +501,7 @@ fn enum_variant_datatype(
                         None,
                         "",
                         generics,
-                        field.inline,
+                        false,
                     )
                     .map(|_| s)
                 })
@@ -595,10 +595,7 @@ fn variant_discriminator(variant: &Variant) -> Option<(String, DiscriminatorValu
         return None;
     };
 
-    let (name, field) = named
-        .fields
-        .iter()
-        .find(|(_, field)| !field.flatten && !field.optional)?;
+    let (name, field) = named.fields.iter().find(|(_, field)| !field.optional)?;
     let ty = field.ty.as_ref()?;
 
     if matches!(ty, DataType::Primitive(specta::datatype::Primitive::str)) {
@@ -650,10 +647,6 @@ fn untagged_strict_keys(variant: &Variant) -> Option<BTreeSet<String>> {
                 .iter()
                 .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
                 .collect::<Vec<_>>();
-            if all_fields.iter().any(|(_, (field, _))| field.flatten) {
-                return None;
-            }
-
             Some(
                 all_fields
                     .into_iter()
@@ -819,7 +812,7 @@ fn object_field_to_ts(
                 None,
                 prefix,
                 generics,
-                force_inline || field.inline,
+                force_inline,
             )?;
             value
         }
@@ -837,7 +830,7 @@ fn inline_reference_docs<'a>(
         return None;
     };
 
-    if !(force_inline || field.inline || r.inline()) {
+    if !force_inline {
         return None;
     }
 
@@ -1035,7 +1028,7 @@ pub(crate) fn deprecated_details(typ: &Deprecated) -> Option<String> {
 
 //     let mut builder = js_doc_builder(docs, deprecated);
 
-//     typ.generics()
+//     typ.generics()()
 //         .into_iter()
 //         .for_each(|generic| builder.push_generic(generic));
 

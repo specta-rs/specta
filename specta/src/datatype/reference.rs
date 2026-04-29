@@ -4,49 +4,70 @@ use std::{
     sync::Arc,
 };
 
-use crate::datatype::Generic;
+use crate::{
+    Types,
+    datatype::{Generic, NamedDataType},
+};
 
 use super::DataType;
 
-/// Reference to another type.
+/// Reference to another datatype.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Reference {
-    /// Reference to a named type collected in a [`Types`].
-    /// This can either produce `TypeName<Generics>` or just an inlined definition.
+    /// Reference to a named type collected in a [`Types`](crate::Types).
+    ///
+    /// This can either render as a named reference, such as `TypeName<T>`, or as
+    /// an inlined datatype depending on [`NamedReference::inner`].
     Named(NamedReference),
     /// Reference to an opaque exporter-specific type.
     Opaque(OpaqueReference),
 }
 
-/// Reference to a [NamedDataType].
+/// Reference to a [`NamedDataType`](crate::datatype::NamedDataType).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct NamedReference {
     pub(crate) id: NamedId,
+    /// How this named type should be referenced at the use site.
     pub inner: NamedReferenceType,
 }
 
-/// Internal representation of a specific [NamedDataType].
+/// Use-site representation for a [`NamedReference`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum NamedReferenceType {
+    /// Recursive reference encountered while resolving an inline type.
+    ///
+    /// Exporters can use this marker to avoid infinitely expanding recursive
+    /// inline definitions.
     Recursive,
+    /// Inline the contained datatype at the reference site.
     #[non_exhaustive]
     Inline {
+        /// Datatype to render in place of the named reference.
         dt: Box<DataType>,
     },
+    /// Render a reference to the named datatype.
     #[non_exhaustive]
     Reference {
+        /// Concrete generic arguments for this use site.
         generics: Vec<(Generic, DataType)>,
     },
 }
 
-/// Reference to a type not understood by Specta's core.
+/// Reference to a type not understood by Specta's core datatype model.
 ///
 /// These are implemented by the language exporter to implement cool features like
 /// [`specta_typescript::branded!`](https://docs.rs/specta-typescript/latest/specta_typescript/macro.branded.html),
 /// [`specta_typescript::define`](https://docs.rs/specta-typescript/latest/specta_typescript/fn.define.html), and more.
 ///
-/// This is an advanced feature designed for language exporters so should generally be avoided and is not intended to be generally useful unless your in control of the language exporter.
+/// # Invariants
+///
+/// Equality and hashing are delegated to the stored opaque state. If two opaque
+/// references should be distinct, their state values must compare and hash
+/// distinctly.
+///
+/// This is an advanced feature designed for language exporters and framework
+/// integrations. Most end users should prefer ordinary [`DataType`] variants.
 #[derive(Clone)]
 pub struct OpaqueReference(Arc<dyn DynOpaqueReference>);
 
@@ -124,36 +145,39 @@ impl hash::Hash for OpaqueReference {
 }
 
 impl OpaqueReference {
-    /// Get the Rust type name of the stored opaque state.
+    /// Returns the Rust type name of the stored opaque state.
     pub fn type_name(&self) -> &'static str {
         self.0.type_name()
     }
 
-    /// Get the [`TypeId`] of the stored opaque state.
+    /// Returns the [`TypeId`] of the stored opaque state.
     pub fn type_id(&self) -> TypeId {
         self.0.as_any().type_id()
     }
 
-    /// Attempt to downcast the opaque state to `T`.
+    /// Attempts to downcast the opaque state to `T`.
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.0.as_any().downcast_ref::<T>()
     }
 }
 
 impl Reference {
-    /// Construct a new reference to an opaque type.
+    /// Constructs a new reference to an opaque type.
     ///
-    /// An opaque type is unable to be represented using the [DataType] system and requires specific exporter integration to handle it.
+    /// An opaque type cannot be represented with the core [`DataType`] model and
+    /// requires specific exporter integration.
     ///
-    /// Opaque [Reference]'s are compared using [PartialEq]. For example `Reference::opaque(()) == Reference::opaque(())` so you must ensure each reference you intent to be unique is implemented as such.
+    /// Opaque [`Reference`]s are compared using the state's [`PartialEq`]
+    /// implementation. For example, `Reference::opaque(()) ==
+    /// Reference::opaque(())`, so unique references need unique state.
     pub fn opaque<T: hash::Hash + Eq + Send + Sync + 'static>(state: T) -> Self {
         Self::Opaque(OpaqueReference(Arc::new(OpaqueReferenceInner(state))))
     }
 
-    /// Compare if two references point to the same type.
+    /// Returns whether two references point to the same underlying type.
     ///
-    /// This is different from using `Eq`, `PartialEq`, or `Hash` as those compare the [Reference].
-    /// A [Reference] contains generics, inline and other attributes which this ignores.
+    /// This differs from [`Eq`], [`PartialEq`], and [`Hash`] because those compare
+    /// the full [`Reference`], including generic arguments and inline state.
     pub fn ty_eq(&self, other: &Reference) -> bool {
         match (self, other) {
             (Reference::Named(a), Reference::Named(b)) => a.id == b.id,
@@ -162,9 +186,10 @@ impl Reference {
         }
     }
 
-    /// Convert an existing [Reference] into an inlined one.
+    /// Converts an existing [`Reference`] into an inlined one.
     ///
-    /// It's not safe to go the other way incase the type is inlined which requires all [Reference]'s to be inlined.
+    /// It is not generally safe to convert an inline reference back into a named
+    /// reference, because some types require every use site to be inlined.
     pub fn inline(mut self) -> Reference {
         // if let Reference::Named(n) = &mut self {
         //     n.inline = true;
@@ -172,6 +197,30 @@ impl Reference {
         // self
 
         todo!();
+    }
+}
+
+impl NamedReference {
+    /// Get the named type this reference points to.
+    pub fn get<'a>(&self, types: &'a Types) -> Option<&'a NamedDataType> {
+        types.get(self)
+    }
+
+    /// Get this reference's concrete generic arguments.
+    pub fn generics(&self) -> &[(Generic, DataType)] {
+        match &self.inner {
+            NamedReferenceType::Reference { generics } => generics,
+            NamedReferenceType::Recursive | NamedReferenceType::Inline { .. } => &[],
+        }
+    }
+
+    /// Get this reference's inlined type, if available.
+    pub fn ty<'a>(&'a self, types: &'a Types) -> Option<&'a DataType> {
+        match &self.inner {
+            NamedReferenceType::Inline { dt } => Some(dt),
+            NamedReferenceType::Reference { .. } => types.get(self)?.ty.as_ref(),
+            NamedReferenceType::Recursive => None,
+        }
     }
 }
 

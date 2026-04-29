@@ -217,7 +217,7 @@ pub fn export_type(
     types: &Types,
     ndt: &specta::datatype::NamedDataType,
 ) -> Result<String, Error> {
-    if !matches!(&ndt.ty, DataType::Struct(_) | DataType::Enum(_)) {
+    if !matches!(&ndt.ty, Some(DataType::Struct(_) | DataType::Enum(_))) {
         return Ok(String::new());
     }
 
@@ -249,10 +249,14 @@ pub fn export_type(
         ));
     }
 
-    let generic_scope = ndt.generics.to_vec();
+    let generic_scope = ndt
+        .generics
+        .iter()
+        .map(|generic| generic.reference())
+        .collect::<Vec<_>>();
 
     // Format based on type
-    match &ndt.ty {
+    match ndt.ty.as_ref().expect("checked above") {
         DataType::Struct(s) => {
             let type_def = struct_to_swift(swift, types, s, generic_scope.clone(), None)?;
             let name = swift.naming.convert(&ndt.name);
@@ -274,7 +278,7 @@ pub fn export_type(
             result.push('}');
         }
         DataType::Enum(e) => {
-            let formatted_enum = match apply_datatype_format(swift, types, &ndt.ty)? {
+            let formatted_enum = match apply_datatype_format(swift, types, ndt.ty.as_ref().expect("checked above"))? {
                 DataType::Enum(e) => Some(e),
                 _ => None,
             };
@@ -398,6 +402,10 @@ pub fn datatype_to_swift(
         DataType::Enum(e) => enum_to_swift(swift, types, e, generic_scope, None, None),
         DataType::Tuple(t) => tuple_to_swift(swift, types, t, generic_scope.clone()),
         DataType::Reference(r) => reference_to_swift(swift, types, r, &generic_scope),
+        DataType::Generic(g) => generic_to_swift(swift, g, &generic_scope),
+        DataType::Intersection(_) => Err(Error::UnsupportedType(
+            "Intersection types are not supported by Swift exporter".to_string(),
+        )),
     }
 }
 
@@ -410,7 +418,8 @@ fn apply_datatype_format(swift: &Swift, types: &Types, dt: &DataType) -> Result<
         return Ok(dt.clone());
     };
 
-    let mapped = (format.map_type)(types, dt)
+    let mapped = format
+        .map_type(types, dt)
         .map_err(|err| Error::format("datatype formatter failed", err))?;
 
     match mapped {
@@ -449,12 +458,19 @@ fn apply_datatype_format_children(
                 *element = apply_datatype_format(swift, types, element)?;
             }
         }
-        DataType::Reference(Reference::Named(reference)) => {
-            for (_, generic) in &mut reference.generics {
-                *generic = apply_datatype_format(swift, types, generic)?;
+        DataType::Intersection(intersection) => {
+            for element in intersection {
+                *element = apply_datatype_format(swift, types, element)?;
             }
         }
-        DataType::Reference(Reference::Generic(_) | Reference::Opaque(_)) => {}
+        DataType::Reference(Reference::Named(reference)) => {
+            if let specta::datatype::NamedReferenceType::Reference { generics, .. } = &mut reference.inner {
+                for (_, generic) in generics {
+                    *generic = apply_datatype_format(swift, types, generic)?;
+                }
+            }
+        }
+        DataType::Reference(Reference::Opaque(_)) | DataType::Generic(_) => {}
     }
 
     Ok(dt)
@@ -497,11 +513,12 @@ fn contains_generic_reference(dt: &DataType) -> bool {
             .any(|(_, variant)| fields_contain_generic_reference(&variant.fields)),
         DataType::Tuple(tuple) => tuple.elements.iter().any(contains_generic_reference),
         DataType::Reference(Reference::Named(reference)) => reference
-            .generics
+            .generics()
             .iter()
             .any(|(_, generic)| contains_generic_reference(generic)),
-        DataType::Reference(Reference::Generic(_)) => true,
         DataType::Reference(Reference::Opaque(_)) => false,
+        DataType::Generic(_) => true,
+        DataType::Intersection(types) => types.iter().any(contains_generic_reference),
     }
 }
 
@@ -967,7 +984,7 @@ fn reference_to_swift(
             }
 
             if ndt.name == "Vec"
-                && let Some((_, inner_ty)) = r.generics.first()
+                && let Some((_, inner_ty)) = r.generics().first()
             {
                 let inner =
                     datatype_to_swift(swift, types, inner_ty, generic_scope.to_vec(), None)?;
@@ -976,11 +993,11 @@ fn reference_to_swift(
 
             let name = swift.naming.convert(&ndt.name);
 
-            if r.generics.is_empty() {
+            if r.generics().is_empty() {
                 Ok(name)
             } else {
                 let generics = r
-                    .generics
+                    .generics()
                     .iter()
                     .map(|(_, t)| datatype_to_swift(swift, types, t, generic_scope.to_vec(), None))
                     .collect::<std::result::Result<Vec<_>, _>>()?
@@ -991,7 +1008,6 @@ fn reference_to_swift(
         Reference::Opaque(_) => Err(Error::UnsupportedType(
             "Opaque references are not supported by Swift exporter".to_string(),
         )),
-        Reference::Generic(g) => generic_to_swift(swift, g, generic_scope),
     }
 }
 
@@ -1003,7 +1019,7 @@ fn generic_to_swift(
 ) -> Result<String, Error> {
     generic_scope
         .iter()
-        .find_map(|generic| (generic.reference() == *g).then(|| generic.name.to_string()))
+        .find_map(|generic| (generic.reference() == *g).then(|| generic.name().to_string()))
         .ok_or_else(|| Error::GenericConstraint(format!("Unresolved generic reference: {g:?}")))
 }
 

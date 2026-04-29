@@ -177,7 +177,7 @@ impl Exporter {
     /// Export the files into a single string.
     ///
     /// Note: This returns an error if the format is `Format::Files`.
-    pub fn export(&self, types: &Types, format: Format) -> Result<String, Error> {
+    pub fn export(&self, types: &Types, format: impl Format) -> Result<String, Error> {
         let exporter = self.clone();
         let types = format_types(types, &format)?;
         let types = types.as_ref();
@@ -232,7 +232,7 @@ impl Exporter {
         &self,
         path: impl AsRef<Path>,
         types: &Types,
-        format: Format,
+        format: impl Format,
     ) -> Result<(), Error> {
         let exporter = self.clone();
         let formatted_types = format_types(types, &format)?;
@@ -457,8 +457,9 @@ impl Exporter {
     }
 }
 
-fn format_types<'a>(types: &'a Types, format: &Format) -> Result<Cow<'a, Types>, Error> {
-    let mapped_types = (format.map_types)(types)
+fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
+    let mapped_types = format
+        .map_types(types)
         .map_err(|err| Error::format("type graph formatter failed", err))?;
     Ok(Cow::Owned(
         map_types_for_datatype_format(mapped_types.as_ref(), Some(format))?.into_owned(),
@@ -466,11 +467,11 @@ fn format_types<'a>(types: &'a Types, format: &Format) -> Result<Cow<'a, Types>,
 }
 
 fn map_datatype_format(
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
     types: &Types,
     dt: &DataType,
 ) -> Result<DataType, Error> {
-    if matches!(dt, DataType::Reference(Reference::Generic(_))) {
+    if matches!(dt, DataType::Generic(_)) {
         return Ok(dt.clone());
     }
 
@@ -514,11 +515,12 @@ fn map_datatype_format(
                 }),
             DataType::Tuple(tuple) => tuple.elements.iter().any(contains_generic_reference),
             DataType::Reference(Reference::Named(reference)) => reference
-                .generics
+                .generics()
                 .iter()
                 .any(|(_, dt)| contains_generic_reference(dt)),
-            DataType::Reference(Reference::Generic(_)) => true,
+            DataType::Generic(_) => true,
             DataType::Reference(Reference::Opaque(_)) => false,
+            DataType::Intersection(types) => types.iter().any(contains_generic_reference),
         }
     }
 
@@ -527,7 +529,7 @@ fn map_datatype_format(
             return map_datatype_format_children(None, types, dt.clone());
         };
 
-        match (format.map_type)(types, dt) {
+        match format.map_type(types, dt) {
             Ok(Cow::Borrowed(dt)) => {
                 return map_datatype_format_children(Some(format), types, dt.clone());
             }
@@ -543,7 +545,8 @@ fn map_datatype_format(
         return Ok(dt.clone());
     };
 
-    let mapped = (format.map_type)(types, dt)
+    let mapped = format
+        .map_type(types, dt)
         .map_err(|err| Error::format("datatype formatter failed", err))?;
 
     match mapped {
@@ -553,7 +556,7 @@ fn map_datatype_format(
 }
 
 fn map_datatype_format_children(
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
     types: &Types,
     mut dt: DataType,
 ) -> Result<DataType, Error> {
@@ -582,12 +585,13 @@ fn map_datatype_format_children(
                 *element = map_datatype_format(format, types, element)?;
             }
         }
-        DataType::Reference(Reference::Named(reference)) => {
-            for (_, generic) in &mut reference.generics {
-                *generic = map_datatype_format(format, types, generic)?;
+        DataType::Intersection(types_) => {
+            for ty in types_ {
+                *ty = map_datatype_format(format, types, ty)?;
             }
         }
-        DataType::Reference(Reference::Generic(_)) => {}
+        DataType::Reference(Reference::Named(_)) => {}
+        DataType::Generic(_) => {}
         DataType::Reference(Reference::Opaque(reference)) => {
             if let Some(branded) = reference.downcast_ref::<Branded>() {
                 dt = Reference::opaque(Branded::new(
@@ -603,7 +607,7 @@ fn map_datatype_format_children(
 }
 
 fn map_datatype_fields(
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
     types: &Types,
     fields: &mut Fields,
 ) -> Result<(), Error> {
@@ -629,18 +633,22 @@ fn map_datatype_fields(
 }
 
 fn map_named_datatype_format(
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
     types: &Types,
     ndt: &NamedDataType,
 ) -> Result<NamedDataType, Error> {
     let mut mapped = ndt.clone();
-    mapped.ty = map_datatype_format_children(format, types, ndt.ty.clone())?;
+    mapped.ty = ndt
+        .ty
+        .clone()
+        .map(|ty| map_datatype_format_children(format, types, ty))
+        .transpose()?;
     Ok(mapped)
 }
 
 fn map_types_for_datatype_format<'a>(
     types: &'a Types,
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
 ) -> Result<Cow<'a, Types>, Error> {
     if format.is_none() {
         return Ok(Cow::Borrowed(types));
@@ -681,7 +689,7 @@ impl AsMut<Exporter> for Exporter {
 /// Reference to Typescript language exporter for branded type callbacks.
 pub struct BrandedTypeExporter<'a> {
     pub(crate) exporter: &'a Exporter,
-    pub(crate) format: Option<&'a Format>,
+    pub(crate) format: Option<&'a dyn Format>,
     /// Collected types currently being exported.
     pub types: &'a Types,
 }
@@ -726,7 +734,7 @@ impl BrandedTypeExporter<'_> {
 /// Reference to Typescript language exporter for framework
 pub struct FrameworkExporter<'a> {
     exporter: &'a Exporter,
-    format: Option<&'a Format>,
+    format: Option<&'a dyn Format>,
     has_manually_exported_user_types: &'a mut bool,
     // For `Layout::Files` we need to inject the value
     files_root_types: &'a str,

@@ -8,10 +8,17 @@ use crate::{
     datatype::{NamedDataType, NamedId, NamedReference},
 };
 
-/// Define a set of types which can be exported together.
+/// Collection of named datatypes that can be exported together.
 ///
-/// While exporting a type will add all of the types it depends on to the collection.
-/// You can also construct your own collection to easily export a set of types together.
+/// Resolving a [`Type`] adds every named type it depends on to this collection.
+/// Exporters usually receive a completed `Types` value and iterate over the
+/// collected [`NamedDataType`] entries.
+///
+/// # Invariants
+///
+/// Internally, entries may temporarily be placeholders while recursive types are
+/// resolving. Public iterators and [`Types::len`] expose only completed
+/// [`NamedDataType`] values.
 #[derive(Default, Clone)]
 pub struct Types {
     // `None` indicates that the entry is a placeholder.
@@ -82,24 +89,30 @@ impl fmt::Debug for Types {
 }
 
 impl Types {
-    /// Register a [`Type`] with the collection.
+    /// Registers `T` and its named dependencies with the collection.
+    ///
+    /// This consumes and returns `self`, making it convenient to chain multiple
+    /// registrations.
     pub fn register<T: Type>(mut self) -> Self {
         T::definition(&mut self);
         self
     }
 
-    /// Register a [`Type`](crate::Type) with the collection.
+    /// Registers `T` and its named dependencies with the collection in-place.
     pub fn register_mut<T: Type>(&mut self) -> &mut Self {
         T::definition(self);
         self
     }
 
-    /// Get a [`NamedDataType`] from a [`NamedReference`].
+    /// Gets the named datatype targeted by a [`NamedReference`].
+    ///
+    /// Returns `None` if the reference is unknown or currently only has an
+    /// internal placeholder entry.
     pub fn get(&self, r: &NamedReference) -> Option<&NamedDataType> {
         self.types.get(&r.id)?.as_ref()
     }
 
-    /// Get the length of the collection.
+    /// Returns the number of completed named datatypes in the collection.
     pub fn len(&self) -> usize {
         debug_assert_eq!(
             self.len,
@@ -113,12 +126,19 @@ impl Types {
         self.len
     }
 
-    /// Check if the collection is empty.
+    /// Returns `true` when the backing collection has no entries.
+    ///
+    /// This is usually equivalent to `len() == 0`. During type resolution,
+    /// internal placeholders can make this return `false` even before any
+    /// completed [`NamedDataType`] has been inserted.
     pub fn is_empty(&self) -> bool {
         self.types.is_empty()
     }
 
-    /// Merge types from another collection into this one.
+    /// Merges types from another collection into this one.
+    ///
+    /// Existing completed entries in `self` are kept. A placeholder in `self` is
+    /// replaced by a completed entry from `other` when available.
     pub fn extend(&mut self, other: &Self) {
         for (id, other) in &other.types {
             match self.types.get(id) {
@@ -142,7 +162,7 @@ impl Types {
         }
     }
 
-    /// Sort the collection into a consistent order and return an iterator.
+    /// Sorts the collection into a consistent order and returns an iterator.
     ///
     /// The sort order is not necessarily guaranteed to be stable between versions but currently we sort by name.
     ///
@@ -163,7 +183,7 @@ impl Types {
         v.into_iter()
     }
 
-    /// Return the unsorted iterator over the collection.
+    /// Returns an unsorted iterator over completed named datatypes.
     pub fn into_unsorted_iter(&self) -> impl ExactSizeIterator<Item = &NamedDataType> {
         UnsortedIter {
             iter: self.types.iter(),
@@ -171,8 +191,9 @@ impl Types {
         }
     }
 
-    /// Return an mutable iterator over the type collection.
-    /// Note: The order returned is unsorted.
+    /// Calls `f` for each completed named datatype in the collection.
+    ///
+    /// The iteration order is intentionally unspecified.
     pub fn iter_mut<F>(&mut self, mut f: F)
     where
         F: FnMut(&mut NamedDataType),
@@ -184,8 +205,10 @@ impl Types {
         }
     }
 
-    /// Map over the collection, transforming each `NamedDataType` with the given closure.
-    /// This preserves the `ArcId` keys, ensuring that `Reference`s remain valid.
+    /// Transforms each completed [`NamedDataType`] in the collection.
+    ///
+    /// The internal identity keys are preserved, so existing [`NamedReference`]s
+    /// continue to resolve to the transformed entries.
     pub fn map<F>(mut self, mut f: F) -> Self
     where
         F: FnMut(NamedDataType) -> NamedDataType,

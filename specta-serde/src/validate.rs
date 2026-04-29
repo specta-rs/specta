@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use specta::{
     Types,
-    datatype::{DataType, Enum, Field, Fields, Generic, GenericReference, Reference, Variant},
+    datatype::{DataType, Enum, Field, Fields, Generic, NamedReferenceType, Reference, Variant},
 };
 
 use crate::{
@@ -20,8 +20,12 @@ pub enum ApplyMode {
 
 pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<(), Error> {
     for ndt in types.into_unsorted_iter() {
+        let Some(ty) = &ndt.ty else {
+            continue;
+        };
+
         validate_datatype_with_generics_for_mode(
-            &ndt.ty,
+            ty,
             types,
             &ndt.generics,
             ndt.name.to_string(),
@@ -52,7 +56,7 @@ pub(crate) fn validate_datatype_for_mode_shallow(
 fn validate_datatype_with_generics_for_mode(
     dt: &DataType,
     types: &Types,
-    generics: &[Generic],
+    generics: &[specta::datatype::GenericDefinition],
     path: String,
     mode: ApplyMode,
     follow_named_references: bool,
@@ -60,10 +64,9 @@ fn validate_datatype_with_generics_for_mode(
     let generics = generics
         .iter()
         .map(|generic| {
-            let reference = generic.reference();
             (
-                reference.clone(),
-                DataType::Reference(Reference::Generic(reference)),
+                Generic::new(generic.name.clone()),
+                DataType::Generic(Generic::new(generic.name.clone())),
             )
         })
         .collect::<Vec<_>>();
@@ -82,7 +85,7 @@ fn validate_datatype_with_generics_for_mode(
 fn inner(
     dt: &DataType,
     types: &Types,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     checked_references: &mut HashSet<Reference>,
     path: String,
     mode: ApplyMode,
@@ -310,18 +313,37 @@ fn inner(
                 )?;
             }
         }
+        DataType::Intersection(types_) => {
+            for (idx, ty) in types_.iter().enumerate() {
+                inner(
+                    ty,
+                    types,
+                    generics,
+                    checked_references,
+                    format!("{path}.<intersection_{idx}>"),
+                    mode,
+                    follow_named_references,
+                )?;
+            }
+        }
         DataType::Reference(reference) => match reference {
             Reference::Named(reference) => {
-                for (_, dt) in &reference.generics {
-                    inner(
-                        dt,
-                        types,
-                        generics,
-                        checked_references,
-                        format!("{path}.<generic>"),
-                        mode,
-                        follow_named_references,
-                    )?;
+                if let NamedReferenceType::Reference {
+                    generics: reference_generics,
+                    ..
+                } = &reference.inner
+                {
+                    for (_, dt) in reference_generics {
+                        inner(
+                            dt,
+                            types,
+                            generics,
+                            checked_references,
+                            format!("{path}.<generic>"),
+                            mode,
+                            follow_named_references,
+                        )?;
+                    }
                 }
 
                 if follow_named_references
@@ -329,8 +351,14 @@ fn inner(
                 {
                     let reference_key = Reference::Named(reference.clone());
                     checked_references.insert(reference_key);
-                    if let Some(ty) = reference.ty(types) {
-                        let merged_generics = merged_generics(generics, &reference.generics);
+                    if let Some(ty) = named_reference_ty(reference, types) {
+                        let merged_generics = match &reference.inner {
+                            NamedReferenceType::Reference {
+                                generics: reference_generics,
+                                ..
+                            } => merged_generics(generics, reference_generics),
+                            _ => generics.to_vec(),
+                        };
                         let name = reference
                             .get(types)
                             .map(|ndt| ndt.name.to_string())
@@ -346,34 +374,6 @@ fn inner(
                         )?;
                     }
                 }
-            }
-            Reference::Generic(generic) => {
-                let Some((_, ty)) = generics.iter().find(|(candidate, _)| candidate == generic)
-                else {
-                    if !follow_named_references {
-                        return Ok(());
-                    }
-
-                    return Err(Error::unresolved_generic_reference(
-                        path,
-                        format!("{generic:?}"),
-                    ));
-                };
-
-                if matches!(ty, DataType::Reference(Reference::Generic(inner)) if inner == generic)
-                {
-                    return Ok(());
-                }
-
-                inner(
-                    ty,
-                    types,
-                    generics,
-                    checked_references,
-                    format!("{path}.<generic_ref>"),
-                    mode,
-                    follow_named_references,
-                )?;
             }
             Reference::Opaque(reference) => {
                 if let Some(phased) = reference.downcast_ref::<PhasedTy>() {
@@ -405,6 +405,32 @@ fn inner(
                 }
             }
         },
+        DataType::Generic(generic) => {
+            let Some((_, ty)) = generics.iter().find(|(candidate, _)| candidate == generic) else {
+                if !follow_named_references {
+                    return Ok(());
+                }
+
+                return Err(Error::unresolved_generic_reference(
+                    path,
+                    format!("{generic:?}"),
+                ));
+            };
+
+            if matches!(ty, DataType::Generic(inner) if inner == generic) {
+                return Ok(());
+            }
+
+            inner(
+                ty,
+                types,
+                generics,
+                checked_references,
+                format!("{path}.<generic_ref>"),
+                mode,
+                follow_named_references,
+            )?;
+        }
         DataType::Primitive(_) => {}
     }
 
@@ -473,7 +499,7 @@ fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<(
 fn validate_container_attributes(
     attrs: &specta::datatype::Attributes,
     types: &Types,
-    generics: &[(GenericReference, DataType)],
+    generics: &[(Generic, DataType)],
     checked_references: &mut HashSet<Reference>,
     path: &str,
     mode: ApplyMode,
@@ -604,15 +630,15 @@ fn ensure_codec_override(
 
 fn has_type_override(attributes: &specta::datatype::Attributes) -> bool {
     attributes
-        .get_named_as::<bool>("specta:inline")
+        .get_named_as::<bool>("specta:type_override")
         .copied()
         .unwrap_or(false)
 }
 
 fn merged_generics(
-    parent: &[(GenericReference, DataType)],
-    child: &[(GenericReference, DataType)],
-) -> Vec<(GenericReference, DataType)> {
+    parent: &[(Generic, DataType)],
+    child: &[(Generic, DataType)],
+) -> Vec<(Generic, DataType)> {
     let unshadowed_parent = parent
         .iter()
         .filter(|(parent_generic, _)| {
@@ -785,14 +811,15 @@ fn validate_internally_tag_enum_datatype(
         },
         DataType::Tuple(tuple) if tuple.elements.is_empty() => Ok(()),
         DataType::Reference(Reference::Named(reference)) => {
-            if let Some(ty) = reference.ty(types) {
+            if let Some(ty) = named_reference_ty(reference, types) {
                 validate_internally_tag_enum_datatype(ty, types, path, variant_name)?;
             }
 
             Ok(())
         }
-        DataType::Reference(Reference::Generic(_))
-        | DataType::Reference(Reference::Opaque(_))
+        DataType::Reference(Reference::Opaque(_))
+        | DataType::Generic(_)
+        | DataType::Intersection(_)
         | DataType::Tuple(_)
         | DataType::Primitive(_)
         | DataType::List(_)
@@ -833,4 +860,25 @@ fn enum_repr_from_attrs(attrs: &specta::datatype::Attributes) -> Result<EnumRepr
             (None, None) => EnumRepr::External,
         },
     )
+}
+
+trait NamedReferenceExt {
+    fn get<'a>(&self, types: &'a Types) -> Option<&'a specta::datatype::NamedDataType>;
+}
+
+impl NamedReferenceExt for specta::datatype::NamedReference {
+    fn get<'a>(&self, types: &'a Types) -> Option<&'a specta::datatype::NamedDataType> {
+        types.get(self)
+    }
+}
+
+fn named_reference_ty<'a>(
+    reference: &'a specta::datatype::NamedReference,
+    types: &'a Types,
+) -> Option<&'a DataType> {
+    match &reference.inner {
+        NamedReferenceType::Inline { dt, .. } => Some(dt),
+        NamedReferenceType::Reference { .. } => types.get(reference)?.ty.as_ref(),
+        NamedReferenceType::Recursive => None,
+    }
 }

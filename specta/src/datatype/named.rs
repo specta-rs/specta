@@ -4,6 +4,7 @@ use std::{
     mem,
     panic::{self, AssertUnwindSafe, Location},
     ptr,
+    sync::Arc,
 };
 
 use crate::{
@@ -15,6 +16,10 @@ use crate::{
     },
 };
 
+/// Resolves any named types created by `func` as inline references.
+///
+/// This temporarily enables inline resolution on the provided [`Types`]
+/// collection and restores the previous setting even if `func` panics.
 pub fn inline<R>(types: &mut Types, func: impl FnOnce(&mut Types) -> R) -> R {
     let prev = mem::replace(&mut types.should_inline, true);
     let result = panic::catch_unwind(AssertUnwindSafe(|| func(types)));
@@ -25,18 +30,32 @@ pub fn inline<R>(types: &mut Types, func: impl FnOnce(&mut Types) -> R) -> R {
     }
 }
 
-/// Named type represents any type with it's own unique name and identity.
+/// Named datatype with its own export identity.
 ///
-/// These can become `export MyNamedType = ...` in Typescript can we be referenced in types like `{ field: MyNamedType }`.
+/// Exporters commonly render these as top-level declarations, such as
+/// `export type MyType = ...` in TypeScript. Other datatypes refer back to a
+/// named datatype through [`Reference::Named`].
+///
+/// # Invariants
+///
+/// The `id` is the stable identity used by [`Types`] and [`NamedReference`]. The
+/// human-readable `name` alone is not guaranteed to be globally unique.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct NamedDataType {
+    /// Stable identity for resolving references to this datatype.
     pub id: NamedId,
+    /// Exported type name.
     pub name: Cow<'static, str>,
+    /// Documentation comments attached to the source type.
     pub docs: Cow<'static, str>,
+    /// Deprecation metadata attached to the source type.
     pub deprecated: Option<Deprecated>,
+    /// Rust module path where the source type was defined.
     pub module_path: Cow<'static, str>,
+    /// Source location where this named datatype was created.
     pub location: Location<'static>,
+    /// Generic parameters declared by this named datatype.
     pub generics: Cow<'static, [GenericDefinition]>,
     /// The generalised datatype of this specific named data type.
     /// This is what will be used for creating `export Type = ...;` statements.
@@ -46,31 +65,57 @@ pub struct NamedDataType {
 }
 
 impl NamedDataType {
-    /// Construct a new named datatype.
+    /// Returns whether this named datatype should be emitted as a named
+    /// declaration instead of only being inlined at use sites.
     ///
-    /// Note: Ensure you call `Self::register` to register the type.
+    /// A datatype with no canonical `ty` has no standalone definition to export.
+    pub fn requires_reference(&self, _types: &Types) -> bool {
+        self.ty.is_some()
+    }
+
+    /// Returns the generic parameters declared by this named datatype.
+    pub fn generics(&self) -> &[GenericDefinition] {
+        &self.generics
+    }
+
+    /// Returns the canonical datatype definition, if this named datatype has one.
+    ///
+    /// `None` means the type is intended to be represented only by inline or
+    /// opaque references.
+    pub fn ty(&self) -> Option<&DataType> {
+        self.ty.as_ref()
+    }
+
+    /// Constructs a new named datatype.
+    ///
+    /// Call [`NamedDataType::register`] to make the type available through a
+    /// [`Types`] collection.
     #[track_caller]
     pub fn new(name: impl Into<Cow<'static, str>>, generics: Vec<Generic>, dt: DataType) -> Self {
         let location = Location::caller();
-        // Self {
-        //     id: NamedId::Dynamic(Arc::new(())),
-        //     name: name.into(),
-        //     docs: Cow::Borrowed(""),
-        //     deprecated: None,
-        //     module_path: file_path_to_module_path(location.file())
-        //         .map(Into::into)
-        //         .unwrap_or(Cow::Borrowed("virtual")),
-        //     location: location.to_owned(),
-        //     generics: Cow::Owned(generics),
-        //     inline: false,
-        //     ty: dt,
-        // }
-        todo!();
+        Self {
+            id: NamedId::Dynamic(Arc::new(())),
+            name: name.into(),
+            docs: Cow::Borrowed(""),
+            deprecated: None,
+            module_path: file_path_to_module_path(location.file())
+                .map(Into::into)
+                .unwrap_or(Cow::Borrowed("virtual")),
+            location: location.to_owned(),
+            generics: Cow::Owned(
+                generics
+                    .into_iter()
+                    .map(|generic| GenericDefinition::new(generic.name().clone(), None))
+                    .collect(),
+            ),
+            ty: Some(dt),
+        }
     }
 
-    /// Construct a new inlined named datatype.
+    /// Constructs a new named datatype intended to be inlined at reference sites.
     ///
-    /// Note: Ensure you call `Self::register` to register the type.
+    /// Call [`NamedDataType::register`] to make the type available through a
+    /// [`Types`] collection.
     #[track_caller]
     pub fn new_inline(
         name: impl Into<Cow<'static, str>>,
@@ -78,24 +123,29 @@ impl NamedDataType {
         dt: DataType,
     ) -> Self {
         let location = Location::caller();
-        // Self {
-        //     id: NamedId::Dynamic(Arc::new(())),
-        //     name: name.into(),
-        //     docs: Cow::Borrowed(""),
-        //     deprecated: None,
-        //     module_path: file_path_to_module_path(location.file())
-        //         .map(Into::into)
-        //         .unwrap_or(Cow::Borrowed("virtual")),
-        //     location: location.to_owned(),
-        //     generics: Cow::Owned(generics),
-        //     inline: true,
-        //     ty: dt,
-        //     instances: Vec::new(),
-        // }
-        todo!();
+        Self {
+            id: NamedId::Dynamic(Arc::new(())),
+            name: name.into(),
+            docs: Cow::Borrowed(""),
+            deprecated: None,
+            module_path: file_path_to_module_path(location.file())
+                .map(Into::into)
+                .unwrap_or(Cow::Borrowed("virtual")),
+            location: location.to_owned(),
+            generics: Cow::Owned(
+                generics
+                    .into_iter()
+                    .map(|generic| GenericDefinition::new(generic.name().clone(), None))
+                    .collect(),
+            ),
+            ty: Some(dt),
+        }
     }
 
-    /// Register the type into a [Types].
+    /// Registers this named datatype into a [`Types`] collection.
+    ///
+    /// If an entry with the same identity already exists, it is replaced and the
+    /// completed-entry count is incremented for this registration.
     pub fn register(&self, types: &mut Types) {
         types.types.insert(self.id.clone(), Some(self.clone()));
         types.len += 1;
@@ -244,37 +294,65 @@ impl NamedDataType {
         }
     }
 
-    /// Construct a [Reference] to a [NamedDataType].
-    /// This can be included in a `DataType::Reference` within another type.
+    #[doc(hidden)]
+    #[track_caller]
+    pub fn init_with_sentinel_inline(
+        sentinel: &'static str,
+        generics: &'static [GenericDefinition],
+        instantiation_generics: &[(Generic, DataType)],
+        has_const_param: bool,
+        container_inline: bool,
+        passthrough_inline: bool,
+        types: &mut Types,
+        build_ndt: fn(&mut Types, &mut NamedDataType),
+        build_ty: fn(&mut Types) -> DataType,
+    ) -> Reference {
+        Self::init_with_sentinel(
+            sentinel,
+            generics,
+            instantiation_generics,
+            has_const_param,
+            container_inline,
+            passthrough_inline,
+            types,
+            build_ndt,
+            build_ty,
+        )
+    }
+
+    /// Constructs a [`Reference`] to this named datatype.
     ///
-    /// This reference will be inlined if the type is inlined, otherwise you can inline it with [Reference::inline].
+    /// The returned reference can be embedded in another [`DataType`]. The
+    /// `generics` vector provides concrete datatypes for this named type's
+    /// declared generic parameters.
+    ///
+    /// This reference will be inlined if the type is configured for inline
+    /// export. Otherwise callers can force an inline reference with
+    /// [`Reference::inline`].
     pub fn reference(&self, generics: Vec<(Generic, DataType)>) -> Reference {
         // TODO: allow generics to be `Cow`
         // TODO: HashMap instead of array for better typesafety??
 
-        // Reference::Named(NamedReference {
-        //     id: self.id.clone(),
-        //     generics,
-        //     inline: self.inline,
-        //     instance: None,
-        //     dt: None, // TODO
-        // })
-
-        todo!();
+        Reference::Named(NamedReference {
+            id: self.id.clone(),
+            inner: NamedReferenceType::Reference { generics },
+        })
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 /// Runtime representation of Rust's `#[deprecated]` metadata.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Deprecated {
+    /// Optional deprecation note or replacement guidance.
     pub note: Option<Cow<'static, str>>,
+    /// Optional version where the item became deprecated.
     since: Option<Cow<'static, str>>,
 }
 
 impl Deprecated {
-    /// Construct deprecation metadata without details.
+    /// Constructs deprecation metadata without details.
     ///
-    /// Eg. `#[deprecated]`
+    /// Corresponds to `#[deprecated]`.
     pub const fn new() -> Self {
         Self {
             note: None,
@@ -282,9 +360,9 @@ impl Deprecated {
         }
     }
 
-    /// Construct deprecation metadata with a note/message.
+    /// Constructs deprecation metadata with a note.
     ///
-    /// Eg. `#[deprecated = "Use something else"]`
+    /// Corresponds to `#[deprecated = "Use something else"]`.
     pub fn with_note(note: Cow<'static, str>) -> Self {
         Self {
             note: Some(note),
@@ -292,9 +370,9 @@ impl Deprecated {
         }
     }
 
-    /// Construct deprecation metadata with a note/message and an optional `since` version.
+    /// Constructs deprecation metadata with a note and optional `since` version.
     ///
-    /// Eg. `#[deprecated(since = "1.0.0", note = "Use something else")]`
+    /// Corresponds to `#[deprecated(since = "1.0.0", note = "Use something else")]`.
     pub fn with_since_note(since: Option<Cow<'static, str>>, note: Cow<'static, str>) -> Self {
         Self {
             note: Some(note),

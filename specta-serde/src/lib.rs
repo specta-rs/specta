@@ -107,8 +107,8 @@ use std::{
 use specta::{
     Format, FormatError, Types,
     datatype::{
-        DataType, Enum, Field, Fields, NamedDataType, Primitive, Reference, Struct, Tuple,
-        UnnamedFields, Variant,
+        DataType, Enum, Field, Fields, NamedDataType, NamedReference, NamedReferenceType,
+        Primitive, Reference, Struct, Tuple, UnnamedFields, Variant,
     },
 };
 
@@ -161,7 +161,7 @@ fn apply(types: Types) -> Result<Types, Error> {
 
         let ndt_name = ndt.name.to_string();
 
-        ndt.map_ty_mut(|ty| {
+        if let Some(ty) = ndt.ty.as_mut() {
             if rewrite_err.is_some() {
                 return;
             }
@@ -176,7 +176,7 @@ fn apply(types: Types) -> Result<Types, Error> {
             ) {
                 rewrite_err = Some(err);
             }
-        });
+        }
 
         if rewrite_err.is_some() {
             return;
@@ -192,14 +192,6 @@ fn apply(types: Types) -> Result<Types, Error> {
     }
 
     Ok(out)
-}
-
-fn map_types(types: &Types) -> Result<Cow<'_, Types>, FormatError> {
-    Ok(Cow::Owned(apply(types.clone())?))
-}
-
-fn map_phases_types(types: &Types) -> Result<Cow<'_, Types>, FormatError> {
-    Ok(Cow::Owned(apply_phases(types.clone())?))
 }
 
 fn map_datatype<'a>(types: &'a Types, dt: &'a DataType) -> Result<Cow<'a, DataType>, FormatError> {
@@ -228,6 +220,32 @@ fn map_phases_datatype<'a>(
     Ok(Cow::Owned(selected))
 }
 
+/// Formatter value used by [`format`].
+pub struct SerdeFormat;
+
+impl Format for SerdeFormat {
+    fn map_types(&'_ self, types: &Types) -> Result<Cow<'_, Types>, FormatError> {
+        Ok(Cow::Owned(apply(types.clone())?))
+    }
+
+    fn map_type(&'_ self, types: &Types, ty: &DataType) -> Result<Cow<'_, DataType>, FormatError> {
+        Ok(Cow::Owned(map_datatype(types, ty)?.into_owned()))
+    }
+}
+
+/// Formatter value used by [`format_phases`].
+pub struct SerdePhasesFormat;
+
+impl Format for SerdePhasesFormat {
+    fn map_types(&'_ self, types: &Types) -> Result<Cow<'_, Types>, FormatError> {
+        Ok(Cow::Owned(apply_phases(types.clone())?))
+    }
+
+    fn map_type(&'_ self, types: &Types, ty: &DataType) -> Result<Cow<'_, DataType>, FormatError> {
+        Ok(Cow::Owned(map_phases_datatype(types, ty)?.into_owned()))
+    }
+}
+
 /// Applies serde-aware rewrites to a single shared type graph.
 ///
 /// Use this when the serialized and deserialized wire shape can be represented
@@ -243,7 +261,7 @@ fn map_phases_datatype<'a>(
 /// formatter returns an error instead of guessing. In that case, use
 /// [`format_phases`].
 #[allow(non_upper_case_globals)]
-pub const format: Format = Format::new(map_types, map_datatype);
+pub const format: SerdeFormat = SerdeFormat;
 
 /// Applies serde-aware rewrites while preserving separate serialize and
 /// deserialize shapes.
@@ -262,7 +280,7 @@ pub const format: Format = Format::new(map_types, map_datatype);
 /// shared. Inline datatype rendering uses the serialize-facing shape; use
 /// [`select_phase_datatype`] to inspect either direction explicitly.
 #[allow(non_upper_case_globals)]
-pub const format_phases: Format = Format::new(map_phases_types, map_phases_datatype);
+pub const format_phases: SerdePhasesFormat = SerdePhasesFormat;
 
 fn apply_phases(types: Types) -> Result<Types, Error> {
     validate::validate_for_mode(&types, validate::ApplyMode::Phases)?;
@@ -274,7 +292,9 @@ fn apply_phases(types: Types) -> Result<Types, Error> {
     for original in &originals {
         let key = TypeIdentity::from_ndt(original);
         let mut deps = HashSet::new();
-        collect_dependencies(&original.ty, &types, &mut deps)?;
+        if let Some(ty) = &original.ty {
+            collect_dependencies(ty, &types, &mut deps)?;
+        }
         for dep in &deps {
             reverse_dependencies
                 .entry(dep.clone())
@@ -286,7 +306,11 @@ fn apply_phases(types: Types) -> Result<Types, Error> {
 
     let mut split_types = HashSet::new();
     for ndt in &originals {
-        if has_local_phase_difference(&ndt.ty)? {
+        if ndt
+            .ty
+            .as_ref()
+            .is_some_and(|ty| has_local_phase_difference(ty).unwrap_or(false))
+        {
             split_types.insert(TypeIdentity::from_ndt(ndt));
         }
     }
@@ -336,11 +360,7 @@ fn apply_phases(types: Types) -> Result<Types, Error> {
         };
 
         let mut rewrite_err = None;
-        generated_types_for_phase.serialize.map_ty_mut(|ty| {
-            if rewrite_err.is_some() {
-                return;
-            }
-
+        if let Some(ty) = generated_types_for_phase.serialize.ty.as_mut() {
             if let Err(err) = rewrite_datatype_for_phase(
                 ty,
                 PhaseRewrite::Serialize,
@@ -351,7 +371,7 @@ fn apply_phases(types: Types) -> Result<Types, Error> {
             ) {
                 rewrite_err = Some(err);
             }
-        });
+        }
         if let Some(err) = rewrite_err.take() {
             return Err(err);
         }
@@ -361,11 +381,7 @@ fn apply_phases(types: Types) -> Result<Types, Error> {
             PhaseRewrite::Serialize,
         )?;
 
-        generated_types_for_phase.deserialize.map_ty_mut(|ty| {
-            if rewrite_err.is_some() {
-                return;
-            }
-
+        if let Some(ty) = generated_types_for_phase.deserialize.ty.as_mut() {
             if let Err(err) = rewrite_datatype_for_phase(
                 ty,
                 PhaseRewrite::Deserialize,
@@ -376,7 +392,7 @@ fn apply_phases(types: Types) -> Result<Types, Error> {
             ) {
                 rewrite_err = Some(err);
             }
-        });
+        }
         if let Some(err) = rewrite_err {
             return Err(err);
         }
@@ -411,14 +427,16 @@ fn apply_phases(types: Types) -> Result<Types, Error> {
             return;
         }
 
-        if let Err(err) = rewrite_datatype_for_phase(
-            &mut ndt.ty,
-            PhaseRewrite::Unified,
-            &types,
-            &generated,
-            &split_types,
-            Some(ndt_name.as_str()),
-        ) {
+        if let Some(ty) = ndt.ty.as_mut()
+            && let Err(err) = rewrite_datatype_for_phase(
+                ty,
+                PhaseRewrite::Unified,
+                &types,
+                &generated,
+                &split_types,
+                Some(ndt_name.as_str()),
+            )
+        {
             rewrite_err = Some(err);
             return;
         }
@@ -450,8 +468,8 @@ fn apply_phases(types: Types) -> Result<Types, Error> {
             .generics
             .iter()
             .map(|generic| {
-                let reference = generic.reference();
-                (reference.clone(), reference.into())
+                let generic = specta::datatype::Generic::new(generic.name.clone());
+                (generic.clone(), generic.into())
             })
             .collect::<Vec<_>>();
 
@@ -477,7 +495,7 @@ fn apply_phases(types: Types) -> Result<Types, Error> {
             .variants
             .push((Cow::Borrowed("Deserialize"), deserialize_variant));
 
-        ndt.ty = DataType::Enum(wrapper);
+        ndt.ty = Some(DataType::Enum(wrapper));
     });
     Ok(out)
 }
@@ -579,24 +597,31 @@ fn select_phase_datatype_inner(ty: &mut DataType, types: &Types, phase: Phase) {
             select_phase_datatype_inner(map.key_ty_mut(), types, phase);
             select_phase_datatype_inner(map.value_ty_mut(), types, phase);
         }
+        DataType::Intersection(types_) => {
+            for ty in types_ {
+                select_phase_datatype_inner(ty, types, phase);
+            }
+        }
         DataType::Nullable(inner) => select_phase_datatype_inner(inner, types, phase),
         DataType::Reference(Reference::Named(reference)) => {
-            let Some(referenced_ndt) = reference.get(types) else {
+            let Some(referenced_ndt) = types.get(reference) else {
                 return;
             };
-            for (_, dt) in &mut reference.generics {
+            for (_, dt) in named_reference_generics_mut(reference) {
                 select_phase_datatype_inner(dt, types, phase);
             }
 
             let target_ndt =
                 select_split_type_variant(referenced_ndt, types, phase).unwrap_or(referenced_ndt);
-            let Reference::Named(new_reference) = target_ndt.reference_from(reference) else {
+            let Reference::Named(new_reference) =
+                target_ndt.reference(named_reference_generics(reference).to_vec())
+            else {
                 unreachable!("named types always produce named references")
             };
             *reference = new_reference;
         }
-        DataType::Reference(Reference::Generic(_))
-        | DataType::Reference(Reference::Opaque(_))
+        DataType::Reference(Reference::Opaque(_))
+        | DataType::Generic(_)
         | DataType::Primitive(_) => {}
     }
 }
@@ -667,7 +692,7 @@ fn select_split_type_variant<'a>(
     types: &'a Types,
     phase: Phase,
 ) -> Option<&'a NamedDataType> {
-    let DataType::Enum(wrapper) = &ndt.ty else {
+    let Some(DataType::Enum(wrapper)) = &ndt.ty else {
         return None;
     };
 
@@ -688,7 +713,27 @@ fn select_split_type_variant<'a>(
         return None;
     };
 
-    reference.get(types)
+    types.get(reference)
+}
+
+fn named_reference_generics(
+    reference: &NamedReference,
+) -> &[(specta::datatype::Generic, DataType)] {
+    match &reference.inner {
+        NamedReferenceType::Reference { generics, .. } => generics,
+        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => &[],
+    }
+}
+
+fn named_reference_generics_mut(
+    reference: &mut NamedReference,
+) -> &mut Vec<(specta::datatype::Generic, DataType)> {
+    match &mut reference.inner {
+        NamedReferenceType::Reference { generics, .. } => generics,
+        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => {
+            unreachable!("inline and recursive references do not carry generics")
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -767,6 +812,9 @@ fn rewrite_datatype_for_phase(
                 false,
             )?;
             rewrite_struct_repr_for_phase(s, mode, container_name)?;
+            if let Some(intersection) = lower_flattened_struct(s)? {
+                *ty = intersection;
+            }
         }
         DataType::Enum(e) => {
             filter_enum_variants_for_phase(e, mode)?;
@@ -825,15 +873,20 @@ fn rewrite_datatype_for_phase(
                 None,
             )?;
         }
+        DataType::Intersection(types_) => {
+            for ty in types_ {
+                rewrite_datatype_for_phase(ty, mode, original_types, generated, split_types, None)?;
+            }
+        }
         DataType::Nullable(inner) => {
             rewrite_datatype_for_phase(inner, mode, original_types, generated, split_types, None)?
         }
         DataType::Reference(Reference::Named(reference)) => {
-            let Some(referenced_ndt) = reference.get(original_types) else {
+            let Some(referenced_ndt) = original_types.get(reference) else {
                 return Ok(());
             };
             let key = TypeIdentity::from_ndt(referenced_ndt);
-            for (_, dt) in &mut reference.generics {
+            for (_, dt) in named_reference_generics_mut(reference) {
                 rewrite_datatype_for_phase(dt, mode, original_types, generated, split_types, None)?;
             }
 
@@ -849,19 +902,67 @@ fn rewrite_datatype_for_phase(
                 PhaseRewrite::Unified => {
                     unreachable!("unified mode should not reference split types")
                 }
-                PhaseRewrite::Serialize => target.serialize.reference_from(reference),
-                PhaseRewrite::Deserialize => target.deserialize.reference_from(reference),
+                PhaseRewrite::Serialize => target
+                    .serialize
+                    .reference(named_reference_generics(reference).to_vec()),
+                PhaseRewrite::Deserialize => target
+                    .deserialize
+                    .reference(named_reference_generics(reference).to_vec()),
             }) else {
                 unreachable!("named types always produce named references")
             };
             *reference = reference_from_target;
         }
-        DataType::Reference(Reference::Generic(_))
-        | DataType::Reference(Reference::Opaque(_))
+        DataType::Reference(Reference::Opaque(_))
+        | DataType::Generic(_)
         | DataType::Primitive(_) => {}
     }
 
     Ok(())
+}
+
+fn lower_flattened_struct(strct: &mut Struct) -> Result<Option<DataType>, Error> {
+    let Fields::Named(named) = &mut strct.fields else {
+        return Ok(None);
+    };
+
+    let has_flattened = named
+        .fields
+        .iter()
+        .any(|(_, field)| field_is_flattened(field));
+    if !has_flattened {
+        return Ok(None);
+    }
+
+    let fields = std::mem::take(&mut named.fields);
+    let mut base = Struct::named();
+    let mut parts = Vec::new();
+
+    for (name, field) in fields {
+        if field_is_flattened(&field) {
+            if let Some(ty) = field.ty {
+                parts.push(ty);
+            }
+        } else {
+            base.field_mut(name, field);
+        }
+    }
+
+    let mut base = match base.build() {
+        DataType::Struct(base) => base,
+        _ => unreachable!("Struct::named always builds a struct"),
+    };
+    base.attributes = strct.attributes.clone();
+    parts.insert(0, DataType::Struct(base));
+
+    Ok(Some(DataType::Intersection(parts)))
+}
+
+fn field_is_flattened(field: &Field) -> bool {
+    SerdeFieldAttrs::from_attributes(&field.attributes)
+        .ok()
+        .flatten()
+        .is_some_and(|attrs| attrs.flatten)
 }
 
 fn rewrite_fields_for_phase(
@@ -1034,10 +1135,8 @@ fn should_skip_field_for_mode(field: &Field, mode: PhaseRewrite) -> Result<bool,
 fn skipped_field_marker(field: &Field) -> Field {
     let mut skipped = Field::default();
     skipped.optional = field.optional;
-    skipped.flatten = field.flatten;
     skipped.deprecated = field.deprecated.clone();
     skipped.docs = field.docs.clone();
-    skipped.inline = field.inline;
     skipped.attributes = field.attributes.clone();
     skipped
 }
@@ -1640,7 +1739,7 @@ fn transform_internal_variant(
 
             if !payload_is_effectively_empty {
                 let mut flattened = payload_field;
-                flattened.flatten = true;
+                flattened.attributes.insert("serde:field:flatten", true);
                 fields.push((Cow::Borrowed("__specta_internal_payload"), flattened));
             }
         }
@@ -1772,8 +1871,12 @@ fn internal_tag_payload_compatibility(
             })
         }
         DataType::Tuple(tuple) => Ok(tuple.elements.is_empty().then_some(true)),
+        DataType::Intersection(_) => Ok(None),
         DataType::Reference(Reference::Named(reference)) => {
-            let Some(referenced) = reference.get(original_types) else {
+            let Some(referenced) = original_types.get(reference) else {
+                return Ok(None);
+            };
+            let Some(referenced_ty) = referenced.ty.as_ref() else {
                 return Ok(None);
             };
 
@@ -1783,7 +1886,7 @@ fn internal_tag_payload_compatibility(
             }
 
             let compatible =
-                internal_tag_payload_compatibility(&referenced.ty, original_types, seen);
+                internal_tag_payload_compatibility(referenced_ty, original_types, seen);
             seen.remove(&key);
             compatible
         }
@@ -1810,8 +1913,8 @@ fn internal_tag_payload_compatibility(
         DataType::Primitive(_)
         | DataType::List(_)
         | DataType::Nullable(_)
-        | DataType::Reference(Reference::Generic(_))
-        | DataType::Reference(Reference::Opaque(_)) => Ok(None),
+        | DataType::Reference(Reference::Opaque(_))
+        | DataType::Generic(_) => Ok(None),
     }
 }
 
@@ -1869,13 +1972,20 @@ fn has_local_phase_difference(dt: &DataType) -> Result<bool, Error> {
         DataType::List(list) => has_local_phase_difference(&list.ty),
         DataType::Map(map) => Ok(has_local_phase_difference(map.key_ty())?
             || has_local_phase_difference(map.value_ty())?),
+        DataType::Intersection(types_) => types_.iter().try_fold(false, |has_difference, ty| {
+            if has_difference {
+                return Ok(true);
+            }
+
+            has_local_phase_difference(ty)
+        }),
         DataType::Nullable(inner) => has_local_phase_difference(inner),
         DataType::Reference(Reference::Opaque(reference)) => {
             Ok(reference.downcast_ref::<PhasedTy>().is_some())
         }
         DataType::Primitive(_)
         | DataType::Reference(Reference::Named(_))
-        | DataType::Reference(Reference::Generic(_)) => Ok(false),
+        | DataType::Generic(_) => Ok(false),
     }
 }
 
@@ -1986,13 +2096,18 @@ fn collect_dependencies(
             collect_dependencies(map.key_ty(), types, deps)?;
             collect_dependencies(map.value_ty(), types, deps)?;
         }
+        DataType::Intersection(types_) => {
+            for ty in types_ {
+                collect_dependencies(ty, types, deps)?;
+            }
+        }
         DataType::Nullable(inner) => collect_dependencies(inner, types, deps)?,
         DataType::Reference(Reference::Named(reference)) => {
-            if let Some(referenced) = reference.get(types) {
+            if let Some(referenced) = types.get(reference) {
                 deps.insert(TypeIdentity::from_ndt(referenced));
             }
 
-            for (_, generic) in &reference.generics {
+            for (_, generic) in named_reference_generics(reference) {
                 collect_dependencies(generic, types, deps)?;
             }
         }
@@ -2004,7 +2119,7 @@ fn collect_dependencies(
                 collect_dependencies(&phased.deserialize, types, deps)?;
             }
         }
-        DataType::Primitive(_) | DataType::Reference(Reference::Generic(_)) => {}
+        DataType::Primitive(_) | DataType::Generic(_) => {}
     }
 
     Ok(())
@@ -2063,14 +2178,16 @@ fn build_from_original(
     original: &NamedDataType,
     mode: PhaseRewrite,
 ) -> Result<NamedDataType, Error> {
-    let mut ndt = original.clone_ty();
+    let mut ndt = original.clone();
     ndt.name = Cow::Owned(split_type_name(original, mode)?);
 
     Ok(ndt)
 }
 
 fn rewrite_named_type_for_phase(ndt: &mut NamedDataType, mode: PhaseRewrite) -> Result<(), Error> {
-    if let Some(rename) = renamed_type_name_for_phase(&ndt.ty, mode, ndt.name.as_ref())? {
+    if let Some(ty) = &ndt.ty
+        && let Some(rename) = renamed_type_name_for_phase(ty, mode, ndt.name.as_ref())?
+    {
         ndt.name = Cow::Owned(rename);
     }
 
@@ -2084,7 +2201,12 @@ fn split_type_name(original: &NamedDataType, mode: PhaseRewrite) -> Result<Strin
         PhaseRewrite::Unified => return Ok(original.name.to_string()),
     };
 
-    let base_name = renamed_type_name_for_phase(&original.ty, mode, original.name.as_ref())?
+    let base_name = original
+        .ty
+        .as_ref()
+        .map(|ty| renamed_type_name_for_phase(ty, mode, original.name.as_ref()))
+        .transpose()?
+        .flatten()
         .unwrap_or_else(|| original.name.to_string());
 
     Ok(format!("{base_name}_{suffix}"))
@@ -2121,17 +2243,14 @@ fn apply_field_attrs(
     mode: PhaseRewrite,
     container_default: bool,
 ) -> Result<(), Error> {
-    let mut flatten = field.flatten;
     let mut optional = field.optional;
     if let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)? {
-        flatten = attrs.flatten;
         if field_is_optional_for_mode(Some(&attrs), container_default, mode) {
             optional = true;
         }
     } else if field_is_optional_for_mode(None, container_default, mode) {
         optional = true;
     }
-    field.flatten = flatten;
     field.optional = optional;
 
     Ok(())

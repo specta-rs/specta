@@ -1,6 +1,6 @@
 //! Swift language exporter configuration and main export functionality.
 
-use std::{borrow::Cow, path::Path};
+use std::{borrow::Cow, fmt, path::Path, sync::Arc};
 
 use specta::{
     Format, Types,
@@ -11,7 +11,7 @@ use crate::Error;
 use crate::primitives::{export_type, is_duration_struct};
 
 /// Swift language exporter.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Swift {
     /// Header comment for generated files.
     pub header: Cow<'static, str>,
@@ -25,7 +25,21 @@ pub struct Swift {
     pub optionals: OptionalStyle,
     /// Additional protocols to conform to.
     pub protocols: Vec<Cow<'static, str>>,
-    pub(crate) format: Option<Format>,
+    pub(crate) format: Option<Arc<dyn Format>>,
+}
+
+impl fmt::Debug for Swift {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Swift")
+            .field("header", &self.header)
+            .field("indent", &self.indent)
+            .field("naming", &self.naming)
+            .field("generics", &self.generics)
+            .field("optionals", &self.optionals)
+            .field("protocols", &self.protocols)
+            .field("format", &self.format.is_some())
+            .finish()
+    }
 }
 
 /// Indentation style for generated Swift code.
@@ -132,9 +146,9 @@ impl Swift {
     }
 
     /// Export types to a Swift string.
-    pub fn export(&self, types: &Types, format: Format) -> Result<String, Error> {
+    pub fn export(&self, types: &Types, format: impl Format + 'static) -> Result<String, Error> {
         let mut exporter = self.clone();
-        exporter.format = Some(format);
+        exporter.format = Some(Arc::new(format));
         let formatted_types = exporter.format_types(types)?;
         let raw_types = formatted_types.as_ref();
 
@@ -175,19 +189,21 @@ impl Swift {
         &self,
         path: impl AsRef<Path>,
         types: &Types,
-        format: Format,
+        format: impl Format + 'static,
     ) -> Result<(), Error> {
         let content = self.export(types, format)?;
         std::fs::write(path, content)?;
         Ok(())
     }
 
-    pub(crate) fn format_types<'a>(&self, types: &'a Types) -> Result<Cow<'a, Types>, Error> {
+    pub(crate) fn format_types<'a>(&'a self, types: &'a Types) -> Result<Cow<'a, Types>, Error> {
         let Some(format) = &self.format else {
             return Ok(Cow::Borrowed(types));
         };
 
-        (format.map_types)(types).map_err(|err| Error::format("type graph formatter failed", err))
+        format
+            .map_types(types)
+            .map_err(|err| Error::format("type graph formatter failed", err))
     }
 }
 
@@ -315,7 +331,7 @@ fn needs_duration_helper(types: &Types) -> bool {
             return true;
         }
         // Also check if any struct fields contain Duration
-        if let DataType::Struct(s) = &ndt.ty
+        if let Some(DataType::Struct(s)) = &ndt.ty
             && let Fields::Named(fields) = &s.fields
         {
             for (_, field) in &fields.fields {

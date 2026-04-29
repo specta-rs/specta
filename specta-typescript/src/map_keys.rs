@@ -142,7 +142,7 @@ fn validate_map_key_inner(
             }
 
             let result = if let Some(ty) = reference.ty(types) {
-                let merged_generics = merged_generics(generics, &reference.generics);
+                let merged_generics = merged_generics(generics, &reference.generics());
                 validate_map_key_inner(
                     ty,
                     types,
@@ -161,12 +161,12 @@ fn validate_map_key_inner(
             visiting_named_refs.remove(&reference_key);
             result
         }
-        DataType::Reference(Reference::Generic(generic)) => {
+        DataType::Generic(generic) => {
             let Some((_, ty)) = generics.iter().find(|(candidate, _)| candidate == generic) else {
                 return Ok(());
             };
 
-            if matches!(ty, DataType::Reference(Reference::Generic(inner)) if inner == generic) {
+            if matches!(ty, DataType::Generic(inner) if inner == generic) {
                 return Ok(());
             }
 
@@ -196,12 +196,13 @@ fn validate_map_key_inner(
             path,
             "tuple keys are not supported by serde_json map key serialization",
         )),
-        DataType::List(_) | DataType::Map(_) | DataType::Nullable(_) => {
-            Err(Error::invalid_map_key(
-                path,
-                "collection, map, and nullable keys are not supported by serde_json map key serialization",
-            ))
-        }
+        DataType::List(_)
+        | DataType::Map(_)
+        | DataType::Nullable(_)
+        | DataType::Intersection(_) => Err(Error::invalid_map_key(
+            path,
+            "collection, map, and nullable keys are not supported by serde_json map key serialization",
+        )),
     }
 }
 
@@ -333,7 +334,7 @@ fn resolve_generics_in_datatype(
                 }
                 DataType::Tuple(out)
             }
-            DataType::Reference(Reference::Generic(generic)) => {
+            DataType::Generic(generic) => {
                 if visiting.iter().any(|seen| seen == generic) {
                     return dt.clone();
                 }
@@ -341,8 +342,7 @@ fn resolve_generics_in_datatype(
                 if let Some((_, resolved)) =
                     generics.iter().find(|(candidate, _)| candidate == generic)
                 {
-                    if matches!(resolved, DataType::Reference(Reference::Generic(inner)) if inner == generic)
-                    {
+                    if matches!(resolved, DataType::Generic(inner) if inner == generic) {
                         dt.clone()
                     } else {
                         visiting.push(generic.clone());
@@ -354,7 +354,7 @@ fn resolve_generics_in_datatype(
                     dt.clone()
                 }
             }
-            DataType::Reference(_) => dt.clone(),
+            DataType::Reference(_) | DataType::Intersection(_) => dt.clone(),
         }
     }
 

@@ -63,7 +63,7 @@ fn resolve_generic_name(generic: &GenericReference) -> Option<Cow<'static, str>>
             scope
                 .iter()
                 .find(|candidate| candidate.reference() == *generic)
-                .map(|generic| generic.name.clone())
+                .map(|generic| generic.name().clone())
         })
     })
 }
@@ -130,7 +130,16 @@ fn export_single_internal(
     let schema_name = format!("{base_name}Schema");
 
     let _guard = push_type_render_stack(ndt.module_path.clone(), ndt.name.clone());
-    let _generic_scope = push_generic_scope(&ndt.generics);
+    let generic_scope = ndt
+        .generics
+        .iter()
+        .map(|generic| generic.reference())
+        .collect::<Vec<_>>();
+    let _generic_scope = push_generic_scope(&generic_scope);
+
+    let Some(ty) = &ndt.ty else {
+        return Ok(());
+    };
 
     if ndt.generics.is_empty() {
         let mut schema_expr = String::new();
@@ -138,7 +147,7 @@ fn export_single_internal(
             &mut schema_expr,
             exporter,
             types,
-            &ndt.ty,
+            ty,
             vec![ndt.name.clone()],
             &[],
             false,
@@ -171,7 +180,7 @@ fn export_single_internal(
         &mut schema_expr,
         exporter,
         types,
-        &ndt.ty,
+        ty,
         vec![ndt.name.clone()],
         &[],
         false,
@@ -266,13 +275,26 @@ fn datatype(
                         let ty = named
                             .ty(types)
                             .ok_or_else(|| Error::dangling_named_reference(format!("{named:?}")))?;
-                        let combined_generics = merged_generics(generics, &named.generics);
+                        let combined_generics = merged_generics(generics, named.generics());
                         datatype(s, exporter, types, ty, location, &combined_generics, false)?;
                     }
                     _ => reference_dt(s, exporter, types, r, location, generics)?,
                 }
             } else {
                 reference_dt(s, exporter, types, r, location, generics)?;
+            }
+        }
+        DataType::Generic(g) => generic_dt(s, exporter, types, g, location, generics)?,
+        DataType::Intersection(intersection) => {
+            let mut parts = Vec::with_capacity(intersection.len());
+            for ty in intersection {
+                let mut part = String::new();
+                datatype(&mut part, exporter, types, ty, location.clone(), generics, false)?;
+                parts.push(part);
+            }
+            s.push_str(&parts.join(".and("));
+            for _ in 1..parts.len() {
+                s.push(')');
             }
         }
     }
@@ -412,7 +434,7 @@ fn struct_dt(
                         ty,
                         location,
                         generics,
-                        field.inline,
+                        false,
                     )?;
                 }
                 fields => {
@@ -428,7 +450,7 @@ fn struct_dt(
                             ty,
                             location.clone(),
                             generics,
-                            field.inline,
+                            false,
                         )?;
                     }
                     s.push_str("])");
@@ -447,8 +469,7 @@ fn struct_dt(
                 return Ok(());
             }
 
-            let (flattened, non_flattened): (Vec<_>, Vec<_>) =
-                all_fields.iter().partition(|(_, field, _)| field.flatten);
+            let non_flattened = all_fields.iter().collect::<Vec<_>>();
 
             let mut schema = String::from("z.object({");
             for (name, field, ty) in &non_flattened {
@@ -462,7 +483,7 @@ fn struct_dt(
                     ty,
                     location.clone(),
                     generics,
-                    field.inline,
+                    false,
                 )?;
                 if field.optional {
                     write!(schema, "{value}.optional(),")?;
@@ -475,25 +496,7 @@ fn struct_dt(
             }
             schema.push_str("})");
 
-            let mut sections = vec![schema];
-            for (_, field, ty) in flattened {
-                let mut value = String::new();
-                datatype_with_inline_attr(
-                    &mut value,
-                    exporter,
-                    types,
-                    ty,
-                    location.clone(),
-                    generics,
-                    field.inline,
-                )?;
-                sections.push(value);
-            }
-
-            s.push_str(&sections.join(".and("));
-            for _ in 1..sections.len() {
-                s.push(')');
-            }
+            s.push_str(&schema);
         }
     }
 
@@ -567,7 +570,7 @@ fn enum_variant_dt(
                     continue;
                 };
 
-                if field.flatten {
+                if false {
                     let mut value = String::new();
                     datatype_with_inline_attr(
                         &mut value,
@@ -576,7 +579,7 @@ fn enum_variant_dt(
                         ty,
                         location.clone(),
                         generics,
-                        field.inline,
+                        false,
                     )?;
                     flattened_sections.push(value);
                     continue;
@@ -591,7 +594,7 @@ fn enum_variant_dt(
                     ty,
                     location.clone(),
                     generics,
-                    field.inline,
+                    false,
                 )?;
 
                 let key = sanitise_key(field_name);
@@ -644,7 +647,7 @@ fn enum_variant_dt(
                         ty,
                         location,
                         generics,
-                        field.inline,
+                        false,
                     )?;
                     Some(out)
                 }
@@ -662,7 +665,7 @@ fn enum_variant_dt(
                             ty,
                             location.clone(),
                             generics,
-                            field.inline,
+                            false,
                         )?;
                         out.push_str(&item);
                     }
@@ -684,26 +687,33 @@ fn reference_dt(
 ) -> Result<(), Error> {
     match r {
         Reference::Named(r) => reference_named_dt(s, exporter, types, r, location, generics),
-        Reference::Generic(g) => {
-            if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
-                if matches!(resolved_dt, DataType::Reference(Reference::Generic(inner)) if inner == g)
-                {
-                    let generic_name = resolve_generic_name(g)
-                        .ok_or_else(|| Error::unresolved_generic_reference(format!("{g:?}")))?;
-                    s.push_str(generic_name.as_ref());
-                } else {
-                    datatype(s, exporter, types, resolved_dt, location, generics, false)?;
-                }
-            } else {
-                let generic_name = resolve_generic_name(g)
-                    .ok_or_else(|| Error::unresolved_generic_reference(format!("{g:?}")))?;
-                s.push_str(generic_name.as_ref());
-            }
-
-            Ok(())
-        }
         Reference::Opaque(r) => reference_opaque_dt(s, r),
     }
+}
+
+fn generic_dt(
+    s: &mut String,
+    exporter: &Zod,
+    types: &Types,
+    g: &GenericReference,
+    location: Vec<Cow<'static, str>>,
+    generics: &[(GenericReference, DataType)],
+) -> Result<(), Error> {
+    if let Some((_, resolved_dt)) = generics.iter().find(|(ge, _)| ge == g) {
+        if matches!(resolved_dt, DataType::Generic(inner) if inner == g) {
+            let generic_name = resolve_generic_name(g)
+                .ok_or_else(|| Error::unresolved_generic_reference(format!("{g:?}")))?;
+            s.push_str(generic_name.as_ref());
+        } else {
+            datatype(s, exporter, types, resolved_dt, location, generics, false)?;
+        }
+    } else {
+        let generic_name = resolve_generic_name(g)
+            .ok_or_else(|| Error::unresolved_generic_reference(format!("{g:?}")))?;
+        s.push_str(generic_name.as_ref());
+    }
+
+    Ok(())
 }
 
 fn reference_opaque_dt(s: &mut String, r: &OpaqueReference) -> Result<(), Error> {
@@ -739,9 +749,14 @@ fn reference_named_dt(
         .get(types)
         .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
 
-    let _generic_scope = push_generic_scope(&ndt.generics);
+    let generic_scope = ndt
+        .generics
+        .iter()
+        .map(|generic| generic.reference())
+        .collect::<Vec<_>>();
+    let _generic_scope = push_generic_scope(&generic_scope);
 
-    if r.inline() {
+    if matches!(r.inner, specta::datatype::NamedReferenceType::Inline { .. }) {
         let ty = r
             .ty(types)
             .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
@@ -751,7 +766,7 @@ fn reference_named_dt(
 
         if !already_inlining {
             INLINE_REFERENCE_STACK.with(|stack| stack.borrow_mut().push(inline_key));
-            let combined_generics = merged_generics(generics, &r.generics);
+            let combined_generics = merged_generics(generics, r.generics());
             let result = datatype(s, exporter, types, ty, location, &combined_generics, false);
             INLINE_REFERENCE_STACK.with(|stack| {
                 stack.borrow_mut().pop();
@@ -792,11 +807,11 @@ fn reference_named_dt(
     });
 
     let mut reference_expr = schema_name;
-    if !r.generics.is_empty() {
+    if !r.generics().is_empty() {
         let scoped_generics = generics
             .iter()
             .filter(|(parent_generic, _)| {
-                !r.generics
+                !r.generics()
                     .iter()
                     .any(|(child_generic, _)| child_generic == parent_generic)
             })
@@ -804,7 +819,7 @@ fn reference_named_dt(
             .collect::<Vec<_>>();
 
         reference_expr.push('(');
-        for (i, (_, v)) in r.generics.iter().enumerate() {
+        for (i, (_, v)) in r.generics().iter().enumerate() {
             if i != 0 {
                 reference_expr.push_str(", ");
             }

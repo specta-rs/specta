@@ -287,19 +287,36 @@ impl Analyzer {
                     }
 
                     stack.push(reference.clone());
-                    let out = self.analyze(&ndt.ty, types, &reference.generics, stack);
+                    let Some(ty) = &ndt.ty else {
+                        stack.pop();
+                        return PlanNode::Identity;
+                    };
+
+                    let out = self.analyze(ty, types, reference.generics(), stack);
                     stack.pop();
                     out
                 } else {
                     PlanNode::Identity
                 }
             }
-            DataType::Reference(Reference::Generic(generic)) => generics
+            DataType::Generic(generic) => generics
                 .iter()
                 .find(|(key, _)| key == generic)
                 .map(|(_, dt)| self.analyze(dt, types, &[], stack))
                 .unwrap_or(PlanNode::Identity),
             DataType::Reference(Reference::Opaque(_)) => PlanNode::Identity,
+            DataType::Intersection(intersection) => {
+                let items = intersection
+                    .iter()
+                    .map(|ty| self.analyze(ty, types, generics, stack))
+                    .collect::<Vec<_>>();
+
+                if items.iter().all(PlanNode::is_identity) {
+                    PlanNode::Identity
+                } else {
+                    PlanNode::Tuple(items)
+                }
+            }
         }
     }
 
@@ -335,8 +352,6 @@ impl Analyzer {
                         let plan = self.analyze(ty, types, generics, stack);
                         if plan.is_identity() {
                             None
-                        } else if field.flatten {
-                            Some(ObjectFieldPlan::Flattened(plan))
                         } else {
                             Some(ObjectFieldPlan::Named(name.to_string(), plan))
                         }

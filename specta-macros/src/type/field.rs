@@ -57,7 +57,7 @@ pub fn construct_field_with_variant_skip(
         field.docs = #doc.into();
         field.attributes = #runtime_attrs;
         if #type_overridden {
-            field.attributes.insert("specta:inline", true);
+            field.attributes.insert("specta:type_override", true);
         }
         if let Some(ty) = #ty {
             field.ty = Some(ty);

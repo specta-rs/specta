@@ -5,7 +5,7 @@ use crate::datatype::Struct;
 use super::{Attributes, DataType, Deprecated};
 use std::borrow::Cow;
 
-/// Data stored within an enum variant or struct.
+/// Field layout for a struct or enum variant.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Fields {
     /// Unit struct.
@@ -22,11 +22,12 @@ pub enum Fields {
     Named(NamedFields),
 }
 
-/// Field metadata for a struct field or enum variant field.
+/// Metadata for a struct field or enum variant field.
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct Field {
-    /// Did the user apply a `#[specta(optional)]` attribute.
+    /// Whether the field was marked optional, for example with
+    /// `#[specta(optional)]`.
     pub optional: bool,
     /// Deprecated attribute for the field.
     pub deprecated: Option<Deprecated>,
@@ -34,7 +35,12 @@ pub struct Field {
     pub docs: Cow<'static, str>,
     /// Runtime attributes for this field.
     pub attributes: Attributes,
-    /// Type for the field. Is optional if `#[serde(skip)]` or `#[specta(skip)]` was applied.
+    /// Type for the field.
+    ///
+    /// This is `None` when the field was skipped with an attribute such as
+    /// `#[serde(skip)]` or `#[specta(skip)]`. Exporters should preserve enough
+    /// information to distinguish skipped fields from absent fields because some
+    /// serialization formats still let skipped fields affect layout.
     ///
     /// You might think, well why not apply this in the macro and just not emit the variant?
     /// Well in Serde `A(String)` and `A(#[serde(skip)] (), String)` export as different Typescript types so the exporter needs runtime knowledge of this.
@@ -42,9 +48,10 @@ pub struct Field {
 }
 
 impl Field {
-    /// Construct a new field with the given type.
+    /// Constructs a new non-optional field with the given type.
     ///
-    /// You can skip the requirement on providing a [`DataType`] by using [`Field::default`]
+    /// Use [`Field::default`] to construct skipped-field metadata where `ty` is
+    /// initially `None`.
     pub fn new(ty: DataType) -> Self {
         Field {
             optional: false,
@@ -56,39 +63,44 @@ impl Field {
     }
 }
 
-/// The fields of an unnamed enum variant.
+/// Fields for an unnamed tuple struct or tuple enum variant.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct UnnamedFields {
+    /// Field metadata in source order.
     pub fields: Vec<Field>,
 }
 
-/// The fields of an named enum variant or a struct.
+/// Fields for a named struct or struct enum variant.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct NamedFields {
+    /// Field names and metadata in source order.
     pub fields: Vec<(Cow<'static, str>, Field)>,
 }
 
 #[derive(Debug, Clone)]
 /// Builder for constructing [`DataType::Struct`] values.
+///
+/// The type parameter tracks whether the builder is currently collecting named
+/// or unnamed fields.
 pub struct StructBuilder<F = ()> {
     pub(crate) fields: F,
 }
 
 impl StructBuilder<NamedFields> {
-    /// Add a named field.
+    /// Adds a named field and returns the updated builder.
     pub fn field(mut self, name: impl Into<Cow<'static, str>>, field: Field) -> Self {
         self.fields.fields.push((name.into(), field));
         self
     }
 
-    /// Add a named field in-place.
+    /// Adds a named field in-place.
     pub fn field_mut(&mut self, name: impl Into<Cow<'static, str>>, field: Field) {
         self.fields.fields.push((name.into(), field));
     }
 
-    /// Finalize this builder into a [`DataType`].
+    /// Finalizes this builder into a [`DataType::Struct`] with named fields.
     pub fn build(self) -> DataType {
         DataType::Struct(Struct {
             fields: Fields::Named(self.fields),
@@ -98,18 +110,18 @@ impl StructBuilder<NamedFields> {
 }
 
 impl StructBuilder<UnnamedFields> {
-    /// Add an unnamed field.
+    /// Adds an unnamed field and returns the updated builder.
     pub fn field(mut self, field: Field) -> Self {
         self.fields.fields.push(field);
         self
     }
 
-    /// Add an unnamed field in-place.
+    /// Adds an unnamed field in-place.
     pub fn field_mut(&mut self, field: Field) {
         self.fields.fields.push(field);
     }
 
-    /// Finalize this builder into a [`DataType`].
+    /// Finalizes this builder into a [`DataType::Struct`] with unnamed fields.
     pub fn build(self) -> DataType {
         DataType::Struct(Struct {
             fields: Fields::Unnamed(self.fields),

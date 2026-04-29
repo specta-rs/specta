@@ -166,7 +166,7 @@ pub fn parse_enum(
                 v.docs = #doc.into();
                 v.attributes = #runtime_attrs;
                 if #type_overridden {
-                    v.attributes.insert("specta:inline", true);
+                    v.attributes.insert("specta:type_override", true);
                 }
                 v
             })))

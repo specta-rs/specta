@@ -2,14 +2,22 @@ use std::{borrow::Cow, error};
 
 use crate::{Types, datatype::DataType};
 
-/// Error type returned by [Format] callbacks.
+/// Error type returned by [`Format`] callbacks.
 pub type FormatError = Box<dyn error::Error + Send + Sync + 'static>;
 
-/// Internal formatter callbacks for rewriting collected types and nested datatypes.
+/// Formatter callbacks for rewriting collected types and nested datatypes.
 ///
-/// This is used by [specta-serde] and other serialize/deserialization formats to apply their attributes.
-/// This can also be used by frameworks to do special transformations to datatypes (like for BigInt support).
+/// This is used by format integration crates, such as `specta-serde`, to apply
+/// format-specific attributes. Exporters and frameworks can also use it for
+/// targeted transformations, such as replacing a Rust integer with an
+/// exporter-specific bigint representation.
 ///
+/// # Invariants
+///
+/// Implementations may return [`Cow::Borrowed`] when no transformation is
+/// needed. Returned owned values must remain internally consistent: references
+/// in mapped datatypes should still resolve against the mapped [`Types`]
+/// collection the exporter will use.
 pub trait Format {
     /// Apply a map function to the full [`Types`] collection.
     ///
