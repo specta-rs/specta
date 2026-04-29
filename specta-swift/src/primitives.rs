@@ -258,7 +258,7 @@ pub fn export_type(
     // Format based on type
     match ndt.ty.as_ref().expect("checked above") {
         DataType::Struct(s) => {
-            let type_def = struct_to_swift(swift, types, s, generic_scope.clone(), None)?;
+            let type_def = struct_to_swift(swift, types, s, generic_scope.clone())?;
             let name = swift.naming.convert(&ndt.name);
             let generics = if ndt.generics.is_empty() {
                 String::new()
@@ -342,14 +342,13 @@ pub fn export_type(
                 "public enum {}{}{} {{\n",
                 name, generics, protocol_part
             ));
-            let enum_body =
-                enum_to_swift(swift, types, e, generic_scope.clone(), None, Some(&name))?;
+            let enum_body = enum_to_swift(swift, types, e, generic_scope.clone(), Some(&name))?;
             result.push_str(&enum_body);
             result.push('}');
 
             // Generate struct definitions for named field variants
             let struct_definitions =
-                generate_enum_structs(swift, types, e, generic_scope.clone(), None, &name)?;
+                generate_enum_structs(swift, types, e, generic_scope.clone(), &name)?;
             result.push_str(&struct_definitions);
 
             // Generate custom Codable implementation for enums with struct variants
@@ -399,12 +398,12 @@ pub fn datatype_to_swift(
             if is_duration_struct(s) {
                 return Ok("RustDuration".to_string());
             }
-            struct_to_swift(swift, types, s, generic_scope, None)
+            struct_to_swift(swift, types, s, generic_scope)
         }
-        DataType::Enum(e) => enum_to_swift(swift, types, e, generic_scope, None, None),
+        DataType::Enum(e) => enum_to_swift(swift, types, e, generic_scope, None),
         DataType::Tuple(t) => tuple_to_swift(swift, types, t, generic_scope.clone()),
         DataType::Reference(r) => reference_to_swift(swift, types, r, &generic_scope),
-        DataType::Generic(g) => generic_to_swift(swift, g, &generic_scope),
+        DataType::Generic(g) => generic_to_swift(g, &generic_scope),
         DataType::Intersection(_) => Err(Error::UnsupportedType(
             "Intersection types are not supported by Swift exporter".to_string(),
         )),
@@ -670,7 +669,6 @@ fn struct_to_swift(
     types: &Types,
     s: &specta::datatype::Struct,
     generic_scope: Vec<Generic>,
-    _reference: Option<&specta::datatype::Reference>,
 ) -> Result<String, Error> {
     match &s.fields {
         specta::datatype::Fields::Unit => Ok("Void".to_string()),
@@ -754,7 +752,6 @@ fn enum_to_swift(
     types: &Types,
     e: &specta::datatype::Enum,
     generic_scope: Vec<Generic>,
-    _reference: Option<&specta::datatype::Reference>,
     enum_name: Option<&str>,
 ) -> Result<String, Error> {
     let mut result = String::new();
@@ -859,7 +856,6 @@ fn generate_enum_structs(
     types: &Types,
     e: &specta::datatype::Enum,
     generic_scope: Vec<Generic>,
-    _reference: Option<&specta::datatype::Reference>,
     enum_name: &str,
 ) -> Result<String, Error> {
     let mut result = String::new();
@@ -1017,7 +1013,6 @@ fn reference_to_swift(
 
 /// Convert generic types to Swift.
 fn generic_to_swift(
-    _swift: &Swift,
     g: &specta::datatype::GenericReference,
     generic_scope: &[Generic],
 ) -> Result<String, Error> {

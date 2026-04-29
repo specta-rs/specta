@@ -233,7 +233,6 @@ pub(crate) fn tuple_datatype(
 
 pub(crate) fn struct_datatype(
     ctx: ExportContext,
-    _parent_name: Option<&str>,
     strct: &Struct,
     types: &Types,
     s: &mut String,
@@ -488,8 +487,8 @@ fn enum_variant_datatype(
             let fields = obj
                 .fields
                 .iter()
-                .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
-                .map(|(field, ty)| {
+                .filter_map(|field| field.ty.as_ref())
+                .map(|ty| {
                     let mut s = String::new();
                     crate::primitives::datatype_with_inline_attr(
                         &mut s,

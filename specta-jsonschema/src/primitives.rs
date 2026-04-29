@@ -69,7 +69,7 @@ pub fn datatype_to_schema(
         }
 
         // Struct
-        DataType::Struct(s) => struct_to_schema(js, types, s, is_definition),
+        DataType::Struct(s) => struct_to_schema(js, types, s),
 
         // Enum
         DataType::Enum(e) => enum_to_schema(js, types, e),
@@ -156,7 +156,6 @@ fn struct_to_schema(
     js: &JsonSchema,
     types: &Types,
     s: &Struct,
-    _is_definition: bool,
 ) -> Result<Value, Error> {
     match &s.fields {
         Fields::Unit => {

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use specta::{
     Types,
-    datatype::{DataType, Fields, GenericReference, NamedReferenceType, Primitive, Reference},
+    datatype::{DataType, Fields, NamedReferenceType, Primitive, Reference},
 };
 
 use crate::Error;
@@ -10,7 +10,6 @@ use crate::Error;
 pub(crate) fn validate_map_key(
     key_ty: &DataType,
     types: &Types,
-    _generics: &[(GenericReference, DataType)],
     path: String,
 ) -> Result<(), Error> {
     validate_map_key_inner(key_ty, types, path, &mut HashSet::new())

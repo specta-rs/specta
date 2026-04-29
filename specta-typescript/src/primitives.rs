@@ -718,7 +718,7 @@ fn shallow_inline_datatype(
         }
         DataType::Map(map) => {
             let path = map_key_path(&location);
-            map_keys::validate_map_key(map.key_ty(), types, generics, format!("{path}.<map_key>"))?;
+            map_keys::validate_map_key(map.key_ty(), types, format!("{path}.<map_key>"))?;
             let rendered_key = map_key_render_type(map.key_ty().clone());
 
             fn is_exhaustive(dt: &DataType, types: &Types) -> bool {
@@ -807,7 +807,6 @@ fn shallow_inline_datatype(
                     cfg: exporter,
                     path: vec![],
                 },
-                parent_name,
                 st,
                 types,
                 s,
@@ -1051,7 +1050,6 @@ fn inline_datatype(
                                 cfg: exporter,
                                 path: vec![],
                             },
-                            parent_name,
                             st,
                             types,
                             s,
@@ -1067,7 +1065,6 @@ fn inline_datatype(
                         cfg: exporter,
                         path: vec![],
                     },
-                    parent_name,
                     st,
                     types,
                     s,
@@ -1076,8 +1073,8 @@ fn inline_datatype(
                 )?
             }
         }
-        DataType::Enum(e) => enum_dt(s, exporter, types, e, location, prefix, generics)?,
-        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, generics)?,
+        DataType::Enum(e) => enum_dt(s, exporter, types, e, prefix, generics)?,
+        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, generics)?,
         DataType::Intersection(types_) => intersection_dt(
             s,
             exporter,
@@ -1131,7 +1128,7 @@ pub(crate) fn datatype(
 
     match dt {
         DataType::Primitive(p) => s.push_str(primitive_dt(p, location)?),
-        DataType::List(l) => list_dt(s, exporter, types, l, location, generics)?,
+        DataType::List(l) => list_dt(s, exporter, types, l, generics)?,
         DataType::Map(m) => map_dt(s, exporter, types, m, location, generics)?,
         DataType::Nullable(def) => {
             // TODO: Replace legacy stuff
@@ -1167,7 +1164,6 @@ pub(crate) fn datatype(
                     cfg: exporter,
                     path: vec![],
                 },
-                parent_name,
                 st,
                 types,
                 s,
@@ -1175,8 +1171,8 @@ pub(crate) fn datatype(
                 generics,
             )?
         }
-        DataType::Enum(e) => enum_dt(s, exporter, types, e, location, prefix, generics)?,
-        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, location, generics)?,
+        DataType::Enum(e) => enum_dt(s, exporter, types, e, prefix, generics)?,
+        DataType::Tuple(t) => tuple_dt(s, exporter, types, t, generics)?,
         DataType::Intersection(types_) => {
             for (idx, ty) in types_.iter().enumerate() {
                 if idx != 0 {
@@ -1222,7 +1218,6 @@ fn list_dt(
     exporter: &Exporter,
     types: &Types,
     l: &List,
-    _location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     // TODO: This is the legacy stuff
@@ -1312,7 +1307,7 @@ fn map_dt(
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     let path = map_key_path(&location);
-    map_keys::validate_map_key(m.key_ty(), types, generics, format!("{path}.<map_key>"))?;
+    map_keys::validate_map_key(m.key_ty(), types, format!("{path}.<map_key>"))?;
 
     {
         fn is_exhaustive(dt: &DataType, types: &Types) -> bool {
@@ -1406,7 +1401,6 @@ fn enum_dt(
     exporter: &Exporter,
     types: &Types,
     e: &Enum,
-    _location: Vec<Cow<'static, str>>,
     prefix: &str,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
@@ -1830,7 +1824,6 @@ fn tuple_dt(
     exporter: &Exporter,
     types: &Types,
     t: &Tuple,
-    _location: Vec<Cow<'static, str>>,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     {
@@ -1879,7 +1872,7 @@ fn reference_dt(
     match r {
         Reference::Named(r) => match &r.inner {
             NamedReferenceType::Reference { .. } => {
-                reference_named_dt(s, exporter, format, types, r, location, prefix, generics)
+                reference_named_dt(s, exporter, types, r, generics)
             }
             NamedReferenceType::Inline { dt, .. } => inline_datatype(
                 s, exporter, format, types, dt, location, None, prefix, 0, generics,
@@ -1948,11 +1941,8 @@ fn reference_opaque_dt(
 fn reference_named_dt(
     s: &mut String,
     exporter: &Exporter,
-    _format: Option<&dyn Format>,
     types: &Types,
     r: &NamedReference,
-    _location: Vec<Cow<'static, str>>,
-    _prefix: &str,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
     // TODO: Legacy stuff
