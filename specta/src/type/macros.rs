@@ -323,7 +323,7 @@ macro_rules! _impl_ndt {
             fn definition(types: &mut Types) -> DataType {
                 use $crate::datatype;
 
-                impl_ndt!(@definition_body false stringify!($($ty)* $($ty_generics)*), [$($generic),*], [$($ty)* $($specta_generics)*], impl_ndt!(@module_path $($ty)*), $inline, $container, $as_ty, types)
+                impl_ndt!(@definition_body_const false stringify!($($ty)* $($ty_generics)*), [$($generic),*], [$($ty)* $($specta_generics)*], impl_ndt!(@module_path $($ty)*), $inline, $container, $as_ty, types)
             }
         }
     };
@@ -335,13 +335,20 @@ macro_rules! _impl_ndt {
             fn definition(types: &mut Types) -> DataType {
                 use $crate::datatype;
 
-                impl_ndt!(@definition_body true stringify!($($ty)* $($ty_generics)*), [$($generic),*], [$($ty)* $($specta_generics)*], impl_ndt!(@module_path $($ty)*), $inline, $container, $as_ty, types)
+                impl_ndt!(@definition_body_const true stringify!($($ty)* $($ty_generics)*), [$($generic),*], [$($ty)* $($specta_generics)*], impl_ndt!(@module_path $($ty)*), $inline, $container, $as_ty, types)
             }
         }
     };
 
-    // Helpers for determining NDT name
     (@definition_body $typed_generics:tt $sentinel:expr, [$($generic:ident),*], [$($type_name:tt)*], $module_path:expr, $inline:literal, $container:literal, $as_ty:ty, $types:ident) => {{
+        impl_ndt!(@definition_body_inner false, $typed_generics $sentinel, [$($generic),*], [$($type_name)*], $module_path, $inline, $container, $as_ty, $types)
+    }};
+    (@definition_body_const $typed_generics:tt $sentinel:expr, [$($generic:ident),*], [$($type_name:tt)*], $module_path:expr, $inline:literal, $container:literal, $as_ty:ty, $types:ident) => {{
+        impl_ndt!(@definition_body_inner true, $typed_generics $sentinel, [$($generic),*], [$($type_name)*], $module_path, $inline, $container, $as_ty, $types)
+    }};
+
+    // Helpers for determining NDT name
+    (@definition_body_inner $has_const_param:literal, $typed_generics:tt $sentinel:expr, [$($generic:ident),*], [$($type_name:tt)*], $module_path:expr, $inline:literal, $container:literal, $as_ty:ty, $types:ident) => {{
         static SENTINEL: &str = $sentinel;
         static GENERICS: &[datatype::GenericDefinition] = &[
             $(
@@ -363,7 +370,7 @@ macro_rules! _impl_ndt {
                         ),
                     )*
                 ],
-                false,
+                $has_const_param,
                 $container,
                 types,
                 |types, ndt| {

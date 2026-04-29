@@ -168,24 +168,28 @@ impl NamedDataType {
             };
 
             // We patch the Tauri `Type` implementation.
-            if ndt.name == "TAURI_CHANNEL" && ndt.module_path.starts_with("tauri::") {
+            let is_tauri_type =
+                ndt.name == "TAURI_CHANNEL" && ndt.module_path.starts_with("tauri::");
+            if is_tauri_type {
                 ndt.ty = None;
                 inline = true;
-                build_ty = |_| reference::tauri().into();
-
-                // // This causes an exporter that isn't aware of Tauri's channel to error.
-                // // This is effectively `Reference::opaque(TauriChannel)` but we do some hackery for better errors.
-
-                // TODO: reference::tauri().into();
-
-                // // This ensures that we never create a `export type Channel`,
-                // // instead the definition gets inlined into each callsite.
-                // inline = true;
-                // // ndt.inline = true;
+                build_ty = |_| {
+                    unreachable!("Specta `build_ty` shouldn't be callable with `tauri::Channel`")
+                }
             }
 
             types.types.insert(id.clone(), Some(ndt));
             types.len += 1;
+
+            // We patch the Tauri `Type` implementation.
+            if is_tauri_type {
+                return Reference::Named(NamedReference {
+                    id,
+                    inner: NamedReferenceType::Reference {
+                        generics: instantiation_generics.to_owned(),
+                    },
+                });
+            }
         }
 
         if inline {
@@ -207,14 +211,11 @@ impl NamedDataType {
                     let result = panic::catch_unwind(AssertUnwindSafe(|| build_ty(types)));
                     types.should_inline = prev_inline;
 
-                    return match result {
-                        Ok(DataType::Reference(reference)) => reference,
-                        Ok(_) => Reference::Named(NamedReference {
-                            id,
-                            inner: NamedReferenceType::Recursive,
-                        }),
+                    match result {
+                        Ok(DataType::Reference(reference)) => return reference,
+                        Ok(_) => {}
                         Err(payload) => panic::resume_unwind(payload),
-                    };
+                    }
                 }
 
                 return Reference::Named(NamedReference {
