@@ -13,12 +13,12 @@ f64: number
 bool: boolean
 char: string
 Range<i32>: {
-	start: number,
-	end: number,
+	start: T,
+	end: T,
 }
 RangeInclusive<i32>: {
-	start: number,
-	end: number,
+	start: T,
+	end: T,
 }
 (): null
 (String, i32): [string, number]
@@ -52,7 +52,10 @@ Vec<MyEnum>: MyEnum[]
 Option<i32>: number | null
 Option<()>: null
 Option<Vec<i32>>: number[] | null
-Result<String, i32>: string | number
+Result<String, i32>: {
+	ok: T,
+	err: E,
+}
 Vec<Option<Cow<'static, i32>>>: (number | null)[]
 Option<Vec<Cow<'static, i32>>>: number[] | null
 [Vec<String>; 3]: [string[], string[], string[]]
@@ -87,10 +90,10 @@ InlinerStruct: {
 	dont_inline_this: RefStruct,
 }
 GenericStruct<i32>: {
-	arg: number,
+	arg: T,
 }
 GenericStruct<String>: {
-	arg: string,
+	arg: T,
 }
 FlattenEnumStruct: {
 	outer: string,
@@ -106,8 +109,8 @@ InlineEnumField: {
 }
 InlineOptionalType: {
 	optional_field: {
-		a: string,
-	} | null,
+	a: string,
+} | null,
 }
 Rename: "OneWord" | "TwoWords"
 TransparentType: TransparentTypeInner
@@ -136,8 +139,8 @@ InlineTuple: {
 }
 InlineTuple2: {
 	demo: [{
-		demo: [string, boolean],
-	}, boolean],
+	demo: [string, boolean],
+}, boolean],
 }
 Box<str>: string
 Box<String>: string
@@ -150,10 +153,10 @@ Issue281<'_>: {
 	default_unity_arguments: string[],
 }
 LifetimeGenericStruct<'_, i32>: {
-	borrowed: number[],
-	owned: number[],
+	borrowed: T[],
+	owned: T[],
 }
-LifetimeGenericEnum<'_, i32>: number
+LifetimeGenericEnum<'_, i32>: T
 RenameWithWeirdCharsField: {
 	odata_context: string,
 }
@@ -180,15 +183,15 @@ SpectaTypeOverride: {
 ContainerTypeOverrideStruct: string
 ContainerTypeOverrideEnum: string
 ContainerTypeOverrideGeneric<Box<dyn Any>>: string
-ContainerTypeOverrideToGeneric<i32>: number
+ContainerTypeOverrideToGeneric<i32>: T
 ContainerTypeOverrideTuple: [string, number]
-ContainerTypeOverrideTupleGeneric<i32>: [number, string]
+ContainerTypeOverrideTupleGeneric<i32>: [T, string]
 InvalidToValidType: {
 	cause: null,
 }
 TupleStruct: string
 TupleStructWithRep: string
-GenericTupleStruct<String>: string
+GenericTupleStruct<String>: T
 BracedStruct: string
 Struct: {
 	a: string,
@@ -318,32 +321,32 @@ number |
 // Some single-line comment
 a: number }
 NonGeneric: {
-	a: number,
-	b: boolean,
+	a: A,
+	b: B,
 }
 HalfGenericA<u8>: {
-	a: number,
-	b: boolean,
+	a: A,
+	b: B,
 }
 HalfGenericB<bool>: {
-	a: number,
-	b: boolean,
+	a: A,
+	b: B,
 }
 FullGeneric<u8, bool>: {
-	a: number,
-	b: boolean,
+	a: A,
+	b: B,
 }
 Another<bool>: {
-	a: number,
-	b: boolean,
+	a: A,
+	b: B,
 }
 MapA<u32>: { [key in string]: number }
 MapB<u32>: { [key in number]: string }
 MapC<u32>: { [key in string]: AGenericStruct<number> }
 AGenericStruct<u32>: {
 	field: {
-	a: number,
-	b: boolean,
+	a: A,
+	b: B,
 },
 }
 A: {
@@ -503,39 +506,39 @@ FlattenG: {
 }
 TupleNested: [number[], [number[], number[]], [number[], number[], number[]]]
 Generic1<()>: {
-	value: null,
-	values: null[],
+	value: T,
+	values: T[],
 }
 GenericAutoBound<()>: {
-	value: null,
-	values: null[],
+	value: T,
+	values: T[],
 }
 GenericAutoBound2<()>: {
-	value: null,
-	values: null[],
+	value: T,
+	values: T[],
 }
 Container1: {
 	foo: Generic1<number>,
 	bar: Generic1<number>[],
 	baz: { [key in string]: Generic1<string> },
 }
-Generic2<(), String, i32>: null | [string, string, string] | number[] | null[][][] | { a: null; b: string; c: number } | number | number[][]
-GenericNewType1<()>: null[][]
-GenericTuple<()>: [null, null[], null[][]]
+Generic2<(), String, i32>: A | [B, B, B] | C[] | A[][][] | { a: A; b: B; c: C } | number[] | number | number[][]
+GenericNewType1<()>: T[][]
+GenericTuple<()>: [T, T[], T[][]]
 GenericStruct2<()>: {
-	a: null,
-	b: [null, null],
-	c: [null, [null, null]],
-	d: [null, null, null],
-	e: [([null, null]), ([null, null]), ([null, null])],
-	f: null[],
-	g: null[][],
-	h: ([([null, null]), ([null, null]), ([null, null])])[],
+	a: T,
+	b: [T, T],
+	c: [T, [T, T]],
+	d: [T, T, T],
+	e: [([T, T]), ([T, T]), ([T, T])],
+	f: T[],
+	g: T[][],
+	h: ([([T, T]), ([T, T]), ([T, T])])[],
 }
 InlineGenericNewtype<String>: string
 InlineGenericNested<String>: [string, string[], [string, string], { [key in string]: string }, string | null, "Unit" | string | { value: string }]
 InlineFlattenGenericsG<()>: {
-	t: null,
+	t: T,
 }
 InlineFlattenGenerics: {
 	g: InlineFlattenGenericsG<string>,
@@ -545,26 +548,26 @@ InlineFlattenGenerics: {
 	t: InlineFlattenGenericsG<string>,
 }
 GenericDefault: {
-	value: string,
+	value: T,
 }
 ChainedGenericDefault: {
-	first: string,
-	second: string,
+	first: T,
+	second: U,
 }
 ChainedGenericDefault<String, String>: {
-	first: string,
-	second: string,
+	first: T,
+	second: U,
 }
 ChainedGenericDefault<i32>: {
-	first: number,
-	second: number,
+	first: T,
+	second: U,
 }
 ChainedGenericDefault<String, i32>: {
-	first: string,
-	second: number,
+	first: T,
+	second: U,
 }
 GenericDefaultSkipped: {
-	value: string,
+	value: T,
 }
 GenericDefaultSkippedNonType: {
 	value: number,
@@ -578,8 +581,8 @@ ConstGenericInNonConstContainer: {
 	d: [number, number],
 }
 ConstGenericInConstContainer: {
-	data: [number],
-	a: [number, number],
+	data: number[],
+	a: number[],
 	d: [number, number],
 }
 NamedConstGenericContainer: {
