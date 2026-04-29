@@ -63,28 +63,28 @@ const _: () = {
         std::string::String as str = inline;
 
         // Non-unique sets
-        std::vec::Vec<T> as [T] = inline_passthrough;
-        std::collections::VecDeque<T> as [T] = inline_passthrough;
-        std::collections::BinaryHeap<T> as [T] = inline_passthrough;
-        std::collections::LinkedList<T> as [T] = inline_passthrough;
+        std::vec::Vec<T> as [T] = passthrough;
+        std::collections::VecDeque<T> as [T] = passthrough;
+        std::collections::BinaryHeap<T> as [T] = passthrough;
+        std::collections::LinkedList<T> as [T] = passthrough;
 
         // Unique sets
-        std::collections::HashSet<T> as PrimitiveSet<T> = inline_passthrough;
-        std::collections::BTreeSet<T> as PrimitiveSet<T> = inline_passthrough;
+        std::collections::HashSet<T> as PrimitiveSet<T> = passthrough;
+        std::collections::BTreeSet<T> as PrimitiveSet<T> = passthrough;
 
         // Maps
-        std::collections::HashMap<K, V> as PrimitiveMap<K, V> = inline_passthrough;
-        std::collections::BTreeMap<K, V> as PrimitiveMap<K, V> = inline_passthrough;
+        std::collections::HashMap<K, V> as PrimitiveMap<K, V> = passthrough;
+        std::collections::BTreeMap<K, V> as PrimitiveMap<K, V> = passthrough;
 
         // Containers
-        std::boxed::Box<T> where { T: Type + ?Sized } as T = inline_passthrough;
-        std::rc::Rc<T> where { T: Type + ?Sized } as T = inline_passthrough;
-        std::sync::Arc<T> where { T: Type + ?Sized } as T = inline_passthrough;
-        std::cell::Cell<T> where { T: Type + ?Sized } as T = inline_passthrough;
-        std::cell::RefCell<T> where { T: Type + ?Sized } as T = inline_passthrough;
+        std::boxed::Box<T> where { T: Type + ?Sized } as T = passthrough;
+        std::rc::Rc<T> where { T: Type + ?Sized } as T = passthrough;
+        std::sync::Arc<T> where { T: Type + ?Sized } as T = passthrough;
+        std::cell::Cell<T> where { T: Type + ?Sized } as T = passthrough;
+        std::cell::RefCell<T> where { T: Type + ?Sized } as T = passthrough;
 
-        std::sync::Mutex<T> where { T: Type + ?Sized } as T = inline_passthrough;
-        std::sync::RwLock<T> where { T: Type + ?Sized } as T = inline_passthrough;
+        std::sync::Mutex<T> where { T: Type + ?Sized } as T = passthrough;
+        std::sync::RwLock<T> where { T: Type + ?Sized } as T = passthrough;
 
         std::ffi::CString as str = inline;
         std::ffi::CStr as str = inline;
@@ -200,8 +200,8 @@ const _: () = {
 #[cfg(feature = "tokio")]
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 impl_ndt!(
-    tokio::sync::Mutex<T> where { T: Type + ?Sized } as T = inline_passthrough;
-    tokio::sync::RwLock<T> where { T: Type + ?Sized } as T = inline_passthrough;
+    tokio::sync::Mutex<T> where { T: Type + ?Sized } as T = passthrough;
+    tokio::sync::RwLock<T> where { T: Type + ?Sized } as T = passthrough;
 );
 
 impl<T: Type + ?Sized> Type for &T {

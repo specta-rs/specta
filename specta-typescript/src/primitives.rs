@@ -742,7 +742,7 @@ fn shallow_inline_datatype(
             }
 
             s.push_str("{ [key in ");
-            shallow_inline_datatype(
+            map_key_datatype(
                 s,
                 exporter,
                 format,
@@ -1009,7 +1009,7 @@ fn inline_datatype(
                 write!(s, "{dt_str}[]")?;
             }
         }
-        DataType::Map(m) => map_dt(s, exporter, types, m, location, generics)?,
+        DataType::Map(m) => map_dt(s, exporter, format, types, m, location, generics)?,
         DataType::Nullable(def) => {
             let mut inner = String::new();
             inline_datatype(
@@ -1159,7 +1159,7 @@ pub(crate) fn datatype(
     match dt {
         DataType::Primitive(p) => s.push_str(primitive_dt(p, location)?),
         DataType::List(l) => list_dt(s, exporter, types, l, generics)?,
-        DataType::Map(m) => map_dt(s, exporter, types, m, location, generics)?,
+        DataType::Map(m) => map_dt(s, exporter, format, types, m, location, generics)?,
         DataType::Nullable(def) => {
             // TODO: Replace legacy stuff
             let mut inner = String::new();
@@ -1328,9 +1328,39 @@ fn list_dt(
     Ok(())
 }
 
+fn map_key_datatype(
+    s: &mut String,
+    exporter: &Exporter,
+    format: Option<&dyn Format>,
+    types: &Types,
+    key_ty: &DataType,
+    location: Vec<Cow<'static, str>>,
+    parent_name: Option<&str>,
+    prefix: &str,
+    generics: &[(GenericReference, DataType)],
+) -> Result<(), Error> {
+    match key_ty {
+        DataType::Reference(r) => {
+            reference_dt(s, exporter, format, types, r, location, prefix, generics)
+        }
+        key_ty => shallow_inline_datatype(
+            s,
+            exporter,
+            format,
+            types,
+            key_ty,
+            location,
+            parent_name,
+            prefix,
+            generics,
+        ),
+    }
+}
+
 fn map_dt(
     s: &mut String,
     exporter: &Exporter,
+    format: Option<&dyn Format>,
     types: &Types,
     m: &Map,
     location: Vec<Cow<'static, str>>,
@@ -1361,14 +1391,15 @@ fn map_dt(
             s.push_str("Partial<");
         }
         s.push_str("{ [key in ");
-        crate::legacy::datatype_inner(
-            crate::legacy::ExportContext {
-                cfg: exporter,
-                path: vec![],
-            },
-            &resolved_key,
-            types,
+        map_key_datatype(
             s,
+            exporter,
+            format,
+            types,
+            &resolved_key,
+            location,
+            None,
+            "",
             generics,
         )?;
         s.push_str("]: ");

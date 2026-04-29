@@ -16,8 +16,8 @@ impl Type for String {
 #[cfg_attr(docsrs, doc(cfg(feature = "indexmap")))]
 const _: () = {
     impl_ndt!(
-        indexmap::IndexSet<T> as PrimitiveSet<T> = inline_passthrough;
-        indexmap::IndexMap<K, V> as PrimitiveMap<K, V> = inline_passthrough;
+        indexmap::IndexSet<T> as PrimitiveSet<T> = passthrough;
+        indexmap::IndexMap<K, V> as PrimitiveMap<K, V> = passthrough;
     );
 };
 
@@ -33,17 +33,17 @@ impl_ndt!(
 const _: () = {
     impl_ndt!(
         // Sequential containers
-        heapless::Vec<T> <T, const N: usize, LenT> where { T: Type, LenT: heapless::LenType } as [T; N] = inline_passthrough;
-        heapless::Deque<T> <T, const N: usize> where { T: Type } as [T; N] = inline_passthrough;
-        heapless::HistoryBuf<T> <T, const N: usize> where { T: Type } as [T; N] = inline_passthrough;
-        heapless::BinaryHeap<T, K> <T, K, const N: usize> where { T: Type + Ord, K: heapless::binary_heap::Kind } as [T; N] = inline_passthrough;
+        heapless::Vec<T> <T, const N: usize, LenT> where { T: Type, LenT: heapless::LenType } as [T; N] = passthrough;
+        heapless::Deque<T> <T, const N: usize> where { T: Type } as [T; N] = passthrough;
+        heapless::HistoryBuf<T> <T, const N: usize> where { T: Type } as [T; N] = passthrough;
+        heapless::BinaryHeap<T, K> <T, K, const N: usize> where { T: Type + Ord, K: heapless::binary_heap::Kind } as [T; N] = passthrough;
 
         // Sets
-        heapless::IndexSet<T, S> <T, S, const N: usize> where { T: Type + Eq + core::hash::Hash, S: core::hash::BuildHasher } as PrimitiveSet<T> = inline_passthrough;
+        heapless::IndexSet<T, S> <T, S, const N: usize> where { T: Type + Eq + core::hash::Hash, S: core::hash::BuildHasher } as PrimitiveSet<T> = passthrough;
 
         // Maps
-        heapless::IndexMap<K, V, S> <K, V, S, const N: usize> where { K: Type + Eq + core::hash::Hash, V: Type, S: core::hash::BuildHasher } as PrimitiveMap<K, V> = inline_passthrough;
-        heapless::LinearMap<K, V> <K, V, const N: usize> where { K: Type + Eq, V: Type } as PrimitiveMap<K, V> = inline_passthrough;
+        heapless::IndexMap<K, V, S> <K, V, S, const N: usize> where { K: Type + Eq + core::hash::Hash, V: Type, S: core::hash::BuildHasher } as PrimitiveMap<K, V> = passthrough;
+        heapless::LinearMap<K, V> <K, V, const N: usize> where { K: Type + Eq, V: Type } as PrimitiveMap<K, V> = passthrough;
 
         // String container
         heapless::String <const N: usize, LenT> where { LenT: heapless::LenType } as str = inline;
@@ -66,12 +66,12 @@ impl_ndt!(smol_str::SmolStr as str = inline);
 #[cfg_attr(docsrs, doc(cfg(feature = "arrayvec")))]
 impl_ndt!(
     arrayvec::ArrayString <const N: usize> as str = inline;
-    arrayvec::ArrayVec<T> <T, const N: usize> as [T; N] = inline_passthrough;
+    arrayvec::ArrayVec<T> <T, const N: usize> as [T; N] = passthrough;
 );
 
 #[cfg(feature = "smallvec")]
 #[cfg_attr(docsrs, doc(cfg(feature = "smallvec")))]
-impl_ndt!(smallvec::SmallVec<T> where { T: smallvec::Array + Type } as T = inline_passthrough);
+impl_ndt!(smallvec::SmallVec<T> where { T: smallvec::Array + Type } as T = passthrough);
 
 #[cfg(feature = "bytes")]
 #[cfg_attr(docsrs, doc(cfg(feature = "bytes")))]
@@ -86,7 +86,7 @@ const _: () = {
     use serde_json::{Map, Number, Value};
 
     impl_ndt!(
-        serde_json::Map<K, V> as PrimitiveMap<K, V> = inline_passthrough;
+        serde_json::Map<K, V> as PrimitiveMap<K, V> = passthrough;
         serde_json::Value as SerdeValue = inline;
         serde_json::Number as SerdeNumber = inline;
     );
@@ -169,7 +169,7 @@ const _: () = {
     use serde_yaml::{Mapping, Number, Value, value::TaggedValue};
 
     impl_ndt!(
-        serde_yaml::Mapping as PrimitiveMap<Value, Value> = inline_passthrough;
+        serde_yaml::Mapping as PrimitiveMap<Value, Value> = passthrough;
         serde_yaml::Value as SerdeYamlValue = inline;
         serde_yaml::Number as SerdeYamlNumber = inline;
         serde_yaml::value::TaggedValue as SerdeYamlTaggedValue = inline;
@@ -268,7 +268,7 @@ const _: () = {
     use toml::{Value, value};
 
     impl_ndt!(
-        toml::map::Map<K, V> as PrimitiveMap<K, V> = inline_passthrough;
+        toml::map::Map<K, V> as PrimitiveMap<K, V> = passthrough;
         toml::value::Datetime as TomlDatetime = inline;
         toml::Value as TomlValue = inline;
     );
@@ -434,7 +434,7 @@ const _: () = {
         bson::DbPointer as BsonDbPointer = inline;
         bson::Document as PrimitiveMap<String, bson::Bson> = inline;
         bson::Bson as Bson = inline;
-        bson::Utf8Lossy<T> as T = inline_passthrough;
+        bson::Utf8Lossy<T> as T = passthrough;
         bson::RawBsonRef<'a,> as Bson = inline;
     );
 
