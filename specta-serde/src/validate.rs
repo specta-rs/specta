@@ -357,8 +357,8 @@ fn inner(
                             } => merged_generics(generics, reference_generics),
                             _ => generics.to_vec(),
                         };
-                        let name = reference
-                            .get(types)
+                        let name = types
+                            .get(reference)
                             .map(|ndt| ndt.name.to_string())
                             .unwrap_or_else(|| path.clone());
                         inner(

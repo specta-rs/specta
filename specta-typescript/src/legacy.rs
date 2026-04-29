@@ -9,8 +9,8 @@ use std::{
 use specta::{
     Types,
     datatype::{
-        DataType, Deprecated, Enum, Field, Fields, GenericReference, Reference, Struct, Tuple,
-        Variant,
+        DataType, Deprecated, Enum, Field, Fields, GenericReference, NamedReferenceType,
+        Reference, Struct, Tuple, Variant,
     },
 };
 
@@ -823,7 +823,7 @@ fn object_field_to_ts(
 
 fn inline_reference_docs<'a>(
     types: &'a Types,
-    (field, ty): (&Field, &'a DataType),
+    (_field, ty): (&Field, &'a DataType),
     force_inline: bool,
 ) -> Option<&'a str> {
     let DataType::Reference(Reference::Named(r)) = ty else {
@@ -834,9 +834,13 @@ fn inline_reference_docs<'a>(
         return None;
     }
 
-    r.get(types)
-        .filter(|ndt| !ndt.docs.trim().is_empty())
-        .map(|ndt| ndt.docs.as_ref())
+    match &r.inner {
+        NamedReferenceType::Reference { .. } => types
+            .get(r)
+            .filter(|ndt| !ndt.docs.trim().is_empty())
+            .map(|ndt| ndt.docs.as_ref()),
+        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => None,
+    }
 }
 
 /// sanitise a string to be a valid Typescript key

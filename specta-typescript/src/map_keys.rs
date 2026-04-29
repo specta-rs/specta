@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use specta::{
     Types,
-    datatype::{DataType, Fields, GenericReference, Primitive, Reference},
+    datatype::{DataType, Fields, GenericReference, NamedReferenceType, Primitive, Reference},
 };
 
 use crate::Error;
@@ -141,21 +141,47 @@ fn validate_map_key_inner(
                 ));
             }
 
-            let result = if let Some(ty) = reference.ty(types) {
-                let merged_generics = merged_generics(generics, &reference.generics());
-                validate_map_key_inner(
-                    ty,
+            let result = match &reference.inner {
+                NamedReferenceType::Reference {
+                    generics: ref_generics,
+                    ..
+                } => {
+                    if let Some(ndt) = types.get(reference) {
+                        if let Some(ty) = ndt.ty.as_ref() {
+                            let merged_generics = merged_generics(generics, ref_generics);
+                            validate_map_key_inner(
+                                ty,
+                                types,
+                                &merged_generics,
+                                path,
+                                visiting_named_refs,
+                                visiting_generic_refs,
+                            )
+                        } else {
+                            Err(Error::invalid_map_key(
+                                path,
+                                format!("unresolved named map key reference {reference:?}"),
+                            ))
+                        }
+                    } else {
+                        Err(Error::invalid_map_key(
+                            path,
+                            format!("unresolved named map key reference {reference:?}"),
+                        ))
+                    }
+                }
+                NamedReferenceType::Inline { dt, .. } => validate_map_key_inner(
+                    dt,
                     types,
-                    &merged_generics,
+                    generics,
                     path,
                     visiting_named_refs,
                     visiting_generic_refs,
-                )
-            } else {
-                Err(Error::invalid_map_key(
+                ),
+                NamedReferenceType::Recursive => Err(Error::invalid_map_key(
                     path,
-                    format!("unresolved named map key reference {reference:?}"),
-                ))
+                    format!("recursive inline named map key reference {reference:?}"),
+                )),
             };
 
             visiting_named_refs.remove(&reference_key);

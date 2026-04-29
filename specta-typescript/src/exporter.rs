@@ -10,7 +10,7 @@ use std::{
 
 use specta::{
     Format, Types,
-    datatype::{DataType, Fields, NamedDataType, Reference},
+    datatype::{DataType, Fields, NamedDataType, NamedReference, NamedReferenceType, Reference},
 };
 
 use crate::{Branded, Error, primitives, references};
@@ -304,7 +304,10 @@ impl Exporter {
 
             let import_paths = referenced_types
                 .into_iter()
-                .filter_map(|r| r.get(types).map(|ndt| ndt.module_path.as_ref().to_string()))
+                .map(|r| reference_module_path(types, &r))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .flatten()
                 .filter(|module_path| module_path != module.module_path.as_ref())
                 .collect::<BTreeSet<_>>();
             if !import_paths.is_empty() {
@@ -400,9 +403,10 @@ impl Exporter {
 
                     let import_paths = runtime_references
                         .into_iter()
-                        .filter_map(|r| {
-                            r.get(types).map(|ndt| ndt.module_path.as_ref().to_string())
-                        })
+                        .map(|r| reference_module_path(types, &r))
+                        .collect::<Result<Vec<_>, _>>()?
+                        .into_iter()
+                        .flatten()
                         .filter(|module_path| !module_path.is_empty())
                         .collect::<BTreeSet<_>>();
 
@@ -457,6 +461,18 @@ impl Exporter {
     }
 }
 
+fn reference_module_path(types: &Types, r: &NamedReference) -> Result<Option<String>, Error> {
+    match &r.inner {
+        NamedReferenceType::Reference { .. } => Ok(types
+            .get(r)
+            .map(|ndt| ndt.module_path.as_ref().to_string())),
+        NamedReferenceType::Inline { .. } => Ok(None),
+        NamedReferenceType::Recursive => Err(Error::dangling_named_reference(format!(
+            "recursive inline named reference {r:?}"
+        ))),
+    }
+}
+
 fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
     let mapped_types = format
         .map_types(types)
@@ -475,56 +491,80 @@ fn map_datatype_format(
         return Ok(dt.clone());
     }
 
-    fn contains_generic_reference(dt: &DataType) -> bool {
-        match dt {
+    fn contains_generic_reference(dt: &DataType) -> Result<bool, Error> {
+        Ok(match dt {
             DataType::Primitive(_) => false,
-            DataType::List(list) => contains_generic_reference(&list.ty),
+            DataType::List(list) => contains_generic_reference(&list.ty)?,
             DataType::Map(map) => {
-                contains_generic_reference(map.key_ty())
-                    || contains_generic_reference(map.value_ty())
+                contains_generic_reference(map.key_ty())?
+                    || contains_generic_reference(map.value_ty())?
             }
-            DataType::Nullable(inner) => contains_generic_reference(inner),
+            DataType::Nullable(inner) => contains_generic_reference(inner)?,
             DataType::Struct(strct) => match &strct.fields {
                 Fields::Unit => false,
                 Fields::Unnamed(unnamed) => unnamed
                     .fields
                     .iter()
                     .filter_map(|field| field.ty.as_ref())
-                    .any(contains_generic_reference),
+                    .try_fold(false, |found, ty| {
+                        Ok::<_, Error>(found || contains_generic_reference(ty)?)
+                    })?,
                 Fields::Named(named) => named
                     .fields
                     .iter()
                     .filter_map(|(_, field)| field.ty.as_ref())
-                    .any(contains_generic_reference),
+                    .try_fold(false, |found, ty| {
+                        Ok::<_, Error>(found || contains_generic_reference(ty)?)
+                    })?,
             },
             DataType::Enum(enm) => enm
                 .variants
                 .iter()
-                .any(|(_, variant)| match &variant.fields {
-                    Fields::Unit => false,
-                    Fields::Unnamed(unnamed) => unnamed
-                        .fields
-                        .iter()
-                        .filter_map(|field| field.ty.as_ref())
-                        .any(contains_generic_reference),
-                    Fields::Named(named) => named
-                        .fields
-                        .iter()
-                        .filter_map(|(_, field)| field.ty.as_ref())
-                        .any(contains_generic_reference),
-                }),
-            DataType::Tuple(tuple) => tuple.elements.iter().any(contains_generic_reference),
-            DataType::Reference(Reference::Named(reference)) => reference
-                .generics()
-                .iter()
-                .any(|(_, dt)| contains_generic_reference(dt)),
+                .try_fold(false, |found, (_, variant)| {
+                    let variant_found = match &variant.fields {
+                        Fields::Unit => false,
+                        Fields::Unnamed(unnamed) => unnamed
+                            .fields
+                            .iter()
+                            .filter_map(|field| field.ty.as_ref())
+                            .try_fold(false, |found, ty| {
+                                Ok::<_, Error>(found || contains_generic_reference(ty)?)
+                            })?,
+                        Fields::Named(named) => named
+                            .fields
+                            .iter()
+                            .filter_map(|(_, field)| field.ty.as_ref())
+                            .try_fold(false, |found, ty| {
+                                Ok::<_, Error>(found || contains_generic_reference(ty)?)
+                            })?,
+                    };
+
+                    Ok::<_, Error>(found || variant_found)
+                })?,
+            DataType::Tuple(tuple) => tuple.elements.iter().try_fold(false, |found, ty| {
+                Ok::<_, Error>(found || contains_generic_reference(ty)?)
+            })?,
+            DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+                NamedReferenceType::Reference { generics, .. } => generics.iter().try_fold(
+                    false,
+                    |found, (_, dt)| Ok::<_, Error>(found || contains_generic_reference(dt)?),
+                )?,
+                NamedReferenceType::Inline { .. } => false,
+                NamedReferenceType::Recursive => {
+                    return Err(Error::dangling_named_reference(format!(
+                        "recursive inline named reference {reference:?}"
+                    )));
+                }
+            },
             DataType::Generic(_) => true,
             DataType::Reference(Reference::Opaque(_)) => false,
-            DataType::Intersection(types) => types.iter().any(contains_generic_reference),
-        }
+            DataType::Intersection(types) => types.iter().try_fold(false, |found, ty| {
+                Ok::<_, Error>(found || contains_generic_reference(ty)?)
+            })?,
+        })
     }
 
-    if contains_generic_reference(dt) {
+    if contains_generic_reference(dt)? {
         let Some(format) = format else {
             return map_datatype_format_children(None, types, dt.clone());
         };
@@ -937,7 +977,7 @@ fn render_types(
                         module
                             .types
                             .iter()
-                            .filter(|ndt| ndt.requires_reference(types))
+                            .filter(|ndt| ndt.ty.is_some())
                             .map(|ndt| ndt.name.as_ref()),
                     )
                 {

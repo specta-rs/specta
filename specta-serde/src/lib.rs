@@ -415,13 +415,18 @@ fn apply_phases(types: Types) -> Result<Types, Error> {
         generated.insert(key, generated_types_for_phase);
     }
 
-    for generated_types_for_phase in generated.values() {
-        generated_types.insert(TypeIdentity::from_ndt(&generated_types_for_phase.serialize));
-        generated_types.insert(TypeIdentity::from_ndt(
-            &generated_types_for_phase.deserialize,
+    for generated_types_for_phase in generated.values_mut() {
+        let serialize = register_generated_type(&mut out, generated_types_for_phase.serialize.clone());
+        let deserialize = Box::new(register_generated_type(
+            &mut out,
+            (*generated_types_for_phase.deserialize).clone(),
         ));
-        generated_types_for_phase.serialize.register(&mut out);
-        generated_types_for_phase.deserialize.register(&mut out);
+
+        generated_types.insert(TypeIdentity::from_ndt(&serialize));
+        generated_types.insert(TypeIdentity::from_ndt(&deserialize));
+
+        generated_types_for_phase.serialize = serialize;
+        generated_types_for_phase.deserialize = deserialize;
     }
 
     let mut rewrite_err = None;
@@ -2157,6 +2162,17 @@ fn build_from_original(
     ndt.name = Cow::Owned(split_type_name(original, mode)?);
 
     Ok(ndt)
+}
+
+fn register_generated_type(types: &mut Types, generated: NamedDataType) -> NamedDataType {
+    NamedDataType::new(generated.name.clone(), types, move |_, ndt| {
+        ndt.docs = generated.docs;
+        ndt.deprecated = generated.deprecated;
+        ndt.module_path = generated.module_path;
+        ndt.location = generated.location;
+        ndt.generics = generated.generics;
+        ndt.ty = generated.ty;
+    })
 }
 
 fn rewrite_named_type_for_phase(ndt: &mut NamedDataType, mode: PhaseRewrite) -> Result<(), Error> {

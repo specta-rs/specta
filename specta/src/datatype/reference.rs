@@ -188,30 +188,6 @@ impl Reference {
     }
 }
 
-impl NamedReference {
-    /// Get the named type this reference points to.
-    pub fn get<'a>(&self, types: &'a Types) -> Option<&'a NamedDataType> {
-        types.get(self)
-    }
-
-    /// Get this reference's concrete generic arguments.
-    pub fn generics(&self) -> &[(Generic, DataType)] {
-        match &self.inner {
-            NamedReferenceType::Reference { generics } => generics,
-            NamedReferenceType::Recursive | NamedReferenceType::Inline { .. } => &[],
-        }
-    }
-
-    /// Get this reference's inlined type, if available.
-    pub fn ty<'a>(&'a self, types: &'a Types) -> Option<&'a DataType> {
-        match &self.inner {
-            NamedReferenceType::Inline { dt } => Some(dt),
-            NamedReferenceType::Reference { .. } => types.get(self)?.ty.as_ref(),
-            NamedReferenceType::Recursive => None,
-        }
-    }
-}
-
 impl From<Reference> for DataType {
     fn from(r: Reference) -> Self {
         Self::Reference(r)

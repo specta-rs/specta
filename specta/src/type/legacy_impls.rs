@@ -1,8 +1,7 @@
 use crate::{
     Type, Types,
     datatype::{
-        self, DataType, Enum, Field, Fields, List, NamedFields, Primitive, Reference, Struct,
-        Variant,
+        self, DataType, Enum, Field, Fields, List, NamedFields, Primitive, Struct, Variant,
     },
     r#type::{impls::*, macros::impl_ndt},
 };

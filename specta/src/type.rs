@@ -1,9 +1,8 @@
 use crate::{Types, datatype::DataType};
 
 mod impls;
-mod macros;
-// TODO: We don't care much about these cause they are gonna go so this will do for now.
 mod legacy_impls;
+mod macros;
 
 /// Provides runtime type information for a Rust type.
 ///
