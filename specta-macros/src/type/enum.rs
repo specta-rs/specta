@@ -1,4 +1,7 @@
-use super::{AttributeScope, attr::*, build_runtime_attributes, r#struct::decode_field_attrs};
+use super::{
+    AttributeScope, attr::*, build_runtime_attributes, generics::type_with_inferred_lifetimes,
+    r#struct::decode_field_attrs,
+};
 use crate::{r#type::field::construct_field_with_variant_skip, utils::*};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
@@ -86,6 +89,7 @@ pub fn parse_enum(
             let variant_name_str = variant_ident_str.to_token_stream();
 
             let variant_value = if let Some(ref variant_ty) = attrs.r#type {
+                let variant_ty = type_with_inferred_lifetimes(variant_ty);
                 quote!(datatype::Variant::unnamed().field({
                     datatype::Field::new(<#variant_ty as #crate_ref::Type>::definition(types))
                 }).build())

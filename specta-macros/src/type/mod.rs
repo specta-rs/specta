@@ -10,7 +10,8 @@ use crate::utils::{AttrExtract, parse_attrs, unraw_raw_ident};
 use self::generics::{
     add_type_to_where_clause, all_type_param_idents, generics_with_ident_and_bounds_only,
     generics_with_ident_only, generics_with_ident_only_and_const_ty, has_associated_type_usage,
-    type_where_clause, used_associated_type_paths, used_direct_type_params, used_type_params,
+    type_where_clause, type_with_inferred_lifetimes, used_associated_type_paths,
+    used_direct_type_params, used_type_params,
 };
 
 pub(crate) mod attr;
@@ -169,6 +170,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         };
 
     let dt_expr = if let Some(container_ty) = &container_attrs.r#type {
+        let container_ty = type_with_inferred_lifetimes(container_ty);
         quote!(datatype::inline(types, |types| <#container_ty as #crate_ref::Type>::definition(types)))
     } else {
         let dt_expr = match data {
@@ -189,7 +191,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     let bounds = generics_with_ident_and_bounds_only(generics);
     let type_args = generics_with_ident_only(generics);
-    let build_ty_bounds = generics_with_ident_only_and_const_ty(generics);
     let has_const_param = generics
         .params
         .iter()
@@ -210,6 +211,10 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         &quote!(#crate_ref::Type),
         used_direct_generics,
         used_associated_paths,
+    );
+    let build_ty_bounds = generics_with_ident_only_and_const_ty(
+        generics,
+        has_associated_type_usage(&used_generic_types),
     );
 
     let build_ty_placeholder_args = generics
@@ -343,10 +348,20 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
 
     // TODO: Avoid emitting `dt_expr` twice into the codegen output
 
+    let has_generic_default = generics
+        .params
+        .iter()
+        .any(|param| matches!(param, GenericParam::Type(ty) if ty.default.is_some()));
     let generics = (!generics_for_ndt.is_empty()).then(|| {
-        quote! {
-            static GENERICS: &[datatype::GenericDefinition] = &[#(#generics_for_ndt),*];
-            ndt.generics = Cow::Borrowed(GENERICS);
+        if has_generic_default {
+            quote! {
+                ndt.generics = Cow::Owned(vec![#(#generics_for_ndt),*]);
+            }
+        } else {
+            quote! {
+                static GENERICS: &[datatype::GenericDefinition] = &[#(#generics_for_ndt),*];
+                ndt.generics = Cow::Borrowed(GENERICS);
+            }
         }
     });
     let docs = (!container_attrs.common.doc.is_empty()).then(|| {

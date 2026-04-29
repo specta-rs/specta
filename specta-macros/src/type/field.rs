@@ -4,7 +4,10 @@ use syn::Type;
 
 use crate::r#type::attr::deprecated_as_tokens;
 
-use super::{AttributeScope, ContainerAttr, FieldAttr, build_runtime_attributes};
+use super::{
+    AttributeScope, ContainerAttr, FieldAttr, build_runtime_attributes,
+    generics::type_with_inferred_lifetimes,
+};
 
 pub fn construct_field(
     crate_ref: &TokenStream,
@@ -31,7 +34,7 @@ pub fn construct_field_with_variant_skip(
     raw_attrs: &[syn::Attribute],
     variant_skip: bool,
 ) -> syn::Result<TokenStream> {
-    let field_ty = attrs.r#type.as_ref().unwrap_or(field_ty);
+    let field_ty = type_with_inferred_lifetimes(attrs.r#type.as_ref().unwrap_or(field_ty));
 
     let runtime_attrs = build_runtime_attributes(
         crate_ref,

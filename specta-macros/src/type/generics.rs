@@ -5,6 +5,7 @@ use syn::{
     ConstParam, Data, GenericParam, Generics, LifetimeParam, Type, TypeParam, TypePath,
     WhereClause, parse_quote,
     visit::{self, Visit},
+    visit_mut::VisitMut,
 };
 
 use crate::utils::parse_attrs;
@@ -47,20 +48,33 @@ pub fn generics_with_ident_and_bounds_only(generics: &Generics) -> Option<TokenS
         .map(|gs| quote!(<#(#gs),*>))
 }
 
-pub fn generics_with_ident_only_and_const_ty(generics: &Generics) -> Option<TokenStream> {
-    (!generics.params.is_empty())
+pub fn generics_with_ident_only_and_const_ty(
+    generics: &Generics,
+    include_type_bounds: bool,
+) -> Option<TokenStream> {
+    generics
+        .params
+        .iter()
+        .any(|param| matches!(param, GenericParam::Type(_) | GenericParam::Const(_)))
         .then(|| {
             use GenericParam::*;
-            generics.params.iter().map(|param| match param {
-                Type(TypeParam { ident, .. }) => quote!(#ident),
-                Lifetime(LifetimeParam { lifetime, .. }) => quote!(#lifetime),
+
+            generics.params.iter().filter_map(|param| match param {
+                Type(TypeParam {
+                    ident,
+                    colon_token,
+                    bounds,
+                    ..
+                }) if include_type_bounds => Some(quote!(#ident #colon_token #bounds)),
+                Type(TypeParam { ident, .. }) => Some(quote!(#ident)),
+                Lifetime(_) => None,
                 Const(ConstParam {
                     const_token,
                     ident,
                     colon_token,
                     ty,
                     ..
-                }) => quote!(#const_token #ident #colon_token #ty),
+                }) => Some(quote!(#const_token #ident #colon_token #ty)),
             })
         })
         .map(|gs| quote!(<#(#gs),*>))
@@ -99,6 +113,20 @@ pub fn generics_with_ident_only(generics: &Generics) -> Option<TokenStream> {
             })
         })
         .map(|gs| quote!(<#(#gs),*>))
+}
+
+pub fn type_with_inferred_lifetimes(ty: &Type) -> Type {
+    let mut ty = ty.clone();
+    InferredLifetimeVisitor.visit_type_mut(&mut ty);
+    ty
+}
+
+struct InferredLifetimeVisitor;
+
+impl VisitMut for InferredLifetimeVisitor {
+    fn visit_lifetime_mut(&mut self, lifetime: &mut syn::Lifetime) {
+        *lifetime = syn::Lifetime::new("'_", lifetime.apostrophe);
+    }
 }
 
 pub fn all_type_param_idents(generics: &Generics) -> Vec<syn::Ident> {
