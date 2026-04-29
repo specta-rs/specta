@@ -618,6 +618,19 @@ fn named_reference_ty<'a>(types: &'a Types, r: &'a NamedReference) -> Result<&'a
     }
 }
 
+fn resolve_scoped_generic_default(
+    default: &DataType,
+    scoped_generics: &[(GenericReference, DataType)],
+) -> DataType {
+    match default {
+        DataType::Generic(default) => scoped_generics
+            .iter()
+            .find_map(|(reference, dt)| (reference == default).then_some(dt.clone()))
+            .unwrap_or_else(|| DataType::Generic(default.clone())),
+        default => default.clone(),
+    }
+}
+
 fn resolved_reference_generics(
     ndt: &specta::datatype::NamedDataType,
     r: &NamedReference,
@@ -634,7 +647,10 @@ fn resolved_reference_generics(
             .find(|(reference, _)| *reference == generic.reference())
             .map(|(_, dt)| dt.clone());
 
-        let resolved_default = generic.default.clone();
+        let resolved_default = generic
+            .default
+            .as_ref()
+            .map(|default| resolve_scoped_generic_default(default, &scoped_generics));
 
         let resolved = explicit.or_else(|| resolved_default.clone()).or_else(|| {
             Some(DataType::Reference(Reference::opaque(
