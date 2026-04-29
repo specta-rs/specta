@@ -642,6 +642,7 @@ fn select_phase_datatype_inner(ty: &mut DataType, types: &Types, phase: Phase) {
         DataType::Reference(Reference::Named(reference)) => {
             if let NamedReferenceType::Inline { dt, .. } = &mut reference.inner {
                 select_phase_datatype_inner(dt, types, phase);
+                return;
             }
 
             let Some(referenced_ndt) = types.get(reference) else {
@@ -1309,9 +1310,9 @@ fn rewrite_enum_repr_for_phase(
 fn enum_repr_already_rewritten(e: &Enum) -> bool {
     e.attributes.is_empty()
         && !e.variants.is_empty()
-        && e.variants
-            .iter()
-            .all(|(name, variant)| variant.attributes.is_empty() && variant_repr_already_rewritten(name, variant))
+        && e.variants.iter().all(|(name, variant)| {
+            variant.attributes.is_empty() && variant_repr_already_rewritten(name, variant)
+        })
 }
 
 fn variant_repr_already_rewritten(name: &str, variant: &Variant) -> bool {

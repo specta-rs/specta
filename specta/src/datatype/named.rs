@@ -237,7 +237,9 @@ impl NamedDataType {
             };
             types.stack.pop();
             let dt = match result {
-                Ok(DataType::Reference(reference)) if passthrough && !caller_inline => return reference,
+                Ok(DataType::Reference(reference)) if passthrough && !caller_inline => {
+                    return reference;
+                }
                 Ok(dt) => Box::new(dt),
                 Err(payload) => panic::resume_unwind(payload),
             };

@@ -630,7 +630,15 @@ fn map_datatype_format_children(
                 *ty = map_datatype_format(format, types, ty)?;
             }
         }
-        DataType::Reference(Reference::Named(_)) => {}
+        DataType::Reference(Reference::Named(reference)) => {
+            if let NamedReferenceType::Inline { dt, .. } = &mut reference.inner {
+                **dt = map_datatype_format(format, types, dt)?;
+            }
+
+            for (_, dt) in named_reference_generics_mut(reference) {
+                *dt = map_datatype_format(format, types, dt)?;
+            }
+        }
         DataType::Generic(_) => {}
         DataType::Reference(Reference::Opaque(reference)) => {
             if let Some(branded) = reference.downcast_ref::<Branded>() {
@@ -644,6 +652,15 @@ fn map_datatype_format_children(
     }
 
     Ok(dt)
+}
+
+fn named_reference_generics_mut(
+    reference: &mut NamedReference,
+) -> &mut [(specta::datatype::Generic, DataType)] {
+    match &mut reference.inner {
+        NamedReferenceType::Reference { generics, .. } => generics,
+        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => &mut [],
+    }
 }
 
 fn map_datatype_fields(
