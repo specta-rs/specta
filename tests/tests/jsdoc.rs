@@ -94,7 +94,7 @@ fn primitives_export() {
             .iter()
             .filter_map(|(name, dt)| {
                 let mut ndt = match dt {
-                    DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap().to_owned(),
+                    DataType::Reference(Reference::Named(r)) => types.get(r).unwrap().to_owned(),
                     _ => return None,
                 };
 
@@ -125,7 +125,7 @@ fn primitives_export_many() {
             &types,
             dts.iter()
                 .filter_map(|(_, ty)| match ty {
-                    DataType::Reference(Reference::Named(r)) => r.get(&types).cloned(),
+                    DataType::Reference(Reference::Named(r)) => types.get(r).cloned(),
                     _ => None,
                 })
                 .map(|mut ndt| {

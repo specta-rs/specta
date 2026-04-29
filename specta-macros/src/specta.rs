@@ -94,7 +94,7 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
 
     let deprecated = if let Some(deprecated) = common.deprecated {
         let tokens = deprecated_as_tokens(deprecated);
-        quote!(Some(#tokens))
+        quote!(#tokens)
     } else {
         quote!(None)
     };

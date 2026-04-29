@@ -392,12 +392,13 @@ impl Zod {
 }
 
 fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
-    let mapped_types = format
+    Ok(match format
         .map_types(types)
-        .map_err(|err| Error::format("type graph formatter failed", err))?;
-    Ok(Cow::Owned(
-        map_types_for_datatype_format(mapped_types.as_ref(), Some(format))?.into_owned(),
-    ))
+        .map_err(|err| Error::format("type graph formatter failed", err))?
+    {
+        Cow::Borrowed(_) => Cow::Borrowed(types),
+        Cow::Owned(types) => Cow::Owned(types),
+    })
 }
 
 fn map_datatype_format(
@@ -507,38 +508,6 @@ fn map_named_datatype_format(
         .map(|ty| map_datatype_format(format, types, ty))
         .transpose()?;
     Ok(mapped)
-}
-
-fn map_types_for_datatype_format<'a>(
-    types: &'a Types,
-    format: Option<&dyn Format>,
-) -> Result<Cow<'a, Types>, Error> {
-    if format.is_none() {
-        return Ok(Cow::Borrowed(types));
-    }
-
-    let mut mapped_types = types.clone();
-    let mut map_err = None;
-    mapped_types.iter_mut(|ndt| {
-        if map_err.is_some() {
-            return;
-        }
-
-        let Some(ty) = &ndt.ty else {
-            return;
-        };
-
-        match map_datatype_format(format, types, ty) {
-            Ok(mapped) => ndt.ty = Some(mapped),
-            Err(err) => map_err = Some(err),
-        }
-    });
-
-    if let Some(err) = map_err {
-        return Err(err);
-    }
-
-    Ok(Cow::Owned(mapped_types))
 }
 
 impl AsRef<Zod> for Zod {

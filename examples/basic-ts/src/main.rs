@@ -161,7 +161,7 @@ fn main() {
         println!(
             "{:#?}",
             match HelloWorld::definition(&mut types) {
-                DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
+                DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
                 _ => unreachable!(),
             }
         );

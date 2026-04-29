@@ -289,19 +289,27 @@ impl Analyzer {
                         return PlanNode::Identity;
                     }
 
+                    if let NamedReferenceType::Inline { dt, .. } = &reference.inner {
+                        return self.analyze(dt, types, &[], stack);
+                    }
+
                     stack.push(reference.clone());
                     let Some(ty) = &ndt.ty else {
                         stack.pop();
                         return PlanNode::Identity;
                     };
 
-                    let generics = match &reference.inner {
-                        NamedReferenceType::Reference { generics, .. } => generics.as_slice(),
-                        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => &[],
+                    let (ty, generics) = match &reference.inner {
+                        NamedReferenceType::Reference { generics, .. } => (ty, generics.as_slice()),
+                        NamedReferenceType::Inline { dt, .. } => (dt.as_ref(), &[][..]),
+                        NamedReferenceType::Recursive => (ty, &[][..]),
                     };
                     let out = self.analyze(ty, types, generics, stack);
                     stack.pop();
                     out
+                }
+                else if let NamedReferenceType::Inline { dt, .. } = &reference.inner {
+                    self.analyze(dt, types, &[], stack)
                 } else {
                     PlanNode::Identity
                 }
@@ -646,7 +654,7 @@ mod tests {
             .ty
             .clone();
 
-        let js = TransformPlan::analyze(&dt, &resolved).map("v");
+        let js = TransformPlan::analyze(dt.as_ref().unwrap(), &resolved).map("v");
 
         assert!(js.contains("[\"kind\"] === \"A\""));
         assert!(js.contains("BigInt("));
@@ -667,7 +675,7 @@ mod tests {
             .ty
             .clone();
 
-        let js = TransformPlan::analyze(&dt, &resolved).map("v");
+        let js = TransformPlan::analyze(dt.as_ref().unwrap(), &resolved).map("v");
 
         assert!(js.contains("[\"kind\"] === \"A\""));
         assert!(js.contains("payload"));

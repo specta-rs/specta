@@ -40,7 +40,9 @@ macro_rules! types {
 
         // This allows us to end-to-end test primitives.
         // Many types won't be directly added to the `Types`, as they are not named.
-        specta::datatype::NamedDataType::new("Primitives", vec![], s.build()).register(&mut types);
+        specta::datatype::NamedDataType::new("Primitives", &mut types, |_, ndt| {
+            ndt.ty = Some(s.build());
+        });
 
         // Test `selection!`
         {

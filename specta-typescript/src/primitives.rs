@@ -56,6 +56,8 @@ pub(crate) fn export_internal<'a>(
     ndts: impl Iterator<Item = &'a NamedDataType>,
     indent: &str,
 ) -> Result<(), Error> {
+    let ndts = ndts.filter(|ndt| ndt.ty.is_some());
+
     if exporter.jsdoc {
         let mut ndts = ndts.peekable();
         if ndts.peek().is_none() {

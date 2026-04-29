@@ -589,7 +589,7 @@ fn primitives_export() {
             .iter()
             .filter_map(|(name, dt)| {
                 let mut ndt = match dt {
-                    DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap().to_owned(),
+                    DataType::Reference(Reference::Named(r)) => types.get(r).unwrap().to_owned(),
                     _ => return None,
                 };
 
@@ -620,7 +620,7 @@ fn primitives_export_many() {
             &types,
             dts.iter()
                 .filter_map(|(_, ty)| match ty {
-                    DataType::Reference(Reference::Named(r)) => r.get(&types).cloned(),
+                    DataType::Reference(Reference::Named(r)) => types.get(r).cloned(),
                     _ => None,
                 })
                 .map(|mut ndt| {
@@ -700,7 +700,7 @@ fn reserved_names() {
 
         let mut types = Types::default();
         let ndt = match r#enum::definition(&mut types) {
-            DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
+            DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
             _ => panic!("Failed to get reference"),
         };
         insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
@@ -714,7 +714,7 @@ fn reserved_names() {
 
         let mut types = Types::default();
         let ndt = match r#enum::definition(&mut types) {
-            DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
+            DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
             _ => panic!("Failed to get reference"),
         };
         insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
@@ -731,7 +731,7 @@ fn reserved_names() {
 
         let mut types = Types::default();
         let ndt = match r#enum::definition(&mut types) {
-            DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
+            DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
             _ => panic!("Failed to get reference"),
         };
         insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);

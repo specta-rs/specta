@@ -138,9 +138,10 @@ fn non_duplicate_typenames_layouts() {
 fn empty_module_path_layouts() {
     let mut types = Types::default();
 
-    let mut testing = NamedDataType::new("testing", Vec::new(), DataType::Primitive(Primitive::i8));
+    let mut testing = NamedDataType::new("testing", &mut types, |_, ndt| {
+        ndt.ty = Some(DataType::Primitive(Primitive::i8));
+    });
     testing.module_path = "".into();
-    testing.register(&mut types);
     let flat = Typescript::default()
         .layout(Layout::FlatFile)
         .export(&types, specta_serde::Format)

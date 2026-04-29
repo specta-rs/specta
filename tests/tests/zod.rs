@@ -156,7 +156,7 @@ fn zod_primitives_smoke() {
     let ndt = dts
         .iter()
         .find_map(|(_, ty)| match ty {
-            DataType::Reference(Reference::Named(r)) => r.get(&types),
+            DataType::Reference(Reference::Named(r)) => types.get(r),
             _ => None,
         })
         .unwrap();
@@ -311,8 +311,9 @@ fn zod_recursive_types_use_lazy() {
 #[test]
 fn zod_reserved_type_name_errors() {
     let mut types = Types::default();
-    NamedDataType::new("class", Vec::new(), DataType::Primitive(Primitive::i8))
-        .register(&mut types);
+    NamedDataType::new("class", &mut types, |_, ndt| {
+        ndt.ty = Some(DataType::Primitive(Primitive::i8));
+    });
     let err = Zod::default()
         .export(&types, specta_serde::Format)
         .unwrap_err();

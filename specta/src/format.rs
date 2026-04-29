@@ -26,7 +26,7 @@ pub trait Format {
     fn map_type(
         &'_ self,
         types: &Types,
-        ty: &DataType,
+        dt: &DataType,
     ) -> std::result::Result<Cow<'_, DataType>, FormatError>;
 }
 
@@ -38,9 +38,9 @@ impl<T: Format + ?Sized> Format for &T {
     fn map_type(
         &'_ self,
         types: &Types,
-        ty: &DataType,
+        dt: &DataType,
     ) -> std::result::Result<Cow<'_, DataType>, FormatError> {
-        (**self).map_type(types, ty)
+        (**self).map_type(types, dt)
     }
 }
 
@@ -52,9 +52,9 @@ impl<T: Format + ?Sized> Format for Box<T> {
     fn map_type(
         &'_ self,
         types: &Types,
-        ty: &DataType,
+        dt: &DataType,
     ) -> std::result::Result<Cow<'_, DataType>, FormatError> {
-        (**self).map_type(types, ty)
+        (**self).map_type(types, dt)
     }
 }
 

@@ -150,10 +150,10 @@ fn enum_payload_to_swift_type(
         DataType::Tuple(tuple) if tuple.elements.len() > 1 => tuple
             .elements
             .iter()
-            .map(|element| datatype_to_swift(swift, types, element, generic_scope.to_vec(), None))
+            .map(|element| datatype_to_swift(swift, types, element, generic_scope.to_vec()))
             .collect::<std::result::Result<Vec<_>, _>>()?
             .join(", "),
-        _ => datatype_to_swift(swift, types, payload, generic_scope.to_vec(), None)?,
+        _ => datatype_to_swift(swift, types, payload, generic_scope.to_vec())?,
     })
 }
 
@@ -374,14 +374,8 @@ pub fn datatype_to_swift(
     types: &Types,
     dt: &DataType,
     generic_scope: Vec<Generic>,
-    reference: Option<&specta::datatype::Reference>,
 ) -> Result<String, Error> {
     let dt = apply_datatype_format(swift, types, dt)?;
-
-    // Check for special standard library types first
-    if let Some(special_type) = is_special_std_type(types, reference) {
-        return Ok(special_type);
-    }
 
     match &dt {
         DataType::Primitive(p) => primitive_to_swift(p),
@@ -389,7 +383,7 @@ pub fn datatype_to_swift(
         DataType::List(l) => list_to_swift(swift, types, l, generic_scope.clone()),
         DataType::Map(m) => map_to_swift(swift, types, m, generic_scope.clone()),
         DataType::Nullable(def) => {
-            let inner = datatype_to_swift(swift, types, def, generic_scope, None)?;
+            let inner = datatype_to_swift(swift, types, def, generic_scope)?;
             Ok(match swift.optionals {
                 crate::swift::OptionalStyle::QuestionMark => format!("{}?", inner),
                 crate::swift::OptionalStyle::Optional => format!("Optional<{}>", inner),
@@ -418,7 +412,7 @@ fn apply_datatype_format(swift: &Swift, types: &Types, dt: &DataType) -> Result<
     }
 
     let Some(format) = swift.format.as_ref() else {
-        return Ok(dt.clone());
+        return apply_datatype_format_children(swift, types, dt.clone());
     };
 
     let mapped = format
@@ -466,15 +460,17 @@ fn apply_datatype_format_children(
                 *element = apply_datatype_format(swift, types, element)?;
             }
         }
-        DataType::Reference(Reference::Named(reference)) => {
-            if let specta::datatype::NamedReferenceType::Reference { generics, .. } =
-                &mut reference.inner
-            {
+        DataType::Reference(Reference::Named(reference)) => match &mut reference.inner {
+            specta::datatype::NamedReferenceType::Inline { dt, .. } => {
+                return apply_datatype_format_children(swift, types, *dt.clone());
+            }
+            specta::datatype::NamedReferenceType::Reference { generics, .. } => {
                 for (_, generic) in generics {
                     *generic = apply_datatype_format(swift, types, generic)?;
                 }
             }
-        }
+            specta::datatype::NamedReferenceType::Recursive => {}
+        },
         DataType::Reference(Reference::Opaque(_)) | DataType::Generic(_) => {}
     }
 
@@ -565,26 +561,6 @@ pub fn is_duration_struct(s: &specta::datatype::Struct) -> bool {
     }
 }
 
-/// Check if a type is a special standard library type that needs special handling
-fn is_special_std_type(
-    types: &Types,
-    reference: Option<&specta::datatype::Reference>,
-) -> Option<String> {
-    if let Some(Reference::Named(r)) = reference
-        && let Some(ndt) = types.get(r)
-    {
-        // Check for std::time::Duration
-        if &ndt.name == "Duration" {
-            return Some("RustDuration".to_string());
-        }
-        // Check for std::time::SystemTime
-        if &ndt.name == "SystemTime" {
-            return Some("Date".to_string());
-        }
-    }
-    None
-}
-
 /// Convert primitive types to Swift.
 fn primitive_to_swift(primitive: &Primitive) -> Result<String, Error> {
     Ok(match primitive {
@@ -651,7 +627,7 @@ fn list_to_swift(
     list: &specta::datatype::List,
     generic_scope: Vec<Generic>,
 ) -> Result<String, Error> {
-    let element_type = datatype_to_swift(swift, types, &list.ty, generic_scope, None)?;
+    let element_type = datatype_to_swift(swift, types, &list.ty, generic_scope)?;
     Ok(format!("[{}]", element_type))
 }
 
@@ -662,8 +638,8 @@ fn map_to_swift(
     map: &specta::datatype::Map,
     generic_scope: Vec<Generic>,
 ) -> Result<String, Error> {
-    let key_type = datatype_to_swift(swift, types, map.key_ty(), generic_scope.clone(), None)?;
-    let value_type = datatype_to_swift(swift, types, map.value_ty(), generic_scope, None)?;
+    let key_type = datatype_to_swift(swift, types, map.key_ty(), generic_scope.clone())?;
+    let value_type = datatype_to_swift(swift, types, map.value_ty(), generic_scope)?;
     Ok(format!("[{}: {}]", key_type, value_type))
 }
 
@@ -689,7 +665,6 @@ fn struct_to_swift(
                         .as_ref()
                         .expect("tuple field should have a type"),
                     generic_scope,
-                    None,
                 )?;
                 Ok(format!("    let value: {}\n", field_type))
             } else {
@@ -701,7 +676,6 @@ fn struct_to_swift(
                         types,
                         field.ty.as_ref().expect("tuple field should have a type"),
                         generic_scope.clone(),
-                        None,
                     )?;
                     result.push_str(&format!("    public let field{}: {}\n", i, field_type));
                 }
@@ -714,7 +688,7 @@ fn struct_to_swift(
 
             for (original_field_name, field) in &fields.fields {
                 let field_type = if let Some(ty) = field.ty.as_ref() {
-                    datatype_to_swift(swift, types, ty, generic_scope.clone(), None)?
+                    datatype_to_swift(swift, types, ty, generic_scope.clone())?
                 } else {
                     continue;
                 };
@@ -807,7 +781,6 @@ fn enum_to_swift(
                                 f.ty.as_ref()
                                     .expect("enum variant field should have a type"),
                                 generic_scope.clone(),
-                                None,
                             )
                         })
                         .collect::<std::result::Result<Vec<_>, _>>()?
@@ -883,8 +856,7 @@ fn generate_enum_structs(
             let mut field_mappings = Vec::new();
             for (original_field_name, field) in &fields.fields {
                 if let Some(ty) = field.ty.as_ref() {
-                    let field_type =
-                        datatype_to_swift(swift, types, ty, generic_scope.clone(), None)?;
+                    let field_type = datatype_to_swift(swift, types, ty, generic_scope.clone())?;
                     let optional_marker = if field.optional { "?" } else { "" };
                     let swift_field_name = swift.naming.convert_field(original_field_name.as_ref());
                     result.push_str(&format!(
@@ -952,12 +924,12 @@ fn tuple_to_swift(
     if t.elements.is_empty() {
         Ok("Void".to_string())
     } else if t.elements.len() == 1 {
-        datatype_to_swift(swift, types, &t.elements[0], generic_scope, None)
+        datatype_to_swift(swift, types, &t.elements[0], generic_scope)
     } else {
         let types_str = t
             .elements
             .iter()
-            .map(|e| datatype_to_swift(swift, types, e, generic_scope.clone(), None))
+            .map(|e| datatype_to_swift(swift, types, e, generic_scope.clone()))
             .collect::<std::result::Result<Vec<_>, _>>()?
             .join(", ");
         Ok(format!("({})", types_str))
@@ -979,26 +951,10 @@ fn reference_to_swift(
                 ));
             };
 
-            if ndt.name == "String" {
-                return Ok("String".to_string());
-            }
-
-            if matches!(ndt.name.as_ref(), "Uuid" | "DateTime" | "NaiveDateTime") {
-                return Ok("String".to_string());
-            }
-
             let generics = match &r.inner {
                 NamedReferenceType::Reference { generics, .. } => generics.as_slice(),
                 NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => &[],
             };
-
-            if ndt.name == "Vec"
-                && let Some((_, inner_ty)) = generics.first()
-            {
-                let inner =
-                    datatype_to_swift(swift, types, inner_ty, generic_scope.to_vec(), None)?;
-                return Ok(format!("[{inner}]"));
-            }
 
             let name = swift.naming.convert(&ndt.name);
 
@@ -1007,7 +963,7 @@ fn reference_to_swift(
             } else {
                 let generics = generics
                     .iter()
-                    .map(|(_, t)| datatype_to_swift(swift, types, t, generic_scope.to_vec(), None))
+                    .map(|(_, t)| datatype_to_swift(swift, types, t, generic_scope.to_vec()))
                     .collect::<std::result::Result<Vec<_>, _>>()?
                     .join(", ");
                 Ok(format!("{}<{}>", name, generics))
@@ -1109,7 +1065,6 @@ fn generate_enum_codable_impl(
                             .as_ref()
                             .expect("enum variant field should have a type"),
                         generic_scope.clone(),
-                        None,
                     )?;
                     result.push_str(&format!("        case .{}:\n", swift_case_name));
                     result.push_str(&format!(

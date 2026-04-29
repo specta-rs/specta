@@ -849,7 +849,10 @@ fn reference_named_dt(
         .any(|(module, name)| module == &ndt.module_path && name == &ndt.name);
 
     let mut reference_expr = schema_name;
-    let reference_generics = named_reference_generics(r)?;
+    let reference_generics = match &r.inner {
+        NamedReferenceType::Recursive => &[],
+        _ => named_reference_generics(r)?,
+    };
     if !reference_generics.is_empty() {
         let scoped_generics = generics
             .iter()

@@ -149,8 +149,9 @@ impl Swift {
     pub fn export(&self, types: &Types, format: impl Format + 'static) -> Result<String, Error> {
         let mut exporter = self.clone();
         exporter.format = Some(Arc::new(format));
-        let formatted_types = exporter.format_types(types)?;
-        let raw_types = formatted_types.as_ref();
+        let formatted_types = exporter.format_types(types)?.into_owned();
+        exporter.format = None;
+        let raw_types = &formatted_types;
 
         let mut result = String::new();
 
