@@ -105,7 +105,7 @@ use std::{
 };
 
 use specta::{
-    Format, FormatError, Types,
+    FormatError, Types,
     datatype::{
         DataType, Enum, Field, Fields, NamedDataType, NamedReference, NamedReferenceType,
         Primitive, Reference, Struct, Tuple, UnnamedFields, Variant,
@@ -220,32 +220,6 @@ fn map_phases_datatype<'a>(
     Ok(Cow::Owned(selected))
 }
 
-/// Formatter value used by [`format`].
-pub struct SerdeFormat;
-
-impl Format for SerdeFormat {
-    fn map_types(&'_ self, types: &Types) -> Result<Cow<'_, Types>, FormatError> {
-        Ok(Cow::Owned(apply(types.clone())?))
-    }
-
-    fn map_type(&'_ self, types: &Types, ty: &DataType) -> Result<Cow<'_, DataType>, FormatError> {
-        Ok(Cow::Owned(map_datatype(types, ty)?.into_owned()))
-    }
-}
-
-/// Formatter value used by [`format_phases`].
-pub struct SerdePhasesFormat;
-
-impl Format for SerdePhasesFormat {
-    fn map_types(&'_ self, types: &Types) -> Result<Cow<'_, Types>, FormatError> {
-        Ok(Cow::Owned(apply_phases(types.clone())?))
-    }
-
-    fn map_type(&'_ self, types: &Types, ty: &DataType) -> Result<Cow<'_, DataType>, FormatError> {
-        Ok(Cow::Owned(map_phases_datatype(types, ty)?.into_owned()))
-    }
-}
-
 /// Applies serde-aware rewrites to a single shared type graph.
 ///
 /// Use this when the serialized and deserialized wire shape can be represented
@@ -260,8 +234,17 @@ impl Format for SerdePhasesFormat {
 /// If serde metadata produces different serialize and deserialize shapes, this
 /// formatter returns an error instead of guessing. In that case, use
 /// [`format_phases`].
-#[allow(non_upper_case_globals)]
-pub const format: SerdeFormat = SerdeFormat;
+pub struct Format;
+
+impl specta::Format for Format {
+    fn map_types(&'_ self, types: &Types) -> Result<Cow<'_, Types>, FormatError> {
+        Ok(Cow::Owned(apply(types.clone())?))
+    }
+
+    fn map_type(&'_ self, types: &Types, ty: &DataType) -> Result<Cow<'_, DataType>, FormatError> {
+        Ok(Cow::Owned(map_datatype(types, ty)?.into_owned()))
+    }
+}
 
 /// Applies serde-aware rewrites while preserving separate serialize and
 /// deserialize shapes.
@@ -279,8 +262,17 @@ pub const format: SerdeFormat = SerdeFormat;
 /// types for definitions that need to diverge, while unchanged definitions stay
 /// shared. Inline datatype rendering uses the serialize-facing shape; use
 /// [`select_phase_datatype`] to inspect either direction explicitly.
-#[allow(non_upper_case_globals)]
-pub const format_phases: SerdePhasesFormat = SerdePhasesFormat;
+pub struct SerdePhasesFormat;
+
+impl specta::Format for SerdePhasesFormat {
+    fn map_types(&'_ self, types: &Types) -> Result<Cow<'_, Types>, FormatError> {
+        Ok(Cow::Owned(apply_phases(types.clone())?))
+    }
+
+    fn map_type(&'_ self, types: &Types, ty: &DataType) -> Result<Cow<'_, DataType>, FormatError> {
+        Ok(Cow::Owned(map_phases_datatype(types, ty)?.into_owned()))
+    }
+}
 
 fn apply_phases(types: Types) -> Result<Types, Error> {
     validate::validate_for_mode(&types, validate::ApplyMode::Phases)?;
