@@ -38,9 +38,10 @@ pub enum NamedReferenceType {
     /// Recursive reference encountered while resolving an inline type.
     ///
     /// Exporters can use this marker to avoid infinitely expanding recursive
-    /// inline definitions.
+    /// inline definitions that they would stack overflow resolving.
     Recursive,
     /// Inline the contained datatype at the reference site.
+    /// These are emitted when `#[specta(inline)]` is used on a field or container.
     #[non_exhaustive]
     Inline {
         /// Datatype to render in place of the named reference.
@@ -177,26 +178,13 @@ impl Reference {
     /// Returns whether two references point to the same underlying type.
     ///
     /// This differs from [`Eq`], [`PartialEq`], and [`Hash`] because those compare
-    /// the full [`Reference`], including generic arguments and inline state.
+    /// the full [`Reference`] which includes generic arguments and inline state.
     pub fn ty_eq(&self, other: &Reference) -> bool {
         match (self, other) {
             (Reference::Named(a), Reference::Named(b)) => a.id == b.id,
             (Reference::Opaque(a), Reference::Opaque(b)) => *a == *b,
             _ => false,
         }
-    }
-
-    /// Converts an existing [`Reference`] into an inlined one.
-    ///
-    /// It is not generally safe to convert an inline reference back into a named
-    /// reference, because some types require every use site to be inlined.
-    pub fn inline(mut self) -> Reference {
-        // if let Reference::Named(n) = &mut self {
-        //     n.inline = true;
-        // }
-        // self
-
-        todo!();
     }
 }
 

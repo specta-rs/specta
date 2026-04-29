@@ -5,19 +5,13 @@ use crate::{Types, datatype::DataType};
 /// Error type returned by [`Format`] callbacks.
 pub type FormatError = Box<dyn error::Error + Send + Sync + 'static>;
 
-/// Formatter callbacks for rewriting collected types and nested datatypes.
+/// The format is used to inform Specta how the Serialize/Deserialization layer handles types.
 ///
-/// This is used by format integration crates, such as `specta-serde`, to apply
-/// format-specific attributes. Exporters and frameworks can also use it for
-/// targeted transformations, such as replacing a Rust integer with an
-/// exporter-specific bigint representation.
+/// This allows them to rewrite the collected types and encountered datatypes to apply format-specific macro attributes or behaviour.
 ///
-/// # Invariants
+/// Currently we have support for:
+///  - [serde](https://docs.rs/specta) via [`specta-serde`](https://docs.rs/specta-serde)
 ///
-/// Implementations may return [`Cow::Borrowed`] when no transformation is
-/// needed. Returned owned values must remain internally consistent: references
-/// in mapped datatypes should still resolve against the mapped [`Types`]
-/// collection the exporter will use.
 pub trait Format {
     /// Apply a map function to the full [`Types`] collection.
     ///
@@ -35,3 +29,34 @@ pub trait Format {
         ty: &DataType,
     ) -> std::result::Result<Cow<'_, DataType>, FormatError>;
 }
+
+impl<T: Format + ?Sized> Format for &T {
+    fn map_types(&'_ self, types: &Types) -> std::result::Result<Cow<'_, Types>, FormatError> {
+        (**self).map_types(types)
+    }
+
+    fn map_type(
+        &'_ self,
+        types: &Types,
+        ty: &DataType,
+    ) -> std::result::Result<Cow<'_, DataType>, FormatError> {
+        (**self).map_type(types, ty)
+    }
+}
+
+impl<T: Format + ?Sized> Format for Box<T> {
+    fn map_types(&'_ self, types: &Types) -> std::result::Result<Cow<'_, Types>, FormatError> {
+        (**self).map_types(types)
+    }
+
+    fn map_type(
+        &'_ self,
+        types: &Types,
+        ty: &DataType,
+    ) -> std::result::Result<Cow<'_, DataType>, FormatError> {
+        (**self).map_type(types, ty)
+    }
+}
+
+// Assert dyn-safety
+const _: Option<&dyn Format> = None;

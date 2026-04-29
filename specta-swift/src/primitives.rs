@@ -278,10 +278,12 @@ pub fn export_type(
             result.push('}');
         }
         DataType::Enum(e) => {
-            let formatted_enum = match apply_datatype_format(swift, types, ndt.ty.as_ref().expect("checked above"))? {
-                DataType::Enum(e) => Some(e),
-                _ => None,
-            };
+            let formatted_enum =
+                match apply_datatype_format(swift, types, ndt.ty.as_ref().expect("checked above"))?
+                {
+                    DataType::Enum(e) => Some(e),
+                    _ => None,
+                };
             let e = formatted_enum
                 .as_ref()
                 .filter(|e| resolved_string_enum(e).is_some())
@@ -464,7 +466,9 @@ fn apply_datatype_format_children(
             }
         }
         DataType::Reference(Reference::Named(reference)) => {
-            if let specta::datatype::NamedReferenceType::Reference { generics, .. } = &mut reference.inner {
+            if let specta::datatype::NamedReferenceType::Reference { generics, .. } =
+                &mut reference.inner
+            {
                 for (_, generic) in generics {
                     *generic = apply_datatype_format(swift, types, generic)?;
                 }

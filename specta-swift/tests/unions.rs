@@ -105,7 +105,7 @@ fn test_enum_with_nested_structs() {
         .register::<ApiResult<String, String>>()
         .register::<ComplexUnion>();
     let swift = Swift::default();
-    let output = swift.export(&types, specta_serde::format).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Generated Swift code:\n{}", output);
 
@@ -147,7 +147,7 @@ fn test_enum_with_nested_structs() {
 fn test_swift_union_syntax() {
     let types = Types::default().register::<UserType>();
     let swift = Swift::default();
-    let output = swift.export(&types, specta_serde::format).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("UserType Swift code:\n{}", output);
 

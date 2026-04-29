@@ -113,7 +113,7 @@ fn legacy_impls() {
         Typescript::default()
             .export(
                 &Types::default().register::<LegacyImpls>(),
-                specta_serde::format
+                specta_serde::Format
             )
             .unwrap()
     );
@@ -124,7 +124,7 @@ fn legacy_impl_bigint_errors() {
     let err = Typescript::default()
         .export(
             &Types::default().register::<LegacyImplWithBigints>(),
-            specta_serde::format,
+            specta_serde::Format,
         )
         .expect_err("bigint glam vectors should fail TypeScript export");
 
@@ -138,7 +138,7 @@ fn legacy_impl_bigint_errors() {
 #[test]
 fn legacy_impl_individual_bigint_errors() {
     fn assert_bigint_export_error<T: Type>(failures: &mut Vec<String>, name: &str) {
-        match Typescript::default().export(&Types::default().register::<T>(), specta_serde::format)
+        match Typescript::default().export(&Types::default().register::<T>(), specta_serde::Format)
         {
             Ok(output) => failures.push(format!(
                 "{name}: expected BigInt export error, but export succeeded with '{output}'"
@@ -152,7 +152,7 @@ fn legacy_impl_individual_bigint_errors() {
     }
 
     fn assert_bigint_or_invalid_map_key_error<T: Type>(failures: &mut Vec<String>, name: &str) {
-        match Typescript::default().export(&Types::default().register::<T>(), specta_serde::format)
+        match Typescript::default().export(&Types::default().register::<T>(), specta_serde::Format)
         {
             Ok(output) => failures.push(format!(
                 "{name}: expected BigInt or invalid map key error, but export succeeded with '{output}'"

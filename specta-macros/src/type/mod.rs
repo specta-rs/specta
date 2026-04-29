@@ -296,26 +296,24 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         quote! {
             #(#generic_placeholders)*
 
-            // TODO: Set params
             ndt.ty = Some(#dt_expr);
         }
     });
 
     let definition = quote! {
         datatype::DataType::Reference(
-            datatype::NamedDataType::init_with_sentinel_inline(
+            datatype::NamedDataType::init_with_sentinel(
                 SENTINEL,
-                GENERICS,
                 &[#(#instantiation_generics),*],
                 #has_const_param,
-                #inline,
                 false,
                 types,
                 |types, ndt| {
                     ndt.name = Cow::Borrowed(#name);
+                    ndt.module_path = Cow::Borrowed(module_path!());
+                    ndt.generics = Cow::Borrowed(GENERICS);
                     ndt.docs = Cow::Borrowed(#comments);
                     ndt.deprecated = #deprecated;
-                    ndt.module_path = Cow::Borrowed(module_path!());
                     #ndt_ty
                 },
                 |types| {
@@ -323,6 +321,12 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 }
             )
         )
+    };
+
+    let definition = if container_attrs.inline {
+        quote!(datatype::inline(types, |types| #definition))
+    } else {
+        definition
     };
 
     Ok(quote! {

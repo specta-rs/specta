@@ -273,7 +273,7 @@ impl fmt::Display for Error {
                 deserialize,
             } => write!(
                 f,
-                "Incompatible {context} for '{name}' in unified mode: serialize={serialize:?}, deserialize={deserialize:?}. Use format_phases for asymmetric serde conversions"
+                "Incompatible {context} for '{name}' in unified mode: serialize={serialize:?}, deserialize={deserialize:?}. Use PhasesFormat for asymmetric serde conversions"
             ),
             ErrorKind::InvalidConversionUsage { path, reason } => {
                 write!(

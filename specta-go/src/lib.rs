@@ -18,7 +18,7 @@
 //! let types = Types::default().register::<MyType>();
 //!
 //! Go::default()
-//!     .export_to("./bindings.go", &types, specta_serde::format)
+//!     .export_to("./bindings.go", &types, specta_serde::Format)
 //!     .unwrap();
 //! ```
 

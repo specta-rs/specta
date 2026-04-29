@@ -867,7 +867,7 @@ fn render_types(
     match exporter.layout {
         Layout::Namespaces => {
             fn has_renderable_content(module: &Module<'_>, types: &Types) -> bool {
-                module.types.iter().any(|ndt| ndt.requires_reference(types))
+                module.types.iter().any(|ndt| ndt.ty.is_some())
                     || module
                         .children
                         .values()
@@ -980,7 +980,7 @@ fn render_flat_types<'a>(
     let mut exports = HashMap::with_capacity(ndts.len());
 
     let ndts = ndts
-        .filter(|ndt| ndt.requires_reference(types))
+        .filter(|ndt| ndt.ty.is_some())
         .map(|ndt| {
             let export_name = exported_type_name(exporter, ndt);
             if let Some(other) = exports.insert(export_name.to_string(), ndt.location) {

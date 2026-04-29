@@ -376,12 +376,12 @@ fn datatype(
             },
         },
         DataType::Generic(g) => {
-                let name = generic_names
-                    .iter()
-                    .find(|candidate| candidate.reference() == *g)
-                    .map(|generic| generic.name().as_ref())
-                    .unwrap_or("any");
-                s.push_str(name);
+            let name = generic_names
+                .iter()
+                .find(|candidate| candidate.reference() == *g)
+                .map(|generic| generic.name().as_ref())
+                .unwrap_or("any");
+            s.push_str(name);
         }
         DataType::Intersection(_) => s.push_str("any"),
     }

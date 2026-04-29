@@ -17,9 +17,7 @@ use crate::{
 };
 
 /// Resolves any named types created by `func` as inline references.
-///
-/// This temporarily enables inline resolution on the provided [`Types`]
-/// collection and restores the previous setting even if `func` panics.
+/// This is emitted when `#[specta(inline)]` is used on a field so the inner fields `Type` implementation knows to inline.
 pub fn inline<R>(types: &mut Types, func: impl FnOnce(&mut Types) -> R) -> R {
     let prev = mem::replace(&mut types.should_inline, true);
     let result = panic::catch_unwind(AssertUnwindSafe(|| func(types)));
@@ -44,7 +42,7 @@ pub fn inline<R>(types: &mut Types, func: impl FnOnce(&mut Types) -> R) -> R {
 #[non_exhaustive]
 pub struct NamedDataType {
     /// Stable identity for resolving references to this datatype.
-    pub id: NamedId,
+    pub(crate) id: NamedId,
     /// Exported type name.
     pub name: Cow<'static, str>,
     /// Documentation comments attached to the source type.
@@ -65,65 +63,15 @@ pub struct NamedDataType {
 }
 
 impl NamedDataType {
-    /// Returns whether this named datatype should be emitted as a named
-    /// declaration instead of only being inlined at use sites.
-    ///
-    /// A datatype with no canonical `ty` has no standalone definition to export.
-    pub fn requires_reference(&self, _types: &Types) -> bool {
-        self.ty.is_some()
-    }
-
-    /// Returns the generic parameters declared by this named datatype.
-    pub fn generics(&self) -> &[GenericDefinition] {
-        &self.generics
-    }
-
-    /// Returns the canonical datatype definition, if this named datatype has one.
-    ///
-    /// `None` means the type is intended to be represented only by inline or
-    /// opaque references.
-    pub fn ty(&self) -> Option<&DataType> {
-        self.ty.as_ref()
-    }
-
-    /// Constructs a new named datatype.
-    ///
-    /// Call [`NamedDataType::register`] to make the type available through a
-    /// [`Types`] collection.
+    /// Constructs a new named datatype and register it into the [`Types`] collection.
     #[track_caller]
-    pub fn new(name: impl Into<Cow<'static, str>>, generics: Vec<Generic>, dt: DataType) -> Self {
-        let location = Location::caller();
-        Self {
-            id: NamedId::Dynamic(Arc::new(())),
-            name: name.into(),
-            docs: Cow::Borrowed(""),
-            deprecated: None,
-            module_path: file_path_to_module_path(location.file())
-                .map(Into::into)
-                .unwrap_or(Cow::Borrowed("virtual")),
-            location: location.to_owned(),
-            generics: Cow::Owned(
-                generics
-                    .into_iter()
-                    .map(|generic| GenericDefinition::new(generic.name().clone(), None))
-                    .collect(),
-            ),
-            ty: Some(dt),
-        }
-    }
-
-    /// Constructs a new named datatype intended to be inlined at reference sites.
-    ///
-    /// Call [`NamedDataType::register`] to make the type available through a
-    /// [`Types`] collection.
-    #[track_caller]
-    pub fn new_inline(
+    pub fn new(
         name: impl Into<Cow<'static, str>>,
-        generics: Vec<Generic>,
-        dt: DataType,
+        types: &mut Types,
+        build: impl FnOnce(&mut Types, &mut NamedDataType),
     ) -> Self {
         let location = Location::caller();
-        Self {
+        let mut ndt = Self {
             id: NamedId::Dynamic(Arc::new(())),
             name: name.into(),
             docs: Cow::Borrowed(""),
@@ -132,23 +80,13 @@ impl NamedDataType {
                 .map(Into::into)
                 .unwrap_or(Cow::Borrowed("virtual")),
             location: location.to_owned(),
-            generics: Cow::Owned(
-                generics
-                    .into_iter()
-                    .map(|generic| GenericDefinition::new(generic.name().clone(), None))
-                    .collect(),
-            ),
-            ty: Some(dt),
-        }
-    }
-
-    /// Registers this named datatype into a [`Types`] collection.
-    ///
-    /// If an entry with the same identity already exists, it is replaced and the
-    /// completed-entry count is incremented for this registration.
-    pub fn register(&self, types: &mut Types) {
-        types.types.insert(self.id.clone(), Some(self.clone()));
+            generics: Cow::Borrowed(&[]),
+            ty: None,
+        };
+        build(types, &mut ndt);
+        types.types.insert(ndt.id.clone(), Some(ndt.clone()));
         types.len += 1;
+        ndt
     }
 
     // TODO: Rewrite this with the new changes
@@ -176,10 +114,8 @@ impl NamedDataType {
     #[track_caller]
     pub fn init_with_sentinel(
         sentinel: &'static str,
-        generics: &'static [GenericDefinition],
         instantiation_generics: &[(Generic, DataType)],
         has_const_param: bool,
-        container_inline: bool,
         passthrough_inline: bool,
         types: &mut Types,
         build_ndt: fn(&mut Types, &mut NamedDataType),
@@ -187,18 +123,16 @@ impl NamedDataType {
     ) -> Reference {
         let id = NamedId::Static(sentinel);
         let location = Location::caller().to_owned();
-        let mut inline = container_inline || types.should_inline;
-
-        println!("init_with_sentinel {sentinel} {inline}");
+        let mut inline = types.should_inline;
 
         // If we have never encountered this type, register it to type map
         if !types.types.contains_key(&id) {
             let mut ndt = NamedDataType {
                 id: id.clone(),
                 location,
-                generics: Cow::Borrowed(generics),
-                ty: None,
                 // `build_ndt` will just override all of this.
+                generics: Cow::Borrowed(&[]),
+                ty: None,
                 name: Cow::Borrowed(""),
                 docs: Cow::Borrowed(""),
                 deprecated: None,
@@ -252,13 +186,10 @@ impl NamedDataType {
                 }
                 h.finish()
             };
-            println!("INLINE {sentinel} {hash:?}");
 
             if types.stack.contains(&hash) {
-                todo!("recursive inline reference detected {:?}", types.stack);
                 return Reference::Named(NamedReference {
                     id,
-                    // TODO: Include metadata about where the recursive loop is
                     inner: NamedReferenceType::Recursive,
                 });
             }
@@ -292,32 +223,6 @@ impl NamedDataType {
                 },
             })
         }
-    }
-
-    #[doc(hidden)]
-    #[track_caller]
-    pub fn init_with_sentinel_inline(
-        sentinel: &'static str,
-        generics: &'static [GenericDefinition],
-        instantiation_generics: &[(Generic, DataType)],
-        has_const_param: bool,
-        container_inline: bool,
-        passthrough_inline: bool,
-        types: &mut Types,
-        build_ndt: fn(&mut Types, &mut NamedDataType),
-        build_ty: fn(&mut Types) -> DataType,
-    ) -> Reference {
-        Self::init_with_sentinel(
-            sentinel,
-            generics,
-            instantiation_generics,
-            has_const_param,
-            container_inline,
-            passthrough_inline,
-            types,
-            build_ndt,
-            build_ty,
-        )
     }
 
     /// Constructs a [`Reference`] to this named datatype.

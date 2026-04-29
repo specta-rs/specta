@@ -1,7 +1,7 @@
 use std::fmt;
 
 use specta::{
-    Type, Types,
+    Format as _, Type, Types,
     datatype::{DataType, Function},
     function::{self, fn_datatype},
     specta,
@@ -10,8 +10,8 @@ use specta_typescript::{Typescript, primitives};
 
 fn render_datatype(ts: &Typescript, types: &Types, dt: &DataType) -> String {
     // This is handled by Specta Typescript for you.
-    let types = (specta_serde::format.map_types)(types).unwrap();
-    let dt = (specta_serde::format.map_type)(&types, dt).unwrap();
+    let types = specta_serde::Format.map_types(types).unwrap();
+    let dt = specta_serde::Format.map_type(&types, dt).unwrap();
 
     match &*dt {
         DataType::Reference(r) => primitives::reference(ts, &types, r).unwrap(),

@@ -26,7 +26,7 @@ fn test_common_types() {
         .register::<TestStruct>()
         .register::<TestEnum>();
     let swift = Swift::default();
-    let output = swift.export(&types, specta_serde::format).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Generated Swift code:\n{}", output);
 

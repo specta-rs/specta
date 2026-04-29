@@ -88,7 +88,7 @@ fn export_to() {
 #[test]
 fn primitives_export() {
     for (mode, format, dts, types) in phase_collections() {
-        let types = (format.map_types)(&types).unwrap().into_owned();
+        let types = format.map_types(&types).unwrap().into_owned();
 
         let output = dts
             .iter()
@@ -98,7 +98,9 @@ fn primitives_export() {
                     _ => return None,
                 };
 
-                ndt.map_ty_mut(|ty| *ty = (format.map_type)(&types, ty).unwrap().into_owned());
+                if let Some(ty) = &mut ndt.ty {
+                    *ty = format.map_type(&types, ty).unwrap().into_owned();
+                }
 
                 Some(
                     primitives::export(&JSDoc::default(), &types, [ndt].iter(), "")
@@ -116,7 +118,7 @@ fn primitives_export() {
 #[test]
 fn primitives_export_many() {
     for (mode, format, dts, types) in phase_collections() {
-        let types = (format.map_types)(&types).unwrap().into_owned();
+        let types = format.map_types(&types).unwrap().into_owned();
 
         let output = primitives::export(
             &JSDoc::default(),
@@ -127,7 +129,9 @@ fn primitives_export_many() {
                     _ => None,
                 })
                 .map(|mut ndt| {
-                    ndt.map_ty_mut(|ty| *ty = (format.map_type)(&types, ty).unwrap().into_owned());
+                    if let Some(ty) = &mut ndt.ty {
+                        *ty = format.map_type(&types, ty).unwrap().into_owned();
+                    }
                     ndt
                 })
                 .collect::<Vec<_>>()
@@ -143,12 +147,12 @@ fn primitives_export_many() {
 #[test]
 fn primitives_reference() {
     for (mode, format, dts, types) in phase_collections() {
-        let types = (format.map_types)(&types).unwrap().into_owned();
+        let types = format.map_types(&types).unwrap().into_owned();
 
         let output = dts
             .iter()
             .filter_map(|(name, dt)| {
-                let dt = (format.map_type)(&types, dt).unwrap().into_owned();
+                let dt = format.map_type(&types, dt).unwrap().into_owned();
 
                 let reference = match dt {
                     DataType::Reference(reference) => reference.clone(),
@@ -171,12 +175,12 @@ fn primitives_reference() {
 #[test]
 fn primitives_inline() {
     for (mode, format, dts, types) in phase_collections() {
-        let types = (format.map_types)(&types).unwrap().into_owned();
+        let types = format.map_types(&types).unwrap().into_owned();
 
         let output = dts
             .iter()
             .map(|(name, dt)| {
-                let dt = (format.map_type)(&types, dt).unwrap().into_owned();
+                let dt = format.map_type(&types, dt).unwrap().into_owned();
 
                 primitives::inline(&JSDoc::default(), &types, &dt).map(|ty| format!("{name}: {ty}"))
             })
@@ -210,7 +214,7 @@ fn jsdoc_export_bigint_errors() {
             return;
         }
 
-        match jsdoc.export(&types, specta_serde::format) {
+        match jsdoc.export(&types, specta_serde::Format) {
             Ok(output) => failures.push(format!(
                 "{name} [export]: expected BigInt error, but export succeeded with '{output}'"
             )),
@@ -377,7 +381,7 @@ fn jsdoc_export_to_files_uses_jsdoc_import_typedefs() {
 
     JSDoc::default()
         .layout(Layout::Files)
-        .export_to(&path, &types, specta_serde::format)
+        .export_to(&path, &types, specta_serde::Format)
         .unwrap();
 
     let output = fs_to_string(&path).unwrap();

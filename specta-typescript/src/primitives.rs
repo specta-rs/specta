@@ -108,7 +108,7 @@ fn export_single_internal(
         return Ok(());
     }
 
-    let _generic_scope = push_generic_scope(&ndt.generics());
+    let _generic_scope = push_generic_scope(&ndt.generics);
 
     // TODO: Modernise this
     let name = crate::legacy::sanitise_type_name(
@@ -145,10 +145,10 @@ fn export_single_internal(
     s.push_str(indent);
     s.push_str("export type ");
     s.push_str(&name);
-    write_generic_parameters(s, exporter, types, &ndt.generics())?;
+    write_generic_parameters(s, exporter, types, &ndt.generics)?;
     s.push_str(" = ");
 
-    let _generic_scope = push_generic_scope(&ndt.generics());
+    let _generic_scope = push_generic_scope(&ndt.generics);
     datatype(
         s,
         exporter,
@@ -393,15 +393,15 @@ fn append_typedef_body(
     dt: &NamedDataType,
     indent: &str,
 ) -> Result<(), Error> {
-    let _generic_scope = push_generic_scope(&dt.generics());
+    let _generic_scope = push_generic_scope(&dt.generics);
 
     let name = &dt.name;
     let mut type_name = String::from(name.as_ref());
-    write_generic_parameters(&mut type_name, exporter, types, &dt.generics())?;
+    write_generic_parameters(&mut type_name, exporter, types, &dt.generics)?;
 
     let mut typedef_ty = String::new();
     let datatype_prefix = format!("{indent}\t*\t");
-    let _generic_scope = push_generic_scope(&dt.generics());
+    let _generic_scope = push_generic_scope(&dt.generics);
     datatype(
         &mut typedef_ty,
         exporter,
@@ -662,9 +662,9 @@ fn resolved_reference_generics(
 ) -> Option<(Vec<DataType>, bool, Vec<(GenericReference, DataType)>)> {
     let mut scoped_generics = scoped_reference_generics(parent_generics, &r.generics());
     let mut all_default = true;
-    let mut rendered_generics = Vec::with_capacity(ndt.generics().len());
+    let mut rendered_generics = Vec::with_capacity(ndt.generics.len());
 
-    for generic in ndt.generics().iter() {
+    for generic in ndt.generics.iter() {
         let explicit = r
             .generics()
             .iter()
@@ -2120,7 +2120,7 @@ fn reference_named_dt(
         let ndt = r
             .get(types)
             .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}")))?;
-        let _generic_scope = push_generic_scope(&ndt.generics());
+        let _generic_scope = push_generic_scope(&ndt.generics);
 
         // We check it's valid before tracking
         crate::references::track_nr(r);

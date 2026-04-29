@@ -25,8 +25,8 @@ fn test_string_enum_generation() {
     let swift = Swift::default();
     let serde_resolved = Types::default().register::<JobStatus>();
     let raw_resolved = Types::default().register::<RegularEnum>();
-    let string_output = swift.export(&serde_resolved, specta_serde::format).unwrap();
-    let raw_output = swift.export(&raw_resolved, specta_serde::format).unwrap();
+    let string_output = swift.export(&serde_resolved, specta_serde::Format).unwrap();
+    let raw_output = swift.export(&raw_resolved, specta_serde::Format).unwrap();
 
     println!("String enum test output:\n{}", string_output);
     println!("Regular enum test output:\n{}", raw_output);

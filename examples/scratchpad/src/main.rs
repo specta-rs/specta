@@ -79,11 +79,23 @@ struct G {
     b: GG<String>,
 }
 
+#[derive(Type)]
+#[specta(inline)]
+pub struct Inner {
+    a: String,
+}
+
+#[derive(Type)]
+pub struct Outer {
+    inner: Inner,
+}
+
 fn main() {
     let mut types = Types::default()
         .register::<A>()
         // .register::<E3>()
-        .register::<G>();
+        .register::<G>()
+        .register::<Outer>();
 
     let def = String::definition(&mut types);
     println!("\n{:?}", def);
@@ -125,10 +137,10 @@ fn main() {
     //     }
     // )
 
-    // println!("{types:#?}");
+    println!("{types:#?}");
 
     // let out = specta_typescript::Typescript::new()
-    //     .export(&types, specta_serde::format_phases)
+    //     .export(&types, specta_serde::PhasesFormat)
     //     .unwrap();
 
     // println!("{}", out);

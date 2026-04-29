@@ -34,7 +34,7 @@
 //!     .export_to(
 //!         "./bindings.ts",
 //!         &types,
-//!         specta_serde::format,
+//!         specta_serde::Format,
 //!     )
 //!     .unwrap();
 //! ```

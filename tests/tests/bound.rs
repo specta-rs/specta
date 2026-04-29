@@ -139,7 +139,7 @@ fn associated_type_bound_issue_138() {
 
     let types = Types::default().register::<Demo<AssocIsI32>>();
     let output = Typescript::default()
-        .export(&types, specta_serde::format)
+        .export(&types, specta_serde::Format)
         .unwrap();
     insta::assert_snapshot!("bound-associated-type-issue-138", output);
 }

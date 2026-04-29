@@ -33,7 +33,7 @@
 //!     .register::<MyType>();
 //!
 //! Swift::default()
-//!     .export_to("./Types.swift", &types, specta_serde::format)
+//!     .export_to("./Types.swift", &types, specta_serde::Format)
 //!     .unwrap();
 //! ```
 //!

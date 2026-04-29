@@ -40,7 +40,7 @@ fn main() {
         .schema_version(SchemaVersion::Draft7)
         .title("My API Types")
         .description("JSON Schema for my API types")
-        .export(&types, specta_serde::format)
+        .export(&types, specta_serde::Format)
         .unwrap();
 
     println!("{}", schema);

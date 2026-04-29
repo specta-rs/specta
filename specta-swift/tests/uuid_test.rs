@@ -16,7 +16,7 @@ struct WithUuid {
 fn test_uuid_support() {
     let types = Types::default().register::<WithUuid>();
     let swift = Swift::default();
-    let output = swift.export(&types, specta_serde::format).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("UUID support test:\n{}", output);
 
@@ -46,7 +46,7 @@ struct WithChrono {
 fn test_chrono_support() {
     let types = Types::default().register::<WithChrono>();
     let swift = Swift::default();
-    let output = swift.export(&types, specta_serde::format).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Chrono support test:\n{}", output);
 

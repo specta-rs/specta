@@ -2,9 +2,9 @@
 //!
 //! # Choosing a mode
 //!
-//! - Use [`format`] when serde behavior is symmetric and a single exported shape
+//! - Use [`Format`] when serde behavior is symmetric and a single exported shape
 //!   should work for both serialization and deserialization.
-//! - Use [`format_phases`] when serde behavior differs by direction (for example
+//! - Use [`PhasesFormat`] when serde behavior differs by direction (for example
 //!   deserialize-widening enums, asymmetric conversion attributes, or explicit
 //!   [`Phased`] overrides).
 //!
@@ -29,7 +29,7 @@
 //! ```
 //!
 //! If serialize and deserialize shapes are different, use [`Phased`] and
-//! [`format_phases`].
+//! [`PhasesFormat`].
 //!
 //! This is required because a single unified type graph cannot represent two
 //! different directional wire shapes at once.
@@ -56,7 +56,7 @@
 //!
 //! let types = Types::default().register::<Filters>();
 //! let phased_types = specta_typescript::Typescript::default()
-//!     .export(&types, specta_serde::format_phases)?;
+//!     .export(&types, specta_serde::PhasesFormat)?;
 //! ```
 //!
 //! As an alternative to codec attributes, `#[serde(into = ...)]`,
@@ -92,7 +92,7 @@
 //! ```
 //!
 //! See `examples/basic-ts/src/main.rs` for a complete exporter example using
-//! [`format`] and [`format_phases`].
+//! [`Format`] and [`PhasesFormat`].
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(
     html_logo_url = "https://github.com/specta-rs/specta/raw/main/.github/logo-128.png",
@@ -127,7 +127,7 @@ use repr::EnumRepr;
 pub use error::Error;
 pub use phased::{Phased, phased};
 
-/// Selects which directional type shape to use with [`format_phases`].
+/// Selects which directional type shape to use with [`PhasesFormat`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
     /// The shape used when Rust serializes data to the wire.
@@ -243,7 +243,7 @@ fn map_phases_datatype<'a>(
 /// Use this when the serialized and deserialized wire shape can be represented
 /// by the same exported schema. Exporters should pass this formatter to Specta's
 /// formatting hook, for example
-/// `specta_typescript::Typescript::default().export(&types, specta_serde::format)`.
+/// `specta_typescript::Typescript::default().export(&types, specta_serde::Format)`.
 ///
 /// This formatter validates the graph for unified export and applies serde
 /// container, variant, and field behavior that affects the exported shape, such
@@ -251,7 +251,7 @@ fn map_phases_datatype<'a>(
 ///
 /// If serde metadata produces different serialize and deserialize shapes, this
 /// formatter returns an error instead of guessing. In that case, use
-/// [`format_phases`].
+/// [`PhasesFormat`].
 pub struct Format;
 
 impl specta::Format for Format {
@@ -274,7 +274,7 @@ impl specta::Format for Format {
 ///
 /// Exporters should pass this formatter to Specta's formatting hook, for
 /// example
-/// `specta_typescript::Typescript::default().export(&types, specta_serde::format_phases)`.
+/// `specta_typescript::Typescript::default().export(&types, specta_serde::PhasesFormat)`.
 ///
 /// The transformed type graph includes `*_Serialize` and `*_Deserialize` named
 /// types for definitions that need to diverge, while unchanged definitions stay
@@ -510,19 +510,19 @@ fn apply_phases(types: Types) -> Result<Types, Error> {
     Ok(out)
 }
 
-/// Rewrites a [`DataType`] to the requested directional shape for [`format_phases`].
+/// Rewrites a [`DataType`] to the requested directional shape for [`PhasesFormat`].
 ///
 /// This is useful for exporter integrations that need deserialize-specific input
 /// types and serialize-specific output types while still exporting against the
 /// resolved type graph produced by the `map_types` callback from
-/// [`format_phases`].
+/// [`PhasesFormat`].
 ///
 /// # Examples
 ///
 /// ```rust
 /// use serde::{Deserialize, Serialize};
-/// use specta::{Type, Types, datatype::{DataType, Reference}};
-/// use specta_serde::{Phase, Phased, format_phases, select_phase_datatype};
+/// use specta::{Format as _, Type, Types, datatype::{DataType, Reference}};
+/// use specta_serde::{Phase, Phased, PhasesFormat, select_phase_datatype};
 ///
 /// #[derive(Type, Serialize, Deserialize)]
 /// #[serde(untagged)]
@@ -539,9 +539,9 @@ fn apply_phases(types: Types) -> Result<Types, Error> {
 ///
 /// let mut types = Types::default();
 /// let dt = Filters::definition(&mut types);
-/// let format = format_phases;
-/// let resolved = (format.map_types)(&types)
-///     .expect("format_phases should succeed")
+/// let format = PhasesFormat;
+/// let resolved = format.map_types(&types)
+///     .expect("PhasesFormat should succeed")
 ///     .into_owned();
 ///
 /// let serialize = select_phase_datatype(&dt, &resolved, Phase::Serialize);
@@ -1532,7 +1532,7 @@ fn resolve_phased_type(
         PhaseRewrite::Unified => {
             return Err(Error::invalid_phased_type_usage(
                 path,
-                "`specta_serde::Phased<Serialize, Deserialize>` requires `format_phases`",
+                "`specta_serde::Phased<Serialize, Deserialize>` requires `PhasesFormat`",
             ));
         }
         PhaseRewrite::Serialize => Some(phased.serialize.clone()),
@@ -2244,9 +2244,9 @@ fn field_is_optional_for_mode(
 #[cfg(test)]
 mod tests {
     use serde::{Deserialize, Serialize};
-    use specta::{Type, Types, datatype::DataType};
+    use specta::{Format as _, Type, Types, datatype::DataType};
 
-    use super::{Phase, Phased, format_phases, select_phase_datatype};
+    use super::{Phase, Phased, PhasesFormat, select_phase_datatype};
 
     #[derive(Type, Serialize, Deserialize)]
     #[serde(untagged)]
@@ -2384,9 +2384,10 @@ mod tests {
     }
 
     fn formatted_phases(types: Types) -> Types {
-        let format = format_phases;
-        (format.map_types)(&types)
-            .expect("format_phases should succeed")
+        let format = PhasesFormat;
+        format
+            .map_types(&types)
+            .expect("PhasesFormat should succeed")
             .into_owned()
     }
 }

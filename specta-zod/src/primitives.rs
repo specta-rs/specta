@@ -208,7 +208,7 @@ fn export_single_internal(
 
 /// Generate an inline Zod expression for a [`DataType`].
 ///
-/// If you are using a custom format such as `specta_serde::format`, this helper does not apply
+/// If you are using a custom format such as `specta_serde::Format`, this helper does not apply
 /// datatype mapping automatically. Map both the full [`Types`] graph and any top-level
 /// [`DataType`] values before calling this helper.
 pub fn inline(exporter: &dyn AsRef<Zod>, types: &Types, dt: &DataType) -> Result<String, Error> {
@@ -219,7 +219,7 @@ pub fn inline(exporter: &dyn AsRef<Zod>, types: &Types, dt: &DataType) -> Result
 
 /// Generate a Zod expression for a [`Reference`].
 ///
-/// If you are using a custom format such as `specta_serde::format`, this helper does not apply
+/// If you are using a custom format such as `specta_serde::Format`, this helper does not apply
 /// datatype mapping automatically.
 pub fn reference(exporter: &dyn AsRef<Zod>, types: &Types, r: &Reference) -> Result<String, Error> {
     let mut s = String::new();
@@ -289,7 +289,15 @@ fn datatype(
             let mut parts = Vec::with_capacity(intersection.len());
             for ty in intersection {
                 let mut part = String::new();
-                datatype(&mut part, exporter, types, ty, location.clone(), generics, false)?;
+                datatype(
+                    &mut part,
+                    exporter,
+                    types,
+                    ty,
+                    location.clone(),
+                    generics,
+                    false,
+                )?;
                 parts.push(part);
             }
             s.push_str(&parts.join(".and("));
@@ -427,15 +435,7 @@ fn struct_dt(
             match fields.as_slice() {
                 [] => s.push_str("z.tuple([])"),
                 [(field, ty)] if unnamed.fields.len() == 1 => {
-                    datatype_with_inline_attr(
-                        s,
-                        exporter,
-                        types,
-                        ty,
-                        location,
-                        generics,
-                        false,
-                    )?;
+                    datatype_with_inline_attr(s, exporter, types, ty, location, generics, false)?;
                 }
                 fields => {
                     s.push_str("z.tuple([");
@@ -641,13 +641,7 @@ fn enum_variant_dt(
                 [(field, ty)] if unnamed.fields.len() == 1 => {
                     let mut out = String::new();
                     datatype_with_inline_attr(
-                        &mut out,
-                        exporter,
-                        types,
-                        ty,
-                        location,
-                        generics,
-                        false,
+                        &mut out, exporter, types, ty, location, generics, false,
                     )?;
                     Some(out)
                 }

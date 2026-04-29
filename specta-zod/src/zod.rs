@@ -449,7 +449,9 @@ fn map_datatype_format_children(
             }
         }
         DataType::Reference(Reference::Named(reference)) => {
-            if let specta::datatype::NamedReferenceType::Reference { generics, .. } = &mut reference.inner {
+            if let specta::datatype::NamedReferenceType::Reference { generics, .. } =
+                &mut reference.inner
+            {
                 for (_, generic) in generics {
                     *generic = map_datatype_format(format, types, generic)?;
                 }

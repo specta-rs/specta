@@ -378,7 +378,7 @@ fn inner(
                     if mode == ApplyMode::Unified {
                         return Err(Error::invalid_phased_type_usage(
                             path,
-                            "`specta_serde::Phased<Serialize, Deserialize>` requires `format_phases`",
+                            "`specta_serde::Phased<Serialize, Deserialize>` requires `PhasesFormat`",
                         ));
                     }
 
@@ -454,7 +454,7 @@ fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<(
     if mode == ApplyMode::Unified {
         return Err(Error::invalid_phased_type_usage(
             path,
-            "identifier enums require `format_phases` because they widen deserialize-only input shape",
+            "identifier enums require `PhasesFormat` because they widen deserialize-only input shape",
         ));
     }
 
@@ -562,7 +562,7 @@ fn validate_variant_attributes(
     {
         return Err(Error::invalid_phased_type_usage(
             path,
-            "phase-specific `#[serde(untagged)]` variants require `format_phases` because unified mode would drop one branch",
+            "phase-specific `#[serde(untagged)]` variants require `PhasesFormat` because unified mode would drop one branch",
         ));
     }
 
@@ -604,7 +604,7 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
     if mode == ApplyMode::Unified && serde_attrs.skip_serializing_if.is_some() {
         return Err(Error::invalid_phased_type_usage(
             path,
-            "`skip_serializing_if` requires `format_phases` because unified mode cannot represent conditional omission",
+            "`skip_serializing_if` requires `PhasesFormat` because unified mode cannot represent conditional omission",
         ));
     }
 
@@ -720,7 +720,7 @@ fn validate_other_variant(
     if mode == ApplyMode::Unified {
         return Err(Error::invalid_phased_type_usage(
             path,
-            "`#[serde(other)]` requires `format_phases` because it widens deserialize-only input shape",
+            "`#[serde(other)]` requires `PhasesFormat` because it widens deserialize-only input shape",
         ));
     }
 

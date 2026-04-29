@@ -2678,7 +2678,7 @@ fn container_default_marks_all_fields_optional_in_unified_mode() {
     let ts = specta_typescript::Typescript::default()
         .export(
             &Types::default().register::<ContainerDefault>(),
-            specta_serde::format,
+            specta_serde::Format,
         )
         .expect("typescript export should succeed");
 
@@ -2690,7 +2690,7 @@ fn field_default_still_marks_only_that_field_optional() {
     let ts = specta_typescript::Typescript::default()
         .export(
             &Types::default().register::<FieldDefault>(),
-            specta_serde::format,
+            specta_serde::Format,
         )
         .expect("typescript export should succeed");
 
@@ -2702,7 +2702,7 @@ fn mixed_tagged_and_untagged_variants_export_in_unified_mode() {
     let ts = specta_typescript::Typescript::default()
         .export(
             &Types::default().register::<MixedTaggedAndUntagged>(),
-            specta_serde::format,
+            specta_serde::Format,
         )
         .expect("typescript export should succeed");
 
@@ -2714,7 +2714,7 @@ fn mixed_tagged_and_untagged_struct_variants_export_in_unified_mode() {
     let ts = specta_typescript::Typescript::default()
         .export(
             &Types::default().register::<MixedTaggedAndUntaggedStruct>(),
-            specta_serde::format,
+            specta_serde::Format,
         )
         .expect("typescript export should succeed");
 
@@ -2726,7 +2726,7 @@ fn phased_mixed_untagged_variants_split_per_phase() {
     let ts = specta_typescript::Typescript::default()
         .export(
             &Types::default().register::<MixedTaggedAndUntaggedPhased>(),
-            specta_serde::format_phases,
+            specta_serde::PhasesFormat,
         )
         .expect("typescript export should succeed");
 

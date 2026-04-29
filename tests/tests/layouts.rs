@@ -47,33 +47,33 @@ fn duplicate_typenames_layouts() {
         .register::<Another>()
         .register::<MoreType>();
     assert_error_contains(
-        Typescript::default().export(&types, specta_serde::format),
+        Typescript::default().export(&types, specta_serde::Format),
         "Detected multiple types",
     );
 
     assert_error_contains(
         Typescript::default()
             .layout(Layout::FlatFile)
-            .export(&types, specta_serde::format),
+            .export(&types, specta_serde::Format),
         "Detected multiple types",
     );
 
     let module_prefixed = Typescript::default()
         .layout(Layout::ModulePrefixedName)
-        .export(&types, specta_serde::format)
+        .export(&types, specta_serde::Format)
         .unwrap();
     insta::assert_snapshot!("layouts-duplicate-module-prefixed", module_prefixed);
 
     let namespaces = Typescript::default()
         .layout(Layout::Namespaces)
-        .export(&types, specta_serde::format)
+        .export(&types, specta_serde::Format)
         .unwrap();
     insta::assert_snapshot!("layouts-duplicate-namespaces", namespaces);
 
     assert_error_contains(
         Typescript::default()
             .layout(Layout::Files)
-            .export(&types, specta_serde::format),
+            .export(&types, specta_serde::Format),
         "Unable to export layout Files",
     );
 
@@ -81,7 +81,7 @@ fn duplicate_typenames_layouts() {
     let path = temp.path().join("duplicate-layout");
     Typescript::default()
         .layout(Layout::Files)
-        .export_to(&path, &types, specta_serde::format)
+        .export_to(&path, &types, specta_serde::Format)
         .unwrap();
 
     let output = crate::fs_to_string(&path).unwrap();
@@ -94,32 +94,32 @@ fn non_duplicate_typenames_layouts() {
         .register::<Another>()
         .register::<MoreType>();
     let default_output = Typescript::default()
-        .export(&types, specta_serde::format)
+        .export(&types, specta_serde::Format)
         .unwrap();
     insta::assert_snapshot!("layouts-non-duplicate-default", default_output);
 
     let flat = Typescript::default()
         .layout(Layout::FlatFile)
-        .export(&types, specta_serde::format)
+        .export(&types, specta_serde::Format)
         .unwrap();
     insta::assert_snapshot!("layouts-non-duplicate-flat", flat);
 
     let module_prefixed = Typescript::default()
         .layout(Layout::ModulePrefixedName)
-        .export(&types, specta_serde::format)
+        .export(&types, specta_serde::Format)
         .unwrap();
     insta::assert_snapshot!("layouts-non-duplicate-module-prefixed", module_prefixed);
 
     let namespaces = Typescript::default()
         .layout(Layout::Namespaces)
-        .export(&types, specta_serde::format)
+        .export(&types, specta_serde::Format)
         .unwrap();
     insta::assert_snapshot!("layouts-non-duplicate-namespaces", namespaces);
 
     assert_error_contains(
         Typescript::default()
             .layout(Layout::Files)
-            .export(&types, specta_serde::format),
+            .export(&types, specta_serde::Format),
         "Unable to export layout Files",
     );
 
@@ -127,7 +127,7 @@ fn non_duplicate_typenames_layouts() {
     let path = temp.path().join("no-duplicate-layout");
     Typescript::default()
         .layout(Layout::Files)
-        .export_to(&path, &types, specta_serde::format)
+        .export_to(&path, &types, specta_serde::Format)
         .unwrap();
 
     let output = crate::fs_to_string(&path).unwrap();
@@ -143,19 +143,19 @@ fn empty_module_path_layouts() {
     testing.register(&mut types);
     let flat = Typescript::default()
         .layout(Layout::FlatFile)
-        .export(&types, specta_serde::format)
+        .export(&types, specta_serde::Format)
         .unwrap();
     insta::assert_snapshot!("layouts-empty-module-path-flat", flat);
 
     let module_prefixed = Typescript::default()
         .layout(Layout::ModulePrefixedName)
-        .export(&types, specta_serde::format)
+        .export(&types, specta_serde::Format)
         .unwrap();
     insta::assert_snapshot!("layouts-empty-module-path-module-prefixed", module_prefixed);
 
     let namespaces = Typescript::default()
         .layout(Layout::Namespaces)
-        .export(&types, specta_serde::format)
+        .export(&types, specta_serde::Format)
         .unwrap();
     insta::assert_snapshot!("layouts-empty-module-path-namespaces", namespaces);
 
@@ -163,7 +163,7 @@ fn empty_module_path_layouts() {
     let path = temp.path().join("empty-module-path-layout");
     Typescript::default()
         .layout(Layout::Files)
-        .export_to(&path, &types, specta_serde::format)
+        .export_to(&path, &types, specta_serde::Format)
         .unwrap();
 
     let output = crate::fs_to_string(Path::new(&path)).unwrap();
