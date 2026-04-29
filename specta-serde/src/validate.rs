@@ -141,16 +141,14 @@ fn inner(
                 &path,
                 mode,
             )?;
-            if SerdeContainerAttrs::from_attributes(&strct.attributes)?
-                .is_some_and(|attrs| attrs.variant_identifier || attrs.field_identifier)
-            {
-                return Err(Error::invalid_phased_type_usage(
-                    path,
-                    "`#[serde(variant_identifier)]` and `#[serde(field_identifier)]` are only valid on enums",
-                ));
-            }
-
             if let Some(attrs) = SerdeContainerAttrs::from_attributes(&strct.attributes)? {
+                if attrs.variant_identifier || attrs.field_identifier {
+                    return Err(Error::invalid_phased_type_usage(
+                        path,
+                        "`#[serde(variant_identifier)]` and `#[serde(field_identifier)]` are only valid on enums",
+                    ));
+                }
+
                 if attrs.untagged {
                     return Err(Error::invalid_phased_type_usage(
                         path,
@@ -664,7 +662,7 @@ fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Re
         ));
     }
 
-    let repr = enum_repr_from_attrs(&enm.attributes)?;
+    let repr = EnumRepr::from_attrs(&enm.attributes)?;
 
     validate_untagged_variants(enm, &path)?;
     validate_other_variant(enm, &path, &repr, mode)?;
@@ -805,7 +803,7 @@ fn validate_internally_tag_enum_datatype(
     match ty {
         DataType::Map(_) => Ok(()),
         DataType::Struct(_) => Ok(()),
-        DataType::Enum(enm) => match enum_repr_from_attrs(&enm.attributes)? {
+        DataType::Enum(enm) => match EnumRepr::from_attrs(&enm.attributes)? {
             EnumRepr::Untagged => validate_internally_tag_enum(enm, types, path.to_string()),
             EnumRepr::External | EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. } => Ok(()),
         },
@@ -828,47 +826,6 @@ fn validate_internally_tag_enum_datatype(
             variant_name,
             "payload cannot be merged with an internal tag",
         )),
-    }
-}
-
-fn enum_repr_from_attrs(attrs: &specta::datatype::Attributes) -> Result<EnumRepr, Error> {
-    let Some(container_attrs) = SerdeContainerAttrs::from_attributes(attrs)? else {
-        return Ok(EnumRepr::External);
-    };
-
-    if container_attrs.untagged {
-        return Ok(EnumRepr::Untagged);
-    }
-
-    Ok(
-        match (
-            container_attrs.tag.as_deref(),
-            container_attrs.content.as_deref(),
-        ) {
-            (Some(tag), Some(content)) => EnumRepr::Adjacent {
-                tag: tag.to_string().into(),
-                content: content.to_string().into(),
-            },
-            (Some(tag), None) => EnumRepr::Internal {
-                tag: tag.to_string().into(),
-            },
-            (None, Some(_)) => {
-                return Err(Error::invalid_enum_representation(
-                    "`content` is set without `tag`",
-                ));
-            }
-            (None, None) => EnumRepr::External,
-        },
-    )
-}
-
-trait NamedReferenceExt {
-    fn get<'a>(&self, types: &'a Types) -> Option<&'a specta::datatype::NamedDataType>;
-}
-
-impl NamedReferenceExt for specta::datatype::NamedReference {
-    fn get<'a>(&self, types: &'a Types) -> Option<&'a specta::datatype::NamedDataType> {
-        types.get(self)
     }
 }
 

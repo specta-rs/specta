@@ -201,14 +201,24 @@ fn map_datatype<'a>(types: &'a Types, dt: &'a DataType) -> Result<Cow<'a, DataTy
         return Err(err.into());
     }
 
-    Ok(Cow::Borrowed(dt))
+    let mut dt = dt.clone();
+    rewrite_datatype_for_phase(
+        &mut dt,
+        PhaseRewrite::Unified,
+        types,
+        &HashMap::new(),
+        &HashSet::new(),
+        None,
+    )?;
+
+    Ok(Cow::Owned(dt))
 }
 
 fn map_phases_datatype<'a>(
     types: &'a Types,
     dt: &'a DataType,
 ) -> Result<Cow<'a, DataType>, FormatError> {
-    let selected = select_phase_datatype(dt, types, Phase::Serialize);
+    let mut selected = select_phase_datatype(dt, types, Phase::Serialize);
 
     if let Err(err) =
         validate::validate_datatype_for_mode_shallow(&selected, types, validate::ApplyMode::Phases)
@@ -216,6 +226,15 @@ fn map_phases_datatype<'a>(
     {
         return Err(err.into());
     }
+
+    rewrite_datatype_for_phase(
+        &mut selected,
+        PhaseRewrite::Serialize,
+        types,
+        &HashMap::new(),
+        &HashSet::new(),
+        None,
+    )?;
 
     Ok(Cow::Owned(selected))
 }
@@ -688,6 +707,10 @@ fn select_split_type_variant<'a>(
         return None;
     };
 
+    if wrapper.variants.len() != 2 {
+        return None;
+    }
+
     let variant_name = match phase {
         Phase::Serialize => "Serialize",
         Phase::Deserialize => "Deserialize",
@@ -700,7 +723,9 @@ fn select_split_type_variant<'a>(
     let Fields::Unnamed(fields) = &variant.fields else {
         return None;
     };
-    let field = &fields.fields.first()?;
+    let [field] = &fields.fields[..] else {
+        return None;
+    };
     let Some(DataType::Reference(Reference::Named(reference))) = field.ty.as_ref() else {
         return None;
     };
@@ -719,12 +744,10 @@ fn named_reference_generics(
 
 fn named_reference_generics_mut(
     reference: &mut NamedReference,
-) -> &mut Vec<(specta::datatype::Generic, DataType)> {
+) -> &mut [(specta::datatype::Generic, DataType)] {
     match &mut reference.inner {
         NamedReferenceType::Reference { generics, .. } => generics,
-        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => {
-            unreachable!("inline and recursive references do not carry generics")
-        }
+        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => &mut [],
     }
 }
 
@@ -944,8 +967,10 @@ fn lower_flattened_struct(strct: &mut Struct) -> Result<Option<DataType>, Error>
         DataType::Struct(base) => base,
         _ => unreachable!("Struct::named always builds a struct"),
     };
-    base.attributes = strct.attributes.clone();
-    parts.insert(0, DataType::Struct(base));
+    if matches!(&base.fields, Fields::Named(named) if !named.fields.is_empty()) {
+        base.attributes = strct.attributes.clone();
+        parts.insert(0, DataType::Struct(base));
+    }
 
     Ok(Some(DataType::Intersection(parts)))
 }
@@ -1154,7 +1179,7 @@ fn rewrite_enum_repr_for_phase(
     mode: PhaseRewrite,
     original_types: &Types,
 ) -> Result<(), Error> {
-    let repr = enum_repr_from_attrs(&e.attributes)?;
+    let repr = EnumRepr::from_attrs(&e.attributes)?;
     if matches!(repr, EnumRepr::Untagged) {
         return Ok(());
     }
@@ -1404,37 +1429,6 @@ fn variant_is_skipped_for_mode(attrs: &SerdeVariantAttrs, mode: PhaseRewrite) ->
     }
 }
 
-fn enum_repr_from_attrs(attrs: &specta::datatype::Attributes) -> Result<EnumRepr, Error> {
-    let Some(container_attrs) = SerdeContainerAttrs::from_attributes(attrs)? else {
-        return Ok(EnumRepr::External);
-    };
-
-    if container_attrs.untagged {
-        return Ok(EnumRepr::Untagged);
-    }
-
-    Ok(
-        match (
-            container_attrs.tag.as_deref(),
-            container_attrs.content.as_deref(),
-        ) {
-            (Some(tag), Some(content)) => EnumRepr::Adjacent {
-                tag: Cow::Owned(tag.to_string()),
-                content: Cow::Owned(content.to_string()),
-            },
-            (Some(tag), None) => EnumRepr::Internal {
-                tag: Cow::Owned(tag.to_string()),
-            },
-            (None, Some(_)) => {
-                return Err(Error::invalid_enum_representation(
-                    "`content` is set without `tag`",
-                ));
-            }
-            (None, None) => EnumRepr::External,
-        },
-    )
-}
-
 fn serialized_variant_name(
     variant_name: &str,
     variant: &Variant,
@@ -1581,45 +1575,35 @@ fn select_conversion_target(
             }
             _ => Err(Error::incompatible_conversion(
                 "container conversion",
-                conversion_name(attrs)?,
-                serialize_conversion_name(parsed.as_ref()),
-                deserialize_conversion_name(parsed.as_ref()),
+                resolved
+                    .and_then(|attrs| {
+                        attrs
+                            .into
+                            .as_ref()
+                            .map(|v| format!("into({})", v.type_src))
+                            .or_else(|| {
+                                attrs.from.as_ref().map(|v| format!("from({})", v.type_src))
+                            })
+                            .or_else(|| {
+                                attrs
+                                    .try_from
+                                    .as_ref()
+                                    .map(|v| format!("try_from({})", v.type_src))
+                            })
+                    })
+                    .unwrap_or_else(|| "<container>".to_string()),
+                resolved.and_then(|attrs| attrs.into.as_ref().map(|v| v.type_src.clone())),
+                resolved.and_then(|attrs| {
+                    attrs.from.as_ref().map(|v| v.type_src.clone()).or_else(|| {
+                        attrs
+                            .try_from
+                            .as_ref()
+                            .map(|v| format!("try_from({})", v.type_src))
+                    })
+                }),
             )),
         },
     }
-}
-
-fn conversion_name(attrs: &specta::datatype::Attributes) -> Result<String, Error> {
-    Ok(SerdeContainerAttrs::from_attributes(attrs)?
-        .and_then(|attrs| {
-            attrs
-                .into
-                .as_ref()
-                .map(|v| format!("into({})", v.type_src))
-                .or_else(|| attrs.from.as_ref().map(|v| format!("from({})", v.type_src)))
-                .or_else(|| {
-                    attrs
-                        .try_from
-                        .as_ref()
-                        .map(|v| format!("try_from({})", v.type_src))
-                })
-        })
-        .unwrap_or_else(|| "<container>".to_string()))
-}
-
-fn serialize_conversion_name(attrs: Option<&SerdeContainerAttrs>) -> Option<String> {
-    attrs.and_then(|attrs| attrs.into.as_ref().map(|v| v.type_src.clone()))
-}
-
-fn deserialize_conversion_name(attrs: Option<&SerdeContainerAttrs>) -> Option<String> {
-    attrs.and_then(|attrs| {
-        attrs.from.as_ref().map(|v| v.type_src.clone()).or_else(|| {
-            attrs
-                .try_from
-                .as_ref()
-                .map(|v| format!("try_from({})", v.type_src))
-        })
-    })
 }
 
 fn transform_external_variant(
@@ -1882,7 +1866,7 @@ fn internal_tag_payload_compatibility(
             seen.remove(&key);
             compatible
         }
-        DataType::Enum(enm) => match enum_repr_from_attrs(&enm.attributes) {
+        DataType::Enum(enm) => match EnumRepr::from_attrs(&enm.attributes) {
             Ok(EnumRepr::Untagged) => {
                 let mut is_effectively_empty = true;
                 for (_, variant) in &enm.variants {
@@ -2209,7 +2193,10 @@ fn renamed_type_name_for_phase(
     mode: PhaseRewrite,
     current_name: &str,
 ) -> Result<Option<String>, Error> {
-    let Some(attrs) = struct_container_attrs(ty)? else {
+    let DataType::Struct(strct) = ty else {
+        return Ok(None);
+    };
+    let Some(attrs) = SerdeContainerAttrs::from_attributes(&strct.attributes)? else {
         return Ok(None);
     };
 
@@ -2221,13 +2208,6 @@ fn renamed_type_name_for_phase(
         current_name,
     )?
     .map(str::to_string))
-}
-
-fn struct_container_attrs(ty: &DataType) -> Result<Option<SerdeContainerAttrs>, Error> {
-    match ty {
-        DataType::Struct(strct) => SerdeContainerAttrs::from_attributes(&strct.attributes),
-        _ => Ok(None),
-    }
 }
 
 fn apply_field_attrs(
