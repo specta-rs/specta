@@ -364,7 +364,6 @@ macro_rules! _impl_ndt {
                     )*
                 ],
                 false,
-                $inline,
                 $container,
                 types,
                 |types, ndt| {

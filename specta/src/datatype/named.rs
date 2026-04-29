@@ -114,11 +114,10 @@ impl NamedDataType {
     /// arrays, so they intentionally don't become part of the global type identity
     /// (We don't want one call-sites const generic in the shared datatype on the `NamedDataType`).
     ///
-    /// `inline` forces this type's own definition to be inlined. `passthrough` is for
-    /// wrapper/container types whose own definition is inline but whose inner type should only see
-    /// the caller's inline context. When passthrough expansion recursively reaches the same wrapper,
-    /// it clears `Types::should_inline` before calling `build_ty` so the inner named type can break
-    /// the cycle with a reference.
+    /// `passthrough` is for wrapper/container types whose own definition is inline but whose inner
+    /// type should only see the caller's inline context. When passthrough expansion recursively
+    /// reaches the same wrapper, it clears `Types::should_inline` before calling `build_ty` so the
+    /// inner named type can break the cycle with a reference.
     ///
     /// `build_ndt` fills metadata and, for exported named types, `NamedDataType::ty`. `build_ty`
     /// builds the datatype used by inline references. If `build_ndt` panics, this removes the
@@ -129,7 +128,6 @@ impl NamedDataType {
         sentinel: &'static str,
         instantiation_generics: &[(Generic, DataType)],
         has_const_param: bool,
-        inline: bool,
         passthrough: bool,
         types: &mut Types,
         build_ndt: fn(&mut Types, &mut NamedDataType),
@@ -138,7 +136,7 @@ impl NamedDataType {
         let id = NamedId::Static(sentinel);
         let location = Location::caller().to_owned();
         let caller_inline = types.should_inline;
-        let mut inline = caller_inline || inline || passthrough;
+        let mut inline = caller_inline || passthrough;
 
         // If we have never encountered this type, register it to type map
         if !types.types.contains_key(&id) {
