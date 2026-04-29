@@ -112,7 +112,7 @@ workspace = true
 specta-macros = { version = "=2.0.0-rc.24", optional = true, path = "../specta-macros" }
 paste = { version = "1", optional = true }
 
-ctor = { version = "0.10.0", default-features = false, optional = true, features = ["proc_macro"] }
+ctor = { version = "0.10.1", default-features = false, optional = true, features = ["proc_macro"] }
 
 # TODO: To be deprecated
 serde_json = { version = "1", optional = true, default-features = false, features = ["std"] }
