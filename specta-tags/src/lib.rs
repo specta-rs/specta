@@ -307,8 +307,7 @@ impl Analyzer {
                     let out = self.analyze(ty, types, generics, stack);
                     stack.pop();
                     out
-                }
-                else if let NamedReferenceType::Inline { dt, .. } = &reference.inner {
+                } else if let NamedReferenceType::Inline { dt, .. } = &reference.inner {
                     self.analyze(dt, types, &[], stack)
                 } else {
                     PlanNode::Identity

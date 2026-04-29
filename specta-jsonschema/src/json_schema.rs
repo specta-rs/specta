@@ -1,9 +1,6 @@
 use crate::{Error, Layout, SchemaVersion, primitives};
 use serde_json::Value;
-use specta::{
-    Format, Types,
-    datatype::NamedDataType,
-};
+use specta::{Format, Types, datatype::NamedDataType};
 use std::{borrow::Cow, collections::BTreeMap, path::Path};
 
 /// JSON Schema exporter configuration

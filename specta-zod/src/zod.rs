@@ -392,13 +392,15 @@ impl Zod {
 }
 
 fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
-    Ok(match format
-        .map_types(types)
-        .map_err(|err| Error::format("type graph formatter failed", err))?
-    {
-        Cow::Borrowed(_) => Cow::Borrowed(types),
-        Cow::Owned(types) => Cow::Owned(types),
-    })
+    Ok(
+        match format
+            .map_types(types)
+            .map_err(|err| Error::format("type graph formatter failed", err))?
+        {
+            Cow::Borrowed(_) => Cow::Borrowed(types),
+            Cow::Owned(types) => Cow::Owned(types),
+        },
+    )
 }
 
 fn map_datatype_format(

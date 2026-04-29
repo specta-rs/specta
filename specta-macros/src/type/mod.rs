@@ -169,7 +169,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         };
 
     let dt_expr = if let Some(container_ty) = &container_attrs.r#type {
-        quote!(<#container_ty as #crate_ref::Type>::definition(types))
+        quote!(datatype::inline(types, |types| <#container_ty as #crate_ref::Type>::definition(types)))
     } else {
         let dt_expr = match data {
             Data::Struct(data) => parse_struct(&crate_ref, &container_attrs, data),
