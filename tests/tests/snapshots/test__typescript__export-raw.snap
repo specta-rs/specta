@@ -12,40 +12,27 @@ RangeInclusive<i32>: export type RangeInclusive<T> = {
 	end: T,
 };
 
-String: export type String = string;
+String: 
+PathBuf: 
+IpAddr: 
+Ipv4Addr: 
+Ipv6Addr: 
+SocketAddr: 
+SocketAddrV4: 
+SocketAddrV6: 
+Cow<'static, str>: 
+Cow<'static, i32>: 
+Vec<i32>: 
+Vec<MyEnum>: 
+Result<String, i32>: export type Result<T, E> = {
+	ok: T,
+	err: E,
+};
 
-PathBuf: export type PathBuf = string;
-
-IpAddr: export type IpAddr = string;
-
-Ipv4Addr: export type Ipv4Addr = string;
-
-Ipv6Addr: export type Ipv6Addr = string;
-
-SocketAddr: export type SocketAddr = string;
-
-SocketAddrV4: export type SocketAddrV4 = string;
-
-SocketAddrV6: export type SocketAddrV6 = string;
-
-Cow<'static, str>: export type Cow<T> = T;
-
-Cow<'static, i32>: export type Cow<T> = T;
-
-Vec<i32>: export type Vec<T> = T[];
-
-Vec<MyEnum>: export type Vec<T> = T[];
-
-Result<String, i32>: export type Result<T, E> = T | E;
-
-Vec<Option<Cow<'static, i32>>>: export type Vec<T> = T[];
-
-PhantomData<()>: export type PhantomData<T> = null;
-
-PhantomData<String>: export type PhantomData<T> = null;
-
-Infallible: export type Infallible = never;
-
+Vec<Option<Cow<'static, i32>>>: 
+PhantomData<()>: 
+PhantomData<String>: 
+Infallible: 
 Unit1: export type Unit1 = null;
 
 Unit2: export type Unit2 = Record<string, never>;
@@ -111,8 +98,8 @@ InlineEnumField: export type InlineEnumField = {
 
 InlineOptionalType: export type InlineOptionalType = {
 	optional_field: {
-		a: string,
-	} | null,
+	a: string,
+} | null,
 };
 
 Rename: export type Rename = "OneWord" | "TwoWords";
@@ -123,12 +110,9 @@ TransparentType2: export type TransparentType2 = null;
 
 TransparentTypeWithOverride: export type TransparentTypeWithOverride = string;
 
-HashMap<BasicEnum, ()>: export type HashMap<K, V> = { [key in K]: V };
-
-HashMap<BasicEnum, i32>: export type HashMap<K, V> = { [key in K]: V };
-
-Vec<PlaceholderInnerField>: export type Vec<T> = T[];
-
+HashMap<BasicEnum, ()>: 
+HashMap<BasicEnum, i32>: 
+Vec<PlaceholderInnerField>: 
 EnumReferenceRecordKey: export type EnumReferenceRecordKey = {
 	a: Partial<{ [key in BasicEnum]: number }>,
 };
@@ -140,28 +124,24 @@ FlattenOnNestedEnum: export type FlattenOnNestedEnum = {
 
 MyEmptyInput: export type MyEmptyInput = Record<string, never>;
 
-(String): export type String = string;
-
+(String): 
 ExtraBracketsInTupleVariant: export type ExtraBracketsInTupleVariant = string;
 
 ExtraBracketsInUnnamedStruct: export type ExtraBracketsInUnnamedStruct = string;
 
-Vec<MyEnum>: export type Vec<T> = T[];
-
+Vec<MyEnum>: 
 InlineTuple: export type InlineTuple = {
 	demo: [string, boolean],
 };
 
 InlineTuple2: export type InlineTuple2 = {
 	demo: [{
-		demo: [string, boolean],
-	}, boolean],
+	demo: [string, boolean],
+}, boolean],
 };
 
-Box<str>: export type Box<T> = T;
-
-Box<String>: export type Box<T> = T;
-
+Box<str>: 
+Box<String>: 
 SkippedFieldWithinVariant: export type SkippedFieldWithinVariant = never | string;
 
 KebabCase: export type KebabCase = {
@@ -286,18 +266,13 @@ UntaggedVariantsWithoutValue: export type UntaggedVariantsWithoutValue = string 
 
 UntaggedVariantsWithDuplicateBranches: export type UntaggedVariantsWithDuplicateBranches = null | number;
 
-HashMap<String, ()>: export type HashMap<K, V> = { [key in K]: V };
-
+HashMap<String, ()>: 
 Regular: export type Regular = { [key in string]: null };
 
-HashMap<Infallible, ()>: export type HashMap<K, V> = { [key in K]: V };
-
-HashMap<TransparentStruct, ()>: export type HashMap<K, V> = { [key in K]: V };
-
-HashMap<UnitVariants, ()>: export type HashMap<K, V> = { [key in K]: V };
-
-HashMap<UntaggedVariantsKey, ()>: export type HashMap<K, V> = { [key in K]: V };
-
+HashMap<Infallible, ()>: 
+HashMap<TransparentStruct, ()>: 
+HashMap<UnitVariants, ()>: 
+HashMap<UntaggedVariantsKey, ()>: 
 ValidMaybeValidKey: export type ValidMaybeValidKey = { [key in MaybeValidKey<string>]: null };
 
 ValidMaybeValidKeyNested: export type ValidMaybeValidKeyNested = { [key in MaybeValidKey<MaybeValidKey<string>>]: null };
@@ -442,12 +417,9 @@ Another<bool>: export type Demo<A, B> = {
 	b: B,
 };
 
-MapA<u32>: export type HashMap<K, V> = { [key in K]: V };
-
-MapB<u32>: export type HashMap<K, V> = { [key in K]: V };
-
-MapC<u32>: export type HashMap<K, V> = { [key in K]: V };
-
+MapA<u32>: 
+MapB<u32>: 
+MapC<u32>: 
 AGenericStruct<u32>: export type AGenericStruct<T> = {
 	field: Demo<T, boolean>,
 };
@@ -712,10 +684,8 @@ GenericStruct2<()>: export type GenericStruct2<T> = {
 	h: ([([T, T]), ([T, T]), ([T, T])])[],
 };
 
-InlineGenericNewtype<String>: export type InlineGenericNewtype<T> = T;
-
-InlineGenericNested<String>: export type InlineGenericNested<T> = [T, T[], [T, T], { [key in string]: T }, T | null, "Unit" | T | { value: T }];
-
+InlineGenericNewtype<String>: 
+InlineGenericNested<String>: 
 InlineFlattenGenericsG<()>: export type InlineFlattenGenericsG<T> = {
 	t: T,
 };

@@ -1,11 +1,17 @@
 use super::DataType;
 
-/// List of items. This will be a [`Vec`](https://doc.rust-lang.org/std/vec/struct.Vec.html) or similar types.
+/// Sequential collection type, such as [`Vec`](std::vec::Vec), arrays, slices,
+/// or set-like collections.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct List {
+    /// Type of each element in the list.
     pub ty: Box<DataType>,
+    /// Fixed number of elements when known.
+    ///
+    /// `None` represents a variable-length collection.
     pub length: Option<usize>,
+    /// Whether elements are expected to be unique, as with set-like types.
     pub unique: bool,
 }
 

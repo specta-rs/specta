@@ -2,12 +2,12 @@ use std::collections::HashSet;
 
 use specta::{
     Types,
-    datatype::{DataType, Enum, Field, Fields, Generic, GenericReference, Reference, Variant},
+    datatype::{DataType, Enum, Field, Fields, NamedReferenceType, Reference, Variant},
 };
 
 use crate::{
     Error,
-    internal::{SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs},
+    parser::{SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs},
     phased::PhasedTy,
     repr::EnumRepr,
 };
@@ -20,10 +20,14 @@ pub enum ApplyMode {
 
 pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<(), Error> {
     for ndt in types.into_unsorted_iter() {
-        validate_datatype_with_generics_for_mode(
-            &ndt.ty,
+        let Some(ty) = &ndt.ty else {
+            continue;
+        };
+
+        inner(
+            ty,
             types,
-            &ndt.generics,
+            &mut HashSet::new(),
             ndt.name.to_string(),
             mode,
             true,
@@ -38,7 +42,14 @@ pub(crate) fn validate_datatype_for_mode(
     types: &Types,
     mode: ApplyMode,
 ) -> Result<(), Error> {
-    validate_datatype_with_generics_for_mode(dt, types, &[], "<top-level>".to_string(), mode, true)
+    inner(
+        dt,
+        types,
+        &mut HashSet::new(),
+        "<top-level>".to_string(),
+        mode,
+        true,
+    )
 }
 
 pub(crate) fn validate_datatype_for_mode_shallow(
@@ -46,43 +57,19 @@ pub(crate) fn validate_datatype_for_mode_shallow(
     types: &Types,
     mode: ApplyMode,
 ) -> Result<(), Error> {
-    validate_datatype_with_generics_for_mode(dt, types, &[], "<top-level>".to_string(), mode, false)
-}
-
-fn validate_datatype_with_generics_for_mode(
-    dt: &DataType,
-    types: &Types,
-    generics: &[Generic],
-    path: String,
-    mode: ApplyMode,
-    follow_named_references: bool,
-) -> Result<(), Error> {
-    let generics = generics
-        .iter()
-        .map(|generic| {
-            let reference = generic.reference();
-            (
-                reference.clone(),
-                DataType::Reference(Reference::Generic(reference)),
-            )
-        })
-        .collect::<Vec<_>>();
-
     inner(
         dt,
         types,
-        &generics,
         &mut HashSet::new(),
-        path,
+        "<top-level>".to_string(),
         mode,
-        follow_named_references,
+        false,
     )
 }
 
 fn inner(
     dt: &DataType,
     types: &Types,
-    generics: &[(GenericReference, DataType)],
     checked_references: &mut HashSet<Reference>,
     path: String,
     mode: ApplyMode,
@@ -92,7 +79,6 @@ fn inner(
         DataType::Nullable(ty) => inner(
             ty,
             types,
-            generics,
             checked_references,
             path,
             mode,
@@ -102,7 +88,6 @@ fn inner(
             inner(
                 map.key_ty(),
                 types,
-                generics,
                 checked_references,
                 format!("{path}.<map_key>"),
                 mode,
@@ -111,7 +96,6 @@ fn inner(
             inner(
                 map.value_ty(),
                 types,
-                generics,
                 checked_references,
                 format!("{path}.<map_value>"),
                 mode,
@@ -122,7 +106,6 @@ fn inner(
             inner(
                 &list.ty,
                 types,
-                generics,
                 checked_references,
                 format!("{path}.<list_item>"),
                 mode,
@@ -133,21 +116,18 @@ fn inner(
             validate_container_attributes(
                 &strct.attributes,
                 types,
-                generics,
                 checked_references,
                 &path,
                 mode,
             )?;
-            if SerdeContainerAttrs::from_attributes(&strct.attributes)?
-                .is_some_and(|attrs| attrs.variant_identifier || attrs.field_identifier)
-            {
-                return Err(Error::invalid_phased_type_usage(
-                    path,
-                    "`#[serde(variant_identifier)]` and `#[serde(field_identifier)]` are only valid on enums",
-                ));
-            }
-
             if let Some(attrs) = SerdeContainerAttrs::from_attributes(&strct.attributes)? {
+                if attrs.variant_identifier || attrs.field_identifier {
+                    return Err(Error::invalid_phased_type_usage(
+                        path,
+                        "`#[serde(variant_identifier)]` and `#[serde(field_identifier)]` are only valid on enums",
+                    ));
+                }
+
                 if attrs.untagged {
                     return Err(Error::invalid_phased_type_usage(
                         path,
@@ -182,7 +162,6 @@ fn inner(
                         inner(
                             ty,
                             types,
-                            generics,
                             checked_references,
                             format!("{path}[{idx}]"),
                             mode,
@@ -206,7 +185,6 @@ fn inner(
                         inner(
                             ty,
                             types,
-                            generics,
                             checked_references,
                             format!("{path}.{name}"),
                             mode,
@@ -217,14 +195,7 @@ fn inner(
             }
         }
         DataType::Enum(enm) => {
-            validate_container_attributes(
-                &enm.attributes,
-                types,
-                generics,
-                checked_references,
-                &path,
-                mode,
-            )?;
+            validate_container_attributes(&enm.attributes, types, checked_references, &path, mode)?;
             if SerdeContainerAttrs::from_attributes(&enm.attributes)?
                 .is_some_and(|attrs| attrs.default)
             {
@@ -256,7 +227,6 @@ fn inner(
                             inner(
                                 ty,
                                 types,
-                                generics,
                                 checked_references,
                                 format!("{path}::{variant_name}.{name}"),
                                 mode,
@@ -286,7 +256,6 @@ fn inner(
                             inner(
                                 ty,
                                 types,
-                                generics,
                                 checked_references,
                                 format!("{path}::{variant_name}[{idx}]"),
                                 mode,
@@ -302,7 +271,6 @@ fn inner(
                 inner(
                     ty,
                     types,
-                    generics,
                     checked_references,
                     format!("{path}[{idx}]"),
                     mode,
@@ -310,18 +278,35 @@ fn inner(
                 )?;
             }
         }
+        DataType::Intersection(types_) => {
+            for (idx, ty) in types_.iter().enumerate() {
+                inner(
+                    ty,
+                    types,
+                    checked_references,
+                    format!("{path}.<intersection_{idx}>"),
+                    mode,
+                    follow_named_references,
+                )?;
+            }
+        }
         DataType::Reference(reference) => match reference {
             Reference::Named(reference) => {
-                for (_, dt) in &reference.generics {
-                    inner(
-                        dt,
-                        types,
-                        generics,
-                        checked_references,
-                        format!("{path}.<generic>"),
-                        mode,
-                        follow_named_references,
-                    )?;
+                if let NamedReferenceType::Reference {
+                    generics: reference_generics,
+                    ..
+                } = &reference.inner
+                {
+                    for (_, dt) in reference_generics {
+                        inner(
+                            dt,
+                            types,
+                            checked_references,
+                            format!("{path}.<generic>"),
+                            mode,
+                            follow_named_references,
+                        )?;
+                    }
                 }
 
                 if follow_named_references
@@ -329,16 +314,14 @@ fn inner(
                 {
                     let reference_key = Reference::Named(reference.clone());
                     checked_references.insert(reference_key);
-                    if let Some(ty) = reference.ty(types) {
-                        let merged_generics = merged_generics(generics, &reference.generics);
-                        let name = reference
-                            .get(types)
+                    if let Some(ty) = named_reference_ty(reference, types) {
+                        let name = types
+                            .get(reference)
                             .map(|ndt| ndt.name.to_string())
                             .unwrap_or_else(|| path.clone());
                         inner(
                             ty,
                             types,
-                            &merged_generics,
                             checked_references,
                             name,
                             mode,
@@ -347,47 +330,18 @@ fn inner(
                     }
                 }
             }
-            Reference::Generic(generic) => {
-                let Some((_, ty)) = generics.iter().find(|(candidate, _)| candidate == generic)
-                else {
-                    if !follow_named_references {
-                        return Ok(());
-                    }
-
-                    return Err(Error::unresolved_generic_reference(
-                        path,
-                        format!("{generic:?}"),
-                    ));
-                };
-
-                if matches!(ty, DataType::Reference(Reference::Generic(inner)) if inner == generic)
-                {
-                    return Ok(());
-                }
-
-                inner(
-                    ty,
-                    types,
-                    generics,
-                    checked_references,
-                    format!("{path}.<generic_ref>"),
-                    mode,
-                    follow_named_references,
-                )?;
-            }
             Reference::Opaque(reference) => {
                 if let Some(phased) = reference.downcast_ref::<PhasedTy>() {
                     if mode == ApplyMode::Unified {
                         return Err(Error::invalid_phased_type_usage(
                             path,
-                            "`specta_serde::Phased<Serialize, Deserialize>` requires `format_phases`",
+                            "`specta_serde::Phased<Serialize, Deserialize>` requires `PhasesFormat`",
                         ));
                     }
 
                     inner(
                         &phased.serialize,
                         types,
-                        generics,
                         checked_references,
                         format!("{path}.<phased_serialize>"),
                         mode,
@@ -396,7 +350,6 @@ fn inner(
                     inner(
                         &phased.deserialize,
                         types,
-                        generics,
                         checked_references,
                         format!("{path}.<phased_deserialize>"),
                         mode,
@@ -405,7 +358,7 @@ fn inner(
                 }
             }
         },
-        DataType::Primitive(_) => {}
+        DataType::Generic(_) | DataType::Primitive(_) => {}
     }
 
     Ok(())
@@ -430,7 +383,7 @@ fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<(
     if mode == ApplyMode::Unified {
         return Err(Error::invalid_phased_type_usage(
             path,
-            "identifier enums require `format_phases` because they widen deserialize-only input shape",
+            "identifier enums require `PhasesFormat` because they widen deserialize-only input shape",
         ));
     }
 
@@ -473,7 +426,6 @@ fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<(
 fn validate_container_attributes(
     attrs: &specta::datatype::Attributes,
     types: &Types,
-    generics: &[(GenericReference, DataType)],
     checked_references: &mut HashSet<Reference>,
     path: &str,
     mode: ApplyMode,
@@ -498,7 +450,6 @@ fn validate_container_attributes(
                 inner(
                     target,
                     types,
-                    generics,
                     checked_references,
                     format!("{path}.{suffix}"),
                     mode,
@@ -520,14 +471,16 @@ fn validate_variant_attributes(
         return Ok(());
     };
 
+    let has_type_override = has_type_override(&variant.attributes);
+
     if serde_attrs.has_serialize_with {
-        ensure_codec_override(variant.type_overridden, &path, "serialize_with")?;
+        ensure_codec_override(has_type_override, &path, "serialize_with")?;
     }
     if serde_attrs.has_deserialize_with {
-        ensure_codec_override(variant.type_overridden, &path, "deserialize_with")?;
+        ensure_codec_override(has_type_override, &path, "deserialize_with")?;
     }
     if serde_attrs.has_with {
-        ensure_codec_override(variant.type_overridden, &path, "with")?;
+        ensure_codec_override(has_type_override, &path, "with")?;
     }
 
     if mode == ApplyMode::Unified
@@ -536,7 +489,7 @@ fn validate_variant_attributes(
     {
         return Err(Error::invalid_phased_type_usage(
             path,
-            "phase-specific `#[serde(untagged)]` variants require `format_phases` because unified mode would drop one branch",
+            "phase-specific `#[serde(untagged)]` variants require `PhasesFormat` because unified mode would drop one branch",
         ));
     }
 
@@ -563,20 +516,22 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
         ));
     }
 
+    let has_type_override = has_type_override(&field.attributes);
+
     if serde_attrs.has_serialize_with {
-        ensure_codec_override(field.type_overridden, &path, "serialize_with")?;
+        ensure_codec_override(has_type_override, &path, "serialize_with")?;
     }
     if serde_attrs.has_deserialize_with {
-        ensure_codec_override(field.type_overridden, &path, "deserialize_with")?;
+        ensure_codec_override(has_type_override, &path, "deserialize_with")?;
     }
     if serde_attrs.has_with {
-        ensure_codec_override(field.type_overridden, &path, "with")?;
+        ensure_codec_override(has_type_override, &path, "with")?;
     }
 
     if mode == ApplyMode::Unified && serde_attrs.skip_serializing_if.is_some() {
         return Err(Error::invalid_phased_type_usage(
             path,
-            "`skip_serializing_if` requires `format_phases` because unified mode cannot represent conditional omission",
+            "`skip_serializing_if` requires `PhasesFormat` because unified mode cannot represent conditional omission",
         ));
     }
 
@@ -584,11 +539,11 @@ fn validate_field_attributes(field: &Field, path: String, mode: ApplyMode) -> Re
 }
 
 fn ensure_codec_override(
-    has_type_overridden: bool,
+    has_type_override: bool,
     path: &str,
     attr: &'static str,
 ) -> Result<(), Error> {
-    if has_type_overridden {
+    if has_type_override {
         return Ok(());
     }
 
@@ -598,20 +553,11 @@ fn ensure_codec_override(
     ))
 }
 
-fn merged_generics(
-    parent: &[(GenericReference, DataType)],
-    child: &[(GenericReference, DataType)],
-) -> Vec<(GenericReference, DataType)> {
-    let unshadowed_parent = parent
-        .iter()
-        .filter(|(parent_generic, _)| {
-            !child
-                .iter()
-                .any(|(child_generic, _)| child_generic == parent_generic)
-        })
-        .cloned();
-
-    child.iter().cloned().chain(unshadowed_parent).collect()
+fn has_type_override(attributes: &specta::datatype::Attributes) -> bool {
+    attributes
+        .get_named_as::<bool>("specta:type_override")
+        .copied()
+        .unwrap_or(false)
 }
 
 fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Result<(), Error> {
@@ -627,7 +573,7 @@ fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Re
         ));
     }
 
-    let repr = enum_repr_from_attrs(&enm.attributes)?;
+    let repr = EnumRepr::from_attrs(&enm.attributes)?;
 
     validate_untagged_variants(enm, &path)?;
     validate_other_variant(enm, &path, &repr, mode)?;
@@ -685,7 +631,7 @@ fn validate_other_variant(
     if mode == ApplyMode::Unified {
         return Err(Error::invalid_phased_type_usage(
             path,
-            "`#[serde(other)]` requires `format_phases` because it widens deserialize-only input shape",
+            "`#[serde(other)]` requires `PhasesFormat` because it widens deserialize-only input shape",
         ));
     }
 
@@ -768,20 +714,21 @@ fn validate_internally_tag_enum_datatype(
     match ty {
         DataType::Map(_) => Ok(()),
         DataType::Struct(_) => Ok(()),
-        DataType::Enum(enm) => match enum_repr_from_attrs(&enm.attributes)? {
+        DataType::Enum(enm) => match EnumRepr::from_attrs(&enm.attributes)? {
             EnumRepr::Untagged => validate_internally_tag_enum(enm, types, path.to_string()),
             EnumRepr::External | EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. } => Ok(()),
         },
         DataType::Tuple(tuple) if tuple.elements.is_empty() => Ok(()),
         DataType::Reference(Reference::Named(reference)) => {
-            if let Some(ty) = reference.ty(types) {
+            if let Some(ty) = named_reference_ty(reference, types) {
                 validate_internally_tag_enum_datatype(ty, types, path, variant_name)?;
             }
 
             Ok(())
         }
-        DataType::Reference(Reference::Generic(_))
-        | DataType::Reference(Reference::Opaque(_))
+        DataType::Reference(Reference::Opaque(_))
+        | DataType::Generic(_)
+        | DataType::Intersection(_)
         | DataType::Tuple(_)
         | DataType::Primitive(_)
         | DataType::List(_)
@@ -793,33 +740,13 @@ fn validate_internally_tag_enum_datatype(
     }
 }
 
-fn enum_repr_from_attrs(attrs: &specta::datatype::Attributes) -> Result<EnumRepr, Error> {
-    let Some(container_attrs) = SerdeContainerAttrs::from_attributes(attrs)? else {
-        return Ok(EnumRepr::External);
-    };
-
-    if container_attrs.untagged {
-        return Ok(EnumRepr::Untagged);
+fn named_reference_ty<'a>(
+    reference: &'a specta::datatype::NamedReference,
+    types: &'a Types,
+) -> Option<&'a DataType> {
+    match &reference.inner {
+        NamedReferenceType::Inline { dt, .. } => Some(dt),
+        NamedReferenceType::Reference { .. } => types.get(reference)?.ty.as_ref(),
+        NamedReferenceType::Recursive => None,
     }
-
-    Ok(
-        match (
-            container_attrs.tag.as_deref(),
-            container_attrs.content.as_deref(),
-        ) {
-            (Some(tag), Some(content)) => EnumRepr::Adjacent {
-                tag: tag.to_string().into(),
-                content: content.to_string().into(),
-            },
-            (Some(tag), None) => EnumRepr::Internal {
-                tag: tag.to_string().into(),
-            },
-            (None, Some(_)) => {
-                return Err(Error::invalid_enum_representation(
-                    "`content` is set without `tag`",
-                ));
-            }
-            (None, None) => EnumRepr::External,
-        },
-    )
 }

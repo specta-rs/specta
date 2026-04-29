@@ -36,7 +36,7 @@
 //!     // Export to JSON Schema
 //!     let schema = JsonSchema::default()
 //!         .schema_version(SchemaVersion::Draft7)
-//!         .export(&types, specta_serde::format)
+//!         .export(&types, specta_serde::Format)
 //!         .unwrap();
 //!
 //!     println!("{}", schema);
@@ -62,7 +62,7 @@
 //!     let types = Types::default().register::<User>();
 //!
 //!     JsonSchema::default()
-//!         .export_to("./schema.json", &types, specta_serde::format)
+//!         .export_to("./schema.json", &types, specta_serde::Format)
 //!         .unwrap();
 //! }
 //! ```
@@ -96,7 +96,7 @@
 //!     .export_to(
 //!         "./schema.json",
 //!         &types,
-//!         specta_serde::format,
+//!         specta_serde::Format,
 //!     )
 //!     .unwrap();
 //!
@@ -106,7 +106,7 @@
 //!     .export_to(
 //!         "./schemas/",
 //!         &types,
-//!         specta_serde::format,
+//!         specta_serde::Format,
 //!     )
 //!     .unwrap();
 //! ```

@@ -4,30 +4,31 @@ use serde::{Deserialize, Serialize};
 use specta::{Format, Type, Types};
 use specta_swift::Swift;
 
-fn phase_collections(types: Types) -> [(&'static str, Format, Types); 3] {
-    // Don't copy this format pattern anywhere else!!!
-    // It's not correct but it's useful specifically here!!!
-    fn identity_types(types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
-        Ok(Cow::Borrowed(types))
+struct IdentityFormat;
+
+impl Format for IdentityFormat {
+    fn map_types(&'_ self, types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
+        Ok(Cow::Owned(types.clone()))
     }
 
-    fn identity_datatype<'a>(
-        _: &'a Types,
-        dt: &'a specta::datatype::DataType,
-    ) -> Result<Cow<'a, specta::datatype::DataType>, specta::FormatError> {
-        Ok(Cow::Borrowed(dt))
+    fn map_type(
+        &'_ self,
+        _: &Types,
+        dt: &specta::datatype::DataType,
+    ) -> Result<Cow<'_, specta::datatype::DataType>, specta::FormatError> {
+        Ok(Cow::Owned(dt.clone()))
     }
+}
 
-    let identity_format = Format::new(identity_types, identity_datatype);
-
-    [
-        ("raw", identity_format, types.clone()),
-        ("serde", specta_serde::format, types.clone()),
-        ("serde_phases", specta_serde::format_phases, types),
+fn phase_collections(types: Types) -> Vec<(&'static str, Box<dyn Format>, Types)> {
+    vec![
+        ("raw", Box::new(IdentityFormat), types.clone()),
+        ("serde", Box::new(specta_serde::Format), types.clone()),
+        ("serde_phases", Box::new(specta_serde::PhasesFormat), types),
     ]
 }
 
-fn phase_output(types: &Types, format: Format) -> String {
+fn phase_output(types: &Types, format: impl Format + 'static) -> String {
     Swift::default().export(types, format).unwrap()
 }
 

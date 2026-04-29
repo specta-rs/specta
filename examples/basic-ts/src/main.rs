@@ -161,13 +161,12 @@ fn main() {
         println!(
             "{:#?}",
             match HelloWorld::definition(&mut types) {
-                DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
+                DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
                 _ => unreachable!(),
             }
         );
     }
 
-    // TODO
     // {
     //     let mut types = Types::default().register::<NotPhaseSpecific>();
     //     let def = HelloWorld::definition(&mut types);
@@ -184,7 +183,6 @@ fn main() {
     //     println!("Types Count: {}", types.len());
     // }
 
-    // TODO
     // {
     //     let types = Types::default()
     //         .register::<NotPhaseSpecific>()
@@ -219,17 +217,17 @@ fn main() {
     //     );
     //     match map_types(&types) {
     //         Ok(_) => println!(
-    //             "specta_serde::format(...):\n{}",
+    //             "specta_serde::Format(...):\n{}",
     //             Typescript::default()
-    //                 .export(&types, specta_serde::format)
+    //                 .export(&types, specta_serde::Format)
     //                 .unwrap()
     //         ),
-    //         Err(err) => println!("specta_serde::format(...) ERROR: {err}"),
+    //         Err(err) => println!("specta_serde::Format(...) ERROR: {err}"),
     //     }
     //     println!(
-    //         "specta_serde::format_phases(...):\n{}",
+    //         "specta_serde::PhasesFormat(...):\n{}",
     //         Typescript::default()
-    //             .export(&types, specta_serde::format_phases)
+    //             .export(&types, specta_serde::PhasesFormat)
     //             .unwrap()
     //     );
     // }
@@ -239,9 +237,9 @@ fn main() {
             .register::<SerdeWithDisplayFromStr>()
             .register::<SerdeWithOneOrMany>();
         println!(
-            "serde_with + specta_serde::format_phases(...):\n{}",
+            "serde_with + specta_serde::PhasesFormat(...):\n{}",
             Typescript::default()
-                .export(&serde_with_types, specta_serde::format_phases)
+                .export(&serde_with_types, specta_serde::PhasesFormat)
                 .unwrap()
         );
     }

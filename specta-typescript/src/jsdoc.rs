@@ -64,7 +64,7 @@ impl JSDoc {
     /// Export the files into a single string.
     ///
     /// Note: This returns an error if the format is `Format::Files`.
-    pub fn export(&self, types: &Types, format: Format) -> Result<String, Error> {
+    pub fn export(&self, types: &Types, format: impl Format) -> Result<String, Error> {
         self.0.export(types, format)
     }
 
@@ -77,7 +77,7 @@ impl JSDoc {
         &self,
         path: impl AsRef<Path>,
         types: &Types,
-        format: Format,
+        format: impl Format,
     ) -> Result<(), Error> {
         self.0.export_to(path, types, format)
     }

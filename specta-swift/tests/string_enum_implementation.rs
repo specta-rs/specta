@@ -77,7 +77,7 @@ fn test_string_enum_snake_case() {
     let types = Types::default().register::<JobStatus>();
 
     let swift = Swift::default();
-    let result = swift.export(&types, specta_serde::format).unwrap();
+    let result = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Generated Swift for JobStatus:");
     println!("{}", result);
@@ -95,7 +95,7 @@ fn test_string_enum_uppercase() {
     let types = Types::default().register::<Priority>();
 
     let swift = Swift::default();
-    let result = swift.export(&types, specta_serde::format).unwrap();
+    let result = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Generated Swift for Priority:");
     println!("{}", result);
@@ -111,7 +111,7 @@ fn test_string_enum_camel_case() {
     let types = Types::default().register::<LogLevel>();
 
     let swift = Swift::default();
-    let result = swift.export(&types, specta_serde::format).unwrap();
+    let result = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Generated Swift for LogLevel:");
     println!("{}", result);
@@ -128,7 +128,7 @@ fn test_string_enum_pascal_case() {
     let types = Types::default().register::<UserRole>();
 
     let swift = Swift::default();
-    let result = swift.export(&types, specta_serde::format).unwrap();
+    let result = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Generated Swift for UserRole:");
     println!("{}", result);
@@ -145,7 +145,7 @@ fn test_string_enum_kebab_case() {
     let types = Types::default().register::<ApiStatus>();
 
     let swift = Swift::default();
-    let result = swift.export(&types, specta_serde::format).unwrap();
+    let result = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Generated Swift for ApiStatus:");
     println!("{}", result);
@@ -161,7 +161,7 @@ fn test_string_enum_screaming_kebab_case() {
     let types = Types::default().register::<DatabaseStatus>();
 
     let swift = Swift::default();
-    let result = swift.export(&types, specta_serde::format).unwrap();
+    let result = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Generated Swift for DatabaseStatus:");
     println!("{}", result);
@@ -176,7 +176,7 @@ fn test_string_enum_screaming_kebab_case() {
 fn test_mixed_enum_not_string() {
     let types = Types::default().register::<MixedEnum>();
     let swift = Swift::default();
-    let result = swift.export(&types, specta_serde::format).unwrap();
+    let result = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Generated Swift for MixedEnum:");
     println!("{}", result);
@@ -203,7 +203,7 @@ fn test_mixed_enum_not_string() {
 fn test_regular_enum_not_string() {
     let types = Types::default().register::<RegularEnum>();
     let swift = Swift::default();
-    let result = swift.export(&types, specta_serde::format).unwrap();
+    let result = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Generated Swift for RegularEnum:");
     println!("{}", result);
@@ -227,8 +227,8 @@ fn test_all_string_enums_together() {
         .register::<MixedEnum>()
         .register::<RegularEnum>();
     let swift = Swift::default();
-    let result = swift.export(&string_types, specta_serde::format).unwrap();
-    let raw_result = swift.export(&other_types, specta_serde::format).unwrap();
+    let result = swift.export(&string_types, specta_serde::Format).unwrap();
+    let raw_result = swift.export(&other_types, specta_serde::Format).unwrap();
 
     println!("Generated Swift for all enums:");
     println!("{}", result);

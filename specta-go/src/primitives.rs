@@ -2,7 +2,10 @@ use std::collections::HashSet;
 
 use specta::{
     Types,
-    datatype::{DataType, Enum, Fields, Generic, NamedDataType, Primitive, Reference, Struct},
+    datatype::{
+        DataType, Enum, Fields, Generic, NamedDataType, NamedReferenceType, Primitive, Reference,
+        Struct,
+    },
 };
 
 use crate::{Error, Go, reserved_names::RESERVED_GO_NAMES};
@@ -60,14 +63,24 @@ pub fn export(
     }
     s.push(' ');
 
-    match &ndt.ty {
+    let generic_names = ndt
+        .generics
+        .iter()
+        .map(|generic| generic.reference())
+        .collect::<Vec<_>>();
+
+    let Some(ty) = &ndt.ty else {
+        return Ok(String::new());
+    };
+
+    match ty {
         DataType::Struct(st) => {
             s.push_str("struct {\n");
             struct_fields(
                 &mut s,
                 exporter,
                 types,
-                &ndt.generics,
+                &generic_names,
                 st,
                 vec![ndt.name.to_string()],
                 ctx,
@@ -80,7 +93,7 @@ pub fn export(
                 &mut s,
                 exporter,
                 types,
-                &ndt.generics,
+                &generic_names,
                 e,
                 vec![ndt.name.to_string()],
                 ctx,
@@ -93,7 +106,7 @@ pub fn export(
                     &mut s,
                     exporter,
                     types,
-                    &ndt.generics,
+                    &generic_names,
                     &t.elements[0],
                     vec![ndt.name.to_string(), "0".into()],
                     ctx,
@@ -107,8 +120,8 @@ pub fn export(
                 &mut s,
                 exporter,
                 types,
-                &ndt.generics,
-                &ndt.ty,
+                &generic_names,
+                ty,
                 vec![ndt.name.to_string()],
                 ctx,
             )?;
@@ -324,14 +337,17 @@ fn datatype(
         }
         DataType::Reference(r) => match r {
             Reference::Named(r) => {
-                let ndt = r.get(types).ok_or_else(|| Error::ForbiddenName {
+                let ndt = types.get(r).ok_or_else(|| Error::ForbiddenName {
                     path: "lookup".into(),
                     name: "missing_reference_in_collection".into(),
                 })?;
 
                 s.push_str(&to_pascal_case(&ndt.name));
 
-                let generics = &r.generics;
+                let generics = match &r.inner {
+                    NamedReferenceType::Reference { generics, .. } => generics.as_slice(),
+                    NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => &[],
+                };
                 if !generics.is_empty() {
                     s.push('[');
                     for (i, (_, g)) in generics.iter().enumerate() {
@@ -344,14 +360,6 @@ fn datatype(
                     }
                     s.push(']');
                 }
-            }
-            Reference::Generic(g) => {
-                let name = generic_names
-                    .iter()
-                    .find(|candidate| candidate.reference() == *g)
-                    .map(|generic| generic.name.as_ref())
-                    .unwrap_or("any");
-                s.push_str(name);
             }
             Reference::Opaque(o) => match o.type_name() {
                 "String" | "char" => s.push_str("string"),
@@ -373,6 +381,15 @@ fn datatype(
                 _ => s.push_str("any"),
             },
         },
+        DataType::Generic(g) => {
+            let name = generic_names
+                .iter()
+                .find(|candidate| candidate.reference() == *g)
+                .map(|generic| generic.name().as_ref())
+                .unwrap_or("any");
+            s.push_str(name);
+        }
+        DataType::Intersection(_) => s.push_str("any"),
     }
     Ok(())
 }

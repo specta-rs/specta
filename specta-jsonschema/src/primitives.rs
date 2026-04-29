@@ -7,7 +7,11 @@ use specta::{
 
 /// Convert a NamedDataType to a JSON Schema definition
 pub fn export(js: &JsonSchema, types: &Types, ndt: &NamedDataType) -> Result<Value, Error> {
-    datatype_to_schema(js, types, &ndt.ty, true)
+    let Some(ty) = &ndt.ty else {
+        return Ok(json!({}));
+    };
+
+    datatype_to_schema(js, types, ty, true)
 }
 
 /// Convert a DataType to a JSON Schema, optionally as a reference
@@ -65,7 +69,7 @@ pub fn datatype_to_schema(
         }
 
         // Struct
-        DataType::Struct(s) => struct_to_schema(js, types, s, is_definition),
+        DataType::Struct(s) => struct_to_schema(js, types, s),
 
         // Enum
         DataType::Enum(e) => enum_to_schema(js, types, e),
@@ -79,8 +83,12 @@ pub fn datatype_to_schema(
                 Reference::Named(r) => {
                     if is_definition {
                         // When exporting a definition, inline it
-                        if let Some(referenced_ndt) = r.get(types) {
-                            datatype_to_schema(js, types, &referenced_ndt.ty, true)
+                        if let Some(referenced_ndt) = types.get(r) {
+                            let Some(ty) = &referenced_ndt.ty else {
+                                return Ok(json!({}));
+                            };
+
+                            datatype_to_schema(js, types, ty, true)
                         } else {
                             Err(Error::InvalidReference(
                                 "Reference not found in Types".to_string(),
@@ -89,7 +97,7 @@ pub fn datatype_to_schema(
                     } else {
                         // Use $ref for references
                         let defs_key = js.schema_version.definitions_key();
-                        if let Some(referenced_ndt) = r.get(types) {
+                        if let Some(referenced_ndt) = types.get(r) {
                             Ok(json!({
                                 "$ref": format!("#/{}/{}", defs_key, referenced_ndt.name)
                             }))
@@ -103,11 +111,15 @@ pub fn datatype_to_schema(
                 Reference::Opaque(_) => Err(Error::UnsupportedDataType(
                     "Opaque references are not supported by JSON Schema exporter".to_string(),
                 )),
-                // JsonSchema doesn't have generics, so we use a placeholder,
-                // This should typically be resolved before export.
-                Reference::Generic(_) => Ok(json!({})), // Empty schema accepts anything
             }
         }
+        DataType::Generic(_) => Ok(json!({})), // Empty schema accepts anything
+        DataType::Intersection(intersection) => Ok(json!({
+            "allOf": intersection
+                .iter()
+                .map(|ty| datatype_to_schema(js, types, ty, false))
+                .collect::<Result<Vec<_>, _>>()?
+        })),
     }
 }
 
@@ -140,12 +152,7 @@ fn primitive_to_schema(p: &Primitive) -> Value {
     }
 }
 
-fn struct_to_schema(
-    js: &JsonSchema,
-    types: &Types,
-    s: &Struct,
-    _is_definition: bool,
-) -> Result<Value, Error> {
+fn struct_to_schema(js: &JsonSchema, types: &Types, s: &Struct) -> Result<Value, Error> {
     match &s.fields {
         Fields::Unit => {
             // Unit struct = null

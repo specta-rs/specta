@@ -25,17 +25,17 @@ enum AdjacentOther {
 }
 
 #[test]
-fn serde_other_requires_format_phases() {
+fn serde_other_requires_phases_format() {
     let err = Typescript::default()
         .export(
             &Types::default().register::<InternalOther>(),
-            specta_serde::format,
+            specta_serde::Format,
         )
-        .expect_err("#[serde(other)] should require format_phases");
+        .expect_err("#[serde(other)] should require PhasesFormat");
 
     assert!(
         err.to_string()
-            .contains("`#[serde(other)]` requires `format_phases`")
+            .contains("`#[serde(other)]` requires `PhasesFormat`")
     );
 }
 
@@ -44,7 +44,7 @@ fn serde_other_internal_tag_widens_deserialize_tag_to_string() {
     let ts = Typescript::default()
         .export(
             &Types::default().register::<InternalOther>(),
-            specta_serde::format_phases,
+            specta_serde::PhasesFormat,
         )
         .expect("typescript export should succeed");
 
@@ -56,7 +56,7 @@ fn serde_other_adjacent_tag_widens_deserialize_tag_to_string() {
     let ts = Typescript::default()
         .export(
             &Types::default().register::<AdjacentOther>(),
-            specta_serde::format_phases,
+            specta_serde::PhasesFormat,
         )
         .expect("typescript export should succeed");
 

@@ -59,17 +59,17 @@ where
 /// use specta::datatype::Attributes;
 ///
 /// let mut attrs = Attributes::default();
-/// attrs.insert("serde.rename", String::from("user_name"));
-/// attrs.insert("serde.skip", true);
+/// attrs.insert("serde:rename", String::from("user_name"));
+/// attrs.insert("serde:skip", true);
 ///
 /// assert_eq!(attrs.len(), 2);
-/// assert!(attrs.contains_key("serde.rename"));
+/// assert!(attrs.contains_key("serde:rename"));
 /// assert_eq!(
-///     attrs.get_named_as::<String>("serde.rename"),
+///     attrs.get_named_as::<String>("serde:rename"),
 ///     Some(&String::from("user_name"))
 /// );
-/// assert_eq!(attrs.get_named_as::<bool>("serde.skip"), Some(&true));
-/// assert_eq!(attrs.get_named_as::<u32>("serde.skip"), None);
+/// assert_eq!(attrs.get_named_as::<bool>("serde:skip"), Some(&true));
+/// assert_eq!(attrs.get_named_as::<u32>("serde:skip"), None);
 /// ```
 #[derive(Default)]
 pub struct Attributes(HashMap<Cow<'static, str>, Arc<dyn DynAttributeValue>>);
@@ -108,9 +108,9 @@ impl Attributes {
     /// use specta::datatype::Attributes;
     ///
     /// let mut attrs = Attributes::default();
-    /// attrs.insert("serde.default", true);
+    /// attrs.insert("serde:default", true);
     ///
-    /// assert_eq!(attrs.get_named_as::<bool>("serde.default"), Some(&true));
+    /// assert_eq!(attrs.get_named_as::<bool>("serde:default"), Some(&true));
     /// ```
     pub fn insert<T>(&mut self, key: impl Into<Cow<'static, str>>, value: T)
     where
@@ -131,14 +131,14 @@ impl Attributes {
     /// use specta::datatype::Attributes;
     ///
     /// let mut base = Attributes::default();
-    /// base.insert("serde.rename", String::from("first_name"));
+    /// base.insert("serde:rename", String::from("first_name"));
     ///
     /// let mut extra = Attributes::default();
-    /// extra.insert("serde.skip", true);
+    /// extra.insert("serde:skip", true);
     ///
     /// base.extend(extra);
     ///
-    /// assert_eq!(base.get_named_as::<bool>("serde.skip"), Some(&true));
+    /// assert_eq!(base.get_named_as::<bool>("serde:skip"), Some(&true));
     /// ```
     pub fn extend(&mut self, other: Self) {
         self.0.extend(other.0);
@@ -160,9 +160,9 @@ impl Attributes {
     /// use specta::datatype::Attributes;
     ///
     /// let mut attrs = Attributes::default();
-    /// attrs.insert("serde.rename", String::from("user_name"));
+    /// attrs.insert("serde:rename", String::from("user_name"));
     ///
-    /// let value = attrs.get_named("serde.rename").unwrap();
+    /// let value = attrs.get_named("serde:rename").unwrap();
     /// assert_eq!(value.downcast_ref::<String>(), Some(&String::from("user_name")));
     /// ```
     pub fn get_named(&self, key: &str) -> Option<&dyn Any> {
@@ -180,10 +180,10 @@ impl Attributes {
     /// use specta::datatype::Attributes;
     ///
     /// let mut attrs = Attributes::default();
-    /// attrs.insert("serde.skip", true);
+    /// attrs.insert("serde:skip", true);
     ///
-    /// assert_eq!(attrs.get_named_as::<bool>("serde.skip"), Some(&true));
-    /// assert_eq!(attrs.get_named_as::<String>("serde.skip"), None);
+    /// assert_eq!(attrs.get_named_as::<bool>("serde:skip"), Some(&true));
+    /// assert_eq!(attrs.get_named_as::<String>("serde:skip"), None);
     /// ```
     pub fn get_named_as<T: Any + 'static>(&self, key: &str) -> Option<&T> {
         self.0

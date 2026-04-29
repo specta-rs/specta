@@ -129,7 +129,7 @@ impl Zod {
     }
 
     /// Export files into a single string.
-    pub fn export(&self, types: &Types, format: Format) -> Result<String, Error> {
+    pub fn export(&self, types: &Types, format: impl Format) -> Result<String, Error> {
         let exporter = self.clone();
         let formatted_types = format_types(types, &format)?;
         let types = formatted_types.as_ref();
@@ -171,7 +171,7 @@ impl Zod {
         &self,
         path: impl AsRef<Path>,
         types: &Types,
-        format: Format,
+        format: impl Format,
     ) -> Result<(), Error> {
         let exporter = self.clone();
         let formatted_types = format_types(types, &format)?;
@@ -245,7 +245,11 @@ impl Zod {
 
             let import_paths = referenced_types
                 .into_iter()
-                .filter_map(|r| r.get(types).map(|ndt| ndt.module_path.as_ref().to_string()))
+                .filter_map(|r| {
+                    types
+                        .get(&r)
+                        .map(|ndt| ndt.module_path.as_ref().to_string())
+                })
                 .filter(|module_path| module_path != module.module_path.as_ref())
                 .collect::<BTreeSet<_>>();
 
@@ -336,7 +340,9 @@ impl Zod {
                     let import_paths = runtime_references
                         .into_iter()
                         .filter_map(|r| {
-                            r.get(types).map(|ndt| ndt.module_path.as_ref().to_string())
+                            types
+                                .get(&r)
+                                .map(|ndt| ndt.module_path.as_ref().to_string())
                         })
                         .filter(|module_path| !module_path.is_empty())
                         .collect::<BTreeSet<_>>();
@@ -385,16 +391,20 @@ impl Zod {
     }
 }
 
-fn format_types<'a>(types: &'a Types, format: &Format) -> Result<Cow<'a, Types>, Error> {
-    let mapped_types = (format.map_types)(types)
-        .map_err(|err| Error::format("type graph formatter failed", err))?;
-    Ok(Cow::Owned(
-        map_types_for_datatype_format(mapped_types.as_ref(), Some(format))?.into_owned(),
-    ))
+fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
+    Ok(
+        match format
+            .map_types(types)
+            .map_err(|err| Error::format("type graph formatter failed", err))?
+        {
+            Cow::Borrowed(_) => Cow::Borrowed(types),
+            Cow::Owned(types) => Cow::Owned(types),
+        },
+    )
 }
 
 fn map_datatype_format(
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
     types: &Types,
     dt: &DataType,
 ) -> Result<DataType, Error> {
@@ -402,7 +412,8 @@ fn map_datatype_format(
         return Ok(dt.clone());
     };
 
-    let mapped = (format.map_type)(types, dt)
+    let mapped = format
+        .map_type(types, dt)
         .map_err(|err| Error::format("datatype formatter failed", err))?;
 
     match mapped {
@@ -412,7 +423,7 @@ fn map_datatype_format(
 }
 
 fn map_datatype_format_children(
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
     types: &Types,
     mut dt: DataType,
 ) -> Result<DataType, Error> {
@@ -441,19 +452,28 @@ fn map_datatype_format_children(
                 *element = map_datatype_format(format, types, element)?;
             }
         }
-        DataType::Reference(Reference::Named(reference)) => {
-            for (_, generic) in &mut reference.generics {
-                *generic = map_datatype_format(format, types, generic)?;
+        DataType::Intersection(intersection) => {
+            for element in intersection {
+                *element = map_datatype_format(format, types, element)?;
             }
         }
-        DataType::Reference(Reference::Generic(_) | Reference::Opaque(_)) => {}
+        DataType::Reference(Reference::Named(reference)) => {
+            if let specta::datatype::NamedReferenceType::Reference { generics, .. } =
+                &mut reference.inner
+            {
+                for (_, generic) in generics {
+                    *generic = map_datatype_format(format, types, generic)?;
+                }
+            }
+        }
+        DataType::Reference(Reference::Opaque(_)) | DataType::Generic(_) => {}
     }
 
     Ok(dt)
 }
 
 fn map_datatype_fields(
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
     types: &Types,
     fields: &mut Fields,
 ) -> Result<(), Error> {
@@ -479,41 +499,17 @@ fn map_datatype_fields(
 }
 
 fn map_named_datatype_format(
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
     types: &Types,
     ndt: &NamedDataType,
 ) -> Result<NamedDataType, Error> {
     let mut mapped = ndt.clone();
-    mapped.ty = map_datatype_format(format, types, &ndt.ty)?;
+    mapped.ty = ndt
+        .ty
+        .as_ref()
+        .map(|ty| map_datatype_format(format, types, ty))
+        .transpose()?;
     Ok(mapped)
-}
-
-fn map_types_for_datatype_format<'a>(
-    types: &'a Types,
-    format: Option<&Format>,
-) -> Result<Cow<'a, Types>, Error> {
-    if format.is_none() {
-        return Ok(Cow::Borrowed(types));
-    }
-
-    let mut mapped_types = types.clone();
-    let mut map_err = None;
-    mapped_types.iter_mut(|ndt| {
-        if map_err.is_some() {
-            return;
-        }
-
-        match map_datatype_format(format, types, &ndt.ty) {
-            Ok(mapped) => ndt.ty = mapped,
-            Err(err) => map_err = Some(err),
-        }
-    });
-
-    if let Some(err) = map_err {
-        return Err(err);
-    }
-
-    Ok(Cow::Owned(mapped_types))
 }
 
 impl AsRef<Zod> for Zod {
@@ -531,7 +527,7 @@ impl AsMut<Zod> for Zod {
 /// Reference to the Zod exporter for framework callbacks.
 pub struct FrameworkExporter<'a> {
     exporter: &'a Zod,
-    format: Option<&'a Format>,
+    format: Option<&'a dyn Format>,
     has_manually_exported_user_types: &'a mut bool,
     files_root_types: &'a str,
     /// Collected types currently being exported.
@@ -681,7 +677,7 @@ fn render_flat_types<'a>(
     let mut exports = HashMap::with_capacity(ndts.len());
 
     let ndts = ndts
-        .filter(|ndt| ndt.requires_reference(types))
+        .filter(|ndt| ndt.ty.is_some())
         .map(|ndt| {
             let export_name = exported_type_name(exporter, ndt);
             if let Some(other) = exports.insert(export_name.to_string(), ndt.location) {
@@ -691,7 +687,15 @@ fn render_flat_types<'a>(
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    primitives::export_internal(s, exporter, types, ndts.into_iter(), indent)?;
+    let mut type_render_stack = Vec::new();
+    primitives::export_internal(
+        s,
+        exporter,
+        types,
+        ndts.into_iter(),
+        indent,
+        &mut type_render_stack,
+    )?;
 
     Ok(exports)
 }

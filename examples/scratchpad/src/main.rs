@@ -1,61 +1,147 @@
 //! A playground for quickly reproducing issue.
 
+use std::{borrow::Cow, ops::Range};
+
 use serde::Serialize;
 use specta::{
     Type, Types,
-    datatype::{DataType, Reference},
+    datatype::{DataType, NamedReferenceType, Reference},
 };
 
-#[derive(Serialize, Type)]
-pub struct Demo {
-    // #[serde(rename = "field2")]
-    #[serde(rename(serialize = "field_ser", deserialize = "field_der"))]
-    field: String,
+#[derive(Type)]
+// #[specta(inline)]
+pub struct A {
+    #[specta(inline)]
+    b: B,
+    c: C,
+}
+
+#[derive(Type)]
+// #[specta(inline)]
+pub struct B {
+    // #[specta(inline)]
+    a: Box<A>,
+    c: C,
+}
+
+#[derive(Type)]
+// #[specta(inline)]
+pub struct C {
+    c: D,
+}
+
+#[derive(Type)]
+pub struct D {
+    // This should never show up in output
+    d: String,
+    // Is recursive but not infinitely recursive.
+    // e: E<E<E<String>>>,
+}
+
+// #[derive(Type)]
+// pub struct B<T> {
+//     #[specta(inline)]
+//     a: Box<T>,
+// }
+
+// B<B<String>>,
+
+// #[derive(Type)]
+// pub struct E<EE> {
+//     e: EE,
+// }
+
+// #[derive(Type)]
+// #[specta(inline)] // TODO
+// pub struct E2<T> {
+//     f: T,
+//     // Infinitely recursive
+//     #[specta(inline)]
+//     e: Box<E2<T>>,
+// }
+
+// #[derive(Type)]
+// #[specta(inline)] // TODO
+// struct E3 {
+//     e: E2<String>,
+//     // { f: String, e: { f: String, e: { f: String, e: ... } } }
+//     ee: E2<E2<String>>,
+//     // { f: String, e: { f: String, e: { f: String, e: ... } } }
+// }
+
+#[derive(Type)]
+struct GG<T>(#[specta(inline)] T);
+
+#[derive(Type)]
+struct G {
+    #[specta(inline)]
+    a: GG<String>,
+    b: GG<String>,
+}
+
+#[derive(Type)]
+#[specta(inline)]
+pub struct Inner {
+    a: String,
+}
+
+#[derive(Type)]
+pub struct Outer {
+    inner: Inner,
 }
 
 fn main() {
-    // let types = Types::default().register::<Demo>();
-    // let out = specta_typescript::Typescript::new()
-    //     .export(&types, specta_serde::format)
-    //     .unwrap();
-    // println!("{}", out);
+    let mut types = Types::default()
+        .register::<A>()
+        // .register::<E3>()
+        .register::<G>()
+        .register::<Outer>();
 
-    let out = specta_typescript::Typescript::new()
-        .export(
-            &Types::default().register::<Demo>(),
-            specta_serde::format_phases,
-        )
-        .unwrap();
-    println!("{}", out);
+    let def = String::definition(&mut types);
+    println!("\n{:?}", def);
+    println!(
+        "{:?}",
+        match def {
+            DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
+            _ => unreachable!(),
+        }
+    );
 
-    let mut types = Types::default();
-    let dt = Demo::definition(&mut types);
-    let dt = match dt {
-        DataType::Reference(Reference::Named(r)) => r.ty(&types).unwrap().clone(),
-        _ => panic!("Expected a named reference"),
-    };
+    let def = Range::<i32>::definition(&mut types);
+    println!("\n{:?}", def);
+    println!(
+        "{:?}",
+        match def {
+            DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
+            _ => unreachable!(),
+        }
+    );
 
+    let def = Cow::<'static, str>::definition(&mut types);
+    println!("\n{:?}", def);
+    println!(
+        "{:?}",
+        match def {
+            DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
+            _ => unreachable!(),
+        }
+    );
+
+    // let def = heapless::Vec::<String, 5>::definition(&mut types);
+    // println!("\n{:?}", def);
     // println!(
     //     "{:?}",
-    //     // TODO: This should error?
-    //     specta_typescript::primitives::inline(
-    //         &specta_typescript::Typescript::new(),
-    //         specta_serde::map_types(&types)
-    //             .unwrap()
-    //             .as_ref(),
-    //         specta_serde::map_datatype(&types, &dt)
-    //             .unwrap()
-    //             .as_ref()
-    //     )
-    // );
-    // println!("{:?}", {
-    //     let format = specta_serde::format_phases;
-    //     let mapped_types = (format.map_types)(&types).unwrap();
-    //     let mapped_dt = (format.map_type)(&types, &dt).unwrap();
-    //     specta_typescript::primitives::inline(
-    //         &specta_typescript::Typescript::new(),
-    //         mapped_types.as_ref(),
-    //         mapped_dt.as_ref(),
-    //     )
-    // });
+    //     match def {
+    //         DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
+    //         _ => unreachable!(),
+    //     }
+    // )
+
+    println!("{types:#?}");
+
+    let out = specta_typescript::Typescript::new()
+        .export(&types, specta_serde::PhasesFormat)
+        .unwrap();
+
+    println!("{}", out);
 }

@@ -180,7 +180,7 @@ fn main() {
 
     // Export with default settings
     let swift = Swift::default();
-    let output = swift.export(&types, specta_serde::format).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("📝 Generated Swift code:\n");
     println!("{}", output);
@@ -190,7 +190,7 @@ fn main() {
         .export_to(
             "./examples/generated/AdvancedUnions.swift",
             &types,
-            specta_serde::format,
+            specta_serde::Format,
         )
         .unwrap();
     println!("✅ Advanced unions exported to AdvancedUnions.swift");

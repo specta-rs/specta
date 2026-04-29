@@ -103,8 +103,8 @@ enum ErrorKind {
     DanglingNamedReference {
         reference: String,
     },
-    /// Found a generic reference that cannot be resolved to a declared generic name.
-    UnresolvedGenericReference {
+    /// Found a recursive named reference while expanding an inline type.
+    InfiniteRecursiveInlineType {
         reference: String,
     },
     /// An error occurred in your exporter framework.
@@ -233,9 +233,9 @@ impl Error {
         }
     }
 
-    pub(crate) fn unresolved_generic_reference(reference: String) -> Self {
+    pub(crate) fn infinite_recursive_inline_type(reference: String) -> Self {
         Self {
-            kind: ErrorKind::UnresolvedGenericReference { reference },
+            kind: ErrorKind::InfiniteRecursiveInlineType { reference },
         }
     }
 
@@ -330,9 +330,9 @@ impl fmt::Display for Error {
                 f,
                 "Found dangling named reference {reference}. The referenced type is missing from the resolved type collection."
             ),
-            ErrorKind::UnresolvedGenericReference { reference } => write!(
+            ErrorKind::InfiniteRecursiveInlineType { reference } => write!(
                 f,
-                "Found unresolved generic reference {reference}. The generic is missing from the active named type scope."
+                "Found infinitely recursive inline named reference {reference}. Recursive inline types cannot be expanded because they would produce an infinite Typescript type."
             ),
             ErrorKind::Framework { message, source } => {
                 let source = source.to_string();

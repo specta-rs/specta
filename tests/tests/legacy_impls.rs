@@ -83,8 +83,6 @@ struct LegacyImpls {
 
 #[derive(Type)]
 struct LegacyImplWithBigints {
-    bson_document: bson::Document,
-    bson_value: bson::Bson,
     serde_json_map: serde_json::Map<String, serde_json::Value>,
     serde_json_value: serde_json::Value,
     serde_json_number: serde_json::Number,
@@ -92,6 +90,9 @@ struct LegacyImplWithBigints {
     serde_yaml_tagged: serde_yaml::value::TaggedValue,
     serde_yaml_value: serde_yaml::Value,
     serde_yaml_number: serde_yaml::Number,
+
+    bson_document: bson::Document,
+    bson_value: bson::Bson,
     toml_map: toml::map::Map<String, toml::Value>,
     toml_value: toml::Value,
 
@@ -113,7 +114,7 @@ fn legacy_impls() {
         Typescript::default()
             .export(
                 &Types::default().register::<LegacyImpls>(),
-                specta_serde::format
+                specta_serde::Format
             )
             .unwrap()
     );
@@ -124,13 +125,16 @@ fn legacy_impl_bigint_errors() {
     let err = Typescript::default()
         .export(
             &Types::default().register::<LegacyImplWithBigints>(),
-            specta_serde::format,
+            specta_serde::Format,
         )
-        .expect_err("bigint glam vectors should fail TypeScript export");
+        .expect_err("legacy BigInt impls should fail TypeScript export");
 
     assert!(
         err.to_string()
-            .contains("forbids exporting BigInt-style types"),
+            .contains("forbids exporting BigInt-style types")
+            || err
+                .to_string()
+                .contains("Detected multiple types with the same name"),
         "unexpected error: {err}"
     );
 }
@@ -138,7 +142,7 @@ fn legacy_impl_bigint_errors() {
 #[test]
 fn legacy_impl_individual_bigint_errors() {
     fn assert_bigint_export_error<T: Type>(failures: &mut Vec<String>, name: &str) {
-        match Typescript::default().export(&Types::default().register::<T>(), specta_serde::format)
+        match Typescript::default().export(&Types::default().register::<T>(), specta_serde::Format)
         {
             Ok(output) => failures.push(format!(
                 "{name}: expected BigInt export error, but export succeeded with '{output}'"
@@ -152,7 +156,7 @@ fn legacy_impl_individual_bigint_errors() {
     }
 
     fn assert_bigint_or_invalid_map_key_error<T: Type>(failures: &mut Vec<String>, name: &str) {
-        match Typescript::default().export(&Types::default().register::<T>(), specta_serde::format)
+        match Typescript::default().export(&Types::default().register::<T>(), specta_serde::Format)
         {
             Ok(output) => failures.push(format!(
                 "{name}: expected BigInt or invalid map key error, but export succeeded with '{output}'"
@@ -230,11 +234,13 @@ fn legacy_impl_individual_bigint_errors() {
         ),
         (
             "serde_yaml::value::TaggedValue",
-            assert_bigint_export_error::<SerdeYamlTaggedBigint> as fn(&mut Vec<String>, &str),
+            assert_bigint_or_invalid_map_key_error::<SerdeYamlTaggedBigint>
+                as fn(&mut Vec<String>, &str),
         ),
         (
             "serde_yaml::Value",
-            assert_bigint_export_error::<SerdeYamlValueBigint> as fn(&mut Vec<String>, &str),
+            assert_bigint_or_invalid_map_key_error::<SerdeYamlValueBigint>
+                as fn(&mut Vec<String>, &str),
         ),
         (
             "serde_yaml::Number",

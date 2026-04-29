@@ -33,7 +33,10 @@ use std::{borrow::Cow, sync::Arc};
 
 use specta::{
     Types,
-    datatype::{DataType, Fields, GenericReference, NamedReference, Primitive, Reference},
+    datatype::{
+        DataType, Fields, GenericReference, NamedReference, NamedReferenceType, Primitive,
+        Reference,
+    },
 };
 
 // TODO: Allow configuring custom named types via NDT name and module path using config params.
@@ -273,7 +276,7 @@ impl Analyzer {
                 }
             }
             DataType::Reference(Reference::Named(reference)) => {
-                if let Some(ndt) = reference.get(types) {
+                if let Some(ndt) = types.get(reference) {
                     if let Some(tag) = self.resolve_named_tag(&ndt.module_path, &ndt.name) {
                         return match tag {
                             KnownNamedTag::BigInt => PlanNode::Leaf(Tag::BigInt),
@@ -286,20 +289,48 @@ impl Analyzer {
                         return PlanNode::Identity;
                     }
 
+                    if let NamedReferenceType::Inline { dt, .. } = &reference.inner {
+                        return self.analyze(dt, types, &[], stack);
+                    }
+
                     stack.push(reference.clone());
-                    let out = self.analyze(&ndt.ty, types, &reference.generics, stack);
+                    let Some(ty) = &ndt.ty else {
+                        stack.pop();
+                        return PlanNode::Identity;
+                    };
+
+                    let (ty, generics) = match &reference.inner {
+                        NamedReferenceType::Reference { generics, .. } => (ty, generics.as_slice()),
+                        NamedReferenceType::Inline { dt, .. } => (dt.as_ref(), &[][..]),
+                        NamedReferenceType::Recursive => (ty, &[][..]),
+                    };
+                    let out = self.analyze(ty, types, generics, stack);
                     stack.pop();
                     out
+                } else if let NamedReferenceType::Inline { dt, .. } = &reference.inner {
+                    self.analyze(dt, types, &[], stack)
                 } else {
                     PlanNode::Identity
                 }
             }
-            DataType::Reference(Reference::Generic(generic)) => generics
+            DataType::Generic(generic) => generics
                 .iter()
                 .find(|(key, _)| key == generic)
                 .map(|(_, dt)| self.analyze(dt, types, &[], stack))
                 .unwrap_or(PlanNode::Identity),
             DataType::Reference(Reference::Opaque(_)) => PlanNode::Identity,
+            DataType::Intersection(intersection) => {
+                let items = intersection
+                    .iter()
+                    .map(|ty| self.analyze(ty, types, generics, stack))
+                    .collect::<Vec<_>>();
+
+                if items.iter().all(PlanNode::is_identity) {
+                    PlanNode::Identity
+                } else {
+                    PlanNode::Tuple(items)
+                }
+            }
         }
     }
 
@@ -335,8 +366,6 @@ impl Analyzer {
                         let plan = self.analyze(ty, types, generics, stack);
                         if plan.is_identity() {
                             None
-                        } else if field.flatten {
-                            Some(ObjectFieldPlan::Flattened(plan))
                         } else {
                             Some(ObjectFieldPlan::Named(name.to_string(), plan))
                         }
@@ -549,7 +578,7 @@ fn string_literal(ty: &DataType) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use serde::{Deserialize, Serialize};
-    use specta::{Type, Types};
+    use specta::{Format as _, Type, Types};
 
     use super::TransformPlan;
 
@@ -612,8 +641,9 @@ mod tests {
 
     #[test]
     fn map_renders_from_serde_applied_internal_enum_shape() {
-        let format = specta_serde::format;
-        let resolved = (format.map_types)(&Types::default().register::<TaggedEnum>())
+        let format = specta_serde::Format;
+        let resolved = format
+            .map_types(&Types::default().register::<TaggedEnum>())
             .unwrap()
             .into_owned();
         let dt = resolved
@@ -623,7 +653,7 @@ mod tests {
             .ty
             .clone();
 
-        let js = TransformPlan::analyze(&dt, &resolved).map("v");
+        let js = TransformPlan::analyze(dt.as_ref().unwrap(), &resolved).map("v");
 
         assert!(js.contains("[\"kind\"] === \"A\""));
         assert!(js.contains("BigInt("));
@@ -632,8 +662,9 @@ mod tests {
 
     #[test]
     fn map_renders_from_serde_applied_adjacent_enum_shape() {
-        let format = specta_serde::format;
-        let resolved = (format.map_types)(&Types::default().register::<AdjacentEnum>())
+        let format = specta_serde::Format;
+        let resolved = format
+            .map_types(&Types::default().register::<AdjacentEnum>())
             .unwrap()
             .into_owned();
         let dt = resolved
@@ -643,7 +674,7 @@ mod tests {
             .ty
             .clone();
 
-        let js = TransformPlan::analyze(&dt, &resolved).map("v");
+        let js = TransformPlan::analyze(dt.as_ref().unwrap(), &resolved).map("v");
 
         assert!(js.contains("[\"kind\"] === \"A\""));
         assert!(js.contains("payload"));

@@ -4,130 +4,76 @@ use std::{
     sync::Arc,
 };
 
-use crate::{Types, datatype::NamedDataType};
+use crate::datatype::Generic;
 
 use super::DataType;
 
-/// Reference to another type.
+/// Reference to another datatype.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Reference {
-    /// Reference to a named type collected in a [`Types`].
+    /// Reference to a named type collected in a [`Types`](crate::Types).
+    ///
+    /// This can either render as a named reference, such as `TypeName<T>`, or as
+    /// an inlined datatype depending on [`NamedReference::inner`].
     Named(NamedReference),
-    /// Reference to a generic type parameter.
-    Generic(GenericReference),
     /// Reference to an opaque exporter-specific type.
     Opaque(OpaqueReference),
 }
 
-/// Reference to a [NamedDataType].
+/// Reference to a [`NamedDataType`](crate::datatype::NamedDataType).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct NamedReference {
     pub(crate) id: NamedId,
-    pub generics: Vec<(GenericReference, DataType)>,
-    pub(crate) inline: bool,
-    pub(crate) instance: Option<usize>,
+    /// How this named type should be referenced at the use site.
+    pub inner: NamedReferenceType,
 }
 
-impl NamedReference {
-    /// Get a reference to a [NamedDataType] from a [Types].
-    ///
-    /// This is guaranteed to return a [NamedDataType] if the [Types] matches,
-    /// what was used to get the original [Reference].
-    pub fn get<'a>(&self, types: &'a Types) -> Option<&'a NamedDataType> {
-        types.0.get(&self.id)?.as_ref()
-    }
-
-    /// Get the datatype of this reference, if it is known.
-    ///
-    /// This is better than retrieving the type from the [`NamedDataType`] directly because we do our best to preserve the exact instantiated type that existed when the reference was created.
-    ///
-    /// Named references only store an instance identifier rather than embedding a full [`DataType`].
-    /// This keeps references lightweight and avoids pulling recursive instantiated type graphs into hashing and equality checks used by exporters.
-    /// The actual instantiated types are stored on the owning [`NamedDataType`] and resolved through the identifier here.
-    pub fn ty<'a, 'b>(&'a self, types: &'b Types) -> Option<&'a DataType>
-    where
-        'b: 'a,
-    {
-        let ndt = self.get(types)?;
-        self.instance
-            .and_then(|instance| ndt.instances.get(instance))
-            .or(Some(&ndt.ty))
-    }
-
-    /// Get whether this reference should be inlined
-    pub fn inline(&self) -> bool {
-        self.inline
-    }
-}
-
-/// Reference to a generic parameter a parent [NamedDataType].
-/// This is resolved to a concrete type by the language exporter.
+/// Use-site representation for a [`NamedReference`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct GenericReference {
-    pub(crate) id: TypeId,
+pub enum NamedReferenceType {
+    /// Recursive reference encountered while resolving an inline type.
+    ///
+    /// Exporters can use this marker to avoid infinitely expanding recursive
+    /// inline definitions that they would stack overflow resolving.
+    Recursive,
+    /// Inline the contained datatype at the reference site.
+    /// These are emitted when `#[specta(inline)]` is used on a field or container.
+    #[non_exhaustive]
+    Inline {
+        /// Datatype to render in place of the named reference.
+        dt: Box<DataType>,
+    },
+    /// Render a reference to the named datatype.
+    #[non_exhaustive]
+    Reference {
+        /// Concrete generic arguments for this use site.
+        generics: Vec<(Generic, DataType)>,
+    },
 }
 
-impl GenericReference {
-    /// Build a new [GenericReference] for a generic type parameter marker.
-    /// `T` should be a unique type which identifies the generic (Eg. `pub struct GenericT;`) and must be registered on the parent [`NamedDataType`].
-    pub const fn new<T: ?Sized + 'static>() -> Self {
-        Self {
-            id: TypeId::of::<T>(),
-        }
-    }
-
-    /// Compare two [GenericReference]s for equality.
-    /// If this returns true they are both a reference to the same generic type.
-    pub fn eq<T: ?Sized + 'static>(&self) -> bool {
-        self.id == TypeId::of::<T>()
-    }
-}
-
-impl From<GenericReference> for DataType {
-    fn from(v: GenericReference) -> Self {
-        DataType::Reference(Reference::Generic(v))
-    }
-}
-
-/// Reference to a type not understood by Specta's core.
+/// Reference to a type not understood by Specta's core datatype model.
 ///
 /// These are implemented by the language exporter to implement cool features like
 /// [`specta_typescript::branded!`](https://docs.rs/specta-typescript/latest/specta_typescript/macro.branded.html),
 /// [`specta_typescript::define`](https://docs.rs/specta-typescript/latest/specta_typescript/fn.define.html), and more.
 ///
-/// This is an advanced feature designed for language exporters so should generally be avoided and is not intended to be generally useful unless your in control of the language exporter.
+/// # Invariants
+///
+/// Equality and hashing are delegated to the stored opaque state. If two opaque
+/// references should be distinct, their state values must compare and hash
+/// distinctly.
+///
+/// This is an advanced feature designed for language exporters and framework
+/// integrations. Most end users should prefer ordinary [`DataType`] variants.
 #[derive(Clone)]
 pub struct OpaqueReference(Arc<dyn DynOpaqueReference>);
-
-pub(crate) fn tauri() -> Reference {
-    Reference::Opaque(OpaqueReference(Arc::new(TauriChannelReferenceInner)))
-}
 
 trait DynOpaqueReference: Any + Send + Sync {
     fn type_name(&self) -> &'static str;
     fn hash(&self, hasher: &mut dyn hash::Hasher);
     fn eq(&self, other: &dyn Any) -> bool;
     fn as_any(&self) -> &dyn Any;
-}
-
-#[derive(PartialEq, Eq)]
-struct TauriChannelReferenceInner;
-impl DynOpaqueReference for TauriChannelReferenceInner {
-    fn type_name(&self) -> &'static str {
-        "tauri::ipc::Channel"
-    }
-    fn hash(&self, hasher: &mut dyn hash::Hasher) {
-        hasher.write_u64(0);
-    }
-    fn eq(&self, other: &dyn Any) -> bool {
-        other
-            .downcast_ref::<Self>()
-            .map(|other| self == other)
-            .unwrap_or_default()
-    }
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
 }
 
 #[derive(Debug)]
@@ -173,53 +119,45 @@ impl hash::Hash for OpaqueReference {
 }
 
 impl OpaqueReference {
-    /// Get the Rust type name of the stored opaque state.
+    /// Returns the Rust type name of the stored opaque state.
     pub fn type_name(&self) -> &'static str {
         self.0.type_name()
     }
 
-    /// Get the [`TypeId`] of the stored opaque state.
+    /// Returns the [`TypeId`] of the stored opaque state.
     pub fn type_id(&self) -> TypeId {
         self.0.as_any().type_id()
     }
 
-    /// Attempt to downcast the opaque state to `T`.
+    /// Attempts to downcast the opaque state to `T`.
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
         self.0.as_any().downcast_ref::<T>()
     }
 }
 
 impl Reference {
-    /// Construct a new reference to an opaque type.
+    /// Constructs a new reference to an opaque type.
     ///
-    /// An opaque type is unable to be represented using the [DataType] system and requires specific exporter integration to handle it.
+    /// An opaque type cannot be represented with the core [`DataType`] model and
+    /// requires specific exporter integration.
     ///
-    /// Opaque [Reference]'s are compared using [PartialEq]. For example `Reference::opaque(()) == Reference::opaque(())` so you must ensure each reference you intent to be unique is implemented as such.
+    /// Opaque [`Reference`]s are compared using the state's [`PartialEq`]
+    /// implementation. For example, `Reference::opaque(()) ==
+    /// Reference::opaque(())`, so unique references need unique state.
     pub fn opaque<T: hash::Hash + Eq + Send + Sync + 'static>(state: T) -> Self {
         Self::Opaque(OpaqueReference(Arc::new(OpaqueReferenceInner(state))))
     }
 
-    /// Compare if two references point to the same type.
+    /// Returns whether two references point to the same underlying type.
     ///
-    /// This is different from using `Eq`, `PartialEq`, or `Hash` as those compare the [Reference].
-    /// A [Reference] contains generics, inline and other attributes which this ignores.
+    /// This differs from [`Eq`], [`PartialEq`], and [`Hash`] because those compare
+    /// the full [`Reference`] which includes generic arguments and inline state.
     pub fn ty_eq(&self, other: &Reference) -> bool {
         match (self, other) {
             (Reference::Named(a), Reference::Named(b)) => a.id == b.id,
-            (Reference::Generic(a), Reference::Generic(b)) => a.id == b.id,
             (Reference::Opaque(a), Reference::Opaque(b)) => *a == *b,
             _ => false,
         }
-    }
-
-    /// Convert an existing [Reference] into an inlined one.
-    ///
-    /// It's not safe to go the other way incase the type is inlined which requires all [Reference]'s to be inlined.
-    pub fn inline(mut self) -> Reference {
-        if let Reference::Named(n) = &mut self {
-            n.inline = true;
-        }
-        self
     }
 }
 
