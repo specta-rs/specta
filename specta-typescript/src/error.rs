@@ -103,6 +103,10 @@ enum ErrorKind {
     DanglingNamedReference {
         reference: String,
     },
+    /// Found a recursive named reference while expanding an inline type.
+    InfiniteRecursiveInlineType {
+        reference: String,
+    },
     /// An error occurred in your exporter framework.
     Framework {
         message: Cow<'static, str>,
@@ -229,6 +233,12 @@ impl Error {
         }
     }
 
+    pub(crate) fn infinite_recursive_inline_type(reference: String) -> Self {
+        Self {
+            kind: ErrorKind::InfiniteRecursiveInlineType { reference },
+        }
+    }
+
     pub(crate) fn forbidden_name_legacy(path: ExportPath, name: &'static str) -> Self {
         Self {
             kind: ErrorKind::ForbiddenNameLegacy(path, name),
@@ -319,6 +329,10 @@ impl fmt::Display for Error {
             ErrorKind::DanglingNamedReference { reference } => write!(
                 f,
                 "Found dangling named reference {reference}. The referenced type is missing from the resolved type collection."
+            ),
+            ErrorKind::InfiniteRecursiveInlineType { reference } => write!(
+                f,
+                "Found infinitely recursive inline named reference {reference}. Recursive inline types cannot be expanded because they would produce an infinite Typescript type."
             ),
             ErrorKind::Framework { message, source } => {
                 let source = source.to_string();

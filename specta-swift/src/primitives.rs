@@ -315,9 +315,10 @@ pub fn export_type(
                 .any(|(variant_name, variant)| should_emit_variant_wrapper(variant_name, variant));
 
             let has_serde_payload_variants = swift.format.is_some()
-                && e.variants
-                    .iter()
-                    .any(|(variant_name, variant)| !is_unit_like_variant(variant_name, variant));
+                && e.variants.iter().any(|(variant_name, variant)| {
+                    serde_variant_payload(variant_name, variant)
+                        .is_some_and(|_| !is_unit_like_variant(variant_name, variant))
+                });
 
             let needs_custom_codable = has_struct_variants || has_serde_payload_variants;
 

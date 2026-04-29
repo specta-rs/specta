@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use specta::{
     Types,
-    datatype::{DataType, Fields, NamedReferenceType, Primitive, Reference},
+    datatype::{DataType, Fields, Generic, NamedReferenceType, Primitive, Reference},
 };
 
 use crate::Error;
@@ -125,10 +125,12 @@ fn validate_map_key_inner(
             }
 
             let result = match &reference.inner {
-                NamedReferenceType::Reference { .. } => {
+                NamedReferenceType::Reference { generics, .. } => {
                     if let Some(ndt) = types.get(reference) {
                         if let Some(ty) = ndt.ty.as_ref() {
-                            validate_map_key_inner(ty, types, path, visiting_named_refs)
+                            let mut ty = ty.clone();
+                            substitute_generics(&mut ty, generics);
+                            validate_map_key_inner(&ty, types, path, visiting_named_refs)
                         } else {
                             Err(Error::invalid_map_key(
                                 path,
@@ -170,6 +172,70 @@ fn validate_map_key_inner(
             path,
             "collection, map, and nullable keys are not supported by serde_json map key serialization",
         )),
+    }
+}
+
+fn substitute_generics(dt: &mut DataType, generics: &[(Generic, DataType)]) {
+    match dt {
+        DataType::Generic(generic) => {
+            if let Some((_, ty)) = generics.iter().find(|(reference, _)| reference == generic) {
+                *dt = ty.clone();
+            }
+        }
+        DataType::List(list) => substitute_generics(&mut list.ty, generics),
+        DataType::Map(map) => {
+            substitute_generics(map.key_ty_mut(), generics);
+            substitute_generics(map.value_ty_mut(), generics);
+        }
+        DataType::Nullable(inner) => substitute_generics(inner, generics),
+        DataType::Struct(strct) => substitute_field_generics(&mut strct.fields, generics),
+        DataType::Enum(enm) => {
+            for (_, variant) in &mut enm.variants {
+                substitute_field_generics(&mut variant.fields, generics);
+            }
+        }
+        DataType::Tuple(tuple) => {
+            for ty in &mut tuple.elements {
+                substitute_generics(ty, generics);
+            }
+        }
+        DataType::Reference(Reference::Named(reference)) => {
+            if let NamedReferenceType::Reference {
+                generics: reference_generics,
+                ..
+            } = &mut reference.inner
+            {
+                for (_, ty) in reference_generics {
+                    substitute_generics(ty, generics);
+                }
+            }
+        }
+        DataType::Intersection(types) => {
+            for ty in types {
+                substitute_generics(ty, generics);
+            }
+        }
+        DataType::Primitive(_) | DataType::Reference(Reference::Opaque(_)) => {}
+    }
+}
+
+fn substitute_field_generics(fields: &mut Fields, generics: &[(Generic, DataType)]) {
+    match fields {
+        Fields::Unit => {}
+        Fields::Unnamed(unnamed) => {
+            for field in &mut unnamed.fields {
+                if let Some(ty) = &mut field.ty {
+                    substitute_generics(ty, generics);
+                }
+            }
+        }
+        Fields::Named(named) => {
+            for (_, field) in &mut named.fields {
+                if let Some(ty) = &mut field.ty {
+                    substitute_generics(ty, generics);
+                }
+            }
+        }
     }
 }
 

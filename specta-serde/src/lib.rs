@@ -1241,7 +1241,7 @@ fn rewrite_enum_repr_for_phase(
             serialized_variant_name(&variant_name, &variant, &container_attrs, mode)?;
         let widen_tag =
             mode == PhaseRewrite::Deserialize && variant_attrs.is_some_and(|attrs| attrs.other);
-        let transformed_variant = match &repr {
+        let mut transformed_variant = match &repr {
             EnumRepr::External => transform_external_variant(serialized_name.clone(), &variant)?,
             EnumRepr::Internal { tag } => transform_internal_variant(
                 serialized_name.clone(),
@@ -1268,10 +1268,12 @@ fn rewrite_enum_repr_for_phase(
             EnumRepr::Untagged => unreachable!(),
         };
 
+        transformed_variant.attributes = Default::default();
         transformed.push((Cow::Owned(serialized_name), transformed_variant));
     }
 
     e.variants = transformed;
+    e.attributes = Default::default();
 
     Ok(())
 }
@@ -1743,14 +1745,27 @@ fn transform_internal_variant(
             };
 
             if !payload_is_effectively_empty {
-                let mut flattened = payload_field;
-                flattened.attributes.insert("serde:field:flatten", true);
-                fields.push((Cow::Borrowed("__specta_internal_payload"), flattened));
+                return Ok(clone_variant_with_unnamed_fields(
+                    variant,
+                    vec![Field::new(DataType::Intersection(vec![
+                        named_fields_datatype(fields),
+                        payload_ty,
+                    ]))],
+                ));
             }
         }
     }
 
     Ok(clone_variant_with_named_fields(variant, fields))
+}
+
+fn named_fields_datatype(fields: Vec<(Cow<'static, str>, Field)>) -> DataType {
+    let mut builder = Struct::named();
+    for (name, field) in fields {
+        builder = builder.field(name, field);
+    }
+
+    builder.build()
 }
 
 fn string_literal_datatype(value: String) -> DataType {
@@ -1876,8 +1891,26 @@ fn internal_tag_payload_compatibility(
             })
         }
         DataType::Tuple(tuple) => Ok(tuple.elements.is_empty().then_some(true)),
-        DataType::Intersection(_) => Ok(None),
+        DataType::Intersection(types) => {
+            let mut is_effectively_empty = true;
+
+            for ty in types {
+                let Some(part_empty) =
+                    internal_tag_payload_compatibility(ty, original_types, seen)?
+                else {
+                    return Ok(None);
+                };
+
+                is_effectively_empty &= part_empty;
+            }
+
+            Ok(Some(is_effectively_empty))
+        }
         DataType::Reference(Reference::Named(reference)) => {
+            if let NamedReferenceType::Inline { dt, .. } = &reference.inner {
+                return internal_tag_payload_compatibility(dt, original_types, seen);
+            }
+
             let Some(referenced) = original_types.get(reference) else {
                 return Ok(None);
             };

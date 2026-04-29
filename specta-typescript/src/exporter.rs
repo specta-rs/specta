@@ -467,9 +467,9 @@ fn reference_module_path(types: &Types, r: &NamedReference) -> Result<Option<Str
             Ok(types.get(r).map(|ndt| ndt.module_path.as_ref().to_string()))
         }
         NamedReferenceType::Inline { .. } => Ok(None),
-        NamedReferenceType::Recursive => Err(Error::dangling_named_reference(format!(
-            "recursive inline named reference {r:?}"
-        ))),
+        NamedReferenceType::Recursive => {
+            Ok(types.get(r).map(|ndt| ndt.module_path.as_ref().to_string()))
+        }
     }
 }
 
@@ -551,11 +551,7 @@ fn map_datatype_format(
                     })?
                 }
                 NamedReferenceType::Inline { .. } => false,
-                NamedReferenceType::Recursive => {
-                    return Err(Error::dangling_named_reference(format!(
-                        "recursive inline named reference {reference:?}"
-                    )));
-                }
+                NamedReferenceType::Recursive => false,
             },
             DataType::Generic(_) => true,
             DataType::Reference(Reference::Opaque(_)) => false,

@@ -599,9 +599,7 @@ fn named_reference_generics(r: &NamedReference) -> Result<&[(GenericReference, D
     match &r.inner {
         NamedReferenceType::Reference { generics, .. } => Ok(generics),
         NamedReferenceType::Inline { .. } => Ok(&[]),
-        NamedReferenceType::Recursive => Err(Error::dangling_named_reference(format!(
-            "recursive inline named reference {r:?}"
-        ))),
+        NamedReferenceType::Recursive => Ok(&[]),
     }
 }
 
@@ -612,9 +610,10 @@ fn named_reference_ty<'a>(types: &'a Types, r: &'a NamedReference) -> Result<&'a
             .and_then(|ndt| ndt.ty.as_ref())
             .ok_or_else(|| Error::dangling_named_reference(format!("{r:?}"))),
         NamedReferenceType::Inline { dt, .. } => Ok(dt),
-        NamedReferenceType::Recursive => Err(Error::dangling_named_reference(format!(
-            "recursive inline named reference {r:?}"
-        ))),
+        NamedReferenceType::Recursive => types
+            .get(r)
+            .and_then(|ndt| ndt.ty.as_ref())
+            .ok_or_else(|| Error::infinite_recursive_inline_type(format!("{r:?}"))),
     }
 }
 
@@ -801,7 +800,7 @@ fn shallow_inline_datatype(
             parent_name,
             prefix,
             generics,
-            shallow_inline_datatype,
+            shallow_intersection_part_datatype,
         )?,
         DataType::Struct(st) => {
             crate::legacy::struct_datatype(
@@ -888,6 +887,35 @@ type DatatypeRenderer = fn(
     &str,
     &[(GenericReference, DataType)],
 ) -> Result<(), Error>;
+
+fn shallow_intersection_part_datatype(
+    s: &mut String,
+    exporter: &Exporter,
+    format: Option<&dyn Format>,
+    types: &Types,
+    dt: &DataType,
+    location: Vec<Cow<'static, str>>,
+    parent_name: Option<&str>,
+    prefix: &str,
+    generics: &[(GenericReference, DataType)],
+) -> Result<(), Error> {
+    match dt {
+        DataType::Reference(r) => {
+            reference_dt(s, exporter, format, types, r, location, prefix, generics)
+        }
+        _ => shallow_inline_datatype(
+            s,
+            exporter,
+            format,
+            types,
+            dt,
+            location,
+            parent_name,
+            prefix,
+            generics,
+        ),
+    }
+}
 
 fn intersection_dt(
     s: &mut String,
@@ -1879,9 +1907,7 @@ fn reference_dt(
             NamedReferenceType::Inline { dt, .. } => inline_datatype(
                 s, exporter, format, types, dt, location, None, prefix, 0, generics,
             ),
-            NamedReferenceType::Recursive => Err(Error::dangling_named_reference(format!(
-                "recursive inline named reference {r:?}"
-            ))),
+            NamedReferenceType::Recursive => reference_named_dt(s, exporter, types, r, generics),
         },
         Reference::Opaque(r) => reference_opaque_dt(s, exporter, format, types, r),
     }

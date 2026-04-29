@@ -199,6 +199,22 @@ impl NamedDataType {
             };
 
             if types.stack.contains(&hash) {
+                // For container inline types we wanna passthrough instead of rejecting on the container.
+                if passthrough_inline {
+                    let prev_inline = mem::replace(&mut types.should_inline, false);
+                    let result = panic::catch_unwind(AssertUnwindSafe(|| build_ty(types)));
+                    types.should_inline = prev_inline;
+
+                    return match result {
+                        Ok(DataType::Reference(reference)) => reference,
+                        Ok(_) => Reference::Named(NamedReference {
+                            id,
+                            inner: NamedReferenceType::Recursive,
+                        }),
+                        Err(payload) => panic::resume_unwind(payload),
+                    };
+                }
+
                 return Reference::Named(NamedReference {
                     id,
                     inner: NamedReferenceType::Recursive,
