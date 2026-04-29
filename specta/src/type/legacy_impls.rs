@@ -703,8 +703,6 @@ impl_ndt!(bytesize::ByteSize as String = inline);
 #[cfg(feature = "uhlc")]
 #[cfg_attr(docsrs, doc(cfg(feature = "uhlc")))]
 const _: () = {
-    use crate::{datatype, r#type::macros::impl_ndt, *};
-
     impl_ndt!(
         uhlc::NTP64 as u64 = inline;
         uhlc::ID as std::num::NonZeroU128 = inline;
@@ -841,8 +839,6 @@ impl_ndt!(
 #[cfg(feature = "url")]
 #[cfg_attr(docsrs, doc(cfg(feature = "url")))]
 const _: () = {
-    use crate::{datatype, r#type::macros::impl_ndt, *};
-
     impl_ndt!(
         url::Url as str = inline;
         url::Host as UrlHost = inline;
@@ -881,8 +877,6 @@ const _: () = {
 #[cfg(feature = "either")]
 #[cfg_attr(docsrs, doc(cfg(feature = "either")))]
 const _: () = {
-    use crate::{datatype, r#type::macros::impl_ndt, *};
-
     impl_ndt!(either::Either<L, R> as Either<L, R> = inline);
 
     struct Either<L, R>(std::marker::PhantomData<(L, R)>);
@@ -912,12 +906,9 @@ const _: () = {
 #[cfg(feature = "error-stack")]
 #[cfg_attr(docsrs, doc(cfg(feature = "error-stack")))]
 const _: () = {
-    use crate::r#type::impls::*;
-    use crate::r#type::macros::impl_ndt;
-
     impl_ndt!(
         "error_stack" ErrorStackContext as ErrorStackContextInner = named;
-        error_stack::Report<C> where { C: std::error::Error + Send + Sync + 'static } as ReportInner = named;
+        error_stack::Report<> <C> where { C: std::error::Error + Send + Sync + 'static } as ReportInner = named;
     );
 
     impl<C: std::error::Error + Send + Sync + 'static> Type for error_stack::Report<[C]> {
@@ -952,26 +943,19 @@ const _: () = {
 
 #[cfg(feature = "bevy_ecs")]
 #[cfg_attr(docsrs, doc(cfg(feature = "bevy_ecs")))]
-const _: () = {
-    use crate::r#type::impls::*;
-    use crate::r#type::macros::impl_ndt;
-
-    impl_ndt!(
-        bevy_ecs::entity::Entity as u64 = named;
-        bevy_ecs::name::Name as str = named;
-        bevy_ecs::hierarchy::ChildOf as bevy_ecs::entity::Entity = named;
-        bevy_ecs::entity::EntityHashMap<V> where { V: Type } as PrimitiveMap<bevy_ecs::entity::Entity, V> = named;
-        bevy_ecs::entity::EntityHashSet as PrimitiveSet<bevy_ecs::entity::Entity> = named;
-        bevy_ecs::entity::EntityIndexMap<V> where { V: Type } as PrimitiveMap<bevy_ecs::entity::Entity, V> = named;
-        bevy_ecs::entity::EntityIndexSet as PrimitiveSet<bevy_ecs::entity::Entity> = named;
-    );
-};
+impl_ndt!(
+    bevy_ecs::entity::Entity as u64 = named;
+    bevy_ecs::name::Name as str = named;
+    bevy_ecs::hierarchy::ChildOf as bevy_ecs::entity::Entity = named;
+    bevy_ecs::entity::EntityHashMap<V> where { V: Type } as PrimitiveMap<bevy_ecs::entity::Entity, V> = named;
+    bevy_ecs::entity::EntityHashSet as PrimitiveSet<bevy_ecs::entity::Entity> = named;
+    bevy_ecs::entity::EntityIndexMap<V> where { V: Type } as PrimitiveMap<bevy_ecs::entity::Entity, V> = named;
+    bevy_ecs::entity::EntityIndexSet as PrimitiveSet<bevy_ecs::entity::Entity> = named;
+);
 
 #[cfg(feature = "bevy_input")]
 #[cfg_attr(docsrs, doc(cfg(feature = "bevy_input")))]
 const _: () = {
-    use crate::{datatype, r#type::macros::impl_ndt, *};
-
     impl_ndt!(
         bevy_input::ButtonState as BevyButtonState = named;
         bevy_input::keyboard::KeyboardInput as BevyKeyboardInput = named;
@@ -1512,8 +1496,6 @@ impl_ndt!(
 #[cfg(feature = "geojson")]
 #[cfg_attr(docsrs, doc(cfg(feature = "geojson")))]
 const _: () = {
-    use crate::{datatype, r#type::macros::impl_ndt, *};
-
     impl_ndt!(
         geojson::Position as [f64] = inline;
         geojson::GeoJson as GeoJson = inline;
