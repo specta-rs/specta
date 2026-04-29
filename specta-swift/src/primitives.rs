@@ -2,7 +2,9 @@
 
 use specta::{
     Types,
-    datatype::{DataType, Enum, Fields, Generic, Primitive, Reference, Variant},
+    datatype::{
+        DataType, Enum, Fields, Generic, NamedReferenceType, Primitive, Reference, Variant,
+    },
 };
 
 use crate::error::Error;
@@ -515,10 +517,12 @@ fn contains_generic_reference(dt: &DataType) -> bool {
             .iter()
             .any(|(_, variant)| fields_contain_generic_reference(&variant.fields)),
         DataType::Tuple(tuple) => tuple.elements.iter().any(contains_generic_reference),
-        DataType::Reference(Reference::Named(reference)) => reference
-            .generics()
-            .iter()
-            .any(|(_, generic)| contains_generic_reference(generic)),
+        DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+            NamedReferenceType::Reference { generics, .. } => generics
+                .iter()
+                .any(|(_, generic)| contains_generic_reference(generic)),
+            NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => false,
+        },
         DataType::Reference(Reference::Opaque(_)) => false,
         DataType::Generic(_) => true,
         DataType::Intersection(types) => types.iter().any(contains_generic_reference),
@@ -567,7 +571,7 @@ fn is_special_std_type(
     reference: Option<&specta::datatype::Reference>,
 ) -> Option<String> {
     if let Some(Reference::Named(r)) = reference
-        && let Some(ndt) = r.get(types)
+        && let Some(ndt) = types.get(r)
     {
         // Check for std::time::Duration
         if &ndt.name == "Duration" {
@@ -969,7 +973,7 @@ fn reference_to_swift(
 ) -> Result<String, Error> {
     match r {
         Reference::Named(r) => {
-            let Some(ndt) = r.get(types) else {
+            let Some(ndt) = types.get(r) else {
                 return Err(Error::InvalidIdentifier(
                     "Reference to unknown type".to_string(),
                 ));
@@ -983,8 +987,13 @@ fn reference_to_swift(
                 return Ok("String".to_string());
             }
 
+            let generics = match &r.inner {
+                NamedReferenceType::Reference { generics, .. } => generics.as_slice(),
+                NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => &[],
+            };
+
             if ndt.name == "Vec"
-                && let Some((_, inner_ty)) = r.generics().first()
+                && let Some((_, inner_ty)) = generics.first()
             {
                 let inner =
                     datatype_to_swift(swift, types, inner_ty, generic_scope.to_vec(), None)?;
@@ -993,11 +1002,10 @@ fn reference_to_swift(
 
             let name = swift.naming.convert(&ndt.name);
 
-            if r.generics().is_empty() {
+            if generics.is_empty() {
                 Ok(name)
             } else {
-                let generics = r
-                    .generics()
+                let generics = generics
                     .iter()
                     .map(|(_, t)| datatype_to_swift(swift, types, t, generic_scope.to_vec(), None))
                     .collect::<std::result::Result<Vec<_>, _>>()?

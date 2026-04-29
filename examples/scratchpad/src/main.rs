@@ -139,9 +139,9 @@ fn main() {
 
     println!("{types:#?}");
 
-    // let out = specta_typescript::Typescript::new()
-    //     .export(&types, specta_serde::PhasesFormat)
-    //     .unwrap();
+    let out = specta_typescript::Typescript::new()
+        .export(&types, specta_serde::PhasesFormat)
+        .unwrap();
 
-    // println!("{}", out);
+    println!("{}", out);
 }

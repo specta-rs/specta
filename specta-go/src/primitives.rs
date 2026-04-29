@@ -2,7 +2,10 @@ use std::collections::HashSet;
 
 use specta::{
     Types,
-    datatype::{DataType, Enum, Fields, Generic, NamedDataType, Primitive, Reference, Struct},
+    datatype::{
+        DataType, Enum, Fields, Generic, NamedDataType, NamedReferenceType, Primitive, Reference,
+        Struct,
+    },
 };
 
 use crate::{Error, Go, reserved_names::RESERVED_GO_NAMES};
@@ -334,14 +337,17 @@ fn datatype(
         }
         DataType::Reference(r) => match r {
             Reference::Named(r) => {
-                let ndt = r.get(types).ok_or_else(|| Error::ForbiddenName {
+                let ndt = types.get(r).ok_or_else(|| Error::ForbiddenName {
                     path: "lookup".into(),
                     name: "missing_reference_in_collection".into(),
                 })?;
 
                 s.push_str(&to_pascal_case(&ndt.name));
 
-                let generics = r.generics();
+                let generics = match &r.inner {
+                    NamedReferenceType::Reference { generics, .. } => generics.as_slice(),
+                    NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => &[],
+                };
                 if !generics.is_empty() {
                     s.push('[');
                     for (i, (_, g)) in generics.iter().enumerate() {

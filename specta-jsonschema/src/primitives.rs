@@ -83,7 +83,7 @@ pub fn datatype_to_schema(
                 Reference::Named(r) => {
                     if is_definition {
                         // When exporting a definition, inline it
-                        if let Some(referenced_ndt) = r.get(types) {
+                        if let Some(referenced_ndt) = types.get(r) {
                             let Some(ty) = &referenced_ndt.ty else {
                                 return Ok(json!({}));
                             };
@@ -97,7 +97,7 @@ pub fn datatype_to_schema(
                     } else {
                         // Use $ref for references
                         let defs_key = js.schema_version.definitions_key();
-                        if let Some(referenced_ndt) = r.get(types) {
+                        if let Some(referenced_ndt) = types.get(r) {
                             Ok(json!({
                                 "$ref": format!("#/{}/{}", defs_key, referenced_ndt.name)
                             }))
@@ -152,11 +152,7 @@ fn primitive_to_schema(p: &Primitive) -> Value {
     }
 }
 
-fn struct_to_schema(
-    js: &JsonSchema,
-    types: &Types,
-    s: &Struct,
-) -> Result<Value, Error> {
+fn struct_to_schema(js: &JsonSchema, types: &Types, s: &Struct) -> Result<Value, Error> {
     match &s.fields {
         Fields::Unit => {
             // Unit struct = null

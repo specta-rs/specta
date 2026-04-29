@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use specta::{
     Types,
-    datatype::{DataType, Enum, Field, Fields, Generic, NamedReferenceType, Reference, Variant},
+    datatype::{DataType, Enum, Field, Fields, NamedReferenceType, Reference, Variant},
 };
 
 use crate::{
@@ -24,10 +24,10 @@ pub fn validate_for_mode(types: &Types, mode: ApplyMode) -> Result<(), Error> {
             continue;
         };
 
-        validate_datatype_with_generics_for_mode(
+        inner(
             ty,
             types,
-            &ndt.generics,
+            &mut HashSet::new(),
             ndt.name.to_string(),
             mode,
             true,
@@ -42,7 +42,14 @@ pub(crate) fn validate_datatype_for_mode(
     types: &Types,
     mode: ApplyMode,
 ) -> Result<(), Error> {
-    validate_datatype_with_generics_for_mode(dt, types, &[], "<top-level>".to_string(), mode, true)
+    inner(
+        dt,
+        types,
+        &mut HashSet::new(),
+        "<top-level>".to_string(),
+        mode,
+        true,
+    )
 }
 
 pub(crate) fn validate_datatype_for_mode_shallow(
@@ -50,42 +57,19 @@ pub(crate) fn validate_datatype_for_mode_shallow(
     types: &Types,
     mode: ApplyMode,
 ) -> Result<(), Error> {
-    validate_datatype_with_generics_for_mode(dt, types, &[], "<top-level>".to_string(), mode, false)
-}
-
-fn validate_datatype_with_generics_for_mode(
-    dt: &DataType,
-    types: &Types,
-    generics: &[specta::datatype::GenericDefinition],
-    path: String,
-    mode: ApplyMode,
-    follow_named_references: bool,
-) -> Result<(), Error> {
-    let generics = generics
-        .iter()
-        .map(|generic| {
-            (
-                Generic::new(generic.name.clone()),
-                DataType::Generic(Generic::new(generic.name.clone())),
-            )
-        })
-        .collect::<Vec<_>>();
-
     inner(
         dt,
         types,
-        &generics,
         &mut HashSet::new(),
-        path,
+        "<top-level>".to_string(),
         mode,
-        follow_named_references,
+        false,
     )
 }
 
 fn inner(
     dt: &DataType,
     types: &Types,
-    generics: &[(Generic, DataType)],
     checked_references: &mut HashSet<Reference>,
     path: String,
     mode: ApplyMode,
@@ -95,7 +79,6 @@ fn inner(
         DataType::Nullable(ty) => inner(
             ty,
             types,
-            generics,
             checked_references,
             path,
             mode,
@@ -105,7 +88,6 @@ fn inner(
             inner(
                 map.key_ty(),
                 types,
-                generics,
                 checked_references,
                 format!("{path}.<map_key>"),
                 mode,
@@ -114,7 +96,6 @@ fn inner(
             inner(
                 map.value_ty(),
                 types,
-                generics,
                 checked_references,
                 format!("{path}.<map_value>"),
                 mode,
@@ -125,7 +106,6 @@ fn inner(
             inner(
                 &list.ty,
                 types,
-                generics,
                 checked_references,
                 format!("{path}.<list_item>"),
                 mode,
@@ -136,7 +116,6 @@ fn inner(
             validate_container_attributes(
                 &strct.attributes,
                 types,
-                generics,
                 checked_references,
                 &path,
                 mode,
@@ -183,7 +162,6 @@ fn inner(
                         inner(
                             ty,
                             types,
-                            generics,
                             checked_references,
                             format!("{path}[{idx}]"),
                             mode,
@@ -207,7 +185,6 @@ fn inner(
                         inner(
                             ty,
                             types,
-                            generics,
                             checked_references,
                             format!("{path}.{name}"),
                             mode,
@@ -218,14 +195,7 @@ fn inner(
             }
         }
         DataType::Enum(enm) => {
-            validate_container_attributes(
-                &enm.attributes,
-                types,
-                generics,
-                checked_references,
-                &path,
-                mode,
-            )?;
+            validate_container_attributes(&enm.attributes, types, checked_references, &path, mode)?;
             if SerdeContainerAttrs::from_attributes(&enm.attributes)?
                 .is_some_and(|attrs| attrs.default)
             {
@@ -257,7 +227,6 @@ fn inner(
                             inner(
                                 ty,
                                 types,
-                                generics,
                                 checked_references,
                                 format!("{path}::{variant_name}.{name}"),
                                 mode,
@@ -287,7 +256,6 @@ fn inner(
                             inner(
                                 ty,
                                 types,
-                                generics,
                                 checked_references,
                                 format!("{path}::{variant_name}[{idx}]"),
                                 mode,
@@ -303,7 +271,6 @@ fn inner(
                 inner(
                     ty,
                     types,
-                    generics,
                     checked_references,
                     format!("{path}[{idx}]"),
                     mode,
@@ -316,7 +283,6 @@ fn inner(
                 inner(
                     ty,
                     types,
-                    generics,
                     checked_references,
                     format!("{path}.<intersection_{idx}>"),
                     mode,
@@ -335,7 +301,6 @@ fn inner(
                         inner(
                             dt,
                             types,
-                            generics,
                             checked_references,
                             format!("{path}.<generic>"),
                             mode,
@@ -350,13 +315,6 @@ fn inner(
                     let reference_key = Reference::Named(reference.clone());
                     checked_references.insert(reference_key);
                     if let Some(ty) = named_reference_ty(reference, types) {
-                        let merged_generics = match &reference.inner {
-                            NamedReferenceType::Reference {
-                                generics: reference_generics,
-                                ..
-                            } => merged_generics(generics, reference_generics),
-                            _ => generics.to_vec(),
-                        };
                         let name = types
                             .get(reference)
                             .map(|ndt| ndt.name.to_string())
@@ -364,7 +322,6 @@ fn inner(
                         inner(
                             ty,
                             types,
-                            &merged_generics,
                             checked_references,
                             name,
                             mode,
@@ -385,7 +342,6 @@ fn inner(
                     inner(
                         &phased.serialize,
                         types,
-                        generics,
                         checked_references,
                         format!("{path}.<phased_serialize>"),
                         mode,
@@ -394,7 +350,6 @@ fn inner(
                     inner(
                         &phased.deserialize,
                         types,
-                        generics,
                         checked_references,
                         format!("{path}.<phased_deserialize>"),
                         mode,
@@ -403,33 +358,7 @@ fn inner(
                 }
             }
         },
-        DataType::Generic(generic) => {
-            let Some((_, ty)) = generics.iter().find(|(candidate, _)| candidate == generic) else {
-                if !follow_named_references {
-                    return Ok(());
-                }
-
-                return Err(Error::unresolved_generic_reference(
-                    path,
-                    format!("{generic:?}"),
-                ));
-            };
-
-            if matches!(ty, DataType::Generic(inner) if inner == generic) {
-                return Ok(());
-            }
-
-            inner(
-                ty,
-                types,
-                generics,
-                checked_references,
-                format!("{path}.<generic_ref>"),
-                mode,
-                follow_named_references,
-            )?;
-        }
-        DataType::Primitive(_) => {}
+        DataType::Generic(_) | DataType::Primitive(_) => {}
     }
 
     Ok(())
@@ -497,7 +426,6 @@ fn validate_identifier_enum(enm: &Enum, path: &str, mode: ApplyMode) -> Result<(
 fn validate_container_attributes(
     attrs: &specta::datatype::Attributes,
     types: &Types,
-    generics: &[(Generic, DataType)],
     checked_references: &mut HashSet<Reference>,
     path: &str,
     mode: ApplyMode,
@@ -522,7 +450,6 @@ fn validate_container_attributes(
                 inner(
                     target,
                     types,
-                    generics,
                     checked_references,
                     format!("{path}.{suffix}"),
                     mode,
@@ -631,22 +558,6 @@ fn has_type_override(attributes: &specta::datatype::Attributes) -> bool {
         .get_named_as::<bool>("specta:type_override")
         .copied()
         .unwrap_or(false)
-}
-
-fn merged_generics(
-    parent: &[(Generic, DataType)],
-    child: &[(Generic, DataType)],
-) -> Vec<(Generic, DataType)> {
-    let unshadowed_parent = parent
-        .iter()
-        .filter(|(parent_generic, _)| {
-            !child
-                .iter()
-                .any(|(child_generic, _)| child_generic == parent_generic)
-        })
-        .cloned();
-
-    child.iter().cloned().chain(unshadowed_parent).collect()
 }
 
 fn validate_enum(enm: &Enum, types: &Types, path: String, mode: ApplyMode) -> Result<(), Error> {

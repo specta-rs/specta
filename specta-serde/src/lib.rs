@@ -194,11 +194,7 @@ fn apply(types: Types) -> Result<Types, Error> {
 }
 
 fn map_datatype<'a>(types: &'a Types, dt: &'a DataType) -> Result<Cow<'a, DataType>, FormatError> {
-    if let Err(err) = validate::validate_datatype_for_mode(dt, types, validate::ApplyMode::Unified)
-        && !err.is_unresolved_generic_reference()
-    {
-        return Err(err.into());
-    }
+    validate::validate_datatype_for_mode(dt, types, validate::ApplyMode::Unified)?;
 
     let mut dt = dt.clone();
     rewrite_datatype_for_phase(
@@ -219,12 +215,7 @@ fn map_phases_datatype<'a>(
 ) -> Result<Cow<'a, DataType>, FormatError> {
     let mut selected = select_phase_datatype(dt, types, Phase::Serialize);
 
-    if let Err(err) =
-        validate::validate_datatype_for_mode_shallow(&selected, types, validate::ApplyMode::Phases)
-        && !err.is_unresolved_generic_reference()
-    {
-        return Err(err.into());
-    }
+    validate::validate_datatype_for_mode_shallow(&selected, types, validate::ApplyMode::Phases)?;
 
     rewrite_datatype_for_phase(
         &mut selected,
@@ -416,7 +407,8 @@ fn apply_phases(types: Types) -> Result<Types, Error> {
     }
 
     for generated_types_for_phase in generated.values_mut() {
-        let serialize = register_generated_type(&mut out, generated_types_for_phase.serialize.clone());
+        let serialize =
+            register_generated_type(&mut out, generated_types_for_phase.serialize.clone());
         let deserialize = Box::new(register_generated_type(
             &mut out,
             (*generated_types_for_phase.deserialize).clone(),
@@ -2358,8 +2350,8 @@ mod tests {
             panic!("expected named reference");
         };
 
-        let actual = reference
-            .get(types)
+        let actual = types
+            .get(reference)
             .expect("reference should resolve")
             .name
             .as_ref();
@@ -2372,7 +2364,7 @@ mod tests {
             panic!("expected named reference");
         };
 
-        let named = reference.get(types).expect("reference should resolve");
+        let named = types.get(reference).expect("reference should resolve");
         let DataType::Struct(strct) = &named.ty else {
             panic!("expected struct type");
         };
@@ -2392,8 +2384,12 @@ mod tests {
             panic!("expected named reference with generics");
         };
 
-        reference
-            .generics
+        let specta::datatype::NamedReferenceType::Reference { generics, .. } = &reference.inner
+        else {
+            panic!("expected named reference with generics");
+        };
+
+        generics
             .first()
             .map(|(_, dt)| dt)
             .expect("expected first generic type")

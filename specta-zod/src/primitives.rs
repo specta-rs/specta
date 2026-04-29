@@ -16,22 +16,6 @@ use crate::{
 
 pub(crate) type TypeRenderStack = Vec<(Cow<'static, str>, Cow<'static, str>)>;
 
-fn merged_generics(
-    parent: &[(GenericReference, DataType)],
-    child: &[(GenericReference, DataType)],
-) -> Vec<(GenericReference, DataType)> {
-    let unshadowed_parent = parent
-        .iter()
-        .filter(|(parent_generic, _)| {
-            !child
-                .iter()
-                .any(|(child_generic, _)| child_generic == parent_generic)
-        })
-        .cloned();
-
-    child.iter().cloned().chain(unshadowed_parent).collect()
-}
-
 fn named_reference_generics(r: &NamedReference) -> Result<&[(GenericReference, DataType)], Error> {
     match &r.inner {
         NamedReferenceType::Reference { generics, .. } => Ok(generics),
@@ -310,15 +294,14 @@ fn datatype(
                 match r {
                     Reference::Named(named) => {
                         let ty = named_reference_ty(types, named)?;
-                        let combined_generics =
-                            merged_generics(generics, named_reference_generics(named)?);
+                        let reference_generics = named_reference_generics(named)?;
                         datatype(
                             s,
                             exporter,
                             types,
                             ty,
                             location,
-                            &combined_generics,
+                            reference_generics,
                             false,
                             type_render_stack,
                         )?;
@@ -824,14 +807,14 @@ fn reference_named_dt(
 
     if matches!(r.inner, NamedReferenceType::Inline { .. }) {
         let ty = named_reference_ty(types, r)?;
-        let combined_generics = merged_generics(generics, named_reference_generics(r)?);
+        let reference_generics = named_reference_generics(r)?;
         return datatype(
             s,
             exporter,
             types,
             ty,
             location,
-            &combined_generics,
+            reference_generics,
             false,
             type_render_stack,
         );

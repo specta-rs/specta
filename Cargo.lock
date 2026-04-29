@@ -766,6 +766,8 @@ dependencies = [
  "heapless",
  "serde",
  "specta",
+ "specta-serde",
+ "specta-typescript",
 ]
 
 [[package]]

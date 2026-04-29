@@ -33,7 +33,10 @@ use std::{borrow::Cow, sync::Arc};
 
 use specta::{
     Types,
-    datatype::{DataType, Fields, GenericReference, NamedReference, Primitive, Reference},
+    datatype::{
+        DataType, Fields, GenericReference, NamedReference, NamedReferenceType, Primitive,
+        Reference,
+    },
 };
 
 // TODO: Allow configuring custom named types via NDT name and module path using config params.
@@ -273,7 +276,7 @@ impl Analyzer {
                 }
             }
             DataType::Reference(Reference::Named(reference)) => {
-                if let Some(ndt) = reference.get(types) {
+                if let Some(ndt) = types.get(reference) {
                     if let Some(tag) = self.resolve_named_tag(&ndt.module_path, &ndt.name) {
                         return match tag {
                             KnownNamedTag::BigInt => PlanNode::Leaf(Tag::BigInt),
@@ -292,7 +295,11 @@ impl Analyzer {
                         return PlanNode::Identity;
                     };
 
-                    let out = self.analyze(ty, types, reference.generics(), stack);
+                    let generics = match &reference.inner {
+                        NamedReferenceType::Reference { generics, .. } => generics.as_slice(),
+                        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => &[],
+                    };
+                    let out = self.analyze(ty, types, generics, stack);
                     stack.pop();
                     out
                 } else {

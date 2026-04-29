@@ -337,7 +337,7 @@ fn needs_duration_helper(types: &Types) -> bool {
             for (_, field) in &fields.fields {
                 if let Some(ty) = field.ty.as_ref() {
                     if let DataType::Reference(Reference::Named(r)) = ty
-                        && let Some(referenced_ndt) = r.get(types)
+                        && let Some(referenced_ndt) = types.get(r)
                         && referenced_ndt.name == "Duration"
                     {
                         return true;

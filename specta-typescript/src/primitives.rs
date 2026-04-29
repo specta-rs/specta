@@ -574,22 +574,6 @@ pub(crate) fn datatype_with_inline_attr(
     )
 }
 
-fn merged_generics(
-    parent: &[(GenericReference, DataType)],
-    child: &[(GenericReference, DataType)],
-) -> Vec<(GenericReference, DataType)> {
-    let unshadowed_parent = parent
-        .iter()
-        .filter(|(parent_generic, _)| {
-            !child
-                .iter()
-                .any(|(child_generic, _)| child_generic == parent_generic)
-        })
-        .cloned();
-
-    child.iter().cloned().chain(unshadowed_parent).collect()
-}
-
 fn write_generic_reference(s: &mut String, generic: &GenericReference) {
     s.push_str(generic.name());
 }
@@ -853,7 +837,7 @@ fn shallow_inline_datatype(
         DataType::Reference(r) => match r {
             Reference::Named(r) => {
                 let ty = named_reference_ty(types, r)?;
-                let combined_generics = merged_generics(generics, named_reference_generics(r)?);
+                let reference_generics = named_reference_generics(r)?;
                 shallow_inline_datatype(
                     s,
                     exporter,
@@ -863,7 +847,7 @@ fn shallow_inline_datatype(
                     location,
                     parent_name,
                     prefix,
-                    &combined_generics,
+                    reference_generics,
                 )
             }
             Reference::Opaque(_) => {
@@ -1091,7 +1075,7 @@ fn inline_datatype(
             if let Reference::Named(r) = r
                 && let Ok(ty) = named_reference_ty(types, r)
             {
-                let combined_generics = merged_generics(generics, named_reference_generics(r)?);
+                let reference_generics = named_reference_generics(r)?;
                 inline_datatype(
                     s,
                     exporter,
@@ -1102,7 +1086,7 @@ fn inline_datatype(
                     parent_name,
                     prefix,
                     depth + 1,
-                    &combined_generics,
+                    reference_generics,
                 )?;
             } else {
                 reference_dt(s, exporter, format, types, r, location, prefix, generics)?;

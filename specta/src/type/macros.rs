@@ -367,27 +367,11 @@ macro_rules! _impl_ndt {
     };
 
     // Helpers for determining NDT name
-    (@type_name $name:ident) => {
-        stringify!($name)
-    };
     (@type_name $head:ident :: $( $tail:ident )::+ $(< $( $lifetime:lifetime, )* $( $generic:ident ),* $(,)? >)?) => {
         impl_ndt!(@type_name $( $tail )::+ $(< $( $lifetime, )* $( $generic ),* >)?)
     };
-    (@type_name $name:ident < >) => {
+    (@type_name $name:ident $(< $( $lifetime:lifetime, )* $( $generic:ident ),* $(,)? >)?) => {
         stringify!($name)
-    };
-    (@type_name $name:ident < $( $lifetime:lifetime, )+ >) => {
-        stringify!($name)
-    };
-    (@type_name $name:ident < $( $lifetime:lifetime, )* $generic:ident $(, $rest:ident)* $(,)? >) => {
-        concat!(
-            stringify!($name),
-            "<",
-            stringify!($generic)
-            $(, ", ", stringify!($rest))*
-            ,
-            ">"
-        )
     };
 
     // Helpers for determining NDT module path

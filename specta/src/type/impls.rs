@@ -132,7 +132,7 @@ const _: () = {
 
         std::convert::Infallible as BaseInfallible = inline;
         std::marker::PhantomData<T> as () = inline;
-        std::borrow::Cow<'a, T> where { T: Type + ?Sized + ToOwned + 'a } as T = named;
+        std::borrow::Cow<'a, T> where { T: Type + ?Sized + ToOwned + 'a } as T = inline;
 
         std::result::Result<T, E> as BaseResult<T, E> = named;
     );
