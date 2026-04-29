@@ -608,7 +608,7 @@ const _: () = {
                     (
                         "Int64".into(),
                         Variant::unnamed()
-                            .field(Field::new(f64::definition(types)))
+                            .field(Field::new(i64::definition(types)))
                             .build(),
                     ),
                     (

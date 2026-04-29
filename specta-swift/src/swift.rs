@@ -1,6 +1,6 @@
 //! Swift language exporter configuration and main export functionality.
 
-use std::{borrow::Cow, fmt, path::Path, sync::Arc};
+use std::{borrow::Cow, fmt, path::Path};
 
 use specta::{
     Format, Types,
@@ -25,7 +25,6 @@ pub struct Swift {
     pub optionals: OptionalStyle,
     /// Additional protocols to conform to.
     pub protocols: Vec<Cow<'static, str>>,
-    pub(crate) format: Option<Arc<dyn Format>>,
 }
 
 impl fmt::Debug for Swift {
@@ -37,7 +36,6 @@ impl fmt::Debug for Swift {
             .field("generics", &self.generics)
             .field("optionals", &self.optionals)
             .field("protocols", &self.protocols)
-            .field("format", &self.format.is_some())
             .finish()
     }
 }
@@ -98,7 +96,6 @@ impl Default for Swift {
             generics: GenericStyle::default(),
             optionals: OptionalStyle::default(),
             protocols: vec![],
-            format: None,
         }
     }
 }
@@ -146,11 +143,9 @@ impl Swift {
     }
 
     /// Export types to a Swift string.
-    pub fn export(&self, types: &Types, format: impl Format + 'static) -> Result<String, Error> {
-        let mut exporter = self.clone();
-        exporter.format = Some(Arc::new(format));
-        let formatted_types = exporter.format_types(types)?.into_owned();
-        exporter.format = None;
+    pub fn export(&self, types: &Types, format: impl Format) -> Result<String, Error> {
+        let exporter = self.clone();
+        let formatted_types = format_types(types, &format)?.into_owned();
         let raw_types = &formatted_types;
 
         let mut result = String::new();
@@ -175,7 +170,7 @@ impl Swift {
 
         // Export types
         for ndt in raw_types.into_sorted_iter() {
-            let exported = export_type(&exporter, raw_types, ndt)?;
+            let exported = export_type(&exporter, Some(&format), raw_types, ndt)?;
             if !exported.is_empty() {
                 result.push_str(&exported);
                 result.push_str("\n\n");
@@ -190,22 +185,18 @@ impl Swift {
         &self,
         path: impl AsRef<Path>,
         types: &Types,
-        format: impl Format + 'static,
+        format: impl Format,
     ) -> Result<(), Error> {
         let content = self.export(types, format)?;
         std::fs::write(path, content)?;
         Ok(())
     }
+}
 
-    pub(crate) fn format_types<'a>(&'a self, types: &'a Types) -> Result<Cow<'a, Types>, Error> {
-        let Some(format) = &self.format else {
-            return Ok(Cow::Borrowed(types));
-        };
-
-        format
-            .map_types(types)
-            .map_err(|err| Error::format("type graph formatter failed", err))
-    }
+fn format_types<'a>(types: &'a Types, format: &'a dyn Format) -> Result<Cow<'a, Types>, Error> {
+    format
+        .map_types(types)
+        .map_err(|err| Error::format("type graph formatter failed", err))
 }
 
 impl NamingConvention {

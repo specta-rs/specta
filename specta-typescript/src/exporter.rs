@@ -217,7 +217,7 @@ impl Exporter {
 
         // User types (if not included in framework runtime)
         if !has_manually_exported_user_types {
-            render_types(&mut out, &exporter, types, "")?;
+            render_types(&mut out, &exporter, Some(&format), types, "")?;
         }
 
         Ok(out)
@@ -262,7 +262,7 @@ impl Exporter {
             }
 
             if !has_manually_exported_user_types {
-                render_types(&mut result, &exporter, types, "")?;
+                render_types(&mut result, &exporter, Some(&format), types, "")?;
             }
 
             if let Some(parent) = path.parent() {
@@ -274,6 +274,7 @@ impl Exporter {
 
         fn export(
             exporter: &Exporter,
+            format: Option<&dyn Format>,
             types: &Types,
             module: &mut Module,
             s: &mut String,
@@ -293,6 +294,7 @@ impl Exporter {
                         let exports = render_flat_types(
                             &mut rendered,
                             exporter,
+                            format,
                             types,
                             module.types.iter().copied(),
                             "",
@@ -335,7 +337,7 @@ impl Exporter {
                 let mut path = path.join(name);
                 let mut out = render_file_header(exporter)?;
 
-                let has_types = export(exporter, types, module, &mut out, &path, files)?;
+                let has_types = export(exporter, format, types, module, &mut out, &path, files)?;
                 if has_types {
                     path.set_extension(if exporter.jsdoc { "js" } else { "ts" });
                     files.insert(path, out);
@@ -352,6 +354,7 @@ impl Exporter {
         let mut root_types = String::new();
         export(
             &exporter,
+            Some(&format),
             types,
             &mut build_module_graph(types),
             &mut root_types,
@@ -778,7 +781,13 @@ impl FrameworkExporter<'_> {
     /// It allows frameworks to intersperse their user types into their runtime code.
     pub fn render_types(&mut self) -> Result<Cow<'static, str>, Error> {
         let mut s = String::new();
-        render_types(&mut s, self.exporter, self.types, self.files_root_types)?;
+        render_types(
+            &mut s,
+            self.exporter,
+            self.format,
+            self.types,
+            self.files_root_types,
+        )?;
         *self.has_manually_exported_user_types = true;
         Ok(Cow::Owned(s))
     }
@@ -870,6 +879,7 @@ fn render_file_header(exporter: &Exporter) -> Result<String, Error> {
 fn render_types(
     s: &mut String,
     exporter: &Exporter,
+    format: Option<&dyn Format>,
     types: &Types,
     files_user_types: &str,
 ) -> Result<(), Error> {
@@ -885,6 +895,7 @@ fn render_types(
 
             fn export<'a>(
                 exporter: &Exporter,
+                format: Option<&dyn Format>,
                 types: &Types,
                 s: &mut String,
                 module: impl ExactSizeIterator<Item = (&'a &'a str, &'a mut Module<'a>)>,
@@ -917,13 +928,21 @@ fn render_types(
                     render_flat_types(
                         s,
                         exporter,
+                        format,
                         types,
                         module.types.iter().copied(),
                         &content_indent,
                     )?;
 
                     // Namespaces
-                    export(exporter, types, s, module.children.iter_mut(), depth + 1)?;
+                    export(
+                        exporter,
+                        format,
+                        types,
+                        s,
+                        module.children.iter_mut(),
+                        depth + 1,
+                    )?;
 
                     s.push_str(&namespace_indent);
                     s.push_str("}\n");
@@ -959,11 +978,18 @@ fn render_types(
                 reexports
             };
 
-            export(exporter, types, s, [(&"$s$", &mut module)].into_iter(), 0)?;
+            export(
+                exporter,
+                format,
+                types,
+                s,
+                [(&"$s$", &mut module)].into_iter(),
+                0,
+            )?;
             s.push_str(&reexports);
         }
         Layout::ModulePrefixedName | Layout::FlatFile => {
-            render_flat_types(s, exporter, types, types.into_sorted_iter(), "")?;
+            render_flat_types(s, exporter, format, types, types.into_sorted_iter(), "")?;
         }
         // The types will get their own files
         // So we keep the user types empty for easy downstream detection.
@@ -982,6 +1008,7 @@ fn render_types(
 fn render_flat_types<'a>(
     s: &mut String,
     exporter: &Exporter,
+    format: Option<&dyn Format>,
     types: &Types,
     ndts: impl ExactSizeIterator<Item = &'a NamedDataType>,
     indent: &str,
@@ -1000,7 +1027,7 @@ fn render_flat_types<'a>(
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    primitives::export_internal(s, exporter, None, types, ndts.into_iter(), indent)?;
+    primitives::export_internal(s, exporter, format, types, ndts.into_iter(), indent)?;
 
     Ok(exports)
 }

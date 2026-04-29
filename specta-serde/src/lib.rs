@@ -202,6 +202,10 @@ impl specta::Format for Format {
     }
 
     fn map_type(&'_ self, types: &Types, dt: &DataType) -> Result<Cow<'_, DataType>, FormatError> {
+        if datatype_is_registered_definition(types, dt) {
+            return Ok(Cow::Owned(dt.clone()));
+        }
+
         validate::validate_datatype_for_mode(dt, types, validate::ApplyMode::Unified)?;
 
         let mut dt = dt.clone();
@@ -501,6 +505,10 @@ impl specta::Format for PhasesFormat {
     }
 
     fn map_type(&'_ self, types: &Types, dt: &DataType) -> Result<Cow<'_, DataType>, FormatError> {
+        if datatype_is_registered_definition(types, dt) {
+            return Ok(Cow::Owned(dt.clone()));
+        }
+
         let mut selected = select_phase_datatype(dt, types, Phase::Serialize);
 
         validate::validate_datatype_for_mode_shallow(
@@ -520,6 +528,12 @@ impl specta::Format for PhasesFormat {
 
         Ok(Cow::Owned(selected))
     }
+}
+
+fn datatype_is_registered_definition(types: &Types, dt: &DataType) -> bool {
+    types
+        .into_unsorted_iter()
+        .any(|ndt| ndt.ty.as_ref() == Some(dt))
 }
 
 /// Rewrites a [`DataType`] to the requested directional shape for [`PhasesFormat`].
@@ -567,11 +581,11 @@ impl specta::Format for PhasesFormat {
 /// };
 ///
 /// assert_eq!(
-///     serialize_reference.get(&resolved).unwrap().name,
+///     resolved.get(serialize_reference).unwrap().name,
 ///     "Filters_Serialize"
 /// );
 /// assert_eq!(
-///     deserialize_reference.get(&resolved).unwrap().name,
+///     resolved.get(deserialize_reference).unwrap().name,
 ///     "Filters_Deserialize"
 /// );
 /// # Ok::<(), specta_serde::Error>(())
@@ -1133,6 +1147,20 @@ fn rewrite_struct_repr_for_phase(
         return Ok(());
     };
 
+    let Fields::Named(named) = &mut strct.fields else {
+        return Ok(());
+    };
+
+    if named.fields.iter().any(|(name, field)| {
+        name.as_ref() == tag
+            && field
+                .ty
+                .as_ref()
+                .is_some_and(is_generated_string_literal_datatype)
+    }) {
+        return Ok(());
+    }
+
     let serialized_name = match select_phase_string(
         mode,
         rename_serialize.as_deref(),
@@ -1149,10 +1177,6 @@ fn rewrite_struct_repr_for_phase(
                     "`#[serde(tag = ...)]` on structs requires either a named type or `#[serde(rename = ...)]`",
                 )
             })?,
-    };
-
-    let Fields::Named(named) = &mut strct.fields else {
-        return Ok(());
     };
 
     named.fields.insert(
@@ -1208,6 +1232,10 @@ fn rewrite_enum_repr_for_phase(
     mode: PhaseRewrite,
     original_types: &Types,
 ) -> Result<(), Error> {
+    if enum_repr_already_rewritten(e) {
+        return Ok(());
+    }
+
     let repr = EnumRepr::from_attrs(&e.attributes)?;
     if matches!(repr, EnumRepr::Untagged) {
         return Ok(());
@@ -1276,6 +1304,33 @@ fn rewrite_enum_repr_for_phase(
     e.attributes = Default::default();
 
     Ok(())
+}
+
+fn enum_repr_already_rewritten(e: &Enum) -> bool {
+    e.attributes.is_empty()
+        && !e.variants.is_empty()
+        && e.variants
+            .iter()
+            .all(|(name, variant)| variant.attributes.is_empty() && variant_repr_already_rewritten(name, variant))
+}
+
+fn variant_repr_already_rewritten(name: &str, variant: &Variant) -> bool {
+    match &variant.fields {
+        Fields::Unit => false,
+        Fields::Unnamed(fields) if fields.fields.len() == 1 => fields
+            .fields
+            .first()
+            .and_then(|field| field.ty.as_ref())
+            .is_some_and(is_generated_string_literal_datatype),
+        Fields::Named(fields) => fields.fields.iter().any(|(field_name, field)| {
+            field_name == name
+                || field
+                    .ty
+                    .as_ref()
+                    .is_some_and(is_generated_string_literal_datatype)
+        }),
+        _ => false,
+    }
 }
 
 fn rewrite_identifier_enum_for_phase(
@@ -1774,6 +1829,30 @@ fn string_literal_datatype(value: String) -> DataType {
         .variants
         .push((Cow::Owned(value), Variant::unit()));
     DataType::Enum(value_enum)
+}
+
+fn is_generated_string_literal_datatype(ty: &DataType) -> bool {
+    let DataType::Enum(e) = ty else {
+        return false;
+    };
+
+    let Some((_, variant)) = e.variants.first() else {
+        return false;
+    };
+
+    if e.variants.len() != 1 {
+        return false;
+    }
+
+    match &variant.fields {
+        Fields::Unit => true,
+        Fields::Unnamed(fields) if fields.fields.len() == 1 => fields
+            .fields
+            .first()
+            .and_then(|field| field.ty.as_ref())
+            .is_some_and(is_generated_string_literal_datatype),
+        _ => false,
+    }
 }
 
 fn variant_has_effective_payload(variant: &Variant) -> bool {

@@ -273,7 +273,7 @@ fn test_function_exporting() {
                 .map(|result| render_datatype(&ts, &types, result))
                 .as_deref()
                 .unwrap_or("None"),
-            @"({ Ok: string }) & { Err?: never } | ({ Err: number }) & { Ok?: never }"
+            @"Result<string, number>"
         );
     }
 
