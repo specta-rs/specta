@@ -6,7 +6,10 @@ use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{FnArg, ItemFn, Pat, Visibility, parse};
 
-use crate::utils::{format_fn_wrapper, parse_attrs};
+use crate::{
+    r#type::attr::deprecated_as_tokens,
+    utils::{format_fn_wrapper, parse_attrs},
+};
 
 fn unraw(s: &str) -> &str {
     if s.starts_with("r#") {
@@ -89,7 +92,12 @@ pub fn attribute(item: proc_macro::TokenStream) -> syn::Result<proc_macro::Token
     let mut attrs = parse_attrs(&function.attrs)?;
     let common = crate::r#type::attr::RustCAttr::from_attrs(&mut attrs)?;
 
-    let deprecated = common.deprecated_as_tokens();
+    let deprecated = if let Some(deprecated) = common.deprecated {
+        let tokens = deprecated_as_tokens(deprecated);
+        quote!(Some(#tokens))
+    } else {
+        quote!(None)
+    };
     let docs = common.doc;
 
     let no_return_type = match function.sig.output {

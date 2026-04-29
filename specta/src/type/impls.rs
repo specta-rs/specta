@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::{
     Type, Types,
-    datatype::{self, DataType, Enum, Field, List},
+    datatype::{self, DataType, List},
     r#type::macros::*,
 };
 
@@ -33,6 +33,7 @@ impl Type for f128 {
 // Technically we only support 12-tuples but the `T13` is required due to how the macro works
 impl_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13);
 
+#[allow(dead_code)]
 pub(crate) struct PrimitiveSet<T>(PhantomData<T>);
 impl<T: Type> Type for PrimitiveSet<T> {
     fn definition(types: &mut Types) -> DataType {
@@ -42,6 +43,7 @@ impl<T: Type> Type for PrimitiveSet<T> {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) struct PrimitiveMap<K, V>(PhantomData<K>, PhantomData<V>);
 impl<K: Type, V: Type> Type for PrimitiveMap<K, V> {
     fn definition(types: &mut Types) -> DataType {
@@ -55,6 +57,8 @@ impl<K: Type, V: Type> Type for PrimitiveMap<K, V> {
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 const _: () = {
+    use crate::datatype::{Enum, Field};
+
     impl_ndt!(
         std::string::String as str = inline;
 

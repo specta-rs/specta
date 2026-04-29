@@ -29,7 +29,7 @@ std = []
 derive = ["dep:specta-macros"]
 
 ## Support for collecting up a global type map
-collect = ["dep:ctor", "specta-macros/DO_NOT_USE_collect"]
+collect = ["dep:small_ctor", "specta-macros/DO_NOT_USE_collect"]
 
 #! Features
 ## Support for exporting the types of Rust functions.
@@ -112,7 +112,7 @@ workspace = true
 specta-macros = { version = "=2.0.0-rc.24", optional = true, path = "../specta-macros" }
 paste = { version = "1", optional = true }
 
-ctor = { version = "0.10.1", default-features = false, optional = true, features = ["proc_macro"] }
+small_ctor = { version = "0.1.2", optional = true }
 
 # TODO: To be deprecated
 serde_json = { version = "1", optional = true, default-features = false, features = ["std"] }

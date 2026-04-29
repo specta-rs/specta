@@ -9,8 +9,8 @@ use crate::utils::{AttrExtract, parse_attrs, unraw_raw_ident};
 
 use self::generics::{
     add_type_to_where_clause, all_type_param_idents, generics_with_ident_and_bounds_only,
-    generics_with_ident_only, has_associated_type_usage, used_associated_type_paths,
-    used_direct_type_params, used_type_params,
+    generics_with_ident_only, generics_with_ident_only_and_const_ty, has_associated_type_usage,
+    type_where_clause, used_associated_type_paths, used_direct_type_params, used_type_params,
 };
 
 pub(crate) mod attr;
@@ -31,9 +31,10 @@ pub(super) enum AttributeScope {
 pub(super) fn build_runtime_attributes(
     crate_ref: &TokenStream,
     scope: AttributeScope,
+    attrs: TokenStream,
     raw_attrs: &[syn::Attribute],
     skip_attrs: &[String],
-) -> syn::Result<TokenStream> {
+) -> syn::Result<Option<TokenStream>> {
     let metas = raw_attrs
         .iter()
         .filter(|attr| {
@@ -53,14 +54,13 @@ pub(super) fn build_runtime_attributes(
     };
 
     if metas.is_empty() && serde_insert.is_none() {
-        return Ok(quote!(datatype::Attributes::default()));
+        return Ok(None);
     }
 
-    Ok(quote!({
-        let mut attrs = datatype::Attributes::default();
+    Ok(Some(quote!({
+        let attrs = &mut #attrs;
         #serde_insert
-        attrs
-    }))
+    })))
 }
 
 pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenStream> {
@@ -144,9 +144,29 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     let container_runtime_attrs = build_runtime_attributes(
         &crate_ref,
         AttributeScope::Container,
+        quote!(s.attributes),
         raw_attrs,
         &container_attrs.skip_attrs,
     )?;
+    let enum_runtime_attrs = build_runtime_attributes(
+        &crate_ref,
+        AttributeScope::Container,
+        quote!(en.attributes),
+        raw_attrs,
+        &container_attrs.skip_attrs,
+    )?;
+    let container_runtime_attrs =
+        if container_runtime_attrs.is_some() || enum_runtime_attrs.is_some() {
+            quote! {
+                match &mut e {
+                    datatype::DataType::Struct(s) => { #container_runtime_attrs }
+                    datatype::DataType::Enum(en) => { #enum_runtime_attrs }
+                    _ => unreachable!("specta derive generated non-container datatype"),
+                }
+            }
+        } else {
+            quote!()
+        };
 
     let dt_expr = if let Some(container_ty) = &container_attrs.r#type {
         quote!(<#container_ty as #crate_ref::Type>::definition(types))
@@ -160,21 +180,16 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             )),
         }?;
 
-        quote!(
-            {
+        quote! {
                 let mut e = #dt_expr;
-                match &mut e {
-                    datatype::DataType::Struct(s) => s.attributes = #container_runtime_attrs,
-                    datatype::DataType::Enum(en) => en.attributes = #container_runtime_attrs,
-                    _ => unreachable!("specta derive generated non-container datatype"),
-                }
+                #container_runtime_attrs
                 e
-            }
-        )
+        }
     };
 
     let bounds = generics_with_ident_and_bounds_only(generics);
     let type_args = generics_with_ident_only(generics);
+    let build_ty_bounds = generics_with_ident_only_and_const_ty(generics);
     let has_const_param = generics
         .params
         .iter()
@@ -191,6 +206,40 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         used_direct_generics,
         used_associated_paths,
     );
+    let build_ty_where_bound = type_where_clause(
+        &quote!(#crate_ref::Type),
+        used_direct_generics,
+        used_associated_paths,
+    );
+
+    let build_ty_placeholder_args = generics
+        .params
+        .iter()
+        .any(|param| matches!(param, GenericParam::Type(_) | GenericParam::Const(_)))
+        .then(|| {
+            let args = generics.params.iter().filter_map(|param| match param {
+                GenericParam::Lifetime(_) => None,
+                GenericParam::Const(t) => Some(t.ident.to_token_stream()),
+                GenericParam::Type(t) => {
+                    Some(format_ident!("PLACEHOLDER_{}", t.ident).to_token_stream())
+                }
+            });
+
+            quote!(::<#(#args),*>)
+        });
+    let build_ty_passthrough_args = generics
+        .params
+        .iter()
+        .any(|param| matches!(param, GenericParam::Type(_) | GenericParam::Const(_)))
+        .then(|| {
+            let args = generics.params.iter().filter_map(|param| match param {
+                GenericParam::Lifetime(_) => None,
+                GenericParam::Const(t) => Some(t.ident.to_token_stream()),
+                GenericParam::Type(t) => Some(t.ident.to_token_stream()),
+            });
+
+            quote!(::<#(#args),*>)
+        });
 
     let (generic_placeholders, shadow_generics): (Vec<_>, Vec<_>) = generics
         .params
@@ -223,7 +272,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             GenericParam::Lifetime(_) | GenericParam::Const(_) => Ok(None),
             GenericParam::Type(t) => {
                 let i = &t.ident;
-                let i_str = i.to_string();
 
                 let skip_default = parse_attrs(&t.attrs)?
                     .extract("specta", "skip_default_generic")
@@ -261,45 +309,65 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         .flatten()
         .collect::<(Vec<_>, Vec<_>)>();
 
-    let collect = (cfg!(feature = "DO_NOT_USE_collect") && container_attrs.collect.unwrap_or(true))
-        .then(|| {
-            let export_fn_name = format_ident!("__push_specta_type_{}", raw_ident);
+    let collect = (cfg!(feature = "DO_NOT_USE_collect")
+        && !container_attrs.inline
+        && container_attrs.collect.unwrap_or(true))
+    .then(|| {
+        let export_fn_name = format_ident!("__push_specta_type_{}", raw_ident);
 
-            let generic_params = generics
-                .params
-                .iter()
-                .filter(|param| matches!(param, syn::GenericParam::Type(_)))
-                .map(|_| quote! { () });
+        let generic_params = generics
+            .params
+            .iter()
+            .filter(|param| matches!(param, syn::GenericParam::Type(_)))
+            .map(|_| quote! { () });
 
-            quote! {
-                #[allow(unsafe_code, non_snake_case)]
-                #[#crate_ref::collect::internal::ctor::ctor(unsafe, anonymous, crate_path = #crate_ref::collect::internal::ctor)]
-                fn #export_fn_name() {
-                    #crate_ref::collect::internal::register::<#ident<#(#generic_params),*>>();
-                }
+        quote! {
+            #[allow(unsafe_code, non_snake_case)]
+            #[#crate_ref::collect::internal::small_ctor::ctor]
+            unsafe fn #export_fn_name() {
+                #crate_ref::collect::internal::register::<#ident<#(#generic_params),*>>();
             }
-        });
-
-    let inline = container_attrs.inline;
-    let comments = &container_attrs.common.doc;
-    let deprecated = container_attrs.common.deprecated_as_tokens();
+        }
+    });
 
     let shadow_generic_aliases = if has_associated_type_usage(&used_generic_types) {
         quote!()
     } else {
         quote!(#(#shadow_generics)*)
     };
+    let ndt_build_ty_args = if has_associated_type_usage(&used_generic_types) {
+        &build_ty_passthrough_args
+    } else {
+        &build_ty_placeholder_args
+    };
 
     // TODO: Avoid emitting `dt_expr` twice into the codegen output
+
+    let generics = (!generics_for_ndt.is_empty()).then(|| {
+        quote! {
+            static GENERICS: &[datatype::GenericDefinition] = &[#(#generics_for_ndt),*];
+            ndt.generics = Cow::Borrowed(GENERICS);
+        }
+    });
+    let docs = (!container_attrs.common.doc.is_empty()).then(|| {
+        let docs = &container_attrs.common.doc;
+        quote! {
+            ndt.docs = Cow::Borrowed(#docs);
+        }
+    });
+    let deprecated = container_attrs.common.deprecated.map(|deprecated| {
+        let tokens = deprecated_as_tokens(deprecated);
+        quote!(ndt.deprecated = #tokens;)
+    });
 
     let ndt_ty = (!container_attrs.inline).then(|| {
         quote! {
             #(#generic_placeholders)*
+            #shadow_generic_aliases
 
-            ndt.ty = Some(#dt_expr);
+            ndt.ty = Some(build #ndt_build_ty_args (types));
         }
     });
-
     let definition = quote! {
         datatype::DataType::Reference(
             datatype::NamedDataType::init_with_sentinel(
@@ -311,14 +379,13 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
                 |types, ndt| {
                     ndt.name = Cow::Borrowed(#name);
                     ndt.module_path = Cow::Borrowed(module_path!());
-                    ndt.generics = Cow::Borrowed(GENERICS);
-                    ndt.docs = Cow::Borrowed(#comments);
-                    ndt.deprecated = #deprecated;
+                    #generics
+                    #docs
+                    #deprecated;
+
                     #ndt_ty
                 },
-                |types| {
-                    #dt_expr
-                }
+                build #build_ty_passthrough_args
             )
         )
     };
@@ -330,23 +397,23 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
     };
 
     Ok(quote! {
-        #[allow(non_camel_case_types)]
-        const _: () = {
-            use std::borrow::Cow;
-            use #crate_ref::datatype;
+        #[automatically_derived]
+        impl #bounds #crate_ref::Type for #ident #type_args #where_bound {
+            fn definition(types: &mut #crate_ref::Types) -> #crate_ref::datatype::DataType {
+                use std::borrow::Cow;
+                use #crate_ref::datatype;
 
-            #[automatically_derived]
-            impl #bounds #crate_ref::Type for #ident #type_args #where_bound {
-                fn definition(types: &mut #crate_ref::Types) -> datatype::DataType {
-                    static SENTINEL: &str = concat!(module_path!(), "::", stringify!(#raw_ident));
-                    static GENERICS: &[datatype::GenericDefinition] = &[#(#generics_for_ndt),*];
+                static SENTINEL: &str = concat!(module_path!(), "::", stringify!(#raw_ident));
 
-                    #definition
+                fn build #build_ty_bounds (types: &mut #crate_ref::Types) -> datatype::DataType #build_ty_where_bound {
+                    #dt_expr
                 }
-            }
 
-            #collect
-        };
+                #definition
+            }
+        }
+
+        #collect
 
     }
     .into())

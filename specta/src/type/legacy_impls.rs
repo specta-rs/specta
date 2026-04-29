@@ -1,13 +1,10 @@
-use crate::{
-    Type, Types,
-    datatype::{
-        self, DataType, Enum, Field, Fields, List, NamedFields, Primitive, Struct, Variant,
-    },
-    r#type::{impls::*, macros::impl_ndt},
-};
+use crate::{Type, Types};
+#[allow(unused_imports)]
+use crate::{datatype::*, r#type::impls::*, r#type::macros::impl_ndt};
 
 // `String` requires `std` feature, while `str` does not.
 // We can't use `str` in a lot of places because it's not `Sized`, so this bridges that.
+#[allow(unused)]
 pub struct String;
 impl Type for String {
     fn definition(types: &mut Types) -> DataType {
@@ -17,10 +14,12 @@ impl Type for String {
 
 #[cfg(feature = "indexmap")]
 #[cfg_attr(docsrs, doc(cfg(feature = "indexmap")))]
-impl_ndt!(
-    indexmap::IndexSet<T> as PrimitiveSet<T> = inline_passthrough;
-    indexmap::IndexMap<K, V> as PrimitiveMap<K, V> = inline_passthrough;
-);
+const _: () = {
+    impl_ndt!(
+        indexmap::IndexSet<T> as PrimitiveSet<T> = inline_passthrough;
+        indexmap::IndexMap<K, V> as PrimitiveMap<K, V> = inline_passthrough;
+    );
+};
 
 #[cfg(feature = "ordered-float")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ordered-float")))]
@@ -31,23 +30,25 @@ impl_ndt!(
 
 #[cfg(feature = "heapless")]
 #[cfg_attr(docsrs, doc(cfg(feature = "heapless")))]
-impl_ndt!(
-    // Sequential containers
-    heapless::Vec<T> <T, const N: usize, LenT> where { T: Type, LenT: heapless::LenType } as [T; N] = inline_passthrough;
-    heapless::Deque<T> <T, const N: usize> where { T: Type } as [T; N] = inline_passthrough;
-    heapless::HistoryBuf<T> <T, const N: usize> where { T: Type } as [T; N] = inline_passthrough;
-    heapless::BinaryHeap<T, K> <T, K, const N: usize> where { T: Type + Ord, K: heapless::binary_heap::Kind } as [T; N] = inline_passthrough;
+const _: () = {
+    impl_ndt!(
+        // Sequential containers
+        heapless::Vec<T> <T, const N: usize, LenT> where { T: Type, LenT: heapless::LenType } as [T; N] = inline_passthrough;
+        heapless::Deque<T> <T, const N: usize> where { T: Type } as [T; N] = inline_passthrough;
+        heapless::HistoryBuf<T> <T, const N: usize> where { T: Type } as [T; N] = inline_passthrough;
+        heapless::BinaryHeap<T, K> <T, K, const N: usize> where { T: Type + Ord, K: heapless::binary_heap::Kind } as [T; N] = inline_passthrough;
 
-    // Sets
-    heapless::IndexSet<T, S> <T, S, const N: usize> where { T: Type + Eq + core::hash::Hash, S: core::hash::BuildHasher } as PrimitiveSet<T> = inline_passthrough;
+        // Sets
+        heapless::IndexSet<T, S> <T, S, const N: usize> where { T: Type + Eq + core::hash::Hash, S: core::hash::BuildHasher } as PrimitiveSet<T> = inline_passthrough;
 
-    // Maps
-    heapless::IndexMap<K, V, S> <K, V, S, const N: usize> where { K: Type + Eq + core::hash::Hash, V: Type, S: core::hash::BuildHasher } as PrimitiveMap<K, V> = inline_passthrough;
-    heapless::LinearMap<K, V> <K, V, const N: usize> where { K: Type + Eq, V: Type } as PrimitiveMap<K, V> = inline_passthrough;
+        // Maps
+        heapless::IndexMap<K, V, S> <K, V, S, const N: usize> where { K: Type + Eq + core::hash::Hash, V: Type, S: core::hash::BuildHasher } as PrimitiveMap<K, V> = inline_passthrough;
+        heapless::LinearMap<K, V> <K, V, const N: usize> where { K: Type + Eq, V: Type } as PrimitiveMap<K, V> = inline_passthrough;
 
-    // String container
-    heapless::String <const N: usize, LenT> where { LenT: heapless::LenType } as str = inline;
-);
+        // String container
+        heapless::String <const N: usize, LenT> where { LenT: heapless::LenType } as str = inline;
+    );
+};
 
 #[cfg(feature = "semver")]
 #[cfg_attr(docsrs, doc(cfg(feature = "semver")))]
@@ -156,7 +157,7 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: datatype::Attributes::default(),
+                attributes: Attributes::default(),
             })
         }
     }
@@ -217,7 +218,7 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: datatype::Attributes::default(),
+                attributes: Attributes::default(),
             })
         }
     }
@@ -246,7 +247,7 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: datatype::Attributes::default(),
+                attributes: Attributes::default(),
             })
         }
     }
@@ -331,7 +332,7 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: datatype::Attributes::default(),
+                attributes: Attributes::default(),
             })
         }
     }
@@ -687,7 +688,7 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: datatype::Attributes::default(),
+                attributes: Attributes::default(),
             })
         }
     }
@@ -702,6 +703,8 @@ impl_ndt!(bytesize::ByteSize as String = inline);
 #[cfg(feature = "uhlc")]
 #[cfg_attr(docsrs, doc(cfg(feature = "uhlc")))]
 const _: () = {
+    use crate::{datatype, r#type::macros::impl_ndt, *};
+
     impl_ndt!(
         uhlc::NTP64 as u64 = inline;
         uhlc::ID as std::num::NonZeroU128 = inline;
@@ -721,7 +724,7 @@ const _: () = {
                                 deprecated: None,
                                 docs: Default::default(),
                                 ty: Some(uhlc::NTP64::definition(types)),
-                                attributes: datatype::Attributes::default(),
+                                attributes: Attributes::default(),
                             },
                         ),
                         (
@@ -731,12 +734,12 @@ const _: () = {
                                 deprecated: None,
                                 docs: Default::default(),
                                 ty: Some(uhlc::ID::definition(types)),
-                                attributes: datatype::Attributes::default(),
+                                attributes: Attributes::default(),
                             },
                         ),
                     ],
                 }),
-                attributes: datatype::Attributes::default(),
+                attributes: Attributes::default(),
             })
         }
     }
@@ -838,6 +841,8 @@ impl_ndt!(
 #[cfg(feature = "url")]
 #[cfg_attr(docsrs, doc(cfg(feature = "url")))]
 const _: () = {
+    use crate::{datatype, r#type::macros::impl_ndt, *};
+
     impl_ndt!(
         url::Url as str = inline;
         url::Host as UrlHost = inline;
@@ -867,7 +872,7 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: datatype::Attributes::default(),
+                attributes: Attributes::default(),
             })
         }
     }
@@ -876,6 +881,8 @@ const _: () = {
 #[cfg(feature = "either")]
 #[cfg_attr(docsrs, doc(cfg(feature = "either")))]
 const _: () = {
+    use crate::{datatype, r#type::macros::impl_ndt, *};
+
     impl_ndt!(either::Either<L, R> as Either<L, R> = inline);
 
     struct Either<L, R>(std::marker::PhantomData<(L, R)>);
@@ -896,7 +903,7 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: datatype::Attributes::default(),
+                attributes: Attributes::default(),
             })
         }
     }
@@ -905,6 +912,9 @@ const _: () = {
 #[cfg(feature = "error-stack")]
 #[cfg_attr(docsrs, doc(cfg(feature = "error-stack")))]
 const _: () = {
+    use crate::r#type::impls::*;
+    use crate::r#type::macros::impl_ndt;
+
     impl_ndt!(
         "error_stack" ErrorStackContext as ErrorStackContextInner = named;
         error_stack::Report<C> where { C: std::error::Error + Send + Sync + 'static } as ReportInner = named;
@@ -943,6 +953,9 @@ const _: () = {
 #[cfg(feature = "bevy_ecs")]
 #[cfg_attr(docsrs, doc(cfg(feature = "bevy_ecs")))]
 const _: () = {
+    use crate::r#type::impls::*;
+    use crate::r#type::macros::impl_ndt;
+
     impl_ndt!(
         bevy_ecs::entity::Entity as u64 = named;
         bevy_ecs::name::Name as str = named;
@@ -957,6 +970,8 @@ const _: () = {
 #[cfg(feature = "bevy_input")]
 #[cfg_attr(docsrs, doc(cfg(feature = "bevy_input")))]
 const _: () = {
+    use crate::{datatype, r#type::macros::impl_ndt, *};
+
     impl_ndt!(
         bevy_input::ButtonState as BevyButtonState = named;
         bevy_input::keyboard::KeyboardInput as BevyKeyboardInput = named;
@@ -1000,7 +1015,7 @@ const _: () = {
                     ("Pressed".into(), Variant::unit()),
                     ("Released".into(), Variant::unit()),
                 ],
-                attributes: datatype::Attributes::default(),
+                attributes: Attributes::default(),
             })
         }
     }
@@ -1010,7 +1025,7 @@ const _: () = {
         fn definition(_: &mut Types) -> DataType {
             DataType::Struct(Struct {
                 fields: Fields::Unit,
-                attributes: datatype::Attributes::default(),
+                attributes: Attributes::default(),
             })
         }
     }
@@ -1081,7 +1096,7 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: datatype::Attributes::default(),
+                attributes: Attributes::default(),
             })
         }
     }
@@ -1103,7 +1118,7 @@ const _: () = {
                     ("Line".into(), Variant::unit()),
                     ("Pixel".into(), Variant::unit()),
                 ],
-                attributes: datatype::Attributes::default(),
+                attributes: Attributes::default(),
             })
         }
     }
@@ -1197,7 +1212,7 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: datatype::Attributes::default(),
+                attributes: Attributes::default(),
             })
         }
     }
@@ -1212,7 +1227,7 @@ const _: () = {
                     ("Ended".into(), Variant::unit()),
                     ("Canceled".into(), Variant::unit()),
                 ],
-                attributes: datatype::Attributes::default(),
+                attributes: Attributes::default(),
             })
         }
     }
@@ -1222,7 +1237,7 @@ const _: () = {
         fn definition(_: &mut Types) -> DataType {
             DataType::Struct(Struct {
                 fields: Fields::Unit,
-                attributes: datatype::Attributes::default(),
+                attributes: Attributes::default(),
             })
         }
     }
@@ -1257,7 +1272,7 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: datatype::Attributes::default(),
+                attributes: Attributes::default(),
             })
         }
     }
@@ -1294,7 +1309,7 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: datatype::Attributes::default(),
+                attributes: Attributes::default(),
             })
         }
     }
@@ -1438,7 +1453,7 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: datatype::Attributes::default(),
+                attributes: Attributes::default(),
             })
         }
     }
@@ -1461,7 +1476,7 @@ const _: () = {
                             .build(),
                     ),
                 ],
-                attributes: datatype::Attributes::default(),
+                attributes: Attributes::default(),
             })
         }
     }
@@ -1481,7 +1496,7 @@ const _: () = {
                     ),
                     ("Disconnected".into(), Variant::unit()),
                 ],
-                attributes: datatype::Attributes::default(),
+                attributes: Attributes::default(),
             })
         }
     }
@@ -1497,6 +1512,8 @@ impl_ndt!(
 #[cfg(feature = "geojson")]
 #[cfg_attr(docsrs, doc(cfg(feature = "geojson")))]
 const _: () = {
+    use crate::{datatype, r#type::macros::impl_ndt, *};
+
     impl_ndt!(
         geojson::Position as [f64] = inline;
         geojson::GeoJson as GeoJson = inline;
@@ -1510,7 +1527,7 @@ const _: () = {
     struct GeoJson;
     impl Type for GeoJson {
         fn definition(types: &mut Types) -> DataType {
-            let mut attributes = datatype::Attributes::default();
+            let mut attributes = Attributes::default();
             attributes.insert("serde:container:untagged", true);
 
             DataType::Enum(Enum {
@@ -1542,7 +1559,7 @@ const _: () = {
     struct GeoJsonGeometryValue;
     impl Type for GeoJsonGeometryValue {
         fn definition(types: &mut Types) -> DataType {
-            let mut attributes = datatype::Attributes::default();
+            let mut attributes = Attributes::default();
             attributes.insert("serde:container:tag", std::string::String::from("type"));
 
             DataType::Enum(Enum {
@@ -1641,7 +1658,7 @@ const _: () = {
     struct GeoJsonFeature;
     impl Type for GeoJsonFeature {
         fn definition(types: &mut Types) -> DataType {
-            let mut attributes = datatype::Attributes::default();
+            let mut attributes = Attributes::default();
             attributes.insert("serde:container:tag", std::string::String::from("type"));
 
             let mut foreign_members = Field::new(Option::<geojson::JsonObject>::definition(types));
@@ -1679,7 +1696,7 @@ const _: () = {
     struct GeoJsonFeatureCollection;
     impl Type for GeoJsonFeatureCollection {
         fn definition(types: &mut Types) -> DataType {
-            let mut attributes = datatype::Attributes::default();
+            let mut attributes = Attributes::default();
             attributes.insert("serde:container:tag", std::string::String::from("type"));
 
             let mut foreign_members = Field::new(Option::<geojson::JsonObject>::definition(types));
@@ -1709,7 +1726,7 @@ const _: () = {
     struct GeoJsonFeatureId;
     impl Type for GeoJsonFeatureId {
         fn definition(types: &mut Types) -> DataType {
-            let mut attributes = datatype::Attributes::default();
+            let mut attributes = Attributes::default();
             attributes.insert("serde:container:untagged", true);
 
             DataType::Enum(Enum {

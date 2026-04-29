@@ -242,6 +242,8 @@ macro_rules! _impl_ndt {
             $($bounds)*
         {
             fn definition(types: &mut Types) -> DataType {
+                use $crate::datatype;
+
                 impl_ndt!(@definition_body false stringify!($ty $(< $( $generic ),* >)?), [$( $( $generic ),* )?], [$ty $(< $( $generic ),* >)?], $module_path, $inline, $container, $as_ty, types)
             }
         }
@@ -254,6 +256,8 @@ macro_rules! _impl_ndt {
             )?
         {
             fn definition(types: &mut Types) -> DataType {
+                use $crate::datatype;
+
                 impl_ndt!(@definition_body true stringify!($ty $(< $( $generic ),* >)?), [$( $( $generic ),* )?], [$ty $(< $( $generic ),* >)?], $module_path, $inline, $container, $as_ty, types)
             }
         }
@@ -264,6 +268,8 @@ macro_rules! _impl_ndt {
             $($bounds)*
         {
             fn definition(types: &mut Types) -> DataType {
+                use $crate::datatype;
+
                 impl_ndt!(@definition_body false stringify!($head::$( $tail )::+ $(< $( $generic ),* >)?), [$( $( $generic ),* )?], [$head :: $( $tail )::+ $(< $( $generic ),* >)?], impl_ndt!(@module_path $head :: $( $tail )::+), $inline, $container, $as_ty, types)
             }
         }
@@ -276,6 +282,8 @@ macro_rules! _impl_ndt {
             )?
         {
             fn definition(types: &mut Types) -> DataType {
+                use $crate::datatype;
+
                 impl_ndt!(@definition_body true stringify!($head::$( $tail )::+ $(< $( $generic ),* >)?), [$( $( $generic ),* )?], [$head :: $( $tail )::+ $(< $( $generic ),* >)?], impl_ndt!(@module_path $head :: $( $tail )::+), $inline, $container, $as_ty, types)
             }
         }
@@ -289,6 +297,8 @@ macro_rules! _impl_ndt {
             $($bounds)*
         {
             fn definition(types: &mut Types) -> DataType {
+                use $crate::datatype;
+
                 impl_ndt!(@definition_body false stringify!($($ty)* $($ty_generics)*), [$($generic),*], [$($ty)* $($specta_generics)*], impl_ndt!(@module_path $($ty)*), $inline, $container, $as_ty, types)
             }
         }
@@ -299,6 +309,8 @@ macro_rules! _impl_ndt {
             $($generic: Type,)*
         {
             fn definition(types: &mut Types) -> DataType {
+                use $crate::datatype;
+
                 impl_ndt!(@definition_body true stringify!($($ty)* $($ty_generics)*), [$($generic),*], [$($ty)* $($specta_generics)*], impl_ndt!(@module_path $($ty)*), $inline, $container, $as_ty, types)
             }
         }
@@ -387,6 +399,7 @@ macro_rules! _impl_ndt {
     };
 }
 
+#[allow(unused_imports)]
 pub(crate) use _impl_ndt as impl_ndt;
 pub(crate) use _impl_primitives as impl_primitives;
 pub(crate) use _impl_tuple as impl_tuple;

@@ -47,6 +47,47 @@ pub fn generics_with_ident_and_bounds_only(generics: &Generics) -> Option<TokenS
         .map(|gs| quote!(<#(#gs),*>))
 }
 
+pub fn generics_with_ident_only_and_const_ty(generics: &Generics) -> Option<TokenStream> {
+    (!generics.params.is_empty())
+        .then(|| {
+            use GenericParam::*;
+            generics.params.iter().map(|param| match param {
+                Type(TypeParam { ident, .. }) => quote!(#ident),
+                Lifetime(LifetimeParam { lifetime, .. }) => quote!(#lifetime),
+                Const(ConstParam {
+                    const_token,
+                    ident,
+                    colon_token,
+                    ty,
+                    ..
+                }) => quote!(#const_token #ident #colon_token #ty),
+            })
+        })
+        .map(|gs| quote!(<#(#gs),*>))
+}
+
+pub fn type_where_clause(
+    ty: &TokenStream,
+    used_generic_types: &[syn::Ident],
+    associated_type_usage: &[TypePath],
+) -> Option<WhereClause> {
+    if used_generic_types.is_empty() && associated_type_usage.is_empty() {
+        return None;
+    }
+
+    let generic_preds = used_generic_types
+        .iter()
+        .map(|ident| parse_quote!(#ident : #ty));
+    let associated_preds = associated_type_usage
+        .iter()
+        .map(|path| parse_quote!(#path : #ty));
+    let preds = generic_preds
+        .chain(associated_preds)
+        .collect::<Vec<syn::WherePredicate>>();
+
+    Some(parse_quote! { where #(#preds),* })
+}
+
 pub fn generics_with_ident_only(generics: &Generics) -> Option<TokenStream> {
     (!generics.params.is_empty())
         .then(|| {
