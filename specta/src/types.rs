@@ -21,24 +21,43 @@ use crate::{
 /// [`NamedDataType`] values.
 #[derive(Default, Clone)]
 pub struct Types {
-    // `None` indicates that the entry is a placeholder.
-    // It is a reference and we are currently resolving it's definition.
+    /// Registered named datatypes keyed by their stable identity.
+    ///
+    /// A `None` value is a placeholder for a datatype whose definition is
+    /// currently being resolved. This lets recursive definitions refer to the
+    /// in-progress type without re-entering resolution indefinitely.
     pub(crate) types: HashMap<NamedId, Option<NamedDataType>>,
 
-    // The count of non-`None` items in the collection.
-    // We store this to avoid expensive iteration.
+    /// Cached count of completed entries in [`Self::types`].
+    ///
+    /// Placeholders are excluded. Keeping this count avoids repeatedly walking
+    /// the full map when exporters ask for iterator lengths which we need for `ExactSizeIterator`.
     pub(crate) len: usize,
 
-    // TODO
+    /// Stack of inline named-type expansions currently being resolved.
+    ///
+    /// Each entry is a hash of the named type sentinel and concrete generic
+    /// arguments for that inline use site. Seeing the same entry twice means an
+    /// inline definition has recursively reached itself, so resolution can emit
+    /// a recursive reference instead of expanding forever.
     pub(crate) stack: Vec<u64>,
 
-    // TODO: Explain
+    /// Whether named types discovered in the current context should be inlined.
+    ///
+    /// This is set while resolving fields annotated with `#[specta(inline)]` and
+    /// similar container/wrapper contexts. It is temporarily cleared when
+    /// building canonical named definitions so top-level registrations are not
+    /// accidentally affected by a use-site inline request.
     pub(crate) should_inline: bool,
 
-    // TODO: Explain
-    /// This variables remains false unless your exporting in the context of `#[derive(Type)]` on a type which contains one or more const-generic parameters.
+    /// Whether the current named-type definition is being built with const parameters.
     ///
-    /// Say for a type like this
+    /// This remains `false` unless Specta is exporting the canonical definition
+    /// for a `#[derive(Type)]` type that declares one or more const-generic
+    /// parameters.
+    ///
+    /// Consider a type like this:
+    ///
     /// ```rs
     /// #[derive(Type)]
     /// struct Demo<const N: usize> {
@@ -46,7 +65,10 @@ pub struct Types {
     /// }
     /// ```
     ///
-    /// If we always set the length in the `impl Type for [T; N]`, the implementation will "bake" whatever the first encountered value of `N` is into the global type definition which is wrong. For example:
+    /// If `impl Type for [T; N]` always exported the concrete array length, the
+    /// first encountered value of `N` would be baked into the shared global
+    /// definition for `Demo`, which is wrong. For example:
+    ///
     /// ```rs
     /// pub struct A {
     ///     a: Demo<1>,
@@ -68,17 +90,23 @@ pub struct Types {
     /// // export type Demo = { [number, number] }; // This is invalid for the `a` field.
     /// ```
     ///
-    /// One observation is that for a length to differ across two instantiations of the same type it must either:
-    ///  - Have a const parameter
-    ///  - Have a generic which uses a trait associated constant
+    /// For a length to differ across two instantiations of the same type, the
+    /// type must either have a const parameter or have a generic parameter whose
+    /// type uses a trait associated constant.
     ///
-    /// Now Specta doesn't and can't support a generic with a trait associated constant as the generic `T` is shadowed by a virtual struct which is used to alter the type to return a generic reference, instead of a flat datatype.
+    /// Specta does not support the trait-associated-constant case here because
+    /// generic `T` parameters are shadowed by virtual structs that return generic
+    /// references instead of flat datatypes.
     ///
-    /// So for DX we know including length is safe as long as the resolving context doesn't have any const parameters. We track this using a thread local so it's entirely runtime meaning the solution doesn't require brittle scanning of the user's `TokenStream` in the derive macro.
+    /// Therefore, including the fixed array length is safe as long as the
+    /// current resolving context has no const parameters. This is tracked at
+    /// runtime, avoiding brittle scans of the user's `TokenStream` in the derive
+    /// macro.
     ///
-    /// We provide `specta_util::FixedArray<N, T>` as a helper type to force Specta to export a fixed-length array instead of a generic `number[]` if you know what your doing.
-    /// This doesn't fix the core issue but it does allow the user to assert they are correct.
-    ///
+    /// `specta_util::FixedArray<N, T>` can be used to force Specta to export a
+    /// fixed-length array instead of a generic `number[]` when the user knows
+    /// the length is safe to include. This does not fix the core issue, but it
+    /// gives the user a way to assert the specific use site is correct.
     pub(crate) has_const_params: bool,
 }
 
@@ -126,13 +154,18 @@ impl Types {
         self.len
     }
 
-    /// Returns `true` when the backing collection has no entries.
-    ///
-    /// This is usually equivalent to `len() == 0`. During type resolution,
-    /// internal placeholders can make this return `false` even before any
-    /// completed [`NamedDataType`] has been inserted.
+    /// Returns `true` when the typemap has no entries at all.
     pub fn is_empty(&self) -> bool {
-        self.types.is_empty()
+        debug_assert_eq!(
+            self.len,
+            self.types
+                .iter()
+                .filter_map(|(_, ndt)| ndt.as_ref())
+                .count(),
+            "Types count logic mismatch"
+        );
+
+        self.len == 0
     }
 
     /// Merges types from another collection into this one.
@@ -162,11 +195,13 @@ impl Types {
         }
     }
 
-    /// Sorts the collection into a consistent order and returns an iterator.
+    /// Sorts completed named datatypes into a consistent order and returns an iterator.
     ///
-    /// The sort order is not necessarily guaranteed to be stable between versions but currently we sort by name.
+    /// The sort order is not guaranteed to remain identical between releases but is designed to stay stable,
+    /// so that between multiple runs of the exporter you get the same type in the same order in the file.
     ///
-    /// This method requires reallocating the map to sort the collection. You should prefer [Self::into_unsorted_iter] if you don't care about the order.
+    /// This method allocates a temporary vector to sort the collection. Prefer
+    /// [`Types::into_unsorted_iter`] if the order does not matter.
     pub fn into_sorted_iter(&self) -> impl ExactSizeIterator<Item = &'_ NamedDataType> {
         let mut v = self
             .types
@@ -191,9 +226,7 @@ impl Types {
         }
     }
 
-    /// Calls `f` for each completed named datatype in the collection.
-    ///
-    /// The iteration order is intentionally unspecified.
+    /// Mutably modifies each [`NamedDataType`] in the collection.
     pub fn iter_mut<F>(&mut self, mut f: F)
     where
         F: FnMut(&mut NamedDataType),
@@ -205,10 +238,7 @@ impl Types {
         }
     }
 
-    /// Transforms each completed [`NamedDataType`] in the collection.
-    ///
-    /// The internal identity keys are preserved, so existing [`NamedReference`]s
-    /// continue to resolve to the transformed entries.
+    /// Transforms each [`NamedDataType`] in the collection.
     pub fn map<F>(mut self, mut f: F) -> Self
     where
         F: FnMut(NamedDataType) -> NamedDataType,
