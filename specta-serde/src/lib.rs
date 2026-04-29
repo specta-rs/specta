@@ -122,6 +122,7 @@ mod validate;
 use inflection::RenameRule;
 use parser::{SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs};
 use phased::PhasedTy;
+use repr::EnumRepr;
 
 pub use error::Error;
 pub use phased::{Phased, phased};
@@ -135,16 +136,14 @@ pub enum Phase {
     Deserialize,
 }
 
-// TODO: Remove this
-#[doc(hidden)]
-pub mod internal {
-    pub use crate::inflection::RenameRule;
-    pub use crate::parser::{
-        ConversionType, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs,
-    };
-}
-
-use repr::EnumRepr;
+// // TODO: Remove this
+// #[doc(hidden)]
+// pub mod internal {
+//     pub use crate::inflection::RenameRule;
+//     pub use crate::parser::{
+//         ConversionType, SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs,
+//     };
+// }
 
 fn apply(types: Types) -> Result<Types, Error> {
     validate::validate_for_mode(&types, validate::ApplyMode::Unified)?;
@@ -281,9 +280,9 @@ impl specta::Format for Format {
 /// types for definitions that need to diverge, while unchanged definitions stay
 /// shared. Inline datatype rendering uses the serialize-facing shape; use
 /// [`select_phase_datatype`] to inspect either direction explicitly.
-pub struct SerdePhasesFormat;
+pub struct PhasesFormat;
 
-impl specta::Format for SerdePhasesFormat {
+impl specta::Format for PhasesFormat {
     fn map_types(&'_ self, types: &Types) -> Result<Cow<'_, Types>, FormatError> {
         Ok(Cow::Owned(apply_phases(types.clone())?))
     }

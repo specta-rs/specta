@@ -7,7 +7,7 @@ use specta::{
 
 use crate::{
     Error,
-    internal::{SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs},
+    parser::{SerdeContainerAttrs, SerdeFieldAttrs, SerdeVariantAttrs},
     phased::PhasedTy,
     repr::EnumRepr,
 };

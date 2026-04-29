@@ -241,7 +241,7 @@ fn main() {
         println!(
             "serde_with + specta_serde::format_phases(...):\n{}",
             Typescript::default()
-                .export(&serde_with_types, specta_serde::format_phases)
+                .export(&serde_with_types, specta_serde::PhasesFormat)
                 .unwrap()
         );
     }
