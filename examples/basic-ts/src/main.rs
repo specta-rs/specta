@@ -167,7 +167,6 @@ fn main() {
         );
     }
 
-    // TODO
     // {
     //     let mut types = Types::default().register::<NotPhaseSpecific>();
     //     let def = HelloWorld::definition(&mut types);
@@ -184,7 +183,6 @@ fn main() {
     //     println!("Types Count: {}", types.len());
     // }
 
-    // TODO
     // {
     //     let types = Types::default()
     //         .register::<NotPhaseSpecific>()

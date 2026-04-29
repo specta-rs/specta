@@ -11,8 +11,7 @@ use crate::{
     Types,
     datatype::{
         DataType, Generic, NamedReference, NamedReferenceType, Reference,
-        generic::GenericDefinition,
-        reference::{self, NamedId},
+        generic::GenericDefinition, reference::NamedId,
     },
 };
 

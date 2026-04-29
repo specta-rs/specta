@@ -1,3 +1,5 @@
+//! TODO(v2): Remove this whole module
+
 use std::borrow::Cow;
 
 use super::{DataType, Deprecated};
@@ -25,7 +27,7 @@ pub struct Function {
     pub(crate) deprecated: Option<Deprecated>,
 }
 
-// TODO(v2): We are keeping the accessors as this submodule is likely going to go.
+// We are keeping the accessors as this submodule is likely going to go.
 impl Function {
     /// Returns whether the function was declared with the `async` keyword.
     pub fn asyncness(&self) -> bool {
