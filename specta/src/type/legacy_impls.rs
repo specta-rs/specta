@@ -71,7 +71,7 @@ impl_ndt!(
 
 #[cfg(feature = "smallvec")]
 #[cfg_attr(docsrs, doc(cfg(feature = "smallvec")))]
-impl_ndt!(smallvec::SmallVec<T> where { T: smallvec::Array + Type } as T = passthrough);
+impl_ndt!(smallvec::SmallVec<T> where { T: smallvec::Array + Type } as [T] = passthrough);
 
 #[cfg(feature = "bytes")]
 #[cfg_attr(docsrs, doc(cfg(feature = "bytes")))]

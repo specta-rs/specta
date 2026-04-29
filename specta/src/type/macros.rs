@@ -377,7 +377,7 @@ macro_rules! _impl_ndt {
                     ndt.name = ::std::borrow::Cow::Borrowed(impl_ndt!(@type_name $($type_name)*));
                     ndt.module_path = ::std::borrow::Cow::Borrowed($module_path);
                     ndt.generics = ::std::borrow::Cow::Borrowed(GENERICS);
-                    if !$inline {
+                    if !$inline && !$container {
                         $(
                             #[allow(dead_code)]
                             pub(crate) struct $generic;
