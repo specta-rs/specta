@@ -101,6 +101,25 @@ impl Attributes {
         self.0.extend(other.0);
     }
 
+    /// Removes the entry under `key`, returning `true` when an entry was
+    /// present.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use specta::datatype::Attributes;
+    ///
+    /// let mut attrs = Attributes::default();
+    /// attrs.insert("serde.skip", true);
+    ///
+    /// assert!(attrs.remove("serde.skip"));
+    /// assert!(!attrs.contains_key("serde.skip"));
+    /// assert!(!attrs.remove("serde.skip"));
+    /// ```
+    pub fn remove(&mut self, key: &str) -> bool {
+        self.0.remove(key).is_some()
+    }
+
     /// Returns `true` if an attribute entry is present for `key`.
     pub fn contains_key(&self, key: &str) -> bool {
         self.0.contains_key(key)

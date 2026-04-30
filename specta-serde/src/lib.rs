@@ -1108,10 +1108,19 @@ fn rewrite_field_for_phase(
     split_types: &HashSet<TypeIdentity>,
 ) -> Result<(), Error> {
     if let Some(attrs) = SerdeFieldAttrs::from_attributes(&field.attributes)?
-        && let PhaseRewrite::Serialize = mode
         && attrs.skip_serializing_if.is_some()
     {
-        field.optional = true;
+        if let PhaseRewrite::Serialize = mode {
+            field.optional = true;
+        }
+        // The attribute is meaningless on phase-split fields: the _Serialize
+        // variant already has `optional = true`, and the _Deserialize variant
+        // treats the field as present-or-default. Leaving it attached makes
+        // `validate_datatype_for_mode(_, _, ApplyMode::Unified)` reject the
+        // already-split variant — a footgun for downstream callers (e.g.
+        // tauri-specta's `validate_exported_command`) that run unified
+        // validation on the post-`apply_phases` graph.
+        field.attributes.remove(parser::FIELD_SKIP_SERIALIZING_IF);
     }
 
     if let Some(ty) = field.ty.clone()
@@ -2404,7 +2413,10 @@ mod tests {
     use serde::{Deserialize, Serialize};
     use specta::{Format as _, Type, Types, datatype::DataType};
 
-    use super::{Phase, Phased, PhasesFormat, select_phase_datatype};
+    use super::{
+        Phase, Phased, PhasesFormat, parser, select_phase_datatype,
+        validate::{ApplyMode, validate_datatype_for_mode},
+    };
 
     #[derive(Type, Serialize, Deserialize)]
     #[serde(untagged)]
@@ -2427,6 +2439,12 @@ mod tests {
     #[derive(Type, Serialize, Deserialize)]
     struct Plain {
         name: String,
+    }
+
+    #[derive(Type, Serialize, Deserialize)]
+    struct WithSkipIf {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        nickname: Option<String>,
     }
 
     #[test]
@@ -2483,6 +2501,40 @@ mod tests {
     }
 
     #[test]
+    fn clears_skip_serializing_if_attribute_after_phase_split() {
+        let mut types = specta::Types::default();
+        let dt = WithSkipIf::definition(&mut types);
+        let resolved = formatted_phases(types);
+
+        let serialize = select_phase_datatype(&dt, &resolved, Phase::Serialize);
+        let deserialize = select_phase_datatype(&dt, &resolved, Phase::Deserialize);
+
+        assert!(!field_has_skip_serializing_if(&serialize, &resolved, "nickname"));
+        assert!(!field_has_skip_serializing_if(&deserialize, &resolved, "nickname"));
+    }
+
+    #[test]
+    fn phase_split_field_passes_unified_mode_validation() {
+        // Regression test for the interaction with downstream callers (e.g.
+        // tauri-specta's `validate_exported_command`) that run unified-mode
+        // validation on the post-`apply_phases` graph. Before clearing the
+        // attribute on phase-split fields, this would error with
+        // "skip_serializing_if requires format_phases because unified mode
+        // cannot represent conditional omission".
+        let mut types = specta::Types::default();
+        let dt = WithSkipIf::definition(&mut types);
+        let resolved = formatted_phases(types);
+
+        let serialize = select_phase_datatype(&dt, &resolved, Phase::Serialize);
+        let deserialize = select_phase_datatype(&dt, &resolved, Phase::Deserialize);
+
+        validate_datatype_for_mode(&serialize, &resolved, ApplyMode::Unified)
+            .expect("Unified validation should accept phase-split _Serialize variant");
+        validate_datatype_for_mode(&deserialize, &resolved, ApplyMode::Unified)
+            .expect("Unified validation should accept phase-split _Deserialize variant");
+    }
+
+    #[test]
     fn resolves_explicit_phased_datatypes_without_named_types() {
         let mut types = specta::Types::default();
         let dt = <Phased<String, Vec<String>>>::definition(&mut types);
@@ -2526,6 +2578,25 @@ mod tests {
             .fields
             .iter()
             .find_map(|(name, field)| (name == field_name).then(|| field.ty.as_ref()).flatten())
+            .expect("field should exist")
+    }
+
+    fn field_has_skip_serializing_if(dt: &DataType, types: &Types, field_name: &str) -> bool {
+        let DataType::Reference(specta::datatype::Reference::Named(reference)) = dt else {
+            panic!("expected named reference");
+        };
+        let named = reference.get(types).expect("reference should resolve");
+        let DataType::Struct(strct) = &named.ty else {
+            panic!("expected struct type");
+        };
+        let specta::datatype::Fields::Named(fields) = &strct.fields else {
+            panic!("expected named fields");
+        };
+        fields
+            .fields
+            .iter()
+            .find(|(name, _)| name == field_name)
+            .map(|(_, field)| field.attributes.contains_key(parser::FIELD_SKIP_SERIALIZING_IF))
             .expect("field should exist")
     }
 
