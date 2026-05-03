@@ -17,6 +17,7 @@ mod macros;
 /// provided [`Types`] collection. Generic placeholders should only be emitted
 /// inside the canonical [`NamedDataType`](crate::datatype::NamedDataType)
 /// definition for the declaring type, not as arbitrary top-level results.
+///
 #[diagnostic::on_unimplemented(
     message = "the trait `specta::Type` is not implemented for `{Self}`",
     label = "`{Self}` must implement `Type`",
