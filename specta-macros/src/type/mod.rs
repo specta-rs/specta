@@ -346,8 +346,6 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
         &build_ty_placeholder_args
     };
 
-    // TODO: Avoid emitting `dt_expr` twice into the codegen output
-
     let has_generic_default = generics
         .params
         .iter()
