@@ -848,14 +848,13 @@ fn enum_to_swift(
                     let raw_value = enum_string_raw_value(variant)
                         .unwrap_or_else(|| original_variant_name.as_ref());
                     result.push_str(&format!("    case {} = \"{}\"\n", variant_name, raw_value));
-                } else if fields.fields.len() == 1
-                    && fields.fields[0]
-                        .ty
-                        .as_ref()
-                        .is_some_and(|ty| is_unit_payload(original_variant_name, ty))
+                } else if fields.fields.is_empty()
+                    || fields.fields.len() == 1
+                        && fields.fields[0]
+                            .ty
+                            .as_ref()
+                            .is_some_and(|ty| is_unit_payload(original_variant_name, ty))
                 {
-                    result.push_str(&format!("    case {}\n", variant_name));
-                } else if fields.fields.is_empty() {
                     result.push_str(&format!("    case {}\n", variant_name));
                 } else {
                     let types_str = fields
@@ -1160,14 +1159,12 @@ fn generate_enum_codable_impl(
                 result.push_str(&format!("            self = .{}\n", swift_case_name));
             }
             specta::datatype::Fields::Unnamed(fields) => {
-                if fields.fields.is_empty() {
-                    result.push_str(&format!("        case .{}:\n", swift_case_name));
-                    result.push_str(&format!("            self = .{}\n", swift_case_name));
-                } else if fields.fields.len() == 1
-                    && fields.fields[0]
-                        .ty
-                        .as_ref()
-                        .is_some_and(|ty| is_unit_payload(original_variant_name, ty))
+                if fields.fields.is_empty()
+                    || fields.fields.len() == 1
+                        && fields.fields[0]
+                            .ty
+                            .as_ref()
+                            .is_some_and(|ty| is_unit_payload(original_variant_name, ty))
                 {
                     result.push_str(&format!("        case .{}:\n", swift_case_name));
                     result.push_str(&format!("            self = .{}\n", swift_case_name));

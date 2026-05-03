@@ -1,4 +1,5 @@
 //! A playground for quickly reproducing issue.
+#![allow(dead_code)]
 
 use std::{borrow::Cow, ops::Range};
 

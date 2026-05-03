@@ -147,13 +147,12 @@ impl PlanNode {
 #[derive(Debug)]
 enum ObjectFieldPlan {
     Named(String, PlanNode),
-    Flattened(PlanNode),
 }
 
 impl ObjectFieldPlan {
     fn is_identity(&self) -> bool {
         match self {
-            Self::Named(_, plan) | Self::Flattened(plan) => plan.is_identity(),
+            Self::Named(_, plan) => plan.is_identity(),
         }
     }
 }
@@ -173,7 +172,6 @@ enum EnumVariantMatcher {
 
 #[derive(Clone, Copy)]
 enum KnownNamedTag {
-    BigInt,
     Date,
     Uint8Array,
 }
@@ -279,7 +277,6 @@ impl Analyzer {
                 if let Some(ndt) = types.get(reference) {
                     if let Some(tag) = self.resolve_named_tag(&ndt.module_path, &ndt.name) {
                         return match tag {
-                            KnownNamedTag::BigInt => PlanNode::Leaf(Tag::BigInt),
                             KnownNamedTag::Date => PlanNode::Leaf(Tag::Date),
                             KnownNamedTag::Uint8Array => PlanNode::Leaf(Tag::Uint8Array),
                         };
@@ -487,12 +484,6 @@ impl Renderer {
                     let next = self.render(plan, &source);
                     out.push_str(&format!(
                         " {{ const next = {next}; if (next !== {source}) {value} = {{ ...{value}, {key}: next }}; }}"
-                    ));
-                }
-                ObjectFieldPlan::Flattened(plan) => {
-                    let next = self.render(plan, &value);
-                    out.push_str(&format!(
-                        " {{ const next = {next}; if (next !== {value}) {value} = next; }}"
                     ));
                 }
             }

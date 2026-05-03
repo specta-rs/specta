@@ -902,12 +902,12 @@ fn render_types(
 ) -> Result<(), Error> {
     match exporter.layout {
         Layout::Namespaces => {
-            fn has_renderable_content(module: &Module<'_>, types: &Types) -> bool {
+            fn has_renderable_content(module: &Module<'_>) -> bool {
                 module.types.iter().any(|ndt| ndt.ty.is_some())
                     || module
                         .children
                         .values()
-                        .any(|child| has_renderable_content(child, types))
+                        .any(has_renderable_content)
             }
 
             fn export<'a>(
@@ -922,7 +922,7 @@ fn render_types(
                 let content_indent = "\t".repeat(depth + 1);
 
                 for (name, module) in module {
-                    if !has_renderable_content(module, types) {
+                    if !has_renderable_content(module) {
                         continue;
                     }
 
@@ -976,7 +976,7 @@ fn render_types(
                     .children
                     .iter()
                     .filter_map(|(name, module)| {
-                        has_renderable_content(module, types).then_some(*name)
+                        has_renderable_content(module).then_some(*name)
                     })
                     .chain(
                         module

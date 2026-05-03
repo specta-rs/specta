@@ -1150,7 +1150,7 @@ pub(crate) fn datatype(
     types: &Types,
     dt: &DataType,
     location: Vec<Cow<'static, str>>,
-    parent_name: Option<&str>,
+    _parent_name: Option<&str>,
     prefix: &str,
     generics: &[(GenericReference, DataType)],
 ) -> Result<(), Error> {
@@ -1215,7 +1215,7 @@ pub(crate) fn datatype(
                     types,
                     ty,
                     location.clone(),
-                    parent_name,
+                    _parent_name,
                     prefix,
                     generics,
                 )?;
