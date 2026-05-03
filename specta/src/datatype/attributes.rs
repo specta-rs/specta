@@ -101,6 +101,13 @@ impl Attributes {
         self.0.extend(other.0);
     }
 
+    /// Removes the entry under `key`, returning `true` when an entry was
+    /// present.
+    ///
+    pub fn remove(&mut self, key: &str) -> bool {
+        self.0.remove(key).is_some()
+    }
+
     /// Returns `true` if an attribute entry is present for `key`.
     pub fn contains_key(&self, key: &str) -> bool {
         self.0.contains_key(key)
