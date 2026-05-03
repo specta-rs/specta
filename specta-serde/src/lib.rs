@@ -2509,8 +2509,14 @@ mod tests {
         let serialize = select_phase_datatype(&dt, &resolved, Phase::Serialize);
         let deserialize = select_phase_datatype(&dt, &resolved, Phase::Deserialize);
 
-        assert!(!field_has_skip_serializing_if(&serialize, &resolved, "nickname"));
-        assert!(!field_has_skip_serializing_if(&deserialize, &resolved, "nickname"));
+        assert!(!field_has_skip_serializing_if(
+            &serialize, &resolved, "nickname"
+        ));
+        assert!(!field_has_skip_serializing_if(
+            &deserialize,
+            &resolved,
+            "nickname"
+        ));
     }
 
     #[test]
@@ -2585,8 +2591,8 @@ mod tests {
         let DataType::Reference(specta::datatype::Reference::Named(reference)) = dt else {
             panic!("expected named reference");
         };
-        let named = reference.get(types).expect("reference should resolve");
-        let DataType::Struct(strct) = &named.ty else {
+        let named = types.get(reference).expect("reference should resolve");
+        let Some(DataType::Struct(strct)) = &named.ty else {
             panic!("expected struct type");
         };
         let specta::datatype::Fields::Named(fields) = &strct.fields else {
@@ -2596,7 +2602,11 @@ mod tests {
             .fields
             .iter()
             .find(|(name, _)| name == field_name)
-            .map(|(_, field)| field.attributes.contains_key(parser::FIELD_SKIP_SERIALIZING_IF))
+            .map(|(_, field)| {
+                field
+                    .attributes
+                    .contains_key(parser::FIELD_SKIP_SERIALIZING_IF)
+            })
             .expect("field should exist")
     }
 
