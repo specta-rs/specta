@@ -1,3 +1,5 @@
+#![allow(dead_code, missing_docs)]
+
 use specta::{Type, Types};
 use specta_swift::Swift;
 
@@ -20,7 +22,7 @@ enum Status {
 fn test_basic_export() {
     let types = Types::default().register::<User>().register::<Status>();
     let swift = Swift::default();
-    let output = swift.export(&types, specta_serde::format).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Generated Swift code:\n{}", output);
 

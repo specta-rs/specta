@@ -4,11 +4,13 @@ use super::StructBuilder;
 
 use super::{NamedFields, UnnamedFields};
 
-/// represents a Rust [struct](https://doc.rust-lang.org/std/keyword.struct.html).
+/// Runtime representation of a Rust [`struct`](https://doc.rust-lang.org/std/keyword.struct.html).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct Struct {
+    /// Field layout for the struct.
     pub fields: Fields,
+    /// Runtime attributes attached to the struct container.
     pub attributes: Attributes,
 }
 
@@ -23,7 +25,7 @@ impl Struct {
         }
     }
 
-    /// Construct a named struct.
+    /// Starts building a struct with named fields.
     pub fn named() -> StructBuilder<NamedFields> {
         StructBuilder {
             fields: NamedFields {
@@ -32,7 +34,7 @@ impl Struct {
         }
     }
 
-    /// Construct an unnamed struct.
+    /// Starts building a tuple struct with unnamed fields.
     pub fn unnamed() -> StructBuilder<UnnamedFields> {
         StructBuilder {
             fields: UnnamedFields {

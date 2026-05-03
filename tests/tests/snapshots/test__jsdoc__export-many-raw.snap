@@ -17,41 +17,12 @@ expression: output
 	* @property {T} start
 	* @property {T} end
 	*
-	* @typedef {string} String
-	*
-	* @typedef {string} PathBuf
-	*
-	* @typedef {string} IpAddr
-	*
-	* @typedef {string} Ipv4Addr
-	*
-	* @typedef {string} Ipv6Addr
-	*
-	* @typedef {string} SocketAddr
-	*
-	* @typedef {string} SocketAddrV4
-	*
-	* @typedef {string} SocketAddrV6
-	*
-	* @typedef {T} Cow<T>
-	*
-	* @typedef {T} Cow<T>
-	*
-	* @typedef {T[]} Vec<T>
-	*
-	* @typedef {T[]} Vec<T>
-	*
-	* @typedef {T | E} Result<T, E>
-	* @property {T} Ok
-	* @property {E} Err
-	*
-	* @typedef {T[]} Vec<T>
-	*
-	* @typedef {null} PhantomData<T>
-	*
-	* @typedef {null} PhantomData<T>
-	*
-	* @typedef {never} Infallible
+	* @typedef {{
+	*		ok: T,
+	*		err: E,
+	*	}} Result<T, E>
+	* @property {T} ok
+	* @property {E} err
 	*
 	* @typedef {null} Unit1
 	*
@@ -108,7 +79,10 @@ expression: output
 	*		},
 	*		dont_inline_this: RefStruct,
 	*	}} InlinerStruct
-	* @property {InlineStruct} inline_this
+	* @property {{
+	*		ref_struct: SimpleStruct,
+	*		val: number,
+	*	}} inline_this
 	* @property {RefStruct} dont_inline_this
 	*
 	* @typedef {{
@@ -151,10 +125,12 @@ expression: output
 	*
 	* @typedef {{
 	*		optional_field: {
-	*			a: string,
-	*		} | null,
+	* 	a: string,
+	* } | null,
 	*	}} InlineOptionalType
-	* @property {PlaceholderInnerField | null} optional_field
+	* @property {{
+	* 	a: string,
+	* } | null} optional_field
 	*
 	* @typedef {"OneWord" | "TwoWords"} Rename
 	* @property {"OneWord"} OneWord
@@ -168,12 +144,6 @@ expression: output
 	*
 	* @typedef {string} TransparentTypeWithOverride
 	* @property {string} "0"
-	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
-	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
-	*
-	* @typedef {T[]} Vec<T>
 	*
 	* @typedef {{
 	*		a: Partial<{ [key in BasicEnum]: number }>,
@@ -189,15 +159,11 @@ expression: output
 	*
 	* @typedef {Record<string, never>} MyEmptyInput
 	*
-	* @typedef {string} String
-	*
 	* @typedef {string} ExtraBracketsInTupleVariant
 	* @property {string} A
 	*
 	* @typedef {string} ExtraBracketsInUnnamedStruct
 	* @property {string} "0"
-	*
-	* @typedef {T[]} Vec<T>
 	*
 	* @typedef {{
 	*		demo: [string, boolean],
@@ -206,14 +172,12 @@ expression: output
 	*
 	* @typedef {{
 	*		demo: [{
-	*			demo: [string, boolean],
-	*		}, boolean],
+	* 	demo: [string, boolean],
+	* }, boolean],
 	*	}} InlineTuple2
-	* @property {[InlineTuple, boolean]} demo
-	*
-	* @typedef {T} Box<T>
-	*
-	* @typedef {T} Box<T>
+	* @property {[{
+	* 	demo: [string, boolean],
+	* }, boolean]} demo
 	*
 	* @typedef {never | string} SkippedFieldWithinVariant
 	* @property {never} A
@@ -401,18 +365,8 @@ expression: output
 	* @property {number} B
 	* @property {null} C
 	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
-	*
 	* @typedef {{ [key in string]: null }} Regular
 	* @property {{ [key in string]: null }} "0"
-	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
-	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
-	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
-	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
 	*
 	* @typedef {{ [key in MaybeValidKey<string>]: null }} ValidMaybeValidKey
 	* @property {{ [key in MaybeValidKey<string>]: null }} "0"
@@ -630,12 +584,6 @@ expression: output
 	* @property {A} a
 	* @property {B} b
 	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
-	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
-	*
-	* @typedef {{ [key in K]: V }} HashMap<K, V>
-	*
 	* @typedef {{
 	*		field: Demo<T, boolean>,
 	*	}} AGenericStruct<T>
@@ -655,10 +603,16 @@ expression: output
 	*		},
 	*	}} A
 	* @property {B} a
-	* @property {B} b
+	* @property {{
+	*		b: number,
+	*	}} b
 	* @property {B} c
-	* @property {D} d
-	* @property {GenericFlattened<number>} e
+	* @property {{
+	*		flattened: number,
+	*	}} d
+	* @property {{
+	*		generic_flattened: number,
+	*	}} e
 	*
 	* @typedef {{
 	*		a: ToBeFlattened,
@@ -682,7 +636,9 @@ expression: output
 	*			a: number,
 	*		},
 	*	}} BoxInline
-	* @property {BoxedInner} c
+	* @property {{
+	*		a: number,
+	*	}} c
 	*
 	* @typedef {{
 	*		a: string,
@@ -710,7 +666,9 @@ expression: output
 	*		},
 	*	}} Fourth
 	* @property {First} a
-	* @property {First} b
+	* @property {{
+	*		a: string,
+	*	}} b
 	*
 	* @typedef {{
 	*		a: First,
@@ -719,7 +677,9 @@ expression: output
 	*		},
 	*	}} TagOnStructWithInline
 	* @property {First} a
-	* @property {First} b
+	* @property {{
+	*		a: string,
+	*	}} b
 	*
 	* @typedef {{
 	*		a: First,
@@ -946,7 +906,10 @@ expression: output
 	*		},
 	*		d: number,
 	*	}} FlattenE
-	* @property {FlattenB} b
+	* @property {{
+	*		a: FlattenA,
+	*		c: number,
+	*	}} b
 	* @property {number} d
 	*
 	* @typedef {{
@@ -956,7 +919,10 @@ expression: output
 	*		},
 	*		d: number,
 	*	}} FlattenF
-	* @property {FlattenB} b
+	* @property {{
+	*		a: FlattenA,
+	*		c: number,
+	*	}} b
 	* @property {number} d
 	*
 	* @typedef {{
@@ -1038,17 +1004,6 @@ expression: output
 	* @property {T[][]} g
 	* @property {([([T, T]), ([T, T]), ([T, T])])[]} h
 	*
-	* @typedef {T} InlineGenericNewtype<T>
-	* @property {T} "0"
-	*
-	* @typedef {[T, T[], [T, T], { [key in string]: T }, T | null, "Unit" | T | { value: T }]} InlineGenericNested<T>
-	* @property {T} "0"
-	* @property {T[]} "1"
-	* @property {[T, T]} "2"
-	* @property {{ [key in string]: T }} "3"
-	* @property {T | null} "4"
-	* @property {"Unit" | T | { value: T }} "5"
-	*
 	* @typedef {{
 	*		t: T,
 	*	}} InlineFlattenGenericsG<T>
@@ -1062,7 +1017,9 @@ expression: output
 	*		t: InlineFlattenGenericsG<string>,
 	*	}} InlineFlattenGenerics
 	* @property {InlineFlattenGenericsG<string>} g
-	* @property {InlineFlattenGenericsG<string>} gi
+	* @property {{
+	*		t: string,
+	*	}} gi
 	* @property {InlineFlattenGenericsG<string>} t
 	*
 	* @typedef {{
@@ -1154,13 +1111,13 @@ expression: output
 	*		d: [number, number],
 	*	}} InlineConstGenericContainer
 	* @property {{
-	*		data: number[],
-	*		a: number[],
+	*		data: [number, number],
+	*		a: [number, number],
 	*		d: [number, number, number],
 	*	}} b
 	* @property {{
-	*		data: number[],
-	*		a: number[],
+	*		data: [number, number, number],
+	*		a: [number, number],
 	*		d: [number, number, number],
 	*	}} c
 	* @property {[number, number]} d
@@ -1180,8 +1137,18 @@ expression: output
 	*		},
 	*		d: [number, number],
 	*	}} InlineRecursiveConstGenericContainer
-	* @property {InlineRecursiveConstGeneric} b
-	* @property {InlineRecursiveConstGeneric} c
+	* @property {{
+	*		data: [number, number],
+	*		a: [number, number],
+	*		d: [number, number, number],
+	*		e: InlineRecursiveConstGeneric,
+	*	}} b
+	* @property {{
+	*		data: [number, number, number],
+	*		a: [number, number],
+	*		d: [number, number, number],
+	*		e: InlineRecursiveConstGeneric,
+	*	}} c
 	* @property {[number, number]} d
 	*
 	* @typedef {never} TestCollectionRegister

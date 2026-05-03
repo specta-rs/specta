@@ -1,3 +1,5 @@
+#![allow(dead_code, missing_docs)]
+
 use specta::{Type, Types};
 use specta_swift::Swift;
 
@@ -38,7 +40,7 @@ fn main() {
         .export_to(
             "./examples/generated/SimpleTypes.swift",
             &types,
-            specta_serde::format,
+            specta_serde::Format,
         )
         .unwrap();
 
@@ -54,7 +56,7 @@ fn main() {
         .export_to(
             "./examples/generated/CustomTypes.swift",
             &types,
-            specta_serde::format,
+            specta_serde::Format,
         )
         .unwrap();
 

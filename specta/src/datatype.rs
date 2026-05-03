@@ -17,14 +17,13 @@ pub use attributes::Attributes;
 pub use r#enum::{Enum, Variant, VariantBuilder};
 pub use fields::{Field, Fields, NamedFields, StructBuilder, UnnamedFields};
 pub use function::Function;
-pub use generic::Generic;
+pub use generic::{Generic, Generic as GenericReference, GenericDefinition};
 pub use list::List;
 // pub use literal::Literal;
 pub use map::Map;
-pub(crate) use named::context_has_const_params;
-pub use named::{Deprecated, NamedDataType};
+pub use named::{Deprecated, NamedDataType, inline};
 pub use primitive::Primitive;
-pub use reference::{GenericReference, NamedReference, OpaqueReference, Reference};
+pub use reference::{NamedReference, NamedReferenceType, OpaqueReference, Reference};
 pub use r#struct::Struct;
 pub use tuple::Tuple;
 
@@ -49,6 +48,11 @@ pub enum DataType {
     Tuple(Tuple),
     /// A nullable wrapper around another type.
     Nullable(Box<DataType>),
+    /// A structural intersection of multiple object-like types.
+    Intersection(Vec<DataType>),
+    /// A placeholder for a generic type defined on the parent [`NamedDataType`].
+    /// Rendered as `T`. These should never be returned from [`Type::definition`](crate::Type::definition), they should only appear in [`NamedDataType`]'s `ty` field.
+    Generic(Generic),
     /// A reference to another named or opaque type.
     Reference(Reference),
 }

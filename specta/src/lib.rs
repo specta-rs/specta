@@ -21,8 +21,11 @@ pub mod internal;
 mod r#type;
 mod types;
 
+#[doc(inline)]
 pub use format::{Format, FormatError};
+#[doc(inline)]
 pub use r#type::Type;
+#[doc(inline)]
 pub use types::Types;
 
 #[doc(inline)]

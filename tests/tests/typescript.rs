@@ -32,24 +32,30 @@ fn typescript_types() -> (Types, Vec<(&'static str, DataType)>) {
     (types, dts)
 }
 
-pub type PhaseCollection = (&'static str, Format, Vec<(&'static str, DataType)>, Types);
+pub type PhaseCollection = (
+    &'static str,
+    Box<dyn Format>,
+    Vec<(&'static str, DataType)>,
+    Types,
+);
 
-pub fn phase_collections() -> [PhaseCollection; 3] {
-    // Don't copy this format pattern anywhere else!!!
-    // It's not correct but it's useful specifically here!!!
-    fn identity_types(types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
-        Ok(Cow::Borrowed(types))
+struct IdentityFormat;
+
+impl Format for IdentityFormat {
+    fn map_types(&'_ self, types: &Types) -> Result<Cow<'_, Types>, specta::FormatError> {
+        Ok(Cow::Owned(types.clone()))
     }
 
-    fn identity_datatype<'a>(
-        _: &'a Types,
-        dt: &'a DataType,
-    ) -> Result<Cow<'a, DataType>, specta::FormatError> {
-        Ok(Cow::Borrowed(dt))
+    fn map_type(
+        &'_ self,
+        _: &Types,
+        dt: &DataType,
+    ) -> Result<Cow<'_, DataType>, specta::FormatError> {
+        Ok(Cow::Owned(dt.clone()))
     }
+}
 
-    let identity_format = Format::new(identity_types, identity_datatype);
-
+pub fn phase_collections() -> Vec<PhaseCollection> {
     let (types, dts) = {
         let (mut types, mut dts) = crate::types();
         let (types2, dts2) = typescript_types();
@@ -64,12 +70,12 @@ pub fn phase_collections() -> [PhaseCollection; 3] {
         (types2, dts2)
     };
 
-    [
-        ("raw", identity_format, dts.clone(), types.clone()),
-        ("serde", specta_serde::format, dts, types),
+    vec![
+        ("raw", Box::new(IdentityFormat), dts.clone(), types.clone()),
+        ("serde", Box::new(specta_serde::Format), dts, types),
         (
             "serde_phases",
-            specta_serde::format_phases,
+            Box::new(specta_serde::PhasesFormat),
             phased_dts,
             phased_types,
         ),
@@ -109,8 +115,8 @@ fn typescript_export_serde_errors() {
         let dt = T::definition(&mut types);
 
         for (mode, format) in [
-            ("serde", specta_serde::format),
-            ("serde_phases", specta_serde::format_phases),
+            ("serde", Box::new(specta_serde::Format) as Box<dyn Format>),
+            ("serde_phases", Box::new(specta_serde::PhasesFormat)),
         ] {
             match Typescript::default().export(&types, format) {
                 Ok(_) => failures.push(format!(
@@ -383,7 +389,7 @@ fn typescript_export_bigint_errors() {
             return;
         }
 
-        match ts.export(&types, specta_serde::format) {
+        match ts.export(&types, specta_serde::Format) {
             Ok(output) => failures.push(format!(
                 "{name} [export]: expected BigInt error, but export succeeded with '{output}'"
             )),
@@ -577,17 +583,19 @@ fn typescript_export_to() {
 #[test]
 fn primitives_export() {
     for (mode, format, dts, types) in phase_collections() {
-        let types = (format.map_types)(&types).unwrap().into_owned();
+        let types = format.map_types(&types).unwrap().into_owned();
 
         let output = dts
             .iter()
             .filter_map(|(name, dt)| {
                 let mut ndt = match dt {
-                    DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap().to_owned(),
+                    DataType::Reference(Reference::Named(r)) => types.get(r).unwrap().to_owned(),
                     _ => return None,
                 };
 
-                ndt.map_ty_mut(|ty| *ty = (format.map_type)(&types, ty).unwrap().into_owned());
+                if let Some(ty) = &mut ndt.ty {
+                    *ty = format.map_type(&types, ty).unwrap().into_owned();
+                }
 
                 Some(
                     primitives::export(&Typescript::default(), &types, [ndt].iter(), "")
@@ -605,18 +613,20 @@ fn primitives_export() {
 #[test]
 fn primitives_export_many() {
     for (mode, format, dts, types) in phase_collections() {
-        let types = (format.map_types)(&types).unwrap().into_owned();
+        let types = format.map_types(&types).unwrap().into_owned();
 
         let output = primitives::export(
             &Typescript::default(),
             &types,
             dts.iter()
                 .filter_map(|(_, ty)| match ty {
-                    DataType::Reference(Reference::Named(r)) => r.get(&types).cloned(),
+                    DataType::Reference(Reference::Named(r)) => types.get(r).cloned(),
                     _ => None,
                 })
                 .map(|mut ndt| {
-                    ndt.map_ty_mut(|ty| *ty = (format.map_type)(&types, ty).unwrap().into_owned());
+                    if let Some(ty) = &mut ndt.ty {
+                        *ty = format.map_type(&types, ty).unwrap().into_owned();
+                    }
                     ndt
                 })
                 .collect::<Vec<_>>()
@@ -632,12 +642,12 @@ fn primitives_export_many() {
 #[test]
 fn primitives_reference() {
     for (mode, format, dts, types) in phase_collections() {
-        let types = (format.map_types)(&types).unwrap().into_owned();
+        let types = format.map_types(&types).unwrap().into_owned();
 
         let output = dts
             .iter()
             .filter_map(|(name, dt)| {
-                let dt = (format.map_type)(&types, dt).unwrap().into_owned();
+                let dt = format.map_type(&types, dt).unwrap().into_owned();
 
                 let reference = match dt {
                     DataType::Reference(reference) => reference.clone(),
@@ -660,12 +670,12 @@ fn primitives_reference() {
 #[test]
 fn primitives_inline() {
     for (mode, format, dts, types) in phase_collections() {
-        let types = (format.map_types)(&types).unwrap().into_owned();
+        let types = format.map_types(&types).unwrap().into_owned();
 
         let output = dts
             .iter()
             .map(|(name, dt)| {
-                let dt = (format.map_type)(&types, dt).unwrap().into_owned();
+                let dt = format.map_type(&types, dt).unwrap().into_owned();
 
                 primitives::inline(&Typescript::default(), &types, &dt)
                     .map(|ty| format!("{name}: {ty}"))
@@ -690,7 +700,7 @@ fn reserved_names() {
 
         let mut types = Types::default();
         let ndt = match r#enum::definition(&mut types) {
-            DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
+            DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
             _ => panic!("Failed to get reference"),
         };
         insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
@@ -704,7 +714,7 @@ fn reserved_names() {
 
         let mut types = Types::default();
         let ndt = match r#enum::definition(&mut types) {
-            DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
+            DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
             _ => panic!("Failed to get reference"),
         };
         insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);
@@ -721,7 +731,7 @@ fn reserved_names() {
 
         let mut types = Types::default();
         let ndt = match r#enum::definition(&mut types) {
-            DataType::Reference(Reference::Named(r)) => r.get(&types).unwrap(),
+            DataType::Reference(Reference::Named(r)) => types.get(&r).unwrap(),
             _ => panic!("Failed to get reference"),
         };
         insta::assert_snapshot!(primitives::export(&Typescript::default(), &types, iter::once(ndt), "").unwrap_err().to_string(), @r#"Attempted to export  but was unable to due to name "enum" conflicting with a reserved keyword in Typescript. Try renaming it or using `#[specta(rename = "new name")]`"#);

@@ -1,9 +1,16 @@
+//! TODO(v2): Remove this whole module
+
 use std::borrow::Cow;
 
 use super::{DataType, Deprecated};
 
-/// Contains type information about a function annotated with the `#[specta]` attribute.
-/// Returned by the `fn_datatype!` macro.
+/// Runtime type information for a function annotated with `#[specta]`.
+///
+/// Values are produced by [`fn_datatype!`](crate::function::fn_datatype) and
+/// [`collect_functions!`](crate::function::collect_functions). Function metadata
+/// is intentionally separate from [`Types`](crate::Types): the function's
+/// argument and result datatypes reference entries collected into the `Types`
+/// value passed to those macros.
 #[derive(Debug, Clone)]
 pub struct Function {
     /// Whether the function is async.
@@ -20,84 +27,84 @@ pub struct Function {
     pub(crate) deprecated: Option<Deprecated>,
 }
 
-// TODO(v2): We are keeping the accessors as this submodule is likely going to go.
+// We are keeping the accessors as this submodule is likely going to go.
 impl Function {
-    /// Is this function defined with the `async` keyword?
+    /// Returns whether the function was declared with the `async` keyword.
     pub fn asyncness(&self) -> bool {
         self.asyncness
     }
 
-    /// Set the `async` status of the function.
+    /// Sets whether the function should be treated as async.
     pub fn set_asyncness(&mut self, asyncness: bool) {
         self.asyncness = asyncness;
     }
 
-    /// Get the name of the function.
+    /// Returns the exported function name.
     pub fn name(&self) -> &Cow<'static, str> {
         &self.name
     }
 
-    /// Get a mutable reference to the name of the function.
+    /// Returns a mutable reference to the exported function name.
     pub fn name_mut(&mut self) -> &mut Cow<'static, str> {
         &mut self.name
     }
 
-    /// Set the name of the function.
+    /// Sets the exported function name.
     pub fn set_name(&mut self, name: Cow<'static, str>) {
         self.name = name;
     }
 
-    /// Get the arguments of the function.
+    /// Returns the exported argument names and datatypes in source order.
     pub fn args(&self) -> &[(Cow<'static, str>, DataType)] {
         &self.args
     }
 
-    /// Get the arguments of the function as mutable references.
+    /// Returns the argument list for in-place mutation.
     pub fn args_mut(&mut self) -> &mut Vec<(Cow<'static, str>, DataType)> {
         &mut self.args
     }
 
-    /// Get the result of the function.
+    /// Returns the function result datatype, if exported.
     pub fn result(&self) -> Option<&DataType> {
         self.result.as_ref()
     }
 
-    /// Get the result of the function as mutable reference.
+    /// Returns the result datatype for in-place mutation, if exported.
     pub fn result_mut(&mut self) -> Option<&mut DataType> {
         self.result.as_mut()
     }
 
-    /// Set the result of the function.
+    /// Sets the function result datatype.
     pub fn set_result(&mut self, result: DataType) {
         self.result = Some(result);
     }
 
-    /// Get the documentation of the function.
+    /// Returns documentation collected from the function item.
     pub fn docs(&self) -> &Cow<'static, str> {
         &self.docs
     }
 
-    /// Get the documentation of the function as mutable reference.
+    /// Returns function documentation for in-place mutation.
     pub fn docs_mut(&mut self) -> &mut Cow<'static, str> {
         &mut self.docs
     }
 
-    /// Set the documentation of the function.
+    /// Sets function documentation.
     pub fn set_docs(&mut self, docs: Cow<'static, str>) {
         self.docs = docs;
     }
 
-    /// Get the deprecated status of the function.
+    /// Returns deprecation metadata for the function, if present.
     pub fn deprecated(&self) -> Option<&Deprecated> {
         self.deprecated.as_ref()
     }
 
-    /// Get the deprecated status of the function as mutable reference.
+    /// Returns deprecation metadata for in-place mutation, if present.
     pub fn deprecated_mut(&mut self) -> Option<&mut Deprecated> {
         self.deprecated.as_mut()
     }
 
-    /// Set the deprecated status of the function.
+    /// Sets deprecation metadata for the function.
     pub fn set_deprecated(&mut self, deprecated: Deprecated) {
         self.deprecated = Some(deprecated);
     }

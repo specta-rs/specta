@@ -24,7 +24,9 @@ pub enum Layout {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Go {
+    /// Content written before the generated Go package declaration.
     pub header: Cow<'static, str>,
+    /// The output file layout.
     pub layout: Layout,
     package_name: String,
 }
@@ -40,21 +42,25 @@ impl Default for Go {
 }
 
 impl Go {
+    /// Creates a Go exporter using the default configuration.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets the generated Go package name.
     pub fn package_name(mut self, name: impl Into<String>) -> Self {
         self.package_name = name.into();
         self
     }
 
+    /// Sets content written before the generated Go package declaration.
     pub fn header(mut self, header: impl Into<Cow<'static, str>>) -> Self {
         self.header = header.into();
         self
     }
 
-    pub fn export(&self, types: &Types, format: Format) -> Result<String, Error> {
+    /// Exports the provided types into a Go source file string.
+    pub fn export(&self, types: &Types, format: impl Format) -> Result<String, Error> {
         let mut ctx = GoContext::default();
         let mut body = String::new();
 
@@ -92,11 +98,12 @@ impl Go {
         Ok(out)
     }
 
+    /// Exports the provided types to a Go source file at the given path.
     pub fn export_to(
         &self,
         path: impl AsRef<Path>,
         types: &Types,
-        format: Format,
+        format: impl Format,
     ) -> Result<(), Error> {
         if self.layout == Layout::Files {
             return Err(Error::UnableToExport(Layout::Files));
@@ -114,9 +121,10 @@ impl Go {
 fn format_types<'a>(
     exporter: &Go,
     types: &'a Types,
-    format: &Format,
+    format: &dyn Format,
 ) -> Result<Cow<'a, Types>, Error> {
-    let mapped_types = (format.map_types)(types)
+    let mapped_types = format
+        .map_types(types)
         .map_err(|err| Error::format("type graph formatter failed", err))?;
     Ok(Cow::Owned(
         map_types_for_datatype_format(exporter, mapped_types.as_ref(), Some(format))?.into_owned(),
@@ -125,7 +133,7 @@ fn format_types<'a>(
 
 fn map_datatype_format(
     exporter: &Go,
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
     types: &Types,
     dt: &DataType,
 ) -> Result<DataType, Error> {
@@ -133,7 +141,8 @@ fn map_datatype_format(
         return Ok(dt.clone());
     };
 
-    let mapped = (format.map_type)(types, dt)
+    let mapped = format
+        .map_type(types, dt)
         .map_err(|err| Error::format("datatype formatter failed", err))?;
 
     match mapped {
@@ -146,14 +155,14 @@ fn map_datatype_format(
 
 fn map_datatype_format_children(
     exporter: &Go,
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
     types: &Types,
     mut dt: DataType,
 ) -> Result<DataType, Error> {
     match &mut dt {
         DataType::Primitive(_) => {}
         DataType::List(list) => {
-            list.ty = Box::new(map_datatype_format(exporter, format, types, &list.ty)?);
+            *list.ty = map_datatype_format(exporter, format, types, &list.ty)?;
         }
         DataType::Map(map) => {
             let key = map_datatype_format(exporter, format, types, map.key_ty())?;
@@ -175,12 +184,21 @@ fn map_datatype_format_children(
                 *element = map_datatype_format(exporter, format, types, element)?;
             }
         }
-        DataType::Reference(Reference::Named(reference)) => {
-            for (_, generic) in &mut reference.generics {
-                *generic = map_datatype_format(exporter, format, types, generic)?;
+        DataType::Intersection(intersection) => {
+            for element in intersection {
+                *element = map_datatype_format(exporter, format, types, element)?;
             }
         }
-        DataType::Reference(Reference::Generic(_) | Reference::Opaque(_)) => {}
+        DataType::Reference(Reference::Named(reference)) => {
+            if let specta::datatype::NamedReferenceType::Reference { generics, .. } =
+                &mut reference.inner
+            {
+                for (_, generic) in generics {
+                    *generic = map_datatype_format(exporter, format, types, generic)?;
+                }
+            }
+        }
+        DataType::Reference(Reference::Opaque(_)) | DataType::Generic(_) => {}
     }
 
     Ok(dt)
@@ -188,7 +206,7 @@ fn map_datatype_format_children(
 
 fn map_datatype_fields(
     exporter: &Go,
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
     types: &Types,
     fields: &mut Fields,
 ) -> Result<(), Error> {
@@ -216,7 +234,7 @@ fn map_datatype_fields(
 fn map_types_for_datatype_format<'a>(
     exporter: &Go,
     types: &'a Types,
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
 ) -> Result<Cow<'a, Types>, Error> {
     if format.is_none() {
         return Ok(Cow::Borrowed(types));
@@ -229,8 +247,12 @@ fn map_types_for_datatype_format<'a>(
             return;
         }
 
-        match map_datatype_format(exporter, format, types, &ndt.ty) {
-            Ok(mapped) => ndt.ty = mapped,
+        let Some(ty) = &ndt.ty else {
+            return;
+        };
+
+        match map_datatype_format(exporter, format, types, ty) {
+            Ok(mapped) => ndt.ty = Some(mapped),
             Err(err) => map_err = Some(err),
         }
     });

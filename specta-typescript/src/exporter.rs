@@ -10,7 +10,7 @@ use std::{
 
 use specta::{
     Format, Types,
-    datatype::{DataType, Fields, NamedDataType, Reference},
+    datatype::{DataType, Fields, NamedDataType, NamedReference, NamedReferenceType, Reference},
 };
 
 use crate::{Branded, Error, primitives, references};
@@ -177,7 +177,7 @@ impl Exporter {
     /// Export the files into a single string.
     ///
     /// Note: This returns an error if the format is `Format::Files`.
-    pub fn export(&self, types: &Types, format: Format) -> Result<String, Error> {
+    pub fn export(&self, types: &Types, format: impl Format) -> Result<String, Error> {
         let exporter = self.clone();
         let types = format_types(types, &format)?;
         let types = types.as_ref();
@@ -217,7 +217,7 @@ impl Exporter {
 
         // User types (if not included in framework runtime)
         if !has_manually_exported_user_types {
-            render_types(&mut out, &exporter, types, "")?;
+            render_types(&mut out, &exporter, Some(&format), types, "")?;
         }
 
         Ok(out)
@@ -232,7 +232,7 @@ impl Exporter {
         &self,
         path: impl AsRef<Path>,
         types: &Types,
-        format: Format,
+        format: impl Format,
     ) -> Result<(), Error> {
         let exporter = self.clone();
         let formatted_types = format_types(types, &format)?;
@@ -262,7 +262,7 @@ impl Exporter {
             }
 
             if !has_manually_exported_user_types {
-                render_types(&mut result, &exporter, types, "")?;
+                render_types(&mut result, &exporter, Some(&format), types, "")?;
             }
 
             if let Some(parent) = path.parent() {
@@ -274,6 +274,7 @@ impl Exporter {
 
         fn export(
             exporter: &Exporter,
+            format: Option<&dyn Format>,
             types: &Types,
             module: &mut Module,
             s: &mut String,
@@ -293,6 +294,7 @@ impl Exporter {
                         let exports = render_flat_types(
                             &mut rendered,
                             exporter,
+                            format,
                             types,
                             module.types.iter().copied(),
                             "",
@@ -304,7 +306,10 @@ impl Exporter {
 
             let import_paths = referenced_types
                 .into_iter()
-                .filter_map(|r| r.get(types).map(|ndt| ndt.module_path.as_ref().to_string()))
+                .map(|r| reference_module_path(types, &r))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .flatten()
                 .filter(|module_path| module_path != module.module_path.as_ref())
                 .collect::<BTreeSet<_>>();
             if !import_paths.is_empty() {
@@ -332,7 +337,7 @@ impl Exporter {
                 let mut path = path.join(name);
                 let mut out = render_file_header(exporter)?;
 
-                let has_types = export(exporter, types, module, &mut out, &path, files)?;
+                let has_types = export(exporter, format, types, module, &mut out, &path, files)?;
                 if has_types {
                     path.set_extension(if exporter.jsdoc { "js" } else { "ts" });
                     files.insert(path, out);
@@ -349,6 +354,7 @@ impl Exporter {
         let mut root_types = String::new();
         export(
             &exporter,
+            Some(&format),
             types,
             &mut build_module_graph(types),
             &mut root_types,
@@ -400,9 +406,10 @@ impl Exporter {
 
                     let import_paths = runtime_references
                         .into_iter()
-                        .filter_map(|r| {
-                            r.get(types).map(|ndt| ndt.module_path.as_ref().to_string())
-                        })
+                        .map(|r| reference_module_path(types, &r))
+                        .collect::<Result<Vec<_>, _>>()?
+                        .into_iter()
+                        .flatten()
                         .filter(|module_path| !module_path.is_empty())
                         .collect::<BTreeSet<_>>();
 
@@ -457,77 +464,112 @@ impl Exporter {
     }
 }
 
-fn format_types<'a>(types: &'a Types, format: &Format) -> Result<Cow<'a, Types>, Error> {
-    let mapped_types = (format.map_types)(types)
-        .map_err(|err| Error::format("type graph formatter failed", err))?;
-    Ok(Cow::Owned(
-        map_types_for_datatype_format(mapped_types.as_ref(), Some(format))?.into_owned(),
-    ))
+fn reference_module_path(types: &Types, r: &NamedReference) -> Result<Option<String>, Error> {
+    match &r.inner {
+        NamedReferenceType::Reference { .. } => {
+            Ok(types.get(r).map(|ndt| ndt.module_path.as_ref().to_string()))
+        }
+        NamedReferenceType::Inline { .. } => Ok(None),
+        NamedReferenceType::Recursive => {
+            Ok(types.get(r).map(|ndt| ndt.module_path.as_ref().to_string()))
+        }
+    }
+}
+
+fn format_types<'a>(types: &'a Types, format: &dyn Format) -> Result<Cow<'a, Types>, Error> {
+    Ok(
+        match format
+            .map_types(types)
+            .map_err(|err| Error::format("type graph formatter failed", err))?
+        {
+            Cow::Borrowed(_) => Cow::Borrowed(types),
+            Cow::Owned(types) => Cow::Owned(types),
+        },
+    )
 }
 
 fn map_datatype_format(
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
     types: &Types,
     dt: &DataType,
 ) -> Result<DataType, Error> {
-    if matches!(dt, DataType::Reference(Reference::Generic(_))) {
+    if matches!(dt, DataType::Generic(_)) {
         return Ok(dt.clone());
     }
 
-    fn contains_generic_reference(dt: &DataType) -> bool {
-        match dt {
+    fn contains_generic_reference(dt: &DataType) -> Result<bool, Error> {
+        Ok(match dt {
             DataType::Primitive(_) => false,
-            DataType::List(list) => contains_generic_reference(&list.ty),
+            DataType::List(list) => contains_generic_reference(&list.ty)?,
             DataType::Map(map) => {
-                contains_generic_reference(map.key_ty())
-                    || contains_generic_reference(map.value_ty())
+                contains_generic_reference(map.key_ty())?
+                    || contains_generic_reference(map.value_ty())?
             }
-            DataType::Nullable(inner) => contains_generic_reference(inner),
+            DataType::Nullable(inner) => contains_generic_reference(inner)?,
             DataType::Struct(strct) => match &strct.fields {
                 Fields::Unit => false,
                 Fields::Unnamed(unnamed) => unnamed
                     .fields
                     .iter()
                     .filter_map(|field| field.ty.as_ref())
-                    .any(contains_generic_reference),
+                    .try_fold(false, |found, ty| {
+                        Ok::<_, Error>(found || contains_generic_reference(ty)?)
+                    })?,
                 Fields::Named(named) => named
                     .fields
                     .iter()
                     .filter_map(|(_, field)| field.ty.as_ref())
-                    .any(contains_generic_reference),
+                    .try_fold(false, |found, ty| {
+                        Ok::<_, Error>(found || contains_generic_reference(ty)?)
+                    })?,
             },
-            DataType::Enum(enm) => enm
-                .variants
-                .iter()
-                .any(|(_, variant)| match &variant.fields {
+            DataType::Enum(enm) => enm.variants.iter().try_fold(false, |found, (_, variant)| {
+                let variant_found = match &variant.fields {
                     Fields::Unit => false,
                     Fields::Unnamed(unnamed) => unnamed
                         .fields
                         .iter()
                         .filter_map(|field| field.ty.as_ref())
-                        .any(contains_generic_reference),
+                        .try_fold(false, |found, ty| {
+                            Ok::<_, Error>(found || contains_generic_reference(ty)?)
+                        })?,
                     Fields::Named(named) => named
                         .fields
                         .iter()
                         .filter_map(|(_, field)| field.ty.as_ref())
-                        .any(contains_generic_reference),
-                }),
-            DataType::Tuple(tuple) => tuple.elements.iter().any(contains_generic_reference),
-            DataType::Reference(Reference::Named(reference)) => reference
-                .generics
-                .iter()
-                .any(|(_, dt)| contains_generic_reference(dt)),
-            DataType::Reference(Reference::Generic(_)) => true,
+                        .try_fold(false, |found, ty| {
+                            Ok::<_, Error>(found || contains_generic_reference(ty)?)
+                        })?,
+                };
+
+                Ok::<_, Error>(found || variant_found)
+            })?,
+            DataType::Tuple(tuple) => tuple.elements.iter().try_fold(false, |found, ty| {
+                Ok::<_, Error>(found || contains_generic_reference(ty)?)
+            })?,
+            DataType::Reference(Reference::Named(reference)) => match &reference.inner {
+                NamedReferenceType::Reference { generics, .. } => {
+                    generics.iter().try_fold(false, |found, (_, dt)| {
+                        Ok::<_, Error>(found || contains_generic_reference(dt)?)
+                    })?
+                }
+                NamedReferenceType::Inline { .. } => false,
+                NamedReferenceType::Recursive => false,
+            },
+            DataType::Generic(_) => true,
             DataType::Reference(Reference::Opaque(_)) => false,
-        }
+            DataType::Intersection(types) => types.iter().try_fold(false, |found, ty| {
+                Ok::<_, Error>(found || contains_generic_reference(ty)?)
+            })?,
+        })
     }
 
-    if contains_generic_reference(dt) {
+    if contains_generic_reference(dt)? {
         let Some(format) = format else {
             return map_datatype_format_children(None, types, dt.clone());
         };
 
-        match (format.map_type)(types, dt) {
+        match format.map_type(types, dt) {
             Ok(Cow::Borrowed(dt)) => {
                 return map_datatype_format_children(Some(format), types, dt.clone());
             }
@@ -543,7 +585,8 @@ fn map_datatype_format(
         return Ok(dt.clone());
     };
 
-    let mapped = (format.map_type)(types, dt)
+    let mapped = format
+        .map_type(types, dt)
         .map_err(|err| Error::format("datatype formatter failed", err))?;
 
     match mapped {
@@ -553,14 +596,14 @@ fn map_datatype_format(
 }
 
 fn map_datatype_format_children(
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
     types: &Types,
     mut dt: DataType,
 ) -> Result<DataType, Error> {
     match &mut dt {
         DataType::Primitive(_) => {}
         DataType::List(list) => {
-            list.ty = Box::new(map_datatype_format(format, types, &list.ty)?);
+            *list.ty = map_datatype_format(format, types, &list.ty)?;
         }
         DataType::Map(map) => {
             let key = map_datatype_format(format, types, map.key_ty())?;
@@ -582,12 +625,21 @@ fn map_datatype_format_children(
                 *element = map_datatype_format(format, types, element)?;
             }
         }
-        DataType::Reference(Reference::Named(reference)) => {
-            for (_, generic) in &mut reference.generics {
-                *generic = map_datatype_format(format, types, generic)?;
+        DataType::Intersection(types_) => {
+            for ty in types_ {
+                *ty = map_datatype_format(format, types, ty)?;
             }
         }
-        DataType::Reference(Reference::Generic(_)) => {}
+        DataType::Reference(Reference::Named(reference)) => {
+            if let NamedReferenceType::Inline { dt, .. } = &mut reference.inner {
+                **dt = map_datatype_format(format, types, dt)?;
+            }
+
+            for (_, dt) in named_reference_generics_mut(reference) {
+                *dt = map_datatype_format(format, types, dt)?;
+            }
+        }
+        DataType::Generic(_) => {}
         DataType::Reference(Reference::Opaque(reference)) => {
             if let Some(branded) = reference.downcast_ref::<Branded>() {
                 dt = Reference::opaque(Branded::new(
@@ -602,8 +654,17 @@ fn map_datatype_format_children(
     Ok(dt)
 }
 
+fn named_reference_generics_mut(
+    reference: &mut NamedReference,
+) -> &mut [(specta::datatype::Generic, DataType)] {
+    match &mut reference.inner {
+        NamedReferenceType::Reference { generics, .. } => generics,
+        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => &mut [],
+    }
+}
+
 fn map_datatype_fields(
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
     types: &Types,
     fields: &mut Fields,
 ) -> Result<(), Error> {
@@ -629,41 +690,17 @@ fn map_datatype_fields(
 }
 
 fn map_named_datatype_format(
-    format: Option<&Format>,
+    format: Option<&dyn Format>,
     types: &Types,
     ndt: &NamedDataType,
 ) -> Result<NamedDataType, Error> {
     let mut mapped = ndt.clone();
-    mapped.ty = map_datatype_format_children(format, types, ndt.ty.clone())?;
+    mapped.ty = ndt
+        .ty
+        .clone()
+        .map(|ty| map_datatype_format_children(format, types, ty))
+        .transpose()?;
     Ok(mapped)
-}
-
-fn map_types_for_datatype_format<'a>(
-    types: &'a Types,
-    format: Option<&Format>,
-) -> Result<Cow<'a, Types>, Error> {
-    if format.is_none() {
-        return Ok(Cow::Borrowed(types));
-    }
-
-    let mut mapped_types = types.clone();
-    let mut map_err = None;
-    mapped_types.iter_mut(|ndt| {
-        if map_err.is_some() {
-            return;
-        }
-
-        match map_named_datatype_format(format, types, ndt) {
-            Ok(mapped) => *ndt = mapped,
-            Err(err) => map_err = Some(err),
-        }
-    });
-
-    if let Some(err) = map_err {
-        return Err(err);
-    }
-
-    Ok(Cow::Owned(mapped_types))
 }
 
 impl AsRef<Exporter> for Exporter {
@@ -681,7 +718,7 @@ impl AsMut<Exporter> for Exporter {
 /// Reference to Typescript language exporter for branded type callbacks.
 pub struct BrandedTypeExporter<'a> {
     pub(crate) exporter: &'a Exporter,
-    pub(crate) format: Option<&'a Format>,
+    pub(crate) format: Option<&'a dyn Format>,
     /// Collected types currently being exported.
     pub types: &'a Types,
 }
@@ -726,7 +763,7 @@ impl BrandedTypeExporter<'_> {
 /// Reference to Typescript language exporter for framework
 pub struct FrameworkExporter<'a> {
     exporter: &'a Exporter,
-    format: Option<&'a Format>,
+    format: Option<&'a dyn Format>,
     has_manually_exported_user_types: &'a mut bool,
     // For `Layout::Files` we need to inject the value
     files_root_types: &'a str,
@@ -761,7 +798,13 @@ impl FrameworkExporter<'_> {
     /// It allows frameworks to intersperse their user types into their runtime code.
     pub fn render_types(&mut self) -> Result<Cow<'static, str>, Error> {
         let mut s = String::new();
-        render_types(&mut s, self.exporter, self.types, self.files_root_types)?;
+        render_types(
+            &mut s,
+            self.exporter,
+            self.format,
+            self.types,
+            self.files_root_types,
+        )?;
         *self.has_manually_exported_user_types = true;
         Ok(Cow::Owned(s))
     }
@@ -853,21 +896,23 @@ fn render_file_header(exporter: &Exporter) -> Result<String, Error> {
 fn render_types(
     s: &mut String,
     exporter: &Exporter,
+    format: Option<&dyn Format>,
     types: &Types,
     files_user_types: &str,
 ) -> Result<(), Error> {
     match exporter.layout {
         Layout::Namespaces => {
-            fn has_renderable_content(module: &Module<'_>, types: &Types) -> bool {
-                module.types.iter().any(|ndt| ndt.requires_reference(types))
+            fn has_renderable_content(module: &Module<'_>) -> bool {
+                module.types.iter().any(|ndt| ndt.ty.is_some())
                     || module
                         .children
                         .values()
-                        .any(|child| has_renderable_content(child, types))
+                        .any(has_renderable_content)
             }
 
             fn export<'a>(
                 exporter: &Exporter,
+                format: Option<&dyn Format>,
                 types: &Types,
                 s: &mut String,
                 module: impl ExactSizeIterator<Item = (&'a &'a str, &'a mut Module<'a>)>,
@@ -877,7 +922,7 @@ fn render_types(
                 let content_indent = "\t".repeat(depth + 1);
 
                 for (name, module) in module {
-                    if !has_renderable_content(module, types) {
+                    if !has_renderable_content(module) {
                         continue;
                     }
 
@@ -900,13 +945,21 @@ fn render_types(
                     render_flat_types(
                         s,
                         exporter,
+                        format,
                         types,
                         module.types.iter().copied(),
                         &content_indent,
                     )?;
 
                     // Namespaces
-                    export(exporter, types, s, module.children.iter_mut(), depth + 1)?;
+                    export(
+                        exporter,
+                        format,
+                        types,
+                        s,
+                        module.children.iter_mut(),
+                        depth + 1,
+                    )?;
 
                     s.push_str(&namespace_indent);
                     s.push_str("}\n");
@@ -923,13 +976,13 @@ fn render_types(
                     .children
                     .iter()
                     .filter_map(|(name, module)| {
-                        has_renderable_content(module, types).then_some(*name)
+                        has_renderable_content(module).then_some(*name)
                     })
                     .chain(
                         module
                             .types
                             .iter()
-                            .filter(|ndt| ndt.requires_reference(types))
+                            .filter(|ndt| ndt.ty.is_some())
                             .map(|ndt| ndt.name.as_ref()),
                     )
                 {
@@ -942,11 +995,18 @@ fn render_types(
                 reexports
             };
 
-            export(exporter, types, s, [(&"$s$", &mut module)].into_iter(), 0)?;
+            export(
+                exporter,
+                format,
+                types,
+                s,
+                [(&"$s$", &mut module)].into_iter(),
+                0,
+            )?;
             s.push_str(&reexports);
         }
         Layout::ModulePrefixedName | Layout::FlatFile => {
-            render_flat_types(s, exporter, types, types.into_sorted_iter(), "")?;
+            render_flat_types(s, exporter, format, types, types.into_sorted_iter(), "")?;
         }
         // The types will get their own files
         // So we keep the user types empty for easy downstream detection.
@@ -965,6 +1025,7 @@ fn render_types(
 fn render_flat_types<'a>(
     s: &mut String,
     exporter: &Exporter,
+    format: Option<&dyn Format>,
     types: &Types,
     ndts: impl ExactSizeIterator<Item = &'a NamedDataType>,
     indent: &str,
@@ -972,7 +1033,7 @@ fn render_flat_types<'a>(
     let mut exports = HashMap::with_capacity(ndts.len());
 
     let ndts = ndts
-        .filter(|ndt| ndt.requires_reference(types))
+        .filter(|ndt| ndt.ty.is_some())
         .map(|ndt| {
             let export_name = exported_type_name(exporter, ndt);
             if let Some(other) = exports.insert(export_name.to_string(), ndt.location) {
@@ -983,7 +1044,7 @@ fn render_flat_types<'a>(
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    primitives::export_internal(s, exporter, None, types, ndts.into_iter(), indent)?;
+    primitives::export_internal(s, exporter, format, types, ndts.into_iter(), indent)?;
 
     Ok(exports)
 }

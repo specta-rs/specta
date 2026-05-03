@@ -1,3 +1,5 @@
+#![allow(dead_code, missing_docs)]
+
 use specta::{Type, Types};
 use specta_swift::Swift;
 
@@ -108,7 +110,7 @@ fn main() {
         .register::<User>();
 
     let swift = Swift::default();
-    let output = swift.export(&types, specta_serde::format).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!(
         "Generated Swift code with comprehensive comments:\n{}",
@@ -120,7 +122,7 @@ fn main() {
         .export_to(
             "./examples/generated/CommentsExample.swift",
             &types,
-            specta_serde::format,
+            specta_serde::Format,
         )
         .unwrap();
     println!("\nComments example written to CommentsExample.swift");

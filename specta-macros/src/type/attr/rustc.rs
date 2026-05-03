@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Lit, Result};
 
@@ -31,14 +32,6 @@ impl Deprecated {
             note: Some(note),
             since,
         }
-    }
-
-    pub fn note(&self) -> Option<&Cow<'static, str>> {
-        self.note.as_ref()
-    }
-
-    pub fn since(&self) -> Option<&Cow<'static, str>> {
-        self.since.as_ref()
     }
 }
 
@@ -120,23 +113,15 @@ impl RustCAttr {
 
         Ok(RustCAttr { doc, deprecated })
     }
+}
 
-    pub fn deprecated_as_tokens(&self) -> proc_macro2::TokenStream {
-        match &self.deprecated {
-            Some(deprecated) => {
-                let since = deprecated
-                    .since()
-                    .map(|v| quote!(#v.into()))
-                    .unwrap_or(quote!(None));
+pub(crate) fn deprecated_as_tokens(Deprecated { note, since }: Deprecated) -> TokenStream {
+    let since = since.map(|v| quote!(#v.into())).unwrap_or(quote!(None));
 
-                let note = match deprecated.note() {
-                    Some(note) => quote!(Some(#note.into())),
-                    None => quote!(None),
-                };
+    let note = match note {
+        Some(note) => quote!(Some(#note.into())),
+        None => quote!(None),
+    };
 
-                quote!(Some(datatype::Deprecated::with_since_note(#since, #note.unwrap_or_default())))
-            }
-            None => quote!(None),
-        }
-    }
+    quote!(Some(datatype::Deprecated::with_since_note(#since, #note.unwrap_or_default())))
 }

@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use serde::{Deserialize, Serialize};
 use specta::{Type, Types};
 use specta_jsonschema::{JsonSchema, SchemaVersion};
@@ -40,7 +42,7 @@ fn main() {
         .schema_version(SchemaVersion::Draft7)
         .title("My API Types")
         .description("JSON Schema for my API types")
-        .export(&types, specta_serde::format)
+        .export(&types, specta_serde::Format)
         .unwrap();
 
     println!("{}", schema);

@@ -2,14 +2,8 @@
 source: tests/tests/jsdoc.rs
 expression: output
 ---
-Range<i32>: {
-	start: number,
-	end: number,
-}
-RangeInclusive<i32>: {
-	start: number,
-	end: number,
-}
+Range<i32>: Range<number>
+RangeInclusive<i32>: RangeInclusive<number>
 String: string
 PathBuf: string
 IpAddr: string
@@ -22,7 +16,7 @@ Cow<'static, str>: string
 Cow<'static, i32>: number
 Vec<i32>: number[]
 Vec<MyEnum>: MyEnum[]
-Result<String, i32>: string | number
+Result<String, i32>: Result<string, number>
 Vec<Option<Cow<'static, i32>>>: (number | null)[]
 PhantomData<()>: null
 PhantomData<String>: null

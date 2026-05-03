@@ -1,4 +1,7 @@
-use super::{AttributeScope, attr::*, build_runtime_attributes, r#struct::decode_field_attrs};
+use super::{
+    AttributeScope, attr::*, build_runtime_attributes, generics::type_with_inferred_lifetimes,
+    r#struct::decode_field_attrs,
+};
 use crate::{r#type::field::construct_field_with_variant_skip, utils::*};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
@@ -72,6 +75,7 @@ pub fn parse_enum(
             let runtime_attrs = build_runtime_attributes(
                 crate_ref,
                 AttributeScope::Variant,
+                quote!(v.attributes),
                 &v.attrs,
                 &container_attrs.skip_attrs,
             )?;
@@ -83,16 +87,11 @@ pub fn parse_enum(
         .map(|(variant, attrs, runtime_attrs)| {
             let variant_ident_str = unraw_raw_ident(&variant.ident);
             let variant_name_str = variant_ident_str.to_token_stream();
-            let variant_skip = attrs.skip;
-            let variant_inline = attrs.inline;
-            let variant_type = attrs.r#type.clone();
-            let variant_type_overridden = variant_type.is_some();
 
-            let variant_value = if let Some(variant_ty) = variant_type {
+            let variant_value = if let Some(ref variant_ty) = attrs.r#type {
+                let variant_ty = type_with_inferred_lifetimes(variant_ty);
                 quote!(datatype::Variant::unnamed().field({
-                    let mut field = datatype::Field::new(<#variant_ty as #crate_ref::Type>::definition(types));
-                    field.type_overridden = true;
-                    field
+                    datatype::Field::new(<#variant_ty as #crate_ref::Type>::definition(types))
                 }).build())
             } else {
                 match &variant.fields {
@@ -106,7 +105,7 @@ pub fn parse_enum(
                                 let (mut field_attrs, raw_attrs) =
                                     decode_field_attrs(field, &container_attrs.skip_attrs)?;
 
-                                if variant_inline && idx == 0 {
+                                if attrs.inline && idx == 0 {
                                     field_attrs.inline = true;
                                 }
 
@@ -116,7 +115,7 @@ pub fn parse_enum(
                                     field_attrs,
                                     &field.ty,
                                     raw_attrs,
-                                    variant_skip,
+                                    attrs.skip,
                                 )
                             })
                             .collect::<syn::Result<Vec<TokenStream>>>()?;
@@ -147,7 +146,7 @@ pub fn parse_enum(
                                     field_attrs,
                                     &field.ty,
                                     raw_attrs,
-                                    variant_skip,
+                                    attrs.skip,
                                 )?;
                                 Ok(quote!(.field(#field_name, #inner)))
                             })
@@ -158,16 +157,31 @@ pub fn parse_enum(
                 }
             };
 
-            let deprecated = attrs.common.deprecated_as_tokens();
-            let skip = variant_skip;
-            let doc = attrs.common.doc;
+            let variant_skip = attrs.skip.then(|| quote!( v.skip = true;));
+
+            let variant_docs = (!attrs.common.doc.is_empty()).then(|| {
+                let docs = &container_attrs.common.doc;
+                quote! {
+                    v.docs = Cow::Borrowed(#docs);
+                }
+            });
+            let field_deprecated = attrs.common.deprecated.map(|deprecated| {
+                let tokens = deprecated_as_tokens(deprecated);
+                quote!(v.deprecated = #tokens;)
+            });
+
+            let type_overridden_attribute = attrs
+                .r#type
+                .as_ref()
+                .map(|_| quote!(v.attributes.insert("specta:type_override", true);));
+
             Ok(quote!((#variant_name_str.into(), {
                 let mut v = #variant_value;
-                v.skip = #skip;
-                v.deprecated = #deprecated;
-                v.docs = #doc.into();
-                v.type_overridden = #variant_type_overridden;
-                v.attributes = #runtime_attrs;
+                #variant_skip
+                #field_deprecated
+                #variant_docs
+                #runtime_attrs
+                #type_overridden_attribute
                 v
             })))
         })

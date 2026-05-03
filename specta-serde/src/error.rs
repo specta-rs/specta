@@ -17,10 +17,6 @@ enum ErrorKind {
         variant: String,
         reason: Cow<'static, str>,
     },
-    UnresolvedGenericReference {
-        path: String,
-        generic: String,
-    },
     InvalidEnumRepresentation {
         reason: Cow<'static, str>,
     },
@@ -65,10 +61,6 @@ enum ErrorKind {
 }
 
 impl Error {
-    pub(crate) fn is_unresolved_generic_reference(&self) -> bool {
-        matches!(self.kind, ErrorKind::UnresolvedGenericReference { .. })
-    }
-
     pub(crate) fn invalid_usage_of_skip(
         path: impl Into<String>,
         reason: impl Into<Cow<'static, str>>,
@@ -91,18 +83,6 @@ impl Error {
                 path: path.into(),
                 variant: variant.into(),
                 reason: reason.into(),
-            },
-        }
-    }
-
-    pub(crate) fn unresolved_generic_reference(
-        path: impl Into<String>,
-        generic: impl Into<String>,
-    ) -> Self {
-        Self {
-            kind: ErrorKind::UnresolvedGenericReference {
-                path: path.into(),
-                generic: generic.into(),
             },
         }
     }
@@ -238,10 +218,6 @@ impl fmt::Display for Error {
                 f,
                 "Invalid internally tagged enum at '{path}', variant '{variant}': {reason}"
             ),
-            ErrorKind::UnresolvedGenericReference { path, generic } => write!(
-                f,
-                "Unresolved generic reference '{generic}' while validating '{path}'"
-            ),
             ErrorKind::InvalidEnumRepresentation { reason } => {
                 write!(f, "Invalid serde enum representation: {reason}")
             }
@@ -273,7 +249,7 @@ impl fmt::Display for Error {
                 deserialize,
             } => write!(
                 f,
-                "Incompatible {context} for '{name}' in unified mode: serialize={serialize:?}, deserialize={deserialize:?}. Use format_phases for asymmetric serde conversions"
+                "Incompatible {context} for '{name}' in unified mode: serialize={serialize:?}, deserialize={deserialize:?}. Use PhasesFormat for asymmetric serde conversions"
             ),
             ErrorKind::InvalidConversionUsage { path, reason } => {
                 write!(

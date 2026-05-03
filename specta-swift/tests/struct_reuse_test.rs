@@ -1,3 +1,5 @@
+#![allow(dead_code, missing_docs)]
+
 use specta::{Type, Types};
 use specta_swift::Swift;
 
@@ -28,7 +30,7 @@ fn test_struct_reuse_between_standalone_and_enum() {
         .register::<ApiResponse>()
         .register::<ApiRequest>();
     let swift = Swift::default();
-    let output = swift.export(&types, specta_serde::format).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Generated Swift for struct reuse test:");
     println!("{}", output);
@@ -66,7 +68,7 @@ fn test_struct_reuse_with_different_ordering() {
         .register::<UserData>()
         .register::<ApiRequest>();
     let swift = Swift::default();
-    let output = swift.export(&types, specta_serde::format).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Generated Swift for struct reuse test (enum first):");
     println!("{}", output);

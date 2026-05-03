@@ -25,32 +25,32 @@ fn identifier_apply_requires_phases() {
     let err = Typescript::default()
         .export(
             &Types::default().register::<VariantIdentifier>(),
-            specta_serde::format,
+            specta_serde::Format,
         )
-        .expect_err("variant_identifier should require format_phases");
+        .expect_err("variant_identifier should require PhasesFormat");
     assert!(
         err.to_string()
-            .contains("identifier enums require `format_phases`")
+            .contains("identifier enums require `PhasesFormat`")
     );
 
     let err = Typescript::default()
         .export(
             &Types::default().register::<FieldIdentifier>(),
-            specta_serde::format,
+            specta_serde::Format,
         )
-        .expect_err("field_identifier should require format_phases");
+        .expect_err("field_identifier should require PhasesFormat");
     assert!(
         err.to_string()
-            .contains("identifier enums require `format_phases`")
+            .contains("identifier enums require `PhasesFormat`")
     );
 }
 
 #[test]
-fn identifier_format_phases_exports_deserialize_union() {
+fn identifier_phases_format_exports_deserialize_union() {
     let variant_ts = Typescript::default()
         .export(
             &Types::default().register::<VariantIdentifier>(),
-            specta_serde::format_phases,
+            specta_serde::PhasesFormat,
         )
         .expect("typescript export should succeed");
 
@@ -59,7 +59,7 @@ fn identifier_format_phases_exports_deserialize_union() {
     let field_ts = Typescript::default()
         .export(
             &Types::default().register::<FieldIdentifier>(),
-            specta_serde::format_phases,
+            specta_serde::PhasesFormat,
         )
         .expect("typescript export should succeed");
 

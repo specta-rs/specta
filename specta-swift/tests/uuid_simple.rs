@@ -1,3 +1,5 @@
+#![allow(dead_code, missing_docs)]
+
 use specta::{Type, Types};
 use specta_swift::Swift;
 
@@ -19,7 +21,7 @@ struct WithChrono {
 fn test_uuid_support() {
     let types = Types::default().register::<WithUuid>();
     let swift = Swift::default();
-    let output = swift.export(&types, specta_serde::format).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("UUID support test:\n{}", output);
 
@@ -32,7 +34,7 @@ fn test_uuid_support() {
 fn test_chrono_support() {
     let types = Types::default().register::<WithChrono>();
     let swift = Swift::default();
-    let output = swift.export(&types, specta_serde::format).unwrap();
+    let output = swift.export(&types, specta_serde::Format).unwrap();
 
     println!("Chrono support test:\n{}", output);
 

@@ -9,8 +9,8 @@ use std::{
 use specta::{
     Types,
     datatype::{
-        DataType, Deprecated, Enum, Field, Fields, GenericReference, Reference, Struct, Tuple,
-        Variant,
+        DataType, Deprecated, Enum, Field, Fields, GenericReference, NamedReferenceType, Reference,
+        Struct, Tuple, Variant,
     },
 };
 
@@ -161,7 +161,7 @@ fn unnamed_fields_datatype(
                 None,
                 "",
                 generics,
-                force_inline || field.inline,
+                force_inline,
             )?;
             s.push_str(&inner_comments(
                 field.deprecated.as_ref(),
@@ -191,7 +191,7 @@ fn unnamed_fields_datatype(
                     None,
                     "",
                     generics,
-                    force_inline || field.inline,
+                    force_inline,
                 )?;
                 s.push_str(&inner_comments(
                     field.deprecated.as_ref(),
@@ -233,7 +233,6 @@ pub(crate) fn tuple_datatype(
 
 pub(crate) fn struct_datatype(
     ctx: ExportContext,
-    _parent_name: Option<&str>,
     strct: &Struct,
     types: &Types,
     s: &mut String,
@@ -272,8 +271,8 @@ pub(crate) fn struct_datatype(
                 return Ok(());
             }
 
-            let (flattened, non_flattened): (Vec<_>, Vec<_>) =
-                fields.iter().partition(|(_, (f, _))| f.flatten);
+            let flattened: Vec<(&Cow<'static, str>, (&Field, &DataType))> = Vec::new();
+            let non_flattened = fields.clone();
 
             let mut flattened_sections = flattened
                 .into_iter()
@@ -289,7 +288,7 @@ pub(crate) fn struct_datatype(
                         None,
                         "",
                         generics,
-                        field.inline,
+                        false,
                     )
                     .map(|_| {
                         inner_comments(
@@ -390,8 +389,8 @@ fn enum_variant_datatype(
                 .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
                 .collect::<Vec<_>>();
 
-            let (flattened, non_flattened): (Vec<_>, Vec<_>) =
-                all_fields.iter().partition(|(_, (f, _))| f.flatten);
+            let flattened: Vec<(&Cow<'static, str>, (&Field, &DataType))> = Vec::new();
+            let non_flattened = all_fields.clone();
 
             let field_sections = flattened
                 .into_iter()
@@ -407,7 +406,7 @@ fn enum_variant_datatype(
                         None,
                         "",
                         generics,
-                        field.inline,
+                        false,
                     )
                     .map(|_| {
                         inner_comments(
@@ -488,8 +487,8 @@ fn enum_variant_datatype(
             let fields = obj
                 .fields
                 .iter()
-                .filter_map(|field| field.ty.as_ref().map(|ty| (field, ty)))
-                .map(|(field, ty)| {
+                .filter_map(|field| field.ty.as_ref())
+                .map(|ty| {
                     let mut s = String::new();
                     crate::primitives::datatype_with_inline_attr(
                         &mut s,
@@ -501,7 +500,7 @@ fn enum_variant_datatype(
                         None,
                         "",
                         generics,
-                        field.inline,
+                        false,
                     )
                     .map(|_| s)
                 })
@@ -595,10 +594,7 @@ fn variant_discriminator(variant: &Variant) -> Option<(String, DiscriminatorValu
         return None;
     };
 
-    let (name, field) = named
-        .fields
-        .iter()
-        .find(|(_, field)| !field.flatten && !field.optional)?;
+    let (name, field) = named.fields.iter().find(|(_, field)| !field.optional)?;
     let ty = field.ty.as_ref()?;
 
     if matches!(ty, DataType::Primitive(specta::datatype::Primitive::str)) {
@@ -650,10 +646,6 @@ fn untagged_strict_keys(variant: &Variant) -> Option<BTreeSet<String>> {
                 .iter()
                 .filter_map(|(name, field)| field.ty.as_ref().map(|ty| (name, (field, ty))))
                 .collect::<Vec<_>>();
-            if all_fields.iter().any(|(_, (field, _))| field.flatten) {
-                return None;
-            }
-
             Some(
                 all_fields
                     .into_iter()
@@ -819,7 +811,7 @@ fn object_field_to_ts(
                 None,
                 prefix,
                 generics,
-                force_inline || field.inline,
+                force_inline,
             )?;
             value
         }
@@ -830,20 +822,24 @@ fn object_field_to_ts(
 
 fn inline_reference_docs<'a>(
     types: &'a Types,
-    (field, ty): (&Field, &'a DataType),
+    (_field, ty): (&Field, &'a DataType),
     force_inline: bool,
 ) -> Option<&'a str> {
     let DataType::Reference(Reference::Named(r)) = ty else {
         return None;
     };
 
-    if !(force_inline || field.inline || r.inline()) {
+    if !force_inline {
         return None;
     }
 
-    r.get(types)
-        .filter(|ndt| !ndt.docs.trim().is_empty())
-        .map(|ndt| ndt.docs.as_ref())
+    match &r.inner {
+        NamedReferenceType::Reference { .. } => types
+            .get(r)
+            .filter(|ndt| !ndt.docs.trim().is_empty())
+            .map(|ndt| ndt.docs.as_ref()),
+        NamedReferenceType::Inline { .. } | NamedReferenceType::Recursive => None,
+    }
 }
 
 /// sanitise a string to be a valid Typescript key
@@ -1035,7 +1031,7 @@ pub(crate) fn deprecated_details(typ: &Deprecated) -> Option<String> {
 
 //     let mut builder = js_doc_builder(docs, deprecated);
 
-//     typ.generics()
+//     typ.generics()()
 //         .into_iter()
 //         .for_each(|generic| builder.push_generic(generic));
 
