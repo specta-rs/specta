@@ -24,7 +24,9 @@ pub enum Layout {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Go {
+    /// Content written before the generated Go package declaration.
     pub header: Cow<'static, str>,
+    /// The output file layout.
     pub layout: Layout,
     package_name: String,
 }
@@ -40,20 +42,24 @@ impl Default for Go {
 }
 
 impl Go {
+    /// Creates a Go exporter using the default configuration.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Sets the generated Go package name.
     pub fn package_name(mut self, name: impl Into<String>) -> Self {
         self.package_name = name.into();
         self
     }
 
+    /// Sets content written before the generated Go package declaration.
     pub fn header(mut self, header: impl Into<Cow<'static, str>>) -> Self {
         self.header = header.into();
         self
     }
 
+    /// Exports the provided types into a Go source file string.
     pub fn export(&self, types: &Types, format: impl Format) -> Result<String, Error> {
         let mut ctx = GoContext::default();
         let mut body = String::new();
@@ -92,6 +98,7 @@ impl Go {
         Ok(out)
     }
 
+    /// Exports the provided types to a Go source file at the given path.
     pub fn export_to(
         &self,
         path: impl AsRef<Path>,

@@ -32,7 +32,7 @@ use crate::{
 ///
 /// We recommend passing in your types in bulk instead of doing individual calls as it leaves formatting to us and also allows us to merge the JSDoc types into a single large comment.
 ///
-/// If you are using a custom format such as [`crate::serde::format`] with the high-level exporter,
+/// If you are using a custom format such as `serde::format` with the high-level exporter,
 /// these primitive helpers do not apply that mapping automatically. Standalone primitive usage
 /// should map both the full [`Types`] graph and any top-level [`DataType`] values with matching
 /// helpers first.

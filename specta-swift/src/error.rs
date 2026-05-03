@@ -32,7 +32,9 @@ pub enum Error {
     /// Custom format callback failed.
     #[error("Format error: {message}: {source}")]
     Format {
+        /// Context describing which format callback failed.
         message: &'static str,
+        /// The underlying format error.
         source: specta::FormatError,
     },
 }
