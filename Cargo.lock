@@ -741,7 +741,6 @@ dependencies = [
 name = "example-scratchpad"
 version = "0.0.0"
 dependencies = [
- "heapless",
  "serde",
  "specta",
  "specta-serde",
