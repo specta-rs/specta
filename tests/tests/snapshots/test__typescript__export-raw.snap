@@ -383,13 +383,13 @@ number |
  */
 a: number };
 
-SingleLineComment: // Some single-line comment
+SingleLineComment: /**  Some single-line comment */
 export type SingleLineComment = 
-// Some single-line comment
+/**  Some single-line comment */
 number | 
-// Some single-line comment
+/**  Some single-line comment */
 { 
-// Some single-line comment
+/**  Some single-line comment */
 a: number };
 
 NonGeneric: export type Demo<A, B> = {

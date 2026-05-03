@@ -314,11 +314,11 @@ number |
  */
 a: number }
 SingleLineComment: 
-// Some single-line comment
+/**  Some single-line comment */
 number | 
-// Some single-line comment
+/**  Some single-line comment */
 { 
-// Some single-line comment
+/**  Some single-line comment */
 a: number }
 NonGeneric: {
 	a: A,

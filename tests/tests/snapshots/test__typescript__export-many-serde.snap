@@ -368,13 +368,13 @@ export type CommentedEnum =
 	a: number,
 } }) & { A?: never };
 
-// Some single-line comment
+/**  Some single-line comment */
 export type SingleLineComment = 
-// Some single-line comment
+/**  Some single-line comment */
 ({ A: number }) & { B?: never } | 
-// Some single-line comment
+/**  Some single-line comment */
 ({ B: {
-	// Some single-line comment
+	/**  Some single-line comment */
 	a: number,
 } }) & { A?: never };
 

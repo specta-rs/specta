@@ -778,32 +778,20 @@ SingleLineComment: /**
 	*  Some single-line comment
 	*
 	* @typedef {
-	*	/**
-	*	 *  Some single-line comment
-	*	 */
+	*	/**  Some single-line comment */
 	* ({ A: number }) & { B?: never } | 
-	*	/**
-	*	 *  Some single-line comment
-	*	 */
+	*	/**  Some single-line comment */
 	* ({ B: {
-	* 	/**
-	* 	 *  Some single-line comment
-	* 	 */
+	* 	/**  Some single-line comment */
 	* 	a: number,
 	* } }) & { A?: never }} SingleLineComment
 	* @property {
-	* /**
-	*  *  Some single-line comment
-	*  */
+	* /**  Some single-line comment */
 	* { A: number }} A - Some single-line comment
 	* @property {
-	* /**
-	*  *  Some single-line comment
-	*  */
+	* /**  Some single-line comment */
 	* { B: {
-	* 	/**
-	* 	 *  Some single-line comment
-	* 	 */
+	* 	/**  Some single-line comment */
 	* 	a: number,
 	* } }} B - Some single-line comment
 	*/

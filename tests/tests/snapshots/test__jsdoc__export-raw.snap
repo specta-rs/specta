@@ -732,31 +732,19 @@ SingleLineComment: /**
 	*  Some single-line comment
 	*
 	* @typedef {
-	*	/**
-	*	 *  Some single-line comment
-	*	 */
+	*	/**  Some single-line comment */
 	* number | 
-	*	/**
-	*	 *  Some single-line comment
-	*	 */
+	*	/**  Some single-line comment */
 	* { 
-	*	/**
-	*	 *  Some single-line comment
-	*	 */
+	*	/**  Some single-line comment */
 	* a: number }} SingleLineComment
 	* @property {
-	* /**
-	*  *  Some single-line comment
-	*  */
+	* /**  Some single-line comment */
 	* number} A - Some single-line comment
 	* @property {
-	* /**
-	*  *  Some single-line comment
-	*  */
+	* /**  Some single-line comment */
 	* { 
-	* /**
-	*  *  Some single-line comment
-	*  */
+	* /**  Some single-line comment */
 	* a: number }} B - Some single-line comment
 	*/
 

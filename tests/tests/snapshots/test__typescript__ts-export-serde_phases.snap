@@ -507,16 +507,16 @@ export type Issue281 = {
 	default_unity_arguments: string[],
 };
 
-// https://github.com/specta-rs/specta/issues/374
+/**  https://github.com/specta-rs/specta/issues/374 */
 export type Issue374 = Issue374_Serialize | Issue374_Deserialize;
 
-// https://github.com/specta-rs/specta/issues/374
+/**  https://github.com/specta-rs/specta/issues/374 */
 export type Issue374_Deserialize = {
 	foo?: boolean,
 	bar?: boolean,
 };
 
-// https://github.com/specta-rs/specta/issues/374
+/**  https://github.com/specta-rs/specta/issues/374 */
 export type Issue374_Serialize = {
 	foo?: boolean,
 	bar?: boolean,
@@ -972,13 +972,13 @@ export type SimpleStruct = {
 	e: string | null,
 };
 
-// Some single-line comment
+/**  Some single-line comment */
 export type SingleLineComment = 
-// Some single-line comment
+/**  Some single-line comment */
 ({ A: number }) & { B?: never } | 
-// Some single-line comment
+/**  Some single-line comment */
 ({ B: {
-	// Some single-line comment
+	/**  Some single-line comment */
 	a: number,
 } }) & { A?: never };
 
