@@ -714,6 +714,15 @@ fn validate_internally_tag_enum_datatype(
     match ty {
         DataType::Map(_) => Ok(()),
         DataType::Struct(_) => Ok(()),
+        DataType::Reference(Reference::Named(reference))
+            if matches!(reference.inner, NamedReferenceType::Inline { .. }) =>
+        {
+            if let Some(ty) = named_reference_ty(reference, types) {
+                validate_internally_tag_enum_datatype(ty, types, path, variant_name)?;
+            }
+
+            Ok(())
+        }
         DataType::Enum(enm) => match EnumRepr::from_attrs(&enm.attributes)? {
             EnumRepr::Untagged => validate_internally_tag_enum(enm, types, path.to_string()),
             EnumRepr::External | EnumRepr::Internal { .. } | EnumRepr::Adjacent { .. } => Ok(()),

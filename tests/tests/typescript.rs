@@ -129,6 +129,22 @@ fn typescript_export_serde_errors() {
         }
     }
 
+    fn assert_serde_export_ok<T: Type>(failures: &mut Vec<String>, name: &str) {
+        let mut types = Types::default();
+        let dt = T::definition(&mut types);
+
+        for (mode, format) in [
+            ("serde", Box::new(specta_serde::Format) as Box<dyn Format>),
+            ("serde_phases", Box::new(specta_serde::PhasesFormat)),
+        ] {
+            if let Err(err) = format.map_type(&types, &dt) {
+                failures.push(format!(
+                    "{name} ({mode}) [map_type]: expected export to succeed, got '{err}'"
+                ));
+            }
+        }
+    }
+
     #[derive(Type, serde::Serialize)]
     #[specta(collect = false)]
     #[serde(tag = "type")]
@@ -251,7 +267,27 @@ fn typescript_export_serde_errors() {
         demo: HashMap<RecursiveMapKeyTrick, String>,
     }
 
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    #[serde(tag = "type")]
+    enum InternallyTaggedBoxedStruct {
+        // Regression test for https://github.com/specta-rs/specta/issues/482
+        // `Box<T>` is transparent to serde, so this must validate like `T`.
+        A(Box<InternallyTaggedBoxedStructPayload>),
+    }
+
+    #[derive(Type, serde::Serialize)]
+    #[specta(collect = false)]
+    struct InternallyTaggedBoxedStructPayload {
+        message: String,
+    }
+
     let mut failures = Vec::new();
+
+    assert_serde_export_ok::<InternallyTaggedBoxedStruct>(
+        &mut failures,
+        "InternallyTaggedBoxedStruct",
+    );
 
     // Serde Error: "cannot serialize tagged newtype variant InternallyTaggedB::A containing a string"
     assert_serde_error::<InternallyTaggedB>(
