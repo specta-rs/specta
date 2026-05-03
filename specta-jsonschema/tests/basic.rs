@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use std::fs;
 
 use serde::{Deserialize, Serialize};

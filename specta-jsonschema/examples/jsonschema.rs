@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use serde::{Deserialize, Serialize};
 use specta::{Type, Types};
 use specta_jsonschema::{JsonSchema, SchemaVersion};

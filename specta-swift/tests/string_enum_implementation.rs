@@ -1,3 +1,5 @@
+#![allow(dead_code, missing_docs)]
+
 use serde::{Deserialize, Serialize};
 use specta::{Type, Types};
 use specta_swift::Swift;
