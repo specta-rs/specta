@@ -21,13 +21,11 @@ pub mod internal;
 mod r#type;
 mod types;
 
-/// Formatter hook used by exporters and integration crates to rewrite collected
-/// type information before export.
+#[doc(inline)]
 pub use format::{Format, FormatError};
-/// Trait implemented by Rust types that can describe themselves as Specta
-/// datatypes.
+#[doc(inline)]
 pub use r#type::Type;
-/// Collection of named type definitions discovered while resolving [`Type`]s.
+#[doc(inline)]
 pub use types::Types;
 
 #[doc(inline)]
