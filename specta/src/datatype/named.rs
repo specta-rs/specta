@@ -270,11 +270,12 @@ impl NamedDataType {
 
 /// Runtime representation of Rust's `#[deprecated]` metadata.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub struct Deprecated {
     /// Optional deprecation note or replacement guidance.
     pub note: Option<Cow<'static, str>>,
     /// Optional version where the item became deprecated.
-    since: Option<Cow<'static, str>>,
+    pub since: Option<Cow<'static, str>>,
 }
 
 impl Deprecated {
