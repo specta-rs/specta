@@ -2,10 +2,9 @@
 
 use std::{borrow::Cow, ops::Range};
 
-use serde::Serialize;
 use specta::{
     Type, Types,
-    datatype::{DataType, NamedReferenceType, Reference},
+    datatype::{DataType, Reference},
 };
 
 #[derive(Type)]

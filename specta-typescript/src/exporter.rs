@@ -603,7 +603,7 @@ fn map_datatype_format_children(
     match &mut dt {
         DataType::Primitive(_) => {}
         DataType::List(list) => {
-            list.ty = Box::new(map_datatype_format(format, types, &list.ty)?);
+            *list.ty = map_datatype_format(format, types, &list.ty)?;
         }
         DataType::Map(map) => {
             let key = map_datatype_format(format, types, map.key_ty())?;

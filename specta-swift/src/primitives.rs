@@ -470,7 +470,7 @@ fn apply_datatype_format_children(
     match &mut dt {
         DataType::Primitive(_) => {}
         DataType::List(list) => {
-            list.ty = Box::new(apply_datatype_format(format, types, &list.ty)?);
+            *list.ty = apply_datatype_format(format, types, &list.ty)?;
         }
         DataType::Map(map) => {
             let key = apply_datatype_format(format, types, map.key_ty())?;
@@ -571,13 +571,13 @@ fn fields_contain_generic_reference(fields: &Fields) -> bool {
             field
                 .ty
                 .as_ref()
-                .is_some_and(|ty| contains_generic_reference(ty))
+                .is_some_and(contains_generic_reference)
         }),
         Fields::Named(named) => named.fields.iter().any(|(_, field)| {
             field
                 .ty
                 .as_ref()
-                .is_some_and(|ty| contains_generic_reference(ty))
+                .is_some_and(contains_generic_reference)
         }),
     }
 }

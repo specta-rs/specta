@@ -323,7 +323,7 @@ impl specta::Format for PhasesFormat {
                 && let Err(err) = rewrite_datatype_for_phase(
                     ty,
                     PhaseRewrite::Serialize,
-                    &types,
+                    types,
                     &generated,
                     &split_types,
                     Some(original.name.as_ref()),

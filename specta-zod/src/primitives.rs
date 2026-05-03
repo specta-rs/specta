@@ -503,7 +503,7 @@ fn struct_dt(
                 }
                 fields => {
                     s.push_str("z.tuple([");
-                    for (i, (field, ty)) in fields.iter().enumerate() {
+                    for (i, (_field, ty)) in fields.iter().enumerate() {
                         if i != 0 {
                             s.push_str(", ");
                         }
@@ -725,7 +725,7 @@ fn enum_variant_dt(
                 }
                 fields => {
                     let mut out = String::from("z.tuple([");
-                    for (i, (field, ty)) in fields.iter().enumerate() {
+                    for (i, (_field, ty)) in fields.iter().enumerate() {
                         if i != 0 {
                             out.push_str(", ");
                         }
