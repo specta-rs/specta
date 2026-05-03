@@ -729,6 +729,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "example-collect"
+version = "0.0.0"
+dependencies = [
+ "specta",
+ "specta-serde",
+ "specta-typescript",
+]
+
+[[package]]
 name = "example-scratchpad"
 version = "0.0.0"
 dependencies = [
