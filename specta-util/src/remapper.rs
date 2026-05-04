@@ -10,8 +10,8 @@ use specta::{
 /// equality checks while walking the [`DataType`] structure applying the transformations.
 ///
 /// Rules are applied in the order they are registered. For each visited
-/// [`DataType`], the first matching rule is used and no later rules are checked
-/// for that node.
+/// [`DataType`], every matching rule is applied, with each rule seeing the
+/// result of the previous matching rule.
 ///
 /// # Examples
 ///
@@ -69,8 +69,15 @@ impl Remapper {
         self
     }
 
+    /// Registers a rule that replaces exact matches of `from` with `to`.
+    ///
+    /// Rules are checked in the order they are registered.
+    pub fn with_rule(self, from: DataType, to: DataType) -> Self {
+        self.rule(from, to)
+    }
+
     /// Applies the remap operation to a datatype, returning the remapped datatype.
-    pub fn remap(&self, mut dt: DataType) -> DataType {
+    pub fn remap_dt(&self, mut dt: DataType) -> DataType {
         self.remap_internal(&mut dt);
         dt
     }
@@ -91,9 +98,7 @@ impl Remapper {
     }
 
     fn remap_internal(&self, dt: &mut DataType) {
-        if self.remap_rule(dt) {
-            return;
-        }
+        self.remap_rules(dt);
 
         match dt {
             DataType::Primitive(_) | DataType::Generic(_) => {}
@@ -123,13 +128,12 @@ impl Remapper {
         }
     }
 
-    fn remap_rule(&self, dt: &mut DataType) -> bool {
-        let Some((_, to)) = self.rules.iter().find(|(from, _)| *dt == *from) else {
-            return false;
-        };
-
-        *dt = to.clone();
-        true
+    fn remap_rules(&self, dt: &mut DataType) {
+        for (from, to) in &self.rules {
+            if *dt == *from {
+                *dt = to.clone();
+            }
+        }
     }
 
     fn remap_fields(&self, fields: &mut Fields) {
@@ -188,7 +192,7 @@ mod tests {
         let remapped = Remapper::new()
             .with_rule(Primitive::u32.into(), Primitive::str.into())
             .with_rule(Primitive::i32.into(), Primitive::bool.into())
-            .remap(dt);
+            .remap_dt(dt);
 
         assert_eq!(
             remapped,
@@ -200,26 +204,26 @@ mod tests {
     }
 
     #[test]
-    fn rules_are_applied_in_registration_order() {
+    fn rules_are_piped_in_registration_order() {
         let remapped = Remapper::new()
-            .with_rule(Primitive::u32.into(), Primitive::str.into())
-            .with_rule(Primitive::u32.into(), Primitive::bool.into())
-            .remap(Primitive::u32.into());
+            .with_rule(Primitive::u32.into(), Primitive::i32.into())
+            .with_rule(Primitive::i32.into(), Primitive::bool.into())
+            .remap_dt(Primitive::u32.into());
 
-        assert_eq!(remapped, Primitive::str.into());
+        assert_eq!(remapped, Primitive::bool.into());
     }
 
     #[test]
-    fn replacement_is_not_recrawled() {
+    fn replacement_is_recrawled() {
         let remapped = Remapper::new()
             .with_rule(
                 Primitive::u32.into(),
                 DataType::List(List::new(Primitive::i32.into())),
             )
             .with_rule(Primitive::i32.into(), Primitive::bool.into())
-            .remap(Primitive::u32.into());
+            .remap_dt(Primitive::u32.into());
 
-        assert_eq!(remapped, DataType::List(List::new(Primitive::i32.into())));
+        assert_eq!(remapped, DataType::List(List::new(Primitive::bool.into())));
     }
 
     #[test]
