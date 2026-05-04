@@ -11,7 +11,7 @@
 mod selection;
 
 mod array;
-mod remap;
+mod remapper;
 
 pub use array::FixedArray;
-pub use remap::Remap;
+pub use remapper::Remapper;
