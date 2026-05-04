@@ -15,40 +15,25 @@ use specta::{
 ///
 /// # Examples
 ///
-/// Remap multiple datatypes in a single crawl:
+/// Remap `u32` to `str` and `i32` to `bool`:
 ///
 /// ```rust
-/// use specta::datatype::{DataType, List, Primitive};
+/// use specta::{Types, datatype::{DataType, Field, List, NamedDataType, Primitive, Struct}};
 /// use specta_util::Remapper;
 ///
 /// let remapper = Remapper::new()
-///     .with_rule(Primitive::u32.into(), Primitive::str.into())
-///     .with_rule(Primitive::i32.into(), Primitive::bool.into());
+///     .rule(Primitive::u32.into(), Primitive::str.into())
+///     .rule(Primitive::i32.into(), Primitive::bool.into());
 ///
+/// // For a single `DataType`
 /// assert_eq!(
-///     remapper.remap(DataType::List(List::new(Primitive::u32.into()))),
+///     remapper.remap_dt(DataType::List(List::new(Primitive::u32.into()))),
 ///     DataType::List(List::new(Primitive::str.into()))
 /// );
-/// ```
 ///
-/// Remap every matching datatype inside a named type collection:
-///
-/// ```rust
-/// use specta::{Types, datatype::{Field, NamedDataType, Primitive, Struct}};
-/// use specta_util::Remapper;
-///
-/// let mut types = Types::default();
-/// NamedDataType::new("User", &mut types, |_, ty| {
-///     ty.ty = Some(Struct::named()
-///         .field("id", Field::new(Primitive::u32.into()))
-///         .build());
-/// });
-///
-/// let types = Remapper::new()
-///     .with_rule(Primitive::u32.into(), Primitive::str.into())
-///     .remap_types(types);
-///
-/// assert!(format!("{types:?}").contains("Primitive(str)"));
+/// // For a whole collection of types
+/// # #[allow(unused)]
+/// let types: Types = remapper.remap_types(Types::default());
 /// ```
 #[derive(Debug, Clone, Default)]
 pub struct Remapper {
@@ -67,13 +52,6 @@ impl Remapper {
     pub fn rule(mut self, from: DataType, to: DataType) -> Self {
         self.rules.push((from, to));
         self
-    }
-
-    /// Registers a rule that replaces exact matches of `from` with `to`.
-    ///
-    /// Rules are checked in the order they are registered.
-    pub fn with_rule(self, from: DataType, to: DataType) -> Self {
-        self.rule(from, to)
     }
 
     /// Applies the remap operation to a datatype, returning the remapped datatype.
@@ -190,8 +168,8 @@ mod tests {
         ]));
 
         let remapped = Remapper::new()
-            .with_rule(Primitive::u32.into(), Primitive::str.into())
-            .with_rule(Primitive::i32.into(), Primitive::bool.into())
+            .rule(Primitive::u32.into(), Primitive::str.into())
+            .rule(Primitive::i32.into(), Primitive::bool.into())
             .remap_dt(dt);
 
         assert_eq!(
@@ -206,8 +184,8 @@ mod tests {
     #[test]
     fn rules_are_piped_in_registration_order() {
         let remapped = Remapper::new()
-            .with_rule(Primitive::u32.into(), Primitive::i32.into())
-            .with_rule(Primitive::i32.into(), Primitive::bool.into())
+            .rule(Primitive::u32.into(), Primitive::i32.into())
+            .rule(Primitive::i32.into(), Primitive::bool.into())
             .remap_dt(Primitive::u32.into());
 
         assert_eq!(remapped, Primitive::bool.into());
@@ -216,11 +194,11 @@ mod tests {
     #[test]
     fn replacement_is_recrawled() {
         let remapped = Remapper::new()
-            .with_rule(
+            .rule(
                 Primitive::u32.into(),
                 DataType::List(List::new(Primitive::i32.into())),
             )
-            .with_rule(Primitive::i32.into(), Primitive::bool.into())
+            .rule(Primitive::i32.into(), Primitive::bool.into())
             .remap_dt(Primitive::u32.into());
 
         assert_eq!(remapped, DataType::List(List::new(Primitive::bool.into())));
@@ -239,8 +217,8 @@ mod tests {
         });
 
         let types = Remapper::new()
-            .with_rule(Primitive::u32.into(), Primitive::str.into())
-            .with_rule(Primitive::i32.into(), Primitive::bool.into())
+            .rule(Primitive::u32.into(), Primitive::str.into())
+            .rule(Primitive::i32.into(), Primitive::bool.into())
             .remap_types(types);
 
         let debug = format!("{types:?}");
