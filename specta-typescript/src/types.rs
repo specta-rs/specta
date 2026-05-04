@@ -76,6 +76,17 @@ impl<T: serde::Serialize> serde::Serialize for Any<T> {
     }
 }
 
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for Any<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        T::deserialize(deserializer).map(Self)
+    }
+}
+
 /// Cast a Rust type to a Typescript `unknown` type.
 ///
 /// # Examples
@@ -140,6 +151,17 @@ impl<T: serde::Serialize> serde::Serialize for Unknown<T> {
         S: serde::Serializer,
     {
         T::serialize(&self.0, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for Unknown<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        T::deserialize(deserializer).map(Self)
     }
 }
 
@@ -210,6 +232,17 @@ impl<T: serde::Serialize> serde::Serialize for Never<T> {
     }
 }
 
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for Never<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        T::deserialize(deserializer).map(Self)
+    }
+}
+
 /// Cast a Rust type to a Typescript `number` type.
 ///
 /// This can be used to opt into exporting BigInt-style Rust integer types as
@@ -277,5 +310,16 @@ impl<T: serde::Serialize> serde::Serialize for Number<T> {
         S: serde::Serializer,
     {
         T::serialize(&self.0, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for Number<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        T::deserialize(deserializer).map(Self)
     }
 }
