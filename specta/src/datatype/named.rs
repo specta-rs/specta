@@ -92,7 +92,11 @@ impl NamedDataType {
     ///
     /// This is used by `#[derive(Type)]` and the built-in `Type` implementation macros and must be used carefully.
     ///
+    /// <div class="warning">
+    ///
     /// WARNING: Do not call this outside of `specta` as its signature and behavior may change in minor releases!!!!
+    ///
+    /// </div>
     ///
     /// This registers the canonical [`NamedDataType`] for `sentinel` at most once, then returns a
     /// use-site [`Reference`]. During first registration, `None` is inserted into [`Types`] before

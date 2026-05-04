@@ -15,24 +15,31 @@ use super::legacy::ExportPath;
 ///
 /// This guard exists because `JSON.parse` will truncate large integers to fit into a JavaScript `number` type so we explicitly forbid exporting them.
 ///
+/// We take the stance that correctness matters more than developer experience as people using Rust generally strive for correctness.
+///
 /// If you encounter this error, there are a few common migration paths (in order of preference):
 ///
-/// 1. Use a smaller integer types (any of `u8`/`i8`/`u16`/`i16`/`u32`/`i32`/`f64`).
+/// 1. Use a Specta-based framework
+///     - Frameworks like [Tauri Specta](https://github.com/specta-rs/tauri-specta) and [TauRPC](https://github.com/MatsDK/TauRPC) take care of this for you.
+///     - They use special internals to preserve the values and make use of [`specta-tags`](http://docs.rs/specta-tags) for generating glue-code automatically.
+///
+/// 2. Use a smaller integer types (any of `u8`/`i8`/`u16`/`i16`/`u32`/`i32`/`f64`).
 ///    - Only possible when the biggest integer you need to represent is small enough to be represented by a `number` in JS.
 ///    - This approach forces your application code to handle overflow/underflow values explicitly
 ///    - Downside is that it can introduce annoying glue code and doesn't actually work if your need large values.
 ///
-/// 2. Serialize the value as a string
-///     - This can be done using `#[specta(type = String)]` combined with a Serde `#[serde(with = "...")]` attribute.
-///     - Downside is that it can introduce annoying glue code, both on in Rust and in JS as you will need to turn it back into a `new BigInt(myString)` in JS.
+/// 3. Serialize the value as a string
+///     - This can be done using `#[specta(type = String)]` for the type combined with a Serde `#[serde(with = "...")]` attribute for runtime.
+///     - Downside is that it can introduce annoying glue code, both on in Rust and in JS as you will need to turn it back into a `new BigInt(myString)` in JS but this will support numbers of any size losslessly.
 ///
-/// 3. Use a Specta-based framework
-///     - Frameworks like [Tauri Specta](https://github.com/specta-rs/tauri-specta) and [TauRPC](https://github.com/MatsDK/TauRPC) take care of this for you.
-///     - They use special internals to preserve the values and make use of [`specta-tags`](http://docs.rs/specta-tags) for generating glue-code automatically.
+/// 4. UNSAFE: Accept precision loss on per-field basis
+///     - Accept that large numbers may be deserialized differently than they are in Rust and use `#[specta(type = specta_typescript::Number)]` to bypass this warning on a per-field basis.
+///     - Marking each field explicitly encodes the decision similar to an `unsafe` block, ensuring everyone working on your codebase is aware of the risk and where it exists within the codebase.
+///     - This doesn't work for external implementations like `serde_json::Value` which contain `BigInt`'s as you don't control the definition.
 ///
-/// 4. UNSAFE: Accept precision loss
-///     - Accept that large numbers may be deserialized differently and use `#[specta(type = f64)]` to bypass this warning on a per-field basis.
-///     - This can't be set globally as it is designed intentionally to introduce friction, as you are accepting the risk of data loss which is not okay.
+/// 5. UNSAFE: Accept precision loss using [`specta_util::Remapper`](https://docs.rs/specta-util/latest/specta_util/struct.Remapper.html)
+///     - You can apply a `Remapper` to your [`Types`](specta::Types) collection to override types. This would allow you to remap `usize`/`isize`/`i64`/`u64`/`i128`/`u128`/`f128` into `number`.
+///     - This is highly not recommended but it might be required if your using `serde_json::Value` or other built-in impls which contain `BigInt`'s as you can't override them.
 ///
 #[non_exhaustive]
 pub struct Error {

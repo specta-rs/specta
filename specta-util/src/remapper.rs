@@ -13,6 +13,16 @@ use specta::{
 /// [`DataType`], every matching rule is applied, with each rule seeing the
 /// result of the previous matching rule.
 ///
+/// <div class="warning">
+///
+/// WARNING: This is an advanced API!
+///
+/// It needs to be used carefully as it can easily break the safety of the end to end type contract.
+///
+/// You must ensure you have Serde applying the same transformations to the runtime data for it to be sound.
+///
+/// </div>
+///
 /// # Examples
 ///
 /// Remap `u32` to `str` and `i32` to `bool`:
