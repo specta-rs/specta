@@ -567,18 +567,14 @@ fn contains_generic_reference(dt: &DataType) -> bool {
 fn fields_contain_generic_reference(fields: &Fields) -> bool {
     match fields {
         Fields::Unit => false,
-        Fields::Unnamed(unnamed) => unnamed.fields.iter().any(|field| {
-            field
-                .ty
-                .as_ref()
-                .is_some_and(contains_generic_reference)
-        }),
-        Fields::Named(named) => named.fields.iter().any(|(_, field)| {
-            field
-                .ty
-                .as_ref()
-                .is_some_and(contains_generic_reference)
-        }),
+        Fields::Unnamed(unnamed) => unnamed
+            .fields
+            .iter()
+            .any(|field| field.ty.as_ref().is_some_and(contains_generic_reference)),
+        Fields::Named(named) => named
+            .fields
+            .iter()
+            .any(|(_, field)| field.ty.as_ref().is_some_and(contains_generic_reference)),
     }
 }
 

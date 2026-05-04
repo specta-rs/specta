@@ -1,6 +1,6 @@
 use specta::{
-    datatype::{DataType, Fields, NamedReferenceType, Reference},
     Types,
+    datatype::{DataType, Fields, NamedReferenceType, Reference},
 };
 
 /// Recursively replaces one [`DataType`] with another.
