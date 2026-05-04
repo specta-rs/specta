@@ -327,6 +327,7 @@ pub fn derive(input: proc_macro::TokenStream) -> syn::Result<proc_macro::TokenSt
             .map(|_| quote! { () });
 
         quote! {
+            #[doc(hidden)]
             #[allow(unsafe_code, non_snake_case)]
             #[#crate_ref::collect::internal::small_ctor::ctor]
             unsafe fn #export_fn_name() {
