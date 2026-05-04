@@ -178,69 +178,20 @@ impl Exporter {
     ///
     /// Note: This returns an error if the format is `Format::Files`.
     pub fn export(&self, types: &Types, format: impl Format) -> Result<String, Error> {
-        let exporter = self.clone();
-        let types = format_types(types, &format)?;
-        let types = types.as_ref();
+        fn inner(exporter: Exporter, types: &Types, format: &dyn Format) -> Result<String, Error> {
+            let types = format_types(types, &format)?;
+            let types = types.as_ref();
 
-        if let Layout::Files = exporter.layout {
-            return Err(Error::unable_to_export(exporter.layout));
-        }
-        if let Layout::Namespaces = exporter.layout
-            && exporter.jsdoc
-        {
-            return Err(Error::unable_to_export(exporter.layout));
-        }
+            if let Layout::Files = exporter.layout {
+                return Err(Error::unable_to_export(exporter.layout));
+            }
+            if let Layout::Namespaces = exporter.layout
+                && exporter.jsdoc
+            {
+                return Err(Error::unable_to_export(exporter.layout));
+            }
 
-        let mut out = render_file_header(&exporter)?;
-
-        let mut has_manually_exported_user_types = false;
-        let mut runtime = Ok(Cow::default());
-        if let Some(framework_runtime) = &exporter.framework_runtime {
-            runtime = (framework_runtime.0)(FrameworkExporter {
-                exporter: &exporter,
-                format: Some(&format),
-                has_manually_exported_user_types: &mut has_manually_exported_user_types,
-                files_root_types: "",
-                types,
-            });
-        }
-        let runtime = runtime?;
-
-        // Framework runtime
-        if !runtime.is_empty() {
-            out += "\n";
-        }
-        out += &runtime;
-        if !runtime.is_empty() {
-            out += "\n";
-        }
-
-        // User types (if not included in framework runtime)
-        if !has_manually_exported_user_types {
-            render_types(&mut out, &exporter, Some(&format), types, "")?;
-        }
-
-        Ok(out)
-    }
-
-    /// Export the types to a specific file/folder.
-    ///
-    /// When configured when `format` is `Format::Files`, you must provide a directory path.
-    /// Otherwise, you must provide the path of a single file.
-    ///
-    pub fn export_to(
-        &self,
-        path: impl AsRef<Path>,
-        types: &Types,
-        format: impl Format,
-    ) -> Result<(), Error> {
-        let exporter = self.clone();
-        let formatted_types = format_types(types, &format)?;
-        let types = formatted_types.as_ref();
-        let path = path.as_ref();
-
-        if exporter.layout != Layout::Files {
-            let mut result = render_file_header(&exporter)?;
+            let mut out = render_file_header(&exporter)?;
 
             let mut has_manually_exported_user_types = false;
             let mut runtime = Ok(Cow::default());
@@ -255,212 +206,274 @@ impl Exporter {
             }
             let runtime = runtime?;
 
+            // Framework runtime
             if !runtime.is_empty() {
-                result.push('\n');
-                result.push_str(&runtime);
-                result.push('\n');
+                out += "\n";
+            }
+            out += &runtime;
+            if !runtime.is_empty() {
+                out += "\n";
             }
 
+            // User types (if not included in framework runtime)
             if !has_manually_exported_user_types {
-                render_types(&mut result, &exporter, Some(&format), types, "")?;
+                render_types(&mut out, &exporter, Some(&format), types, "")?;
             }
 
-            if let Some(parent) = path.parent() {
-                std::fs::create_dir_all(parent)?;
-            };
-            std::fs::write(path, result)?;
-            return Ok(());
+            Ok(out)
         }
 
-        fn export(
-            exporter: &Exporter,
-            format: Option<&dyn Format>,
-            types: &Types,
-            module: &mut Module,
-            s: &mut String,
+        inner(self.clone(), types, &format)
+    }
+
+    /// Export the types to a specific file/folder.
+    ///
+    /// When configured when `format` is `Format::Files`, you must provide a directory path.
+    /// Otherwise, you must provide the path of a single file.
+    ///
+    pub fn export_to(
+        &self,
+        path: impl AsRef<Path>,
+        types: &Types,
+        format: impl Format,
+    ) -> Result<(), Error> {
+        fn inner(
+            exporter: Exporter,
             path: &Path,
-            files: &mut HashMap<PathBuf, String>,
-        ) -> Result<bool, Error> {
-            module.types.sort_by(|a, b| {
-                a.name
-                    .cmp(&b.name)
-                    .then(a.module_path.cmp(&b.module_path))
-                    .then(a.location.cmp(&b.location))
-            });
-            let (rendered_types_result, referenced_types) =
-                references::with_module_path(module.module_path.as_ref(), || {
-                    references::collect_references(|| {
-                        let mut rendered = String::new();
-                        let exports = render_flat_types(
-                            &mut rendered,
-                            exporter,
-                            format,
-                            types,
-                            module.types.iter().copied(),
-                            "",
-                        )?;
-                        Ok::<_, Error>((rendered, exports))
-                    })
+            types: &Types,
+            format: &dyn Format,
+        ) -> Result<(), Error> {
+            let formatted_types = format_types(types, &format)?;
+            let types = formatted_types.as_ref();
+
+            if exporter.layout != Layout::Files {
+                let mut result = render_file_header(&exporter)?;
+
+                let mut has_manually_exported_user_types = false;
+                let mut runtime = Ok(Cow::default());
+                if let Some(framework_runtime) = &exporter.framework_runtime {
+                    runtime = (framework_runtime.0)(FrameworkExporter {
+                        exporter: &exporter,
+                        format: Some(&format),
+                        has_manually_exported_user_types: &mut has_manually_exported_user_types,
+                        files_root_types: "",
+                        types,
+                    });
+                }
+                let runtime = runtime?;
+
+                if !runtime.is_empty() {
+                    result.push('\n');
+                    result.push_str(&runtime);
+                    result.push('\n');
+                }
+
+                if !has_manually_exported_user_types {
+                    render_types(&mut result, &exporter, Some(&format), types, "")?;
+                }
+
+                if let Some(parent) = path.parent() {
+                    std::fs::create_dir_all(parent)?;
+                };
+                std::fs::write(path, result)?;
+                return Ok(());
+            }
+
+            fn export(
+                exporter: &Exporter,
+                format: Option<&dyn Format>,
+                types: &Types,
+                module: &mut Module,
+                s: &mut String,
+                path: &Path,
+                files: &mut HashMap<PathBuf, String>,
+            ) -> Result<bool, Error> {
+                module.types.sort_by(|a, b| {
+                    a.name
+                        .cmp(&b.name)
+                        .then(a.module_path.cmp(&b.module_path))
+                        .then(a.location.cmp(&b.location))
                 });
-            let (rendered_types, exports) = rendered_types_result?;
-
-            let import_paths = referenced_types
-                .into_iter()
-                .map(|r| reference_module_path(types, &r))
-                .collect::<Result<Vec<_>, _>>()?
-                .into_iter()
-                .flatten()
-                .filter(|module_path| module_path != module.module_path.as_ref())
-                .collect::<BTreeSet<_>>();
-            if !import_paths.is_empty() {
-                s.push('\n');
-                s.push_str(&module_import_block(
-                    exporter,
-                    module.module_path.as_ref(),
-                    &import_paths,
-                ));
-            }
-
-            if !import_paths.is_empty() && !rendered_types.is_empty() {
-                s.push('\n');
-            }
-
-            s.push_str(&rendered_types);
-
-            for (name, module) in &mut module.children {
-                // This doesn't account for `NamedDataType::requires_reference`
-                // but we keep it for performance.
-                if module.types.is_empty() && module.children.is_empty() {
-                    continue;
-                }
-
-                let mut path = path.join(name);
-                let mut out = render_file_header(exporter)?;
-
-                let has_types = export(exporter, format, types, module, &mut out, &path, files)?;
-                if has_types {
-                    path.set_extension(if exporter.jsdoc { "js" } else { "ts" });
-                    files.insert(path, out);
-                }
-            }
-
-            Ok(!exports.is_empty())
-        }
-
-        let mut files = HashMap::new();
-        let mut runtime_path = path.join("index");
-        runtime_path.set_extension(if self.jsdoc { "js" } else { "ts" });
-
-        let mut root_types = String::new();
-        export(
-            &exporter,
-            Some(&format),
-            types,
-            &mut build_module_graph(types),
-            &mut root_types,
-            path,
-            &mut files,
-        )?;
-
-        {
-            let mut has_manually_exported_user_types = false;
-            let mut runtime = Cow::default();
-            let mut runtime_references = HashSet::new();
-            if let Some(framework_runtime) = &exporter.framework_runtime {
-                let (runtime_result, referenced_types) = references::with_module_path("", || {
-                    references::collect_references(|| {
-                        (framework_runtime.0)(FrameworkExporter {
-                            exporter: &exporter,
-                            format: Some(&format),
-                            has_manually_exported_user_types: &mut has_manually_exported_user_types,
-                            files_root_types: &root_types,
-                            types,
+                let (rendered_types_result, referenced_types) =
+                    references::with_module_path(module.module_path.as_ref(), || {
+                        references::collect_references(|| {
+                            let mut rendered = String::new();
+                            let exports = render_flat_types(
+                                &mut rendered,
+                                exporter,
+                                format,
+                                types,
+                                module.types.iter().copied(),
+                                "",
+                            )?;
+                            Ok::<_, Error>((rendered, exports))
                         })
-                    })
-                });
-                runtime = runtime_result?;
-                runtime_references = referenced_types;
-            }
+                    });
+                let (rendered_types, exports) = rendered_types_result?;
 
-            let should_export_user_types =
-                !has_manually_exported_user_types && !root_types.is_empty();
+                let import_paths = referenced_types
+                    .into_iter()
+                    .map(|r| reference_module_path(types, &r))
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .flatten()
+                    .filter(|module_path| module_path != module.module_path.as_ref())
+                    .collect::<BTreeSet<_>>();
+                if !import_paths.is_empty() {
+                    s.push('\n');
+                    s.push_str(&module_import_block(
+                        exporter,
+                        module.module_path.as_ref(),
+                        &import_paths,
+                    ));
+                }
 
-            if !runtime.is_empty() || should_export_user_types {
-                files.insert(runtime_path, {
-                    let mut out = render_file_header(&exporter)?;
-                    let mut body = String::new();
+                if !import_paths.is_empty() && !rendered_types.is_empty() {
+                    s.push('\n');
+                }
 
-                    // Framework runtime
-                    if !runtime.is_empty() {
-                        body.push_str(&runtime);
+                s.push_str(&rendered_types);
+
+                for (name, module) in &mut module.children {
+                    // This doesn't account for `NamedDataType::requires_reference`
+                    // but we keep it for performance.
+                    if module.types.is_empty() && module.children.is_empty() {
+                        continue;
                     }
 
-                    // User types (if not included in framework runtime)
-                    if should_export_user_types {
-                        if !body.is_empty() {
-                            body.push('\n');
+                    let mut path = path.join(name);
+                    let mut out = render_file_header(exporter)?;
+
+                    let has_types =
+                        export(exporter, format, types, module, &mut out, &path, files)?;
+                    if has_types {
+                        path.set_extension(if exporter.jsdoc { "js" } else { "ts" });
+                        files.insert(path, out);
+                    }
+                }
+
+                Ok(!exports.is_empty())
+            }
+
+            let mut files = HashMap::new();
+            let mut runtime_path = path.join("index");
+            runtime_path.set_extension(if exporter.jsdoc { "js" } else { "ts" });
+
+            let mut root_types = String::new();
+            export(
+                &exporter,
+                Some(&format),
+                types,
+                &mut build_module_graph(types),
+                &mut root_types,
+                path,
+                &mut files,
+            )?;
+
+            {
+                let mut has_manually_exported_user_types = false;
+                let mut runtime = Cow::default();
+                let mut runtime_references = HashSet::new();
+                if let Some(framework_runtime) = &exporter.framework_runtime {
+                    let (runtime_result, referenced_types) =
+                        references::with_module_path("", || {
+                            references::collect_references(|| {
+                                (framework_runtime.0)(FrameworkExporter {
+                                    exporter: &exporter,
+                                    format: Some(&format),
+                                    has_manually_exported_user_types:
+                                        &mut has_manually_exported_user_types,
+                                    files_root_types: &root_types,
+                                    types,
+                                })
+                            })
+                        });
+                    runtime = runtime_result?;
+                    runtime_references = referenced_types;
+                }
+
+                let should_export_user_types =
+                    !has_manually_exported_user_types && !root_types.is_empty();
+
+                if !runtime.is_empty() || should_export_user_types {
+                    files.insert(runtime_path, {
+                        let mut out = render_file_header(&exporter)?;
+                        let mut body = String::new();
+
+                        // Framework runtime
+                        if !runtime.is_empty() {
+                            body.push_str(&runtime);
                         }
 
-                        body.push_str(&root_types);
-                    }
+                        // User types (if not included in framework runtime)
+                        if should_export_user_types {
+                            if !body.is_empty() {
+                                body.push('\n');
+                            }
 
-                    let import_paths = runtime_references
-                        .into_iter()
-                        .map(|r| reference_module_path(types, &r))
-                        .collect::<Result<Vec<_>, _>>()?
-                        .into_iter()
-                        .flatten()
-                        .filter(|module_path| !module_path.is_empty())
-                        .collect::<BTreeSet<_>>();
+                            body.push_str(&root_types);
+                        }
 
-                    let import_paths = import_paths
-                        .into_iter()
-                        .filter(|module_path| {
-                            !body.contains(&module_import_statement(&exporter, "", module_path))
-                        })
-                        .collect::<BTreeSet<_>>();
+                        let import_paths = runtime_references
+                            .into_iter()
+                            .map(|r| reference_module_path(types, &r))
+                            .collect::<Result<Vec<_>, _>>()?
+                            .into_iter()
+                            .flatten()
+                            .filter(|module_path| !module_path.is_empty())
+                            .collect::<BTreeSet<_>>();
 
-                    if !import_paths.is_empty() {
-                        out.push('\n');
-                        out.push_str(&module_import_block(&exporter, "", &import_paths));
-                    }
+                        let import_paths = import_paths
+                            .into_iter()
+                            .filter(|module_path| {
+                                !body.contains(&module_import_statement(&exporter, "", module_path))
+                            })
+                            .collect::<BTreeSet<_>>();
 
-                    if !body.is_empty() {
-                        out.push('\n');
                         if !import_paths.is_empty() {
                             out.push('\n');
+                            out.push_str(&module_import_block(&exporter, "", &import_paths));
                         }
-                        out.push_str(&body);
-                    }
 
-                    out
-                });
-            }
-        }
+                        if !body.is_empty() {
+                            out.push('\n');
+                            if !import_paths.is_empty() {
+                                out.push('\n');
+                            }
+                            out.push_str(&body);
+                        }
 
-        match path.metadata() {
-            Ok(meta) if !meta.is_dir() => std::fs::remove_file(path).or_else(|source| {
-                if source.kind() == std::io::ErrorKind::NotFound {
-                    Ok(())
-                } else {
-                    Err(Error::remove_file(path.to_path_buf(), source))
+                        out
+                    });
                 }
-            })?,
-            Ok(_) => {}
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-            Err(source) => {
-                return Err(Error::metadata(path.to_path_buf(), source));
             }
+
+            match path.metadata() {
+                Ok(meta) if !meta.is_dir() => std::fs::remove_file(path).or_else(|source| {
+                    if source.kind() == std::io::ErrorKind::NotFound {
+                        Ok(())
+                    } else {
+                        Err(Error::remove_file(path.to_path_buf(), source))
+                    }
+                })?,
+                Ok(_) => {}
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+                Err(source) => {
+                    return Err(Error::metadata(path.to_path_buf(), source));
+                }
+            }
+
+            for (path, content) in &files {
+                path.parent().map(std::fs::create_dir_all).transpose()?;
+                std::fs::write(path, content)?;
+            }
+
+            cleanup_stale_files(path, &files)?;
+
+            Ok(())
         }
 
-        for (path, content) in &files {
-            path.parent().map(std::fs::create_dir_all).transpose()?;
-            std::fs::write(path, content)?;
-        }
-
-        cleanup_stale_files(path, &files)?;
-
-        Ok(())
+        inner(self.clone(), path.as_ref(), types, &format)
     }
 }
 
@@ -904,10 +917,7 @@ fn render_types(
         Layout::Namespaces => {
             fn has_renderable_content(module: &Module<'_>) -> bool {
                 module.types.iter().any(|ndt| ndt.ty.is_some())
-                    || module
-                        .children
-                        .values()
-                        .any(has_renderable_content)
+                    || module.children.values().any(has_renderable_content)
             }
 
             fn export<'a>(
@@ -975,9 +985,7 @@ fn render_types(
                 for name in module
                     .children
                     .iter()
-                    .filter_map(|(name, module)| {
-                        has_renderable_content(module).then_some(*name)
-                    })
+                    .filter_map(|(name, module)| has_renderable_content(module).then_some(*name))
                     .chain(
                         module
                             .types
