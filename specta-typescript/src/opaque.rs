@@ -14,6 +14,9 @@ pub(crate) struct Unknown;
 #[derive(PartialEq, Eq, Hash)]
 pub(crate) struct Never;
 
+#[derive(PartialEq, Eq, Hash)]
+pub(crate) struct Number;
+
 /// Define a custom Typescript string which can be used as a `DataType::Reference`.
 ///
 /// This is an advanced feature which should be used with caution.

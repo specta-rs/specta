@@ -68,5 +68,5 @@ pub use exporter::{BrandedTypeExporter, Exporter, FrameworkExporter, Layout};
 pub use jsdoc::JSDoc;
 pub use opaque::define;
 pub use references::collect_references;
-pub use types::{Any, Never, Unknown};
+pub use types::{Any, Never, Number, Unknown};
 pub use typescript::Typescript;

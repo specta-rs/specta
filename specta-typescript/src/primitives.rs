@@ -1958,6 +1958,9 @@ fn reference_opaque_dt(
     } else if r.downcast_ref::<opaque::Never>().is_some() {
         s.push_str("never");
         return Ok(());
+    } else if r.downcast_ref::<opaque::Number>().is_some() {
+        s.push_str("number");
+        return Ok(());
     } else if let Some(def) = r.downcast_ref::<Branded>() {
         if let Some(branded_type) = exporter
             .branded_type_impl
