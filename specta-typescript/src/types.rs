@@ -11,7 +11,7 @@ use crate::opaque;
 ///
 /// <div class="warning">
 ///
-/// WARNING: When used with `Option<Any<T>>`, Typescript will not prompt you about nullability checks as `any | null` is coalesced to `any` in Typescript.
+/// **WARNING:** When used with `Option<Any<T>>`, Typescript will not prompt you about nullability checks as `any | null` is coalesced to `any` in Typescript.
 ///
 /// </div>
 ///

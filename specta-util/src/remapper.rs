@@ -15,7 +15,7 @@ use specta::{
 ///
 /// <div class="warning">
 ///
-/// WARNING: This is an advanced API!
+/// **WARNING:** This is an advanced API!
 ///
 /// It needs to be used carefully as it can easily break the safety of the end to end type contract.
 ///

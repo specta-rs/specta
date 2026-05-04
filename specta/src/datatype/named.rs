@@ -94,7 +94,7 @@ impl NamedDataType {
     ///
     /// <div class="warning">
     ///
-    /// WARNING: Do not call this outside of `specta` as its signature and behavior may change in minor releases!!!!
+    /// **WARNING:** Do not call this outside of `specta` as its signature and behavior may change in minor releases!!!!
     ///
     /// </div>
     ///

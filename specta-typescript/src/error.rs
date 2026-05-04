@@ -32,12 +32,12 @@ use super::legacy::ExportPath;
 ///     - This can be done using `#[specta(type = String)]` for the type combined with a Serde `#[serde(with = "...")]` attribute for runtime.
 ///     - Downside is that it can introduce annoying glue code, both on in Rust and in JS as you will need to turn it back into a `new BigInt(myString)` in JS but this will support numbers of any size losslessly.
 ///
-/// 4. UNSAFE: Accept precision loss on per-field basis
+/// 4. **UNSAFE:** Accept precision loss on per-field basis
 ///     - Accept that large numbers may be deserialized differently than they are in Rust and use `#[specta(type = specta_typescript::Number)]` to bypass this warning on a per-field basis.
 ///     - Marking each field explicitly encodes the decision similar to an `unsafe` block, ensuring everyone working on your codebase is aware of the risk and where it exists within the codebase.
 ///     - This doesn't work for external implementations like `serde_json::Value` which contain `BigInt`'s as you don't control the definition.
 ///
-/// 5. UNSAFE: Accept precision loss using [`specta_util::Remapper`](https://docs.rs/specta-util/latest/specta_util/struct.Remapper.html)
+/// 5. **UNSAFE:** Accept precision loss using [`specta_util::Remapper`](https://docs.rs/specta-util/latest/specta_util/struct.Remapper.html)
 ///     - You can apply a `Remapper` to your [`Types`](specta::Types) collection to override types. This would allow you to remap `usize`/`isize`/`i64`/`u64`/`i128`/`u128`/`f128` into `number`.
 ///     - This is highly not recommended but it might be required if your using `serde_json::Value` or other built-in impls which contain `BigInt`'s as you can't override them.
 ///
