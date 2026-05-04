@@ -1327,6 +1327,7 @@ fn enum_repr_already_rewritten(e: &Enum) -> bool {
 fn variant_repr_already_rewritten(name: &str, variant: &Variant) -> bool {
     match &variant.fields {
         Fields::Unit => false,
+        Fields::Unnamed(fields) if name.is_empty() => unnamed_live_field_count(fields) == 1,
         Fields::Unnamed(fields) if fields.fields.len() == 1 => fields
             .fields
             .first()
@@ -1394,7 +1395,7 @@ fn rewrite_identifier_enum_for_phase(
     }
 
     variants.push((
-        Cow::Borrowed("__specta_identifier_index"),
+        Cow::Borrowed(""),
         identifier_union_variant(DataType::Primitive(specta::datatype::Primitive::u32)),
     ));
 
@@ -1413,12 +1414,10 @@ fn rewrite_identifier_enum_for_phase(
             split_types,
             None,
         )?;
-        variants.push((
-            Cow::Borrowed("__specta_identifier_other"),
-            identifier_union_variant(fallback_ty),
-        ));
+        variants.push((Cow::Borrowed(""), identifier_union_variant(fallback_ty)));
     }
 
+    e.attributes = Default::default();
     e.variants = variants;
     Ok(true)
 }

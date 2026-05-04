@@ -376,7 +376,15 @@ fn enum_variant_datatype(
     ty_override: Option<VariantTypeOverride<'_>>,
 ) -> Result<Option<String>> {
     match &variant.fields {
+        Fields::Unit if name.is_empty() => Err(Error::invalid_name_legacy(
+            ctx.export_path(),
+            "anonymous unit enum variants cannot be exported to Typescript".to_string(),
+        )),
         Fields::Unit => Ok(Some(sanitise_key(name, true).to_string())),
+        Fields::Named(_) if name.is_empty() => Err(Error::invalid_name_legacy(
+            ctx.export_path(),
+            "anonymous named-field enum variants cannot be exported to Typescript".to_string(),
+        )),
         Fields::Named(obj) => {
             let all_fields = obj
                 .fields
@@ -544,6 +552,10 @@ enum DiscriminatorValue {
 fn analyze_discriminator(
     variants: &[&(Cow<'static, str>, Variant)],
 ) -> Option<DiscriminatorAnalysis> {
+    if variants.iter().any(|(name, _)| name.is_empty()) {
+        return None;
+    }
+
     let mut key = None::<String>;
     let mut known_literals = BTreeSet::new();
     let mut fallback_variant_idx = None;
@@ -650,6 +662,10 @@ fn untagged_strict_keys(variant: &Variant) -> Option<BTreeSet<String>> {
     }
 }
 
+fn has_anonymous_variant(variants: &[&(Cow<'static, str>, Variant)]) -> bool {
+    variants.iter().any(|(name, _)| name.is_empty())
+}
+
 fn strictify_enum_variants(variants: &mut [EnumVariantOutput]) {
     let strict_key_universe = variants
         .iter()
@@ -737,7 +753,7 @@ pub(crate) fn enum_datatype(
         });
     }
 
-    if discriminator.is_none() {
+    if discriminator.is_none() && !has_anonymous_variant(&filtered_variants) {
         strictify_enum_variants(&mut rendered_variants);
     }
 
