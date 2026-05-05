@@ -19,9 +19,8 @@ use super::legacy::ExportPath;
 ///
 /// If you encounter this error, there are a few common migration paths (in order of preference):
 ///
-/// 1. Use a Specta-based framework
-///     - Frameworks like [Tauri Specta](https://github.com/specta-rs/tauri-specta) and [TauRPC](https://github.com/MatsDK/TauRPC) take care of this for you.
-///     - They use special internals to preserve the values and make use of [`specta-tags`](http://docs.rs/specta-tags) for generating glue-code automatically.
+/// 1. Use a Specta-based framework which can handle these types
+///     - None currently exist but it would theoretically be possible refer to [#203](https://github.com/specta-rs/specta/issues/203) for more information.
 ///
 /// 2. Use a smaller integer types (any of `u8`/`i8`/`u16`/`i16`/`u32`/`i32`/`f64`).
 ///    - Only possible when the biggest integer you need to represent is small enough to be represented by a `number` in JS.
