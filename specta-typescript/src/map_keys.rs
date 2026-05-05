@@ -157,10 +157,24 @@ fn validate_map_key_inner(
             result
         }
         DataType::Generic(_) => Ok(()),
-        DataType::Reference(Reference::Opaque(_)) => Err(Error::invalid_map_key(
-            path,
-            "opaque references cannot be validated as serde_json map keys",
-        )),
+        DataType::Reference(Reference::Opaque(r)) => {
+            // `define(literal)` is the user-facing escape hatch for inserting a
+            // verbatim TypeScript expression into the type graph. Treat it as
+            // valid for map keys -- the caller is asserting that `literal` is
+            // a serializable JSON map key, and rejecting it forces them to
+            // duplicate the bigint-style rewrite already done by libraries
+            // like taurpc (which converts `i64` -> `define("number")` to
+            // satisfy the BigInt-forbidden filter). Other opaque flavors --
+            // Tauri channels, branded types -- still fail loudly.
+            if r.downcast_ref::<crate::opaque::Define>().is_some() {
+                Ok(())
+            } else {
+                Err(Error::invalid_map_key(
+                    path,
+                    "opaque references cannot be validated as serde_json map keys",
+                ))
+            }
+        }
         DataType::Tuple(_) => Err(Error::invalid_map_key(
             path,
             "tuple keys are not supported by serde_json map key serialization",
