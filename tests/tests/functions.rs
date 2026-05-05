@@ -344,17 +344,17 @@ fn test_function_exporting() {
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![rename_all_fn](&mut types);
-        insta::assert_snapshot!(def.name(), @"rename_all_fn");
-        insta::assert_snapshot!(def.args()[0].0, @"my_arg");
-        insta::assert_snapshot!(def.args()[1].0, @"another_value");
+        insta::assert_snapshot!(def.name, @"rename_all_fn");
+        insta::assert_snapshot!(def.args[0].0, @"my_arg");
+        insta::assert_snapshot!(def.args[1].0, @"another_value");
     }
 
     {
-        let mut types = TypeCollection::default();
+        let mut types = Types::default();
         let def: Function = fn_datatype![renamed_fn](&mut types);
-        insta::assert_snapshot!(def.name(), @"totally_custom");
-        insta::assert_snapshot!(def.args()[0].0, @"myArg");
+        insta::assert_snapshot!(def.name, @"totally_custom");
+        insta::assert_snapshot!(def.args[0].0, @"myArg");
     }
 }
