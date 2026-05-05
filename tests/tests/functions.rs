@@ -321,11 +321,11 @@ fn test_function_exporting() {
     {
         let mut types = Types::default();
         let def: Function = fn_datatype![with_docs](&mut types);
-        insta::assert_snapshot!(def.asyncness(), @"false");
-        insta::assert_snapshot!(def.name(), @"with_docs");
-        insta::assert_snapshot!(def.args().len(), @"0");
-        insta::assert_snapshot!(format!("{:?}", def.result()), @"None");
-        insta::assert_snapshot!(def.docs(), @" Testing Doc Comment");
+        insta::assert_snapshot!(def.asyncness, @"false");
+        insta::assert_snapshot!(def.name, @"with_docs");
+        insta::assert_snapshot!(def.args.len(), @"0");
+        insta::assert_snapshot!(format!("{:?}", def.result), @"None");
+        insta::assert_snapshot!(def.docs, @" Testing Doc Comment");
     }
 
     {
